@@ -191,6 +191,7 @@ export { ERASED_TOMBSTONE, type EraseRecipientResult, eraseRecipient } from "./e
 export { type SesEventsHealth, sesEventsHealth } from "./events-health.js";
 export {
   accountMailCard,
+  EMAIL_WHITE_TILE_URL,
   EMAIL_WORDMARK_BONE_URL,
   EMAIL_WORDMARK_INK_URL,
   escapeHtml,

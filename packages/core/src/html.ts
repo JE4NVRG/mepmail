@@ -37,6 +37,15 @@ export const EMAIL_WORDMARK_INK_URL = "https://millionsend.com/email/wordmark-in
 export const EMAIL_WORDMARK_BONE_URL = "https://millionsend.com/email/wordmark-bone.png";
 
 /**
+ * A solid white tile: the Gmail button's fill. Gmail for Android darkens
+ * bright colour stops even inside a background gradient (observed
+ * 2026-09-13: a white-to-white gradient came back as its dark grey), but it
+ * never repaints an image, so the one white surface that survives there is
+ * a picture of white.
+ */
+export const EMAIL_WHITE_TILE_URL = "https://millionsend.com/email/white.png";
+
+/**
  * Fills `{key}` placeholders. A replacer function, not a replacement string:
  * user-controlled values such as names may contain `$'` / `$$`, which
  * String.replace would otherwise interpret. Every occurrence is filled.
@@ -70,11 +79,11 @@ const DARK_RULES = [
  * backgrounds and keeps dark ones, iOS inverts every colour) and wraps the
  * body so that `u + .body` matches there alone. There the wordmark and the
  * button are painted as the difference from the card instead: the bone
- * glyphs and a white fill come out ink on the light card and bone on a dark
- * one, and the button's label sits in nested black wrappers that keep it
- * white in the button's own layer whatever Gmail does to colours, so the
- * label reads as the fill's negative. Gmail leaves gradients and images as
- * they are, which is why the fills are gradients.
+ * glyphs and the white tile come out ink on the light card and bone on a
+ * dark one. The button's label sits in nested black wrappers that keep it
+ * white whatever Gmail does to colours (Rémi Parmentier's screen-over-
+ * difference pair), and one more difference against the white tile turns
+ * it black inside the button's layer, so it reads as the fill's negative.
  */
 const STYLE = [
   ":root{color-scheme:light dark;supported-color-schemes:light dark}",
@@ -99,7 +108,7 @@ const WORDMARK = `<a href="https://millionsend.com" style="display:block;margin:
 function buttons(url: string, label: string): string {
   const text = "font-size:14px;font-weight:600";
   return `<a class="ms-btn" href="${url}" style="display:inline-block;background:#18181b;color:#ffffff;${text};text-decoration:none;border-radius:8px;padding:12px 20px;margin-top:12px">${label}</a>
-    <!--[if !mso]><!--><a class="ms-gmail" href="${url}" style="display:none;${text};background:linear-gradient(#ffffff,#ffffff);mix-blend-mode:difference;border-radius:8px;margin-top:12px;text-decoration:none"><span style="display:inline-block;background:linear-gradient(#000000,#000000);mix-blend-mode:difference;border-radius:8px;padding:12px 20px"><span style="background:#000000;mix-blend-mode:screen"><span style="background:#000000;mix-blend-mode:difference"><span style="color:#ffffff">${label}</span></span></span></span></a><!--<![endif]-->`;
+    <!--[if !mso]><!--><a class="ms-gmail" href="${url}" style="display:none;${text};background:#ffffff url(${EMAIL_WHITE_TILE_URL});mix-blend-mode:difference;border-radius:8px;padding:12px 20px;margin-top:12px;text-decoration:none"><span style="mix-blend-mode:difference"><span style="background:#000000;mix-blend-mode:screen"><span style="background:#000000;mix-blend-mode:difference"><span style="color:#ffffff">${label}</span></span></span></span></a><!--<![endif]-->`;
 }
 
 /**
