@@ -30,7 +30,7 @@
     "@aws-sdk/client-sqs": "^3.1111.0",
     "@aws-sdk/client-sts": "^3.750.0",
     "@millionsend/core": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "^4.6.3"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

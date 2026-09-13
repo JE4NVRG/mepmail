@@ -18,7 +18,7 @@
     "mailparser": "^3.9.26",
     "smtp-server": "^3.19.12",
     "tsx": "^4.23.12",
-    "zod": "^4.4.3"
+    "zod": "^4.6.3"
   },
   "devDependencies": {
     "@millionsend/test-utils": "workspace:*",
