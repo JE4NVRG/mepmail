@@ -3,6 +3,7 @@ import { CLOUD_API_URL, TRADEMARK_NOTICE, VERSION } from "./meta.js";
 import { PROVIDERS, type ProviderId, RESOURCES, type Resource } from "./model.js";
 import { providers } from "./providers/index.js";
 import { COLOR_MODES, type ColorMode } from "./theme.js";
+import { stripTrailingSlashes } from "./utils.js";
 
 export type Command = "migrate" | "plan" | "apply" | "status" | "rollback" | "help" | "version";
 
@@ -146,7 +147,7 @@ function apiUrl(value: string): string {
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new ConfigError(`The MillionSend API URL must be http(s): ${value}`);
   }
-  return value.replace(/\/+$/, "");
+  return stripTrailingSlashes(value);
 }
 
 /**
