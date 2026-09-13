@@ -50,14 +50,14 @@ const MUTED =
 
 /** The dark theme, in the dashboard's tokens: void, panel, bone, muted; the button flips to bone on ink. */
 const DARK_RULES = [
-  ".ms-page{background:#0a0a0a!important}",
-  ".ms-card{background:#0c0c0d!important}",
-  ".ms-text{color:#f4f1ea!important}",
-  ".ms-muted{color:#918f89!important}",
-  ".ms-link{color:#f4f1ea!important}",
-  ".ms-btn{background:#f4f1ea!important;color:#0c0c0d!important}",
-  ".ms-ink{display:none!important}",
-  ".ms-bone{display:block!important}",
+  ".ms-page{background:#0a0a0a !important}",
+  ".ms-card{background:#0c0c0d !important}",
+  ".ms-text{color:#f4f1ea !important}",
+  ".ms-muted{color:#918f89 !important}",
+  ".ms-link{color:#f4f1ea !important}",
+  ".ms-btn{background:#f4f1ea !important;color:#0c0c0d !important}",
+  ".ms-ink{display:none !important}",
+  ".ms-bone{display:block !important}",
 ];
 
 /**
@@ -80,29 +80,35 @@ const STYLE = [
   ":root{color-scheme:light dark;supported-color-schemes:light dark}",
   `@media (prefers-color-scheme:dark){${DARK_RULES.join("")}}`,
   ...DARK_RULES.flatMap((rule) => [`[data-ogsc] ${rule}`, `[data-ogsb] ${rule}`]),
-  "u + .body .ms-ink{display:none!important}",
-  "u + .body .ms-bone{display:block!important}",
-  "u + .body .ms-btn{display:none!important}",
-  "u + .body .ms-gmail{display:inline-block!important}",
+  "u + .body .ms-ink{display:none !important}",
+  "u + .body .ms-bone{display:block !important}",
+  "u + .body .ms-btn{display:none !important}",
+  "u + .body .ms-gmail{display:inline-block !important}",
 ].join("\n");
 
 const WORDMARK = `<a href="https://millionsend.com" style="display:block;margin:0 0 24px;line-height:0">
       <img class="ms-ink" src="${EMAIL_WORDMARK_INK_URL}" width="174" height="24" alt="MillionSend" style="display:block;height:24px;width:auto;border:0">
-      <img class="ms-bone" src="${EMAIL_WORDMARK_BONE_URL}" width="174" height="24" alt="MillionSend" style="display:none;mso-hide:all;height:24px;width:auto;border:0;mix-blend-mode:difference">
+      <!--[if !mso]><!--><img class="ms-bone" src="${EMAIL_WORDMARK_BONE_URL}" width="174" height="24" alt="MillionSend" style="display:none;height:24px;width:auto;border:0;mix-blend-mode:difference"><!--<![endif]-->
     </a>`;
 
+/**
+ * Word (classic Outlook for Windows) ignores display:none on images and
+ * inline anchors, so the alternates it must never see sit behind a
+ * conditional comment instead.
+ */
 function buttons(url: string, label: string): string {
-  const text = `font-size:14px;font-weight:600`;
+  const text = "font-size:14px;font-weight:600";
   return `<a class="ms-btn" href="${url}" style="display:inline-block;background:#18181b;color:#ffffff;${text};text-decoration:none;border-radius:8px;padding:12px 20px;margin-top:12px">${label}</a>
-    <a class="ms-gmail" href="${url}" style="display:none;mso-hide:all;background:linear-gradient(#ffffff,#ffffff);mix-blend-mode:difference;border-radius:8px;margin-top:12px;text-decoration:none"><span style="display:inline-block;background:linear-gradient(#000000,#000000);mix-blend-mode:difference;border-radius:8px;padding:12px 20px"><span style="background:#000000;mix-blend-mode:screen"><span style="background:#000000;mix-blend-mode:difference"><span style="color:#ffffff;${text}">${label}</span></span></span></span></a>`;
+    <!--[if !mso]><!--><a class="ms-gmail" href="${url}" style="display:none;${text};background:linear-gradient(#ffffff,#ffffff);mix-blend-mode:difference;border-radius:8px;margin-top:12px;text-decoration:none"><span style="display:inline-block;background:linear-gradient(#000000,#000000);mix-blend-mode:difference;border-radius:8px;padding:12px 20px"><span style="background:#000000;mix-blend-mode:screen"><span style="background:#000000;mix-blend-mode:difference"><span style="color:#ffffff">${label}</span></span></span></span></a><!--<![endif]-->`;
 }
 
 /**
  * The one account-mail layout, for every email the instance sends about
  * itself: wordmark, card, an optional heading, paragraphs, a button, then
  * muted footers, as a full document so the theme sheet reaches the clients
- * that read one. The card is the dashboard's light panel tone rather than
- * pure white, which Apple Mail may invert on its own. `linkFallback` adds
+ * that read one. The card is neutral white on purpose: Yahoo's dark theme
+ * lowers lightness rather than inverting, and a hue-tinted off-white comes
+ * out as a saturated mustard there. `linkFallback` adds
  * the button's URL as text under it, for the mails whose link is the point
  * (a reset, a verification); without it the text version names the button
  * instead. Everything is escaped here, so catalogs stay plain text.
@@ -145,7 +151,7 @@ ${STYLE}
 </head>
 <body class="body" style="margin:0;padding:0">
 <div class="ms-page" style="background:#f4f4f5;padding:32px 16px;font-family:-apple-system,'Segoe UI',Roboto,sans-serif">
-  <div class="ms-card" style="max-width:440px;margin:0 auto;background:#fffefb;border-radius:12px;padding:32px">
+  <div class="ms-card" style="max-width:440px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px">
     ${WORDMARK}
     ${heading}${paragraphs}${button}${fallback}
     ${muted}
