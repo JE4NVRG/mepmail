@@ -23,7 +23,7 @@
     "@millionsend/config": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.7",
-    "tsx": "^4.23.12"
+    "tsx": "^4.23.13"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.14",
