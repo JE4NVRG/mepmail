@@ -114,6 +114,26 @@ describe("accountMailCard", () => {
     expect(card.text).toBe("Hello\n\nhttps://app.example/x\n\n\n");
     expect(card.html).toContain("Or paste this:<br>");
   });
+
+  it("leads with the heading and drops the button when there is no url", () => {
+    const card = accountMailCard({ heading: "It works.", paragraphs: ["Hello"], muted: [] });
+    expect(card.html).toContain(">It works.</p>");
+    expect(card.html).not.toContain('class="ms-btn"');
+    expect(card.text.startsWith("It works.\n\nHello")).toBe(true);
+  });
+
+  it("carries both wordmarks and the theme sheet", () => {
+    const card = accountMailCard({
+      paragraphs: ["Hello"],
+      button: "Open",
+      url: "https://x.y",
+      muted: [],
+    });
+    expect(card.html).toContain("wordmark-ink.png");
+    expect(card.html).toContain("wordmark-bone.png");
+    expect(card.html).toContain("@media (prefers-color-scheme:dark)");
+    expect(card.html).toContain("u + .body .ms-gmail");
+  });
 });
 
 describe("listTeamOwners", () => {
