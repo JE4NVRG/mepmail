@@ -114,6 +114,13 @@ describe("accountMailCard", () => {
     expect(card.text).toBe("Hello\n\nhttps://app.example/x\n\n\n");
     expect(card.html).toContain("Or paste this:<br>");
   });
+
+  it("leads with the heading and drops the button when there is no url", () => {
+    const card = accountMailCard({ heading: "It works.", paragraphs: ["Hello"], muted: [] });
+    expect(card.html).toContain(">It works.</p>");
+    expect(card.html).not.toContain("<a ");
+    expect(card.text.startsWith("It works.\n\nHello")).toBe(true);
+  });
 });
 
 describe("listTeamOwners", () => {
