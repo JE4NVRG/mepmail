@@ -17,7 +17,10 @@ export function parseDmarcRecord(txt: string): { policy: DmarcPolicy } | null {
   const tags = txt.split(";").map((tag) => tag.trim());
   if (!/^v\s*=\s*dmarc1$/i.test(tags[0] ?? "")) return null;
   for (const tag of tags.slice(1)) {
-    const match = /^p\s*=\s*(.+)$/i.exec(tag);
+    // No `\s*` before the value (the trim below covers it) and the `s` flag, so
+    // the value is taken in one pass; `\s*(.+)` backtracked quadratically on a
+    // TXT value of whitespace, which the domain's own nameserver controls.
+    const match = /^p\s*=(.+)$/is.exec(tag);
     if (!match) continue;
     const policy = (match[1] ?? "").trim().toLowerCase();
     return policy === "none" || policy === "quarantine" || policy === "reject" ? { policy } : null;

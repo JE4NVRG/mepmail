@@ -511,7 +511,7 @@ export const broadcastsRouter = router({
       z.object({
         from: z.string().trim().min(1),
         subject: z.string().trim().min(1),
-        html: z.string().nullable(),
+        html: z.string().max(500_000).nullable(),
         text: z.string().nullable(),
         previewText: z.string().nullable().optional(),
         replyTo: z.array(z.string().trim().min(1)).max(10).optional(),

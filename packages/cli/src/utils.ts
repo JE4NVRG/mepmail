@@ -97,3 +97,10 @@ export async function forEachConcurrent<T>(
   const workers = Math.max(1, Math.min(limit, items.length));
   await Promise.all(Array.from({ length: workers }, worker));
 }
+
+/** A loop rather than /\/+$/: that regex backtracks quadratically on a long slash run. */
+export function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === "/") end--;
+  return s.slice(0, end);
+}

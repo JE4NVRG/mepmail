@@ -17,7 +17,13 @@ import { type MigratePaths, writePrivate, writePrivateJson } from "./paths.js";
 import { foldedKeysLine, groupPlanItems } from "./plan.js";
 import { countUp } from "./progress.js";
 import { bold, dim, err, heading, info, note, SYM, shortId, wrapIndent } from "./theme.js";
-import { capitalize, formatNumber, pluralize, stripControlDeep } from "./utils.js";
+import {
+  capitalize,
+  formatNumber,
+  pluralize,
+  stripControlDeep,
+  stripTrailingSlashes,
+} from "./utils.js";
 
 export interface Offer {
   emailsLast30Days: number | null;
@@ -112,7 +118,7 @@ function buildOffer(
   const url =
     usage.appUrl === null
       ? CLOUD_BILLING_URL
-      : `${usage.appUrl.replace(/\/+$/, "")}/settings/billing`;
+      : `${stripTrailingSlashes(usage.appUrl)}/settings/billing`;
   const short: string[] = [];
   const over = sent !== null && current.perMonth !== null && sent > current.perMonth;
   const volumeShort = over && !usage.period?.overageEnabled;
