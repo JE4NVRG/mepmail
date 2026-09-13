@@ -16,7 +16,7 @@ import { type OnProgress, type Provider, providers, type Source } from "./provid
 import { RESEND_BASE_URL_ENV } from "./providers/resend.js";
 import { dim, ok, SYM, wrapIndent } from "./theme.js";
 import { banner, pickBannerTier, secretPrompt, selectPrompt, textPrompt } from "./tty-ui.js";
-import { capitalize, formatNumber } from "./utils.js";
+import { capitalize, formatNumber, stripTrailingSlashes } from "./utils.js";
 
 /** MillionSend allows 600 requests per minute per key; batch endpoints keep the real rate far below. */
 export const TARGET_RPS = 10;
@@ -142,7 +142,7 @@ async function resolveTargetUrl(ctx: Context): Promise<string> {
         ? undefined
         : "must be a URL starting with http:// or https://",
   });
-  return url.replace(/\/+$/, "");
+  return stripTrailingSlashes(url);
 }
 
 export async function connectTarget(ctx: Context): Promise<TargetSession> {

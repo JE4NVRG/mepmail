@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatHtml } from "@/lib/html";
+import { formatHtml, htmlToText } from "@/lib/html";
 
 describe("formatHtml", () => {
   it("indents nested tags one per line and leaves void elements flat", () => {
@@ -34,5 +34,11 @@ describe("formatHtml", () => {
         "</a>",
       ].join("\n"),
     );
+  });
+});
+
+describe("htmlToText", () => {
+  it("decodes &amp; last so an escaped entity stays literal", () => {
+    expect(htmlToText("<p>Type &lt;b&gt; to bold &amp;lt;</p>")).toBe("Type <b> to bold &lt;");
   });
 });

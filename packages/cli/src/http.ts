@@ -1,5 +1,5 @@
 import type { Logger } from "./log.js";
-import { sleep } from "./utils.js";
+import { sleep, stripTrailingSlashes } from "./utils.js";
 
 /** 401/403 from either side: a hard stop, never retried, never routed around. */
 export class AuthError extends Error {
@@ -202,7 +202,7 @@ export function createHttp(options: HttpOptions): HttpClient {
     timeoutMs = 30_000,
     fetch: fetchFn = globalThis.fetch,
   } = options;
-  const base = options.baseUrl.replace(/\/+$/, "");
+  const base = stripTrailingSlashes(options.baseUrl);
   let targetRps = options.rps;
   let rps = targetRps;
   let rampedAt = 0;

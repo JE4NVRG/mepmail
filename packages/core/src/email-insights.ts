@@ -150,10 +150,13 @@ interface Link extends Anchor {
   protocol: string;
 }
 
+// `[^<>]`, not `[^>]`: an unclosed tag then stops the scan at the next `<`
+// instead of rescanning to the end from every one, quadratic on a crafted
+// body. An unclosed style/script swallows the rest, as a browser does.
 function visibleText(html: string): string {
   return html
-    .replace(/<(style|script)\b[\s\S]*?<\/\1\s*>/gi, "")
-    .replace(/<[^>]*>/g, " ")
+    .replace(/<(style|script)\b(?:[\s\S]*?<\/\1\s*>|[\s\S]*)/gi, "")
+    .replace(/<[^<>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -181,7 +184,7 @@ function toLink(a: Anchor): Link | null {
   }
 }
 
-const IMG_TAG = /<img\b[^>]*>/gi;
+const IMG_TAG = /<img\b[^<>]*>/gi;
 
 function extractImages(html: string): { src: string | null; alt: string | null }[] {
   return [...html.matchAll(IMG_TAG)].map((m) => ({
