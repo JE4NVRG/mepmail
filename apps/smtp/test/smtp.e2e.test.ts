@@ -135,7 +135,7 @@ describe("smtp relay", () => {
       html: "<p>rich body</p>",
     });
     expect(info.response).toContain("Queued as");
-    const id = /Queued as (\S+)/.exec(info.response)?.[1];
+    const id = /Queued as (\S+)/.exec(info.response ?? "")?.[1];
     expect(id).toBeTruthy();
 
     const [row] = await db
@@ -272,7 +272,7 @@ describe("smtp relay", () => {
       subject: "s",
       text: "t",
     });
-    const row = await emailRow(info.response);
+    const row = await emailRow(info.response ?? "");
     expect(row.from).toBe('"Doe, John" <a@acme.dev>');
     expect(row.to).toEqual(['"Roe, Jane" <r@example.com>']);
   });
@@ -296,7 +296,7 @@ describe("smtp relay", () => {
       text: "t",
       envelope: { from: "a@acme.dev", to: ["r@example.com", "hidden@example.com"] },
     });
-    const row = await emailRow(info.response);
+    const row = await emailRow(info.response ?? "");
     expect(row.to).toEqual(["r@example.com"]);
     expect(row.bcc).toEqual(["hidden@example.com"]);
   });
