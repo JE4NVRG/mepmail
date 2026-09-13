@@ -189,7 +189,13 @@ export {
 export { purgedEmailBodyColumns } from "./email-retention.js";
 export { ERASED_TOMBSTONE, type EraseRecipientResult, eraseRecipient } from "./erase-recipient.js";
 export { type SesEventsHealth, sesEventsHealth } from "./events-health.js";
-export { accountMailCard, EMAIL_WORDMARK_URL, escapeHtml, fillTemplate } from "./html.js";
+export {
+  accountMailCard,
+  EMAIL_WORDMARK_BONE_URL,
+  EMAIL_WORDMARK_INK_URL,
+  escapeHtml,
+  fillTemplate,
+} from "./html.js";
 export {
   beginIdempotent,
   completeIdempotent,
