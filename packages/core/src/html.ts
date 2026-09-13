@@ -33,8 +33,8 @@ export function unescapeHtml(value: string): string {
  * colours (Gmail for Android darkens light backgrounds, Gmail for iOS inverts
  * everything) but never an image's pixels, so the plate keeps the wordmark
  * legible on the white card and on whatever the card becomes. Rendered at
- * 4× its 198×40 display size; Gmail for Android recolours images under
- * about 100px of intrinsic height.
+ * 4× its 198×40 display size; Gmail for Android recolours only images drawn
+ * at 64×64 CSS px or smaller.
  */
 export const EMAIL_WORDMARK_URL = "https://millionsend.com/email/wordmark-badge.png";
 
@@ -51,8 +51,9 @@ const MUTED = 'style="font-size:13px;line-height:1.5;color:#52525b;margin:24px 0
 
 /**
  * The one account-mail layout, for every email the instance sends about
- * itself: wordmark, white card, an optional heading, paragraphs, a button,
- * then muted footers. The button is steel rather than ink: Gmail for
+ * itself: wordmark, card, an optional heading, paragraphs, a button, then
+ * muted footers. The card is the dashboard's light panel tone rather than
+ * pure white, which Apple Mail may invert on its own. The button is steel rather than ink: Gmail for
  * Android darkens the white card but leaves a near-black background as it
  * is, so an ink button vanishes there, while a mid-tone keeps its contrast
  * against the card and its text through partial and full inversion alike.
@@ -89,7 +90,7 @@ export function accountMailCard(input: {
       : "";
   const muted = input.muted.map((m) => `<p ${MUTED}>${escapeHtml(m)}</p>`).join("\n    ");
   const html = `<div style="background:#f4f4f5;padding:32px 16px;font-family:-apple-system,'Segoe UI',Roboto,sans-serif">
-  <div style="max-width:440px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px">
+  <div style="max-width:440px;margin:0 auto;background:#fffefb;border-radius:12px;padding:32px">
     <img src="${EMAIL_WORDMARK_URL}" width="198" height="40" alt="MillionSend" style="display:block;height:40px;width:auto;margin:0 0 24px;border:0">
     ${heading}${paragraphs}${button}${fallback}
     ${muted}
