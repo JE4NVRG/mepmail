@@ -27,6 +27,12 @@ describe("parseDmarcRecord", () => {
     expect(parseDmarcRecord("v=DMARC1; p=nonsense")).toBeNull();
     expect(parseDmarcRecord("v=DMARC1; rua=mailto:a@b.c")).toBeNull();
   });
+
+  it("stays linear on a p value of whitespace", () => {
+    const started = performance.now();
+    expect(parseDmarcRecord(`v=DMARC1; p=${" ".repeat(65_000)}x\ny`)).toBeNull();
+    expect(performance.now() - started).toBeLessThan(500);
+  });
 });
 
 const ENOTFOUND = Object.assign(new Error("queryTxt ENOTFOUND"), { code: "ENOTFOUND" });

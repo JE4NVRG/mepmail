@@ -71,4 +71,10 @@ describe("hasWellFormedMergeTokens", () => {
     expect(hasWellFormedMergeTokens("<p>{{{FIRST NAME}}}</p>")).toBe(false);
     expect(hasWellFormedMergeTokens("<p>{{{bad-name}}}</p>")).toBe(false);
   });
+
+  it("stays linear on openers with no closer", () => {
+    const started = performance.now();
+    expect(hasWellFormedMergeTokens("{{{".repeat(200_000))).toBe(true);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
 });

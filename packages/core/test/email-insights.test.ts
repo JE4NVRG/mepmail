@@ -873,3 +873,14 @@ describe("tracking_unbranded reasons", () => {
     expect(none.detail?.reason).toBe("no_tracking_subdomain");
   });
 });
+
+describe("crafted html", () => {
+  it("stays linear on unclosed tags", () => {
+    const junk = ["<", "<img ", "<a ", "<script"].map((s) => s.repeat(200_000));
+    for (const html of junk) {
+      const started = performance.now();
+      evaluateEmailInsights(input({ html, preTrackingHtml: html }));
+      expect(performance.now() - started).toBeLessThan(1000);
+    }
+  });
+});

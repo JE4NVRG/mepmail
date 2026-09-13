@@ -59,7 +59,10 @@ export function applyMergeFields(
  */
 export function injectPreheader(html: string, previewText: string): string {
   const preheader = `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all">${escapeHtml(previewText)}${"&nbsp;&zwnj;".repeat(40)}</div>`;
-  const bodyTag = /<body[^>]*>/i.exec(html);
-  const at = bodyTag ? bodyTag.index + bodyTag[0].length : 0;
+  // search + indexOf, not /<body[^>]*>/: with no `>` in sight the regex rescans
+  // to the end from every `<body`, quadratic on a customer-supplied body.
+  const open = html.search(/<body/i);
+  const close = open === -1 ? -1 : html.indexOf(">", open);
+  const at = close === -1 ? 0 : close + 1;
   return html.slice(0, at) + preheader + html.slice(at);
 }

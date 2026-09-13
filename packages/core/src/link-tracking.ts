@@ -32,9 +32,10 @@ export interface RewriteOptions {
 // it, but that does not occur in real email HTML. Upgrade to a parser only if a
 // broken template surfaces it. Shared with email-insights so both sides see
 // the exact same set of anchors. The value is matched per quote kind rather
-// than lazily up to a backreference: the html is the customer's, and the
-// lazy form backtracks polynomially on a crafted body.
-export const ANCHOR_HREF = /(<a\b[^>]*?\shref=)(?:(")([^"]*)"|(')([^']*)')/gi;
+// than lazily up to a backreference, and the tag prefix is `[^<>]` rather
+// than `[^>]`: the html is the customer's, and either lazy form backtracks
+// polynomially on a crafted body (an unclosed `<a` now stops at the next `<`).
+export const ANCHOR_HREF = /(<a\b[^<>]*?\shref=)(?:(")([^"]*)"|(')([^']*)')/gi;
 
 /** An ANCHOR_HREF match taken apart: the tag up to the quote, the quote, the raw value. */
 export function anchorHrefParts(m: readonly (string | undefined)[]): {

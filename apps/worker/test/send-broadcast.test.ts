@@ -656,6 +656,12 @@ it("injectPreheader hides escaped preview text at the top of the body", () => {
   expect(doc.indexOf("New &lt;deals&gt;")).toBeLessThan(doc.indexOf("<p>Hi</p>"));
   // Fragment without a <body> tag: prepended.
   expect(injectPreheader("<p>Hi</p>", "peek").startsWith('<div style="display:none')).toBe(true);
+  // A `<body` run with no `>` at all: prepended, and in linear time.
+  const started = performance.now();
+  expect(
+    injectPreheader("<body".repeat(200_000), "peek").startsWith('<div style="display:none'),
+  ).toBe(true);
+  expect(performance.now() - started).toBeLessThan(1000);
 });
 
 it("fan-out injects the preheader into html only when preview_text is set", async () => {

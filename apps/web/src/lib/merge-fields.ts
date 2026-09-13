@@ -79,8 +79,13 @@ export function parseMergeToken(token: string): { name: string; fallback?: strin
  * guard rejects such html before it can become a send.
  */
 export function hasWellFormedMergeTokens(html: string): boolean {
-  for (const match of html.matchAll(/\{\{\{[\s\S]*?\}\}\}/g)) {
-    if (parseMergeToken(match[0]) === null) return false;
+  // indexOf, not /\{\{\{[\s\S]*?\}\}\}/g: with no closer in sight the lazy
+  // scan restarts from every opener, quadratic on a crafted document.
+  for (let open = html.indexOf("{{{"); open !== -1; ) {
+    const close = html.indexOf("}}}", open + 3);
+    if (close === -1) return true;
+    if (parseMergeToken(html.slice(open, close + 3)) === null) return false;
+    open = html.indexOf("{{{", close + 3);
   }
   return true;
 }
