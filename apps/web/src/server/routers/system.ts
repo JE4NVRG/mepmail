@@ -95,6 +95,8 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
       return {
         credentialsConfigured: awsCredentialsConfigured(),
         region: env.AWS_REGION,
+        // Whether the caller may open the instance console (Settings → SES card).
+        isOperator: await isInstanceOperator(ctx.db, ctx.session.user.id),
       };
     }),
 
