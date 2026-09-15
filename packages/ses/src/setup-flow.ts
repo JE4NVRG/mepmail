@@ -109,6 +109,16 @@ export function servedRegionsInEnv(content: string | null): string[] {
 }
 
 /**
+ * Whether the AWS step may offer a full re-run: it recreates the events
+ * transport for one region and rewrites SNS_TOPIC_ARNS and the queue policy
+ * to that region's topic alone, which on a multi-region install would
+ * silently drop the other regions' events.
+ */
+export function fullRerunOffered(content: string | null): boolean {
+  return servedRegionsInEnv(content).length <= 1;
+}
+
+/**
  * The .env entries that add a region to an existing install: the region
  * joins AWS_REGIONS (seeded from the region already served when the list did
  * not exist yet) and the topic joins SNS_TOPIC_ARNS. AWS_REGION and
@@ -232,12 +242,11 @@ export function flowPlan(
   }
   if (
     state.envContent !== null &&
-    envValue(state.envContent, "AWS_ACCESS_KEY_ID") &&
     envValue(state.envContent, "SNS_TOPIC_ARNS") &&
     envValue(state.envContent, "SQS_QUEUE_URL")
   ) {
     lines.push(
-      `aws: already set up (${servedRegionsInEnv(state.envContent).join(", ")}) — offer to add a region (its topic and configuration set, events into the existing queue, no new key) or a full re-run`,
+      `aws: already set up (${servedRegionsInEnv(state.envContent).join(", ")}) — offer to add a region (its topic and configuration set, events into the existing queue, no new key)${fullRerunOffered(state.envContent) ? " or a full re-run" : ""}`,
     );
   } else {
     for (const line of setupPlan({ region: opts.region, appBaseUrl: opts.appBaseUrl })) {

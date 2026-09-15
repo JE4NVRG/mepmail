@@ -91,9 +91,12 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
   // Production access per served region, for the add-domain form: one
   // GetAccount per region at most once a minute — features runs on every
   // dashboard page and the non-send SES API is throttled at one request per
-  // second per region. A failed probe keeps the last answer; without
-  // credentials nothing is probed (the SDK chain fails slowly) and every
-  // region reads alike.
+  // second per region. Only a region's first probe is awaited (bounded by
+  // the client's timeouts); an expired answer is served at once while the
+  // probe refreshes it, so a region that stops answering never stalls the
+  // screens. A failed probe keeps the last answer; without credentials
+  // nothing is probed (the SDK chain fails slowly) and every region reads
+  // alike.
   const productionProbes = new Map<string, { at: number; value: Promise<boolean> }>();
   const productionAccess = (region: string): Promise<boolean> => {
     const cached = productionProbes.get(region);
@@ -105,7 +108,7 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
         )
       : Promise.resolve(false);
     productionProbes.set(region, { at: Date.now(), value });
-    return value;
+    return cached ? cached.value : value;
   };
   return router({
     /**

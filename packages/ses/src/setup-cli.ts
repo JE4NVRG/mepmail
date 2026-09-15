@@ -53,6 +53,7 @@ import {
   envValue,
   flowPlan,
   freshDatabaseEntries,
+  fullRerunOffered,
   generateSecret,
   isCloudEnv,
   missingSecrets,
@@ -273,12 +274,16 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     const hasEvents = (envValue(env, "SNS_TOPIC_ARNS") ?? "") !== "";
     const queueUrl = envValue(env, "SQS_QUEUE_URL") ?? "";
     if (hasKeys) console.log(dim("\nAWS access key already in .env."));
-    if (hasKeys && hasEvents && queueUrl !== "") {
-      // An install that already sends and receives events: the usual
-      // follow-up is a second SES region, which keeps the IAM user and the
-      // events queue and mints no key.
+    if (hasEvents && queueUrl !== "") {
+      // An install that already sends and receives events (with an access
+      // key or the credential chain): the usual follow-up is a second SES
+      // region, which keeps the IAM user and the events queue and mints no
+      // key. A full re-run is for single-region installs only — it rewrites
+      // the topic list and the queue policy for one region.
+      const served = servedRegionsInEnv(env);
+      const rerun = fullRerunOffered(env);
       const choice = await selectPrompt(rl, {
-        label: `AWS is set up (${servedRegionsInEnv(env).join(", ")}). Add another SES region?`,
+        label: `AWS is set up (${served.join(", ")}). Add another SES region?`,
         initial: "skip",
         options: [
           {
@@ -286,7 +291,9 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
             label: "Add a region",
             hint: "topic + configuration set there; events join the existing queue; no new key",
           },
-          { value: "full", label: "Full AWS re-run", hint: "also mints a NEW access key" },
+          ...(rerun
+            ? [{ value: "full", label: "Full AWS re-run", hint: "also mints a NEW access key" }]
+            : []),
           { value: "skip", label: "Skip" },
         ],
       });
@@ -296,6 +303,13 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         await awsStep(rl, interactive, appBaseUrl, writeEnv, false, apiPort);
       } else {
         console.log(dim("AWS step skipped."));
+        if (!rerun) {
+          console.log(
+            dim(
+              `To rotate the access key on a multi-region install, create one for the ${SETUP_NAMES.user} IAM user in the IAM console and update .env; a full re-run here would keep only one region's events.`,
+            ),
+          );
+        }
       }
     } else if (hasKeys && !hasEvents) {
       // The common re-run trap: sends work but events were never set up, and
@@ -856,8 +870,17 @@ async function addRegionStep(
   let topicArn: string;
   try {
     onStep(`IAM policy ${SETUP_NAMES.policy}`);
-    if (await syncAdoptedPolicy(clients.iam, setupPolicyArn(accountId))) {
-      onStep(`IAM policy ${SETUP_NAMES.policy}: updated to the current document`);
+    try {
+      if (await syncAdoptedPolicy(clients.iam, setupPolicyArn(accountId))) {
+        onStep(`IAM policy ${SETUP_NAMES.policy}: updated to the current document`);
+      }
+    } catch (error) {
+      // An install that brought its own IAM (the events-only path) has no
+      // wizard-named policy; the region's resources need none.
+      if ((error as { name?: string }).name !== "NoSuchEntityException") throw error;
+      onStep(
+        `IAM policy ${SETUP_NAMES.policy}: not found, this install brought its own IAM — kept`,
+      );
     }
     const existingTopics = (envValue(env, "SNS_TOPIC_ARNS") ?? "")
       .split(",")
@@ -1022,7 +1045,7 @@ $ ${command}`);
     `
 ${bold("Running. Next steps:")}
   · ${appBaseUrl} — sign up (the first user becomes the owner)
-  · SES sandbox account? Set the send rate to 1 in Settings → Instance
+  · SES sandbox account? Recipients must be verified until AWS grants production access
   · Verify a sending domain in the dashboard, then send${
     origin
       ? `

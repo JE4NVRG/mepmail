@@ -50,7 +50,7 @@
     "region": "Region",
     "recommended": "Recommended",
     "regionHint": "Domains are provisioned in one of the SES regions this deployment serves. A domain has one region: to move it, delete it and add it again.",
-    "regionSandbox": "sandbox — available once AWS grants production access there",
+    "regionSandbox": "sandbox — no production access",
     "advanced": "Advanced options",
     "returnPath": "Custom Return-Path",
     "returnPathHint": "Used for SPF authentication, DMARC alignment, and bounces. Avoid values that undermine credibility (e.g. <code>testing</code>) — they may be exposed to recipients.",
