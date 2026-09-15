@@ -71,7 +71,6 @@ export function periodDayKeys(period: Period, now: Date = new Date()): string[] 
   return out;
 }
 
-
 /** "100K", "1M", "1.5M": mirrors formatVolume in @millionsend/core/plans. */
 export function formatVolume(n: number): string {
   if (n >= 1_000_000) return `${n / 1_000_000}M`;

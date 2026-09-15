@@ -11,7 +11,7 @@ import {
 } from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, ilike, isNull, or, type SQL, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, isNull, or, type SQL, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { escapeLike } from "@/lib/sql";
