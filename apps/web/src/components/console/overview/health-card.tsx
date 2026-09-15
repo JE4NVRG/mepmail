@@ -26,13 +26,28 @@ const DOT: Record<Tone, React.CSSProperties> = {
   off: {},
 };
 
+/** The probes the Health card shows rows for; the stat tiles' probes are not health. */
+const HEALTH_PROBES: ReadonlySet<string> = new Set([
+  "pg_latency_ms",
+  "pg_size_bytes",
+  "worker_heartbeat",
+  "boss_waiting",
+  "boss_failed",
+  "ses_events_lag_s",
+  "webhook_success_rate",
+  "webhook_tripped",
+  "kms_wrap_ms",
+  "stripe_last_event_s",
+  "retention_purged",
+]);
+
 /** The header pill's verdict: failing and warning probes among those that have a sample. */
 export function healthStatus(summary: Summary, now = Date.now()) {
   let failing = 0;
   let warnings = 0;
   let total = 0;
   for (const p of summary.probes) {
-    if (p.takenAt === null) continue;
+    if (p.takenAt === null || !HEALTH_PROBES.has(p.key)) continue;
     total += 1;
     const stale = p.key === "worker_heartbeat" && now - new Date(p.takenAt).getTime() > STALE_MS;
     if (p.ok === false || stale) {
@@ -95,7 +110,7 @@ export function HealthCard({ summary }: { summary: Summary }) {
   const common = useTranslations("console.common");
   const locale = useLocale();
   const fmt = new Intl.NumberFormat(locale);
-  const count = (v: number) => fmt.format(v);
+  const count = (v: number) => fmt.format(Math.round(v));
   const [open, setOpen] = useState<Row | null>(null);
 
   const probes = new Map(summary.probes.map((p) => [p.key, p]));

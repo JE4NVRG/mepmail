@@ -1182,6 +1182,11 @@ table.ms-table {
   right: 0;
   bottom: 0;
 }
+/* Console lists keep every cell on one line; the wrapper scrolls sideways instead. */
+.ms-table.nowrap th,
+.ms-table.nowrap td {
+  white-space: nowrap;
+}
 /* The health card's rows: a dot, the probe, the reading pushed right. */
 .ms-health-row {
   display: flex;
@@ -1200,6 +1205,10 @@ table.ms-table {
   cursor: pointer;
   text-align: left;
   box-sizing: content-box;
+}
+.ms-health-row > span:nth-child(2) {
+  flex: none;
+  white-space: nowrap;
 }
 .ms-health-row:hover {
   background: color-mix(in srgb, var(--ms-panel-raised) 70%, transparent);

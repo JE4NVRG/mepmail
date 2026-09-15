@@ -249,7 +249,7 @@ export function TeamsView() {
         </div>
       ) : (
         <div className="ms-card" style={{ padding: 0, overflow: "hidden" }}>
-          <Table>
+          <Table className="nowrap">
             <thead>
               <tr>
                 {sortable("name", false, "asc")}
