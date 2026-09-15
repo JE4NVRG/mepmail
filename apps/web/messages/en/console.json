@@ -572,7 +572,8 @@
         "complaints": "Complaints 7d",
         "bounces": "Hard bounces 7d",
         "sent7d": "Sent 7d",
-        "contacts": "Contacts"
+        "contacts": "Contacts",
+        "scoreOf": "{score} / 10"
       },
       "checks": {
         "title": "Content checks",
@@ -603,6 +604,10 @@
       "openFlagTitle": "Flag {team}",
       "openFlagLead": "A manual flag lists the team on Trust & safety until you clear it; the safety cron never clears it.",
       "openFlagConfirm": "Flag team"
+    },
+    "metric": {
+      "complaint": "Complaints",
+      "hard_bounce": "Hard bounces"
     }
   },
   "audit": {
