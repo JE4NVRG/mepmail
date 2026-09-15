@@ -63,8 +63,9 @@ function SkeletonRows() {
           <td>
             <Skeleton width={140} />
           </td>
-          {[28, 48, 56, 28].map((w) => (
-            <td key={w} className="right">
+          {[28, 48, 56, 28].map((w, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: placeholder cells, position is identity
+            <td key={i} className="right">
               <Skeleton width={w} />
             </td>
           ))}
@@ -290,7 +291,15 @@ export function TeamsView() {
                       <td>
                         <PlanBadge plan={row.plan} planQuota={row.planQuota} />
                       </td>
-                      <td style={{ color: "var(--ms-muted)" }}>
+                      <td
+                        title={row.ownerEmail ?? undefined}
+                        style={{
+                          color: "var(--ms-muted)",
+                          maxWidth: 200,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
                         {row.ownerEmail ?? common("none")}
                       </td>
                       <td className="right ms-digits">{nf.format(row.domains)}</td>
