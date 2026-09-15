@@ -1,7 +1,7 @@
 import { GetAccountCommand, PutAccountPricingAttributesCommand } from "@aws-sdk/client-sesv2";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createFlow } from "../../cli/src/flow.js";
 import { setColorMode } from "../../cli/src/theme.js";
-import type { LineReader } from "../../cli/src/tty-ui.js";
 import { authAction, essentialsPlanPrompt, main } from "../src/setup-cli.js";
 
 describe("main --dry-run", () => {
@@ -98,8 +98,8 @@ describe("essentialsPlanPrompt", () => {
       },
     };
   }
-  const answering = (answer: string): LineReader =>
-    ({ question: async () => answer, close: () => {} }) as unknown as LineReader;
+  const answering = (answer: string) =>
+    createFlow({ question: async () => answer }, { rail: false });
 
   it("cancels only on an explicit yes", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
@@ -118,7 +118,7 @@ describe("essentialsPlanPrompt", () => {
   it("asks nothing on à la carte, and leaves an unreadable plan alone", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const question = vi.fn(async () => "y");
-    const rl = { question, close: () => {} } as unknown as LineReader;
+    const rl = createFlow({ question }, { rail: false });
     const none = fakeSes("NONE");
     expect(await essentialsPlanPrompt(rl, none.ses, "us-east-1")).toBe("not_essentials");
     const down = fakeSes(new Error("throttled"));

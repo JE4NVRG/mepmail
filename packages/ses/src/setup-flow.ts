@@ -109,6 +109,61 @@ export function servedRegionsInEnv(content: string | null): string[] {
 }
 
 /**
+ * An install the wizard has already been through: the secrets are in place
+ * and AWS is at least partly set up. Such a run opens on a menu of things to
+ * do instead of walking every step again.
+ */
+export function setupDone(content: string | null): boolean {
+  return (
+    content !== null &&
+    missingSecrets(content).length === 0 &&
+    (Boolean(envValue(content, "AWS_ACCESS_KEY_ID")) ||
+      Boolean(envValue(content, "SNS_TOPIC_ARNS")))
+  );
+}
+
+export interface MenuOption {
+  value: string;
+  label: string;
+  hint?: string;
+}
+
+/** The menu a finished install opens on, shaped by what its .env already has. */
+export function menuOptions(content: string | null, cloud: boolean): MenuOption[] {
+  const keys = Boolean(envValue(content, "AWS_ACCESS_KEY_ID"));
+  const events = Boolean(envValue(content, "SNS_TOPIC_ARNS"));
+  const queue = Boolean(envValue(content, "SQS_QUEUE_URL"));
+  const options: MenuOption[] = [];
+  if (events && queue) {
+    options.push({
+      value: "region",
+      label: "Add an SES region",
+      hint: `served: ${servedRegionsInEnv(content).join(", ")}`,
+    });
+  }
+  options.push({
+    value: "aws",
+    label: "AWS resources",
+    hint: events
+      ? "re-run the AWS setup"
+      : keys
+        ? "add event ingestion (bounces, deliveries)"
+        : "IAM user + key, SNS events, SES configuration set",
+  });
+  options.push(
+    { value: "urls", label: "Base URLs", hint: "APP_BASE_URL, PUBLIC_API_URL" },
+    ...(cloud ? [{ value: "cloud", label: "Cloud values", hint: "KMS key, Stripe" }] : []),
+    { value: "storage", label: "Object storage & backups", hint: "S3-compatible buckets" },
+    { value: "social", label: "Social login", hint: "Google, GitHub" },
+    { value: "email", label: "Account email sender", hint: "AUTH_EMAIL_FROM" },
+    { value: "all", label: "Walk through every step" },
+    { value: "start", label: "Start the stack", hint: "docker compose up -d" },
+    { value: "exit", label: "Exit" },
+  );
+  return options;
+}
+
+/**
  * Whether the AWS step may offer a full re-run: it recreates the events
  * transport for one region and rewrites SNS_TOPIC_ARNS and the queue policy
  * to that region's topic alone, which on a multi-region install would
@@ -220,6 +275,11 @@ export function flowPlan(
   opts: { appBaseUrl: string; region: string; cloud?: boolean },
 ): string[] {
   const lines: string[] = [];
+  if (setupDone(state.envContent)) {
+    lines.push(
+      "menu: this install is set up — on a terminal the run opens on a menu (add an SES region, AWS resources, base URLs, storage, social login, account email, walk through every step, start); piped runs walk the steps below",
+    );
+  }
   lines.push(
     state.envContent === null
       ? "env: create .env from the built-in template (offered)"
