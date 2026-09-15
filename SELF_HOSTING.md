@@ -60,6 +60,9 @@ In `.env` (everything else defaults to a working local setup):
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` — from the AWS setup below, or rely
   on the default AWS credential chain. Sandbox SES accounts must keep
   `SES_MAX_SEND_RATE=1`.
+- `AWS_REGIONS` — optional, comma-separated: serve several SES regions from one
+  deployment, the first being the default; unset means the one region in
+  `AWS_REGION`. See "Adding a region" below.
 
 ```sh
 docker compose up -d
@@ -168,6 +171,55 @@ mode 600):
 
 Prefer not to run a CLI? The dashboard's Settings → SES page offers a CloudFormation
 quick-create link and a pre-filled shell script that create the same resources.
+
+</details>
+
+<details>
+<summary><b>Adding a region</b></summary>
+
+One deployment can send through several SES regions. A domain lives in one
+region, the one picked when it is added (to move it, delete it and add it
+again); identities, the 24-hour quota, the send rate and the sandbox status
+are all per region; every region's events land in the one SQS queue, because
+SNS delivers across regions.
+
+Re-run the wizard where the `.env` lives and take **Add a region** at the AWS
+step:
+
+```sh
+npx @millionsend/setup
+```
+
+It keeps the IAM user, policy and access key (no new key), creates in the new
+region the SNS topic, the SES configuration set with its event destination and
+the bounce-only suppression setting, subscribes the topic to the existing
+queue, and appends to `.env`:
+
+```sh
+AWS_REGIONS=sa-east-1,us-east-1   # the first entry stays the default region
+SNS_TOPIC_ARNS=<first topic ARN>,<new topic ARN>
+```
+
+`AWS_REGION` and `SQS_QUEUE_URL` are left as they are. Restart the stack
+(`docker compose up -d`): the region then appears in the add-domain form and on
+Settings → SES, marked **Sandbox** until AWS grants production access there —
+request it per region, as for the first one. While one region has production
+access, a sandbox region is listed but not selectable in the form; a sandbox
+region paces its own sends at its 1/s and holds only its own domains when its
+24-hour quota is spent.
+
+Pricing: since 2026-07-21 an SES account × region with no prior sending starts
+on the Essentials plan ($0.16 per 1,000 messages instead of the à la carte
+$0.10). After provisioning, the wizard reads the region's plan and, on
+Essentials, asks whether to cancel it; nothing MillionSend uses needs a plan,
+and a defaulted plan's cancellation takes effect immediately. By hand:
+`aws sesv2 put-account-pricing-attributes --plan NONE --region <region>`.
+
+Manual equivalent: in the new region, the SNS topic, the configuration set and
+the suppression setting exactly as in "SES events" below; a `sqs`
+subscription of that topic to the existing queue's ARN, and the queue's policy
+extended so `sqs:SendMessage` is allowed from the new topic ARN as well; then
+the two `.env` lines above and a restart.
 
 </details>
 
