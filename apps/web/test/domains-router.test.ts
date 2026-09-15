@@ -127,6 +127,23 @@ describe("domains.create", () => {
     });
     expect(calls).toHaveLength(0);
   });
+  it("accepts any served region when AWS_REGIONS lists several, and names them all in a refusal", async () => {
+    vi.stubEnv("AWS_REGIONS", "sa-east-1,us-east-1");
+    const teamId = await createTeam(db);
+    const { deps, calls } = fakeSes();
+    const { id } = await callerFor(teamId, deps).domains.create({
+      name: "us.example.com",
+      region: "us-east-1",
+    });
+    const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.region).toBe("us-east-1");
+    expect(calls.map((c) => c.name)).toContain("CreateEmailIdentityCommand");
+    await expect(
+      callerFor(teamId, deps).domains.create({ name: "far.example.com", region: "eu-west-1" }),
+    ).rejects.toMatchObject({
+      message: "Region eu-west-1 is not available; this deployment serves sa-east-1, us-east-1",
+    });
+  });
   it("uploads a BYODKIM key to SES and stores only the selector and public half", async () => {
     const teamId = await createTeam(db);
     const { deps, calls } = fakeSes();

@@ -25,6 +25,7 @@ function stubAws(vars: Record<string, string>): void {
     "AWS_SECRET_ACCESS_KEY",
     "AWS_DEFAULT_CHAIN",
     "AWS_REGION",
+    "AWS_REGIONS",
   ]) {
     vi.stubEnv(key, vars[key] ?? "");
   }
@@ -44,6 +45,15 @@ describe("system.awsReadiness", () => {
     expect(await caller().system.awsReadiness()).toEqual({
       credentialsConfigured: true,
       region: "sa-east-1",
+      regions: ["sa-east-1"],
+    });
+  });
+
+  it("lists every served region, the default first", async () => {
+    stubAws({ AWS_REGIONS: "sa-east-1, us-east-1", AWS_REGION: "sa-east-1" });
+    expect(await caller().system.awsReadiness()).toMatchObject({
+      region: "sa-east-1",
+      regions: ["sa-east-1", "us-east-1"],
     });
   });
 
@@ -73,9 +83,13 @@ describe("system.awsReadiness", () => {
 });
 
 /** Caller over a system router with an injected fake SES account client. */
-function sesCaller(client: SesAccountClient) {
+function sesCaller(client: SesAccountClient | ((region: string) => SesAccountClient)) {
   const factory = createCallerFactory(
-    router({ system: createSystemRouter({ accountClient: () => client }) }),
+    router({
+      system: createSystemRouter({
+        accountClient: typeof client === "function" ? client : () => client,
+      }),
+    }),
   );
   return factory({
     db: {} as Db,
@@ -86,6 +100,11 @@ function sesCaller(client: SesAccountClient) {
 }
 
 describe("system.sesAccount", () => {
+  beforeEach(() => {
+    stubAws({ AWS_ACCESS_KEY_ID: "AKIAEXAMPLE", AWS_SECRET_ACCESS_KEY: "secret" });
+    vi.stubEnv("AWS_REGION", "us-east-1");
+  });
+
   it("returns the mapped account overview on success", async () => {
     const client: SesAccountClient = {
       async send() {
@@ -98,6 +117,7 @@ describe("system.sesAccount", () => {
     };
     expect(await sesCaller(client).system.sesAccount()).toEqual({
       ok: true,
+      region: "us-east-1",
       sendingEnabled: true,
       productionAccess: false,
       quota: { max24h: 200, sentLast24h: 3, maxSendRate: 1 },
@@ -113,6 +133,7 @@ describe("system.sesAccount", () => {
     };
     expect(await sesCaller(client).system.sesAccount()).toEqual({
       ok: false,
+      region: "us-east-1",
       kind: "credentials",
       message: "The security token included in the request is invalid.",
     });
@@ -128,6 +149,65 @@ describe("system.sesAccount", () => {
       ok: false,
       kind: "unreachable",
     });
+  });
+
+  it("probes the named served region and refuses one the deployment does not serve", async () => {
+    vi.stubEnv("AWS_REGIONS", "sa-east-1,us-east-1");
+    const asked: string[] = [];
+    const caller = sesCaller((region) => ({
+      async send() {
+        asked.push(region);
+        return { ProductionAccessEnabled: region === "sa-east-1" };
+      },
+    }));
+    expect(await caller.system.sesAccount({ region: "us-east-1" })).toMatchObject({
+      ok: true,
+      region: "us-east-1",
+      productionAccess: false,
+    });
+    expect(await caller.system.sesAccount()).toMatchObject({
+      region: "sa-east-1",
+      productionAccess: true,
+    });
+    expect(asked).toEqual(["us-east-1", "sa-east-1"]);
+    await expect(caller.system.sesAccount({ region: "eu-west-1" })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+  });
+
+  it("features lists the served regions with production access from one cached probe each", async () => {
+    vi.stubEnv("AWS_REGIONS", "sa-east-1,us-east-1");
+    const asked: string[] = [];
+    const caller = sesCaller((region) => ({
+      async send() {
+        asked.push(region);
+        if (region === "us-east-1") throw new Error("throttled");
+        return { ProductionAccessEnabled: true };
+      },
+    }));
+    const expected = [
+      { code: "sa-east-1", production: true },
+      { code: "us-east-1", production: false },
+    ];
+    expect((await caller.system.features()).regions).toEqual(expected);
+    // A second read within the minute reuses the answers.
+    expect((await caller.system.features()).regions).toEqual(expected);
+    expect(asked).toEqual(["sa-east-1", "us-east-1"]);
+  });
+
+  it("features probes nothing without credentials", async () => {
+    stubAws({ AWS_REGIONS: "sa-east-1" });
+    const asked: string[] = [];
+    const caller = sesCaller((region) => ({
+      async send() {
+        asked.push(region);
+        return {};
+      },
+    }));
+    expect((await caller.system.features()).regions).toEqual([
+      { code: "sa-east-1", production: false },
+    ]);
+    expect(asked).toEqual([]);
   });
 });
 
