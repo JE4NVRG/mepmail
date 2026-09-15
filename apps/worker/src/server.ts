@@ -438,6 +438,7 @@ await queue.work(
         signal: ctx.signal,
         mailer,
         appBaseUrl: env.APP_BASE_URL,
+        sesQuota: sendControls,
       },
       payload,
     );
