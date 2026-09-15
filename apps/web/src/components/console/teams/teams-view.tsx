@@ -302,16 +302,16 @@ export function TeamsView() {
                       >
                         {row.ownerEmail ?? common("none")}
                       </td>
-                      <td className="right ms-digits">{nf.format(row.domains)}</td>
-                      <td className="right ms-digits">{nf.format(row.contacts)}</td>
+                      <td className="right num">{nf.format(row.domains)}</td>
+                      <td className="right num">{nf.format(row.contacts)}</td>
                       <td
-                        className="right ms-digits"
+                        className="right num"
                         style={row.sent30d === null ? { color: "var(--ms-muted)" } : undefined}
                       >
                         {row.sent30d === null ? common("none") : nf.format(row.sent30d)}
                       </td>
                       <td
-                        className="right ms-digits"
+                        className="right num"
                         style={{
                           color:
                             row.scoreTenths === null

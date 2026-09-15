@@ -272,12 +272,12 @@ export function RegionsView() {
                             </span>
                           )}
                         </td>
-                        <td className="right ms-digits">{f.n(r.domainsVerified)}</td>
-                        <td className="right ms-digits">{f.n(r.sent24h)}</td>
-                        <td className="right ms-digits">
+                        <td className="right num">{f.n(r.domainsVerified)}</td>
+                        <td className="right num">{f.n(r.sent24h)}</td>
+                        <td className="right num">
                           {r.week ? f.pct2(r.week.hardBounceRate) : mutedDash}
                         </td>
-                        <td className="right ms-digits">
+                        <td className="right num">
                           {r.week ? f.pct3(r.week.complaintRate) : mutedDash}
                         </td>
                         <td>
