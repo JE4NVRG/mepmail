@@ -569,7 +569,8 @@
         "complaints": "Reclamações 7d",
         "bounces": "Hard bounces 7d",
         "sent7d": "Enviados 7d",
-        "contacts": "Contatos"
+        "contacts": "Contatos",
+        "scoreOf": "{score} / 10"
       },
       "checks": {
         "title": "Checagens de conteúdo",
@@ -600,6 +601,10 @@
       "openFlagTitle": "Sinalizar {team}",
       "openFlagLead": "Uma sinalização manual lista a equipe em Confiança e segurança até você limpá-la; o cron de segurança nunca a limpa.",
       "openFlagConfirm": "Sinalizar equipe"
+    },
+    "metric": {
+      "complaint": "Reclamações",
+      "hard_bounce": "Hard bounces"
     }
   },
   "audit": {
