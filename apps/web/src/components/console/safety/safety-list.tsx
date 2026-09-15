@@ -258,14 +258,14 @@ export function SafetyList() {
                             ? percent(row.hardBounceRate7d)
                             : common("none")}
                         </td>
-                        <td>
+                        <td style={{ maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis" }}>
                           <GuardrailCell
                             guardrail={row.guardrail}
                             suspendedAt={row.suspendedAt}
                             pausedAt={row.broadcastsPausedByOperatorAt}
                           />
                         </td>
-                        <td style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <td style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>
                           <ReasonLabel reason={row.reason} detail={row.detail} />
                         </td>
                         <td>
