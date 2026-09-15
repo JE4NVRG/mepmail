@@ -399,13 +399,11 @@ export function registerDomainRoutes(
         .where(and(eq(d.teamId, auth.teamId), eq(d.name, body.name)));
       if (existing) return c.json(errorBody(409, "conflict", "domain already added"), 409);
       if (deps.isCloud) {
-        // SES identities are account-wide per region and every cloud tenant
-        // shares the account, so a domain another team holds in this region
-        // is taken — adopting it would re-key their DKIM.
-        const [taken] = await db
-          .select({ id: d.id })
-          .from(d)
-          .where(and(eq(d.name, body.name), eq(d.region, region)));
+        // Every cloud tenant shares the SES account, so a domain another team
+        // holds is taken in every served region: in the same region adopting
+        // it would re-key their DKIM, and in another it would let a second
+        // team stand up the same sender elsewhere.
+        const [taken] = await db.select({ id: d.id }).from(d).where(eq(d.name, body.name));
         if (taken) return c.json(errorBody(409, "conflict", "domain already registered"), 409);
         const limit = PLAN_DOMAIN_LIMIT[auth.plan];
         const [owned] = await db.select({ n: count() }).from(d).where(eq(d.teamId, auth.teamId));

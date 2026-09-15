@@ -273,15 +273,14 @@ export function createDomainsRouter(deps: DomainsSesDeps = defaultSesDeps) {
           .where(and(eq(schema.domains.teamId, ctx.teamId), eq(schema.domains.name, input.name)));
         if (existing) throw new TRPCError({ code: "CONFLICT", message: "domain already added" });
         if (isCloud) {
-          // SES identities are account-wide per region and every cloud tenant
-          // shares the account, so a domain another team holds in this region
-          // is taken — adopting it would re-key their DKIM.
+          // Every cloud tenant shares the SES account, so a domain another
+          // team holds is taken in every served region: in the same region
+          // adopting it would re-key their DKIM, and in another it would let
+          // a second team stand up the same sender elsewhere.
           const [taken] = await ctx.db
             .select({ id: schema.domains.id })
             .from(schema.domains)
-            .where(
-              and(eq(schema.domains.name, input.name), eq(schema.domains.region, input.region)),
-            );
+            .where(eq(schema.domains.name, input.name));
           if (taken) {
             throw new TRPCError({ code: "CONFLICT", message: "domain already registered" });
           }
