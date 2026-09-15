@@ -1,4 +1,5 @@
-/** Placeholder: the screen owner replaces this file. */
-export default function ConsolePlaceholderPage() {
-  return null;
+import { RegionsView } from "@/components/console/regions/regions-view";
+
+export default function ConsoleRegionsPage() {
+  return <RegionsView />;
 }
