@@ -8,7 +8,7 @@ import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/cli
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApi } from "../src/app.js";
 
 /**
@@ -541,6 +541,13 @@ describe("tools", () => {
 });
 
 describe("rate limiting", () => {
+  // The limiter counts in fixed minute windows; a test whose calls straddle a
+  // boundary sees a fresh window and no 429. Wait out the last seconds of one.
+  beforeEach(async () => {
+    const left = 60_000 - (Date.now() % 60_000);
+    if (left < 3_000) await new Promise((resolve) => setTimeout(resolve, left));
+  });
+
   it("429s a user who exceeds the per-minute cap on /mcp", async () => {
     const limited = createApi({
       db,
