@@ -333,8 +333,9 @@ verify at their next sign-in.
 
 Nothing on the instance contacts millionsend.com on its own. The wizard offers, once and
 interactively, to subscribe your address to release notes (a confirmation link comes first);
-**Settings → Instance** links to the same page. Full text: docs, "Account mail, contacts and
-product updates".
+when it cannot reach millionsend.com it prints the page instead,
+<https://app.millionsend.com/updates?source=self-host>, and **Settings → Instance** links to
+the same page. Full text: docs, "Account mail, contacts and product updates".
 
 </details>
 
