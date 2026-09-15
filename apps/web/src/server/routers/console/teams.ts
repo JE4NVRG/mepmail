@@ -38,14 +38,14 @@ const st = schema.teamStandings;
 // Correlated subqueries the list and the detail share; each is an index range on the team id.
 const ownerEmail = sql<
   string | null
->`(select u.email from ${schema.teamMembers} m join ${schema.user} u on u.id = m.user_id where m.team_id = ${t.id} and m.role = 'owner' order by m.created_at limit 1)`;
-const memberCount = sql<number>`(select count(*)::int from ${schema.teamMembers} m where m.team_id = ${t.id})`;
-const domainCount = sql<number>`(select count(*)::int from ${schema.domains} d where d.team_id = ${t.id} and d.status = 'verified')`;
-const contactCount = sql<number>`(select count(*)::int from ${schema.contacts} c where c.team_id = ${t.id})`;
+>`(select u.email from ${schema.teamMembers} m join ${schema.user} u on u.id = m.user_id where m.team_id = ${t}."id" and m.role = 'owner' order by m.created_at limit 1)`;
+const memberCount = sql<number>`(select count(*)::int from ${schema.teamMembers} m where m.team_id = ${t}."id")`;
+const domainCount = sql<number>`(select count(*)::int from ${schema.domains} d where d.team_id = ${t}."id" and d.status = 'verified')`;
+const contactCount = sql<number>`(select count(*)::int from ${schema.contacts} c where c.team_id = ${t}."id")`;
 // The team's region is that of its most recently verified domain, the breaker's own convention.
 const teamRegion = sql<
   string | null
->`(select d.region from ${schema.domains} d where d.team_id = ${t.id} order by d.verified_at desc nulls last, d.created_at desc limit 1)`;
+>`(select d.region from ${schema.domains} d where d.team_id = ${t}."id" order by d.verified_at desc nulls last, d.created_at desc limit 1)`;
 const planRank = sql<number>`case ${t.plan}::text when 'free' then 0 when 'starter' then 1 when 'pro' then 2 when 'scale' then 3 else 4 end`;
 const guardrailRank = sql<number>`case ${st.guardrail} when 'warning' then 1 when 'paused' then 2 else 0 end`;
 
@@ -97,8 +97,8 @@ function searchWhere(q: string): SQL | undefined {
     UUID.test(q) ? eq(t.id, q) : undefined,
     eq(t.stripeCustomerId, q),
     eq(t.stripeSubscriptionId, q),
-    sql`exists (select 1 from ${schema.teamMembers} m join ${schema.user} u on u.id = m.user_id where m.team_id = ${t.id} and u.email ilike ${like})`,
-    sql`exists (select 1 from ${schema.domains} d where d.team_id = ${t.id} and d.name ilike ${like})`,
+    sql`exists (select 1 from ${schema.teamMembers} m join ${schema.user} u on u.id = m.user_id where m.team_id = ${t}."id" and u.email ilike ${like})`,
+    sql`exists (select 1 from ${schema.domains} d where d.team_id = ${t}."id" and d.name ilike ${like})`,
   );
 }
 

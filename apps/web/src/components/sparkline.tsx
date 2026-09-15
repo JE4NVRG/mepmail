@@ -16,6 +16,7 @@ export function Sparkline({
   color = "var(--ms-steel)",
   height = 56,
   min,
+  max,
 }: {
   values: number[];
   /** One label per value, for the tooltip. */
@@ -25,13 +26,15 @@ export function Sparkline({
   height?: number;
   /** Floor of the y axis; the series minimum when omitted. */
   min?: number;
+  /** Ceiling of the y axis, for small multiples that share one scale; the series peak when omitted. */
+  max?: number;
 }) {
   const [hover, setHover] = useState<{ index: number; px: number; py: number; w: number } | null>(
     null,
   );
   const W = 300;
   const n = values.length;
-  const top = Math.max(...values, 0) * 1.05 || 1;
+  const top = (max ?? Math.max(...values, 0)) * 1.05 || 1;
   const floor = min ?? Math.min(...values, 0) * 0.9;
   const span = top - floor || 1;
   const x = (i: number) => (n <= 1 ? W : (i / (n - 1)) * W);

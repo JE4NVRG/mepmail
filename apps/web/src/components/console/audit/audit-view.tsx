@@ -21,7 +21,7 @@ const isKnownAction = (action: string): action is AuditAction =>
 export function useActionLabel() {
   const t = useTranslations("settings");
   return (action: string) =>
-    isKnownAction(action) ? t(`actions.${action.replace(".", "_")}`) : action;
+    isKnownAction(action) ? t(`audit.actions.${action.replace(".", "_")}`) : action;
 }
 
 export function useAuditQuery(action: string, limit: number) {
@@ -52,7 +52,7 @@ function Head() {
 
 function AuditSkeleton() {
   return (
-    <Table>
+    <Table className="nowrap">
       <Head />
       <tbody>
         {["46%", "62%", "54%", "38%", "58%"].map((width, row) => (
@@ -133,7 +133,7 @@ export function AuditView({
           {t("empty")}
         </p>
       ) : (
-        <Table>
+        <Table className="nowrap">
           <Head />
           <tbody>
             {items.map((row) => {

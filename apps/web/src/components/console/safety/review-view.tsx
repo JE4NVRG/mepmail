@@ -343,11 +343,11 @@ export function ReviewView({ teamId }: { teamId: string }) {
                     <RelativeTime date={row.createdAt} />
                   </td>
                   <td>
-                    {row.actor.kind === "user" ? (
-                      <span className="ms-mono">{row.actor.id.slice(0, 8)}</span>
-                    ) : (
-                      auditT(`actors.${row.actor.kind}`)
-                    )}
+                    {row.actor.kind === "user"
+                      ? (row.actorName ?? (
+                          <span className="ms-mono">{row.actor.id.slice(0, 8)}</span>
+                        ))
+                      : auditT(`actors.${row.actor.kind}`)}
                   </td>
                   <td>
                     {(AUDIT_ACTIONS as readonly string[]).includes(row.action) ? (

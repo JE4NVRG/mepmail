@@ -150,6 +150,8 @@ export function RegionsView() {
       return (typeof ka === "string" ? ka.localeCompare(String(kb)) : ka - Number(kb)) * sign;
     });
   }, [list.data, sort, domains]);
+  // One scale for every region's sparkline, so a quiet region reads as quiet.
+  const sharedPeak = Math.max(1, ...served.flatMap((r) => r.daily.map((p) => p.sent)));
 
   const [addParam, setAdd] = useUrlState("add", "");
   const known = list.data?.known ?? [];
@@ -218,7 +220,7 @@ export function RegionsView() {
       ) : (
         <>
           <div className="ms-card" style={{ padding: 0, marginBottom: 16 }}>
-            <Table>
+            <Table className="nowrap">
               {header}
               {list.data ? (
                 <tbody>
@@ -348,7 +350,7 @@ export function RegionsView() {
               <div className="ms-card" style={{ padding: 24, overflow: "hidden" }}>
                 <div style={{ marginBottom: 16 }}>
                   <h3 style={cardTitle}>{t("sparks.title")}</h3>
-                  <p style={cardSub}>{t("sparks.subtitleOwnScale")}</p>
+                  <p style={cardSub}>{t("sparks.subtitle")}</p>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                   {list.data
@@ -381,6 +383,7 @@ export function RegionsView() {
                               formatValue={(v) => f.n(Math.round(v))}
                               height={44}
                               min={0}
+                              max={sharedPeak}
                               color={r.status === "serving" ? "var(--ms-steel)" : "var(--ms-muted)"}
                             />
                           </div>

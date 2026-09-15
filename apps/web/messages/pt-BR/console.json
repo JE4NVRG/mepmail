@@ -296,7 +296,6 @@
     "sparks": {
       "title": "Enviados por região",
       "subtitle": "Últimos 7 dias · escala compartilhada",
-      "subtitleOwnScale": "Últimos 7 dias · escala própria por região",
       "total": "{count} · 7d"
     },
     "perRegion": {

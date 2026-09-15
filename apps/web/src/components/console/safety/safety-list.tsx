@@ -115,7 +115,7 @@ export function SafetyList() {
       <PageHeader
         title={t("title")}
         subtitle={t("proof", counts)}
-        actions={<Tooltip text={t("info")} />}
+        titleAdornment={<Tooltip text={t("info")} />}
       />
       <div
         className="ms-filter-row"
@@ -135,9 +135,12 @@ export function SafetyList() {
         <Select
           value={status}
           onChange={setStatus}
-          width={150}
+          width={160}
           ariaLabel={t("filters.status", { value: t(`status.${status}`) })}
-          options={STATUSES.map((s) => ({ value: s, label: t(`status.${s}`) }))}
+          options={STATUSES.map((s) => ({
+            value: s,
+            label: t("filters.status", { value: t(`status.${s}`) }),
+          }))}
         />
         <Select
           value={reason}
@@ -147,8 +150,11 @@ export function SafetyList() {
             value: reason === "all" ? t("filters.all") : t(`reasons.${reason}`),
           })}
           options={[
-            { value: "all", label: t("filters.all") },
-            ...REASONS.map((r) => ({ value: r, label: t(`reasons.${r}`) })),
+            { value: "all", label: t("filters.reason", { value: t("filters.all") }) },
+            ...REASONS.map((r) => ({
+              value: r,
+              label: t("filters.reason", { value: t(`reasons.${r}`) }),
+            })),
           ]}
         />
         <Select
@@ -159,10 +165,12 @@ export function SafetyList() {
             value: region === "all" ? t("filters.all") : domains(`regions.${region}`),
           })}
           options={[
-            { value: "all", label: t("filters.all") },
+            { value: "all", label: t("filters.region", { value: t("filters.all") }) },
             ...DOMAIN_REGIONS.map((r) => ({
               value: r,
-              label: `${regionFlag(r)} ${domains(`regions.${r}`)}`,
+              label: t("filters.region", {
+                value: `${regionFlag(r)} ${domains(`regions.${r}`)}`,
+              }),
             })),
           ]}
         />
@@ -173,7 +181,7 @@ export function SafetyList() {
       ) : (
         <>
           <div className="ms-card" style={{ padding: 0 }}>
-            <Table>
+            <Table className="nowrap">
               <thead>
                 <tr>
                   {th("name")}

@@ -20,7 +20,7 @@ const t = schema.teams;
 const st = schema.teamStandings;
 const teamRegion = sql<
   string | null
->`(select d.region from ${schema.domains} d where d.team_id = ${t.id} order by d.verified_at desc nulls last, d.created_at desc limit 1)`;
+>`(select d.region from ${schema.domains} d where d.team_id = ${t}."id" order by d.verified_at desc nulls last, d.created_at desc limit 1)`;
 
 const SORT_KEYS = ["name", "type", "score", "guardrail", "reason", "status", "since"] as const;
 const planRank = sql<number>`case ${t.plan}::text when 'free' then 0 when 'starter' then 1 when 'pro' then 2 when 'scale' then 3 else 4 end`;
@@ -62,8 +62,8 @@ export const consoleSafetyRouter = router({
           or(
             ilike(t.name, like),
             ilike(t.slug, like),
-            sql`exists (select 1 from ${schema.teamMembers} m join ${schema.user} u on u.id = m.user_id where m.team_id = ${t.id} and u.email ilike ${like})`,
-            sql`exists (select 1 from ${schema.domains} d where d.team_id = ${t.id} and d.name ilike ${like})`,
+            sql`exists (select 1 from ${schema.teamMembers} m join ${schema.user} u on u.id = m.user_id where m.team_id = ${t}."id" and u.email ilike ${like})`,
+            sql`exists (select 1 from ${schema.domains} d where d.team_id = ${t}."id" and d.name ilike ${like})`,
           ),
         );
       }
@@ -155,7 +155,7 @@ export const consoleSafetyRouter = router({
         ctx.db
           .select({
             region: teamRegion,
-            domains: sql<number>`(select count(*)::int from ${schema.domains} d where d.team_id = ${t.id} and d.status = 'verified')`,
+            domains: sql<number>`(select count(*)::int from ${schema.domains} d where d.team_id = ${t}."id" and d.status = 'verified')`,
           })
           .from(t)
           .where(eq(t.id, team.id))
@@ -206,6 +206,25 @@ export const consoleSafetyRouter = router({
           .orderBy(desc(schema.auditLog.createdAt))
           .limit(20),
       ]);
+    // The tail names the people behind user actors, as the audit screens do.
+    const actorIds = [
+      ...new Set(
+        audit.flatMap((row) => {
+          const actor = parseAuditActor(row.actorId);
+          return actor.kind === "user" ? [actor.id] : [];
+        }),
+      ),
+    ];
+    const actorNames = new Map(
+      actorIds.length > 0
+        ? (
+            await ctx.db
+              .select({ id: schema.user.id, name: schema.user.name, email: schema.user.email })
+              .from(schema.user)
+              .where(inArray(schema.user.id, actorIds))
+          ).map((u) => [u.id, u.name || u.email])
+        : [],
+    );
     return {
       team: {
         id: team.id,
@@ -253,7 +272,14 @@ export const consoleSafetyRouter = router({
           failingCount: failing.length,
         };
       }),
-      audit: audit.map((row) => ({ ...row, actor: parseAuditActor(row.actorId) })),
+      audit: audit.map((row) => {
+        const actor = parseAuditActor(row.actorId);
+        return {
+          ...row,
+          actor,
+          actorName: actor.kind === "user" ? (actorNames.get(actor.id) ?? null) : null,
+        };
+      }),
     };
   }),
 
