@@ -95,10 +95,13 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
       return {
         credentialsConfigured: awsCredentialsConfigured(),
         region: env.AWS_REGION,
-        // Whether the caller may open the instance console (Settings → SES card).
-        isOperator: await isInstanceOperator(ctx.db, ctx.session.user.id),
       };
     }),
+
+    /** Whether the caller is the instance operator, for the Settings → SES console card. */
+    operator: teamProcedure.query(async ({ ctx }) => ({
+      isOperator: await isInstanceOperator(ctx.db, ctx.session.user.id),
+    })),
 
     /**
      * Deployment facts every tenant's screens need, cloud included — nothing
