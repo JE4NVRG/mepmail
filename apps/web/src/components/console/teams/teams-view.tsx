@@ -295,7 +295,7 @@ export function TeamsView() {
                         title={row.ownerEmail ?? undefined}
                         style={{
                           color: "var(--ms-muted)",
-                          maxWidth: 180,
+                          maxWidth: 170,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                         }}
