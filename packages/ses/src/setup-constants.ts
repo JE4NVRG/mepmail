@@ -408,13 +408,19 @@ export function snsTopicPolicy(topicArn: string, accountId: string): object {
 }
 
 /**
- * Events-queue policy: only the events topic may write, and the millionsend
- * IAM user may consume. The consume grant lives here (resource policy) rather
- * than in SES_IAM_POLICY because a same-account resource policy suffices on
- * SQS, and the identity policy — created once, adopted on re-runs — could not
- * gain new statements on deployments that predate the queue.
+ * Events-queue policy: only the events topics may write (one per served
+ * region; SNS delivers across regions), and the millionsend IAM user may
+ * consume. The consume grant lives here (resource policy) rather than in
+ * SES_IAM_POLICY because a same-account resource policy suffices on SQS, and
+ * the identity policy — created once, adopted on re-runs — could not gain new
+ * statements on deployments that predate the queue.
  */
-export function sqsQueuePolicy(queueArn: string, topicArn: string, accountId: string): object {
+export function sqsQueuePolicy(
+  queueArn: string,
+  topicArns: string | readonly string[],
+  accountId: string,
+): object {
+  const arns = typeof topicArns === "string" ? [topicArns] : [...topicArns];
   return {
     Version: "2012-10-17",
     Statement: [
@@ -423,7 +429,9 @@ export function sqsQueuePolicy(queueArn: string, topicArn: string, accountId: st
         Principal: { Service: "sns.amazonaws.com" },
         Action: "sqs:SendMessage",
         Resource: queueArn,
-        Condition: { ArnEquals: { "aws:SourceArn": topicArn } },
+        // One topic stays a plain string: the generated shell script splices
+        // its ARN into exactly that shape.
+        Condition: { ArnEquals: { "aws:SourceArn": arns.length === 1 ? arns[0] : arns } },
       },
       {
         Effect: "Allow",

@@ -93,6 +93,38 @@ export function envValue(content: string | null, key: string): string | null {
   return null;
 }
 
+/** Comma-separated .env value → trimmed entries. */
+function envList(content: string | null, key: string): string[] {
+  return (envValue(content, key) ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/** The SES regions an .env serves, read the way the app reads them: AWS_REGIONS, else AWS_REGION, else the built-in default. */
+export function servedRegionsInEnv(content: string | null): string[] {
+  const listed = envList(content, "AWS_REGIONS");
+  if (listed.length > 0) return listed;
+  return [envValue(content, "AWS_REGION") || "us-east-1"];
+}
+
+/**
+ * The .env entries that add a region to an existing install: the region
+ * joins AWS_REGIONS (seeded from the region already served when the list did
+ * not exist yet) and the topic joins SNS_TOPIC_ARNS. AWS_REGION and
+ * SQS_QUEUE_URL are left as they are.
+ */
+export function addRegionEnvEntries(
+  content: string | null,
+  region: string,
+  topicArn: string,
+): Record<string, string> {
+  return {
+    AWS_REGIONS: [...new Set([...servedRegionsInEnv(content), region])].join(","),
+    SNS_TOPIC_ARNS: [...new Set([...envList(content, "SNS_TOPIC_ARNS"), topicArn])].join(","),
+  };
+}
+
 /** The wizard-managed secrets that are missing or empty in the given .env content. */
 export function missingSecrets(content: string): string[] {
   return SECRET_KEYS.filter((key) => !envValue(content, key));
@@ -198,8 +230,19 @@ export function flowPlan(
       `cloud: IS_CLOUD=true; prompt for ${CLOUD_REQUIRED_KEYS.join(", ")} and STRIPE_PORTAL_CONFIG; offer the docs profile`,
     );
   }
-  for (const line of setupPlan({ region: opts.region, appBaseUrl: opts.appBaseUrl })) {
-    lines.push(`aws: ${line}`);
+  if (
+    state.envContent !== null &&
+    envValue(state.envContent, "AWS_ACCESS_KEY_ID") &&
+    envValue(state.envContent, "SNS_TOPIC_ARNS") &&
+    envValue(state.envContent, "SQS_QUEUE_URL")
+  ) {
+    lines.push(
+      `aws: already set up (${servedRegionsInEnv(state.envContent).join(", ")}) — offer to add a region (its topic and configuration set, events into the existing queue, no new key) or a full re-run`,
+    );
+  } else {
+    for (const line of setupPlan({ region: opts.region, appBaseUrl: opts.appBaseUrl })) {
+      lines.push(`aws: ${line}`);
+    }
   }
   const upCommand = `docker ${composeUpArgs(state.composeContent).join(" ")}`;
   lines.push(
