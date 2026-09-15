@@ -67,7 +67,7 @@ import {
 // Wrapped at print time to the live terminal width — baked-in line breaks
 // double-wrap on narrow terminals (soft wrap first, then the hard break).
 const DESCRIPTION_TEXT =
-  "Sets up a self-hosted MillionSend end to end: a .env with generated secrets, the AWS resources (IAM user + key, SNS event topic, SES configuration set), and the Docker launch. Run it in the directory MillionSend should live in — an empty one works. Every step is offered, skippable, and safe to re-run.";
+  "Sets up a self-hosted MillionSend end to end: a .env with generated secrets, the AWS resources (IAM user + key, SNS event topic, SES configuration set), and the Docker launch. Run it in the directory MillionSend should live in — an empty one works. Every step is offered, skippable, and safe to re-run. Sub-commands: add-region <region> (a further SES region on an existing install), teardown.";
 const descriptionWidth = (): number => Math.min(process.stdout.columns || 80, 80) - 2;
 const DESCRIPTION = (): string => wrapText(DESCRIPTION_TEXT, descriptionWidth());
 
@@ -149,6 +149,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   const rl = lineReader();
   try {
     printHeader();
+    if (argv[0] === "add-region") return await addRegionMain(rl, argv.slice(1), dryRun);
     if (teardown) return await teardownMain(rl, dryRun);
 
     const interactive = process.stdin.isTTY === true && process.stdout.isTTY === true;
@@ -843,6 +844,7 @@ async function addRegionStep(
   env: string | null,
   queueUrl: string,
   writeEnv: (entries: Record<string, string>) => boolean,
+  preset: string | null = null,
 ): Promise<void> {
   const queue = parseSqsQueueUrl(queueUrl);
   if (!queue) {
@@ -854,7 +856,7 @@ async function addRegionStep(
   const accountId = await resolveIdentity(rl);
   if (accountId === null) return;
   const served = servedRegionsInEnv(env);
-  const region = await chooseRegion(rl);
+  const region = preset ?? (await chooseRegion(rl));
   if (region === null) return;
   if (served.includes(region)) {
     console.log(dim(`${region} is already served (${served.join(", ")}) — nothing to add.`));
@@ -917,6 +919,91 @@ async function addRegionStep(
       "The SNS subscription confirms itself once the app runs with these values;\nif it stays pending, use 'Request confirmation' on it in the SNS console.",
     );
   }
+}
+
+/**
+ * `setup add-region [region]`: the add-region step on its own, without the
+ * rest of the wizard. Where the install's .env is — the deploy directory, or
+ * the container's `setup` mode on the server — it edits that file; anywhere
+ * else it asks for the install's queue, topics and regions and prints the
+ * two lines to apply. --dry-run prints the plan and touches nothing.
+ */
+async function addRegionMain(rl: LineReader, args: string[], dryRun: boolean): Promise<number> {
+  const preset = args.find((arg) => !arg.startsWith("--")) ?? null;
+  if (preset !== null && !REGION_RE.test(preset)) {
+    console.error(`Not an AWS region name: ${preset}`);
+    return 1;
+  }
+  const interactive = process.stdin.isTTY === true && process.stdout.isTTY === true;
+  const envPath = join(process.cwd(), ".env");
+  let env = readCwdFile(".env");
+  let queueUrl = envValue(env, "SQS_QUEUE_URL") || process.env.SQS_QUEUE_URL || "";
+  if (env !== null && queueUrl === "") {
+    console.error("This .env has no SQS_QUEUE_URL — run the full setup first, then add regions.");
+    return 1;
+  }
+  let appBaseUrl = envValue(env, "APP_BASE_URL") || process.env.APP_BASE_URL || "";
+  if (dryRun) {
+    console.log(bold("Plan:"));
+    const plan = addRegionPlan({
+      region: preset ?? "<region>",
+      queueUrl: queueUrl || "<SQS_QUEUE_URL>",
+      appBaseUrl,
+    });
+    for (const line of plan) console.log(`  · ${line}`);
+    console.log("\n--dry-run: nothing was created or written.");
+    return 0;
+  }
+  let writeEnv: (entries: Record<string, string>) => boolean;
+  if (env === null) {
+    console.log(
+      dim(
+        "No .env here — the install's current values are asked for and the result is printed, not written.\n",
+      ),
+    );
+    queueUrl =
+      queueUrl || (await rl.question("SQS_QUEUE_URL — the install's events queue: ")).trim();
+    if (queueUrl === "") {
+      console.error("An events queue is required: the new region's topic delivers into it.");
+      return 1;
+    }
+    const topics = (
+      await rl.question(
+        "SNS_TOPIC_ARNS — the topic ARNs the install already allows, comma-separated: ",
+      )
+    ).trim();
+    if (topics === "") {
+      console.error(
+        "The queue policy is rewritten with the topics listed here; an empty list would cut off the existing regions' events.",
+      );
+      return 1;
+    }
+    const queueRegion = parseSqsQueueUrl(queueUrl)?.region ?? "";
+    const regions =
+      (
+        await rl.question(
+          `AWS_REGIONS — the regions the install serves today, comma-separated [${queueRegion}]: `,
+        )
+      ).trim() || queueRegion;
+    appBaseUrl =
+      (
+        await rl.question(
+          `APP_BASE_URL — for the optional https push of events (empty: queue only)${appBaseUrl ? ` [${appBaseUrl}]` : ""}: `,
+        )
+      ).trim() || appBaseUrl;
+    env = upsertEnv("", { AWS_REGIONS: regions, SNS_TOPIC_ARNS: topics, SQS_QUEUE_URL: queueUrl });
+    writeEnv = () => false;
+  } else {
+    console.log(dim(`Found ${envPath} — the region is written into it.\n`));
+    writeEnv = (entries) => {
+      env = upsertEnv(env ?? "", entries);
+      writeFileSync(envPath, env, { mode: 0o600 });
+      chmodSync(envPath, 0o600);
+      return true;
+    };
+  }
+  await addRegionStep(rl, interactive, appBaseUrl, env, queueUrl, writeEnv, preset);
+  return 0;
 }
 
 /**

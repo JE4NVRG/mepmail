@@ -235,12 +235,22 @@ de novo); identidades, cota de 24 horas, taxa de envio e status de sandbox são
 todos por região; os eventos de todas as regiões caem na única fila SQS,
 porque o SNS entrega entre regiões.
 
-Rode o assistente de novo no diretório do `.env` e escolha **Add a region** na
-etapa de AWS:
+Rode o comando `add-region` do assistente onde o `.env` está — o diretório de
+deploy, ou no servidor pela imagem, com credenciais de admin de curta duração
+no ambiente (nada fica gravado):
 
 ```sh
-npx @millionsend/setup
+npx @millionsend/setup add-region us-east-1
+# ou, no servidor, a partir do diretório de deploy:
+docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms \
+  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
+  -v "$PWD":/work -w /work ghcr.io/millionsend/millionsend:latest setup add-region us-east-1
 ```
+
+O assistente interativo oferece a mesma etapa como **Add a region** na etapa
+de AWS. Rodado em qualquer outro lugar, sem `.env`, o comando pergunta
+`SQS_QUEUE_URL`, `SNS_TOPIC_ARNS` e `AWS_REGIONS` da instalação e imprime as
+duas linhas em vez de gravá-las.
 
 Ele mantém o usuário IAM, a política e a chave de acesso (nenhuma chave nova),
 cria na nova região o tópico SNS, o configuration set do SES com seu event

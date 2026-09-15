@@ -10,6 +10,7 @@ MillionSend API (migrations from other providers).
 npx @millionsend/setup            # the wizard
 npx @millionsend/setup --dry-run  # print the full plan, touch nothing
 npx @millionsend/setup teardown   # delete the AWS resources it created
+npx @millionsend/setup add-region us-east-1   # a further SES region on an existing install
 ```
 
 ## What it does
