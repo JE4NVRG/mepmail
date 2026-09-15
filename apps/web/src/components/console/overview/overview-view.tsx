@@ -97,6 +97,19 @@ export function OverviewView() {
                 ))}
                 <AddRegionCard region={regions.data.known[0]?.region ?? "eu-west-1"} />
               </>
+            ) : regions.isError ? (
+              <div className="ms-card ms-state" style={{ gridColumn: "1 / -1" }}>
+                <p className="ms-state-headline">{common("loadError")}</p>
+                <div className="ms-state-actions">
+                  <button
+                    type="button"
+                    className="ms-btn ms-btn-secondary"
+                    onClick={() => regions.refetch()}
+                  >
+                    {common("retry")}
+                  </button>
+                </div>
+              </div>
             ) : (
               <Ghosts n={3} height={220} />
             )}

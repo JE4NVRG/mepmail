@@ -80,6 +80,9 @@ function KpiCard({ kind, initial }: { kind: KpiKind; initial: PeriodKey }) {
               })
             : t("kpi.complaintLines");
     }
+  } else if (query.isError) {
+    headline = common("none");
+    sub = common("loadError");
   }
 
   const open = () => setDialog(true);

@@ -1,6 +1,5 @@
 import { env, isCloudDeployment, servedRegions, sesTenantsEnabled } from "@millionsend/config";
 import {
-  DAY_MS,
   getInstanceSettings,
   holdRegion,
   latestProbes,
@@ -18,7 +17,7 @@ import {
   SES_REGIONS,
 } from "@millionsend/ses";
 import { TRPCError } from "@trpc/server";
-import { eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { type RegionAccountDeps, servedRegionAccounts } from "../../console/ses-regions";
 import { operatorProcedure, router } from "../../trpc";
@@ -176,24 +175,14 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
     accessRequestFacts: operatorProcedure.input(regionInput).query(async ({ ctx, input }) => {
       assertServed(input.region);
       const now = new Date();
-      const c = schema.usageCounters;
       const d = schema.domains;
-      const [teams, peak, day, week, aligned] = await Promise.all([
+      const [teams, daily, day, week, aligned] = await Promise.all([
         ctx.db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(schema.teams)
+          .select({ n: sql<number>`count(distinct ${d.teamId})::int` })
+          .from(d)
+          .where(and(eq(d.region, input.region), eq(d.status, "verified")))
           .then((r) => r[0]?.n ?? 0),
-        ctx.db
-          .select({ n: sql<string>`coalesce(max(daily.sent), 0)::bigint` })
-          .from(
-            ctx.db
-              .select({ sent: sql`sum(${c.sent})`.as("sent") })
-              .from(c)
-              .where(gte(c.day, new Date(now.getTime() - 30 * DAY_MS).toISOString().slice(0, 10)))
-              .groupBy(c.day)
-              .as("daily"),
-          )
-          .then((r) => Number(r[0]?.n ?? 0)),
+        regionDailySends(ctx.db, { now, days: 30 }),
         regionWindowCounts(ctx.db, { now, hours: 24 }),
         regionCounterTotals(ctx.db, { now, days: 7 }),
         ctx.db
@@ -202,7 +191,7 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
             dmarc: sql<number>`count(*) filter (where ${d.dmarcPolicy} is not null)::int`,
           })
           .from(d)
-          .where(eq(d.status, "verified"))
+          .where(and(eq(d.region, input.region), eq(d.status, "verified")))
           .then((r) => r[0] ?? { total: 0, dmarc: 0 }),
       ]);
       const w = week.get(input.region);
@@ -210,7 +199,7 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
         region: input.region,
         teams,
         sent24h: day.get(input.region)?.sent ?? 0,
-        peak30d: peak,
+        peak30d: Math.max(0, ...(daily.get(input.region) ?? []).map((p) => p.sent)),
         hardBounceRate7d: w && w.sent > 0 ? w.hardBounced / w.sent : 0,
         complaintRate7d: w && w.sent > 0 ? w.complained / w.sent : 0,
         domainsVerified: aligned.total,

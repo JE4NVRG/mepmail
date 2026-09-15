@@ -21,7 +21,7 @@ export function RegionBreakerBanner() {
           key={r.region}
           tone="danger"
           text={
-            r.manualReason
+            r.held
               ? t("held", { region: r.region })
               : t("paused", {
                   region: r.region,

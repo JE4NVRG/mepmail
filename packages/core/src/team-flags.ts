@@ -1,9 +1,10 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import type { TeamFlagDetail } from "@millionsend/db/schema";
-import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { fetchAccountScore } from "./account-score.js";
 import {
+  type DeliverabilityHealth,
   type DeliverabilityStatus,
   fetchDeliverabilityHealth,
   GUARDRAIL_WINDOW_DAYS,
@@ -32,6 +33,7 @@ export interface TeamStandingRow {
   teamId: string;
   scoreTenths: number | null;
   guardrail: DeliverabilityStatus;
+  guardrailMetric: "complaint" | "hard_bounce" | null;
   complaintRate7d: number;
   hardBounceRate7d: number;
   sent7d: number;
@@ -67,6 +69,7 @@ export async function computeTeamStandings(
       teamId: team.teamId,
       scoreTenths: score.scoreTenths,
       guardrail: health.status,
+      guardrailMetric: guardrailMetricOf(health),
       complaintRate7d: health.complaintRate,
       hardBounceRate7d: health.bounceRate,
       sent7d: health.sent,
@@ -74,6 +77,13 @@ export async function computeTeamStandings(
     });
   }
   return rows;
+}
+
+/** The metric behind the guardrail's standing: the pause reason when paused, else the warning's. */
+function guardrailMetricOf(health: DeliverabilityHealth): TeamStandingRow["guardrailMetric"] {
+  if (health.status === "ok") return null;
+  const reason = health.reasons.find((r) => r.tier === health.status) ?? health.reasons[0] ?? null;
+  return reason === null ? null : reason.metric === "bounce" ? "hard_bounce" : "complaint";
 }
 
 export async function saveTeamStandings(
@@ -90,6 +100,7 @@ export async function saveTeamStandings(
       set: {
         scoreTenths: sql`excluded.score_tenths`,
         guardrail: sql`excluded.guardrail`,
+        guardrailMetric: sql`excluded.guardrail_metric`,
         complaintRate7d: sql`excluded.complaint_rate_7d`,
         hardBounceRate7d: sql`excluded.hard_bounce_rate_7d`,
         sent7d: sql`excluded.sent_7d`,
@@ -97,6 +108,15 @@ export async function saveTeamStandings(
         computedAt: now,
       },
     });
+}
+
+/** Drop the rows a run did not refresh: a team that stopped sending has no standing, not a frozen one. */
+export async function pruneTeamStandings(db: Db, refreshedAt: Date): Promise<number> {
+  const gone = await db
+    .delete(schema.teamStandings)
+    .where(lt(schema.teamStandings.computedAt, refreshedAt))
+    .returning({ teamId: schema.teamStandings.teamId });
+  return gone.length;
 }
 
 export interface FlagTrigger {
@@ -107,7 +127,9 @@ export interface FlagTrigger {
 /** The trigger a standing fires, strongest first; null when the team is fine. */
 export function flagTrigger(s: TeamStandingRow): FlagTrigger | null {
   if (s.guardrail !== "ok") {
-    const metric = s.hardBounceRate7d >= FLAG_HARD_BOUNCE_RATE ? "hard_bounce" : "complaint";
+    const metric =
+      s.guardrailMetric ??
+      (s.hardBounceRate7d >= FLAG_HARD_BOUNCE_RATE ? "hard_bounce" : "complaint");
     return {
       reason: "guardrail",
       detail: {
@@ -134,18 +156,24 @@ export function flagTrigger(s: TeamStandingRow): FlagTrigger | null {
 /**
  * Bring the automatic flags in line with the standings. A team with a
  * trigger and no open flag gets one, unless an operator cleared a flag for
- * the same reason and the trigger never went away since (their call stands);
- * an open automatic flag whose trigger is gone is cleared; an operator's
- * manual flag is never touched. `opened_at` of an open flag is left alone
- * so the list's "since" holds still.
+ * the same reason and the trigger has held since (their call stands; a
+ * trigger that lapsed and came back is a new finding, judged against the
+ * previous run's standings, so `previous` must be the rows saved before this
+ * run's); an open automatic flag whose trigger is gone is cleared; an
+ * operator's manual flag is never touched. `opened_at` of an open flag is
+ * left alone so the list's "since" holds still.
  */
 export async function syncTeamFlags(
   db: Db,
   standings: readonly TeamStandingRow[],
   now: Date = new Date(),
+  previous?: readonly TeamStandingRow[],
 ): Promise<{ opened: number; cleared: number }> {
   const f = schema.teamFlags;
   const open = await db.select().from(f).where(eq(f.status, "open"));
+  const before = new Map(
+    (previous ?? (await db.select().from(schema.teamStandings))).map((row) => [row.teamId, row]),
+  );
   const openByTeam = new Map(open.map((row) => [row.teamId, row]));
   const triggered = new Map(
     standings.flatMap((s) => {
@@ -172,7 +200,9 @@ export async function syncTeamFlags(
       .where(eq(f.teamId, teamId))
       .orderBy(desc(f.openedAt))
       .limit(1);
-    if (latest?.clearedBy && latest.reason === trigger.reason) continue;
+    const prior = before.get(teamId);
+    const held = prior !== undefined && flagTrigger(prior)?.reason === trigger.reason;
+    if (held && latest?.clearedBy && latest.reason === trigger.reason) continue;
     await db.insert(f).values({
       teamId,
       reason: trigger.reason,

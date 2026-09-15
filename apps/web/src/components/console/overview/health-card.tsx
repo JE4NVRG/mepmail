@@ -147,9 +147,11 @@ export function HealthCard({ summary }: { summary: Summary }) {
   rows.push({
     probe: "worker_heartbeat",
     tone: !worker ? "off" : workerStale ? "danger" : toneOf(worker, worker.ok === true),
-    how: worker
-      ? t("health.how.worker", { ago: formatRelative(worker.takenAt as Date, locale) })
-      : t("health.noProbes"),
+    how: !worker
+      ? t("health.noProbes")
+      : t(workerStale ? "health.stale" : "health.how.worker", {
+          ago: formatRelative(worker.takenAt as Date, locale),
+        }),
     muted: !worker,
     formatValue: count,
   });

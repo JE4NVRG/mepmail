@@ -3639,8 +3639,9 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
           });
           if (reservation.reserved) continue;
           // Nothing parks for a month: a monthly plan at its included volume
-          // with overage off refuses the whole batch.
-          if (quota.kind === "month") {
+          // with overage off refuses the whole batch. A full day under an
+          // operator ceiling is the daily case below, tail parked.
+          if (quota.kind === "month" && reservation.cap !== "day") {
             throw new AcceptRejectedError(
               {
                 ok: false,

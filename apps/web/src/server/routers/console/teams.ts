@@ -225,7 +225,12 @@ export const consoleTeamsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const team = await loadTeam(ctx.db, input.id);
-      if (team.stripeSubscriptionId) {
+      // A live subscription owns the plan; an ended one (canceled, never
+      // completed) leaves the row to the operator.
+      if (
+        team.stripeSubscriptionId &&
+        !["none", "canceled", "incomplete"].includes(team.planStatus)
+      ) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "managed_by_stripe" });
       }
       const rung = operatorRungs().find(
@@ -306,7 +311,14 @@ export const consoleTeamsRouter = router({
         }
       }
       const cloud = isCloudDeployment();
+      // A lifted ceiling frees parked rows even when the month's capacity
+      // reads the same, so the ceiling is compared on its own.
+      const lifted =
+        (input.dailySendCeiling ?? Number.POSITIVE_INFINITY) >
+        (team.dailySendCeiling ?? Number.POSITIVE_INFINITY);
       if (
+        lifted ||
+        (pausedBefore && !input.broadcastsPaused) ||
         raisesQuota(
           teamQuota(team, cloud),
           teamQuota({ ...team, dailySendCeiling: input.dailySendCeiling }, cloud),
@@ -327,12 +339,11 @@ export const consoleTeamsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const team = await loadTeam(ctx.db, input.id);
-      if (!team.broadcastsPausedByOperatorAt) {
-        await ctx.db
-          .update(t)
-          .set({ broadcastsPausedByOperatorAt: new Date() })
-          .where(eq(t.id, team.id));
-      }
+      if (team.broadcastsPausedByOperatorAt) return;
+      await ctx.db
+        .update(t)
+        .set({ broadcastsPausedByOperatorAt: new Date() })
+        .where(eq(t.id, team.id));
       await auditOperator(ctx, {
         teamId: team.id,
         action: "team.broadcasts_paused",
@@ -355,6 +366,7 @@ export const consoleTeamsRouter = router({
     .input(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const team = await loadTeam(ctx.db, input.id);
+      if (!team.broadcastsPausedByOperatorAt) return;
       await ctx.db.update(t).set({ broadcastsPausedByOperatorAt: null }).where(eq(t.id, team.id));
       await auditOperator(ctx, {
         teamId: team.id,
@@ -362,6 +374,7 @@ export const consoleTeamsRouter = router({
         target: { type: "team", id: team.id },
         metadata: { name: team.name },
       });
+      await kickQuotaDrain();
     }),
 
   /** Every send refused until reinstated; owners hear about it unless it is phishing. */
@@ -401,6 +414,17 @@ export const consoleTeamsRouter = router({
           reason: reasonText(locale, "team.suspended", input.reason, input.note),
         }));
       }
+      // The trust & safety list is the register of suspended teams, so a
+      // suspension without a flag opens a manual one.
+      await ctx.db
+        .insert(schema.teamFlags)
+        .values({
+          teamId: team.id,
+          reason: "manual",
+          note: input.note ?? null,
+          openedBy: ctx.operator.id,
+        })
+        .onConflictDoNothing();
     }),
 
   reinstate: operatorProcedure
@@ -420,6 +444,7 @@ export const consoleTeamsRouter = router({
       if (team.suspendedAt && team.suspensionReason !== "phishing") {
         await mailTeamOwners(ctx.db, team, "team.reinstated", "/emails", () => ({}));
       }
+      await kickQuotaDrain();
     }),
 });
 

@@ -111,3 +111,37 @@ it.each([
     expect(rescheduled).toHaveLength(1);
   },
 );
+
+it("a suspension landing mid-walk stops the fan-out at the page edge; the resumed walk sends the rest once", async () => {
+  const teamId = await seedTeam("mid-walk");
+  const broadcastId = await insertBroadcast(teamId, "mid-walk");
+  const { deps, enqueued, rescheduled } = makeDeps();
+  const paged: BroadcastDeps = {
+    ...deps,
+    batchSize: 1,
+    enqueueEmailSends: async (batch) => {
+      await deps.enqueueEmailSends(batch);
+      // The operator suspends the team once the first page is out.
+      await db
+        .update(schema.teams)
+        .set({ suspendedAt: new Date(), suspensionReason: "manual" })
+        .where(eq(schema.teams.id, teamId));
+    },
+  };
+  expect(await sendBroadcast(db, paged, { broadcastId })).toBe("deferred");
+  expect(enqueued).toHaveLength(1);
+  expect(rescheduled).toHaveLength(1);
+  const [held] = await db
+    .select({ status: schema.broadcasts.status })
+    .from(schema.broadcasts)
+    .where(eq(schema.broadcasts.id, broadcastId));
+  expect(held?.status).toBe("sending");
+
+  await db
+    .update(schema.teams)
+    .set({ suspendedAt: null, suspensionReason: null })
+    .where(eq(schema.teams.id, teamId));
+  expect(await sendBroadcast(db, deps, { broadcastId })).toBe("sent");
+  expect(await emailsOf(broadcastId)).toHaveLength(2);
+  expect(enqueued).toHaveLength(2);
+});

@@ -26,6 +26,7 @@ CREATE TABLE "team_standings" (
 	"team_id" uuid PRIMARY KEY NOT NULL,
 	"score_tenths" integer,
 	"guardrail" text NOT NULL,
+	"guardrail_metric" text,
 	"complaint_rate_7d" double precision DEFAULT 0 NOT NULL,
 	"hard_bounce_rate_7d" double precision DEFAULT 0 NOT NULL,
 	"sent_7d" integer DEFAULT 0 NOT NULL,

@@ -1,11 +1,12 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   computeTeamStandings,
   flagTrigger,
+  pruneTeamStandings,
   saveTeamStandings,
   syncTeamFlags,
   type TeamStandingRow,
@@ -23,6 +24,7 @@ afterAll(() => close());
 const standing = (over: Partial<TeamStandingRow> & { teamId: string }): TeamStandingRow => ({
   scoreTenths: 80,
   guardrail: "ok",
+  guardrailMetric: null,
   complaintRate7d: 0,
   hardBounceRate7d: 0,
   sent7d: 1_000,
@@ -147,20 +149,77 @@ describe("syncTeamFlags", () => {
       clearedAt: new Date("2026-09-01T00:00:00Z"),
       openedAt: new Date("2026-08-30T00:00:00Z"),
     });
-    expect(await syncTeamFlags(db, [standing({ teamId, complaintRate7d: 0.002 })])).toEqual({
+    const noisy = standing({ teamId, complaintRate7d: 0.002 });
+    // The previous run fired the same trigger: the operator's clear stands.
+    expect(await syncTeamFlags(db, [noisy], new Date(), [noisy])).toEqual({
       opened: 0,
       cleared: 0,
     });
     expect(await flagsOf(teamId)).toHaveLength(1);
 
     // A different reason is a new finding.
-    expect(await syncTeamFlags(db, [standing({ teamId, scoreTenths: 20 })])).toEqual({
+    expect(
+      await syncTeamFlags(db, [standing({ teamId, scoreTenths: 20 })], new Date(), [noisy]),
+    ).toEqual({
       opened: 1,
       cleared: 0,
     });
     expect((await flagsOf(teamId)).filter((f) => f.status === "open")).toMatchObject([
       { reason: "score" },
     ]);
+  });
+
+  it("reopens a cleared reason once its trigger lapsed and came back", async () => {
+    const teamId = await createTeam(db, "lapsed");
+    await db.insert(schema.teamFlags).values({
+      teamId,
+      reason: "complaints",
+      status: "cleared",
+      clearedBy: "op",
+      clearedAt: new Date("2026-09-01T00:00:00Z"),
+      openedAt: new Date("2026-08-30T00:00:00Z"),
+    });
+    const noisy = standing({ teamId, complaintRate7d: 0.002 });
+    // The previous run was clean, so this is a fresh finding, not the one cleared.
+    expect(await syncTeamFlags(db, [noisy], new Date(), [standing({ teamId })])).toMatchObject({
+      opened: 1,
+    });
+    expect((await flagsOf(teamId)).filter((f) => f.status === "open")).toHaveLength(1);
+  });
+
+  it("reads the previous standings from the table when none are handed in", async () => {
+    const teamId = await createTeam(db, "from-table");
+    await db.insert(schema.teamFlags).values({
+      teamId,
+      reason: "complaints",
+      status: "cleared",
+      clearedBy: "op",
+      clearedAt: new Date("2026-09-01T00:00:00Z"),
+      openedAt: new Date("2026-08-30T00:00:00Z"),
+    });
+    const noisy = standing({ teamId, complaintRate7d: 0.002 });
+    await saveTeamStandings(db, [noisy]);
+    expect(await syncTeamFlags(db, [noisy])).toMatchObject({ opened: 0 });
+    expect((await flagsOf(teamId)).filter((f) => f.status === "open")).toEqual([]);
+  });
+});
+
+describe("guardrail metric", () => {
+  it("a guardrail tripped by hard bounces reads as such even when the 7-day rate is under the line", () => {
+    expect(
+      flagTrigger(
+        standing({
+          teamId: "t",
+          guardrail: "paused",
+          guardrailMetric: "hard_bounce",
+          hardBounceRate7d: 0.02,
+          complaintRate7d: 0.004,
+        }),
+      ),
+    ).toEqual({
+      reason: "guardrail",
+      detail: { guardrail: "paused", metric: "hard_bounce", rate: 0.02 },
+    });
   });
 });
 
@@ -180,6 +239,7 @@ describe("standings", () => {
         teamId,
         scoreTenths: 80,
         guardrail: "warning",
+        guardrailMetric: null,
         complaintRate7d: 0,
         hardBounceRate7d: 0,
         sent7d: 20,
@@ -188,6 +248,21 @@ describe("standings", () => {
       },
     ]);
     await saveTeamStandings(db, [], t2);
+  });
+
+  it("pruneTeamStandings drops what a run did not refresh", async () => {
+    const kept = await createTeam(db, "kept");
+    const gone = await createTeam(db, "gone");
+    const earlier = new Date("2026-09-10T00:00:00Z");
+    const later = new Date("2026-09-10T00:15:00Z");
+    await saveTeamStandings(db, [standing({ teamId: kept }), standing({ teamId: gone })], earlier);
+    await saveTeamStandings(db, [standing({ teamId: kept })], later);
+    expect(await pruneTeamStandings(db, later)).toBeGreaterThanOrEqual(1);
+    const left = await db
+      .select({ teamId: schema.teamStandings.teamId })
+      .from(schema.teamStandings)
+      .where(inArray(schema.teamStandings.teamId, [kept, gone]));
+    expect(left).toEqual([{ teamId: kept }]);
   });
 
   it("computeTeamStandings reads the counters of every team that sent", async () => {

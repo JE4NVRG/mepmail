@@ -190,7 +190,13 @@ export interface QuotaTeamRow {
 export type TeamQuota =
   /** Self-host: counted, never capped. */
   | { kind: "none" }
-  | { kind: "day"; plan: Plan; limit: number }
+  | {
+      kind: "day";
+      plan: Plan;
+      limit: number;
+      /** An operator ceiling on the day, enforced as typed (the plan's tolerance never stretches it). */
+      dailyCeiling?: number | null | undefined;
+    }
   | {
       kind: "month";
       plan: Plan;
@@ -252,8 +258,10 @@ function planQuota(team: QuotaTeamRow, isCloud: boolean, now: Date): TeamQuota {
  */
 function withCeiling(quota: TeamQuota, plan: Plan, ceiling: number | null): TeamQuota {
   if (ceiling === null) return quota;
-  if (quota.kind === "none") return { kind: "day", plan, limit: ceiling };
-  if (quota.kind === "day") return { ...quota, limit: Math.min(quota.limit, ceiling) };
+  if (quota.kind === "none") return { kind: "day", plan, limit: ceiling, dailyCeiling: ceiling };
+  if (quota.kind === "day") {
+    return { ...quota, limit: Math.min(quota.limit, ceiling), dailyCeiling: ceiling };
+  }
   return { ...quota, dailyCeiling: ceiling };
 }
 

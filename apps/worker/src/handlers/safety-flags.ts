@@ -1,5 +1,6 @@
 import {
   computeTeamStandings,
+  pruneTeamStandings,
   recordProbes,
   saveTeamStandings,
   syncTeamFlags,
@@ -19,9 +20,11 @@ export async function runSafetyFlags(
   opts: { now?: Date } = {},
 ): Promise<{ teams: number; opened: number; cleared: number }> {
   const now = opts.now ?? new Date();
+  const previous = await db.select().from(schema.teamStandings);
   const standings = await computeTeamStandings(db, now);
+  const flags = await syncTeamFlags(db, standings, now, previous);
   await saveTeamStandings(db, standings, now);
-  const flags = await syncTeamFlags(db, standings, now);
+  await pruneTeamStandings(db, now);
   try {
     const [row] = await db
       .select({ n: sql<number>`count(*)::int` })
