@@ -25,6 +25,7 @@ export const QUOTA_COLUMNS = {
   currentPeriodStart: schema.teams.currentPeriodStart,
   currentPeriodEnd: schema.teams.currentPeriodEnd,
   overageEnabled: schema.teams.overageEnabled,
+  dailySendCeiling: schema.teams.dailySendCeiling,
 } as const;
 
 /** teamQuota for a team row; null when the team does not exist. */
