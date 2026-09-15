@@ -32,6 +32,34 @@ describe("main --dry-run", () => {
   });
 });
 
+describe("main add-region --dry-run", () => {
+  afterEach(() => {
+    setColorMode("auto");
+    vi.restoreAllMocks();
+  });
+
+  it("prints the add-region plan for the named region without prompting or touching AWS", async () => {
+    setColorMode("never");
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.join(" "));
+    });
+    expect(await main(["add-region", "us-east-1", "--dry-run"])).toBe(0);
+    const out = lines.join("\n");
+    expect(out).toContain("Plan:");
+    expect(out).toContain("SNS topic millionsend-events in us-east-1");
+    expect(out).toContain("us-east-1 appended to AWS_REGIONS");
+    expect(out).toContain("nothing was created or written");
+  });
+
+  it("refuses a malformed region name", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await main(["add-region", "US East", "--dry-run"])).toBe(1);
+    expect(errors).toHaveBeenCalledWith("Not an AWS region name: US East");
+  });
+});
+
 describe("authAction", () => {
   it("proceeds when the identity check passed", () => {
     expect(authAction({ identityOk: true, hasAwsCli: false, isTTY: false })).toBe("proceed");
