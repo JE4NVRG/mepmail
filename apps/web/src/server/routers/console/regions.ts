@@ -3,6 +3,7 @@ import {
   DAY_MS,
   getInstanceSettings,
   holdRegion,
+  latestProbes,
   pausedRegions,
   regionCounterTotals,
   regionWindowCounts,
@@ -59,23 +60,35 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
       const served = servedRegions();
       const monthDays = now.getUTCDate();
       const d = schema.domains;
-      const [regionAccounts, settings, day, week, month, paused, domains, hourly, daily, events] =
-        await Promise.all([
-          accounts(),
-          getInstanceSettings(ctx.db),
-          regionWindowCounts(ctx.db, { now, hours: 24 }),
-          regionCounterTotals(ctx.db, { now, days: 7 }),
-          regionCounterTotals(ctx.db, { now, days: monthDays }),
-          pausedRegions(ctx.db),
-          ctx.db
-            .select({ region: d.region, n: sql<number>`count(*)::int` })
-            .from(d)
-            .where(eq(d.status, "verified"))
-            .groupBy(d.region),
-          regionHourlySends(ctx.db, { now, hours: 24 }),
-          regionDailySends(ctx.db, { now, days: 7 }),
-          env.SNS_TOPIC_ARNS?.length ? sesEventsHealth(ctx.db, now) : Promise.resolve(null),
-        ]);
+      const [
+        regionAccounts,
+        settings,
+        day,
+        week,
+        month,
+        paused,
+        domains,
+        hourly,
+        daily,
+        events,
+        probes,
+      ] = await Promise.all([
+        accounts(),
+        getInstanceSettings(ctx.db),
+        regionWindowCounts(ctx.db, { now, hours: 24 }),
+        regionCounterTotals(ctx.db, { now, days: 7 }),
+        regionCounterTotals(ctx.db, { now, days: monthDays }),
+        pausedRegions(ctx.db),
+        ctx.db
+          .select({ region: d.region, n: sql<number>`count(*)::int` })
+          .from(d)
+          .where(eq(d.status, "verified"))
+          .groupBy(d.region),
+        regionHourlySends(ctx.db, { now, hours: 24 }),
+        regionDailySends(ctx.db, { now, days: 7 }),
+        env.SNS_TOPIC_ARNS?.length ? sesEventsHealth(ctx.db, now) : Promise.resolve(null),
+        latestProbes(ctx.db),
+      ]);
       const ceiling = settings.sesMaxSendRate ?? env.SES_MAX_SEND_RATE;
       const tenants = sesTenantsEnabled();
       const domainsByRegion = new Map(domains.map((r) => [r.region, r.n]));
@@ -136,7 +149,8 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
         }),
         known: SES_REGIONS.filter((r) => !served.includes(r)).map((region) => ({ region })),
         eventsHealth: events,
-        eventsLagSeconds: null as number | null,
+        // The SQS pipeline is one queue for every region; the lag the worker measured applies to all.
+        eventsLagSeconds: probes.get("ses_events_lag_s")?.value ?? null,
         cloud: isCloudDeployment(),
         defaultRegion: served[0] ?? env.AWS_REGION,
         envRegions: env.AWS_REGIONS ?? null,

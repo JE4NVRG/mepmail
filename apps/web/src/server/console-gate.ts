@@ -1,6 +1,17 @@
+import type { Db } from "@millionsend/db";
 import { getDb } from "@millionsend/db";
 import { getAuth } from "./auth";
 import { isInstanceOperator } from "./instance-operator";
+
+export interface ConsoleGateDeps {
+  session(headers: Headers): Promise<{ user: { id: string; email: string; name: string } } | null>;
+  db(): Db;
+}
+
+const defaultDeps: ConsoleGateDeps = {
+  session: (headers) => getAuth().api.getSession({ headers }),
+  db: getDb,
+};
 
 /**
  * The console's gate, shared by its layout and the pages under it: the
@@ -10,8 +21,9 @@ import { isInstanceOperator } from "./instance-operator";
  */
 export async function consoleOperator(
   headers: Headers,
+  deps: ConsoleGateDeps = defaultDeps,
 ): Promise<{ id: string; email: string; name: string } | null> {
-  const session = await getAuth().api.getSession({ headers });
+  const session = await deps.session(headers);
   if (!session) return null;
-  return (await isInstanceOperator(getDb(), session.user.id)) ? session.user : null;
+  return (await isInstanceOperator(deps.db(), session.user.id)) ? session.user : null;
 }

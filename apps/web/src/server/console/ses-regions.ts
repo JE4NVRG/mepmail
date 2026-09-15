@@ -28,6 +28,13 @@ export const defaultRegionAccountDeps: RegionAccountDeps = {
 };
 
 const cache = new Map<string, { at: number; value: Promise<RegionAccount> }>();
+let activeDeps: RegionAccountDeps = defaultRegionAccountDeps;
+
+/** Tests: swap the SES client factory (and clear the cache) instead of stubbing the AWS SDK. */
+export function setRegionAccountDeps(deps: RegionAccountDeps | null): void {
+  activeDeps = deps ?? defaultRegionAccountDeps;
+  cache.clear();
+}
 
 async function probe(region: string, deps: RegionAccountDeps): Promise<RegionAccount> {
   const now = deps.now?.() ?? new Date();
@@ -50,7 +57,7 @@ export function regionAccount(
   region: string,
   opts: { fresh?: boolean; deps?: RegionAccountDeps } = {},
 ): Promise<RegionAccount> {
-  const deps = opts.deps ?? defaultRegionAccountDeps;
+  const deps = opts.deps ?? activeDeps;
   const hit = cache.get(region);
   if (!opts.fresh && hit && Date.now() - hit.at < ACCOUNT_CACHE_MS) return hit.value;
   const value = probe(region, deps);
