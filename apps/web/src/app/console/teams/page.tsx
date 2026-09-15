@@ -1,4 +1,5 @@
-/** Placeholder: the screen owner replaces this file. */
-export default function ConsolePlaceholderPage() {
-  return null;
+import { TeamsView } from "@/components/console/teams/teams-view";
+
+export default function ConsoleTeamsPage() {
+  return <TeamsView />;
 }
