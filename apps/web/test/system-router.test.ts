@@ -120,6 +120,8 @@ describe("system.sesAccount", () => {
       region: "us-east-1",
       sendingEnabled: true,
       productionAccess: false,
+      enforcementStatus: null,
+      pricingPlan: null,
       quota: { max24h: 200, sentLast24h: 3, maxSendRate: 1 },
       committedPerDay: null,
     });

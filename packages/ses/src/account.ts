@@ -34,6 +34,14 @@ export interface SesAccountOverview {
   sendingEnabled: boolean;
   /** ProductionAccessEnabled — false means the account is in the SES sandbox. */
   productionAccess: boolean;
+  /** EnforcementStatus for this region: HEALTHY, PROBATION or SHUTDOWN; null when SES reports none. */
+  enforcementStatus: string | null;
+  /**
+   * PricingAttributes.CurrentPlan for this region: NONE (à la carte),
+   * ESSENTIALS, PRO or ENTERPRISE; null when SES reports none. A region with
+   * no prior sending starts on ESSENTIALS, which costs more per message.
+   */
+  pricingPlan: string | null;
   quota: {
     max24h: number;
     sentLast24h: number;
@@ -48,6 +56,8 @@ export async function getAccountOverview(client: SesAccountClient): Promise<SesA
   return {
     sendingEnabled: out.SendingEnabled ?? false,
     productionAccess: out.ProductionAccessEnabled ?? false,
+    enforcementStatus: out.EnforcementStatus ?? null,
+    pricingPlan: out.PricingAttributes?.CurrentPlan ?? null,
     quota: {
       max24h: out.SendQuota?.Max24HourSend ?? 0,
       sentLast24h: out.SendQuota?.SentLast24Hours ?? 0,
