@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { PopoverMenuItem } from "@/components/popover-menu";
 import { toast } from "@/components/toast";
 import { planLabel } from "@/lib/console-format";
@@ -72,6 +72,12 @@ export function useTeamActions(onChanged: () => void): TeamActions {
   const failed = (error: { message: string }) => {
     toast(t("toast.error", { message: error.message }), "danger");
   };
+  const detailError = detail.error;
+  useEffect(() => {
+    if (!detailError) return;
+    toast(t("toast.error", { message: detailError.message }), "danger");
+    setDialog(null);
+  }, [detailError, t]);
 
   const limits = useMutation(trpc.console.teams.adjustLimits.mutationOptions({ onError: failed }));
   const plan = useMutation(trpc.console.teams.changePlan.mutationOptions({ onError: failed }));

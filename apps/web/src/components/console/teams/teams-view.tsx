@@ -32,6 +32,7 @@ const SORT_KEYS = [
   "created",
 ] as const;
 const GUARDRAILS = ["ok", "warning", "paused"] as const;
+const TEAM_TYPES = ["free", "starter", "pro", "scale", "system"] as const;
 const GUARDRAIL_COLOR = {
   ok: "var(--ms-success)",
   warning: "var(--ms-warn)",
@@ -111,10 +112,11 @@ export function TeamsView() {
   const sort = oneOf(SORT_KEYS, sortParam, "sent30d");
   const dir: SortDir = oneOf(["asc", "desc"] as const, dirParam, "desc");
   const region = oneOf(DOMAIN_REGIONS, regionParam, "all");
+  const type = oneOf(TEAM_TYPES, typeParam, "all");
 
   const input = {
     ...(deferredSearch ? { search: deferredSearch } : {}),
-    ...(typeParam !== "all" ? { type: typeParam } : {}),
+    ...(type !== "all" ? { type } : {}),
     ...(region !== "all" ? { region } : {}),
     ...(guardrail !== "all" ? { guardrail } : {}),
     sort,
@@ -192,7 +194,7 @@ export function TeamsView() {
           />
         </div>
         <Select
-          value={plans.includes(typeParam) ? typeParam : "all"}
+          value={plans.includes(type) ? type : "all"}
           onChange={setType}
           ariaLabel={t("columns.type")}
           options={[

@@ -120,12 +120,20 @@ describe("console.teams.changePlan", () => {
     const managed = await createTeam(db, "managed");
     await db
       .update(schema.teams)
-      .set({ stripeSubscriptionId: "sub_123" })
+      .set({ stripeSubscriptionId: "sub_123", planStatus: "active" })
       .where(eq(schema.teams.id, managed));
     await expect(
       operator().console.teams.changePlan({ id: managed, plan: "pro", planQuota: 100_000 }),
     ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect((await team(managed)).plan).toBe("free");
+
+    // An ended subscription leaves the plan to the operator.
+    await db
+      .update(schema.teams)
+      .set({ planStatus: "canceled" })
+      .where(eq(schema.teams.id, managed));
+    await operator().console.teams.changePlan({ id: managed, plan: "pro", planQuota: 100_000 });
+    expect((await team(managed)).plan).toBe("pro");
   });
 
   it("writes the rung and records billing.plan_changed", async () => {
@@ -212,6 +220,17 @@ describe("pause, resume, suspend, reinstate", () => {
       actorId: `user:${OPERATOR}`,
       data: { reason: "manual", note: "asked", notified: false },
     });
+    // The suspension shows on the trust & safety list through a manual flag.
+    const [flag] = await db
+      .select()
+      .from(schema.teamFlags)
+      .where(eq(schema.teamFlags.teamId, teamId));
+    expect(flag).toMatchObject({
+      reason: "manual",
+      status: "open",
+      note: "asked",
+      openedBy: OPERATOR,
+    });
 
     await operator().console.teams.reinstate({ id: teamId });
     expect(await team()).toMatchObject({
@@ -224,6 +243,7 @@ describe("pause, resume, suspend, reinstate", () => {
       actorId: `user:${OPERATOR}`,
       data: { reason: "manual" },
     });
+    await db.delete(schema.teamFlags).where(eq(schema.teamFlags.teamId, teamId));
   });
 
   it("members cannot reach any of it", async () => {
@@ -280,7 +300,8 @@ describe("console.safety flags", () => {
     expect((await auditRows("console.flag_reopened"))[0]).toMatchObject({
       teamId,
       actorId: `user:${OPERATOR}`,
-      target: `team_flag:${flag.id}`,
+      target: `team_flag:${flags.find((f) => f.status === "open")?.id}`,
+      data: { from: flag.id },
     });
     await expect(operator().console.safety.reopenFlag({ flagId: flag.id })).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",

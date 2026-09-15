@@ -103,6 +103,10 @@ export function sumPoints(points: readonly CounterPoint[]): Omit<CounterPoint, "
  * A team's traffic is attributed to the region of its most recently
  * verified domain, the convention the platform breaker's weekly window
  * uses (usage counters carry no domain).
+ * ponytail: a team with verified domains in two regions has all of its
+ * series drawn in one of them, while the headline counts beside them split
+ * its rows by the sending domain; split the series by joining emails to
+ * domains when such teams matter.
  */
 export function teamRegionSubquery(db: Db) {
   const d = schema.domains;

@@ -1,5 +1,5 @@
 {
-  "id": "c7768141-6aac-46ba-90c3-ee32b5771d59",
+  "id": "600adeb5-cd9c-4951-b6da-664f2834fda6",
   "prevId": "997dd49d-b112-4277-b965-b68903fa1041",
   "version": "7",
   "dialect": "postgresql",
@@ -4297,6 +4297,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "guardrail_metric": {
+          "name": "guardrail_metric",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "complaint_rate_7d": {
           "name": "complaint_rate_7d",

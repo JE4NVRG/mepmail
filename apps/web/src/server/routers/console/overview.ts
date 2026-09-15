@@ -10,7 +10,7 @@ import {
 import { schema } from "@millionsend/db";
 import { gte, sql } from "drizzle-orm";
 import { z } from "zod";
-import { periodSchema, resolvePeriod } from "../../console/periods";
+import { periodSchema, previousPeriod, resolvePeriod } from "../../console/periods";
 import { servedRegionAccounts } from "../../console/ses-regions";
 import { operatorProcedure, router } from "../../trpc";
 import { instanceCounterSeries, sumPoints } from "./series";
@@ -87,15 +87,9 @@ export const consoleOverviewRouter = router({
     .query(async ({ ctx, input }) => {
       const now = new Date();
       const period = resolvePeriod(input.period, now);
-      const span = period.to.getTime() - period.from.getTime();
-      const previous = {
-        ...period,
-        from: new Date(period.from.getTime() - span),
-        to: new Date(period.from.getTime() - 1),
-      };
       const [points, before] = await Promise.all([
         instanceCounterSeries(ctx.db, period),
-        instanceCounterSeries(ctx.db, previous),
+        instanceCounterSeries(ctx.db, previousPeriod(period)),
       ]);
       return {
         grain: period.grain,

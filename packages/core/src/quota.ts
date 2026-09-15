@@ -44,6 +44,8 @@ export async function reserveDailyQuota(
     teamId: string;
     count: number;
     limit: number | null;
+    /** An operator ceiling: a hard line the tolerance above `limit` never crosses. */
+    hardLimit?: number | null;
     day?: string;
     /** The instant the sends count against (their delivery time); noon of `day` when only that is known. */
     at?: Date;
@@ -54,7 +56,9 @@ export async function reserveDailyQuota(
   const day = params.day ?? utcDay();
   const at = params.at ?? (params.day ? new Date(`${params.day}T12:00:00Z`) : new Date());
   const t = schema.usageCounters;
-  const ceiling = limit === null ? null : dailyCeiling(limit);
+  const soft = limit === null ? null : dailyCeiling(limit);
+  const hard = params.hardLimit ?? null;
+  const ceiling = soft === null ? hard : hard === null ? soft : Math.min(soft, hard);
 
   if (ceiling !== null && count > ceiling) {
     const existing = await db
@@ -157,7 +161,8 @@ export async function reservePeriodQuota(
   const daily = await reserveDailyQuota(db, {
     teamId,
     count,
-    limit: params.dailyCeiling ?? null,
+    limit: null,
+    hardLimit: params.dailyCeiling ?? null,
     ...(params.day ? { day: params.day } : {}),
     ...(params.at ? { at: params.at } : {}),
   });
@@ -223,6 +228,7 @@ export async function reserveQuota(
     teamId,
     count,
     limit: quota.kind === "day" ? quota.limit : null,
+    hardLimit: quota.kind === "day" ? (quota.dailyCeiling ?? null) : null,
     ...when,
   });
 }

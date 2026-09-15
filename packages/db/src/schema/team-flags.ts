@@ -74,6 +74,8 @@ export const teamStandings = pgTable("team_standings", {
     .references(() => teams.id, { onDelete: "cascade" }),
   scoreTenths: integer("score_tenths"),
   guardrail: text("guardrail").$type<"ok" | "warning" | "paused">().notNull(),
+  // The metric that tripped the guardrail, when it is not "ok".
+  guardrailMetric: text("guardrail_metric").$type<"complaint" | "hard_bounce">(),
   complaintRate7d: doublePrecision("complaint_rate_7d").notNull().default(0),
   hardBounceRate7d: doublePrecision("hard_bounce_rate_7d").notNull().default(0),
   sent7d: integer("sent_7d").notNull().default(0),

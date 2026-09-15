@@ -378,6 +378,7 @@ export {
   FLAG_WINDOW_DAYS,
   type FlagTrigger,
   flagTrigger,
+  pruneTeamStandings,
   STANDING_WINDOW_DAYS,
   saveTeamStandings,
   syncTeamFlags,

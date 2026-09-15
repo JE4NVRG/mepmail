@@ -7,7 +7,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { acceptEmail } from "../src/accept-email.js";
 import { EnvKeyring } from "../src/crypto/keyring.js";
 import { type QuotaTeamRow, teamQuota } from "../src/plans.js";
-import { readPeriodUsage, reservePeriodQuota } from "../src/quota.js";
+import { readPeriodUsage, reservePeriodQuota, reserveQuota } from "../src/quota.js";
+import { committedDailyVolume } from "../src/team-plan.js";
 import { fetchTeamStanding, isTeamSuspended } from "../src/team-standing.js";
 
 let db: Db;
@@ -33,11 +34,13 @@ describe("teamQuota with an operator ceiling", () => {
       kind: "day",
       plan: "free",
       limit: 40,
+      dailyCeiling: 40,
     });
     expect(teamQuota({ ...FREE, dailySendCeiling: 500 }, true)).toEqual({
       kind: "day",
       plan: "free",
       limit: 100,
+      dailyCeiling: 500,
     });
   });
 
@@ -58,9 +61,51 @@ describe("teamQuota with an operator ceiling", () => {
       kind: "day",
       plan: "free",
       limit: 250,
+      dailyCeiling: 250,
     });
     expect(teamQuota(FREE, false)).toEqual({ kind: "none" });
     expect(teamQuota({ ...FREE, dailySendCeiling: null }, false)).toEqual({ kind: "none" });
+  });
+});
+
+describe("the ceiling is a hard line", () => {
+  it("a daily plan's tolerance never stretches the operator's number", async () => {
+    const teamId = await createTeam(db, "hard-day");
+    const quota = teamQuota({ ...FREE, dailySendCeiling: 40 }, true);
+    const day = "2026-09-11";
+    expect(await reserveQuota(db, { teamId, count: 40, quota, day })).toMatchObject({
+      reserved: true,
+      accepted: 40,
+    });
+    expect(await reserveQuota(db, { teamId, count: 1, quota, day })).toMatchObject({
+      reserved: false,
+      accepted: 40,
+      ceiling: 40,
+    });
+  });
+
+  it("a monthly plan's day stops exactly at the ceiling", async () => {
+    const teamId = await createTeam(db, "hard-month");
+    const quota = teamQuota({ ...PRO, dailySendCeiling: 10 }, true);
+    const day = "2026-09-11";
+    expect(await reserveQuota(db, { teamId, count: 10, quota, day })).toMatchObject({
+      reserved: true,
+    });
+    expect(await reserveQuota(db, { teamId, count: 1, quota, day })).toMatchObject({
+      reserved: false,
+      cap: "day",
+      ceiling: 10,
+    });
+  });
+
+  it("committedDailyVolume counts a ceilinged monthly plan at its ceiling", async () => {
+    const before = await committedDailyVolume(db);
+    const teamId = await createTeam(db, "committed");
+    await db
+      .update(schema.teams)
+      .set({ plan: "pro", planQuota: 100_000, dailySendCeiling: 1_000 })
+      .where(eq(schema.teams.id, teamId));
+    expect((await committedDailyVolume(db)) - before).toBe(1_000);
   });
 });
 

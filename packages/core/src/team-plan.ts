@@ -67,7 +67,9 @@ export async function committedDailyVolume(db: Db, now: Date = new Date()): Prom
     rows.reduce((sum, row) => {
       const quota = teamQuota(row, true, now);
       if (quota.kind === "day") return sum + quota.limit;
-      return quota.kind === "month" ? sum + quota.included / 30 : sum;
+      if (quota.kind !== "month") return sum;
+      const spread = quota.included / 30;
+      return sum + (quota.dailyCeiling == null ? spread : Math.min(spread, quota.dailyCeiling));
     }, 0),
   );
 }

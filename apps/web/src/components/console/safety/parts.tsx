@@ -4,6 +4,7 @@ import type { TeamFlagDetail } from "@millionsend/db/schema";
 import { useLocale, useTranslations } from "next-intl";
 import { type DomainRegion, regionFlag } from "@/app/(dashboard)/domains/regions";
 import { Tooltip } from "@/components/tooltip";
+import { planLabel } from "@/lib/console-format";
 import { formatScoreTenths } from "@/lib/score-band";
 
 export type Guardrail = "ok" | "warning" | "paused";
@@ -15,13 +16,7 @@ const PLAN_KEYS = ["free", "starter", "pro", "scale", "system"];
 /** "Pro 100K" when a quota is set, else the plan name; unknown plan values read raw. */
 export function usePlanLabel(): (plan: string, planQuota: number | null) => string {
   const t = useTranslations("console.plan");
-  const locale = useLocale();
-  return (plan, planQuota) => {
-    const name = PLAN_KEYS.includes(plan) ? t(plan) : plan;
-    return planQuota
-      ? `${name} ${new Intl.NumberFormat(locale, { notation: "compact" }).format(planQuota)}`
-      : name;
-  };
+  return (plan, planQuota) => planLabel(PLAN_KEYS.includes(plan) ? t(plan) : plan, planQuota);
 }
 
 /** Plan pill: info for system, success for paid, neutral for free and unknown values. */

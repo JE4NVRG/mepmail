@@ -152,7 +152,10 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
         return null;
       }
       const paused = await pausedRegions(ctx.db);
-      return paused.length > 0 ? paused : null;
+      // The hold reason is the operator's own note; tenants learn only that it is a hold.
+      return paused.length > 0
+        ? paused.map(({ manualReason, ...row }) => ({ ...row, held: manualReason !== null }))
+        : null;
     }),
 
     /** Env-side SES settings the setup page reports alongside awsReadiness. */

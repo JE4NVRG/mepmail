@@ -45,7 +45,14 @@ export const teamBootstrapRouter = router({
   })),
 
   /** The operator overrides on the active team, for the dashboard's notices. */
-  standing: teamProcedure.query(({ ctx }) => fetchTeamStanding(ctx.db, ctx.teamId)),
+  standing: teamProcedure.query(async ({ ctx }) => {
+    const standing = await fetchTeamStanding(ctx.db, ctx.teamId);
+    // The note is written for the owner only on a manual suspension; on the
+    // other reasons it is the operator's own record.
+    return standing?.suspended && standing.suspended.reason !== "manual"
+      ? { ...standing, suspended: { ...standing.suspended, note: null } }
+      : standing;
+  }),
 
   /**
    * Selects an active team. The cookie is a selection, not authorization:

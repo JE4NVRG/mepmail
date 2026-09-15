@@ -119,7 +119,7 @@ export const consoleSafetyRouter = router({
           .select({
             open: sql<number>`count(*) filter (where ${f.status} = 'open')::int`,
             guardrailPaused: sql<number>`count(*) filter (where ${f.status} = 'open' and ${st.guardrail} = 'paused')::int`,
-            suspended: sql<number>`count(distinct ${t.id}) filter (where ${t.suspendedAt} is not null)::int`,
+            suspended: sql<number>`(select count(*) from ${t} where ${t.suspendedAt} is not null)::int`,
           })
           .from(f)
           .innerJoin(t, eq(t.id, f.teamId))
@@ -288,6 +288,7 @@ export const consoleSafetyRouter = router({
     .mutation(async ({ ctx, input }) => {
       const [flag] = await ctx.db.select().from(f).where(eq(f.id, input.flagId));
       if (!flag) throw new TRPCError({ code: "NOT_FOUND" });
+      if (flag.status !== "open") return;
       await ctx.db
         .update(f)
         .set({ status: "cleared", clearedAt: new Date(), clearedBy: ctx.operator.id })
@@ -311,18 +312,21 @@ export const consoleSafetyRouter = router({
         .from(f)
         .where(and(eq(f.teamId, flag.teamId), eq(f.status, "open")));
       if (open) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "already_open" });
-      await ctx.db.insert(f).values({
-        teamId: flag.teamId,
-        reason: flag.reason,
-        detail: flag.detail,
-        note: flag.note,
-        openedBy: ctx.operator.id,
-      });
+      const [reopened] = await ctx.db
+        .insert(f)
+        .values({
+          teamId: flag.teamId,
+          reason: flag.reason,
+          detail: flag.detail,
+          note: flag.note,
+          openedBy: ctx.operator.id,
+        })
+        .returning({ id: f.id });
       await auditOperator(ctx, {
         teamId: flag.teamId,
         action: "console.flag_reopened",
-        target: { type: "team_flag", id: flag.id },
-        metadata: { reason: flag.reason },
+        target: { type: "team_flag", id: reopened?.id ?? flag.id },
+        metadata: { reason: flag.reason, from: flag.id },
       });
     }),
 
