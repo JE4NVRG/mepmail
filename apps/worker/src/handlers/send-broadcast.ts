@@ -10,6 +10,7 @@ import {
   encryptEmailBody,
   fetchDeliverabilityHealth,
   fetchTeamQuota,
+  fetchTeamStanding,
   findSuppressed,
   formatMailDate,
   injectPreheader,
@@ -187,6 +188,13 @@ export async function sendBroadcast(
         }),
       );
     }
+    await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
+    return "deferred";
+  }
+  // An operator's pause or suspension parks the fan-out the way a region
+  // hold does; the owners heard about it when the operator acted.
+  const standing = await fetchTeamStanding(db, broadcast.teamId);
+  if (standing?.suspended || standing?.broadcastsPausedByOperatorAt) {
     await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
     return "deferred";
   }
