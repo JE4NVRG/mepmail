@@ -296,6 +296,7 @@
     "sparks": {
       "title": "Enviados por região",
       "subtitle": "Últimos 7 dias · escala compartilhada",
+      "subtitleOwnScale": "Últimos 7 dias · escala própria por região",
       "total": "{count} · 7d"
     },
     "perRegion": {
@@ -346,7 +347,9 @@
       "cliConfigSet": "Configuration set do SES millionsend",
       "cliSuppression": "Supressão da conta: BOUNCE",
       "cliPricing": "? O plano de preços é Essentials ($0,16/1k). Cancelar para à la carte?",
-      "cliEnv": "Adicione ao .env:"
+      "cliEnv": "Adicione ao .env:",
+      "cliRegion": "? Região AWS",
+      "check1Production": "GetAccount responde · produção"
     }
   },
   "teams": {

@@ -296,6 +296,7 @@
     "sparks": {
       "title": "Sent per region",
       "subtitle": "Last 7 days · shared scale",
+      "subtitleOwnScale": "Last 7 days · own scale per region",
       "total": "{count} · 7d"
     },
     "perRegion": {
@@ -346,7 +347,9 @@
       "cliConfigSet": "SES configuration set millionsend",
       "cliSuppression": "Account suppression: BOUNCE",
       "cliPricing": "? Pricing plan is Essentials ($0.16/1k). Cancel to à la carte?",
-      "cliEnv": "Add to .env:"
+      "cliEnv": "Add to .env:",
+      "cliRegion": "? AWS region",
+      "check1Production": "GetAccount answers · production"
     }
   },
   "teams": {
