@@ -69,9 +69,10 @@ export interface SenderDomainOwner {
  * team is the designation. Exact host, as everywhere: owning `example.com`
  * does not cover `mail.example.com`.
  *
- * Cloud refuses the same (name, region) in two teams, so the answer is
- * single-valued there. Self-host may hold one name in several teams; the
- * oldest verified row wins, which is also the row a later re-key demotes last.
+ * Cloud refuses the same name in two teams, whatever the region, so the
+ * answer is single-valued there. Self-host may hold one name in several
+ * teams; the oldest verified row wins, which is also the row a later re-key
+ * demotes last.
  */
 export async function findSenderDomainOwner(
   db: Db,

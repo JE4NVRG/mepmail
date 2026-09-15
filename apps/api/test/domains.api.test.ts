@@ -438,6 +438,20 @@ describe("POST /domains in cloud (shared AWS account)", () => {
     return { id, key: await insertKey(id) };
   }
 
+  it("in cloud, 409s a domain another team holds in another served region", async () => {
+    const { client, calls } = fakeSes();
+    const app = makeApp({ client, isCloud: true, regions: ["sa-east-1", "us-east-1"] });
+    await db
+      .insert(schema.domains)
+      .values({ teamId: otherTeamId, name: "elsewhere.example.com", region: "sa-east-1" });
+    const res = await call(app, fullKey, "POST", "/domains", {
+      name: "elsewhere.example.com",
+      region: "us-east-1",
+    });
+    expect(res.status).toBe(409);
+    expect(calls.filter((c) => c.name === "CreateEmailIdentityCommand")).toHaveLength(0);
+  });
+
   it("409s a domain another team holds in the same region and never re-keys it", async () => {
     const a = await cloudTeam("cloud-a");
     const b = await cloudTeam("cloud-b");

@@ -328,6 +328,23 @@ describe("domains.create", () => {
     ]);
   });
 
+  it("in cloud, a name another team holds in any served region is taken", async () => {
+    vi.stubEnv("IS_CLOUD", "true");
+    vi.stubEnv("AWS_REGIONS", "sa-east-1,us-east-1");
+    const teamA = await createTeam(db, "holder");
+    const teamB = await createTeam(db, "claimant");
+    const { deps, calls } = fakeSes();
+    await callerFor(teamA, deps).domains.create({ name: "held.example.com", region: "sa-east-1" });
+    const created = calls.length;
+    await expect(
+      callerFor(teamB, deps).domains.create({ name: "held.example.com", region: "us-east-1" }),
+    ).rejects.toMatchObject({ code: "CONFLICT", message: "domain already registered" });
+    expect(calls).toHaveLength(created);
+    // The same team may not hold it twice either: one region per domain.
+    await expect(
+      callerFor(teamA, deps).domains.create({ name: "held.example.com", region: "us-east-1" }),
+    ).rejects.toMatchObject({ code: "CONFLICT", message: "domain already added" });
+  });
   it("in cloud, 409s a domain another team holds in the region and never adopts SES identities", async () => {
     vi.stubEnv("IS_CLOUD", "true");
     const teamA = await createTeam(db, "team-a");
