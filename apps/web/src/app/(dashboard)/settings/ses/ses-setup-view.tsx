@@ -284,6 +284,8 @@ function ConsoleCard() {
       className="ms-card"
       style={{
         padding: 24,
+        // Sits in the stepper's content column (rail 30px + gap 18px), not under the rail.
+        marginLeft: 48,
         marginBottom: 24,
         display: "flex",
         alignItems: "center",
