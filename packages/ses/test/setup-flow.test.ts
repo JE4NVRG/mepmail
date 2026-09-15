@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { upsertEnv } from "../src/setup.js";
 import { envTemplate } from "../src/setup-constants.js";
 import {
+  addRegionEnvEntries,
   composeUpArgs,
   confirmed,
   detectDirState,
@@ -13,6 +14,7 @@ import {
   generateSecret,
   missingSecrets,
   secretLaterHint,
+  servedRegionsInEnv,
   stateSummary,
 } from "../src/setup-flow.js";
 
@@ -162,5 +164,43 @@ const envExamplePath = fileURLToPath(new URL("../../../.env.example", import.met
 describe("envTemplate", () => {
   it.skipIf(!existsSync(envExamplePath))("is byte-identical to the repo's .env.example", () => {
     expect(envTemplate()).toBe(readFileSync(envExamplePath, "utf8"));
+  });
+});
+
+describe("addRegionEnvEntries / servedRegionsInEnv", () => {
+  const topic = "arn:aws:sns:us-east-1:123456789012:millionsend-events";
+
+  it("reads the served regions the way the app does", () => {
+    expect(servedRegionsInEnv("AWS_REGIONS=sa-east-1, us-east-1\nAWS_REGION=sa-east-1\n")).toEqual([
+      "sa-east-1",
+      "us-east-1",
+    ]);
+    expect(servedRegionsInEnv("AWS_REGION=eu-west-1\n")).toEqual(["eu-west-1"]);
+    expect(servedRegionsInEnv("AWS_REGIONS=\n")).toEqual(["us-east-1"]);
+    expect(servedRegionsInEnv(null)).toEqual(["us-east-1"]);
+  });
+
+  it("seeds AWS_REGIONS from the region already served and appends the topic", () => {
+    const content = "AWS_REGION=sa-east-1\nSNS_TOPIC_ARNS=arn:first\nSQS_QUEUE_URL=https://q\n";
+    expect(addRegionEnvEntries(content, "us-east-1", topic)).toEqual({
+      AWS_REGIONS: "sa-east-1,us-east-1",
+      SNS_TOPIC_ARNS: `arn:first,${topic}`,
+    });
+    // Applied through upsertEnv the alias and the queue stay untouched.
+    expect(upsertEnv(content, addRegionEnvEntries(content, "us-east-1", topic))).toBe(
+      `AWS_REGION=sa-east-1\nSNS_TOPIC_ARNS=arn:first,${topic}\nSQS_QUEUE_URL=https://q\nAWS_REGIONS=sa-east-1,us-east-1\n`,
+    );
+  });
+
+  it("extends an existing list without duplicating a region or a topic", () => {
+    const content = `AWS_REGIONS=sa-east-1,us-east-1\nSNS_TOPIC_ARNS=arn:first,${topic}\n`;
+    expect(addRegionEnvEntries(content, "us-east-1", topic)).toEqual({
+      AWS_REGIONS: "sa-east-1,us-east-1",
+      SNS_TOPIC_ARNS: `arn:first,${topic}`,
+    });
+    expect(addRegionEnvEntries(content, "eu-west-1", "arn:eu")).toEqual({
+      AWS_REGIONS: "sa-east-1,us-east-1,eu-west-1",
+      SNS_TOPIC_ARNS: `arn:first,${topic},arn:eu`,
+    });
   });
 });

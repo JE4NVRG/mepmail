@@ -17,24 +17,33 @@ import {
 } from "../../cli/src/tty-ui.js";
 import { SES_REGIONS, type SesRegion } from "./domain-identity.js";
 import {
+  addRegionPlan,
+  cancelPricingPlan,
   createSetupClients,
   createStorageClient,
+  ESSENTIALS_WARNING,
   ensureBucket,
   envTemplate,
   eventsPlan,
   httpsOrigin,
+  parseSqsQueueUrl,
+  readPricingPlan,
   runEventsSetup,
   runSetup,
   runTeardown,
   SETUP_NAMES,
+  type SetupSesClient,
   STORAGE_BUCKET_DEFAULTS,
   setupEnvEntries,
   setupPlan,
+  setupPolicyArn,
   storageEnvEntries,
+  syncAdoptedPolicy,
   teardownPlan,
   upsertEnv,
 } from "./setup.js";
 import {
+  addRegionEnvEntries,
   CLOUD_REQUIRED_KEYS,
   COMPOSE_DOWNLOAD_URL,
   composeUpArgs,
@@ -48,6 +57,7 @@ import {
   isCloudEnv,
   missingSecrets,
   secretLaterHint,
+  servedRegionsInEnv,
   sesEventsProxyHint,
   stateSummary,
   withComposeProfile,
@@ -261,8 +271,33 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     // --- aws step ---
     const hasKeys = (envValue(env, "AWS_ACCESS_KEY_ID") ?? "") !== "";
     const hasEvents = (envValue(env, "SNS_TOPIC_ARNS") ?? "") !== "";
+    const queueUrl = envValue(env, "SQS_QUEUE_URL") ?? "";
     if (hasKeys) console.log(dim("\nAWS access key already in .env."));
-    if (hasKeys && !hasEvents) {
+    if (hasKeys && hasEvents && queueUrl !== "") {
+      // An install that already sends and receives events: the usual
+      // follow-up is a second SES region, which keeps the IAM user and the
+      // events queue and mints no key.
+      const choice = await selectPrompt(rl, {
+        label: `AWS is set up (${servedRegionsInEnv(env).join(", ")}). Add another SES region?`,
+        initial: "skip",
+        options: [
+          {
+            value: "region",
+            label: "Add a region",
+            hint: "topic + configuration set there; events join the existing queue; no new key",
+          },
+          { value: "full", label: "Full AWS re-run", hint: "also mints a NEW access key" },
+          { value: "skip", label: "Skip" },
+        ],
+      });
+      if (choice === "region") {
+        await addRegionStep(rl, interactive, appBaseUrl, env, queueUrl, writeEnv);
+      } else if (choice === "full") {
+        await awsStep(rl, interactive, appBaseUrl, writeEnv, false, apiPort);
+      } else {
+        console.log(dim("AWS step skipped."));
+      }
+    } else if (hasKeys && !hasEvents) {
       // The common re-run trap: sends work but events were never set up, and
       // a full re-run both mints an unwanted key and can hit the 2-key IAM
       // limit. Offer the events-only path first — it touches no IAM.
@@ -776,6 +811,136 @@ async function awsStep(
       "The SNS subscription confirms itself once the app runs with these values;\nif it stays pending, use 'Request confirmation' on it in the SNS console.",
     );
     console.log(`\n${sesEventsProxyHint(origin, apiPort)}`);
+  }
+}
+
+/**
+ * Adds an SES region to an install that already has one. IAM is global, so
+ * the user and policy are kept (the policy document is synced); the region
+ * gets its own SNS topic, configuration set and bounce suppression; the topic
+ * delivers into the existing events queue across regions; .env gains the
+ * region and the topic ARN while AWS_REGION and SQS_QUEUE_URL stay as they
+ * are. Failures print their hint and return, like the AWS step.
+ */
+async function addRegionStep(
+  rl: LineReader,
+  interactive: boolean,
+  appBaseUrl: string,
+  env: string | null,
+  queueUrl: string,
+  writeEnv: (entries: Record<string, string>) => boolean,
+): Promise<void> {
+  const queue = parseSqsQueueUrl(queueUrl);
+  if (!queue) {
+    console.error(
+      `SQS_QUEUE_URL is not a standard queue URL (${queueUrl}); add the region by hand — SELF_HOSTING.md, "Adding a region".`,
+    );
+    return;
+  }
+  const accountId = await resolveIdentity(rl);
+  if (accountId === null) return;
+  const served = servedRegionsInEnv(env);
+  const region = await chooseRegion(rl);
+  if (region === null) return;
+  if (served.includes(region)) {
+    console.log(dim(`${region} is already served (${served.join(", ")}) — nothing to add.`));
+    return;
+  }
+
+  console.log(`\n${bold("Plan:")}`);
+  for (const line of addRegionPlan({ region, queueUrl, appBaseUrl })) console.log(`  · ${line}`);
+  if (!(await offer(rl, "\nProceed?", interactive))) return;
+
+  const clients = createSetupClients(region, queue.region);
+  const onStep = (line: string) => console.log(`${info("==>")} ${line}`);
+  let topicArn: string;
+  try {
+    onStep(`IAM policy ${SETUP_NAMES.policy}`);
+    if (await syncAdoptedPolicy(clients.iam, setupPolicyArn(accountId))) {
+      onStep(`IAM policy ${SETUP_NAMES.policy}: updated to the current document`);
+    }
+    const existingTopics = (envValue(env, "SNS_TOPIC_ARNS") ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    ({ topicArn } = await runEventsSetup(clients, {
+      region,
+      accountId,
+      appBaseUrl,
+      onStep,
+      existingQueue: { url: queueUrl, topicArns: existingTopics },
+    }));
+  } catch (error) {
+    console.error(
+      `${err("Adding the region failed:")} ${(error as Error).message}\nFix that and re-run — resources it already created are adopted, not duplicated.`,
+    );
+    return;
+  }
+  await essentialsPlanPrompt(rl, clients.ses, region);
+
+  const entries = addRegionEnvEntries(env, region, topicArn);
+  if (writeEnv(entries)) {
+    console.log(
+      `\n${region} added to .env (AWS_REGIONS, SNS_TOPIC_ARNS). Restart the stack (docker compose up -d) so the worker and dashboard pick it up; the region reads as Sandbox until AWS grants production access there.`,
+    );
+  } else {
+    const block = Object.entries(entries)
+      .map(([key, value]) => `${key}=${value}`)
+      .join("\n");
+    console.log(`\nDone. Paste into .env where MillionSend runs, then restart it:\n\n${block}\n`);
+  }
+  if (httpsOrigin(appBaseUrl)) {
+    console.log(
+      "The SNS subscription confirms itself once the app runs with these values;\nif it stays pending, use 'Request confirmation' on it in the SNS console.",
+    );
+  }
+}
+
+/**
+ * A region with no prior sending starts on the Essentials plan, which costs
+ * more per message than à la carte: say so and offer the cancel. Nothing is
+ * changed without an explicit yes; a plan that cannot be read is left alone.
+ * Exported for tests.
+ */
+export async function essentialsPlanPrompt(
+  rl: LineReader,
+  ses: SetupSesClient,
+  region: string,
+): Promise<"kept" | "cancelled" | "not_essentials" | "unknown"> {
+  let plan: string | null;
+  try {
+    plan = await readPricingPlan(ses);
+  } catch (error) {
+    console.log(
+      dim(`Could not read the SES pricing plan in ${region}: ${(error as Error).message}`),
+    );
+    return "unknown";
+  }
+  if (plan !== "ESSENTIALS") return "not_essentials";
+  console.log(`\n${bold("Pricing plan:")} ${wrapText(ESSENTIALS_WARNING, descriptionWidth())}`);
+  if (
+    !(await offer(
+      rl,
+      `Cancel the Essentials plan in ${region} now (PutAccountPricingAttributes Plan=NONE)?`,
+      false,
+    ))
+  ) {
+    console.log(
+      dim(
+        `Kept. Cancel later with: aws sesv2 put-account-pricing-attributes --plan NONE --region ${region}`,
+      ),
+    );
+    return "kept";
+  }
+  try {
+    await cancelPricingPlan(ses);
+    console.log(dim(`${region} is now on à la carte SES pricing.`));
+    return "cancelled";
+  } catch (error) {
+    console.error(
+      `${err("Cancel failed:")} ${(error as Error).message}\nCancel it in the SES console (Pricing plan → Cancel plan) or with the CLI line above.`,
+    );
+    return "kept";
   }
 }
 
