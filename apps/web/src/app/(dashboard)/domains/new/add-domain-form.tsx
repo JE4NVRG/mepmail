@@ -21,7 +21,7 @@ import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { trpcErrorCode } from "@/lib/trpc-error";
 import { AwsCredentialsBanner } from "../aws-credentials-banner";
-import { isDomainRegion, regionFlag } from "../regions";
+import { regionFlag, regionName } from "../regions";
 import { TrackingSetup } from "../tracking-setup";
 
 // Client-side pre-check only; the router's zod schema is authoritative.
@@ -246,7 +246,6 @@ export function AddDomainForm({ userEmail }: { userEmail: string }) {
       setRegion((served.find((r) => r.production) ?? served[0])?.code ?? "");
     }
   }, [served, region]);
-  const regionName = (code: string) => (isDomainRegion(code) ? t(`regions.${code}`) : code);
   const [returnPath, setReturnPath] = useState("send");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -340,7 +339,7 @@ export function AddDomainForm({ userEmail }: { userEmail: string }) {
               // regional, so any other region would send blind.
               options={(served ?? []).map(({ code, production }) => ({
                 value: code,
-                label: `${regionFlag(code)} ${regionName(code)} (${code})`,
+                label: `${regionFlag(code)} ${regionName(code, t)} (${code})`,
                 ...(anyProduction && !production
                   ? { hint: t("new.regionSandbox"), disabled: true }
                   : {}),

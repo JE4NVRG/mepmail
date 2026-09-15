@@ -147,12 +147,14 @@ export const env = createEnv({
     // Unset follows IS_CLOUD; see sesTenantsEnabled().
     SES_TENANTS: z.enum(["true", "false", "1", "0"]).optional(),
 
-    // Messages/second ceiling for THE ONE worker process: the bucket is
+    // Messages/second ceiling for THE ONE worker process: the buckets are
     // in-memory, so running N worker replicas multiplies the real SES rate
     // by N. Until the bucket is shared (Postgres-backed), scale the worker
-    // vertically only, or divide this value by the replica count. 14/s is
-    // SES's standard production default; sandbox accounts must set 1.
-    // Bootstrap value only — the instance_settings row overrides it.
+    // vertically only, or divide this value by the replica count. Each
+    // region runs at the lower of its own SES MaxSendRate and this, so a
+    // sandbox region paces itself at 1/s without lowering it. 14/s is SES's
+    // standard production default. Bootstrap value only — the
+    // instance_settings row overrides it.
     SES_MAX_SEND_RATE: z.coerce.number().positive().default(SES_MAX_SEND_RATE_DEFAULT),
     // Concurrent send lanes in the worker. A lane spends most of a send
     // waiting on SES, so about 1.2 lanes per message/second of send rate

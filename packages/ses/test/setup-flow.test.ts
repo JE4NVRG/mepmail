@@ -11,6 +11,7 @@ import {
   envValue,
   flowPlan,
   freshDatabaseEntries,
+  fullRerunOffered,
   generateSecret,
   missingSecrets,
   secretLaterHint,
@@ -202,5 +203,13 @@ describe("addRegionEnvEntries / servedRegionsInEnv", () => {
       AWS_REGIONS: "sa-east-1,us-east-1,eu-west-1",
       SNS_TOPIC_ARNS: `arn:first,${topic},arn:eu`,
     });
+  });
+});
+
+describe("fullRerunOffered", () => {
+  it("is offered on a single-region install only", () => {
+    expect(fullRerunOffered("AWS_REGION=sa-east-1\n")).toBe(true);
+    expect(fullRerunOffered(null)).toBe(true);
+    expect(fullRerunOffered("AWS_REGIONS=sa-east-1,us-east-1\n")).toBe(false);
   });
 });

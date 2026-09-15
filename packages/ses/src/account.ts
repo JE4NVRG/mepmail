@@ -26,6 +26,10 @@ export function createSesAccountClient(options: {
   const { region, accessKeyId, secretAccessKey } = options;
   return new SESv2Client({
     region,
+    // GetAccount is a probe on the dashboard's and the worker's hot paths: a
+    // region that does not answer must fail in seconds, not at the OS
+    // connect timeout times the SDK's retries.
+    requestHandler: { connectionTimeout: 3_000, requestTimeout: 10_000 },
     ...(accessKeyId && secretAccessKey ? { credentials: { accessKeyId, secretAccessKey } } : {}),
   });
 }

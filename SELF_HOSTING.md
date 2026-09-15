@@ -58,8 +58,9 @@ In `.env` (everything else defaults to a working local setup):
   documentation site), `smtp` (the relay; mount a keypair first), `backup`
   (scheduled dumps).
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` — from the AWS setup below, or rely
-  on the default AWS credential chain. Sandbox SES accounts must keep
-  `SES_MAX_SEND_RATE=1`.
+  on the default AWS credential chain. The worker paces each region at the lower
+  of its own SES send rate and `SES_MAX_SEND_RATE` (or the Settings → Instance
+  value), so a sandbox region needs no change.
 - `AWS_REGIONS` — optional, comma-separated: serve several SES regions from one
   deployment, the first being the default; unset means the one region in
   `AWS_REGION`. See "Adding a region" below.

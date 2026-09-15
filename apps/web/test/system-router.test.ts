@@ -197,6 +197,36 @@ describe("system.sesAccount", () => {
     expect(asked).toEqual(["sa-east-1", "us-east-1"]);
   });
 
+  it("features serves an expired answer at once and refreshes it in the background", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubEnv("AWS_REGIONS", "sa-east-1");
+      let production = false;
+      const asked: string[] = [];
+      const caller = sesCaller((region) => ({
+        async send() {
+          asked.push(region);
+          return { ProductionAccessEnabled: production };
+        },
+      }));
+      expect((await caller.system.features()).regions).toEqual([
+        { code: "sa-east-1", production: false },
+      ]);
+      production = true;
+      vi.advanceTimersByTime(61_000);
+      // The stale answer comes back; the refreshing probe has been issued.
+      expect((await caller.system.features()).regions).toEqual([
+        { code: "sa-east-1", production: false },
+      ]);
+      expect(asked).toEqual(["sa-east-1", "sa-east-1"]);
+      expect((await caller.system.features()).regions).toEqual([
+        { code: "sa-east-1", production: true },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("features probes nothing without credentials", async () => {
     stubAws({ AWS_REGIONS: "sa-east-1" });
     const asked: string[] = [];
