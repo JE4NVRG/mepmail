@@ -238,7 +238,7 @@ export function SafetyList() {
                           <PlanBadge plan={row.plan} planQuota={row.planQuota} />
                         </td>
                         <td
-                          className="right ms-digits"
+                          className="right num"
                           style={{
                             color:
                               row.scoreTenths === null ? undefined : scoreColor(row.scoreTenths),

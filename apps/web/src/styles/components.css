@@ -1182,10 +1182,19 @@ table.ms-table {
   right: 0;
   bottom: 0;
 }
-/* Console lists keep every cell on one line; the wrapper scrolls sideways instead. */
+/* Console lists keep every cell on one line (the wrapper scrolls sideways
+   instead) on slightly tighter cells, and print their figures in mono at
+   12.5px — a dense operator list, not a KPI. */
 .ms-table.nowrap th,
 .ms-table.nowrap td {
   white-space: nowrap;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.ms-table .num {
+  font-family: var(--ms-font-mono);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
 }
 /* The health card's rows: a dot, the probe, the reading pushed right. */
 .ms-health-row {
