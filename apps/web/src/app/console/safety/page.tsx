@@ -1,4 +1,5 @@
-/** Placeholder: the screen owner replaces this file. */
-export default function ConsolePlaceholderPage() {
-  return null;
+import { SafetyList } from "@/components/console/safety/safety-list";
+
+export default function ConsoleSafetyPage() {
+  return <SafetyList />;
 }
