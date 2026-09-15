@@ -1,6 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { env } from "@millionsend/config";
-import { ALL_TEAMS_GRANT, fetchBestOwnedPlan, PLAN_TEAM_LIMIT } from "@millionsend/core";
+import {
+  ALL_TEAMS_GRANT,
+  fetchBestOwnedPlan,
+  fetchTeamStanding,
+  PLAN_TEAM_LIMIT,
+} from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
@@ -9,7 +14,7 @@ import { isUniqueViolation } from "@/lib/db-errors";
 import { slugify } from "@/lib/slug";
 import { recordAudit } from "../audit";
 import { listMemberships } from "../membership";
-import { type AuthSession, type Context, protectedProcedure, router } from "../trpc";
+import { type AuthSession, type Context, protectedProcedure, router, teamProcedure } from "../trpc";
 
 /**
  * Records the active-team selection in both places that read it: the cookie
@@ -38,6 +43,9 @@ export const teamBootstrapRouter = router({
     teams: await listMemberships(ctx.db, ctx.session.user.id),
     activeTeamId: ctx.teamId,
   })),
+
+  /** The operator overrides on the active team, for the dashboard's notices. */
+  standing: teamProcedure.query(({ ctx }) => fetchTeamStanding(ctx.db, ctx.teamId)),
 
   /**
    * Selects an active team. The cookie is a selection, not authorization:

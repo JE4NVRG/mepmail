@@ -294,6 +294,7 @@ export {
   type RegionContributor,
   type RegionDecision,
   type RegionWindowCounts,
+  regionCounterTotals,
   regionPause,
   regionWindowCounts,
   releaseRegion,
