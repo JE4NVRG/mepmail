@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type DomainRegion, regionFlag } from "./regions";
+import { isDomainRegion, regionFlag } from "./regions";
 
 /**
  * "🇧🇷 São Paulo (sa-east-1)" — flag + localized city + region code.
@@ -17,7 +17,7 @@ export function RegionLabel({
   const t = useTranslations("domains");
   return (
     <>
-      {regionFlag(region)} {t(`regions.${region as DomainRegion}`)}{" "}
+      {regionFlag(region)} {isDomainRegion(region) ? t(`regions.${region}`) : region}{" "}
       {variant === "list" ? (
         <span style={{ color: "var(--ms-faint)" }}>({region})</span>
       ) : (

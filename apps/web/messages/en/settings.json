@@ -120,7 +120,7 @@
       "rateHint": "SES_MAX_SEND_RATE={envRate} in .env · account max {accountRate}/s — these disagree.",
       "errors": {
         "credentials": "AWS rejected the credentials — check <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code> in <code>.env</code>.",
-        "unreachable": "SES did not respond — check <code>AWS_REGION</code> and the network path."
+        "unreachable": "SES did not respond — check <code>AWS_REGION</code> / <code>AWS_REGIONS</code> and the network path."
       },
       "disabledHint": "Set your AWS credentials first.",
       "committedPerDay": "Committed per day"
