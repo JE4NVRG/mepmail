@@ -265,7 +265,7 @@ export function SafetyList() {
                             pausedAt={row.broadcastsPausedByOperatorAt}
                           />
                         </td>
-                        <td>
+                        <td style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}>
                           <ReasonLabel reason={row.reason} detail={row.detail} />
                         </td>
                         <td>
