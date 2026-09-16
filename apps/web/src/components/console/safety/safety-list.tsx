@@ -1,6 +1,7 @@
 "use client";
 
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
@@ -27,6 +28,7 @@ import {
   PlanBadge,
   ReasonLabel,
   RegionCell,
+  RiskCell,
   scoreColor,
   usePercent,
 } from "./parts";
@@ -34,9 +36,9 @@ import {
 const STATUSES = ["open", "cleared", "suspended", "all"] as const;
 // The team_flag_reason enum; tsc checks it against the router's input.
 const REASONS = ["monitor", "complaints", "guardrail", "score", "report", "manual"] as const;
-const SORTS = ["name", "type", "score", "guardrail", "reason", "status", "since"] as const;
+const SORTS = ["name", "type", "risk", "score", "guardrail", "reason", "status", "since"] as const;
 const DIRS = ["asc", "desc"] as const;
-const COLUMNS = 11;
+const COLUMNS = 12;
 
 export function SafetyList() {
   const t = useTranslations("console.safety");
@@ -116,6 +118,11 @@ export function SafetyList() {
         title={t("title")}
         subtitle={t("proof", counts)}
         titleAdornment={<Tooltip text={t("info")} />}
+        actions={
+          <Link href="/console/safety/settings" className="ms-btn ms-btn-secondary">
+            {t("settingsButton")}
+          </Link>
+        }
       />
       <div
         className="ms-filter-row"
@@ -186,6 +193,15 @@ export function SafetyList() {
                 <tr>
                   {th("name")}
                   {th("type")}
+                  <SortableTh
+                    column="risk"
+                    label={t("columns.risk")}
+                    sort={sort}
+                    dir={dir}
+                    onSort={onSort}
+                    defaultDir="desc"
+                    right
+                  />
                   {th("score", "desc", true)}
                   <th className="right">{t("columns.complaints")}</th>
                   <th className="right">{t("columns.bounces")}</th>
@@ -236,6 +252,11 @@ export function SafetyList() {
                         </td>
                         <td>
                           <PlanBadge plan={row.plan} planQuota={row.planQuota} />
+                        </td>
+                        <td className="right num">
+                          <Tooltip inline text={t("riskTip")}>
+                            <RiskCell risk={row.monitorRisk} plan={row.plan} />
+                          </Tooltip>
                         </td>
                         <td
                           className="right num"
@@ -367,6 +388,9 @@ function SkeletonRows() {
       </td>
       <td>
         <SkeletonBadge width={56} />
+      </td>
+      <td className="right">
+        <Skeleton width={32} />
       </td>
       <td className="right">
         <Skeleton width={28} />

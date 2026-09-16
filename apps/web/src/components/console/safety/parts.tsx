@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { type DomainRegion, regionFlag } from "@/app/(dashboard)/domains/regions";
 import { Tooltip } from "@/components/tooltip";
 import { planLabel } from "@/lib/console-format";
+import { formatRisk, riskColor } from "@/lib/monitor-settings";
 import { formatScoreTenths } from "@/lib/score-band";
 
 export type Guardrail = "ok" | "warning" | "paused";
@@ -115,6 +116,12 @@ export function ReasonLabel({
         score: formatScoreTenths(detail?.scoreTenths ?? 0, locale),
       });
       break;
+    case "monitor":
+      label = t("reasonLabel.monitor", {
+        risk: formatRisk(detail?.risk ?? 0),
+        samples: detail?.samples ?? 0,
+      });
+      break;
     default:
       label = t(`reasonLabel.${reason}`);
   }
@@ -192,4 +199,13 @@ export function CardHead({
       ) : null}
     </div>
   );
+}
+
+/** The internal monitor risk, two decimals; "exempt" for a system team, a dash before the first sample. */
+export function RiskCell({ risk, plan }: { risk: number | null; plan: string }) {
+  const t = useTranslations("console.safety");
+  const common = useTranslations("console.common");
+  if (plan === "system") return <span style={{ color: "var(--ms-muted)" }}>{t("exempt")}</span>;
+  if (risk === null) return <>{common("none")}</>;
+  return <span style={{ color: riskColor(risk) }}>{formatRisk(risk)}</span>;
 }
