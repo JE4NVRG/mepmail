@@ -564,9 +564,7 @@ export const consoleSafetyRouter = router({
         target: { type: "team_flag", id: flag.id },
         metadata: {
           reason: flag.reason,
-          ...(input.afterGrantId
-            ? { grantId: input.afterGrantId, verdict: "false_positive" }
-            : {}),
+          ...(input.afterGrantId ? { grantId: input.afterGrantId, verdict: "false_positive" } : {}),
         },
       });
     }),
