@@ -3,6 +3,9 @@ import { DAY_MS } from "./utc-day.js";
 
 export type Plan = (typeof schema.planEnum.enumValues)[number];
 
+/** A plan on the ladder: every plan but system, which has no rung and no cap. */
+export type LadderPlan = Exclude<Plan, "system">;
+
 /** Days past current_period_end a paid plan keeps its limits without a fresh Stripe period. */
 export const PLAN_GRACE_DAYS = 7;
 
@@ -11,14 +14,15 @@ export const PLAN_GRACE_DAYS = 7;
  * Stripe webhook, so a dropped cancellation would leave a paid plan forever;
  * once the last paid period is past its grace window the team is limited as
  * free until Stripe reports a new period. A null period end (never
- * subscribed, or a plan set outside Stripe) is taken at face value.
+ * subscribed, or a plan set outside Stripe) is taken at face value, and the
+ * system plan never lapses: Stripe has no say over it.
  */
 export function effectivePlan(
   plan: Plan,
   currentPeriodEnd: Date | null,
   now: Date = new Date(),
 ): Plan {
-  if (plan === "free" || !currentPeriodEnd) return plan;
+  if (plan === "free" || plan === "system" || !currentPeriodEnd) return plan;
   return currentPeriodEnd.getTime() + PLAN_GRACE_DAYS * DAY_MS < now.getTime() ? "free" : plan;
 }
 
@@ -33,6 +37,7 @@ export const PLAN_NAME: Record<Plan, string> = {
   starter: "Starter",
   pro: "Pro",
   scale: "Scale",
+  system: "System",
 };
 
 /** One step of the ladder: what a team gets for a monthly price. */
@@ -52,7 +57,8 @@ export interface PlanRung {
 /**
  * The ladder, cheapest first. Free and Starter cap per day; Pro and Scale
  * include a monthly volume and can bill overage past it. Self-host ignores
- * plans entirely.
+ * plans entirely. The system plan (the instance's own team) has no rung:
+ * callers that can see it branch before asking for one.
  */
 export const PLAN_RUNGS = [
   {
@@ -157,8 +163,9 @@ export function formatVolume(n: number): string {
   return String(n);
 }
 
-/** "Pro 100K" on a monthly plan, the bare plan name on a daily one. */
+/** "Pro 100K" on a monthly plan, the bare plan name on a daily one (and on System). */
 export function planLabel(plan: Plan, planQuota: number | null): string {
+  if (plan === "system") return PLAN_NAME.system;
   const rung = teamRung(plan, planQuota);
   return rung.period === "month"
     ? `${PLAN_NAME[plan]} ${formatVolume(rung.included)}`
@@ -188,18 +195,18 @@ export interface QuotaTeamRow {
 
 /** What limits a team's sends right now. */
 export type TeamQuota =
-  /** Self-host: counted, never capped. */
+  /** Self-host, and the instance's own team: counted, never capped. */
   | { kind: "none" }
   | {
       kind: "day";
-      plan: Plan;
+      plan: LadderPlan;
       limit: number;
       /** An operator ceiling on the day, enforced as typed (the plan's tolerance never stretches it). */
       dailyCeiling?: number | null | undefined;
     }
   | {
       kind: "month";
-      plan: Plan;
+      plan: LadderPlan;
       included: number;
       periodStart: Date;
       periodEnd: Date;
@@ -236,6 +243,7 @@ export function quotaPeriod(
 function planQuota(team: QuotaTeamRow, isCloud: boolean, now: Date): TeamQuota {
   if (!isCloud) return { kind: "none" };
   const plan = effectivePlan(team.plan, team.currentPeriodEnd, now);
+  if (plan === "system") return { kind: "none" };
   const rung = teamRung(plan, plan === team.plan ? team.planQuota : null);
   if (rung.period === "day") return { kind: "day", plan, limit: rung.included };
   const period = quotaPeriod(team, now);
@@ -257,7 +265,8 @@ function planQuota(team: QuotaTeamRow, isCloud: boolean, now: Date): TeamQuota {
  * daily cap.
  */
 function withCeiling(quota: TeamQuota, plan: Plan, ceiling: number | null): TeamQuota {
-  if (ceiling === null) return quota;
+  // The system plan is the instance's own team: no rung, no cap, no ceiling.
+  if (ceiling === null || plan === "system") return quota;
   if (quota.kind === "none") return { kind: "day", plan, limit: ceiling, dailyCeiling: ceiling };
   if (quota.kind === "day") {
     return { ...quota, limit: Math.min(quota.limit, ceiling), dailyCeiling: ceiling };
@@ -294,6 +303,7 @@ export const PLAN_TEAM_LIMIT: Record<Plan, number> = {
   starter: 5,
   pro: 10,
   scale: 15,
+  system: Number.POSITIVE_INFINITY,
 };
 
 /** Sender domains per team per plan; null = unlimited. Self-host ignores plans entirely. */
@@ -302,6 +312,7 @@ export const PLAN_DOMAIN_LIMIT: Record<Plan, number | null> = {
   starter: 10,
   pro: null,
   scale: null,
+  system: null,
 };
 
 /** Contacts a team may hold per plan; null = unlimited. Self-host ignores plans entirely. */
@@ -310,6 +321,7 @@ export const PLAN_CONTACT_LIMIT: Record<Plan, number | null> = {
   starter: null,
   pro: null,
   scale: null,
+  system: null,
 };
 
 /**

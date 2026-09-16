@@ -30,7 +30,7 @@ import {
 import { and, asc, eq } from "drizzle-orm";
 import { createRemoteJWKSet, type JWTVerifyGetKey, jwtVerify } from "jose";
 import { type ApiDeps, type Env, errorBody } from "./app.js";
-import { servedRegion } from "./routes/domains.js";
+import { servedRegions } from "./routes/domains.js";
 import {
   batchAddSuppressionsRequestSchema,
   batchContactsRequestSchema,
@@ -471,7 +471,7 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
     "emails:read",
     {
       description:
-        "Get the team's plan and quota picture before bulk work: effective plan, its send limit (emails_per_day on Free and Starter, emails_per_month on Pro and Scale), domain limit and contact limit (`limits.contacts`, null when unlimited), emails accepted so far today (UTC) and when that counter resets, and on a monthly plan a `period` object with the billing period's emails_sent, included volume, whether overage is on and when the period ends. A self-hosted instance reports cloud=false with null plan, limits and period.",
+        "Get the team's plan and quota picture before bulk work: effective plan, its send limit (emails_per_day on Free and Starter, emails_per_month on Pro and Scale), domain limit and contact limit (`limits.contacts`, null when unlimited), emails accepted so far today (UTC) and when that counter resets, and on a monthly plan a `period` object with the billing period's emails_sent, included volume, whether overage is on and when the period ends. A self-hosted instance reports cloud=false with null plan, limits and period; the instance's own (system) team reports cloud=true with the same nulls.",
       inputSchema: z.object({}),
       readOnly: true,
     },
@@ -1137,13 +1137,13 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
     ({ id }) => api("DELETE", `/api-keys/${enc(id)}`),
   );
   if (deps.ses) {
-    const region = servedRegion(deps.ses);
+    const regions = servedRegions(deps.ses);
     tool(
       "create_domain",
       "domains:write",
       {
-        description: `Add a sending domain. region is optional and must be ${region}, the only region this deployment serves (it is also the default). Returns the DNS records to create; the domain sends once they verify. Open and click tracking start off; pass open_tracking/click_tracking together with a tracking_subdomain to stand the domain up tracked in one call — its Tracking CNAME then comes back with the other records (same rules as update_domain).`,
-        inputSchema: createDomainRequestSchema([region]),
+        description: `Add a sending domain. region is optional: this deployment serves ${regions.join(", ")} (default ${regions[0]}) and refuses any other. A domain has one region; to move it, delete and re-add it. Returns the DNS records to create; the domain sends once they verify. Open and click tracking start off; pass open_tracking/click_tracking together with a tracking_subdomain to stand the domain up tracked in one call — its Tracking CNAME then comes back with the other records (same rules as update_domain).`,
+        inputSchema: createDomainRequestSchema(regions),
       },
       (body) => api("POST", "/domains", body),
     );

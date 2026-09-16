@@ -1,6 +1,6 @@
 {
-  "id": "bb21ac97-dc38-4642-b1e6-fd6fb17016ba",
-  "prevId": "997dd49d-b112-4277-b965-b68903fa1041",
+  "id": "64359930-c1bd-4255-99fe-e7ed0ca7ec5a",
+  "prevId": "bb21ac97-dc38-4642-b1e6-fd6fb17016ba",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3667,6 +3667,67 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.instance_probes": {
+      "name": "instance_probes",
+      "schema": "",
+      "columns": {
+        "probe": {
+          "name": "probe",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "taken_at": {
+          "name": "taken_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ok": {
+          "name": "ok",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "instance_probes_taken_at_idx": {
+          "name": "instance_probes_taken_at_idx",
+          "columns": [
+            {
+              "expression": "taken_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "instance_probes_probe_taken_at_pk": {
+          "name": "instance_probes_probe_taken_at_pk",
+          "columns": [
+            "probe",
+            "taken_at"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.instance_settings": {
       "name": "instance_settings",
       "schema": "",
@@ -3731,6 +3792,12 @@
         "reason": {
           "name": "reason",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "manual_reason": {
+          "name": "manual_reason",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -4062,6 +4129,222 @@
         "suppressions_team_id_teams_id_fk": {
           "name": "suppressions_team_id_teams_id_fk",
           "tableFrom": "suppressions",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.team_flags": {
+      "name": "team_flags",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "team_flag_reason",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "team_flag_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "detail": {
+          "name": "detail",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "opened_by": {
+          "name": "opened_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "opened_at": {
+          "name": "opened_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "cleared_by": {
+          "name": "cleared_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cleared_at": {
+          "name": "cleared_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "team_flags_open_idx": {
+          "name": "team_flags_open_idx",
+          "columns": [
+            {
+              "expression": "team_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"team_flags\".\"status\" = 'open'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "team_flags_team_idx": {
+          "name": "team_flags_team_idx",
+          "columns": [
+            {
+              "expression": "team_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "opened_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "team_flags_team_id_teams_id_fk": {
+          "name": "team_flags_team_id_teams_id_fk",
+          "tableFrom": "team_flags",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.team_standings": {
+      "name": "team_standings",
+      "schema": "",
+      "columns": {
+        "team_id": {
+          "name": "team_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "score_tenths": {
+          "name": "score_tenths",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "guardrail": {
+          "name": "guardrail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "guardrail_metric": {
+          "name": "guardrail_metric",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "complaint_rate_7d": {
+          "name": "complaint_rate_7d",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "hard_bounce_rate_7d": {
+          "name": "hard_bounce_rate_7d",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "sent_7d": {
+          "name": "sent_7d",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "sent_30d": {
+          "name": "sent_30d",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "computed_at": {
+          "name": "computed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "team_standings_team_id_teams_id_fk": {
+          "name": "team_standings_team_id_teams_id_fk",
+          "tableFrom": "team_standings",
           "tableTo": "teams",
           "columnsFrom": [
             "team_id"
@@ -4434,6 +4717,37 @@
         },
         "logo_url": {
           "name": "logo_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "daily_send_ceiling": {
+          "name": "daily_send_ceiling",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "broadcasts_paused_by_operator_at": {
+          "name": "broadcasts_paused_by_operator_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "suspended_at": {
+          "name": "suspended_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "suspension_reason": {
+          "name": "suspension_reason",
+          "type": "suspension_reason",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "suspension_note": {
+          "name": "suspension_note",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -5583,6 +5897,26 @@
         "one_click_unsubscribe"
       ]
     },
+    "public.team_flag_reason": {
+      "name": "team_flag_reason",
+      "schema": "public",
+      "values": [
+        "monitor",
+        "complaints",
+        "guardrail",
+        "score",
+        "report",
+        "manual"
+      ]
+    },
+    "public.team_flag_status": {
+      "name": "team_flag_status",
+      "schema": "public",
+      "values": [
+        "open",
+        "cleared"
+      ]
+    },
     "public.plan": {
       "name": "plan",
       "schema": "public",
@@ -5605,6 +5939,16 @@
         "unpaid",
         "canceled",
         "incomplete"
+      ]
+    },
+    "public.suspension_reason": {
+      "name": "suspension_reason",
+      "schema": "public",
+      "values": [
+        "manual",
+        "reputation",
+        "phishing",
+        "non_payment"
       ]
     },
     "public.unsubscribe_logo_radius": {

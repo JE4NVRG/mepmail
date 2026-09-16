@@ -18,16 +18,16 @@ describe("getAccountOverview", () => {
     const { client, calls } = fakeClient({
       SendingEnabled: true,
       ProductionAccessEnabled: true,
-      SendQuota: { Max24HourSend: 50000, SentLast24Hours: 1234, MaxSendRate: 14 },
       EnforcementStatus: "HEALTHY",
-      PricingAttributes: { CurrentPlan: "ESSENTIALS" },
+      PricingAttributes: { CurrentPlan: "NONE" },
+      SendQuota: { Max24HourSend: 50000, SentLast24Hours: 1234, MaxSendRate: 14 },
     });
     expect(await getAccountOverview(client)).toEqual({
       sendingEnabled: true,
       productionAccess: true,
-      quota: { max24h: 50000, sentLast24h: 1234, maxSendRate: 14 },
       enforcementStatus: "HEALTHY",
-      pricingPlan: "ESSENTIALS",
+      pricingPlan: "NONE",
+      quota: { max24h: 50000, sentLast24h: 1234, maxSendRate: 14 },
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]).toBeInstanceOf(GetAccountCommand);
@@ -42,9 +42,9 @@ describe("getAccountOverview", () => {
     expect(await getAccountOverview(client)).toEqual({
       sendingEnabled: true,
       productionAccess: false,
-      quota: { max24h: 200, sentLast24h: 0, maxSendRate: 1 },
       enforcementStatus: null,
       pricingPlan: null,
+      quota: { max24h: 200, sentLast24h: 0, maxSendRate: 1 },
     });
   });
 
@@ -53,9 +53,9 @@ describe("getAccountOverview", () => {
     expect(await getAccountOverview(client)).toEqual({
       sendingEnabled: false,
       productionAccess: false,
-      quota: { max24h: 0, sentLast24h: 0, maxSendRate: 0 },
       enforcementStatus: null,
       pricingPlan: null,
+      quota: { max24h: 0, sentLast24h: 0, maxSendRate: 0 },
     });
   });
 });
