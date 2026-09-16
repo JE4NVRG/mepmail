@@ -19,16 +19,26 @@ const MASK = "••••••";
 const URL_PATH_STUB_MAX = 24;
 /** A cut link ends here, so a shortened one is never mistaken for the whole. */
 const CUT = "…";
-/** Written with a scheme or as a bare www host; both are links to a reader. */
-const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"'`)\]]+/gi;
+/**
+ * Written with a scheme or as a bare www host; both are links to a reader.
+ * The scheme branch takes no word boundary: a link glued to the word before
+ * it — or to the tail of a run some other rule matched — is still a link, and
+ * a boundary there would let the whole of it through.
+ */
+const URL_RE = /(?:https?:\/\/|\bwww\.)[^\s<>"'`)\]]+/gi;
 /** Trailing sentence punctuation is not part of the link. */
 const URL_TAIL = /[.,;:!?]+$/;
 
+/**
+ * Each run is bounded by its own alphabet rather than by \b: an underscore is
+ * a word character, so a boundary would refuse to match after the prefix every
+ * modern key wears — sk_live_, whsec_, ghp_ — and hand the secret back whole.
+ */
 const SECRETS: RegExp[] = [
   // JWT: three base64url segments.
-  /\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}/g,
-  /\b[0-9a-fA-F]{32,}\b/g,
-  /\b[A-Za-z0-9+/]{40,}={0,2}/g,
+  /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}/g,
+  /(?<![0-9a-fA-F])[0-9a-fA-F]{32,}(?![0-9a-fA-F])/g,
+  /(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{40,}={0,2}/g,
   // This platform's own API key: base64url, so neither the hex nor the base64
   // shape above catches it, and it is the credential most likely to be quoted
   // back into a message the operator ends up reading.
@@ -121,7 +131,9 @@ export function redactRevealedText(text: string): RevealedContent {
   let cursor = 0;
   let redactions = 0;
   for (const hit of hits) {
-    if (hit.start < cursor) continue;
+    // A hit already covered is dropped; one that only overlaps still emits, so
+    // the tail an earlier hit left behind is replaced rather than published.
+    if (hit.end <= cursor) continue;
     if (hit.start > cursor) spans.push({ text: text.slice(cursor, hit.start) });
     spans.push({ text: hit.text, redacted: true });
     redactions += 1;
@@ -159,9 +171,10 @@ export function renderRevealedBody(body: {
   html: string | null;
   text: string | null;
 }): RevealedContent {
-  const source =
-    body.html === null
-      ? (body.text ?? "").trim()
-      : decodeEntities(visibleText(stripHiddenElements(body.html).html));
+  // Empty HTML is no HTML: a message carrying only a text part must not read
+  // as an empty body.
+  const source = body.html
+    ? decodeEntities(visibleText(stripHiddenElements(body.html).html))
+    : (body.text ?? "").trim();
   return truncate(redactRevealedText(source), CONTENT_REVEAL_TEXT_MAX_CHARS);
 }

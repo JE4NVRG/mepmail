@@ -80,6 +80,25 @@ describe("redactRevealedText", () => {
     expect(plain(content)).toBe("Use •••••• to send.");
   });
 
+  it("masks a key whose prefix ends in an underscore, where a word boundary cannot", () => {
+    const hex = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
+    expect(plain(redactRevealedText(`key sk_live_${hex}1234 end`))).toBe("key sk_live_•••••• end");
+    const b64 = "QUJD".repeat(12);
+    expect(plain(redactRevealedText(`key whsec_${b64} end`))).toBe("key whsec_•••••• end");
+  });
+
+  it("reduces a link glued to the text before it, and one a masked run runs into", () => {
+    expect(plain(redactRevealedText("click herehttps://login.example.com/r?t=9k"))).toBe(
+      "click herehttps://example.com/r…",
+    );
+    // The base64 run swallows the scheme's letters and stops at the colon; the
+    // link must not come out whole behind it.
+    const run = "A".repeat(40);
+    expect(plain(redactRevealedText(`${run}https://evil.example.com/reset?token=abc`))).toBe(
+      "••••••https://example.com/reset…",
+    );
+  });
+
   it("marks every changed run as redacted and nothing else", () => {
     const content = redactRevealedText("Hi, your code is 111222 at https://example.com/a/b.");
     expect(masked(content)).toEqual(["••••••", "https://example.com/a/b"]);
@@ -130,6 +149,11 @@ describe("renderRevealedBody", () => {
     const content = renderRevealedBody({ html: null, text: body });
     expect(plain(content)).not.toContain("•");
     expect(content.redactions).toBe(0);
+  });
+
+  it("reads an empty html string as no html at all", () => {
+    const content = renderRevealedBody({ html: "", text: "Your PIN is 4821" });
+    expect(plain(content)).toBe("Your PIN is ••••••");
   });
 
   it("holds an empty body without spans", () => {
