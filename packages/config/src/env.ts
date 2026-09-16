@@ -34,6 +34,13 @@ export const AWS_REGION_DEFAULT = "us-east-1";
 export const EMAIL_RETENTION_DAYS_DEFAULT = 30;
 export const OPEN_PREFETCH_WINDOW_SECONDS_DEFAULT = 10;
 
+/** Where the optional content-monitor judge runs; "off" is the default everywhere. */
+export const ABUSE_JUDGE_PROVIDERS = ["off", "bedrock", "openai", "anthropic"] as const;
+export type AbuseJudgeProvider = (typeof ABUSE_JUDGE_PROVIDERS)[number];
+export const ABUSE_JUDGE_REGION_DEFAULT = "us-east-1";
+export const ABUSE_JUDGE_BASE_URL_DEFAULT = "https://api.openai.com/v1";
+export const ABUSE_JUDGE_TIMEOUT_MS_DEFAULT = 20_000;
+
 const emailAddress = z.email();
 
 /**
@@ -187,6 +194,42 @@ export const env = createEnv({
       .int()
       .min(0)
       .default(OPEN_PREFETCH_WINDOW_SECONDS_DEFAULT),
+
+    // Optional content monitor: a model judges a sample of accepted mail
+    // after SES took it. Off by default; sending never waits on it. The
+    // provider picks the adapter, the model id is the provider's own.
+    // Bedrock uses the AWS credential chain SES already uses; the hosted
+    // providers need ABUSE_JUDGE_API_KEY. Sampling rates and thresholds are
+    // instance settings (console → Trust & safety → Monitoring settings);
+    // the MONITOR_* values below are their bootstrap defaults.
+    ABUSE_JUDGE: z.enum(ABUSE_JUDGE_PROVIDERS).default("off"),
+    ABUSE_JUDGE_MODEL: z.string().optional(),
+    ABUSE_JUDGE_REGION: z.string().default(ABUSE_JUDGE_REGION_DEFAULT),
+    ABUSE_JUDGE_BASE_URL: z.url().default(ABUSE_JUDGE_BASE_URL_DEFAULT),
+    ABUSE_JUDGE_API_KEY: z.string().optional(),
+    ABUSE_JUDGE_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(1000)
+      .default(ABUSE_JUDGE_TIMEOUT_MS_DEFAULT),
+    MONITOR_FIRST_SENDS: z.coerce.number().int().min(0).optional(),
+    MONITOR_FIRST_HOURS: z.coerce.number().int().min(0).optional(),
+    MONITOR_RAMP_SENDS: z.coerce.number().int().min(0).optional(),
+    MONITOR_RAMP_RATE: z.coerce.number().min(0).max(1).optional(),
+    MONITOR_RAMP_DAYS: z.coerce.number().int().min(0).optional(),
+    MONITOR_PROBATION_RATE: z.coerce.number().min(0).max(1).optional(),
+    MONITOR_ESTABLISHED_RATE: z.coerce.number().min(0).max(1).optional(),
+    MONITOR_TRUSTED_RATE: z.coerce.number().min(0).max(1).optional(),
+    MONITOR_BROADCAST_COPIES: z.coerce.number().int().min(0).optional(),
+    MONITOR_BROADCAST_COPIES_NEW: z.coerce.number().int().min(0).optional(),
+    MONITOR_ANOMALY_MULTIPLIER: z.coerce.number().min(1).optional(),
+    MONITOR_TEAM_DAILY_CAP: z.coerce.number().int().min(0).optional(),
+    MONITOR_INSTANCE_DAILY_CAP: z.coerce.number().int().min(0).optional(),
+    MONITOR_FLAG_RISK: z.coerce.number().min(0).max(1).optional(),
+    MONITOR_ALERT_RISK: z.coerce.number().min(0).max(1).optional(),
+    MONITOR_PAUSE_RISK: z.coerce.number().min(0).max(1).optional(),
+    MONITOR_AUTO_PAUSE: z.enum(["true", "false", "1", "0"]).optional(),
+    MONITOR_FLAG_SCORE: z.coerce.number().int().min(0).max(100).optional(),
 
     // Public base URL of this deployment; SNS subscriptions and hosted
     // unsubscribe pages are derived from it.
@@ -365,6 +408,34 @@ export function accountMailDeliverable(e: Env = env): boolean {
   return reachable && Boolean(e.AUTH_EMAIL_FROM);
 }
 
+export interface AbuseJudgeConfig {
+  provider: Exclude<AbuseJudgeProvider, "off">;
+  model: string;
+  region: string;
+  baseUrl: string;
+  apiKey: string | undefined;
+  timeoutMs: number;
+}
+
+/**
+ * The judge the worker builds, or null when the monitor is off. Read through
+ * a function so a process under SKIP_ENV_VALIDATION (raw strings) reads the
+ * same answer as a validated one.
+ */
+export function abuseJudgeConfig(e: Env = env): AbuseJudgeConfig | null {
+  const provider = (e.ABUSE_JUDGE as unknown as string | undefined) || "off";
+  if (provider === "off") return null;
+  const timeout = Number(e.ABUSE_JUDGE_TIMEOUT_MS);
+  return {
+    provider: provider as AbuseJudgeConfig["provider"],
+    model: e.ABUSE_JUDGE_MODEL ?? "",
+    region: e.ABUSE_JUDGE_REGION || ABUSE_JUDGE_REGION_DEFAULT,
+    baseUrl: e.ABUSE_JUDGE_BASE_URL || ABUSE_JUDGE_BASE_URL_DEFAULT,
+    apiKey: e.ABUSE_JUDGE_API_KEY,
+    timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : ABUSE_JUDGE_TIMEOUT_MS_DEFAULT,
+  };
+}
+
 /**
  * Whether strangers may register. Cloud is always open; a self-host is open
  * only by explicit choice, and a closed one has nobody to market to — sign-ups
@@ -455,6 +526,16 @@ export function assertEnvConsistency(e: Env): void {
   for (const key of BACKUP_TUNING_KEYS) {
     if (e[key] && !e.S3_BACKUP_BUCKET) {
       throw new Error(`${key} requires S3_BACKUP_BUCKET`);
+    }
+  }
+  // A judge switched on without its model or key would fail every sample
+  // as "no credentials" forever, silently; refuse the boot instead.
+  if (e.ABUSE_JUDGE && e.ABUSE_JUDGE !== "off") {
+    if (!e.ABUSE_JUDGE_MODEL) {
+      throw new Error(`ABUSE_JUDGE=${e.ABUSE_JUDGE} requires ABUSE_JUDGE_MODEL`);
+    }
+    if (e.ABUSE_JUDGE !== "bedrock" && !e.ABUSE_JUDGE_API_KEY) {
+      throw new Error(`ABUSE_JUDGE=${e.ABUSE_JUDGE} requires ABUSE_JUDGE_API_KEY`);
     }
   }
   if (e.IS_CLOUD) {
