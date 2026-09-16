@@ -207,6 +207,33 @@ export const ptBR = {
     ],
     button: "Abrir painel",
   },
+  "monitor.alert": {
+    subject: "Monitor de conteúdo: {team} precisa de uma olhada",
+    body: [
+      "O risco do monitor de conteúdo para {team} chegou a {risk} (nível {tier}, {samples} amostras julgadas nos últimos 7 dias, {flagged} acima da linha de sinalização). O modelo lê uma amostra do e-mail aceito; nada foi pausado nem retido por conta dele.",
+      "Abra a página de revisão para ver os veredictos amostrados, as verificações de conteúdo e o histórico da equipe, e decida. Este aviso se repete no máximo uma vez por dia por equipe enquanto o risco ficar acima da linha.",
+    ],
+    button: "Abrir revisão",
+  },
+  "monitor.broadcasts_paused": {
+    subject: "O monitor de conteúdo pausou os broadcasts de {team}",
+    body: [
+      "{team} está no nível novo, seu risco no monitor chegou a {risk} e uma mensagem amostrada pontuou {score}. Pela política de pausa, seus broadcasts estão em espera; o e-mail transacional continua saindo.",
+      "A equipe vê os broadcasts como pausados aguardando revisão. Abra a página de revisão para ler os veredictos e retomar, suspender ou limpar.",
+    ],
+    button: "Abrir revisão",
+  },
+  "monitor.degraded": {
+    subject: "Monitor de conteúdo: {rate} das amostras ficaram sem julgamento na última hora",
+    body: [
+      "{unjudged} de {samples} amostras sorteadas na última hora voltaram sem julgamento ({provider} · {model}). O envio não é afetado: uma amostra sem julgamento não muda risco, não abre sinalização e não retém e-mail.",
+      "As causas comuns são um provedor limitado ou inacessível, credenciais ausentes, ou um modelo que responde fora do formato da rubrica. O cartão Saúde do console mostra a parcela sem julgamento.",
+    ],
+    button: "Abrir console",
+    muted: [
+      "Enviado ao operador da instância no máximo a cada seis horas enquanto a parcela ficar acima de 20%.",
+    ],
+  },
 } as const satisfies Record<AccountMailKind, AccountMailEntry>;
 
 export const ptBRPhrases = {

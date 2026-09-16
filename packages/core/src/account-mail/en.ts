@@ -207,6 +207,33 @@ export const en = {
     ],
     button: "Open dashboard",
   },
+  "monitor.alert": {
+    subject: "Content monitor: {team} needs a look",
+    body: [
+      "The content monitor's risk for {team} reached {risk} ({tier} tier, {samples} samples judged in the last 7 days, {flagged} over the flag line). The model reads a sample of accepted mail; nothing was paused or held on its account.",
+      "Open the review page to see the sampled verdicts, the content checks and the team's history, and decide. This notice repeats at most once a day per team while the risk stays over the line.",
+    ],
+    button: "Open review",
+  },
+  "monitor.broadcasts_paused": {
+    subject: "Content monitor paused broadcasts for {team}",
+    body: [
+      "{team} is in the new tier, its monitor risk reached {risk} and a sampled message scored {score}. Under the pause policy its broadcasts are now on hold; transactional mail still flows.",
+      "The team sees broadcasts as paused pending review. Open the review page to read the verdicts and resume, suspend or clear.",
+    ],
+    button: "Open review",
+  },
+  "monitor.degraded": {
+    subject: "Content monitor: {rate} of samples went unjudged in the last hour",
+    body: [
+      "{unjudged} of {samples} samples drawn in the last hour came back unjudged ({provider} · {model}). Sending is unaffected: an unjudged sample changes no risk, opens no flag and holds no mail.",
+      "Common causes are a throttled or unreachable provider, missing credentials, or a model that answers outside the rubric's format. The console's Health card charts the unjudged share.",
+    ],
+    button: "Open console",
+    muted: [
+      "Sent to the instance operator at most once every six hours while the share stays over 20%.",
+    ],
+  },
 } as const satisfies Record<AccountMailKind, AccountMailEntry>;
 
 /** Sentences several kinds share, filled by the builders. */
