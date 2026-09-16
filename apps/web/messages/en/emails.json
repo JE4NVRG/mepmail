@@ -83,7 +83,8 @@
     "noHtml": "No HTML body.",
     "noText": "No plain-text body.",
     "previewLight": "Light",
-    "previewDark": "Dark"
+    "previewDark": "Dark",
+    "hiddenBySupportView": "Email content is hidden in support view"
   },
   "insights": {
     "outOfTen": "/ 10",

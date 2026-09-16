@@ -440,7 +440,9 @@
       "monitor_broadcasts_paused": "O monitor de conteúdo pausou transmissões",
       "monitor_broadcasts_resumed": "Retomou transmissões após pausa do monitor",
       "content_revealed": "Leu o conteúdo de mensagens",
-      "content_accessed": "Um operador leu o conteúdo de mensagens"
+      "content_accessed": "Um operador leu o conteúdo de mensagens",
+      "support_view_started": "Modo de suporte iniciado",
+      "support_view_ended": "Modo de suporte encerrado"
     },
     "empty": "Nada registrado ainda.",
     "loadMore": "Carregar mais",
@@ -530,5 +532,23 @@
         "note": "O plano pago terminou."
       }
     }
+  },
+  "supportAccess": {
+    "title": "Acesso de suporte",
+    "intro": "A seu pedido, um operador da instância pode abrir este painel em modo somente leitura por até 30 minutos. O conteúdo dos e-mails enviados, exportações e segredos ficam ocultos, e a sessão é registrada no log de auditoria.",
+    "none": "Nenhuma sessão de suporte ativa.",
+    "operator": "Operador",
+    "started": "Início",
+    "expires": "Termina",
+    "reason": "Motivo",
+    "reference": "Referência",
+    "reasons": {
+      "support_ticket": "Chamado de suporte",
+      "billing_dispute": "Disputa de cobrança",
+      "other": "Outro"
+    },
+    "end": "Encerrar sessão",
+    "ended": "Sessão de suporte encerrada",
+    "error": "Não foi possível encerrar a sessão: {reason}"
   }
 }

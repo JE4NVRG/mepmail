@@ -56,7 +56,8 @@
     "saveAndClose": "Salvar e fechar",
     "saved": "Salvo",
     "saveError": "Não foi possível salvar o modelo.",
-    "error": "Não foi possível carregar o modelo."
+    "error": "Não foi possível carregar o modelo.",
+    "hiddenBySupportView": "O conteúdo do template fica oculto no modo de suporte."
   },
   "picker": {
     "label": "Começar de um modelo",

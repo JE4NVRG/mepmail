@@ -141,8 +141,12 @@ export const logsRouter = router({
     const caller = { apiKeyName, apiKeyRevoked, oauthClientName };
 
     // Bodies carry recipient data and full API payloads: admin-only, while
-    // the metadata stays readable for every member.
-    if (ctx.role === "member") return { ...row, ...caller, requestBody: null, responseBody: null };
-    return { ...row, ...caller };
+    // the metadata stays readable for every member, and never shown to a
+    // support view (the message content lives in them).
+    const hiddenBySupportView = Boolean(ctx.supportView);
+    if (ctx.role === "member" || hiddenBySupportView) {
+      return { ...row, ...caller, requestBody: null, responseBody: null, hiddenBySupportView };
+    }
+    return { ...row, ...caller, hiddenBySupportView };
   }),
 });

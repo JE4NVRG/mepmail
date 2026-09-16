@@ -83,7 +83,8 @@
     "noHtml": "Sem corpo HTML.",
     "noText": "Sem corpo em texto simples.",
     "previewLight": "Claro",
-    "previewDark": "Escuro"
+    "previewDark": "Escuro",
+    "hiddenBySupportView": "O conteúdo do e-mail fica oculto no modo de suporte"
   },
   "insights": {
     "outOfTen": "/ 10",

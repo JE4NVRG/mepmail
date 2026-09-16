@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { refusedAsReadOnly } from "@/lib/read-only";
 import { useScrollLock } from "@/lib/use-scroll-lock";
 
 function CloseGlyph({ onClose }: { onClose: () => void }) {
@@ -73,7 +74,9 @@ export function Modal({
       if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
         if (onConfirm) {
           event.preventDefault();
-          onConfirm();
+          // The one confirm path no button carries, so nothing a read-only
+          // view dims can stop it.
+          if (!refusedAsReadOnly()) onConfirm();
         }
         return;
       }

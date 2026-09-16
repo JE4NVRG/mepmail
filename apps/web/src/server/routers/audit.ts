@@ -1,13 +1,18 @@
 import { parseAuditActor } from "@millionsend/core";
 import { schema } from "@millionsend/db";
+import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { beforeCursor, createdAtCursorField, cursorSchema, paginate } from "../keyset";
-import { adminProcedure, router } from "../trpc";
+import { router, teamProcedure } from "../trpc";
 
-/** Read-only, owner/admin only: the trail is a forensic record, not a member feed. */
+/**
+ * Read-only, and never a member feed: the trail is a forensic record. A
+ * support view reads it too — it is metadata, it carries that session's own
+ * two rows, and answering "when did this change" is what support is for.
+ */
 export const auditRouter = router({
-  list: adminProcedure
+  list: teamProcedure
     .input(
       z.object({
         cursor: cursorSchema.optional(),
@@ -15,6 +20,7 @@ export const auditRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
+      if (ctx.role === "member") throw new TRPCError({ code: "FORBIDDEN" });
       const t = schema.auditLog;
       const rows = await ctx.db
         .select({

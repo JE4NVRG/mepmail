@@ -138,6 +138,7 @@ export function TeamsView() {
 
   const rows = list.data?.pages.flatMap((page) => page.items) ?? [];
   const total = list.data?.pages[0]?.total ?? 0;
+  const supportView = list.data?.pages[0]?.supportViewEnabled ?? false;
   const plans = useMemo(
     () => [...new Set((list.data?.pages[0]?.rungs ?? []).map((r) => r.plan))],
     [list.data?.pages],
@@ -341,7 +342,9 @@ export function TeamsView() {
                       <td className="right" style={{ width: 40 }}>
                         <PopoverMenu
                           ariaLabel={common("actions")}
-                          items={teamMenuItems(row, actions, (key) => t(`menu.${key}`))}
+                          items={teamMenuItems(row, actions, (key) => t(`menu.${key}`), {
+                            supportView,
+                          })}
                         />
                       </td>
                     </tr>

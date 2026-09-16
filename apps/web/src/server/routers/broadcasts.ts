@@ -286,7 +286,19 @@ export const broadcastsRouter = router({
 
   /** Detail surface: full content plus the stat strip's aggregate over fanned-out emails. */
   get: teamProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
-    const row = await getOwnBroadcast(ctx, input.id);
+    const stored = await getOwnBroadcast(ctx, input.id);
+    // A body that has reached recipients IS the content of sent emails, which
+    // a support view never sees. One still queued has reached nobody, and
+    // "why does this render wrong" is what support is asked before a send,
+    // so a draft and a scheduled broadcast stay readable. Canceled counts as
+    // reached: a cancel can land mid-fan-out, after copies have gone.
+    const SENT_TO_SOMEONE: readonly string[] = ["sending", "sent", "canceled"];
+    const hiddenBySupportView = Boolean(ctx.supportView) && SENT_TO_SOMEONE.includes(stored.status);
+    // previewText is the preheader the worker injects into the sent html, so
+    // it travels with the body and goes with it.
+    const row = hiddenBySupportView
+      ? { ...stored, html: null, text: null, document: null, previewText: null }
+      : stored;
     const e = schema.emails;
     const tp = schema.topics;
     const [topic] = row.topicId
@@ -318,6 +330,7 @@ export const broadcastsRouter = router({
     const live = stats && stats.total > 0 ? stats : null;
     return {
       ...row,
+      hiddenBySupportView,
       replyTo: firstReplyTo(row.replyTo),
       topicName: topic?.name ?? null,
       segmentName: segment?.name ?? null,

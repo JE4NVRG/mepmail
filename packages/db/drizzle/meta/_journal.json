@@ -281,6 +281,13 @@
       "when": 1789570292949,
       "tag": "0039_content_reveal",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1789583105460,
+      "tag": "0040_support_view",
+      "breakpoints": true
     }
   ]
 }

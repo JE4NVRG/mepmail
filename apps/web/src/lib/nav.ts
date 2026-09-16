@@ -36,3 +36,8 @@ export function isActive(pathname: string, href: string): boolean {
 export function pickActive(pathname: string, hrefs: readonly string[]): string | undefined {
   return hrefs.filter((href) => isActive(pathname, href)).sort((a, b) => b.length - a.length)[0];
 }
+
+/** The console's Teams list, searched down to one team (the search matches an id). */
+export function consoleTeamHref(teamId: string): string {
+  return `/console/teams?q=${encodeURIComponent(teamId)}`;
+}

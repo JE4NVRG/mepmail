@@ -244,6 +244,7 @@ export default function BroadcastDetailPage() {
               html: broadcast.html,
               text: broadcast.text,
               insights: broadcast.insights,
+              hiddenBySupportView: broadcast.hiddenBySupportView,
             }}
           />
         ) : (

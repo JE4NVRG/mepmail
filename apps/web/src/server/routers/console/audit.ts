@@ -13,6 +13,7 @@ const CONSOLE_ACTION_PREFIXES = [
   "region.",
   "instance.",
   "guardrail.",
+  "support.",
 ];
 
 export const consoleAuditRouter = router({

@@ -183,7 +183,11 @@ export const emailsRouter = router({
     if (!email) throw new TRPCError({ code: "NOT_FOUND" });
 
     let body: EmailBody = { html: null, text: null };
+    // A support view reads the envelope, never the message: the body is not
+    // decrypted at all, and the flag says so instead of "no body".
+    const hiddenBySupportView = Boolean(ctx.supportView);
     if (
+      !hiddenBySupportView &&
       email.bodyCiphertext &&
       email.bodyIv &&
       email.bodyWrappedDek &&
@@ -249,6 +253,7 @@ export const emailsRouter = router({
       bodyPurgedAt: email.bodyPurgedAt,
       html: body.html,
       text: body.text,
+      hiddenBySupportView,
       events,
       insights,
     };

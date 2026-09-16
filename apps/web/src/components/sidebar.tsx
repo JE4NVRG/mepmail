@@ -190,8 +190,9 @@ export function Sidebar({
         background: "var(--ms-panel)",
         borderRight: "1px solid var(--ms-line)",
         position: "sticky",
-        top: 0,
-        height: "100vh",
+        // Set only while a support view's strip is on screen; unset is 0.
+        top: "var(--ms-support-strip-h, 0px)",
+        height: "calc(100vh - var(--ms-support-strip-h, 0px))",
         boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",

@@ -16,7 +16,7 @@ const isKnownAction = (action: string): action is AuditAction =>
 
 /** The one identifying fact the row carries, if any: a name, an address, a URL, a plan. */
 function targetLabel(data: Record<string, unknown> | null, target: string | null): string {
-  for (const key of ["name", "email", "url", "plan"]) {
+  for (const key of ["name", "email", "url", "plan", "reference"]) {
     const value = data?.[key];
     if (typeof value === "string" && value) return value;
   }

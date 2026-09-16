@@ -399,6 +399,8 @@
     "empty": "0 teams match.",
     "menu": {
       "open": "Open team",
+      "view": "View as owner",
+      "viewOff": "Off on this instance: SUPPORT_VIEW=on turns it on",
       "limits": "Adjust limits",
       "plan": "Change plan",
       "pause": "Pause broadcasts",
@@ -435,7 +437,8 @@
       "stripeSub": "{id} · {status}",
       "ceiling": "Daily ceiling",
       "ceilingNone": "plan decides",
-      "standingAt": "standing computed {ago}"
+      "standingAt": "standing computed {ago}",
+      "supportView": "Support view live · ends in {left}"
     },
     "limitsDialog": {
       "title": "Adjust limits · {team}",
@@ -494,6 +497,26 @@
       "title": "Reinstate {team}",
       "lead": "Sends go out again at once; held broadcasts resume within 15 minutes. The owner is emailed unless the suspension was for phishing.",
       "confirm": "Reinstate team"
+    },
+    "viewDialog": {
+      "title": "View {team} as its owner",
+      "lead": "Opens the team dashboard read-only under a banner, for 30 minutes. Every procedure read lands in the instance audit and the session appears in the team's own audit at once.",
+      "reasons": {
+        "support_ticket": "Support ticket",
+        "billing_dispute": "Billing dispute",
+        "other": "Other"
+      },
+      "reference": "Ticket reference",
+      "referencePlaceholder": "#4812",
+      "hiddenTitle": "Sent bodies stay hidden here too.",
+      "hiddenBody": "The content of a broadcast that has gone out, and of every sent email, follows the Trust & safety reveal rule, not the support view. A draft or scheduled broadcast stays readable.",
+      "confirm": "Start session · 30 min",
+      "errors": {
+        "support_view_off": "Support view is off on this instance (SUPPORT_VIEW=on turns it on).",
+        "support_view_live": "A support view is already live. Open the dashboard and end it from its banner before starting another.",
+        "own_team": "You are a member of this team; open it from the team switcher instead.",
+        "reference_required": "A ticket reference is required for this reason."
+      }
     }
   },
   "safety": {

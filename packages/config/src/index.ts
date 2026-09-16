@@ -26,6 +26,7 @@ export {
   servedRegions,
   sesTenantsEnabled,
   signupOpen,
+  supportViewEnabled,
   trackingCnameTarget,
   trackingSubdomainsSupported,
   unsubscribeBaseUrl,

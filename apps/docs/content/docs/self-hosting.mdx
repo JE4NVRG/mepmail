@@ -916,6 +916,53 @@ variable and both procedures refuse. Reading other people's messages is
 lawful only as a narrow, recorded, disclosed security measure: say so in the
 instance's terms and privacy notice before turning it on.
 
+## Support view (optional)
+
+Off by default; `SUPPORT_VIEW=on` turns it on. From the console's Teams
+list, "View as owner" opens a team's dashboard as its owner sees it,
+read-only, for 30 minutes, after the operator names a reason (support
+ticket, billing dispute, other) and the ticket reference. Every reason is a
+request the customer made; an operator checking an abuse report works from
+the console's own Trust & safety pages instead, and from the content reveal
+when the message text itself is needed. The session rides on the operator's
+own login; no session is ever minted for the owner.
+
+**What the operator sees.** The dashboard under a banner ("Support view of
+&lt;team&gt; · read-only · ends in mm:ss"): emails and their events,
+contacts, domains, broadcasts, templates, API key names, webhook endpoints,
+settings and usage.
+
+**What stays hidden.** The content of sent mail: email bodies (the detail
+says "Email content is hidden in support view"); the body and preheader of a
+broadcast that has started going out, is sent, or was canceled mid-send;
+every template body, since a template's text is copied into the broadcasts
+sent from it and nothing records which; API log request and response bodies;
+CSV exports (the export route answers 403); and every secret, so API keys,
+webhook signing secrets and SMTP credentials are never returned. A draft or
+scheduled broadcast stays readable, since nothing of it has reached anyone. Every change is refused:
+the server answers `FORBIDDEN` to any mutation while the view is live,
+whatever the screen shows.
+
+**How long.** 30 minutes, enforced on every request. One live view per
+operator, starting another ends the previous, and a view cannot start
+another. The operator ends it from the banner, the owner from Settings →
+Support access, and expiry ends it on the next request.
+
+**What is logged.** `support.view_started` and `support.view_ended`, in the
+instance audit and, at once, in the team's own Settings → Audit log: who,
+the reason, the reference, how it ended, the minutes, and how many distinct
+procedures were read. The record keeps a count per procedure name and never
+anything a procedure returned.
+
+**What the owner receives.** An email when the session starts, naming who
+opened it, why, the reference, until when, and where to end it; and the
+Support access card under Settings while it is live, with an "End session"
+button.
+
+```sh
+SUPPORT_VIEW=on
+```
+
 ## Operations
 
 - Send rate and email retention are managed in the dashboard: **Settings →

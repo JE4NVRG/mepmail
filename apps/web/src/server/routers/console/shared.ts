@@ -42,6 +42,8 @@ export async function loadTeam(db: Db, teamId: string) {
 /**
  * One account mail to every owner of the team, in their own language, sent
  * without holding the request (sendAccountMail logs a failure and moves on).
+ * Answers how many owners it handed mail to, so a caller recording that a
+ * team was notified can tell "nobody to tell" from "told".
  */
 export async function mailTeamOwners(
   db: Db,
@@ -49,8 +51,12 @@ export async function mailTeamOwners(
   kind: AccountMailKind,
   path: string,
   values: (locale: MailLocale) => Record<string, string>,
-): Promise<void> {
-  const owners = await listTeamOwners(db, team.id, accountEmailFrom(), kind);
+): Promise<number> {
+  const sender = accountEmailFrom();
+  // No sender configured means the mail cannot leave, whatever the team's
+  // owner count says; a caller recording "notified" must hear zero.
+  if (!sender) return 0;
+  const owners = await listTeamOwners(db, team.id, sender, kind);
   for (const owner of owners) {
     sendAccountMail(
       buildAccountEmail({
@@ -62,6 +68,7 @@ export async function mailTeamOwners(
       }),
     );
   }
+  return owners.length;
 }
 
 /** Sends parked under a lifted hold would otherwise wait for the scheduled drain. Best-effort. */

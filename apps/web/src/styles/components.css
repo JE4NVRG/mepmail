@@ -942,6 +942,30 @@ table.ms-table {
   );
 }
 
+/* A dashboard under a support view is read-only: the server refuses every
+   mutation, and the buttons that would attempt one are dimmed and inert.
+   The marker sits on <html> so dialogs, which portal to document.body, are
+   covered too. Anchors drawn as primary buttons stay live, they navigate.
+   ponytail: a pointer-level block only — a keyboard can still activate a
+   dimmed button, and the server's refusal is what answers it. Thread a
+   read-only context and set `disabled` if that asymmetry starts to matter. */
+[data-support-view] button.ms-btn-primary,
+[data-support-view] button.ms-btn-destructive {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* The strip stays on screen: it carries the only countdown, and a dashboard
+   that scrolled it away is indistinguishable from the operator's own. It
+   measures itself into --ms-support-strip-h, which the sidebar drops by so
+   the page keeps to one viewport. Above .ms-mobile-topbar's z-index. */
+.ms-support-strip {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  flex: none;
+}
+
 /* Odometer — the product's only flourish; reduced-motion degrades to a plain swap */
 .ms-odometer {
   display: inline-flex;
@@ -1843,7 +1867,8 @@ summary:focus-visible,
   }
   .ms-mobile-topbar {
     position: sticky;
-    top: 0;
+    /* Under the support view strip, which sticks above it. */
+    top: var(--ms-support-strip-h, 0px);
     z-index: 20;
     display: flex;
     align-items: center;
@@ -1866,7 +1891,9 @@ summary:focus-visible,
     position: fixed !important;
     height: 100dvh !important;
     left: 0;
-    top: 0;
+    /* The drawer covers the viewport, the strip included, so it takes no
+       offset from it; !important because the desktop offset is inline. */
+    top: 0 !important;
     /* Above the scrim and every popover, below the modal token: a dialog
        opened from the drawer (create team) must paint over the drawer. */
     z-index: calc(var(--ms-z-modal) - 1);
