@@ -503,7 +503,6 @@
       "lead": "Abre o painel da equipe em modo somente leitura sob uma faixa, por 30 minutos. Cada procedimento lido vai para a auditoria da instância e a sessão aparece na auditoria da própria equipe na hora.",
       "reasons": {
         "support_ticket": "Chamado de suporte",
-        "abuse_report_check": "Verificação de denúncia de abuso",
         "billing_dispute": "Disputa de cobrança",
         "other": "Outro"
       },

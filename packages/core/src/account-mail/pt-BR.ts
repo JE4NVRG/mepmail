@@ -262,7 +262,6 @@ export const ptBR = {
     extra: {
       support_ticket: "a seu pedido, chamado {reference}",
       billing_dispute: "por uma disputa de cobrança, referência {reference}",
-      abuse_report_check: "para verificar uma denúncia de abuso{reference}",
       other: "por outro motivo{reference}",
       ref: " (referência {reference})",
     },

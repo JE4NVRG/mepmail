@@ -287,10 +287,13 @@ export const broadcastsRouter = router({
   /** Detail surface: full content plus the stat strip's aggregate over fanned-out emails. */
   get: teamProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
     const stored = await getOwnBroadcast(ctx, input.id);
-    // Once a broadcast leaves draft its body IS the content of sent emails,
-    // which a support view never sees; a draft stays readable, since "why
-    // does this render wrong" is the question support is usually asked.
-    const hiddenBySupportView = Boolean(ctx.supportView) && stored.status !== "draft";
+    // A body that has reached recipients IS the content of sent emails, which
+    // a support view never sees. One still queued has reached nobody, and
+    // "why does this render wrong" is what support is asked before a send,
+    // so a draft and a scheduled broadcast stay readable. Canceled counts as
+    // reached: a cancel can land mid-fan-out, after copies have gone.
+    const SENT_TO_SOMEONE: readonly string[] = ["sending", "sent", "canceled"];
+    const hiddenBySupportView = Boolean(ctx.supportView) && SENT_TO_SOMEONE.includes(stored.status);
     const row = hiddenBySupportView
       ? { ...stored, html: null, text: null, document: null }
       : stored;

@@ -262,7 +262,6 @@ export const en = {
     extra: {
       support_ticket: "at your request, support ticket {reference}",
       billing_dispute: "for a billing dispute, reference {reference}",
-      abuse_report_check: "to verify an abuse report{reference}",
       other: "for another reason{reference}",
       ref: " (reference {reference})",
     },

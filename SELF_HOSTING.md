@@ -841,11 +841,13 @@ instance's terms and privacy notice before turning it on.
 <summary><b>Support view (optional)</b></summary>
 
 Off by default. With `SUPPORT_VIEW=on`, the console's Teams list gains
-"View as owner": the operator names a reason (support ticket, verifying an
-abuse report, billing dispute, other) and the ticket or report reference,
-and opens the team's dashboard as its owner sees it, read-only, for 30
-minutes. The session rides on the operator's own login; no session is ever
-minted for the owner.
+"View as owner": the operator names a reason (support ticket, billing
+dispute, other) and the ticket reference, and opens the team's dashboard as
+its owner sees it, read-only, for 30 minutes. Every reason is a request the
+customer made; an operator checking an abuse report works from the console's
+own Trust & safety pages instead, and from the content reveal when the
+message text itself is needed. The session rides on the operator's own
+login; no session is ever minted for the owner.
 
 - **What the operator sees:** the dashboard under a banner ("Support view
   of <team> · read-only · ends in mm:ss"): emails and their events,

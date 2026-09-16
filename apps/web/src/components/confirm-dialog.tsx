@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/modal";
 import { ConfirmKeycap, ModalFooter } from "@/components/modal-footer";
+import { refusedAsReadOnly } from "@/lib/read-only";
 
 export interface ConfirmDialogOptions {
   message: string;
@@ -29,6 +30,12 @@ let listener: ((request: ConfirmRequest) => void) | null = null;
 /** Our design-system replacement for window.confirm — resolves true on confirm. */
 export function confirmDialog(options: ConfirmDialogOptions): Promise<boolean> {
   return new Promise((resolve) => {
+    // Every caller is a mutation the server would refuse anyway; refusing
+    // here keeps a keyboard from reaching a confirm that cannot be honoured.
+    if (refusedAsReadOnly()) {
+      resolve(false);
+      return;
+    }
     if (!listener) {
       resolve(window.confirm(options.message));
       return;
