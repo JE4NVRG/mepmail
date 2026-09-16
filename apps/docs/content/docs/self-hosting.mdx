@@ -932,10 +932,14 @@ own login; no session is ever minted for the owner.
 contacts, domains, broadcasts, templates, API key names, webhook endpoints,
 settings and usage.
 
-**What stays hidden.** Email bodies (the detail says "Email content is
-hidden in support view"), API log request and response bodies, CSV exports
-(the export route answers 403), and every secret: API keys, webhook signing
-secrets and SMTP credentials are never returned. Every change is refused:
+**What stays hidden.** The content of sent mail: email bodies (the detail
+says "Email content is hidden in support view"); the body and preheader of a
+broadcast that has started going out, is sent, or was canceled mid-send;
+every template body, since a template's text is copied into the broadcasts
+sent from it and nothing records which; API log request and response bodies;
+CSV exports (the export route answers 403); and every secret, so API keys,
+webhook signing secrets and SMTP credentials are never returned. A draft or
+scheduled broadcast stays readable, since nothing of it has reached anyone. Every change is refused:
 the server answers `FORBIDDEN` to any mutation while the view is live,
 whatever the screen shows.
 

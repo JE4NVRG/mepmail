@@ -64,9 +64,15 @@ export const templatesRouter = router({
       return paginate(rows, input.limit);
     }),
 
-  get: teamProcedure
-    .input(z.object({ id: z.uuid() }))
-    .query(({ ctx, input }) => getOwnTemplate(ctx, input.id)),
+  get: teamProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
+    const template = await getOwnTemplate(ctx, input.id);
+    // The composer copies a template's body into the broadcast it sends, and
+    // no column records which template a broadcast came from, so a template's
+    // text cannot be told apart from the text of mail already delivered. A
+    // support view, which never sees sent content, therefore sees none of it.
+    if (!ctx.supportView) return { ...template, hiddenBySupportView: false };
+    return { ...template, html: null, text: null, document: null, hiddenBySupportView: true };
+  }),
 
   create: teamProcedure
     .input(

@@ -56,7 +56,8 @@
     "saveAndClose": "Save & close",
     "saved": "Saved",
     "saveError": "Couldn't save the template.",
-    "error": "Couldn't load the template."
+    "error": "Couldn't load the template.",
+    "hiddenBySupportView": "Template content is hidden in support view."
   },
   "picker": {
     "label": "Start from a template",

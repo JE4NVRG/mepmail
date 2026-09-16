@@ -853,10 +853,16 @@ login; no session is ever minted for the owner.
   of <team> · read-only · ends in mm:ss"): emails and their events,
   contacts, domains, broadcasts, templates, API key names, webhook
   endpoints, settings and usage.
-- **What stays hidden:** email bodies (the detail says "Email content is
-  hidden in support view"), API log request and response bodies, CSV
-  exports (the export route answers 403), and every secret: API keys,
-  webhook signing secrets and SMTP credentials are never returned.
+- **What stays hidden:** the content of sent mail. Email bodies (the
+  detail says "Email content is hidden in support view"); the body and
+  preheader of a broadcast that has started going out, is sent, or was
+  canceled mid-send; every template body, since a template's text is copied
+  into the broadcasts sent from it and nothing records which; API log
+  request and response bodies; CSV exports (the export route answers 403);
+  and every secret: API keys, webhook signing secrets and SMTP credentials
+  are never returned. A draft or scheduled broadcast stays readable, since
+  nothing of it has reached anyone and checking one before it goes is what
+  support is asked for.
 - **What is refused:** every change. A base tRPC middleware answers
   `FORBIDDEN` to every mutation while the view is live, whatever the
   screen shows; the console's own actions keep working.

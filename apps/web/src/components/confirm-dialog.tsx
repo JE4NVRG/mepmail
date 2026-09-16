@@ -15,6 +15,11 @@ export interface ConfirmDialogOptions {
   danger?: boolean;
   /** Irreversible confirms: the action unlocks only after typing the confirm word (DELETE). */
   typeToConfirm?: boolean;
+  /**
+   * The confirm decides something in this browser only (a recovered draft, an
+   * editor buffer), so a read-only support view has no reason to refuse it.
+   */
+  local?: boolean;
 }
 
 interface ConfirmRequest extends ConfirmDialogOptions {
@@ -30,9 +35,10 @@ let listener: ((request: ConfirmRequest) => void) | null = null;
 /** Our design-system replacement for window.confirm — resolves true on confirm. */
 export function confirmDialog(options: ConfirmDialogOptions): Promise<boolean> {
   return new Promise((resolve) => {
-    // Every caller is a mutation the server would refuse anyway; refusing
-    // here keeps a keyboard from reaching a confirm that cannot be honoured.
-    if (refusedAsReadOnly()) {
+    // A confirm that reaches the server cannot be honoured under a read-only
+    // support view, so refusing here keeps a keyboard from arriving at one.
+    // A local confirm decides nothing the view forbids.
+    if (!options.local && refusedAsReadOnly()) {
       resolve(false);
       return;
     }

@@ -1867,7 +1867,8 @@ summary:focus-visible,
   }
   .ms-mobile-topbar {
     position: sticky;
-    top: 0;
+    /* Under the support view strip, which sticks above it. */
+    top: var(--ms-support-strip-h, 0px);
     z-index: 20;
     display: flex;
     align-items: center;
@@ -1890,7 +1891,9 @@ summary:focus-visible,
     position: fixed !important;
     height: 100dvh !important;
     left: 0;
-    top: 0;
+    /* The drawer covers the viewport, the strip included, so it takes no
+       offset from it; !important because the desktop offset is inline. */
+    top: 0 !important;
     /* Above the scrim and every popover, below the modal token: a dialog
        opened from the drawer (create team) must paint over the drawer. */
     z-index: calc(var(--ms-z-modal) - 1);

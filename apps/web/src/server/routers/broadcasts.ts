@@ -294,8 +294,10 @@ export const broadcastsRouter = router({
     // reached: a cancel can land mid-fan-out, after copies have gone.
     const SENT_TO_SOMEONE: readonly string[] = ["sending", "sent", "canceled"];
     const hiddenBySupportView = Boolean(ctx.supportView) && SENT_TO_SOMEONE.includes(stored.status);
+    // previewText is the preheader the worker injects into the sent html, so
+    // it travels with the body and goes with it.
     const row = hiddenBySupportView
-      ? { ...stored, html: null, text: null, document: null }
+      ? { ...stored, html: null, text: null, document: null, previewText: null }
       : stored;
     const e = schema.emails;
     const tp = schema.topics;
