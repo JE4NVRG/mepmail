@@ -79,14 +79,17 @@ export interface LatestProbe {
 }
 
 /** The newest sample of every probe. */
-export async function latestProbes(db: Db): Promise<Map<ProbeKey, LatestProbe>> {
+export async function latestProbes(
+  db: Db,
+  now: Date = new Date(),
+): Promise<Map<ProbeKey, LatestProbe>> {
   const p = schema.instanceProbes;
   // A probe older than a day is stale whatever it says, and the bound keeps
   // the read off the whole 90-day table.
   const rows = await db
     .selectDistinctOn([p.probe], { probe: p.probe, value: p.value, ok: p.ok, takenAt: p.takenAt })
     .from(p)
-    .where(gte(p.takenAt, new Date(Date.now() - DAY_MS)))
+    .where(gte(p.takenAt, new Date(now.getTime() - DAY_MS)))
     .orderBy(p.probe, desc(p.takenAt));
   const out = new Map<ProbeKey, LatestProbe>();
   for (const row of rows) {

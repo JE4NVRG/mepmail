@@ -60,7 +60,7 @@ it("latestProbes returns the newest sample per probe", async () => {
   const later = new Date(NOW.getTime() + 60_000);
   await createTeam(db, "second");
   await runInstanceProbes(db, { ...offCloud, now: later });
-  const latest = await latestProbes(db);
+  const latest = await latestProbes(db, later);
   expect(latest.get("teams_total")).toEqual({
     probe: "teams_total",
     value: 2,
