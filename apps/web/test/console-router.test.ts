@@ -395,3 +395,190 @@ describe("console.audit.list", () => {
     await expect(member().console.audit.list({})).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
+
+describe("console.monitor", () => {
+  it("reads every setting with its source, and the judge as off by default", async () => {
+    const got = await operator().console.monitor.settings.get();
+    expect(got.judge).toEqual({ on: false });
+    expect(got.settings).toHaveLength(18);
+    expect(got.settings.find((s) => s.key === "firstSends")).toEqual({
+      key: "firstSends",
+      value: 1000,
+      source: "default",
+      default: 1000,
+      kind: "count",
+    });
+    const status = await operator().console.monitor.status();
+    expect(status).toMatchObject({ judge: { on: false }, today: null, openFlags: 0 });
+  });
+
+  it("stores overrides, records only the changed keys, clears with null, and honours env between", async () => {
+    const first = await operator().console.monitor.settings.update({
+      firstSends: 500,
+      autoPause: false,
+    });
+    expect(first.changed.sort()).toEqual(["autoPause", "firstSends"]);
+    const [audit] = await auditRows("instance.monitor_settings_updated");
+    expect(audit).toMatchObject({
+      actorId: `user:${OPERATOR}`,
+      teamId: null,
+      data: { firstSends: 500, autoPause: false },
+    });
+    vi.stubEnv("MONITOR_RAMP_RATE", "0.4");
+    const got = await operator().console.monitor.settings.get();
+    expect(got.settings.find((s) => s.key === "firstSends")).toMatchObject({
+      value: 500,
+      source: "db",
+    });
+    expect(got.settings.find((s) => s.key === "autoPause")).toMatchObject({
+      value: false,
+      source: "db",
+    });
+    expect(got.settings.find((s) => s.key === "rampRate")).toMatchObject({
+      value: 0.4,
+      source: "env",
+    });
+    await operator().console.monitor.settings.update({ firstSends: null });
+    expect(
+      (await operator().console.monitor.settings.get()).settings.find(
+        (s) => s.key === "firstSends",
+      ),
+    ).toMatchObject({ value: 1000, source: "default" });
+    expect(await operator().console.monitor.settings.update({})).toEqual({ changed: [] });
+  });
+
+  it("refuses values outside their kind and thresholds out of order", async () => {
+    await expect(
+      operator().console.monitor.settings.update({ rampRate: 1.5 }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST", message: "invalid_rampRate" });
+    await expect(
+      operator().console.monitor.settings.update({ teamDailyCap: -1 }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(
+      operator().console.monitor.settings.update({ flagRisk: 0.75 }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST", message: "thresholds_order" });
+    await expect(
+      operator().console.monitor.settings.update({ alertRisk: 0.9, pauseRisk: 0.8 }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST", message: "thresholds_order" });
+    expect(
+      (await operator().console.monitor.settings.get()).settings.find((s) => s.key === "flagRisk"),
+    ).toMatchObject({ value: 0.5 });
+  });
+
+  it("shows the judge and today's tallies once the env names a provider", async () => {
+    vi.stubEnv("ABUSE_JUDGE", "bedrock");
+    vi.stubEnv("ABUSE_JUDGE_MODEL", "amazon.nova-lite-v1:0");
+    await db.insert(schema.monitorSamples).values([
+      { teamId, kind: "first_sends", status: "judged", score: 80 },
+      { teamId, kind: "first_sends", status: "judged", score: 10 },
+      { teamId, kind: "first_sends", status: "unjudged", errorClass: "timeout" },
+    ]);
+    const status = await operator().console.monitor.status();
+    expect(status.judge).toEqual({
+      on: true,
+      provider: "bedrock",
+      model: "amazon.nova-lite-v1:0",
+      region: "us-east-1",
+      baseUrl: null,
+    });
+    expect(status.today).toEqual({ sampled: 3, judged: 2, unjudged: 1, flagged: 1 });
+  });
+
+  it("sets and clears the sampling override, and lifts the monitor's pause with the hold", async () => {
+    const { until } = await operator().console.monitor.setOverride({ teamId });
+    expect(until.getTime()).toBeGreaterThan(Date.now() + 6 * 86_400_000);
+    const [row] = await db
+      .select()
+      .from(schema.teamMonitor)
+      .where(eq(schema.teamMonitor.teamId, teamId));
+    expect(row).toMatchObject({ overrideRate: 1, overrideUntil: until });
+    expect((await auditRows("monitor.override_set"))[0]).toMatchObject({
+      actorId: `user:${OPERATOR}`,
+      teamId,
+    });
+    await operator().console.monitor.clearOverride({ teamId });
+    expect((await auditRows("monitor.override_cleared"))[0]).toMatchObject({ teamId });
+
+    const pausedAt = new Date();
+    await db
+      .update(schema.teamMonitor)
+      .set({ broadcastsPausedAt: pausedAt })
+      .where(eq(schema.teamMonitor.teamId, teamId));
+    await db
+      .update(schema.teams)
+      .set({ broadcastsPausedByOperatorAt: pausedAt })
+      .where(eq(schema.teams.id, teamId));
+    expect(await operator().console.monitor.resumeBroadcasts({ teamId })).toEqual({
+      resumed: true,
+    });
+    expect((await team()).broadcastsPausedByOperatorAt).toBeNull();
+    expect((await auditRows("monitor.broadcasts_resumed"))[0]).toMatchObject({ teamId });
+    expect(await operator().console.monitor.resumeBroadcasts({ teamId })).toEqual({
+      resumed: false,
+    });
+
+    // The operator's own resume lifts the monitor's pause too.
+    await db
+      .update(schema.teamMonitor)
+      .set({ broadcastsPausedAt: pausedAt })
+      .where(eq(schema.teamMonitor.teamId, teamId));
+    await db
+      .update(schema.teams)
+      .set({ broadcastsPausedByOperatorAt: pausedAt })
+      .where(eq(schema.teams.id, teamId));
+    await operator().console.teams.resumeBroadcasts({ id: teamId });
+    expect(
+      (await db.select().from(schema.teamMonitor).where(eq(schema.teamMonitor.teamId, teamId)))[0]
+        ?.broadcastsPausedAt,
+    ).toBeNull();
+  });
+
+  it("carries the risk on the safety list and the monitor block on the review", async () => {
+    const flagged = await createTeam(db, "flagged-team");
+    await db.insert(schema.monitorSamples).values([
+      { teamId: flagged, kind: "first_sends", status: "judged", score: 80 },
+      { teamId: flagged, kind: "first_sends", status: "judged", score: 10 },
+      { teamId: flagged, kind: "first_sends", status: "unjudged", errorClass: "timeout" },
+    ]);
+    await db
+      .insert(schema.teamFlags)
+      .values({ teamId: flagged, reason: "monitor", detail: { risk: 0.62, samples: 3 } });
+    await db
+      .insert(schema.teamStandings)
+      .values({ teamId: flagged, guardrail: "ok", monitorRisk: 0.62 });
+    const list = await operator().console.safety.list({ sort: "risk", dir: "desc" });
+    expect(list.items[0]).toMatchObject({
+      teamId: flagged,
+      reason: "monitor",
+      monitorRisk: 0.62,
+      detail: { risk: 0.62, samples: 3 },
+    });
+    const review = await operator().console.safety.review({ teamId: flagged });
+    expect(review.monitor).toMatchObject({
+      tier: "new",
+      risk: null,
+      samples7d: 3,
+      judged7d: 2,
+      flagged7d: 1,
+      unjudged7d: 1,
+      override: null,
+      broadcastsPausedAt: null,
+      judge: { on: false },
+      flagScore: 70,
+    });
+    expect(review.monitor.samples).toHaveLength(3);
+    expect(review.monitor.samples[0]).not.toHaveProperty("subject");
+  });
+
+  it("is operator-only", async () => {
+    await expect(member().console.monitor.status()).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(member().console.monitor.settings.update({ firstSends: 1 })).rejects.toMatchObject(
+      {
+        code: "NOT_FOUND",
+      },
+    );
+    await expect(member().console.monitor.setOverride({ teamId })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+});

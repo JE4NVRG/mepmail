@@ -15,9 +15,8 @@ import { and, asc, eq, ilike, isNull, or, type SQL, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { escapeLike } from "@/lib/sql";
-import { getQueue } from "../../queue";
 import { operatorProcedure, router } from "../../trpc";
-import { auditOperator, loadTeam, mailTeamOwners } from "./shared";
+import { auditOperator, kickQuotaDrain, loadTeam, mailTeamOwners } from "./shared";
 
 const SORT_KEYS = [
   "name",
@@ -368,6 +367,11 @@ export const consoleTeamsRouter = router({
       const team = await loadTeam(ctx.db, input.id);
       if (!team.broadcastsPausedByOperatorAt) return;
       await ctx.db.update(t).set({ broadcastsPausedByOperatorAt: null }).where(eq(t.id, team.id));
+      // The monitor's pause rides on the same hold; lifting one lifts both.
+      await ctx.db
+        .update(schema.teamMonitor)
+        .set({ broadcastsPausedAt: null })
+        .where(eq(schema.teamMonitor.teamId, team.id));
       await auditOperator(ctx, {
         teamId: team.id,
         action: "team.broadcasts_resumed",
@@ -447,12 +451,3 @@ export const consoleTeamsRouter = router({
       await kickQuotaDrain();
     }),
 });
-
-/** Sends parked under the old ceiling would otherwise wait for the scheduled drain. Best-effort. */
-async function kickQuotaDrain(): Promise<void> {
-  try {
-    await (await getQueue()).runCronNow("quota.drain");
-  } catch (err) {
-    console.error("console: quota.drain kick failed; the scheduled drain releases the mail", err);
-  }
-}

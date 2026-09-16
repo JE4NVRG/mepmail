@@ -10,6 +10,7 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
+import { getQueue } from "../../queue";
 import { buildAccountEmail, sendAccountMail } from "../../system-mail";
 
 /** What every console action has: the database and the operator behind it. */
@@ -60,5 +61,14 @@ export async function mailTeamOwners(
         values: { team: team.name, ...values(owner.locale) },
       }),
     );
+  }
+}
+
+/** Sends parked under a lifted hold would otherwise wait for the scheduled drain. Best-effort. */
+export async function kickQuotaDrain(): Promise<void> {
+  try {
+    await (await getQueue()).runCronNow("quota.drain");
+  } catch (err) {
+    console.error("console: quota.drain kick failed; the scheduled drain releases the mail", err);
   }
 }
