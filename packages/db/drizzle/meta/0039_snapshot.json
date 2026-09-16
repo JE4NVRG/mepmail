@@ -1,6 +1,6 @@
 {
-  "id": "133b6c42-dadc-434d-9299-e82db288e2ec",
-  "prevId": "a6fce3d1-d7a5-41c5-819b-3ff74f26d607",
+  "id": "a6fce3d1-d7a5-41c5-819b-3ff74f26d607",
+  "prevId": "0f878eaa-0817-4500-a492-49c9c17e0972",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4649,161 +4649,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.support_view_grants": {
-      "name": "support_view_grants",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "team_id": {
-          "name": "team_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "operator_user_id": {
-          "name": "operator_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reason": {
-          "name": "reason",
-          "type": "support_view_reason",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reference": {
-          "name": "reference",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ended_at": {
-          "name": "ended_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ended_by": {
-          "name": "ended_by",
-          "type": "support_view_ended_by",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "procedures": {
-          "name": "procedures",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "notified_at": {
-          "name": "notified_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "support_view_grants_live_operator_idx": {
-          "name": "support_view_grants_live_operator_idx",
-          "columns": [
-            {
-              "expression": "operator_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"support_view_grants\".\"ended_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "support_view_grants_team_idx": {
-          "name": "support_view_grants_team_idx",
-          "columns": [
-            {
-              "expression": "team_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "support_view_grants_team_id_teams_id_fk": {
-          "name": "support_view_grants_team_id_teams_id_fk",
-          "tableFrom": "support_view_grants",
-          "tableTo": "teams",
-          "columnsFrom": [
-            "team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "support_view_grants_operator_user_id_user_id_fk": {
-          "name": "support_view_grants_operator_user_id_user_id_fk",
-          "tableFrom": "support_view_grants",
-          "tableTo": "user",
-          "columnsFrom": [
-            "operator_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.suppressions": {
       "name": "suppressions",
       "schema": "",
@@ -6684,25 +6529,6 @@
         "pending",
         "judged",
         "unjudged"
-      ]
-    },
-    "public.support_view_ended_by": {
-      "name": "support_view_ended_by",
-      "schema": "public",
-      "values": [
-        "operator",
-        "owner",
-        "expiry"
-      ]
-    },
-    "public.support_view_reason": {
-      "name": "support_view_reason",
-      "schema": "public",
-      "values": [
-        "support_ticket",
-        "abuse_report_check",
-        "billing_dispute",
-        "other"
       ]
     },
     "public.suppression_reason": {

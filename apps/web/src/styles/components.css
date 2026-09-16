@@ -65,6 +65,11 @@
   color: var(--ms-danger);
   border-color: var(--ms-danger-border);
 }
+/* Row-height button for dense tables: the badge's box on the button's skin. */
+.ms-btn-sm {
+  padding: 3px 8px;
+  font-size: var(--ms-fs-badge);
+}
 .ms-btn-icon {
   background: var(--ms-panel-raised);
   color: var(--ms-muted);
@@ -1275,6 +1280,31 @@ table.ms-table {
 .ms-radio-card .sub {
   color: var(--ms-muted);
   font-size: 12px;
+}
+
+/* The revealed body in the console's content-access view: a message written
+   for a mail client, read here as evidence. Scrolls on its own so a long one
+   never pushes the dialog's decisions off the screen. */
+.ms-revealed {
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: var(--ms-inset);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  font-family: var(--ms-font-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* What the server shortened or masked. The span already holds the replacement
+   — the original never reached this page — so it stays legible: the box says
+   "changed", not "hidden behind a bar you could select". */
+.ms-redact {
+  background: var(--ms-line-strong);
+  border-radius: 3px;
+  padding: 0 2px;
 }
 
 /* Focus policy: the steel --ms-focus-ring belongs to interactive controls on

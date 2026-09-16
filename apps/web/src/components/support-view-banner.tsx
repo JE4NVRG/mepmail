@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect } from "react";
 import { BtnSpinner } from "@/components/spinner";
 import { toast } from "@/components/toast";
+import { formatMmSs } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
 import { trpcErrorCode } from "@/lib/trpc-error";
 import { useCountdown } from "@/lib/use-countdown";
@@ -18,8 +19,9 @@ export function consoleTeamHref(teamId: string): string {
 /**
  * The strip over a dashboard opened in a support view: which team, that it
  * is read-only, and how long is left. Ending clears the grant and returns
- * to the console; the countdown running out reloads, and the server, which
- * has already ended the grant, lands the operator back on their own team.
+ * to the console. The countdown running out does the same, and so does a
+ * poll that finds the grant gone: the owner can end a session from their
+ * side, and nothing else would tell a tab already under the banner.
  */
 export function SupportViewBanner({
   teamId,
@@ -35,8 +37,13 @@ export function SupportViewBanner({
   const queryClient = useQueryClient();
   const back = consoleTeamHref(teamId);
   const leave = useCallback(() => window.location.assign(back), [back]);
-  const left = useCountdown(expiresAt, leave);
+  const leftMs = useCountdown(expiresAt);
   const end = useMutation(trpc.support.end.mutationOptions({ onSuccess: leave }));
+
+  // The deadline the server enforces, reached by this tab's own clock.
+  useEffect(() => {
+    if (leftMs === 0) leave();
+  }, [leftMs, leave]);
 
   // The owner can end the session from their side, and the server would then
   // quietly serve this tab its own team under a banner that still names the
@@ -70,7 +77,7 @@ export function SupportViewBanner({
       <span>
         {t("banner", { team: teamName })} ·{" "}
         {/* The clock runs on the client: the server's second and the browser's differ. */}
-        <span suppressHydrationWarning>{t("endsIn", { left })}</span>
+        <span suppressHydrationWarning>{t("endsIn", { left: formatMmSs(leftMs) })}</span>
       </span>
       <span style={{ marginLeft: "auto", display: "inline-flex", gap: 8, alignItems: "center" }}>
         <Link href={back} className="ms-btn ms-btn-secondary">

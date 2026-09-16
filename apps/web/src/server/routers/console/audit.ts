@@ -8,6 +8,7 @@ import { operatorProcedure, router } from "../../trpc";
 /** Actions the instance audit lists whoever performed them; the operator's own rows are listed whatever the action. */
 const CONSOLE_ACTION_PREFIXES = [
   "console.",
+  "content.",
   "team.",
   "region.",
   "instance.",

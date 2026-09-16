@@ -19,7 +19,7 @@ import { TeamLogo } from "@/components/team-logo";
 import { toast } from "@/components/toast";
 import { authClient } from "@/lib/auth-client";
 import { UPDATES_URL } from "@/lib/docs-links";
-import { formatDayTime } from "@/lib/format";
+import { formatDayTime, formatMmSs } from "@/lib/format";
 import { TEAM_LOGO_ACCEPT, TEAM_LOGO_MAX_BYTES } from "@/lib/image-type";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { removeTeamLogo, uploadTeamLogo } from "@/lib/team-logo-api";
@@ -730,7 +730,7 @@ function MembersSection() {
 
 function SupportEndsAt({ expiresAt }: { expiresAt: Date }) {
   const locale = useLocale();
-  const left = useCountdown(expiresAt);
+  const left = formatMmSs(useCountdown(expiresAt));
   return (
     <>
       {formatDayTime(expiresAt, locale)} · {left}

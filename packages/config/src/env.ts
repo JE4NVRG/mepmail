@@ -34,6 +34,10 @@ export const AWS_REGION_DEFAULT = "us-east-1";
 export const EMAIL_RETENTION_DAYS_DEFAULT = 30;
 export const OPEN_PREFETCH_WINDOW_SECONDS_DEFAULT = 10;
 
+/** Break-glass content access in the console; "off" is the default everywhere. */
+export const CONTENT_REVEAL_MODES = ["off", "on"] as const;
+export type ContentRevealMode = (typeof CONTENT_REVEAL_MODES)[number];
+
 /** Where the optional content-monitor judge runs; "off" is the default everywhere. */
 export const ABUSE_JUDGE_PROVIDERS = ["off", "typesafe"] as const;
 export type AbuseJudgeProvider = (typeof ABUSE_JUDGE_PROVIDERS)[number];
@@ -210,6 +214,11 @@ export const env = createEnv({
       .int()
       .min(1000)
       .default(ABUSE_JUDGE_TIMEOUT_MS_DEFAULT),
+    // Break-glass: with this on, an operator can read the subject and
+    // rendered text of a flagged team's messages for a recorded security
+    // reason, for 30 minutes, disclosed to the team after 7 days. The cloud
+    // keeps it off until its terms and privacy notice say so.
+    CONTENT_REVEAL: z.enum(CONTENT_REVEAL_MODES).default("off"),
     MONITOR_FIRST_SENDS: z.coerce.number().int().min(0).optional(),
     MONITOR_FIRST_HOURS: z.coerce.number().int().min(0).optional(),
     MONITOR_RAMP_SENDS: z.coerce.number().int().min(0).optional(),
@@ -425,6 +434,15 @@ export interface AbuseJudgeConfig {
  * a function so a process under SKIP_ENV_VALIDATION (raw strings) reads the
  * same answer as a validated one.
  */
+/**
+ * Whether the console may unwrap content, read as a function so a process
+ * under SKIP_ENV_VALIDATION (raw strings) reads the same answer as a
+ * validated one — as abuseJudgeConfig does for the judge.
+ */
+export function contentRevealOn(e: Env = env): boolean {
+  return ((e.CONTENT_REVEAL as unknown as string | undefined) || "off") === "on";
+}
+
 export function abuseJudgeConfig(e: Env = env): AbuseJudgeConfig | null {
   const provider = (e.ABUSE_JUDGE as unknown as string | undefined) || "off";
   if (provider === "off") return null;

@@ -524,7 +524,7 @@
   "safety": {
     "title": "Trust & safety",
     "info": "A team lands here when the deliverability guardrail turns warning or paused, complaints pass 0.1% or hard bounces 5% over 7 days, the content monitor's risk crosses its flag line (sampled content judged by the model), the account score drops under 5, or an operator flags it by hand. Automatic flags clear on their own once the trigger goes away; a flag you clear stays cleared while the same trigger holds.",
-    "proof": "{open} open · {guardrailPaused} paused by guardrail · {suspended} suspended",
+    "proof": "{open} open · {guardrailPaused} paused by guardrail · {suspended} suspended · {revealsThisWeek, plural, one {# content reveal} other {# content reveals}} this week",
     "search": "Search teams, owners, domains",
     "filters": {
       "status": "Status: {value}",
@@ -587,7 +587,8 @@
       "clear": "Clear flag",
       "reopen": "Reopen",
       "suspend": "Suspend team",
-      "reinstate": "Reinstate team"
+      "reinstate": "Reinstate team",
+      "reveal": "Request content access"
     },
     "toast": {
       "cleared": "{team} · cleared",
@@ -637,7 +638,8 @@
         "monitor": "Monitor",
         "modelScore": "Model: {score} · {detail}",
         "notFlagged": "not flagged",
-        "modelUnjudged": "Model: unjudged · {error}"
+        "modelUnjudged": "Model: unjudged · {error}",
+        "content": "Content"
       },
       "audit": {
         "title": "Audit tail",
@@ -705,7 +707,8 @@
           "overrideCleared": "{team} · override stopped",
           "resumed": "{team} · broadcasts resumed"
         },
-        "modelOff": "off in this app's environment"
+        "modelOff": "off in this app's environment",
+        "unjudgedNoError": "unjudged"
       }
     },
     "metric": {
@@ -810,6 +813,72 @@
         "db": "set here",
         "env": "from the environment ({value})",
         "default": "built-in default {value}"
+      }
+    },
+    "reveal": {
+      "request": "Request content access",
+      "off": "Content access is off on this instance: set CONTENT_REVEAL=on in its environment.",
+      "row": "Reveal",
+      "open": "Open",
+      "left": "{time} left",
+      "dialog": {
+        "title": "Reveal email content",
+        "lead": "{team} · {from} · sent {sent} to {recipients, plural, one {# recipient} other {# recipients}}",
+        "leadTeam": "{team}",
+        "reason": "Reason",
+        "reasons": {
+          "phishing_or_malware": "Suspected phishing or malware",
+          "complaint_spike": "Spam complaint spike",
+          "provider_report": "Provider abuse report",
+          "legal_request": "Legal request",
+          "owner_support_request": "Support ticket at the owner's request"
+        },
+        "why": "What you saw that needs the content",
+        "whyHelper": "{reason}; the stored insights cannot tell a phishing lure from a newsletter without the text.",
+        "whyShort": "Say what you saw · at least {min} characters",
+        "scope": "Scope",
+        "scopeEmail": "This email only",
+        "scopeEmailSub": "Rendered text and subject. Attachments, headers and the recipient list stay hidden.",
+        "scopeWindow": "All {count, plural, one {# flagged email} other {# flagged emails}} in the window",
+        "scopeWindowAll": "All flagged emails in the window",
+        "scopeWindowSub": "Same fields.",
+        "window": "Window",
+        "windowValue": "30 minutes, then hidden again",
+        "recorded": "Recorded",
+        "recordedValue": "Instance audit · team audit after 7 days",
+        "note": "Bodies already purged by retention cannot be revealed.",
+        "confirm": "Reveal",
+        "whyPlaceholder": "The verdicts name impersonation and the links point at a lookalike host."
+      },
+      "view": {
+        "title": "Revealed content · {team}",
+        "lead": "Read it, decide, close. The view expires on its own.",
+        "expires": "expires in {time}",
+        "renderedOnly": "rendered text only",
+        "recipientsHidden": "recipients hidden",
+        "noExport": "no export",
+        "redactions": "{count, plural, one {# redaction} other {# redactions}}",
+        "subject": "Subject",
+        "body": "Body · credentials and one-time links redacted",
+        "empty": "The rendered text is empty.",
+        "verdict": "Monitor verdict: {verdict}",
+        "verdictNone": "The monitor never judged this email.",
+        "note": "Recorded in the instance audit log.",
+        "close": "Close",
+        "clear": "Legitimate, clear this flag",
+        "suspend": "Abusive, suspend team",
+        "expired": "The window closed. Request access again.",
+        "purged": "Bodies already purged by retention cannot be revealed.",
+        "failed": "Could not open the content."
+      },
+      "toast": {
+        "granted": "{team} · content access open for 30 minutes",
+        "purged": "{count, plural, one {# email} other {# emails}} skipped: the body was purged by retention",
+        "cleared": "{team} · cleared as a false positive",
+        "failed": "Could not open content access: {message}",
+        "failedOff": "Content access is off on this instance.",
+        "failedPurged": "Every message in scope had its body purged by retention.",
+        "failedNotFlagged": "That email is no longer in the team's flagged window."
       }
     }
   },
