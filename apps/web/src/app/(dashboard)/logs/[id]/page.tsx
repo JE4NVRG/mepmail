@@ -290,13 +290,25 @@ export default function LogDetailPage() {
         label={t("detail.request")}
         value={log.requestBody}
         requestPath={log.path}
-        noBody={t(membersOnly ? "detail.membersHint" : "detail.requestNotStored")}
+        noBody={t(
+          log.hiddenBySupportView
+            ? "detail.supportViewHint"
+            : membersOnly
+              ? "detail.membersHint"
+              : "detail.requestNotStored",
+        )}
       />
       <JsonSection
         label={t("detail.response")}
         value={log.responseBody}
         requestPath={log.path}
-        noBody={t(membersOnly ? "detail.membersHint" : "detail.responseNotStored")}
+        noBody={t(
+          log.hiddenBySupportView
+            ? "detail.supportViewHint"
+            : membersOnly
+              ? "detail.membersHint"
+              : "detail.responseNotStored",
+        )}
       />
     </>
   );

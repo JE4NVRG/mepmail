@@ -16,12 +16,15 @@ import { Skeleton, SkeletonBadge } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
 import { Table } from "@/components/table";
 import { TeamLogo } from "@/components/team-logo";
+import { toast } from "@/components/toast";
 import { authClient } from "@/lib/auth-client";
 import { UPDATES_URL } from "@/lib/docs-links";
+import { formatDayTime } from "@/lib/format";
 import { TEAM_LOGO_ACCEPT, TEAM_LOGO_MAX_BYTES } from "@/lib/image-type";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { removeTeamLogo, uploadTeamLogo } from "@/lib/team-logo-api";
 import { useTRPC } from "@/lib/trpc";
+import { useCountdown } from "@/lib/use-countdown";
 import { ListFooter } from "../emails/list-parts";
 
 function SectionCard({
@@ -725,6 +728,93 @@ function MembersSection() {
   );
 }
 
+function SupportEndsAt({ expiresAt }: { expiresAt: Date }) {
+  const locale = useLocale();
+  const left = useCountdown(expiresAt);
+  return (
+    <>
+      {formatDayTime(expiresAt, locale)} · {left}
+    </>
+  );
+}
+
+/**
+ * The operator's read-only look at this team, for its owners and admins:
+ * who, since when, until when and why, with the way to end it. Absent
+ * while the instance has the feature off.
+ */
+function SupportAccessSection() {
+  const t = useTranslations("settings.supportAccess");
+  const locale = useLocale();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const { data: teamList } = useQuery(trpc.team.list.queryOptions());
+  const role = teamList?.teams.find((m) => m.teamId === teamList.activeTeamId)?.role;
+  const canManage = role === "owner" || role === "admin";
+  const current = useQuery(
+    trpc.team.supportView.current.queryOptions(undefined, {
+      enabled: canManage,
+      // A session an operator opens shows up without a reload.
+      refetchInterval: 30_000,
+    }),
+  );
+  const end = useMutation(
+    trpc.team.supportView.end.mutationOptions({
+      onSuccess: () => {
+        toast(t("ended"));
+        void queryClient.invalidateQueries(trpc.team.supportView.current.queryFilter());
+      },
+      onError: (e) => toast(t("error", { reason: e.message }), "danger"),
+    }),
+  );
+  if (!canManage || !current.data?.enabled) return null;
+  const live = current.data.live;
+  return (
+    <SectionCard
+      title={t("title")}
+      action={
+        live ? (
+          <button
+            type="button"
+            className="ms-btn ms-btn-destructive"
+            disabled={end.isPending}
+            onClick={() => end.mutate()}
+          >
+            <BtnSpinner on={end.isPending} />
+            {t("end")}
+          </button>
+        ) : null
+      }
+    >
+      <p style={{ margin: "0 0 14px", color: "var(--ms-muted)", fontSize: "var(--ms-fs-label)" }}>
+        {t("intro")}
+      </p>
+      {live ? (
+        <dl className="ms-kv">
+          <dt>{t("operator")}</dt>
+          <dd>
+            {live.operator.name} · <span className="ms-mono">{live.operator.email}</span>
+          </dd>
+          <dt>{t("started")}</dt>
+          <dd>{formatDayTime(live.startedAt, locale)}</dd>
+          <dt>{t("expires")}</dt>
+          <dd>
+            <SupportEndsAt expiresAt={live.expiresAt} />
+          </dd>
+          <dt>{t("reason")}</dt>
+          <dd>{t(`reasons.${live.reason}`)}</dd>
+          <dt>{t("reference")}</dt>
+          <dd>{live.reference ?? "—"}</dd>
+        </dl>
+      ) : (
+        <p style={{ margin: 0, color: "var(--ms-bone)", fontSize: "var(--ms-fs-ui)" }}>
+          {t("none")}
+        </p>
+      )}
+    </SectionCard>
+  );
+}
+
 function LanguageSection() {
   const t = useTranslations("settings");
   const locale = useLocale();
@@ -1031,6 +1121,7 @@ export function SettingsSections({ showInstance }: { showInstance: boolean }) {
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
       <TeamSection billing={!showInstance} />
       <MembersSection />
+      <SupportAccessSection />
       {showInstance ? <InstanceSection /> : null}
       <LanguageSection />
       <DangerSection />

@@ -9,6 +9,7 @@ import { Tooltip } from "@/components/tooltip";
 import { planLabel } from "@/lib/console-format";
 import { formatDayTime, formatRelative } from "@/lib/format";
 import { formatScoreTenths } from "@/lib/score-band";
+import { useCountdown } from "@/lib/use-countdown";
 import { GuardrailLabel, RegionLabel, usePlanName } from "./cells";
 import type { TeamDetail } from "./types";
 
@@ -23,17 +24,29 @@ function Figure({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function LiveViewLine({ expiresAt }: { expiresAt: Date }) {
+  const t = useTranslations("console.teams");
+  const left = useCountdown(expiresAt);
+  return (
+    <p style={{ margin: "0 0 16px", color: "var(--ms-warn)", fontSize: 13 }}>
+      {t("detail.supportView", { left })}
+    </p>
+  );
+}
+
 /** Everything the console knows about one team, with Adjust limits as the way out. */
 export function TeamDialog({
   name,
   detail,
   onClose,
   onAdjustLimits,
+  onViewAsOwner,
 }: {
   name: string;
   detail: TeamDetail | undefined;
   onClose: () => void;
   onAdjustLimits: () => void;
+  onViewAsOwner: () => void;
 }) {
   const t = useTranslations("console.teams");
   const common = useTranslations("console.common");
@@ -50,6 +63,7 @@ export function TeamDialog({
       <p style={{ margin: "6px 0 18px", color: "var(--ms-muted)", fontSize: 13.5 }}>
         {t("detail.lead")}
       </p>
+      {detail?.supportView ? <LiveViewLine expiresAt={detail.supportView.expiresAt} /> : null}
       <div className="ms-grid ms-grid-2" style={{ gap: 12, marginBottom: 16 }}>
         {detail ? (
           <>
@@ -152,6 +166,22 @@ export function TeamDialog({
         <button type="button" className="ms-btn ms-btn-secondary" onClick={onClose}>
           {common("close")} <span className="ms-keycap">Esc</span>
         </button>
+        {detail && !detail.supportViewEnabled ? (
+          <Tooltip text={t("menu.viewOff")}>
+            <button type="button" className="ms-btn ms-btn-secondary" disabled>
+              {t("menu.view")}
+            </button>
+          </Tooltip>
+        ) : (
+          <button
+            type="button"
+            className="ms-btn ms-btn-secondary"
+            disabled={!detail}
+            onClick={onViewAsOwner}
+          >
+            {t("menu.view")}
+          </button>
+        )}
         <button type="button" className="ms-btn ms-btn-primary" onClick={onAdjustLimits}>
           {t("menu.limits")}
         </button>

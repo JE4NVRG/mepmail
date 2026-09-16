@@ -399,6 +399,8 @@
     "empty": "0 equipes encontradas.",
     "menu": {
       "open": "Abrir equipe",
+      "view": "Ver como proprietário",
+      "viewOff": "Desligado nesta instância: SUPPORT_VIEW=on liga",
       "limits": "Ajustar limites",
       "plan": "Alterar plano",
       "pause": "Pausar transmissões",
@@ -414,7 +416,8 @@
       "reinstated": "{team} reativada",
       "limits": "Limites salvos para {team}",
       "plan": "{team} · {from} → {to}",
-      "error": "A ação falhou: {message}"
+      "error": "A ação falhou: {message}",
+      "viewStarted": "Modo de suporte de {team} iniciado · somente leitura · 30 min"
     },
     "detail": {
       "lead": "Tudo o que o console sabe sobre a equipe. Corpos de e-mail não estão aqui.",
@@ -435,7 +438,8 @@
       "stripeSub": "{id} · {status}",
       "ceiling": "Teto diário",
       "ceilingNone": "o plano decide",
-      "standingAt": "situação calculada {ago}"
+      "standingAt": "situação calculada {ago}",
+      "supportView": "Modo de suporte ativo · termina em {left}"
     },
     "limitsDialog": {
       "title": "Ajustar limites · {team}",
@@ -494,6 +498,27 @@
       "title": "Reativar {team}",
       "lead": "Os envios voltam a sair na hora; transmissões retidas retomam em até 15 minutos. O proprietário é avisado por e-mail, exceto se a suspensão foi por phishing.",
       "confirm": "Reativar equipe"
+    },
+    "viewDialog": {
+      "title": "Ver {team} como proprietário",
+      "lead": "Abre o painel da equipe em modo somente leitura sob uma faixa, por 30 minutos. Cada procedimento lido vai para a auditoria da instância e a sessão aparece na auditoria da própria equipe na hora.",
+      "reasons": {
+        "support_ticket": "Chamado de suporte",
+        "abuse_report_check": "Verificação de denúncia de abuso",
+        "billing_dispute": "Disputa de cobrança",
+        "other": "Outro"
+      },
+      "reference": "Referência do chamado ou da denúncia",
+      "referencePlaceholder": "#4812",
+      "hiddenTitle": "Corpos de e-mail ficam ocultos aqui também.",
+      "hiddenBody": "O conteúdo dos e-mails segue a regra de revelação de Trust & safety, não o modo de suporte.",
+      "confirm": "Iniciar sessão · 30 min",
+      "errors": {
+        "support_view_off": "O modo de suporte está desligado nesta instância (SUPPORT_VIEW=on liga).",
+        "support_view_live": "Já existe um modo de suporte ativo; encerre-o pela faixa antes.",
+        "own_team": "Você é membro desta equipe; abra-a pelo seletor de equipes.",
+        "reference_required": "Uma referência de chamado ou denúncia é obrigatória para este motivo."
+      }
     }
   },
   "safety": {

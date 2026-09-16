@@ -20,11 +20,14 @@ export function AppShell({
   teamName,
   teamLogoUrl,
   userEmail,
+  banner,
   children,
 }: {
   teamName: string;
   teamLogoUrl?: string | null | undefined;
   userEmail: string;
+  /** A strip over the whole shell, sidebar included: the support view banner. Its presence marks the shell read-only. */
+  banner?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const t = useTranslations("common");
@@ -53,41 +56,47 @@ export function AppShell({
   }, [drawerOpen]);
 
   return (
-    <div className="ms-app-shell" style={{ display: "flex", minHeight: "100vh" }}>
-      <header className="ms-mobile-topbar">
-        <button
-          type="button"
-          className="ms-btn ms-btn-icon"
-          aria-label={t("openNav")}
-          aria-expanded={drawerOpen}
-          onClick={() => setDrawerOpen((open) => !open)}
-        >
-          <MenuGlyph size={16} />
-        </button>
-        <Link href="/" style={{ display: "inline-flex" }}>
-          {/* biome-ignore lint/performance/noImgElement: static SVG logo, nothing for next/image to optimize */}
-          <img
-            src="/logo/millionsend-wordmark.svg"
-            className="ms-wordmark"
-            alt={t("appName")}
-            style={{ height: 15, display: "block" }}
-          />
-        </Link>
-      </header>
-      {drawerOpen ? (
-        // biome-ignore lint/a11y/noStaticElementInteractions: scrim click-to-dismiss; Esc handles keyboard
-        // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard dismissal is the Esc listener above
-        <div className="ms-drawer-scrim" onClick={() => setDrawerOpen(false)} />
-      ) : null}
-      <Sidebar
-        teamName={teamName}
-        teamLogoUrl={teamLogoUrl}
-        userEmail={userEmail}
-        className={drawerOpen ? "ms-sidebar open" : "ms-sidebar"}
-        onNavigate={() => setDrawerOpen(false)}
-      />
-      <CommandPalette />
-      {children}
+    <div
+      style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
+      {...(banner ? { "data-support-view": "" } : {})}
+    >
+      {banner}
+      <div className="ms-app-shell" style={{ display: "flex", flex: 1 }}>
+        <header className="ms-mobile-topbar">
+          <button
+            type="button"
+            className="ms-btn ms-btn-icon"
+            aria-label={t("openNav")}
+            aria-expanded={drawerOpen}
+            onClick={() => setDrawerOpen((open) => !open)}
+          >
+            <MenuGlyph size={16} />
+          </button>
+          <Link href="/" style={{ display: "inline-flex" }}>
+            {/* biome-ignore lint/performance/noImgElement: static SVG logo, nothing for next/image to optimize */}
+            <img
+              src="/logo/millionsend-wordmark.svg"
+              className="ms-wordmark"
+              alt={t("appName")}
+              style={{ height: 15, display: "block" }}
+            />
+          </Link>
+        </header>
+        {drawerOpen ? (
+          // biome-ignore lint/a11y/noStaticElementInteractions: scrim click-to-dismiss; Esc handles keyboard
+          // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard dismissal is the Esc listener above
+          <div className="ms-drawer-scrim" onClick={() => setDrawerOpen(false)} />
+        ) : null}
+        <Sidebar
+          teamName={teamName}
+          teamLogoUrl={teamLogoUrl}
+          userEmail={userEmail}
+          className={drawerOpen ? "ms-sidebar open" : "ms-sidebar"}
+          onNavigate={() => setDrawerOpen(false)}
+        />
+        <CommandPalette />
+        {children}
+      </div>
     </div>
   );
 }

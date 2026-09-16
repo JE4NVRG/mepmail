@@ -101,5 +101,11 @@
     "ours": "The error is on our side. Try again in a moment.",
     "retry": "Try again",
     "back": "Back to {to}"
+  },
+  "supportView": {
+    "banner": "Support view of {team} · read-only · ends in {left}",
+    "end": "End session",
+    "back": "Back to console",
+    "readOnly": "Read-only support view: nothing can be changed here."
   }
 }
