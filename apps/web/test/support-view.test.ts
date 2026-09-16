@@ -312,12 +312,10 @@ describe("console.teams.startSupportView", () => {
 
   it("has no reason that is not a request the customer made", async () => {
     expect(SUPPORT_VIEW_REASONS).toEqual(["support_ticket", "billing_dispute", "other"]);
+    // The value the enum used to carry, typed back in so the router can refuse it.
+    const removed = "abuse_report_check" as unknown as (typeof SUPPORT_VIEW_REASONS)[number];
     await expect(
-      // biome-ignore lint/suspicious/noExplicitAny: a value the enum no longer carries
-      operator().console.teams.startSupportView({
-        id: teamId,
-        reason: "abuse_report_check" as any,
-      }),
+      operator().console.teams.startSupportView({ id: teamId, reason: removed }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
