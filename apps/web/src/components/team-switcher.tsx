@@ -83,6 +83,10 @@ export function TeamSwitcher({
 
   const { data } = useQuery(trpc.team.list.queryOptions());
   const active = data?.teams.find((m) => m.teamId === data.activeTeamId);
+  // The active team is not one of this session's memberships under a support
+  // view: there is nothing to switch to from here, and every row would be
+  // refused, so the trigger is a label rather than a menu.
+  const switchable = !data || active !== undefined;
 
   const switchTeam = useMutation(
     trpc.team.switch.mutationOptions({
@@ -118,6 +122,7 @@ export function TeamSwitcher({
         aria-label={t("switch")}
         aria-haspopup="menu"
         aria-expanded={open}
+        disabled={!switchable}
         onClick={() => setOpen((v) => !v)}
         style={{
           display: "flex",
@@ -128,7 +133,7 @@ export function TeamSwitcher({
           borderRadius: 10,
           background: open ? "var(--ms-panel-raised)" : "none",
           border: 0,
-          cursor: "pointer",
+          cursor: switchable ? "pointer" : "default",
           textAlign: "left",
           font: "inherit",
           color: "inherit",

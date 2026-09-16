@@ -14,6 +14,7 @@ import { metricsRouter } from "./metrics";
 import { onboardingRouter } from "./onboarding";
 import { segmentsRouter } from "./segments";
 import { settingsRouter } from "./settings";
+import { supportRouter } from "./support";
 import { systemRouter } from "./system";
 import { teamBootstrapRouter } from "./team-bootstrap";
 import { templatesRouter } from "./templates";
@@ -36,6 +37,7 @@ export const appRouter = router({
   onboarding: onboardingRouter,
   segments: segmentsRouter,
   settings: settingsRouter,
+  support: supportRouter,
   system: systemRouter,
   team: teamBootstrapRouter,
   templates: templatesRouter,

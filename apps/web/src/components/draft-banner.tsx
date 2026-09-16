@@ -48,6 +48,7 @@ export function DraftBanner({
         onClick={() => {
           // Discarding is irreversible — the draft is the only copy.
           void confirmDialog({
+            local: true,
             message: common("draftDiscardConfirm"),
             confirmLabel: common("draftDiscard"),
             danger: true,

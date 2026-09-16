@@ -27,6 +27,8 @@ export interface PopoverMenuItem {
   onSelect: () => void;
   danger?: boolean;
   disabled?: boolean;
+  /** Native tooltip, for a disabled item to say why it is. */
+  title?: string;
   /** Right-aligned glyph, e.g. "↗" for external destinations. */
   trailing?: string;
   /** The item's action is running: a spinner sits in the row and clicks are ignored. */
@@ -197,6 +199,7 @@ export function PopoverMenu({
                     role="menuitem"
                     className={item.danger ? "ms-menu-item danger" : "ms-menu-item"}
                     disabled={item.disabled}
+                    title={item.title}
                     aria-busy={item.busy}
                     onClick={() => {
                       if (item.busy) return;

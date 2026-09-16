@@ -12,6 +12,7 @@ import { PauseDialog, ReinstateDialog, SuspendDialog } from "./teams/hold-dialog
 import { LimitsDialog } from "./teams/limits-dialog";
 import { PlanDialog } from "./teams/plan-dialog";
 import { TeamDialog } from "./teams/team-dialog";
+import { ViewDialog } from "./teams/view-dialog";
 
 /** The facts every team action needs, as both the Teams list and the Trust & safety rows carry them. */
 export interface TeamActionTarget {
@@ -32,11 +33,13 @@ export interface TeamActions {
   resumeBroadcasts(team: TeamActionTarget): void;
   suspend(team: TeamActionTarget): void;
   reinstate(team: TeamActionTarget): void;
+  /** The read-only support view of the team's dashboard (SUPPORT_VIEW=on). */
+  viewAsOwner(team: TeamActionTarget): void;
   /** Render once per page: the dialogs the actions above open. */
   dialogs: React.ReactNode;
 }
 
-type DialogKind = "team" | "limits" | "plan" | "pause" | "suspend" | "reinstate";
+type DialogKind = "team" | "limits" | "plan" | "pause" | "suspend" | "reinstate" | "view";
 
 /**
  * Every operator action on a team and its dialog (Adjust limits, Change
@@ -89,6 +92,13 @@ export function useTeamActions(onChanged: () => void): TeamActions {
   );
   const suspend = useMutation(trpc.console.teams.suspend.mutationOptions({ onError: failed }));
   const reinstate = useMutation(trpc.console.teams.reinstate.mutationOptions({ onError: failed }));
+  // A refusal stays in the dialog (the code is one it can explain); success
+  // leaves for the dashboard in this tab, so the layout reads the new cookie.
+  const view = useMutation(
+    trpc.console.teams.startSupportView.mutationOptions({
+      onSuccess: () => window.location.assign("/"),
+    }),
+  );
 
   const team = dialog?.team;
   const loaded = detail.data?.id === team?.id ? detail.data : undefined;
@@ -101,6 +111,19 @@ export function useTeamActions(onChanged: () => void): TeamActions {
           detail={loaded}
           onClose={close}
           onAdjustLimits={() => setDialog({ kind: "limits", team })}
+          onViewAsOwner={() => {
+            view.reset();
+            setDialog({ kind: "view", team });
+          }}
+        />
+      ) : null}
+      {dialog?.kind === "view" ? (
+        <ViewDialog
+          name={team.name}
+          pending={view.isPending || view.isSuccess}
+          error={view.error?.message ?? null}
+          onClose={close}
+          onSubmit={(input) => view.mutate({ id: team.id, ...input })}
         />
       ) : null}
       {dialog?.kind === "limits" ? (
@@ -205,6 +228,10 @@ export function useTeamActions(onChanged: () => void): TeamActions {
     pauseBroadcasts: open("pause"),
     suspend: open("suspend"),
     reinstate: open("reinstate"),
+    viewAsOwner: (target) => {
+      view.reset();
+      setDialog({ kind: "view", team: target });
+    },
     resumeBroadcasts: (target) =>
       resume.mutate(
         { id: target.id },
@@ -216,16 +243,27 @@ export function useTeamActions(onChanged: () => void): TeamActions {
 
 /**
  * The Teams list's "…" items for one team, from the shared actions: Open
- * team, Adjust limits, Change plan, separator, Pause/Resume broadcasts,
- * Suspend/Reinstate team. `labels` come from console.teams.menu.
+ * team, View as owner (when `supportView` is given: disabled with the env
+ * named while the feature is off), Adjust limits, Change plan, separator,
+ * Pause/Resume broadcasts, Suspend/Reinstate team. `labels` come from
+ * console.teams.menu.
  */
 export function teamMenuItems(
   team: TeamActionTarget,
   actions: TeamActions,
   labels: (key: string) => string,
+  options?: { supportView: boolean },
 ): (PopoverMenuItem | null)[] {
   return [
     { label: labels("open"), onSelect: () => actions.openTeam(team) },
+    options
+      ? {
+          label: labels("view"),
+          onSelect: () => actions.viewAsOwner(team),
+          disabled: !options.supportView,
+          ...(options.supportView ? {} : { title: labels("viewOff") }),
+        }
+      : null,
     { label: labels("limits"), onSelect: () => actions.adjustLimits(team) },
     { label: labels("plan"), onSelect: () => actions.changePlan(team) },
     null,

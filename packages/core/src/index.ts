@@ -456,6 +456,21 @@ export {
   transitionQueueState,
 } from "./status.js";
 export {
+  endSupportView,
+  findLiveSupportView,
+  type LiveSupportView,
+  liveSupportViewForTeam,
+  liveSupportViewOfOperator,
+  recordSupportViewRead,
+  SUPPORT_VIEW_MINUTES,
+  SUPPORT_VIEW_REASONS,
+  type SupportViewEndedBy,
+  type SupportViewGrant,
+  type SupportViewReason,
+  startSupportView,
+  supportViewNeedsReference,
+} from "./support-view.js";
+export {
   clearUnsubscribeSuppression,
   extractAddrSpec,
   findSuppressed,
