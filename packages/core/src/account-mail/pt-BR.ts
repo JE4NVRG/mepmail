@@ -238,7 +238,7 @@ export const ptBR = {
     subject: "Modo de suporte iniciado em {team}",
     body: [
       "{operator}, operador da instância, abriu o painel de {team} em um modo de suporte somente leitura {reason}. Ele termina às {until}, ou antes se você encerrá-lo.",
-      "O conteúdo dos e-mails, exportações e segredos não ficam visíveis nesse modo. Cada procedimento lido pelo operador é contado, e a sessão já aparece no log de auditoria da sua equipe em Configurações → Log de auditoria. Abra Acesso de suporte em Configurações para encerrá-la.",
+      "O conteúdo dos e-mails enviados, exportações e segredos não ficam visíveis nesse modo. Cada procedimento lido pelo operador é contado, e a sessão já aparece no log de auditoria da sua equipe em Configurações → Log de auditoria. Abra Acesso de suporte em Configurações para encerrá-la.",
     ],
     button: "Abrir acesso de suporte",
     extra: {

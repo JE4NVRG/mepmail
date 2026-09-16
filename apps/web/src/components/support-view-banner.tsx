@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect } from "react";
@@ -37,6 +37,17 @@ export function SupportViewBanner({
   const leave = useCallback(() => window.location.assign(back), [back]);
   const left = useCountdown(expiresAt, leave);
   const end = useMutation(trpc.support.end.mutationOptions({ onSuccess: leave }));
+
+  // The owner can end the session from their side, and the server would then
+  // quietly serve this tab its own team under a banner that still names the
+  // customer's. Asking after the grant is the only thing that notices.
+  const live = useQuery(
+    trpc.support.current.queryOptions(undefined, { refetchInterval: 15_000, staleTime: 0 }),
+  );
+  const gone = live.isSuccess && live.data === null;
+  useEffect(() => {
+    if (gone) leave();
+  }, [gone, leave]);
 
   // Every refused mutation, from any screen, says why in one place.
   useEffect(() => {

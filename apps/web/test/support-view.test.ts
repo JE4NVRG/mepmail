@@ -8,7 +8,7 @@ import {
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, isNull } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionRole } from "@/server/membership";
 import { createCaller } from "@/server/routers";
@@ -24,7 +24,7 @@ const h = vi.hoisted(() => ({
   db: undefined as unknown as Db,
   session: null as { user: { id: string; email: string; name: string } } | null,
   cookies: new Map<string, string>(),
-  cookieSets: [] as { name: string; value: string; expires?: Date }[],
+  cookieSets: [] as { name: string; value: string; options: Record<string, unknown> }[],
   cookieDeletes: [] as string[],
   sent: [] as SystemMailMessage[],
 }));
@@ -52,9 +52,9 @@ vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
       h.cookies.has(name) ? { name, value: h.cookies.get(name) as string } : undefined,
-    set: (name: string, value: string, options?: { expires?: Date }) => {
+    set: (name: string, value: string, options?: Record<string, unknown>) => {
       h.cookies.set(name, value);
-      h.cookieSets.push({ name, value, ...(options?.expires ? { expires: options.expires } : {}) });
+      h.cookieSets.push({ name, value, options: options ?? {} });
     },
     delete: (name: string) => {
       h.cookies.delete(name);
@@ -264,6 +264,39 @@ describe("console.teams.startSupportView", () => {
     expect((await resolveSupportView(db, OPERATOR, second.id))?.grantId).toBe(second.id);
   });
 
+  it("leaves notified_at null when the team has no owner to write to", async () => {
+    const orphan = await createTeam(db, `orphan-${Date.now()}`);
+    const result = await operator().console.teams.startSupportView({
+      id: orphan,
+      reason: "abuse_report_check",
+    });
+    const grant = await grantRow(result.grantId);
+    expect(grant.notifiedAt).toBeNull();
+    expect(h.sent).toEqual([]);
+  });
+
+  it("never leaves two live grants when starts run at once", async () => {
+    const results = await Promise.allSettled([
+      operator().console.teams.startSupportView({ id: teamId, reason: "other" }),
+      operator().console.teams.startSupportView({ id: teamId, reason: "other" }),
+    ]);
+    // Whoever loses the one-live-view index is told a view is live, never a
+    // raw database error; the winner's grant is the only one still open.
+    for (const result of results) {
+      if (result.status === "rejected") {
+        expect(result.reason).toMatchObject({
+          code: "PRECONDITION_FAILED",
+          message: "support_view_live",
+        });
+      }
+    }
+    const live = await db
+      .select()
+      .from(schema.supportViewGrants)
+      .where(isNull(schema.supportViewGrants.endedAt));
+    expect(live).toHaveLength(1);
+  });
+
   it("cannot be nested: a view cannot start another", async () => {
     const grant = await start();
     await expect(
@@ -313,9 +346,9 @@ describe("the read-only guard", () => {
   it("refuses every mutation under a view except support.end", async () => {
     const grant = await start();
     const v = viewer(grant);
-    await expect(v.apiKeys.create({ name: "k", permission: "full_access" })).rejects.toMatchObject(
-      READ_ONLY,
-    );
+    await expect(
+      v.apiKeys.create({ name: "refused", permission: "full_access" }),
+    ).rejects.toMatchObject(READ_ONLY);
     await expect(
       v.emails.suppressions.add({ email: "x@example.com", reason: "manual" }),
     ).rejects.toMatchObject(READ_ONLY);
@@ -325,7 +358,9 @@ describe("the read-only guard", () => {
     await expect(v.webhooks.create({ url: "https://hook.example.com/in" })).rejects.toMatchObject(
       READ_ONLY,
     );
-    expect(await db.select().from(schema.apiKeys)).toEqual([]);
+    expect(
+      await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.name, "refused")),
+    ).toEqual([]);
     expect((await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)))[0]?.name).toBe(
       "acme",
     );
@@ -358,6 +393,17 @@ describe("the read-only guard", () => {
     expect((await grantRow(grant.id)).procedures).toEqual({ "apiKeys.list": 2, "emails.stats": 1 });
     await v.emails.stats();
     expect((await grantRow(grant.id)).procedures).toEqual({ "apiKeys.list": 2, "emails.stats": 2 });
+  });
+
+  it("lets the banner ask after its own session without counting it as a read", async () => {
+    const grant = await start();
+    const v = viewer(grant);
+    expect(await v.support.current()).toMatchObject({ grantId: grant.id, teamId });
+    await v.apiKeys.list();
+    expect((await grantRow(grant.id)).procedures).toEqual({ "apiKeys.list": 1 });
+    // The owner ends it; the next poll is what tells the operator's tab.
+    await owner().team.supportView.end();
+    expect(await callerFor(OPERATOR, ownTeamId, "owner").support.current()).toBeNull();
   });
 
   it("support.end ends the operator's grant, clears the cookie and audits the distinct reads", async () => {
@@ -445,13 +491,16 @@ describe("what a view can and cannot see", () => {
     const grant = await start();
     const v = viewer(grant);
     const keys = await v.apiKeys.list();
-    expect(keys.map((k) => Object.keys(k).sort())).toEqual([
-      expect.not.arrayContaining(["keyHash", "token"]),
-    ]);
+    expect(keys).toHaveLength(1);
+    // The mask's parts and nothing behind them, whatever the router adds later.
+    for (const key of keys) {
+      expect(Object.keys(key)).toEqual(expect.not.arrayContaining(["keyHash", "token", "secret"]));
+    }
     expect(JSON.stringify(keys)).not.toContain(created.token);
     const endpoint = await v.webhooks.get({ id: hook.id });
-    expect(Object.keys(endpoint)).not.toEqual(
-      expect.arrayContaining(["secret", "secretCiphertext"]),
+    expect(endpoint.secretLast4).toBe(hook.secret.slice(-4));
+    expect(Object.keys(endpoint)).toEqual(
+      expect.not.arrayContaining(["secret", "secretCiphertext", "secretWrappedDek"]),
     );
     expect(JSON.stringify(endpoint)).not.toContain(hook.secret);
     await expect(v.webhooks.rotateSecret({ id: hook.id })).rejects.toMatchObject(READ_ONLY);
@@ -561,8 +610,15 @@ describe("through the tRPC route (cookie to context)", () => {
     });
     expect(started.status).toBe(200);
     const grantId = started.data.grantId as string;
-    expect(h.cookieSets.at(-1)).toMatchObject({ name: "ms_support_view", value: grantId });
-    expect(h.cookieSets.at(-1)?.expires?.toISOString()).toBe(started.data.expiresAt);
+    // The grant rides in an httpOnly, same-site cookie that dies with it.
+    expect(h.cookieSets.at(-1)).toMatchObject({
+      name: "ms_support_view",
+      value: grantId,
+      options: { httpOnly: true, sameSite: "lax", path: "/" },
+    });
+    const expires = h.cookieSets.at(-1)?.options.expires;
+    expect(expires).toBeInstanceOf(Date);
+    expect((expires as Date).toISOString()).toBe(started.data.expiresAt);
 
     // The cookie the console set now selects the viewed team, read-only.
     const list = await call("team.list");
