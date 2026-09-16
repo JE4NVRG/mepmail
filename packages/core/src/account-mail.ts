@@ -34,6 +34,9 @@ export const ACCOUNT_MAIL_KINDS = [
   "team.broadcasts_paused",
   "team.suspended",
   "team.reinstated",
+  "monitor.alert",
+  "monitor.broadcasts_paused",
+  "monitor.degraded",
 ] as const;
 export type AccountMailKind = (typeof ACCOUNT_MAIL_KINDS)[number];
 

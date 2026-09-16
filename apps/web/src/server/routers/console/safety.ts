@@ -1,10 +1,15 @@
+import { env } from "@millionsend/config";
 import {
   CHECKS,
   fetchAccountScore,
   fetchContentFactors,
   fetchDeliverabilityHealth,
+  getMonitorSettingsRow,
   parseAuditActor,
+  recentMonitorSamples,
+  resolveMonitorSettings,
   TEAM_FLAG_REASONS,
+  teamMonitorOverview,
 } from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
@@ -12,6 +17,7 @@ import { and, asc, desc, eq, ilike, inArray, isNotNull, or, type SQL, sql } from
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { escapeLike } from "@/lib/sql";
+import { judgeStatus } from "../../console/monitor";
 import { operatorProcedure, router } from "../../trpc";
 import { auditOperator, loadTeam } from "./shared";
 
@@ -22,11 +28,21 @@ const teamRegion = sql<
   string | null
 >`(select d.region from ${schema.domains} d where d.team_id = ${t}."id" order by d.verified_at desc nulls last, d.created_at desc limit 1)`;
 
-const SORT_KEYS = ["name", "type", "score", "guardrail", "reason", "status", "since"] as const;
+const SORT_KEYS = [
+  "name",
+  "type",
+  "risk",
+  "score",
+  "guardrail",
+  "reason",
+  "status",
+  "since",
+] as const;
 const planRank = sql<number>`case ${t.plan}::text when 'free' then 0 when 'starter' then 1 when 'pro' then 2 when 'scale' then 3 else 4 end`;
 const SORT_EXPR: Record<(typeof SORT_KEYS)[number], SQL | AnyPgColumn> = {
   name: t.name,
   type: planRank,
+  risk: sql`${st.monitorRisk}`,
   score: sql`${st.scoreTenths}`,
   guardrail: sql`case ${st.guardrail} when 'warning' then 1 when 'paused' then 2 else 0 end`,
   reason: sql`${f.reason}::text`,
@@ -101,6 +117,7 @@ export const consoleSafetyRouter = router({
             complaintRate7d: st.complaintRate7d,
             hardBounceRate7d: st.hardBounceRate7d,
             sent7d: st.sent7d,
+            monitorRisk: st.monitorRisk,
           })
           .from(f)
           .innerJoin(t, eq(t.id, f.teamId))
@@ -125,11 +142,16 @@ export const consoleSafetyRouter = router({
           .innerJoin(t, eq(t.id, f.teamId))
           .leftJoin(st, eq(st.teamId, t.id)),
       ]);
+      const { settings } = resolveMonitorSettings(
+        await getMonitorSettingsRow(ctx.db),
+        env as unknown as Record<string, unknown>,
+      );
       return {
         items: rows.slice(0, input.limit),
         total: count?.total ?? 0,
         nextOffset: rows.length > input.limit ? input.offset + input.limit : null,
         counts: open ?? { open: 0, guardrailPaused: 0, suspended: 0 },
+        thresholds: { flagRisk: settings.flagRisk, alertRisk: settings.alertRisk },
       };
     }),
 
@@ -140,72 +162,106 @@ export const consoleSafetyRouter = router({
     const since = new Date(now.getTime() - FLAGGED_EMAIL_DAYS * 86_400_000);
     const e = schema.emails;
     const i = schema.emailInsights;
-    const [flags, health, score, factors, owners, region, contacts, flagged, audit] =
-      await Promise.all([
-        ctx.db.select().from(f).where(eq(f.teamId, team.id)).orderBy(desc(f.openedAt)).limit(10),
-        fetchDeliverabilityHealth(ctx.db, team.id, { now }),
-        fetchAccountScore(ctx.db, team.id, { now }),
-        fetchContentFactors(ctx.db, team.id, { now }),
-        ctx.db
-          .select({ email: schema.user.email, name: schema.user.name })
-          .from(schema.teamMembers)
-          .innerJoin(schema.user, eq(schema.user.id, schema.teamMembers.userId))
-          .where(and(eq(schema.teamMembers.teamId, team.id), eq(schema.teamMembers.role, "owner")))
-          .orderBy(asc(schema.teamMembers.createdAt)),
-        ctx.db
-          .select({
-            region: teamRegion,
-            domains: sql<number>`(select count(*)::int from ${schema.domains} d where d.team_id = ${t}."id" and d.status = 'verified')`,
-          })
-          .from(t)
-          .where(eq(t.id, team.id))
-          .then((r) => r[0] ?? { region: null, domains: 0 }),
-        ctx.db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(schema.contacts)
-          .where(eq(schema.contacts.teamId, team.id))
-          .then((r) => r[0]?.n ?? 0),
-        // One row per email; a broadcast's recipients share its insights row.
-        ctx.db
-          .select({
-            id: e.id,
-            sentAt: e.sentAt,
-            from: e.from,
-            recipients: sql<number>`jsonb_array_length(${e.to})`,
-            broadcastId: e.broadcastId,
-            checks: i.checks,
-          })
-          .from(e)
-          .innerJoin(
-            i,
-            or(
-              eq(i.emailId, e.id),
-              and(isNotNull(e.broadcastId), eq(i.broadcastId, e.broadcastId)),
-            ),
-          )
-          .where(
-            and(
-              eq(e.teamId, team.id),
-              sql`${e.sentAt} >= ${since}`,
-              sql`exists (select 1 from jsonb_array_elements(${i.checks}) c where c->>'status' = 'fail' and c->>'severity' in ('critical', 'major'))`,
-            ),
-          )
-          .orderBy(desc(e.sentAt))
-          .limit(50),
-        ctx.db
-          .select({
-            id: schema.auditLog.id,
-            actorId: schema.auditLog.actorId,
-            action: schema.auditLog.action,
-            target: schema.auditLog.target,
-            data: schema.auditLog.data,
-            createdAt: schema.auditLog.createdAt,
-          })
-          .from(schema.auditLog)
-          .where(eq(schema.auditLog.teamId, team.id))
-          .orderBy(desc(schema.auditLog.createdAt))
-          .limit(20),
-      ]);
+    const judge = judgeStatus();
+    const { settings: monitorSettings } = resolveMonitorSettings(
+      await getMonitorSettingsRow(ctx.db),
+      env as unknown as Record<string, unknown>,
+    );
+    const [
+      flags,
+      health,
+      score,
+      factors,
+      owners,
+      region,
+      contacts,
+      flagged,
+      audit,
+      monitor,
+      samples,
+    ] = await Promise.all([
+      ctx.db.select().from(f).where(eq(f.teamId, team.id)).orderBy(desc(f.openedAt)).limit(10),
+      fetchDeliverabilityHealth(ctx.db, team.id, { now }),
+      fetchAccountScore(ctx.db, team.id, { now }),
+      fetchContentFactors(ctx.db, team.id, { now }),
+      ctx.db
+        .select({ email: schema.user.email, name: schema.user.name })
+        .from(schema.teamMembers)
+        .innerJoin(schema.user, eq(schema.user.id, schema.teamMembers.userId))
+        .where(and(eq(schema.teamMembers.teamId, team.id), eq(schema.teamMembers.role, "owner")))
+        .orderBy(asc(schema.teamMembers.createdAt)),
+      ctx.db
+        .select({
+          region: teamRegion,
+          domains: sql<number>`(select count(*)::int from ${schema.domains} d where d.team_id = ${t}."id" and d.status = 'verified')`,
+        })
+        .from(t)
+        .where(eq(t.id, team.id))
+        .then((r) => r[0] ?? { region: null, domains: 0 }),
+      ctx.db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(schema.contacts)
+        .where(eq(schema.contacts.teamId, team.id))
+        .then((r) => r[0]?.n ?? 0),
+      // One row per email; a broadcast's recipients share its insights row.
+      ctx.db
+        .select({
+          id: e.id,
+          sentAt: e.sentAt,
+          from: e.from,
+          recipients: sql<number>`jsonb_array_length(${e.to})`,
+          broadcastId: e.broadcastId,
+          checks: i.checks,
+        })
+        .from(e)
+        .innerJoin(
+          i,
+          or(eq(i.emailId, e.id), and(isNotNull(e.broadcastId), eq(i.broadcastId, e.broadcastId))),
+        )
+        .where(
+          and(
+            eq(e.teamId, team.id),
+            sql`${e.sentAt} >= ${since}`,
+            sql`exists (select 1 from jsonb_array_elements(${i.checks}) c where c->>'status' = 'fail' and c->>'severity' in ('critical', 'major'))`,
+          ),
+        )
+        .orderBy(desc(e.sentAt))
+        .limit(50),
+      ctx.db
+        .select({
+          id: schema.auditLog.id,
+          actorId: schema.auditLog.actorId,
+          action: schema.auditLog.action,
+          target: schema.auditLog.target,
+          data: schema.auditLog.data,
+          createdAt: schema.auditLog.createdAt,
+        })
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.teamId, team.id))
+        .orderBy(desc(schema.auditLog.createdAt))
+        .limit(20),
+      teamMonitorOverview(ctx.db, team.id, monitorSettings, now),
+      recentMonitorSamples(ctx.db, team.id, 20),
+    ]);
+    // The judge's answer for each flagged email, when it was drawn; the verdict fields only.
+    const ms = schema.monitorSamples;
+    const flaggedIds = flagged.map((row) => row.id);
+    const verdicts = new Map(
+      flaggedIds.length === 0
+        ? []
+        : (
+            await ctx.db
+              .select({
+                emailId: ms.emailId,
+                status: ms.status,
+                score: ms.score,
+                reasons: ms.reasons,
+                errorClass: ms.errorClass,
+              })
+              .from(ms)
+              .where(and(eq(ms.teamId, team.id), inArray(ms.emailId, flaggedIds)))
+          ).map((row) => [row.emailId, row]),
+    );
     // The tail names the people behind user actors, as the audit screens do.
     const actorIds = [
       ...new Set(
@@ -262,6 +318,7 @@ export const consoleSafetyRouter = router({
         const failing = (row.checks as { id: string; severity: string; status: string }[]).filter(
           (c) => c.status === "fail" && (CRITICAL_OR_MAJOR as string[]).includes(c.id),
         );
+        const verdict = verdicts.get(row.id);
         return {
           id: row.id,
           sentAt: row.sentAt,
@@ -270,8 +327,24 @@ export const consoleSafetyRouter = router({
           broadcastId: row.broadcastId,
           check: failing[0] ? { id: failing[0].id, severity: failing[0].severity } : null,
           failingCount: failing.length,
+          model: verdict
+            ? {
+                status: verdict.status,
+                score: verdict.score,
+                reasons: verdict.reasons ?? [],
+                errorClass: verdict.errorClass,
+              }
+            : null,
         };
       }),
+      monitor: {
+        ...monitor,
+        samples,
+        judge,
+        flagScore: monitorSettings.flagScore,
+        flagRisk: monitorSettings.flagRisk,
+        alertRisk: monitorSettings.alertRisk,
+      },
       audit: audit.map((row) => {
         const actor = parseAuditActor(row.actorId);
         return {
