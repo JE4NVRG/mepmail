@@ -73,7 +73,7 @@ export const teamBootstrapRouter = router({
 
   /** The operator's read-only look at the active team, for the owner's Support access card. */
   supportView: router({
-    current: teamProcedure.query(async ({ ctx }) => {
+    current: adminProcedure.query(async ({ ctx }) => {
       const enabled = supportViewEnabled();
       const live = enabled ? await liveSupportViewForTeam(ctx.db, ctx.teamId) : null;
       return {

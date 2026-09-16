@@ -52,7 +52,11 @@ export async function mailTeamOwners(
   path: string,
   values: (locale: MailLocale) => Record<string, string>,
 ): Promise<number> {
-  const owners = await listTeamOwners(db, team.id, accountEmailFrom(), kind);
+  const sender = accountEmailFrom();
+  // No sender configured means the mail cannot leave, whatever the team's
+  // owner count says; a caller recording "notified" must hear zero.
+  if (!sender) return 0;
+  const owners = await listTeamOwners(db, team.id, sender, kind);
   for (const owner of owners) {
     sendAccountMail(
       buildAccountEmail({

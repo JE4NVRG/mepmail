@@ -1,20 +1,20 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, type SQL, sql } from "drizzle-orm";
 import { recordAudit } from "./audit.js";
+import {
+  SUPPORT_VIEW_REASONS,
+  type SupportViewReason,
+  supportViewNeedsReference,
+} from "./support-view-reasons.js";
+
+export { SUPPORT_VIEW_REASONS, type SupportViewReason, supportViewNeedsReference };
 
 /** How long one read-only look at a team's dashboard lasts, server-enforced on every request. */
 export const SUPPORT_VIEW_MINUTES = 30;
 
-export type SupportViewReason = (typeof schema.supportViewReasonEnum.enumValues)[number];
-export const SUPPORT_VIEW_REASONS = schema.supportViewReasonEnum.enumValues;
 export type SupportViewEndedBy = (typeof schema.supportViewEndedByEnum.enumValues)[number];
 export type SupportViewGrant = typeof schema.supportViewGrants.$inferSelect;
-
-/** The reasons that answer a request the customer can point at, so the reference is mandatory. */
-export function supportViewNeedsReference(reason: SupportViewReason): boolean {
-  return reason === "support_ticket" || reason === "billing_dispute";
-}
 
 const g = schema.supportViewGrants;
 
@@ -25,7 +25,7 @@ export interface LiveSupportView extends SupportViewGrant {
 
 async function liveWhere(
   db: Db,
-  where: ReturnType<typeof eq>,
+  where: SQL | undefined,
   now: Date,
 ): Promise<LiveSupportView | null> {
   const [row] = await db
@@ -54,8 +54,9 @@ export async function findLiveSupportView(
   operatorUserId: string,
   now: Date = new Date(),
 ): Promise<LiveSupportView | null> {
-  const live = await liveWhere(db, eq(g.id, grantId), now);
-  return live && live.operatorUserId === operatorUserId ? live : null;
+  // Both halves are in the lookup: a grant id belonging to someone else must
+  // not even reach the lazy expiry below, which writes to the row it finds.
+  return liveWhere(db, and(eq(g.id, grantId), eq(g.operatorUserId, operatorUserId)), now);
 }
 
 export function liveSupportViewForTeam(

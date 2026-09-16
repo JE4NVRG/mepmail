@@ -3,18 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { BtnSpinner } from "@/components/spinner";
 import { toast } from "@/components/toast";
 import { formatMmSs } from "@/lib/format";
+import { consoleTeamHref } from "@/lib/nav";
 import { useTRPC } from "@/lib/trpc";
 import { trpcErrorCode } from "@/lib/trpc-error";
 import { useCountdown } from "@/lib/use-countdown";
-
-/** The console's Teams list, searched down to this team (the search matches an id). */
-export function consoleTeamHref(teamId: string): string {
-  return `/console/teams?q=${encodeURIComponent(teamId)}`;
-}
 
 /**
  * The strip over a dashboard opened in a support view: which team, that it
@@ -24,10 +20,12 @@ export function consoleTeamHref(teamId: string): string {
  * side, and nothing else would tell a tab already under the banner.
  */
 export function SupportViewBanner({
+  grantId,
   teamId,
   teamName,
   expiresAt,
 }: {
+  grantId: string;
   teamId: string;
   teamName: string;
   expiresAt: Date;
@@ -51,10 +49,35 @@ export function SupportViewBanner({
   const live = useQuery(
     trpc.support.current.queryOptions(undefined, { refetchInterval: 15_000, staleTime: 0 }),
   );
-  const gone = live.isSuccess && live.data === null;
+  // Identity, not existence: starting a view of another team elsewhere leaves
+  // a grant live while THIS one is over, and the banner would keep naming a
+  // team the requests no longer resolve to.
+  const gone = live.isSuccess && live.data?.grantId !== grantId;
   useEffect(() => {
     if (gone) leave();
   }, [gone, leave]);
+
+  // Both markers go on the document, not on the shell. The read-only flag
+  // must reach dialogs, which portal to document.body; the strip's measured
+  // height is what the sticky sidebar drops by, so the page keeps to one
+  // viewport instead of growing by the strip.
+  const strip = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.supportView = "";
+    const measure = () => {
+      const height = strip.current?.offsetHeight ?? 0;
+      root.style.setProperty("--ms-support-strip-h", `${height}px`);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (strip.current) observer.observe(strip.current);
+    return () => {
+      observer.disconnect();
+      delete root.dataset.supportView;
+      root.style.removeProperty("--ms-support-strip-h");
+    };
+  }, []);
 
   // Every refused mutation, from any screen, says why in one place.
   useEffect(() => {
@@ -70,8 +93,9 @@ export function SupportViewBanner({
 
   return (
     <div
+      ref={strip}
       role="status"
-      className="ms-notice-strip ms-notice-strip-warn"
+      className="ms-notice-strip ms-notice-strip-warn ms-support-strip"
       style={{ margin: 0, borderRadius: 0, borderWidth: "0 0 1px" }}
     >
       <span>

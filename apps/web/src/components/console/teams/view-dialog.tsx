@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  SUPPORT_VIEW_REASONS,
+  type SupportViewReason,
+  supportViewNeedsReference,
+} from "@millionsend/core/support-view-reasons";
 import { useTranslations } from "next-intl";
 import { useId, useState } from "react";
 import { Modal } from "@/components/modal";
@@ -7,22 +12,11 @@ import { ConfirmKeycap, ModalFooter } from "@/components/modal-footer";
 import { Select } from "@/components/select";
 import { BtnSpinner } from "@/components/spinner";
 
-// Mirrors schema.supportViewReasonEnum (packages/db); the schema module is server-only.
-export const SUPPORT_VIEW_REASONS = [
-  "support_ticket",
-  "abuse_report_check",
-  "billing_dispute",
-  "other",
-] as const;
-export type SupportViewReason = (typeof SUPPORT_VIEW_REASONS)[number];
-
 export interface ViewInput {
   reason: SupportViewReason;
   reference?: string;
 }
 
-/** Mirrors supportViewNeedsReference in core: the server refuses these without a reference. */
-const REFERENCE_REQUIRED: readonly SupportViewReason[] = ["support_ticket", "billing_dispute"];
 const KNOWN_ERRORS = ["support_view_off", "support_view_live", "own_team", "reference_required"];
 
 /** Names a reason and a request, then opens the team's dashboard read-only for 30 minutes. */
@@ -45,7 +39,7 @@ export function ViewDialog({
   const id = useId();
   const [reason, setReason] = useState<SupportViewReason>("support_ticket");
   const [reference, setReference] = useState("");
-  const needsReference = REFERENCE_REQUIRED.includes(reason);
+  const needsReference = supportViewNeedsReference(reason);
   const trimmed = reference.trim();
   const valid = !needsReference || trimmed.length > 0;
 

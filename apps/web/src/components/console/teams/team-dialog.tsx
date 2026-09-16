@@ -167,8 +167,17 @@ export function TeamDialog({
           {common("close")} <span className="ms-keycap">Esc</span>
         </button>
         {detail && !detail.supportViewEnabled ? (
-          <Tooltip text={t("menu.viewOff")}>
-            <button type="button" className="ms-btn ms-btn-secondary" disabled>
+          // Inline, so the trigger is a span: the default trigger is itself a
+          // button, and a button inside a button is invalid nesting the
+          // browser may reparent. The span is focusable, so the reason
+          // reaches a keyboard user too.
+          <Tooltip inline text={t("menu.viewOff")}>
+            <button
+              type="button"
+              className="ms-btn ms-btn-secondary"
+              disabled
+              style={{ pointerEvents: "none" }}
+            >
               {t("menu.view")}
             </button>
           </Tooltip>

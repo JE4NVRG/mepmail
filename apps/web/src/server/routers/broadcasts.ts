@@ -286,7 +286,14 @@ export const broadcastsRouter = router({
 
   /** Detail surface: full content plus the stat strip's aggregate over fanned-out emails. */
   get: teamProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
-    const row = await getOwnBroadcast(ctx, input.id);
+    const stored = await getOwnBroadcast(ctx, input.id);
+    // Once a broadcast leaves draft its body IS the content of sent emails,
+    // which a support view never sees; a draft stays readable, since "why
+    // does this render wrong" is the question support is usually asked.
+    const hiddenBySupportView = Boolean(ctx.supportView) && stored.status !== "draft";
+    const row = hiddenBySupportView
+      ? { ...stored, html: null, text: null, document: null }
+      : stored;
     const e = schema.emails;
     const tp = schema.topics;
     const [topic] = row.topicId
@@ -318,6 +325,7 @@ export const broadcastsRouter = router({
     const live = stats && stats.total > 0 ? stats : null;
     return {
       ...row,
+      hiddenBySupportView,
       replyTo: firstReplyTo(row.replyTo),
       topicName: topic?.name ?? null,
       segmentName: segment?.name ?? null,
