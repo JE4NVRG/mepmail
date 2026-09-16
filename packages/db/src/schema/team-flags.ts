@@ -31,6 +31,9 @@ export interface TeamFlagDetail {
   rate?: number;
   scoreTenths?: number;
   guardrail?: "warning" | "paused";
+  /** The monitor reason: the internal risk and the judged samples behind it. */
+  risk?: number;
+  samples?: number;
 }
 
 /**
@@ -80,5 +83,8 @@ export const teamStandings = pgTable("team_standings", {
   hardBounceRate7d: doublePrecision("hard_bounce_rate_7d").notNull().default(0),
   sent7d: integer("sent_7d").notNull().default(0),
   sent30d: integer("sent_30d").notNull().default(0),
+  // The content monitor's internal risk, copied from team_monitor so the
+  // list sorts on it; null for a team the monitor never drew for.
+  monitorRisk: doublePrecision("monitor_risk"),
   computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
 });
