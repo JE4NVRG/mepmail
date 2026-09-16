@@ -17,6 +17,7 @@ export * from "./monitor.js";
 export * from "./region-breakers.js";
 export * from "./segments.js";
 export * from "./stripe-events.js";
+export * from "./support-view.js";
 export * from "./suppressions.js";
 export * from "./team-flags.js";
 export * from "./team-invitations.js";
