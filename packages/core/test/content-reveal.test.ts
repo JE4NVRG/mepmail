@@ -30,6 +30,12 @@ describe("redactRevealedText", () => {
     );
   });
 
+  it("reduces a link written without a scheme, and names none it did not have", () => {
+    expect(plain(redactRevealedText("Go to www.login.example.com/reset?t=9k now"))).toBe(
+      "Go to example.com/reset… now",
+    );
+  });
+
   it("keeps a short path whole and leaves sentence punctuation outside the link", () => {
     const content = redactRevealedText("See https://example.com/pricing.");
     expect(plain(content)).toBe("See https://example.com/pricing.");
