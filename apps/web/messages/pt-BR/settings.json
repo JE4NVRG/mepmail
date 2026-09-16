@@ -438,7 +438,9 @@
       "monitor_override_set": "Definiu override de amostragem do monitor",
       "monitor_override_cleared": "Removeu override de amostragem do monitor",
       "monitor_broadcasts_paused": "O monitor de conteúdo pausou transmissões",
-      "monitor_broadcasts_resumed": "Retomou transmissões após pausa do monitor"
+      "monitor_broadcasts_resumed": "Retomou transmissões após pausa do monitor",
+      "content_revealed": "Leu o conteúdo de mensagens",
+      "content_accessed": "Um operador leu o conteúdo de mensagens"
     },
     "empty": "Nada registrado ainda.",
     "loadMore": "Carregar mais",

@@ -499,7 +499,7 @@
   "safety": {
     "title": "Confiança e segurança",
     "info": "Uma equipe entra aqui quando o guardrail de entregabilidade vira alerta ou pausa, as reclamações passam de 0,1% ou os hard bounces de 5% em 7 dias, o risco do monitor de conteúdo cruza a linha de sinalização (conteúdo amostrado julgado pelo modelo), o score da conta cai abaixo de 5, ou um operador a sinaliza à mão. Sinalizações automáticas somem sozinhas quando o gatilho passa; uma que você limpa fica limpa enquanto o mesmo gatilho durar.",
-    "proof": "{open} abertas · {guardrailPaused} pausadas pelo guardrail · {suspended} suspensas",
+    "proof": "{open} abertas · {guardrailPaused} pausadas pelo guardrail · {suspended} suspensas · {revealsThisWeek, plural, one {# revelação de conteúdo} other {# revelações de conteúdo}} esta semana",
     "search": "Buscar equipes, proprietários, domínios",
     "filters": {
       "status": "Status: {value}",
@@ -562,7 +562,8 @@
       "clear": "Limpar sinalização",
       "reopen": "Reabrir",
       "suspend": "Suspender equipe",
-      "reinstate": "Reativar equipe"
+      "reinstate": "Reativar equipe",
+      "reveal": "Pedir acesso ao conteúdo"
     },
     "toast": {
       "cleared": "{team} · limpa",
@@ -612,7 +613,8 @@
         "monitor": "Monitor",
         "modelScore": "Modelo: {score} · {detail}",
         "notFlagged": "não sinalizado",
-        "modelUnjudged": "Modelo: sem julgamento · {error}"
+        "modelUnjudged": "Modelo: sem julgamento · {error}",
+        "content": "Conteúdo"
       },
       "audit": {
         "title": "Cauda de auditoria",
@@ -785,6 +787,67 @@
         "db": "definido aqui",
         "env": "do ambiente ({value})",
         "default": "padrão embutido {value}"
+      }
+    },
+    "reveal": {
+      "request": "Pedir acesso ao conteúdo",
+      "off": "O acesso ao conteúdo está desligado nesta instância: defina CONTENT_REVEAL=on no ambiente dela.",
+      "row": "Revelar",
+      "open": "Abrir",
+      "left": "faltam {time}",
+      "dialog": {
+        "title": "Revelar o conteúdo do e-mail",
+        "lead": "{team} · {from} · enviado {sent} para {recipients, plural, one {# destinatário} other {# destinatários}}",
+        "leadTeam": "{team}",
+        "reason": "Motivo",
+        "reasons": {
+          "phishing_or_malware": "Suspeita de phishing ou malware",
+          "complaint_spike": "Pico de reclamações de spam",
+          "provider_report": "Denúncia de abuso de um provedor",
+          "legal_request": "Solicitação judicial",
+          "owner_support_request": "Chamado de suporte a pedido do dono"
+        },
+        "why": "O que você viu que exige o conteúdo",
+        "whyHelper": "{reason}; as métricas armazenadas não distinguem uma isca de phishing de uma newsletter sem o texto.",
+        "whyShort": "Diga o que você viu · pelo menos {min} caracteres",
+        "scope": "Alcance",
+        "scopeEmail": "Somente este e-mail",
+        "scopeEmailSub": "Texto renderizado e assunto. Anexos, cabeçalhos e a lista de destinatários continuam ocultos.",
+        "scopeWindow": "{count, plural, one {O # e-mail sinalizado} other {Todos os # e-mails sinalizados}} da janela",
+        "scopeWindowAll": "Todos os e-mails sinalizados da janela",
+        "scopeWindowSub": "Os mesmos campos.",
+        "window": "Janela",
+        "windowValue": "30 minutos, depois some de novo",
+        "recorded": "Registrado",
+        "recordedValue": "Auditoria da instância · auditoria da equipe em 7 dias",
+        "note": "Corpos já expurgados pela retenção não podem ser revelados.",
+        "confirm": "Revelar"
+      },
+      "view": {
+        "title": "Conteúdo revelado · {team}",
+        "lead": "Leia, decida, feche. A visão expira sozinha.",
+        "expires": "expira em {time}",
+        "renderedOnly": "somente texto renderizado",
+        "recipientsHidden": "destinatários ocultos",
+        "noExport": "sem exportação",
+        "redactions": "{count, plural, one {# ocultação} other {# ocultações}}",
+        "subject": "Assunto",
+        "body": "Corpo · credenciais e links de uso único ocultados",
+        "empty": "O texto renderizado está vazio.",
+        "verdict": "Veredicto do monitor: {verdict}",
+        "verdictNone": "O monitor nunca julgou este e-mail.",
+        "note": "Registrado no log de auditoria da instância.",
+        "close": "Fechar",
+        "clear": "Legítimo, limpar esta sinalização",
+        "suspend": "Abusivo, suspender a equipe",
+        "expired": "A janela fechou. Peça acesso de novo.",
+        "purged": "Corpos já expurgados pela retenção não podem ser revelados.",
+        "failed": "Não foi possível abrir o conteúdo."
+      },
+      "toast": {
+        "granted": "{team} · acesso ao conteúdo aberto por 30 minutos",
+        "purged": "{count, plural, one {# e-mail ignorado} other {# e-mails ignorados}}: o corpo foi expurgado pela retenção",
+        "cleared": "{team} · limpa como falso positivo"
       }
     }
   },

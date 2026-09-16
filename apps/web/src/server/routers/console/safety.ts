@@ -548,7 +548,8 @@ export const consoleSafetyRouter = router({
     }),
 
   clearFlag: operatorProcedure
-    .input(z.object({ flagId: z.uuid() }))
+    /** `afterGrantId` marks the clear as the verdict of a content reveal. */
+    .input(z.object({ flagId: z.uuid(), afterGrantId: z.uuid().optional() }))
     .mutation(async ({ ctx, input }) => {
       const [flag] = await ctx.db.select().from(f).where(eq(f.id, input.flagId));
       if (!flag) throw new TRPCError({ code: "NOT_FOUND" });
@@ -561,7 +562,12 @@ export const consoleSafetyRouter = router({
         teamId: flag.teamId,
         action: "console.flag_cleared",
         target: { type: "team_flag", id: flag.id },
-        metadata: { reason: flag.reason },
+        metadata: {
+          reason: flag.reason,
+          ...(input.afterGrantId
+            ? { grantId: input.afterGrantId, verdict: "false_positive" }
+            : {}),
+        },
       });
     }),
 
