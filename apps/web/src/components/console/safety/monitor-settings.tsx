@@ -30,7 +30,6 @@ type Draft = string | boolean | null;
 export function MonitorSettingsView() {
   const t = useTranslations("console.safety.monitor");
   const safety = useTranslations("console.safety");
-  const common = useTranslations("console.common");
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const query = useQuery(trpc.console.monitor.settings.get.queryOptions());
