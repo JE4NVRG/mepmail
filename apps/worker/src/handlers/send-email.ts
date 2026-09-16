@@ -11,6 +11,7 @@ import {
   evaluateEmailInsights,
   extractAddrSpec,
   fetchTeamQuota,
+  fetchTeamStanding,
   findSuppressed,
   hashRecipient,
   isOnboardingSender,
@@ -264,7 +265,11 @@ export async function failQueuedEmail(db: Db, emailId: string, reason: string): 
  * one per row, as it does for plan-parked mail) so the two kinds share one
  * drain path. A row that already left "queued" is left alone.
  */
-async function parkForSesQuota(db: Db, email: { id: string; teamId: string }): Promise<void> {
+async function parkQueued(
+  db: Db,
+  email: { id: string; teamId: string },
+  why: string,
+): Promise<void> {
   await db.transaction(async (tx) => {
     const txDb = tx as unknown as Db;
     const moved = await transitionQueueState(txDb, email.id, {
@@ -278,7 +283,7 @@ async function parkForSesQuota(db: Db, email: { id: string; teamId: string }): P
     const quota = await fetchTeamQuota(txDb, email.teamId, true);
     if (quota) await releaseQuota(txDb, { teamId: email.teamId, count: 1, quota });
   });
-  console.warn(`email.send: SES 24h quota reached, parked ${email.id}`);
+  console.warn(`email.send: ${why}, parked ${email.id}`);
 }
 
 /** Header names are case-insensitive; the caller's map keeps whatever casing it sent. */
@@ -339,6 +344,16 @@ export async function sendEmail(
     await deps.reschedule?.(email.id, email.scheduledAt, emailSendPriority(email));
     return "deferred";
   }
+  // An operator's suspension, or a broadcast pause, holds mail the queue
+  // already carries: parked like an over-quota send, and the drain skips the
+  // team until the operator lifts the hold. Read per send, so it bites on the
+  // next row, not the next fan-out.
+  const standing = await fetchTeamStanding(db, email.teamId);
+  if (standing?.suspended || (email.broadcastId && standing?.broadcastsPausedByOperatorAt)) {
+    await parkQueued(db, email, standing.suspended ? "team suspended" : "broadcasts paused");
+    return "parked";
+  }
+
   // SES identities, the 24-hour quota and the send rate are all per region:
   // the send must target the domain's region, not a single deployment-wide
   // one, and so must the gate and bucket below. The name also seeds the
@@ -374,7 +389,7 @@ export async function sendEmail(
   // the way an over-plan email parks at accept. The drain releases it as the
   // window frees.
   if (deps.sesQuota?.exhausted(domain?.region)) {
-    await parkForSesQuota(db, email);
+    await parkQueued(db, email, "SES 24h quota reached");
     return "parked";
   }
 
@@ -674,7 +689,7 @@ export async function sendEmail(
         deps.sesQuota !== undefined &&
         (await deps.sesQuota.refresh(domain?.region)))
     ) {
-      await parkForSesQuota(db, email);
+      await parkQueued(db, email, "SES 24h quota reached");
       return "parked";
     }
     throw err;
