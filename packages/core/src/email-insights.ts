@@ -193,7 +193,8 @@ export function extractImages(html: string): { src: string | null; alt: string |
   }));
 }
 
-function isIpLiteral(host: string): boolean {
+/** A host given as an address rather than a name: IPv4, or a bracketed IPv6. */
+export function isIpLiteral(host: string): boolean {
   return IPV4.test(host) || host.startsWith("[");
 }
 

@@ -109,6 +109,13 @@ export function formatHoursMinutes(ms: number): string {
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
+/** A countdown as mm:ss, floored at 00:00. */
+export function formatMmSs(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)}`;
+}
+
 export function formatDurationShort(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)} ms`;
   if (ms < 60_000) return `${trimFixed(ms / 1000, 2)} s`;
