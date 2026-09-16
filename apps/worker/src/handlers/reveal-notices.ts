@@ -5,7 +5,6 @@ import {
   CONTENT_REVEAL_NOTICE_DAYS,
   formatMailDateTime,
   type MailLocale,
-  recordAudit,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
@@ -61,17 +60,21 @@ export async function runRevealNotices(
       grant.suspendedAt > grant.createdAt;
     try {
       if (!underInvestigation) {
-        await recordAudit(db, {
+        // Written straight rather than through recordAudit, whose failures are
+        // swallowed so a trail can never fail the action it records: here the
+        // row IS the action, so a failed write must leave the grant unstamped
+        // for tomorrow's run. Dated at the access, not at the disclosure.
+        await db.insert(schema.auditLog).values({
           teamId: grant.teamId,
-          actor: "system",
+          actorId: "system",
           action: "content.accessed",
-          target: { type: "content_access_grant", id: grant.id },
-          metadata: {
+          target: `content_access_grant:${grant.id}`,
+          data: {
             reason: grant.reason,
             emails: grant.emailIds.length,
             fields: CONTENT_REVEAL_FIELDS,
           },
-          at: grant.createdAt,
+          createdAt: grant.createdAt,
         });
         await sendNotice(db, deps, grant);
       }

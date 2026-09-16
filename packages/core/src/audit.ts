@@ -16,8 +16,6 @@ export interface AuditEvent {
   target?: { type: string; id: string };
   /** Identifying facts only (names, roles, plans). Never secrets or message bodies. */
   metadata?: Record<string, unknown>;
-  /** When it happened, when that is not now: a disclosure the row is dated back to. */
-  at?: Date;
 }
 
 export type ParsedAuditActor =
@@ -57,7 +55,6 @@ export async function recordAudit(db: Db, event: AuditEvent): Promise<void> {
       action: event.action,
       target: event.target ? `${event.target.type}:${event.target.id}` : null,
       data: event.metadata ?? null,
-      ...(event.at ? { createdAt: event.at } : {}),
     });
   } catch (err) {
     console.error("audit write failed", err);
