@@ -8,6 +8,7 @@ import { EventsHealthBanner } from "@/components/events-health-banner";
 import { RegionBreakerBanner } from "@/components/region-breaker-banner";
 import { SupportViewBanner } from "@/components/support-view-banner";
 import { TeamStandingBanner } from "@/components/team-standing-banner";
+import { ToastHost } from "@/components/toast";
 import { getAuth } from "@/server/auth";
 import { ACTIVE_TEAM_COOKIE, getActiveMembership } from "@/server/membership";
 import { resolveSupportView, SUPPORT_VIEW_COOKIE } from "@/server/support-view";
@@ -57,6 +58,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </main>
       <ConfirmDialogHost />
+      {/* The dashboard raises toasts too (a refused mutation under a support
+          view, the Support access card); without a host they are dropped. */}
+      <ToastHost />
     </AppShell>
   );
 }

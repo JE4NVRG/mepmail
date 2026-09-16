@@ -12,10 +12,15 @@ import {
 import { user } from "./auth.js";
 import { teams } from "./teams.js";
 
-/** The controller's instruction a support view rests on; the reference ties it to a request. */
+/**
+ * The controller's instruction a support view rests on; the reference ties it
+ * to a request. Every value is a request the customer made: an operator
+ * checking an abuse report works from the console's own metadata and, when
+ * content is needed, the Trust & safety reveal, neither of which opens the
+ * customer's dashboard.
+ */
 export const supportViewReasonEnum = pgEnum("support_view_reason", [
   "support_ticket",
-  "abuse_report_check",
   "billing_dispute",
   "other",
 ]);

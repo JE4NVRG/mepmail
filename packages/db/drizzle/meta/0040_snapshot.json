@@ -1,5 +1,5 @@
 {
-  "id": "133b6c42-dadc-434d-9299-e82db288e2ec",
+  "id": "46a4c3f5-53f1-4e35-a864-f90ba7666a02",
   "prevId": "a6fce3d1-d7a5-41c5-819b-3ff74f26d607",
   "version": "7",
   "dialect": "postgresql",
@@ -6700,7 +6700,6 @@
       "schema": "public",
       "values": [
         "support_ticket",
-        "abuse_report_check",
         "billing_dispute",
         "other"
       ]

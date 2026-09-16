@@ -8,6 +8,7 @@ import { BtnSpinner } from "@/components/spinner";
 import { toast } from "@/components/toast";
 import { formatMmSs } from "@/lib/format";
 import { consoleTeamHref } from "@/lib/nav";
+import { setReadOnly } from "@/lib/read-only";
 import { useTRPC } from "@/lib/trpc";
 import { trpcErrorCode } from "@/lib/trpc-error";
 import { useCountdown } from "@/lib/use-countdown";
@@ -62,9 +63,12 @@ export function SupportViewBanner({
   // height is what the sticky sidebar drops by, so the page keeps to one
   // viewport instead of growing by the strip.
   const strip = useRef<HTMLDivElement>(null);
+  const readOnlyMessage = t("readOnly");
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.supportView = "";
+    // The seams CSS cannot dim read this instead.
+    setReadOnly(true, readOnlyMessage);
     const measure = () => {
       const height = strip.current?.offsetHeight ?? 0;
       root.style.setProperty("--ms-support-strip-h", `${height}px`);
@@ -74,10 +78,11 @@ export function SupportViewBanner({
     if (strip.current) observer.observe(strip.current);
     return () => {
       observer.disconnect();
+      setReadOnly(false);
       delete root.dataset.supportView;
       root.style.removeProperty("--ms-support-strip-h");
     };
-  }, []);
+  }, [readOnlyMessage]);
 
   // Every refused mutation, from any screen, says why in one place.
   useEffect(() => {

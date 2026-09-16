@@ -503,7 +503,6 @@
       "lead": "Opens the team dashboard read-only under a banner, for 30 minutes. Every procedure read lands in the instance audit and the session appears in the team's own audit at once.",
       "reasons": {
         "support_ticket": "Support ticket",
-        "abuse_report_check": "Verifying an abuse report",
         "billing_dispute": "Billing dispute",
         "other": "Other"
       },

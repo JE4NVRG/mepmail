@@ -544,7 +544,6 @@
     "reference": "Reference",
     "reasons": {
       "support_ticket": "Support ticket",
-      "abuse_report_check": "Verifying an abuse report",
       "billing_dispute": "Billing dispute",
       "other": "Other"
     },

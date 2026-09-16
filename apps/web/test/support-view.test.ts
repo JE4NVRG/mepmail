@@ -3,6 +3,7 @@ import {
   EnvKeyring,
   encryptEmailBody,
   SUPPORT_VIEW_MINUTES,
+  SUPPORT_VIEW_REASONS,
   type SystemMailMessage,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
@@ -280,7 +281,7 @@ describe("console.teams.startSupportView", () => {
     const orphan = await createTeam(db, `orphan-${Date.now()}`);
     const result = await operator().console.teams.startSupportView({
       id: orphan,
-      reason: "abuse_report_check",
+      reason: "other",
     });
     const grant = await grantRow(result.grantId);
     expect(grant.notifiedAt).toBeNull();
@@ -307,6 +308,17 @@ describe("console.teams.startSupportView", () => {
       .from(schema.supportViewGrants)
       .where(isNull(schema.supportViewGrants.endedAt));
     expect(live).toHaveLength(1);
+  });
+
+  it("has no reason that is not a request the customer made", async () => {
+    expect(SUPPORT_VIEW_REASONS).toEqual(["support_ticket", "billing_dispute", "other"]);
+    await expect(
+      // biome-ignore lint/suspicious/noExplicitAny: a value the enum no longer carries
+      operator().console.teams.startSupportView({
+        id: teamId,
+        reason: "abuse_report_check" as any,
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("cannot be nested: a view cannot start another", async () => {
@@ -472,7 +484,7 @@ describe("what a view can and cannot see", () => {
     expect(viewed).not.toHaveProperty("bodyCiphertext");
   });
 
-  it("hides a sent broadcast's body but leaves a draft readable", async () => {
+  it("hides a broadcast's body once it has reached someone, and not before", async () => {
     const body = { html: "<p>the newsletter</p>", text: "the newsletter" };
     const [sent] = await db
       .insert(schema.broadcasts)
@@ -496,7 +508,18 @@ describe("what a view can and cannot see", () => {
         ...body,
       })
       .returning({ id: schema.broadcasts.id });
-    if (!sent || !draft) throw new Error("broadcast insert failed");
+    const [scheduled] = await db
+      .insert(schema.broadcasts)
+      .values({
+        teamId,
+        name: "November",
+        from: "Example <hello@example.com>",
+        subject: "Scheduled",
+        status: "scheduled",
+        ...body,
+      })
+      .returning({ id: schema.broadcasts.id });
+    if (!sent || !draft || !scheduled) throw new Error("broadcast insert failed");
 
     const grant = await start();
     const v = viewer(grant);
@@ -507,11 +530,25 @@ describe("what a view can and cannot see", () => {
       text: null,
       hiddenBySupportView: true,
     });
-    // A draft was never mail to anyone: support still answers "why does this render wrong".
-    expect(await v.broadcasts.get({ id: draft.id })).toMatchObject({
-      html: body.html,
-      hiddenBySupportView: false,
-    });
+    // Nothing has left yet for either of these, and checking a broadcast
+    // before it goes is what support is asked for.
+    for (const id of [draft.id, scheduled.id]) {
+      expect(await v.broadcasts.get({ id })).toMatchObject({
+        html: body.html,
+        hiddenBySupportView: false,
+      });
+    }
+    // Sending and canceled count as reached: a cancel can land mid-fan-out.
+    for (const status of ["sending", "canceled"] as const) {
+      await db
+        .update(schema.broadcasts)
+        .set({ status })
+        .where(eq(schema.broadcasts.id, scheduled.id));
+      expect(await v.broadcasts.get({ id: scheduled.id })).toMatchObject({
+        html: null,
+        hiddenBySupportView: true,
+      });
+    }
     // The owner sees both, as before.
     expect((await owner().broadcasts.get({ id: sent.id })).html).toBe(body.html);
   });
@@ -669,7 +706,7 @@ describe("through the tRPC route (cookie to context)", () => {
     h.session = { user: user(OPERATOR) };
     const started = await mutate("console.teams.startSupportView", {
       id: teamId,
-      reason: "abuse_report_check",
+      reason: "other",
     });
     expect(started.status).toBe(200);
     const grantId = started.data.grantId as string;

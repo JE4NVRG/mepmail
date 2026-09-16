@@ -1,5 +1,5 @@
 CREATE TYPE "public"."support_view_ended_by" AS ENUM('operator', 'owner', 'expiry');--> statement-breakpoint
-CREATE TYPE "public"."support_view_reason" AS ENUM('support_ticket', 'abuse_report_check', 'billing_dispute', 'other');--> statement-breakpoint
+CREATE TYPE "public"."support_view_reason" AS ENUM('support_ticket', 'billing_dispute', 'other');--> statement-breakpoint
 CREATE TABLE "support_view_grants" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"team_id" uuid NOT NULL,
