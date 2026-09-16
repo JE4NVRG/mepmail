@@ -38,6 +38,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       banner={
         view ? (
           <SupportViewBanner
+            grantId={view.grantId}
             teamId={view.teamId}
             teamName={view.teamName}
             expiresAt={view.expiresAt}

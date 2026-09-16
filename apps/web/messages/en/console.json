@@ -416,8 +416,7 @@
       "reinstated": "{team} reinstated",
       "limits": "Limits saved for {team}",
       "plan": "{team} · {from} → {to}",
-      "error": "The action failed: {message}",
-      "viewStarted": "Support view of {team} started · read-only · 30 min"
+      "error": "The action failed: {message}"
     },
     "detail": {
       "lead": "Everything the console knows about the team. Bodies are not here.",

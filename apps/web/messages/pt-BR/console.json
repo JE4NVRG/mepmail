@@ -416,8 +416,7 @@
       "reinstated": "{team} reativada",
       "limits": "Limites salvos para {team}",
       "plan": "{team} · {from} → {to}",
-      "error": "A ação falhou: {message}",
-      "viewStarted": "Modo de suporte de {team} iniciado · somente leitura · 30 min"
+      "error": "A ação falhou: {message}"
     },
     "detail": {
       "lead": "Tudo o que o console sabe sobre a equipe. Corpos de e-mail não estão aqui.",

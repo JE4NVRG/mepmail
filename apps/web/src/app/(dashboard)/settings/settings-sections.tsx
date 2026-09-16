@@ -25,6 +25,7 @@ import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { removeTeamLogo, uploadTeamLogo } from "@/lib/team-logo-api";
 import { useTRPC } from "@/lib/trpc";
 import { useCountdown } from "@/lib/use-countdown";
+import { useTeamRole } from "@/lib/use-team-role";
 import { ListFooter } from "../emails/list-parts";
 
 function SectionCard({
@@ -748,8 +749,7 @@ function SupportAccessSection() {
   const locale = useLocale();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { data: teamList } = useQuery(trpc.team.list.queryOptions());
-  const role = teamList?.teams.find((m) => m.teamId === teamList.activeTeamId)?.role;
+  const role = useTeamRole();
   const canManage = role === "owner" || role === "admin";
   const current = useQuery(
     trpc.team.supportView.current.queryOptions(undefined, {

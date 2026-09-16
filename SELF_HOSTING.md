@@ -835,6 +835,9 @@ variable and both procedures refuse. Reading other people's messages is
 lawful only as a narrow, recorded, disclosed security measure: say so in the
 instance's terms and privacy notice before turning it on.
 
+</details>
+
+<details>
 <summary><b>Support view (optional)</b></summary>
 
 Off by default. With `SUPPORT_VIEW=on`, the console's Teams list gains

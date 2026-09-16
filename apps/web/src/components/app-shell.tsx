@@ -56,10 +56,7 @@ export function AppShell({
   }, [drawerOpen]);
 
   return (
-    <div
-      style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
-      {...(banner ? { "data-support-view": "" } : {})}
-    >
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       {banner}
       <div className="ms-app-shell" style={{ display: "flex", flex: 1 }}>
         <header className="ms-mobile-topbar">

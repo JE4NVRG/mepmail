@@ -98,6 +98,7 @@ afterAll(() => close());
 beforeEach(() => {
   vi.stubEnv("SUPPORT_VIEW", "on");
   vi.stubEnv("APP_BASE_URL", APP);
+  vi.stubEnv("AUTH_EMAIL_FROM", "MillionSend <hello@example.com>");
   h.session = null;
   h.cookies.clear();
   h.cookieSets = [];
@@ -262,6 +263,17 @@ describe("console.teams.startSupportView", () => {
     });
     expect(await resolveSupportView(db, OPERATOR, first.id)).toBeNull();
     expect((await resolveSupportView(db, OPERATOR, second.id))?.grantId).toBe(second.id);
+  });
+
+  it("leaves notified_at null when the instance has no sender configured", async () => {
+    vi.stubEnv("AUTH_EMAIL_FROM", "");
+    vi.stubEnv("NOTIFICATIONS_EMAIL_FROM", "");
+    const result = await operator().console.teams.startSupportView({
+      id: teamId,
+      reason: "other",
+    });
+    expect((await grantRow(result.grantId)).notifiedAt).toBeNull();
+    expect(h.sent).toEqual([]);
   });
 
   it("leaves notified_at null when the team has no owner to write to", async () => {
@@ -460,6 +472,57 @@ describe("what a view can and cannot see", () => {
     expect(viewed).not.toHaveProperty("bodyCiphertext");
   });
 
+  it("hides a sent broadcast's body but leaves a draft readable", async () => {
+    const body = { html: "<p>the newsletter</p>", text: "the newsletter" };
+    const [sent] = await db
+      .insert(schema.broadcasts)
+      .values({
+        teamId,
+        name: "September",
+        from: "Example <hello@example.com>",
+        subject: "Hello",
+        status: "sent",
+        ...body,
+      })
+      .returning({ id: schema.broadcasts.id });
+    const [draft] = await db
+      .insert(schema.broadcasts)
+      .values({
+        teamId,
+        name: "October",
+        from: "Example <hello@example.com>",
+        subject: "Draft",
+        status: "draft",
+        ...body,
+      })
+      .returning({ id: schema.broadcasts.id });
+    if (!sent || !draft) throw new Error("broadcast insert failed");
+
+    const grant = await start();
+    const v = viewer(grant);
+    const viewedSent = await v.broadcasts.get({ id: sent.id });
+    expect(viewedSent).toMatchObject({
+      subject: "Hello",
+      html: null,
+      text: null,
+      hiddenBySupportView: true,
+    });
+    // A draft was never mail to anyone: support still answers "why does this render wrong".
+    expect(await v.broadcasts.get({ id: draft.id })).toMatchObject({
+      html: body.html,
+      hiddenBySupportView: false,
+    });
+    // The owner sees both, as before.
+    expect((await owner().broadcasts.get({ id: sent.id })).html).toBe(body.html);
+  });
+
+  it("lets a support view read the team's own audit trail, and never a member", async () => {
+    const grant = await start();
+    const trail = await viewer(grant).audit.list({});
+    expect(trail.items.some((r) => r.action === "support.view_started")).toBe(true);
+    await expect(member().audit.list({})).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("withholds API log bodies", async () => {
     const [log] = await db
       .insert(schema.apiRequests)
@@ -540,8 +603,8 @@ describe("the owner's side", () => {
         expiresAt: grant.expiresAt,
       },
     });
-    // Members see that a view is live; only owners and admins end it.
-    expect((await member().team.supportView.current()).live?.id).toBe(grant.id);
+    // The card is owner/admin only, and so is the read behind it.
+    await expect(member().team.supportView.current()).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(member().team.supportView.end()).rejects.toMatchObject({ code: "FORBIDDEN" });
 
     expect(await owner().team.supportView.end()).toEqual({ ended: true });
