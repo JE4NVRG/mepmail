@@ -257,6 +257,7 @@ export {
   effectivePlan,
   formatVolume,
   isPlanRungKey,
+  type LadderPlan,
   monthlyCapacity,
   OVERAGE_HARD_CAP,
   PAID_RUNGS,

@@ -1,4 +1,5 @@
 export {
+  AWS_REGION_DEFAULT,
   accountEmailFrom,
   accountMailDeliverable,
   assertEnvConsistency,
