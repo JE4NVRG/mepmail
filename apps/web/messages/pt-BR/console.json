@@ -182,7 +182,7 @@
       "title": "Monitoramento",
       "subtitle": "Conteúdo amostrado julgado pelo modelo · clique para o histórico por hora",
       "off": "O monitoramento está desligado",
-      "offLead": "O juiz é definido no ambiente da instância (lido pelo worker e pelo app): ABUSE_JUDGE nomeia o provedor, ABUSE_JUDGE_MODEL o modelo. As verificações determinísticas de conteúdo rodam de qualquer forma.",
+      "offLead": "O juiz é definido no ambiente da instância (lido pelo worker e pelo app): ABUSE_JUDGE=typesafe e ABUSE_JUDGE_API_KEY ligam. As verificações determinísticas de conteúdo rodam de qualquer forma.",
       "offDocs": "Guia de monitoramento de conteúdo",
       "judge": "Juiz",
       "sampledToday": "Amostrados hoje",
@@ -716,7 +716,7 @@
         "region": "Região",
         "baseUrl": "Endpoint",
         "off": "O monitoramento está desligado: nenhuma mensagem é amostrada, nenhum job roda, nada é armazenado. As verificações determinísticas de conteúdo rodam em todo envio de qualquer forma.",
-        "offLead": "O juiz é definido no ambiente da instância, não aqui; o worker e o app leem as mesmas linhas. Estas ligam o padrão da nuvem (Nova Lite no Bedrock, com a cadeia de credenciais do SES):",
+        "offLead": "O juiz é definido no ambiente da instância, não aqui; o worker e o app leem as mesmas linhas. Estas ligam (TypeSafe Jev):",
         "change": "Para mudar o provedor ou o modelo, edite o ambiente da instância e reinicie o worker e o app.",
         "docs": "Guia de monitoramento de conteúdo"
       },

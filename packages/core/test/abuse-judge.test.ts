@@ -2,81 +2,72 @@ import { describe, expect, it } from "vitest";
 import {
   buildJudgeBlock,
   JUDGE_TEXT_MAX_CHARS,
-  judgeUserMessage,
   stripHiddenElements,
 } from "../src/abuse-judge/block.js";
-import { ABUSE_JUDGE_RUBRIC } from "../src/abuse-judge/rubric.js";
-import { JudgeError, judgeErrorClass, parseJudgeOutput } from "../src/abuse-judge/types.js";
+import {
+  ABUSE_JUDGE_POLICY,
+  ABUSE_JUDGE_QUESTIONS,
+  composeJudgeVerdict,
+  JUDGE_IMPERSONATION_NOUL,
+  judgeState,
+} from "../src/abuse-judge/questions.js";
+import { JudgeError, judgeErrorClass } from "../src/abuse-judge/types.js";
 
-describe("parseJudgeOutput", () => {
-  it("reads a fenced answer and one with prose after the object", () => {
+describe("composeJudgeVerdict", () => {
+  it("scores is_abuse and ORs high impersonation so a brand clone still flags", () => {
     expect(
-      parseJudgeOutput(
-        '```json\n{"score": 88, "verdict": "abuse", "categories": ["phishing"], "impersonated_brand": "Example Bank", "reasons": ["lookalike_domain", "credential_ask"], "language": "pt-BR"}\n```',
-      ),
+      composeJudgeVerdict({
+        is_abuse: { type: "noul", noul: 0.88 },
+        impersonation: { type: "noul", noul: 0.2 },
+        category: { type: "choice", choice: "phishing_credentials" },
+        language: { type: "choice", choice: "pt-BR" },
+      }),
     ).toEqual({
       score: 88,
       verdict: "abuse",
-      categories: ["phishing"],
-      impersonatedBrand: "Example Bank",
-      reasons: ["lookalike_domain", "credential_ask"],
+      categories: ["phishing_credentials"],
+      impersonatedBrand: null,
+      reasons: [],
       language: "pt-BR",
     });
     expect(
-      parseJudgeOutput(
-        'Sure: {"score": 12, "verdict": "clean", "reasons": ["own_domain"]} — done.',
-      ),
-    ).toMatchObject({ score: 12, verdict: "clean", reasons: ["own_domain"], categories: [] });
-  });
-
-  it("clamps the score, derives a missing verdict from the band, and drops junk", () => {
-    expect(parseJudgeOutput('{"score": 140, "reasons": [1, "x", ""]}')).toMatchObject({
-      score: 100,
+      composeJudgeVerdict({
+        is_abuse: { type: "noul", noul: 0.49 },
+        impersonation: { type: "noul", noul: 0.89 },
+        off_domain_lure: { type: "noul", noul: 0.8 },
+        category: { type: "choice", choice: "brand_impersonation" },
+      }),
+    ).toMatchObject({
+      score: Math.round(JUDGE_IMPERSONATION_NOUL * 100),
       verdict: "abuse",
-      reasons: ["x"],
-      impersonatedBrand: null,
-      language: "other",
-    });
-    expect(parseJudgeOutput('{"score": "64.4"}').verdict).toBe("clean");
-    expect(parseJudgeOutput('{"score": -3, "impersonated_brand": "  "}')).toMatchObject({
-      score: 0,
-      impersonatedBrand: null,
+      categories: ["brand_impersonation"],
+      reasons: ["impersonation", "off_domain_lure"],
     });
   });
 
-  it("normalises reasons and categories to a few short codes", () => {
-    const out = parseJudgeOutput(
-      '{"score": 70, "reasons": ["Reply-To domain mismatch", "credential_ask", "credential_ask", "Pague a taxa de R$ 4,90 em ate 24 horas para liberar a entrega da encomenda", "a", "b", "c", "d"], "categories": ["Brand impersonation"], "impersonated_brand": "  Example   Bank  "}',
-    );
-    expect(out.reasons).toEqual([
-      "reply_to_domain_mismatch",
-      "credential_ask",
-      "pague_a_taxa_de_r_4_90_em_ate_24_horas_p",
-      "a",
-      "b",
-    ]);
-    expect(out.categories).toEqual(["brand_impersonation"]);
-    expect(out.impersonatedBrand).toBe("Example Bank");
+  it("stays clean when both nouls are low, and drops a clean category", () => {
+    expect(
+      composeJudgeVerdict({
+        is_abuse: { type: "noul", noul: 0.03 },
+        impersonation: { type: "noul", noul: 0.05 },
+        category: { type: "choice", choice: "clean" },
+        language: { type: "choice", choice: "en" },
+      }),
+    ).toEqual({
+      score: 3,
+      verdict: "clean",
+      categories: [],
+      impersonatedBrand: null,
+      reasons: [],
+      language: "en",
+    });
   });
 
-  it("skips a non-JSON brace pair and takes the next object that parses", () => {
-    expect(parseJudgeOutput('Note {not json} then {"score": 33}').score).toBe(33);
-  });
-
-  it("is a parse error without an object or a numeric score", () => {
-    for (const text of [
-      "no json here",
-      '{"verdict": "abuse"}',
-      '{"score": "high"}',
-      "{ broken",
-      '{"score": null}',
-      '{"score": ""}',
-      '{"score": true}',
-      '{"score": []}',
-    ]) {
+  it("is a parse error without an answers object or is_abuse noul", () => {
+    for (const answers of [null, [], "x", {}, { is_abuse: { type: "noul" } }]) {
       let error: unknown;
       try {
-        parseJudgeOutput(text);
+        composeJudgeVerdict(answers);
       } catch (err) {
         error = err;
       }
@@ -147,9 +138,7 @@ describe("buildJudgeBlock", () => {
       "Hidden characters count: 20",
     ]);
     expect(block).not.toContain("reviewer");
-    expect(judgeUserMessage(block)).toMatch(
-      /^Judge the email below[\s\S]*<<<EMAIL\n[\s\S]*\nEMAIL>>>$/,
-    );
+    expect(judgeState(block)).toEqual({ policy: ABUSE_JUDGE_POLICY, email: block });
   });
 
   it("falls back to the text part, decodes entities, strips invisible characters and truncates", () => {
@@ -187,13 +176,10 @@ describe("buildJudgeBlock", () => {
     expect(block.split("\n").filter((l) => l.startsWith("  L")).length).toBe(30);
   });
 
-  it("ships the rubric verbatim with its output contract", () => {
-    expect(
-      ABUSE_JUDGE_RUBRIC.startsWith("You are the outbound abuse judge for an email platform"),
-    ).toBe(true);
-    expect(ABUSE_JUDGE_RUBRIC).toContain('verdict "abuse" from 65');
-    expect(ABUSE_JUDGE_RUBRIC.trim().endsWith('"language": "pt-BR"|"en"|"es"|"other"}.')).toBe(
-      true,
-    );
+  it("ships the policy and typed questions the adapter posts", () => {
+    expect(ABUSE_JUDGE_POLICY).toContain("verified the listed domains");
+    expect(ABUSE_JUDGE_QUESTIONS.is_abuse.type).toBe("noul");
+    expect(ABUSE_JUDGE_QUESTIONS.impersonation.type).toBe("noul");
+    expect(ABUSE_JUDGE_QUESTIONS.category.type).toBe("choice");
   });
 });

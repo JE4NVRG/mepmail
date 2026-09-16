@@ -154,9 +154,7 @@ export function MonitorSettingsView() {
         </p>
         {judge.on ? null : (
           <pre className="ms-mono" style={{ margin: "10px 0 0", fontSize: 12 }}>
-            {
-              "ABUSE_JUDGE=bedrock\nABUSE_JUDGE_MODEL=amazon.nova-lite-v1:0\nABUSE_JUDGE_REGION=us-east-1"
-            }
+            {"ABUSE_JUDGE=typesafe\nABUSE_JUDGE_API_KEY=...\nABUSE_JUDGE_MODEL=jev-latest"}
           </pre>
         )}
       </div>

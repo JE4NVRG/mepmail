@@ -1,305 +1,112 @@
-import type { ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
-import { ABUSE_JUDGE_RUBRIC, JudgeError } from "@millionsend/core";
-import { describe, expect, it } from "vitest";
-import { createAnthropicJudge } from "../src/abuse-judge/anthropic.js";
-import { type BedrockConverseClient, createBedrockJudge } from "../src/abuse-judge/bedrock.js";
+import { ABUSE_JUDGE_POLICY, ABUSE_JUDGE_QUESTIONS, JudgeError } from "@millionsend/core";
+import { expect, it } from "vitest";
 import { createAbuseJudge } from "../src/abuse-judge/index.js";
-import { createOpenAiJudge } from "../src/abuse-judge/openai.js";
+import { createTypesafeJudge } from "../src/abuse-judge/typesafe.js";
 
-const BLOCK = "Team name: Acme\nSubject: hi";
-const signal = new AbortController().signal;
+const answers = {
+  is_abuse: { type: "noul", noul: 0.88 },
+  impersonation: { type: "noul", noul: 0.91 },
+  category: { type: "choice", choice: "brand_impersonation" },
+  language: { type: "choice", choice: "en" },
+};
 
-async function errorClass(p: Promise<unknown>): Promise<string> {
-  try {
-    await p;
-    return "none";
-  } catch (err) {
-    return err instanceof JudgeError ? err.class : `other:${String(err)}`;
-  }
-}
-
-function fetchStub(
-  handler: (body: Record<string, unknown>, attempt: number) => { status: number; body: unknown },
-) {
-  const calls: Record<string, unknown>[] = [];
-  const fetch = async (_url: string, init: RequestInit) => {
-    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
-    calls.push(body);
-    const res = handler(body, calls.length);
-    return new Response(JSON.stringify(res.body), {
-      status: res.status,
-      headers: { "content-type": "application/json" },
-    });
-  };
-  return { fetch, calls };
-}
-
-describe("OpenAI-compatible adapter", () => {
-  const ok = (text: string) => ({
-    status: 200,
-    body: { choices: [{ message: { content: text } }] },
-  });
-
-  it("sends the rubric and the fenced block, and reads a fenced answer", async () => {
-    const { fetch, calls } = fetchStub(() => ok('```json\n{"score": 90, "verdict": "abuse"}\n```'));
-    const judge = createOpenAiJudge({
-      model: "m",
-      baseUrl: "https://llm.example.com/v1/",
-      apiKey: "k",
-      fetch,
-    });
-    expect(await judge.judge(BLOCK, { signal })).toMatchObject({ score: 90, verdict: "abuse" });
-    expect(calls[0]).toMatchObject({
-      model: "m",
-      temperature: 0,
-      max_tokens: 300,
-      response_format: { type: "json_object" },
-    });
-    const messages = calls[0]?.messages as { role: string; content: string }[];
-    expect(messages[0]).toEqual({ role: "system", content: ABUSE_JUDGE_RUBRIC });
-    expect(messages[1]?.content).toContain("<<<EMAIL\nTeam name: Acme");
-  });
-
-  it("retries once without a parameter the model rejects, and swaps max_tokens", async () => {
-    const { fetch, calls } = fetchStub((body) => {
-      if ("temperature" in body) {
-        return {
-          status: 400,
-          body: {
-            error: {
-              message: "Unsupported parameter: 'temperature' is not supported with this model.",
-              param: "temperature",
-            },
-          },
-        };
-      }
-      if ("max_tokens" in body) {
-        return {
-          status: 400,
-          body: {
-            error: {
-              message: "Unsupported parameter: 'max_tokens'. Use 'max_completion_tokens' instead.",
-            },
-          },
-        };
-      }
-      return ok('{"score": 5}');
-    });
-    const judge = createOpenAiJudge({
-      model: "custom-chat-model",
-      baseUrl: "https://api.openai.com/v1",
-      apiKey: "k",
-      fetch,
-    });
-    expect((await judge.judge(BLOCK, { signal })).score).toBe(5);
-    expect(calls).toHaveLength(3);
-    expect(calls[2]).not.toHaveProperty("temperature");
-    expect(calls[2]).toMatchObject({ max_completion_tokens: 300 });
-  });
-
-  it("sends a gpt-5 model the probe's shape and remembers a rejected parameter", async () => {
-    const { fetch, calls } = fetchStub((body) =>
-      "reasoning_effort" in body
-        ? {
-            status: 400,
-            body: { error: { param: "reasoning_effort", message: "Unknown parameter" } },
-          }
-        : ok('{"score": 1}'),
-    );
-    const judge = createOpenAiJudge({
-      model: "gpt-5-nano",
-      baseUrl: "https://x.example",
-      apiKey: "k",
-      fetch,
-    });
-    expect((await judge.judge(BLOCK, { signal })).score).toBe(1);
-    expect(calls[0]).toMatchObject({ reasoning_effort: "minimal", max_completion_tokens: 600 });
-    expect(calls[0]).not.toHaveProperty("temperature");
-    expect(calls).toHaveLength(2);
-    // The next call skips the round trip the first one paid for.
-    expect((await judge.judge(BLOCK, { signal })).score).toBe(1);
-    expect(calls).toHaveLength(3);
-    expect(calls[2]).not.toHaveProperty("reasoning_effort");
-  });
-
-  it("maps statuses to classes and a bad body to a parse error", async () => {
-    const judge = (status: number, body: unknown = {}) =>
-      createOpenAiJudge({
-        model: "m",
-        baseUrl: "https://x.example",
-        apiKey: "k",
-        fetch: fetchStub(() => ({ status, body })).fetch,
+it("posts state and typed questions, then composes the verdict", async () => {
+  let posted: { url: string; body: Record<string, unknown>; auth: string | null } | undefined;
+  const judge = createTypesafeJudge({
+    model: "jev-latest",
+    baseUrl: "https://api.typesafe.ai",
+    apiKey: "k",
+    fetch: async (url, init) => {
+      posted = {
+        url,
+        body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+        auth: new Headers(init?.headers).get("authorization"),
+      };
+      return new Response(JSON.stringify({ model: "jev-1.13.0", answers }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
       });
-    expect(await errorClass(judge(429).judge(BLOCK, { signal }))).toBe("throttled");
-    expect(await errorClass(judge(401).judge(BLOCK, { signal }))).toBe("no_credentials");
-    expect(await errorClass(judge(403).judge(BLOCK, { signal }))).toBe("no_credentials");
-    expect(await errorClass(judge(500).judge(BLOCK, { signal }))).toBe("upstream");
-    expect(
-      await errorClass(judge(400, { error: { message: "bad" } }).judge(BLOCK, { signal })),
-    ).toBe("upstream");
-    expect(
-      await errorClass(
-        judge(200, { choices: [{ message: { content: "no json" } }] }).judge(BLOCK, { signal }),
-      ),
-    ).toBe("parse_error");
-    const noKey = createOpenAiJudge({
-      model: "m",
-      baseUrl: "https://x.example",
-      apiKey: undefined,
-    });
-    expect(await errorClass(noKey.judge(BLOCK, { signal }))).toBe("no_credentials");
+    },
   });
-
-  it("classes a network failure as upstream and an abort as a timeout", async () => {
-    const down = createOpenAiJudge({
-      model: "m",
-      baseUrl: "https://x.example",
-      apiKey: "k",
-      fetch: async () => {
-        throw new TypeError("fetch failed");
-      },
-    });
-    expect(await errorClass(down.judge(BLOCK, { signal }))).toBe("upstream");
-    const slow = createOpenAiJudge({
-      model: "m",
-      baseUrl: "https://x.example",
-      apiKey: "k",
-      fetch: async (_u, init) =>
-        new Promise((_, reject) =>
-          init.signal?.addEventListener("abort", () => reject(init.signal?.reason)),
-        ),
-    });
-    expect(await errorClass(slow.judge(BLOCK, { signal: AbortSignal.timeout(10) }))).toBe(
-      "timeout",
-    );
+  await expect(
+    judge.judge("Team name: Acme\nFrom: Bank <a@x.example>", {
+      signal: new AbortController().signal,
+    }),
+  ).resolves.toMatchObject({
+    score: 88,
+    verdict: "abuse",
+    categories: ["brand_impersonation"],
+    reasons: ["impersonation"],
+    language: "en",
+  });
+  expect(posted).toMatchObject({
+    url: "https://api.typesafe.ai/v1/systemone",
+    auth: "Bearer k",
+  });
+  expect(posted?.body).toMatchObject({
+    model: "jev-latest",
+    questions: ABUSE_JUDGE_QUESTIONS,
+    state: { policy: ABUSE_JUDGE_POLICY, email: "Team name: Acme\nFrom: Bank <a@x.example>" },
   });
 });
 
-describe("Anthropic adapter", () => {
-  it("posts a Messages request and joins the text blocks; 529 is a throttle", async () => {
-    const { fetch, calls } = fetchStub(() => ({
-      status: 200,
-      body: {
-        content: [
-          { type: "text", text: '{"score": 7' },
-          { type: "text", text: ', "verdict": "clean"}' },
-        ],
-      },
-    }));
-    const judge = createAnthropicJudge({ model: "claude", apiKey: "k", fetch });
-    expect(await judge.judge(BLOCK, { signal })).toMatchObject({ score: 7, verdict: "clean" });
-    expect(calls[0]).toMatchObject({
-      model: "claude",
-      system: ABUSE_JUDGE_RUBRIC,
-      max_tokens: 300,
-      temperature: 0,
-    });
-    const overloaded = createAnthropicJudge({
-      model: "claude",
+it("classes HTTP failures and a missing key", async () => {
+  const judge = (status: number) =>
+    createTypesafeJudge({
+      model: "jev-latest",
+      baseUrl: "https://api.typesafe.ai/",
       apiKey: "k",
-      fetch: fetchStub(() => ({ status: 529, body: {} })).fetch,
+      fetch: async () => new Response("nope", { status }),
     });
-    expect(await errorClass(overloaded.judge(BLOCK, { signal }))).toBe("throttled");
+  await expect(
+    judge(401).judge("x", { signal: new AbortController().signal }),
+  ).rejects.toMatchObject({ class: "no_credentials" });
+  await expect(
+    judge(429).judge("x", { signal: new AbortController().signal }),
+  ).rejects.toMatchObject({ class: "throttled" });
+  await expect(
+    judge(529).judge("x", { signal: new AbortController().signal }),
+  ).rejects.toMatchObject({ class: "throttled" });
+  await expect(
+    judge(500).judge("x", { signal: new AbortController().signal }),
+  ).rejects.toMatchObject({ class: "upstream" });
+  const noKey = createTypesafeJudge({
+    model: "jev-latest",
+    baseUrl: "https://api.typesafe.ai",
+    apiKey: undefined,
+    fetch: async () => {
+      throw new Error("should not fetch");
+    },
   });
+  await expect(noKey.judge("x", { signal: new AbortController().signal })).rejects.toBeInstanceOf(
+    JudgeError,
+  );
+});
 
-  it("drops temperature when the model rejects it and remembers", async () => {
-    const { fetch, calls } = fetchStub((body) =>
-      "temperature" in body
-        ? {
-            status: 400,
-            body: {
-              type: "error",
-              error: {
-                type: "invalid_request_error",
-                message: "temperature is not supported by this model",
-              },
-            },
-          }
-        : { status: 200, body: { content: [{ type: "text", text: '{"score": 9}' }] } },
-    );
-    const judge = createAnthropicJudge({ model: "claude-opus-5", apiKey: "k", fetch });
-    expect((await judge.judge(BLOCK, { signal })).score).toBe(9);
-    expect(calls).toHaveLength(2);
-    expect(calls[1]).not.toHaveProperty("temperature");
-    await judge.judge(BLOCK, { signal });
-    expect(calls).toHaveLength(3);
-    expect(calls[2]).not.toHaveProperty("temperature");
+it("is a parse error when the body has no is_abuse noul", async () => {
+  const judge = createTypesafeJudge({
+    model: "jev-latest",
+    baseUrl: "https://api.typesafe.ai",
+    apiKey: "k",
+    fetch: async () =>
+      new Response(JSON.stringify({ answers: { impersonation: { type: "noul", noul: 0.9 } } }), {
+        status: 200,
+      }),
+  });
+  await expect(judge.judge("x", { signal: new AbortController().signal })).rejects.toMatchObject({
+    class: "parse_error",
   });
 });
 
-describe("Bedrock adapter", () => {
-  function client(
-    answer: () => Promise<{ output?: { message?: { content?: { text?: string }[] } } }>,
-  ) {
-    const commands: ConverseCommand[] = [];
-    const fake: BedrockConverseClient = {
-      send: async (command) => {
-        commands.push(command);
-        return answer();
-      },
-    };
-    return { fake, commands };
-  }
-
-  it("converses with the rubric as the system turn at temperature zero", async () => {
-    const { fake, commands } = client(async () => ({
-      output: { message: { content: [{ text: '{"score": 42}' }] } },
-    }));
-    const judge = createBedrockJudge({
-      model: "amazon.nova-lite-v1:0",
-      region: "us-east-1",
-      client: fake,
-    });
-    expect((await judge.judge(BLOCK, { signal })).score).toBe(42);
-    expect(commands[0]?.input).toMatchObject({
-      modelId: "amazon.nova-lite-v1:0",
-      system: [{ text: ABUSE_JUDGE_RUBRIC }],
-      inferenceConfig: { temperature: 0, maxTokens: 300 },
-    });
-  });
-
-  it("maps the SDK's error names", async () => {
-    const failing = (name: string) =>
-      createBedrockJudge({
-        model: "m",
-        region: "r",
-        client: client(async () => {
-          throw Object.assign(new Error(name), { name });
-        }).fake,
-      });
-    expect(await errorClass(failing("ThrottlingException").judge(BLOCK, { signal }))).toBe(
-      "throttled",
-    );
-    expect(await errorClass(failing("AccessDeniedException").judge(BLOCK, { signal }))).toBe(
-      "no_credentials",
-    );
-    expect(await errorClass(failing("UnrecognizedClientException").judge(BLOCK, { signal }))).toBe(
-      "no_credentials",
-    );
-    expect(await errorClass(failing("ValidationException").judge(BLOCK, { signal }))).toBe(
-      "upstream",
-    );
-    expect(await errorClass(failing("AbortError").judge(BLOCK, { signal }))).toBe("timeout");
-  });
-});
-
-describe("createAbuseJudge", () => {
-  it("is null when off and picks the provider otherwise", () => {
-    expect(createAbuseJudge(null)).toBeNull();
-    const base = {
-      region: "us-east-1",
-      baseUrl: "https://api.openai.com/v1",
+it("createAbuseJudge is null when off and TypeSafe when on", () => {
+  expect(createAbuseJudge(null)).toBeNull();
+  expect(
+    createAbuseJudge({
+      provider: "typesafe",
+      model: "jev-latest",
+      baseUrl: "https://api.typesafe.ai",
       apiKey: "k",
-      timeoutMs: 1000,
-    };
-    expect(
-      createAbuseJudge({ ...base, provider: "bedrock", model: "amazon.nova-lite-v1:0" }),
-    ).toMatchObject({ provider: "bedrock", model: "amazon.nova-lite-v1:0" });
-    expect(createAbuseJudge({ ...base, provider: "openai", model: "gpt" })).toMatchObject({
-      provider: "openai",
-    });
-    expect(createAbuseJudge({ ...base, provider: "anthropic", model: "claude" })).toMatchObject({
-      provider: "anthropic",
-    });
-  });
+      timeoutMs: 20_000,
+    }),
+  ).toMatchObject({ provider: "typesafe", model: "jev-latest" });
 });
