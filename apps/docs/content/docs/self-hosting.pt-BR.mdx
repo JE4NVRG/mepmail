@@ -889,7 +889,8 @@ HTML), cortado em 20.000 caracteres e ocultado na saída: todo link é
 reduzido ao esquema, ao domínio registrável e a no máximo 24 caracteres de
 caminho, de modo que um link de uso único não possa ser seguido; qualquer
 coisa com forma de credencial (um JWT, 32 ou mais caracteres hexadecimais,
-40 ou mais de base64) é mascarada, assim como uma sequência de 4 a 8 dígitos
+40 ou mais de base64, uma das chaves de API `ms_` da própria instância) é
+mascarada, assim como uma sequência de 4 a 8 dígitos
 a até 40 caracteres de uma palavra como *código*, *code*, *OTP*, *PIN*,
 *token*, *senha*, *password* ou *verification*. Nunca o HTML bruto, os
 endereços dos destinatários, os cabeçalhos, os anexos ou os destinos de
