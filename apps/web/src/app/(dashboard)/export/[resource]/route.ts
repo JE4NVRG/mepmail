@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getAuth } from "@/server/auth";
 import { buildExport } from "@/server/exports";
 import { ACTIVE_TEAM_COOKIE, getActiveMembership } from "@/server/membership";
+import { resolveSupportView, SUPPORT_VIEW_COOKIE } from "@/server/support-view";
 
 /**
  * CSV export for the dashboard list surfaces. Authenticated by the Better Auth
@@ -17,6 +18,10 @@ export async function GET(request: Request, ctx: { params: Promise<{ resource: s
 
   const db = getDb();
   const cookieStore = await cookies();
+  // A support view reads on screen only: no file ever leaves under it.
+  if (await resolveSupportView(db, session.user.id, cookieStore.get(SUPPORT_VIEW_COOKIE)?.value)) {
+    return new Response(null, { status: 403 });
+  }
   const membership = await getActiveMembership(
     db,
     session.user.id,

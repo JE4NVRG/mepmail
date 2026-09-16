@@ -1,9 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { env } from "@millionsend/config";
+import { env, supportViewEnabled } from "@millionsend/config";
 import {
   ALL_TEAMS_GRANT,
+  endSupportView,
   fetchBestOwnedPlan,
   fetchTeamStanding,
+  liveSupportViewForTeam,
   PLAN_TEAM_LIMIT,
 } from "@millionsend/core";
 import { schema } from "@millionsend/db";
@@ -14,7 +16,14 @@ import { isUniqueViolation } from "@/lib/db-errors";
 import { slugify } from "@/lib/slug";
 import { recordAudit } from "../audit";
 import { listMemberships } from "../membership";
-import { type AuthSession, type Context, protectedProcedure, router, teamProcedure } from "../trpc";
+import {
+  type AuthSession,
+  adminProcedure,
+  type Context,
+  protectedProcedure,
+  router,
+  teamProcedure,
+} from "../trpc";
 
 /**
  * Records the active-team selection in both places that read it: the cookie
@@ -60,6 +69,35 @@ export const teamBootstrapRouter = router({
     return standing.suspended && standing.suspended.reason !== "manual"
       ? { ...standing, pendingReview, suspended: { ...standing.suspended, note: null } }
       : { ...standing, pendingReview };
+  }),
+
+  /** The operator's read-only look at the active team, for the owner's Support access card. */
+  supportView: router({
+    current: teamProcedure.query(async ({ ctx }) => {
+      const enabled = supportViewEnabled();
+      const live = enabled ? await liveSupportViewForTeam(ctx.db, ctx.teamId) : null;
+      return {
+        enabled,
+        live: live
+          ? {
+              id: live.id,
+              operator: live.operator,
+              reason: live.reason,
+              reference: live.reference,
+              startedAt: live.createdAt,
+              expiresAt: live.expiresAt,
+            }
+          : null,
+      };
+    }),
+
+    /** The owner (or an admin) ends the session; the grant records who did. */
+    end: adminProcedure.mutation(async ({ ctx }) => {
+      const live = await liveSupportViewForTeam(ctx.db, ctx.teamId);
+      if (!live) return { ended: false };
+      await endSupportView(ctx.db, live, { by: "owner", userId: ctx.session.user.id });
+      return { ended: true };
+    }),
   }),
 
   /**

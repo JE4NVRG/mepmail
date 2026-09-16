@@ -4,6 +4,8 @@ import { asc, eq } from "drizzle-orm";
 import { uploadsEnabled } from "./storage";
 
 export type TeamRole = (typeof schema.teamMemberRoleEnum.enumValues)[number];
+/** A membership role, or the operator's read-only support view of a team they are not a member of. */
+export type SessionRole = TeamRole | "viewer";
 export type TeamPlan = (typeof schema.planEnum.enumValues)[number];
 
 /**

@@ -1,12 +1,19 @@
-import { isCloudDeployment } from "@millionsend/config";
+import { isCloudDeployment, supportViewEnabled } from "@millionsend/config";
 import {
   accountMailPhrase,
   fetchAccountScore,
   fetchDeliverabilityHealth,
+  formatMailDateTime,
+  liveSupportViewForTeam,
+  type MailLocale,
   PLAN_RUNGS,
   type Plan,
   raisesQuota,
+  SUPPORT_VIEW_REASONS,
   SUSPENSION_REASONS,
+  type SupportViewReason,
+  startSupportView,
+  supportViewNeedsReference,
   teamQuota,
 } from "@millionsend/core";
 import { schema } from "@millionsend/db";
@@ -115,6 +122,21 @@ export function operatorRungs(): { plan: string; planQuota: number | null; key: 
     : rungs;
 }
 
+/** The clause the owner's notice gives for a support view: "at your request, support ticket #4812". */
+function supportViewReasonText(
+  locale: MailLocale,
+  reason: SupportViewReason,
+  reference: string | null,
+): string {
+  const kind = "support.view_started";
+  const needed = supportViewNeedsReference(reason);
+  const ref =
+    reference && !needed
+      ? accountMailPhrase({ locale, kind, key: "ref", values: { reference } })
+      : (reference ?? "");
+  return accountMailPhrase({ locale, kind, key: reason, values: { reference: ref } });
+}
+
 /** What a pause or suspension mail says in the reason slot: the phrase, then the operator's note. */
 function reasonText(
   locale: Parameters<typeof accountMailPhrase>[0]["locale"],
@@ -179,6 +201,7 @@ export const consoleTeamsRouter = router({
         total: count?.total ?? 0,
         nextOffset: rows.length > input.limit ? input.offset + input.limit : null,
         rungs: operatorRungs(),
+        supportViewEnabled: supportViewEnabled(),
       };
     }),
 
@@ -190,7 +213,8 @@ export const consoleTeamsRouter = router({
       .leftJoin(st, eq(st.teamId, t.id))
       .where(eq(t.id, input.id));
     if (!row) throw new TRPCError({ code: "NOT_FOUND" });
-    const [owners, health, score] = await Promise.all([
+    const viewEnabled = supportViewEnabled();
+    const [owners, health, score, view] = await Promise.all([
       ctx.db
         .select({ email: schema.user.email, name: schema.user.name, role: schema.teamMembers.role })
         .from(schema.teamMembers)
@@ -199,6 +223,7 @@ export const consoleTeamsRouter = router({
         .orderBy(asc(schema.teamMembers.createdAt)),
       fetchDeliverabilityHealth(ctx.db, input.id),
       fetchAccountScore(ctx.db, input.id),
+      viewEnabled ? liveSupportViewForTeam(ctx.db, input.id) : null,
     ]);
     return {
       ...row,
@@ -210,8 +235,69 @@ export const consoleTeamsRouter = router({
       sent7d: health.sent,
       cloud: isCloudDeployment(),
       rungs: operatorRungs(),
+      supportViewEnabled: viewEnabled,
+      supportView: view ? { operatorEmail: view.operator.email, expiresAt: view.expiresAt } : null,
     };
   }),
+
+  /**
+   * Opens the team's dashboard as its owner sees it, read-only, for 30
+   * minutes: a grant on the operator's own session (never a session for the
+   * owner), named by a cookie the context re-checks on every request. The
+   * owners are emailed at once and both audit trails carry the start.
+   */
+  startSupportView: operatorProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        reason: z.enum(SUPPORT_VIEW_REASONS),
+        reference: z.string().trim().max(200).optional(),
+        note: z.string().trim().max(1000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!supportViewEnabled()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "support_view_off" });
+      }
+      // No nesting: a view is left through its banner, not replaced from inside.
+      if (ctx.supportView) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "support_view_live" });
+      }
+      const team = await loadTeam(ctx.db, input.id);
+      const [own] = await ctx.db
+        .select({ id: schema.teamMembers.id })
+        .from(schema.teamMembers)
+        .where(
+          and(
+            eq(schema.teamMembers.teamId, team.id),
+            eq(schema.teamMembers.userId, ctx.operator.id),
+          ),
+        )
+        .limit(1);
+      if (own) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "own_team" });
+      const reference = input.reference || null;
+      if (supportViewNeedsReference(input.reason) && !reference) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "reference_required" });
+      }
+      const grant = await startSupportView(ctx.db, {
+        teamId: team.id,
+        operatorUserId: ctx.operator.id,
+        reason: input.reason,
+        reference,
+        note: input.note || null,
+      });
+      ctx.setSupportViewCookie?.({ id: grant.id, expiresAt: grant.expiresAt });
+      await mailTeamOwners(ctx.db, team, "support.view_started", "/settings", (locale) => ({
+        operator: `${ctx.operator.name} (${ctx.operator.email})`,
+        reason: supportViewReasonText(locale, input.reason, reference),
+        until: formatMailDateTime(locale, grant.expiresAt),
+      }));
+      await ctx.db
+        .update(schema.supportViewGrants)
+        .set({ notifiedAt: new Date() })
+        .where(eq(schema.supportViewGrants.id, grant.id));
+      return { grantId: grant.id, expiresAt: grant.expiresAt };
+    }),
 
   /** Write the plan directly; never for a team Stripe manages, and never touching Stripe. */
   changePlan: operatorProcedure

@@ -1,4 +1,4 @@
-import type { WebhookEnqueue } from "@millionsend/core";
+import { recordSupportViewRead, type WebhookEnqueue } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { getDb } from "@millionsend/db";
 import { initTRPC, TRPCError } from "@trpc/server";
@@ -6,8 +6,9 @@ import { cookies } from "next/headers";
 import superjson from "superjson";
 import { getAuth } from "./auth";
 import { isInstanceOperator } from "./instance-operator";
-import { ACTIVE_TEAM_COOKIE, getActiveMembership, type TeamRole } from "./membership";
+import { ACTIVE_TEAM_COOKIE, getActiveMembership, type SessionRole } from "./membership";
 import { enqueueEmailSend, enqueueWebhookDeliveries, getQueue } from "./queue";
+import { resolveSupportView, SUPPORT_VIEW_COOKIE } from "./support-view";
 
 export interface SessionUser {
   id: string;
@@ -26,13 +27,23 @@ export interface AuthSession {
   session?: { id: string; createdAt?: Date };
 }
 
+/** The read-only view a request runs under: the team is the grant's and the role is viewer. */
+export interface SupportViewContext {
+  grantId: string;
+  expiresAt: Date;
+}
+
 export interface Context {
   db: Db;
   session: AuthSession | null;
   teamId: string | null;
-  role: TeamRole | null;
+  role: SessionRole | null;
+  /** Set only while the session user's own live grant names the team; every mutation is refused. */
+  supportView?: SupportViewContext | undefined;
   /** Persists the team selection (ACTIVE_TEAM_COOKIE). Absent outside HTTP requests (tests). */
   setActiveTeamCookie?: (teamId: string) => void;
+  /** Names the live grant (SUPPORT_VIEW_COOKIE), or clears it with null. Absent in tests. */
+  setSupportViewCookie?: (grant: { id: string; expiresAt: Date } | null) => void;
   /**
    * Hands a scheduled broadcast to the fan-out queue (same optional seam as
    * the API's ApiDeps.enqueueBroadcastSend). Absent in tests; without it a
@@ -66,37 +77,81 @@ export async function createContext({ headers }: { headers: Headers }): Promise<
   const session = await getAuth().api.getSession({ headers });
   if (!session) return { db, session: null, teamId: null, role: null };
   const cookieStore = await cookies();
+  const secure = process.env.NODE_ENV === "production";
+  const shared = {
+    db,
+    session,
+    enqueueBroadcastSend,
+    enqueueEmailSend,
+    enqueueWebhookDeliveries,
+    setActiveTeamCookie: (teamId: string) =>
+      cookieStore.set(ACTIVE_TEAM_COOKIE, teamId, {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure,
+        maxAge: 60 * 60 * 24 * 365,
+      }),
+    setSupportViewCookie: (grant: { id: string; expiresAt: Date } | null) =>
+      grant
+        ? cookieStore.set(SUPPORT_VIEW_COOKIE, grant.id, {
+            httpOnly: true,
+            sameSite: "lax",
+            path: "/",
+            secure,
+            expires: grant.expiresAt,
+          })
+        : cookieStore.delete(SUPPORT_VIEW_COOKIE),
+  };
+  const viewCookie = cookieStore.get(SUPPORT_VIEW_COOKIE)?.value;
+  const view = await resolveSupportView(db, session.user.id, viewCookie);
+  if (view) {
+    return {
+      ...shared,
+      teamId: view.teamId,
+      role: "viewer",
+      supportView: { grantId: view.grantId, expiresAt: view.expiresAt },
+    };
+  }
+  // A cookie that no longer names a live grant of this user is dropped, so
+  // the browser stops sending it; the request falls back to the membership.
+  if (viewCookie) cookieStore.delete(SUPPORT_VIEW_COOKIE);
   const membership = await getActiveMembership(
     db,
     session.user.id,
     cookieStore.get(ACTIVE_TEAM_COOKIE)?.value,
   );
-  return {
-    db,
-    session,
-    teamId: membership?.teamId ?? null,
-    role: membership?.role ?? null,
-    enqueueBroadcastSend,
-    enqueueEmailSend,
-    enqueueWebhookDeliveries,
-    setActiveTeamCookie: (teamId) =>
-      cookieStore.set(ACTIVE_TEAM_COOKIE, teamId, {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24 * 365,
-      }),
-  };
+  return { ...shared, teamId: membership?.teamId ?? null, role: membership?.role ?? null };
 }
 
 const t = initTRPC.context<Context>().create({ transformer: superjson });
 
 export const router = t.router;
 export const createCallerFactory = t.createCallerFactory;
-export const publicProcedure = t.procedure;
 
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+/** The one mutation a support view may run: the operator ending it. */
+export const SUPPORT_VIEW_END_PATH = "support.end";
+
+/**
+ * Read-only support view, enforced once for every procedure: a mutation is
+ * refused whatever the router hides or disables, and each read is counted
+ * on the grant by procedure path. The console's own procedures pass
+ * untouched and uncounted: the operator is still the operator, and a
+ * console read is not a read of the team.
+ */
+const supportViewGuard = t.middleware(async ({ ctx, type, path, next }) => {
+  const view = ctx.supportView;
+  if (!view || path.startsWith("console.")) return next();
+  if (type === "mutation" && path !== SUPPORT_VIEW_END_PATH) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Read-only support view" });
+  }
+  if (type === "query") await recordSupportViewRead(ctx.db, view.grantId, path);
+  return next();
+});
+
+export const publicProcedure = t.procedure.use(supportViewGuard);
+
+export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
   if (!ctx.session) throw new TRPCError({ code: "UNAUTHORIZED" });
   return next({ ctx: { session: ctx.session } });
 });

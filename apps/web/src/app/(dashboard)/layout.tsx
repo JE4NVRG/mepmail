@@ -6,25 +6,44 @@ import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { DeliverabilityBanner } from "@/components/deliverability-banner";
 import { EventsHealthBanner } from "@/components/events-health-banner";
 import { RegionBreakerBanner } from "@/components/region-breaker-banner";
+import { SupportViewBanner } from "@/components/support-view-banner";
 import { TeamStandingBanner } from "@/components/team-standing-banner";
 import { getAuth } from "@/server/auth";
 import { ACTIVE_TEAM_COOKIE, getActiveMembership } from "@/server/membership";
+import { resolveSupportView, SUPPORT_VIEW_COOKIE } from "@/server/support-view";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
-  const membership = await getActiveMembership(
-    getDb(),
+  const db = getDb();
+  const cookieStore = await cookies();
+  // A live support view stands in for the membership: the shell shows the
+  // viewed team under the banner, and the tRPC context resolves the same way.
+  const view = await resolveSupportView(
+    db,
     session.user.id,
-    (await cookies()).get(ACTIVE_TEAM_COOKIE)?.value,
+    cookieStore.get(SUPPORT_VIEW_COOKIE)?.value,
   );
-  if (!membership) redirect("/onboarding");
+  const membership = view
+    ? null
+    : await getActiveMembership(db, session.user.id, cookieStore.get(ACTIVE_TEAM_COOKIE)?.value);
+  const team = view ?? membership;
+  if (!team) redirect("/onboarding");
 
   return (
     <AppShell
-      teamName={membership.teamName}
-      teamLogoUrl={membership.logoUrl}
+      teamName={team.teamName}
+      teamLogoUrl={team.logoUrl}
       userEmail={session.user.email}
+      banner={
+        view ? (
+          <SupportViewBanner
+            teamId={view.teamId}
+            teamName={view.teamName}
+            expiresAt={view.expiresAt}
+          />
+        ) : null
+      }
     >
       {/* Canvas main-block padding: 32px 40px (DESIGN.md Layout); 16px below 900px. */}
       <main className="ms-main" style={{ flex: 1, minWidth: 0, padding: "32px 40px" }}>
