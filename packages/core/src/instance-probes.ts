@@ -28,6 +28,8 @@ export const PROBES = {
   queue_waiting: "warn",
   queue_quota_held: "warn",
   queue_oldest_s: "warn",
+  monitor_samples_1h: "warn",
+  monitor_unjudged_rate: "warn",
 } as const;
 
 export type ProbeKey = keyof typeof PROBES;

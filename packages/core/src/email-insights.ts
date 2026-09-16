@@ -136,7 +136,7 @@ const COMMON_TLDS = new Set(
 const NO_REPLY_LOCAL = /^(no-?reply|do-?not-?reply|nao-?responda)/i;
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 
-interface Anchor {
+export interface Anchor {
   href: string;
   /** Visible inner text, tags stripped, whitespace collapsed. */
   text: string;
@@ -153,7 +153,7 @@ interface Link extends Anchor {
 // `[^<>]`, not `[^>]`: an unclosed tag then stops the scan at the next `<`
 // instead of rescanning to the end from every one, quadratic on a crafted
 // body. An unclosed style/script swallows the rest, as a browser does.
-function visibleText(html: string): string {
+export function visibleText(html: string): string {
   return html
     .replace(/<(style|script)\b(?:[\s\S]*?<\/\1\s*>|[\s\S]*)/gi, "")
     .replace(/<[^<>]*>/g, " ")
@@ -161,7 +161,7 @@ function visibleText(html: string): string {
     .trim();
 }
 
-function extractAnchors(html: string): Anchor[] {
+export function extractAnchors(html: string): Anchor[] {
   const lower = html.toLowerCase();
   const anchors: Anchor[] = [];
   for (const m of html.matchAll(ANCHOR_HREF)) {
@@ -186,7 +186,7 @@ function toLink(a: Anchor): Link | null {
 
 const IMG_TAG = /<img\b[^<>]*>/gi;
 
-function extractImages(html: string): { src: string | null; alt: string | null }[] {
+export function extractImages(html: string): { src: string | null; alt: string | null }[] {
   return [...html.matchAll(IMG_TAG)].map((m) => ({
     src: m[0].match(/\ssrc\s*=\s*(["'])(.*?)\1/i)?.[2] ?? null,
     alt: m[0].match(/\salt\s*=\s*(["'])(.*?)\1/i)?.[2] ?? null,

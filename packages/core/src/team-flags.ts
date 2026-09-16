@@ -2,6 +2,7 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import type { TeamFlagDetail } from "@millionsend/db/schema";
 import { and, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
+import { MONITOR_FLAG_RISK_DEFAULT, monitorSamplesByTeam } from "./abuse-monitor.js";
 import { fetchAccountScore } from "./account-score.js";
 import {
   type DeliverabilityHealth,
@@ -38,6 +39,9 @@ export interface TeamStandingRow {
   hardBounceRate7d: number;
   sent7d: number;
   sent30d: number;
+  /** The content monitor's risk and the judged samples of the last week; null and 0 when it never drew. */
+  monitorRisk: number | null;
+  monitorSamples: number;
 }
 
 /**
@@ -59,6 +63,18 @@ export async function computeTeamStandings(
     .where(gte(c.day, since))
     .groupBy(c.teamId)
     .having(sql`sum(${c.sent}) > 0`);
+  const teamIds = active.map((t) => t.teamId);
+  const risks = new Map(
+    teamIds.length === 0
+      ? []
+      : (
+          await db
+            .select({ teamId: schema.teamMonitor.teamId, risk: schema.teamMonitor.risk })
+            .from(schema.teamMonitor)
+            .where(inArray(schema.teamMonitor.teamId, teamIds))
+        ).map((r) => [r.teamId, r.risk]),
+  );
+  const samples = await monitorSamplesByTeam(db, teamIds, now);
   const rows: TeamStandingRow[] = [];
   for (const team of active) {
     const [health, score] = await Promise.all([
@@ -74,6 +90,8 @@ export async function computeTeamStandings(
       hardBounceRate7d: health.bounceRate,
       sent7d: health.sent,
       sent30d: team.sent30d,
+      monitorRisk: risks.get(team.teamId) ?? null,
+      monitorSamples: samples.get(team.teamId) ?? 0,
     });
   }
   return rows;
@@ -94,7 +112,7 @@ export async function saveTeamStandings(
   if (rows.length === 0) return;
   await db
     .insert(schema.teamStandings)
-    .values(rows.map((r) => ({ ...r, computedAt: now })))
+    .values(rows.map(({ monitorSamples: _samples, ...r }) => ({ ...r, computedAt: now })))
     .onConflictDoUpdate({
       target: schema.teamStandings.teamId,
       set: {
@@ -105,6 +123,7 @@ export async function saveTeamStandings(
         hardBounceRate7d: sql`excluded.hard_bounce_rate_7d`,
         sent7d: sql`excluded.sent_7d`,
         sent30d: sql`excluded.sent_30d`,
+        monitorRisk: sql`excluded.monitor_risk`,
         computedAt: now,
       },
     });
@@ -124,8 +143,13 @@ export interface FlagTrigger {
   detail: TeamFlagDetail;
 }
 
+export interface FlagTriggerOptions {
+  /** The monitor's flag line; the built-in default when the caller has no settings. */
+  monitorFlagRisk?: number | undefined;
+}
+
 /** The trigger a standing fires, strongest first; null when the team is fine. */
-export function flagTrigger(s: TeamStandingRow): FlagTrigger | null {
+export function flagTrigger(s: TeamStandingRow, opts: FlagTriggerOptions = {}): FlagTrigger | null {
   if (s.guardrail !== "ok") {
     const metric =
       s.guardrailMetric ??
@@ -147,6 +171,15 @@ export function flagTrigger(s: TeamStandingRow): FlagTrigger | null {
       return { reason: "complaints", detail: { metric: "hard_bounce", rate: s.hardBounceRate7d } };
     }
   }
+  if (
+    s.monitorRisk !== null &&
+    s.monitorRisk >= (opts.monitorFlagRisk ?? MONITOR_FLAG_RISK_DEFAULT)
+  ) {
+    return {
+      reason: "monitor",
+      detail: { risk: Number(s.monitorRisk.toFixed(3)), samples: s.monitorSamples },
+    };
+  }
   if (s.scoreTenths !== null && s.scoreTenths < FLAG_SCORE_TENTHS) {
     return { reason: "score", detail: { metric: "score", scoreTenths: s.scoreTenths } };
   }
@@ -167,17 +200,22 @@ export async function syncTeamFlags(
   db: Db,
   standings: readonly TeamStandingRow[],
   now: Date = new Date(),
-  previous?: readonly TeamStandingRow[],
+  previous?: readonly (Omit<TeamStandingRow, "monitorSamples"> & { monitorSamples?: number })[],
+  opts: FlagTriggerOptions = {},
 ): Promise<{ opened: number; cleared: number }> {
   const f = schema.teamFlags;
   const open = await db.select().from(f).where(eq(f.status, "open"));
   const before = new Map(
-    (previous ?? (await db.select().from(schema.teamStandings))).map((row) => [row.teamId, row]),
+    (previous ?? (await db.select().from(schema.teamStandings))).map((row) => [
+      row.teamId,
+      // A stored row has no sample count; the trigger only reads the risk off it.
+      { monitorSamples: 0, ...row } as TeamStandingRow,
+    ]),
   );
   const openByTeam = new Map(open.map((row) => [row.teamId, row]));
   const triggered = new Map(
     standings.flatMap((s) => {
-      const trigger = flagTrigger(s);
+      const trigger = flagTrigger(s, opts);
       return trigger ? [[s.teamId, trigger] as const] : [];
     }),
   );
@@ -201,7 +239,7 @@ export async function syncTeamFlags(
       .orderBy(desc(f.openedAt))
       .limit(1);
     const prior = before.get(teamId);
-    const held = prior !== undefined && flagTrigger(prior)?.reason === trigger.reason;
+    const held = prior !== undefined && flagTrigger(prior, opts)?.reason === trigger.reason;
     if (held && latest?.clearedBy && latest.reason === trigger.reason) continue;
     await db.insert(f).values({
       teamId,
