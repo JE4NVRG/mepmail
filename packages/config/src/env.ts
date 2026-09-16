@@ -229,6 +229,12 @@ export const env = createEnv({
     MONITOR_AUTO_PAUSE: z.enum(["true", "false", "1", "0"]).optional(),
     MONITOR_FLAG_SCORE: z.coerce.number().int().min(0).max(100).optional(),
 
+    // Read-only support view: the instance operator may open a team's
+    // dashboard as its owner sees it, for 30 minutes, with a reason and a
+    // ticket reference, under a banner, notified to the owner and recorded
+    // in both audit logs. Off by default; read through supportViewEnabled().
+    SUPPORT_VIEW: z.enum(["off", "on"]).default("off"),
+
     // Public base URL of this deployment; SNS subscriptions and hosted
     // unsubscribe pages are derived from it.
     APP_BASE_URL: z.url().optional(),
@@ -430,6 +436,11 @@ export function abuseJudgeConfig(e: Env = env): AbuseJudgeConfig | null {
     apiKey: e.ABUSE_JUDGE_API_KEY,
     timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : ABUSE_JUDGE_TIMEOUT_MS_DEFAULT,
   };
+}
+
+/** Whether the operator may open a team's dashboard read-only; raw-string safe under SKIP_ENV_VALIDATION. */
+export function supportViewEnabled(e: Env = env): boolean {
+  return (e.SUPPORT_VIEW as unknown) === "on";
 }
 
 /**
