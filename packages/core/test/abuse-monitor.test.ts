@@ -1,0 +1,584 @@
+import type { Db } from "@millionsend/db";
+import { schema } from "@millionsend/db";
+import { createTeam, createTestDb } from "@millionsend/test-utils";
+import { desc, eq } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  applyJudgedSample,
+  clearMonitorOverride,
+  deriveSamplingKey,
+  drawBroadcastCopy,
+  foldRisk,
+  MONITOR_PRIOR_NEW,
+  MONITOR_PRIOR_SETTLED,
+  MONITOR_PRIOR_WEIGHT,
+  MONITOR_RISK_HALF_LIFE_MS,
+  type MonitorTeamState,
+  markLostSamples,
+  monitorDayCounts,
+  monitorHealth,
+  monitorRate,
+  monitorTier,
+  noteAcceptedSend,
+  planBroadcastSamples,
+  pruneMonitorSamples,
+  resumeMonitorPause,
+  sampleAcceptedEmail,
+  samplingFraction,
+  setMonitorOverride,
+  teamMonitorOverview,
+} from "../src/abuse-monitor.js";
+import { MONITOR_SETTING_DEFAULTS, type MonitorSettings } from "../src/monitor-settings.js";
+import { DAY_MS } from "../src/utc-day.js";
+
+const KEY = Buffer.alloc(32, 7);
+const NOW = new Date("2026-09-15T12:00:00Z");
+const S: MonitorSettings = MONITOR_SETTING_DEFAULTS;
+const HOUR = 3600_000;
+
+const state = (over: Partial<MonitorTeamState> = {}): MonitorTeamState => ({
+  sentTotal: 20_000,
+  firstSendAt: new Date(NOW.getTime() - 60 * DAY_MS),
+  plan: "free",
+  flaggedRecently: false,
+  overrideRate: null,
+  overrideUntil: null,
+  risk: null,
+  ...over,
+});
+
+describe("the draw", () => {
+  it("is keyed, deterministic and uniform enough to pin", () => {
+    expect(samplingFraction(KEY, "t1:e1")).toBeCloseTo(0.35108, 5);
+    expect(samplingFraction(KEY, "t1:e4")).toBeCloseTo(0.23885, 5);
+    expect(samplingFraction(KEY, "t1:e1")).toBe(samplingFraction(KEY, "t1:e1"));
+    expect(samplingFraction(Buffer.alloc(32, 8), "t1:e1")).not.toBe(samplingFraction(KEY, "t1:e1"));
+    const picked = ["e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8"].filter(
+      (e) => samplingFraction(KEY, `t1:${e}`) < 0.25,
+    );
+    expect(picked).toEqual(["e4"]);
+    expect(drawBroadcastCopy(KEY, "b1", "e3", 2, 4)).toBe(true);
+    expect(drawBroadcastCopy(KEY, "b1", "e2", 2, 4)).toBe(false);
+    expect(drawBroadcastCopy(KEY, "b1", "e2", 3, 0)).toBe(true);
+  });
+
+  it("derives its key from the master key and refuses a short one", () => {
+    const a = deriveSamplingKey(Buffer.alloc(32, 1));
+    expect(a).toHaveLength(32);
+    expect(a.equals(deriveSamplingKey(Buffer.alloc(32, 1)))).toBe(true);
+    expect(a.equals(deriveSamplingKey(Buffer.alloc(32, 2)))).toBe(false);
+    expect(() => deriveSamplingKey(Buffer.alloc(8))).toThrow("too short");
+  });
+});
+
+describe("tiers and rates", () => {
+  it("walks new, probation, established, trusted and exempt", () => {
+    expect(monitorTier(state({ sentTotal: 10, firstSendAt: null }), S, NOW)).toBe("new");
+    expect(
+      monitorTier(
+        state({ sentTotal: 5_000, firstSendAt: new Date(NOW.getTime() - 3 * DAY_MS) }),
+        S,
+        NOW,
+      ),
+    ).toBe("new");
+    expect(
+      monitorTier(
+        state({ sentTotal: 5_000, firstSendAt: new Date(NOW.getTime() - 8 * DAY_MS) }),
+        S,
+        NOW,
+      ),
+    ).toBe("probation");
+    expect(
+      monitorTier(
+        state({ sentTotal: 20_000, firstSendAt: new Date(NOW.getTime() - 3 * DAY_MS) }),
+        S,
+        NOW,
+      ),
+    ).toBe("probation");
+    expect(
+      monitorTier(
+        state({ sentTotal: 20_000, firstSendAt: new Date(NOW.getTime() - 4 * DAY_MS) }),
+        S,
+        NOW,
+      ),
+    ).toBe("probation");
+    expect(monitorTier(state(), S, NOW)).toBe("established");
+    const old = state({ sentTotal: 60_000, firstSendAt: new Date(NOW.getTime() - 200 * DAY_MS) });
+    expect(monitorTier(old, S, NOW)).toBe("trusted");
+    expect(monitorTier({ ...old, flaggedRecently: true }, S, NOW)).toBe("established");
+    expect(monitorTier({ ...old, sentTotal: 49_999 }, S, NOW)).toBe("established");
+    expect(monitorTier(state({ plan: "system" }), S, NOW)).toBe("exempt");
+    // The first-sends window keeps a slow team new regardless of its age.
+    expect(
+      monitorTier(
+        state({ sentTotal: 900, firstSendAt: new Date(NOW.getTime() - 200 * DAY_MS) }),
+        S,
+        NOW,
+      ),
+    ).toBe("new");
+  });
+
+  it("forces the first sends and hours through, then follows the tier", () => {
+    const first = monitorRate(
+      state({ sentTotal: 999, firstSendAt: new Date(NOW.getTime() - 10 * DAY_MS) }),
+      S,
+      NOW,
+      { anomalies: 0 },
+    );
+    expect(first).toMatchObject({ rate: 1, kind: "first_sends", tier: "new" });
+    const hours = monitorRate(
+      state({ sentTotal: 5_000, firstSendAt: new Date(NOW.getTime() - 71 * HOUR) }),
+      S,
+      NOW,
+      { anomalies: 0 },
+    );
+    expect(hours).toMatchObject({ rate: 1, kind: "first_sends" });
+    const ramp = monitorRate(
+      state({ sentTotal: 5_000, firstSendAt: new Date(NOW.getTime() - 73 * HOUR) }),
+      S,
+      NOW,
+      { anomalies: 0 },
+    );
+    expect(ramp).toMatchObject({ rate: 0.25, kind: "ramp", tier: "new" });
+    expect(
+      monitorRate(state({ firstSendAt: new Date(NOW.getTime() - 10 * DAY_MS) }), S, NOW, {
+        anomalies: 0,
+      }),
+    ).toMatchObject({ rate: 0.05, kind: "tier", tier: "probation" });
+    expect(monitorRate(state(), S, NOW, { anomalies: 0 })).toMatchObject({
+      rate: 0.02,
+      kind: "tier",
+      tier: "established",
+      elevated: [],
+    });
+    expect(
+      monitorRate(
+        state({ sentTotal: 60_000, firstSendAt: new Date(NOW.getTime() - 200 * DAY_MS) }),
+        S,
+        NOW,
+        { anomalies: 0 },
+      ),
+    ).toMatchObject({ rate: 0.005, tier: "trusted" });
+    expect(monitorRate(state({ plan: "system" }), S, NOW, { anomalies: 2 })).toMatchObject({
+      rate: 0,
+      tier: "exempt",
+    });
+  });
+
+  it("multiplies for one anomaly, forces two, quadruples a flagged team, never past one", () => {
+    expect(monitorRate(state(), S, NOW, { anomalies: 1 })).toMatchObject({
+      rate: 0.4,
+      kind: "anomaly",
+      elevated: ["anomaly"],
+    });
+    expect(monitorRate(state(), S, NOW, { anomalies: 2 })).toMatchObject({
+      rate: 1,
+      kind: "anomaly",
+    });
+    expect(monitorRate(state({ risk: 0.6 }), S, NOW, { anomalies: 0 })).toMatchObject({
+      rate: 0.08,
+      kind: "tier",
+      elevated: ["flagged"],
+    });
+    expect(monitorRate(state({ risk: 0.6 }), S, NOW, { anomalies: 1 })).toMatchObject({
+      rate: 1,
+      elevated: ["anomaly", "flagged"],
+    });
+    expect(monitorRate(state({ risk: 0.49 }), S, NOW, { anomalies: 0 }).rate).toBe(0.02);
+  });
+
+  it("lets an override replace the tier rate until it lapses, not the first window", () => {
+    const active = state({ overrideRate: 1, overrideUntil: new Date(NOW.getTime() + DAY_MS) });
+    expect(monitorRate(active, S, NOW, { anomalies: 0 })).toMatchObject({
+      rate: 1,
+      kind: "override",
+      elevated: ["override"],
+    });
+    const lapsed = state({ overrideRate: 1, overrideUntil: new Date(NOW.getTime() - 1) });
+    expect(monitorRate(lapsed, S, NOW, { anomalies: 0 })).toMatchObject({
+      rate: 0.02,
+      kind: "tier",
+    });
+    const first = state({
+      sentTotal: 5,
+      overrideRate: 0.1,
+      overrideUntil: new Date(NOW.getTime() + DAY_MS),
+    });
+    expect(monitorRate(first, S, NOW, { anomalies: 0 })).toMatchObject({
+      rate: 1,
+      kind: "first_sends",
+    });
+  });
+});
+
+describe("foldRisk", () => {
+  const fresh = {
+    riskNum: 0,
+    riskDen: 0,
+    riskUpdatedAt: null,
+    firstSendAt: new Date(NOW.getTime() - 2 * DAY_MS),
+  };
+
+  it("starts from the prior and halves old evidence every half-life", () => {
+    const one = foldRisk(fresh, 100, NOW);
+    expect(one.risk).toBeCloseTo(
+      (1 + MONITOR_PRIOR_NEW * MONITOR_PRIOR_WEIGHT) / (1 + MONITOR_PRIOR_WEIGHT),
+      10,
+    );
+    const later = new Date(NOW.getTime() + MONITOR_RISK_HALF_LIFE_MS);
+    const two = foldRisk({ ...one, riskUpdatedAt: NOW, firstSendAt: fresh.firstSendAt }, 0, later);
+    expect(two.riskNum).toBeCloseTo(0.5, 10);
+    expect(two.riskDen).toBeCloseTo(1.5, 10);
+    expect(two.risk).toBeCloseTo((0.5 + MONITOR_PRIOR_NEW * 3) / (1.5 + 3), 10);
+  });
+
+  it("uses the settled prior past day 30", () => {
+    const settled = foldRisk(
+      { ...fresh, firstSendAt: new Date(NOW.getTime() - 40 * DAY_MS) },
+      50,
+      NOW,
+    );
+    expect(settled.risk).toBeCloseTo((0.5 + MONITOR_PRIOR_SETTLED * 3) / 4, 10);
+  });
+});
+
+describe("sampling against the database", () => {
+  let db: Db;
+  let close: () => Promise<void>;
+  let teamId: string;
+  const queued: string[] = [];
+  let settings: MonitorSettings = S;
+  const deps = {
+    samplingKey: KEY,
+    settings: async () => settings,
+    enqueueJudge: async (id: string) => void queued.push(id),
+  };
+
+  beforeAll(async () => {
+    ({ db, close } = await createTestDb());
+    teamId = await createTeam(db, "t1");
+  });
+  afterAll(() => close());
+
+  async function email(id: string): Promise<string> {
+    const [row] = await db
+      .insert(schema.emails)
+      .values({ id, teamId, from: "a@acme.dev", to: ["r@example.com"], subject: "s" })
+      .returning({ id: schema.emails.id });
+    return row?.id ?? "";
+  }
+  const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+
+  it("counts every accepted send, judges the first ones fully, and skips broadcast rows", async () => {
+    const first = await sampleAcceptedEmail(db, deps, {
+      teamId,
+      emailId: await email(uuid(1)),
+      broadcast: false,
+      anomalies: 0,
+      now: NOW,
+    });
+    expect(first.decision).toMatchObject({ kind: "first_sends", rate: 1, tier: "new" });
+    expect(first.sampleId).not.toBeNull();
+    expect(queued).toEqual([first.sampleId]);
+    const bulk = await sampleAcceptedEmail(db, deps, {
+      teamId,
+      emailId: await email(uuid(2)),
+      broadcast: true,
+      anomalies: 0,
+      now: NOW,
+    });
+    expect(bulk).toEqual({ sampleId: null, decision: null });
+    const [row] = await db
+      .select()
+      .from(schema.teamMonitor)
+      .where(eq(schema.teamMonitor.teamId, teamId));
+    expect(row).toMatchObject({ sentTotal: 2, firstSendAt: NOW, lastSampleAt: NOW });
+    const [sample] = await db
+      .select()
+      .from(schema.monitorSamples)
+      .where(eq(schema.monitorSamples.id, first.sampleId ?? ""));
+    expect(sample).toMatchObject({
+      teamId,
+      emailId: uuid(1),
+      kind: "first_sends",
+      status: "pending",
+    });
+  });
+
+  it("draws with the pinned key once past the first window", async () => {
+    await db
+      .update(schema.teamMonitor)
+      .set({ sentTotal: 5_000, firstSendAt: new Date(NOW.getTime() - 10 * DAY_MS) })
+      .where(eq(schema.teamMonitor.teamId, teamId));
+    const before = queued.length;
+    const results: string[] = [];
+    for (const e of ["e1", "e2", "e3", "e4"]) {
+      const id =
+        `${uuid(100)}`.slice(0, -2) +
+        (e === "e1" ? "e1" : e === "e2" ? "e2" : e === "e3" ? "e3" : "e4");
+      await email(id);
+      const r = await sampleAcceptedEmail(
+        db,
+        { ...deps, samplingKey: KEY, settings: async () => ({ ...S, probationRate: 0.25 }) },
+        { teamId, emailId: id, broadcast: false, anomalies: 0, now: NOW },
+      );
+      // The draw hashes "teamId:emailId"; the picks depend on the real ids, so assert consistency with the fraction.
+      const fraction = samplingFraction(KEY, `${teamId}:${id}`);
+      expect(r.sampleId !== null).toBe(fraction < 0.25);
+      expect(r.decision).toMatchObject({ tier: "probation", kind: "tier", rate: 0.25 });
+      if (r.sampleId) results.push(r.sampleId);
+    }
+    expect(queued.length - before).toBe(results.length);
+  });
+
+  it("stops at the team cap, and at the instance cap except for first sends and anomalies", async () => {
+    const [count] = await db
+      .select({ n: schema.monitorSamples.id })
+      .from(schema.monitorSamples)
+      .where(eq(schema.monitorSamples.teamId, teamId));
+    expect(count).toBeDefined();
+    settings = { ...S, teamDailyCap: 1 };
+    const capped = await sampleAcceptedEmail(db, deps, {
+      teamId,
+      emailId: await email(uuid(10)),
+      broadcast: false,
+      anomalies: 2,
+      now: NOW,
+    });
+    expect(capped.decision?.rate).toBe(1);
+    expect(capped.sampleId).toBeNull();
+    settings = { ...S, teamDailyCap: 600, instanceDailyCap: 1 };
+    const tier = await sampleAcceptedEmail(
+      db,
+      { ...deps, settings: async () => ({ ...settings, probationRate: 1 }) },
+      { teamId, emailId: await email(uuid(11)), broadcast: false, anomalies: 0, now: NOW },
+    );
+    expect(tier.decision?.kind).toBe("tier");
+    expect(tier.sampleId).toBeNull();
+    const anomaly = await sampleAcceptedEmail(db, deps, {
+      teamId,
+      emailId: await email(uuid(12)),
+      broadcast: false,
+      anomalies: 2,
+      now: NOW,
+    });
+    expect(anomaly.decision?.kind).toBe("anomaly");
+    expect(anomaly.sampleId).not.toBeNull();
+    settings = S;
+  });
+
+  it("backfills an old team's history from the usage counters on its first monitor row", async () => {
+    const old = await createTeam(db, "old");
+    await db.insert(schema.usageCounters).values([
+      { teamId: old, day: "2026-01-10", sent: 30_000 },
+      { teamId: old, day: "2026-09-15", sent: 25_000 },
+    ]);
+    const row = await noteAcceptedSend(db, old, NOW);
+    expect(row).toMatchObject({ sentTotal: 55_000, firstSendAt: new Date("2026-01-10T00:00:00Z") });
+    expect((await noteAcceptedSend(db, old, NOW)).sentTotal).toBe(55_001);
+  });
+
+  it("plans a broadcast: the skeleton sample plus the tier's copies, none for a system team", async () => {
+    const [broadcast] = await db
+      .insert(schema.broadcasts)
+      .values({ teamId, from: "a@acme.dev", subject: "news", html: "<p>hi</p>", status: "sending" })
+      .returning({ id: schema.broadcasts.id });
+    const plan = await planBroadcastSamples(db, deps, {
+      teamId,
+      broadcastId: broadcast?.id ?? "",
+      now: NOW,
+    });
+    expect(plan.copies).toBe(10);
+    const [sample] = await db
+      .select()
+      .from(schema.monitorSamples)
+      .where(eq(schema.monitorSamples.id, plan.skeletonSampleId ?? ""));
+    expect(sample).toMatchObject({
+      kind: "broadcast_skeleton",
+      broadcastId: broadcast?.id,
+      emailId: null,
+    });
+    await db
+      .update(schema.teamMonitor)
+      .set({ sentTotal: 20_000, firstSendAt: new Date(NOW.getTime() - 60 * DAY_MS) })
+      .where(eq(schema.teamMonitor.teamId, teamId));
+    expect(
+      (await planBroadcastSamples(db, deps, { teamId, broadcastId: broadcast?.id ?? "", now: NOW }))
+        .copies,
+    ).toBe(3);
+  });
+});
+
+describe("verdicts and thresholds", () => {
+  let db: Db;
+  let close: () => Promise<void>;
+  let teamId: string;
+
+  beforeAll(async () => {
+    ({ db, close } = await createTestDb());
+    teamId = await createTeam(db, "judged");
+    await db
+      .insert(schema.teamMonitor)
+      .values({ teamId, sentTotal: 10, firstSendAt: new Date(NOW.getTime() - HOUR) });
+  });
+  afterAll(() => close());
+
+  const monitor = async () =>
+    (await db.select().from(schema.teamMonitor).where(eq(schema.teamMonitor.teamId, teamId)))[0];
+  const team = async () =>
+    (await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)))[0];
+  const audits = () =>
+    db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.teamId, teamId))
+      .orderBy(desc(schema.auditLog.createdAt));
+  async function judged(score: number, at: Date) {
+    await db.insert(schema.monitorSamples).values({
+      teamId,
+      kind: "first_sends",
+      status: "judged",
+      score,
+      judgedAt: at,
+      createdAt: at,
+    });
+  }
+
+  it("folds the score into the risk and alerts once per day past the alert line", async () => {
+    await judged(60, NOW);
+    const low = await applyJudgedSample(db, S, { teamId, score: 60, now: NOW });
+    expect(low).toMatchObject({ tier: "new", alert: false, paused: false });
+    expect(low.risk).toBeCloseTo((0.6 + 0.35 * 3) / 4, 10);
+    expect(await monitor()).toMatchObject({ risk: low.risk, riskUpdatedAt: NOW, alertedAt: null });
+    for (let i = 0; i < 6; i += 1) await judged(95, NOW);
+    let out = { risk: 0, alert: false, paused: false };
+    for (let i = 0; i < 6; i += 1)
+      out = {
+        ...out,
+        ...(await applyJudgedSample(
+          db,
+          { ...S, autoPause: false },
+          { teamId, score: 95, now: NOW },
+        )),
+      };
+    expect(out.risk).toBeGreaterThan(S.alertRisk);
+    const alerts = (
+      await db.select().from(schema.teamMonitor).where(eq(schema.teamMonitor.teamId, teamId))
+    )[0]?.alertedAt;
+    expect(alerts).toEqual(NOW);
+    const again = await applyJudgedSample(
+      db,
+      { ...S, autoPause: false },
+      { teamId, score: 85, now: new Date(NOW.getTime() + HOUR) },
+    );
+    expect(again.alert).toBe(false);
+    const tomorrow = await applyJudgedSample(
+      db,
+      { ...S, autoPause: false },
+      { teamId, score: 85, now: new Date(NOW.getTime() + DAY_MS) },
+    );
+    expect(tomorrow.alert).toBe(true);
+    expect((await monitor())?.broadcastsPausedAt).toBeNull();
+  });
+
+  it("pauses broadcasts only for a new team under the policy with a strong verdict inside a day", async () => {
+    // A dozen certain verdicts push the risk past the pause line; the policy is off while they land.
+    const t0 = new Date(NOW.getTime() + 2 * DAY_MS);
+    for (let i = 0; i < 12; i += 1) {
+      await judged(100, t0);
+      await applyJudgedSample(db, { ...S, autoPause: false }, { teamId, score: 100, now: t0 });
+    }
+    // A day later those verdicts are outside the window and the new one is weak: no pause.
+    const t1 = new Date(t0.getTime() + DAY_MS + HOUR);
+    const weak = await applyJudgedSample(db, S, { teamId, score: 85, now: t1 });
+    expect(weak.risk).toBeGreaterThan(S.pauseRisk);
+    expect(weak).toMatchObject({ tier: "new", paused: false });
+    await judged(95, t1);
+    const strong = await applyJudgedSample(db, S, { teamId, score: 95, now: t1 });
+    expect(strong.paused).toBe(true);
+    expect(await monitor()).toMatchObject({ broadcastsPausedAt: t1 });
+    expect((await team())?.broadcastsPausedByOperatorAt).toEqual(t1);
+    expect((await audits())[0]).toMatchObject({
+      action: "monitor.broadcasts_paused",
+      actorId: "system",
+      target: `team:${teamId}`,
+    });
+    // Already paused: no second pause, no second audit.
+    expect((await applyJudgedSample(db, S, { teamId, score: 99, now: t1 })).paused).toBe(false);
+    expect((await audits()).filter((a) => a.action === "monitor.broadcasts_paused")).toHaveLength(
+      1,
+    );
+  });
+
+  it("resumes from the review page and clears the operator hold with it", async () => {
+    expect(await resumeMonitorPause(db, { teamId, actor: { userId: "op" } })).toBe(true);
+    expect((await monitor())?.broadcastsPausedAt).toBeNull();
+    expect((await team())?.broadcastsPausedByOperatorAt).toBeNull();
+    expect((await audits())[0]).toMatchObject({
+      action: "monitor.broadcasts_resumed",
+      actorId: "user:op",
+    });
+    expect(await resumeMonitorPause(db, { teamId, actor: { userId: "op" } })).toBe(false);
+  });
+
+  it("never pauses an established team or with the policy off", async () => {
+    const t = new Date(NOW.getTime() + 4 * DAY_MS);
+    await db
+      .update(schema.teamMonitor)
+      .set({ sentTotal: 20_000, firstSendAt: new Date(t.getTime() - 60 * DAY_MS) })
+      .where(eq(schema.teamMonitor.teamId, teamId));
+    await judged(99, t);
+    const settled = await applyJudgedSample(db, S, { teamId, score: 99, now: t });
+    expect(settled.tier).toBe("established");
+    expect(settled.paused).toBe(false);
+    await db
+      .update(schema.teamMonitor)
+      .set({ sentTotal: 10, firstSendAt: new Date(t.getTime() - HOUR) })
+      .where(eq(schema.teamMonitor.teamId, teamId));
+    expect(
+      (await applyJudgedSample(db, { ...S, autoPause: false }, { teamId, score: 99, now: t }))
+        .paused,
+    ).toBe(false);
+    expect((await monitor())?.broadcastsPausedAt).toBeNull();
+  });
+
+  it("sets and clears an override with audits", async () => {
+    const until = new Date(NOW.getTime() + 7 * DAY_MS);
+    await setMonitorOverride(db, { teamId, rate: 1, until, actor: { userId: "op" } });
+    expect(await monitor()).toMatchObject({ overrideRate: 1, overrideUntil: until });
+    expect((await audits())[0]).toMatchObject({
+      action: "monitor.override_set",
+      data: { rate: 1, until: until.toISOString() },
+    });
+    const overview = await teamMonitorOverview(db, teamId, S, NOW);
+    expect(overview.override).toEqual({ rate: 1, until });
+    expect(overview.decision.kind).toBe("first_sends");
+    await clearMonitorOverride(db, { teamId, actor: { userId: "op" } });
+    expect(await monitor()).toMatchObject({ overrideRate: null, overrideUntil: null });
+    expect((await audits())[0]?.action).toBe("monitor.override_cleared");
+  });
+
+  it("summarises the team and the day, marks lost samples, and prunes old ones", async () => {
+    const overview = await teamMonitorOverview(db, teamId, S, new Date(NOW.getTime() + 3 * DAY_MS));
+    expect(overview.samples7d).toBeGreaterThan(5);
+    expect(overview.flagged7d).toBeGreaterThan(5);
+    expect(overview.unjudged7d).toBe(0);
+    await db.insert(schema.monitorSamples).values([
+      { teamId, kind: "tier", status: "unjudged", errorClass: "timeout", createdAt: NOW },
+      { teamId, kind: "tier", status: "pending", createdAt: new Date(NOW.getTime() - 4 * HOUR) },
+      {
+        teamId,
+        kind: "tier",
+        status: "judged",
+        score: 10,
+        createdAt: new Date(NOW.getTime() - 100 * DAY_MS),
+      },
+    ]);
+    expect(await monitorHealth(db, NOW)).toMatchObject({ unjudged: 1 });
+    expect(await markLostSamples(db, NOW)).toBe(1);
+    const day = await monitorDayCounts(db, S, NOW);
+    expect(day.unjudged).toBe(2);
+    expect(day.flagged).toBeGreaterThan(0);
+    expect(await pruneMonitorSamples(db, NOW)).toBe(1);
+  });
+});
