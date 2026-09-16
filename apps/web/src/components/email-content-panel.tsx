@@ -296,6 +296,8 @@ export function EmailContentPanel({
     text: string | null;
     insights: EmailInsights | null;
     bodyPurgedAt?: Date | null | undefined;
+    /** The body was never decrypted: the request ran under a support view. */
+    hiddenBySupportView?: boolean | undefined;
   };
 }) {
   const t = useTranslations("emails");
@@ -417,7 +419,7 @@ export function EmailContentPanel({
             </p>
           </div>
         )
-      ) : email.bodyPurgedAt ? (
+      ) : email.hiddenBySupportView || email.bodyPurgedAt ? (
         <p
           style={{
             margin: 0,
@@ -426,7 +428,7 @@ export function EmailContentPanel({
             fontSize: "var(--ms-fs-ui)",
           }}
         >
-          {t("detail.bodyPurged")}
+          {t(email.hiddenBySupportView ? "detail.hiddenBySupportView" : "detail.bodyPurged")}
         </p>
       ) : (
         <>

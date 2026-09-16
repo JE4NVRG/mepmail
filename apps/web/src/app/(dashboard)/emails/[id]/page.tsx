@@ -957,6 +957,7 @@ export default function EmailDetailPage() {
             text: email.text,
             insights: email.insights,
             bodyPurgedAt: email.bodyPurgedAt,
+            hiddenBySupportView: email.hiddenBySupportView,
           }}
         />
       </div>

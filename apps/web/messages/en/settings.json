@@ -438,7 +438,9 @@
       "monitor_override_set": "Set monitor sampling override",
       "monitor_override_cleared": "Cleared monitor sampling override",
       "monitor_broadcasts_paused": "Content monitor paused broadcasts",
-      "monitor_broadcasts_resumed": "Resumed broadcasts after monitor pause"
+      "monitor_broadcasts_resumed": "Resumed broadcasts after monitor pause",
+      "support_view_started": "Support view started",
+      "support_view_ended": "Support view ended"
     },
     "empty": "Nothing recorded yet.",
     "loadMore": "Load more",
@@ -528,5 +530,24 @@
         "note": "The paid plan ended."
       }
     }
+  },
+  "supportAccess": {
+    "title": "Support access",
+    "intro": "At your request, or to verify an abuse report, an instance operator may open this dashboard read-only for up to 30 minutes. Email content, exports and secrets stay hidden, and the session is recorded in the audit log.",
+    "none": "No support session is live.",
+    "operator": "Operator",
+    "started": "Started",
+    "expires": "Ends",
+    "reason": "Reason",
+    "reference": "Reference",
+    "reasons": {
+      "support_ticket": "Support ticket",
+      "abuse_report_check": "Verifying an abuse report",
+      "billing_dispute": "Billing dispute",
+      "other": "Other"
+    },
+    "end": "End session",
+    "ended": "Support session ended",
+    "error": "Could not end the session: {reason}"
   }
 }

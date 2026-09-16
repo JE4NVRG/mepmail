@@ -937,6 +937,15 @@ table.ms-table {
   );
 }
 
+/* A shell under a support view is read-only: the server refuses every
+   mutation, and the buttons that would attempt one are dimmed and inert.
+   Anchors drawn as primary buttons stay live, they only navigate. */
+[data-support-view] button.ms-btn-primary,
+[data-support-view] button.ms-btn-destructive {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 /* Odometer — the product's only flourish; reduced-motion degrades to a plain swap */
 .ms-odometer {
   display: inline-flex;

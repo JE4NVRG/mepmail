@@ -101,5 +101,11 @@
     "ours": "O erro é do nosso lado. Tente de novo em instantes.",
     "retry": "Tentar novamente",
     "back": "Voltar para {to}"
+  },
+  "supportView": {
+    "banner": "Modo de suporte de {team} · somente leitura · termina em {left}",
+    "end": "Encerrar sessão",
+    "back": "Voltar ao console",
+    "readOnly": "Modo de suporte somente leitura: nada pode ser alterado aqui."
   }
 }
