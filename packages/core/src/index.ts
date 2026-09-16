@@ -198,9 +198,8 @@ export {
   contentRevealExpiry,
   type RevealedContent,
   type RevealSpan,
-  redactRevealedText,
-  renderRevealedBody,
 } from "./content-reveal.js";
+export { redactRevealedText, renderRevealedBody } from "./content-reveal-render.js";
 export {
   BOUND_ENVELOPE_VERSION_OFFSET,
   decryptEmailBody,

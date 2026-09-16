@@ -4,9 +4,8 @@ import {
   CONTENT_REVEAL_WINDOW_MS,
   contentRevealExpiry,
   type RevealedContent,
-  redactRevealedText,
-  renderRevealedBody,
 } from "../src/content-reveal.js";
+import { redactRevealedText, renderRevealedBody } from "../src/content-reveal-render.js";
 
 const plain = (content: RevealedContent) => content.spans.map((s) => s.text).join("");
 const masked = (content: RevealedContent) =>
