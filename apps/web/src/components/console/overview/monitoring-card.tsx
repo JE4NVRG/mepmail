@@ -67,16 +67,18 @@ export function MonitoringCard() {
 
   const today = data.today ?? { sampled: 0, judged: 0, unjudged: 0, flagged: 0 };
   const unjudgedRate = today.sampled > 0 ? today.unjudged / today.sampled : null;
-  const figures: { label: React.ReactNode; value: string; color?: string }[] = [
-    { label: t("judge"), value: `${data.judge.provider} · ${data.judge.model}` },
-    { label: t("sampledToday"), value: nf.format(today.sampled) },
-    { label: t("judged"), value: nf.format(today.judged) },
+  const figures: { id: string; label: React.ReactNode; value: string; color?: string }[] = [
+    { id: "judge", label: t("judge"), value: `${data.judge.provider} · ${data.judge.model}` },
+    { id: "sampled", label: t("sampledToday"), value: nf.format(today.sampled) },
+    { id: "judged", label: t("judged"), value: nf.format(today.judged) },
     {
+      id: "unjudged",
       label: t("unjudgedRate"),
       value: unjudgedRate === null ? common("none") : formatPercent(unjudgedRate, locale, 1),
       ...(unjudgedRate !== null && unjudgedRate > 0.2 ? { color: "var(--ms-warn)" } : {}),
     },
     {
+      id: "flagged",
       label: (
         <Tooltip inline text={t("flaggedTip", { score: data.flagScore })}>
           {t("flaggedToday")}
@@ -86,6 +88,7 @@ export function MonitoringCard() {
       ...(today.flagged > 0 ? { color: "var(--ms-warn)" } : {}),
     },
     {
+      id: "flags",
       label: t("openFlags"),
       value: nf.format(data.openFlags),
       ...(data.openFlags > 0 ? { color: "var(--ms-danger)" } : {}),
@@ -113,12 +116,16 @@ export function MonitoringCard() {
       >
         {head}
         <div style={{ display: "flex", flexWrap: "wrap", gap: "12px 36px" }}>
-          {figures.map((figure, index) => (
-            <div key={index}>
+          {figures.map((figure) => (
+            <div key={figure.id}>
               <div className="ms-microlabel">{figure.label}</div>
               <div
-                className={index === 0 ? "ms-mono" : "ms-digits"}
-                style={{ fontSize: index === 0 ? 13 : 22, marginTop: 4, color: figure.color }}
+                className={figure.id === "judge" ? "ms-mono" : "ms-digits"}
+                style={{
+                  fontSize: figure.id === "judge" ? 13 : 22,
+                  marginTop: 4,
+                  color: figure.color,
+                }}
               >
                 {figure.value}
               </div>
