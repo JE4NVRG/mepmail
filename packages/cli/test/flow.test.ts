@@ -79,6 +79,26 @@ describe("flow on a pipe", () => {
     ]);
     rl.close();
   });
+
+  it("puts the hint on piped questions", async () => {
+    setColorMode("never");
+    const questions: string[] = [];
+    const rl = reader("\nn\n");
+    const asking = {
+      question: async (prompt: string) => {
+        questions.push(prompt);
+        return rl.question(prompt);
+      },
+    };
+    const flow = createFlow(asking, { rail: false });
+    await flow.ask({ label: "S3_ENDPOINT", hint: "empty skips", initial: "x" });
+    await flow.confirm("Delete these?", false, "the access keys stop working immediately");
+    expect(questions).toEqual([
+      "S3_ENDPOINT — empty skips [x]: ",
+      "Delete these? (the access keys stop working immediately) [y/N] ",
+    ]);
+    rl.close();
+  });
 });
 
 describe("flow on a terminal", () => {
@@ -105,8 +125,7 @@ describe("flow on a terminal", () => {
     );
     expect(shown).toContain(`${RAIL.done}  IAM policy millionsend-ses`);
     expect(shown).toContain(`${RAIL.warn}  careful`);
-    // The active question, then the redraw: cursor up over the two rows, the
-    // hollow diamond, the answer on the rail.
+    // The live question is erased by a relative cursor-up, then the hollow diamond stays.
     expect(shown).toContain(`${RAIL.active}  APP_BASE_URL (dashboard origin)\n`);
     expect(shown).toContain("\x1b[2A\x1b[J");
     expect(shown).toContain(
@@ -127,5 +146,115 @@ describe("flow on a terminal", () => {
       .filter((row) => row.startsWith(`${RAIL.bar}  word`));
     expect(rows.length).toBeGreaterThan(1);
     for (const row of rows) expect(row.length).toBeLessThanOrEqual(80);
+  });
+
+  it("does not slice into the bar's SGR when colors are on", () => {
+    setColorMode("always");
+    const { out, text } = screen();
+    const flow = createFlow({ question: async () => "" }, { rail: true, out });
+    flow.step("created");
+    flow.warn("careful");
+    flow.error("boom");
+    const shown = text();
+    expect(shown).not.toContain("  m│");
+    expect(shown).toContain("\x1b[2m◇\x1b[22m  created\n");
+    expect(shown).toContain("\x1b[33m▲\x1b[39m  careful\n");
+    expect(shown).toContain("\x1b[31m■\x1b[39m  boom\n");
+  });
+
+  it("keeps the colored hanging bar intact on a wrapped step", () => {
+    setColorMode("always");
+    const chunks: string[] = [];
+    const out = {
+      columns: 40,
+      write: (chunk: string) => {
+        chunks.push(chunk);
+        return true;
+      },
+    } as unknown as NodeJS.WriteStream;
+    const flow = createFlow({ question: async () => "" }, { rail: true, out });
+    flow.step("word ".repeat(20).trim());
+    const shown = chunks.join("");
+    expect(shown).not.toContain("  m│");
+    expect(shown.split("\n").filter((row) => row.includes("word")).length).toBeGreaterThan(1);
+    expect(shown).toContain("\x1b[2m│\x1b[22m  word");
+  });
+
+  it("wraps a long ask head under the rail and erases by row count", async () => {
+    setColorMode("never");
+    const chunks: string[] = [];
+    const out = {
+      columns: 40,
+      write: (chunk: string) => {
+        chunks.push(chunk);
+        return true;
+      },
+    } as unknown as NodeJS.WriteStream;
+    const rl = reader("https://mail.example.com\n");
+    const flow = createFlow(rl, { rail: true, out });
+    expect(
+      await flow.ask({
+        label: "APP_BASE_URL",
+        hint: "the URL the dashboard is opened at; an https URL also gets SES events pushed",
+        initial: "http://localhost:3000",
+      }),
+    ).toBe("https://mail.example.com");
+    const shown = chunks.join("");
+    const headRows = shown
+      .split("\n")
+      .filter((row) => row.startsWith(`${RAIL.active}  `) || row.startsWith(`${RAIL.bar}  `));
+    expect(headRows.length).toBeGreaterThan(1);
+    for (const row of headRows) expect(row.length).toBeLessThanOrEqual(40);
+    expect(shown).toContain("A\x1b[J");
+    expect(shown).not.toContain("\x1b[s");
+    rl.close();
+  });
+
+  it("shows the default on the rail head before the operator types", async () => {
+    setColorMode("never");
+    const { out, text } = screen();
+    const rl = reader("\n");
+    const flow = createFlow(rl, { rail: true, out });
+    expect(
+      await flow.ask({
+        label: "APP_BASE_URL",
+        hint: "dashboard origin",
+        initial: "http://localhost:3000",
+      }),
+    ).toBe("http://localhost:3000");
+    expect(text()).toContain(
+      `${RAIL.active}  APP_BASE_URL (dashboard origin) [http://localhost:3000]`,
+    );
+    rl.close();
+  });
+
+  it("keeps leading indent on verbatim snippets", () => {
+    setColorMode("never");
+    const { out, text } = screen();
+    const flow = createFlow({ question: async () => "" }, { rail: true, out });
+    flow.note("    location = /ses/events { proxy_pass http://127.0.0.1:3001; }");
+    expect(text()).toContain(
+      `${RAIL.bar}      location = /ses/events { proxy_pass http://127.0.0.1:3001; }`,
+    );
+  });
+
+  it("wraps to the output stream's width", () => {
+    setColorMode("never");
+    const chunks: string[] = [];
+    const out = {
+      columns: 40,
+      write: (chunk: string) => {
+        chunks.push(chunk);
+        return true;
+      },
+    } as unknown as NodeJS.WriteStream;
+    const flow = createFlow({ question: async () => "" }, { rail: true, out });
+    flow.note("word ".repeat(20).trim());
+    const rows = chunks
+      .join("")
+      .split("\n")
+      .filter((row) => row.startsWith(`${RAIL.bar}  word`));
+    expect(rows.length).toBeGreaterThan(1);
+    for (const row of rows) expect(row.length).toBeLessThanOrEqual(40);
   });
 });

@@ -63,7 +63,13 @@ export function lineReader(
         rl.prompt();
       }
       const line = queue.shift();
-      if (line !== undefined) return Promise.resolve(line);
+      if (line !== undefined) {
+        // Echo as if the operator typed it, so a later relative erase sees
+        // the same cursor as a real Enter. Pipes stay silent: answers must
+        // not leak into scripted stdout.
+        if ((output as NodeJS.WriteStream).isTTY === true) output.write(`${line}\n`);
+        return Promise.resolve(line);
+      }
       if (ended) return Promise.resolve("");
       return new Promise((resolve) => {
         waiting = resolve;

@@ -30,7 +30,7 @@ partir de um template embutido com segredos gerados, provisionar os recursos
 da AWS e os buckets S3 para uploads e backups (ambos abaixo), baixar o
 arquivo compose standalone e rodar `docker compose up -d`. Toda etapa pode
 ser pulada e é segura de repetir; `--dry-run` imprime o plano completo sem
-tocar em nada. Em uma instalação já configurada, uma execução no terminal abre um menu (adicionar uma região do SES, recursos da AWS, URLs base, storage, login social, e-mail da conta, o passo a passo completo ou iniciar a stack).
+tocar em nada. Em uma instalação já configurada, uma execução no terminal abre um menu de próximos passos em vez de percorrer cada etapa de novo.
 
 O equivalente manual usa a mesma imagem multi-arch pré-construída:
 
@@ -249,8 +249,9 @@ docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms \
 
 O assistente interativo oferece a mesma etapa como **Add a region** na etapa
 de AWS. Rodado em qualquer outro lugar, sem `.env`, o comando pergunta
-`SQS_QUEUE_URL`, `SNS_TOPIC_ARNS` e `AWS_REGIONS` da instalação e imprime as
-duas linhas em vez de gravá-las.
+`SQS_QUEUE_URL`, `SNS_TOPIC_ARNS`, `AWS_REGIONS` e o `APP_BASE_URL` opcional
+(vazio: só a fila), confirma antes de criar qualquer coisa e imprime as duas
+linhas em vez de gravá-las.
 
 Ele mantém o usuário IAM, a política e a chave de acesso (nenhuma chave nova),
 cria na nova região o tópico SNS, o configuration set do SES com seu event

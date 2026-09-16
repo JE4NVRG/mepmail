@@ -13,8 +13,10 @@ import {
   freshDatabaseEntries,
   fullRerunOffered,
   generateSecret,
+  menuInitial,
   menuOptions,
   missingSecrets,
+  resolveAppBaseUrl,
   secretLaterHint,
   servedRegionsInEnv,
   setupDone,
@@ -215,7 +217,21 @@ describe("flowPlan on a finished install", () => {
     const state = detectDirState((name) => (name === ".env" ? envContent : null), null);
     const plan = flowPlan(state, { appBaseUrl: "http://x", region: "us-east-1" });
     expect(plan[0]).toContain("menu: this install is set up");
+    expect(plan[0]).toContain("Add an SES region");
     expect(plan.join("\n")).toContain("aws: already set up");
+  });
+
+  it("lists only the menu items this install would offer", () => {
+    const envContent = "MASTER_ENCRYPTION_KEY=k\nBETTER_AUTH_SECRET=s\nAWS_ACCESS_KEY_ID=AKIA\n";
+    const state = detectDirState((name) => (name === ".env" ? envContent : null), null);
+    const plan = flowPlan(state, { appBaseUrl: "http://x", region: "us-east-1" }).join("\n");
+    expect(plan).toContain("menu: this install is set up");
+    expect(plan).not.toContain("Add an SES region");
+    expect(plan).toContain("AWS resources");
+    expect(plan).not.toContain("Cloud values");
+    expect(
+      flowPlan(state, { appBaseUrl: "http://x", region: "us-east-1", cloud: true }).join("\n"),
+    ).toContain("Cloud values");
   });
 });
 
@@ -268,5 +284,38 @@ describe("setupDone / menuOptions", () => {
     expect(menuOptions(`${secrets}AWS_ACCESS_KEY_ID=AKIA\n`, false)[0]?.hint).toContain(
       "event ingestion",
     );
+    expect(menuOptions(full, false).find((o) => o.value === "aws")?.hint).toBe(
+      "add a region, or skip",
+    );
+    expect(
+      menuOptions(
+        `${secrets}AWS_REGION=sa-east-1\nSNS_TOPIC_ARNS=arn:a\nSQS_QUEUE_URL=https://q\n`,
+        false,
+      ).find((o) => o.value === "aws")?.hint,
+    ).toBe("re-run the AWS setup");
+    expect(
+      menuOptions(
+        `${secrets}AWS_REGIONS=sa-east-1,us-east-1\nSNS_TOPIC_ARNS=arn:a,arn:b\n`,
+        false,
+      ).find((o) => o.value === "aws")?.hint,
+    ).not.toBe("add a region, or skip");
+  });
+
+  it("starts the cursor on Exit so Enter does not provision AWS", () => {
+    const full = `${secrets}SNS_TOPIC_ARNS=arn:a\nSQS_QUEUE_URL=https://q\n`;
+    expect(menuInitial(menuOptions(full, false))).toBe("exit");
+  });
+});
+
+describe("resolveAppBaseUrl", () => {
+  it("keeps a typed URL even when there is no .env", () => {
+    expect(resolveAppBaseUrl("https://mail.example.com", null, undefined)).toBe(
+      "https://mail.example.com",
+    );
+    expect(resolveAppBaseUrl(null, "APP_BASE_URL=http://from-file\n", "http://from-proc")).toBe(
+      "http://from-file",
+    );
+    expect(resolveAppBaseUrl(null, null, "http://from-proc")).toBe("http://from-proc");
+    expect(resolveAppBaseUrl(null, null, undefined)).toBe("http://localhost:3000");
   });
 });
