@@ -240,6 +240,7 @@ export function BroadcastComposer({ initial }: { initial?: ComposerInitial }) {
     // (text is the rendered plain text, so an empty document stays empty).
     if (dirty || text.trim() !== "") {
       const ok = await confirmDialog({
+        local: true,
         title: tTemplates("picker.replaceTitle"),
         message: tTemplates("picker.replaceBody"),
         confirmLabel: tTemplates("picker.replaceConfirm"),
@@ -253,14 +254,15 @@ export function BroadcastComposer({ initial }: { initial?: ComposerInitial }) {
     // setDocument would show the old body forever.
     setTemplateId(id);
     if (template.subject) setSubject(template.subject);
-    setHtml(template.html);
+    // Null only under a support view, which cannot save the broadcast anyway.
+    setHtml(template.html ?? "");
     setText(template.text ?? "");
     setDocument(template.document);
     setEditorNonce((n) => n + 1);
     // An html-authored template lands as html: on its preview, like a stored one.
     setConverting(false);
     setTab(
-      bodyEditorMode({ document: template.document, html: template.html }) === "code"
+      bodyEditorMode({ document: template.document, html: template.html ?? "" }) === "code"
         ? "preview"
         : "edit",
     );

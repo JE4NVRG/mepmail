@@ -492,6 +492,7 @@ describe("what a view can and cannot see", () => {
         from: "Example <hello@example.com>",
         subject: "Hello",
         status: "sent",
+        previewText: "a peek at the newsletter",
         ...body,
       })
       .returning({ id: schema.broadcasts.id });
@@ -526,6 +527,9 @@ describe("what a view can and cannot see", () => {
       subject: "Hello",
       html: null,
       text: null,
+      document: null,
+      // The preheader rides inside the html that went out.
+      previewText: null,
       hiddenBySupportView: true,
     });
     // Nothing has left yet for either of these, and checking a broadcast
@@ -549,6 +553,30 @@ describe("what a view can and cannot see", () => {
     }
     // The owner sees both, as before.
     expect((await owner().broadcasts.get({ id: sent.id })).html).toBe(body.html);
+  });
+
+  it("hides every template body, since a sent broadcast is copied from one", async () => {
+    const body = { html: "<p>reusable</p>", text: "reusable" };
+    const [template] = await db
+      .insert(schema.templates)
+      .values({ teamId, name: "Monthly", subject: "Hi", ...body })
+      .returning({ id: schema.templates.id });
+    if (!template) throw new Error("template insert failed");
+    expect(await owner().templates.get({ id: template.id })).toMatchObject({
+      html: body.html,
+      hiddenBySupportView: false,
+    });
+    const grant = await start();
+    expect(await viewer(grant).templates.get({ id: template.id })).toMatchObject({
+      name: "Monthly",
+      html: null,
+      text: null,
+      document: null,
+      hiddenBySupportView: true,
+    });
+    // The list never carried a body to begin with.
+    const listed = await viewer(grant).templates.list({});
+    expect(listed.items[0]).not.toHaveProperty("html");
   });
 
   it("lets a support view read the team's own audit trail, and never a member", async () => {

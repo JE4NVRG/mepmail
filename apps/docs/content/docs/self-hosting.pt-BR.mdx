@@ -950,11 +950,16 @@ do proprietário.
 eventos, contatos, domínios, transmissões, templates, nomes de chaves de
 API, endpoints de webhook, configurações e uso.
 
-**O que fica oculto.** Corpos de e-mail (o detalhe diz "O conteúdo do
-e-mail fica oculto no modo de suporte"), corpos de requisição e resposta dos
-logs de API, exportações CSV (a rota de exportação responde 403) e todo
-segredo: chaves de API, segredos de assinatura de webhook e credenciais SMTP
-nunca são devolvidos. Toda alteração é recusada: o servidor responde
+**O que fica oculto.** O conteúdo do que já foi enviado: corpos de e-mail
+(o detalhe diz "O conteúdo do e-mail fica oculto no modo de suporte"); o
+corpo e o preheader de uma transmissão que começou a sair, já saiu ou foi
+cancelada no meio do envio; o corpo de todo template, já que o texto de um
+template é copiado para as transmissões enviadas a partir dele e nada
+registra quais; corpos de requisição e resposta dos logs de API; exportações
+CSV (a rota de exportação responde 403); e todo segredo, então chaves de
+API, segredos de assinatura de webhook e credenciais SMTP nunca são
+devolvidos. Um rascunho ou transmissão agendada continua legível, já que
+nada dele chegou a ninguém. Toda alteração é recusada: o servidor responde
 `FORBIDDEN` a qualquer mutação enquanto o modo está ativo, independentemente
 do que a tela mostra.
 

@@ -535,7 +535,7 @@
   },
   "supportAccess": {
     "title": "Acesso de suporte",
-    "intro": "A seu pedido, ou para verificar uma denúncia de abuso, um operador da instância pode abrir este painel em modo somente leitura por até 30 minutos. O conteúdo dos e-mails enviados, exportações e segredos ficam ocultos, e a sessão é registrada no log de auditoria.",
+    "intro": "A seu pedido, um operador da instância pode abrir este painel em modo somente leitura por até 30 minutos. O conteúdo dos e-mails enviados, exportações e segredos ficam ocultos, e a sessão é registrada no log de auditoria.",
     "none": "Nenhuma sessão de suporte ativa.",
     "operator": "Operador",
     "started": "Início",

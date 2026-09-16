@@ -28,6 +28,16 @@ export default function EditTemplatePage() {
     );
   }
   if (!template) return <EditorSkeleton />;
+  if (template.hiddenBySupportView) {
+    return (
+      <p
+        className="ms-card"
+        style={{ padding: 24, margin: 0, color: "var(--ms-muted)", fontSize: "var(--ms-fs-ui)" }}
+      >
+        {t("editor.hiddenBySupportView")}
+      </p>
+    );
+  }
 
   return (
     <TemplateEditor
@@ -35,7 +45,8 @@ export default function EditTemplatePage() {
         id: template.id,
         name: template.name,
         subject: template.subject,
-        html: template.html,
+        // Non-null past the support view check above.
+        html: template.html ?? "",
         text: template.text,
         document: template.document,
       }}
