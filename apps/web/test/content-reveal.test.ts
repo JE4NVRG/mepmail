@@ -165,6 +165,18 @@ describe("console.safety.requestAccess", () => {
     expect(await db.select().from(schema.contentAccessGrants)).toHaveLength(0);
   });
 
+  it("wants an email id when the scope is one email", async () => {
+    await flaggedEmail();
+    await expect(
+      operator().console.safety.requestAccess({
+        teamId,
+        reason: "phishing_or_malware",
+        justification: JUSTIFICATION,
+        scope: "email",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
   it("wants a justification of some substance", async () => {
     const emailId = await flaggedEmail();
     await expect(

@@ -411,18 +411,23 @@ export const consoleSafetyRouter = router({
    */
   requestAccess: operatorProcedure
     .input(
-      z.object({
-        teamId: z.uuid(),
-        reason: z.enum(CONTENT_REVEAL_REASONS),
-        justification: z
-          .string()
-          .trim()
-          .min(CONTENT_REVEAL_JUSTIFICATION_MIN)
-          .max(CONTENT_REVEAL_JUSTIFICATION_MAX),
-        scope: z.enum(CONTENT_REVEAL_SCOPES),
-        /** Required for scope "email"; ignored for a whole-window grant. */
-        emailId: z.uuid().optional(),
-      }),
+      z
+        .object({
+          teamId: z.uuid(),
+          reason: z.enum(CONTENT_REVEAL_REASONS),
+          justification: z
+            .string()
+            .trim()
+            .min(CONTENT_REVEAL_JUSTIFICATION_MIN)
+            .max(CONTENT_REVEAL_JUSTIFICATION_MAX),
+          scope: z.enum(CONTENT_REVEAL_SCOPES),
+          /** Required for scope "email"; ignored for a whole-window grant. */
+          emailId: z.uuid().optional(),
+        })
+        .refine((input) => input.scope !== "email" || input.emailId !== undefined, {
+          message: "emailId is required for scope email",
+          path: ["emailId"],
+        }),
     )
     .mutation(async ({ ctx, input }) => {
       assertContentRevealOn();
