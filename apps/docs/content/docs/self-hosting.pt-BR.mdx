@@ -704,20 +704,10 @@ uma credencial válida, e os links nunca são reescritos para rastreio de
 cliques. Enquanto nenhum time tiver o domínio, eles saem direto pelo SES sem
 deixar rastro, como antes.
 
-Esse time é o da própria instância. Dê a ele o plano `system` e ele nunca
-tem limite nem cobrança, o selo diz System, a aba Cobrança mostra um aviso
-no lugar dos planos e o Stripe nunca escreve na linha dele (numa instância
-auto-hospedada os planos não impõem limites, então isso só o rotula; com
-`IS_CLOUD=true` também remove os limites de envio, domínios, contatos e
-times). O comando não altera nada enquanto o time ainda tiver cliente ou
-assinatura no Stripe:
-
-```sql
-update teams
-set plan = 'system', plan_quota = null, current_period_start = null, current_period_end = null,
-    plan_status = 'none', pending_rung = null, cancel_at = null
-where id = '<id do time>' and stripe_customer_id is null and stripe_subscription_id is null;
-```
+Esse time é o da própria instância, e o operador pode marcá-lo como tal: no
+plano `system` ele nunca tem limite nem cobrança, o selo diz System e a aba
+Cobrança mostra um aviso no lugar dos planos. Numa instância auto-hospedada
+os planos não impõem limites, então a marca só o rotula.
 
 O mesmo time é a audiência das novidades do produto. Em uma instância com
 `ALLOW_SIGNUP=true`, toda conta nova vira um contato ali com a propriedade
