@@ -12,6 +12,10 @@
       "types": "./src/audit-actions.ts",
       "default": "./src/audit-actions.ts"
     },
+    "./content-reveal": {
+      "types": "./src/content-reveal.ts",
+      "default": "./src/content-reveal.ts"
+    },
     "./bounce-guidance": {
       "types": "./src/bounce-guidance.ts",
       "default": "./src/bounce-guidance.ts"

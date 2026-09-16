@@ -73,6 +73,7 @@ import { runMonitorHealth } from "./handlers/monitor-health.js";
 import { reportPlanMove, sweepNotifications } from "./handlers/notify.js";
 import { runPlatformBreaker } from "./handlers/platform-breaker.js";
 import { processSesEvent } from "./handlers/process-ses-event.js";
+import { runRevealNotices } from "./handlers/reveal-notices.js";
 import { runSafetyFlags } from "./handlers/safety-flags.js";
 import { sendBroadcast } from "./handlers/send-broadcast.js";
 import { failQueuedEmail, sendEmail } from "./handlers/send-email.js";
@@ -373,6 +374,14 @@ await queue.scheduleCrons({
     if (result.opened > 0 || result.cleared > 0) {
       console.log(
         `safety.flags: teams=${result.teams} opened=${result.opened} cleared=${result.cleared}`,
+      );
+    }
+  },
+  "safety.reveal_notices": async () => {
+    const result = await runRevealNotices(db, { mailer, appBaseUrl: env.APP_BASE_URL });
+    if (result.disclosed > 0 || result.withheld > 0) {
+      console.log(
+        `safety.reveal_notices: disclosed=${result.disclosed} withheld=${result.withheld}`,
       );
     }
   },

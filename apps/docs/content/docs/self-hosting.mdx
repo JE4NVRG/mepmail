@@ -862,6 +862,60 @@ hourly sample count, and the operator is emailed when more than 20% of an
 hour's samples (at least 20 of them) went unjudged, at most once every six
 hours.
 
+## Content access (break-glass)
+
+Off by default. With it on, an authorised operator can read the subject and
+the rendered visible text of specific messages of a flagged team, for a
+security reason they name and justify before anything is decrypted, for at
+most 30 minutes. It is the break-glass path for the cases the stored
+metadata cannot settle: the insights know a link points at a shortener, not
+whether the text around it is a bank lure or a newsletter.
+
+**What an operator can see.** The subject, and the rendered visible text of
+the HTML with hidden elements stripped (or the plain-text part when there is
+no HTML), cut at 20,000 characters and redacted on the way out: every link —
+written with a scheme or as a bare `www.` host — is reduced to its scheme, its registrable domain and at most 24 characters
+of path, with the query and the fragment dropped entirely, so a one-time
+link cannot be followed; anything shaped like a
+credential (a JWT, 32 or more hex characters, 40 or more of base64, one of
+this instance's own `ms_` API keys) is masked, as is a 4-to-8-digit run
+within 40 characters of a word like *code*, *código*, *OTP*, *PIN*, *token*,
+*senha*, *password* or *verification*.
+Never the raw HTML, the recipient addresses, the headers, the attachments or
+the click-tracking targets, and the view offers no copy or download. A body
+retention has already purged cannot be revealed by anyone.
+
+**For how long.** A grant lasts 30 minutes from the moment it is made and is
+never extended; a later look is a new grant, with a new reason and a new
+audit row. Every view is counted on the grant.
+
+**What is logged.** The grant row (`content_access_grants`) keeps the
+operator, the reason, the justification they wrote, the scope, the message
+ids, the view count and the times. Nothing prunes those rows: they are the
+inventory of who read what. An instance audit row (`content.revealed`) is
+written before anything decrypts, with the grant id, the reason and the
+number of messages — never the justification's text and never any content.
+
+**What the team sees, and when.** Seven days later a daily job adds a
+`content.accessed` row to the team's own audit log — dated at the access,
+not at the disclosure — and emails the team's owners in their own language:
+when it happened, the reason, how many messages, and what was withheld. The
+one exception is a team suspended for phishing since the grant, where the
+row and the notice are withheld; the grant records that the disclosure step
+ran either way, so it is not retried nightly.
+
+**Turning it on** in the instance's `.env`, read by the worker and the app
+(a restart applies it):
+
+```bash
+CONTENT_REVEAL=on
+```
+
+Off, the console's buttons render disabled with a tooltip naming the
+variable and both procedures refuse. Reading other people's messages is
+lawful only as a narrow, recorded, disclosed security measure: say so in the
+instance's terms and privacy notice before turning it on.
+
 ## Operations
 
 - Send rate and email retention are managed in the dashboard: **Settings →
