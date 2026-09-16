@@ -6,7 +6,7 @@ import {
   CONTENT_REVEAL_REASONS,
   type ContentRevealReason,
   type RevealSpan,
-} from "@millionsend/core";
+} from "@millionsend/core/content-reveal";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useId, useState } from "react";
@@ -463,7 +463,9 @@ export function RevealCell({
   if (grant && left > 0) {
     return (
       <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-        <span className="ms-chip">{t("left", { time: formatMmSs(left) })}</span>
+        <span className="ms-chip" style={{ whiteSpace: "nowrap" }}>
+          {t("left", { time: formatMmSs(left) })}
+        </span>
         <button
           type="button"
           className="ms-btn ms-btn-secondary ms-btn-sm"
