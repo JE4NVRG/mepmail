@@ -24,6 +24,7 @@ import { z } from "zod";
 import { isAwsCredentialError } from "@/lib/aws-errors";
 import { recordAudit } from "../audit";
 import { isInstanceOperator } from "../instance-operator";
+import type { SessionRole } from "../membership";
 import { awsCredentialsConfigured, passwordRecoveryEnabled } from "../system-mail";
 import { router, teamProcedure } from "../trpc";
 
@@ -45,10 +46,11 @@ type OperatorCtx = {
   session: { user: { id: string } };
 };
 
-async function canManageInstance(ctx: OperatorCtx & { role: "owner" | "admin" | "member" }) {
+async function canManageInstance(ctx: OperatorCtx & { role: SessionRole }) {
   return (
     !isCloudDeployment() &&
     ctx.role !== "member" &&
+    ctx.role !== "viewer" &&
     (await isInstanceOperator(ctx.db, ctx.session.user.id))
   );
 }
