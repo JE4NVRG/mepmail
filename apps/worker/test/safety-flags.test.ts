@@ -80,3 +80,27 @@ it("clears the flag once the counters are fixed", async () => {
     (await db.select().from(schema.teamStandings)).find((s) => s.teamId === noisy),
   ).toMatchObject({ guardrail: "ok", complaintRate7d: 0, computedAt: later });
 });
+
+it("opens the monitor flag off the team's risk and carries it on the standing", async () => {
+  const risky = await createTeam(db, "risky");
+  const later = new Date(NOW.getTime() + 30 * 60_000);
+  await db.insert(schema.usageCounters).values({ teamId: risky, day: DAY, sent: 50 });
+  await db.insert(schema.teamMonitor).values({ teamId: risky, sentTotal: 50, risk: 0.61 });
+  await db.insert(schema.monitorSamples).values([
+    { teamId: risky, kind: "first_sends", status: "judged", score: 80, createdAt: NOW },
+    { teamId: risky, kind: "first_sends", status: "judged", score: 90, createdAt: NOW },
+    { teamId: risky, kind: "first_sends", status: "unjudged", createdAt: NOW },
+  ]);
+  expect(await runSafetyFlags(db, { now: later })).toMatchObject({ opened: 1 });
+  expect(await flagsOf(risky)).toMatchObject([
+    { status: "open", reason: "monitor", detail: { risk: 0.61, samples: 2 } },
+  ]);
+  expect(
+    (await db.select().from(schema.teamStandings)).find((s) => s.teamId === risky),
+  ).toMatchObject({ monitorRisk: 0.61 });
+  // A higher configured line leaves the same team alone next run.
+  const evenLater = new Date(later.getTime() + 15 * 60_000);
+  expect(await runSafetyFlags(db, { now: evenLater, monitorFlagRisk: 0.7 })).toMatchObject({
+    cleared: 1,
+  });
+});

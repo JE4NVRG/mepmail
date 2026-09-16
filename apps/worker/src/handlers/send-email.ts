@@ -17,6 +17,8 @@ import {
   isOnboardingSender,
   isSubscribedToTopic,
   type Keyring,
+  MONITOR_ANOMALY_CHECKS,
+  type MonitorDeps,
   makeUnsubscribeToken,
   openAttachments,
   parseSingleSender,
@@ -25,6 +27,7 @@ import {
   rewriteForTracking,
   SCORE_VERSION,
   SYSTEM_MAIL_TAG,
+  sampleAcceptedEmail,
   substituteUnsubscribeUrl,
   transitionQueueState,
   utcDay,
@@ -98,6 +101,11 @@ export interface SendDeps {
    * whole dep is optional so tests that don't exercise tracking need not wire
    * it — the worker always provides it, since the master key is always present.
    */
+  /**
+   * The content monitor's draw on an accepted send. Absent when the judge is
+   * off (and in tests that never reach it): no rows, no jobs, no state.
+   */
+  monitor?: MonitorDeps | undefined;
   tracking?:
     | {
         secretKey: Buffer;
@@ -733,6 +741,7 @@ export async function sendEmail(
   }
   // Insights are best-effort bookkeeping on an already-accepted send: a bug
   // here must never fail (and so retry) the delivery.
+  let insights: ReturnType<typeof evaluateEmailInsights> | undefined;
   try {
     // Broadcast fan-out shares ONE broadcastId-keyed row, so after the first
     // completed send one indexed point-read here replaces a full engine run
@@ -746,7 +755,7 @@ export async function sendEmail(
           .limit(1)
       : [];
     if (!existing) {
-      const insights = evaluateEmailInsights({
+      insights = evaluateEmailInsights({
         html,
         preTrackingHtml,
         text,
@@ -795,6 +804,25 @@ export async function sendEmail(
     }
   } catch (err) {
     console.error(`email.send: insights failed for ${email.id}`, err);
+  }
+  // The content monitor's draw, the same best-effort rule: the send is done,
+  // a failure here is logged and changes nothing. The instance's own account
+  // mail is never customer content, so it is never drawn.
+  if (deps.monitor && !systemMail) {
+    try {
+      await sampleAcceptedEmail(db, deps.monitor, {
+        teamId: email.teamId,
+        emailId: email.id,
+        broadcast: email.broadcastId !== null,
+        anomalies:
+          insights?.checks.filter(
+            (c) =>
+              c.status === "fail" && (MONITOR_ANOMALY_CHECKS as readonly string[]).includes(c.id),
+          ).length ?? 0,
+      });
+    } catch (err) {
+      console.error(`email.send: monitor draw failed for ${email.id}`, err);
+    }
   }
   // The sentAt claim above makes this path single-shot per email, so the
   // email.sent fan-out cannot double-fire on a job retry.
