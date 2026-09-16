@@ -103,7 +103,8 @@
     "back": "Back to {to}"
   },
   "supportView": {
-    "banner": "Support view of {team} · read-only · ends in {left}",
+    "banner": "Support view of {team} · read-only",
+    "endsIn": "ends in {left}",
     "end": "End session",
     "back": "Back to console",
     "readOnly": "Read-only support view: nothing can be changed here."
