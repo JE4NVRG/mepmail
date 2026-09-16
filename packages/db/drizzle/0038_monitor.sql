@@ -33,6 +33,7 @@ CREATE TABLE "team_monitor" (
 	"override_rate" double precision,
 	"override_until" timestamp with time zone,
 	"broadcasts_paused_at" timestamp with time zone,
+	"broadcasts_resumed_at" timestamp with time zone,
 	"alerted_at" timestamp with time zone,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -61,4 +62,6 @@ ALTER TABLE "monitor_samples" ADD CONSTRAINT "monitor_samples_email_id_emails_id
 ALTER TABLE "monitor_samples" ADD CONSTRAINT "monitor_samples_broadcast_id_broadcasts_id_fk" FOREIGN KEY ("broadcast_id") REFERENCES "public"."broadcasts"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "team_monitor" ADD CONSTRAINT "team_monitor_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "monitor_samples_team_created_idx" ON "monitor_samples" USING btree ("team_id","created_at");--> statement-breakpoint
-CREATE INDEX "monitor_samples_created_idx" ON "monitor_samples" USING btree ("created_at");
+CREATE INDEX "monitor_samples_created_idx" ON "monitor_samples" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "monitor_samples_email_idx" ON "monitor_samples" USING btree ("email_id") WHERE "monitor_samples"."email_id" is not null;--> statement-breakpoint
+CREATE INDEX "monitor_samples_broadcast_idx" ON "monitor_samples" USING btree ("broadcast_id") WHERE "monitor_samples"."broadcast_id" is not null;

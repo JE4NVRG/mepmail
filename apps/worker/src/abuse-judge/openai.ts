@@ -3,6 +3,7 @@ import {
   classForStatus,
   type FetchLike,
   JUDGE_MAX_TOKENS,
+  JUDGE_REASONING_MAX_TOKENS,
   judgePrompt,
   throwIfAbort,
   verdictFromText,
@@ -10,9 +11,11 @@ import {
 
 /**
  * Chat Completions against any OpenAI-compatible endpoint. Some models reject
- * a parameter the request carries (gpt-5-nano refuses `temperature`; newer
- * models want `max_completion_tokens`): a 400 that names the parameter is
- * retried once without it, or with its replacement.
+ * a parameter the request carries (gpt-5 models refuse `temperature` and
+ * want `max_completion_tokens`): a 400 that names the parameter is retried
+ * without it, or with its replacement, and the adapter remembers the shape
+ * so later calls skip the round trip. A gpt-5 model reasons at "minimal",
+ * the effort the probe scored best at, with the probe's output cap.
  */
 export function createOpenAiJudge(opts: {
   model: string;
@@ -22,6 +25,8 @@ export function createOpenAiJudge(opts: {
 }): AbuseJudge {
   const fetcher: FetchLike = opts.fetch ?? ((url, init) => fetch(url, init));
   const url = `${opts.baseUrl.replace(/\/$/, "")}/chat/completions`;
+  const reasoning = /^gpt-5/i.test(opts.model);
+  const omitted = new Set<string>();
   return {
     provider: "openai",
     model: opts.model,
@@ -35,9 +40,14 @@ export function createOpenAiJudge(opts: {
           { role: "user", content: user },
         ],
         response_format: { type: "json_object" },
-        temperature: 0,
-        max_tokens: JUDGE_MAX_TOKENS,
+        ...(reasoning
+          ? { reasoning_effort: "minimal", max_completion_tokens: JUDGE_REASONING_MAX_TOKENS }
+          : { temperature: 0, max_tokens: JUDGE_MAX_TOKENS }),
       };
+      for (const key of omitted) {
+        if (key === "max_tokens") body.max_completion_tokens = JUDGE_MAX_TOKENS;
+        delete body[key];
+      }
       for (let attempt = 0; ; attempt += 1) {
         let res: Response;
         try {
@@ -62,15 +72,12 @@ export function createOpenAiJudge(opts: {
           return verdictFromText(text);
         }
         const detail = await res.text().catch(() => "");
-        if (res.status === 400 && attempt < 2) {
+        if (res.status === 400 && attempt < 3) {
           const param = unsupportedParam(detail);
-          if (param === "temperature" || param === "response_format") {
+          if (param && param in body && !omitted.has(param)) {
+            omitted.add(param);
+            if (param === "max_tokens") body.max_completion_tokens = JUDGE_MAX_TOKENS;
             delete body[param];
-            continue;
-          }
-          if (param === "max_tokens") {
-            delete body.max_tokens;
-            body.max_completion_tokens = JUDGE_MAX_TOKENS;
             continue;
           }
         }
@@ -80,14 +87,15 @@ export function createOpenAiJudge(opts: {
   };
 }
 
+const RETRYABLE_PARAMS = /'(temperature|response_format|max_tokens|reasoning_effort)'/;
+
 /** The parameter a 400 body names as unsupported, from its `param` field or its message. */
 function unsupportedParam(detail: string): string | null {
   try {
     const parsed = JSON.parse(detail) as { error?: { param?: string; message?: string } };
     if (parsed.error?.param) return parsed.error.param;
-    const named = parsed.error?.message?.match(/'(temperature|response_format|max_tokens)'/);
-    return named?.[1] ?? null;
+    return parsed.error?.message?.match(RETRYABLE_PARAMS)?.[1] ?? null;
   } catch {
-    return detail.match(/'(temperature|response_format|max_tokens)'/)?.[1] ?? null;
+    return detail.match(RETRYABLE_PARAMS)?.[1] ?? null;
   }
 }

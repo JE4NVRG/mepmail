@@ -142,11 +142,16 @@ export const consoleSafetyRouter = router({
           .innerJoin(t, eq(t.id, f.teamId))
           .leftJoin(st, eq(st.teamId, t.id)),
       ]);
+      const { settings } = resolveMonitorSettings(
+        await getMonitorSettingsRow(ctx.db),
+        env as unknown as Record<string, unknown>,
+      );
       return {
         items: rows.slice(0, input.limit),
         total: count?.total ?? 0,
         nextOffset: rows.length > input.limit ? input.offset + input.limit : null,
         counts: open ?? { open: 0, guardrailPaused: 0, suspended: 0 },
+        thresholds: { flagRisk: settings.flagRisk, alertRisk: settings.alertRisk },
       };
     }),
 
@@ -332,7 +337,14 @@ export const consoleSafetyRouter = router({
             : null,
         };
       }),
-      monitor: { ...monitor, samples, judge, flagScore: monitorSettings.flagScore },
+      monitor: {
+        ...monitor,
+        samples,
+        judge,
+        flagScore: monitorSettings.flagScore,
+        flagRisk: monitorSettings.flagRisk,
+        alertRisk: monitorSettings.alertRisk,
+      },
       audit: audit.map((row) => {
         const actor = parseAuditActor(row.actorId);
         return {

@@ -182,7 +182,7 @@
       "title": "Monitoramento",
       "subtitle": "Conteúdo amostrado julgado pelo modelo · clique para o histórico por hora",
       "off": "O monitoramento está desligado",
-      "offLead": "O juiz roda no worker e é definido no ambiente dele: ABUSE_JUDGE nomeia o provedor, ABUSE_JUDGE_MODEL o modelo. As verificações determinísticas de conteúdo rodam de qualquer forma.",
+      "offLead": "O juiz é definido no ambiente da instância (lido pelo worker e pelo app): ABUSE_JUDGE nomeia o provedor, ABUSE_JUDGE_MODEL o modelo. As verificações determinísticas de conteúdo rodam de qualquer forma.",
       "offDocs": "Guia de monitoramento de conteúdo",
       "judge": "Juiz",
       "sampledToday": "Amostrados hoje",
@@ -679,7 +679,8 @@
           "override": "{team} · amostrando tudo por 7 dias",
           "overrideCleared": "{team} · override parado",
           "resumed": "{team} · broadcasts retomados"
-        }
+        },
+        "modelOff": "desligado no ambiente deste app"
       }
     },
     "metric": {
@@ -715,8 +716,8 @@
         "region": "Região",
         "baseUrl": "Endpoint",
         "off": "O monitoramento está desligado: nenhuma mensagem é amostrada, nenhum job roda, nada é armazenado. As verificações determinísticas de conteúdo rodam em todo envio de qualquer forma.",
-        "offLead": "O juiz é definido no ambiente do worker, não aqui. Estas linhas ligam o padrão da nuvem (Nova Lite no Bedrock, com a cadeia de credenciais do SES):",
-        "change": "Para mudar o provedor ou o modelo, edite o ambiente do worker e reinicie-o.",
+        "offLead": "O juiz é definido no ambiente da instância, não aqui; o worker e o app leem as mesmas linhas. Estas ligam o padrão da nuvem (Nova Lite no Bedrock, com a cadeia de credenciais do SES):",
+        "change": "Para mudar o provedor ou o modelo, edite o ambiente da instância e reinicie o worker e o app.",
         "docs": "Guia de monitoramento de conteúdo"
       },
       "groups": {
@@ -782,7 +783,7 @@
       },
       "source": {
         "db": "definido aqui",
-        "env": "do ambiente",
+        "env": "do ambiente ({value})",
         "default": "padrão embutido {value}"
       }
     }

@@ -300,8 +300,15 @@ export async function sendBroadcast(
         teamId: broadcast.teamId,
         broadcastId: broadcast.id,
       });
-      monitorCopies = plan.copies;
-      if (monitorCopies > 0) {
+      if (plan.copies > 0) {
+        // The topic rule the walk applies, so the expected copy count holds
+        // for an opt-in topic too.
+        const s = schema.contactTopicSubscriptions;
+        const topicRule = !broadcast.topicId
+          ? undefined
+          : topicDefault
+            ? sql`not exists (select 1 from ${s} where ${s.contactId} = ${schema.contacts.id} and ${s.topicId} = ${broadcast.topicId} and ${s.subscribed} = false)`
+            : sql`exists (select 1 from ${s} where ${s.contactId} = ${schema.contacts.id} and ${s.topicId} = ${broadcast.topicId} and ${s.subscribed} = true)`;
         const [audience] = await db
           .select({ n: sql<number>`count(*)::int` })
           .from(schema.contacts)
@@ -310,9 +317,12 @@ export async function sendBroadcast(
               eq(schema.contacts.teamId, broadcast.teamId),
               eq(schema.contacts.unsubscribed, false),
               segmentPredicate,
+              topicRule,
             ),
           );
+        // Both or neither: a count that failed must not turn into "draw everyone".
         monitorAudience = audience?.n ?? 0;
+        monitorCopies = plan.copies;
       }
     } catch (err) {
       console.error(`broadcast ${broadcast.id}: monitor skeleton skipped`, err);

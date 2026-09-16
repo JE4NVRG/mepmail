@@ -2,7 +2,7 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import type { TeamFlagDetail } from "@millionsend/db/schema";
 import { and, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
-import { MONITOR_FLAG_RISK_DEFAULT, monitorSamplesByTeam } from "./abuse-monitor.js";
+import { MONITOR_FLAG_RISK_DEFAULT, monitorSamplesByTeam, riskAt } from "./abuse-monitor.js";
 import { fetchAccountScore } from "./account-score.js";
 import {
   type DeliverabilityHealth,
@@ -64,15 +64,23 @@ export async function computeTeamStandings(
     .groupBy(c.teamId)
     .having(sql`sum(${c.sent}) > 0`);
   const teamIds = active.map((t) => t.teamId);
+  // The risk as of this run, decayed since the last verdict, so a team the
+  // judge stopped sampling drifts back under the line on its own.
   const risks = new Map(
     teamIds.length === 0
       ? []
       : (
           await db
-            .select({ teamId: schema.teamMonitor.teamId, risk: schema.teamMonitor.risk })
+            .select({
+              teamId: schema.teamMonitor.teamId,
+              riskNum: schema.teamMonitor.riskNum,
+              riskDen: schema.teamMonitor.riskDen,
+              riskUpdatedAt: schema.teamMonitor.riskUpdatedAt,
+              firstSendAt: schema.teamMonitor.firstSendAt,
+            })
             .from(schema.teamMonitor)
             .where(inArray(schema.teamMonitor.teamId, teamIds))
-        ).map((r) => [r.teamId, r.risk]),
+        ).map((r) => [r.teamId, riskAt(r, now)]),
   );
   const samples = await monitorSamplesByTeam(db, teamIds, now);
   const rows: TeamStandingRow[] = [];
@@ -144,7 +152,10 @@ export interface FlagTrigger {
 }
 
 export interface FlagTriggerOptions {
-  /** The monitor's flag line; the built-in default when the caller has no settings. */
+  /**
+   * The monitor's flag line; the built-in default when the caller has no
+   * settings, Infinity when the judge is off so a stored risk opens nothing.
+   */
   monitorFlagRisk?: number | undefined;
 }
 

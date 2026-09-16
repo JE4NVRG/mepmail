@@ -23,6 +23,7 @@ import {
   planBroadcastSamples,
   pruneMonitorSamples,
   resumeMonitorPause,
+  riskAt,
   sampleAcceptedEmail,
   samplingFraction,
   setMonitorOverride,
@@ -232,6 +233,20 @@ describe("foldRisk", () => {
     expect(two.risk).toBeCloseTo((0.5 + MONITOR_PRIOR_NEW * 3) / (1.5 + 3), 10);
   });
 
+  it("reads the risk as of now, decayed toward the prior, and null before a verdict", () => {
+    expect(riskAt(fresh, NOW)).toBeNull();
+    const one = {
+      ...foldRisk(fresh, 100, NOW),
+      riskUpdatedAt: NOW,
+      firstSendAt: fresh.firstSendAt,
+    };
+    expect(riskAt(one, NOW)).toBeCloseTo(one.risk, 10);
+    const later = new Date(NOW.getTime() + 8 * MONITOR_RISK_HALF_LIFE_MS);
+    // Eight weeks on the team is past day 30: the risk sits just above the settled prior.
+    expect(riskAt(one, later)).toBeLessThan(0.2);
+    expect(riskAt(one, later)).toBeGreaterThan(MONITOR_PRIOR_SETTLED);
+  });
+
   it("uses the settled prior past day 30", () => {
     const settled = foldRisk(
       { ...fresh, firstSendAt: new Date(NOW.getTime() - 40 * DAY_MS) },
@@ -370,12 +385,21 @@ describe("sampling against the database", () => {
   it("backfills an old team's history from the usage counters on its first monitor row", async () => {
     const old = await createTeam(db, "old");
     await db.insert(schema.usageCounters).values([
+      // An accepted-only day is not a send day.
+      { teamId: old, day: "2025-12-01", accepted: 5, sent: 0 },
       { teamId: old, day: "2026-01-10", sent: 30_000 },
       { teamId: old, day: "2026-09-15", sent: 25_000 },
     ]);
     const row = await noteAcceptedSend(db, old, NOW);
     expect(row).toMatchObject({ sentTotal: 55_000, firstSendAt: new Date("2026-01-10T00:00:00Z") });
     expect((await noteAcceptedSend(db, old, NOW)).sentTotal).toBe(55_001);
+    // A brand-new team whose first batch is in flight keeps its real first instant.
+    const fresh = await createTeam(db, "fresh-batch");
+    await db.insert(schema.usageCounters).values({ teamId: fresh, day: "2026-09-15", sent: 3 });
+    expect(await noteAcceptedSend(db, fresh, NOW)).toMatchObject({
+      sentTotal: 3,
+      firstSendAt: NOW,
+    });
   });
 
   it("plans a broadcast: the skeleton sample plus the tier's copies, none for a system team", async () => {
@@ -511,14 +535,48 @@ describe("verdicts and thresholds", () => {
   });
 
   it("resumes from the review page and clears the operator hold with it", async () => {
+    const t = new Date(NOW.getTime() + 3 * DAY_MS + 2 * HOUR);
     expect(await resumeMonitorPause(db, { teamId, actor: { userId: "op" } })).toBe(true);
     expect((await monitor())?.broadcastsPausedAt).toBeNull();
+    expect((await monitor())?.broadcastsResumedAt).not.toBeNull();
     expect((await team())?.broadcastsPausedByOperatorAt).toBeNull();
     expect((await audits())[0]).toMatchObject({
       action: "monitor.broadcasts_resumed",
       actorId: "user:op",
     });
     expect(await resumeMonitorPause(db, { teamId, actor: { userId: "op" } })).toBe(false);
+    // The reviewed verdicts stay behind the resume: a weak verdict cannot pause the team again.
+    await db
+      .update(schema.teamMonitor)
+      .set({ broadcastsResumedAt: t })
+      .where(eq(schema.teamMonitor.teamId, teamId));
+    const weak = await applyJudgedSample(db, S, {
+      teamId,
+      score: 60,
+      now: new Date(t.getTime() + 1),
+    });
+    expect(weak.risk).toBeGreaterThan(S.pauseRisk);
+    expect(weak.paused).toBe(false);
+    // A team the operator holds by hand is theirs: the policy stamps nothing and audits nothing.
+    await db
+      .update(schema.teams)
+      .set({ broadcastsPausedByOperatorAt: t })
+      .where(eq(schema.teams.id, teamId));
+    await judged(99, new Date(t.getTime() + 2));
+    const held = await applyJudgedSample(db, S, {
+      teamId,
+      score: 99,
+      now: new Date(t.getTime() + 2),
+    });
+    expect(held.paused).toBe(false);
+    expect((await monitor())?.broadcastsPausedAt).toBeNull();
+    expect((await audits()).filter((a) => a.action === "monitor.broadcasts_paused")).toHaveLength(
+      1,
+    );
+    await db
+      .update(schema.teams)
+      .set({ broadcastsPausedByOperatorAt: null })
+      .where(eq(schema.teams.id, teamId));
   });
 
   it("never pauses an established team or with the policy off", async () => {

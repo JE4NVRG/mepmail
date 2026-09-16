@@ -1,7 +1,7 @@
 import { createHmac, hkdfSync } from "node:crypto";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { recordAudit } from "./audit.js";
 import { MONITOR_SETTING_DEFAULTS, type MonitorSettings } from "./monitor-settings.js";
 import { DAY_MS, utcDay } from "./utc-day.js";
@@ -201,15 +201,28 @@ export function foldRisk(
   const decay = 2 ** (-Math.max(0, elapsed) / MONITOR_RISK_HALF_LIFE_MS);
   const riskNum = state.riskNum * decay + score / 100;
   const riskDen = state.riskDen * decay + 1;
+  return { riskNum, riskDen, risk: riskOf(riskNum, riskDen, state.firstSendAt, now) };
+}
+
+function riskOf(riskNum: number, riskDen: number, firstSendAt: Date | null, now: Date): number {
   const prior =
-    daysSince(state.firstSendAt, now) < MONITOR_PROBATION_DAYS
+    daysSince(firstSendAt, now) < MONITOR_PROBATION_DAYS
       ? MONITOR_PRIOR_NEW
       : MONITOR_PRIOR_SETTLED;
-  return {
-    riskNum,
-    riskDen,
-    risk: (riskNum + prior * MONITOR_PRIOR_WEIGHT) / (riskDen + MONITOR_PRIOR_WEIGHT),
-  };
+  return (riskNum + prior * MONITOR_PRIOR_WEIGHT) / (riskDen + MONITOR_PRIOR_WEIGHT);
+}
+
+/**
+ * The risk as of `now`: the stored numerator and denominator decayed since
+ * the last verdict, so a team that stopped being sampled drifts back toward
+ * the prior instead of keeping the last verdict's reading. Null before the
+ * first verdict.
+ */
+export function riskAt(state: RiskState, now: Date): number | null {
+  if (state.riskUpdatedAt === null) return null;
+  const decay =
+    2 ** (-Math.max(0, now.getTime() - state.riskUpdatedAt.getTime()) / MONITOR_RISK_HALF_LIFE_MS);
+  return riskOf(state.riskNum * decay, state.riskDen * decay, state.firstSendAt, now);
 }
 
 export interface MonitorDeps {
@@ -247,12 +260,15 @@ export async function noteAcceptedSend(db: Db, teamId: string, now: Date): Promi
   const [history] = await db
     .select({
       sent: sql<number>`coalesce(sum(${c.sent}), 0)::int`,
-      first: sql<string | null>`min(${c.day})`,
+      first: sql<string | null>`min(${c.day}) filter (where ${c.sent} > 0)`,
     })
     .from(c)
     .where(eq(c.teamId, teamId));
-  if (!history || history.sent <= 1 || !history.first) return row;
-  const firstSendAt = new Date(`${history.first}T00:00:00Z`);
+  if (!history || history.sent <= 1) return row;
+  // A first day in the past is history the monitor missed; today's counter
+  // is the batch this row was created in, and its first send was just now.
+  const firstSendAt =
+    history.first && history.first < utcDay(now) ? new Date(`${history.first}T00:00:00Z`) : now;
   const [backfilled] = await db
     .update(tm)
     .set({ sentTotal: history.sent, firstSendAt })
@@ -273,6 +289,7 @@ const EMPTY_ROW = (teamId: string): TeamMonitorRow => ({
   overrideRate: null,
   overrideUntil: null,
   broadcastsPausedAt: null,
+  broadcastsResumedAt: null,
   alertedAt: null,
   updatedAt: new Date(0),
 });
@@ -317,7 +334,7 @@ export async function loadMonitorState(
     flaggedRecently,
     overrideRate: row.overrideRate,
     overrideUntil: row.overrideUntil,
-    risk: row.risk,
+    risk: riskAt(row, now),
   };
 }
 
@@ -459,61 +476,96 @@ export async function applyJudgedSample(
   input: { teamId: string; score: number; now?: Date },
 ): Promise<VerdictOutcome> {
   const now = input.now ?? new Date();
-  const row = await teamMonitorRow(db, input.teamId);
-  const next = foldRisk(row, input.score, now);
-  await db
-    .insert(tm)
-    .values({ teamId: input.teamId, ...next, riskUpdatedAt: now, updatedAt: now })
-    .onConflictDoUpdate({
-      target: tm.teamId,
-      set: { ...next, riskUpdatedAt: now, updatedAt: now },
-    });
-  const tier = monitorTier(await loadMonitorState(db, { ...row, risk: next.risk }, now), s, now);
-  let alert = false;
-  if (
-    next.risk >= s.alertRisk &&
-    (row.alertedAt === null || now.getTime() - row.alertedAt.getTime() >= MONITOR_ALERT_INTERVAL_MS)
-  ) {
-    await db.update(tm).set({ alertedAt: now }).where(eq(tm.teamId, input.teamId));
-    alert = true;
-  }
-  let paused = false;
-  if (
-    s.autoPause &&
-    tier === "new" &&
-    next.risk >= s.pauseRisk &&
-    row.broadcastsPausedAt === null
-  ) {
-    const [hot] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(ms)
-      .where(
-        and(
-          eq(ms.teamId, input.teamId),
-          eq(ms.status, "judged"),
-          gte(ms.score, MONITOR_PAUSE_VERDICT_SCORE),
-          gte(ms.judgedAt, new Date(now.getTime() - MONITOR_PAUSE_VERDICT_WINDOW_MS)),
+  // Judge lanes run side by side; the team's fold is serialised on an
+  // advisory lock held to the end of the transaction, so no verdict is lost
+  // to a stale read and the alert and pause fire once.
+  const outcome = await db.transaction(async (tx) => {
+    const t = tx as unknown as Db;
+    await t.execute(sql`select pg_advisory_xact_lock(hashtext(${input.teamId}))`);
+    const row = await teamMonitorRow(t, input.teamId);
+    const next = foldRisk(row, input.score, now);
+    await t
+      .insert(tm)
+      .values({ teamId: input.teamId, ...next, riskUpdatedAt: now, updatedAt: now })
+      .onConflictDoUpdate({
+        target: tm.teamId,
+        set: { ...next, riskUpdatedAt: now, updatedAt: now },
+      });
+    const tier = monitorTier(await loadMonitorState(t, { ...row, risk: next.risk }, now), s, now);
+    let alert = false;
+    if (next.risk >= s.alertRisk) {
+      const stamped = await t
+        .update(tm)
+        .set({ alertedAt: now })
+        .where(
+          and(
+            eq(tm.teamId, input.teamId),
+            or(
+              isNull(tm.alertedAt),
+              lte(tm.alertedAt, new Date(now.getTime() - MONITOR_ALERT_INTERVAL_MS)),
+            ),
+          ),
+        )
+        .returning({ teamId: tm.teamId });
+      alert = stamped.length > 0;
+    }
+    let paused = false;
+    if (
+      s.autoPause &&
+      tier === "new" &&
+      next.risk >= s.pauseRisk &&
+      row.broadcastsPausedAt === null
+    ) {
+      // Only verdicts since the operator last resumed count: a reviewed
+      // episode's evidence must not pause the team again on its own.
+      const since = new Date(
+        Math.max(
+          now.getTime() - MONITOR_PAUSE_VERDICT_WINDOW_MS,
+          row.broadcastsResumedAt?.getTime() ?? 0,
         ),
       );
-    if ((hot?.n ?? 0) > 0 || input.score >= MONITOR_PAUSE_VERDICT_SCORE) {
-      await db.update(tm).set({ broadcastsPausedAt: now }).where(eq(tm.teamId, input.teamId));
-      await db
-        .update(schema.teams)
-        .set({
-          broadcastsPausedByOperatorAt: sql`coalesce(${schema.teams.broadcastsPausedByOperatorAt}, ${now})`,
-        })
-        .where(eq(schema.teams.id, input.teamId));
-      await recordAudit(db, {
-        teamId: input.teamId,
-        actor: "system",
-        action: "monitor.broadcasts_paused",
-        target: { type: "team", id: input.teamId },
-        metadata: { risk: Number(next.risk.toFixed(3)), score: input.score, tier },
-      });
-      paused = true;
+      const [hot] = await t
+        .select({ n: sql<number>`count(*)::int` })
+        .from(ms)
+        .where(
+          and(
+            eq(ms.teamId, input.teamId),
+            eq(ms.status, "judged"),
+            gte(ms.score, MONITOR_PAUSE_VERDICT_SCORE),
+            gte(ms.judgedAt, since),
+          ),
+        );
+      if ((hot?.n ?? 0) > 0 || input.score >= MONITOR_PAUSE_VERDICT_SCORE) {
+        // A team the operator already holds is theirs; the policy only
+        // stamps a team nothing else holds, so its Resume lifts its own hold.
+        const held = await t
+          .update(schema.teams)
+          .set({ broadcastsPausedByOperatorAt: now })
+          .where(
+            and(
+              eq(schema.teams.id, input.teamId),
+              isNull(schema.teams.broadcastsPausedByOperatorAt),
+            ),
+          )
+          .returning({ id: schema.teams.id });
+        if (held.length > 0) {
+          await t.update(tm).set({ broadcastsPausedAt: now }).where(eq(tm.teamId, input.teamId));
+          paused = true;
+        }
+      }
     }
+    return { risk: next.risk, tier, alert, paused };
+  });
+  if (outcome.paused) {
+    await recordAudit(db, {
+      teamId: input.teamId,
+      actor: "system",
+      action: "monitor.broadcasts_paused",
+      target: { type: "team", id: input.teamId },
+      metadata: { risk: Number(outcome.risk.toFixed(3)), score: input.score, tier: outcome.tier },
+    });
   }
-  return { risk: next.risk, tier, alert, paused };
+  return outcome;
 }
 
 /** The review page's Resume: lifts the monitor's pause and the operator hold it rode on. */
@@ -523,7 +575,7 @@ export async function resumeMonitorPause(
 ): Promise<boolean> {
   const [row] = await db
     .update(tm)
-    .set({ broadcastsPausedAt: null })
+    .set({ broadcastsPausedAt: null, broadcastsResumedAt: new Date() })
     .where(and(eq(tm.teamId, input.teamId), sql`${tm.broadcastsPausedAt} is not null`))
     .returning({ teamId: tm.teamId });
   if (!row) return false;
@@ -714,7 +766,7 @@ export async function teamMonitorOverview(
   return {
     tier: decision.tier,
     decision,
-    risk: row.risk,
+    risk: state.risk,
     sentTotal: row.sentTotal,
     firstSendAt: row.firstSendAt,
     lastSampleAt: row.lastSampleAt,

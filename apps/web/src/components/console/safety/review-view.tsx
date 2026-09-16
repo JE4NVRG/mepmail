@@ -214,7 +214,11 @@ export function ReviewView({ teamId }: { teamId: string }) {
               {t("tiles.risk")}
             </Tooltip>
           }
-          color={monitor.risk === null ? undefined : riskColor(monitor.risk)}
+          color={
+            monitor.risk === null
+              ? undefined
+              : riskColor(monitor.risk, monitor.flagRisk, monitor.alertRisk)
+          }
         >
           {exempt
             ? t("tiles.riskExempt")
@@ -245,7 +249,7 @@ export function ReviewView({ teamId }: { teamId: string }) {
           <div style={{ flex: 1, minWidth: 240 }}>
             <CardHead title={monitorT("title")} subtitle={monitorT("subtitle")} />
           </div>
-          {monitor.judge.on && !exempt ? (
+          {!exempt ? (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {monitor.broadcastsPausedAt ? (
                 <button
@@ -275,7 +279,7 @@ export function ReviewView({ teamId }: { teamId: string }) {
                   <BtnSpinner on={clearOverride.isPending} />
                   {monitorT("stopOverride")}
                 </button>
-              ) : (
+              ) : monitor.judge.on ? (
                 <button
                   type="button"
                   className="ms-btn ms-btn-secondary"
@@ -287,11 +291,11 @@ export function ReviewView({ teamId }: { teamId: string }) {
                   <BtnSpinner on={setOverride.isPending} />
                   {monitorT("sampleAll")}
                 </button>
-              )}
+              ) : null}
             </div>
           ) : null}
         </div>
-        {!monitor.judge.on ? (
+        {!monitor.judge.on && monitor.samples.length === 0 && !monitor.broadcastsPausedAt ? (
           <p style={{ margin: 0, fontSize: 13, color: "var(--ms-muted)" }}>{monitorT("off")}</p>
         ) : exempt ? (
           <p style={{ margin: 0, fontSize: 13, color: "var(--ms-muted)" }}>{monitorT("exempt")}</p>
@@ -341,7 +345,11 @@ export function ReviewView({ teamId }: { teamId: string }) {
                 )}
               </dd>
               <dt>{monitorT("model")}</dt>
-              <dd style={KV_VALUE}>{`${monitor.judge.provider} · ${monitor.judge.model}`}</dd>
+              <dd style={KV_VALUE}>
+                {monitor.judge.on
+                  ? `${monitor.judge.provider} · ${monitor.judge.model}`
+                  : monitorT("modelOff")}
+              </dd>
               <dt>{monitorT("override")}</dt>
               <dd style={KV_VALUE}>
                 {monitor.override

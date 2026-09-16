@@ -202,10 +202,23 @@ export function CardHead({
 }
 
 /** The internal monitor risk, two decimals; "exempt" for a system team, a dash before the first sample. */
-export function RiskCell({ risk, plan }: { risk: number | null; plan: string }) {
+export function RiskCell({
+  risk,
+  plan,
+  thresholds,
+}: {
+  risk: number | null;
+  plan: string;
+  /** The configured flag and alert lines the colour follows. */
+  thresholds?: { flagRisk: number; alertRisk: number } | undefined;
+}) {
   const t = useTranslations("console.safety");
   const common = useTranslations("console.common");
   if (plan === "system") return <span style={{ color: "var(--ms-muted)" }}>{t("exempt")}</span>;
   if (risk === null) return <>{common("none")}</>;
-  return <span style={{ color: riskColor(risk) }}>{formatRisk(risk)}</span>;
+  return (
+    <span style={{ color: riskColor(risk, thresholds?.flagRisk, thresholds?.alertRisk) }}>
+      {formatRisk(risk)}
+    </span>
+  );
 }

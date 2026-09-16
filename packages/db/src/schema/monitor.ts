@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   doublePrecision,
@@ -57,6 +58,9 @@ export const teamMonitor = pgTable("team_monitor", {
   // Set by the pause policy; the same instant is written to
   // teams.broadcasts_paused_by_operator_at so every hold honours it.
   broadcastsPausedAt: timestamp("broadcasts_paused_at", { withTimezone: true }),
+  // When an operator last lifted the policy's pause: only verdicts after it
+  // can pause the team again, so a reviewed episode is not re-litigated.
+  broadcastsResumedAt: timestamp("broadcasts_resumed_at", { withTimezone: true }),
   alertedAt: timestamp("alerted_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -96,6 +100,11 @@ export const monitorSamples = pgTable(
     index("monitor_samples_team_created_idx").on(t.teamId, t.createdAt),
     // The instance-wide daily cap and the retention prune count by age alone.
     index("monitor_samples_created_idx").on(t.createdAt),
+    // The set-null foreign keys fire on every email and broadcast delete.
+    index("monitor_samples_email_idx").on(t.emailId).where(sql`${t.emailId} is not null`),
+    index("monitor_samples_broadcast_idx")
+      .on(t.broadcastId)
+      .where(sql`${t.broadcastId} is not null`),
   ],
 );
 
