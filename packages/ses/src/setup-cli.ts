@@ -490,7 +490,7 @@ async function socialLoginStep(wizard: Wizard): Promise<void> {
 const EMAIL_FROM_RE = /^(?:[^<>]+<)?[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>?$/;
 
 const UPDATES_SUBSCRIBE_URL = "https://app.millionsend.com/api/updates/subscribe";
-const UPDATES_PAGE_URL = "https://app.millionsend.com/updates";
+const UPDATES_PAGE_URL = "https://app.millionsend.com/updates?source=self-host";
 
 /**
  * Optional, interactive only: the operator's one-time opt-in to release
