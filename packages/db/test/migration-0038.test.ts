@@ -82,6 +82,24 @@ it("stores a sample's verdict fields and nulls its email once the email is gone"
   ]);
 });
 
+it("indexes the sample's email and broadcast keys and stamps a resume", async () => {
+  const { rows } = await client.query<{ indexname: string }>(
+    "select indexname from pg_indexes where tablename = 'monitor_samples' order by indexname",
+  );
+  expect(rows.map((r) => r.indexname)).toEqual([
+    "monitor_samples_broadcast_idx",
+    "monitor_samples_created_idx",
+    "monitor_samples_email_idx",
+    "monitor_samples_pkey",
+    "monitor_samples_team_created_idx",
+  ]);
+  const resumed = await client.query(
+    "update team_monitor set broadcasts_resumed_at = now() where team_id = $1 returning broadcasts_resumed_at is not null as resumed",
+    [teamId],
+  );
+  expect(resumed.rows).toEqual([{ resumed: true }]);
+});
+
 it("adds the monitor settings and the standing's risk column", async () => {
   await client.query(
     "insert into instance_settings (id, monitor_first_sends, monitor_trusted_rate, monitor_auto_pause) values (1, 500, 0.005, false)",

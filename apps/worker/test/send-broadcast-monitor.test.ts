@@ -129,3 +129,50 @@ it("fans out untouched when the monitor fails", async () => {
       .where(eq(schema.monitorSamples.broadcastId, broadcast?.id ?? "")),
   ).toEqual([]);
 });
+
+it("counts the audience with the topic rule so an opt-in topic still gets its copies", async () => {
+  const queued: string[] = [];
+  const monitor: MonitorDeps = {
+    samplingKey: Buffer.alloc(32, 7),
+    settings: async () => ({ ...MONITOR_SETTING_DEFAULTS, broadcastCopiesNew: 1 }),
+    enqueueJudge: async (id) => void queued.push(id),
+  };
+  const [topic] = await db
+    .insert(schema.topics)
+    .values({ teamId, name: "Opt-in", defaultSubscribed: false })
+    .returning({ id: schema.topics.id });
+  const [subscriber] = await db
+    .select({ id: schema.contacts.id })
+    .from(schema.contacts)
+    .where(eq(schema.contacts.email, "b@example.com"));
+  await db
+    .insert(schema.contactTopicSubscriptions)
+    .values({ contactId: subscriber?.id ?? "", topicId: topic?.id ?? "", subscribed: true });
+  const deps: BroadcastDeps = {
+    keyring,
+    unsubscribeSecretKey: deriveUnsubscribeKey(randomBytes(32)),
+    unsubscribeBaseUrl: "https://app.example.com",
+    isCloud: false,
+    enqueueEmailSends: async () => {},
+    monitor,
+  };
+  const [broadcast] = await db
+    .insert(schema.broadcasts)
+    .values({
+      teamId,
+      topicId: topic?.id,
+      from: "B <hi@bcast.dev>",
+      subject: "opt-in",
+      html: "<p>Hi</p>",
+      status: "scheduled",
+    })
+    .returning({ id: schema.broadcasts.id });
+  expect(await sendBroadcast(db, deps, { broadcastId: broadcast?.id ?? "" })).toBe("sent");
+  const samples = await db
+    .select()
+    .from(schema.monitorSamples)
+    .where(eq(schema.monitorSamples.broadcastId, broadcast?.id ?? ""));
+  // One subscriber, one copy wanted: the audience is 1, so the one row is drawn.
+  expect(samples.filter((s) => s.kind === "broadcast_copy")).toHaveLength(1);
+  expect(samples.filter((s) => s.kind === "broadcast_skeleton")).toHaveLength(1);
+});

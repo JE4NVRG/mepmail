@@ -707,14 +707,16 @@ on. Self-hosters can leave it off; the cloud runs it.
 
 **What it does and does not do.** It opens the `monitor` flag on Trust &
 safety when a team's risk crosses the flag line, emails the operator once a
-day per team past the alert line, and, for a team in its first days
-only, pauses broadcasts when the risk passes the pause line and a sampled
+day per team past the alert line, and, for a team in the New tier only
+(inside its first 1,000 sends or 72 hours, or under 10,000 sends within 7
+days), pauses broadcasts when the risk passes the pause line and a sampled
 message scored 90 or more within a day (transactional mail keeps flowing;
 the team sees "paused pending review"; the operator resumes from the review
 page). It never suspends a team and never holds transactional mail: a
 person decides. The pause policy is a setting and can be switched off.
 
-**Turning it on** (worker environment; a restart applies it):
+**Turning it on** (in the instance's `.env`, read by the worker and the
+app; a restart applies it):
 
 ```sh
 # Bedrock Converse, using the AWS credentials or role SES already uses.
@@ -790,7 +792,8 @@ that starts new teams higher; the review page shows it beside the tier,
 the last samples and the judge's answer next to each flagged email, and
 offers "Sample everything for 7 days". The Overview's Monitoring card
 charts the hourly sample count, and the operator is emailed when more than
-20% of an hour's samples went unjudged.
+20% of an hour's samples (at least 20 of them) went unjudged, at most once
+every six hours.
 
 </details>
 

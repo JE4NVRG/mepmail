@@ -9,6 +9,7 @@ import { Tooltip } from "@/components/tooltip";
 import { formatPercent } from "@/lib/console-format";
 import { CONTENT_MONITORING_DOCS_URL } from "@/lib/docs-links";
 import { useTRPC } from "@/lib/trpc";
+import { LoadErrorCard } from "../safety/parts";
 import { ProbeChart } from "./charts";
 
 /**
@@ -27,6 +28,7 @@ export function MonitoringCard() {
   const nf = new Intl.NumberFormat(locale);
   const data = query.data;
 
+  if (query.isError) return <LoadErrorCard onRetry={() => query.refetch()} />;
   if (!data) {
     return (
       <div className="ms-card" style={{ padding: 24, marginTop: 16 }}>
@@ -65,7 +67,7 @@ export function MonitoringCard() {
     );
   }
 
-  const today = data.today ?? { sampled: 0, judged: 0, unjudged: 0, flagged: 0 };
+  const today = data.today;
   const unjudgedRate = today.sampled > 0 ? today.unjudged / today.sampled : null;
   const figures: { id: string; label: React.ReactNode; value: string; color?: string }[] = [
     { id: "judge", label: t("judge"), value: `${data.judge.provider} · ${data.judge.model}` },

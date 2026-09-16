@@ -11,7 +11,7 @@ import {
 } from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, ilike, isNull, or, type SQL, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, isNotNull, isNull, or, type SQL, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { escapeLike } from "@/lib/sql";
@@ -286,6 +286,18 @@ export const consoleTeamsRouter = router({
             : null,
         })
         .where(eq(t.id, team.id));
+      if (!input.broadcastsPaused) {
+        // Lifting the hold lifts the monitor's pause too, as Resume does.
+        await ctx.db
+          .update(schema.teamMonitor)
+          .set({ broadcastsPausedAt: null, broadcastsResumedAt: now })
+          .where(
+            and(
+              eq(schema.teamMonitor.teamId, team.id),
+              isNotNull(schema.teamMonitor.broadcastsPausedAt),
+            ),
+          );
+      }
       await auditOperator(ctx, {
         teamId: team.id,
         action: "team.limits_updated",
@@ -370,8 +382,13 @@ export const consoleTeamsRouter = router({
       // The monitor's pause rides on the same hold; lifting one lifts both.
       await ctx.db
         .update(schema.teamMonitor)
-        .set({ broadcastsPausedAt: null })
-        .where(eq(schema.teamMonitor.teamId, team.id));
+        .set({ broadcastsPausedAt: null, broadcastsResumedAt: new Date() })
+        .where(
+          and(
+            eq(schema.teamMonitor.teamId, team.id),
+            isNotNull(schema.teamMonitor.broadcastsPausedAt),
+          ),
+        );
       await auditOperator(ctx, {
         teamId: team.id,
         action: "team.broadcasts_resumed",

@@ -80,7 +80,7 @@ export function MonitorSettingsView() {
     const setting = byKey.get(key);
     if (!setting) return 0;
     if (value === undefined) return setting.value;
-    return value === null ? setting.default : value;
+    return value === null ? setting.fallback : value;
   };
   const ordered =
     Number(effective("flagRisk")) < Number(effective("alertRisk")) &&
@@ -177,9 +177,10 @@ export function MonitorSettingsView() {
                   disabled={save.isPending}
                   onChange={(draft) => setDrafts((d) => ({ ...d, [key]: draft }))}
                   onReset={() =>
+                    // Only a stored value can be cleared; an env or default value has nothing to reset.
                     setDrafts((d) => ({
                       ...d,
-                      [key]: setting.source === "default" ? undefined : null,
+                      [key]: setting.source === "db" ? null : undefined,
                     }))
                   }
                 />
@@ -213,6 +214,8 @@ function Field({
     value: number | boolean;
     source: "db" | "env" | "default";
     default: number | boolean;
+    /** What applies once the stored value is cleared: the env value, else the default. */
+    fallback: number | boolean;
     kind: MonitorSettingKind;
   };
   draft: Draft | undefined;
@@ -223,11 +226,12 @@ function Field({
 }) {
   const t = useTranslations("console.safety.monitor");
   const id = useId();
-  const shownSource = draft === undefined ? setting.source : draft === null ? "default" : "db";
+  const fallbackSource = setting.fallback === setting.default ? "default" : "env";
+  const shownSource = draft === undefined ? setting.source : draft === null ? fallbackSource : "db";
   const resettable = draft === undefined ? setting.source === "db" : draft !== null;
   const meta = (
     <div style={{ display: "flex", gap: 10, fontSize: 12, color: "var(--ms-muted)", marginTop: 6 }}>
-      <span>{t(`source.${shownSource}`, { value: String(setting.default) })}</span>
+      <span>{t(`source.${shownSource}`, { value: String(setting.fallback) })}</span>
       {resettable ? (
         <button
           type="button"
@@ -244,7 +248,7 @@ function Field({
   if (setting.kind === "bool") {
     const checked =
       draft === undefined || draft === null
-        ? Boolean(draft === null ? setting.default : setting.value)
+        ? Boolean(draft === null ? setting.fallback : setting.value)
         : draft === true;
     return (
       <div className="ms-field" style={{ flex: "1 1 260px", maxWidth: 320 }}>
@@ -269,7 +273,7 @@ function Field({
     draft === undefined
       ? String(setting.value)
       : draft === null
-        ? String(setting.default)
+        ? String(setting.fallback)
         : String(draft);
   return (
     <div className="ms-field" style={{ flex: "1 1 260px", maxWidth: 320 }}>

@@ -255,7 +255,11 @@ export function SafetyList() {
                         </td>
                         <td className="right num">
                           <Tooltip inline text={t("riskTip")}>
-                            <RiskCell risk={row.monitorRisk} plan={row.plan} />
+                            <RiskCell
+                              risk={row.monitorRisk}
+                              plan={row.plan}
+                              thresholds={first?.thresholds}
+                            />
                           </Tooltip>
                         </td>
                         <td

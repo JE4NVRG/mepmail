@@ -122,7 +122,7 @@ export function buildJudgeBlock(input: JudgeBlockInput): string {
     .slice(0, JUDGE_TEXT_MAX_CHARS);
   const rows = new Set<string>();
   for (const a of stripped ? extractAnchors(stripped.html) : []) {
-    rows.add(`  ${label(a.text)} -> ${linkTarget(a.href)}`);
+    rows.add(`  ${label(decodeEntities(a.text))} -> ${linkTarget(a.href)}`);
     if (rows.size >= JUDGE_LINK_ROWS_MAX) break;
   }
   const attachments = input.attachments

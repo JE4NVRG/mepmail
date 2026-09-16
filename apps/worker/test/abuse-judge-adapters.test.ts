@@ -86,7 +86,7 @@ describe("OpenAI-compatible adapter", () => {
       return ok('{"score": 5}');
     });
     const judge = createOpenAiJudge({
-      model: "gpt-5-nano",
+      model: "custom-chat-model",
       baseUrl: "https://api.openai.com/v1",
       apiKey: "k",
       fetch,
@@ -95,6 +95,31 @@ describe("OpenAI-compatible adapter", () => {
     expect(calls).toHaveLength(3);
     expect(calls[2]).not.toHaveProperty("temperature");
     expect(calls[2]).toMatchObject({ max_completion_tokens: 300 });
+  });
+
+  it("sends a gpt-5 model the probe's shape and remembers a rejected parameter", async () => {
+    const { fetch, calls } = fetchStub((body) =>
+      "reasoning_effort" in body
+        ? {
+            status: 400,
+            body: { error: { param: "reasoning_effort", message: "Unknown parameter" } },
+          }
+        : ok('{"score": 1}'),
+    );
+    const judge = createOpenAiJudge({
+      model: "gpt-5-nano",
+      baseUrl: "https://x.example",
+      apiKey: "k",
+      fetch,
+    });
+    expect((await judge.judge(BLOCK, { signal })).score).toBe(1);
+    expect(calls[0]).toMatchObject({ reasoning_effort: "minimal", max_completion_tokens: 600 });
+    expect(calls[0]).not.toHaveProperty("temperature");
+    expect(calls).toHaveLength(2);
+    // The next call skips the round trip the first one paid for.
+    expect((await judge.judge(BLOCK, { signal })).score).toBe(1);
+    expect(calls).toHaveLength(3);
+    expect(calls[2]).not.toHaveProperty("reasoning_effort");
   });
 
   it("maps statuses to classes and a bad body to a parse error", async () => {
@@ -175,6 +200,30 @@ describe("Anthropic adapter", () => {
       fetch: fetchStub(() => ({ status: 529, body: {} })).fetch,
     });
     expect(await errorClass(overloaded.judge(BLOCK, { signal }))).toBe("throttled");
+  });
+
+  it("drops temperature when the model rejects it and remembers", async () => {
+    const { fetch, calls } = fetchStub((body) =>
+      "temperature" in body
+        ? {
+            status: 400,
+            body: {
+              type: "error",
+              error: {
+                type: "invalid_request_error",
+                message: "temperature is not supported by this model",
+              },
+            },
+          }
+        : { status: 200, body: { content: [{ type: "text", text: '{"score": 9}' }] } },
+    );
+    const judge = createAnthropicJudge({ model: "claude-opus-5", apiKey: "k", fetch });
+    expect((await judge.judge(BLOCK, { signal })).score).toBe(9);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).not.toHaveProperty("temperature");
+    await judge.judge(BLOCK, { signal });
+    expect(calls).toHaveLength(3);
+    expect(calls[2]).not.toHaveProperty("temperature");
   });
 });
 

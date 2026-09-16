@@ -85,7 +85,16 @@ it("opens the monitor flag off the team's risk and carries it on the standing", 
   const risky = await createTeam(db, "risky");
   const later = new Date(NOW.getTime() + 30 * 60_000);
   await db.insert(schema.usageCounters).values({ teamId: risky, day: DAY, sent: 50 });
-  await db.insert(schema.teamMonitor).values({ teamId: risky, sentTotal: 50, risk: 0.61 });
+  // Twelve certain verdicts an hour ago: about 0.83 now, decaying toward the settled prior.
+  await db.insert(schema.teamMonitor).values({
+    teamId: risky,
+    sentTotal: 50,
+    firstSendAt: new Date(NOW.getTime() - 40 * 86_400_000),
+    risk: 0.83,
+    riskNum: 12,
+    riskDen: 12,
+    riskUpdatedAt: NOW,
+  });
   await db.insert(schema.monitorSamples).values([
     { teamId: risky, kind: "first_sends", status: "judged", score: 80, createdAt: NOW },
     { teamId: risky, kind: "first_sends", status: "judged", score: 90, createdAt: NOW },
@@ -93,14 +102,38 @@ it("opens the monitor flag off the team's risk and carries it on the standing", 
   ]);
   expect(await runSafetyFlags(db, { now: later })).toMatchObject({ opened: 1 });
   expect(await flagsOf(risky)).toMatchObject([
-    { status: "open", reason: "monitor", detail: { risk: 0.61, samples: 2 } },
+    { status: "open", reason: "monitor", detail: { risk: 0.83, samples: 2 } },
   ]);
   expect(
-    (await db.select().from(schema.teamStandings)).find((s) => s.teamId === risky),
-  ).toMatchObject({ monitorRisk: 0.61 });
+    (await db.select().from(schema.teamStandings)).find((s) => s.teamId === risky)?.monitorRisk,
+  ).toBeCloseTo(0.83, 2);
   // A higher configured line leaves the same team alone next run.
   const evenLater = new Date(later.getTime() + 15 * 60_000);
-  expect(await runSafetyFlags(db, { now: evenLater, monitorFlagRisk: 0.7 })).toMatchObject({
+  expect(await runSafetyFlags(db, { now: evenLater, monitorFlagRisk: 0.9 })).toMatchObject({
     cleared: 1,
   });
+  // With no new verdict the risk decays on its own: weeks later the standing reads near the prior.
+  const weeksOn = new Date(NOW.getTime() + 60 * 86_400_000);
+  await db.insert(schema.usageCounters).values({ teamId: risky, day: utcDay(weeksOn), sent: 10 });
+  expect(await runSafetyFlags(db, { now: weeksOn })).toMatchObject({ opened: 0 });
+  const standing = (await db.select().from(schema.teamStandings)).find((s) => s.teamId === risky);
+  expect(standing?.monitorRisk).toBeLessThan(0.2);
+});
+
+it("opens nothing from a stored risk while the judge is off", async () => {
+  const stale = await createTeam(db, "stale");
+  const t = new Date(NOW.getTime() + 61 * 86_400_000);
+  await db.insert(schema.usageCounters).values({ teamId: stale, day: utcDay(t), sent: 50 });
+  await db.insert(schema.teamMonitor).values({
+    teamId: stale,
+    sentTotal: 50,
+    risk: 0.95,
+    riskNum: 20,
+    riskDen: 20,
+    riskUpdatedAt: t,
+  });
+  expect(
+    await runSafetyFlags(db, { now: t, monitorFlagRisk: Number.POSITIVE_INFINITY }),
+  ).toMatchObject({ opened: 0 });
+  expect(await flagsOf(stale)).toEqual([]);
 });

@@ -1,5 +1,5 @@
 {
-  "id": "d4633e8c-0375-4c12-a446-d2ad165b4879",
+  "id": "0f878eaa-0817-4500-a492-49c9c17e0972",
   "prevId": "64359930-c1bd-4255-99fe-e7ed0ca7ec5a",
   "version": "7",
   "dialect": "postgresql",
@@ -4035,6 +4035,38 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "monitor_samples_email_idx": {
+          "name": "monitor_samples_email_idx",
+          "columns": [
+            {
+              "expression": "email_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"monitor_samples\".\"email_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "monitor_samples_broadcast_idx": {
+          "name": "monitor_samples_broadcast_idx",
+          "columns": [
+            {
+              "expression": "broadcast_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"monitor_samples\".\"broadcast_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -4153,6 +4185,12 @@
         },
         "broadcasts_paused_at": {
           "name": "broadcasts_paused_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "broadcasts_resumed_at": {
+          "name": "broadcasts_resumed_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

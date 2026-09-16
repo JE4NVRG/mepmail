@@ -36,11 +36,15 @@ export const consoleMonitorRouter = router({
       .select({ n: sql<number>`count(*)::int` })
       .from(f)
       .where(and(eq(f.reason, "monitor"), eq(f.status, "open")));
+    // Tallies are read whatever this process's env says: the worker is the
+    // one that samples, and its rows are the truth.
     return {
       judge,
-      today: judge.on ? await monitorDayCounts(ctx.db, settings) : null,
+      today: await monitorDayCounts(ctx.db, settings),
       openFlags: flags?.n ?? 0,
       flagScore: settings.flagScore,
+      flagRisk: settings.flagRisk,
+      alertRisk: settings.alertRisk,
     };
   }),
 
@@ -51,6 +55,8 @@ export const consoleMonitorRouter = router({
         await getMonitorSettingsRow(ctx.db),
         envValues(),
       );
+      // What clearing the stored value falls back to: the env value, else the default.
+      const fallback = resolveMonitorSettings(null, envValues()).settings;
       return {
         judge: judgeStatus(),
         settings: MONITOR_SETTING_KEYS.map((key) => ({
@@ -58,6 +64,7 @@ export const consoleMonitorRouter = router({
           value: settings[key],
           source: sources[key],
           default: MONITOR_SETTINGS[key].default,
+          fallback: fallback[key],
           kind: MONITOR_SETTINGS[key].kind,
         })),
       };

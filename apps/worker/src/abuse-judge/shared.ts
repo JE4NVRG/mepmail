@@ -34,3 +34,5 @@ export function classForStatus(status: number): "throttled" | "no_credentials" |
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
 export const JUDGE_MAX_TOKENS = 300;
+/** A reasoning model spends part of its cap thinking; the probe ran gpt-5-nano at this. */
+export const JUDGE_REASONING_MAX_TOKENS = 600;

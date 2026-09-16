@@ -44,8 +44,36 @@ describe("parseJudgeOutput", () => {
     });
   });
 
+  it("normalises reasons and categories to a few short codes", () => {
+    const out = parseJudgeOutput(
+      '{"score": 70, "reasons": ["Reply-To domain mismatch", "credential_ask", "credential_ask", "Pague a taxa de R$ 4,90 em ate 24 horas para liberar a entrega da encomenda", "a", "b", "c", "d"], "categories": ["Brand impersonation"], "impersonated_brand": "  Example   Bank  "}',
+    );
+    expect(out.reasons).toEqual([
+      "reply_to_domain_mismatch",
+      "credential_ask",
+      "pague_a_taxa_de_r_4_90_em_ate_24_horas_p",
+      "a",
+      "b",
+    ]);
+    expect(out.categories).toEqual(["brand_impersonation"]);
+    expect(out.impersonatedBrand).toBe("Example Bank");
+  });
+
+  it("skips a non-JSON brace pair and takes the next object that parses", () => {
+    expect(parseJudgeOutput('Note {not json} then {"score": 33}').score).toBe(33);
+  });
+
   it("is a parse error without an object or a numeric score", () => {
-    for (const text of ["no json here", '{"verdict": "abuse"}', '{"score": "high"}', "{ broken"]) {
+    for (const text of [
+      "no json here",
+      '{"verdict": "abuse"}',
+      '{"score": "high"}',
+      "{ broken",
+      '{"score": null}',
+      '{"score": ""}',
+      '{"score": true}',
+      '{"score": []}',
+    ]) {
       let error: unknown;
       try {
         parseJudgeOutput(text);
@@ -140,6 +168,14 @@ describe("buildJudgeBlock", () => {
     expect(html).toContain("Hidden characters count: 1");
     expect(html).toContain("Reply-To: other@example.net");
     expect(html).toContain("Attachments: (none)");
+  });
+
+  it("decodes entities in anchor labels like the visible text", () => {
+    const block = buildJudgeBlock({
+      ...base,
+      html: '<a href="https://pay.example.net/x">Pay &amp; go &#8203;now</a>',
+    });
+    expect(block).toContain("  Pay & go now -> example.net");
   });
 
   it("caps the link table at thirty distinct rows", () => {

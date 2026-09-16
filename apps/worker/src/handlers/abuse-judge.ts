@@ -89,30 +89,33 @@ export async function judgeSample(
     return unjudged(errorClass, latencyMs);
   }
   const latencyMs = Date.now() - started;
-  const [judged] = await db
-    .update(ms)
-    .set({
-      status: "judged",
-      score: verdict.score,
-      verdict: verdict.verdict,
-      categories: verdict.categories,
-      reasons: verdict.reasons,
-      impersonatedBrand: verdict.impersonatedBrand,
-      language: verdict.language,
-      model: deps.judge.model,
-      latencyMs,
-      judgedAt: now,
-    })
-    .where(and(eq(ms.id, sample.id), eq(ms.status, "pending")))
-    .returning({ id: ms.id });
-  // A concurrent run already wrote this sample: its verdict stands, the risk moved once.
-  if (!judged) return "skipped";
   const settings = await deps.settings();
-  const outcome = await applyJudgedSample(db, settings, {
-    teamId: sample.teamId,
-    score: verdict.score,
-    now,
+  const model = deps.judge.model;
+  // The verdict and its fold commit together: a crash between them would
+  // leave a judged row the retry skips and a risk that never saw it.
+  const outcome = await db.transaction(async (tx) => {
+    const t = tx as unknown as Db;
+    const [judged] = await t
+      .update(ms)
+      .set({
+        status: "judged",
+        score: verdict.score,
+        verdict: verdict.verdict,
+        categories: verdict.categories,
+        reasons: verdict.reasons,
+        impersonatedBrand: verdict.impersonatedBrand,
+        language: verdict.language,
+        model,
+        latencyMs,
+        judgedAt: now,
+      })
+      .where(and(eq(ms.id, sample.id), eq(ms.status, "pending")))
+      .returning({ id: ms.id });
+    // A concurrent run already wrote this sample: its verdict stands, the risk moved once.
+    if (!judged) return null;
+    return applyJudgedSample(t, settings, { teamId: sample.teamId, score: verdict.score, now });
   });
+  if (!outcome) return "skipped";
   if ((outcome.alert || outcome.paused) && deps.mailer) {
     await notifyOperator(db, deps, sample.teamId, verdict.score, outcome, settings, now);
   }

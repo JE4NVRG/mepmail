@@ -406,10 +406,18 @@ describe("console.monitor", () => {
       value: 1000,
       source: "default",
       default: 1000,
+      fallback: 1000,
       kind: "count",
     });
     const status = await operator().console.monitor.status();
-    expect(status).toMatchObject({ judge: { on: false }, today: null, openFlags: 0 });
+    expect(status).toMatchObject({
+      judge: { on: false },
+      today: { sampled: 0, judged: 0, unjudged: 0, flagged: 0 },
+      openFlags: 0,
+      flagRisk: 0.5,
+      alertRisk: 0.7,
+    });
+    expect(got.settings.find((s) => s.key === "rampRate")).toMatchObject({ fallback: 0.25 });
   });
 
   it("stores overrides, records only the changed keys, clears with null, and honours env between", async () => {
@@ -426,6 +434,7 @@ describe("console.monitor", () => {
     });
     vi.stubEnv("MONITOR_RAMP_RATE", "0.4");
     const got = await operator().console.monitor.settings.get();
+    expect(got.settings.find((s) => s.key === "rampRate")).toMatchObject({ fallback: 0.4 });
     expect(got.settings.find((s) => s.key === "firstSends")).toMatchObject({
       value: 500,
       source: "db",
@@ -517,6 +526,25 @@ describe("console.monitor", () => {
       resumed: false,
     });
 
+    // Un-pausing through the limits dialog lifts it as well, and stamps the resume.
+    await db
+      .update(schema.teamMonitor)
+      .set({ broadcastsPausedAt: pausedAt, broadcastsResumedAt: null })
+      .where(eq(schema.teamMonitor.teamId, teamId));
+    await db
+      .update(schema.teams)
+      .set({ broadcastsPausedByOperatorAt: pausedAt })
+      .where(eq(schema.teams.id, teamId));
+    await operator().console.teams.adjustLimits({
+      id: teamId,
+      dailySendCeiling: null,
+      broadcastsPaused: false,
+    });
+    const afterLimits = (
+      await db.select().from(schema.teamMonitor).where(eq(schema.teamMonitor.teamId, teamId))
+    )[0];
+    expect(afterLimits?.broadcastsPausedAt).toBeNull();
+    expect(afterLimits?.broadcastsResumedAt).not.toBeNull();
     // The operator's own resume lifts the monitor's pause too.
     await db
       .update(schema.teamMonitor)
@@ -547,6 +575,7 @@ describe("console.monitor", () => {
       .insert(schema.teamStandings)
       .values({ teamId: flagged, guardrail: "ok", monitorRisk: 0.62 });
     const list = await operator().console.safety.list({ sort: "risk", dir: "desc" });
+    expect(list.thresholds).toEqual({ flagRisk: 0.5, alertRisk: 0.7 });
     expect(list.items[0]).toMatchObject({
       teamId: flagged,
       reason: "monitor",
