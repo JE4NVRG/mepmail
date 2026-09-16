@@ -781,6 +781,46 @@ every six hours.
 </details>
 
 <details>
+<summary><b>Support view (optional)</b></summary>
+
+Off by default. With `SUPPORT_VIEW=on`, the console's Teams list gains
+"View as owner": the operator names a reason (support ticket, verifying an
+abuse report, billing dispute, other) and the ticket or report reference,
+and opens the team's dashboard as its owner sees it, read-only, for 30
+minutes. The session rides on the operator's own login; no session is ever
+minted for the owner.
+
+- **What the operator sees:** the dashboard under a banner ("Support view
+  of <team> · read-only · ends in mm:ss"): emails and their events,
+  contacts, domains, broadcasts, templates, API key names, webhook
+  endpoints, settings and usage.
+- **What stays hidden:** email bodies (the detail says "Email content is
+  hidden in support view"), API log request and response bodies, CSV
+  exports (the export route answers 403), and every secret: API keys,
+  webhook signing secrets and SMTP credentials are never returned.
+- **What is refused:** every change. A base tRPC middleware answers
+  `FORBIDDEN` to every mutation while the view is live, whatever the
+  screen shows; the console's own actions keep working.
+- **How long:** 30 minutes, enforced on every request; one live view per
+  operator, starting another ends the previous, and a view cannot start
+  another. The operator ends it from the banner, the owner from Settings →
+  Support access, and expiry ends it on the next request.
+- **What is logged:** `support.view_started` and `support.view_ended` in
+  the instance audit and, at once, in the team's own Settings → Audit log
+  (who, the reason, the reference, how it ended, the minutes, how many
+  distinct procedures were read). The grant row keeps a count per
+  procedure name and never anything a procedure returned.
+- **What the owner receives:** an email when the session starts (who, why,
+  the reference, until when, and where to end it), and the Support access
+  card while it is live.
+
+```sh
+SUPPORT_VIEW=on
+```
+
+</details>
+
+<details>
 <summary><b>Operations</b></summary>
 
 - Send rate and email retention are managed in the dashboard: Settings → Instance

@@ -873,6 +873,49 @@ visão geral mostra a contagem de amostras por hora, e o operador é avisado
 por e-mail quando mais de 20% das amostras de uma hora (pelo menos 20 delas)
 ficaram sem julgamento, no máximo a cada seis horas.
 
+## Modo de suporte (opcional)
+
+Desligado por padrão; `SUPPORT_VIEW=on` liga. Na lista de Equipes do
+console, "Ver como proprietário" abre o painel de uma equipe como o
+proprietário o vê, em modo somente leitura, por 30 minutos, depois que o
+operador informa um motivo (chamado de suporte, verificação de denúncia de
+abuso, disputa de cobrança, outro) e a referência do chamado ou da denúncia.
+A sessão usa o login do próprio operador; nenhuma sessão é criada em nome
+do proprietário.
+
+**O que o operador vê.** O painel sob uma faixa ("Modo de suporte de
+&lt;equipe&gt; · somente leitura · termina em mm:ss"): e-mails e seus
+eventos, contatos, domínios, transmissões, templates, nomes de chaves de
+API, endpoints de webhook, configurações e uso.
+
+**O que fica oculto.** Corpos de e-mail (o detalhe diz "O conteúdo do
+e-mail fica oculto no modo de suporte"), corpos de requisição e resposta dos
+logs de API, exportações CSV (a rota de exportação responde 403) e todo
+segredo: chaves de API, segredos de assinatura de webhook e credenciais SMTP
+nunca são devolvidos. Toda alteração é recusada: o servidor responde
+`FORBIDDEN` a qualquer mutação enquanto o modo está ativo, independentemente
+do que a tela mostra.
+
+**Por quanto tempo.** 30 minutos, verificados a cada requisição. Um modo
+ativo por operador; iniciar outro encerra o anterior, e um modo não inicia
+outro. O operador encerra pela faixa, o proprietário em Configurações →
+Acesso de suporte, e a expiração encerra na requisição seguinte.
+
+**O que é registrado.** `support.view_started` e `support.view_ended`, na
+auditoria da instância e, na hora, no Log de auditoria da própria equipe em
+Configurações: quem, o motivo, a referência, como terminou, os minutos e
+quantos procedimentos distintos foram lidos. O registro guarda uma contagem
+por nome de procedimento e nunca o que um procedimento devolveu.
+
+**O que o proprietário recebe.** Um e-mail quando a sessão começa, dizendo
+quem abriu, por quê, a referência, até quando e onde encerrar; e o cartão
+Acesso de suporte em Configurações enquanto ela está ativa, com um botão
+"Encerrar sessão".
+
+```sh
+SUPPORT_VIEW=on
+```
+
 ## Operações
 
 - Taxa de envio e retenção de emails são gerenciadas no painel:
