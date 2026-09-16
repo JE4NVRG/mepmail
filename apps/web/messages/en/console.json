@@ -682,7 +682,8 @@
           "overrideCleared": "{team} · override stopped",
           "resumed": "{team} · broadcasts resumed"
         },
-        "modelOff": "off in this app's environment"
+        "modelOff": "off in this app's environment",
+        "unjudgedNoError": "unjudged"
       }
     },
     "metric": {
@@ -821,7 +822,8 @@
         "recorded": "Recorded",
         "recordedValue": "Instance audit · team audit after 7 days",
         "note": "Bodies already purged by retention cannot be revealed.",
-        "confirm": "Reveal"
+        "confirm": "Reveal",
+        "whyPlaceholder": "The verdicts name impersonation and the links point at a lookalike host."
       },
       "view": {
         "title": "Revealed content · {team}",
@@ -847,7 +849,11 @@
       "toast": {
         "granted": "{team} · content access open for 30 minutes",
         "purged": "{count, plural, one {# email} other {# emails}} skipped: the body was purged by retention",
-        "cleared": "{team} · cleared as a false positive"
+        "cleared": "{team} · cleared as a false positive",
+        "failed": "Could not open content access: {message}",
+        "failedOff": "Content access is off on this instance.",
+        "failedPurged": "Every message in scope had its body purged by retention.",
+        "failedNotFlagged": "That email is no longer in the team's flagged window."
       }
     }
   },

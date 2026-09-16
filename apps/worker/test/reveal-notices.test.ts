@@ -122,6 +122,15 @@ describe("safety.reveal_notices", () => {
     expect(await runRevealNotices(db, { mailer })).toEqual({ disclosed: 0, withheld: 0 });
   });
 
+  it("withholds from a team already suspended for phishing before the grant", async () => {
+    // A re-suspension keeps the original suspended_at, so an escalation to
+    // phishing is indistinguishable from one that was always phishing.
+    await suspend("phishing");
+    const id = await grant(8);
+    expect(await runRevealNotices(db)).toEqual({ disclosed: 0, withheld: 1 });
+    expect(await teamRowsFor(id)).toEqual([]);
+  });
+
   it("still discloses to a team suspended for anything else", async () => {
     const id = await grant(8);
     await suspend("non_payment");
