@@ -174,7 +174,23 @@
       "queue_quota_held": "E-mails retidos por cota",
       "queue_oldest_s": "Job mais antigo na fila",
       "region_sent": "Enviados por hora · {region}",
-      "noPoints": "Nada registrado neste período ainda."
+      "noPoints": "Nada registrado neste período ainda.",
+      "monitor_samples_1h": "Amostras do monitor por hora",
+      "monitor_unjudged_rate": "Parcela sem julgamento do monitor"
+    },
+    "monitoring": {
+      "title": "Monitoramento",
+      "subtitle": "Conteúdo amostrado julgado pelo modelo · clique para o histórico por hora",
+      "off": "O monitoramento está desligado",
+      "offLead": "O juiz roda no worker e é definido no ambiente dele: ABUSE_JUDGE nomeia o provedor, ABUSE_JUDGE_MODEL o modelo. As verificações determinísticas de conteúdo rodam de qualquer forma.",
+      "offDocs": "Guia de monitoramento de conteúdo",
+      "judge": "Juiz",
+      "sampledToday": "Amostrados hoje",
+      "judged": "Julgados",
+      "unjudgedRate": "Sem julgamento",
+      "flaggedToday": "Sinalizados hoje",
+      "flaggedTip": "Amostras julgadas com pontuação {score} ou mais.",
+      "openFlags": "Sinalizações do monitor abertas"
     }
   },
   "region": {
@@ -482,7 +498,7 @@
   },
   "safety": {
     "title": "Confiança e segurança",
-    "info": "Uma equipe entra aqui quando o guardrail de entregabilidade vira alerta ou pausa, as reclamações passam de 0,1% ou os hard bounces de 5% em 7 dias, o score da conta cai abaixo de 5, ou um operador a sinaliza à mão. Sinalizações automáticas somem sozinhas quando o gatilho passa; uma que você limpa fica limpa enquanto o mesmo gatilho durar.",
+    "info": "Uma equipe entra aqui quando o guardrail de entregabilidade vira alerta ou pausa, as reclamações passam de 0,1% ou os hard bounces de 5% em 7 dias, o risco do monitor de conteúdo cruza a linha de sinalização (conteúdo amostrado julgado pelo modelo), o score da conta cai abaixo de 5, ou um operador a sinaliza à mão. Sinalizações automáticas somem sozinhas quando o gatilho passa; uma que você limpa fica limpa enquanto o mesmo gatilho durar.",
     "proof": "{open} abertas · {guardrailPaused} pausadas pelo guardrail · {suspended} suspensas",
     "search": "Buscar equipes, proprietários, domínios",
     "filters": {
@@ -506,7 +522,7 @@
       "manual": "Manual"
     },
     "reasonTip": {
-      "monitor": "O monitor automático sinalizou conteúdo amostrado.",
+      "monitor": "O monitor de conteúdo: conteúdo amostrado julgado pelo modelo levou o risco interno acima da linha de sinalização.",
       "complaints": "A taxa de reclamações passou de 0,1% ou a de hard bounces de 5% nos últimos 7 dias (o SES revisa contas nessas linhas).",
       "guardrail": "O guardrail de entregabilidade virou alerta ou pausou a equipe pelas taxas de bounce ou reclamação.",
       "score": "O score da conta caiu abaixo de 5 em 10.",
@@ -521,7 +537,7 @@
       "score": "Score {score} / 10",
       "manual": "Sinalizada pelo operador",
       "report": "Denúncia de abuso",
-      "monitor": "Monitor"
+      "monitor": "Risco {risk} · {samples, plural, one {# amostra} other {# amostras}}"
     },
     "columns": {
       "team": "Equipe",
@@ -533,7 +549,8 @@
       "reason": "Sinalizada por",
       "status": "Status",
       "region": "Região",
-      "since": "Desde"
+      "since": "Desde",
+      "risk": "Risco"
     },
     "scoreTip": "O score da conta que o cliente vê: checagens de conteúdo e resultados de bounce/reclamação em 30 dias. A equipe vê este.",
     "empty": "0 equipes sinalizadas.",
@@ -572,7 +589,10 @@
         "bounces": "Hard bounces 7d",
         "sent7d": "Enviados 7d",
         "contacts": "Contatos",
-        "scoreOf": "{score} / 10"
+        "scoreOf": "{score} / 10",
+        "risk": "Risco do monitor",
+        "riskTip": "Interno. Veredictos amostrados decaídos ao longo do tempo, ponderados pela idade da equipe. Nunca mostrado à equipe.",
+        "riskExempt": "isenta"
       },
       "checks": {
         "title": "Checagens de conteúdo",
@@ -588,7 +608,11 @@
         "recipients": "Destinatários",
         "insight": "Insight",
         "more": "+{count} mais",
-        "none": "0 e-mails sinalizados no período."
+        "none": "0 e-mails sinalizados no período.",
+        "monitor": "Monitor",
+        "modelScore": "Modelo: {score} · {detail}",
+        "notFlagged": "não sinalizado",
+        "modelUnjudged": "Modelo: sem julgamento · {error}"
       },
       "audit": {
         "title": "Cauda de auditoria",
@@ -602,11 +626,165 @@
       "openFlag": "Sinalizar esta equipe",
       "openFlagTitle": "Sinalizar {team}",
       "openFlagLead": "Uma sinalização manual lista a equipe em Confiança e segurança até você limpá-la; o cron de segurança nunca a limpa.",
-      "openFlagConfirm": "Sinalizar equipe"
+      "openFlagConfirm": "Sinalizar equipe",
+      "monitor": {
+        "title": "Monitoramento",
+        "subtitle": "Conteúdo amostrado julgado pelo modelo. Só interno; nunca mostrado à equipe.",
+        "off": "O monitoramento está desligado nesta instância; as verificações de conteúdo acima continuam rodando em todo envio.",
+        "exempt": "Esta equipe é isenta: está no plano de sistema.",
+        "tier": "Nível de amostragem",
+        "tierValue": "{tier} · {rate} dos envios aceitos",
+        "elevated": {
+          "anomaly": "elevada por anomalias",
+          "flagged": "×4 enquanto sinalizada",
+          "override": "override"
+        },
+        "samples": "Amostras · 7d",
+        "samplesValue": "{samples} · {flagged} sinalizadas · {unjudged} sem julgamento",
+        "verdicts": "Veredictos",
+        "verdictsValue": "{clean} limpos · {flagged} sinalizados",
+        "verdictsReasons": "{clean} limpos · {flagged} sinalizados: {reasons}",
+        "lastSample": "Última amostra",
+        "model": "Modelo",
+        "override": "Override",
+        "overrideValue": "amostrando tudo até {until}",
+        "overrideNone": "nenhum",
+        "pause": "Pausa do monitor",
+        "pauseValue": "broadcasts pausados aguardando revisão desde {since}",
+        "pauseNone": "nenhuma",
+        "sampleAll": "Amostrar tudo por 7 dias",
+        "stopOverride": "Parar override",
+        "resume": "Retomar broadcasts",
+        "samplesTitle": "Últimas amostras",
+        "samplesSubtitle": "As 20 mais recentes. Enviado em, tipo, a pontuação ou por que ficou sem julgamento, e os códigos de motivo; nunca o assunto ou o corpo.",
+        "samplesNone": "0 amostras.",
+        "cols": {
+          "at": "Enviado",
+          "kind": "Tipo",
+          "result": "Pontuação",
+          "reasons": "Motivos"
+        },
+        "kinds": {
+          "first_sends": "primeiros envios",
+          "ramp": "rampa",
+          "tier": "nível",
+          "anomaly": "anomalia",
+          "override": "override",
+          "broadcast_skeleton": "esqueleto do broadcast",
+          "broadcast_copy": "cópia do broadcast"
+        },
+        "pending": "pendente",
+        "unjudged": "sem julgamento · {error}",
+        "toast": {
+          "override": "{team} · amostrando tudo por 7 dias",
+          "overrideCleared": "{team} · override parado",
+          "resumed": "{team} · broadcasts retomados"
+        }
+      }
     },
     "metric": {
       "complaint": "Reclamações",
       "hard_bounce": "Hard bounces"
+    },
+    "settingsButton": "Configurações de monitoramento",
+    "exempt": "isenta",
+    "riskTip": "Risco interno do monitor, de 0 a 1. Conteúdo amostrado julgado pelo modelo, decaído ao longo do tempo, ponderado pela idade da equipe. Nunca mostrado à equipe.",
+    "tiers": {
+      "new": "Nova",
+      "probation": "Probatória",
+      "established": "Estabelecida",
+      "trusted": "Confiável",
+      "exempt": "Isenta"
+    },
+    "monitor": {
+      "title": "Configurações de monitoramento",
+      "crumb": "Confiança e segurança",
+      "subtitle": "Taxas de amostragem, limites e linhas · um valor definido aqui sobrepõe o ambiente e o padrão embutido",
+      "save": "Salvar alterações",
+      "saved": "Configurações de monitoramento salvas",
+      "error": "Não foi possível salvar: {message}",
+      "order": "As linhas de sinalização, alerta e pausa precisam subir nessa ordem.",
+      "footnote": "A amostragem só muda a rapidez com que o risco ganha confiança: o julgamento acontece depois que o SES aceita a mensagem e nunca a atrasa nem a retém. A rubrica, os níveis e as linhas são públicos; só a chave de amostragem é secreta.",
+      "on": "ligada",
+      "off": "desligada",
+      "reset": "Restaurar padrão",
+      "judge": {
+        "title": "Juiz",
+        "provider": "Provedor",
+        "model": "Modelo",
+        "region": "Região",
+        "baseUrl": "Endpoint",
+        "off": "O monitoramento está desligado: nenhuma mensagem é amostrada, nenhum job roda, nada é armazenado. As verificações determinísticas de conteúdo rodam em todo envio de qualquer forma.",
+        "offLead": "O juiz é definido no ambiente do worker, não aqui. Estas linhas ligam o padrão da nuvem (Nova Lite no Bedrock, com a cadeia de credenciais do SES):",
+        "change": "Para mudar o provedor ou o modelo, edite o ambiente do worker e reinicie-o.",
+        "docs": "Guia de monitoramento de conteúdo"
+      },
+      "groups": {
+        "launch": "Perfil de lançamento",
+        "tiers": "Níveis",
+        "broadcasts": "Broadcasts",
+        "escalation": "Escalonamento e limites",
+        "thresholds": "Linhas e política"
+      },
+      "groupsSub": {
+        "launch": "Os primeiros envios e horas de uma equipe são julgados por inteiro; depois vale a taxa de rampa até a contagem de envios ou o dia, o que vier primeiro.",
+        "tiers": "Probatória vai do fim da rampa ao dia 30; Estabelecida a partir do dia 30; Confiável exige 120 dias, 50.000 envios e nenhuma sinalização em 90 dias.",
+        "broadcasts": "Um broadcast é julgado pelo seu próprio HTML mais esta quantidade de cópias renderizadas; os destinatários nunca são amostrados por mensagem além disso.",
+        "escalation": "Uma checagem crítica ou importante de conteúdo falhando multiplica a taxa; duas forçam. Os limites param a amostragem em silêncio, nunca o envio.",
+        "thresholds": "O risco vai de 0 a 1. A sinalização lista a equipe aqui e quadruplica sua taxa; o alerta envia um e-mail uma vez por dia por equipe; a pausa retém os broadcasts de uma equipe nova quando uma mensagem amostrada também pontuou 90 ou mais."
+      },
+      "fields": {
+        "firstSends": "Primeiros envios julgados por inteiro",
+        "firstHours": "Primeiras horas julgadas por inteiro",
+        "rampSends": "A rampa termina no envio",
+        "rampRate": "Taxa da rampa",
+        "rampDays": "A rampa termina no dia",
+        "probationRate": "Taxa probatória",
+        "establishedRate": "Taxa estabelecida",
+        "trustedRate": "Taxa confiável",
+        "broadcastCopies": "Cópias renderizadas por broadcast",
+        "broadcastCopiesNew": "Cópias renderizadas · equipes novas e probatórias",
+        "anomalyMultiplier": "Multiplicador de anomalia",
+        "teamDailyCap": "Mensagens julgadas por equipe por dia",
+        "instanceDailyCap": "Mensagens julgadas por instância por dia",
+        "flagRisk": "Sinalizar no risco",
+        "alertRisk": "Avisar o operador por e-mail no risco",
+        "pauseRisk": "Pausar os broadcasts de uma equipe nova no risco",
+        "autoPause": "Política de pausa",
+        "flagScore": "Uma amostra conta como sinalizada a partir da pontuação"
+      },
+      "hints": {
+        "firstSends": "as primeiras N mensagens aceitas de uma equipe",
+        "firstHours": "tudo nas primeiras H horas após o primeiro envio",
+        "rampSends": "a taxa da rampa vale até esta contagem acumulada",
+        "rampRate": "envios após a primeira janela, até a rampa terminar",
+        "rampDays": "a rampa termina neste dia após o primeiro envio, no máximo",
+        "probationRate": "do fim da rampa ao dia 30",
+        "establishedRate": "do dia 30 em diante",
+        "trustedRate": "120 dias, 50.000 envios, nenhuma sinalização em 90 dias",
+        "broadcastCopies": "equipes estabelecidas e confiáveis; o esqueleto é julgado à parte",
+        "broadcastCopiesNew": "equipes novas, em rampa e probatórias",
+        "anomalyMultiplier": "uma checagem crítica ou importante falhando; duas ou mais forçam a amostra",
+        "teamDailyCap": "além dele, a amostragem para na equipe, primeiros envios incluídos",
+        "instanceDailyCap": "além dele, a amostragem por nível para; primeiros envios e anomalias continuam",
+        "flagRisk": "abre a sinalização do monitor e quadruplica a taxa da equipe",
+        "alertRisk": "avisa o operador por e-mail, uma vez por equipe por dia",
+        "pauseRisk": "só no nível nova, com um veredicto de 90 ou mais no último dia",
+        "autoPause": "se a pausa acima é aplicada; uma pessoa decide todo o resto",
+        "flagScore": "a faixa de abuso da própria rubrica começa em 65"
+      },
+      "kinds": {
+        "count": "número inteiro",
+        "rate": "0 a 1",
+        "multiplier": "1 ou mais",
+        "score": "0 a 100",
+        "bool": ""
+      },
+      "source": {
+        "db": "definido aqui",
+        "env": "do ambiente",
+        "default": "padrão embutido {value}"
+      }
     }
   },
   "audit": {
@@ -647,6 +825,7 @@
       "reputation": "reputação de envio",
       "phishing": "abuso",
       "non_payment": "inadimplência"
-    }
+    },
+    "broadcastsPendingReview": "As transmissões desta equipe estão pausadas aguardando revisão desde {since}. E-mails transacionais não são afetados."
   }
 }

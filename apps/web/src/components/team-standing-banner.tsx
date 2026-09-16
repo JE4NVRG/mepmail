@@ -36,7 +36,7 @@ export function TeamStandingBanner() {
     return (
       <NoticeStrip
         tone="warn"
-        text={t("broadcastsPaused", {
+        text={t(data.pendingReview ? "broadcastsPendingReview" : "broadcastsPaused", {
           since: formatDayTime(data.broadcastsPausedByOperatorAt, locale),
         })}
       />

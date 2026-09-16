@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/skeleton";
 import { useTRPC } from "@/lib/trpc";
 import { HealthCard, HealthPill } from "./health-card";
 import { KpiCards } from "./kpi-cards";
+import { MonitoringCard } from "./monitoring-card";
 import { SentPerDay } from "./sent-per-day";
 import { StatTiles } from "./stat-tiles";
 
@@ -118,6 +119,7 @@ export function OverviewView() {
             <SentPerDay />
             <HealthCard summary={s} />
           </div>
+          <MonitoringCard />
         </>
       )}
     </>

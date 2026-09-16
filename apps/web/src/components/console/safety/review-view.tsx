@@ -15,7 +15,8 @@ import { BtnSpinner } from "@/components/spinner";
 import { Table } from "@/components/table";
 import { toast } from "@/components/toast";
 import { Tooltip } from "@/components/tooltip";
-import { formatRelative } from "@/lib/format";
+import { formatDayTime, formatRelative } from "@/lib/format";
+import { formatRisk, riskColor } from "@/lib/monitor-settings";
 import { formatScoreTenths } from "@/lib/score-band";
 import { useTRPC } from "@/lib/trpc";
 import { useTeamActions } from "../team-actions";
@@ -29,6 +30,12 @@ import {
 } from "./parts";
 
 const TILE: React.CSSProperties = { padding: "18px 22px" };
+// The monitoring rows are sentences, not figures: sans, left, the body size.
+const KV_VALUE: React.CSSProperties = {
+  textAlign: "left",
+  fontFamily: "var(--ms-font-sans)",
+  fontSize: 13,
+};
 const SEVERITY_DOT: Record<string, string> = {
   critical: "var(--ms-danger)",
   major: "var(--ms-danger)",
@@ -57,6 +64,11 @@ export function ReviewView({ teamId }: { teamId: string }) {
   const clear = useMutation(trpc.console.safety.clearFlag.mutationOptions());
   const reopen = useMutation(trpc.console.safety.reopenFlag.mutationOptions());
   const open = useMutation(trpc.console.safety.openFlag.mutationOptions());
+  const setOverride = useMutation(trpc.console.monitor.setOverride.mutationOptions());
+  const clearOverride = useMutation(trpc.console.monitor.clearOverride.mutationOptions());
+  const resumeMonitor = useMutation(trpc.console.monitor.resumeBroadcasts.mutationOptions());
+  const monitorT = useTranslations("console.safety.review.monitor");
+  const tiers = useTranslations("console.safety.tiers");
 
   const [flagDialog, setFlagDialog] = useState(false);
   const [note, setNote] = useState("");
@@ -68,7 +80,15 @@ export function ReviewView({ teamId }: { teamId: string }) {
   if (query.isError) return <LoadErrorCard onRetry={refetch} />;
   if (query.isPending) return <ReviewSkeleton />;
 
-  const { team, flag, standing, checks, flaggedEmails, audit } = query.data;
+  const { team, flag, standing, checks, flaggedEmails, audit, monitor } = query.data;
+  const exempt = monitor.tier === "exempt";
+  const percentRate = (rate: number) =>
+    new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 1 }).format(rate);
+  const monitorDone = (key: "override" | "overrideCleared" | "resumed") => () => {
+    toast(monitorT(`toast.${key}`, { team: team.name }));
+    refetch();
+  };
+  const monitorBusy = setOverride.isPending || clearOverride.isPending || resumeMonitor.isPending;
   const target = {
     id: team.id,
     name: team.name,
@@ -186,8 +206,22 @@ export function ReviewView({ teamId }: { teamId: string }) {
 
       <div
         className="ms-grid"
-        style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))", marginBottom: 16 }}
+        style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))", marginBottom: 16 }}
       >
+        <Tile
+          label={
+            <Tooltip inline text={t("tiles.riskTip")}>
+              {t("tiles.risk")}
+            </Tooltip>
+          }
+          color={monitor.risk === null ? undefined : riskColor(monitor.risk)}
+        >
+          {exempt
+            ? t("tiles.riskExempt")
+            : monitor.risk === null
+              ? common("none")
+              : formatRisk(monitor.risk)}
+        </Tile>
         <Tile
           label={
             <Tooltip inline text={t("tiles.scoreTip")}>
@@ -204,6 +238,176 @@ export function ReviewView({ teamId }: { teamId: string }) {
         <Tile label={t("tiles.bounces")}>{percent(standing.hardBounceRate7d)}</Tile>
         <Tile label={t("tiles.sent7d")}>{nf.format(standing.sent7d)}</Tile>
         <Tile label={t("tiles.contacts")}>{nf.format(team.contacts)}</Tile>
+      </div>
+
+      <div className="ms-card" style={{ padding: 24, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <CardHead title={monitorT("title")} subtitle={monitorT("subtitle")} />
+          </div>
+          {monitor.judge.on && !exempt ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {monitor.broadcastsPausedAt ? (
+                <button
+                  type="button"
+                  className="ms-btn ms-btn-secondary"
+                  disabled={monitorBusy}
+                  onClick={() =>
+                    resumeMonitor.mutate({ teamId: team.id }, { onSuccess: monitorDone("resumed") })
+                  }
+                >
+                  <BtnSpinner on={resumeMonitor.isPending} />
+                  {monitorT("resume")}
+                </button>
+              ) : null}
+              {monitor.override ? (
+                <button
+                  type="button"
+                  className="ms-btn ms-btn-secondary"
+                  disabled={monitorBusy}
+                  onClick={() =>
+                    clearOverride.mutate(
+                      { teamId: team.id },
+                      { onSuccess: monitorDone("overrideCleared") },
+                    )
+                  }
+                >
+                  <BtnSpinner on={clearOverride.isPending} />
+                  {monitorT("stopOverride")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="ms-btn ms-btn-secondary"
+                  disabled={monitorBusy}
+                  onClick={() =>
+                    setOverride.mutate({ teamId: team.id }, { onSuccess: monitorDone("override") })
+                  }
+                >
+                  <BtnSpinner on={setOverride.isPending} />
+                  {monitorT("sampleAll")}
+                </button>
+              )}
+            </div>
+          ) : null}
+        </div>
+        {!monitor.judge.on ? (
+          <p style={{ margin: 0, fontSize: 13, color: "var(--ms-muted)" }}>{monitorT("off")}</p>
+        ) : exempt ? (
+          <p style={{ margin: 0, fontSize: 13, color: "var(--ms-muted)" }}>{monitorT("exempt")}</p>
+        ) : (
+          <>
+            <dl
+              className="ms-kv"
+              style={{ gridTemplateColumns: "max-content 1fr", marginBottom: 16 }}
+            >
+              <dt>{monitorT("tier")}</dt>
+              <dd style={KV_VALUE}>
+                {monitorT("tierValue", {
+                  tier: tiers(monitor.tier),
+                  rate: percentRate(monitor.decision.rate),
+                })}
+                {monitor.decision.elevated.length > 0
+                  ? ` · ${monitor.decision.elevated.map((e) => monitorT(`elevated.${e}`)).join(" · ")}`
+                  : ""}
+              </dd>
+              <dt>{monitorT("samples")}</dt>
+              <dd style={KV_VALUE}>
+                {monitorT("samplesValue", {
+                  samples: monitor.samples7d,
+                  flagged: monitor.flagged7d,
+                  unjudged: monitor.unjudged7d,
+                })}
+              </dd>
+              <dt>{monitorT("verdicts")}</dt>
+              <dd style={KV_VALUE}>
+                {monitor.topReasons.length > 0
+                  ? monitorT("verdictsReasons", {
+                      clean: monitor.judged7d - monitor.flagged7d,
+                      flagged: monitor.flagged7d,
+                      reasons: monitor.topReasons.join(", "),
+                    })
+                  : monitorT("verdictsValue", {
+                      clean: monitor.judged7d - monitor.flagged7d,
+                      flagged: monitor.flagged7d,
+                    })}
+              </dd>
+              <dt>{monitorT("lastSample")}</dt>
+              <dd style={KV_VALUE}>
+                {monitor.lastSampleAt ? (
+                  <RelativeTime date={monitor.lastSampleAt} />
+                ) : (
+                  common("none")
+                )}
+              </dd>
+              <dt>{monitorT("model")}</dt>
+              <dd style={KV_VALUE}>{`${monitor.judge.provider} · ${monitor.judge.model}`}</dd>
+              <dt>{monitorT("override")}</dt>
+              <dd style={KV_VALUE}>
+                {monitor.override
+                  ? monitorT("overrideValue", {
+                      until: formatDayTime(monitor.override.until, locale),
+                    })
+                  : monitorT("overrideNone")}
+              </dd>
+              <dt>{monitorT("pause")}</dt>
+              <dd style={KV_VALUE}>
+                {monitor.broadcastsPausedAt
+                  ? monitorT("pauseValue", {
+                      since: formatDayTime(monitor.broadcastsPausedAt, locale),
+                    })
+                  : monitorT("pauseNone")}
+              </dd>
+            </dl>
+            <CardHead title={monitorT("samplesTitle")} subtitle={monitorT("samplesSubtitle")} />
+            <Table>
+              <thead>
+                <tr>
+                  <th>{monitorT("cols.at")}</th>
+                  <th>{monitorT("cols.kind")}</th>
+                  <th className="right">{monitorT("cols.result")}</th>
+                  <th>{monitorT("cols.reasons")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monitor.samples.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} style={{ color: "var(--ms-muted)" }}>
+                      {monitorT("samplesNone")}
+                    </td>
+                  </tr>
+                ) : (
+                  monitor.samples.map((sample) => (
+                    <tr key={sample.id}>
+                      <td style={{ color: "var(--ms-muted)" }}>
+                        <RelativeTime date={sample.createdAt} />
+                      </td>
+                      <td>{monitorT(`kinds.${sample.kind}`)}</td>
+                      <td
+                        className="right num"
+                        style={{
+                          color:
+                            sample.status === "judged" && sample.score !== null
+                              ? riskColor(sample.score / 100, monitor.flagScore / 100, 0.9)
+                              : "var(--ms-muted)",
+                        }}
+                      >
+                        {sample.status === "judged"
+                          ? (sample.score ?? common("none"))
+                          : sample.status === "pending"
+                            ? monitorT("pending")
+                            : monitorT("unjudged", { error: sample.errorClass ?? "" })}
+                      </td>
+                      <td className="ms-mono" style={{ fontSize: 12, color: "var(--ms-muted)" }}>
+                        {(sample.reasons ?? []).join(", ") || common("none")}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </Table>
+          </>
+        )}
       </div>
 
       <div className="ms-grid ms-grid-12" style={{ marginBottom: 16 }}>
@@ -271,12 +475,13 @@ export function ReviewView({ teamId }: { teamId: string }) {
               <th>{t("emails.from")}</th>
               <th className="right">{t("emails.recipients")}</th>
               <th>{t("emails.insight")}</th>
+              <th>{t("emails.monitor")}</th>
             </tr>
           </thead>
           <tbody>
             {flaggedEmails.length === 0 ? (
               <tr>
-                <td colSpan={4} style={{ color: "var(--ms-muted)" }}>
+                <td colSpan={5} style={{ color: "var(--ms-muted)" }}>
                   {t("emails.none")}
                 </td>
               </tr>
@@ -310,6 +515,21 @@ export function ReviewView({ teamId }: { teamId: string }) {
                     ) : (
                       common("none")
                     )}
+                  </td>
+                  <td style={{ fontSize: 12, color: "var(--ms-muted)", whiteSpace: "normal" }}>
+                    {!email.model
+                      ? common("none")
+                      : email.model.status === "judged" && email.model.score !== null
+                        ? t("emails.modelScore", {
+                            score: email.model.score,
+                            detail:
+                              email.model.score >= monitor.flagScore
+                                ? email.model.reasons.join(", ")
+                                : t("emails.notFlagged"),
+                          })
+                        : email.model.status === "pending"
+                          ? monitorT("pending")
+                          : t("emails.modelUnjudged", { error: email.model.errorClass ?? "" })}
                   </td>
                 </tr>
               ))
@@ -445,9 +665,9 @@ function ReviewSkeleton() {
       </div>
       <div
         className="ms-grid"
-        style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))", marginBottom: 16 }}
+        style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))", marginBottom: 16 }}
       >
-        {[0, 1, 2, 3, 4].map((i) => (
+        {[0, 1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="ms-card" style={TILE}>
             <div className="ms-microlabel" style={{ display: "flex" }}>
               <Skeleton width={80} height="1lh" />
