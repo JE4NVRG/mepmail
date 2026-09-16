@@ -19,7 +19,8 @@ const MASK = "••••••";
 const URL_PATH_STUB_MAX = 24;
 /** A cut link ends here, so a shortened one is never mistaken for the whole. */
 const CUT = "…";
-const URL_RE = /\bhttps?:\/\/[^\s<>"'`)\]]+/gi;
+/** Written with a scheme or as a bare www host; both are links to a reader. */
+const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"'`)\]]+/gi;
 /** Trailing sentence punctuation is not part of the link. */
 const URL_TAIL = /[.,;:!?]+$/;
 
@@ -47,9 +48,10 @@ interface Hit {
 }
 
 function reduceUrl(raw: string): string {
+  const scheme = /^https?:\/\//i.exec(raw)?.[0] ?? "";
   let url: URL;
   try {
-    url = new URL(raw);
+    url = new URL(scheme ? raw : `https://${raw}`);
   } catch {
     return MASK;
   }
@@ -65,7 +67,9 @@ function reduceUrl(raw: string): string {
   // A bare address keeps its host: reducing 10.0.0.7 to a "domain" would
   // name a host that does not exist, and the literal is itself the signal.
   const host = isIpLiteral(url.hostname) ? url.hostname : registrableDomain(url.hostname);
-  return `${url.protocol}//${host}${cut}`;
+  // A link written without a scheme keeps none: naming one it did not have
+  // would put words in the sender's mouth.
+  return `${scheme.toLowerCase()}${host}${cut}`;
 }
 
 function urlHits(text: string): Hit[] {
