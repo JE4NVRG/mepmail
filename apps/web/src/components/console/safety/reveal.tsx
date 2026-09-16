@@ -362,6 +362,10 @@ function RevealedView({
       <p style={{ margin: "6px 0 14px", color: "var(--ms-muted)", fontSize: 13.5 }}>{t("lead")}</p>
       {query.isPending ? (
         <p style={{ margin: 0, fontSize: 13, color: "var(--ms-muted)" }}>…</p>
+      ) : expired ? (
+        // "30 minutes, then hidden again" is the promise; an open dialog that
+        // outlives its window must hide what it already fetched.
+        <p style={{ margin: 0, fontSize: 13, color: "var(--ms-warn)" }}>{t("expired")}</p>
       ) : query.isError ? (
         <p style={{ margin: 0, fontSize: 13, color: "var(--ms-danger)" }}>
           {errorMessage === "expired"
@@ -381,9 +385,7 @@ function RevealedView({
               flexWrap: "wrap",
             }}
           >
-            <span className="ms-chip">
-              {expired ? t("expired") : t("expires", { time: formatMmSs(left) })}
-            </span>
+            <span className="ms-chip">{t("expires", { time: formatMmSs(left) })}</span>
             <span className="ms-chip">{t("renderedOnly")}</span>
             <span className="ms-chip">{t("recipientsHidden")}</span>
             <span className="ms-chip">{t("noExport")}</span>
