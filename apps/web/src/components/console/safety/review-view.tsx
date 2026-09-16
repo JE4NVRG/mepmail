@@ -28,6 +28,7 @@ import {
   usePercent,
   usePlanLabel,
 } from "./parts";
+import { RevealCell, useContentReveal } from "./reveal";
 
 const TILE: React.CSSProperties = { padding: "18px 22px" };
 // The monitoring rows are sentences, not figures: sans, left, the body size.
@@ -70,6 +71,35 @@ export function ReviewView({ teamId }: { teamId: string }) {
   const monitorT = useTranslations("console.safety.review.monitor");
   const tiers = useTranslations("console.safety.tiers");
 
+  const revealT = useTranslations("console.safety.reveal");
+  const reveal = useContentReveal({
+    onChanged: refetch,
+    onClearFlag: (grantId) => {
+      const data = query.data;
+      if (data?.flag?.status !== "open") return;
+      clear.mutate(
+        { flagId: data.flag.id, afterGrantId: grantId },
+        {
+          onSuccess: () => {
+            toast(revealT("toast.cleared", { team: data.team.name }));
+            refetch();
+          },
+        },
+      );
+    },
+    onSuspend: () => {
+      const data = query.data;
+      if (!data) return;
+      actions.suspend({
+        id: data.team.id,
+        name: data.team.name,
+        plan: data.team.plan,
+        planQuota: data.team.planQuota,
+        suspendedAt: data.team.suspendedAt,
+        broadcastsPausedByOperatorAt: data.team.broadcastsPausedByOperatorAt,
+      });
+    },
+  });
   const [flagDialog, setFlagDialog] = useState(false);
   const [note, setNote] = useState("");
   const closeFlagDialog = useCallback(() => {
@@ -80,7 +110,18 @@ export function ReviewView({ teamId }: { teamId: string }) {
   if (query.isError) return <LoadErrorCard onRetry={refetch} />;
   if (query.isPending) return <ReviewSkeleton />;
 
-  const { team, flag, standing, checks, flaggedEmails, audit, monitor } = query.data;
+  const { team, flag, standing, checks, flaggedEmails, audit, monitor, grants, contentReveal } =
+    query.data;
+  const grantFor = (emailId: string) => grants.find((g) => g.emailIds.includes(emailId));
+  const revealRequest = (email: (typeof flaggedEmails)[number] | null) => () =>
+    reveal.request({
+      team: { id: team.id, name: team.name },
+      email: email
+        ? { id: email.id, from: email.from, sentAt: email.sentAt, recipients: email.recipients }
+        : null,
+      flaggedCount: flaggedEmails.length,
+      flagLabel: safety(`reasons.${flag?.reason ?? "manual"}`),
+    });
   const exempt = monitor.tier === "exempt";
   const percentRate = (rate: number) =>
     new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 1 }).format(rate);
@@ -155,6 +196,16 @@ export function ReviewView({ teamId }: { teamId: string }) {
                 {t(flagOpen ? "badges.flagOpen" : "badges.flagCleared")}
               </span>
             ) : null}
+            <Tooltip inline text={contentReveal ? "" : revealT("off")}>
+              <button
+                type="button"
+                className="ms-btn ms-btn-primary"
+                disabled={!contentReveal || flaggedEmails.length === 0}
+                onClick={revealRequest(flaggedEmails[0] ?? null)}
+              >
+                {revealT("request")}
+              </button>
+            </Tooltip>
             <button
               type="button"
               className="ms-btn ms-btn-secondary"
@@ -484,12 +535,13 @@ export function ReviewView({ teamId }: { teamId: string }) {
               <th className="right">{t("emails.recipients")}</th>
               <th>{t("emails.insight")}</th>
               <th>{t("emails.monitor")}</th>
+              <th className="right">{t("emails.content")}</th>
             </tr>
           </thead>
           <tbody>
             {flaggedEmails.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ color: "var(--ms-muted)" }}>
+                <td colSpan={6} style={{ color: "var(--ms-muted)" }}>
                   {t("emails.none")}
                 </td>
               </tr>
@@ -538,6 +590,16 @@ export function ReviewView({ teamId }: { teamId: string }) {
                         : email.model.status === "pending"
                           ? monitorT("pending")
                           : t("emails.modelUnjudged", { error: email.model.errorClass ?? "" })}
+                  </td>
+                  <td className="right">
+                    <RevealCell
+                      grant={grantFor(email.id)}
+                      disabled={!contentReveal}
+                      onReveal={revealRequest(email)}
+                      onOpen={(grantId) =>
+                        reveal.view({ id: team.id, name: team.name }, grantId, email.id)
+                      }
+                    />
                   </td>
                 </tr>
               ))
@@ -633,6 +695,7 @@ export function ReviewView({ teamId }: { teamId: string }) {
         </ModalFooter>
       </Modal>
       {actions.dialogs}
+      {reveal.dialogs}
     </>
   );
 }

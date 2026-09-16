@@ -32,6 +32,7 @@ import {
   scoreColor,
   usePercent,
 } from "./parts";
+import { useContentReveal } from "./reveal";
 
 const STATUSES = ["open", "cleared", "suspended", "all"] as const;
 // The team_flag_reason enum; tsc checks it against the router's input.
@@ -83,12 +84,19 @@ export function SafetyList() {
   });
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
   const first = query.data?.pages[0];
-  const counts = first?.counts ?? { open: 0, guardrailPaused: 0, suspended: 0 };
+  const counts = first?.counts ?? {
+    open: 0,
+    guardrailPaused: 0,
+    suspended: 0,
+    revealsThisWeek: 0,
+  };
+  const contentReveal = first?.contentReveal ?? false;
 
   const refetch = () => {
     query.refetch();
   };
   const actions = useTeamActions(refetch);
+  const reveal = useContentReveal({ onChanged: refetch });
   const clear = useMutation(trpc.console.safety.clearFlag.mutationOptions());
   const reopen = useMutation(trpc.console.safety.reopenFlag.mutationOptions());
   const done = (key: "cleared" | "reopened", team: string) => () => {
@@ -307,6 +315,20 @@ export function SafetyList() {
                             ariaLabel={common("actions")}
                             items={[
                               { label: t("menu.review"), onSelect: () => router.push(href) },
+                              ...(contentReveal
+                                ? [
+                                    {
+                                      label: t("menu.reveal"),
+                                      onSelect: () =>
+                                        reveal.request({
+                                          team: { id: row.teamId, name: row.name },
+                                          email: null,
+                                          flaggedCount: 0,
+                                          flagLabel: t(`reasons.${row.reason}`),
+                                        }),
+                                    },
+                                  ]
+                                : []),
                               row.broadcastsPausedByOperatorAt
                                 ? {
                                     label: t("menu.resume"),
@@ -375,6 +397,7 @@ export function SafetyList() {
         </>
       )}
       {actions.dialogs}
+      {reveal.dialogs}
     </>
   );
 }
