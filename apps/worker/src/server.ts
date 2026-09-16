@@ -6,6 +6,7 @@ import {
   reportOverage,
 } from "@millionsend/billing";
 import {
+  abuseJudgeConfig,
   env,
   servedRegions,
   sesTenantsEnabled,
@@ -15,12 +16,16 @@ import {
 } from "@millionsend/config";
 import {
   committedDailyVolume,
+  deriveSamplingKey,
   deriveTrackingKey,
   deriveUnsubscribeKey,
   eraseRecipient,
   getInstanceSettings,
   hashRecipient,
+  type MonitorDeps,
+  monitorSettingsReader,
   postJson,
+  pruneMonitorSamples,
   pruneProbes,
   purgeExpiredIdempotencyKeys,
   type QueuedWebhookDelivery,
@@ -28,7 +33,7 @@ import {
   recountStaleSegments,
   sesEventsHealth,
 } from "@millionsend/core";
-import { getDb } from "@millionsend/db";
+import { getDb, schema } from "@millionsend/db";
 import {
   EMAIL_SEND_PRIORITY,
   type EmailSendPriority,
@@ -43,6 +48,9 @@ import {
   nodeDnsResolver,
   type SesIdentityClient,
 } from "@millionsend/ses";
+import { and, eq } from "drizzle-orm";
+import { createAbuseJudge } from "./abuse-judge/index.js";
+import { judgeSample } from "./handlers/abuse-judge.js";
 import {
   drainQuotaParked,
   purgeExpiredApiRequests,
@@ -61,6 +69,7 @@ import {
 } from "./handlers/cron.js";
 import { drainWebhookEndpoint } from "./handlers/deliver-webhook.js";
 import { runInstanceProbes } from "./handlers/instance-probes.js";
+import { runMonitorHealth } from "./handlers/monitor-health.js";
 import { reportPlanMove, sweepNotifications } from "./handlers/notify.js";
 import { runPlatformBreaker } from "./handlers/platform-breaker.js";
 import { processSesEvent } from "./handlers/process-ses-event.js";
@@ -180,6 +189,27 @@ const enqueueSend = (emailId: string, startAfter?: Date, priority?: EmailSendPri
 // Account mail rides the pipeline, so the mailer needs the queue it enqueues into.
 const mailer = createSystemMailer({ db, keyring, enqueueSend });
 
+// The content monitor: off unless ABUSE_JUDGE names a provider. When on, an
+// accepted send may be drawn and judged after the fact; the sampling key is
+// derived like the token keys, the settings row is re-read once a minute.
+const judgeConfig = abuseJudgeConfig();
+const judge = createAbuseJudge(judgeConfig, {
+  accessKeyId: env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+});
+const monitorSettings = monitorSettingsReader(db, env as unknown as Record<string, unknown>);
+const monitor: MonitorDeps | undefined = judge
+  ? {
+      samplingKey: deriveSamplingKey(masterKeyBytes),
+      settings: monitorSettings,
+      enqueueJudge: async (sampleId) => {
+        await queue.send("abuse.judge", { sampleId }, { dedupeKey: sampleId });
+      },
+    }
+  : undefined;
+const monitorHealthState = { degradedMailedAt: null as Date | null };
+if (judge) console.log(`content monitor: ${judge.provider} · ${judge.model}`);
+
 /**
  * Concurrent send lanes. One send waits on KMS, SES and a few writes (about a
  * second), so a single lane moves about one email a second while the rate
@@ -246,11 +276,13 @@ await queue.scheduleCrons({
     const hourlyUsage = await purgeStaleHourlyUsage(db);
     const stripeEvents = await purgeStripeEvents(db);
     const probes = await pruneProbes(db);
+    const monitorSamples = await pruneMonitorSamples(db);
     // The console's retention row: how many bodies the last run purged.
     await recordProbes(db, [{ probe: "retention_purged", value: purged, ok: true }]);
     const counts = {
       purged,
       probes,
+      monitorSamples,
       hourlyUsage,
       apiRequests: requests,
       events: stripped.events,
@@ -337,10 +369,25 @@ await queue.scheduleCrons({
     });
   },
   "safety.flags": async () => {
-    const result = await runSafetyFlags(db);
+    const result = await runSafetyFlags(db, {
+      monitorFlagRisk: judge ? (await monitorSettings()).flagRisk : undefined,
+    });
     if (result.opened > 0 || result.cleared > 0) {
       console.log(
         `safety.flags: teams=${result.teams} opened=${result.opened} cleared=${result.cleared}`,
+      );
+    }
+  },
+  "monitor.health": async () => {
+    const result = await runMonitorHealth(db, {
+      judge: judgeConfig,
+      mailer,
+      appBaseUrl: env.APP_BASE_URL,
+      state: monitorHealthState,
+    });
+    if (result.lost > 0 || result.degraded) {
+      console.warn(
+        `monitor.health: samples1h=${result.samples} unjudged=${result.unjudged} lost=${result.lost} degraded=${result.degraded}`,
       );
     }
   },
@@ -423,6 +470,18 @@ await queue.workDeadLetter("webhook.drain", async ({ endpointId }) => {
   console.error(`webhook.drain: dead-lettered endpoint ${endpointId}`);
 });
 
+// A judge job that kept throwing (database or decrypt errors, not the judge's
+// own failures, which never throw): the sample reads as unjudged, never pending.
+await queue.workDeadLetter("abuse.judge", async ({ sampleId }) => {
+  await db
+    .update(schema.monitorSamples)
+    .set({ status: "unjudged", errorClass: "lost", judgedAt: new Date() })
+    .where(
+      and(eq(schema.monitorSamples.id, sampleId), eq(schema.monitorSamples.status, "pending")),
+    );
+  console.error(`abuse.judge: dead-lettered sample ${sampleId}`);
+});
+
 await queue.work(
   "email.send",
   async (payload) => {
@@ -438,6 +497,7 @@ await queue.work(
         sesQuota: sendControls,
         enqueueWebhookDelivery: enqueueWebhook,
         tracking,
+        monitor,
         ...(unsubscribe ? { unsubscribe } : {}),
       },
       payload,
@@ -462,6 +522,7 @@ await queue.work(
         mailer,
         appBaseUrl: env.APP_BASE_URL,
         sesQuota: sendControls,
+        monitor,
       },
       payload,
     );
@@ -469,6 +530,28 @@ await queue.work(
   // Two broadcasts fired together fan out side by side instead of the
   // second waiting for the first's whole walk.
   { concurrency: 2 },
+);
+
+// Judge calls: a plain queue, a few lanes. The provider's request quota is
+// the real limit (Nova on this account: 100 a minute), so the lanes stay few
+// and a throttle is retried through the queue's backoff, not in-process.
+await queue.work(
+  "abuse.judge",
+  async ({ sampleId }) => {
+    await judgeSample(
+      db,
+      {
+        judge,
+        keyring,
+        settings: monitorSettings,
+        timeoutMs: judgeConfig?.timeoutMs,
+        mailer,
+        appBaseUrl: env.APP_BASE_URL,
+      },
+      { sampleId },
+    );
+  },
+  { concurrency: 4 },
 );
 
 await queue.work(

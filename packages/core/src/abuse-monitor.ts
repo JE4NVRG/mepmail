@@ -41,6 +41,18 @@ export const MONITOR_SAMPLE_RETENTION_DAYS = 90;
 /** A pending sample older than this had its job lost; pg-boss's last retry lands well inside it. */
 export const MONITOR_LOST_AFTER_MS = 3 * 3600_000;
 
+/**
+ * The insight checks whose failure is an anomaly for the draw: the ones that
+ * speak to deception in the content itself. A missing DMARC record or a
+ * large body is a configuration finding and would only burn the judge's
+ * budget on every send of a team that has it.
+ */
+export const MONITOR_ANOMALY_CHECKS = [
+  "link_domains_match",
+  "no_shorteners",
+  "phishing_links",
+] as const;
+
 const HKDF_INFO = "abuse-judge-sampling";
 
 /** The draw's key, derived from the master key like every other token key, so it is never configured or logged. */
@@ -404,13 +416,21 @@ export async function planBroadcastSamples(
   const state = await loadMonitorState(db, await teamMonitorRow(db, input.teamId), now);
   const tier = monitorTier(state, s, now);
   if (tier === "exempt") return { skeletonSampleId: null, copies: 0 };
-  const skeletonSampleId = await recordMonitorSample(db, deps, s, {
-    teamId: input.teamId,
-    emailId: null,
-    broadcastId: input.broadcastId,
-    kind: "broadcast_skeleton",
-    now,
-  });
+  // A resumed fan-out plans again; the skeleton was judged the first time.
+  const [existing] = await db
+    .select({ id: ms.id })
+    .from(ms)
+    .where(and(eq(ms.broadcastId, input.broadcastId), eq(ms.kind, "broadcast_skeleton")))
+    .limit(1);
+  const skeletonSampleId =
+    existing?.id ??
+    (await recordMonitorSample(db, deps, s, {
+      teamId: input.teamId,
+      emailId: null,
+      broadcastId: input.broadcastId,
+      kind: "broadcast_skeleton",
+      now,
+    }));
   return {
     skeletonSampleId,
     copies: tier === "new" || tier === "probation" ? s.broadcastCopiesNew : s.broadcastCopies,
