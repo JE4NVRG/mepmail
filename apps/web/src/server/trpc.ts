@@ -129,20 +129,26 @@ const t = initTRPC.context<Context>().create({ transformer: superjson });
 export const router = t.router;
 export const createCallerFactory = t.createCallerFactory;
 
-/** The one mutation a support view may run: the operator ending it. */
-export const SUPPORT_VIEW_END_PATH = "support.end";
+/**
+ * The procedures a live view may still reach, by exact path: the operator
+ * ending their own session, and the banner asking whether it still holds.
+ * Named one by one rather than by prefix, so a procedure added to the
+ * support router later does not inherit the exemption.
+ */
+const SUPPORT_VIEW_PASS: ReadonlySet<string> = new Set(["support.end", "support.current"]);
 
 /**
  * Read-only support view, enforced once for every procedure: a mutation is
  * refused whatever the router hides or disables, and each read is counted
  * on the grant by procedure path. The console's own procedures pass
- * untouched and uncounted: the operator is still the operator, and a
- * console read is not a read of the team.
+ * untouched and uncounted — the operator is still the operator, and a
+ * console read is not a read of the team — and so do the two procedures
+ * above, which are about the session rather than the team's data.
  */
 const supportViewGuard = t.middleware(async ({ ctx, type, path, next }) => {
   const view = ctx.supportView;
-  if (!view || path.startsWith("console.")) return next();
-  if (type === "mutation" && path !== SUPPORT_VIEW_END_PATH) {
+  if (!view || path.startsWith("console.") || SUPPORT_VIEW_PASS.has(path)) return next();
+  if (type === "mutation") {
     throw new TRPCError({ code: "FORBIDDEN", message: "Read-only support view" });
   }
   if (type === "query") await recordSupportViewRead(ctx.db, view.grantId, path);

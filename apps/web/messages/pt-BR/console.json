@@ -515,7 +515,7 @@
       "confirm": "Iniciar sessão · 30 min",
       "errors": {
         "support_view_off": "O modo de suporte está desligado nesta instância (SUPPORT_VIEW=on liga).",
-        "support_view_live": "Já existe um modo de suporte ativo; encerre-o pela faixa antes.",
+        "support_view_live": "Já existe um modo de suporte ativo. Abra o painel e encerre-o pela faixa antes de iniciar outro.",
         "own_team": "Você é membro desta equipe; abra-a pelo seletor de equipes.",
         "reference_required": "Uma referência de chamado ou denúncia é obrigatória para este motivo."
       }

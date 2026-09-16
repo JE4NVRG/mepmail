@@ -515,7 +515,7 @@
       "confirm": "Start session · 30 min",
       "errors": {
         "support_view_off": "Support view is off on this instance (SUPPORT_VIEW=on turns it on).",
-        "support_view_live": "A support view is already live; end it from its banner first.",
+        "support_view_live": "A support view is already live. Open the dashboard and end it from its banner before starting another.",
         "own_team": "You are a member of this team; open it from the team switcher instead.",
         "reference_required": "A ticket or report reference is required for this reason."
       }

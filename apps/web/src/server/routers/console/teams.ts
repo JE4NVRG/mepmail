@@ -21,6 +21,7 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, eq, ilike, isNotNull, isNull, or, type SQL, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { z } from "zod";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { escapeLike } from "@/lib/sql";
 import { operatorProcedure, router } from "../../trpc";
 import { auditOperator, kickQuotaDrain, loadTeam, mailTeamOwners } from "./shared";
@@ -259,7 +260,7 @@ export const consoleTeamsRouter = router({
       if (!supportViewEnabled()) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "support_view_off" });
       }
-      // No nesting: a view is left through its banner, not replaced from inside.
+      // No nesting: a live view is left through its banner, not replaced from inside.
       if (ctx.supportView) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "support_view_live" });
       }
@@ -279,23 +280,41 @@ export const consoleTeamsRouter = router({
       if (supportViewNeedsReference(input.reason) && !reference) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "reference_required" });
       }
-      const grant = await startSupportView(ctx.db, {
-        teamId: team.id,
-        operatorUserId: ctx.operator.id,
-        reason: input.reason,
-        reference,
-        note: input.note || null,
-      });
+      let grant: Awaited<ReturnType<typeof startSupportView>>;
+      try {
+        grant = await startSupportView(ctx.db, {
+          teamId: team.id,
+          operatorUserId: ctx.operator.id,
+          reason: input.reason,
+          reference,
+          note: input.note || null,
+        });
+      } catch (error) {
+        // The one-live-view-per-operator index, tripped by two starts racing:
+        // the other one won, so this reads as a view already being live.
+        if (!isUniqueViolation(error)) throw error;
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "support_view_live" });
+      }
       ctx.setSupportViewCookie?.({ id: grant.id, expiresAt: grant.expiresAt });
-      await mailTeamOwners(ctx.db, team, "support.view_started", "/settings", (locale) => ({
-        operator: `${ctx.operator.name} (${ctx.operator.email})`,
-        reason: supportViewReasonText(locale, input.reason, reference),
-        until: formatMailDateTime(locale, grant.expiresAt),
-      }));
-      await ctx.db
-        .update(schema.supportViewGrants)
-        .set({ notifiedAt: new Date() })
-        .where(eq(schema.supportViewGrants.id, grant.id));
+      const notified = await mailTeamOwners(
+        ctx.db,
+        team,
+        "support.view_started",
+        "/settings",
+        (locale) => ({
+          operator: `${ctx.operator.name} (${ctx.operator.email})`,
+          reason: supportViewReasonText(locale, input.reason, reference),
+          until: formatMailDateTime(locale, grant.expiresAt),
+        }),
+      );
+      // Stamped only when a notice actually went out: a team with no owner to
+      // write to, or an instance with no sender, must not read as notified.
+      if (notified > 0) {
+        await ctx.db
+          .update(schema.supportViewGrants)
+          .set({ notifiedAt: new Date() })
+          .where(eq(schema.supportViewGrants.id, grant.id));
+      }
       return { grantId: grant.id, expiresAt: grant.expiresAt };
     }),
 
