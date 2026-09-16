@@ -26,6 +26,10 @@ const SECRETS: RegExp[] = [
   /\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}/g,
   /\b[0-9a-fA-F]{32,}\b/g,
   /\b[A-Za-z0-9+/]{40,}={0,2}/g,
+  // This platform's own API key: base64url, so neither the hex nor the base64
+  // shape above catches it, and it is the credential most likely to be quoted
+  // back into a message the operator ends up reading.
+  /\bms_[A-Za-z0-9_-]{20,}/g,
 ];
 
 /** Words a one-time code follows, in both of the dashboard's languages. */

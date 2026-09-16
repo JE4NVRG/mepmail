@@ -58,6 +58,12 @@ describe("redactRevealedText", () => {
     expect(plain(content)).toBe("t •••••• h •••••• b •••••• end");
   });
 
+  it("masks a MillionSend API key, which neither the hex nor the base64 shape catches", () => {
+    const key = `ms_${"A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6".slice(0, 32)}`;
+    const content = redactRevealedText(`Use ${key} to send.`);
+    expect(plain(content)).toBe("Use •••••• to send.");
+  });
+
   it("marks every changed run as redacted and nothing else", () => {
     const content = redactRevealedText("Hi, your code is 111222 at https://example.com/a/b.");
     expect(masked(content)).toEqual(["••••••", "https://example.com/a/b"]);
