@@ -794,7 +794,8 @@ whether the text around it is a bank lure or a newsletter.
 the HTML with hidden elements stripped (or the plain-text part when there is
 no HTML), cut at 20,000 characters and redacted on the way out: every link
 is reduced to its scheme, its registrable domain and at most 24 characters
-of path, so a one-time link cannot be followed; anything shaped like a
+of path, with the query and the fragment dropped entirely, so a one-time
+link cannot be followed; anything shaped like a
 credential (a JWT, 32 or more hex characters, 40 or more of base64, one of
 this instance's own `ms_` API keys) is masked, as is a 4-to-8-digit run
 within 40 characters of a word like *code*, *código*, *OTP*, *PIN*, *token*,

@@ -14,10 +14,20 @@ const masked = (content: RevealedContent) =>
 describe("redactRevealedText", () => {
   it("reduces a link to its registrable domain and a short path stub", () => {
     const content = redactRevealedText(
-      "Confirm at https://login.secure.example.co.uk/reset?token=abcdefghijklmnopqrstuvwxyz0123 now.",
+      "Confirm at https://login.secure.example.co.uk/reset/now/and/here/please/ok now.",
     );
-    expect(plain(content)).toBe("Confirm at https://example.co.uk/reset?token=abcdefghijk… now.");
+    expect(plain(content)).toBe("Confirm at https://example.co.uk/reset/now/and/here/plea… now.");
     expect(content.redactions).toBe(1);
+  });
+
+  it("drops the query and the fragment, however short, and says it did", () => {
+    // A one-time token fits well inside any cap when it lives in the query.
+    expect(plain(redactRevealedText("Open https://app.example.com/r?token=8sJ2k"))).toBe(
+      "Open https://example.com/r…",
+    );
+    expect(plain(redactRevealedText("Open https://example.com/a#tok"))).toBe(
+      "Open https://example.com/a…",
+    );
   });
 
   it("keeps a short path whole and leaves sentence punctuation outside the link", () => {

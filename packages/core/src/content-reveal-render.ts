@@ -17,6 +17,8 @@ const MASK = "••••••";
 
 /** Enough of a link to judge where it points, never enough to follow a one-time one. */
 const URL_PATH_STUB_MAX = 24;
+/** A cut link ends here, so a shortened one is never mistaken for the whole. */
+const CUT = "…";
 const URL_RE = /\bhttps?:\/\/[^\s<>"'`)\]]+/gi;
 /** Trailing sentence punctuation is not part of the link. */
 const URL_TAIL = /[.,;:!?]+$/;
@@ -51,8 +53,15 @@ function reduceUrl(raw: string): string {
   } catch {
     return MASK;
   }
-  const stub = `${url.pathname}${url.search}${url.hash}`.replace(/^\/$/, "");
-  const cut = stub.length > URL_PATH_STUB_MAX ? `${stub.slice(0, URL_PATH_STUB_MAX)}…` : stub;
+  // The query and the fragment are dropped rather than capped: a one-time
+  // token often fits inside the cap there, and nothing in a query helps an
+  // operator judge where a link goes.
+  const path = url.pathname.replace(/^\/$/, "");
+  const trimmed = path.length > URL_PATH_STUB_MAX ? path.slice(0, URL_PATH_STUB_MAX) : path;
+  const cut =
+    trimmed.length < path.length || url.search !== "" || url.hash !== ""
+      ? `${trimmed}${CUT}`
+      : trimmed;
   // A bare address keeps its host: reducing 10.0.0.7 to a "domain" would
   // name a host that does not exist, and the literal is itself the signal.
   const host = isIpLiteral(url.hostname) ? url.hostname : registrableDomain(url.hostname);
