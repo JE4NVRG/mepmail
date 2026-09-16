@@ -37,6 +37,8 @@ export const AUDIT_ACTIONS = [
   "monitor.override_cleared",
   "monitor.broadcasts_paused",
   "monitor.broadcasts_resumed",
+  "support.view_started",
+  "support.view_ended",
   "billing.checkout_started",
   "billing.portal_opened",
   "billing.subscription_updated",
