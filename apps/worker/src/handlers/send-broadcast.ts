@@ -7,6 +7,7 @@ import {
   buildAccountMail,
   buildUnsubscribeHeaders,
   claimNotification,
+  drawBroadcastCopy,
   encryptEmailBody,
   fetchDeliverabilityHealth,
   fetchTeamQuota,
@@ -17,9 +18,12 @@ import {
   isSubscribedToTopic,
   type Keyring,
   type MailLocale,
+  type MonitorDeps,
   makeUnsubscribeToken,
   nextUtcDayStart,
   parseSingleSender,
+  planBroadcastSamples,
+  recordMonitorSample,
   regionPause,
   reserveQuota,
   segmentContactsWhere,
@@ -70,6 +74,8 @@ export interface BroadcastDeps {
   sesQuota?: { exhausted(region?: string): boolean } | undefined;
   /** Dashboard origin for the links in those mails. */
   appBaseUrl?: string | undefined;
+  /** The content monitor: the skeleton sample at fan-out start and the copies drawn per recipient. */
+  monitor?: MonitorDeps | undefined;
 }
 
 /**
@@ -281,6 +287,47 @@ export async function sendBroadcast(
     segmentPredicate = segmentContactsWhere(schema.contacts, segment);
   }
 
+  // The monitor judges the broadcast's own HTML once and a few rendered
+  // copies: the expected count is `copies`, so the draw needs the audience
+  // size. Counted here over the same predicate the walk pages over; the
+  // suppressed and topic-unsubscribed contacts it skips make the expected
+  // count run a little under. Every step is best-effort.
+  let monitorCopies = 0;
+  let monitorAudience = 0;
+  if (deps.monitor) {
+    try {
+      const plan = await planBroadcastSamples(db, deps.monitor, {
+        teamId: broadcast.teamId,
+        broadcastId: broadcast.id,
+      });
+      if (plan.copies > 0) {
+        // The topic rule the walk applies, so the expected copy count holds
+        // for an opt-in topic too.
+        const s = schema.contactTopicSubscriptions;
+        const topicRule = !broadcast.topicId
+          ? undefined
+          : topicDefault
+            ? sql`not exists (select 1 from ${s} where ${s.contactId} = ${schema.contacts.id} and ${s.topicId} = ${broadcast.topicId} and ${s.subscribed} = false)`
+            : sql`exists (select 1 from ${s} where ${s.contactId} = ${schema.contacts.id} and ${s.topicId} = ${broadcast.topicId} and ${s.subscribed} = true)`;
+        const [audience] = await db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(schema.contacts)
+          .where(
+            and(
+              eq(schema.contacts.teamId, broadcast.teamId),
+              eq(schema.contacts.unsubscribed, false),
+              segmentPredicate,
+              topicRule,
+            ),
+          );
+        // Both or neither: a count that failed must not turn into "draw everyone".
+        monitorAudience = audience?.n ?? 0;
+        monitorCopies = plan.copies;
+      }
+    } catch (err) {
+      console.error(`broadcast ${broadcast.id}: monitor skeleton skipped`, err);
+    }
+  }
   const replyTo = broadcast.replyTo ? (JSON.parse(broadcast.replyTo) as string[]) : null;
   // The preheader is per-broadcast, so it is injected once here; merge tokens
   // inside it still personalize per contact below.
@@ -460,6 +507,30 @@ export async function sendBroadcast(
       if (accepted && !accepted.parked) {
         emitted += 1;
         batch.push({ emailId: accepted.id, startAfter });
+      }
+      if (
+        accepted &&
+        deps.monitor &&
+        monitorCopies > 0 &&
+        drawBroadcastCopy(
+          deps.monitor.samplingKey,
+          broadcast.id,
+          accepted.id,
+          monitorCopies,
+          monitorAudience,
+        )
+      ) {
+        try {
+          await recordMonitorSample(db, deps.monitor, await deps.monitor.settings(), {
+            teamId: broadcast.teamId,
+            emailId: accepted.id,
+            broadcastId: broadcast.id,
+            kind: "broadcast_copy",
+            now: new Date(),
+          });
+        } catch (err) {
+          console.error(`broadcast ${broadcast.id}: monitor copy skipped`, err);
+        }
       }
     }
     // One statement per page: the rows are committed, so a failed enqueue

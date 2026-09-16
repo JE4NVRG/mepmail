@@ -17,12 +17,14 @@ import { eq, sql } from "drizzle-orm";
  */
 export async function runSafetyFlags(
   db: Db,
-  opts: { now?: Date } = {},
+  opts: { now?: Date; monitorFlagRisk?: number | undefined } = {},
 ): Promise<{ teams: number; opened: number; cleared: number }> {
   const now = opts.now ?? new Date();
   const previous = await db.select().from(schema.teamStandings);
   const standings = await computeTeamStandings(db, now);
-  const flags = await syncTeamFlags(db, standings, now, previous);
+  const flags = await syncTeamFlags(db, standings, now, previous, {
+    monitorFlagRisk: opts.monitorFlagRisk,
+  });
   await saveTeamStandings(db, standings, now);
   await pruneTeamStandings(db, now);
   try {

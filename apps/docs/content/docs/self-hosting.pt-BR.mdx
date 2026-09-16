@@ -768,8 +768,10 @@ região do SES com cota, plano de preços e status de enforcement, e as sondas
 de saúde com histórico), uma página de Regiões, uma página de Equipes com
 ações do operador (alterar plano ou tipo, teto diário de envio, pausar
 transmissões, suspender e reativar), uma página de Confiança e segurança
-construída sobre o guardrail, o score da conta e os insights de conteúdo
-armazenados (nunca o corpo dos e-mails), e um log de auditoria da instância.
+construída sobre o guardrail, o score da conta, os insights de conteúdo
+armazenados (nunca o corpo dos e-mails) e, quando o monitor de conteúdo
+opcional está ligado, os veredictos amostrados do modelo, e um log de
+auditoria da instância.
 
 Só o operador da instância (o primeiro usuário cadastrado) consegue abri-lo;
 todos os outros recebem 404, e nada no app leva até ele. Em uma instância
@@ -785,6 +787,91 @@ transmissões retém as transmissões enquanto o e-mail transacional continua;
 um teto diário limita o dia da equipe abaixo do plano. Os proprietários são
 avisados por e-mail a cada ação (exceto suspensão por phishing), e cada ação
 entra no log de auditoria com o motivo.
+
+## Monitoramento de conteúdo (opcional)
+
+Desligado por padrão. Com um juiz configurado, uma amostra do e-mail aceito é
+pontuada de 0 a 100 pelo TypeSafe Jev depois que o SES o recebeu e incorporada
+a um risco por equipe que o operador vê em Confiança e segurança. Nada no caminho de envio espera por
+isso: um veredicto nunca atrasa, retém ou recusa uma mensagem, e uma falha do
+juiz de qualquer tipo (recurso desligado, credenciais ausentes, limitação de
+taxa, timeout, erro do provedor, resposta que não parseia, corpo já removido
+pela retenção) registra a amostra como sem julgamento e não muda mais nada.
+As verificações determinísticas de conteúdo (os insights, o guardrail, o
+score da conta) rodam em todo envio com ou sem o juiz. Quem hospeda por
+conta própria pode deixá-lo desligado.
+
+**O que ele faz.** Abre a sinalização `monitor` em Confiança e segurança
+quando o risco de uma equipe cruza a linha de sinalização, avisa o operador
+por e-mail uma vez por dia por equipe acima da linha de alerta e, só para uma
+equipe no nível Nova (nos primeiros 1.000 envios ou 72 horas, ou abaixo de
+10.000 envios em 7 dias), pausa os broadcasts quando o risco passa da
+linha de pausa e uma mensagem amostrada pontuou 90 ou mais no último dia (o
+e-mail transacional continua saindo; a equipe vê "pausados aguardando
+revisão"; o operador retoma pela página de revisão). Nunca suspende uma
+equipe e nunca retém e-mail transacional: uma pessoa decide. A política de
+pausa é uma configuração e pode ser desligada.
+
+**Para ligar**, no `.env` da instância, lido pelo worker e pelo app (um
+reinício aplica):
+
+```bash
+ABUSE_JUDGE=typesafe
+ABUSE_JUDGE_API_KEY=...
+# Opcional; jev-latest é o padrão.
+ABUSE_JUDGE_MODEL=jev-latest
+ABUSE_JUDGE_TIMEOUT_MS=20000
+```
+
+Uma chave de API ausente falha a inicialização. As perguntas que o Jev
+responde estão em `packages/core/src/abuse-judge/questions.ts`. A TypeSafe é
+um subprocessador nos EUA do texto amostrado abaixo; nomeie-a nos termos e
+no aviso de privacidade da instância antes de ligar o juiz.
+
+**Exatamente o que o Jev vê**, montado em memória a cada chamada e nunca
+armazenado: o nome da equipe, os domínios verificados, os dias desde o
+primeiro envio e o plano; os cabeçalhos `From`, `Reply-To` e `Subject`; o
+texto visível renderizado com os elementos ocultos removidos (até 6.000
+caracteres); uma tabela com os textos dos links e seus domínios registráveis
+(até 30); a contagem de imagens, os nomes e tipos dos anexos e a contagem de
+caracteres ocultos. Nunca um endereço de destinatário, nunca o HTML bruto,
+nunca o conteúdo de um anexo. Uma amostra julgada guarda a pontuação, o
+veredicto, as categorias, os códigos de motivo, a marca imitada, o idioma, o
+id do modelo, a latência e a classe de erro; a página de revisão mostra isso
+e nunca um assunto ou um corpo. As linhas de amostra são removidas após 90
+dias.
+
+**Amostragem.** Depois de cada mensagem aceita, um sorteio com chave decide
+se ela é julgada. Cada valor abaixo é editado no console em Confiança e
+segurança → Configurações de monitoramento, ou definido na variável de
+ambiente `MONITOR_*` até lá; o console prevalece.
+
+| Variável | Padrão | Significado |
+| --- | --- | --- |
+| `MONITOR_FIRST_SENDS` | 1000 | As primeiras N mensagens aceitas de uma equipe são julgadas por inteiro |
+| `MONITOR_FIRST_HOURS` | 72 | Tudo nas primeiras H horas após o primeiro envio da equipe é julgado por inteiro |
+| `MONITOR_RAMP_SENDS` | 10000 | Até esta contagem acumulada vale a taxa da rampa |
+| `MONITOR_RAMP_RATE` | 0.25 | A taxa da rampa; a rampa termina na contagem acima ou no dia abaixo, o que vier primeiro |
+| `MONITOR_RAMP_DAYS` | 7 | |
+| `MONITOR_PROBATION_RATE` | 0.05 | Do fim da rampa ao dia 30 |
+| `MONITOR_ESTABLISHED_RATE` | 0.02 | Do dia 30 em diante |
+| `MONITOR_TRUSTED_RATE` | 0.005 | 120 dias, 50.000 envios e nenhuma sinalização em 90 dias |
+| `MONITOR_BROADCAST_COPIES` | 3 | Cópias renderizadas julgadas por broadcast (mais o HTML do próprio broadcast), equipes estabelecidas e confiáveis |
+| `MONITOR_BROADCAST_COPIES_NEW` | 10 | O mesmo para equipes novas, em rampa e probatórias |
+| `MONITOR_ANOMALY_MULTIPLIER` | 20 | Uma checagem de domínio de link, encurtador ou padrão de phishing falhando multiplica a taxa; duas forçam a amostra |
+| `MONITOR_TEAM_DAILY_CAP` | 600 | Mensagens julgadas por equipe por dia UTC; além disso a amostragem para em silêncio |
+| `MONITOR_INSTANCE_DAILY_CAP` | 50000 | Para a instância toda; além disso a amostragem por nível para, primeiros envios e anomalias continuam |
+| `MONITOR_FLAG_RISK` | 0.5 | A equipe recebe a sinalização `monitor` e é amostrada quatro vezes mais |
+| `MONITOR_ALERT_RISK` | 0.7 | O operador é avisado por e-mail, uma vez por equipe por dia |
+| `MONITOR_PAUSE_RISK` | 0.85 | Só equipes novas: os broadcasts pausam, com um veredicto de 90 ou mais no último dia |
+| `MONITOR_AUTO_PAUSE` | true | Se a política de pausa se aplica |
+| `MONITOR_FLAG_SCORE` | 70 | Uma amostra conta como sinalizada no console a partir desta pontuação |
+
+O risco é uma média decaída dos veredictos (meia-vida de 7 dias) com um
+prior que começa mais alto para equipes novas. O cartão Monitoramento da
+visão geral mostra a contagem de amostras por hora, e o operador é avisado
+por e-mail quando mais de 20% das amostras de uma hora (pelo menos 20 delas)
+ficaram sem julgamento, no máximo a cada seis horas.
 
 ## Operações
 

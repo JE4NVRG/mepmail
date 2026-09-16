@@ -692,6 +692,95 @@ content insights (never email bodies), and an instance-wide audit log.
 </details>
 
 <details>
+<summary><b>Content monitoring (optional)</b></summary>
+
+Off by default. With a judge configured, a sample of accepted mail is
+scored 0–100 by TypeSafe Jev after SES has taken it and folded into a
+per-team risk the operator sees on Trust & safety.
+Nothing on the send path waits for it: a verdict never delays, holds or
+refuses a message, and a judge failure of any kind (feature off, missing
+credentials, throttling, timeout, upstream error, unparseable answer, body
+already purged by retention) records the sample as unjudged and changes
+nothing else. The deterministic content checks (`email_insights`, the
+guardrail, the account score) run on every send whether or not the judge is
+on. Self-hosters can leave it off; the cloud runs it.
+
+**What it does and does not do.** It opens the `monitor` flag on Trust &
+safety when a team's risk crosses the flag line, emails the operator once a
+day per team past the alert line, and, for a team in the New tier only
+(inside its first 1,000 sends or 72 hours, or under 10,000 sends within 7
+days), pauses broadcasts when the risk passes the pause line and a sampled
+message scored 90 or more within a day (transactional mail keeps flowing;
+the team sees "paused pending review"; the operator resumes from the review
+page). It never suspends a team and never holds transactional mail: a
+person decides. The pause policy is a setting and can be switched off.
+
+**Turning it on** (in the instance's `.env`, read by the worker and the
+app; a restart applies it):
+
+```sh
+ABUSE_JUDGE=typesafe
+ABUSE_JUDGE_API_KEY=...
+# Optional; jev-latest is the default.
+ABUSE_JUDGE_MODEL=jev-latest
+ABUSE_JUDGE_TIMEOUT_MS=20000
+```
+
+A missing API key fails the boot. The questions Jev answers ship in
+`packages/core/src/abuse-judge/questions.ts`. TypeSafe is a US sub-processor
+of the sampled text below; name it in the instance's terms and privacy
+notice before turning the judge on.
+
+**Exactly what Jev sees**, built in memory per call and never stored:
+the team's name, verified domains, days since its first send and plan; the
+`From`, `Reply-To` and `Subject` headers; the rendered visible text with
+hidden elements stripped (up to 6,000 characters); a table of link anchor
+texts and their registrable domains (up to 30); the image count, the
+attachment names and types, and the count of hidden characters. Never a
+recipient address, never the raw HTML, never an attachment's content. The
+stored record of a judged sample is the score, verdict, categories, reason
+codes, impersonated brand, language, model id, latency and error class;
+the review page shows those and never a subject or a body. Sample rows are
+metadata and are pruned after 90 days.
+
+**Sampling.** After each accepted message, a keyed draw
+(HMAC of the team and message ids under a key derived from
+`MASTER_ENCRYPTION_KEY`) decides whether it is judged. Every value below is
+edited in the console under Trust & safety → Monitoring settings, or set
+as its `MONITOR_*` environment variable until it is; the console wins.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `MONITOR_FIRST_SENDS` | 1000 | A team's first N accepted messages are judged in full |
+| `MONITOR_FIRST_HOURS` | 72 | Everything in the first H hours after a team's first send is judged in full |
+| `MONITOR_RAMP_SENDS` | 10000 | Up to this lifetime count the ramp rate applies |
+| `MONITOR_RAMP_RATE` | 0.25 | The ramp rate; the ramp ends at the count above or on the day below, whichever comes first |
+| `MONITOR_RAMP_DAYS` | 7 | |
+| `MONITOR_PROBATION_RATE` | 0.05 | The ramp's end to day 30 |
+| `MONITOR_ESTABLISHED_RATE` | 0.02 | Day 30 onward |
+| `MONITOR_TRUSTED_RATE` | 0.005 | 120 days, 50,000 sends and no flag in 90 days |
+| `MONITOR_BROADCAST_COPIES` | 3 | Rendered copies judged per broadcast (plus the broadcast's own HTML), established and trusted teams |
+| `MONITOR_BROADCAST_COPIES_NEW` | 10 | The same for new, ramp and probation teams |
+| `MONITOR_ANOMALY_MULTIPLIER` | 20 | One failing link-domain, shortener or phishing-pattern check multiplies the rate; two force the sample |
+| `MONITOR_TEAM_DAILY_CAP` | 600 | Judged messages per team per UTC day; past it sampling stops silently |
+| `MONITOR_INSTANCE_DAILY_CAP` | 50000 | Instance-wide; past it tier sampling stops, first sends and anomalies continue |
+| `MONITOR_FLAG_RISK` | 0.5 | The team gets the `monitor` flag and samples four times as much |
+| `MONITOR_ALERT_RISK` | 0.7 | The operator is emailed, once per team per day |
+| `MONITOR_PAUSE_RISK` | 0.85 | New teams only: broadcasts pause, with a verdict of 90 or more in the last day |
+| `MONITOR_AUTO_PAUSE` | true | Whether the pause policy applies |
+| `MONITOR_FLAG_SCORE` | 70 | A sample counts as flagged in the console from this score |
+
+The risk is a decayed mean of the verdicts (half-life 7 days) with a prior
+that starts new teams higher; the review page shows it beside the tier,
+the last samples and the judge's answer next to each flagged email, and
+offers "Sample everything for 7 days". The Overview's Monitoring card
+charts the hourly sample count, and the operator is emailed when more than
+20% of an hour's samples (at least 20 of them) went unjudged, at most once
+every six hours.
+
+</details>
+
+<details>
 <summary><b>Operations</b></summary>
 
 - Send rate and email retention are managed in the dashboard: Settings → Instance

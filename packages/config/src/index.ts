@@ -1,5 +1,12 @@
 export {
+  ABUSE_JUDGE_BASE_URL_DEFAULT,
+  ABUSE_JUDGE_MODEL_DEFAULT,
+  ABUSE_JUDGE_PROVIDERS,
+  ABUSE_JUDGE_TIMEOUT_MS_DEFAULT,
+  type AbuseJudgeConfig,
+  type AbuseJudgeProvider,
   AWS_REGION_DEFAULT,
+  abuseJudgeConfig,
   accountEmailFrom,
   accountMailDeliverable,
   assertEnvConsistency,

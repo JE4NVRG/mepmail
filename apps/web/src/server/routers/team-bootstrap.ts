@@ -47,11 +47,19 @@ export const teamBootstrapRouter = router({
   /** The operator overrides on the active team, for the dashboard's notices. */
   standing: teamProcedure.query(async ({ ctx }) => {
     const standing = await fetchTeamStanding(ctx.db, ctx.teamId);
+    if (!standing) return null;
+    // A pause the content monitor applied reads as "pending review" to the
+    // team; the reason behind it stays on the operator's side.
+    const [monitor] = await ctx.db
+      .select({ pausedAt: schema.teamMonitor.broadcastsPausedAt })
+      .from(schema.teamMonitor)
+      .where(eq(schema.teamMonitor.teamId, ctx.teamId));
+    const pendingReview = Boolean(standing.broadcastsPausedByOperatorAt && monitor?.pausedAt);
     // The note is written for the owner only on a manual suspension; on the
     // other reasons it is the operator's own record.
-    return standing?.suspended && standing.suspended.reason !== "manual"
-      ? { ...standing, suspended: { ...standing.suspended, note: null } }
-      : standing;
+    return standing.suspended && standing.suspended.reason !== "manual"
+      ? { ...standing, pendingReview, suspended: { ...standing.suspended, note: null } }
+      : { ...standing, pendingReview };
   }),
 
   /**

@@ -29,6 +29,8 @@ const standing = (over: Partial<TeamStandingRow> & { teamId: string }): TeamStan
   hardBounceRate7d: 0,
   sent7d: 1_000,
   sent30d: 4_000,
+  monitorRisk: null,
+  monitorSamples: 0,
   ...over,
 });
 
@@ -244,6 +246,7 @@ describe("standings", () => {
         hardBounceRate7d: 0,
         sent7d: 20,
         sent30d: 4_000,
+        monitorRisk: null,
         computedAt: t2,
       },
     ]);
@@ -282,5 +285,24 @@ describe("standings", () => {
         sent30d: 200,
       },
     ]);
+  });
+});
+
+describe("the monitor trigger", () => {
+  it("flags on the risk line after the rate triggers and before the score, honouring the setting", () => {
+    expect(flagTrigger(standing({ teamId: "m", monitorRisk: 0.5, monitorSamples: 22 }))).toEqual({
+      reason: "monitor",
+      detail: { risk: 0.5, samples: 22 },
+    });
+    expect(flagTrigger(standing({ teamId: "m", monitorRisk: 0.49 }))).toBeNull();
+    expect(
+      flagTrigger(standing({ teamId: "m", monitorRisk: 0.49 }), { monitorFlagRisk: 0.4 })?.reason,
+    ).toBe("monitor");
+    expect(flagTrigger(standing({ teamId: "m", monitorRisk: 0.9, scoreTenths: 10 }))?.reason).toBe(
+      "monitor",
+    );
+    expect(
+      flagTrigger(standing({ teamId: "m", monitorRisk: 0.9, complaintRate7d: 0.01 }))?.reason,
+    ).toBe("complaints");
   });
 });

@@ -135,8 +135,12 @@ it("the worker starts a migrating, listening consumer first and a producer secon
     "ses.event",
     "webhook.drain",
     "recipient.erase",
+    "abuse.judge",
   ]) {
-    expect(queues.get(name)).toEqual({ policy: "short", notify: name !== "recipient.erase" });
+    expect(queues.get(name)).toEqual({
+      policy: "short",
+      notify: name !== "recipient.erase" && name !== "abuse.judge",
+    });
   }
   for (const name of Object.values(DEAD_LETTER_QUEUES)) {
     expect(queues.get(name)).toEqual({ policy: "standard", notify: false });

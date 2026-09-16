@@ -174,7 +174,23 @@
       "queue_quota_held": "Quota-held emails",
       "queue_oldest_s": "Oldest queued job",
       "region_sent": "Sent per hour · {region}",
-      "noPoints": "Nothing recorded in this window yet."
+      "noPoints": "Nothing recorded in this window yet.",
+      "monitor_samples_1h": "Monitor samples per hour",
+      "monitor_unjudged_rate": "Monitor unjudged share"
+    },
+    "monitoring": {
+      "title": "Monitoring",
+      "subtitle": "Sampled content judged by the model · click for the hourly history",
+      "off": "Monitoring is off",
+      "offLead": "The judge is set in the instance environment (read by the worker and the app): ABUSE_JUDGE=typesafe and ABUSE_JUDGE_API_KEY turn it on. Deterministic content checks run regardless.",
+      "offDocs": "Content monitoring guide",
+      "judge": "Judge",
+      "sampledToday": "Sampled today",
+      "judged": "Judged",
+      "unjudgedRate": "Unjudged",
+      "flaggedToday": "Flagged today",
+      "flaggedTip": "Judged samples scoring {score} or more.",
+      "openFlags": "Open monitor flags"
     }
   },
   "region": {
@@ -482,7 +498,7 @@
   },
   "safety": {
     "title": "Trust & safety",
-    "info": "A team lands here when the deliverability guardrail turns warning or paused, complaints pass 0.1% or hard bounces 5% over 7 days, the account score drops under 5, or an operator flags it by hand. Automatic flags clear on their own once the trigger goes away; a flag you clear stays cleared while the same trigger holds.",
+    "info": "A team lands here when the deliverability guardrail turns warning or paused, complaints pass 0.1% or hard bounces 5% over 7 days, the content monitor's risk crosses its flag line (sampled content judged by the model), the account score drops under 5, or an operator flags it by hand. Automatic flags clear on their own once the trigger goes away; a flag you clear stays cleared while the same trigger holds.",
     "proof": "{open} open · {guardrailPaused} paused by guardrail · {suspended} suspended",
     "search": "Search teams, owners, domains",
     "filters": {
@@ -506,7 +522,7 @@
       "manual": "Manual"
     },
     "reasonTip": {
-      "monitor": "The automated monitor flagged sampled content.",
+      "monitor": "The content monitor: sampled content judged by the model pushed the internal risk over the flag line.",
       "complaints": "The complaint rate passed 0.1% or the hard-bounce rate 5% over the last 7 days (SES reviews accounts at those lines).",
       "guardrail": "The deliverability guardrail turned warning or paused the team on its bounce or complaint rates.",
       "score": "The account score dropped under 5 out of 10.",
@@ -521,7 +537,7 @@
       "score": "Score {score} / 10",
       "manual": "Flagged by operator",
       "report": "Abuse report",
-      "monitor": "Monitor"
+      "monitor": "Risk {risk} · {samples, plural, one {# sample} other {# samples}}"
     },
     "columns": {
       "team": "Team",
@@ -533,7 +549,8 @@
       "reason": "Flagged for",
       "status": "Status",
       "region": "Region",
-      "since": "Since"
+      "since": "Since",
+      "risk": "Risk"
     },
     "scoreTip": "The customer-facing account score: content lint and bounce/complaint outcomes over 30 days. The team sees this one.",
     "empty": "0 flagged teams.",
@@ -572,7 +589,10 @@
         "bounces": "Hard bounces 7d",
         "sent7d": "Sent 7d",
         "contacts": "Contacts",
-        "scoreOf": "{score} / 10"
+        "scoreOf": "{score} / 10",
+        "risk": "Monitor risk",
+        "riskTip": "Internal. Sampled verdicts decayed over time, weighted by team age. Never shown to the team.",
+        "riskExempt": "exempt"
       },
       "checks": {
         "title": "Content checks",
@@ -588,7 +608,11 @@
         "recipients": "Recipients",
         "insight": "Insight",
         "more": "+{count} more",
-        "none": "0 flagged emails in the window."
+        "none": "0 flagged emails in the window.",
+        "monitor": "Monitor",
+        "modelScore": "Model: {score} · {detail}",
+        "notFlagged": "not flagged",
+        "modelUnjudged": "Model: unjudged · {error}"
       },
       "audit": {
         "title": "Audit tail",
@@ -602,11 +626,166 @@
       "openFlag": "Flag this team",
       "openFlagTitle": "Flag {team}",
       "openFlagLead": "A manual flag lists the team on Trust & safety until you clear it; the safety cron never clears it.",
-      "openFlagConfirm": "Flag team"
+      "openFlagConfirm": "Flag team",
+      "monitor": {
+        "title": "Monitoring",
+        "subtitle": "Sampled content judged by the model. Internal only; never shown to the team.",
+        "off": "Monitoring is off on this instance; the content checks above still run on every send.",
+        "exempt": "This team is exempt: it runs on the system plan.",
+        "tier": "Sampling tier",
+        "tierValue": "{tier} · {rate} of accepted sends",
+        "elevated": {
+          "anomaly": "raised by anomalies",
+          "flagged": "×4 while flagged",
+          "override": "override"
+        },
+        "samples": "Samples · 7d",
+        "samplesValue": "{samples} · {flagged} flagged · {unjudged} unjudged",
+        "verdicts": "Verdicts",
+        "verdictsValue": "{clean} clean · {flagged} flagged",
+        "verdictsReasons": "{clean} clean · {flagged} flagged: {reasons}",
+        "lastSample": "Last sample",
+        "model": "Model",
+        "override": "Override",
+        "overrideValue": "sampling everything until {until}",
+        "overrideNone": "none",
+        "pause": "Monitor pause",
+        "pauseValue": "broadcasts paused pending review since {since}",
+        "pauseNone": "none",
+        "sampleAll": "Sample everything for 7 days",
+        "stopOverride": "Stop override",
+        "resume": "Resume broadcasts",
+        "samplesTitle": "Last samples",
+        "samplesSubtitle": "The newest 20. Sent at, kind, the score or why it went unjudged, and the reason codes; never the subject or the body.",
+        "samplesNone": "0 samples.",
+        "cols": {
+          "at": "Sent",
+          "kind": "Kind",
+          "result": "Score",
+          "reasons": "Reasons"
+        },
+        "kinds": {
+          "first_sends": "first sends",
+          "ramp": "ramp",
+          "tier": "tier",
+          "anomaly": "anomaly",
+          "override": "override",
+          "broadcast_skeleton": "broadcast skeleton",
+          "broadcast_copy": "broadcast copy"
+        },
+        "pending": "pending",
+        "unjudged": "unjudged · {error}",
+        "toast": {
+          "override": "{team} · sampling everything for 7 days",
+          "overrideCleared": "{team} · override stopped",
+          "resumed": "{team} · broadcasts resumed"
+        },
+        "modelOff": "off in this app's environment"
+      }
     },
     "metric": {
       "complaint": "Complaints",
       "hard_bounce": "Hard bounces"
+    },
+    "settingsButton": "Monitoring settings",
+    "exempt": "exempt",
+    "riskTip": "Internal monitor risk, 0 to 1. Sampled content judged by the model, decayed over time, weighted by team age. Never shown to the team.",
+    "tiers": {
+      "new": "New",
+      "probation": "Probation",
+      "established": "Established",
+      "trusted": "Trusted",
+      "exempt": "Exempt"
+    },
+    "monitor": {
+      "title": "Monitoring settings",
+      "crumb": "Trust & safety",
+      "subtitle": "Sampling rates, caps and thresholds · a value set here overrides the environment and the built-in default",
+      "save": "Save changes",
+      "saved": "Monitoring settings saved",
+      "error": "Could not save: {message}",
+      "order": "The flag, alert and pause lines must climb in that order.",
+      "footnote": "Sampling only changes how fast the risk becomes confident: judging happens after SES accepts a message and never delays or holds it. The rubric, tiers and thresholds ship in the open; only the sampling key is secret.",
+      "on": "on",
+      "off": "off",
+      "reset": "Reset to default",
+      "judge": {
+        "title": "Judge",
+        "provider": "Provider",
+        "model": "Model",
+        "region": "Region",
+        "baseUrl": "Endpoint",
+        "off": "Monitoring is off: no message is sampled, no job runs, nothing is stored. The deterministic content checks run on every send regardless.",
+        "offLead": "The judge is set in the instance environment, not here; the worker and the app read the same lines. These turn it on (TypeSafe Jev):",
+        "change": "To change the provider or model, edit the instance environment and restart the worker and the app.",
+        "docs": "Content monitoring guide"
+      },
+      "groups": {
+        "launch": "Launch profile",
+        "tiers": "Tiers",
+        "broadcasts": "Broadcasts",
+        "escalation": "Escalation and caps",
+        "thresholds": "Thresholds and policy"
+      },
+      "groupsSub": {
+        "launch": "A team's first sends and hours are judged in full, then the ramp rate applies until its send count or day, whichever comes first.",
+        "tiers": "Probation runs from the ramp's end to day 30; Established from day 30; Trusted needs 120 days, 50,000 sends and no flag in 90 days.",
+        "broadcasts": "A broadcast is judged as its own HTML plus this many rendered copies; recipients are never sampled per message on top.",
+        "escalation": "A failing critical or major content check multiplies the rate; two force it. Caps stop sampling silently, never sending.",
+        "thresholds": "Risk runs 0 to 1. A flag lists the team here and quadruples its rate; the alert emails you once a day per team; the pause holds a new team's broadcasts when a sampled message also scored 90 or more."
+      },
+      "fields": {
+        "firstSends": "First sends judged in full",
+        "firstHours": "First hours judged in full",
+        "rampSends": "Ramp ends at send",
+        "rampRate": "Ramp rate",
+        "rampDays": "Ramp ends on day",
+        "probationRate": "Probation rate",
+        "establishedRate": "Established rate",
+        "trustedRate": "Trusted rate",
+        "broadcastCopies": "Rendered copies per broadcast",
+        "broadcastCopiesNew": "Rendered copies · new and probation teams",
+        "anomalyMultiplier": "Anomaly multiplier",
+        "teamDailyCap": "Judged messages per team per day",
+        "instanceDailyCap": "Judged messages per instance per day",
+        "flagRisk": "Flag at risk",
+        "alertRisk": "Email the operator at risk",
+        "pauseRisk": "Pause a new team's broadcasts at risk",
+        "autoPause": "Pause policy",
+        "flagScore": "A sample counts as flagged from score"
+      },
+      "hints": {
+        "firstSends": "a team's first N accepted messages",
+        "firstHours": "everything in the first H hours after the first send",
+        "rampSends": "the ramp rate applies up to this lifetime count",
+        "rampRate": "sends after the first window, until the ramp ends",
+        "rampDays": "the ramp ends on this day after the first send at the latest",
+        "probationRate": "the ramp's end to day 30",
+        "establishedRate": "day 30 onward",
+        "trustedRate": "120 days, 50,000 sends, no flag in 90 days",
+        "broadcastCopies": "established and trusted teams; the skeleton is judged besides",
+        "broadcastCopiesNew": "new, ramp and probation teams",
+        "anomalyMultiplier": "one failing critical or major check; two or more force the sample",
+        "teamDailyCap": "past it, sampling stops for the team, first sends included",
+        "instanceDailyCap": "past it, tier sampling stops; first sends and anomalies continue",
+        "flagRisk": "opens the monitor flag and quadruples the team's rate",
+        "alertRisk": "emails the operator, once per team per day",
+        "pauseRisk": "new tier only, with a verdict of 90 or more in the last day",
+        "autoPause": "whether the pause above is applied; a human decides everything else",
+        "flagScore": "the rubric's own abuse band starts at 65"
+      },
+      "kinds": {
+        "count": "whole number",
+        "rate": "0 to 1",
+        "multiplier": "1 or more",
+        "score": "0 to 100",
+        "bool": ""
+      },
+      "source": {
+        "db": "set here",
+        "env": "from the environment ({value})",
+        "default": "built-in default {value}"
+      }
     }
   },
   "audit": {
@@ -647,6 +826,7 @@
       "reputation": "sending reputation",
       "phishing": "abuse",
       "non_payment": "non-payment"
-    }
+    },
+    "broadcastsPendingReview": "Broadcasts are paused for this team pending review since {since}. Transactional email is unaffected."
   }
 }

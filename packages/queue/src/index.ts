@@ -19,6 +19,9 @@ export interface JobPayloads {
   // Cross-table scrub of one address after its contact was deleted; too slow
   // for a request on a large team, so it runs here.
   "recipient.erase": { teamId: string; address: string };
+  // The content monitor's judge call for one pending sample; the sample row
+  // names the email, the job carries nothing else.
+  "abuse.judge": { sampleId: string };
 }
 
 /** ParsedSesEvent with occurredAt as ISO string (JSON-safe). */
@@ -88,6 +91,7 @@ export const DEAD_LETTER_QUEUES = {
   "email.send": "email.send.dead",
   "webhook.drain": "webhook.drain.dead",
   "recipient.erase": "recipient.erase.dead",
+  "abuse.judge": "abuse.judge.dead",
 } as const;
 
 export type DeadLetteredJobName = keyof typeof DEAD_LETTER_QUEUES;
@@ -98,6 +102,7 @@ const JOB_QUEUES = [
   "ses.event",
   "webhook.drain",
   "recipient.erase",
+  "abuse.judge",
 ] as const;
 // Compile-time check that every JobPayloads key is listed above.
 const _everyJobQueueListed: Record<Exclude<JobName, (typeof JOB_QUEUES)[number]>, never> = {};
@@ -181,6 +186,9 @@ export const CRON_JOBS = {
   "instance.probe": "* * * * *",
   // Every 15 min: per-team standings and the automatic trust & safety flags.
   "safety.flags": "*/15 * * * *",
+  // Every 10 min: the content monitor's sample count and unjudged share as
+  // probes, and the operator's notice when the judge keeps failing.
+  "monitor.health": "*/10 * * * *",
 } as const;
 
 export type CronJobName = keyof typeof CRON_JOBS;

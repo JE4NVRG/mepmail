@@ -1,5 +1,9 @@
 import { accountEmailFrom, env, notificationsEmailFrom, servedRegions } from "@millionsend/config";
 import {
+  type AccountMailKind,
+  accountLocale,
+  buildAccountMail,
+  findInstanceOperator,
   type Keyring,
   listTeamOwners,
   type MailContent,
@@ -102,4 +106,27 @@ export async function mailOwners(
     }
   }
   return sent;
+}
+
+/**
+ * One catalog notice to the instance operator, in their own language when
+ * their contact row says which; nothing goes out when no operator exists.
+ * Returns whether it was sent; a failing send is the caller's to log.
+ */
+export async function mailOperator(
+  db: Db,
+  mailer: SystemMailer,
+  kind: AccountMailKind,
+  path: string,
+  values: Record<string, string>,
+  appBaseUrl: string | undefined,
+): Promise<boolean> {
+  const operator = await findInstanceOperator(db);
+  if (!operator) return false;
+  const locale = await accountLocale(db, accountEmailFrom(), operator.email);
+  await mailer.send(operator.email, {
+    ...buildAccountMail({ kind, locale, url: `${appBaseUrl ?? ""}${path}`, values }),
+    kind,
+  });
+  return true;
 }

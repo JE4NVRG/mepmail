@@ -433,7 +433,12 @@
       "console_flag_reopened": "Reopened flag",
       "region_breaker_opened": "Paused broadcasts in region",
       "region_breaker_closed": "Resumed broadcasts in region",
-      "region_quota_requested": "Requested SES quota increase"
+      "region_quota_requested": "Requested SES quota increase",
+      "instance_monitor_settings_updated": "Updated monitoring settings",
+      "monitor_override_set": "Set monitor sampling override",
+      "monitor_override_cleared": "Cleared monitor sampling override",
+      "monitor_broadcasts_paused": "Content monitor paused broadcasts",
+      "monitor_broadcasts_resumed": "Resumed broadcasts after monitor pause"
     },
     "empty": "Nothing recorded yet.",
     "loadMore": "Load more",
