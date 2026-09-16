@@ -182,7 +182,7 @@
       "title": "Monitoring",
       "subtitle": "Sampled content judged by the model · click for the hourly history",
       "off": "Monitoring is off",
-      "offLead": "The judge is set in the instance environment (read by the worker and the app): ABUSE_JUDGE names the provider, ABUSE_JUDGE_MODEL the model. Deterministic content checks run regardless.",
+      "offLead": "The judge is set in the instance environment (read by the worker and the app): ABUSE_JUDGE=typesafe and ABUSE_JUDGE_API_KEY turn it on. Deterministic content checks run regardless.",
       "offDocs": "Content monitoring guide",
       "judge": "Judge",
       "sampledToday": "Sampled today",
@@ -716,7 +716,7 @@
         "region": "Region",
         "baseUrl": "Endpoint",
         "off": "Monitoring is off: no message is sampled, no job runs, nothing is stored. The deterministic content checks run on every send regardless.",
-        "offLead": "The judge is set in the instance environment, not here; the worker and the app read the same lines. These turn on the cloud default (Nova Lite on Bedrock, using the SES credential chain):",
+        "offLead": "The judge is set in the instance environment, not here; the worker and the app read the same lines. These turn it on (TypeSafe Jev):",
         "change": "To change the provider or model, edit the instance environment and restart the worker and the app.",
         "docs": "Content monitoring guide"
       },

@@ -103,7 +103,7 @@ function fakeJudge(
 ): AbuseJudge & { blocks: string[] } {
   const blocks: string[] = [];
   return {
-    provider: "openai",
+    provider: "typesafe",
     model: "fake-model",
     blocks,
     judge: async (block) => {

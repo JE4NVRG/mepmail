@@ -791,9 +791,8 @@ entra no log de auditoria com o motivo.
 ## Monitoramento de conteúdo (opcional)
 
 Desligado por padrão. Com um juiz configurado, uma amostra do e-mail aceito é
-lida por um modelo de linguagem depois que o SES o recebeu, pontuada de 0 a
-100 contra uma rubrica fixa e incorporada a um risco por equipe que o
-operador vê em Confiança e segurança. Nada no caminho de envio espera por
+pontuada de 0 a 100 pelo TypeSafe Jev depois que o SES o recebeu e incorporada
+a um risco por equipe que o operador vê em Confiança e segurança. Nada no caminho de envio espera por
 isso: um veredicto nunca atrasa, retém ou recusa uma mensagem, e uma falha do
 juiz de qualquer tipo (recurso desligado, credenciais ausentes, limitação de
 taxa, timeout, erro do provedor, resposta que não parseia, corpo já removido
@@ -817,36 +816,19 @@ pausa é uma configuração e pode ser desligada.
 reinício aplica):
 
 ```bash
-# Bedrock Converse, com as credenciais ou o papel da AWS que o SES já usa.
-ABUSE_JUDGE=bedrock
-ABUSE_JUDGE_MODEL=amazon.nova-lite-v1:0
-ABUSE_JUDGE_REGION=us-east-1
-
-# Ou qualquer endpoint de chat completions compatível com a OpenAI.
-ABUSE_JUDGE=openai
-ABUSE_JUDGE_MODEL=gpt-5-nano
+ABUSE_JUDGE=typesafe
 ABUSE_JUDGE_API_KEY=...
-ABUSE_JUDGE_BASE_URL=https://api.openai.com/v1
-
-# Ou a Messages API da Anthropic.
-ABUSE_JUDGE=anthropic
-ABUSE_JUDGE_MODEL=claude-haiku-4-5
-ABUSE_JUDGE_API_KEY=...
-
-# Timeout por chamada (padrão 20000 ms).
+# Opcional; jev-latest é o padrão.
+ABUSE_JUDGE_MODEL=jev-latest
 ABUSE_JUDGE_TIMEOUT_MS=20000
 ```
 
-Um provedor sem o modelo, ou um provedor hospedado sem a chave, falha a
-inicialização. A rubrica está no repositório
-(`packages/core/src/abuse-judge/rubric.ts`); ela foi escolhida em um corpus
-rotulado com o Nova Lite, e modelos pequenos da classe do Nova Micro não
-seguram uma rubrica desse tamanho e geram falsos positivos, então use o Nova
-Lite ou maior (ou um modelo da classe Haiku) em vez de encurtar a rubrica.
-Confira os termos de retenção do seu provedor hospedado antes de apontar o
-juiz para ele: o texto abaixo chega até ele.
+Uma chave de API ausente falha a inicialização. As perguntas que o Jev
+responde estão em `packages/core/src/abuse-judge/questions.ts`. A TypeSafe é
+um subprocessador nos EUA do texto amostrado abaixo; nomeie-a nos termos e
+no aviso de privacidade da instância antes de ligar o juiz.
 
-**Exatamente o que o modelo vê**, montado em memória a cada chamada e nunca
+**Exatamente o que o Jev vê**, montado em memória a cada chamada e nunca
 armazenado: o nome da equipe, os domínios verificados, os dias desde o
 primeiro envio e o plano; os cabeçalhos `From`, `Reply-To` e `Subject`; o
 texto visível renderizado com os elementos ocultos removidos (até 6.000

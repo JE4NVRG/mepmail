@@ -475,8 +475,9 @@ describe("console.monitor", () => {
   });
 
   it("shows the judge and today's tallies once the env names a provider", async () => {
-    vi.stubEnv("ABUSE_JUDGE", "bedrock");
-    vi.stubEnv("ABUSE_JUDGE_MODEL", "amazon.nova-lite-v1:0");
+    vi.stubEnv("ABUSE_JUDGE", "typesafe");
+    vi.stubEnv("ABUSE_JUDGE_API_KEY", "k");
+    vi.stubEnv("ABUSE_JUDGE_MODEL", "jev-latest");
     await db.insert(schema.monitorSamples).values([
       { teamId, kind: "first_sends", status: "judged", score: 80 },
       { teamId, kind: "first_sends", status: "judged", score: 10 },
@@ -485,10 +486,10 @@ describe("console.monitor", () => {
     const status = await operator().console.monitor.status();
     expect(status.judge).toEqual({
       on: true,
-      provider: "bedrock",
-      model: "amazon.nova-lite-v1:0",
-      region: "us-east-1",
-      baseUrl: null,
+      provider: "typesafe",
+      model: "jev-latest",
+      region: null,
+      baseUrl: "https://api.typesafe.ai",
     });
     expect(status.today).toEqual({ sampled: 3, judged: 2, unjudged: 1, flagged: 1 });
   });

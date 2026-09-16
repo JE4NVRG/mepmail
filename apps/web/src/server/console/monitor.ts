@@ -1,15 +1,13 @@
 import { abuseJudgeConfig } from "@millionsend/config";
 
-/** What the console says about the judge: off, or the provider and model the env names. */
+/** What the console says about the judge: off, or the TypeSafe model the env names. */
 export type JudgeStatus =
   | { on: false }
   | {
       on: true;
-      provider: "bedrock" | "openai" | "anthropic";
+      provider: "typesafe";
       model: string;
-      /** Bedrock's region; null for the hosted providers. */
       region: string | null;
-      /** The OpenAI-compatible endpoint; null for the others. */
       baseUrl: string | null;
     };
 
@@ -20,7 +18,7 @@ export function judgeStatus(): JudgeStatus {
     on: true,
     provider: config.provider,
     model: config.model,
-    region: config.provider === "bedrock" ? config.region : null,
-    baseUrl: config.provider === "openai" ? config.baseUrl : null,
+    region: null,
+    baseUrl: config.baseUrl,
   };
 }

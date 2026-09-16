@@ -193,10 +193,7 @@ const mailer = createSystemMailer({ db, keyring, enqueueSend });
 // accepted send may be drawn and judged after the fact; the sampling key is
 // derived like the token keys, the settings row is re-read once a minute.
 const judgeConfig = abuseJudgeConfig();
-const judge = createAbuseJudge(judgeConfig, {
-  accessKeyId: env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-});
+const judge = createAbuseJudge(judgeConfig);
 const monitorSettings = monitorSettingsReader(db, env as unknown as Record<string, unknown>);
 const monitor: MonitorDeps | undefined = judge
   ? {
@@ -533,9 +530,8 @@ await queue.work(
   { concurrency: 2 },
 );
 
-// Judge calls: a plain queue, a few lanes. The provider's request quota is
-// the real limit (Nova on this account: 100 a minute), so the lanes stay few
-// and a throttle is retried through the queue's backoff, not in-process.
+// Judge calls: a plain queue, a few lanes. A throttle is retried through
+// the queue's backoff, not in-process.
 await queue.work(
   "abuse.judge",
   async ({ sampleId }) => {

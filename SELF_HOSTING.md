@@ -694,9 +694,9 @@ content insights (never email bodies), and an instance-wide audit log.
 <details>
 <summary><b>Content monitoring (optional)</b></summary>
 
-Off by default. With a judge configured, a sample of accepted mail is read
-by a language model after SES has taken it, scored 0–100 against a fixed
-rubric, and folded into a per-team risk the operator sees on Trust & safety.
+Off by default. With a judge configured, a sample of accepted mail is
+scored 0–100 by TypeSafe Jev after SES has taken it and folded into a
+per-team risk the operator sees on Trust & safety.
 Nothing on the send path waits for it: a verdict never delays, holds or
 refuses a message, and a judge failure of any kind (feature off, missing
 credentials, throttling, timeout, upstream error, unparseable answer, body
@@ -719,36 +719,19 @@ person decides. The pause policy is a setting and can be switched off.
 app; a restart applies it):
 
 ```sh
-# Bedrock Converse, using the AWS credentials or role SES already uses.
-ABUSE_JUDGE=bedrock
-ABUSE_JUDGE_MODEL=amazon.nova-lite-v1:0
-ABUSE_JUDGE_REGION=us-east-1
-
-# Or any OpenAI-compatible chat completions endpoint.
-ABUSE_JUDGE=openai
-ABUSE_JUDGE_MODEL=gpt-5-nano
+ABUSE_JUDGE=typesafe
 ABUSE_JUDGE_API_KEY=...
-ABUSE_JUDGE_BASE_URL=https://api.openai.com/v1
-
-# Or the Anthropic Messages API.
-ABUSE_JUDGE=anthropic
-ABUSE_JUDGE_MODEL=claude-haiku-4-5
-ABUSE_JUDGE_API_KEY=...
-
-# Per-call timeout (default 20000 ms).
+# Optional; jev-latest is the default.
+ABUSE_JUDGE_MODEL=jev-latest
 ABUSE_JUDGE_TIMEOUT_MS=20000
 ```
 
-A provider without its model, or a hosted provider without its key, fails
-the boot. The rubric is `packages/core/src/abuse-judge/rubric.ts` and ships
-in the open; it was chosen on a labelled corpus with Nova Lite, and small
-models of the Nova Micro class cannot hold a rubric this long and
-false-positive on it, so use Nova Lite or larger (or a Haiku-class model)
-rather than shortening the rubric. Bedrock keeps no prompt content;
-check your hosted provider's retention terms before pointing the judge at
-it, since the text below reaches it.
+A missing API key fails the boot. The questions Jev answers ship in
+`packages/core/src/abuse-judge/questions.ts`. TypeSafe is a US sub-processor
+of the sampled text below; name it in the instance's terms and privacy
+notice before turning the judge on.
 
-**Exactly what the model sees**, built in memory per call and never stored:
+**Exactly what Jev sees**, built in memory per call and never stored:
 the team's name, verified domains, days since its first send and plan; the
 `From`, `Reply-To` and `Subject` headers; the rendered visible text with
 hidden elements stripped (up to 6,000 characters); a table of link anchor

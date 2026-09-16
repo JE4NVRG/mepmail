@@ -15,7 +15,7 @@ const mailer = {
     sends.push({ to, kind: m.kind, text: m.text });
   },
 };
-const judge = { provider: "bedrock", model: "amazon.nova-lite-v1:0" };
+const judge = { provider: "typesafe" as const, model: "jev-latest" };
 
 beforeAll(async () => {
   ({ db, close } = await createTestDb());
@@ -78,7 +78,7 @@ it("records the hour's probes, marks lost samples, and mails the operator once p
   expect(sends).toHaveLength(1);
   expect(sends[0]).toMatchObject({ to: "op@example.com", kind: "monitor.degraded" });
   expect(sends[0]?.text).toContain("15 of 35");
-  expect(sends[0]?.text).toContain("bedrock · amazon.nova-lite-v1:0");
+  expect(sends[0]?.text).toContain("typesafe · jev-latest");
   expect(state.degradedMailedAt).toEqual(later);
   const rate = await db
     .select()
