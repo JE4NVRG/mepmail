@@ -7,7 +7,7 @@ import { ModalFooter } from "@/components/modal-footer";
 import { Skeleton } from "@/components/skeleton";
 import { Tooltip } from "@/components/tooltip";
 import { planLabel } from "@/lib/console-format";
-import { formatDayTime, formatRelative } from "@/lib/format";
+import { formatDayTime, formatMmSs, formatRelative } from "@/lib/format";
 import { formatScoreTenths } from "@/lib/score-band";
 import { useCountdown } from "@/lib/use-countdown";
 import { GuardrailLabel, RegionLabel, usePlanName } from "./cells";
@@ -26,7 +26,7 @@ function Figure({ label, value }: { label: string; value: React.ReactNode }) {
 
 function LiveViewLine({ expiresAt }: { expiresAt: Date }) {
   const t = useTranslations("console.teams");
-  const left = useCountdown(expiresAt);
+  const left = formatMmSs(useCountdown(expiresAt));
   return (
     <p style={{ margin: "0 0 16px", color: "var(--ms-warn)", fontSize: 13 }}>
       {t("detail.supportView", { left })}

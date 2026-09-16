@@ -1,29 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatCountdown } from "./format";
 
 /**
- * "mm:ss" until `deadline`, ticking every second and calling `onZero` once
- * when it runs out. Client-side only: the server enforces the deadline
- * regardless of what the clock here says.
+ * Milliseconds left until `until`, ticking once a second and floored at zero;
+ * the interval is cleared when the target changes and when the caller
+ * unmounts. A new target is measured during the render that brings it, so a
+ * countdown never paints a frame of zero before its first tick — callers read
+ * zero as "the window closed". Zero while `until` is null, which is also what
+ * a server render sees, so hydration agrees.
  */
-export function useCountdown(deadline: Date | string | number, onZero?: () => void): string {
-  const target = new Date(deadline).getTime();
-  const [left, setLeft] = useState(() => formatCountdown(target - Date.now()));
+export function useCountdown(until: Date | null): number {
+  const target = until?.getTime() ?? 0;
+  const [state, setState] = useState({ target: 0, left: 0 });
+  if (state.target !== target) {
+    setState({ target, left: target === 0 ? 0 : Math.max(0, target - Date.now()) });
+  }
   useEffect(() => {
-    let fired = false;
-    const tick = () => {
-      const ms = target - Date.now();
-      setLeft(formatCountdown(ms));
-      if (ms <= 0 && !fired) {
-        fired = true;
-        onZero?.();
-      }
-    };
-    tick();
-    const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
-  }, [target, onZero]);
-  return left;
+    if (target === 0) return;
+    const id = setInterval(
+      () => setState({ target, left: Math.max(0, target - Date.now()) }),
+      1000,
+    );
+    return () => clearInterval(id);
+  }, [target]);
+  return state.target === target ? state.left : 0;
 }

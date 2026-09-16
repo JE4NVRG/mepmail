@@ -109,12 +109,11 @@ export function formatHoursMinutes(ms: number): string {
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
-/** A deadline as "mm:ss", never below 00:00, for the support view countdowns. */
-export function formatCountdown(ms: number): string {
-  const total = Math.max(0, Math.ceil(ms / 1000));
-  const minutes = Math.floor(total / 60);
-  const seconds = total % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+/** A countdown as mm:ss, floored at 00:00. */
+export function formatMmSs(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)}`;
 }
 
 export function formatDurationShort(ms: number): string {

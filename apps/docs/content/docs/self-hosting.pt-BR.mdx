@@ -873,6 +873,66 @@ visão geral mostra a contagem de amostras por hora, e o operador é avisado
 por e-mail quando mais de 20% das amostras de uma hora (pelo menos 20 delas)
 ficaram sem julgamento, no máximo a cada seis horas.
 
+## Acesso ao conteúdo (quebra de vidro)
+
+Desligado por padrão. Com ele ligado, um operador autorizado pode ler o
+assunto e o texto visível renderizado de mensagens específicas de uma equipe
+sinalizada, por um motivo de segurança que ele nomeia e justifica antes de
+qualquer coisa ser descriptografada, por no máximo 30 minutos. É o caminho
+de emergência para os casos que os metadados armazenados não resolvem: as
+métricas sabem que um link aponta para um encurtador, não se o texto ao
+redor é uma isca bancária ou uma newsletter.
+
+**O que um operador vê.** O assunto e o texto visível renderizado do HTML
+com os elementos ocultos removidos (ou a parte em texto puro, quando não há
+HTML), cortado em 20.000 caracteres e ocultado na saída: todo link — escrito com
+esquema ou como um host `www.` puro — é reduzido ao esquema, ao domínio registrável e a no máximo 24 caracteres de
+caminho, sem a query nem o fragmento, de modo que um link de uso único não
+possa ser seguido; qualquer
+coisa com forma de credencial (um JWT, 32 ou mais caracteres hexadecimais,
+40 ou mais de base64, uma das chaves de API `ms_` da própria instância) é
+mascarada, assim como uma sequência de 4 a 8 dígitos
+a até 40 caracteres de uma palavra como *código*, *code*, *OTP*, *PIN*,
+*token*, *senha*, *password* ou *verification*. Nunca o HTML bruto, os
+endereços dos destinatários, os cabeçalhos, os anexos ou os destinos de
+rastreamento de cliques, e a tela não oferece copiar nem baixar. Um corpo
+que a retenção já expurgou não pode ser revelado por ninguém.
+
+**Por quanto tempo.** Uma autorização dura 30 minutos a partir do momento em
+que é criada e nunca é estendida; uma nova olhada é uma nova autorização,
+com um novo motivo e uma nova linha de auditoria. Cada visualização é
+contada na autorização.
+
+**O que fica registrado.** A linha da autorização (`content_access_grants`)
+guarda o operador, o motivo, a justificativa que ele escreveu, o alcance, os
+ids das mensagens, a contagem de visualizações e os horários. Nada expurga
+essas linhas: elas são o inventário de quem leu o quê. Uma linha na
+auditoria da instância (`content.revealed`) é escrita antes de qualquer
+coisa ser descriptografada, com o id da autorização, o motivo e a quantidade
+de mensagens — nunca o texto da justificativa e nunca qualquer conteúdo.
+
+**O que a equipe vê, e quando.** Sete dias depois, uma rotina diária
+acrescenta uma linha `content.accessed` ao log de auditoria da própria
+equipe — datada no acesso, não na divulgação — e envia um e-mail aos donos
+da equipe no idioma de cada um: quando aconteceu, o motivo, quantas
+mensagens e o que não foi acessado. A única exceção é uma equipe suspensa
+por phishing depois da autorização, em que a linha e o aviso são retidos; a
+autorização registra que a etapa de divulgação rodou de qualquer forma, para
+não ser repetida toda noite.
+
+**Como ligar**, no `.env` da instância, lido pelo worker e pelo app (um
+restart aplica):
+
+```bash
+CONTENT_REVEAL=on
+```
+
+Desligado, os botões do console aparecem desabilitados com uma dica nomeando
+a variável e os dois procedimentos recusam. Ler as mensagens de outras
+pessoas só é lícito como uma medida de segurança estreita, registrada e
+informada: diga isso nos termos e no aviso de privacidade da instância antes
+de ligar.
+
 ## Modo de suporte (opcional)
 
 Desligado por padrão; `SUPPORT_VIEW=on` liga. Na lista de Equipes do

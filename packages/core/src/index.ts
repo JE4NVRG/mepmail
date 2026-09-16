@@ -1,6 +1,7 @@
 export type { ContactActivityType, SegmentCondition, SegmentFilter } from "@millionsend/db/schema";
 export {
   buildJudgeBlock,
+  decodeEntities,
   JUDGE_LINK_ROWS_MAX,
   JUDGE_TEXT_MAX_CHARS,
   type JudgeBlockInput,
@@ -183,6 +184,22 @@ export {
   CONTACT_PROPERTY_VALUE_MAX_LENGTH,
   contactPropertiesChange,
 } from "./contact-properties.js";
+export {
+  CONTENT_REVEAL_FIELDS,
+  CONTENT_REVEAL_JUSTIFICATION_MAX,
+  CONTENT_REVEAL_JUSTIFICATION_MIN,
+  CONTENT_REVEAL_NOTICE_DAYS,
+  CONTENT_REVEAL_REASONS,
+  CONTENT_REVEAL_SCOPES,
+  CONTENT_REVEAL_TEXT_MAX_CHARS,
+  CONTENT_REVEAL_WINDOW_MS,
+  type ContentRevealReason,
+  type ContentRevealScope,
+  contentRevealExpiry,
+  type RevealedContent,
+  type RevealSpan,
+} from "./content-reveal.js";
+export { redactRevealedText, renderRevealedBody } from "./content-reveal-render.js";
 export {
   BOUND_ENVELOPE_VERSION_OFFSET,
   decryptEmailBody,
