@@ -1,20 +1,11 @@
-import {
-  badge,
-  bold,
-  dim,
-  err,
-  info,
-  layoutWidth,
-  warn as warnColor,
-  wrapIndent,
-} from "./theme.js";
+import { badge, bold, dim, err, info, warn as warnColor, wrapIndent } from "./theme.js";
 import {
   type Asker,
   isInteractive,
-  rowsFor,
   type SelectOption,
   secretPrompt,
   selectPrompt,
+  visibleLength,
 } from "./tty-ui.js";
 
 /** Glyphs of a guided flow: a rail down the left margin, a diamond per step. */
@@ -73,30 +64,40 @@ export function createFlow(
   const rail = opts.rail ?? isInteractive();
   const out = opts.out ?? process.stdout;
   const columns = (): number => out.columns ?? 80;
+  const wrapWidth = (): number => Math.min(columns(), 100) - 3;
   const bar = (): string => dim(RAIL.bar);
   const write = (text: string): void => {
     out.write(`${text}\n`);
   };
-  // Wrapped to the layout width minus the rail, every line prefixed with it.
+  // Leading whitespace is a verbatim snippet (nginx location); wrapIndent would collapse it.
+  const wrapLines = (text: string): string[] =>
+    text.split("\n").flatMap((paragraph) => {
+      if (paragraph === "") return [""];
+      if (/^\s/.test(paragraph)) return [paragraph];
+      return wrapIndent(paragraph, { width: wrapWidth() }).split("\n");
+    });
   const railed = (text: string, style: (s: string) => string = (s) => s): string[] =>
-    text
-      .split("\n")
-      .flatMap((paragraph) =>
-        paragraph === "" ? [""] : wrapIndent(paragraph, { width: layoutWidth() - 3 }).split("\n"),
-      )
-      .map((line) => `${bar()}  ${style(line)}`);
-  const marked = (glyph: string, text: string, style: (s: string) => string = (s) => s): void => {
-    const [first = "", ...rest] = railed(text, style);
-    write(`${glyph}  ${first.slice(visible(bar()) + 2)}`);
-    for (const line of rest) write(line);
+    wrapLines(text).map((line) => `${bar()}  ${style(line)}`);
+  const marked = (glyph: string, text: string, style: (s: string) => string = (s) => s): number => {
+    const [first = "", ...rest] = wrapLines(text);
+    write(`${glyph}  ${style(first)}`);
+    for (const line of rest) write(`${bar()}  ${style(line)}`);
+    return 1 + rest.length;
+  };
+  const lineRows = (line: string): number => {
+    const cols = columns();
+    const len = visibleLength(line);
+    if (len === 0) return 1;
+    const rows = Math.ceil(len / cols);
+    return len % cols === 0 ? rows + 1 : rows;
   };
   const plain = (text: string): void => {
     for (const line of text.split("\n")) console.log(line);
   };
 
   const answered = (label: string, answer: string, hint?: string): void => {
-    write(`${dim(RAIL.done)}  ${label}${hint ? dim(` (${hint})`) : ""}`);
-    write(`${bar()}  ${dim(answer)}`);
+    marked(dim(RAIL.done), hint ? `${label} (${hint})` : label);
+    for (const line of wrapLines(answer || "—")) write(`${bar()}  ${dim(line)}`);
     write(bar());
   };
 
@@ -159,7 +160,7 @@ export function createFlow(
       write(`${dim(RAIL.done)}  ${bold(title)}`);
       for (const line of lines) {
         const wrapped = wrapIndent(line, {
-          width: layoutWidth() - 3,
+          width: wrapWidth(),
           indent: "· ",
           hanging: "  ",
         }).split("\n");
@@ -169,23 +170,22 @@ export function createFlow(
     },
     async ask({ label, hint, initial, secret = false }) {
       if (!rail) {
-        const question = `${label}${initial ? ` [${initial}]` : ""}: `;
+        const question = `${label}${hint ? ` — ${hint}` : ""}${initial ? ` [${initial}]` : ""}: `;
         const raw = secret ? await secretPrompt(rl, { label }) : await rl.question(question);
         return raw.trim() || initial || "";
       }
-      const head = `${info(RAIL.active)}  ${bold(label)}${hint ? dim(` (${hint})`) : ""}`;
-      write(head);
+      const extra = `${hint ? ` (${hint})` : ""}${initial ? ` [${initial}]` : ""}`;
+      const headRows = marked(info(RAIL.active), `${label}${extra}`);
       if (secret) {
         const value = await secretPrompt(rl, { label, rail: true });
-        // secretPrompt drew its own two rows under the head.
-        out.write(`\x1b[${rowsFor([head], columns()) + 2}A\x1b[J`);
+        out.write(`\x1b[${headRows + 2}A\x1b[J`);
         answered(label, value ? "••••" : initial || "—", hint);
         return value || initial || "";
       }
       const prompt = `${bar()}  `;
       const raw = await rl.question(prompt);
       const answer = raw.trim() || initial || "";
-      out.write(`\x1b[${rowsFor([head, `${prompt}${raw}`], columns())}A\x1b[J`);
+      out.write(`\x1b[${headRows + lineRows(`${prompt}${raw}`)}A\x1b[J`);
       answered(label, answer || "—", hint);
       return answer;
     },
@@ -199,7 +199,8 @@ export function createFlow(
     },
     async confirm(label, initial, hint) {
       if (!rail) {
-        return yes(await rl.question(`${label} ${initial ? "[Y/n]" : "[y/N]"} `), initial);
+        const question = `${label}${hint ? ` (${hint})` : ""} ${initial ? "[Y/n]" : "[y/N]"} `;
+        return yes(await rl.question(question), initial);
       }
       const choice = await selectPrompt(rl, {
         label: hint ? `${label} ${dim(`(${hint})`)}` : label,
@@ -223,10 +224,4 @@ export function createFlow(
       write("");
     },
   };
-}
-
-/** Characters the terminal shows, SGR sequences removed. */
-function visible(s: string): number {
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: SGR escapes are what is stripped
-  return [...s.replace(/\x1b\[[0-9;]*m/g, "")].length;
 }

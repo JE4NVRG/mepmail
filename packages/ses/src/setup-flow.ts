@@ -28,6 +28,17 @@ export const CLOUD_REQUIRED_KEYS = [
   "STRIPE_WEBHOOK_SECRET",
 ] as const;
 
+export const DEFAULT_APP_BASE_URL = "http://localhost:3000";
+
+/** Dashboard origin: typed answer, then .env, then the process env, then the compose default. */
+export function resolveAppBaseUrl(
+  typed: string | null,
+  env: string | null,
+  processUrl: string | undefined,
+): string {
+  return typed || envValue(env, "APP_BASE_URL") || processUrl || DEFAULT_APP_BASE_URL;
+}
+
 /** An .env that already runs as the hosted cloud: re-runs then need no --cloud flag. */
 export function isCloudEnv(content: string | null): boolean {
   const value = envValue(content, "IS_CLOUD");
@@ -144,11 +155,16 @@ export function menuOptions(content: string | null, cloud: boolean): MenuOption[
   options.push({
     value: "aws",
     label: "AWS resources",
-    hint: events
-      ? "re-run the AWS setup"
-      : keys
-        ? "add event ingestion (bounces, deliveries)"
-        : "IAM user + key, SNS events, SES configuration set",
+    hint:
+      events && queue
+        ? fullRerunOffered(content)
+          ? "re-run the AWS setup"
+          : "add a region, or skip"
+        : keys && !events
+          ? "add event ingestion (bounces, deliveries)"
+          : keys
+            ? "re-run the AWS setup"
+            : "IAM user + key, SNS events, SES configuration set",
   });
   options.push(
     { value: "urls", label: "Base URLs", hint: "APP_BASE_URL, PUBLIC_API_URL" },
@@ -161,6 +177,11 @@ export function menuOptions(content: string | null, cloud: boolean): MenuOption[
     { value: "exit", label: "Exit" },
   );
   return options;
+}
+
+/** Enter on a finished install must not provision AWS. */
+export function menuInitial(options: readonly MenuOption[]): string | undefined {
+  return options.find((o) => o.value === "exit")?.value ?? options[0]?.value;
 }
 
 /**
@@ -276,8 +297,12 @@ export function flowPlan(
 ): string[] {
   const lines: string[] = [];
   if (setupDone(state.envContent)) {
+    const items = menuOptions(state.envContent, opts.cloud ?? false)
+      .filter((o) => o.value !== "exit")
+      .map((o) => o.label)
+      .join(", ");
     lines.push(
-      "menu: this install is set up — on a terminal the run opens on a menu (add an SES region, AWS resources, base URLs, storage, social login, account email, walk through every step, start); piped runs walk the steps below",
+      `menu: this install is set up — on a terminal the run opens on a menu (${items}); piped runs walk the steps below`,
     );
   }
   lines.push(

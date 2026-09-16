@@ -48,8 +48,10 @@ import {
   fullRerunOffered,
   generateSecret,
   isCloudEnv,
+  menuInitial,
   menuOptions,
   missingSecrets,
+  resolveAppBaseUrl,
   secretLaterHint,
   servedRegionsInEnv,
   sesEventsProxyHint,
@@ -72,8 +74,6 @@ const REGION_HINTS: Record<SesRegion, string> = {
 
 /** selectPrompt value for the free-form region escape hatch (TTY only). */
 const OTHER_REGION = "__other__";
-
-const DEFAULT_APP_BASE_URL = "http://localhost:3000";
 
 export type AuthAction = "proceed" | "offer-login" | "hint-exit";
 
@@ -131,7 +131,7 @@ function printBanner(): void {
  * loses nothing, owner-only so a pre-existing world-readable file is
  * tightened too), and the answers the steps share.
  */
-interface Wizard {
+export interface Wizard {
   flow: Flow;
   interactive: boolean;
   cloud: boolean;
@@ -139,7 +139,9 @@ interface Wizard {
   env: string | null;
   writeEnv(entries: Record<string, string>): boolean;
   enableProfile(profile: string): boolean;
-  /** The dashboard origin: .env, then the process env, then the compose default. */
+  /** Last APP_BASE_URL the operator typed; kept when there is no .env to write. */
+  typedAppBaseUrl: string | null;
+  /** The dashboard origin: typed answer, then .env, then the process env, then the compose default. */
   appBaseUrl(): string;
   /** The api's own listen port, for the reverse-proxy hint the AWS step prints. */
   apiPort(): number;
@@ -175,8 +177,9 @@ function createWizard(
       save();
       return true;
     },
+    typedAppBaseUrl: null,
     appBaseUrl: () =>
-      envValue(wizard.env, "APP_BASE_URL") || process.env.APP_BASE_URL || DEFAULT_APP_BASE_URL,
+      resolveAppBaseUrl(wizard.typedAppBaseUrl, wizard.env, process.env.APP_BASE_URL),
     apiPort: () => Number(envValue(wizard.env, "PORT")) || 3001,
   };
   return wizard;
@@ -247,14 +250,15 @@ async function walkSteps(wizard: Wizard): Promise<number> {
  * The menu an already-set-up install opens on: one step at a time, back to
  * the menu after each, until the operator starts the stack or leaves.
  */
-async function menuLoop(wizard: Wizard): Promise<number> {
+export async function menuLoop(wizard: Wizard): Promise<number> {
   const { flow } = wizard;
+  if (wizard.cloud && !isCloudEnv(wizard.env)) wizard.writeEnv({ IS_CLOUD: "true" });
   for (;;) {
     const options = menuOptions(wizard.env, wizard.cloud);
-    const first = options[0];
+    const initial = menuInitial(options);
     const choice = await flow.select({
       label: "This install is set up. What would you like to do?",
-      ...(first ? { initial: first.value } : {}),
+      ...(initial !== undefined ? { initial } : {}),
       options,
     });
     switch (choice) {
@@ -328,6 +332,7 @@ async function baseUrlsStep(wizard: Wizard): Promise<void> {
     hint: "the URL the dashboard is opened at; an https URL also gets SES events pushed",
     initial: wizard.appBaseUrl(),
   });
+  wizard.typedAppBaseUrl = appBaseUrl;
   if (wizard.env !== null && appBaseUrl !== envValue(wizard.env, "APP_BASE_URL")) {
     wizard.writeEnv({ APP_BASE_URL: appBaseUrl });
   }
@@ -382,6 +387,7 @@ async function secretsStep(wizard: Wizard): Promise<void> {
  */
 async function cloudStep(wizard: Wizard): Promise<void> {
   const { flow } = wizard;
+  if (wizard.cloud && !isCloudEnv(wizard.env)) wizard.writeEnv({ IS_CLOUD: "true" });
   flow.note("Hosted cloud (IS_CLOUD=true) — boot needs every value below except the portal id.");
   const prompts = [
     {
@@ -866,28 +872,33 @@ async function addRegionStep(
   wizard: Wizard,
   queueUrl: string,
   preset: string | null,
-): Promise<void> {
+  proceedYes = wizard.interactive,
+): Promise<"ok" | "skipped" | "failed"> {
   const { flow } = wizard;
+  const served = servedRegionsInEnv(wizard.env);
+  if (preset !== null && served.includes(preset)) {
+    flow.note(`${preset} is already served (${served.join(", ")}) — nothing to add.`);
+    return "ok";
+  }
   const queue = parseSqsQueueUrl(queueUrl);
   if (!queue) {
     flow.error(
       `SQS_QUEUE_URL is not a standard queue URL (${queueUrl}); add the region by hand — SELF_HOSTING.md, "Adding a region".`,
     );
-    return;
+    return "failed";
   }
   const accountId = await resolveIdentity(flow);
-  if (accountId === null) return;
-  const served = servedRegionsInEnv(wizard.env);
+  if (accountId === null) return "failed";
   const region = preset ?? (await chooseRegion(flow));
-  if (region === null) return;
+  if (region === null) return "failed";
   if (served.includes(region)) {
     flow.note(`${region} is already served (${served.join(", ")}) — nothing to add.`);
-    return;
+    return "ok";
   }
   const appBaseUrl = wizard.appBaseUrl();
 
   flow.list("Plan:", addRegionPlan({ region, queueUrl, appBaseUrl }));
-  if (!(await flow.confirm("Proceed?", wizard.interactive))) return;
+  if (!(await flow.confirm("Proceed?", proceedYes))) return "skipped";
 
   const clients = createSetupClients(region, queue.region);
   const onStep = (line: string): void => flow.step(line);
@@ -921,7 +932,7 @@ async function addRegionStep(
     flow.error(
       `Adding the region failed: ${(error as Error).message}\nFix that and re-run — resources it already created are adopted, not duplicated.`,
     );
-    return;
+    return "failed";
   }
   await essentialsPlanPrompt(flow, clients.ses, region);
 
@@ -940,6 +951,7 @@ async function addRegionStep(
       "The SNS subscription confirms itself once the app runs with these values; if it stays pending, use 'Request confirmation' on it in the SNS console.",
     );
   }
+  return "ok";
 }
 
 /**
@@ -1014,13 +1026,11 @@ async function addRegionMain(flow: Flow, args: string[], dryRun: boolean): Promi
     });
     // No path: nothing is written, the step prints the lines instead.
     const wizard = createWizard(flow, state, false, env, null);
-    await addRegionStep(wizard, queueUrl, preset);
-    return 0;
+    return (await addRegionStep(wizard, queueUrl, preset, true)) === "ok" ? 0 : 1;
   }
   flow.note(`Found ${envPath} — the region is written into it.`);
   const wizard = createWizard(flow, state, isCloudEnv(state.envContent), state.envContent, envPath);
-  await addRegionStep(wizard, queueUrl, preset);
-  return 0;
+  return (await addRegionStep(wizard, queueUrl, preset, true)) === "ok" ? 0 : 1;
 }
 
 /**

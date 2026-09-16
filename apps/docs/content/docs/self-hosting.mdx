@@ -28,7 +28,7 @@ The wizard detects what is already there and offers each step — create `.env`
 from a built-in template with generated secrets, provision the AWS resources
 and the S3 buckets for uploads and backups (both below), download the
 standalone compose file, and `docker compose up -d`. Every step is skippable
-and safe to re-run; `--dry-run` prints the full plan and touches nothing. On an install that is already set up, a terminal run opens on a menu instead (add an SES region, AWS resources, base URLs, storage, social login, account email, a full walk-through, or start the stack).
+and safe to re-run; `--dry-run` prints the full plan and touches nothing. On an install that is already set up, a terminal run opens on a menu of next steps instead of walking every step again.
 
 The manual equivalent runs the same multi-arch prebuilt image:
 
@@ -242,8 +242,9 @@ docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms \
 
 The interactive wizard offers the same step as **Add a region** at its AWS
 step. Run anywhere else, without a `.env`, the command asks for the install's
-`SQS_QUEUE_URL`, `SNS_TOPIC_ARNS` and `AWS_REGIONS` and prints the two lines
-instead of writing them.
+`SQS_QUEUE_URL`, `SNS_TOPIC_ARNS`, `AWS_REGIONS`, and optional `APP_BASE_URL`
+(empty: queue only), then confirms before creating anything and prints the two
+lines instead of writing them.
 
 It keeps the IAM user, policy and access key (no new key), creates in the new
 region the SNS topic, the SES configuration set with its event destination and
