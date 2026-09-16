@@ -18,9 +18,10 @@ export const contentAccessScopeEnum = pgEnum("content_access_scope", ["email", "
  * justification they gave before anything was decrypted.
  *
  * Rows are the access inventory a security measure over other people's
- * content has to keep, so nothing prunes them — not the retention cron, not
- * the message they point at. `email_ids` is a plain jsonb array rather than
- * a join table for the same reason: it must survive the emails' deletion.
+ * content has to keep: nothing prunes them, neither the retention cron nor
+ * the message they point at, and they outlive both. `email_ids` is a plain
+ * jsonb array rather than a join table for the same reason. They do go with
+ * the team, whose deletion takes everything about it.
  */
 export const contentAccessGrants = pgTable(
   "content_access_grants",

@@ -15,6 +15,7 @@ import { ConfirmKeycap, ModalFooter } from "@/components/modal-footer";
 import { Select } from "@/components/select";
 import { BtnSpinner } from "@/components/spinner";
 import { toast } from "@/components/toast";
+import { Tooltip } from "@/components/tooltip";
 import { formatDayTime, formatMmSs } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
 import { useCountdown } from "@/lib/use-countdown";
@@ -69,6 +70,8 @@ type Stage =
  */
 export function useContentReveal(opts: {
   onChanged: () => void;
+  /** False hides the clear button: there is no open flag to clear. */
+  canClearFlag?: boolean | undefined;
   onClearFlag?: ((grantId: string) => void) | undefined;
   onSuspend?: ((team: RevealTeam) => void) | undefined;
 }): ContentReveal {
@@ -108,7 +111,15 @@ export function useContentReveal(opts: {
             close();
           }
         },
-        onError: (error) => toast(error.message, "danger"),
+        onError: (error) => {
+          const known: Record<string, string> = {
+            off: "toast.failedOff",
+            purged: "toast.failedPurged",
+            not_flagged: "toast.failedNotFlagged",
+          };
+          const key = known[error.message];
+          toast(key ? t(key) : t("toast.failed", { message: error.message }), "danger");
+        },
       },
     );
   };
@@ -130,7 +141,7 @@ export function useContentReveal(opts: {
           grantId={stage.grantId}
           emailId={stage.emailId}
           onClose={close}
-          {...(opts.onClearFlag
+          {...(opts.onClearFlag && opts.canClearFlag !== false
             ? {
                 onClear: () => {
                   close();
@@ -171,9 +182,7 @@ function RevealDialog({
   const locale = useLocale();
   const id = useId();
   const [reason, setReason] = useState<ContentRevealReason>("phishing_or_malware");
-  const [justification, setJustification] = useState(() =>
-    t("whyHelper", { reason: request.flagLabel }),
-  );
+  const [justification, setJustification] = useState("");
   const { email } = request;
   const windowOnly = email === null;
   const [scope, setScope] = useState<"email" | "flagged_window">(
@@ -232,11 +241,15 @@ function RevealDialog({
             style={{ width: "100%", minHeight: 76, resize: "vertical" }}
             maxLength={CONTENT_REVEAL_JUSTIFICATION_MAX}
             disabled={pending}
+            placeholder={t("whyPlaceholder")}
             value={justification}
             onChange={(event) => setJustification(event.target.value)}
           />
-          {short ? (
-            <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ms-warn)" }}>
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ms-muted)" }}>
+            {t("whyHelper", { reason: request.flagLabel })}
+          </p>
+          {short && justification.length > 0 ? (
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--ms-warn)" }}>
               {t("whyShort", { min: CONTENT_REVEAL_JUSTIFICATION_MIN })}
             </p>
           ) : null}
@@ -312,6 +325,23 @@ function RevealDialog({
   );
 }
 
+/** The monitor's answer for one email as a sentence, or why it has none. */
+function verdictLine(
+  verdict: { status: string; score: number | null; reasons: unknown; errorClass: string | null },
+  monitorT: (key: string, values?: Record<string, string>) => string,
+): string {
+  if (verdict.status === "pending") return monitorT("pending");
+  if (verdict.status !== "judged") {
+    return verdict.errorClass
+      ? monitorT("unjudged", { error: verdict.errorClass })
+      : monitorT("unjudgedNoError");
+  }
+  const reasons = Array.isArray(verdict.reasons) ? (verdict.reasons as string[]) : [];
+  return reasons.length > 0
+    ? `${verdict.score ?? "—"} · ${reasons.join(", ")}`
+    : `${verdict.score ?? "—"}`;
+}
+
 /** Where a span starts: the body is one immutable string, so an offset is identity. */
 function keyedSpans(spans: RevealSpan[]): { key: string; span: RevealSpan }[] {
   let offset = 0;
@@ -348,9 +378,12 @@ function RevealedView({
   const trpc = useTRPC();
   const query = useQuery({
     ...trpc.console.safety.revealed.queryOptions({ grantId, emailId }),
+    // Every view is counted on the grant, so a focus refetch must not inflate
+    // the record — and nothing of the body outlives the closed dialog, which
+    // also makes reopening it the second view it is.
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    gcTime: 0,
     retry: false,
   });
   const left = useCountdown(query.data?.expiresAt ?? null);
@@ -396,7 +429,13 @@ function RevealedView({
           <div className="ms-microlabel" style={{ marginBottom: 4 }}>
             {t("subject")}
           </div>
-          <div style={{ fontWeight: 600, marginBottom: 12 }}>{query.data.subject}</div>
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>
+            {keyedSpans(query.data.subject).map(({ key, span }) => (
+              <span key={key} className={span.redacted ? "ms-redact" : undefined}>
+                {span.text}
+              </span>
+            ))}
+          </div>
           <div className="ms-microlabel" style={{ marginBottom: 4 }}>
             {t("body")}
           </div>
@@ -413,14 +452,7 @@ function RevealedView({
           </div>
           <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
             {query.data.verdict
-              ? t("verdict", {
-                  verdict:
-                    query.data.verdict.status === "judged"
-                      ? `${query.data.verdict.score ?? "—"} · ${(query.data.verdict.reasons ?? []).join(", ") || "—"}`
-                      : monitorT(query.data.verdict.status === "pending" ? "pending" : "unjudged", {
-                          error: "",
-                        }),
-                })
+              ? t("verdict", { verdict: verdictLine(query.data.verdict, monitorT) })
               : t("verdictNone")}
           </p>
         </>
@@ -478,15 +510,23 @@ export function RevealCell({
       </span>
     );
   }
-  return (
+  const button = (
     <button
       type="button"
       className="ms-btn ms-btn-secondary ms-btn-sm"
       disabled={disabled}
-      title={disabled ? t("off") : undefined}
       onClick={onReveal}
     >
       {t("row")}
     </button>
+  );
+  // A native title never shows on a disabled button, so the reason rides the
+  // console's own tooltip instead.
+  return disabled ? (
+    <Tooltip inline text={t("off")}>
+      {button}
+    </Tooltip>
+  ) : (
+    button
   );
 }

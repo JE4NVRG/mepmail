@@ -54,10 +54,11 @@ export async function runRevealNotices(
   let disclosed = 0;
   let withheld = 0;
   for (const grant of grants) {
-    const underInvestigation =
-      grant.suspensionReason === "phishing" &&
-      grant.suspendedAt !== null &&
-      grant.suspendedAt > grant.createdAt;
+    // Suspended for phishing at the disclosure, whenever the suspension
+    // happened: a re-suspension keeps the original suspended_at, so an
+    // escalation to phishing would otherwise read as older than the grant,
+    // and a team already suspended for it is no less under investigation.
+    const underInvestigation = grant.suspensionReason === "phishing" && grant.suspendedAt !== null;
     try {
       if (!underInvestigation) {
         // Written straight rather than through recordAudit, whose failures are
@@ -76,7 +77,12 @@ export async function runRevealNotices(
           },
           createdAt: grant.createdAt,
         });
-        await sendNotice(db, deps, grant);
+        const told = await sendNotice(db, deps, grant);
+        if (told === 0) {
+          console.warn(
+            `safety.reveal_notices: grant ${grant.id} recorded in the team audit but reached no owner by mail`,
+          );
+        }
       }
       await db
         .update(g)
@@ -94,12 +100,13 @@ export async function runRevealNotices(
   return { disclosed, withheld };
 }
 
+/** How many owners the notice reached; zero is worth a line in the log. */
 function sendNotice(
   db: Db,
   deps: RevealNoticeDeps,
   grant: { teamId: string; teamName: string; reason: string; emailIds: string[]; createdAt: Date },
-): Promise<unknown> {
-  if (!deps.mailer) return Promise.resolve();
+): Promise<number> {
+  if (!deps.mailer) return Promise.resolve(0);
   const count = grant.emailIds.length;
   const values = (locale: MailLocale) => ({
     team: grant.teamName,

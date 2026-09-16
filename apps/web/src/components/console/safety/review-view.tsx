@@ -74,6 +74,9 @@ export function ReviewView({ teamId }: { teamId: string }) {
   const revealT = useTranslations("console.safety.reveal");
   const reveal = useContentReveal({
     onChanged: refetch,
+    // Offered only while a flag is open: a button that closes the dialog and
+    // does nothing would be worse than no button.
+    canClearFlag: query.data?.flag?.status === "open",
     onClearFlag: (grantId) => {
       const data = query.data;
       if (data?.flag?.status !== "open") return;
@@ -196,16 +199,13 @@ export function ReviewView({ teamId }: { teamId: string }) {
                 {t(flagOpen ? "badges.flagOpen" : "badges.flagCleared")}
               </span>
             ) : null}
-            <Tooltip inline text={contentReveal ? "" : revealT("off")}>
-              <button
-                type="button"
-                className="ms-btn ms-btn-primary"
-                disabled={!contentReveal || flaggedEmails.length === 0}
-                onClick={revealRequest(flaggedEmails[0] ?? null)}
-              >
-                {revealT("request")}
-              </button>
-            </Tooltip>
+            <RequestAccessButton
+              on={contentReveal}
+              disabled={!contentReveal || flaggedEmails.length === 0}
+              label={revealT("request")}
+              off={revealT("off")}
+              onClick={revealRequest(flaggedEmails[0] ?? null)}
+            />
             <button
               type="button"
               className="ms-btn ms-btn-secondary"
@@ -697,6 +697,34 @@ export function ReviewView({ teamId }: { teamId: string }) {
       {actions.dialogs}
       {reveal.dialogs}
     </>
+  );
+}
+
+/** The header's primary action; the tooltip exists only when there is a reason to give. */
+function RequestAccessButton({
+  on,
+  disabled,
+  label,
+  off,
+  onClick,
+}: {
+  on: boolean;
+  disabled: boolean;
+  label: string;
+  off: string;
+  onClick: () => void;
+}) {
+  const button = (
+    <button type="button" className="ms-btn ms-btn-primary" disabled={disabled} onClick={onClick}>
+      {label}
+    </button>
+  );
+  return on ? (
+    button
+  ) : (
+    <Tooltip inline text={off}>
+      {button}
+    </Tooltip>
   );
 }
 

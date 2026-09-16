@@ -682,7 +682,8 @@
           "overrideCleared": "{team} · override parado",
           "resumed": "{team} · broadcasts retomados"
         },
-        "modelOff": "desligado no ambiente deste app"
+        "modelOff": "desligado no ambiente deste app",
+        "unjudgedNoError": "sem julgamento"
       }
     },
     "metric": {
@@ -821,7 +822,8 @@
         "recorded": "Registrado",
         "recordedValue": "Auditoria da instância · auditoria da equipe em 7 dias",
         "note": "Corpos já expurgados pela retenção não podem ser revelados.",
-        "confirm": "Revelar"
+        "confirm": "Revelar",
+        "whyPlaceholder": "Os veredictos apontam falsidade ideológica e os links vão para um domínio parecido."
       },
       "view": {
         "title": "Conteúdo revelado · {team}",
@@ -847,7 +849,11 @@
       "toast": {
         "granted": "{team} · acesso ao conteúdo aberto por 30 minutos",
         "purged": "{count, plural, one {# e-mail ignorado} other {# e-mails ignorados}}: o corpo foi expurgado pela retenção",
-        "cleared": "{team} · limpa como falso positivo"
+        "cleared": "{team} · limpa como falso positivo",
+        "failed": "Não foi possível abrir o acesso ao conteúdo: {message}",
+        "failedOff": "O acesso ao conteúdo está desligado nesta instância.",
+        "failedPurged": "Todas as mensagens no alcance tiveram o corpo expurgado pela retenção.",
+        "failedNotFlagged": "Esse e-mail não está mais na janela de sinalizados da equipe."
       }
     }
   },

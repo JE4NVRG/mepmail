@@ -14,6 +14,7 @@ import {
   getMonitorSettingsRow,
   parseAuditActor,
   recentMonitorSamples,
+  redactRevealedText,
   renderRevealedBody,
   resolveMonitorSettings,
   TEAM_FLAG_REASONS,
@@ -530,9 +531,17 @@ export const consoleSafetyRouter = router({
         { teamId: email.teamId, rowId: email.id },
       );
       const content = renderRevealedBody(body);
+      // The subject goes through the same pass: a one-time code lives there as
+      // often as in the body, and nothing is lost by reducing it.
+      const subject = redactRevealedText(email.subject);
       const ms = schema.monitorSamples;
       const [verdict] = await ctx.db
-        .select({ status: ms.status, score: ms.score, reasons: ms.reasons })
+        .select({
+          status: ms.status,
+          score: ms.score,
+          reasons: ms.reasons,
+          errorClass: ms.errorClass,
+        })
         .from(ms)
         .where(eq(ms.emailId, email.id))
         .orderBy(desc(ms.createdAt))
@@ -543,9 +552,9 @@ export const consoleSafetyRouter = router({
         .where(eq(g.id, grant.id))
         .returning({ viewCount: g.viewCount });
       return {
-        subject: email.subject,
+        subject: subject.spans,
         spans: content.spans,
-        redactions: content.redactions,
+        redactions: content.redactions + subject.redactions,
         verdict: verdict ?? null,
         expiresAt: grant.expiresAt,
         viewCount: counted?.viewCount ?? grant.viewCount + 1,

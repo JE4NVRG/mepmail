@@ -262,13 +262,14 @@ describe("console.safety.revealed", () => {
     const { grantId } = await grantFor(emailId);
     const view = await operator().console.safety.revealed({ grantId, emailId });
 
-    expect(view.subject).toBe("Sua conta precisa de atenção");
+    expect(view.subject.map((s) => s.text).join("")).toBe("Sua conta precisa de atenção");
     const text = view.spans.map((s) => s.text).join("");
     expect(text).toContain("Regularize seu acesso.");
     expect(text).not.toContain("hidden filler");
     expect(text).not.toContain("448122");
     expect(text).toContain("https://example.com/session/abcdefghijklmno…");
     expect(view.redactions).toBe(2);
+    expect(view.subject.some((s) => s.redacted)).toBe(false);
     expect(view.viewCount).toBe(1);
 
     const payload = JSON.stringify(view);
