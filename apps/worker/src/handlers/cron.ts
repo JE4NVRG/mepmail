@@ -245,7 +245,9 @@ export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainRe
       .from(b)
       .where(
         and(
-          eq(b.status, "sending"),
+          // Sent rows too: a broadcast completed before the status stayed
+          // sending until its last row may still hold plan-parked rows.
+          inArray(b.status, ["sending", "sent"]),
           sql`exists (select 1 from emails e where e.broadcast_id = broadcasts.id and e.latest_status = 'queued_quota')`,
         ),
       )

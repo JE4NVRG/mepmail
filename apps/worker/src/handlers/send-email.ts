@@ -372,6 +372,15 @@ function isTransientError(err: unknown): boolean {
   );
 }
 
+async function broadcastCanceled(db: Db, broadcastId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ status: schema.broadcasts.status })
+    .from(schema.broadcasts)
+    .where(eq(schema.broadcasts.id, broadcastId))
+    .limit(1);
+  return row?.status === "canceled";
+}
+
 /** An ineligible row: canceled with its broadcast, suppressed for any other reason. */
 async function refuse(
   db: Db,
@@ -452,6 +461,11 @@ export async function sendEmail(
   const bulk = email.broadcastId !== null;
   const region = domain?.region;
   if (bulk) {
+    // Before any park: a row of a stopped broadcast must end canceled, never
+    // parked where no sweep looks again.
+    if (email.broadcastId && (await broadcastCanceled(db, email.broadcastId))) {
+      return refuse(db, email, "broadcast_canceled");
+    }
     if (deps.sesQuota?.bulkExhausted?.(region) || deps.sesQuota?.paused?.(region)) {
       await parkQueued(
         db,

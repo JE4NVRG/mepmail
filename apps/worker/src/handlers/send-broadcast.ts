@@ -635,14 +635,15 @@ export async function finalizeBroadcast(
   broadcastId: string,
 ): Promise<boolean> {
   const e = schema.emails;
-  // One statement, one snapshot: a row parking between two probes would
-  // read as gone.
-  const [open] = await db
-    .select({ id: e.id })
-    .from(e)
-    .where(and(eq(e.broadcastId, broadcastId), inArray(e.latestStatus, ["queued", "queued_quota"])))
-    .limit(1);
-  if (open) return false;
+  // One statement, one snapshot (a row parking between two probes would read
+  // as gone), and one EXISTS per state so each uses its partial index.
+  const [probe] = await db
+    .select({
+      open: sql<boolean>`exists (select 1 from ${e} where ${e.broadcastId} = ${broadcastId} and ${e.latestStatus} = 'queued_quota')
+        or exists (select 1 from ${e} where ${e.broadcastId} = ${broadcastId} and ${e.latestStatus} = 'queued')`,
+    })
+    .from(sql`(select 1) as one`);
+  if (probe?.open) return false;
   // Only a finished walk (recipientCount set) can complete: a crashed walk
   // whose written rows all went out is still re-kicked, not sent.
   const [done] = await db
