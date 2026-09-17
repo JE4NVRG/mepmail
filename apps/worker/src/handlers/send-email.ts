@@ -38,7 +38,7 @@ import { schema } from "@millionsend/db";
 import { type EmailSendPriority, emailSendPriority } from "@millionsend/queue";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { createTransport } from "nodemailer";
-import { isSesQuotaRefusal, isSesThrottle, type SesQuotaGate } from "./ses-quota.js";
+import { isSesQuotaRefusal, isSesThrottle, type SendQuotaControls } from "./ses-quota.js";
 
 /**
  * Sends one queued email through SES. The SES client is injected (tests use
@@ -84,8 +84,8 @@ export interface SendDeps {
   reschedule?:
     | ((emailId: string, at: Date, priority: EmailSendPriority) => Promise<void>)
     | undefined;
-  /** SES's 24-hour quota; absent in tests that never reach it. */
-  sesQuota?: SesQuotaGate | undefined;
+  /** SES's 24-hour quota and the broadcast share; absent in tests that never reach it. */
+  sesQuota?: SendQuotaControls | undefined;
   /** Arms the webhook drain for the endpoints written; email.sent webhooks are skipped when absent. */
   enqueueWebhookDelivery?: WebhookEnqueue | undefined;
   /**
@@ -177,13 +177,18 @@ async function checkSendEligibility(
 
   if (!email.broadcastId) return { eligible: true, topicId: null };
   const [broadcast] = await db
-    .select({ topicId: schema.broadcasts.topicId })
+    .select({ topicId: schema.broadcasts.topicId, status: schema.broadcasts.status })
     .from(schema.broadcasts)
     .where(
       and(eq(schema.broadcasts.id, email.broadcastId), eq(schema.broadcasts.teamId, email.teamId)),
     )
     .limit(1);
   if (!broadcast) return { eligible: false, topicId: null, reason: "broadcast_missing" };
+  // A row a walk page or a drain release committed after the stop: the
+  // audience was told nothing more goes out.
+  if (broadcast.status === "canceled") {
+    return { eligible: false, topicId: null, reason: "broadcast_canceled" };
+  }
   if (!broadcast.topicId) return { eligible: true, topicId: null };
 
   const [topic] = await db
@@ -395,9 +400,22 @@ export async function sendEmail(
     : undefined;
   // SES at its 24-hour ceiling in this region: park before building anything,
   // the way an over-plan email parks at accept. The drain releases it as the
-  // window frees.
-  if (deps.sesQuota?.exhausted(domain?.region)) {
+  // window frees. A bulk row parks earlier, at the broadcast share (or while
+  // the region's broadcasts are held), so transactional mail keeps the rest.
+  const bulk = email.broadcastId !== null;
+  const region = domain?.region;
+  if (bulk) {
+    if (deps.sesQuota?.bulkExhausted?.(region) || deps.sesQuota?.paused?.(region)) {
+      await parkQueued(
+        db,
+        email,
+        deps.sesQuota.paused?.(region) ? "region broadcasts held" : "SES bulk share reached",
+      );
+      return "parked";
+    }
+  } else if (deps.sesQuota?.exhausted(region)) {
     await parkQueued(db, email, "SES 24h quota reached");
+    deps.sesQuota.noteTransactionalParked?.(region);
     return "parked";
   }
 
@@ -693,11 +711,10 @@ export async function sendEmail(
     // is full. Either way the email parks; a plain rate refusal keeps retrying.
     if (
       isSesQuotaRefusal(err) ||
-      (isSesThrottle(err) &&
-        deps.sesQuota !== undefined &&
-        (await deps.sesQuota.refresh(domain?.region)))
+      (isSesThrottle(err) && deps.sesQuota !== undefined && (await deps.sesQuota.refresh(region)))
     ) {
-      await parkQueued(db, email, "SES 24h quota reached");
+      await parkQueued(db, email, bulk ? "SES bulk share reached" : "SES 24h quota reached");
+      if (!bulk) deps.sesQuota?.noteTransactionalParked?.(region);
       return "parked";
     }
     throw err;
@@ -726,6 +743,7 @@ export async function sendEmail(
       set: { sent: sql`${counter.sent} + 1` },
     });
   await bumpHourlyUsage(db, { teamId: email.teamId, at: sentAt, counts: { sent: 1 } });
+  if (bulk) deps.sesQuota?.noteBulkSent?.(region);
   // Credential-bearing account mail loses its body the moment SES holds it: a
   // reset link is live for thirty minutes, and the row's body is otherwise
   // readable by every member of the owning team, any full-access key and
