@@ -7,13 +7,21 @@ import {
   trackingSubdomainsSupported,
   unsubscribeBaseUrl,
 } from "@millionsend/config";
-import { deriveUnsubscribeKey, hashRecipient } from "@millionsend/core";
+import {
+  deriveUnsubscribeKey,
+  getInstanceSettings,
+  hashRecipient,
+  pacingHorizonDays,
+} from "@millionsend/core";
 import { getDb } from "@millionsend/db";
 import { EMAIL_SEND_PRIORITY, Queue } from "@millionsend/queue";
 import {
   createCachingCertFetcher,
   createKeyringFromEnv,
+  createRegionAccountCache,
+  createSesAccountClient,
   createSesv2Client,
+  regionAccountWithin,
   type SesIdentityClient,
 } from "@millionsend/ses";
 import { createApi } from "./app.js";
@@ -48,9 +56,33 @@ function clientForRegion(region: string): SesIdentityClient {
   return client;
 }
 
+const db = getDb();
+// The send planner's GetAccount, reused for a minute; a cold read gets two
+// seconds before the send answers without an estimate.
+const accountCache = createRegionAccountCache({
+  accountClient: (region) =>
+    createSesAccountClient({
+      region,
+      accessKeyId: env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+    }),
+});
+const settings = () => getInstanceSettings(db);
+
 const app = createApi({
-  db: getDb(),
+  db,
   keyring,
+  pacing: {
+    regionAccount: async (region) => {
+      const account = await regionAccountWithin(accountCache, region, 2_000);
+      return account?.ok ? account.overview.quota : null;
+    },
+    reservePercent: async () =>
+      (await settings()).sesTransactionalReserve ?? env.SES_TRANSACTIONAL_RESERVE,
+    rateCeiling: async () => (await settings()).sesMaxSendRate ?? env.SES_MAX_SEND_RATE,
+    horizonDays: async () =>
+      pacingHorizonDays((await settings()).emailRetentionDays ?? env.EMAIL_RETENTION_DAYS),
+  },
   isCloud: env.IS_CLOUD,
   onboardingEmailFrom: env.ONBOARDING_EMAIL_FROM,
   requireVerifiedMembers: accountMailDeliverable(),

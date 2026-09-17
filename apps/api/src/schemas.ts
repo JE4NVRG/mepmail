@@ -986,6 +986,37 @@ export const sendBroadcastRequestSchema = z
 
 export const broadcastIdResponseSchema = z.object({ id: z.uuid() }).openapi("BroadcastIdResponse");
 
+/**
+ * A send's answer. A large audience is paced over days: finishes_at is the
+ * estimated instant the last email goes out (null when the estimate is not
+ * available), and warning says why it takes more than one wave.
+ */
+export const sendBroadcastResponseSchema = z
+  .object({
+    id: z.uuid(),
+    finishes_at: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("When the last email is expected to go out (ISO 8601); null when unknown"),
+    estimated: z
+      .literal(true)
+      .optional()
+      .describe("finishes_at is an estimate that moves as other sends come in"),
+    warning: z
+      .object({
+        code: z
+          .enum(["paced", "queued_behind"])
+          .describe(
+            "paced: more than the capacity available now; queued_behind: other sends go first",
+          ),
+        days: z.number().int().describe("Days the send spans"),
+        message: z.string(),
+      })
+      .optional(),
+  })
+  .openapi("SendBroadcastResponse");
+
 const broadcastListItemSchema = z.object({
   id: z.uuid(),
   name: z.string().nullable(),
@@ -994,6 +1025,19 @@ const broadcastListItemSchema = z.object({
   created_at: z.string(),
   scheduled_at: z.string().nullable(),
   sent_at: z.string().nullable(),
+  sent_count: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      "Emails handed off so far; null before the send starts and once its emails have left the retention window",
+    ),
+  finishes_at: z
+    .string()
+    .nullable()
+    .describe(
+      "Estimated instant the last email goes out, while the broadcast is going out; else null",
+    ),
 });
 
 export const listBroadcastsResponseSchema = z
@@ -1022,7 +1066,14 @@ export const removeBroadcastResponseSchema = z
   .openapi("RemoveBroadcastResponse");
 
 export const cancelBroadcastResponseSchema = z
-  .object({ object: z.literal("broadcast"), id: z.uuid() })
+  .object({
+    object: z.literal("broadcast"),
+    id: z.uuid(),
+    canceled_remaining: z
+      .number()
+      .int()
+      .describe("Emails stopped before going out; the ones already sent are not recalled"),
+  })
   .openapi("CancelBroadcastResponse");
 
 /**

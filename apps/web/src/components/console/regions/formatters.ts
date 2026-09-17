@@ -2,7 +2,7 @@
 
 import { useLocale } from "next-intl";
 import { useMemo } from "react";
-import { formatDayUtc } from "@/lib/format";
+import { formatDayUtc, roundUpToQuarterHour } from "@/lib/format";
 
 /** The number formats the region screens share: plain digits, fixed-decimal percentages, hour and day labels. */
 export function useRegionFormats() {
@@ -15,6 +15,11 @@ export function useRegionFormats() {
         maximumFractionDigits: digits,
       });
     const hour = new Intl.DateTimeFormat(locale, { hour: "numeric" });
+    const clears = new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     const nf = new Intl.NumberFormat(locale);
     const one = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
     return {
@@ -26,6 +31,8 @@ export function useRegionFormats() {
       pct3: (v: number) => percent(3).format(v),
       hourLabel: (iso: string) => hour.format(new Date(iso)),
       dayLabel: (day: string) => formatDayUtc(day, locale),
+      /** "Fri 10:30": a forecast, rounded up to the quarter hour. */
+      clearsAbout: (at: Date | string) => clears.format(roundUpToQuarterHour(at)),
     };
   }, [locale]);
 }

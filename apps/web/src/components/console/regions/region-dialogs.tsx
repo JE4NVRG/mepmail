@@ -53,18 +53,21 @@ export function QuotaDialog({
   region,
   open,
   onClose,
+  prefill,
 }: {
   region: ServedRegion;
   open: boolean;
   onClose: () => void;
+  /** What the sold-versus-share notice asks for; the menu opens the dialog with the defaults. */
+  prefill?: { desired: number; justification?: string | undefined } | undefined;
 }) {
   const t = useTranslations("console.region");
   const common = useTranslations("console.common");
   const trpc = useTRPC();
   const f = useRegionFormats();
   const max = region.account?.quota.max24h ?? 0;
-  const [desired, setDesired] = useState(String(Math.max(1, max * 10)));
-  const [justification, setJustification] = useState<string | null>(null);
+  const [desired, setDesired] = useState(String(prefill?.desired ?? Math.max(1, max * 10)));
+  const [justification, setJustification] = useState<string | null>(prefill?.justification ?? null);
   const [denied, setDenied] = useState<{ text: string } | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 

@@ -131,7 +131,7 @@
       "domains": "Domains",
       "domainsSub": "verified · {pending} pending · {failed} failing DKIM",
       "queue": "Queue",
-      "queueSub": "{waiting} queued · {held} quota-held · oldest {oldest}",
+      "queueSub": "{waiting} queued · {held} held (plan + pacing) · oldest {oldest}",
       "queuePending": "counted by the next probe"
     },
     "sent": {
@@ -175,7 +175,7 @@
       "stripe_last_event_s": "Time since last Stripe event",
       "retention_purged": "Bodies purged per run",
       "contacts_unsubscribed": "Unsubscribed contacts",
-      "queue_quota_held": "Quota-held emails",
+      "queue_quota_held": "Emails held (plan + pacing)",
       "queue_oldest_s": "Oldest queued job",
       "region_sent": "Sent per hour · {region}",
       "noPoints": "Nothing recorded in this window yet.",
@@ -291,7 +291,17 @@
       "lead": "A region leaves the deployment through its environment, not from here.",
       "body": "Remove {region} from AWS_REGIONS (and its topic from SNS_TOPIC_ARNS), restart, then delete its configuration set and topic in AWS if nothing else uses them.",
       "blocked": "{count, plural, one {# verified domain still sends} other {# verified domains still send}} from this region; move or delete them first."
-    }
+    },
+    "legendBroadcasts": "Broadcasts {sent} of {share}",
+    "legendTransactional": "Transactional {sent}",
+    "legendUsable": "(usable reserve {usable})",
+    "queue": "Queue",
+    "queueValue": "{waiting} waiting · {count, plural, one {# broadcast} other {# broadcasts}} · clears about {clears}",
+    "queueEmpty": "empty",
+    "txParked": "Transactional parked",
+    "txParkedAt": "parked {ago}",
+    "txParkedNone": "none in 24h",
+    "txParkedChip": "transactional parked"
   },
   "regions": {
     "title": "Regions",
@@ -382,6 +392,12 @@
       "cliEnv": "Add to .env:",
       "cliRegion": "? AWS region",
       "check1Production": "GetAccount answers · production"
+    },
+    "sold": {
+      "text": "Sold {committed}/day against a {share}/day broadcast share in {region}",
+      "backlog": " · {waiting} waiting, clears about {clears}",
+      "action": "Request quota increase",
+      "justification": "Broadcast backlog clears by {date}; the plans sold outrun the broadcast share of the quota."
     }
   },
   "teams": {

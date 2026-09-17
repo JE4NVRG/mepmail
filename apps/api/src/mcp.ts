@@ -990,7 +990,7 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
     "broadcasts:write",
     {
       description:
-        "Create a broadcast (bulk email to a segment or the whole audience). Saved as a draft unless send is true; use send_broadcast to send a draft later.",
+        "Create a broadcast (bulk email to a segment or the whole audience). Saved as a draft unless send is true; use send_broadcast to send a draft later. A large audience is paced over days; the response's finishes_at and warning say when it finishes.",
       inputSchema: createBroadcastRequestSchema,
     },
     (body) => api("POST", "/broadcasts", body),
@@ -1011,7 +1011,7 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
     "broadcasts:write",
     {
       description:
-        "Send a draft broadcast now, or schedule it with scheduled_at. Recipients are resolved at send time; unsubscribed and topic-opted-out contacts are skipped.",
+        "Send a draft broadcast now, or schedule it with scheduled_at. Recipients are resolved at send time; unsubscribed and topic-opted-out contacts are skipped. A large audience is paced over days; the response's finishes_at and warning say when it finishes.",
       inputSchema: sendBroadcastRequestSchema.extend({
         id: z.uuid().describe("Broadcast id from create_broadcast"),
       }),
@@ -1022,7 +1022,8 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
     "cancel_broadcast",
     "broadcasts:write",
     {
-      description: "Cancel a scheduled broadcast before it starts sending.",
+      description:
+        "Cancels a queued broadcast. Emails already sent are not recalled: check sent_count first; canceled_remaining says how many were stopped.",
       inputSchema: z.object({ id: z.uuid().describe("Broadcast id from list_broadcasts") }),
     },
     ({ id }) => api("POST", `/broadcasts/${enc(id)}/cancel`),

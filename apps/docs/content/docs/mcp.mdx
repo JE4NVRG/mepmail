@@ -185,7 +185,7 @@ and admins.
 | `create_broadcast` | `broadcasts:write` | Create a broadcast draft (or send it immediately). |
 | `update_broadcast` | `broadcasts:write` | Update a draft broadcast. |
 | `send_broadcast` | `broadcasts:write` | Send or schedule a draft broadcast. |
-| `cancel_broadcast` | `broadcasts:write` | Cancel a scheduled broadcast. |
+| `cancel_broadcast` | `broadcasts:write` | Cancel a queued broadcast, scheduled or already going out; emails already sent are not recalled. |
 | `delete_broadcast` | `broadcasts:write` | Delete a draft broadcast. |
 | `create_template` | `templates:write` | Create an email template (live immediately). |
 | `update_template` | `templates:write` | Change a template's name, subject, html, text or alias. |
