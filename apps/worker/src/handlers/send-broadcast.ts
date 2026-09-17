@@ -14,6 +14,7 @@ import {
   fetchTeamStanding,
   findSuppressed,
   formatMailDate,
+  formatMailDateTime,
   injectPreheader,
   isSubscribedToTopic,
   type Keyring,
@@ -21,11 +22,18 @@ import {
   type MonitorDeps,
   makeUnsubscribeToken,
   nextUtcDayStart,
+  PACING_HORIZON_MAX_RETENTION_DAYS,
+  pacingHorizonDays,
   parseSingleSender,
   planBroadcastSamples,
+  planCaps,
+  planRegionSend,
+  quotaUsage,
+  type RegionCapacity,
   recordMonitorSample,
   regionPause,
   reserveQuota,
+  roundUpToSlot,
   segmentContactsWhere,
   substituteUnsubscribeUrl,
 } from "@millionsend/core";
@@ -67,11 +75,14 @@ export interface BroadcastDeps {
   /** Owners hear when the broadcast went out or is held; absent = silent (tests). */
   mailer?: SystemMailer | undefined;
   /**
-   * SES's own 24-hour quota, per region: while the sender domain's region is
-   * full the walk waits, instead of every fanned-out row parking one by one
-   * in the send handler.
+   * The broadcast share of the sender domain's SES region: the walk admits
+   * up to the room it finds and parks the rest for the drain, instead of
+   * every fanned-out row parking one by one in the send handler. Absent
+   * (tests, an unpaced deployment) everything is admitted.
    */
-  sesQuota?: { exhausted(region?: string): boolean } | undefined;
+  sesQuota?: BroadcastQuotaControls | undefined;
+  /** Days a paced send may take; the owner's estimate stops there. */
+  horizonDays?: number | undefined;
   /** Dashboard origin for the links in those mails. */
   appBaseUrl?: string | undefined;
   /** The content monitor: the skeleton sample at fan-out start and the copies drawn per recipient. */
@@ -84,7 +95,7 @@ export interface BroadcastDeps {
  */
 async function report(
   db: Db,
-  deps: BroadcastDeps,
+  deps: Pick<BroadcastDeps, "mailer" | "appBaseUrl">,
   broadcast: { id: string; teamId: string },
   kind: AccountMailKind,
   path: string,
@@ -110,12 +121,20 @@ async function report(
   }
 }
 
+/** The room ledger and the region facts the fan-out and its walk-end report read. */
+export interface BroadcastQuotaControls {
+  take(region: string | undefined, walkId: string, n: number): number;
+  progress(walkId: string, emitted: number): void;
+  done(walkId: string): void;
+  reserve(): number;
+  capacity(region?: string): RegionCapacity | null;
+  rate(region?: string): number;
+}
+
 export type BroadcastOutcome = "sent" | "skipped" | "deferred";
 
 /** How long a fan-out waits before re-checking a held region. */
 const REGION_HOLD_RETRY_MS = 15 * 60 * 1000;
-/** Before re-checking a region at its SES 24-hour quota: the rolling window frees gradually and the gate re-reads every minute. */
-const SES_QUOTA_RETRY_MS = 5 * 60 * 1000;
 
 // The merge and preheader helpers live in core so the dashboard's test send
 // renders exactly what the fan-out renders; re-exported for the callers that
@@ -205,13 +224,6 @@ export async function sendBroadcast(
     await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
     return "deferred";
   }
-  if (deps.sesQuota?.exhausted(domain.region)) {
-    console.warn(
-      `broadcast ${broadcast.id}: SES 24-hour quota reached in ${domain.region}, fan-out deferred`,
-    );
-    await deps.reschedule?.(broadcast.id, new Date(Date.now() + SES_QUOTA_RETRY_MS));
-    return "deferred";
-  }
   // An operator's pause or suspension parks the fan-out the way a region
   // hold does; the owners heard about it when the operator acted.
   const standing = await fetchTeamStanding(db, broadcast.teamId);
@@ -287,11 +299,38 @@ export async function sendBroadcast(
     segmentPredicate = segmentContactsWhere(schema.contacts, segment);
   }
 
+  // The audience over the same predicate the walk pages over, with the
+  // topic rule the walk applies so it holds for an opt-in topic too. An
+  // upper bound: the suppressed and topic-unsubscribed contacts the walk
+  // skips make the real count run a little under. It sizes the admission
+  // into the region's broadcast share and the monitor's draw.
+  const subs = schema.contactTopicSubscriptions;
+  const topicRule = !broadcast.topicId
+    ? undefined
+    : topicDefault
+      ? sql`not exists (select 1 from ${subs} where ${subs.contactId} = ${schema.contacts.id} and ${subs.topicId} = ${broadcast.topicId} and ${subs.subscribed} = false)`
+      : sql`exists (select 1 from ${subs} where ${subs.contactId} = ${schema.contacts.id} and ${subs.topicId} = ${broadcast.topicId} and ${subs.subscribed} = true)`;
+  const [audience] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.contacts)
+    .where(
+      and(
+        eq(schema.contacts.teamId, broadcast.teamId),
+        eq(schema.contacts.unsubscribed, false),
+        segmentPredicate,
+        topicRule,
+      ),
+    );
+  const audienceCount = audience?.n ?? 0;
+  // Admission: the first `admitted` rows this walk writes get a job now; the
+  // rest park for the drain. A resumed walk takes again against the count,
+  // which already holds the rows it wrote before.
+  const admitted =
+    deps.sesQuota?.take(domain.region, broadcast.id, audienceCount) ?? Number.POSITIVE_INFINITY;
+
   // The monitor judges the broadcast's own HTML once and a few rendered
   // copies: the expected count is `copies`, so the draw needs the audience
-  // size. Counted here over the same predicate the walk pages over; the
-  // suppressed and topic-unsubscribed contacts it skips make the expected
-  // count run a little under. Every step is best-effort.
+  // size. Every step is best-effort.
   let monitorCopies = 0;
   let monitorAudience = 0;
   if (deps.monitor) {
@@ -301,27 +340,7 @@ export async function sendBroadcast(
         broadcastId: broadcast.id,
       });
       if (plan.copies > 0) {
-        // The topic rule the walk applies, so the expected copy count holds
-        // for an opt-in topic too.
-        const s = schema.contactTopicSubscriptions;
-        const topicRule = !broadcast.topicId
-          ? undefined
-          : topicDefault
-            ? sql`not exists (select 1 from ${s} where ${s.contactId} = ${schema.contacts.id} and ${s.topicId} = ${broadcast.topicId} and ${s.subscribed} = false)`
-            : sql`exists (select 1 from ${s} where ${s.contactId} = ${schema.contacts.id} and ${s.topicId} = ${broadcast.topicId} and ${s.subscribed} = true)`;
-        const [audience] = await db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(schema.contacts)
-          .where(
-            and(
-              eq(schema.contacts.teamId, broadcast.teamId),
-              eq(schema.contacts.unsubscribed, false),
-              segmentPredicate,
-              topicRule,
-            ),
-          );
-        // Both or neither: a count that failed must not turn into "draw everyone".
-        monitorAudience = audience?.n ?? 0;
+        monitorAudience = audienceCount;
         monitorCopies = plan.copies;
       }
     } catch (err) {
@@ -338,8 +357,11 @@ export async function sendBroadcast(
   const batchSize = deps.batchSize ?? 100;
   // Keyset pages over (team_id, id): comparing the uuid column itself keeps
   // every page an index range; casting it to text made each page rescan the
-  // whole team.
-  let cursor: string | null = null;
+  // whole team. The cursor advances only once a page's rows and jobs are
+  // committed, and the heartbeat persists it, so a walk cut off mid-page
+  // resumes from the last committed page and the unique index covers the
+  // partial one.
+  let cursor: string | null = broadcast.fanOutCursor;
   for (;;) {
     // Checked after the previous page's enqueue, so no enqueued page is lost.
     if (deps.signal?.aborted) throw new Error(`broadcast ${broadcast.id}: fan-out aborted`);
@@ -366,17 +388,17 @@ export async function sendBroadcast(
       .orderBy(asc(schema.contacts.id))
       .limit(batchSize);
     if (contacts.length === 0) break;
-    cursor = contacts[contacts.length - 1]?.id ?? cursor;
     // Heartbeat: the stall reconcile re-enqueues a "sending" broadcast whose
     // row has not moved in fifteen minutes, so a long walk touches it once
     // per page. The status guard also stops a run whose twin already
-    // finished the broadcast.
+    // finished the broadcast, or a cancel.
     const [alive] = await db
       .update(schema.broadcasts)
-      .set({ updatedAt: new Date() })
+      .set({ updatedAt: new Date(), fanOutCursor: cursor })
       .where(and(eq(schema.broadcasts.id, broadcast.id), eq(schema.broadcasts.status, "sending")))
       .returning({ id: schema.broadcasts.id });
     if (!alive) return "skipped";
+    deps.sesQuota?.progress(broadcast.id, emitted);
     // A suspension or pause landing mid-walk stops the fan-out at the page
     // edge; the resumed walk skips the contacts already inserted.
     const standingNow = await fetchTeamStanding(db, broadcast.teamId);
@@ -452,6 +474,9 @@ export async function sendBroadcast(
       // conflicts (accepted === null) don't, so a resumed fan-out keeps
       // spacing tight instead of leaving gaps for already-queued contacts.
       const startAfter = spacingMs > 0 ? new Date(startMs + emitted * spacingMs) : undefined;
+      // Past the share's room the row parks at once: no reservation and no
+      // job, the drain reserves on release (the existing parking contract).
+      const paced = emitted >= admitted;
       // Quota reservation and email insert commit atomically (the quota
       // contract), same as the API accept path — a broadcast must not
       // bypass the plan's cap.
@@ -471,11 +496,11 @@ export async function sendBroadcast(
             to: [contact.email],
             replyTo,
             subject: applyMergeFields(broadcast.subject, contact, { html: false }),
-            latestStatus: "queued",
+            latestStatus: paced ? "queued_quota" : "queued",
             // The drip lives on the row: the send handler defers to it and
             // the reconcile sweep leaves a not-yet-due row alone instead of
             // re-enqueueing every throttled send each pass.
-            scheduledAt: startAfter ?? null,
+            scheduledAt: paced ? null : (startAfter ?? null),
             bodyCiphertext: encrypted.ciphertext,
             bodyIv: encrypted.iv,
             bodyWrappedDek: encrypted.wrappedDek,
@@ -487,6 +512,7 @@ export async function sendBroadcast(
           })
           .returning({ id: schema.emails.id });
         if (!row) return null;
+        if (paced) return { id: row.id, parked: true };
         const reservation = await reserveQuota(tx as unknown as Db, {
           teamId: broadcast.teamId,
           count: 1,
@@ -542,83 +568,209 @@ export async function sendBroadcast(
         console.error("email.send enqueue failed; reconcile sweep will recover", err);
       }
     }
+    cursor = contacts[contacts.length - 1]?.id ?? cursor;
   }
 
-  const [done] = await db
+  // The walk is done, the send is not: recipientCount marks the walk's end
+  // and the status flips only once every row has gone (finalizeBroadcast),
+  // which the drain and the reconcile sweep call again for a paced send.
+  const [walked] = await db
     .update(schema.broadcasts)
     .set({
-      status: "sent",
-      sentAt: new Date(),
       updatedAt: new Date(),
+      fanOutCursor: null,
       // Counted once here off the fan-out's own unique index, so lists never
       // join the emails table to size a broadcast.
       recipientCount: sql`(select count(*)::int from ${schema.emails} where ${schema.emails.broadcastId} = ${broadcast.id})`,
     })
     .where(and(eq(schema.broadcasts.id, broadcast.id), eq(schema.broadcasts.status, "sending")))
     .returning({ recipientCount: schema.broadcasts.recipientCount });
-  // The report follows the flip and is claimed per broadcast, so a walk that
-  // resumed after a crash or a reconcile re-kick reports once.
+  deps.sesQuota?.progress(broadcast.id, emitted);
+  deps.sesQuota?.done(broadcast.id);
+  if (!walked) return "skipped";
+  if (!(await finalizeBroadcast(db, deps, broadcast.id))) {
+    await reportWalkEnd(db, deps, broadcast, domain.region, walked.recipientCount ?? 0, quota);
+  }
+  return "sent";
+}
+
+/**
+ * The end of a send: once no row of the broadcast is queued or parked, the
+ * status flips to sent and the owners get the report, claimed once per
+ * broadcast however many callers (the walk, the drain, the reconcile sweep)
+ * arrive. False while rows remain, or when the broadcast is no longer
+ * sending.
+ */
+export async function finalizeBroadcast(
+  db: Db,
+  deps: Pick<BroadcastDeps, "mailer" | "appBaseUrl">,
+  broadcastId: string,
+): Promise<boolean> {
+  const e = schema.emails;
+  // Two probes rather than one `in (...)`: the parked one is an index range
+  // on its own, the queued one stops at the first row it finds.
+  for (const status of ["queued_quota", "queued"] as const) {
+    const [open] = await db
+      .select({ id: e.id })
+      .from(e)
+      .where(and(eq(e.broadcastId, broadcastId), eq(e.latestStatus, status)))
+      .limit(1);
+    if (open) return false;
+  }
+  const [done] = await db
+    .update(schema.broadcasts)
+    .set({
+      status: "sent",
+      sentAt: new Date(),
+      updatedAt: new Date(),
+      recipientCount: sql`coalesce(${schema.broadcasts.recipientCount}, (select count(*)::int from ${e} where ${e.broadcastId} = ${broadcastId}))`,
+    })
+    .where(and(eq(schema.broadcasts.id, broadcastId), eq(schema.broadcasts.status, "sending")))
+    .returning({
+      id: schema.broadcasts.id,
+      teamId: schema.broadcasts.teamId,
+      name: schema.broadcasts.name,
+      subject: schema.broadcasts.subject,
+      recipientCount: schema.broadcasts.recipientCount,
+    });
+  if (!done) return false;
   if (
-    done &&
-    deps.mailer &&
-    (await claimNotification(db, {
-      teamId: broadcast.teamId,
+    !deps.mailer ||
+    !(await claimNotification(db, {
+      teamId: done.teamId,
       kind: "broadcast.sent",
+      periodKey: done.id,
+    }))
+  ) {
+    return true;
+  }
+  const [{ failed } = { failed: 0 }] = await db
+    .select({ failed: sql<number>`count(*)::int` })
+    .from(e)
+    .where(and(eq(e.broadcastId, broadcastId), eq(e.latestStatus, "failed")));
+  const count = done.recipientCount ?? 0;
+  await report(db, deps, done, "broadcast.sent", `/broadcasts/${done.id}`, (locale, team) => ({
+    name: done.name ?? done.subject,
+    subject: done.subject,
+    team,
+    count: count.toLocaleString(locale),
+    failed:
+      failed > 0
+        ? accountMailPhrase({
+            locale,
+            kind: "broadcast.sent",
+            key: "failed",
+            values: { n: failed.toLocaleString(locale) },
+          })
+        : "",
+  }));
+  return true;
+}
+
+/**
+ * What the owners hear when the walk ends with rows still waiting: the
+ * plan's cap holds them (today's quota notice), or the platform's capacity
+ * does (the pacing note with the planner's estimate). Each claimed once per
+ * broadcast, apart from the completion report.
+ */
+async function reportWalkEnd(
+  db: Db,
+  deps: BroadcastDeps,
+  broadcast: { id: string; teamId: string; name: string | null; subject: string },
+  region: string,
+  count: number,
+  quota: NonNullable<Awaited<ReturnType<typeof fetchTeamQuota>>>,
+): Promise<void> {
+  if (!deps.mailer) return;
+  const [{ parked } = { parked: 0 }] = await db
+    .select({ parked: sql<number>`count(*)::int` })
+    .from(schema.emails)
+    .where(
+      and(
+        eq(schema.emails.broadcastId, broadcast.id),
+        eq(schema.emails.latestStatus, "queued_quota"),
+      ),
+    );
+  if (parked === 0) return;
+  const name = broadcast.name ?? broadcast.subject;
+  const now = new Date();
+  const capRoom = Math.min(
+    ...planCaps(quota, await quotaUsage(db, broadcast.teamId, quota, now), now).map(
+      (cap) => cap.remaining,
+    ),
+  );
+  if (capRoom <= 0) {
+    const kind = "broadcast.held_quota";
+    if (!(await claimNotification(db, { teamId: broadcast.teamId, kind, periodKey: broadcast.id })))
+      return;
+    const limit = quota.kind === "month" ? quota.included : quota.kind === "day" ? quota.limit : 0;
+    await report(db, deps, broadcast, kind, "/settings/billing", (locale, team) => ({
+      name,
+      team,
+      count: count.toLocaleString(locale),
+      parked: parked.toLocaleString(locale),
+      sent: (count - parked).toLocaleString(locale),
+      limit: limit.toLocaleString(locale),
+      release:
+        quota.kind === "month"
+          ? accountMailPhrase({
+              locale,
+              kind,
+              key: "releaseMonthly",
+              values: { date: formatMailDate(locale, quota.periodEnd) },
+            })
+          : accountMailPhrase({
+              locale,
+              kind,
+              key: "releaseDaily",
+              values: { resetsAt: nextUtcDayStart(now).toISOString().slice(11, 16) },
+            }),
+    }));
+    return;
+  }
+  const capacity = deps.sesQuota?.capacity(region);
+  if (!deps.sesQuota || !capacity) {
+    console.warn(`broadcast ${broadcast.id}: ${parked} rows paced, no SES capacity known yet`);
+    return;
+  }
+  const plan = await planRegionSend(db, {
+    region,
+    account: capacity,
+    reservePercent: deps.sesQuota.reserve(),
+    rateCeiling: deps.sesQuota.rate(region),
+    horizonDays: deps.horizonDays ?? pacingHorizonDays(PACING_HORIZON_MAX_RETENTION_DAYS),
+    now,
+  });
+  const mine = plan.estimates.find((estimate) => estimate.key === broadcast.id);
+  if (!mine?.finishesAt) {
+    console.warn(`broadcast ${broadcast.id}: ${parked} rows paced past the horizon`);
+    return;
+  }
+  // The rest goes out within the day: the completion report is news enough.
+  if (mine.days <= 1) return;
+  const finishesAt = roundUpToSlot(mine.finishesAt);
+  if (
+    !(await claimNotification(db, {
+      teamId: broadcast.teamId,
+      kind: "broadcast.sending",
       periodKey: broadcast.id,
     }))
   ) {
-    const count = done.recipientCount ?? 0;
-    const [{ parked } = { parked: 0 }] = await db
-      .select({ parked: sql<number>`count(*)::int` })
-      .from(schema.emails)
-      .where(
-        and(
-          eq(schema.emails.broadcastId, broadcast.id),
-          eq(schema.emails.latestStatus, "queued_quota"),
-        ),
-      );
-    const name = broadcast.name ?? broadcast.subject;
-    if (parked > 0) {
-      const kind = "broadcast.held_quota";
-      const limit =
-        quota.kind === "month" ? quota.included : quota.kind === "day" ? quota.limit : 0;
-      await report(db, deps, broadcast, kind, "/settings/billing", (locale, team) => ({
-        name,
-        team,
-        count: count.toLocaleString(locale),
-        parked: parked.toLocaleString(locale),
-        sent: (count - parked).toLocaleString(locale),
-        limit: limit.toLocaleString(locale),
-        release:
-          quota.kind === "month"
-            ? accountMailPhrase({
-                locale,
-                kind,
-                key: "releaseMonthly",
-                values: { date: formatMailDate(locale, quota.periodEnd) },
-              })
-            : accountMailPhrase({
-                locale,
-                kind,
-                key: "releaseDaily",
-                values: { resetsAt: nextUtcDayStart(Date.now()).toISOString().slice(11, 16) },
-              }),
-      }));
-    } else {
-      await report(
-        db,
-        deps,
-        broadcast,
-        "broadcast.sent",
-        `/broadcasts/${broadcast.id}`,
-        (locale, team) => ({
-          name,
-          subject: broadcast.subject,
-          team,
-          count: count.toLocaleString(locale),
-        }),
-      );
-    }
+    return;
   }
-  return "sent";
+  await report(
+    db,
+    deps,
+    broadcast,
+    "broadcast.sending",
+    `/broadcasts/${broadcast.id}`,
+    (locale, team) => ({
+      name,
+      team,
+      days: String(mine.days),
+      first: (count - parked).toLocaleString(locale),
+      count: count.toLocaleString(locale),
+      finishesAt: formatMailDateTime(locale, finishesAt),
+    }),
+  );
 }
