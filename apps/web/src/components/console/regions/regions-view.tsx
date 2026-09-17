@@ -12,11 +12,13 @@ import { BtnSpinner } from "@/components/spinner";
 import { Table } from "@/components/table";
 import { toast } from "@/components/toast";
 import { Tooltip } from "@/components/tooltip";
+import { formatFinishAbout, withinLastDay } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
 import { oneOf, useUrlState } from "@/lib/url-state";
 import { QuotaBar, RegionBadge, RegionMenu, type ServedRegion } from "../region-actions";
 import { AddRegionPanel } from "./add-region-panel";
 import { useRegionFormats } from "./formatters";
+import { QuotaDialog } from "./region-dialogs";
 import { ReserveCard } from "./reserve-card";
 
 const COLUMNS = [
@@ -167,6 +169,33 @@ export function RegionsView() {
     sandbox: served.filter((r) => r.status === "sandbox").length,
     known: known.length,
   };
+  // The plans sold outrun a region's broadcast share: the cue to raise the
+  // quota, with the request prefilled from the week's peaks and the backlog.
+  const committed = list.data?.committedPerDay ?? null;
+  const oversold =
+    committed === null
+      ? null
+      : (served.find((r) => r.share !== null && committed > r.share) ?? null);
+  const [quotaFor, setQuotaFor] = useState<ServedRegion | null>(null);
+  const prefillFor = (r: ServedRegion) => {
+    const daysToClear = r.lastFinishesAt
+      ? Math.max(1, Math.ceil((new Date(r.lastFinishesAt).getTime() - Date.now()) / 86_400_000))
+      : 1;
+    const perDay = r.txPeak7d + Math.max(r.bulkPeak7d, r.bulkParked / daysToClear);
+    // Never a request for less than the region already has.
+    const floor = (r.account?.quota.max24h ?? 0) + 10_000;
+    return {
+      desired: Math.max(Math.ceil((1.5 * perDay) / 10_000) * 10_000, floor),
+      ...(r.bulkParked > 0 && r.lastFinishesAt
+        ? {
+            // Read by AWS staff outside the operator's zone: a full stamp.
+            justification: t("sold.justification", {
+              date: formatFinishAbout(r.lastFinishesAt, f.locale),
+            }),
+          }
+        : {}),
+    };
+  };
 
   const header = (
     <thead>
@@ -220,6 +249,48 @@ export function RegionsView() {
         </div>
       ) : (
         <>
+          {oversold && oversold.share !== null && committed !== null ? (
+            <div role="status" className="ms-notice-strip ms-notice-strip-warn">
+              <span>
+                {t("sold.text", {
+                  committed: f.n(committed),
+                  share: f.n(oversold.share),
+                  region: oversold.region,
+                })}
+                {oversold.bulkParked > 0
+                  ? t("sold.backlog", {
+                      waiting: f.n(oversold.bulkParked),
+                      clears: oversold.lastFinishesAt
+                        ? f.clearsAbout(oversold.lastFinishesAt)
+                        : "—",
+                    })
+                  : null}
+              </span>
+              <button
+                type="button"
+                className="ms-notice-strip-action"
+                style={{
+                  background: "none",
+                  border: 0,
+                  padding: 0,
+                  cursor: "pointer",
+                  font: "inherit",
+                  color: "inherit",
+                }}
+                onClick={() => setQuotaFor(oversold)}
+              >
+                {t("sold.action")} →
+              </button>
+            </div>
+          ) : null}
+          {quotaFor ? (
+            <QuotaDialog
+              region={quotaFor}
+              open
+              onClose={() => setQuotaFor(null)}
+              prefill={prefillFor(quotaFor)}
+            />
+          ) : null}
           <div className="ms-card" style={{ padding: 0, marginBottom: 16 }}>
             <Table className="nowrap">
               {header}
@@ -303,6 +374,15 @@ export function RegionsView() {
                                         rate: f.pct2(r.breaker.reason.rate),
                                       })
                                     : tr("breakerManual")}
+                              {withinLastDay(r.txParkedAt) ? (
+                                <span style={{ marginLeft: 10 }}>
+                                  <span
+                                    className="ms-dot"
+                                    style={{ background: "var(--ms-danger)", marginRight: 6 }}
+                                  />
+                                  {tr("txParkedChip")}
+                                </span>
+                              ) : null}
                             </>
                           )}
                         </td>

@@ -187,7 +187,7 @@ cobre as duas ferramentas de `broadcasts:read`. Ferramentas marcadas com
 | `create_broadcast` | `broadcasts:write` | Cria um rascunho de broadcast (ou envia na hora). |
 | `update_broadcast` | `broadcasts:write` | Atualiza um rascunho de broadcast. |
 | `send_broadcast` | `broadcasts:write` | Envia ou agenda um rascunho de broadcast. |
-| `cancel_broadcast` | `broadcasts:write` | Cancela um broadcast agendado. |
+| `cancel_broadcast` | `broadcasts:write` | Cancela um broadcast na fila, agendado ou já saindo; e-mails já enviados não voltam. |
 | `delete_broadcast` | `broadcasts:write` | Exclui um rascunho de broadcast. |
 | `create_template` | `templates:write` | Cria um template de e-mail (ativo na hora). |
 | `update_template` | `templates:write` | Altera nome, assunto, html, texto ou alias de um template. |

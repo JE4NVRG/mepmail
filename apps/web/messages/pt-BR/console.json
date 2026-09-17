@@ -131,7 +131,7 @@
       "domains": "Domínios",
       "domainsSub": "verificados · {pending} pendentes · {failed} com DKIM falhando",
       "queue": "Fila",
-      "queueSub": "{waiting} na fila · {held} retidos por cota · mais antigo {oldest}",
+      "queueSub": "{waiting} na fila · {held} retidos (plano + ritmo) · mais antigo {oldest}",
       "queuePending": "contado na próxima sonda"
     },
     "sent": {
@@ -175,7 +175,7 @@
       "stripe_last_event_s": "Tempo desde o último evento do Stripe",
       "retention_purged": "Corpos removidos por execução",
       "contacts_unsubscribed": "Contatos descadastrados",
-      "queue_quota_held": "E-mails retidos por cota",
+      "queue_quota_held": "E-mails retidos (plano + ritmo)",
       "queue_oldest_s": "Job mais antigo na fila",
       "region_sent": "Enviados por hora · {region}",
       "noPoints": "Nada registrado neste período ainda.",
@@ -291,7 +291,17 @@
       "lead": "Uma região sai da implantação pelo ambiente, não daqui.",
       "body": "Remova {region} de AWS_REGIONS (e o tópico dela de SNS_TOPIC_ARNS), reinicie e depois apague o configuration set e o tópico na AWS se nada mais os usar.",
       "blocked": "{count, plural, one {# domínio verificado ainda envia} other {# domínios verificados ainda enviam}} por esta região; mova ou apague antes."
-    }
+    },
+    "legendBroadcasts": "Transmissões {sent} de {share}",
+    "legendTransactional": "Transacional {sent}",
+    "legendUsable": "(reserva utilizável {usable})",
+    "queue": "Fila",
+    "queueValue": "{waiting} aguardando · {count, plural, one {# transmissão} other {# transmissões}} · libera por volta de {clears}",
+    "queueEmpty": "vazia",
+    "txParked": "Transacional retido",
+    "txParkedAt": "retido {ago}",
+    "txParkedNone": "nenhum em 24h",
+    "txParkedChip": "transacional retido"
   },
   "regions": {
     "title": "Regiões",
@@ -382,6 +392,12 @@
       "cliEnv": "Adicione ao .env:",
       "cliRegion": "? Região AWS",
       "check1Production": "GetAccount responde · produção"
+    },
+    "sold": {
+      "text": "Vendidos {committed}/dia contra uma parcela de transmissões de {share}/dia em {region}",
+      "backlog": " · {waiting} aguardando, libera por volta de {clears}",
+      "action": "Solicitar aumento de cota",
+      "justification": "A fila de transmissões libera até {date}; os planos vendidos ultrapassam a parcela de transmissões da cota."
     }
   },
   "teams": {
