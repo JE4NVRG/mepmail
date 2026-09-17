@@ -195,8 +195,17 @@ export async function cancelBroadcastRows(
       if (rows.length < CANCEL_PAGE) return n;
     }
   };
-  const parked = await flip("queued_quota");
-  const queued = await flip("queued");
+  // Rows the send lane parks between the two flips are caught by the next
+  // round; the sweep ends only when a full round moved nothing.
+  let parked = 0;
+  let queued = 0;
+  for (;;) {
+    const p = await flip("queued_quota");
+    const q = await flip("queued");
+    parked += p;
+    queued += q;
+    if (p === 0 && q === 0) break;
+  }
   if (queued > 0) {
     // Against the counter accept charged, read the way parking reads it.
     const quota = await fetchTeamQuota(db, params.teamId, true);
@@ -253,6 +262,8 @@ export interface RegionSendPlanInput {
   rateCeiling: number;
   horizonDays: number;
   now?: Date;
+  /** The caps of a team's own broadcasts in flight, so a plan-held one is not promised a capacity-only finish. */
+  capsFor?: (teamId: string) => PlanCap[] | undefined;
   /** A send about to be initiated, planned alongside the broadcasts already going out in the region. */
   newSend?: {
     key: string;
@@ -287,11 +298,17 @@ export async function planRegionSend(db: Db, input: RegionSendPlanInput): Promis
   const share = bulkShare(input.account.max24h, input.reservePercent);
   const bulkSent24h = counts.get(input.region)?.sent24h ?? 0;
   const txPerDay = Math.max(0, input.account.sentLast24h - bulkSent24h);
-  const broadcasts: PlannedBroadcast[] = sending.map((b) => ({
-    key: b.id,
-    queued: b.queued,
-    parked: b.parked,
-  }));
+  const broadcasts: PlannedBroadcast[] = sending.map((b) => {
+    const caps = input.capsFor?.(b.teamId);
+    return {
+      key: b.id,
+      queued: b.queued,
+      parked: b.parked,
+      // Its days count from when it was sent, as every surface prints them.
+      ...(b.scheduledAt ? { at: Math.min(b.scheduledAt.getTime(), now.getTime()) } : {}),
+      ...(caps ? { caps } : {}),
+    };
+  });
   if (input.newSend) {
     broadcasts.push({
       key: input.newSend.key,

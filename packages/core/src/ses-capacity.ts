@@ -173,6 +173,8 @@ interface Sim {
   key: string;
   parked: number;
   admit: number;
+  /** Whether the fan-out has run in the model (a send with nothing to admit counts as run). */
+  admitted: boolean;
   at: number;
   spacingMs: number;
   caps: PlanCap[];
@@ -208,15 +210,18 @@ export function planBulkWaves(input: PlanInput): BroadcastEstimate[] {
     const key = bucketOf(Math.floor(b.at / slot) * slot + slot - WINDOW_BUCKET_MS);
     buckets.set(key, (buckets.get(key) ?? 0) + b.count);
   }
+  // Rows sent by t and not yet aged out; rows released but not sent are the
+  // queue, counted apart.
   const inWindow = (t: number): number => {
     let sum = 0;
-    for (const [at, n] of buckets) if (at + WINDOW_BUCKET_MS > t - DAY_MS) sum += n;
+    for (const [at, n] of buckets) if (at <= t && at + WINDOW_BUCKET_MS > t - DAY_MS) sum += n;
     return sum;
   };
   const sims: Sim[] = input.broadcasts.map((b) => ({
     key: b.key,
     parked: b.parked ?? 0,
     admit: b.admit ?? 0,
+    admitted: (b.admit ?? 0) === 0,
     at: b.at === undefined ? start : typeof b.at === "number" ? b.at : b.at.getTime(),
     spacingMs: b.spacingMs ?? 0,
     caps: (b.caps ?? []).map((c) => ({ ...c })),
@@ -294,7 +299,9 @@ export function planBulkWaves(input: PlanInput): BroadcastEstimate[] {
     const s = sims[i];
     if (s && b.queued) sendRun(s, start, b.queued);
   }
-  for (const s of sims.filter((s) => s.admit > 0).sort((a, b) => a.at - b.at)) {
+  // A fan-out takes the room its region has at its own instant: the sends
+  // in flight and the releases before it are all in place by then.
+  const admit = (s: Sim): void => {
     const wanted = s.admit;
     const granted = Math.min(wanted, room(s.at), capRoom(s, s.at));
     s.first = granted;
@@ -302,14 +309,18 @@ export function planBulkWaves(input: PlanInput): BroadcastEstimate[] {
     charge(s, granted);
     noteHold(s, wanted, granted);
     s.parked += wanted - granted;
-  }
+    s.admitted = true;
+  };
+  const byAt = (a: Sim, b: Sim) => a.at - b.at;
+  for (const s of sims.filter((s) => !s.admitted && s.at <= start).sort(byAt)) admit(s);
 
   // A send waits from its own instant, and its horizon counts from there:
   // a scheduled send is judged on the days it takes, not on the days until
   // it starts.
   const pending = (s: Sim, at: number) => s.parked > 0 && at - s.at <= horizonMs;
   let t = Math.floor(start / slot) * slot + slot + offset;
-  while (sims.some((s) => pending(s, t))) {
+  while (sims.some((s) => pending(s, t) || !s.admitted)) {
+    for (const s of sims.filter((s) => !s.admitted && s.at <= t).sort(byAt)) admit(s);
     const waiting = sims.filter((s) => pending(s, t) && t >= s.at);
     let budget = Math.min(room(t), drainCap);
     for (const [i, s] of waiting.entries()) {
