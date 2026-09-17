@@ -247,6 +247,8 @@
     "subtitle": "Vale para toda esta instalação, todos os times.",
     "rateLabel": "Taxa de envio SES (mensagens/segundo)",
     "retentionLabel": "Retenção de corpos de e-mail (dias)",
+    "reserveLabel": "Reserva transacional (% da cota de envio)",
+    "reserveNote": "A reserva transacional é definida em <link>Console → Regiões</link>.",
     "save": "Salvar",
     "saved": "Salvo",
     "error": "Não foi possível salvar.",
