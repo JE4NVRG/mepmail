@@ -49,6 +49,8 @@ export function isMailPreferenceKey(value: unknown): value is MailPreferenceKey 
 /** The switch a kind answers to; null for mail that is always sent. */
 export function mailPreferenceOf(kind: SystemMailKind): MailPreferenceKey | null {
   if (kind === "domain.lost.identity") return "domain.lost";
+  // The progress note of a paced broadcast rides the same switch as its report.
+  if (kind === "broadcast.sending") return "broadcast.sent";
   if (kind.startsWith("quota.")) return "quota";
   if (kind.startsWith("deliverability.")) return "deliverability";
   return isMailPreferenceKey(kind) ? kind : null;
