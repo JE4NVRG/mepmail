@@ -1,3 +1,7 @@
+import { SES_QUOTA_MARGIN } from "@millionsend/core";
+
+export { SES_QUOTA_MARGIN };
+
 /**
  * SES's rolling 24-hour sending quota, as the worker last read it. Sends hold
  * once the account is within the margin of its ceiling, so SES never has to
@@ -15,8 +19,18 @@ export interface SesQuotaGate {
   refresh(region?: string): Promise<boolean>;
 }
 
-/** Hold sends from this share of the quota: the last messages of the window are SES's, not ours. */
-export const SES_QUOTA_MARGIN = 0.98;
+/**
+ * What the send lane asks beyond the total gate: bulk rows park on the
+ * broadcast share and on a held region, transactional rows only at the
+ * total; the notes feed the room ledger and the parked-transactional probe.
+ * Every method is optional so a bare gate (tests, the drain) still fits.
+ */
+export interface SendQuotaControls extends SesQuotaGate {
+  bulkExhausted?(region?: string): boolean;
+  paused?(region?: string): boolean;
+  noteBulkSent?(region?: string): void;
+  noteTransactionalParked?(region?: string): void;
+}
 
 export function createSesQuotaGate(
   read: () => Promise<{ max24h: number; sentLast24h: number }>,
