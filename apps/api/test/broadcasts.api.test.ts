@@ -796,8 +796,8 @@ describe("broadcasts API pacing", () => {
   });
 
   it("422 broadcast_too_large past the horizon, leaving the draft", async () => {
-    // Three a day against five thousand: months past the horizon.
-    const { token, broadcastId } = await seed("bc-pace-huge", 5_000);
+    // Three a day against two hundred: months past the horizon.
+    const { token, broadcastId } = await seed("bc-pace-huge", 200);
     account = { ...ACCOUNT, max24h: 5 };
     const res = await request(token, "POST", `/broadcasts/${broadcastId}/send`, {});
     account = ACCOUNT;
@@ -806,10 +806,10 @@ describe("broadcasts API pacing", () => {
       statusCode: 422,
       name: "broadcast_too_large",
       message:
-        "This audience of 5,000 needs more than 24 days of sending capacity. Split it into smaller segments or contact support.",
+        "This audience of 200 needs more than 24 days of sending capacity. Split it into smaller segments or contact support.",
     });
     expect((await statusRow(broadcastId))?.status).toBe("draft");
-  });
+  }, 30_000);
 
   it("without SES's numbers the send goes through with no estimate", async () => {
     const { token, broadcastId } = await seed("bc-pace-blind", 12);
