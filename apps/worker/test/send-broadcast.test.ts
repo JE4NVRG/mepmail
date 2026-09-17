@@ -13,12 +13,14 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import type { EmailSendRequest } from "@millionsend/queue";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { reconcileStalledBroadcasts } from "../src/handlers/cron.js";
 import {
   applyMergeFields,
   type BroadcastDeps,
+  type BroadcastQuotaControls,
+  finalizeBroadcast,
   injectPreheader,
   sendBroadcast,
 } from "../src/handlers/send-broadcast.js";
@@ -118,6 +120,49 @@ function makeDeps(overrides: Partial<BroadcastDeps> = {}): {
   };
 }
 
+/** The region's room ledger as the fan-out sees it, admitting up to `room` rows. */
+function fakeControls(
+  room: number,
+  capacity = { max24h: 100_000, sentLast24h: 0, maxSendRate: 14 },
+): {
+  controls: BroadcastQuotaControls;
+  calls: { taken: [string | undefined, string, number][]; progress: number[]; done: string[] };
+} {
+  const calls = {
+    taken: [] as [string | undefined, string, number][],
+    progress: [] as number[],
+    done: [] as string[],
+  };
+  return {
+    calls,
+    controls: {
+      take: (region, id, n) => {
+        calls.taken.push([region, id, n]);
+        return Math.min(n, room);
+      },
+      progress: (_id, emitted) => {
+        calls.progress.push(emitted);
+      },
+      done: (id) => {
+        calls.done.push(id);
+      },
+      reserve: () => 30,
+      capacity: () => capacity,
+      rate: () => 14,
+    },
+  };
+}
+
+/** Every queued row of the broadcast leaves the queue as sent (or as given). */
+async function settleRows(broadcastId: string, status: "sent" | "failed" = "sent") {
+  await db
+    .update(schema.emails)
+    .set({ latestStatus: status, sentAt: status === "sent" ? new Date() : null })
+    .where(
+      and(eq(schema.emails.broadcastId, broadcastId), eq(schema.emails.latestStatus, "queued")),
+    );
+}
+
 async function insertBroadcast(
   overrides: Partial<typeof schema.broadcasts.$inferInsert> = {},
 ): Promise<string> {
@@ -141,22 +186,36 @@ async function insertBroadcast(
 const emailsOf = (broadcastId: string) =>
   db.select().from(schema.emails).where(eq(schema.emails.broadcastId, broadcastId));
 
-it("a broadcast with no segment or topic fans out to ALL subscribed team contacts, personalizes, and marks sent", async () => {
+it("a broadcast with no segment or topic fans out to ALL subscribed team contacts, personalizes, and marks sent once every row has gone", async () => {
   const broadcastId = await insertBroadcast();
   const mail = captureMailer();
   const { deps, enqueued } = makeDeps(mail);
 
   expect(await sendBroadcast(db, deps, { broadcastId })).toBe("sent");
+  const rows = await emailsOf(broadcastId);
+  expect(rows.map((r) => r.to[0]).sort()).toEqual(["a@example.com", "b@example.com"]);
+  expect(enqueued.sort()).toEqual(rows.map((r) => r.id).sort());
+
+  // The walk is done, the rows are still queued: sending, walk marked, no report yet.
+  const [walked] = await db
+    .select()
+    .from(schema.broadcasts)
+    .where(eq(schema.broadcasts.id, broadcastId));
+  expect(walked?.status).toBe("sending");
+  expect(walked?.recipientCount).toBe(2);
+  expect(walked?.fanOutCursor).toBeNull();
+  expect(mail.sends).toEqual([]);
+  expect(await finalizeBroadcast(db, deps, broadcastId)).toBe(false);
+
+  await settleRows(broadcastId);
+  expect(await finalizeBroadcast(db, deps, broadcastId)).toBe(true);
   // The owners' report: what went out, to how many, with the link.
   expect(mail.sends.map((s) => [s.to, s.kind, s.subject])).toEqual([
     ["acme-owner@example.com", "broadcast.sent", '"launch" went out to 2 recipients'],
   ]);
   expect(mail.sends[0]?.text).toContain('"launch" was handed to 2 contacts of acme;');
+  expect(mail.sends[0]?.text).not.toContain("could not be sent");
   expect(mail.sends[0]?.text).toContain(`${BASE_URL}/broadcasts/${broadcastId}`);
-
-  const rows = await emailsOf(broadcastId);
-  expect(rows.map((r) => r.to[0]).sort()).toEqual(["a@example.com", "b@example.com"]);
-  expect(enqueued.sort()).toEqual(rows.map((r) => r.id).sort());
 
   const [broadcast] = await db
     .select()
@@ -164,6 +223,9 @@ it("a broadcast with no segment or topic fans out to ALL subscribed team contact
     .where(eq(schema.broadcasts.id, broadcastId));
   expect(broadcast?.status).toBe("sent");
   expect(broadcast?.sentAt).toBeInstanceOf(Date);
+  // Claimed once: a second finalizer finds nothing to flip.
+  expect(await finalizeBroadcast(db, deps, broadcastId)).toBe(false);
+  expect(mail.sends).toHaveLength(1);
 
   // Per-recipient personalization: the literal token is replaced with the
   // hosted unsubscribe URL whose token verifies back to this contact.
@@ -254,21 +316,153 @@ it("re-running a fan-out never double-sends: no duplicate rows, jobs or reports"
   expect(await sendBroadcast(db, first.deps, { broadcastId })).toBe("sent");
   expect(first.enqueued).toHaveLength(2);
 
-  // Simulate a re-run after a crash mid-fan-out (status back to sending).
-  await db
-    .update(schema.broadcasts)
-    .set({ status: "sending" })
-    .where(eq(schema.broadcasts.id, broadcastId));
+  // A re-run after a crash mid-fan-out walks again and finds every row there.
   const second = makeDeps(mail);
   expect(await sendBroadcast(db, second.deps, { broadcastId })).toBe("sent");
   expect(await emailsOf(broadcastId)).toHaveLength(2);
   // Conflicted rows enqueue nothing — their jobs already exist.
   expect(second.enqueued).toHaveLength(0);
 
+  await settleRows(broadcastId);
+  expect(await finalizeBroadcast(db, first.deps, broadcastId)).toBe(true);
   // A completed broadcast is a no-op.
   const third = makeDeps(mail);
   expect(await sendBroadcast(db, third.deps, { broadcastId })).toBe("skipped");
   expect(mail.sends.map((s) => s.kind)).toEqual(["broadcast.sent"]);
+});
+
+it("a resumed walk starts from the committed cursor: nothing skipped, nothing sent twice", async () => {
+  const { teamId: tId, ids } = await seedTeam("cursor", [
+    { email: "c1@example.com" },
+    { email: "c2@example.com" },
+    { email: "c3@example.com" },
+    { email: "c4@example.com" },
+    { email: "c5@example.com" },
+  ]);
+  const broadcastId = await insertBroadcast({ teamId: tId, from: "Acme <hi@cursor.dev>" });
+  const controller = new AbortController();
+  const first = makeDeps({ batchSize: 2, signal: controller.signal });
+  // The walk stops at the top of page 3, after page 2's heartbeat persisted
+  // page 1's last id: the last page whose rows and jobs are all committed.
+  const enqueue = first.deps.enqueueEmailSends;
+  first.deps.enqueueEmailSends = async (batch) => {
+    await enqueue(batch);
+    if (first.enqueued.length === 4) controller.abort();
+  };
+  await expect(sendBroadcast(db, first.deps, { broadcastId })).rejects.toThrow(/fan-out aborted/);
+  const contactIds = Object.values(ids).sort();
+  const [interrupted] = await db
+    .select({ cursor: schema.broadcasts.fanOutCursor, status: schema.broadcasts.status })
+    .from(schema.broadcasts)
+    .where(eq(schema.broadcasts.id, broadcastId));
+  expect(interrupted).toEqual({ cursor: contactIds[1], status: "sending" });
+
+  const second = makeDeps({ batchSize: 2 });
+  expect(await sendBroadcast(db, second.deps, { broadcastId })).toBe("sent");
+  // Page 2 conflicts row by row; page 3 is new. Every contact exactly once.
+  expect(second.enqueued).toHaveLength(1);
+  const rows = await emailsOf(broadcastId);
+  expect(rows.map((r) => r.contactId).sort()).toEqual(contactIds);
+  expect(new Set([...first.enqueued, ...second.enqueued]).size).toBe(5);
+  const [resumed] = await db
+    .select({ cursor: schema.broadcasts.fanOutCursor, count: schema.broadcasts.recipientCount })
+    .from(schema.broadcasts)
+    .where(eq(schema.broadcasts.id, broadcastId));
+  expect(resumed).toEqual({ cursor: null, count: 5 });
+});
+
+it("admits up to the region's room and parks the rest with no reservation and no job", async () => {
+  const { teamId: tId } = await seedTeam("room", [
+    { email: "r1@example.com" },
+    { email: "r2@example.com" },
+    { email: "r3@example.com" },
+    { email: "r4@example.com" },
+    { email: "r5@example.com" },
+  ]);
+  const broadcastId = await insertBroadcast({ teamId: tId, from: "Acme <hi@room.dev>" });
+  const { controls, calls } = fakeControls(3);
+  const { deps, enqueued } = makeDeps({ isCloud: true, sesQuota: controls, batchSize: 2 });
+  expect(await sendBroadcast(db, deps, { broadcastId })).toBe("sent");
+  const rows = await emailsOf(broadcastId);
+  const queued = rows.filter((r) => r.latestStatus === "queued");
+  const parked = rows.filter((r) => r.latestStatus === "queued_quota");
+  expect(queued).toHaveLength(3);
+  expect(parked).toHaveLength(2);
+  expect(parked.every((r) => r.scheduledAt === null)).toBe(true);
+  expect(enqueued.sort()).toEqual(queued.map((r) => r.id).sort());
+  // The walk asked for the whole audience once, reported its progress per
+  // page and closed its grant; only the admitted rows charged the plan.
+  expect(calls.taken).toEqual([["us-east-1", broadcastId, 5]]);
+  expect(calls.progress.at(-1)).toBe(3);
+  expect(calls.done).toEqual([broadcastId]);
+  const [counter] = await db
+    .select({ accepted: schema.usageCounters.accepted })
+    .from(schema.usageCounters)
+    .where(eq(schema.usageCounters.teamId, tId));
+  expect(counter?.accepted).toBe(3);
+  const [row] = await db
+    .select({ status: schema.broadcasts.status, count: schema.broadcasts.recipientCount })
+    .from(schema.broadcasts)
+    .where(eq(schema.broadcasts.id, broadcastId));
+  expect(row).toEqual({ status: "sending", count: 5 });
+});
+
+it("a paced broadcast tells the owners once at walk end, then reports when the last row has gone", async () => {
+  const { teamId: tId } = await seedTeam("paced", [
+    { email: "p1@example.com" },
+    { email: "p2@example.com" },
+    { email: "p3@example.com" },
+  ]);
+  // A region of its own: the estimate is shared with every broadcast still
+  // sending in the region, and other tests leave some behind.
+  await db
+    .update(schema.domains)
+    .set({ region: "eu-west-1" })
+    .where(eq(schema.domains.teamId, tId));
+  const broadcastId = await insertBroadcast({ teamId: tId, from: "Acme <hi@paced.dev>" });
+  const mail = captureMailer();
+  // A two-row quota: one row a day, so the two parked rows take days.
+  const { controls } = fakeControls(1, { max24h: 2, sentLast24h: 0, maxSendRate: 14 });
+  const { deps } = makeDeps({ sesQuota: controls, ...mail });
+  expect(await sendBroadcast(db, deps, { broadcastId })).toBe("sent");
+  expect(mail.sends.map((s) => [s.kind, s.subject])).toEqual([
+    ["broadcast.sending", '"launch" is going out over 3 days'],
+  ]);
+  expect(mail.sends[0]?.text).toContain("1 of 3 emails went out in the first wave");
+  expect(mail.sends[0]?.text).toMatch(/the last about .* UTC\./);
+  expect(mail.sends[0]?.text).toContain("paced's transactional email is not held behind them");
+  expect(mail.sends[0]?.text).toContain(`${BASE_URL}/broadcasts/${broadcastId}`);
+  // Nothing more while rows wait; the walk-end note is said once.
+  expect(await finalizeBroadcast(db, deps, broadcastId)).toBe(false);
+  expect(await sendBroadcast(db, deps, { broadcastId })).toBe("sent");
+  expect(mail.sends).toHaveLength(1);
+
+  // The drain released and the lanes sent everything; one row failed.
+  await db
+    .update(schema.emails)
+    .set({ latestStatus: "queued" })
+    .where(
+      and(
+        eq(schema.emails.broadcastId, broadcastId),
+        eq(schema.emails.latestStatus, "queued_quota"),
+      ),
+    );
+  const [loser] = await emailsOf(broadcastId);
+  await db
+    .update(schema.emails)
+    .set({ latestStatus: "failed" })
+    .where(eq(schema.emails.id, loser?.id ?? ""));
+  await settleRows(broadcastId);
+  expect(await finalizeBroadcast(db, deps, broadcastId)).toBe(true);
+  expect(mail.sends.map((s) => s.kind)).toEqual(["broadcast.sending", "broadcast.sent"]);
+  expect(mail.sends[1]?.subject).toBe('"launch" went out to 3 recipients');
+  expect(mail.sends[1]?.text).toContain("1 could not be sent.");
+  const [row] = await db
+    .select({ status: schema.broadcasts.status, sentAt: schema.broadcasts.sentAt })
+    .from(schema.broadcasts)
+    .where(eq(schema.broadcasts.id, broadcastId));
+  expect(row?.status).toBe("sent");
+  expect(row?.sentAt).toBeInstanceOf(Date);
 });
 
 it("broadcast emails carry RFC 8058 headers through the SES send", async () => {
@@ -878,22 +1072,31 @@ it("opt-out topic: default (no row) is skipped; only explicit-in sends", async (
   expect(rows.map((r) => r.to[0]).sort()).toEqual(["optout-in@example.com"]);
 });
 
-it("reconcile re-enqueues past-due scheduled and stale sending broadcasts", async () => {
+it("reconcile re-enqueues past-due scheduled and stale sending broadcasts, and finalizes walked ones", async () => {
   const past = new Date(Date.now() - 60 * 60 * 1000);
   const stuck = await insertBroadcast({ scheduledAt: past });
   const stale = await insertBroadcast({ status: "sending", updatedAt: past });
   const fresh = await insertBroadcast({ scheduledAt: new Date(Date.now() + 60_000) });
+  // A finished walk whose rows still drain is never re-kicked, only finalized.
+  const walked = await insertBroadcast({ status: "sending", updatedAt: past, recipientCount: 0 });
 
   const enqueued: string[] = [];
+  const finalized: string[] = [];
   const requeued = await reconcileStalledBroadcasts(db, {
     enqueue: async (id) => {
       enqueued.push(id);
+    },
+    finalize: async (id) => {
+      finalized.push(id);
     },
   });
   expect(requeued).toBeGreaterThanOrEqual(2);
   expect(enqueued).toContain(stuck);
   expect(enqueued).toContain(stale);
   expect(enqueued).not.toContain(fresh);
+  expect(enqueued).not.toContain(walked);
+  expect(finalized).toContain(walked);
+  expect(finalized).not.toContain(stale);
 });
 
 it("a segment broadcast fans out only to matching contacts, composing with the topic filter", async () => {
@@ -1048,25 +1251,22 @@ it("applyMergeFields only lets web/mail URLs open an href or src; anything else 
   );
 });
 
-it("defers the fan-out while the sender domain's region is at its SES 24-hour quota", async () => {
+it("a region with no room parks the whole fan-out instead of deferring it", async () => {
   const broadcastId = await insertBroadcast();
   const rescheduled: Date[] = [];
-  const full = new Set(["us-east-1"]);
+  const { controls } = fakeControls(0);
   const { deps, enqueued } = makeDeps({
     reschedule: async (_id, at) => {
       rescheduled.push(at);
     },
-    sesQuota: { exhausted: (region) => full.has(region ?? "") },
+    sesQuota: controls,
   });
-  expect(await sendBroadcast(db, deps, { broadcastId })).toBe("deferred");
-  expect(rescheduled).toHaveLength(1);
-  expect(enqueued).toEqual([]);
-  expect(await emailsOf(broadcastId)).toHaveLength(0);
-  // Another region's quota is not this domain's problem.
-  full.clear();
-  full.add("sa-east-1");
   expect(await sendBroadcast(db, deps, { broadcastId })).toBe("sent");
-  expect(enqueued.length).toBeGreaterThan(0);
+  expect(rescheduled).toEqual([]);
+  expect(enqueued).toEqual([]);
+  const rows = await emailsOf(broadcastId);
+  expect(rows).toHaveLength(2);
+  expect(rows.every((r) => r.latestStatus === "queued_quota")).toBe(true);
 });
 
 it("defers the fan-out while the sender domain's region is held by the platform breaker", async () => {
