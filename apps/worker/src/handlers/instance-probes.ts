@@ -16,6 +16,10 @@ export interface ProbeDeps {
   keyring?: Keyring | undefined;
   /** Whether SES events are expected at all (SNS_TOPIC_ARNS set). */
   eventsConfigured: boolean;
+  /** Served regions, for the parked-transactional probe. */
+  regions?: readonly string[] | undefined;
+  /** When a transactional row last parked at the region's SES quota line; the worker's own memory. */
+  txParkedAt?: ((region: string) => Date | null) | undefined;
   now?: Date;
 }
 
@@ -25,6 +29,7 @@ export const KMS_WRAP_OK_MS = 2_000;
 export const WEBHOOK_SUCCESS_OK_RATE = 0.9;
 
 const HOUR_MS = 3_600_000;
+const DAY_S = 86_400;
 
 /**
  * One pass of every health probe, each measured on its own so one failure
@@ -126,6 +131,18 @@ export async function runInstanceProbes(db: Db, deps: ProbeDeps): Promise<ProbeS
       value: row?.lag === null || row?.lag === undefined ? null : Math.max(0, Number(row.lag)),
       ok: health.status !== "unhealthy",
     };
+  });
+
+  await probe("ses_transactional_parked", async () => {
+    // Bad the minute a transactional row waits for capacity: the reserve
+    // was too small for the day. Reads only this process's memory, so one
+    // worker replica is the assumption.
+    const parks = (deps.regions ?? [])
+      .map((region) => deps.txParkedAt?.(region)?.getTime() ?? null)
+      .filter((t): t is number => t !== null);
+    if (parks.length === 0) return { value: null, ok: true };
+    const age = (now.getTime() - Math.max(...parks)) / 1000;
+    return { value: age, ok: age > DAY_S };
   });
 
   await probe("webhook_success_rate", async () => {
