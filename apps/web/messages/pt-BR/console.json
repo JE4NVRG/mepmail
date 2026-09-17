@@ -84,6 +84,7 @@
         "worker_heartbeat": "Worker",
         "boss_waiting": "Fila pg-boss",
         "ses_events_lag_s": "Eventos do SES",
+        "ses_transactional_parked": "Transacional retido",
         "webhook_success_rate": "Entregas de webhook",
         "kms_wrap_ms": "KMS",
         "stripe_last_event_s": "Webhook do Stripe",
@@ -104,7 +105,9 @@
         "stripeNever": "nenhum evento ainda",
         "retention": "{count} corpos removidos",
         "retentionNever": "ainda não rodou",
-        "failed": "sonda falhou"
+        "failed": "sonda falhou",
+        "txParked": "retido {ago}",
+        "txParkedNone": "nenhum em 24h"
       }
     },
     "kpi": {
@@ -165,6 +168,7 @@
       "boss_waiting": "Jobs aguardando no pg-boss",
       "boss_failed": "Jobs com falha no pg-boss",
       "ses_events_lag_s": "Atraso dos eventos do SES",
+      "ses_transactional_parked": "Tempo desde que um e-mail transacional ficou retido",
       "webhook_success_rate": "Taxa de sucesso dos webhooks",
       "webhook_tripped": "Endpoints de webhook desativados",
       "kms_wrap_ms": "Latência do wrap no KMS",
@@ -309,6 +313,19 @@
       "ESSENTIALS": "Essentials"
     },
     "provision": "Provisionar",
+    "reserve": {
+      "title": "Reserva transacional",
+      "help": "Parte da cota de envio de 24 horas de cada região que as transmissões nunca usam. O e-mail transacional pode usar toda ela e tomar emprestado além dela.",
+      "label": "Reserva · percentual",
+      "unit": "da cota · {min}–{max}",
+      "hint": "Pico transacional nesta semana {peak} ({share} da reserva utilizável) · sugerido {suggested}. A sugestão nunca é aplicada sozinha.",
+      "hintNoQuota": "Pico transacional nesta semana {peak} · sugerido {suggested}. A sugestão nunca é aplicada sozinha.",
+      "regionRow": "parcela {share} · reserva utilizável {usable}",
+      "regionUnlimited": "sem cota",
+      "regionUnreachable": "inacessível",
+      "save": "Salvar reserva",
+      "toast": "Reserva transacional definida em {percent}"
+    },
     "sparks": {
       "title": "Enviados por região",
       "subtitle": "Últimos 7 dias · escala compartilhada",

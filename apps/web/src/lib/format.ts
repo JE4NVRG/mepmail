@@ -180,3 +180,81 @@ export function mailDomain(address: string): string {
 export function displayUrl(url: string): string {
   return url.replace(/^https?:\/\//, "");
 }
+
+const QUARTER_HOUR_MS = 15 * 60_000;
+
+/** The instant when it is less than a day old, else null. */
+export function withinLastDay(at: Date | string | null): Date | null {
+  if (!at) return null;
+  const then = new Date(at);
+  return Date.now() - then.getTime() < 24 * 3_600_000 ? then : null;
+}
+
+/** A forecast rounded up to the next quarter hour: what every surface prints as "about". */
+export function roundUpToQuarterHour(date: Date | string | number): Date {
+  return new Date(Math.ceil(new Date(date).getTime() / QUARTER_HOUR_MS) * QUARTER_HOUR_MS);
+}
+
+/** Weekday and date of a send step ("Fri, Sep 18" / "sex., 18 de set."). */
+export function formatStepDay(date: Date | string | number, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(new Date(date));
+}
+
+/** A clock time with the zone's abbreviation ("10:30 AM GMT-3"), so a forecast is unambiguous. */
+export function formatStepTime(date: Date | string | number, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(new Date(date));
+}
+
+/** "Fri, Sep 18, 10:30 AM GMT-3": the finish stamp of a paced send. */
+export function formatFinishAbout(date: Date | string | number, locale: string): string {
+  return `${formatStepDay(date, locale)}, ${formatStepTime(date, locale)}`;
+}
+
+/** Whether two instants fall on the same local calendar day. */
+export function sameLocalDay(a: Date | string | number, b: Date | string | number): boolean {
+  return new Date(a).toDateString() === new Date(b).toDateString();
+}
+
+export interface SendDay {
+  startsAt: Date;
+  endsAt: Date;
+  count: number;
+}
+
+/** Whether two instants fall on the same UTC day: the day a daily plan cap resets on. */
+export function sameUtcDay(a: Date | string | number, b: Date | string | number): boolean {
+  return new Date(a).toISOString().slice(0, 10) === new Date(b).toISOString().slice(0, 10);
+}
+
+/**
+ * A send's releases grouped by the day they start on, in order: the local
+ * day for capacity waves, the UTC day when a daily plan cap paces them (its
+ * reset is UTC midnight, so a row per reset needs UTC days).
+ */
+export function groupReleasesByDay(
+  releases: readonly { at: Date | string; endsAt: Date | string; count: number }[],
+  day: "local" | "utc" = "local",
+): SendDay[] {
+  const same = day === "utc" ? sameUtcDay : sameLocalDay;
+  const days: SendDay[] = [];
+  for (const release of releases) {
+    const startsAt = new Date(release.at);
+    const endsAt = new Date(release.endsAt);
+    const last = days[days.length - 1];
+    if (last && same(last.startsAt, startsAt)) {
+      last.count += release.count;
+      if (endsAt > last.endsAt) last.endsAt = endsAt;
+    } else {
+      days.push({ startsAt, endsAt, count: release.count });
+    }
+  }
+  return days;
+}

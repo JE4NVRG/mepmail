@@ -612,3 +612,35 @@ describe("console.monitor", () => {
     });
   });
 });
+
+describe("console.regions reserve", () => {
+  it("lists each region's share and sets the reserve, clamped and audited", async () => {
+    vi.stubEnv("SES_TRANSACTIONAL_RESERVE", "");
+    let list = await operator().console.regions.list();
+    expect(list.reserve).toMatchObject({ percent: 30, source: "default", min: 5, max: 90 });
+    expect(list.served.find((r) => r.region === REGION)).toMatchObject({
+      share: 700,
+      usableReserve: 280,
+    });
+    expect(list.reserve.hint).toMatchObject({ txPeak7d: 0, usableReserveNow: 280, suggested: 30 });
+
+    expect(await operator().console.regions.setReserve({ percent: 40 })).toEqual({ percent: 40 });
+    list = await operator().console.regions.list();
+    expect(list.reserve).toMatchObject({ percent: 40, source: "db" });
+    expect(list.served.find((r) => r.region === REGION)).toMatchObject({
+      share: 600,
+      usableReserve: 380,
+    });
+
+    expect(await operator().console.regions.setReserve({ percent: 2 })).toEqual({ percent: 5 });
+    expect(await operator().console.regions.setReserve({ percent: 95 })).toEqual({ percent: 90 });
+    const rows = await auditRows("instance.reserve_updated");
+    expect(rows).toHaveLength(3);
+    expect(rows[0]?.data).toMatchObject({ from: 5, to: 90 });
+    expect(rows[0]?.teamId).toBeNull();
+
+    await expect(member().console.regions.setReserve({ percent: 30 })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+});

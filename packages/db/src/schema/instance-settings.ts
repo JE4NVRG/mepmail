@@ -13,6 +13,9 @@ export const instanceSettings = pgTable(
   {
     id: smallint("id").primaryKey().default(1),
     sesMaxSendRate: integer("ses_max_send_rate"),
+    // Percent of every served region's SES 24-hour quota that broadcasts
+    // never touch; transactional mail may use all of it and borrow beyond.
+    sesTransactionalReserve: smallint("ses_transactional_reserve"),
     emailRetentionDays: integer("email_retention_days"),
     ...monitorSettingColumns,
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

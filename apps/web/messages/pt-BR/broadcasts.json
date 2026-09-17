@@ -26,7 +26,10 @@
     "retry": "Tentar novamente",
     "deleteTitle": "Excluir rascunho",
     "deleteBody": "\"{name}\" será excluído. Rascunhos não deixam nada para trás.",
-    "deleteConfirm": "Excluir"
+    "deleteConfirm": "Excluir",
+    "stopRest": "Parar o restante",
+    "finishTip": "Termina por volta de {time}",
+    "progressTip": "{sent} enviados · {waiting} aguardando"
   },
   "composer": {
     "newTitle": "Nova transmissão",
@@ -80,7 +83,26 @@
     "sendNow": "Enviar agora",
     "schedule": "Agendar",
     "appBaseUrl": "APP_BASE_URL não está definido. Os links de descadastro dependem dele — defina e reinicie.",
-    "sendError": "Não foi possível enviar. Tente novamente."
+    "sendError": "Não foi possível enviar. Tente novamente.",
+    "stepNow": "Agora",
+    "stepFirst": "{count} saem",
+    "stepMore": "mais {count} conforme a capacidade libera",
+    "stepLast": "últimos {count} · termina por volta de {time}",
+    "stepOnly": "{count} saem · termina por volta de {time}",
+    "stepStarts": "começa por volta de {time} · outros envios estão na frente do seu",
+    "stepAllSent": "todos os {count} enviados · por volta de {time}",
+    "stepLimitDay": "limite diário do {plan}",
+    "stepLimitMonth": "limite mensal do {plan}",
+    "stepMoreReset": "mais {count} quando o limite reinicia às {reset}",
+    "stepLastReset": "últimos {count} quando o limite reinicia às {reset} · termina por volta de {time}",
+    "reason": "Envios acima da capacidade diária da plataforma são distribuídos pelos dias seguintes. Seu e-mail transacional não fica retido atrás deles.",
+    "planFits": "{plan} envia todos até {time}",
+    "planFitsOverage": "{plan} com excedente envia todos até {time}",
+    "todayAt": "hoje, {time}",
+    "seePlans": "Ver planos",
+    "tooLarge": "Esta audiência precisa de mais de {days} dias de capacidade de envio. Divida em segmentos menores ou fale com o suporte.",
+    "tooLargeSelfHost": "Esta audiência precisa de mais de {days} dias de capacidade de envio. Divida em segmentos menores ou peça mais capacidade ao operador da instância.",
+    "stepFirstReset": "{count} saem quando o limite reinicia às {reset}"
   },
   "detail": {
     "eyebrow": "Transmissão",
@@ -110,7 +132,18 @@
     "cancelConfirm": "Cancelar envio",
     "keep": "Manter",
     "error": "Não foi possível carregar a transmissão.",
-    "emails": "E-mails"
+    "emails": "E-mails",
+    "finishesAbout": "Termina por volta de",
+    "started": "começou {time}",
+    "progress": "{sent} enviados · {waiting} aguardando",
+    "planHold": "Aguardando o plano · retoma {date}",
+    "sentSoFar": "Enviados até agora",
+    "ofTotal": "de {total}",
+    "stopRest": "Parar o restante",
+    "stopTitle": "Parar o restante",
+    "stopBody": "Parar os {waiting} envios restantes? Os {sent} já enviados não são afetados.",
+    "keepSending": "Continuar enviando",
+    "stopConfirm": "Parar o restante"
   },
   "apiSheet": {
     "title": "API de Transmissões",

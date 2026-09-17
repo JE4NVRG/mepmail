@@ -1,7 +1,8 @@
-import { env } from "@millionsend/config";
+import { env, isCloudDeployment } from "@millionsend/config";
 import {
   acceptEmail,
   applyMergeFields,
+  cancelBroadcastRows,
   DAY_MS,
   emailInsightsView,
   fetchBroadcastInsights,
@@ -20,7 +21,7 @@ import {
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
-import { and, count, desc, eq, gt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { createTranslator } from "next-intl";
 import { z } from "zod";
 import { mailyDocumentSchema } from "@/lib/email-doc";
@@ -28,6 +29,7 @@ import enDeliverability from "../../../messages/en/deliverability.json";
 import ptBRDeliverability from "../../../messages/pt-BR/deliverability.json";
 import type { AppLocale } from "../../i18n/request";
 import { fetchQuotaRow } from "../billing";
+import { planBroadcastSend, planHoldUntil, sendingProgress } from "../broadcast-plan";
 import { resolveEditorSave } from "../email-content";
 import { getKeyring } from "../keyring";
 import { beforeCursor, createdAtCursorField, cursorSchema, paginate } from "../keyset";
@@ -118,6 +120,34 @@ async function standingGuard(ctx: { db: Db; teamId: string }): Promise<TRPCError
   return new TRPCError({
     code: "PRECONDITION_FAILED",
     message: t(standing.suspended ? "sendGuard.suspended" : "sendGuard.operatorPaused"),
+  });
+}
+
+/**
+ * PRECONDITION_FAILED when the send would still be going out past the pacing
+ * horizon: capacity or the team's own cap needs more days than bodies are
+ * kept for. The dialog shows the same verdict; this is what enforces it. No
+ * estimate (SES unreachable) refuses nothing.
+ */
+async function horizonGuard(
+  ctx: { db: Db; teamId: string },
+  region: string,
+  count: number,
+  at: Date,
+): Promise<TRPCError | null> {
+  if (count === 0) return null;
+  const plan = await planBroadcastSend(ctx.db, {
+    teamId: ctx.teamId,
+    region,
+    newSend: { count, at },
+  });
+  if (!plan?.estimate?.blocked) return null;
+  const { t } = await sendGuardTranslator();
+  return new TRPCError({
+    code: "PRECONDITION_FAILED",
+    message: t(isCloudDeployment() ? "sendGuard.tooLarge" : "sendGuard.tooLargeSelfHost", {
+      days: plan.estimate.horizonDays,
+    }),
   });
 }
 
@@ -269,18 +299,22 @@ export const broadcastsRouter = router({
         .orderBy(desc(b.createdAt), desc(b.id))
         .limit(input.limit + 1);
       const page = paginate(rows, input.limit);
+      // One planner run per region for the rows still going out; nothing
+      // when none is.
+      const progress = page.items.some((row) => row.status === "sending")
+        ? await sendingProgress(ctx.db, ctx.teamId)
+        : new Map<string, never>();
       return {
         ...page,
-        items: await Promise.all(
-          page.items.map(async (row) => ({
+        items: page.items.map((row) => {
+          const p = progress.get(row.id);
+          return {
             ...row,
-            // Progress denominator while the fan-out runs: the audience it
-            // walks, counted like the composer's guard. Suppressed rows still
-            // drop out of the walk, so the final count can land a little under.
-            audience:
-              row.status === "sending" ? await countAudience(ctx, row).catch(() => null) : null,
-          })),
-        ),
+            sentCount: p?.sentCount ?? null,
+            parkedCount: p?.parkedCount ?? null,
+            finishesAt: p?.finishesAt ?? null,
+          };
+        }),
       };
     }),
 
@@ -328,9 +362,21 @@ export const broadcastsRouter = router({
       .from(e)
       .where(and(eq(e.broadcastId, row.id), eq(e.teamId, ctx.teamId)));
     const live = stats && stats.total > 0 ? stats : null;
+    const progress =
+      row.status === "sending"
+        ? (await sendingProgress(ctx.db, ctx.teamId)).get(row.id)
+        : undefined;
+    // Parked rows with no room under the team's own cap wait for its reset, not for capacity.
+    const planHold =
+      progress && progress.parkedCount > 0 ? await planHoldUntil(ctx.db, ctx.teamId) : null;
     return {
       ...row,
       hiddenBySupportView,
+      sentCount: progress?.sentCount ?? null,
+      parkedCount: progress?.parkedCount ?? null,
+      finishesAt: progress?.finishesAt ?? null,
+      startedAt: row.status === "sending" ? row.scheduledAt : null,
+      planHold: planHold ? { resumesAt: planHold } : null,
       replyTo: firstReplyTo(row.replyTo),
       topicName: topic?.name ?? null,
       segmentName: segment?.name ?? null,
@@ -512,6 +558,13 @@ export const broadcastsRouter = router({
           message: `Broadcasts can be scheduled at most ${MAX_SCHEDULE_AHEAD_DAYS} days ahead.`,
         });
       }
+      const horizonError = await horizonGuard(
+        ctx,
+        sender.region,
+        await countAudience(ctx, row),
+        scheduledAt,
+      );
+      if (horizonError) throw horizonError;
       const b = schema.broadcasts;
       // status filter re-checked in the UPDATE so two concurrent sends cannot
       // both flip the row.
@@ -629,21 +682,36 @@ export const broadcastsRouter = router({
       return { to };
     }),
 
+  /**
+   * Scheduled → canceled before the fan-out; sending → canceled stops the
+   * rest: the fan-out's heartbeat sees the flip within a page, and every row
+   * still waiting is canceled in pages. Emails already sent are not recalled.
+   */
   cancel: teamProcedure.input(z.object({ id: z.uuid() })).mutation(async ({ ctx, input }) => {
     await getOwnBroadcast(ctx, input.id);
     const b = schema.broadcasts;
     const [updated] = await ctx.db
       .update(b)
       .set({ status: "canceled", updatedAt: new Date() })
-      .where(and(eq(b.id, input.id), eq(b.teamId, ctx.teamId), eq(b.status, "scheduled")))
+      .where(
+        and(
+          eq(b.id, input.id),
+          eq(b.teamId, ctx.teamId),
+          inArray(b.status, ["scheduled", "sending"]),
+        ),
+      )
       .returning({ id: b.id });
     if (!updated) {
       throw new TRPCError({
         code: "PRECONDITION_FAILED",
-        message: "Only scheduled broadcasts can be canceled.",
+        message: "Only scheduled or sending broadcasts can be canceled.",
       });
     }
-    return { id: input.id };
+    const canceledRemaining = await cancelBroadcastRows(ctx.db, {
+      broadcastId: input.id,
+      teamId: ctx.teamId,
+    });
+    return { id: input.id, canceledRemaining };
   }),
 
   /**
@@ -660,4 +728,31 @@ export const broadcastsRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => ({ count: await countAudience(ctx, input) })),
+
+  /**
+   * The send dialog's plan: the audience count and, when SES has answered,
+   * how the send goes out (first wave, later days, the finish, a plan hold).
+   * Advisory: the send mutation runs the same planner for the refusal.
+   */
+  sendPlan: teamProcedure
+    .input(
+      z.object({
+        topicId: z.uuid().nullable().optional(),
+        segmentId: z.uuid().nullable().optional(),
+        from: z.string().trim().max(320),
+        scheduledAt: z.date().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const cloud = isCloudDeployment();
+      const count = await countAudience(ctx, input);
+      const sender = await verifySenderDomain(ctx.db, ctx.teamId, input.from);
+      if (!sender.ok || count === 0) return { count, cloud, estimate: null };
+      const plan = await planBroadcastSend(ctx.db, {
+        teamId: ctx.teamId,
+        region: sender.region,
+        newSend: { count, at: input.scheduledAt ?? new Date() },
+      });
+      return { count, cloud, estimate: plan?.estimate ?? null };
+    }),
 });

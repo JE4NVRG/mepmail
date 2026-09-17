@@ -84,6 +84,7 @@
         "worker_heartbeat": "Worker",
         "boss_waiting": "pg-boss queue",
         "ses_events_lag_s": "SES events",
+        "ses_transactional_parked": "Transactional parked",
         "webhook_success_rate": "Webhook deliveries",
         "kms_wrap_ms": "KMS",
         "stripe_last_event_s": "Stripe webhook",
@@ -104,7 +105,9 @@
         "stripeNever": "no event yet",
         "retention": "{count} bodies purged",
         "retentionNever": "not run yet",
-        "failed": "probe failed"
+        "failed": "probe failed",
+        "txParked": "parked {ago}",
+        "txParkedNone": "none in 24h"
       }
     },
     "kpi": {
@@ -165,6 +168,7 @@
       "boss_waiting": "pg-boss waiting jobs",
       "boss_failed": "pg-boss failed jobs",
       "ses_events_lag_s": "SES events lag",
+      "ses_transactional_parked": "Time since a transactional row parked",
       "webhook_success_rate": "Webhook success rate",
       "webhook_tripped": "Tripped webhook endpoints",
       "kms_wrap_ms": "KMS wrap latency",
@@ -309,6 +313,19 @@
       "ESSENTIALS": "Essentials"
     },
     "provision": "Provision",
+    "reserve": {
+      "title": "Transactional reserve",
+      "help": "Share of each region's 24-hour sending quota broadcasts never touch. Transactional mail may use all of it and borrow beyond it.",
+      "label": "Reserve · percent",
+      "unit": "of the quota · {min}–{max}",
+      "hint": "Transactional peak this week {peak} ({share} of the usable reserve) · suggested {suggested}. The hint is never applied on its own.",
+      "hintNoQuota": "Transactional peak this week {peak} · suggested {suggested}. The hint is never applied on its own.",
+      "regionRow": "share {share} · usable reserve {usable}",
+      "regionUnlimited": "no quota",
+      "regionUnreachable": "unreachable",
+      "save": "Save reserve",
+      "toast": "Transactional reserve set to {percent}"
+    },
     "sparks": {
       "title": "Sent per region",
       "subtitle": "Last 7 days · shared scale",

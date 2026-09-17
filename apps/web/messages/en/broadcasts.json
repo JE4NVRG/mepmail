@@ -26,7 +26,10 @@
     "retry": "Retry",
     "deleteTitle": "Delete draft",
     "deleteBody": "\"{name}\" will be deleted. Drafts leave nothing behind.",
-    "deleteConfirm": "Delete"
+    "deleteConfirm": "Delete",
+    "stopRest": "Stop the rest",
+    "finishTip": "Finishes about {time}",
+    "progressTip": "{sent} sent · {waiting} waiting"
   },
   "composer": {
     "newTitle": "New broadcast",
@@ -80,7 +83,26 @@
     "sendNow": "Send now",
     "schedule": "Schedule",
     "appBaseUrl": "APP_BASE_URL is not set. Unsubscribe links are built from it — set it and restart.",
-    "sendError": "Couldn't send. Try again."
+    "sendError": "Couldn't send. Try again.",
+    "stepNow": "Now",
+    "stepFirst": "{count} go out",
+    "stepMore": "{count} more as capacity frees",
+    "stepLast": "last {count} · finishes about {time}",
+    "stepOnly": "{count} go out · finishes about {time}",
+    "stepStarts": "starts about {time} · other sends are ahead of yours",
+    "stepAllSent": "all {count} sent · about {time}",
+    "stepLimitDay": "{plan}'s daily limit",
+    "stepLimitMonth": "{plan}'s monthly limit",
+    "stepMoreReset": "{count} more when the limit resets at {reset}",
+    "stepLastReset": "last {count} when the limit resets at {reset} · finishes about {time}",
+    "reason": "Sends above the platform's daily capacity are spread over the following days. Your transactional email is not held behind them.",
+    "planFits": "{plan} sends all of them by {time}",
+    "planFitsOverage": "{plan} with overage sends all of them by {time}",
+    "todayAt": "today, {time}",
+    "seePlans": "See plans",
+    "tooLarge": "This audience needs more than {days} days of sending capacity. Split it into smaller segments or contact support.",
+    "tooLargeSelfHost": "This audience needs more than {days} days of sending capacity. Split it into smaller segments or ask your instance operator for more capacity.",
+    "stepFirstReset": "{count} go out when the limit resets at {reset}"
   },
   "detail": {
     "eyebrow": "Broadcast",
@@ -110,7 +132,18 @@
     "cancelConfirm": "Cancel send",
     "keep": "Keep it",
     "error": "Couldn't load the broadcast.",
-    "emails": "Emails"
+    "emails": "Emails",
+    "finishesAbout": "Finishes about",
+    "started": "started {time}",
+    "progress": "{sent} sent · {waiting} waiting",
+    "planHold": "Waiting for the plan · resumes {date}",
+    "sentSoFar": "Sent so far",
+    "ofTotal": "of {total}",
+    "stopRest": "Stop the rest",
+    "stopTitle": "Stop the rest",
+    "stopBody": "Stop the remaining {waiting} sends? The {sent} already sent are not affected.",
+    "keepSending": "Keep sending",
+    "stopConfirm": "Stop the rest"
   },
   "apiSheet": {
     "title": "Broadcasts API",

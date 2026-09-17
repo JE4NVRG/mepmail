@@ -23,7 +23,7 @@ import { useTRPC } from "@/lib/trpc";
 import { useLocalDraft } from "@/lib/use-local-draft";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-warning";
 import { ConvertBlocksDialog, HtmlAuthoredBanner, HtmlCodeMode } from "../templates/html-mode";
-import { ContentPreview } from "./parts";
+import { ContentPreview, SendPlanSummary } from "./parts";
 
 /** Everything a crash would lose — mirrored into the local draft. */
 interface ComposerDraft {
@@ -97,7 +97,6 @@ export function BroadcastComposer({ initial }: { initial?: ComposerInitial }) {
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const nf = useMemo(() => new Intl.NumberFormat(locale), [locale]);
 
   const [topicId, setTopicId] = useState(initial?.topicId ?? "");
   const [segmentId, setSegmentId] = useState(initial?.segmentId ?? "");
@@ -271,12 +270,20 @@ export function BroadcastComposer({ initial }: { initial?: ComposerInitial }) {
     savedDoc.current = "__applied__";
     setDirty(true);
   }
-  const recipientCount = useQuery(
-    trpc.broadcasts.recipientCount.queryOptions(
-      { topicId: topicId || null, segmentId: segmentId || null },
+  // The plan behind the guard: the count and, when capacity or the plan
+  // paces the send, how it goes out. Re-read when the schedule moves.
+  const sendPlan = useQuery(
+    trpc.broadcasts.sendPlan.queryOptions(
+      {
+        topicId: topicId || null,
+        segmentId: segmentId || null,
+        from: from.trim(),
+        ...(schedule ? { scheduledAt: new Date(schedule) } : {}),
+      },
       { enabled: guardOpen },
     ),
   );
+  const sendBlocked = sendPlan.data?.count === 0 || sendPlan.data?.estimate?.blocked === true;
 
   const createMutation = useMutation(trpc.broadcasts.create.mutationOptions());
   const updateMutation = useMutation(trpc.broadcasts.update.mutationOptions());
@@ -369,9 +376,9 @@ export function BroadcastComposer({ initial }: { initial?: ComposerInitial }) {
   }
 
   async function confirmSend() {
-    // Mirrors the confirm button's disabled state (zero recipients included):
+    // Mirrors the confirm button's disabled state (zero recipients, too large):
     // Modal's onConfirm shortcut routes here too and must obey the same guard.
-    if (!complete || sending || recipientCount.data?.count === 0) return;
+    if (!complete || sending || sendBlocked) return;
     try {
       const id = await persist();
       await sendMutation.mutateAsync({
@@ -850,15 +857,20 @@ export function BroadcastComposer({ initial }: { initial?: ComposerInitial }) {
             void confirmSend();
           }}
         >
-          <p style={{ margin: "0 0 18px", fontSize: "var(--ms-fs-ui)" }}>
-            {recipientCount.isPending ? (
-              <span style={{ color: "var(--ms-muted)" }}>{t("guard.counting")}</span>
-            ) : recipientCount.data?.count === 0 ? (
-              t("guard.zero")
-            ) : (
-              t("guard.body", { count: nf.format(recipientCount.data?.count ?? 0) })
-            )}
-          </p>
+          {sendPlan.data ? (
+            <SendPlanSummary
+              count={sendPlan.data.count}
+              estimate={sendPlan.data.estimate}
+              cloud={sendPlan.data.cloud}
+              locale={locale}
+            />
+          ) : (
+            <p
+              style={{ margin: "0 0 18px", fontSize: "var(--ms-fs-ui)", color: "var(--ms-muted)" }}
+            >
+              {t("guard.counting")}
+            </p>
+          )}
           <div className="ms-field">
             <label htmlFor="bc-schedule">
               {t("guard.scheduleLabel")}{" "}
@@ -883,7 +895,7 @@ export function BroadcastComposer({ initial }: { initial?: ComposerInitial }) {
             <button
               type="submit"
               className="ms-btn ms-btn-primary"
-              disabled={sending || recipientCount.data?.count === 0}
+              disabled={sending || sendBlocked}
             >
               <BtnSpinner on={sending} />
               {schedule ? t("guard.schedule") : t("guard.sendNow")} <ConfirmKeycap />

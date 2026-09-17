@@ -1,13 +1,25 @@
-import { env, isCloudDeployment, servedRegions, sesTenantsEnabled } from "@millionsend/config";
 import {
+  env,
+  isCloudDeployment,
+  SES_TRANSACTIONAL_RESERVE_DEFAULT,
+  servedRegions,
+  sesTenantsEnabled,
+} from "@millionsend/config";
+import {
+  bulkShare,
+  clampReserve,
   getInstanceSettings,
   holdRegion,
   latestProbes,
   pausedRegions,
   regionCounterTotals,
+  regionDailyPeaks,
   regionWindowCounts,
   releaseRegion,
+  SES_TRANSACTIONAL_RESERVE_MAX,
+  SES_TRANSACTIONAL_RESERVE_MIN,
   sesEventsHealth,
+  usableReserve,
 } from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import {
@@ -17,10 +29,11 @@ import {
   SES_REGIONS,
 } from "@millionsend/ses";
 import { TRPCError } from "@trpc/server";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { type RegionAccountDeps, servedRegionAccounts } from "../../console/ses-regions";
 import { operatorProcedure, router } from "../../trpc";
+import { effectiveSetting } from "../system";
 import { emptyDaily, emptyHourly, regionDailySends, regionHourlySends } from "./series";
 import { auditOperator } from "./shared";
 
@@ -49,6 +62,22 @@ function assertServed(region: string): void {
   if (!servedRegions().includes(region)) throw new TRPCError({ code: "NOT_FOUND" });
 }
 
+/** Headroom the hint leaves over the week's transactional peak before it suggests a reserve. */
+const HINT_HEADROOM = 1.3;
+
+/**
+ * The smallest reserve (steps of five) whose usable part covers the week's
+ * transactional peak with headroom, never under the default: a hint beside
+ * the field, never applied on its own.
+ */
+function suggestedReserve(max24h: number | null, txPeak7d: number): number {
+  if (max24h === null || max24h <= 0) return SES_TRANSACTIONAL_RESERVE_DEFAULT;
+  for (let p = SES_TRANSACTIONAL_RESERVE_DEFAULT; p <= SES_TRANSACTIONAL_RESERVE_MAX; p += 5) {
+    if (usableReserve(max24h, p) >= txPeak7d * HINT_HEADROOM) return p;
+  }
+  return SES_TRANSACTIONAL_RESERVE_MAX;
+}
+
 export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps) {
   const accounts = (fresh = false) =>
     servedRegionAccounts({ fresh, ...(deps.accounts ? { deps: deps.accounts } : {}) });
@@ -59,6 +88,7 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
       const served = servedRegions();
       const monthDays = now.getUTCDate();
       const d = schema.domains;
+      const defaultRegion = served[0];
       const [
         regionAccounts,
         settings,
@@ -71,6 +101,7 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
         daily,
         events,
         probes,
+        peaks,
       ] = await Promise.all([
         accounts(),
         getInstanceSettings(ctx.db),
@@ -87,8 +118,21 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
         regionDailySends(ctx.db, { now, days: 7 }),
         env.SNS_TOPIC_ARNS?.length ? sesEventsHealth(ctx.db, now) : Promise.resolve(null),
         latestProbes(ctx.db),
+        defaultRegion
+          ? regionDailyPeaks(ctx.db, { region: defaultRegion, days: 7, now })
+          : Promise.resolve({ txPeak: 0, bulkPeak: 0 }),
       ]);
       const ceiling = settings.sesMaxSendRate ?? env.SES_MAX_SEND_RATE;
+      const reserve = effectiveSetting(
+        settings.sesTransactionalReserve,
+        process.env.SES_TRANSACTIONAL_RESERVE,
+        SES_TRANSACTIONAL_RESERVE_DEFAULT,
+      );
+      // The split only means something against a finite quota.
+      const quotaOf = (account: (typeof regionAccounts)[number]) =>
+        account.ok && account.overview.quota.max24h > 0 ? account.overview.quota.max24h : null;
+      const defaultAccount = regionAccounts.find((a) => a.region === defaultRegion);
+      const defaultQuota = defaultAccount ? quotaOf(defaultAccount) : null;
       const tenants = sesTenantsEnabled();
       const domainsByRegion = new Map(domains.map((r) => [r.region, r.n]));
       const breakers = new Map(paused.map((p) => [p.region, p]));
@@ -101,9 +145,14 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
           const plan = account.ok ? account.overview.pricingPlan : null;
           const rate = RATE_CENTS_PER_1K[plan ?? "NONE"] ?? ALA_CARTE_CENTS_PER_1K;
           const breaker = breakers.get(region);
+          const quota = quotaOf(account);
           return {
             region,
             served: true as const,
+            // What broadcasts may hold in the rolling window, and what the
+            // total gate really protects above it; null without a finite quota.
+            share: quota === null ? null : bulkShare(quota, reserve.value),
+            usableReserve: quota === null ? null : usableReserve(quota, reserve.value),
             status: !account.ok
               ? ("unreachable" as const)
               : account.overview.productionAccess
@@ -147,6 +196,19 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
           };
         }),
         known: SES_REGIONS.filter((r) => !served.includes(r)).map((region) => ({ region })),
+        reserve: {
+          percent: reserve.value,
+          source: reserve.source,
+          min: SES_TRANSACTIONAL_RESERVE_MIN,
+          max: SES_TRANSACTIONAL_RESERVE_MAX,
+          // The default region's week: the hint beside the field.
+          hint: {
+            txPeak7d: peaks.txPeak,
+            usableReserveNow:
+              defaultQuota === null ? null : usableReserve(defaultQuota, reserve.value),
+            suggested: suggestedReserve(defaultQuota, peaks.txPeak),
+          },
+        },
         eventsHealth: events,
         // The SQS pipeline is one queue for every region; the lag the worker measured applies to all.
         eventsLagSeconds: probes.get("ses_events_lag_s")?.value ?? null,
@@ -231,6 +293,31 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
         metadata: { manual: true },
       });
     }),
+
+    /** The share of every region's quota kept for transactional mail; clamped, stored on the instance row, audited. */
+    setReserve: operatorProcedure
+      .input(z.object({ percent: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        const percent = clampReserve(input.percent);
+        const before = effectiveSetting(
+          (await getInstanceSettings(ctx.db)).sesTransactionalReserve,
+          process.env.SES_TRANSACTIONAL_RESERVE,
+          SES_TRANSACTIONAL_RESERVE_DEFAULT,
+        ).value;
+        await ctx.db
+          .insert(schema.instanceSettings)
+          .values({ id: 1, sesTransactionalReserve: percent })
+          .onConflictDoUpdate({
+            target: schema.instanceSettings.id,
+            set: { sesTransactionalReserve: percent, updatedAt: new Date() },
+          });
+        await auditOperator(ctx, {
+          teamId: null,
+          action: "instance.reserve_updated",
+          metadata: { from: before, to: percent },
+        });
+        return { percent };
+      }),
 
     /** File a daily quota raise through Service Quotas; access_denied means the operator pastes the request instead. */
     requestQuota: operatorProcedure

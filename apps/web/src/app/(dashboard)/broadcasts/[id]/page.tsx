@@ -18,7 +18,7 @@ import { StatBlock } from "@/components/stat-block";
 import { formatDayTime, formatUtcTimestamp } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
 import { ListFooter } from "../../emails/list-parts";
-import { type BroadcastStatus, StatusPill } from "../parts";
+import { type BroadcastStatus, FinishCell, SendingStatus } from "../parts";
 
 function Microlabel({ children }: { children: React.ReactNode }) {
   return (
@@ -72,6 +72,18 @@ export default function BroadcastDetailPage() {
   }
 
   const title = broadcast ? (broadcast.name ?? broadcast.subject) : null;
+  // A send in progress: its rows so far, and the forecast for the last one.
+  const progress =
+    broadcast && status === "sending" && broadcast.sentCount !== null
+      ? {
+          sentCount: broadcast.sentCount,
+          parkedCount: broadcast.parkedCount,
+          recipients: broadcast.stats.total,
+          finishesAt: broadcast.finishesAt,
+        }
+      : null;
+  const finishesAt = progress?.finishesAt ?? null;
+  const waiting = progress ? Math.max(0, progress.recipients - (progress.sentCount ?? 0)) : 0;
 
   return (
     <>
@@ -89,13 +101,13 @@ export default function BroadcastDetailPage() {
               <Link className="ms-btn ms-btn-secondary" href={`/broadcasts/${id}/edit`}>
                 {t("detail.editDraft")}
               </Link>
-            ) : status === "scheduled" ? (
+            ) : status === "scheduled" || status === "sending" ? (
               <button
                 type="button"
                 className="ms-btn ms-btn-destructive"
                 onClick={() => setCancelOpen(true)}
               >
-                {t("detail.cancelSend")}
+                {t(status === "sending" ? "detail.stopRest" : "detail.cancelSend")}
               </button>
             ) : undefined
           }
@@ -137,9 +149,18 @@ export default function BroadcastDetailPage() {
       >
         <div>
           <Microlabel>{t("detail.status")}</Microlabel>
-          <div style={{ marginTop: 6 }}>
-            {status ? <StatusPill status={status} /> : <SkeletonBadge width={74} />}
-          </div>
+          {broadcast && status ? (
+            <SendingStatus
+              status={status}
+              progress={progress}
+              planHold={broadcast.planHold?.resumesAt ?? null}
+              locale={locale}
+            />
+          ) : (
+            <div style={{ marginTop: 6 }}>
+              <SkeletonBadge width={74} />
+            </div>
+          )}
         </div>
         <div>
           <Microlabel>{t("detail.targeting")}</Microlabel>
@@ -159,23 +180,33 @@ export default function BroadcastDetailPage() {
           ) : null}
         </div>
         <div>
-          <Microlabel>{broadcast?.sentAt ? t("detail.sent") : t("detail.scheduled")}</Microlabel>
-          <div style={{ fontSize: 13, marginTop: 7 }}>
-            {broadcast ? (
-              (() => {
-                const at = broadcast.sentAt ?? broadcast.scheduledAt;
-                return at ? (
-                  <span title={formatUtcTimestamp(at)}>{formatDayTime(at, locale)}</span>
-                ) : (
-                  <span style={{ color: "var(--ms-faint)" }}>—</span>
-                );
-              })()
-            ) : (
-              <span style={{ display: "flex" }}>
-                <Skeleton width={140} height="1lh" />
-              </span>
-            )}
-          </div>
+          <Microlabel>
+            {broadcast?.sentAt
+              ? t("detail.sent")
+              : finishesAt
+                ? t("detail.finishesAbout")
+                : t("detail.scheduled")}
+          </Microlabel>
+          {broadcast && finishesAt ? (
+            <FinishCell finishesAt={finishesAt} startedAt={broadcast.startedAt} locale={locale} />
+          ) : (
+            <div style={{ fontSize: 13, marginTop: 7 }}>
+              {broadcast ? (
+                (() => {
+                  const at = broadcast.sentAt ?? broadcast.scheduledAt;
+                  return at ? (
+                    <span title={formatUtcTimestamp(at)}>{formatDayTime(at, locale)}</span>
+                  ) : (
+                    <span style={{ color: "var(--ms-faint)" }}>—</span>
+                  );
+                })()
+              ) : (
+                <span style={{ display: "flex" }}>
+                  <Skeleton width={140} height="1lh" />
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div>
           <Microlabel>{t("detail.from")}</Microlabel>
@@ -199,10 +230,18 @@ export default function BroadcastDetailPage() {
           marginBottom: 26,
         }}
       >
-        <StatBlock
-          label={t("detail.stats.recipients")}
-          value={broadcast ? nf.format(broadcast.stats.total) : null}
-        />
+        {progress ? (
+          <StatBlock
+            label={t("detail.sentSoFar")}
+            value={nf.format(progress.sentCount ?? 0)}
+            hint={t("detail.ofTotal", { total: nf.format(progress.recipients) })}
+          />
+        ) : (
+          <StatBlock
+            label={t("detail.stats.recipients")}
+            value={broadcast ? nf.format(broadcast.stats.total) : null}
+          />
+        )}
         <StatBlock
           label={t("detail.stats.delivered")}
           value={broadcast ? nf.format(broadcast.stats.delivered) : null}
@@ -269,7 +308,7 @@ export default function BroadcastDetailPage() {
         open={cancelOpen}
         onClose={closeCancel}
         onConfirm={confirmCancel}
-        title={t("detail.cancelTitle")}
+        title={t(progress ? "detail.stopTitle" : "detail.cancelTitle")}
       >
         <form
           onSubmit={(event) => {
@@ -278,11 +317,17 @@ export default function BroadcastDetailPage() {
           }}
         >
           <p style={{ margin: "0 0 22px", color: "var(--ms-muted)", fontSize: "var(--ms-fs-ui)" }}>
-            {t("detail.cancelBody", { name: title ?? "—" })}
+            {progress
+              ? t("detail.stopBody", {
+                  waiting: nf.format(waiting),
+                  sent: nf.format(progress.sentCount ?? 0),
+                })
+              : t("detail.cancelBody", { name: title ?? "—" })}
           </p>
           <ModalFooter>
             <button type="button" className="ms-btn ms-btn-secondary" onClick={closeCancel}>
-              {t("detail.keep")} <span className="ms-keycap">Esc</span>
+              {t(progress ? "detail.keepSending" : "detail.keep")}{" "}
+              <span className="ms-keycap">Esc</span>
             </button>
             <button
               type="submit"
@@ -290,7 +335,7 @@ export default function BroadcastDetailPage() {
               disabled={cancelMutation.isPending}
             >
               <BtnSpinner on={cancelMutation.isPending} />
-              {t("detail.cancelConfirm")} <ConfirmKeycap />
+              {t(progress ? "detail.stopConfirm" : "detail.cancelConfirm")} <ConfirmKeycap />
             </button>
           </ModalFooter>
         </form>

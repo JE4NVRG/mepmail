@@ -172,6 +172,7 @@ connections, so separate containers and worker replicas fit without tuning.
 | --- | --- |
 | `SEND_CONCURRENCY` | Parallel send lanes in the worker (default `16`) — about 1.2 per message/second of SES send rate. |
 | `WORKER_REPLICAS` | Number of worker processes running (default `1`). The SES rate limiter is a per-process token bucket, so each worker divides the send rate by this to keep the account at its total. |
+| `SES_TRANSACTIONAL_RESERVE` | Percent of every region's rolling 24-hour SES quota that broadcasts never touch (default `30`, allowed `5`–`90`). Transactional mail may use all of it and borrow beyond it; a broadcast larger than the rest is paced over the following days. Bootstrap value only: Console → Regions overrides it at runtime. |
 | `SQS_POLL_CONCURRENCY` | Parallel SQS long-poll loops for SES events (default `4`). |
 | `WEBHOOK_DELIVERY_RETENTION_DAYS` | How long webhook delivery rows and payloads stay readable in the delivery log (default `30`); older ones are purged. |
 | `EMAIL_METADATA_RETENTION_DAYS` | Days whole email rows (recipients, subject, status, events) are kept (default `30`, the industry norm); bodies leave earlier on the dashboard's retention setting, and daily counters and broadcast results are kept regardless. Releases before v0.6.30 defaulted to `365`: set it explicitly before upgrading if that history must stay. |
