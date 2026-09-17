@@ -288,6 +288,13 @@
       "when": 1789583105460,
       "tag": "0040_support_view",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1789612549115,
+      "tag": "0041_paced_broadcasts",
+      "breakpoints": true
     }
   ]
 }

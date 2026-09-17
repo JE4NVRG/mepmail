@@ -46,9 +46,15 @@ export const broadcasts = pgTable(
     status: broadcastStatusEnum("status").notNull().default("draft"),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     sentAt: timestamp("sent_at", { withTimezone: true }),
-    // Emails the fan-out wrote, recorded when it completes so lists never
-    // count the emails table. Null for rows that predate the column.
+    // Emails the fan-out wrote, recorded when the walk completes so lists
+    // never count the emails table; also the walk-done marker, since a paced
+    // broadcast stays "sending" until its parked rows have gone. Null for
+    // rows that predate the column and while the walk runs.
     recipientCount: integer("recipient_count"),
+    // The last contact id of the fan-out's last committed page, so a walk
+    // interrupted by a crash resumes from it instead of rescanning the team.
+    // Cleared when the walk ends.
+    fanOutCursor: uuid("fan_out_cursor"),
     // Results recorded once the broadcast's emails are about to age out of
     // the metadata window, so a campaign keeps its numbers after its rows
     // are gone. Null while the emails are still there to count.
