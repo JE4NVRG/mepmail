@@ -138,24 +138,30 @@ export function SendPlanSummary({
   const nf = useMemo(() => new Intl.NumberFormat(locale), [locale]);
   const finish = estimate?.finishesAt ? roundUpToQuarterHour(estimate.finishesAt) : null;
   const time = (d: Date) => formatStepTime(d, locale);
-  const dayAbout = (d: Date) =>
-    t("guard.stepDayAbout", { day: formatStepDay(d, locale), time: time(roundUpToQuarterHour(d)) });
   const paced = estimate !== null && !estimate.blocked && estimate.first < count;
   let steps: Step[] = [];
   if (paced && estimate.startsAt && finish) {
     if (estimate.first === 0) {
+      // The day sits in the rail column, the clock times in the text: a
+      // full stamp would wrap the narrow column.
+      const starts = roundUpToQuarterHour(estimate.startsAt);
       steps = [
-        { when: dayAbout(estimate.startsAt), what: t("guard.stepStarts") },
         {
-          when: sameLocalDay(finish, estimate.startsAt)
-            ? t("guard.stepAbout", { time: time(finish) })
-            : dayAbout(finish),
-          what: t("guard.stepAllSent", { count: nf.format(count) }),
+          when: formatStepDay(starts, locale),
+          what: t("guard.stepStarts", { time: time(starts) }),
+        },
+        {
+          when: formatStepDay(finish, locale),
+          what: t("guard.stepAllSent", { count: nf.format(count), time: time(finish) }),
         },
       ];
     } else {
-      const days = groupReleasesByDay(estimate.releases);
       const held = estimate.planHold !== null;
+      // A daily cap releases at UTC midnight: one row per reset, not per local day.
+      const days = groupReleasesByDay(
+        estimate.releases,
+        held && estimate.planPeriod === "day" ? "utc" : "local",
+      );
       steps = days.map((day, i) => {
         const last = i === days.length - 1;
         const n = nf.format(day.count);
@@ -176,13 +182,21 @@ export function SendPlanSummary({
         if (last) {
           return {
             when,
-            what: t(held ? "guard.stepLastReset" : "guard.stepLast", {
-              count: n,
-              time: time(finish),
-            }),
+            what: held
+              ? t("guard.stepLastReset", {
+                  count: n,
+                  reset: time(day.startsAt),
+                  time: time(finish),
+                })
+              : t("guard.stepLast", { count: n, time: time(finish) }),
           };
         }
-        return { when, what: t(held ? "guard.stepMoreReset" : "guard.stepMore", { count: n }) };
+        return {
+          when,
+          what: held
+            ? t("guard.stepMoreReset", { count: n, reset: time(day.startsAt) })
+            : t("guard.stepMore", { count: n }),
+        };
       });
     }
   }

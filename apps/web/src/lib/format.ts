@@ -222,16 +222,27 @@ export interface SendDay {
   count: number;
 }
 
-/** A send's releases grouped by the local day they start on, in order. */
+/** Whether two instants fall on the same UTC day: the day a daily plan cap resets on. */
+export function sameUtcDay(a: Date | string | number, b: Date | string | number): boolean {
+  return new Date(a).toISOString().slice(0, 10) === new Date(b).toISOString().slice(0, 10);
+}
+
+/**
+ * A send's releases grouped by the day they start on, in order: the local
+ * day for capacity waves, the UTC day when a daily plan cap paces them (its
+ * reset is UTC midnight, so a row per reset needs UTC days).
+ */
 export function groupReleasesByDay(
   releases: readonly { at: Date | string; endsAt: Date | string; count: number }[],
+  day: "local" | "utc" = "local",
 ): SendDay[] {
+  const same = day === "utc" ? sameUtcDay : sameLocalDay;
   const days: SendDay[] = [];
   for (const release of releases) {
     const startsAt = new Date(release.at);
     const endsAt = new Date(release.endsAt);
     const last = days[days.length - 1];
-    if (last && sameLocalDay(last.startsAt, startsAt)) {
+    if (last && same(last.startsAt, startsAt)) {
       last.count += release.count;
       if (endsAt > last.endsAt) last.endsAt = endsAt;
     } else {
