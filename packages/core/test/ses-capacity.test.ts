@@ -176,3 +176,24 @@ describe("planBulkWaves", () => {
     expect(a?.blocked).toBe(true);
   });
 });
+
+describe("window accounting", () => {
+  it("keeps every released row in the window until it ages, whatever the rate", () => {
+    // A share of three: with a row lost per release the model would release
+    // dozens a day; with exact bucketing only three ever fit in a window.
+    const [a] = planBulkWaves({
+      share: 3,
+      rate: 14,
+      txPerDay: 0,
+      sentBySlot: [],
+      start: START,
+      broadcasts: [{ key: "a", admit: 100 }],
+      horizonDays: 5,
+    });
+    if (!a) throw new Error("no estimate");
+    expect(a.first).toBe(3);
+    const sent = a.releases.reduce((n, r) => n + r.count, 0);
+    // Three rows a day for five days plus the first wave, no more.
+    expect(sent).toBeLessThanOrEqual(3 * 6);
+  });
+});
