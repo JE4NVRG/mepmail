@@ -12,7 +12,7 @@ import { Modal } from "@/components/modal";
 import { ConfirmKeycap, ModalFooter } from "@/components/modal-footer";
 import { RelativeTime } from "@/components/relative-time";
 import { Select } from "@/components/select";
-import { Skeleton, SkeletonBadge } from "@/components/skeleton";
+import { Skeleton, SkeletonBadge, SkeletonChip } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
 import { Table } from "@/components/table";
 import { TeamLogo } from "@/components/team-logo";
@@ -70,6 +70,7 @@ function TeamSection({ billing }: { billing: boolean }) {
   const { data: team } = useQuery(trpc.settings.team.get.queryOptions());
   const { data: teamList } = useQuery(trpc.team.list.queryOptions());
   const activeRole = teamList?.teams.find((m) => m.teamId === teamList.activeTeamId)?.role;
+  const activeTeamId = teamList?.activeTeamId;
   const canManageLogo = activeRole === "owner" || activeRole === "admin";
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoError, setLogoError] = useState(false);
@@ -130,6 +131,19 @@ function TeamSection({ billing }: { billing: boolean }) {
                 <Skeleton width={200} height={30} radius="var(--ms-r-input)" />
                 <Skeleton width={56} height={30} radius="var(--ms-r-input)" />
               </div>
+            </div>
+            <div className="ms-field" style={{ minWidth: 0 }}>
+              <span
+                style={{
+                  display: "block",
+                  fontSize: "var(--ms-fs-label)",
+                  color: "var(--ms-muted)",
+                  marginBottom: 6,
+                }}
+              >
+                {t("team.id")}
+              </span>
+              <SkeletonChip width={300} />
             </div>
           </div>
           {billing ? (
@@ -210,6 +224,24 @@ function TeamSection({ billing }: { billing: boolean }) {
               </p>
             ) : null}
           </form>
+          {/* minWidth 0: the uuid chip does not wrap, so without this the field's
+              min-content pins the card wider than a phone viewport. */}
+          <div className="ms-field" style={{ minWidth: 0 }}>
+            {/* span, not label: the id is read-only, so there is no control to label. */}
+            <span
+              style={{
+                display: "block",
+                fontSize: "var(--ms-fs-label)",
+                color: "var(--ms-muted)",
+                marginBottom: 6,
+              }}
+            >
+              {t("team.id")}
+            </span>
+            {/* The id rides the team list, which resolves independently of the
+                card's own query, so the loaded card can still be waiting on it. */}
+            {activeTeamId ? <CopyChip value={activeTeamId} /> : <SkeletonChip width={300} />}
+          </div>
           {team.logoUploadsEnabled && canManageLogo ? (
             <div className="ms-field" style={{ maxWidth: 420 }}>
               {/* span, not label: the controls are buttons, not a labelable input. Metrics mirror .ms-field label. */}

@@ -150,6 +150,7 @@
   "team": {
     "title": "Team",
     "name": "Team name",
+    "id": "ID",
     "save": "Save",
     "saved": "Saved",
     "plan": "Plan",
