@@ -4,6 +4,7 @@ import {
   env,
   isCloudDeployment,
   SES_MAX_SEND_RATE_DEFAULT,
+  SES_TRANSACTIONAL_RESERVE_DEFAULT,
   servedRegions,
   trackingSubdomainsSupported,
 } from "@millionsend/config";
@@ -35,7 +36,11 @@ import { router, teamProcedure } from "../trpc";
  * and boot validation already guarantees the raw value is numeric. ""
  * counts as unset, matching emptyStringAsUndefined.
  */
-function effectiveSetting(dbValue: number | null, envRaw: string | undefined, fallback: number) {
+export function effectiveSetting(
+  dbValue: number | null,
+  envRaw: string | undefined,
+  fallback: number,
+) {
   if (dbValue !== null) return { value: dbValue, source: "db" as const };
   if (envRaw) return { value: Number(envRaw), source: "env" as const };
   return { value: fallback, source: "default" as const };
@@ -271,6 +276,13 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
             stored.emailRetentionDays,
             process.env.EMAIL_RETENTION_DAYS,
             EMAIL_RETENTION_DAYS_DEFAULT,
+          ),
+          // Read-only here: the console's Regions view sets it, so the cloud
+          // operator can too.
+          sesTransactionalReserve: effectiveSetting(
+            stored.sesTransactionalReserve,
+            process.env.SES_TRANSACTIONAL_RESERVE,
+            SES_TRANSACTIONAL_RESERVE_DEFAULT,
           ),
           canEdit: await canManageInstance(ctx),
         };

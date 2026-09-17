@@ -17,6 +17,7 @@ import { oneOf, useUrlState } from "@/lib/url-state";
 import { QuotaBar, RegionBadge, RegionMenu, type ServedRegion } from "../region-actions";
 import { AddRegionPanel } from "./add-region-panel";
 import { useRegionFormats } from "./formatters";
+import { ReserveCard } from "./reserve-card";
 
 const COLUMNS = [
   "region",
@@ -347,6 +348,11 @@ export function RegionsView() {
           </div>
           <div className="ms-grid ms-grid-12">
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {list.data ? (
+                <ReserveCard list={list.data} onChanged={refetch} />
+              ) : (
+                <Skeleton width="100%" height={300} radius="var(--ms-r-card)" />
+              )}
               <div className="ms-card" style={{ padding: 24, overflow: "hidden" }}>
                 <div style={{ marginBottom: 16 }}>
                   <h3 style={cardTitle}>{t("sparks.title")}</h3>

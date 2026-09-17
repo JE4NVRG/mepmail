@@ -34,6 +34,7 @@ const HEALTH_PROBES: ReadonlySet<string> = new Set([
   "boss_waiting",
   "boss_failed",
   "ses_events_lag_s",
+  "ses_transactional_parked",
   "webhook_success_rate",
   "webhook_tripped",
   "kms_wrap_ms",
@@ -182,6 +183,23 @@ export function HealthCard({ summary }: { summary: Summary }) {
           ? t("health.how.eventsIdle")
           : t("health.how.events", { lag: seconds(events.value) }),
     muted: !events,
+    formatValue: seconds,
+  });
+
+  const txParked = sampled("ses_transactional_parked");
+  rows.push({
+    probe: "ses_transactional_parked",
+    tone: toneOf(txParked, txParked?.ok === true),
+    how: !txParked
+      ? t("health.noProbes")
+      : txParked.ok
+        ? t("health.how.txParkedNone")
+        : txParked.value === null
+          ? t("health.how.failed")
+          : t("health.how.txParked", {
+              ago: formatRelative(new Date(Date.now() - txParked.value * 1000), locale),
+            }),
+    muted: !txParked,
     formatValue: seconds,
   });
 
