@@ -9,7 +9,7 @@ import { regionFlag } from "@/app/(dashboard)/domains/regions";
 import { PopoverMenu } from "@/components/popover-menu";
 import { Sparkline } from "@/components/sparkline";
 import { toast } from "@/components/toast";
-import { formatDurationShort, formatUsd } from "@/lib/format";
+import { formatDurationShort, formatRelative, formatUsd, withinLastDay } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { useRegionFormats } from "./regions/formatters";
@@ -119,23 +119,34 @@ export function RegionMenu({
   );
 }
 
-/** The 6px quota track; warn fill for a sandbox region. */
+/**
+ * The 6px quota track; warn fill for a sandbox region. `segments` stack
+ * fills left to right (broadcasts, then transactional) in place of the one
+ * fill, and `tick` marks a fraction of the track (the broadcast share).
+ */
 export function QuotaBar({
   used,
   max,
   warn,
+  segments,
+  tick,
   style,
 }: {
   used: number;
   max: number;
   warn: boolean;
+  segments?: { value: number; color: string }[] | undefined;
+  tick?: number | undefined;
   style?: React.CSSProperties;
 }) {
-  const pct = max > 0 ? (used / max) * 100 : 0;
+  const pctOf = (value: number) => (max > 0 ? (value / max) * 100 : 0);
+  const fills = segments ?? [{ value: used, color: warn ? "var(--ms-warn)" : "var(--ms-steel)" }];
   return (
     <div
       aria-hidden="true"
       style={{
+        position: "relative",
+        display: "flex",
         height: 6,
         borderRadius: 999,
         background: "var(--ms-inset)",
@@ -144,19 +155,42 @@ export function QuotaBar({
         ...style,
       }}
     >
-      <div
-        style={{
-          height: "100%",
-          width: `${Math.min(100, Math.max(pct, pct > 0 ? 1.5 : 0))}%`,
-          borderRadius: 999,
-          background: warn ? "var(--ms-warn)" : "var(--ms-steel)",
-        }}
-      />
+      {fills.map((fill, i) => {
+        const pct = pctOf(fill.value);
+        return (
+          <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: fixed order, position is identity
+            key={i}
+            style={{
+              height: "100%",
+              width: `${Math.min(100, Math.max(pct, pct > 0 ? 1.5 : 0))}%`,
+              // Only the leading edge is rounded when segments stack; the
+              // track's overflow rounds the far end.
+              borderRadius: i === 0 ? (fills.length > 1 ? "999px 0 0 999px" : 999) : 0,
+              background: fill.color,
+              flex: "none",
+            }}
+          />
+        );
+      })}
+      {tick !== undefined && tick > 0 && tick < 1 ? (
+        <span
+          style={{
+            position: "absolute",
+            left: `${tick * 100}%`,
+            top: 0,
+            bottom: 0,
+            width: 1,
+            background: "var(--ms-bone)",
+            opacity: 0.8,
+          }}
+        />
+      ) : null}
     </div>
   );
 }
 
-function Dot({ tone }: { tone: "success" | "warn" | "danger" }) {
+function Dot({ tone }: { tone: "success" | "warn" | "danger" | "info" | "steel" }) {
   return <span className="ms-dot" style={{ background: `var(--ms-${tone})`, marginRight: 6 }} />;
 }
 
@@ -177,6 +211,26 @@ export function RegionCard({ region, onChanged }: { region: ServedRegion; onChan
   const plan = account?.pricingPlan ?? null;
   const enforcement = account?.enforcementStatus ?? null;
   const breaker = region.breaker;
+  const txParked = withinLastDay(region.txParkedAt);
+  // The window split: what broadcasts hold, what transactional mail holds
+  // (warn-coloured past the usable reserve), and the share as a tick. A
+  // sandbox region keeps its plain warn fill.
+  const split =
+    account && !sandbox && region.share !== null && region.usableReserve !== null
+      ? {
+          segments: [
+            { value: region.bulkSent24h, color: "var(--ms-steel)" },
+            {
+              value: region.txSent24h ?? 0,
+              color:
+                (region.txSent24h ?? 0) > region.usableReserve
+                  ? "var(--ms-warn)"
+                  : "var(--ms-info)",
+            },
+          ],
+          tick: region.share / account.quota.max24h,
+        }
+      : null;
   // The SQS pipeline is one queue for every region: the list-wide health and lag apply to each card.
   const events = (pipeline: Pick<RegionList, "eventsHealth" | "eventsLagSeconds">) =>
     pipeline.eventsHealth === null
@@ -215,6 +269,30 @@ export function RegionCard({ region, onChanged }: { region: ServedRegion; onChan
       </>,
     ],
     [t("domains"), t("domainsValue", { count: region.domainsVerified })],
+    [
+      t("queue"),
+      region.bulkParked > 0
+        ? t("queueValue", {
+            waiting: f.n(region.bulkParked),
+            count: region.waitingBroadcasts,
+            clears: region.lastFinishesAt ? f.clearsAbout(region.lastFinishesAt) : "—",
+          })
+        : t("queueEmpty"),
+    ],
+    [
+      t("txParked"),
+      txParked ? (
+        <>
+          <Dot tone="danger" />
+          {t("txParkedAt", { ago: formatRelative(txParked, f.locale) })}
+        </>
+      ) : (
+        <>
+          <Dot tone="success" />
+          {t("txParkedNone")}
+        </>
+      ),
+    ],
     sandbox
       ? [
           t("productionRow"),
@@ -314,8 +392,33 @@ export function RegionCard({ region, onChanged }: { region: ServedRegion; onChan
           used={account?.quota.sentLast24h ?? 0}
           max={account?.quota.max24h ?? 0}
           warn={sandbox}
+          {...(split ? { segments: split.segments, tick: split.tick } : {})}
           style={{ marginTop: 6 }}
         />
+        {split && region.share !== null && region.usableReserve !== null ? (
+          <div
+            style={{
+              display: "flex",
+              gap: 14,
+              flexWrap: "wrap",
+              marginTop: 8,
+              fontSize: 12,
+              color: "var(--ms-bone)",
+            }}
+          >
+            <span>
+              <Dot tone="steel" />
+              {t("legendBroadcasts", { sent: f.n(region.bulkSent24h), share: f.n(region.share) })}
+            </span>
+            <span>
+              <Dot tone={split.segments[1]?.color === "var(--ms-warn)" ? "warn" : "info"} />
+              {t("legendTransactional", { sent: f.n(region.txSent24h ?? 0) })}{" "}
+              <span style={{ color: "var(--ms-muted)" }}>
+                {t("legendUsable", { usable: f.n(region.usableReserve) })}
+              </span>
+            </span>
+          </div>
+        ) : null}
       </div>
       <dl className="ms-kv">
         {rows.map(([label, value]) => (

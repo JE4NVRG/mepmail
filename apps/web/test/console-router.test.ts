@@ -644,3 +644,59 @@ describe("console.regions reserve", () => {
     });
   });
 });
+
+describe("console.regions pacing numbers", () => {
+  it("reads the window split, the backlog and the finish of a send still going out", async () => {
+    const [domain] = await db
+      .insert(schema.domains)
+      .values({ teamId, name: "paced.example", region: REGION, status: "verified" })
+      .returning({ id: schema.domains.id });
+    if (!domain) throw new Error("domain insert failed");
+    const [broadcast] = await db
+      .insert(schema.broadcasts)
+      .values({
+        teamId,
+        from: "hi@paced.example",
+        subject: "s",
+        status: "sending",
+        scheduledAt: new Date(Date.now() - 60_000),
+      })
+      .returning({ id: schema.broadcasts.id });
+    if (!broadcast) throw new Error("broadcast insert failed");
+    const row = (over: Partial<typeof schema.emails.$inferInsert>) => ({
+      teamId,
+      domainId: domain.id,
+      broadcastId: broadcast.id,
+      from: "hi@paced.example",
+      to: ["r@example.com"],
+      subject: "s",
+      ...over,
+    });
+    await db
+      .insert(schema.emails)
+      .values([
+        row({ latestStatus: "sent", sentAt: new Date(Date.now() - 5 * 60_000) }),
+        row({ latestStatus: "queued_quota" }),
+        row({ latestStatus: "queued_quota" }),
+      ]);
+    const list = await operator().console.regions.list();
+    const region = list.served.find((r) => r.region === REGION);
+    expect(region).toMatchObject({
+      bulkSent24h: 1,
+      // The stubbed account reports 10 sent: everything past our one bulk send is transactional.
+      txSent24h: 9,
+      bulkParked: 2,
+      waitingBroadcasts: 1,
+      txParkedAt: null,
+    });
+    // The one bulk send in the window takes room off the share, whatever the reserve is.
+    expect(region?.room).toBe((region?.share ?? 0) - 1);
+    expect(region?.lastFinishesAt).toBeInstanceOf(Date);
+    expect(region?.lastFinishesAt?.getTime()).toBeGreaterThan(Date.now());
+    // Off the cloud nothing is sold against the quota.
+    expect(list.committedPerDay).toBeNull();
+    await db.delete(schema.emails).where(eq(schema.emails.broadcastId, broadcast.id));
+    await db.delete(schema.broadcasts).where(eq(schema.broadcasts.id, broadcast.id));
+    await db.delete(schema.domains).where(eq(schema.domains.id, domain.id));
+  });
+});
