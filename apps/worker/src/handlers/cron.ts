@@ -1,7 +1,10 @@
 import {
+  broadcastSendSpacingMs,
   countDistinctRecipients,
   DAY_MS,
+  DRAIN_MAX_PER_RUN,
   failQueuedEmailsForDomain,
+  fetchDeliverabilityHealth,
   getInstanceSettings,
   isIdentitySharedByOtherDomains,
   type PlanSnapshot,
@@ -11,6 +14,7 @@ import {
   recordAudit,
   releaseQuota,
   reserveQuota,
+  SES_QUOTA_SLOT_MS,
   type TeamQuota,
   teamQuota,
   transitionQueueState,
@@ -43,6 +47,7 @@ import {
   ne,
   notInArray,
   or,
+  type SQL,
   sql,
 } from "drizzle-orm";
 import { exhaustOpenDeliveries } from "./deliver-webhook.js";
@@ -107,29 +112,40 @@ export async function reconcileWebhookDeliveries(
  * enqueue (or a worker crash mid-fan-out). Scheduled broadcasts past due and
  * sending broadcasts whose fan-out went quiet are re-enqueued; the handler's
  * status re-check plus the (broadcastId, contactId) unique index make a stray
- * extra job harmless.
+ * extra job harmless. A walk that finished (recipientCount set) is never
+ * re-kicked: its broadcast stays sending only while parked rows drain, and
+ * `finalize` flips it once the last one has gone.
  */
 export async function reconcileStalledBroadcasts(
   db: Db,
-  deps: { enqueue: (broadcastId: string) => Promise<void>; now?: Date },
+  deps: {
+    enqueue: (broadcastId: string) => Promise<void>;
+    finalize?: ((broadcastId: string) => Promise<unknown>) | undefined;
+    now?: Date;
+  },
 ): Promise<number> {
   const now = deps.now ?? new Date();
   const staleBefore = new Date(now.getTime() - 15 * 60 * 1000);
+  const b = schema.broadcasts;
   const stalled = await db
-    .select({ id: schema.broadcasts.id })
-    .from(schema.broadcasts)
+    .select({ id: b.id })
+    .from(b)
     .where(
       or(
-        and(
-          eq(schema.broadcasts.status, "scheduled"),
-          lt(schema.broadcasts.scheduledAt, staleBefore),
-        ),
-        and(eq(schema.broadcasts.status, "sending"), lt(schema.broadcasts.updatedAt, staleBefore)),
+        and(eq(b.status, "scheduled"), lt(b.scheduledAt, staleBefore)),
+        and(eq(b.status, "sending"), lt(b.updatedAt, staleBefore), isNull(b.recipientCount)),
       ),
     )
-    .orderBy(asc(schema.broadcasts.createdAt));
+    .orderBy(asc(b.createdAt));
   for (const broadcast of stalled) {
     await deps.enqueue(broadcast.id);
+  }
+  const walked = await db
+    .select({ id: b.id })
+    .from(b)
+    .where(and(eq(b.status, "sending"), isNotNull(b.recipientCount)));
+  for (const broadcast of walked) {
+    await deps.finalize?.(broadcast.id);
   }
   return stalled.length;
 }
@@ -139,11 +155,24 @@ export interface DrainDeps {
   /** One call per page; startAfter defers emails scheduled beyond the drain time, priority keeps transactional rows ahead of broadcast ones. */
   enqueueSends: EnqueueEmailSends;
   /**
-   * SES's own 24-hour quota, per region: rows whose region is full stay
-   * parked, since releasing them would only park them again. Rows with no
-   * domain send from the default region, the list's first entry.
+   * SES's own 24-hour quota and the broadcast share, per region: rows whose
+   * region is full stay parked, since releasing them would only park them
+   * again, and bulk rows move only into the room the share has. Rows with
+   * no domain send from the default region, the list's first entry.
    */
-  sesQuota?: { regions: readonly string[]; exhausted(region: string): boolean } | undefined;
+  sesQuota?:
+    | {
+        regions: readonly string[];
+        exhausted(region: string): boolean;
+        room?(region: string): number;
+        paused?(region: string): boolean;
+        recount?(): Promise<void>;
+        noteBulkQueued?(region: string, n: number): void;
+      }
+    | undefined;
+  /** Called for every broadcast the bulk pass touched; flips it to sent once nothing of it remains. */
+  finalize?: ((broadcastId: string) => Promise<unknown>) | undefined;
+  now?: Date | undefined;
 }
 
 export interface DrainResult {
@@ -156,8 +185,14 @@ class DrainRaced extends Error {}
 
 /** Parked rows loaded per page; the backlog is unbounded (see acceptEmail). */
 const DRAIN_PAGE = 500;
-/** Rows released per run; the rest wait for the next drain rather than one run owning the cron slot. */
-const DRAIN_MAX_PER_RUN = 10_000;
+
+/** What one drain run carries between its passes. */
+interface DrainRun {
+  now: Date;
+  /** Teams found at their cap this run leave every later page query. */
+  exhaustedTeams: Set<string>;
+  failures: unknown[];
+}
 
 /**
  * Drain of quota-parked emails, every 15 minutes (which covers the UTC
@@ -166,30 +201,126 @@ const DRAIN_MAX_PER_RUN = 10_000;
  * emails hold NO reservation (accept-time reservation failed, or the send
  * handler handed it back when SES was full), so each one must win a
  * reservation against its team's cap before it may move to "queued":
- * without this, parking would be a quota bypass. Oldest first;
- * once a team's cap fills, its remaining emails stay parked for later. While
- * a region's SES 24-hour quota is full, its rows do not move at all.
+ * without this, parking would be a quota bypass.
+ *
+ * Two passes under one per-run cap. Transactional rows first, oldest first,
+ * in every region not at its quota: a password reset never waits behind a
+ * newsletter. Then broadcasts: each one still sending with parked rows gets
+ * an equal slice of what is left, in the order they were scheduled, into
+ * the room its region's broadcast share has; a throttled team's slice is
+ * one cadence of its drip, spaced on the rows themselves so the reconcile
+ * sweep leaves them alone. A broadcast whose last parked row went is
+ * finalized at the end of the run.
  *
  * Reserve + transition commit atomically per email (no crash window that
  * burns quota or half-moves a row). One email's failure never blocks the
  * rest — errors are collected and rethrown at the end so the cron retries.
  */
 export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainResult> {
+  await deps.sesQuota?.recount?.();
   const regions = deps.sesQuota?.regions ?? [];
   const held = regions.filter((region) => deps.sesQuota?.exhausted(region));
-  if (regions.length > 0 && held.length === regions.length) {
-    return { drained: 0, stillParked: await countParked(db) };
-  }
-  const exhausted = new Set<string>();
-  const failures: unknown[] = [];
+  const run: DrainRun = { now: deps.now ?? new Date(), exhaustedTeams: new Set(), failures: [] };
   let drained = 0;
-  // Keyset pages over (createdAt, id): global oldest-first order keeps the
-  // per-team fairness, and a row that stays parked (exhausted team, failed
-  // enqueue) can never be re-read into an infinite loop. Teams found
-  // exhausted leave the page query, so one capped team's backlog is never
-  // walked row by row.
+  if (regions.length === 0 || held.length < regions.length) {
+    const released = await releaseParkedRows(db, deps, run, {
+      where: isNull(schema.emails.broadcastId),
+      budget: DRAIN_MAX_PER_RUN,
+      held,
+      spacingMs: 0,
+    });
+    drained += released.total;
+    const remaining = await parkedByRegion(db, regions[0] ?? "", isNull(schema.emails.broadcastId));
+    for (const region of new Set([...released.byRegion.keys(), ...remaining.keys()])) {
+      console.log(
+        `quota.drain: pass=1 region=${region} released=${released.byRegion.get(region) ?? 0} remaining=${remaining.get(region) ?? 0}`,
+      );
+    }
+  }
+  let budget = DRAIN_MAX_PER_RUN - drained;
+  if (budget > 0) {
+    const b = schema.broadcasts;
+    const waiting = await db
+      .select({ id: b.id, teamId: b.teamId })
+      .from(b)
+      .where(
+        and(
+          eq(b.status, "sending"),
+          sql`exists (select 1 from emails e where e.broadcast_id = broadcasts.id and e.latest_status = 'queued_quota')`,
+        ),
+      )
+      .orderBy(asc(b.scheduledAt), asc(b.createdAt), asc(b.id));
+    const roomLeft = new Map<string, number>();
+    const touched: string[] = [];
+    for (const [i, broadcast] of waiting.entries()) {
+      if (budget <= 0) break;
+      const region = (await parkedRegion(db, broadcast.id)) ?? regions[0] ?? "";
+      if (deps.sesQuota && (deps.sesQuota.paused?.(region) || deps.sesQuota.exhausted(region))) {
+        continue;
+      }
+      const room =
+        roomLeft.get(region) ?? deps.sesQuota?.room?.(region) ?? Number.POSITIVE_INFINITY;
+      if (room <= 0) continue;
+      const spacingMs = broadcastSendSpacingMs(
+        (await fetchDeliverabilityHealth(db, broadcast.teamId)).status,
+      );
+      // A dripping team gets one cadence of rows per run, so its slices
+      // never stack past the next drain.
+      const cap =
+        spacingMs > 0 ? Math.floor(SES_QUOTA_SLOT_MS / spacingMs) : Number.POSITIVE_INFINITY;
+      // An equal share of what the run and the region can still give; a
+      // slice one broadcast cannot use passes down the FIFO.
+      const grant = Math.min(Math.ceil(Math.min(budget, room) / (waiting.length - i)), cap);
+      if (grant <= 0) continue;
+      const released = await releaseParkedRows(db, deps, run, {
+        where: eq(schema.emails.broadcastId, broadcast.id),
+        budget: grant,
+        held: [],
+        spacingMs,
+      });
+      drained += released.total;
+      budget -= released.total;
+      roomLeft.set(region, room - released.total);
+      deps.sesQuota?.noteBulkQueued?.(region, released.total);
+      const remaining = await parkedByRegion(
+        db,
+        region,
+        eq(schema.emails.broadcastId, broadcast.id),
+      );
+      console.log(
+        `quota.drain: pass=2 region=${region} broadcast=${broadcast.id} room=${room} released=${released.total} remaining=${remaining.get(region) ?? 0}`,
+      );
+      touched.push(broadcast.id);
+    }
+    for (const id of touched) await deps.finalize?.(id);
+  }
+  if (run.failures.length > 0) {
+    throw new Error(`quota drain: ${run.failures.length} email(s) failed`, {
+      cause: run.failures[0],
+    });
+  }
+  return { drained, stillParked: await countParked(db) };
+}
+
+/**
+ * One pass over parked rows matching `where`, oldest first, up to `budget`.
+ * Keyset pages over (createdAt, id): a row that stays parked (exhausted
+ * team, failed enqueue) can never be re-read into an infinite loop, and
+ * teams found exhausted leave the page query so one capped team's backlog
+ * is never walked row by row.
+ */
+async function releaseParkedRows(
+  db: Db,
+  deps: DrainDeps,
+  run: DrainRun,
+  opts: { where: SQL; budget: number; held: readonly string[]; spacingMs: number },
+): Promise<{ total: number; byRegion: Map<string, number> }> {
+  const regions = deps.sesQuota?.regions ?? [];
+  const region = sql<string>`coalesce(${schema.domains.region}, ${regions[0] ?? ""})`;
+  const byRegion = new Map<string, number>();
+  let total = 0;
   let cursorId: string | undefined;
-  while (drained < DRAIN_MAX_PER_RUN) {
+  while (total < opts.budget) {
     const page = await db
       .select({
         id: schema.emails.id,
@@ -200,6 +331,7 @@ export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainRe
         to: schema.emails.to,
         cc: schema.emails.cc,
         bcc: schema.emails.bcc,
+        region,
       })
       .from(schema.emails)
       .innerJoin(schema.teams, eq(schema.emails.teamId, schema.teams.id))
@@ -207,14 +339,15 @@ export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainRe
       .where(
         and(
           eq(schema.emails.latestStatus, "queued_quota"),
+          opts.where,
           // The operator's holds: a suspended team releases nothing, a paused
           // team releases only its transactional rows.
           isNull(schema.teams.suspendedAt),
           or(isNull(schema.emails.broadcastId), isNull(schema.teams.broadcastsPausedByOperatorAt)),
-          exhausted.size > 0 ? notInArray(schema.emails.teamId, [...exhausted]) : undefined,
-          held.length > 0
-            ? notInArray(sql`coalesce(${schema.domains.region}, ${regions[0] ?? ""})`, held)
+          run.exhaustedTeams.size > 0
+            ? notInArray(schema.emails.teamId, [...run.exhaustedTeams])
             : undefined,
+          opts.held.length > 0 ? notInArray(region, [...opts.held]) : undefined,
           cursorId
             ? keysetCursorWhere(schema.emails.createdAt, schema.emails.id, cursorId)
             : undefined,
@@ -227,8 +360,12 @@ export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainRe
     cursorId = last.id;
     const moved: MovedEmail[] = [];
     for (const email of page) {
-      if (drained + moved.length >= DRAIN_MAX_PER_RUN) break;
-      const released = await releaseParked(db, deps, email, exhausted, failures);
+      if (total + moved.length >= opts.budget) break;
+      const throttleAt =
+        opts.spacingMs > 0
+          ? new Date(run.now.getTime() + (total + moved.length) * opts.spacingMs)
+          : null;
+      const released = await releaseParked(db, deps, email, run, throttleAt);
       if (released) moved.push(released);
     }
     if (moved.length === 0) continue;
@@ -240,12 +377,13 @@ export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainRe
           priority: emailSendPriority(m),
         })),
       );
-      drained += moved.length;
+      total += moved.length;
+      for (const m of moved) byRegion.set(m.region, (byRegion.get(m.region) ?? 0) + 1);
     } catch (err) {
       // The page's enqueue is one statement, so it failed whole: "queued"
       // emails with no job would only be picked up by the reconcile sweep;
       // re-park them so the drain retry handles them sooner.
-      failures.push(err);
+      run.failures.push(err);
       for (const m of moved) {
         // A row a racing send lane already claimed keeps its reservation:
         // refunding it here would credit the team for a send that happened.
@@ -256,10 +394,7 @@ export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainRe
       break;
     }
   }
-  if (failures.length > 0) {
-    throw new Error(`quota drain: ${failures.length} email(s) failed`, { cause: failures[0] });
-  }
-  return { drained, stillParked: await countParked(db) };
+  return { total, byRegion };
 }
 
 async function countParked(db: Db): Promise<number> {
@@ -270,18 +405,57 @@ async function countParked(db: Db): Promise<number> {
   return rest?.n ?? 0;
 }
 
+/** Parked rows matching `where`, by region (domain-less rows count as the default). */
+async function parkedByRegion(
+  db: Db,
+  defaultRegion: string,
+  where: SQL,
+): Promise<Map<string, number>> {
+  const region = sql<string>`coalesce(${schema.domains.region}, ${defaultRegion})`;
+  const rows = await db
+    .select({ region, n: sql<number>`count(*)::int` })
+    .from(schema.emails)
+    .leftJoin(schema.domains, eq(schema.emails.domainId, schema.domains.id))
+    .where(and(eq(schema.emails.latestStatus, "queued_quota"), where))
+    // Positional: a bound parameter inside the expression reads as a second
+    // expression to the parser when repeated in GROUP BY.
+    .groupBy(sql`1`);
+  return new Map(rows.map((r) => [r.region, r.n]));
+}
+
+/** The region a broadcast's parked rows send from; null when it has none. */
+async function parkedRegion(db: Db, broadcastId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ region: schema.domains.region })
+    .from(schema.emails)
+    .innerJoin(schema.domains, eq(schema.emails.domainId, schema.domains.id))
+    .where(
+      and(
+        eq(schema.emails.broadcastId, broadcastId),
+        eq(schema.emails.latestStatus, "queued_quota"),
+      ),
+    )
+    .limit(1);
+  return row?.region ?? null;
+}
+
 /** A row moved to "queued" with the reservation it holds, awaiting its job. */
 interface MovedEmail {
   id: string;
   teamId: string;
   broadcastId: string | null;
   scheduledAt: Date | null;
+  region: string;
   units: number;
   /** The cap the reservation ran against, so a refund lands on the same counter. */
   quota: TeamQuota;
 }
 
-/** Reserves quota and moves the email to queued; null when it stays parked. */
+/**
+ * Reserves quota and moves the email to queued; null when it stays parked.
+ * A drip time, when given, lands on the row in the same transaction as the
+ * move, so the send handler defers to it and the reconcile sweep leaves it.
+ */
 async function releaseParked(
   db: Db,
   deps: DrainDeps,
@@ -290,14 +464,15 @@ async function releaseParked(
     teamId: string;
     broadcastId: string | null;
     scheduledAt: Date | null;
+    region: string;
     to: string[];
     cc: string[] | null;
     bcc: string[] | null;
   },
-  exhausted: Set<string>,
-  failures: unknown[],
+  run: DrainRun,
+  throttleAt: Date | null,
 ): Promise<MovedEmail | null> {
-  if (exhausted.has(email.teamId)) return null;
+  if (run.exhaustedTeams.has(email.teamId)) return null;
   const quota = teamQuota(email, deps.isCloud);
   // Charged the way accept charged it: one unit per distinct mailbox.
   const units = countDistinctRecipients(email.to, email.cc, email.bcc);
@@ -312,6 +487,12 @@ async function releaseParked(
           to: "queued",
         });
         if (!moved) throw new DrainRaced();
+        if (throttleAt) {
+          await txDb
+            .update(schema.emails)
+            .set({ scheduledAt: throttleAt })
+            .where(eq(schema.emails.id, email.id));
+        }
         return "moved" as const;
       })
       .catch((err) => {
@@ -319,14 +500,22 @@ async function releaseParked(
         throw err;
       });
     if (outcome === "exhausted") {
-      exhausted.add(email.teamId);
+      run.exhaustedTeams.add(email.teamId);
       return null;
     }
     if (outcome === "raced") return null;
-    const { id, teamId, broadcastId, scheduledAt } = email;
-    return { id, teamId, broadcastId, scheduledAt, units, quota };
+    const { id, teamId, broadcastId, region } = email;
+    return {
+      id,
+      teamId,
+      broadcastId,
+      scheduledAt: throttleAt ?? email.scheduledAt,
+      region,
+      units,
+      quota,
+    };
   } catch (err) {
-    failures.push(err);
+    run.failures.push(err);
     return null;
   }
 }
