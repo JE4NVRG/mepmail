@@ -161,6 +161,30 @@ describe("planBulkWaves", () => {
     expect(a.days).toBe(1);
   });
 
+  it("a wave in flight counts once: what it sent is in the window, what it has not is the queue", () => {
+    // 20k queued in the region (a wave in flight) and an idle window: a new
+    // 100k send gets 50k now, not 30k.
+    const [, a] = plan([
+      { key: "other", queued: 20_000 },
+      { key: "a", admit: 100_000 },
+    ]);
+    // The current minute's bucket counts as sent: a few hundred rows of pessimism.
+    expect(a?.first).toBeGreaterThan(49_000);
+    expect(a?.first).toBeLessThanOrEqual(50_000);
+  });
+
+  it("a scheduled send takes the room left after the releases before it", () => {
+    // A 300k backlog in flight; a 50k send scheduled two days out starts
+    // behind it instead of being handed a full first wave today.
+    const [, b] = plan([
+      { key: "backlog", queued: 70_000, parked: 230_000 },
+      { key: "b", admit: 50_000, at: START + 2 * 24 * 3_600_000 },
+    ]);
+    if (!b) throw new Error("no estimate");
+    expect(b.first).toBe(0);
+    expect(b.startsAt?.getTime()).toBeGreaterThan(START + 2 * 24 * 3_600_000);
+  });
+
   it("a throttled team drips one row a second and takes one cadence per slice", () => {
     const [a] = plan([{ key: "a", admit: 2_000, spacingMs: 1_000 }]);
     if (!a) throw new Error("no estimate");
