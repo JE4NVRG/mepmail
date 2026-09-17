@@ -101,7 +101,8 @@
     "todayAt": "today, {time}",
     "seePlans": "See plans",
     "tooLarge": "This audience needs more than {days} days of sending capacity. Split it into smaller segments or contact support.",
-    "tooLargeSelfHost": "This audience needs more than {days} days of sending capacity. Split it into smaller segments or ask your instance operator for more capacity."
+    "tooLargeSelfHost": "This audience needs more than {days} days of sending capacity. Split it into smaller segments or ask your instance operator for more capacity.",
+    "stepFirstReset": "{count} go out when the limit resets at {reset}"
   },
   "detail": {
     "eyebrow": "Broadcast",
