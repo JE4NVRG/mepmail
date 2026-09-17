@@ -4,6 +4,7 @@ import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setRegionAccountDeps } from "@/server/console/ses-regions";
 import { createCaller } from "@/server/routers";
 
 // vitest.config sets SKIP_ENV_VALIDATION (env reads stay live), so setting
@@ -664,5 +665,163 @@ describe("broadcasts.sendTest", () => {
         text: null,
       }),
     ).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+  });
+});
+
+describe("paced sends", () => {
+  type Quota = { max24h: number; sentLast24h: number; maxSendRate: number };
+  function stubAccount(quota: Quota | Error) {
+    setRegionAccountDeps({
+      accountClient: () => ({
+        async send() {
+          if (quota instanceof Error) throw quota;
+          return {
+            SendingEnabled: true,
+            ProductionAccessEnabled: true,
+            EnforcementStatus: "HEALTHY",
+            SendQuota: {
+              Max24HourSend: quota.max24h,
+              SentLast24Hours: quota.sentLast24h,
+              MaxSendRate: quota.maxSendRate,
+            },
+          };
+        },
+      }),
+    });
+  }
+  afterEach(() => setRegionAccountDeps(null));
+
+  async function seedContacts(teamId: string, n: number) {
+    await db
+      .insert(schema.contacts)
+      .values(Array.from({ length: n }, (_, i) => ({ teamId, email: `c${i}@example.com` })));
+  }
+
+  async function seedSendingBroadcast(teamId: string) {
+    const { caller, id } = await seedDraft(teamId);
+    const scheduledAt = new Date(Date.now() - 60_000);
+    await db
+      .update(schema.broadcasts)
+      .set({ status: "sending", scheduledAt })
+      .where(eq(schema.broadcasts.id, id));
+    const [domain] = await db
+      .select({ id: schema.domains.id })
+      .from(schema.domains)
+      .where(eq(schema.domains.teamId, teamId));
+    const row = (latestStatus: "sent" | "queued" | "queued_quota", i: number) => ({
+      teamId,
+      broadcastId: id,
+      domainId: domain?.id ?? null,
+      contactId: crypto.randomUUID(),
+      from: DRAFT_INPUT.from,
+      to: [`r${i}@example.com`],
+      subject: DRAFT_INPUT.subject,
+      latestStatus,
+      sentAt: latestStatus === "sent" ? new Date() : null,
+    });
+    await db
+      .insert(schema.emails)
+      .values([
+        row("sent", 0),
+        row("sent", 1),
+        row("queued", 2),
+        row("queued", 3),
+        row("queued", 4),
+        row("queued_quota", 5),
+        row("queued_quota", 6),
+        row("queued_quota", 7),
+        row("queued_quota", 8),
+      ]);
+    return { caller, id, scheduledAt };
+  }
+
+  it("sendPlan answers the count alone while SES has not answered", async () => {
+    stubAccount(new Error("ses down"));
+    const teamId = await createTeam(db, "team-a");
+    await seedVerifiedDomain(teamId);
+    await seedContacts(teamId, 2);
+    const plan = await callerFor(teamId).broadcasts.sendPlan({ from: DRAFT_INPUT.from });
+    expect(plan).toEqual({ count: 2, cloud: false, estimate: null });
+  });
+
+  it("sendPlan estimates a paced send from the region's quota", async () => {
+    // Share 7 of a 10-a-day quota: 20 contacts go out over three days.
+    stubAccount({ max24h: 10, sentLast24h: 0, maxSendRate: 14 });
+    const teamId = await createTeam(db, "team-a");
+    await seedVerifiedDomain(teamId);
+    await seedContacts(teamId, 20);
+    const caller = callerFor(teamId);
+    const { count, estimate } = await caller.broadcasts.sendPlan({ from: DRAFT_INPUT.from });
+    expect(count).toBe(20);
+    expect(estimate).toMatchObject({ first: 7, blocked: false, days: 3, planHold: null });
+    expect(estimate?.releases.reduce((n, r) => n + r.count, 0)).toBe(20);
+    expect(estimate?.finishesAt?.getTime()).toBeGreaterThan(Date.now() + 40 * 3_600_000);
+    // An unverified sender gets the count only.
+    expect(
+      (await caller.broadcasts.sendPlan({ from: "a@nowhere.example.com" })).estimate,
+    ).toBeNull();
+  });
+
+  it("send refuses an audience that needs more days than the horizon", async () => {
+    stubAccount({ max24h: 10, sentLast24h: 0, maxSendRate: 14 });
+    const teamId = await createTeam(db, "team-a");
+    const { caller, id } = await seedDraft(teamId);
+    await seedContacts(teamId, 200);
+    expect((await caller.broadcasts.sendPlan({ from: DRAFT_INPUT.from })).estimate).toMatchObject({
+      blocked: true,
+      horizonDays: 24,
+    });
+    await expect(caller.broadcasts.send({ id })).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: expect.stringContaining("24 days"),
+    });
+    expect((await broadcastRow(id))?.status).toBe("draft");
+    // The same audience under a real quota is fine.
+    stubAccount({ max24h: 100_000, sentLast24h: 0, maxSendRate: 14 });
+    await caller.broadcasts.send({ id });
+    expect((await broadcastRow(id))?.status).toBe("scheduled");
+  });
+
+  it("cancel stops the rest of a send in progress and says how many", async () => {
+    const teamId = await createTeam(db, "team-a");
+    const { caller, id } = await seedSendingBroadcast(teamId);
+    expect(await caller.broadcasts.cancel({ id })).toEqual({ id, canceledRemaining: 7 });
+    expect((await broadcastRow(id))?.status).toBe("canceled");
+    const rows = await db
+      .select({ status: schema.emails.latestStatus })
+      .from(schema.emails)
+      .where(eq(schema.emails.broadcastId, id));
+    expect(rows.filter((r) => r.status === "canceled")).toHaveLength(7);
+    expect(rows.filter((r) => r.status === "sent")).toHaveLength(2);
+  });
+
+  it("list and get carry the progress and the forecast of a send in progress", async () => {
+    stubAccount({ max24h: 100_000, sentLast24h: 0, maxSendRate: 14 });
+    const teamId = await createTeam(db, "team-a");
+    const { caller, id, scheduledAt } = await seedSendingBroadcast(teamId);
+    const { items } = await caller.broadcasts.list({});
+    expect(items[0]).toMatchObject({
+      id,
+      status: "sending",
+      recipients: 9,
+      sentCount: 2,
+      parkedCount: 4,
+    });
+    expect(items[0]?.finishesAt).toBeInstanceOf(Date);
+    const got = await caller.broadcasts.get({ id });
+    expect(got).toMatchObject({
+      sentCount: 2,
+      parkedCount: 4,
+      startedAt: scheduledAt,
+      planHold: null,
+    });
+    expect(got.finishesAt).toBeInstanceOf(Date);
+    // Draft rows carry none of it.
+    const { id: draft } = await caller.broadcasts.create(DRAFT_INPUT);
+    expect(await caller.broadcasts.get({ id: draft })).toMatchObject({
+      sentCount: null,
+      finishesAt: null,
+      startedAt: null,
+    });
   });
 });
