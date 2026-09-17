@@ -243,14 +243,21 @@ export function planBulkWaves(input: PlanInput): BroadcastEstimate[] {
     if (s.spacingMs > 0) s.laneFree = en;
     else laneFree = en;
     s.runs.push({ start: st, end: en, n });
-    // Bucket the sends by minute, exactly n rows in total.
+    // Bucket the sends by minute, exactly n rows in total: floating rates
+    // floor a row short at the end, and it belongs to the last bucket, never
+    // outside the window.
     const sentBy = (x: number) => Math.floor(((x - st) * perSecond) / 1000);
+    let counted = 0;
+    let last = bucketOf(st);
     for (let b = bucketOf(st); b < en; b += WINDOW_BUCKET_MS) {
       const count =
         Math.min(n, sentBy(Math.min(b + WINDOW_BUCKET_MS, en))) -
         Math.min(n, sentBy(Math.max(b, st)));
       if (count > 0) buckets.set(b, (buckets.get(b) ?? 0) + count);
+      counted += count;
+      last = b;
     }
+    if (counted < n) buckets.set(last, (buckets.get(last) ?? 0) + (n - counted));
   };
   const room = (t: number) => Math.max(0, input.share - inWindow(t) - queued(t));
   const capRoom = (s: Sim, t: number): number => {
