@@ -211,10 +211,14 @@ export function planBulkWaves(input: PlanInput): BroadcastEstimate[] {
     buckets.set(key, (buckets.get(key) ?? 0) + b.count);
   }
   // Rows sent by t and not yet aged out; rows released but not sent are the
-  // queue, counted apart.
+  // queue, counted apart. Aged buckets are dropped as the model advances, so
+  // a long horizon never rescans the whole history per slot.
   const inWindow = (t: number): number => {
     let sum = 0;
-    for (const [at, n] of buckets) if (at <= t && at + WINDOW_BUCKET_MS > t - DAY_MS) sum += n;
+    for (const [at, n] of buckets) {
+      if (at + WINDOW_BUCKET_MS <= t - DAY_MS) buckets.delete(at);
+      else if (at <= t) sum += n;
+    }
     return sum;
   };
   const sims: Sim[] = input.broadcasts.map((b) => ({
@@ -230,14 +234,14 @@ export function planBulkWaves(input: PlanInput): BroadcastEstimate[] {
     first: 0,
     planHold: null,
   }));
-  // Rows released but not yet sent at t, across every broadcast.
+  // Rows released but not yet sent at t, across every broadcast: only the
+  // runs still open are walked, and a run that has ended leaves the list.
+  let open: { start: number; end: number; n: number }[] = [];
   const queued = (t: number): number => {
     let q = 0;
-    for (const s of sims) {
-      for (const r of s.runs) {
-        if (r.end > t) q += Math.round((r.n * (r.end - Math.max(t, r.start))) / (r.end - r.start));
-      }
-    }
+    open = open.filter((r) => r.end > t);
+    for (const r of open)
+      q += Math.round((r.n * (r.end - Math.max(t, r.start))) / (r.end - r.start));
     return q;
   };
   let laneFree = start;
@@ -249,7 +253,9 @@ export function planBulkWaves(input: PlanInput): BroadcastEstimate[] {
     const en = st + (n * 1000) / perSecond;
     if (s.spacingMs > 0) s.laneFree = en;
     else laneFree = en;
-    s.runs.push({ start: st, end: en, n });
+    const run = { start: st, end: en, n };
+    s.runs.push(run);
+    open.push(run);
     // Bucket the sends by minute, exactly n rows in total: floating rates
     // floor a row short at the end, and it belongs to the last bucket, never
     // outside the window.
@@ -328,7 +334,6 @@ export function planBulkWaves(input: PlanInput): BroadcastEstimate[] {
       // one cannot use passes down the FIFO.
       let grant = Math.min(s.parked, Math.ceil(budget / (waiting.length - i)));
       if (s.spacingMs > 0) grant = Math.min(grant, Math.floor(slot / s.spacingMs));
-      const wanted = grant;
       grant = Math.min(grant, capRoom(s, t));
       if (grant > 0) {
         sendRun(s, t, grant);
