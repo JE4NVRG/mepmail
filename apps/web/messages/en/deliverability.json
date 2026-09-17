@@ -16,7 +16,9 @@
     "regionPaused": "Broadcasts are paused in {region} while the platform's {metric} rate recovers. Transactional email is unaffected. Try again later.",
     "suspended": "This team is suspended by the instance operator. Sending is disabled until it is reinstated.",
     "operatorPaused": "Broadcasts are paused for this team by the instance operator. Transactional email is unaffected.",
-    "regionHeld": "Broadcasts are paused in {region} by the instance operator. Transactional email is unaffected. Try again later."
+    "regionHeld": "Broadcasts are paused in {region} by the instance operator. Transactional email is unaffected. Try again later.",
+    "tooLarge": "This audience needs more than {days} days of sending capacity. Split it into smaller segments or contact support.",
+    "tooLargeSelfHost": "This audience needs more than {days} days of sending capacity. Split it into smaller segments or ask your instance operator for more capacity."
   },
   "metric": {
     "bounce": "hard-bounce",
