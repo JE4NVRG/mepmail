@@ -19,6 +19,7 @@ import { NavTile, TONE_COLOR } from "@/components/status-tile";
 import { Table } from "@/components/table";
 import { Tooltip } from "@/components/tooltip";
 import { Truncated } from "@/components/truncated";
+import { formatFinishAbout, roundUpToQuarterHour } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
 import { ListFooter, StateCard } from "../emails/list-parts";
 import { type BroadcastStatus, PILL_VARIANT, StatusPill } from "./parts";
@@ -97,7 +98,13 @@ export default function BroadcastsPage() {
   const nf = useMemo(() => new Intl.NumberFormat(locale), [locale]);
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<{ id: string; name: string } | null>(null);
+  // `stop` carries the counts of a send in progress: the dialog then reads
+  // "Stop the rest" instead of "Cancel send".
+  const [cancelTarget, setCancelTarget] = useState<{
+    id: string;
+    name: string;
+    stop: { sent: number; waiting: number } | null;
+  } | null>(null);
 
   const query = useInfiniteQuery(
     trpc.broadcasts.list.infiniteQueryOptions(
@@ -204,16 +211,41 @@ export default function BroadcastsPage() {
                       </span>
                     </td>
                     <td>
-                      <StatusPill status={status} />
+                      {status === "sending" && row.sentCount !== null ? (
+                        <Tooltip
+                          inline
+                          text={
+                            <>
+                              {row.finishesAt
+                                ? t("list.finishTip", {
+                                    time: formatFinishAbout(
+                                      roundUpToQuarterHour(row.finishesAt),
+                                      locale,
+                                    ),
+                                  })
+                                : null}
+                              {row.finishesAt ? <br /> : null}
+                              {t("list.progressTip", {
+                                sent: nf.format(row.sentCount),
+                                waiting: nf.format(Math.max(0, row.recipients - row.sentCount)),
+                              })}
+                            </>
+                          }
+                        >
+                          <StatusPill status={status} />
+                        </Tooltip>
+                      ) : (
+                        <StatusPill status={status} />
+                      )}
                     </td>
                     <td>{row.segmentName ?? t("composer.segmentNone")}</td>
                     <td className="right ms-digits">
-                      {row.audience != null ? (
+                      {status === "sending" && row.sentCount !== null ? (
                         <>
-                          {nf.format(row.recipients)}
+                          {nf.format(row.sentCount)}
                           <span style={{ color: "var(--ms-faint)" }}>
                             {" / "}
-                            {nf.format(row.audience)}
+                            {nf.format(row.recipients)}
                           </span>
                         </>
                       ) : row.recipients > 0 ? (
@@ -232,7 +264,7 @@ export default function BroadcastsPage() {
                       onClick={(event) => event.stopPropagation()}
                     >
                       {/* The row itself opens the broadcast; a menu with only "View" would repeat it. */}
-                      {status === "draft" || status === "scheduled" ? (
+                      {status === "draft" || status === "scheduled" || status === "sending" ? (
                         <PopoverMenu
                           ariaLabel={t("list.menu")}
                           items={
@@ -249,20 +281,34 @@ export default function BroadcastsPage() {
                                     onSelect: () => setDeleteTarget({ id: row.id, name: label }),
                                   },
                                 ]
-                              : status === "scheduled"
-                                ? [
-                                    {
-                                      label: t("list.view"),
-                                      onSelect: () => router.push(`/broadcasts/${row.id}`),
-                                    },
-                                    null,
-                                    {
-                                      label: t("list.cancel"),
-                                      danger: true,
-                                      onSelect: () => setCancelTarget({ id: row.id, name: label }),
-                                    },
-                                  ]
-                                : []
+                              : [
+                                  {
+                                    label: t("list.view"),
+                                    onSelect: () => router.push(`/broadcasts/${row.id}`),
+                                  },
+                                  null,
+                                  {
+                                    label: t(
+                                      status === "sending" ? "list.stopRest" : "list.cancel",
+                                    ),
+                                    danger: true,
+                                    onSelect: () =>
+                                      setCancelTarget({
+                                        id: row.id,
+                                        name: label,
+                                        stop:
+                                          status === "sending" && row.sentCount !== null
+                                            ? {
+                                                sent: row.sentCount,
+                                                waiting: Math.max(
+                                                  0,
+                                                  row.recipients - row.sentCount,
+                                                ),
+                                              }
+                                            : null,
+                                      }),
+                                  },
+                                ]
                           }
                         />
                       ) : null}
@@ -319,7 +365,7 @@ export default function BroadcastsPage() {
         open={cancelTarget !== null}
         onClose={closeCancel}
         onConfirm={confirmCancel}
-        title={t("detail.cancelTitle")}
+        title={t(cancelTarget?.stop ? "detail.stopTitle" : "detail.cancelTitle")}
       >
         <form
           onSubmit={(event) => {
@@ -328,11 +374,17 @@ export default function BroadcastsPage() {
           }}
         >
           <p style={{ margin: 0, color: "var(--ms-muted)", fontSize: "var(--ms-fs-ui)" }}>
-            {t("detail.cancelBody", { name: cancelTarget?.name ?? "—" })}
+            {cancelTarget?.stop
+              ? t("detail.stopBody", {
+                  waiting: nf.format(cancelTarget.stop.waiting),
+                  sent: nf.format(cancelTarget.stop.sent),
+                })
+              : t("detail.cancelBody", { name: cancelTarget?.name ?? "—" })}
           </p>
           <ModalFooter>
             <button type="button" className="ms-btn ms-btn-secondary" onClick={closeCancel}>
-              {t("detail.keep")} <span className="ms-keycap">Esc</span>
+              {t(cancelTarget?.stop ? "detail.keepSending" : "detail.keep")}{" "}
+              <span className="ms-keycap">Esc</span>
             </button>
             <button
               type="submit"
@@ -340,7 +392,8 @@ export default function BroadcastsPage() {
               disabled={cancelMutation.isPending}
             >
               <BtnSpinner on={cancelMutation.isPending} />
-              {t("detail.cancelConfirm")} <ConfirmKeycap />
+              {t(cancelTarget?.stop ? "detail.stopConfirm" : "detail.cancelConfirm")}{" "}
+              <ConfirmKeycap />
             </button>
           </ModalFooter>
         </form>
