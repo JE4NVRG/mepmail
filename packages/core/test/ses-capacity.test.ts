@@ -25,6 +25,9 @@ describe("share arithmetic", () => {
     expect(bulkShare(100_000, 30)).toBe(70_000);
     expect(usableReserve(100_000, 30)).toBe(28_000);
     expect(bulkShare(50_000, 30)).toBe(35_000);
+    expect(bulkShare(100_000, 80)).toBe(20_000);
+    expect(bulkShare(100_000, 55)).toBe(45_000);
+    expect(usableReserve(100_000, 80)).toBe(78_000);
     expect(bulkShare(200, 30)).toBe(140);
     expect(bulkShare(-1, 30)).toBe(Number.POSITIVE_INFINITY);
     expect(clampReserve(2)).toBe(5);
@@ -174,6 +177,20 @@ describe("planBulkWaves", () => {
   it("refuses past the horizon", () => {
     const [a] = plan([{ key: "a", admit: 2_400_000 }]);
     expect(a?.blocked).toBe(true);
+  });
+
+  it("a scheduled send is judged from its own start, not from now", () => {
+    const later = START + 23 * 24 * 3_600_000;
+    const [a] = plan([{ key: "a", admit: 170_000, at: later }]);
+    if (!a) throw new Error("no estimate");
+    expect(a.blocked).toBe(false);
+    expect(a.first).toBe(70_000);
+    expect(a.days).toBe(3);
+    expect(a.startsAt?.getTime()).toBe(later);
+    // Nothing of it is released before it starts.
+    expect(a.releases.every((r) => r.at.getTime() >= later)).toBe(true);
+    const [small] = plan([{ key: "b", admit: 4_200, at: START + 3 * 24 * 3_600_000 }]);
+    expect(small?.days).toBe(1);
   });
 });
 

@@ -36,7 +36,9 @@ export function pacingHorizonDays(retentionDays: number): number {
 /** Rows broadcasts may hold in a region's rolling window; Infinity when SES reports no quota (−1, unlimited). */
 export function bulkShare(max24h: number, reservePercent: number): number {
   if (max24h <= 0) return Number.POSITIVE_INFINITY;
-  return Math.floor((1 - reservePercent / 100) * max24h);
+  // Integer arithmetic: (1 − p/100) × n lands a hair under the integer for
+  // many pairs and the floor would drop a row.
+  return Math.floor((max24h * (100 - reservePercent)) / 100);
 }
 
 /** What the total gate really protects for transactional mail: the margin line minus the share. */
@@ -302,9 +304,13 @@ export function planBulkWaves(input: PlanInput): BroadcastEstimate[] {
     s.parked += wanted - granted;
   }
 
+  // A send waits from its own instant, and its horizon counts from there:
+  // a scheduled send is judged on the days it takes, not on the days until
+  // it starts.
+  const pending = (s: Sim, at: number) => s.parked > 0 && at - s.at <= horizonMs;
   let t = Math.floor(start / slot) * slot + slot + offset;
-  while (sims.some((s) => s.parked > 0) && t - start <= horizonMs) {
-    const waiting = sims.filter((s) => s.parked > 0);
+  while (sims.some((s) => pending(s, t))) {
+    const waiting = sims.filter((s) => pending(s, t) && t >= s.at);
     let budget = Math.min(room(t), drainCap);
     for (const [i, s] of waiting.entries()) {
       // Each waiting broadcast gets an equal share of what is left; a slice
@@ -333,7 +339,7 @@ export function planBulkWaves(input: PlanInput): BroadcastEstimate[] {
       first: s.first,
       startsAt: starts === null ? null : new Date(starts),
       finishesAt: finishes === null ? null : new Date(finishes),
-      days: finishes === null ? 0 : Math.max(1, Math.ceil((finishes - start) / DAY_MS)),
+      days: finishes === null ? 0 : Math.max(1, Math.ceil((finishes - s.at) / DAY_MS)),
       blocked: s.parked > 0,
       releases: own.map((r) => ({ at: new Date(r.start), endsAt: new Date(r.end), count: r.n })),
       planHold: s.planHold,

@@ -64,6 +64,8 @@ export async function regionBulkCounts(
   return out;
 }
 
+// Raw statements bind instants as ISO strings with a cast: postgres-js
+// refuses a Date parameter here, which PGlite (the test driver) accepts.
 /** Bulk sends in one region over the last 24 hours, by drain slot, for the planner's window. */
 export async function bulkSentBySlot(
   db: Db,
@@ -78,7 +80,7 @@ export async function bulkSentBySlot(
       select to_timestamp(floor(extract(epoch from ${e.sentAt}) / ${slotSeconds}) * ${slotSeconds}) as at,
         count(*)::int as n
       from ${e} join ${d} on ${d.id} = ${e.domainId}
-      where ${e.sentAt} >= ${new Date(now.getTime() - DAY_MS)}
+      where ${e.sentAt} >= ${new Date(now.getTime() - DAY_MS).toISOString()}::timestamptz
         and ${e.broadcastId} is not null
         and ${d.region} = ${opts.region}
       group by 1
@@ -225,7 +227,7 @@ export async function regionDailyPeaks(
       select count(*) filter (where ${e.broadcastId} is null)::int as tx,
         count(*) filter (where ${e.broadcastId} is not null)::int as bulk
       from ${e} join ${d} on ${d.id} = ${e.domainId}
-      where ${e.sentAt} >= ${new Date(now.getTime() - days * DAY_MS)}
+      where ${e.sentAt} >= ${new Date(now.getTime() - days * DAY_MS).toISOString()}::timestamptz
         and ${d.region} = ${opts.region}
       group by (${e.sentAt} at time zone 'UTC')::date
     `),
