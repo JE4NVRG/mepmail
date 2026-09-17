@@ -101,7 +101,8 @@
     "todayAt": "hoje, {time}",
     "seePlans": "Ver planos",
     "tooLarge": "Esta audiência precisa de mais de {days} dias de capacidade de envio. Divida em segmentos menores ou fale com o suporte.",
-    "tooLargeSelfHost": "Esta audiência precisa de mais de {days} dias de capacidade de envio. Divida em segmentos menores ou peça mais capacidade ao operador da instância."
+    "tooLargeSelfHost": "Esta audiência precisa de mais de {days} dias de capacidade de envio. Divida em segmentos menores ou peça mais capacidade ao operador da instância.",
+    "stepFirstReset": "{count} saem quando o limite reinicia às {reset}"
   },
   "detail": {
     "eyebrow": "Transmissão",

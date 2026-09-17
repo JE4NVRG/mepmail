@@ -141,7 +141,7 @@ export function SendPlanSummary({
   const paced = estimate !== null && !estimate.blocked && estimate.first < count;
   let steps: Step[] = [];
   if (paced && estimate.startsAt && finish) {
-    if (estimate.first === 0) {
+    if (estimate.first === 0 && estimate.planHold === null) {
       // The day sits in the rail column, the clock times in the text: a
       // full stamp would wrap the narrow column.
       const starts = roundUpToQuarterHour(estimate.startsAt);
@@ -177,7 +177,15 @@ export function SendPlanSummary({
                   plan: estimate.planLabel,
                 })
               : undefined;
-          return { when, what: t("guard.stepFirst", { count: n }), sub, now: isNow };
+          return {
+            when,
+            what:
+              held && estimate.first === 0
+                ? t("guard.stepFirstReset", { count: n, reset: time(day.startsAt) })
+                : t("guard.stepFirst", { count: n }),
+            sub,
+            now: isNow,
+          };
         }
         if (last) {
           return {
@@ -219,8 +227,9 @@ export function SendPlanSummary({
       </p>
       {steps.length > 0 ? (
         <ol className="ms-steps" aria-label={t("guard.title")}>
-          {steps.map((step) => (
-            <li key={step.when} className={step.now ? "now" : undefined}>
+          {steps.map((step, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: fixed order, position is identity
+            <li key={i} className={step.now ? "now" : undefined}>
               <span className="when">{step.when}</span>
               <span className="what">
                 {step.what}
@@ -230,7 +239,7 @@ export function SendPlanSummary({
           ))}
         </ol>
       ) : null}
-      {paced ? (
+      {paced && (planLine || estimate.planHold === null) ? (
         <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--ms-muted)" }}>
           {planLine ? (
             <>
