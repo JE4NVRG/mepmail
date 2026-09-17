@@ -80,11 +80,17 @@ export async function planBroadcastSend(
     settings.emailRetentionDays ?? Number(env.EMAIL_RETENTION_DAYS ?? EMAIL_RETENTION_DAYS_DEFAULT),
   );
   const { quota: sesQuota } = account.overview;
-  const [counts, sentBySlot, sending] = await Promise.all([
+  const [counts, sentBySlot, sending, quota] = await Promise.all([
     regionBulkCounts(db, now),
     bulkSentBySlot(db, { region: opts.region, now }),
     sendingBroadcasts(db, { region: opts.region }),
+    fetchTeamQuota(db, opts.teamId, isCloudDeployment()),
   ]);
+  if (!quota) return null;
+  const used = await quotaUsage(db, opts.teamId, quota, now);
+  // The team's own sends in flight run under its caps; other teams' are
+  // modelled on capacity alone.
+  const ownCaps = planCaps(quota, used, now);
   const input: PlanInput = {
     share: bulkShare(sesQuota.max24h, reservePercent),
     rate: Math.min(sesQuota.maxSendRate || rateCeiling, rateCeiling),
@@ -92,19 +98,20 @@ export async function planBroadcastSend(
     sentBySlot,
     start: now,
     horizonDays,
-    broadcasts: sending.map((b) => ({ key: b.id, queued: b.queued, parked: b.parked })),
+    broadcasts: sending.map((b) => ({
+      key: b.id,
+      queued: b.queued,
+      parked: b.parked,
+      ...(b.scheduledAt ? { at: Math.min(b.scheduledAt.getTime(), now.getTime()) } : {}),
+      ...(b.teamId === opts.teamId ? { caps: ownCaps.map((c) => ({ ...c })) } : {}),
+    })),
   };
   const byKey = (estimates: BroadcastEstimate[]) =>
     new Map(estimates.filter((e) => e.key !== NEW_SEND).map((e) => [e.key, e]));
   if (!opts.newSend) {
     return { sending, estimates: byKey(planBulkWaves(input)), estimate: null };
   }
-  const quota = await fetchTeamQuota(db, opts.teamId, isCloudDeployment());
-  if (!quota) return null;
-  const [used, health] = await Promise.all([
-    quotaUsage(db, opts.teamId, quota, now),
-    fetchDeliverabilityHealth(db, opts.teamId, { now }),
-  ]);
+  const health = await fetchDeliverabilityHealth(db, opts.teamId, { now });
   const spacingMs = broadcastSendSpacingMs(health.status);
   const { count, at } = opts.newSend;
   const withCaps = (caps: PlanCap[]) =>

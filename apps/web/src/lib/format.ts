@@ -183,6 +183,13 @@ export function displayUrl(url: string): string {
 
 const QUARTER_HOUR_MS = 15 * 60_000;
 
+/** The instant when it is less than a day old, else null. */
+export function withinLastDay(at: Date | string | null): Date | null {
+  if (!at) return null;
+  const then = new Date(at);
+  return Date.now() - then.getTime() < 24 * 3_600_000 ? then : null;
+}
+
 /** A forecast rounded up to the next quarter hour: what every surface prints as "about". */
 export function roundUpToQuarterHour(date: Date | string | number): Date {
   return new Date(Math.ceil(new Date(date).getTime() / QUARTER_HOUR_MS) * QUARTER_HOUR_MS);
