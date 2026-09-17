@@ -701,3 +701,201 @@ describe("domain-scoped keys cannot cross domains on broadcasts", () => {
     expect(enq).toContain(id);
   });
 });
+
+describe("broadcasts API pacing", () => {
+  const ACCOUNT = { max24h: 10, sentLast24h: 0, maxSendRate: 14 };
+  type Read = {
+    id: string;
+    status?: string;
+    sent_count?: number | null;
+    finishes_at?: string | null;
+    estimated?: true;
+    warning?: { code: string; days: number; message: string };
+  };
+  const read = async (res: Response) => (await res.json()) as Read;
+  let account: typeof ACCOUNT | null = ACCOUNT;
+  let paced: ReturnType<typeof createApi>;
+
+  const request = (token: string, method: string, path: string, body?: unknown) =>
+    paced.request(path, {
+      method,
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(body !== undefined ? { "content-type": "application/json" } : {}),
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+
+  // A sendable team with its verified domain's id and `n` subscribed contacts.
+  async function seed(slug: string, contacts: number) {
+    const team = await makeSendableTeam(slug);
+    const [domain] = await db
+      .select({ id: schema.domains.id })
+      .from(schema.domains)
+      .where(eq(schema.domains.teamId, team.teamId));
+    if (!domain) throw new Error("domain missing");
+    if (contacts > 0) {
+      await db.insert(schema.contacts).values(
+        Array.from({ length: contacts }, (_, i) => ({
+          teamId: team.teamId,
+          email: `${slug}-${i}@example.com`,
+        })),
+      );
+    }
+    return { ...team, domainId: domain.id };
+  }
+
+  beforeAll(() => {
+    paced = createApi({
+      db,
+      keyring: EnvKeyring.fromBase64(randomBytes(32).toString("base64")),
+      isCloud: true,
+      enqueueEmailSend: async () => {},
+      enqueueBroadcastSend: async () => {},
+      appBaseUrl: "https://app.example.test",
+      // A ten-a-day account at the default 30% reserve: broadcasts get 7.
+      pacing: {
+        regionAccount: async () => account,
+        reservePercent: async () => 30,
+        rateCeiling: async () => 14,
+        horizonDays: async () => 24,
+      },
+    });
+  });
+
+  it("an audience inside the room goes out at once: finishes_at, no warning", async () => {
+    const { token, broadcastId } = await seed("bc-pace-fits", 5);
+    const res = await request(token, "POST", `/broadcasts/${broadcastId}/send`, {});
+    expect(res.status).toBe(200);
+    const body = await read(res);
+    expect(body).toMatchObject({ id: broadcastId, estimated: true });
+    expect(typeof body.finishes_at).toBe("string");
+    expect(body.warning).toBeUndefined();
+  });
+
+  it("an audience past the room is paced: the warning names the count and the finish", async () => {
+    const { token, broadcastId } = await seed("bc-pace-paced", 12);
+    const res = await request(token, "POST", `/broadcasts/${broadcastId}/send`, {});
+    expect(res.status).toBe(200);
+    const body = await read(res);
+    expect(body.warning).toMatchObject({ code: "paced", days: 2 });
+    expect(body.warning?.message).toMatch(
+      /^12 recipients exceed the broadcast capacity available now; sending is paced and finishes about \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00Z\. Transactional email is unaffected\.$/,
+    );
+    // The instant carried is unrounded; the message rounds up to the quarter hour.
+    expect(new Date(body.finishes_at ?? 0).getTime()).toBeGreaterThan(Date.now() + 20 * 3_600_000);
+    expect((await statusRow(broadcastId))?.status).toBe("scheduled");
+  });
+
+  it("send-on-create carries the same fields", async () => {
+    const { token } = await seed("bc-pace-create", 12);
+    const res = await request(token, "POST", "/broadcasts", { ...draftBody(), send: true });
+    expect(res.status).toBe(200);
+    const body = await read(res);
+    expect(body).toMatchObject({ estimated: true, warning: { code: "paced" } });
+  });
+
+  it("422 broadcast_too_large past the horizon, leaving the draft", async () => {
+    // Three a day against five thousand: months past the horizon.
+    const { token, broadcastId } = await seed("bc-pace-huge", 5_000);
+    account = { ...ACCOUNT, max24h: 5 };
+    const res = await request(token, "POST", `/broadcasts/${broadcastId}/send`, {});
+    account = ACCOUNT;
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({
+      statusCode: 422,
+      name: "broadcast_too_large",
+      message:
+        "This audience of 5,000 needs more than 24 days of sending capacity. Split it into smaller segments or contact support.",
+    });
+    expect((await statusRow(broadcastId))?.status).toBe("draft");
+  });
+
+  it("without SES's numbers the send goes through with no estimate", async () => {
+    const { token, broadcastId } = await seed("bc-pace-blind", 12);
+    account = null;
+    const res = await request(token, "POST", `/broadcasts/${broadcastId}/send`, {});
+    account = ACCOUNT;
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: broadcastId, finishes_at: null, estimated: true });
+  });
+
+  it("a broadcast going out reads sent_count and finishes_at; a later send queues behind it; stop the rest", async () => {
+    const { teamId, token, broadcastId, domainId } = await seed("bc-pace-live", 0);
+    await db
+      .update(schema.broadcasts)
+      .set({ status: "sending", scheduledAt: new Date() })
+      .where(eq(schema.broadcasts.id, broadcastId));
+    const row = (over: Partial<typeof schema.emails.$inferInsert>) => ({
+      teamId,
+      domainId,
+      broadcastId,
+      from: "Acme <hi@acme.dev>",
+      to: ["r@example.com"],
+      subject: "s",
+      ...over,
+    });
+    await db
+      .insert(schema.emails)
+      .values([
+        row({ latestStatus: "sent", sentAt: new Date() }),
+        row({ latestStatus: "delivered", sentAt: new Date() }),
+        ...Array.from({ length: 7 }, () => row({ latestStatus: "queued" })),
+        row({ latestStatus: "queued_quota" }),
+      ]);
+
+    const got = await read(await request(token, "GET", `/broadcasts/${broadcastId}`));
+    expect(got).toMatchObject({ status: "queued", sent_count: 2, sent_at: null });
+    expect(typeof got.finishes_at).toBe("string");
+    const listed = (await (await request(token, "GET", "/broadcasts")).json()) as {
+      data: { id: string; sent_count: number | null; finishes_at: string | null }[];
+    };
+    expect(listed.data.find((b) => b.id === broadcastId)).toMatchObject({
+      sent_count: 2,
+      finishes_at: got.finishes_at,
+    });
+
+    // Its wave fills the region's room: a new send starts once it has aged out.
+    const other = await seed("bc-pace-behind", 3);
+    const behind = await read(
+      await request(other.token, "POST", `/broadcasts/${other.broadcastId}/send`, {}),
+    );
+    expect(behind.warning).toMatchObject({ code: "queued_behind" });
+    expect(behind.warning?.message).toMatch(
+      /^Other sends are ahead; this one starts about \S+ and finishes about \S+\.$/,
+    );
+
+    const canceled = await request(token, "POST", `/broadcasts/${broadcastId}/cancel`);
+    expect(canceled.status).toBe(200);
+    expect(await canceled.json()).toEqual({
+      object: "broadcast",
+      id: broadcastId,
+      canceled_remaining: 8,
+    });
+    const rows = await db
+      .select({ status: schema.emails.latestStatus })
+      .from(schema.emails)
+      .where(eq(schema.emails.broadcastId, broadcastId));
+    expect(rows.filter((r) => r.status === "canceled")).toHaveLength(8);
+    expect(await (await request(token, "GET", `/broadcasts/${broadcastId}`)).json()).toMatchObject({
+      status: "canceled",
+      sent_count: 2,
+      finishes_at: null,
+    });
+
+    const again = await request(token, "POST", `/broadcasts/${broadcastId}/cancel`);
+    expect(again.status).toBe(400);
+    expect(await again.json()).toMatchObject({
+      name: "invalid_parameter",
+      message: "Only queued broadcasts can be canceled",
+    });
+  });
+
+  async function statusRow(id: string) {
+    const [row] = await db
+      .select({ status: schema.broadcasts.status })
+      .from(schema.broadcasts)
+      .where(eq(schema.broadcasts.id, id));
+    return row;
+  }
+});
