@@ -195,6 +195,50 @@ describe("the broadcast share and its room ledger", () => {
     expect(h.controls.room(R)).toBe(34_000);
   });
 
+  it("a walk that takes again keeps only the rows it wrote, until a count sees them", async () => {
+    const h = harness({ [R]: { max24h: 100_000, sentLast24h: 10_000, maxSendRate: 14 } }, 14, {
+      counts: { [R]: { sent24h: 10_000, queued: 0 } },
+    });
+    await h.controls.refreshAll();
+    expect(h.controls.take(R, "a", 170_000)).toBe(60_000);
+    h.controls.progress("a", 30_000);
+    // A retry in the same process: the earlier grant holds its 30,000 rows,
+    // not the 30,000 it never wrote.
+    expect(h.controls.take(R, "a", 170_000)).toBe(30_000);
+    expect(h.controls.room(R)).toBe(0);
+    expect(h.controls.take(R, "b", 1_000)).toBe(0);
+    h.pacing.counts = { [R]: { sent24h: 10_000, queued: 30_000 } };
+    await h.controls.recount();
+    expect(h.controls.room(R)).toBe(0);
+  });
+
+  it("rows written while a count runs stay on the ledger until the next count", async () => {
+    let gate: Promise<Map<string, { sent24h: number; queued: number }>> | null = null;
+    let release: () => void = () => {};
+    const controls = createRegionSendControls({
+      regions: [R],
+      read: async () => ({ max24h: 100_000, sentLast24h: 10_000, maxSendRate: 14 }),
+      ceiling: async () => 14,
+      reserve: async () => 30,
+      paused: async () => new Set(),
+      counts: () => gate ?? Promise.resolve(new Map([[R, { sent24h: 10_000, queued: 0 }]])),
+      initialRate: 14,
+      replicas: 1,
+    });
+    await controls.refreshAll();
+    expect(controls.take(R, "a", 170_000)).toBe(60_000);
+    controls.progress("a", 20_000);
+    gate = new Promise((resolve) => {
+      release = () => resolve(new Map([[R, { sent24h: 10_000, queued: 20_000 }]]));
+    });
+    const recount = controls.recount();
+    // Three more pages commit while the count runs; the count did not see them.
+    controls.progress("a", 20_300);
+    release();
+    await recount;
+    expect(controls.room(R)).toBe(0);
+  });
+
   it("an unlimited quota never paces", async () => {
     const h = harness({ [R]: { max24h: -1, sentLast24h: 500_000, maxSendRate: 100 } }, 100, {
       counts: new Error("never"),

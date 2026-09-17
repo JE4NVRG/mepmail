@@ -177,9 +177,10 @@ const sendControls = createRegionSendControls({
 });
 await sendControls.refreshAll();
 setInterval(() => void sendControls.refreshAll(), 60_000).unref();
-// The owner's estimate stops where the send would be refused: retention's
-// horizon, read once at boot like the retention default itself.
-const horizonDays = pacingHorizonDays(env.EMAIL_RETENTION_DAYS);
+// The owner's estimate stops where the send would be refused: the horizon
+// the web and the API derive from the same retention setting.
+const horizonDays = async () =>
+  pacingHorizonDays((await getInstanceSettings(db)).emailRetentionDays ?? env.EMAIL_RETENTION_DAYS);
 
 const queue = await Queue.start(env.DATABASE_URL, { workers: true });
 

@@ -6,6 +6,7 @@ import {
   broadcastSendSpacingMs,
   buildAccountMail,
   buildUnsubscribeHeaders,
+  cancelBroadcastRows,
   claimNotification,
   drawBroadcastCopy,
   encryptEmailBody,
@@ -40,7 +41,7 @@ import {
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import type { EmailSendRequest, EnqueueEmailSends } from "@millionsend/queue";
-import { and, asc, eq, gt, inArray, type SQL, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, type SQL, sql } from "drizzle-orm";
 import { mailOwners, type SystemMailer } from "../system-mail.js";
 
 /**
@@ -81,8 +82,8 @@ export interface BroadcastDeps {
    * (tests, an unpaced deployment) everything is admitted.
    */
   sesQuota?: BroadcastQuotaControls | undefined;
-  /** Days a paced send may take; the owner's estimate stops there. */
-  horizonDays?: number | undefined;
+  /** Days a paced send may take; the owner's estimate stops there. Read per walk end, like the retention it derives from. */
+  horizonDays?: (() => Promise<number>) | undefined;
   /** Dashboard origin for the links in those mails. */
   appBaseUrl?: string | undefined;
   /** The content monitor: the skeleton sample at fan-out start and the copies drawn per recipient. */
@@ -362,236 +363,263 @@ export async function sendBroadcast(
   // resumes from the last committed page and the unique index covers the
   // partial one.
   let cursor: string | null = broadcast.fanOutCursor;
-  for (;;) {
-    // Checked after the previous page's enqueue, so no enqueued page is lost.
-    if (deps.signal?.aborted) throw new Error(`broadcast ${broadcast.id}: fan-out aborted`);
-    // A billing period can renew under a long walk (the daily counter follows
-    // the clock by itself); each page reserves against the period current now.
-    quota = (await fetchTeamQuota(db, broadcast.teamId, deps.isCloud)) ?? quota;
-    const contacts = await db
-      .select({
-        id: schema.contacts.id,
-        email: schema.contacts.email,
-        firstName: schema.contacts.firstName,
-        lastName: schema.contacts.lastName,
-        properties: schema.contacts.properties,
-      })
-      .from(schema.contacts)
-      .where(
-        and(
-          eq(schema.contacts.teamId, broadcast.teamId),
-          eq(schema.contacts.unsubscribed, false),
-          cursor ? gt(schema.contacts.id, cursor) : undefined,
-          segmentPredicate,
-        ),
-      )
-      .orderBy(asc(schema.contacts.id))
-      .limit(batchSize);
-    if (contacts.length === 0) break;
-    // Heartbeat: the stall reconcile re-enqueues a "sending" broadcast whose
-    // row has not moved in fifteen minutes, so a long walk touches it once
-    // per page. The status guard also stops a run whose twin already
-    // finished the broadcast, or a cancel.
-    const [alive] = await db
-      .update(schema.broadcasts)
-      .set({ updatedAt: new Date(), fanOutCursor: cursor })
-      .where(and(eq(schema.broadcasts.id, broadcast.id), eq(schema.broadcasts.status, "sending")))
-      .returning({ id: schema.broadcasts.id });
-    if (!alive) return "skipped";
-    deps.sesQuota?.progress(broadcast.id, emitted);
-    // A suspension or pause landing mid-walk stops the fan-out at the page
-    // edge; the resumed walk skips the contacts already inserted.
-    const standingNow = await fetchTeamStanding(db, broadcast.teamId);
-    if (standingNow?.suspended || standingNow?.broadcastsPausedByOperatorAt) {
-      await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
-      return "deferred";
-    }
-
-    // Suppression mirrors the API accept path: a bounced or complained
-    // address must never receive bulk mail again, or SES reputation pays.
-    const suppressed = await findSuppressed(
-      db,
-      broadcast.teamId,
-      contacts.map((c) => c.email),
-    );
-    // Explicit topic overrides for this batch (absence = topicDefault).
-    const topicOverrides = new Map<string, boolean>();
-    if (broadcast.topicId) {
-      const rows = await db
+  let walked: { recipientCount: number | null } | undefined;
+  // Every way out of the walk closes its grant, or the room it did not use
+  // would stay reserved until the process restarts.
+  try {
+    for (;;) {
+      // Checked after the previous page's enqueue, so no enqueued page is lost.
+      if (deps.signal?.aborted) throw new Error(`broadcast ${broadcast.id}: fan-out aborted`);
+      // A billing period can renew under a long walk (the daily counter follows
+      // the clock by itself); each page reserves against the period current now.
+      quota = (await fetchTeamQuota(db, broadcast.teamId, deps.isCloud)) ?? quota;
+      const contacts = await db
         .select({
-          contactId: schema.contactTopicSubscriptions.contactId,
-          subscribed: schema.contactTopicSubscriptions.subscribed,
+          id: schema.contacts.id,
+          email: schema.contacts.email,
+          firstName: schema.contacts.firstName,
+          lastName: schema.contacts.lastName,
+          properties: schema.contacts.properties,
         })
-        .from(schema.contactTopicSubscriptions)
+        .from(schema.contacts)
         .where(
           and(
-            eq(schema.contactTopicSubscriptions.topicId, broadcast.topicId),
-            inArray(
-              schema.contactTopicSubscriptions.contactId,
-              contacts.map((c) => c.id),
-            ),
+            eq(schema.contacts.teamId, broadcast.teamId),
+            eq(schema.contacts.unsubscribed, false),
+            cursor ? gt(schema.contacts.id, cursor) : undefined,
+            segmentPredicate,
           ),
-        );
-      for (const r of rows) topicOverrides.set(r.contactId, r.subscribed);
-    }
-    const batch: EmailSendRequest[] = [];
-    for (const contact of contacts) {
-      if (suppressed.has(contact.email)) continue;
-      if (
-        broadcast.topicId &&
-        !isSubscribedToTopic(topicOverrides.get(contact.id), topicDefault ?? false)
-      ) {
-        continue;
-      }
-      // The row id is minted before the body so the unsubscribe link can name
-      // the email it sits in.
-      const emailId = randomUUID();
-      const token = makeUnsubscribeToken({
-        contactId: contact.id,
-        topicId: broadcast.topicId,
-        emailId,
-        secretKey: deps.unsubscribeSecretKey,
-      });
-      const headers = buildUnsubscribeHeaders(deps.unsubscribeBaseUrl, token);
-      // "<url>" → url; reusing the header builder keeps link and header
-      // pointing at the exact same page.
-      const unsubscribeUrl = headers["List-Unsubscribe"].slice(1, -1);
-      // Unsubscribe first: replaced segments are not rescanned, so a hostile
-      // contact field containing the token can never inject the URL swap.
-      const personalize = (s: string | null, opts: { html: boolean }) =>
-        s === null
-          ? null
-          : applyMergeFields(substituteUnsubscribeUrl(s, unsubscribeUrl), contact, opts);
-      const encrypted = await encryptEmailBody(
-        {
-          html: personalize(baseHtml, { html: true }),
-          text: personalize(broadcast.text, { html: false }),
-        },
-        deps.keyring,
-        { teamId: broadcast.teamId, rowId: emailId },
-      );
-      // Only rows this run actually enqueues advance the drip — re-run
-      // conflicts (accepted === null) don't, so a resumed fan-out keeps
-      // spacing tight instead of leaving gaps for already-queued contacts.
-      const startAfter = spacingMs > 0 ? new Date(startMs + emitted * spacingMs) : undefined;
-      // Past the share's room the row parks at once: no reservation and no
-      // job, the drain reserves on release (the existing parking contract).
-      const paced = emitted >= admitted;
-      // Quota reservation and email insert commit atomically (the quota
-      // contract), same as the API accept path — a broadcast must not
-      // bypass the plan's cap.
-      const accepted = await db.transaction(async (tx) => {
-        // Insert before reserving: a conflict means a previous run already
-        // fanned this contact out (and reserved quota for it), so a re-run
-        // must not burn quota again.
-        const [row] = await tx
-          .insert(schema.emails)
-          .values({
-            id: emailId,
-            teamId: broadcast.teamId,
-            domainId: domain.id,
-            broadcastId: broadcast.id,
-            contactId: contact.id,
-            from: broadcast.from,
-            to: [contact.email],
-            replyTo,
-            subject: applyMergeFields(broadcast.subject, contact, { html: false }),
-            latestStatus: paced ? "queued_quota" : "queued",
-            // The drip lives on the row: the send handler defers to it and
-            // the reconcile sweep leaves a not-yet-due row alone instead of
-            // re-enqueueing every throttled send each pass.
-            scheduledAt: paced ? null : (startAfter ?? null),
-            bodyCiphertext: encrypted.ciphertext,
-            bodyIv: encrypted.iv,
-            bodyWrappedDek: encrypted.wrappedDek,
-            bodyKeyVersion: encrypted.keyVersion,
-          })
-          .onConflictDoNothing({
-            target: [schema.emails.broadcastId, schema.emails.contactId],
-            where: sql`${schema.emails.broadcastId} is not null`,
-          })
-          .returning({ id: schema.emails.id });
-        if (!row) return null;
-        if (paced) return { id: row.id, parked: true };
-        const reservation = await reserveQuota(tx as unknown as Db, {
-          teamId: broadcast.teamId,
-          count: 1,
-          quota,
-        });
-        if (reservation.reserved) return { id: row.id, parked: false };
-        // Over the plan cap: park as queued_quota — accepted but not
-        // enqueued; the quota drain moves it to queued once the cap has
-        // room again (the UTC rollover, the period renewal, overage on).
-        await tx
-          .update(schema.emails)
-          .set({ latestStatus: "queued_quota" })
-          .where(eq(schema.emails.id, row.id));
-        return { id: row.id, parked: true };
-      });
-      // null → this contact was fanned out by a previous run; its job is
-      // already queued (or the sends.reconcile sweep recovers it).
-      if (accepted && !accepted.parked) {
-        emitted += 1;
-        batch.push({ emailId: accepted.id, startAfter });
-      }
-      if (
-        accepted &&
-        deps.monitor &&
-        monitorCopies > 0 &&
-        drawBroadcastCopy(
-          deps.monitor.samplingKey,
-          broadcast.id,
-          accepted.id,
-          monitorCopies,
-          monitorAudience,
         )
-      ) {
-        try {
-          await recordMonitorSample(db, deps.monitor, await deps.monitor.settings(), {
+        .orderBy(asc(schema.contacts.id))
+        .limit(batchSize);
+      if (contacts.length === 0) break;
+      // Heartbeat: the stall reconcile re-enqueues a "sending" broadcast whose
+      // row has not moved in fifteen minutes, so a long walk touches it once
+      // per page. The status guard also stops a run whose twin already
+      // finished the broadcast, or a cancel.
+      const [alive] = await db
+        .update(schema.broadcasts)
+        .set({ updatedAt: new Date(), fanOutCursor: cursor })
+        .where(and(eq(schema.broadcasts.id, broadcast.id), eq(schema.broadcasts.status, "sending")))
+        .returning({ id: schema.broadcasts.id });
+      if (!alive) {
+        await stopIfCanceled(db, broadcast);
+        return "skipped";
+      }
+      deps.sesQuota?.progress(broadcast.id, emitted);
+      // A suspension or pause landing mid-walk stops the fan-out at the page
+      // edge; the resumed walk skips the contacts already inserted.
+      const standingNow = await fetchTeamStanding(db, broadcast.teamId);
+      if (standingNow?.suspended || standingNow?.broadcastsPausedByOperatorAt) {
+        await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
+        return "deferred";
+      }
+
+      // Suppression mirrors the API accept path: a bounced or complained
+      // address must never receive bulk mail again, or SES reputation pays.
+      const suppressed = await findSuppressed(
+        db,
+        broadcast.teamId,
+        contacts.map((c) => c.email),
+      );
+      // Explicit topic overrides for this batch (absence = topicDefault).
+      const topicOverrides = new Map<string, boolean>();
+      if (broadcast.topicId) {
+        const rows = await db
+          .select({
+            contactId: schema.contactTopicSubscriptions.contactId,
+            subscribed: schema.contactTopicSubscriptions.subscribed,
+          })
+          .from(schema.contactTopicSubscriptions)
+          .where(
+            and(
+              eq(schema.contactTopicSubscriptions.topicId, broadcast.topicId),
+              inArray(
+                schema.contactTopicSubscriptions.contactId,
+                contacts.map((c) => c.id),
+              ),
+            ),
+          );
+        for (const r of rows) topicOverrides.set(r.contactId, r.subscribed);
+      }
+      const batch: EmailSendRequest[] = [];
+      for (const contact of contacts) {
+        if (suppressed.has(contact.email)) continue;
+        if (
+          broadcast.topicId &&
+          !isSubscribedToTopic(topicOverrides.get(contact.id), topicDefault ?? false)
+        ) {
+          continue;
+        }
+        // The row id is minted before the body so the unsubscribe link can name
+        // the email it sits in.
+        const emailId = randomUUID();
+        const token = makeUnsubscribeToken({
+          contactId: contact.id,
+          topicId: broadcast.topicId,
+          emailId,
+          secretKey: deps.unsubscribeSecretKey,
+        });
+        const headers = buildUnsubscribeHeaders(deps.unsubscribeBaseUrl, token);
+        // "<url>" → url; reusing the header builder keeps link and header
+        // pointing at the exact same page.
+        const unsubscribeUrl = headers["List-Unsubscribe"].slice(1, -1);
+        // Unsubscribe first: replaced segments are not rescanned, so a hostile
+        // contact field containing the token can never inject the URL swap.
+        const personalize = (s: string | null, opts: { html: boolean }) =>
+          s === null
+            ? null
+            : applyMergeFields(substituteUnsubscribeUrl(s, unsubscribeUrl), contact, opts);
+        const encrypted = await encryptEmailBody(
+          {
+            html: personalize(baseHtml, { html: true }),
+            text: personalize(broadcast.text, { html: false }),
+          },
+          deps.keyring,
+          { teamId: broadcast.teamId, rowId: emailId },
+        );
+        // Only rows this run actually enqueues advance the drip — re-run
+        // conflicts (accepted === null) don't, so a resumed fan-out keeps
+        // spacing tight instead of leaving gaps for already-queued contacts.
+        const startAfter = spacingMs > 0 ? new Date(startMs + emitted * spacingMs) : undefined;
+        // Past the share's room the row parks at once: no reservation and no
+        // job, the drain reserves on release (the existing parking contract).
+        const paced = emitted >= admitted;
+        // Quota reservation and email insert commit atomically (the quota
+        // contract), same as the API accept path — a broadcast must not
+        // bypass the plan's cap.
+        const accepted = await db.transaction(async (tx) => {
+          // Insert before reserving: a conflict means a previous run already
+          // fanned this contact out (and reserved quota for it), so a re-run
+          // must not burn quota again.
+          const [row] = await tx
+            .insert(schema.emails)
+            .values({
+              id: emailId,
+              teamId: broadcast.teamId,
+              domainId: domain.id,
+              broadcastId: broadcast.id,
+              contactId: contact.id,
+              from: broadcast.from,
+              to: [contact.email],
+              replyTo,
+              subject: applyMergeFields(broadcast.subject, contact, { html: false }),
+              latestStatus: paced ? "queued_quota" : "queued",
+              // The drip lives on the row: the send handler defers to it and
+              // the reconcile sweep leaves a not-yet-due row alone instead of
+              // re-enqueueing every throttled send each pass.
+              scheduledAt: paced ? null : (startAfter ?? null),
+              bodyCiphertext: encrypted.ciphertext,
+              bodyIv: encrypted.iv,
+              bodyWrappedDek: encrypted.wrappedDek,
+              bodyKeyVersion: encrypted.keyVersion,
+            })
+            .onConflictDoNothing({
+              target: [schema.emails.broadcastId, schema.emails.contactId],
+              where: sql`${schema.emails.broadcastId} is not null`,
+            })
+            .returning({ id: schema.emails.id });
+          if (!row) return null;
+          if (paced) return { id: row.id, parked: true };
+          const reservation = await reserveQuota(tx as unknown as Db, {
             teamId: broadcast.teamId,
-            emailId: accepted.id,
-            broadcastId: broadcast.id,
-            kind: "broadcast_copy",
-            now: new Date(),
+            count: 1,
+            quota,
           });
-        } catch (err) {
-          console.error(`broadcast ${broadcast.id}: monitor copy skipped`, err);
+          if (reservation.reserved) return { id: row.id, parked: false };
+          // Over the plan cap: park as queued_quota — accepted but not
+          // enqueued; the quota drain moves it to queued once the cap has
+          // room again (the UTC rollover, the period renewal, overage on).
+          await tx
+            .update(schema.emails)
+            .set({ latestStatus: "queued_quota" })
+            .where(eq(schema.emails.id, row.id));
+          return { id: row.id, parked: true };
+        });
+        // null → this contact was fanned out by a previous run; its job is
+        // already queued (or the sends.reconcile sweep recovers it).
+        if (accepted && !accepted.parked) {
+          emitted += 1;
+          batch.push({ emailId: accepted.id, startAfter });
+        }
+        if (
+          accepted &&
+          deps.monitor &&
+          monitorCopies > 0 &&
+          drawBroadcastCopy(
+            deps.monitor.samplingKey,
+            broadcast.id,
+            accepted.id,
+            monitorCopies,
+            monitorAudience,
+          )
+        ) {
+          try {
+            await recordMonitorSample(db, deps.monitor, await deps.monitor.settings(), {
+              teamId: broadcast.teamId,
+              emailId: accepted.id,
+              broadcastId: broadcast.id,
+              kind: "broadcast_copy",
+              now: new Date(),
+            });
+          } catch (err) {
+            console.error(`broadcast ${broadcast.id}: monitor copy skipped`, err);
+          }
         }
       }
-    }
-    // One statement per page: the rows are committed, so a failed enqueue
-    // only delays them until the sends.reconcile sweep.
-    if (batch.length > 0) {
-      try {
-        await deps.enqueueEmailSends(batch);
-      } catch (err) {
-        console.error("email.send enqueue failed; reconcile sweep will recover", err);
+      // One statement per page: the rows are committed, so a failed enqueue
+      // only delays them until the sends.reconcile sweep.
+      if (batch.length > 0) {
+        try {
+          await deps.enqueueEmailSends(batch);
+        } catch (err) {
+          console.error("email.send enqueue failed; reconcile sweep will recover", err);
+        }
       }
+      cursor = contacts[contacts.length - 1]?.id ?? cursor;
     }
-    cursor = contacts[contacts.length - 1]?.id ?? cursor;
-  }
 
-  // The walk is done, the send is not: recipientCount marks the walk's end
-  // and the status flips only once every row has gone (finalizeBroadcast),
-  // which the drain and the reconcile sweep call again for a paced send.
-  const [walked] = await db
-    .update(schema.broadcasts)
-    .set({
-      updatedAt: new Date(),
-      fanOutCursor: null,
-      // Counted once here off the fan-out's own unique index, so lists never
-      // join the emails table to size a broadcast.
-      recipientCount: sql`(select count(*)::int from ${schema.emails} where ${schema.emails.broadcastId} = ${broadcast.id})`,
-    })
-    .where(and(eq(schema.broadcasts.id, broadcast.id), eq(schema.broadcasts.status, "sending")))
-    .returning({ recipientCount: schema.broadcasts.recipientCount });
-  deps.sesQuota?.progress(broadcast.id, emitted);
-  deps.sesQuota?.done(broadcast.id);
-  if (!walked) return "skipped";
+    // The walk is done, the send is not: recipientCount marks the walk's end
+    // and the status flips only once every row has gone (finalizeBroadcast),
+    // which the drain and the reconcile sweep call again for a paced send.
+    [walked] = await db
+      .update(schema.broadcasts)
+      .set({
+        updatedAt: new Date(),
+        fanOutCursor: null,
+        // Counted once here off the fan-out's own unique index, so lists never
+        // join the emails table to size a broadcast.
+        recipientCount: sql`(select count(*)::int from ${schema.emails} where ${schema.emails.broadcastId} = ${broadcast.id})`,
+      })
+      .where(and(eq(schema.broadcasts.id, broadcast.id), eq(schema.broadcasts.status, "sending")))
+      .returning({ recipientCount: schema.broadcasts.recipientCount });
+  } finally {
+    deps.sesQuota?.progress(broadcast.id, emitted);
+    deps.sesQuota?.done(broadcast.id);
+  }
+  if (!walked) {
+    await stopIfCanceled(db, broadcast);
+    return "skipped";
+  }
   if (!(await finalizeBroadcast(db, deps, broadcast.id))) {
     await reportWalkEnd(db, deps, broadcast, domain.region, walked.recipientCount ?? 0, quota);
   }
   return "sent";
+}
+
+/**
+ * A walk that lost its status CAS to a stop: rows the last page committed
+ * after the stop's own sweep are canceled the same way, and their
+ * reservations go back. Idempotent, so a page that raced is the only cost.
+ */
+async function stopIfCanceled(db: Db, broadcast: { id: string; teamId: string }): Promise<void> {
+  const [row] = await db
+    .select({ status: schema.broadcasts.status })
+    .from(schema.broadcasts)
+    .where(eq(schema.broadcasts.id, broadcast.id));
+  if (row?.status === "canceled") {
+    await cancelBroadcastRows(db, { broadcastId: broadcast.id, teamId: broadcast.teamId });
+  }
 }
 
 /**
@@ -607,25 +635,26 @@ export async function finalizeBroadcast(
   broadcastId: string,
 ): Promise<boolean> {
   const e = schema.emails;
-  // Two probes rather than one `in (...)`: the parked one is an index range
-  // on its own, the queued one stops at the first row it finds.
-  for (const status of ["queued_quota", "queued"] as const) {
-    const [open] = await db
-      .select({ id: e.id })
-      .from(e)
-      .where(and(eq(e.broadcastId, broadcastId), eq(e.latestStatus, status)))
-      .limit(1);
-    if (open) return false;
-  }
+  // One statement, one snapshot: a row parking between two probes would
+  // read as gone.
+  const [open] = await db
+    .select({ id: e.id })
+    .from(e)
+    .where(and(eq(e.broadcastId, broadcastId), inArray(e.latestStatus, ["queued", "queued_quota"])))
+    .limit(1);
+  if (open) return false;
+  // Only a finished walk (recipientCount set) can complete: a crashed walk
+  // whose written rows all went out is still re-kicked, not sent.
   const [done] = await db
     .update(schema.broadcasts)
-    .set({
-      status: "sent",
-      sentAt: new Date(),
-      updatedAt: new Date(),
-      recipientCount: sql`coalesce(${schema.broadcasts.recipientCount}, (select count(*)::int from ${e} where ${e.broadcastId} = ${broadcastId}))`,
-    })
-    .where(and(eq(schema.broadcasts.id, broadcastId), eq(schema.broadcasts.status, "sending")))
+    .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.broadcasts.id, broadcastId),
+        eq(schema.broadcasts.status, "sending"),
+        isNotNull(schema.broadcasts.recipientCount),
+      ),
+    )
     .returning({
       id: schema.broadcasts.id,
       teamId: schema.broadcasts.teamId,
@@ -738,7 +767,9 @@ async function reportWalkEnd(
     account: capacity,
     reservePercent: deps.sesQuota.reserve(),
     rateCeiling: deps.sesQuota.rate(region),
-    horizonDays: deps.horizonDays ?? pacingHorizonDays(PACING_HORIZON_MAX_RETENTION_DAYS),
+    horizonDays: deps.horizonDays
+      ? await deps.horizonDays()
+      : pacingHorizonDays(PACING_HORIZON_MAX_RETENTION_DAYS),
     now,
   });
   const mine = plan.estimates.find((estimate) => estimate.key === broadcast.id);

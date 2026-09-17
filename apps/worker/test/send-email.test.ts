@@ -1527,7 +1527,7 @@ it("a broadcast row parks on the bulk share or a held region; a transactional ro
   expect(parked).toEqual(["us-east-1"]);
 });
 
-it("a row of a canceled broadcast is suppressed, not sent", async () => {
+it("a row of a canceled broadcast is canceled, not sent", async () => {
   const { ses, sends } = fakeSes("mid-canceled");
   const [bc] = await db
     .insert(schema.broadcasts)
@@ -1549,11 +1549,16 @@ it("a row of a canceled broadcast is suppressed, not sent", async () => {
       },
       { emailId },
     ),
-  ).toBe("suppressed");
+  ).toBe("canceled");
   expect(sends).toHaveLength(0);
-  const [event] = await db
-    .select({ data: schema.emailEvents.data })
+  const [row] = await db
+    .select({ status: schema.emails.latestStatus })
+    .from(schema.emails)
+    .where(eq(schema.emails.id, emailId));
+  expect(row?.status).toBe("canceled");
+  const events = await db
+    .select({ id: schema.emailEvents.id })
     .from(schema.emailEvents)
     .where(eq(schema.emailEvents.emailId, emailId));
-  expect(event?.data).toMatchObject({ reason: "broadcast_canceled" });
+  expect(events).toHaveLength(0);
 });
