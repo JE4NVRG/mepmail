@@ -553,6 +553,35 @@ function interposeBeforeFirstUpdate(realDb: Db, hook: () => Promise<void>): Db {
   }) as Db;
 }
 
+it("a stop landing mid-walk closes the grant and cancels the rows the last page wrote", async () => {
+  const { teamId: tId } = await seedTeam("stop", [
+    { email: "s1@example.com" },
+    { email: "s2@example.com" },
+    { email: "s3@example.com" },
+    { email: "s4@example.com" },
+  ]);
+  const broadcastId = await insertBroadcast({ teamId: tId, from: "Acme <hi@stop.dev>" });
+  const { controls, calls } = fakeControls(100);
+  const d = makeDeps({ sesQuota: controls, batchSize: 2 });
+  const enqueue = d.deps.enqueueEmailSends;
+  // The owner stops the rest right after page 1 committed; page 2's
+  // heartbeat loses its CAS.
+  d.deps.enqueueEmailSends = async (batch) => {
+    await enqueue(batch);
+    if (d.enqueued.length === 2) {
+      await db
+        .update(schema.broadcasts)
+        .set({ status: "canceled" })
+        .where(eq(schema.broadcasts.id, broadcastId));
+    }
+  };
+  expect(await sendBroadcast(db, d.deps, { broadcastId })).toBe("skipped");
+  expect(calls.done).toEqual([broadcastId]);
+  const rows = await emailsOf(broadcastId);
+  expect(rows).toHaveLength(2);
+  expect(rows.every((r) => r.latestStatus === "canceled")).toBe(true);
+});
+
 it("a cancel racing the sending claim fans out nothing", async () => {
   const broadcastId = await insertBroadcast();
   const { deps, enqueued } = makeDeps();

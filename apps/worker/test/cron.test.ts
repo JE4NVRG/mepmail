@@ -1168,6 +1168,44 @@ it("drain moves nothing of a broadcast in a region with no room, at its total, o
   ).toEqual({ drained: 0, stillParked: 2 });
 });
 
+it("drain caps a throttled team at one cadence of rows per run", async () => {
+  await db
+    .insert(schema.usageCounters)
+    .values({ teamId, day: today(), sent: 2_000, hardBounced: 90 });
+  const domainId = await seedRegionDomain(teamId);
+  const [broadcast] = await db
+    .insert(schema.broadcasts)
+    .values({
+      teamId,
+      from: "a@acme.dev",
+      subject: "paced",
+      status: "sending",
+      scheduledAt: new Date(),
+    })
+    .returning({ id: schema.broadcasts.id });
+  if (!broadcast) throw new Error("broadcast insert failed");
+  const from = new Date("2026-08-13T01:00:00Z");
+  await db.insert(schema.emails).values(
+    Array.from({ length: 950 }, (_, i) => ({
+      teamId,
+      domainId,
+      broadcastId: broadcast.id,
+      from: "a@acme.dev",
+      to: ["r@example.com"],
+      subject: "bulk",
+      latestStatus: "queued_quota" as const,
+      createdAt: new Date(from.getTime() + i * 1000),
+    })),
+  );
+  const result = await drainQuotaParked(db, {
+    isCloud: false,
+    enqueueSends: async () => {},
+    sesQuota: { regions: ["us-east-1"], exhausted: () => false, room: () => 5_000 },
+  });
+  // 15 minutes at one row a second: the rest waits for the next run.
+  expect(result).toEqual({ drained: 900, stillParked: 50 });
+}, 60_000);
+
 it("drain gives a throttled team one cadence of rows per run, spaced on the rows themselves", async () => {
   // 90/2000 = 4.5% hard bounces: over the warning line, under the pause line.
   await db

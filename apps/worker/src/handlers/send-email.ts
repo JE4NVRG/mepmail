@@ -130,7 +130,14 @@ export interface SendDeps {
     | undefined;
 }
 
-export type SendOutcome = "sent" | "skipped" | "deferred" | "suppressed" | "failed" | "parked";
+export type SendOutcome =
+  | "sent"
+  | "skipped"
+  | "deferred"
+  | "suppressed"
+  | "failed"
+  | "parked"
+  | "canceled";
 
 interface SendEligibility {
   eligible: boolean;
@@ -299,6 +306,32 @@ async function parkQueued(
   console.warn(`email.send: ${why}, parked ${email.id}`);
 }
 
+/**
+ * A queued row of a broadcast that was stopped: canceled like the rows the
+ * stop swept, with its reservation handed back. A row that already left
+ * "queued" is left alone.
+ */
+async function cancelQueuedEmail(db: Db, email: { id: string; teamId: string }): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const txDb = tx as unknown as Db;
+    const [row] = await txDb
+      .update(schema.emails)
+      .set({ latestStatus: "canceled" })
+      .where(
+        and(
+          eq(schema.emails.id, email.id),
+          eq(schema.emails.latestStatus, "queued"),
+          isNull(schema.emails.sentAt),
+        ),
+      )
+      .returning({ id: schema.emails.id });
+    if (!row) return false;
+    const quota = await fetchTeamQuota(txDb, email.teamId, true);
+    if (quota) await releaseQuota(txDb, { teamId: email.teamId, count: 1, quota });
+    return true;
+  });
+}
+
 /** Header names are case-insensitive; the caller's map keeps whatever casing it sent. */
 const hasListUnsubscribe = (headers: Record<string, string> | null | undefined): boolean =>
   Object.keys(headers ?? {}).some((k) => k.toLowerCase() === "list-unsubscribe");
@@ -337,6 +370,20 @@ function isTransientError(err: unknown): boolean {
     e.name === "TimeoutError" ||
     e.name === "AbortError"
   );
+}
+
+/** An ineligible row: canceled with its broadcast, suppressed for any other reason. */
+async function refuse(
+  db: Db,
+  email: { id: string; teamId: string },
+  reason: string | undefined,
+): Promise<SendOutcome> {
+  if (reason === "broadcast_canceled") {
+    return (await cancelQueuedEmail(db, email)) ? "canceled" : "skipped";
+  }
+  return (await suppressQueuedEmail(db, email.id, reason ?? "ineligible"))
+    ? "suppressed"
+    : "skipped";
 }
 
 export async function sendEmail(
@@ -420,11 +467,7 @@ export async function sendEmail(
   }
 
   let eligibility = await checkSendEligibility(db, email);
-  if (!eligibility.eligible) {
-    return (await suppressQueuedEmail(db, email.id, eligibility.reason ?? "ineligible"))
-      ? "suppressed"
-      : "skipped";
-  }
+  if (!eligibility.eligible) return refuse(db, email, eligibility.reason);
   if (eligibility.strip) await stripRecipients(db, email, eligibility.strip);
 
   // SES rejects a tenant send whose identity or configuration set is not
@@ -651,11 +694,7 @@ export async function sendEmail(
   // meantime invalidates the MIME already built, so the row is stripped and
   // handed straight back to the queue.
   eligibility = await checkSendEligibility(db, email);
-  if (!eligibility.eligible) {
-    return (await suppressQueuedEmail(db, email.id, eligibility.reason ?? "ineligible"))
-      ? "suppressed"
-      : "skipped";
-  }
+  if (!eligibility.eligible) return refuse(db, email, eligibility.reason);
   if (eligibility.strip) {
     await stripRecipients(db, email, eligibility.strip);
     await deps.reschedule?.(email.id, new Date(), emailSendPriority(email));

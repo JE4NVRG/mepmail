@@ -99,6 +99,7 @@ export function createRegionSendControls(opts: {
   let pausedRegions = new Set<string>();
   let ticks = 0;
   const grants = new Map<string, Grant>();
+  let folded = 0;
   const controls = new Map(
     opts.regions.map((region) => {
       const state = {
@@ -163,6 +164,9 @@ export function createRegionSendControls(opts: {
   };
   const recount = async ({ attempts = 1 } = {}) => {
     for (let attempt = 1; attempt <= attempts; attempt++) {
+      // What each walk had written when the count started: pages committed
+      // while the count runs are not in it, so they stay on the ledger.
+      const seen = new Map([...grants].map(([id, g]) => [id, g.emitted]));
       try {
         const counts = opts.counts ? await opts.counts() : new Map<string, RegionBulkCounts>();
         await readPaused();
@@ -177,7 +181,7 @@ export function createRegionSendControls(opts: {
         // released; a finished walk has nothing left to hold.
         for (const [id, g] of grants) {
           if (g.closed) grants.delete(id);
-          else g.counted = g.emitted;
+          else g.counted = seen.get(id) ?? g.counted;
         }
         countsOk = true;
         return;
@@ -232,6 +236,15 @@ export function createRegionSendControls(opts: {
     paused: (region) => pausedRegions.has(pick(region).key),
     take: (region, walkId, n) => {
       const c = pick(region);
+      // A walk taking again (a retry, a resume): its earlier grant keeps
+      // only the rows it wrote, until a count sees them.
+      const prev = grants.get(walkId);
+      if (prev) {
+        prev.admitted = prev.emitted;
+        prev.closed = true;
+        grants.set(`${walkId}#${folded++}`, prev);
+        grants.delete(walkId);
+      }
       const admitted = Math.min(n, room(c.key));
       grants.set(walkId, { region: c.key, admitted, emitted: 0, counted: 0, closed: false });
       return admitted;

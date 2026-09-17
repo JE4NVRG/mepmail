@@ -250,17 +250,26 @@ export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainRe
         ),
       )
       .orderBy(asc(b.scheduledAt), asc(b.createdAt), asc(b.id));
-    const roomLeft = new Map<string, number>();
-    const touched: string[] = [];
-    for (const [i, broadcast] of waiting.entries()) {
-      if (budget <= 0) break;
+    // Only broadcasts that can move this run share the slices, and a slice
+    // is split among the peers of the same region (the room is per region).
+    const eligible: { id: string; teamId: string; region: string }[] = [];
+    for (const broadcast of waiting) {
       const region = (await parkedRegion(db, broadcast.id)) ?? regions[0] ?? "";
       if (deps.sesQuota && (deps.sesQuota.paused?.(region) || deps.sesQuota.exhausted(region))) {
         continue;
       }
+      if ((deps.sesQuota?.room?.(region) ?? Number.POSITIVE_INFINITY) <= 0) continue;
+      eligible.push({ ...broadcast, region });
+    }
+    const roomLeft = new Map<string, number>();
+    const touched: string[] = [];
+    for (const [i, broadcast] of eligible.entries()) {
+      if (budget <= 0) break;
+      const { region } = broadcast;
       const room =
         roomLeft.get(region) ?? deps.sesQuota?.room?.(region) ?? Number.POSITIVE_INFINITY;
       if (room <= 0) continue;
+      const peers = eligible.filter((w, j) => j >= i && w.region === region).length;
       const spacingMs = broadcastSendSpacingMs(
         (await fetchDeliverabilityHealth(db, broadcast.teamId)).status,
       );
@@ -270,7 +279,7 @@ export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainRe
         spacingMs > 0 ? Math.floor(SES_QUOTA_SLOT_MS / spacingMs) : Number.POSITIVE_INFINITY;
       // An equal share of what the run and the region can still give; a
       // slice one broadcast cannot use passes down the FIFO.
-      const grant = Math.min(Math.ceil(Math.min(budget, room) / (waiting.length - i)), cap);
+      const grant = Math.min(Math.ceil(Math.min(budget, room) / peers), cap);
       if (grant <= 0) continue;
       const released = await releaseParkedRows(db, deps, run, {
         where: eq(schema.emails.broadcastId, broadcast.id),
