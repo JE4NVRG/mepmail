@@ -54,7 +54,7 @@
   },
   "status": {
     "queued": "Queued",
-    "queued_quota": "Queued (quota)",
+    "queued_quota": "Waiting",
     "sent": "Sent",
     "delivery_delayed": "Delivery delayed",
     "delivered": "Delivered",

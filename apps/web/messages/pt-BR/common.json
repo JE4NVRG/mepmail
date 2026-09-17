@@ -54,7 +54,7 @@
   },
   "status": {
     "queued": "Na fila",
-    "queued_quota": "Na fila (cota)",
+    "queued_quota": "Aguardando",
     "sent": "Enviado",
     "delivery_delayed": "Entrega atrasada",
     "delivered": "Entregue",
