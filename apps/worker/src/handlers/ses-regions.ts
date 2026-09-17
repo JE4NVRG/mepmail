@@ -164,24 +164,38 @@ export function createRegionSendControls(opts: {
   };
   const recount = async ({ attempts = 1 } = {}) => {
     for (let attempt = 1; attempt <= attempts; attempt++) {
-      // What each walk had written when the count started: pages committed
-      // while the count runs are not in it, so they stay on the ledger.
-      const seen = new Map([...grants].map(([id, g]) => [id, g.emitted]));
+      // What each walk had written, and what the lane and the drain had
+      // noted, when the count started: anything after that is not in the
+      // count and stays on the ledger until the next one. Keyed by the grant
+      // itself, since a re-take moves a grant under a new key.
+      const seen = new Map([...grants.values()].map((g) => [g, g.emitted]));
+      const since = new Map(
+        [...controls].map(([region, c]) => [
+          region,
+          { sent: c.state.sentSince, queued: c.state.queuedSince },
+        ]),
+      );
       try {
         const counts = opts.counts ? await opts.counts() : new Map<string, RegionBulkCounts>();
         await readPaused();
         for (const [region, control] of controls) {
           const c = counts.get(region);
+          const before = since.get(region) ?? { sent: 0, queued: 0 };
           control.state.dbBulkSent = c?.sent24h ?? 0;
           control.state.dbBulkQueued = c?.queued ?? 0;
-          control.state.sentSince = 0;
-          control.state.queuedSince = 0;
+          control.state.sentSince -= before.sent;
+          control.state.queuedSince -= before.queued;
         }
-        // The count now covers every row a walk has written or the drain has
-        // released; a finished walk has nothing left to hold.
+        // The count covers what each grant had written when it started; a
+        // closed grant leaves once a count has seen all of it.
         for (const [id, g] of grants) {
-          if (g.closed) grants.delete(id);
-          else g.counted = seen.get(id) ?? g.counted;
+          const counted = seen.get(g);
+          if (counted === undefined) continue;
+          g.counted = counted;
+          if (g.closed) {
+            g.admitted = g.emitted;
+            if (counted === g.emitted) grants.delete(id);
+          }
         }
         countsOk = true;
         return;

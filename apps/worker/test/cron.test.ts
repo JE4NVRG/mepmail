@@ -1168,6 +1168,25 @@ it("drain moves nothing of a broadcast in a region with no room, at its total, o
   ).toEqual({ drained: 0, stillParked: 2 });
 });
 
+it("drain still releases the plan-parked rows of a broadcast that already reads sent", async () => {
+  const domainId = await seedRegionDomain(teamId);
+  const bulk = await seedPacedBroadcast(teamId, domainId, 2, new Date("2026-08-13T01:00:00Z"));
+  await db
+    .update(schema.broadcasts)
+    .set({ status: "sent", sentAt: new Date(), recipientCount: 2 })
+    .where(eq(schema.broadcasts.id, bulk.id));
+  const enqueued: string[] = [];
+  const result = await drainQuotaParked(db, {
+    isCloud: false,
+    enqueueSends: async (batch) => {
+      enqueued.push(...batch.map((j) => j.emailId));
+    },
+    sesQuota: { regions: ["us-east-1"], exhausted: () => false, room: () => 5_000 },
+  });
+  expect(result).toEqual({ drained: 2, stillParked: 0 });
+  expect(enqueued.sort()).toEqual([...bulk.rows].sort());
+});
+
 it("drain caps a throttled team at one cadence of rows per run", async () => {
   await db
     .insert(schema.usageCounters)
