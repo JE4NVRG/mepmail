@@ -91,10 +91,22 @@ export const en = {
   "broadcast.sent": {
     subject: '"{name}" went out to {count} recipients',
     body: [
-      '"{subject}" was handed to {count} contacts of {team}; suppressed and unsubscribed addresses were skipped.',
+      '"{subject}" was handed to {count} contacts of {team}; suppressed and unsubscribed addresses were skipped.{failed}',
       "Opens, clicks and bounces appear on the broadcast page as they arrive.",
     ],
     button: "Open broadcast",
+    extra: { failed: " {n} could not be sent." },
+  },
+  "broadcast.sending": {
+    subject: '"{name}" is going out over {days} days',
+    body: [
+      "{first} of {count} emails went out in the first wave; the rest follows as capacity frees, the last about {finishesAt}.",
+      "Sends above the platform's daily capacity are spread over the following days; {team}'s transactional email is not held behind them.",
+    ],
+    button: "Open broadcast",
+    muted: [
+      "You get this once per broadcast that takes more than one day. The finish time is an estimate and moves as other teams send.",
+    ],
   },
   "broadcast.held_quota": {
     subject: '"{name}": {parked} of {count} recipients are waiting for the quota',

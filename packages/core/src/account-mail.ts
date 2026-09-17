@@ -23,6 +23,7 @@ export const ACCOUNT_MAIL_KINDS = [
   "domain.lost",
   "domain.lost.identity",
   "broadcast.sent",
+  "broadcast.sending",
   "broadcast.held_quota",
   "broadcast.held",
   "billing.payment_failed",

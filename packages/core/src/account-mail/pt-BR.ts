@@ -91,10 +91,22 @@ export const ptBR = {
   "broadcast.sent": {
     subject: '"{name}" foi enviado para {count} destinatários',
     body: [
-      '"{subject}" foi entregue a {count} contatos de {team}; endereços suprimidos e descadastrados foram ignorados.',
+      '"{subject}" foi entregue a {count} contatos de {team}; endereços suprimidos e descadastrados foram ignorados.{failed}',
       "Aberturas, cliques e bounces aparecem na página do broadcast conforme chegam.",
     ],
     button: "Abrir broadcast",
+    extra: { failed: " {n} não puderam ser enviados." },
+  },
+  "broadcast.sending": {
+    subject: '"{name}" está saindo ao longo de {days} dias',
+    body: [
+      "{first} de {count} e-mails saíram na primeira leva; o restante segue conforme a capacidade libera, o último por volta de {finishesAt}.",
+      "Envios acima da capacidade diária da plataforma são distribuídos pelos dias seguintes; o e-mail transacional de {team} não fica retido atrás deles.",
+    ],
+    button: "Abrir broadcast",
+    muted: [
+      "Você recebe isto uma vez por broadcast que leva mais de um dia. O horário de término é uma estimativa e muda conforme outras equipes enviam.",
+    ],
   },
   "broadcast.held_quota": {
     subject: '"{name}": {parked} de {count} destinatários aguardam a cota',
