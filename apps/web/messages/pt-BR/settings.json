@@ -436,6 +436,7 @@
       "region_breaker_closed": "Retomou transmissões na região",
       "region_quota_requested": "Solicitou aumento de cota do SES",
       "instance_monitor_settings_updated": "Atualizou configurações de monitoramento",
+      "instance_reserve_updated": "Alterou a reserva transacional",
       "monitor_override_set": "Definiu override de amostragem do monitor",
       "monitor_override_cleared": "Removeu override de amostragem do monitor",
       "monitor_broadcasts_paused": "O monitor de conteúdo pausou transmissões",
