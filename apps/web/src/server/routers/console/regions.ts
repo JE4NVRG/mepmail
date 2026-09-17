@@ -1,6 +1,8 @@
 import {
+  EMAIL_RETENTION_DAYS_DEFAULT,
   env,
   isCloudDeployment,
+  SES_MAX_SEND_RATE_DEFAULT,
   SES_TRANSACTIONAL_RESERVE_DEFAULT,
   servedRegions,
   sesTenantsEnabled,
@@ -8,16 +10,21 @@ import {
 import {
   bulkShare,
   clampReserve,
+  committedDailyVolume,
   getInstanceSettings,
   holdRegion,
   latestProbes,
+  pacingHorizonDays,
   pausedRegions,
+  planRegionSend,
+  regionBulkCounts,
   regionCounterTotals,
   regionDailyPeaks,
   regionWindowCounts,
   releaseRegion,
   SES_TRANSACTIONAL_RESERVE_MAX,
   SES_TRANSACTIONAL_RESERVE_MIN,
+  sendingBroadcasts,
   sesEventsHealth,
   usableReserve,
 } from "@millionsend/core";
@@ -102,6 +109,9 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
         events,
         probes,
         peaks,
+        bulk,
+        sending,
+        committedPerDay,
       ] = await Promise.all([
         accounts(),
         getInstanceSettings(ctx.db),
@@ -118,11 +128,23 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
         regionDailySends(ctx.db, { now, days: 7 }),
         env.SNS_TOPIC_ARNS?.length ? sesEventsHealth(ctx.db, now) : Promise.resolve(null),
         latestProbes(ctx.db),
-        defaultRegion
-          ? regionDailyPeaks(ctx.db, { region: defaultRegion, days: 7, now })
-          : Promise.resolve({ txPeak: 0, bulkPeak: 0 }),
+        Promise.all(
+          served.map(
+            async (region) =>
+              [region, await regionDailyPeaks(ctx.db, { region, days: 7, now })] as const,
+          ),
+        ).then((rows) => new Map(rows)),
+        regionBulkCounts(ctx.db, now),
+        sendingBroadcasts(ctx.db),
+        isCloudDeployment() ? committedDailyVolume(ctx.db, now) : Promise.resolve(null),
       ]);
-      const ceiling = settings.sesMaxSendRate ?? env.SES_MAX_SEND_RATE;
+      // Env values are raw strings when validation is skipped (tests), hence Number().
+      const horizonDays = pacingHorizonDays(
+        settings.emailRetentionDays ??
+          Number(env.EMAIL_RETENTION_DAYS ?? EMAIL_RETENTION_DAYS_DEFAULT),
+      );
+      const ceiling =
+        settings.sesMaxSendRate ?? Number(env.SES_MAX_SEND_RATE ?? SES_MAX_SEND_RATE_DEFAULT);
       const reserve = effectiveSetting(
         settings.sesTransactionalReserve,
         process.env.SES_TRANSACTIONAL_RESERVE,
@@ -133,10 +155,42 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
         account.ok && account.overview.quota.max24h > 0 ? account.overview.quota.max24h : null;
       const defaultAccount = regionAccounts.find((a) => a.region === defaultRegion);
       const defaultQuota = defaultAccount ? quotaOf(defaultAccount) : null;
+      const defaultPeak = defaultRegion ? (peaks.get(defaultRegion)?.txPeak ?? 0) : 0;
       const tenants = sesTenantsEnabled();
       const domainsByRegion = new Map(domains.map((r) => [r.region, r.n]));
       const breakers = new Map(paused.map((p) => [p.region, p]));
+      // The worker's memory of a transactional row parking at the quota line,
+      // one value for the instance: the probe carries seconds since.
+      const txParkedProbe = probes.get("ses_transactional_parked");
+      const txParkedAt =
+        txParkedProbe && !txParkedProbe.ok && txParkedProbe.value !== null
+          ? new Date(txParkedProbe.takenAt.getTime() - txParkedProbe.value * 1000)
+          : null;
+      // One planner run per region with a broadcast still going out: when
+      // the last of them finishes, for the queue row and the notice.
+      const lastFinishes = new Map(
+        await Promise.all(
+          regionAccounts.map(async (account) => {
+            const inRegion = sending.filter((b) => b.region === account.region);
+            if (!account.ok || inRegion.length === 0) return [account.region, null] as const;
+            const plan = await planRegionSend(ctx.db, {
+              region: account.region,
+              account: account.overview.quota,
+              reservePercent: reserve.value,
+              rateCeiling: ceiling,
+              horizonDays,
+              now,
+            });
+            const ends = plan.estimates.flatMap((e) => (e.finishesAt ? [e.finishesAt] : []));
+            return [
+              account.region,
+              ends.length > 0 ? new Date(Math.max(...ends.map((d) => d.getTime()))) : null,
+            ] as const;
+          }),
+        ),
+      );
       return {
+        committedPerDay,
         served: regionAccounts.map((account) => {
           const region = account.region;
           const counts24 = day.get(region);
@@ -146,13 +200,29 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
           const rate = RATE_CENTS_PER_1K[plan ?? "NONE"] ?? ALA_CARTE_CENTS_PER_1K;
           const breaker = breakers.get(region);
           const quota = quotaOf(account);
+          const share = quota === null ? null : bulkShare(quota, reserve.value);
+          const bulkSent24h = bulk.get(region)?.sent24h ?? 0;
+          const bulkQueued = bulk.get(region)?.queued ?? 0;
+          const inRegion = sending.filter((b) => b.region === region);
           return {
             region,
             served: true as const,
             // What broadcasts may hold in the rolling window, and what the
             // total gate really protects above it; null without a finite quota.
-            share: quota === null ? null : bulkShare(quota, reserve.value),
+            share,
             usableReserve: quota === null ? null : usableReserve(quota, reserve.value),
+            bulkSent24h,
+            // SES's own number minus ours: whatever else sends counts as transactional.
+            txSent24h: account.ok
+              ? Math.max(0, account.overview.quota.sentLast24h - bulkSent24h)
+              : null,
+            room: share === null ? null : Math.max(0, share - bulkSent24h - bulkQueued),
+            bulkParked: inRegion.reduce((n, b) => n + b.parked, 0),
+            waitingBroadcasts: inRegion.filter((b) => b.parked > 0).length,
+            lastFinishesAt: lastFinishes.get(region) ?? null,
+            txParkedAt,
+            txPeak7d: peaks.get(region)?.txPeak ?? 0,
+            bulkPeak7d: peaks.get(region)?.bulkPeak ?? 0,
             status: !account.ok
               ? ("unreachable" as const)
               : account.overview.productionAccess
@@ -203,10 +273,10 @@ export function createConsoleRegionsRouter(deps: ConsoleRegionDeps = defaultDeps
           max: SES_TRANSACTIONAL_RESERVE_MAX,
           // The default region's week: the hint beside the field.
           hint: {
-            txPeak7d: peaks.txPeak,
+            txPeak7d: defaultPeak,
             usableReserveNow:
               defaultQuota === null ? null : usableReserve(defaultQuota, reserve.value),
-            suggested: suggestedReserve(defaultQuota, peaks.txPeak),
+            suggested: suggestedReserve(defaultQuota, defaultPeak),
           },
         },
         eventsHealth: events,
