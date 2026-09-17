@@ -32,7 +32,11 @@ const today = () => utcDay();
 // Sends pass this far over the nominal daily cap before parking.
 const FREE_CEILING = dailyCeiling(teamRung("free", null).included);
 
-async function insertParked(createdAt: Date, subject = "parked"): Promise<string> {
+async function insertParked(
+  createdAt: Date,
+  subject = "parked",
+  over: Partial<typeof schema.emails.$inferInsert> = {},
+): Promise<string> {
   const [row] = await db
     .insert(schema.emails)
     .values({
@@ -42,6 +46,7 @@ async function insertParked(createdAt: Date, subject = "parked"): Promise<string
       subject,
       latestStatus: "queued_quota",
       createdAt,
+      ...over,
     })
     .returning({ id: schema.emails.id });
   if (!row) throw new Error("insert failed");
@@ -1032,4 +1037,166 @@ it("drain holds a paused team's broadcast rows and releases its transactional on
   expect(result).toEqual({ drained: 1, stillParked: 1 });
   expect(enqueued).toEqual([plain]);
   expect(await statusOf(bulk?.id ?? "")).toBe("queued_quota");
+});
+
+/** A sending broadcast of `team` with `parked` parked rows in the region's domain, oldest first from `from`. */
+async function seedPacedBroadcast(
+  team: string,
+  domainId: string,
+  parked: number,
+  from: Date,
+  scheduledAt = from,
+): Promise<{ id: string; rows: string[] }> {
+  const [broadcast] = await db
+    .insert(schema.broadcasts)
+    .values({ teamId: team, from: "a@acme.dev", subject: "paced", status: "sending", scheduledAt })
+    .returning({ id: schema.broadcasts.id });
+  if (!broadcast) throw new Error("broadcast insert failed");
+  const rows: string[] = [];
+  for (let i = 0; i < parked; i++) {
+    rows.push(
+      await insertParked(new Date(from.getTime() + i * 1000), "bulk", {
+        teamId: team,
+        domainId,
+        broadcastId: broadcast.id,
+      }),
+    );
+  }
+  return { id: broadcast.id, rows };
+}
+
+async function seedRegionDomain(team: string, region = "us-east-1"): Promise<string> {
+  const [domain] = await db
+    .insert(schema.domains)
+    .values({ teamId: team, name: `${region}.${team.slice(0, 6)}.dev`, region })
+    .returning({ id: schema.domains.id });
+  if (!domain) throw new Error("domain insert failed");
+  return domain.id;
+}
+
+it("drain releases transactional rows first, then broadcast rows only into the region's room", async () => {
+  const domainId = await seedRegionDomain(teamId);
+  const t0 = new Date("2026-08-13T01:00:00Z");
+  const bulk = await seedPacedBroadcast(teamId, domainId, 3, t0);
+  // Younger than every bulk row, yet released first.
+  const reset = await insertParked(new Date("2026-08-13T02:00:00Z"), "reset", { domainId });
+  const enqueued: string[] = [];
+  const noted: [string, number][] = [];
+  const finalized: string[] = [];
+  const result = await drainQuotaParked(db, {
+    isCloud: false,
+    enqueueSends: async (batch) => {
+      enqueued.push(...batch.map((j) => j.emailId));
+    },
+    sesQuota: {
+      regions: ["us-east-1"],
+      exhausted: () => false,
+      room: () => 2,
+      noteBulkQueued: (region, n) => {
+        noted.push([region, n]);
+      },
+    },
+    finalize: async (id) => {
+      finalized.push(id);
+    },
+  });
+  expect(result).toEqual({ drained: 3, stillParked: 1 });
+  expect(enqueued).toEqual([reset, bulk.rows[0], bulk.rows[1]]);
+  expect(await statusOf(bulk.rows[2] ?? "")).toBe("queued_quota");
+  expect(noted).toEqual([["us-east-1", 2]]);
+  expect(finalized).toEqual([bulk.id]);
+});
+
+it("drain splits a run's slice round-robin between the broadcasts still waiting, oldest scheduled first", async () => {
+  const domainId = await seedRegionDomain(teamId);
+  const first = await seedPacedBroadcast(teamId, domainId, 4, new Date("2026-08-13T01:00:00Z"));
+  const second = await seedPacedBroadcast(teamId, domainId, 4, new Date("2026-08-13T02:00:00Z"));
+  const enqueued: string[] = [];
+  const result = await drainQuotaParked(db, {
+    isCloud: false,
+    enqueueSends: async (batch) => {
+      enqueued.push(...batch.map((j) => j.emailId));
+    },
+    sesQuota: { regions: ["us-east-1"], exhausted: () => false, room: () => 6 },
+  });
+  expect(result).toEqual({ drained: 6, stillParked: 2 });
+  expect(enqueued).toEqual([...first.rows.slice(0, 3), ...second.rows.slice(0, 3)]);
+  // A broadcast that needs less than its share passes the rest down.
+  const third = await seedPacedBroadcast(teamId, domainId, 1, new Date("2026-08-13T03:00:00Z"));
+  enqueued.length = 0;
+  expect(
+    await drainQuotaParked(db, {
+      isCloud: false,
+      enqueueSends: async (batch) => {
+        enqueued.push(...batch.map((j) => j.emailId));
+      },
+      sesQuota: { regions: ["us-east-1"], exhausted: () => false, room: () => 10 },
+    }),
+  ).toEqual({ drained: 3, stillParked: 0 });
+  expect(enqueued).toEqual([first.rows[3], second.rows[3], third.rows[0]]);
+});
+
+it("drain moves nothing of a broadcast in a region with no room, at its total, or held", async () => {
+  const domainId = await seedRegionDomain(teamId);
+  const bulk = await seedPacedBroadcast(teamId, domainId, 2, new Date("2026-08-13T01:00:00Z"));
+  const reset = await insertParked(new Date("2026-08-13T02:00:00Z"), "reset", { domainId });
+  const deps = { isCloud: false, enqueueSends: async () => {} };
+  expect(
+    await drainQuotaParked(db, {
+      ...deps,
+      sesQuota: { regions: ["us-east-1"], exhausted: () => false, room: () => 0 },
+    }),
+  ).toEqual({ drained: 1, stillParked: 2 });
+  expect(await statusOf(reset)).toBe("queued");
+  expect(await statusOf(bulk.rows[0] ?? "")).toBe("queued_quota");
+  expect(
+    await drainQuotaParked(db, {
+      ...deps,
+      sesQuota: { regions: ["us-east-1"], exhausted: () => true, room: () => 100 },
+    }),
+  ).toEqual({ drained: 0, stillParked: 2 });
+  expect(
+    await drainQuotaParked(db, {
+      ...deps,
+      sesQuota: {
+        regions: ["us-east-1"],
+        exhausted: () => false,
+        room: () => 100,
+        paused: () => true,
+      },
+    }),
+  ).toEqual({ drained: 0, stillParked: 2 });
+});
+
+it("drain gives a throttled team one cadence of rows per run, spaced on the rows themselves", async () => {
+  // 90/2000 = 4.5% hard bounces: over the warning line, under the pause line.
+  await db
+    .insert(schema.usageCounters)
+    .values({ teamId, day: today(), sent: 2_000, hardBounced: 90 });
+  const domainId = await seedRegionDomain(teamId);
+  const bulk = await seedPacedBroadcast(teamId, domainId, 3, new Date("2026-08-13T01:00:00Z"));
+  const now = new Date("2026-08-14T12:00:00Z");
+  const jobs: { emailId: string; startAfter?: Date | undefined }[] = [];
+  const result = await drainQuotaParked(db, {
+    isCloud: false,
+    now,
+    enqueueSends: async (batch) => {
+      jobs.push(...batch.map((j) => ({ emailId: j.emailId, startAfter: j.startAfter })));
+    },
+    sesQuota: { regions: ["us-east-1"], exhausted: () => false, room: () => 5_000 },
+  });
+  expect(result).toEqual({ drained: 3, stillParked: 0 });
+  expect(jobs.map((j) => j.startAfter?.getTime())).toEqual([
+    now.getTime(),
+    now.getTime() + 1_000,
+    now.getTime() + 2_000,
+  ]);
+  const rows = await db
+    .select({ scheduledAt: schema.emails.scheduledAt })
+    .from(schema.emails)
+    .where(eq(schema.emails.broadcastId, bulk.id))
+    .orderBy(schema.emails.createdAt);
+  expect(rows.map((r) => r.scheduledAt?.getTime())).toEqual(
+    jobs.map((j) => j.startAfter?.getTime()),
+  );
 });
