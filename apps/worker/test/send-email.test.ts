@@ -1457,3 +1457,108 @@ it("parks a suspended team's mail before SES, and a paused team's broadcast rows
   expect(sends).toHaveLength(1);
   await hold({ broadcastsPausedByOperatorAt: null });
 });
+
+it("a broadcast row parks on the bulk share or a held region; a transactional row only at the total, which the probe hears", async () => {
+  const { ses, sends } = fakeSes("mid-share");
+  const [bc] = await db
+    .insert(schema.broadcasts)
+    .values({ teamId, from: "Acme <a@acme.dev>", subject: "share", status: "sending" })
+    .returning({ id: schema.broadcasts.id });
+  const contactId = await insertContact("share@example.com");
+  const bulk = await insertEmail({ broadcastId: bc?.id, contactId, to: ["share@example.com"] });
+  const transactional = await insertEmail();
+  const parked: (string | undefined)[] = [];
+  const sent: (string | undefined)[] = [];
+  const share = {
+    exhausted: () => false,
+    refresh: async () => false,
+    bulkExhausted: () => true,
+    noteTransactionalParked: (region?: string) => {
+      parked.push(region);
+    },
+    noteBulkSent: (region?: string) => {
+      sent.push(region);
+    },
+  };
+  expect(await sendEmail(db, { keyring, ses, sesQuota: share }, { emailId: bulk })).toBe("parked");
+  expect(await sendEmail(db, { keyring, ses, sesQuota: share }, { emailId: transactional })).toBe(
+    "sent",
+  );
+  expect(parked).toEqual([]);
+  expect(sent).toEqual([]);
+
+  const heldContact = await insertContact("share-held@example.com");
+  const held = await insertEmail({
+    broadcastId: bc?.id,
+    contactId: heldContact,
+    to: ["share-held@example.com"],
+  });
+  const paused = { ...share, bulkExhausted: () => false, paused: () => true };
+  expect(await sendEmail(db, { keyring, ses, sesQuota: paused }, { emailId: held })).toBe("parked");
+
+  const open = { ...share, bulkExhausted: () => false };
+  const flowingContact = await insertContact("share-flow@example.com");
+  const flowing = await insertEmail({
+    broadcastId: bc?.id,
+    contactId: flowingContact,
+    to: ["share-flow@example.com"],
+  });
+  const second = fakeSes("mid-share-bulk");
+  expect(
+    await sendEmail(
+      db,
+      {
+        keyring,
+        ses: second.ses,
+        sesQuota: open,
+        unsubscribe: { secretKey: randomBytes(32), baseUrl: "https://app.example.com" },
+      },
+      { emailId: flowing },
+    ),
+  ).toBe("sent");
+  expect(sent).toEqual(["us-east-1"]);
+  expect(sends).toHaveLength(1);
+  expect(second.sends).toHaveLength(1);
+
+  const full = { ...share, exhausted: () => true, refresh: async () => true };
+  expect(
+    await sendEmail(db, { keyring, ses, sesQuota: full }, { emailId: await insertEmail() }),
+  ).toBe("parked");
+  expect(parked).toEqual(["us-east-1"]);
+});
+
+it("a row of a canceled broadcast is canceled, not sent", async () => {
+  const { ses, sends } = fakeSes("mid-canceled");
+  const [bc] = await db
+    .insert(schema.broadcasts)
+    .values({ teamId, from: "Acme <a@acme.dev>", subject: "stopped", status: "canceled" })
+    .returning({ id: schema.broadcasts.id });
+  const contactId = await insertContact("stopped@example.com");
+  const emailId = await insertEmail({
+    broadcastId: bc?.id,
+    contactId,
+    to: ["stopped@example.com"],
+  });
+  expect(
+    await sendEmail(
+      db,
+      {
+        keyring,
+        ses,
+        unsubscribe: { secretKey: randomBytes(32), baseUrl: "https://app.example.com" },
+      },
+      { emailId },
+    ),
+  ).toBe("canceled");
+  expect(sends).toHaveLength(0);
+  const [row] = await db
+    .select({ status: schema.emails.latestStatus })
+    .from(schema.emails)
+    .where(eq(schema.emails.id, emailId));
+  expect(row?.status).toBe("canceled");
+  const events = await db
+    .select({ id: schema.emailEvents.id })
+    .from(schema.emailEvents)
+    .where(eq(schema.emailEvents.emailId, emailId));
+  expect(events).toHaveLength(0);
+});

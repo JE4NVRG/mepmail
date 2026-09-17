@@ -16,6 +16,9 @@ export const PROBES = {
   boss_waiting: "warn",
   boss_failed: "warn",
   ses_events_lag_s: "bad",
+  // A transactional row parked at the SES quota line: the reserve was too
+  // small for the day, and a password reset waited behind the drain.
+  ses_transactional_parked: "bad",
   webhook_success_rate: "warn",
   webhook_tripped: "warn",
   kms_wrap_ms: "bad",

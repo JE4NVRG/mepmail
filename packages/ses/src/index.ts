@@ -4,6 +4,14 @@ export {
   type SesAccountClient,
   type SesAccountOverview,
 } from "./account.js";
+export {
+  ACCOUNT_CACHE_MS,
+  createRegionAccountCache,
+  type RegionAccount,
+  type RegionAccountCache,
+  type RegionAccountDeps,
+  regionAccountWithin,
+} from "./account-cache.js";
 export { type DmarcLookup, type DmarcPolicy, lookupDmarc, parseDmarcRecord } from "./dmarc.js";
 export {
   checkDnsRecords,

@@ -30,6 +30,10 @@ export function parseCommaList(value: string | undefined): string[] | undefined 
 // display — the env proxy is raw process.env under SKIP_ENV_VALIDATION, so
 // consumers needing the default without zod's parsing read these.
 export const SES_MAX_SEND_RATE_DEFAULT = 14;
+/** Percent of each region's SES 24-hour quota kept for transactional mail; broadcasts get the rest. */
+export const SES_TRANSACTIONAL_RESERVE_DEFAULT = 30;
+export const SES_TRANSACTIONAL_RESERVE_MIN = 5;
+export const SES_TRANSACTIONAL_RESERVE_MAX = 90;
 export const AWS_REGION_DEFAULT = "us-east-1";
 export const EMAIL_RETENTION_DAYS_DEFAULT = 30;
 export const OPEN_PREFETCH_WINDOW_SECONDS_DEFAULT = 10;
@@ -167,6 +171,17 @@ export const env = createEnv({
     // standard production default. Bootstrap value only — the
     // instance_settings row overrides it.
     SES_MAX_SEND_RATE: z.coerce.number().positive().default(SES_MAX_SEND_RATE_DEFAULT),
+    // Share of every served region's rolling 24-hour SES quota that
+    // broadcasts never touch, as a percent. Transactional mail may use all
+    // of it and borrow beyond it; broadcasts get the rest and are paced over
+    // days past it. One value for every region. Bootstrap value only — the
+    // instance_settings row (Console → Regions) overrides it.
+    SES_TRANSACTIONAL_RESERVE: z.coerce
+      .number()
+      .int()
+      .min(SES_TRANSACTIONAL_RESERVE_MIN)
+      .max(SES_TRANSACTIONAL_RESERVE_MAX)
+      .default(SES_TRANSACTIONAL_RESERVE_DEFAULT),
     // Concurrent send lanes in the worker. A lane spends most of a send
     // waiting on SES, so about 1.2 lanes per message/second of send rate
     // keeps the bucket full; the default matches the standard 14/s account.

@@ -178,6 +178,7 @@ worker cabem sem ajuste.
 | --- | --- |
 | `SEND_CONCURRENCY` | Faixas de envio paralelas no worker (padrão `16`) — cerca de 1,2 por mensagem/segundo da taxa de envio do SES. |
 | `WORKER_REPLICAS` | Quantos processos de worker estão rodando (padrão `1`). O limitador de taxa do SES é um token bucket por processo, então cada worker divide a taxa de envio por este número para manter a conta no total. |
+| `SES_TRANSACTIONAL_RESERVE` | Percentual da cota móvel de 24 horas do SES de cada região que as transmissões nunca usam (padrão `30`, permitido `5`–`90`). O e-mail transacional pode usar toda essa parte e tomar emprestado além dela; uma transmissão maior que o restante é distribuída pelos dias seguintes. Valor inicial apenas: Console → Regiões sobrescreve em tempo de execução. |
 | `SQS_POLL_CONCURRENCY` | Loops paralelos de long polling no SQS para eventos do SES (padrão `4`). |
 | `WEBHOOK_DELIVERY_RETENTION_DAYS` | Por quanto tempo as linhas e payloads de entrega de webhook ficam legíveis no log de entregas (padrão `30`); as mais antigas são expurgadas. |
 | `EMAIL_METADATA_RETENTION_DAYS` | Dias que as linhas inteiras de email (destinatários, assunto, status, eventos) são mantidas (padrão `30`, a norma do setor); os corpos saem antes pela configuração de retenção do painel, e contadores diários e resultados de broadcasts são mantidos sempre. Versões anteriores à v0.6.30 usavam `365`: defina explicitamente antes de atualizar se esse histórico precisa ficar. |

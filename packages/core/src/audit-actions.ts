@@ -38,6 +38,7 @@ export const AUDIT_ACTIONS = [
   "region.quota_requested",
   "instance.settings_updated",
   "instance.monitor_settings_updated",
+  "instance.reserve_updated",
   "monitor.override_set",
   "monitor.override_cleared",
   "monitor.broadcasts_paused",

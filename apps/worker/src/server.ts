@@ -24,6 +24,8 @@ import {
   hashRecipient,
   type MonitorDeps,
   monitorSettingsReader,
+  pacingHorizonDays,
+  pausedRegions,
   postJson,
   pruneMonitorSamples,
   pruneProbes,
@@ -31,6 +33,7 @@ import {
   type QueuedWebhookDelivery,
   recordProbes,
   recountStaleSegments,
+  regionBulkCounts,
   sesEventsHealth,
 } from "@millionsend/core";
 import { getDb, schema } from "@millionsend/db";
@@ -75,7 +78,7 @@ import { runPlatformBreaker } from "./handlers/platform-breaker.js";
 import { processSesEvent } from "./handlers/process-ses-event.js";
 import { runRevealNotices } from "./handlers/reveal-notices.js";
 import { runSafetyFlags } from "./handlers/safety-flags.js";
-import { sendBroadcast } from "./handlers/send-broadcast.js";
+import { finalizeBroadcast, sendBroadcast } from "./handlers/send-broadcast.js";
 import { failQueuedEmail, sendEmail } from "./handlers/send-email.js";
 import { createRegionSendControls } from "./handlers/ses-regions.js";
 import { syncTenants } from "./handlers/tenants.js";
@@ -158,15 +161,26 @@ const accountClientFor = (region: string) => {
 // together with the rolling 24-hour quota, so sends park as queued_quota
 // before SES starts refusing them and a Settings → Instance change applies
 // without a restart. A failed read keeps the region's last answers.
+// The broadcast share and its room ledger are in-process too: with more
+// than one replica each over-admits by at most one room, which the gate
+// parks, and the parked-transactional probe reads one replica's memory.
 const sendControls = createRegionSendControls({
   regions,
   read: async (region) => (await getAccountOverview(accountClientFor(region))).quota,
   ceiling: async () => (await getInstanceSettings(db)).sesMaxSendRate ?? env.SES_MAX_SEND_RATE,
+  reserve: async () =>
+    (await getInstanceSettings(db)).sesTransactionalReserve ?? env.SES_TRANSACTIONAL_RESERVE,
+  counts: () => regionBulkCounts(db),
+  paused: async () => new Set((await pausedRegions(db)).map((p) => p.region)),
   initialRate: env.SES_MAX_SEND_RATE,
   replicas: env.WORKER_REPLICAS,
 });
 await sendControls.refreshAll();
 setInterval(() => void sendControls.refreshAll(), 60_000).unref();
+// The owner's estimate stops where the send would be refused: the horizon
+// the web and the API derive from the same retention setting.
+const horizonDays = async () =>
+  pacingHorizonDays((await getInstanceSettings(db)).emailRetentionDays ?? env.EMAIL_RETENTION_DAYS);
 
 const queue = await Queue.start(env.DATABASE_URL, { workers: true });
 
@@ -249,6 +263,7 @@ await queue.scheduleCrons({
       isCloud: env.IS_CLOUD,
       enqueueSends,
       sesQuota: sendControls,
+      finalize: (id) => finalizeBroadcast(db, { mailer, appBaseUrl: env.APP_BASE_URL }, id),
     });
     console.log(`quota.drain: drained=${result.drained} stillParked=${result.stillParked}`);
   },
@@ -338,6 +353,7 @@ await queue.scheduleCrons({
   "broadcasts.reconcile": async () => {
     const requeued = await reconcileStalledBroadcasts(db, {
       enqueue: (broadcastId) => enqueueBroadcast(broadcastId),
+      finalize: (id) => finalizeBroadcast(db, { mailer, appBaseUrl: env.APP_BASE_URL }, id),
     });
     if (requeued > 0) console.log(`broadcasts.reconcile: requeued=${requeued}`);
   },
@@ -364,6 +380,8 @@ await queue.scheduleCrons({
       isCloud: env.IS_CLOUD,
       keyring,
       eventsConfigured: Boolean(env.SNS_TOPIC_ARNS?.length),
+      regions,
+      txParkedAt: (region) => sendControls.txParkedAt(region),
     });
   },
   "safety.flags": async () => {
@@ -529,6 +547,7 @@ await queue.work(
         mailer,
         appBaseUrl: env.APP_BASE_URL,
         sesQuota: sendControls,
+        horizonDays,
         monitor,
       },
       payload,

@@ -161,6 +161,21 @@ export {
   injectPreheader,
   type MergeContact,
 } from "./broadcast-content.js";
+export {
+  bulkSentBySlot,
+  cancelBroadcastRows,
+  planRegionSend,
+  quotaUsage,
+  type RegionBulkCounts,
+  type RegionCapacity,
+  type RegionSendPlan,
+  type RegionSendPlanInput,
+  regionBulkCounts,
+  regionDailyPeaks,
+  rungThatFits,
+  type SendingBroadcast,
+  sendingBroadcasts,
+} from "./broadcast-pacing.js";
 export { canonicalBodyHash, canonicalStringify } from "./canonical-json.js";
 export { forwardedClientIp } from "./client-ip.js";
 export { type ContactActivityRow, recordContactActivity } from "./contact-activities.js";
@@ -440,6 +455,28 @@ export {
   segmentWhere,
 } from "./segment-filter.js";
 export { formatMailbox, type Mailbox, parseMailbox, parseSingleSender } from "./sender-address.js";
+export {
+  type BroadcastEstimate,
+  bulkShare,
+  clampReserve,
+  DRAIN_MAX_PER_RUN,
+  DRAIN_START_OFFSET_MS,
+  PACING_HORIZON_FRACTION,
+  PACING_HORIZON_MAX_RETENTION_DAYS,
+  type PlanCap,
+  type PlanInput,
+  type PlannedBroadcast,
+  pacingHorizonDays,
+  planBulkWaves,
+  planCaps,
+  type Release,
+  roundUpToSlot,
+  SES_QUOTA_MARGIN,
+  SES_QUOTA_SLOT_MS,
+  SES_TRANSACTIONAL_RESERVE_MAX,
+  SES_TRANSACTIONAL_RESERVE_MIN,
+  usableReserve,
+} from "./ses-capacity.js";
 export { associateDomainTenant, markDomainTenantAssociated } from "./ses-tenant.js";
 export {
   isBlockedIp,

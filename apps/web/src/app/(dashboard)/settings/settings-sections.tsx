@@ -915,6 +915,7 @@ function InstanceSection() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { data } = useQuery(trpc.system.instanceSettings.get.queryOptions());
+  const operator = useQuery(trpc.system.operator.queryOptions());
   const [rateDraft, setRateDraft] = useState<string | null>(null);
   const [retentionDraft, setRetentionDraft] = useState<string | null>(null);
   const save = useMutation(
@@ -936,22 +937,24 @@ function InstanceSection() {
           <Skeleton width={260} height="1lh" />
         </p>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-          {[t("instance.rateLabel"), t("instance.retentionLabel")].map((label) => (
-            <div key={label} className="ms-field" style={{ flex: "1 1 220px", maxWidth: 280 }}>
-              {/* span, not label: there is no control to label yet. Metrics mirror .ms-field label. */}
-              <span
-                style={{
-                  display: "block",
-                  fontSize: "var(--ms-fs-label)",
-                  color: "var(--ms-muted)",
-                  marginBottom: 6,
-                }}
-              >
-                {label}
-              </span>
-              <Skeleton width="100%" height={30} radius="var(--ms-r-input)" />
-            </div>
-          ))}
+          {[t("instance.rateLabel"), t("instance.retentionLabel"), t("instance.reserveLabel")].map(
+            (label) => (
+              <div key={label} className="ms-field" style={{ flex: "1 1 220px", maxWidth: 280 }}>
+                {/* span, not label: there is no control to label yet. Metrics mirror .ms-field label. */}
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: "var(--ms-fs-label)",
+                    color: "var(--ms-muted)",
+                    marginBottom: 6,
+                  }}
+                >
+                  {label}
+                </span>
+                <Skeleton width="100%" height={30} radius="var(--ms-r-input)" />
+              </div>
+            ),
+          )}
         </div>
       </SectionCard>
     );
@@ -1013,7 +1016,22 @@ function InstanceSection() {
             disabled={!data.canEdit || save.isPending}
             onChange={setRetentionDraft}
           />
+          <InstanceField
+            id="settings-instance-reserve"
+            label={t("instance.reserveLabel")}
+            min={5}
+            max={90}
+            value={String(data.sesTransactionalReserve.value)}
+            disabled
+            onChange={() => {}}
+          />
         </div>
+        <p style={{ margin: "8px 0 0", color: "var(--ms-muted)", fontSize: "var(--ms-fs-label)" }}>
+          {t.rich("instance.reserveNote", {
+            link: (chunks) =>
+              operator.data?.isOperator ? <Link href="/console/regions">{chunks}</Link> : chunks,
+          })}
+        </p>
         {data.canEdit ? (
           <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16 }}>
             <button type="submit" className="ms-btn ms-btn-secondary" disabled={save.isPending}>

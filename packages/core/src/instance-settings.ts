@@ -4,6 +4,8 @@ import type { MonitorSettingsRow } from "./monitor-settings.js";
 
 export interface InstanceSettings extends MonitorSettingsRow {
   sesMaxSendRate: number | null;
+  /** Percent of each region's SES 24-hour quota kept for transactional mail. */
+  sesTransactionalReserve: number | null;
   emailRetentionDays: number | null;
 }
 
@@ -24,6 +26,7 @@ export async function getInstanceSettings(db: Db): Promise<InstanceSettings> {
   return {
     ...monitor,
     sesMaxSendRate: row?.sesMaxSendRate ?? null,
+    sesTransactionalReserve: row?.sesTransactionalReserve ?? null,
     emailRetentionDays: row?.emailRetentionDays ?? null,
   };
 }

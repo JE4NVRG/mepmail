@@ -38,7 +38,7 @@ import { schema } from "@millionsend/db";
 import { type EmailSendPriority, emailSendPriority } from "@millionsend/queue";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { createTransport } from "nodemailer";
-import { isSesQuotaRefusal, isSesThrottle, type SesQuotaGate } from "./ses-quota.js";
+import { isSesQuotaRefusal, isSesThrottle, type SendQuotaControls } from "./ses-quota.js";
 
 /**
  * Sends one queued email through SES. The SES client is injected (tests use
@@ -84,8 +84,8 @@ export interface SendDeps {
   reschedule?:
     | ((emailId: string, at: Date, priority: EmailSendPriority) => Promise<void>)
     | undefined;
-  /** SES's 24-hour quota; absent in tests that never reach it. */
-  sesQuota?: SesQuotaGate | undefined;
+  /** SES's 24-hour quota and the broadcast share; absent in tests that never reach it. */
+  sesQuota?: SendQuotaControls | undefined;
   /** Arms the webhook drain for the endpoints written; email.sent webhooks are skipped when absent. */
   enqueueWebhookDelivery?: WebhookEnqueue | undefined;
   /**
@@ -130,7 +130,14 @@ export interface SendDeps {
     | undefined;
 }
 
-export type SendOutcome = "sent" | "skipped" | "deferred" | "suppressed" | "failed" | "parked";
+export type SendOutcome =
+  | "sent"
+  | "skipped"
+  | "deferred"
+  | "suppressed"
+  | "failed"
+  | "parked"
+  | "canceled";
 
 interface SendEligibility {
   eligible: boolean;
@@ -177,13 +184,18 @@ async function checkSendEligibility(
 
   if (!email.broadcastId) return { eligible: true, topicId: null };
   const [broadcast] = await db
-    .select({ topicId: schema.broadcasts.topicId })
+    .select({ topicId: schema.broadcasts.topicId, status: schema.broadcasts.status })
     .from(schema.broadcasts)
     .where(
       and(eq(schema.broadcasts.id, email.broadcastId), eq(schema.broadcasts.teamId, email.teamId)),
     )
     .limit(1);
   if (!broadcast) return { eligible: false, topicId: null, reason: "broadcast_missing" };
+  // A row a walk page or a drain release committed after the stop: the
+  // audience was told nothing more goes out.
+  if (broadcast.status === "canceled") {
+    return { eligible: false, topicId: null, reason: "broadcast_canceled" };
+  }
   if (!broadcast.topicId) return { eligible: true, topicId: null };
 
   const [topic] = await db
@@ -294,6 +306,32 @@ async function parkQueued(
   console.warn(`email.send: ${why}, parked ${email.id}`);
 }
 
+/**
+ * A queued row of a broadcast that was stopped: canceled like the rows the
+ * stop swept, with its reservation handed back. A row that already left
+ * "queued" is left alone.
+ */
+async function cancelQueuedEmail(db: Db, email: { id: string; teamId: string }): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const txDb = tx as unknown as Db;
+    const [row] = await txDb
+      .update(schema.emails)
+      .set({ latestStatus: "canceled" })
+      .where(
+        and(
+          eq(schema.emails.id, email.id),
+          eq(schema.emails.latestStatus, "queued"),
+          isNull(schema.emails.sentAt),
+        ),
+      )
+      .returning({ id: schema.emails.id });
+    if (!row) return false;
+    const quota = await fetchTeamQuota(txDb, email.teamId, true);
+    if (quota) await releaseQuota(txDb, { teamId: email.teamId, count: 1, quota });
+    return true;
+  });
+}
+
 /** Header names are case-insensitive; the caller's map keeps whatever casing it sent. */
 const hasListUnsubscribe = (headers: Record<string, string> | null | undefined): boolean =>
   Object.keys(headers ?? {}).some((k) => k.toLowerCase() === "list-unsubscribe");
@@ -332,6 +370,29 @@ function isTransientError(err: unknown): boolean {
     e.name === "TimeoutError" ||
     e.name === "AbortError"
   );
+}
+
+async function broadcastCanceled(db: Db, broadcastId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ status: schema.broadcasts.status })
+    .from(schema.broadcasts)
+    .where(eq(schema.broadcasts.id, broadcastId))
+    .limit(1);
+  return row?.status === "canceled";
+}
+
+/** An ineligible row: canceled with its broadcast, suppressed for any other reason. */
+async function refuse(
+  db: Db,
+  email: { id: string; teamId: string },
+  reason: string | undefined,
+): Promise<SendOutcome> {
+  if (reason === "broadcast_canceled") {
+    return (await cancelQueuedEmail(db, email)) ? "canceled" : "skipped";
+  }
+  return (await suppressQueuedEmail(db, email.id, reason ?? "ineligible"))
+    ? "suppressed"
+    : "skipped";
 }
 
 export async function sendEmail(
@@ -395,18 +456,32 @@ export async function sendEmail(
     : undefined;
   // SES at its 24-hour ceiling in this region: park before building anything,
   // the way an over-plan email parks at accept. The drain releases it as the
-  // window frees.
-  if (deps.sesQuota?.exhausted(domain?.region)) {
+  // window frees. A bulk row parks earlier, at the broadcast share (or while
+  // the region's broadcasts are held), so transactional mail keeps the rest.
+  const bulk = email.broadcastId !== null;
+  const region = domain?.region;
+  if (bulk) {
+    // Before any park: a row of a stopped broadcast must end canceled, never
+    // parked where no sweep looks again.
+    if (email.broadcastId && (await broadcastCanceled(db, email.broadcastId))) {
+      return refuse(db, email, "broadcast_canceled");
+    }
+    if (deps.sesQuota?.bulkExhausted?.(region) || deps.sesQuota?.paused?.(region)) {
+      await parkQueued(
+        db,
+        email,
+        deps.sesQuota.paused?.(region) ? "region broadcasts held" : "SES bulk share reached",
+      );
+      return "parked";
+    }
+  } else if (deps.sesQuota?.exhausted(region)) {
     await parkQueued(db, email, "SES 24h quota reached");
+    deps.sesQuota.noteTransactionalParked?.(region);
     return "parked";
   }
 
   let eligibility = await checkSendEligibility(db, email);
-  if (!eligibility.eligible) {
-    return (await suppressQueuedEmail(db, email.id, eligibility.reason ?? "ineligible"))
-      ? "suppressed"
-      : "skipped";
-  }
+  if (!eligibility.eligible) return refuse(db, email, eligibility.reason);
   if (eligibility.strip) await stripRecipients(db, email, eligibility.strip);
 
   // SES rejects a tenant send whose identity or configuration set is not
@@ -633,11 +708,7 @@ export async function sendEmail(
   // meantime invalidates the MIME already built, so the row is stripped and
   // handed straight back to the queue.
   eligibility = await checkSendEligibility(db, email);
-  if (!eligibility.eligible) {
-    return (await suppressQueuedEmail(db, email.id, eligibility.reason ?? "ineligible"))
-      ? "suppressed"
-      : "skipped";
-  }
+  if (!eligibility.eligible) return refuse(db, email, eligibility.reason);
   if (eligibility.strip) {
     await stripRecipients(db, email, eligibility.strip);
     await deps.reschedule?.(email.id, new Date(), emailSendPriority(email));
@@ -693,11 +764,10 @@ export async function sendEmail(
     // is full. Either way the email parks; a plain rate refusal keeps retrying.
     if (
       isSesQuotaRefusal(err) ||
-      (isSesThrottle(err) &&
-        deps.sesQuota !== undefined &&
-        (await deps.sesQuota.refresh(domain?.region)))
+      (isSesThrottle(err) && deps.sesQuota !== undefined && (await deps.sesQuota.refresh(region)))
     ) {
-      await parkQueued(db, email, "SES 24h quota reached");
+      await parkQueued(db, email, bulk ? "SES bulk share reached" : "SES 24h quota reached");
+      if (!bulk) deps.sesQuota?.noteTransactionalParked?.(region);
       return "parked";
     }
     throw err;
@@ -726,6 +796,7 @@ export async function sendEmail(
       set: { sent: sql`${counter.sent} + 1` },
     });
   await bumpHourlyUsage(db, { teamId: email.teamId, at: sentAt, counts: { sent: 1 } });
+  if (bulk) deps.sesQuota?.noteBulkSent?.(region);
   // Credential-bearing account mail loses its body the moment SES holds it: a
   // reset link is live for thirty minutes, and the row's body is otherwise
   // readable by every member of the owning team, any full-access key and

@@ -105,3 +105,32 @@ it("probeHistory buckets samples with the average and bool_and(ok)", async () =>
   });
   expect(points).toEqual([{ t: t0, value: 20, ok: false }]);
 });
+
+it("ses_transactional_parked reads the worker's memory of the last park", async () => {
+  const quiet = await runInstanceProbes(db, { ...offCloud, now: NOW, regions: ["us-east-1"] });
+  expect(quiet.find((s) => s.probe === "ses_transactional_parked")).toEqual({
+    probe: "ses_transactional_parked",
+    value: null,
+    ok: true,
+  });
+  const later = new Date(NOW.getTime() + 1);
+  const parkedAt = new Date(later.getTime() - 90_000);
+  const recent = await runInstanceProbes(db, {
+    ...offCloud,
+    now: later,
+    regions: ["us-east-1", "sa-east-1"],
+    txParkedAt: (region) => (region === "sa-east-1" ? parkedAt : null),
+  });
+  expect(recent.find((s) => s.probe === "ses_transactional_parked")).toEqual({
+    probe: "ses_transactional_parked",
+    value: 90,
+    ok: false,
+  });
+  const old = await runInstanceProbes(db, {
+    ...offCloud,
+    now: new Date(NOW.getTime() + 2),
+    regions: ["sa-east-1"],
+    txParkedAt: () => new Date(NOW.getTime() - 2 * DAY_MS),
+  });
+  expect(old.find((s) => s.probe === "ses_transactional_parked")).toMatchObject({ ok: true });
+});

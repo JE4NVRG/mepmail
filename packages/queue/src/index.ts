@@ -153,8 +153,10 @@ export const CRON_JOBS = {
   "idempotency.purge": "30 * * * *",
   // Every 15 min: re-enqueue webhook deliveries whose job was lost.
   "webhooks.reconcile": "*/15 * * * *",
-  // Every 15 min: re-enqueue broadcasts stuck in scheduled/sending.
-  "broadcasts.reconcile": "*/15 * * * *",
+  // Every 5 min: re-enqueue broadcasts stuck in scheduled/sending (the stall
+  // line stays at 15 min) and flip a finished send to sent once its last row
+  // has gone, so the Sent pill and the report follow the last row closely.
+  "broadcasts.reconcile": "*/5 * * * *",
   // Every 30 min: refresh the cached contact counts the Segments page shows.
   "segments.recount": "*/30 * * * *",
   // Every 15 min: re-check live DNS so a removed record demotes a verified
