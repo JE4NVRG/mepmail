@@ -63,6 +63,13 @@ remaining deltas are deliberate and loud:
   `403 broadcasts_paused` while the platform's aggregate rate in the sender's
   SES region is recovering; it is per region, leaves transactional email
   untouched, and clears on its own.
+- A broadcast send answers with `finishes_at` (the estimated instant the last
+  email goes out, or `null`), `estimated: true` and, when the audience exceeds
+  the capacity available now, a `warning` (`paced` or `queued_behind`, with
+  `days` and a message). Broadcast reads carry `sent_count` and a live
+  `finishes_at`; a cancel answers with `canceled_remaining`. An audience that
+  needs more than 24 days of capacity is refused with
+  `422 broadcast_too_large`. See [Broadcasts](/concepts/broadcasts#pacing).
 - `POST /emails` and `POST /emails/batch` return `429 daily_quota_exceeded`
   on a daily plan (Free, Starter) when the day's sending quota is spent and
   the queued backlog is full — retry after the UTC day rolls over — and

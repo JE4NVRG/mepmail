@@ -7,12 +7,14 @@ import {
   acceptEmail,
   authenticateApiKey,
   beginIdempotent,
+  broadcastSendSpacingMs,
   buildUnsubscribeUrl,
   CONTACT_PROPERTY_MAX_KEYS,
   CONTACT_PROPERTY_VALUE_MAX_LENGTH,
   type ContactActivityRow,
   type ContactEventContext,
   type ContactSnapshot,
+  cancelBroadcastRows,
   canonicalBodyHash,
   clearUnsubscribeSuppression,
   completeIdempotent,
@@ -29,6 +31,7 @@ import {
   fetchAccountScore,
   fetchDeliverabilityHealth,
   fetchEmailInsights,
+  fetchTeamQuota,
   fetchTeamStanding,
   findSuppressed,
   findTopicOptOuts,
@@ -42,17 +45,22 @@ import {
   PAUSE_COMPLAINT_RATE,
   PLAN_CONTACT_LIMIT,
   parseScheduledAt,
+  planCaps,
+  planRegionSend,
   QUOTA_BACKLOG_DAYS,
   quotaRoom,
+  quotaUsage,
   recordContactActivity,
   recountSegment,
   regionPause,
   releaseIdempotent,
   reserveQuota,
+  roundUpToSlot,
   SCHEDULED_AT_FORMS,
   scoreBand,
   segmentContactsWhere,
   segmentFilterSchema,
+  sendingBroadcasts,
   teamQuota,
   verifyOnboardingSender,
   verifySenderDomain,
@@ -147,6 +155,7 @@ import {
   type SendEmailRequest,
   segmentResponseSchema,
   sendBroadcastRequestSchema,
+  sendBroadcastResponseSchema,
   sendEmailRequestSchema,
   sendEmailResponseSchema,
   topicIdResponseSchema,
@@ -234,6 +243,22 @@ export interface ApiDeps {
    * certificate for customer-owned hostnames.
    */
   trackingSubdomains?: boolean | undefined;
+  /**
+   * What the send planner reads to say when a broadcast finishes: the
+   * region's SES account numbers (null when SES has not answered, which is
+   * never an error) and the instance's pacing settings. Omitted → sends
+   * carry no estimate and are never refused for size.
+   */
+  pacing?:
+    | {
+        regionAccount(
+          region: string,
+        ): Promise<{ max24h: number; sentLast24h: number; maxSendRate: number } | null>;
+        reservePercent(): Promise<number>;
+        rateCeiling(): Promise<number>;
+        horizonDays(): Promise<number>;
+      }
+    | undefined;
   /** Per-key fixed-window request cap. Defaults to 600 requests/minute. */
   rateLimitPerMinute?: number | undefined;
   /** Deployed source revision, reported by /health. */
@@ -2549,6 +2574,47 @@ function registerSegmentRoutes(app: OpenAPIHono<Env>, db: Db): void {
   );
 }
 
+/** Contacts the fan-out would walk: subscribed, in the segment, and subscribed to the topic. */
+async function countBroadcastAudience(
+  db: Db,
+  teamId: string,
+  broadcast: { segmentId: string | null; topicId: string | null },
+): Promise<number> {
+  const c = schema.contacts;
+  const conditions: (SQL | undefined)[] = [eq(c.teamId, teamId), eq(c.unsubscribed, false)];
+  if (broadcast.segmentId) {
+    const [segment] = await db
+      .select()
+      .from(schema.segments)
+      .where(and(eq(schema.segments.id, broadcast.segmentId), eq(schema.segments.teamId, teamId)));
+    if (segment) conditions.push(segmentContactsWhere(c, segment));
+  }
+  if (broadcast.topicId) {
+    const [topic] = await db
+      .select({ defaultSubscribed: schema.topics.defaultSubscribed })
+      .from(schema.topics)
+      .where(eq(schema.topics.id, broadcast.topicId));
+    const s = schema.contactTopicSubscriptions;
+    conditions.push(
+      topic?.defaultSubscribed
+        ? sql`not exists (select 1 from ${s} where ${s.contactId} = ${c.id} and ${s.topicId} = ${broadcast.topicId} and ${s.subscribed} = false)`
+        : sql`exists (select 1 from ${s} where ${s.contactId} = ${c.id} and ${s.topicId} = ${broadcast.topicId} and ${s.subscribed} = true)`,
+    );
+  }
+  const [row] = await db
+    .select({ n: count() })
+    .from(c)
+    .where(and(...conditions));
+  return row?.n ?? 0;
+}
+
+/** ISO to the second, the rounded instants the messages print. */
+const isoMinute = (at: Date) =>
+  roundUpToSlot(at)
+    .toISOString()
+    .replace(/\.\d{3}Z$/, "Z");
+const grouped = (n: number) => n.toLocaleString("en-US");
+
 function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
   const db = deps.db;
   const jsonErr = (description: string) => ({
@@ -2578,12 +2644,13 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
   // Every guard plus the draft→scheduled CAS behind POST /broadcasts/{id}/send,
   // shared with send-on-create (POST /broadcasts with send: true) so the two
   // entry points can never drift.
+  type SendBody = z.infer<typeof sendBroadcastResponseSchema>;
   const initiateSend = async (
     auth: ApiKeyAuth,
-    broadcast: { id: string; from: string },
+    broadcast: { id: string; from: string; segmentId: string | null; topicId: string | null },
     scheduledAtInput: string | undefined,
   ): Promise<
-    | { ok: true; id: string }
+    | { ok: true; id: string; body: SendBody }
     | { ok: false; status: 400 | 403 | 422; body: ReturnType<typeof errorBody> }
   > => {
     const fail = (status: 400 | 403 | 422, name: string, message: string) => ({
@@ -2646,6 +2713,16 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
     // satisfies the type); relative forms ("in 2 days") resolve against now.
     const scheduledAt =
       (scheduledAtInput ? parseScheduledAt(scheduledAtInput) : null) ?? new Date();
+    // The planner says when the send finishes and refuses one that would
+    // not finish inside the horizon; without SES's numbers it says nothing.
+    const estimate = await estimateSend(auth.teamId, broadcast, domain.region, scheduledAt);
+    if (estimate?.blocked) {
+      return fail(
+        422,
+        "broadcast_too_large",
+        `This audience of ${grouped(estimate.count)} needs more than ${estimate.horizonDays} days of sending capacity. Split it into smaller segments or ${deps.isCloud ? "contact support" : "ask your instance operator for more capacity"}.`,
+      );
+    }
     const [row] = await db
       .update(schema.broadcasts)
       .set({ status: "scheduled", scheduledAt, updatedAt: new Date() })
@@ -2661,7 +2738,122 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
     } catch (err) {
       console.error("broadcast.send enqueue failed; reconcile sweep will recover", err);
     }
-    return { ok: true, id: row.id };
+    const body: SendBody = {
+      id: row.id,
+      finishes_at: estimate?.finishesAt?.toISOString() ?? null,
+      estimated: true,
+    };
+    if (estimate?.finishesAt && estimate.startsAt && estimate.first === 0 && !estimate.planHold) {
+      body.warning = {
+        code: "queued_behind",
+        days: estimate.days,
+        message: `Other sends are ahead; this one starts about ${isoMinute(estimate.startsAt)} and finishes about ${isoMinute(estimate.finishesAt)}.`,
+      };
+    } else if (estimate?.finishesAt && estimate.first < estimate.count) {
+      body.warning = {
+        code: "paced",
+        days: estimate.days,
+        message: `${grouped(estimate.count)} recipients exceed the broadcast capacity available now; sending is paced and finishes about ${isoMinute(estimate.finishesAt)}. Transactional email is unaffected.`,
+      };
+    }
+    return { ok: true, id: row.id, body };
+  };
+
+  /**
+   * The new send planned beside the region's broadcasts in flight, at its
+   * scheduled instant (the window and the caps are aged to it). Null when
+   * the planner has no SES numbers to work from.
+   */
+  const estimateSend = async (
+    teamId: string,
+    broadcast: { id: string; segmentId: string | null; topicId: string | null },
+    region: string,
+    at: Date,
+  ) => {
+    if (!deps.pacing) return null;
+    const account = await deps.pacing.regionAccount(region);
+    if (!account) return null;
+    const [count, quota, health, reservePercent, rateCeiling, horizonDays] = await Promise.all([
+      countBroadcastAudience(db, teamId, broadcast),
+      fetchTeamQuota(db, teamId, deps.isCloud),
+      fetchDeliverabilityHealth(db, teamId),
+      deps.pacing.reservePercent(),
+      deps.pacing.rateCeiling(),
+      deps.pacing.horizonDays(),
+    ]);
+    const caps = quota ? planCaps(quota, await quotaUsage(db, teamId, quota), new Date()) : [];
+    const plan = await planRegionSend(db, {
+      region,
+      account,
+      reservePercent,
+      rateCeiling,
+      horizonDays,
+      newSend: {
+        key: broadcast.id,
+        count,
+        at,
+        spacingMs: broadcastSendSpacingMs(health.status),
+        caps,
+      },
+    });
+    const mine = plan.estimates.find((e) => e.key === broadcast.id);
+    return mine ? { ...mine, count, horizonDays } : null;
+  };
+
+  /** finishes_at per broadcast of the team still going out: one planner run per region, under the team's own caps. */
+  const liveFinishes = async (teamId: string): Promise<Map<string, Date | null>> => {
+    const out = new Map<string, Date | null>();
+    if (!deps.pacing) return out;
+    const mine = await sendingBroadcasts(db, { teamId });
+    const regions = new Set(mine.flatMap((b) => (b.region ? [b.region] : [])));
+    if (regions.size === 0) return out;
+    const [reservePercent, rateCeiling, horizonDays, quota] = await Promise.all([
+      deps.pacing.reservePercent(),
+      deps.pacing.rateCeiling(),
+      deps.pacing.horizonDays(),
+      fetchTeamQuota(db, teamId, deps.isCloud),
+    ]);
+    const caps = quota ? planCaps(quota, await quotaUsage(db, teamId, quota), new Date()) : [];
+    for (const region of regions) {
+      const account = await deps.pacing.regionAccount(region);
+      if (!account) continue;
+      const plan = await planRegionSend(db, {
+        region,
+        account,
+        reservePercent,
+        rateCeiling,
+        horizonDays,
+        capsFor: (id) => (id === teamId ? caps.map((c) => ({ ...c })) : undefined),
+      });
+      for (const e of plan.estimates) out.set(e.key, e.finishesAt);
+    }
+    return out;
+  };
+
+  /**
+   * Rows handed to SES so far, per broadcast, in one grouped count; null
+   * before the fan-out wrote any row and once the rows have left the
+   * metadata retention window.
+   */
+  const sentCounts = async (
+    broadcasts: readonly { id: string; status: string }[],
+  ): Promise<Map<string, number | null>> => {
+    const out = new Map<string, number | null>(broadcasts.map((b) => [b.id, null]));
+    const ids = broadcasts
+      .filter((b) => b.status !== "draft" && b.status !== "scheduled")
+      .map((b) => b.id);
+    if (ids.length === 0) return out;
+    const e = schema.emails;
+    const rows = await db
+      .select({
+        id: e.broadcastId,
+        sent: sql<number>`count(*) filter (where ${e.sentAt} is not null)::int`,
+      })
+      .from(e)
+      .where(inArray(e.broadcastId, ids))
+      .groupBy(e.broadcastId);
+    for (const row of rows) if (row.id) out.set(row.id, row.sent);
+    return out;
   };
 
   const parseReplyTo = (stored: string | null): string[] | null =>
@@ -2676,7 +2868,7 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
       },
       responses: {
         200: {
-          content: { "application/json": { schema: broadcastIdResponseSchema } },
+          content: { "application/json": { schema: sendBroadcastResponseSchema } },
           description: "Broadcast created (and scheduled when send: true)",
         },
         400: jsonErr("Broadcast state conflict"),
@@ -2723,8 +2915,18 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
       // /broadcasts/{id}/send. A failed guard returns its error but the
       // just-created draft remains, fixable and sendable later.
       if (body.send) {
-        const out = await initiateSend(auth, { id: row.id, from: body.from }, body.scheduled_at);
+        const out = await initiateSend(
+          auth,
+          {
+            id: row.id,
+            from: body.from,
+            segmentId: body.segment_id ?? null,
+            topicId: body.topic_id ?? null,
+          },
+          body.scheduled_at,
+        );
         if (!out.ok) return c.json(out.body, out.status);
+        return c.json(out.body, 200);
       }
       return c.json({ id: row.id }, 200);
     },
@@ -2777,6 +2979,12 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
           422,
         );
       }
+      const [finishes, sent] = await Promise.all([
+        page.rows.some((r) => r.status === "sending")
+          ? liveFinishes(auth.teamId)
+          : Promise.resolve(new Map<string, Date | null>()),
+        sentCounts(page.rows),
+      ]);
       return c.json(
         {
           object: "list" as const,
@@ -2788,6 +2996,9 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
             created_at: r.createdAt.toISOString(),
             scheduled_at: r.scheduledAt?.toISOString() ?? null,
             sent_at: r.sentAt?.toISOString() ?? null,
+            sent_count: sent.get(r.id) ?? null,
+            finishes_at:
+              r.status === "sending" ? (finishes.get(r.id)?.toISOString() ?? null) : null,
           })),
           has_more: page.hasMore,
         },
@@ -2830,6 +3041,11 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
           created_at: broadcast.createdAt.toISOString(),
           scheduled_at: broadcast.scheduledAt?.toISOString() ?? null,
           sent_at: broadcast.sentAt?.toISOString() ?? null,
+          sent_count: (await sentCounts([broadcast])).get(broadcast.id) ?? null,
+          finishes_at:
+            broadcast.status === "sending"
+              ? ((await liveFinishes(auth.teamId)).get(broadcast.id)?.toISOString() ?? null)
+              : null,
         },
         200,
       );
@@ -2949,8 +3165,8 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
       },
       responses: {
         200: {
-          content: { "application/json": { schema: broadcastIdResponseSchema } },
-          description: "Broadcast scheduled",
+          content: { "application/json": { schema: sendBroadcastResponseSchema } },
+          description: "Broadcast scheduled; finishes_at and warning say when it goes out",
         },
         400: jsonErr("Not a draft"),
         403: jsonErr("Sending paused"),
@@ -2972,7 +3188,7 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
       }
       const out = await initiateSend(auth, broadcast, body.scheduled_at);
       if (!out.ok) return c.json(out.body, out.status);
-      return c.json({ id: out.id }, 200);
+      return c.json(out.body, 200);
     },
   );
 
@@ -2986,7 +3202,7 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
           content: { "application/json": { schema: cancelBroadcastResponseSchema } },
           description: "Broadcast canceled",
         },
-        400: jsonErr("Not scheduled"),
+        400: jsonErr("Not queued"),
         404: jsonErr("Not found"),
       },
     }),
@@ -2995,20 +3211,34 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
       const { id } = c.req.valid("param");
       const broadcast = await findBroadcast(auth.teamId, id);
       if (!broadcast) return c.json(errorBody(404, "not_found", "Broadcast not found"), 404);
-      // Scheduled only: the fan-out handler re-checks status, so a cancel
-      // that wins this update beats a racing send job.
+      // Scheduled or sending: the fan-out's heartbeat re-checks status, so a
+      // cancel that wins this update stops a racing walk at its next page;
+      // whatever it already wrote is stopped below, and a row a racing page
+      // commits afterwards is refused at send time.
       const [row] = await db
         .update(schema.broadcasts)
         .set({ status: "canceled", updatedAt: new Date() })
-        .where(and(eq(schema.broadcasts.id, id), eq(schema.broadcasts.status, "scheduled")))
+        .where(
+          and(
+            eq(schema.broadcasts.id, id),
+            inArray(schema.broadcasts.status, ["scheduled", "sending"]),
+          ),
+        )
         .returning({ id: schema.broadcasts.id });
       if (!row) {
         return c.json(
-          errorBody(400, "invalid_parameter", "Only scheduled broadcasts can be canceled"),
+          errorBody(400, "invalid_parameter", "Only queued broadcasts can be canceled"),
           400,
         );
       }
-      return c.json({ object: "broadcast" as const, id: row.id }, 200);
+      const canceledRemaining = await cancelBroadcastRows(db, {
+        broadcastId: row.id,
+        teamId: auth.teamId,
+      });
+      return c.json(
+        { object: "broadcast" as const, id: row.id, canceled_remaining: canceledRemaining },
+        200,
+      );
     },
   );
 }

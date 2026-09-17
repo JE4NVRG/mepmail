@@ -232,6 +232,20 @@ describe("auth middleware", () => {
 });
 
 describe("tool listing", () => {
+  it("the broadcast tools say a large audience is paced and what a cancel stops", async () => {
+    const client = await connect(await mintToken());
+    const tools = (await client.listTools()).tools;
+    const description = (name: string) => tools.find((t) => t.name === name)?.description ?? "";
+    expect(description("create_broadcast")).toContain(
+      "A large audience is paced over days; the response's finishes_at and warning say when it finishes.",
+    );
+    expect(description("send_broadcast")).toContain("finishes_at and warning say when it finishes");
+    expect(description("cancel_broadcast")).toBe(
+      "Cancels a queued broadcast. Emails already sent are not recalled: check sent_count first; canceled_remaining says how many were stopped.",
+    );
+    await client.close();
+  });
+
   it("create_domain advertises and accepts only the regions this deployment serves", async () => {
     const client = await connect(await mintToken());
     const tool = (await client.listTools()).tools.find((t) => t.name === "create_domain");

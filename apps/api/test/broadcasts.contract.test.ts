@@ -99,6 +99,8 @@ describe("official resend SDK: broadcasts", () => {
         created_at: expect.any(String),
         scheduled_at: null,
         sent_at: null,
+        sent_count: null,
+        finishes_at: null,
       },
     ]);
   });
