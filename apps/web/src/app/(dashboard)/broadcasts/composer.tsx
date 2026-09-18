@@ -438,6 +438,7 @@ export function BroadcastComposer({ initial }: { initial?: ComposerInitial }) {
               </button>
               {testResult ? (
                 <span
+                  className="ms-action-note"
                   style={{
                     position: "absolute",
                     top: "calc(100% + 6px)",
@@ -699,7 +700,7 @@ export function BroadcastComposer({ initial }: { initial?: ComposerInitial }) {
 
               <FromField key={editorNonce} id="bc-from" value={from} onChange={setFrom} />
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div className="ms-tpl-meta" style={{ gap: 10 }}>
                 <div className="ms-field">
                   <label htmlFor="bc-reply-to">
                     {t("composer.replyToLabel")}{" "}

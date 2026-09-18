@@ -921,11 +921,11 @@ export function AudienceContactsView({ migrateToUrl }: { migrateToUrl: string | 
                 skipped: nf.format(importResult.skipped),
               })}
             </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 22 }}>
+            <ModalFooter>
               <button type="button" className="ms-btn ms-btn-primary" onClick={closeImport}>
                 {t("contacts.importDone")} <span className="ms-keycap">Esc</span>
               </button>
-            </div>
+            </ModalFooter>
           </>
         ) : (
           <>

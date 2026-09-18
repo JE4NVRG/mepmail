@@ -116,6 +116,11 @@
   outline: none;
   box-shadow: var(--ms-focus-ring);
 }
+/* The KPI cards' period pill is its own trigger: the 28px square would clip it. */
+.ms-kpi-period .ms-menu-trigger-bare {
+  width: auto;
+  height: auto;
+}
 .ms-keycap {
   font: 500 var(--ms-fs-micro) var(--ms-font-sans);
   border-radius: var(--ms-r-chip);
@@ -455,6 +460,7 @@ table.ms-table {
   line-height: 1.4;
   color: var(--ms-muted);
   max-width: 100%;
+  box-sizing: border-box;
 }
 /* Segment condition pill: the chip box, holding the button that opens the
    condition's editor and the ✕ that removes it. */
@@ -1098,8 +1104,9 @@ table.ms-table {
   border-radius: var(--ms-r-modal);
   box-shadow: var(--ms-shadow-card);
   /* The bottom edge is supplied by .ms-modal-footer, which every dialog ends with. */
+  box-sizing: border-box;
   padding: 28px 28px 0;
-  width: 480px;
+  width: 538px;
   max-width: calc(100vw - 48px);
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
@@ -1110,6 +1117,7 @@ table.ms-table {
    sit exactly where a short dialog puts them. */
 .ms-modal-footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
   position: sticky;
@@ -1136,7 +1144,7 @@ table.ms-table {
 
 /* The console's history dialog: wider than a form, narrower than the plan ladder. */
 .ms-modal-wide {
-  width: 760px;
+  width: 818px;
 }
 
 /* Sortable table headers (the console lists): the header cell is a button
@@ -1182,6 +1190,9 @@ table.ms-table {
   display: grid;
   gap: 16px;
 }
+.ms-grid-6 {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
 .ms-grid-4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -1196,6 +1207,16 @@ table.ms-table {
 }
 .ms-grid-12 {
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+/* A short card beside a tall one keeps its own height. */
+.ms-grid-21,
+.ms-grid-12 {
+  align-items: start;
+}
+/* Region cards: as many 380px columns as fit, so one served region plus the
+   add-a-region card share the row; min() keeps a card inside a narrower phone. */
+.ms-grid-regions {
+  grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
 }
 /* A card whose chart bleeds to its edges: the sparkline sits in the card's
    bottom band, under the card's own padding. */
@@ -1262,7 +1283,7 @@ table.ms-table {
 .ms-kv {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 6px 16px;
+  gap: 6px 12px;
   font-size: var(--ms-fs-label);
   align-items: baseline;
   margin: 0;
@@ -1274,8 +1295,9 @@ table.ms-table {
 .ms-kv dd {
   margin: 0;
   font-family: var(--ms-font-mono);
-  font-size: 12.5px;
+  font-size: 12px;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 /* Radio-card rows in the console dialogs. */
 .ms-radio-card {
@@ -1924,6 +1946,7 @@ summary:focus-visible,
   .ms-page-title {
     flex: 1 1 auto;
     min-width: 0;
+    overflow-wrap: anywhere;
   }
   .ms-page-actions {
     flex: 1 1 100%;
@@ -1933,9 +1956,23 @@ summary:focus-visible,
     flex: 1 1 auto;
     justify-content: center;
   }
+  .ms-page-actions > .ms-badge,
+  .ms-page-actions > .ms-page-badge {
+    flex: 0 0 auto;
+  }
   .ms-page-actions > .ms-btn-icon,
   .ms-page-actions > .ms-menu-trigger-bare {
     flex: 0 0 auto;
+  }
+  /* A note hung under a header action (the composer's "test sent to …") reads
+     from the action's left edge: right-anchored and nowrap, a long one ran off
+     the viewport. !important beats the inline anchoring. */
+  .ms-action-note {
+    left: 0;
+    right: auto !important;
+    white-space: normal !important;
+    width: max-content;
+    max-width: calc(100vw - 32px);
   }
   /* A split (primary button + menu root) grows like any action; the button
      inside must take that width too, or it floats centered in empty space. */
@@ -1969,7 +2006,11 @@ summary:focus-visible,
     width: 100% !important;
   }
 
-  /* Console grids: 4-up and 3-up collapse to 2-up; the 2/1 splits stack. */
+  /* Console grids: 6-up drops to 3-up, 4-up and 3-up collapse to 2-up; the
+     2/1 splits stack. */
+  .ms-grid-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .ms-grid-4,
   .ms-grid-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2137,8 +2178,20 @@ summary:focus-visible,
     max-width: min(320px, calc(100vw - 24px)) !important;
   }
   /* Keyboard hints are meaningless on touch. */
-  .ms-cmdk-hints {
+  .ms-cmdk-hints,
+  .ms-modal-footer .ms-keycap {
     display: none;
+  }
+  /* Dialog buttons share the width instead of pushing past the panel edge. */
+  .ms-modal-footer > *,
+  .ms-modal-footer > .ms-tooltip-trigger > .ms-btn,
+  .ms-modal-footer > .ms-tpl-convert-actions > .ms-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  /* Stat tiles stay two per row down to phone width. */
+  .ms-grid-6 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   /* Side sheets run edge to edge; their code blocks scroll inside. */
   .ms-sheet {
@@ -2148,9 +2201,6 @@ summary:focus-visible,
 }
 
 @media (max-width: 479px) {
-  .ms-meta-grid {
-    grid-template-columns: 1fr !important;
-  }
   .ms-modal {
     width: calc(100vw - 24px);
     max-width: calc(100vw - 24px);
@@ -2915,10 +2965,8 @@ summary:focus-visible,
   font-size: 13px;
   color: var(--ms-muted);
 }
-/* Sized with its padding inside the box (the base modal is content-box and
-   would grow past the viewport), leaving a rim of the page around it. */
+/* Sized with its padding inside the box, leaving a rim of the page around it. */
 .ms-modal-full {
-  box-sizing: border-box;
   width: calc(100vw - 72px);
   max-width: 1440px;
   height: calc(100dvh - 72px);

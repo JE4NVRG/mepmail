@@ -456,6 +456,7 @@ export function OnboardingSteps({
       </pre>
       {sender && hasKey ? (
         <div
+          className="ms-wrap-row"
           style={{
             display: "flex",
             alignItems: "center",

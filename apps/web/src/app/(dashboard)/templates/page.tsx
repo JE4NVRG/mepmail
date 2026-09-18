@@ -21,13 +21,19 @@ import { Truncated } from "@/components/truncated";
 import { useTRPC } from "@/lib/trpc";
 import { ListFooter, StateCard } from "../emails/list-parts";
 
+// Fixed layout: the time and trigger columns have set widths, the name
+// column takes the remainder and truncates, so no width needs to scroll.
+const TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed" };
+
 function TemplatesHead() {
   const t = useTranslations("templates");
   return (
     <thead>
       <tr>
-        <th style={{ width: "64%" }}>{t("list.name")}</th>
-        <th className="right">{t("list.updated")}</th>
+        <th>{t("list.name")}</th>
+        <th className="right" style={{ width: 96 }}>
+          {t("list.updated")}
+        </th>
         <th className="right" style={{ width: 44 }} />
       </tr>
     </thead>
@@ -38,7 +44,7 @@ function TemplatesHead() {
 function TemplatesSkeleton() {
   const widths = ["46%", "62%", "38%", "54%", "42%"];
   return (
-    <Table style={{ tableLayout: "fixed" }}>
+    <Table style={TABLE_STYLE}>
       <TemplatesHead />
       <tbody>
         {widths.map((width, row) => (
@@ -132,7 +138,7 @@ export default function TemplatesPage() {
         />
       ) : (
         <>
-          <Table style={{ tableLayout: "fixed" }}>
+          <Table style={TABLE_STYLE}>
             <TemplatesHead />
             <tbody>
               {items.map((row) => {

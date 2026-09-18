@@ -104,7 +104,7 @@ export function AddRegionPanel({
         : "danger";
 
   return (
-    <div className="ms-card" id="add-region" style={{ padding: 24, scrollMarginTop: 24 }}>
+    <div className="ms-card" id="add-region" style={{ padding: 20, scrollMarginTop: 24 }}>
       <div
         style={{
           display: "flex",

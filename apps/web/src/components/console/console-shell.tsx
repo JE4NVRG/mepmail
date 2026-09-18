@@ -140,13 +140,8 @@ function ConsoleSidebar({
           style={{ height: 15, display: "block" }}
         />
       </div>
-      <div style={{ padding: "2px 10px 12px", display: "flex", alignItems: "center", gap: 8 }}>
-        <span className="ms-microlabel" style={{ whiteSpace: "nowrap" }}>
-          {t("console")}
-        </span>
-        <span className="ms-chip" style={{ fontSize: 10, padding: "1px 6px", marginLeft: "auto" }}>
-          /console
-        </span>
+      <div style={{ padding: "2px 10px 12px" }}>
+        <span className="ms-microlabel">{t("console")}</span>
       </div>
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: delegated close-drawer hook; links stay the interactive elements */}
       <nav
@@ -306,9 +301,6 @@ export function ConsoleShell({
           alt={tCommon("appName")}
           style={{ height: 15, display: "block" }}
         />
-        <span className="ms-chip" style={{ fontSize: 10, padding: "1px 6px", marginLeft: "auto" }}>
-          /console
-        </span>
       </header>
       {drawerOpen ? (
         // biome-ignore lint/a11y/noStaticElementInteractions: scrim click-to-dismiss; Esc handles keyboard
