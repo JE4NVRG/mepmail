@@ -261,6 +261,7 @@ function CodeBlock({ value }: { value: string }) {
           lineHeight: 1.7,
           color: "var(--ms-bone)",
           whiteSpace: "pre-wrap",
+          overflowWrap: "anywhere",
         }}
       >
         {value}
@@ -634,6 +635,7 @@ export default function EmailDetailPage() {
 
       {hardBounced ? (
         <div
+          className="ms-wrap-row"
           style={{
             display: "flex",
             alignItems: "center",

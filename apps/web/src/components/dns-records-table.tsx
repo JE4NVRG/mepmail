@@ -108,8 +108,10 @@ function RecordsTable({
 }) {
   const t = useTranslations("domains");
   return (
-    /* tableLayout fixed so the pill cells can end-ellipsize long values. */
-    <Table className="ms-mono dense" style={{ fontSize: 13, tableLayout: "fixed" }}>
+    /* tableLayout fixed so the pill cells can end-ellipsize long values; the
+       min width makes the wrapper scroll on phones instead of collapsing the
+       Value column to nothing. */
+    <Table className="ms-mono dense" style={{ fontSize: 13, tableLayout: "fixed", minWidth: 720 }}>
       <thead>
         <tr className="ms-mono">
           <th style={{ width: 64 }}>{t("detail.columns.type")}</th>

@@ -172,18 +172,24 @@ export function CardHead({
   title,
   subtitle,
   inset = false,
+  flush = false,
 }: {
   title: string;
   subtitle?: string;
   /** For a padding-0 card holding a table: the head carries its own padding and rule. */
   inset?: boolean;
+  /** No bottom margin: the enclosing row carries the spacing, so actions that
+   * wrap under the subtitle keep the same distance to what follows. */
+  flush?: boolean;
 }) {
   return (
     <div
       style={
         inset
           ? { padding: "16px 20px 12px", borderBottom: "1px solid var(--ms-line)" }
-          : { marginBottom: 16 }
+          : flush
+            ? undefined
+            : { marginBottom: 16 }
       }
     >
       <h3

@@ -278,6 +278,7 @@ export default function ContactDetailPage() {
       ) : (
         // Mirrors the loaded PageHeader's boxes (breadcrumb + avatar + H1 + actions).
         <div
+          className="ms-page-row"
           style={{
             display: "flex",
             alignItems: "flex-end",
@@ -286,7 +287,7 @@ export default function ContactDetailPage() {
             marginBottom: 28,
           }}
         >
-          <div>
+          <div className="ms-page-title" style={{ minWidth: 0 }}>
             <div style={{ display: "flex", fontSize: 13, lineHeight: 1, marginBottom: 10 }}>
               <Skeleton width={200} height="1lh" />
             </div>
@@ -294,13 +295,19 @@ export default function ContactDetailPage() {
               <Skeleton width={44} height={44} radius="50%" />
               <h1
                 className="ms-display"
-                style={{ fontSize: "var(--ms-fs-h1)", fontWeight: 600, margin: 0, display: "flex" }}
+                style={{
+                  fontSize: "var(--ms-fs-h1)",
+                  fontWeight: 600,
+                  margin: 0,
+                  display: "flex",
+                  minWidth: 0,
+                }}
               >
                 <Skeleton width={300} height="1lh" />
               </h1>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="ms-page-actions" style={{ display: "flex", gap: 10 }}>
             <Skeleton width={64} height={30} radius="var(--ms-r-input)" />
             <Skeleton width={106} height={30} radius="var(--ms-r-input)" />
             <Skeleton width={72} height={30} radius="var(--ms-r-input)" />
@@ -343,6 +350,7 @@ export default function ContactDetailPage() {
       </div>
 
       <div
+        className="ms-meta-grid"
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
@@ -434,6 +442,7 @@ export default function ContactDetailPage() {
         </p>
         {row ? (
           <div
+            className="ms-meta-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
@@ -451,6 +460,7 @@ export default function ContactDetailPage() {
           </div>
         ) : (
           <div
+            className="ms-meta-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
