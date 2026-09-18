@@ -24,6 +24,10 @@ import { useTRPC } from "@/lib/trpc";
 import { ListFooter, StateCard } from "../emails/list-parts";
 import { type BroadcastStatus, PILL_VARIANT, StatusPill } from "./parts";
 
+// Fixed layout keeps the percentage column shares; the min width makes the
+// wrapper scroll on narrow screens instead of squeezing nowrap cells together.
+const TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", minWidth: 640 };
+
 function BroadcastsHead() {
   const t = useTranslations("broadcasts");
   return (
@@ -46,7 +50,7 @@ function BroadcastsHead() {
 function BroadcastsSkeleton() {
   const widths = ["58%", "42%", "66%", "50%", "38%"];
   return (
-    <Table style={{ tableLayout: "fixed" }}>
+    <Table style={TABLE_STYLE}>
       <BroadcastsHead />
       <tbody>
         {widths.map((width, row) => (
@@ -178,7 +182,7 @@ export default function BroadcastsPage() {
       ) : (
         <>
           {/* Fixed layout: the name column keeps its share and the name truncates in it. */}
-          <Table style={{ tableLayout: "fixed" }}>
+          <Table style={TABLE_STYLE}>
             <BroadcastsHead />
             <tbody>
               {items.map((row) => {

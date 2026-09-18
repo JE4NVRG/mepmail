@@ -343,8 +343,8 @@ export function RegionCard({ region, onChanged }: { region: ServedRegion; onChan
       className="ms-card ms-card-bleed"
       style={{
         position: "relative",
-        padding: 24,
-        paddingBottom: 74,
+        padding: 20,
+        paddingBottom: 78,
         display: "flex",
         flexDirection: "column",
         gap: 14,
@@ -399,10 +399,10 @@ export function RegionCard({ region, onChanged }: { region: ServedRegion; onChan
           <div
             style={{
               display: "flex",
-              gap: 14,
+              gap: 10,
               flexWrap: "wrap",
               marginTop: 8,
-              fontSize: 12,
+              fontSize: 11.5,
               color: "var(--ms-bone)",
             }}
           >
@@ -430,7 +430,7 @@ export function RegionCard({ region, onChanged }: { region: ServedRegion; onChan
       </dl>
       <span
         className="ms-microlabel"
-        style={{ position: "absolute", left: 24, bottom: 60, pointerEvents: "none" }}
+        style={{ position: "absolute", left: 20, bottom: 60, pointerEvents: "none" }}
       >
         {t("sparkLabel")}
       </span>
@@ -465,7 +465,7 @@ export function AddRegionCard({ region }: { region: string }) {
         textAlign: "center",
         color: "var(--ms-muted)",
         minHeight: 220,
-        padding: 24,
+        padding: 20,
       }}
     >
       <div style={{ fontSize: 18, letterSpacing: 4, filter: "grayscale(1)", opacity: 0.7 }}>

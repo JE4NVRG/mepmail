@@ -129,9 +129,22 @@ export function TeamDialog({
             <dt>{t("detail.stripe")}</dt>
             <dd>
               {detail.stripeSubscriptionId
-                ? t("detail.stripeSub", {
+                ? t.rich("detail.stripeSub", {
                     id: detail.stripeSubscriptionId,
                     status: detail.planStatus ?? none,
+                    link: (chunks) =>
+                      detail.stripeSubscriptionUrl ? (
+                        <a
+                          className="ms-link"
+                          href={detail.stripeSubscriptionUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {chunks} ↗
+                        </a>
+                      ) : (
+                        chunks
+                      ),
                   })
                 : t("detail.stripeNone")}
             </dd>

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { ChartDialog, PERIOD_KEYS, type PeriodKey } from "@/components/console/chart-dialog";
+import { ChevronGlyph } from "@/components/icons/nav-icons";
 import { PopoverMenu } from "@/components/popover-menu";
 import { Skeleton } from "@/components/skeleton";
 import { Sparkline } from "@/components/sparkline";
@@ -93,7 +94,7 @@ function KpiCard({ kind, initial }: { kind: KpiKind; initial: PeriodKey }) {
         className="ms-card ms-card-bleed"
         role="button"
         tabIndex={0}
-        style={{ padding: 24, position: "relative", paddingBottom: 70, cursor: "pointer" }}
+        style={{ padding: 20, position: "relative", paddingBottom: 70, cursor: "pointer" }}
         onClick={(event) => {
           const target = event.target as Element;
           if (target.closest("button") || target.closest("[data-spark]")) return;
@@ -107,20 +108,13 @@ function KpiCard({ kind, initial }: { kind: KpiKind; initial: PeriodKey }) {
           }
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            // The menu trigger is a fixed 28px square; its wider period label
-            // overflows it symmetrically, so the row keeps room on the right.
-            paddingRight: 12,
-          }}
-        >
-          <div className="ms-microlabel">{t(`kpi.${kind}`)}</div>
+        <div className="ms-microlabel">{t(`kpi.${kind}`)}</div>
+        {/* Out of flow, so the microlabel sits at the card padding instead of centring
+            against the taller trigger. */}
+        <div className="ms-kpi-period" style={{ position: "absolute", top: 14, right: 20 }}>
           <PopoverMenu
             ariaLabel={t("kpi.period")}
-            triggerGlyph={
+            triggerGlyph={(menuOpen) => (
               <span
                 className="ms-btn ms-btn-secondary"
                 style={{
@@ -135,11 +129,9 @@ function KpiCard({ kind, initial }: { kind: KpiKind; initial: PeriodKey }) {
                 }}
               >
                 {common(`periodShort.${period}`)}
-                <span aria-hidden="true" style={{ fontSize: 10 }}>
-                  ▾
-                </span>
+                <ChevronGlyph size={10} direction={menuOpen ? "up" : "down"} />
               </span>
-            }
+            )}
             items={[
               ...PERIOD_KEYS.map((key) => ({
                 label: common(`period.${key}`),

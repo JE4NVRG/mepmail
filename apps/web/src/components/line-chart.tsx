@@ -16,8 +16,6 @@ export interface LineChartSeries {
    own padding; the right edge reserves a gutter sized to the widest y tick
    label so the axis never overlaps the series. */
 const PAD = { top: 12, bottom: 24, left: 0 };
-/* Width one short-day x label needs — drives label thinning. */
-const X_LABEL_W = 46;
 
 /** 1/2/5×10^k ceiling so gridline ticks land on round numbers. */
 function niceStep(raw: number): number {
@@ -136,8 +134,10 @@ export function LineChart({
   const y = (v: number) => PAD.top + plotH * (1 - v / top);
   const point = (i: number, v: number) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`;
 
-  // Thin from the right so the newest day always keeps its label.
-  const labelStep = Math.max(1, Math.ceil((n * X_LABEL_W) / Math.max(1, plotW)));
+  // Thin from the right so the newest day always keeps its label. The slot
+  // width follows the widest label: hourly grains print far wider than days.
+  const labelW = 12 + Math.max(0, ...days.map((d) => formatDay(d).length)) * 6.2;
+  const labelStep = Math.max(1, Math.ceil((n * labelW) / Math.max(1, plotW)));
 
   function track(event: React.PointerEvent<HTMLDivElement>) {
     if (n === 0 || plotW <= 0) return;

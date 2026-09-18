@@ -1,4 +1,5 @@
-import { isCloudDeployment, supportViewEnabled } from "@millionsend/config";
+import { isLiveKey } from "@millionsend/billing";
+import { env, isCloudDeployment, supportViewEnabled } from "@millionsend/config";
 import {
   accountMailPhrase,
   fetchAccountScore,
@@ -228,6 +229,9 @@ export const consoleTeamsRouter = router({
     ]);
     return {
       ...row,
+      stripeSubscriptionUrl: row.stripeSubscriptionId
+        ? `https://dashboard.stripe.com/${isLiveKey(env.STRIPE_SECRET_KEY ?? "") ? "" : "test/"}subscriptions/${row.stripeSubscriptionId}`
+        : null,
       members: owners,
       guardrail: health.status,
       scoreTenths: score.scoreTenths,

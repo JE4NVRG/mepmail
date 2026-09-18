@@ -322,7 +322,6 @@
       "NONE": "à la carte",
       "ESSENTIALS": "Essentials"
     },
-    "provision": "Provisionar",
     "reserve": {
       "title": "Reserva transacional",
       "help": "Parte da cota de envio de 24 horas de cada região que as transmissões nunca usam. O e-mail transacional pode usar toda ela e tomar emprestado além dela.",
@@ -467,7 +466,7 @@
       "created": "Criada",
       "stripe": "Stripe",
       "stripeNone": "nenhum",
-      "stripeSub": "{id} · {status}",
+      "stripeSub": "<link>{id}</link> · {status}",
       "ceiling": "Teto diário",
       "ceilingNone": "o plano decide",
       "standingAt": "situação calculada {ago}",

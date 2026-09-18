@@ -29,6 +29,7 @@ export function ListFooter({
   const showChooser = size !== undefined && onSize && sizeLabel && !singlePage;
   return (
     <div
+      className="ms-wrap-row"
       style={{
         display: "flex",
         justifyContent: "space-between",
@@ -40,7 +41,7 @@ export function ListFooter({
       }}
     >
       <span>{left}</span>
-      <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
         {showChooser ? (
           <Select
             button

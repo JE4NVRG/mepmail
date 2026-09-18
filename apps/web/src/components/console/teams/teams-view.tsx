@@ -242,7 +242,7 @@ export function TeamsView() {
       {list.isError ? (
         <div
           className="ms-card"
-          style={{ padding: 24, display: "flex", gap: 14, alignItems: "center" }}
+          style={{ padding: 20, display: "flex", gap: 14, alignItems: "center" }}
         >
           <p style={{ margin: 0, color: "var(--ms-bone)", fontSize: "var(--ms-fs-ui)" }}>
             {common("loadError")}

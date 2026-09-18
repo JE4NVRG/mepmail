@@ -156,13 +156,9 @@ export function RegionsView() {
   // One scale for every region's sparkline, so a quiet region reads as quiet.
   const sharedPeak = Math.max(1, ...served.flatMap((r) => r.daily.map((p) => p.sent)));
 
-  const [addParam, setAdd] = useUrlState("add", "");
+  const [addParam] = useUrlState("add", "");
   const known = list.data?.known ?? [];
   const addRegion = oneOf(DOMAIN_REGIONS, addParam, "") || (known[0]?.region ?? "eu-west-1");
-  const provision = (region: string) => {
-    setAdd(region);
-    document.getElementById("add-region")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
 
   const counts = {
     serving: served.filter((r) => r.status === "serving").length,
@@ -250,7 +246,7 @@ export function RegionsView() {
       ) : (
         <>
           {oversold && oversold.share !== null && committed !== null ? (
-            <div role="status" className="ms-notice-strip ms-notice-strip-warn">
+            <div role="status" className="ms-notice-strip ms-notice-strip-warn ms-wrap-row">
               <span>
                 {t("sold.text", {
                   committed: f.n(committed),
@@ -408,16 +404,7 @@ export function RegionsView() {
                         </td>
                       ))}
                       <td>{mutedDash}</td>
-                      <td className="right">
-                        <button
-                          type="button"
-                          className="ms-btn ms-btn-secondary"
-                          style={{ height: 24, padding: "2px 8px", fontSize: 12 }}
-                          onClick={() => provision(k.region)}
-                        >
-                          {t("provision")}
-                        </button>
-                      </td>
+                      <td className="right" />
                     </tr>
                   ))}
                 </tbody>
@@ -433,7 +420,7 @@ export function RegionsView() {
               ) : (
                 <Skeleton width="100%" height={300} radius="var(--ms-r-card)" />
               )}
-              <div className="ms-card" style={{ padding: 24, overflow: "hidden" }}>
+              <div className="ms-card" style={{ padding: 20, overflow: "hidden" }}>
                 <div style={{ marginBottom: 16 }}>
                   <h3 style={cardTitle}>{t("sparks.title")}</h3>
                   <p style={cardSub}>{t("sparks.subtitle")}</p>
@@ -441,13 +428,13 @@ export function RegionsView() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                   {list.data
                     ? served.map((r) => (
-                        <div key={r.region} style={{ margin: "0 -24px" }}>
+                        <div key={r.region} style={{ margin: "0 -20px" }}>
                           <div
                             style={{
                               display: "flex",
                               justifyContent: "space-between",
                               fontSize: "var(--ms-fs-label)",
-                              padding: "0 24px 4px",
+                              padding: "0 20px 4px",
                             }}
                           >
                             <span>
@@ -485,7 +472,7 @@ export function RegionsView() {
                       ))}
                 </div>
               </div>
-              <div className="ms-card" style={{ padding: 24 }}>
+              <div className="ms-card" style={{ padding: 20 }}>
                 <div style={{ marginBottom: 16 }}>
                   <h3 style={cardTitle}>{t("perRegion.title")}</h3>
                   <p style={cardSub}>{t("perRegion.subtitle")}</p>

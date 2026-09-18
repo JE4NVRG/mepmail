@@ -30,7 +30,7 @@ import {
 } from "./parts";
 import { RevealCell, useContentReveal } from "./reveal";
 
-const TILE: React.CSSProperties = { padding: "18px 22px" };
+const TILE: React.CSSProperties = { padding: "16px 20px" };
 // The monitoring rows are sentences, not figures: sans, left, the body size.
 const KV_VALUE: React.CSSProperties = {
   textAlign: "left",
@@ -255,10 +255,7 @@ export function ReviewView({ teamId }: { teamId: string }) {
         }
       />
 
-      <div
-        className="ms-grid"
-        style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))", marginBottom: 16 }}
-      >
+      <div className="ms-grid ms-grid-6" style={{ marginBottom: 16 }}>
         <Tile
           label={
             <Tooltip inline text={t("tiles.riskTip")}>
@@ -295,10 +292,18 @@ export function ReviewView({ teamId }: { teamId: string }) {
         <Tile label={t("tiles.contacts")}>{nf.format(team.contacts)}</Tile>
       </div>
 
-      <div className="ms-card" style={{ padding: 24, marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+      <div className="ms-card" style={{ padding: 20, marginBottom: 16 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 12,
+            flexWrap: "wrap",
+            marginBottom: 16,
+          }}
+        >
           <div style={{ flex: 1, minWidth: 240 }}>
-            <CardHead title={monitorT("title")} subtitle={monitorT("subtitle")} />
+            <CardHead flush title={monitorT("title")} subtitle={monitorT("subtitle")} />
           </div>
           {!exempt ? (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -470,7 +475,7 @@ export function ReviewView({ teamId }: { teamId: string }) {
       </div>
 
       <div className="ms-grid ms-grid-12" style={{ marginBottom: 16 }}>
-        <div className="ms-card" style={{ padding: 24 }}>
+        <div className="ms-card" style={{ padding: 20 }}>
           <CardHead title={t("flagTitle")} />
           {flag ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13 }}>
@@ -487,7 +492,7 @@ export function ReviewView({ teamId }: { teamId: string }) {
             <p style={{ margin: 0, fontSize: 13, color: "var(--ms-muted)" }}>{common("none")}</p>
           )}
         </div>
-        <div className="ms-card" style={{ padding: 24 }}>
+        <div className="ms-card" style={{ padding: 20 }}>
           <CardHead title={t("checks.title")} subtitle={t("checks.subtitle")} />
           {checks.length === 0 ? (
             <p style={{ margin: 0, fontSize: 13, color: "var(--ms-muted)" }}>{t("checks.none")}</p>
@@ -762,10 +767,7 @@ function ReviewSkeleton() {
           <Skeleton width={380} />
         </div>
       </div>
-      <div
-        className="ms-grid"
-        style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))", marginBottom: 16 }}
-      >
+      <div className="ms-grid ms-grid-6" style={{ marginBottom: 16 }}>
         {[0, 1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="ms-card" style={TILE}>
             <div className="ms-microlabel" style={{ display: "flex" }}>
@@ -779,7 +781,7 @@ function ReviewSkeleton() {
       </div>
       <div className="ms-grid ms-grid-12" style={{ marginBottom: 16 }}>
         {[0, 1].map((i) => (
-          <div key={i} className="ms-card" style={{ padding: 24 }}>
+          <div key={i} className="ms-card" style={{ padding: 20 }}>
             <div style={{ display: "flex", marginBottom: 16 }}>
               <Skeleton width={120} height={22} />
             </div>
@@ -792,7 +794,7 @@ function ReviewSkeleton() {
         ))}
       </div>
       {[0, 1].map((i) => (
-        <div key={i} className="ms-card" style={{ padding: 24, marginBottom: 16 }}>
+        <div key={i} className="ms-card" style={{ padding: 20, marginBottom: 16 }}>
           <div style={{ display: "flex", marginBottom: 16 }}>
             <Skeleton width={160} height={22} />
           </div>

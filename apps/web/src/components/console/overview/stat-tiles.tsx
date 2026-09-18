@@ -30,7 +30,7 @@ function Tile({
         style={{
           display: "block",
           width: "100%",
-          padding: "18px 22px",
+          padding: "16px 20px",
           cursor: "pointer",
           textAlign: "left",
           font: "inherit",

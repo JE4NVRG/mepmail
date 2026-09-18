@@ -62,7 +62,7 @@ export function PopoverMenu({
   ariaLabel: string;
   items: (PopoverMenuItem | null)[];
   align?: "left" | "right";
-  triggerGlyph?: React.ReactNode;
+  triggerGlyph?: React.ReactNode | ((open: boolean) => React.ReactNode);
   boxed?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -177,7 +177,9 @@ export function PopoverMenu({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        {triggerGlyph ?? <EllipsisGlyph />}
+        {(typeof triggerGlyph === "function" ? triggerGlyph(open) : triggerGlyph) ?? (
+          <EllipsisGlyph />
+        )}
       </button>
       {open && position
         ? createPortal(

@@ -122,7 +122,7 @@ export function MonitorSettingsView() {
         }
       />
 
-      <div className="ms-card" style={{ padding: 24, marginBottom: 16 }}>
+      <div className="ms-card" style={{ padding: 20, marginBottom: 16 }}>
         <CardHead title={t("judge.title")} />
         {judge.on ? (
           <dl className="ms-kv" style={{ gridTemplateColumns: "max-content 1fr" }}>
@@ -139,7 +139,7 @@ export function MonitorSettingsView() {
             {judge.baseUrl ? (
               <>
                 <dt>{t("judge.baseUrl")}</dt>
-                <dd style={{ textAlign: "left" }}>{judge.baseUrl}</dd>
+                <dd style={{ textAlign: "left", overflowWrap: "anywhere" }}>{judge.baseUrl}</dd>
               </>
             ) : null}
           </dl>
@@ -160,7 +160,7 @@ export function MonitorSettingsView() {
       </div>
 
       {GROUPS.map((group) => (
-        <div key={group.key} className="ms-card" style={{ padding: 24, marginBottom: 16 }}>
+        <div key={group.key} className="ms-card" style={{ padding: 20, marginBottom: 16 }}>
           <CardHead title={t(`groups.${group.key}`)} subtitle={t(`groupsSub.${group.key}`)} />
           <div style={{ display: "flex", flexWrap: "wrap", gap: "16px 24px" }}>
             {group.fields.map((key) => {
@@ -308,11 +308,11 @@ function SettingsSkeleton() {
         </div>
       </div>
       {[0, 1, 2].map((i) => (
-        <div key={i} className="ms-card" style={{ padding: 24, marginBottom: 16 }}>
+        <div key={i} className="ms-card" style={{ padding: 20, marginBottom: 16 }}>
           <div style={{ display: "flex", marginBottom: 16 }}>
             <Skeleton width={140} height={22} />
           </div>
-          <div style={{ display: "flex", gap: 24 }}>
+          <div className="ms-wrap-row" style={{ display: "flex", gap: 24 }}>
             <Skeleton width={260} height={60} />
             <Skeleton width={260} height={60} />
           </div>

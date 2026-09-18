@@ -108,8 +108,16 @@ export function TrackingSetup({
       ) : null}
 
       {/* Subdomain / domain pair: <input> . <domain>. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: heading ? 16 : 0 }}>
-        <div className="ms-field" style={{ flex: 1 }}>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+          marginTop: heading ? 16 : 0,
+        }}
+      >
+        <div className="ms-field" style={{ flex: 1, minWidth: 160 }}>
           <input
             id="tracking-subdomain"
             type="text"

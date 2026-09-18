@@ -32,6 +32,7 @@ function SuppressionDetailSkeleton() {
   return (
     <>
       <div
+        className="ms-page-row"
         style={{
           display: "flex",
           alignItems: "flex-end",
@@ -40,7 +41,7 @@ function SuppressionDetailSkeleton() {
           marginBottom: 28,
         }}
       >
-        <div>
+        <div className="ms-page-title">
           <div style={{ display: "flex", fontSize: 13, lineHeight: 1, marginBottom: 10 }}>
             <Skeleton width={220} height="1lh" />
           </div>
@@ -51,7 +52,9 @@ function SuppressionDetailSkeleton() {
             <Skeleton width={280} height="1lh" />
           </h1>
         </div>
-        <Skeleton width={110} height={30} radius="var(--ms-r-input)" />
+        <div className="ms-page-actions" style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Skeleton width={110} height={30} radius="var(--ms-r-input)" />
+        </div>
       </div>
 
       <div
@@ -246,6 +249,7 @@ export default function SuppressionDetailPage() {
                 lineHeight: 1.7,
                 color: "var(--ms-bone)",
                 whiteSpace: "pre-wrap",
+                overflowWrap: "anywhere",
               }}
             >
               {diagnostic}

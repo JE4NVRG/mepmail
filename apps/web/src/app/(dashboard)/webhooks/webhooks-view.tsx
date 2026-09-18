@@ -367,11 +367,11 @@ export function WebhooksView() {
             <p style={{ margin: 0, color: "var(--ms-warn)", fontSize: "var(--ms-fs-label)" }}>
               {t("reveal.warning")}
             </p>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <ModalFooter>
               <button type="submit" className="ms-btn ms-btn-primary">
                 {t("reveal.done")} <ConfirmKeycap />
               </button>
-            </div>
+            </ModalFooter>
           </form>
         ) : (
           <form
