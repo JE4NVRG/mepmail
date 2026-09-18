@@ -73,7 +73,7 @@ export function SentPerDay() {
     : [];
 
   return (
-    <div className="ms-card" style={{ padding: 24 }}>
+    <div className="ms-card" style={{ padding: 20 }}>
       <div
         style={{
           display: "flex",

@@ -125,7 +125,7 @@ export function AuditView({
         <p
           style={{
             margin: 0,
-            padding: 24,
+            padding: 20,
             color: "var(--ms-muted)",
             fontSize: "var(--ms-fs-label)",
           }}

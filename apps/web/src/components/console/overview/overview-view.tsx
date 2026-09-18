@@ -83,7 +83,7 @@ export function OverviewView() {
         <>
           <KpiCards />
           <StatTiles summary={s} />
-          <div className="ms-grid ms-grid-3" style={{ marginBottom: 16 }}>
+          <div className="ms-grid ms-grid-regions" style={{ marginBottom: 16 }}>
             {regions.data ? (
               <>
                 {regions.data.served.map((r) => (

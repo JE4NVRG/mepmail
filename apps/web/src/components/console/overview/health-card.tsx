@@ -71,7 +71,7 @@ export function HealthPill({ summary }: { summary: Summary }) {
           ? ["warn", t("warnings", { count: warnings, total })]
           : ["success", t("allOk", { count: total })];
   return (
-    <Tooltip inline text={t("pillTip")}>
+    <Tooltip inline text={t("pillTip")} triggerClassName="ms-page-badge">
       <button
         type="button"
         className={`ms-badge ms-badge-${tone}`}
@@ -259,7 +259,7 @@ export function HealthCard({ summary }: { summary: Summary }) {
   });
 
   return (
-    <div id="health" className="ms-card" style={{ padding: 24 }}>
+    <div id="health" className="ms-card" style={{ padding: 20 }}>
       <h3 className="ms-display" style={{ fontSize: 22, margin: 0, fontWeight: 500 }}>
         {t("health.title")}
       </h3>

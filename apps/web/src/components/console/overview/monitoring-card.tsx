@@ -31,7 +31,7 @@ export function MonitoringCard() {
   if (query.isError) return <LoadErrorCard onRetry={() => query.refetch()} />;
   if (!data) {
     return (
-      <div className="ms-card" style={{ padding: 24, marginTop: 16 }}>
+      <div className="ms-card" style={{ padding: 20, marginTop: 16 }}>
         <div style={{ display: "flex" }}>
           <Skeleton width={140} height={22} />
         </div>
@@ -55,7 +55,7 @@ export function MonitoringCard() {
 
   if (!data.judge.on) {
     return (
-      <div className="ms-card" style={{ padding: 24, marginTop: 16 }}>
+      <div className="ms-card" style={{ padding: 20, marginTop: 16 }}>
         {head}
         <p style={{ margin: 0, fontSize: 13 }}>
           {t("offLead")}{" "}
@@ -104,7 +104,7 @@ export function MonitoringCard() {
         style={{
           display: "block",
           width: "100%",
-          padding: 24,
+          padding: 20,
           marginTop: 16,
           cursor: "pointer",
           textAlign: "left",

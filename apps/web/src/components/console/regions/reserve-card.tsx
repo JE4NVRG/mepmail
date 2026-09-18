@@ -62,7 +62,7 @@ export function ReserveCard({ list, onChanged }: { list: RegionList; onChanged: 
   };
 
   return (
-    <div className="ms-card" style={{ padding: 24 }}>
+    <div className="ms-card" style={{ padding: 20 }}>
       <div style={{ marginBottom: 16 }}>
         <h3 style={cardTitle}>{t("title")}</h3>
         <p style={cardSub}>{t("help")}</p>

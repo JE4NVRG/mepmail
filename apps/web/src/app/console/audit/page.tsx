@@ -24,6 +24,7 @@ export default function ConsoleAuditPage() {
             value={action}
             onChange={setAction}
             ariaLabel={t("columns.action")}
+            width="100%"
             options={[
               { value: "all", label: t("actionAll") },
               ...actions.map((value) => ({

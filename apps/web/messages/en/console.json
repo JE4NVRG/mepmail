@@ -322,7 +322,6 @@
       "NONE": "à la carte",
       "ESSENTIALS": "Essentials"
     },
-    "provision": "Provision",
     "reserve": {
       "title": "Transactional reserve",
       "help": "Share of each region's 24-hour sending quota broadcasts never touch. Transactional mail may use all of it and borrow beyond it.",
@@ -467,7 +466,7 @@
       "created": "Created",
       "stripe": "Stripe",
       "stripeNone": "none",
-      "stripeSub": "{id} · {status}",
+      "stripeSub": "<link>{id}</link> · {status}",
       "ceiling": "Daily ceiling",
       "ceilingNone": "plan decides",
       "standingAt": "standing computed {ago}",

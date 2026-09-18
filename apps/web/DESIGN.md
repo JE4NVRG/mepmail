@@ -60,9 +60,10 @@ other icon fonts or icon libraries. Logos in
 
 Fixed 240px sidebar on `--ms-panel`; content column on void with the canvas
 main-block padding: `32px 40px` (40px gutters — never wider). Cards: panel
-fill, 1px line, 14px radius, 24px padding. Controls compact per the canvas
-overrides: `.ms-btn` 6px 12px, `.ms-input` 6px 10px / line-height 1.4,
-`.ms-btn-icon` an exact 30×30 square — everything lands ≈30px tall. Lists
+fill, 1px line, 14px radius, 24px padding; console cards (`/console`) run
+denser at 20px, and console stat tiles at `16px 20px`. Controls compact per
+the canvas overrides: `.ms-btn` 6px 12px, `.ms-input` 6px 10px / line-height
+1.4, `.ms-btn-icon` an exact 30×30 square — everything lands ≈30px tall. Lists
 (`.ms-table`) run at 13px with 6px cell padding — ≈40px rows, so a page of
 contacts or emails fits a laptop viewport; the shared `ListFooter` holds the
 page-size chooser and then "Load more" at the right, both drawn as secondary
@@ -77,8 +78,10 @@ panel bg, hairline bottom); the drawer slides over content with the modal
 scrim, closes on nav/scrim/Esc, and locks body scroll while open. Content
 padding collapses to 16px. Page headers and filter rows wrap (search takes
 the full first line); meta/stat grids drop to 2-up then 1-up (<480px);
-side-by-side KPI cards stack; stepper rails hide or shrink under 640px.
-Modals go `calc(100vw - 24px)` under 480px; `.ms-menu` popovers clamp to the
+side-by-side KPI cards stack; the console's 6-up stat tile strip drops to
+3-up then 2-up (<640px); stepper rails hide or shrink under 640px. Modals go
+`calc(100vw - 24px)` under 480px and their footers wrap — buttons share the
+width, keycaps hidden under 640px; `.ms-menu` popovers clamp to the
 viewport. Tables scroll horizontally **inside their own wrapper** (the shared
 `<Table>`) — the page itself never scrolls horizontally. All rules live in
 the delimited responsive section at the end of `components.css` (media

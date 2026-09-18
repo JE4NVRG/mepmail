@@ -776,7 +776,7 @@ export function SesSetupView() {
       {credentialsOk || anyOk ? (
         <Step marker="04" last title={t("next.title")}>
           <section className="ms-card" style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div className="ms-wrap-row" style={{ display: "flex", alignItems: "center", gap: 16 }}>
               <Link href="/domains/new" className="ms-btn ms-btn-secondary">
                 {t("next.addDomain")} →
               </Link>
