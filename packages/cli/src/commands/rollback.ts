@@ -1,6 +1,6 @@
 import { RESOURCE_LABEL, ROLLBACK_ORDER } from "../apply.js";
 import type { Context } from "../context.js";
-import type { MillionSendTarget, WriteResult } from "../millionsend.js";
+import type { MepMailTarget, WriteResult } from "../millionsend.js";
 import type { MigrateState, Resource } from "../model.js";
 import { migratePaths, readJson, STATE_DIR, writePrivateJson } from "../paths.js";
 import { connectTarget, printHeader, TARGET_RPS } from "../session.js";
@@ -12,10 +12,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Deletes between two state writes; each write serialises the whole file. */
 const SAVE_EVERY = 100;
 const HEADER_TEXT =
-  "Deletes what an earlier run created on your MillionSend instance; nothing on Resend is touched.";
+  "Deletes what an earlier run created on your MepMail instance; nothing on Resend is touched.";
 
 const DELETE: Partial<
-  Record<Resource, (target: MillionSendTarget, id: string) => Promise<WriteResult>>
+  Record<Resource, (target: MepMailTarget, id: string) => Promise<WriteResult>>
 > = {
   broadcasts: (t, id) => t.deleteBroadcast(id),
   templates: (t, id) => t.deleteTemplate(id),
@@ -47,7 +47,7 @@ export async function rollback(ctx: Context): Promise<number> {
     const bad = (state.created[resource] ?? []).filter((id) => !UUID.test(id)).length;
     if (bad > 0) {
       throw new Error(
-        `${paths.state} lists ${pluralize(bad, "id")} under "${resource}" that are not MillionSend ids; the file was edited outside this tool. Fix or delete it, then run again.`,
+        `${paths.state} lists ${pluralize(bad, "id")} under "${resource}" that are not MepMail ids; the file was edited outside this tool. Fix or delete it, then run again.`,
       );
     }
   }
@@ -72,7 +72,7 @@ export async function rollback(ctx: Context): Promise<number> {
   out.write(`${capitalize(formatDuration(requests / TARGET_RPS))} at ${TARGET_RPS} req/s.\n\n`);
   if (!config.yes) {
     if (config.nonInteractive) throw new Error("Rollback needs --yes in non-interactive mode.");
-    if (!(await confirmPrompt(ctx.rl, { label: "Delete these from your MillionSend instance?" }))) {
+    if (!(await confirmPrompt(ctx.rl, { label: "Delete these from your MepMail instance?" }))) {
       out.write("Nothing deleted.\n");
       emitJson([]);
       return 0;

@@ -2,7 +2,7 @@ import type { Logger } from "./log.js";
 import {
   BATCH_MAX,
   type ContactBatchItem,
-  type MillionSendTarget,
+  type MepMailTarget,
   type WriteResult,
 } from "./millionsend.js";
 import type {
@@ -65,7 +65,7 @@ export interface ApplyInput {
   /** Resources this run covers; the cutover-ready block needs contacts, domains and suppressions among them. */
   include?: ReadonlySet<Resource> | undefined;
   source: Source;
-  target: MillionSendTarget;
+  target: MepMailTarget;
   state: MigrateState;
   onConflict: "upsert" | "skip" | "error";
   progress: Progress;

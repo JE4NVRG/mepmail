@@ -17,7 +17,7 @@ export const RESOURCES = [
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
-/** One DNS row as both Resend and MillionSend present it. */
+/** One DNS row as both Resend and MepMail present it. */
 export interface DnsRecord {
   record: string;
   name: string;

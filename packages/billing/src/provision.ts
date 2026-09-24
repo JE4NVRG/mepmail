@@ -121,7 +121,7 @@ async function ensureProduct(
     return existing.id;
   }
   const created = await stripe.products.create({
-    name: `MillionSend ${PLAN_NAME[plan]}`,
+    name: `MepMail ${PLAN_NAME[plan]}`,
     metadata: { [PRODUCT_METADATA_KEY]: plan },
     tax_code: SAAS_BUSINESS_TAX_CODE,
   });
@@ -325,7 +325,7 @@ async function ensureWebhook(
     url,
     enabled_events: [...WEBHOOK_EVENTS],
     api_version: Stripe.API_VERSION,
-    description: "MillionSend billing",
+    description: "MepMail billing",
   });
   log(`webhook: ${created.id} (created)`);
   if (created.secret) {

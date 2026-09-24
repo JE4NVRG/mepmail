@@ -134,7 +134,7 @@ function ConsoleSidebar({
       <div style={{ padding: "4px 10px 14px" }}>
         {/* biome-ignore lint/performance/noImgElement: static SVG logo, nothing for next/image to optimize */}
         <img
-          src="/logo/millionsend-wordmark.svg"
+          src="/logo/mepmail-wordmark.svg"
           className="ms-wordmark"
           alt={tCommon("appName")}
           style={{ height: 15, display: "block" }}
@@ -296,7 +296,7 @@ export function ConsoleShell({
         </button>
         {/* biome-ignore lint/performance/noImgElement: static SVG logo */}
         <img
-          src="/logo/millionsend-wordmark.svg"
+          src="/logo/mepmail-wordmark.svg"
           className="ms-wordmark"
           alt={tCommon("appName")}
           style={{ height: 15, display: "block" }}

@@ -79,7 +79,7 @@ export const SES_IAM_POLICY_JSON = JSON.stringify(SES_IAM_POLICY, null, 2);
  * in an empty directory with no repo clone. Edit both together.
  */
 export function envTemplate(): string {
-  return `# MillionSend self-host configuration.
+  return `# MepMail self-host configuration.
 # Save as .env, generate the two secrets below, and \`docker compose up -d\`.
 # This file holds every secret the instance has: keep it readable by its
 # owner only (chmod 600 .env) and out of version control and backups.
@@ -174,7 +174,7 @@ SQS_QUEUE_URL=
 
 # SES configuration set applied to sends that have no per-domain configuration
 # set. Point its event destination at the SNS topic above so delivery events
-# reach MillionSend. Unset sends without a configuration set.
+# reach MepMail. Unset sends without a configuration set.
 SES_CONFIGURATION_SET=
 
 # One SES tenant per team, so SES tracks bounce/complaint reputation per

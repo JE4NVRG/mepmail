@@ -33,8 +33,10 @@ export function unescapeHtml(value: string): string {
  * enough that Gmail for Android, which recolours images drawn at 64×64 CSS px
  * or smaller, leaves them alone.
  */
-export const EMAIL_WORDMARK_INK_URL = "https://millionsend.com/email/wordmark-ink.png";
-export const EMAIL_WORDMARK_BONE_URL = "https://millionsend.com/email/wordmark-bone.png";
+const EMAIL_ASSET_BASE = process.env.EMAIL_ASSET_BASE_URL ?? "https://mail.je4ndev.com";
+/** Absolute URLs: email clients do not resolve app-relative paths. */
+export const EMAIL_WORDMARK_INK_URL = `${EMAIL_ASSET_BASE}/email/wordmark-ink.png`;
+export const EMAIL_WORDMARK_BONE_URL = `${EMAIL_ASSET_BASE}/email/wordmark-bone.png`;
 
 /**
  * A solid white tile: the Gmail button's fill. Gmail for Android darkens
@@ -43,7 +45,7 @@ export const EMAIL_WORDMARK_BONE_URL = "https://millionsend.com/email/wordmark-b
  * never repaints an image, so the one white surface that survives there is
  * a picture of white.
  */
-export const EMAIL_WHITE_TILE_URL = "https://millionsend.com/email/white.png";
+export const EMAIL_WHITE_TILE_URL = `${EMAIL_ASSET_BASE}/email/white.png`;
 
 /**
  * Fills `{key}` placeholders. A replacer function, not a replacement string:
@@ -95,9 +97,9 @@ const STYLE = [
   "u + .body .ms-gmail{display:inline-block !important}",
 ].join("\n");
 
-const WORDMARK = `<a href="https://millionsend.com" style="display:block;margin:0 0 24px;line-height:0">
-      <img class="ms-ink" src="${EMAIL_WORDMARK_INK_URL}" width="174" height="24" alt="MillionSend" style="display:block;height:24px;width:auto;border:0">
-      <!--[if !mso]><!--><img class="ms-bone" src="${EMAIL_WORDMARK_BONE_URL}" width="174" height="24" alt="MillionSend" style="display:none;height:24px;width:auto;border:0;mix-blend-mode:difference"><!--<![endif]-->
+const WORDMARK = `<a href="https://je4ndev.com" style="display:block;margin:0 0 24px;line-height:0">
+      <img class="ms-ink" src="${EMAIL_WORDMARK_INK_URL}" width="174" height="24" alt="MepMail" style="display:block;height:24px;width:auto;border:0">
+      <!--[if !mso]><!--><img class="ms-bone" src="${EMAIL_WORDMARK_BONE_URL}" width="174" height="24" alt="MepMail" style="display:none;height:24px;width:auto;border:0;mix-blend-mode:difference"><!--<![endif]-->
     </a>`;
 
 /**

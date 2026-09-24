@@ -9,7 +9,7 @@
     "error": "Falha ao criar o time. Tente de novo."
   },
   "title": "Envie seu primeiro e-mail",
-  "subtitle": "Siga os passos para enviar um e-mail pela API do MillionSend.",
+  "subtitle": "Siga os passos para enviar um e-mail pela API do MepMail.",
   "step1": {
     "title": "Adicione uma chave de API",
     "body": "As chaves autenticam cada requisição. A chave completa aparece uma única vez, na criação.",
@@ -60,7 +60,7 @@
     },
     "mcp": {
       "title": "Instale o MCP",
-      "body": "Conecte suas ferramentas e agentes de IA para enviar e-mail pelo MillionSend.",
+      "body": "Conecte suas ferramentas e agentes de IA para enviar e-mail pelo MepMail.",
       "cta": "Instalar MCP"
     },
     "webhooks": {
@@ -82,7 +82,7 @@
   },
   "stepSes": {
     "title": "Conecte seu AWS SES",
-    "body": "O MillionSend envia pela sua própria conta AWS SES. Conecte uma vez nas configurações — o assistente cria tudo e testa a conexão.",
+    "body": "O MepMail envia pela sua própria conta AWS SES. Conecte uma vez nas configurações — o assistente cria tudo e testa a conexão.",
     "cta": "Abrir configuração do SES"
   }
 }

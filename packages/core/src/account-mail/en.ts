@@ -2,7 +2,7 @@ import type { AccountMailEntry, AccountMailKind, MailPhraseKey } from "../accoun
 
 export const en = {
   welcome: {
-    subject: "Welcome to MillionSend",
+    subject: "Welcome to MepMail",
     body: [
       "Hi {name}, your account is ready.",
       "First add a sending domain and publish its DNS records; sends go out the moment it verifies.",
@@ -12,7 +12,7 @@ export const en = {
     muted: ["Docs: {docsUrl}"],
   },
   password_changed: {
-    subject: "Your MillionSend password was changed",
+    subject: "Your MepMail password was changed",
     body: [
       "The password for {email} was just changed and every other session was signed out.",
       "If this was you, nothing to do. If it wasn't, reset it now — that signs out whoever did it — and review your API keys and connected apps.",
@@ -20,9 +20,9 @@ export const en = {
     button: "Reset password",
   },
   "mcp.connected": {
-    subject: "{app} is connected to your MillionSend account",
+    subject: "{app} is connected to your MepMail account",
     body: [
-      "You allowed {app} to act on {team} through the MillionSend MCP server with these permissions: {scopes}.",
+      "You allowed {app} to act on {team} through the MepMail MCP server with these permissions: {scopes}.",
       "It can do there what you can do, in your name, until you revoke it.",
     ],
     button: "Review connected apps",
@@ -42,7 +42,7 @@ export const en = {
       sending_access: "sending access",
       apiKeyActor: "an API key",
       mcpActor: "an MCP client",
-      systemActor: "MillionSend",
+      systemActor: "MepMail",
     },
   },
   "webhook.secret_rotated": {

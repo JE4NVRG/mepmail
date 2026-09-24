@@ -242,7 +242,7 @@ export function AuthForm({
       <div className={styles.column}>
         {/* biome-ignore lint/performance/noImgElement: static SVG logo, nothing for next/image to optimize */}
         <img
-          src="/logo/millionsend-wordmark.svg"
+          src="/logo/mepmail-wordmark.svg"
           className="ms-wordmark"
           alt={tCommon("appName")}
           height={22}

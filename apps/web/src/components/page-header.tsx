@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect } from "react";
 
-/** Page chrome: breadcrumb, display H1, actions — and the tab title ("Contacts · MillionSend"). */
+/** Page chrome: breadcrumb, display H1, actions — and the tab title ("Contacts · MepMail"). */
 export function PageHeader({
   title,
   subtitle,

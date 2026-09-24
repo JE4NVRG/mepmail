@@ -462,14 +462,14 @@ export const deliverabilityResponseSchema = z
   .openapi("DeliverabilityResponse");
 
 /**
- * GET /usage (MillionSend extension): the plan and quota picture a client
+ * GET /usage (MepMail extension): the plan and quota picture a client
  * needs before bulk work. Plan and limits are null off Cloud, where no plan
  * applies.
  */
 export const usageResponseSchema = z
   .object({
     object: z.literal("usage"),
-    cloud: z.boolean().describe("True on MillionSend Cloud, where plan limits apply"),
+    cloud: z.boolean().describe("True on MepMail Cloud, where plan limits apply"),
     plan: z
       .enum(["free", "starter", "pro", "scale"])
       .nullable()
@@ -571,7 +571,7 @@ const contactIncludeQuery = z
     message: "include accepts properties and topics, comma-separated",
   })
   .describe(
-    "MillionSend extension: comma-separated facets attached to every item — `properties` (the {type, value} map GET /contacts/{id} returns) and `topics` (the rows GET /contacts/{id}/topics returns). Omitted, each item has the Resend shape.",
+    "MepMail extension: comma-separated facets attached to every item — `properties` (the {type, value} map GET /contacts/{id} returns) and `topics` (the rows GET /contacts/{id}/topics returns). Omitted, each item has the Resend shape.",
   );
 export const listContactsQuerySchema = oneCursor(
   listQueryFields.extend({ include: contactIncludeQuery }),
@@ -782,7 +782,7 @@ export const removeContactSegmentResponseSchema = z
   .openapi("RemoveContactSegmentResponse");
 
 /**
- * POST /contacts/batch (MillionSend extension; Resend imports contacts only
+ * POST /contacts/batch (MepMail extension; Resend imports contacts only
  * via CSV). Items are untyped here for the same reason as BatchEmailRequest:
  * the handler validates each against CreateContactRequest itself so the
  * x-batch-validation header can decide between failing the whole batch
@@ -1077,7 +1077,7 @@ export const cancelBroadcastResponseSchema = z
   .openapi("CancelBroadcastResponse");
 
 /**
- * Segments (MillionSend extension, docs/resend-compatibility.md). A segment
+ * Segments (MepMail extension, docs/resend-compatibility.md). A segment
  * is a saved filter over the team's contacts. The filter's field/operator
  * semantics are validated by @millionsend/core's `segmentFilterSchema` in the
  * handler (422 on a bad shape); this schema only pins the wire structure for
@@ -1218,7 +1218,7 @@ const CLICK_TRACKING_DESC =
 const OPEN_TRACKING_DESC =
   "Inject a tracking pixel served from the tracking subdomain and record email.opened events. Off by default.";
 const TRACKING_SUBDOMAIN_DESC =
-  'DNS label of the branded tracking host, e.g. "links" for links.<domain>. Setting it adds a Tracking CNAME to records[]; links are tracked through it once that CNAME resolves. Required on MillionSend Cloud to turn tracking on.';
+  'DNS label of the branded tracking host, e.g. "links" for links.<domain>. Setting it adds a Tracking CNAME to records[]; links are tracked through it once that CNAME resolves. Required on MepMail Cloud to turn tracking on.';
 
 /**
  * Built per deployment so `region` lists only what it serves (the default
@@ -1639,7 +1639,7 @@ export const batchRemoveSuppressionsResponseSchema = z
 
 /**
  * Templates — wire-compatible with the resend SDK's templates surface.
- * MillionSend templates have no draft/publish cycle and no version history
+ * MepMail templates have no draft/publish cycle and no version history
  * (every save is live), so on the wire `status` is always "published",
  * `published_at` is created_at, `current_version_id` is the template id and
  * `has_unpublished_versions` is false. `from`, `reply_to` and `variables` are

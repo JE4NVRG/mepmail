@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: t("meta.description"),
     // Everything behind the sign-in is private; the auth pages opt back in.
     robots: { index: false, follow: false },
-    icons: { icon: "/logo/millionsend-favicon.svg" },
+    icons: { icon: "/logo/mepmail-favicon.svg" },
     openGraph: {
       siteName: t("appName"),
       type: "website",
