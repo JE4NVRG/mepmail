@@ -3,8 +3,8 @@ import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
-      title: "MillionSend Docs",
+      title: "MepMail Docs",
     },
-    githubUrl: "https://github.com/MillionSend/millionsend",
+    githubUrl: "https://github.com/JE4NVRG/millionsend",
   };
 }

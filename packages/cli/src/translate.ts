@@ -1,14 +1,14 @@
 import type { SourceBroadcast, SourceDomain, SourceTemplate } from "./model.js";
 
 /*
- * Pure Resend → MillionSend shape translation. The bundle has no runtime
+ * Pure Resend → MepMail shape translation. The bundle has no runtime
  * dependencies, so the target's vocabularies are mirrored here instead of
  * imported: keep them identical to their sources.
  */
 
 /** Mirror of packages/core/src/webhooks.ts WEBHOOK_EVENT_TYPES. */
 /**
- * Resend webhook event names MillionSend also emits, so a subscription carries
+ * Resend webhook event names MepMail also emits, so a subscription carries
  * over as-is. Resend's other names (domain.*, email.suppressed, …) have no
  * counterpart here and are dropped per webhook, listed in the plan.
  */

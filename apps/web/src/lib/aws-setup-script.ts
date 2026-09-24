@@ -62,7 +62,7 @@ export function buildAwsSetupScript(opts: {
 
   const lines = [
     "#!/bin/sh",
-    "# MillionSend AWS setup. Run where the aws CLI has admin credentials.",
+    "# MepMail AWS setup. Run where the aws CLI has admin credentials.",
     "# Re-runnable: creates that may already exist are tolerated (|| true) —",
     "# but every run mints a NEW access key; delete stale keys in the IAM console.",
     "set -u",

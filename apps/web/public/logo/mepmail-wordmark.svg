@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -50 5103 706" role="img" aria-label="MepMail">
+<title>MepMail</title>
+<defs><linearGradient id="mm-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#4F46E5"/></linearGradient></defs>
+<g transform="translate(30 -90) scale(5)"><path d="M12 112 L124 64 L12 16 L12 52 L92 64 L12 76 Z" fill="url(#mm-g)"/></g>
+<text x="790" y="494" font-family="'JetBrains Mono','DejaVu Sans Mono',ui-monospace,Consolas,monospace" font-size="750" font-weight="700" fill="#F4F1EA" textLength="4200" lengthAdjust="spacing">Mep<tspan fill="#9F8CFF">Mail</tspan></text>
+</svg>

@@ -66,13 +66,13 @@ function TopicName({ name }: { name: string }) {
   return <span style={{ overflowWrap: "anywhere" }}>{name}</span>;
 }
 
-const BRAND_MARK_URL = "/logo/millionsend-favicon.svg";
+const BRAND_MARK_URL = "/logo/mepmail-favicon.svg";
 
-/** "Powered by MillionSend", under the card, linking to the site. */
+/** "Powered by MepMail", under the card, linking to the site. */
 function PoweredBy({ template }: { template: string }) {
   return (
     <a
-      href="https://millionsend.com"
+      href="https://je4ndev.com"
       target="_blank"
       rel="noopener noreferrer"
       style={{
@@ -97,7 +97,7 @@ function PoweredBy({ template }: { template: string }) {
           >
             {/* biome-ignore lint/performance/noImgElement: static pre-sized svg, nothing for next/image to optimize */}
             <img src={BRAND_MARK_URL} alt="" width={16} height={16} style={{ borderRadius: 4 }} />
-            MillionSend
+            MepMail
           </span>
         ),
       })}
@@ -140,15 +140,15 @@ function Wordmark() {
       {/* biome-ignore lint/performance/noImgElement: static pre-sized svg, nothing for next/image to optimize */}
       <img
         className="ms-dark-only"
-        src="/logo/millionsend-wordmark.svg"
-        alt="MillionSend"
+        src="/logo/mepmail-wordmark.svg"
+        alt="MepMail"
         height={20}
       />
       {/* biome-ignore lint/performance/noImgElement: static pre-sized svg, nothing for next/image to optimize */}
       <img
         className="ms-light-only"
-        src="/logo/millionsend-wordmark-light.svg"
-        alt="MillionSend"
+        src="/logo/mepmail-wordmark-light.svg"
+        alt="MepMail"
         height={20}
       />
     </>

@@ -1832,7 +1832,7 @@ summary:focus-visible,
 /* Wordmark — the SVG's fills are bone-on-transparent, invisible on paper;
    light theme swaps in the ink variant of the same lockup. */
 [data-theme="light"] .ms-wordmark {
-  content: url("/logo/millionsend-wordmark-light.svg");
+  content: url("/logo/mepmail-wordmark-light.svg");
 }
 
 /* Theme-scoped visibility — elements that ship one render per theme (e.g. the

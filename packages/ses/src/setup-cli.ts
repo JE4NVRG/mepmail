@@ -61,7 +61,7 @@ import {
 } from "./setup-flow.js";
 
 const DESCRIPTION_TEXT =
-  "Sets up a self-hosted MillionSend end to end: a .env with generated secrets, the AWS resources (IAM user + key, SNS event topic, SES configuration set), and the Docker launch. Run it in the directory MillionSend should live in — an empty one works. Every step is offered, skippable, and safe to re-run. Sub-commands: add-region <region> (a further SES region on an existing install), teardown.";
+  "Sets up a self-hosted MepMail end to end: a .env with generated secrets, the AWS resources (IAM user + key, SNS event topic, SES configuration set), and the Docker launch. Run it in the directory MepMail should live in — an empty one works. Every step is offered, skippable, and safe to re-run. Sub-commands: add-region <region> (a further SES region on an existing install), teardown.";
 
 const REGION_RE = /^[a-z0-9][a-z0-9-]*$/;
 
@@ -297,7 +297,7 @@ export async function menuLoop(wizard: Wizard): Promise<number> {
 }
 
 const ENV_EXAMPLE_URL =
-  "https://raw.githubusercontent.com/MillionSend/millionsend/main/.env.example";
+  "https://raw.githubusercontent.com/JE4NVRG/millionsend/main/.env.example";
 
 /** Creates .env from the built-in template when there is none. */
 async function envStep(wizard: Wizard): Promise<void> {
@@ -414,7 +414,7 @@ async function cloudStep(wizard: Wizard): Promise<void> {
     if (wizard.writeEnv(entries)) {
       flow.note(`${Object.keys(entries).join(", ")} written to .env.`);
     } else {
-      flow.log(`No .env here — paste into .env where MillionSend runs:\n\n${pasteBlock(entries)}`);
+      flow.log(`No .env here — paste into .env where MepMail runs:\n\n${pasteBlock(entries)}`);
     }
   }
   const missing = CLOUD_REQUIRED_KEYS.filter((key) => !(entries[key] ?? envValue(wizard.env, key)));
@@ -481,7 +481,7 @@ async function socialLoginStep(wizard: Wizard): Promise<void> {
     if (wizard.writeEnv(entries)) {
       flow.note(`${provider.name} credentials written to .env.`);
     } else {
-      flow.log(`No .env here — paste into .env where MillionSend runs:\n\n${pasteBlock(entries)}`);
+      flow.log(`No .env here — paste into .env where MepMail runs:\n\n${pasteBlock(entries)}`);
     }
   }
 }
@@ -557,7 +557,7 @@ async function accountEmailStep(wizard: Wizard): Promise<void> {
       "AUTH_EMAIL_FROM written to .env. Its domain must be a verified sending domain in this instance.",
     );
   } else {
-    flow.log(`No .env here — paste into .env where MillionSend runs:\n\nAUTH_EMAIL_FROM=${value}`);
+    flow.log(`No .env here — paste into .env where MepMail runs:\n\nAUTH_EMAIL_FROM=${value}`);
   }
 }
 
@@ -652,7 +652,7 @@ async function storageStep(wizard: Wizard): Promise<void> {
       flow.note("backup added to COMPOSE_PROFILES — the scheduled dumps start with the stack.");
     }
   } else {
-    flow.log(`No .env here — paste into .env where MillionSend runs:\n\n${pasteBlock(entries)}`);
+    flow.log(`No .env here — paste into .env where MepMail runs:\n\n${pasteBlock(entries)}`);
   }
   if (publicUrl === "") {
     flow.note(
@@ -848,7 +848,7 @@ async function awsStep(wizard: Wizard, eventsOnly: boolean): Promise<void> {
     flow.step(`${eventsOnly ? "Event ingestion values" : "AWS keys"} written to .env.`);
   } else {
     flow.log(
-      `Done. Paste into .env where MillionSend runs, then restart it:\n\n${pasteBlock(entries)}`,
+      `Done. Paste into .env where MepMail runs, then restart it:\n\n${pasteBlock(entries)}`,
     );
   }
   const origin = httpsOrigin(appBaseUrl);
@@ -943,7 +943,7 @@ async function addRegionStep(
     );
   } else {
     flow.log(
-      `Done. Paste into .env where MillionSend runs, then restart it:\n\n${pasteBlock(entries)}`,
+      `Done. Paste into .env where MepMail runs, then restart it:\n\n${pasteBlock(entries)}`,
     );
   }
   if (httpsOrigin(appBaseUrl)) {
@@ -1087,7 +1087,7 @@ async function launchStep(wizard: Wizard): Promise<number> {
     return 0;
   }
   const choice = await flow.select({
-    label: "Start MillionSend now?",
+    label: "Start MepMail now?",
     initial: wizard.interactive ? "start" : "later",
     options: [
       { value: "start", label: "Start", hint: "docker compose up" },

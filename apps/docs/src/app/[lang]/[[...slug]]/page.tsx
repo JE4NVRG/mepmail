@@ -34,7 +34,7 @@ export default async function Page(props: PageParams) {
       <PageActions
         markdownUrl={markdownUrl}
         markdownHref={absoluteUrl(markdownUrl)}
-        githubUrl={`https://github.com/MillionSend/millionsend/blob/main/apps/docs/content/docs/${page.path}`}
+        githubUrl={`https://github.com/JE4NVRG/millionsend/blob/main/apps/docs/content/docs/${page.path}`}
         labels={pageActionLabels(lang)}
       />
       <DocsBody>
@@ -71,7 +71,7 @@ export async function generateMetadata(props: PageParams): Promise<Metadata> {
     // Page-level openGraph replaces the layout's wholesale, so the image
     // rides along here or vanishes from article pages.
     openGraph: {
-      siteName: "MillionSend Docs",
+      siteName: "MepMail Docs",
       type: "article",
       locale: lang === "pt-BR" ? "pt_BR" : "en_US",
       url: absoluteUrl(page.url),

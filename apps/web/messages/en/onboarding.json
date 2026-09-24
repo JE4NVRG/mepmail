@@ -9,7 +9,7 @@
     "error": "Team creation failed. Try again."
   },
   "title": "Send your first email",
-  "subtitle": "Follow the steps to send an email using the MillionSend API.",
+  "subtitle": "Follow the steps to send an email using the MepMail API.",
   "step1": {
     "title": "Add an API key",
     "body": "Keys authenticate every request. The full key is shown once, at creation.",
@@ -60,7 +60,7 @@
     },
     "mcp": {
       "title": "Install MCP",
-      "body": "Connect your AI tools and agents to send email through MillionSend.",
+      "body": "Connect your AI tools and agents to send email through MepMail.",
       "cta": "Install MCP"
     },
     "webhooks": {
@@ -82,7 +82,7 @@
   },
   "stepSes": {
     "title": "Connect your AWS SES",
-    "body": "MillionSend sends through your own AWS SES account. Connect it once in settings — the wizard creates everything and tests the connection.",
+    "body": "MepMail sends through your own AWS SES account. Connect it once in settings — the wizard creates everything and tests the connection.",
     "cta": "Open SES setup"
   }
 }

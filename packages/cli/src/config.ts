@@ -145,7 +145,7 @@ function apiUrl(value: string): string {
     throw new ConfigError(`Not a URL: ${value}. Expected e.g. ${CLOUD_API_URL}`);
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new ConfigError(`The MillionSend API URL must be http(s): ${value}`);
+    throw new ConfigError(`The MepMail API URL must be http(s): ${value}`);
   }
   return stripTrailingSlashes(value);
 }
@@ -240,10 +240,10 @@ export function parseConfig(
     }
     if (toKey.source === "prompt") {
       throw new ConfigError(
-        `Missing MillionSend API key. Set ${TARGET_KEY_ENV} or pass --to-key-stdin (non-interactive mode never prompts).`,
+        `Missing MepMail API key. Set ${TARGET_KEY_ENV} or pass --to-key-stdin (non-interactive mode never prompts).`,
       );
     }
-    // Like the SDKs, the target is MillionSend Cloud unless an instance URL is named;
+    // Like the SDKs, the target is MepMail Cloud unless an instance URL is named;
     // a terminal still asks, since a self-hoster's key against Cloud is only a 401.
     if (toUrl === null) toUrl = CLOUD_API_URL;
     // Decided here, before any network call: the confirmation would only come after the whole source is read.
@@ -336,7 +336,7 @@ function minimal(command: "help" | "version"): Config {
 }
 
 export function helpText(): string {
-  return `millionsend ${VERSION} — move an email account to MillionSend
+  return `millionsend ${VERSION} — move an email account to MepMail
 
 Usage
   millionsend migrate --from resend                          connect, choose resources, plan, confirm, apply, summary
@@ -350,9 +350,9 @@ Options
   --from <provider>          source provider; only \`resend\` exists
   --from-key-stdin           read the source API key from stdin (first line)
   --from-key <key>           source API key as an argument (visible in process lists; prefer the env var)
-  --to-url <url>             MillionSend API URL of a self-hosted instance (default ${CLOUD_API_URL}; a terminal asks)
-  --to-key-stdin             read the MillionSend API key from stdin (second line when both stdin flags are set)
-  --to-key <key>             MillionSend API key as an argument (same caveat)
+  --to-url <url>             MepMail API URL of a self-hosted instance (default ${CLOUD_API_URL}; a terminal asks)
+  --to-key-stdin             read the MepMail API key from stdin (second line when both stdin flags are set)
+  --to-key <key>             MepMail API key as an argument (same caveat)
   --rps <n>                  requests per second against the source (default ${DEFAULT_RPS}). Resend's team limit is ${MAX_RPS}, shared
                              with your production sending; the CLI prints the limit it detects and warns above it.
                              Go past ${MAX_RPS} only after Resend raised your limit (up to ${RPS_CEILING})
@@ -378,8 +378,8 @@ Resources
 
 Environment
   RESEND_API_KEY             source API key (full access; the tool only reads from Resend)
-  ${TARGET_KEY_ENV}        MillionSend API key (full access)
-  ${TARGET_URL_ENV}       MillionSend API URL, same as --to-url
+  ${TARGET_KEY_ENV}        MepMail API key (full access)
+  ${TARGET_URL_ENV}       MepMail API URL, same as --to-url
   NO_COLOR                   disable colors
   FORCE_COLOR                colors even when piped, same as --color always
   DO_NOT_TRACK               honored, as a no-op: this tool sends no telemetry, never phones home and never checks for updates

@@ -16,7 +16,7 @@ describe("the unsubscribe host", () => {
       200,
     );
     expect(
-      proxy(request("https://unsubscribe.example.com/logo/millionsend-favicon.svg")).status,
+      proxy(request("https://unsubscribe.example.com/logo/mepmail-favicon.svg")).status,
     ).toBe(200);
     expect(proxy(request("https://unsubscribe.example.com/_next/static/x.css")).status).toBe(200);
     expect(proxy(request("https://unsubscribe.example.com/")).status).toBe(404);

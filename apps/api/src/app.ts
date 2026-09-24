@@ -360,7 +360,7 @@ function acceptRejection(result: Exclude<AcceptEmailResult, { ok: true }>) {
  * API client must not bypass what the dashboard enforces. If the team's
  * trailing-window bounce or complaint rate has crossed SES's own pause line,
  * new sends are refused so we stop before SES pauses the whole account.
- * `sending_paused` is a MillionSend-specific error outside Resend's SDK
+ * `sending_paused` is a MepMail-specific error outside Resend's SDK
  * union (see docs/resend-compatibility.md, known deltas). Returns the error
  * body, or null when sending may proceed.
  */
@@ -770,7 +770,7 @@ function registerContactRootRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
       .enum(["true", "false"])
       .optional()
       .describe(
-        "MillionSend extension. `true` also erases the address from email history, event payloads and API logs (a GDPR/LGPD erasure); by default the send log is kept and ages out with the team's retention window",
+        "MepMail extension. `true` also erases the address from email history, event payloads and API logs (a GDPR/LGPD erasure); by default the send log is kept and ages out with the team's retention window",
       ),
   });
   const membershipParams = z.object({ id: z.string().min(1), segmentId: z.uuid() });
@@ -1396,7 +1396,7 @@ function registerContactRootRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
       path: "/contacts/batch/get",
       summary: "Read contacts in bulk",
       description:
-        "MillionSend extension: returns up to 1000 contacts by id or by email address in one " +
+        "MepMail extension: returns up to 1000 contacts by id or by email address in one " +
         "request, in request order, optionally with their properties and topic subscriptions. " +
         "Entries that match no contact are listed under `missing` instead of failing the call. " +
         "One call counts as one request against the rate limit.",
@@ -1458,7 +1458,7 @@ function registerContactRootRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
       path: "/contacts/batch/remove",
       summary: "Delete contacts in bulk",
       description:
-        "MillionSend extension (Resend deletes contacts one at a time): deletes up to 1000 contacts " +
+        "MepMail extension (Resend deletes contacts one at a time): deletes up to 1000 contacts " +
         "by id or by email address in one request and lists the rows actually deleted; unknown ids " +
         "or addresses are skipped. Emails stay in the log; `erase: true` also scrubs each address " +
         "from email history, event payloads and API logs, like DELETE /contacts/{id}?erase=true.",
@@ -1517,7 +1517,7 @@ function registerContactRootRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
       path: "/contacts/batch",
       summary: "Create contacts in bulk",
       description:
-        "MillionSend extension: creates up to 1000 contacts in one request (Resend imports " +
+        "MepMail extension: creates up to 1000 contacts in one request (Resend imports " +
         "contacts only via CSV). Each item is a CreateContactRequest. `on_conflict` decides what " +
         "happens to an email that already belongs to a contact — `error` (default), `skip`, or " +
         "`upsert`. An upsert updates `first_name`/`last_name` only when provided, merges " +
@@ -1732,7 +1732,7 @@ function registerContactRootRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
       path: "/contacts/{id}/preferences-link",
       summary: "Mint a preference-center link for a contact",
       description:
-        "MillionSend extension. Returns the contact's hosted preferences URL, the same page the " +
+        "MepMail extension. Returns the contact's hosted preferences URL, the same page the " +
         "unsubscribe links in their emails open, so a product settings screen can deep-link into " +
         "it. The page lists the team's public topics and carries the global unsubscribe. The link " +
         "is a signed, contact-scoped capability with no expiry: anyone holding it can change that " +
@@ -2278,7 +2278,7 @@ function registerTopicRoutes(app: OpenAPIHono<Env>, db: Db): void {
 }
 
 /**
- * Segments — MillionSend segmentation (a saved filter over the team's
+ * Segments — MepMail segmentation (a saved filter over the team's
  * contacts, docs/resend-compatibility.md).
  */
 function registerSegmentRoutes(app: OpenAPIHono<Env>, db: Db): void {
@@ -3296,11 +3296,11 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
 
   app.doc("/openapi.json", {
     openapi: "3.1.0",
-    info: { title: "MillionSend API", version: "1.0.0" },
+    info: { title: "MepMail API", version: "1.0.0" },
     // Servers drive the docs playground's target picker: Cloud first (docs
     // convention), then a variable entry self-hosters point at their origin.
     servers: [
-      { url: "https://api.millionsend.com", description: "MillionSend Cloud" },
+      { url: "https://api.millionsend.com", description: "MepMail Cloud" },
       {
         url: "{baseUrl}",
         description: "Self-hosted instance",

@@ -6,7 +6,7 @@ import {
   RESOURCE_LABEL,
 } from "../apply.js";
 import type { Context } from "../context.js";
-import type { MillionSendTarget } from "../millionsend.js";
+import type { MepMailTarget } from "../millionsend.js";
 import {
   type MigrateState,
   type Plan,
@@ -36,7 +36,7 @@ import { formatNumber, pluralize } from "../utils.js";
 export interface Prepared {
   provider: Provider;
   source: Source;
-  target: MillionSendTarget;
+  target: MepMailTarget;
   usage: TargetUsage;
   baseUrl: string;
   snapshot: Snapshot;
@@ -155,20 +155,20 @@ export async function prepare(ctx: Context, providerId: ProviderId): Promise<Pre
   const label = providers[providerId].label;
   printHeader(
     ctx,
-    `Moves your ${label} account into MillionSend. Reads only; nothing on ${label} is changed.`,
+    `Moves your ${label} account into MepMail. Reads only; nothing on ${label} is changed.`,
   );
   const { provider, source } = await connectSource(ctx, providerId);
   const { target, usage, baseUrl } = await connectTarget(ctx);
   const include = includeSet(config);
   out.write(`\n${heading(`Reading ${label}`)}\n`);
-  ctx.progress.section([...[...include].map((r) => RESOURCE_LABEL[r]), "MillionSend"]);
+  ctx.progress.section([...[...include].map((r) => RESOURCE_LABEL[r]), "MepMail"]);
   const snapshot = await source.readShallow({
     include,
     includeSent: config.includeSent,
     onProgress: bridgeProgress(ctx.progress),
   });
   if (usage.cloud) snapshot.metrics = await source.readMetrics();
-  const step = ctx.progress.step("MillionSend");
+  const step = ctx.progress.step("MepMail");
   const targetState = await target.readState();
   step.done("current state read");
   const chosen =

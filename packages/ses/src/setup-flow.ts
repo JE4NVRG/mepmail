@@ -13,7 +13,7 @@ export const COMPOSE_FILENAMES = [
 ] as const;
 
 export const COMPOSE_DOWNLOAD_URL =
-  "https://raw.githubusercontent.com/MillionSend/millionsend/main/deploy/docker-compose.yml";
+  "https://raw.githubusercontent.com/JE4NVRG/millionsend/main/deploy/docker-compose.yml";
 
 /** .env keys the wizard offers to generate when missing or empty. */
 export const SECRET_KEYS = ["MASTER_ENCRYPTION_KEY", "BETTER_AUTH_SECRET"] as const;
