@@ -325,6 +325,30 @@ export const PLAN_CONTACT_LIMIT: Record<Plan, number | null> = {
 };
 
 /**
+ * Attachment bytes one email may carry per plan (decoded, summed across
+ * attachments). SES bills outbound *data* apart from the per-recipient rate
+ * (US$ 0.12/GB), so a plan that pays US$ 0.16 per 1,000 sends cannot also
+ * absorb megabytes per message: 100k emails of 5 MB is ~490 GB, some US$ 59
+ * of data alone against a US$ 29 plan. The ceiling scales with the plan that
+ * pays for it — never one instance-wide number. Self-host ignores plans
+ * (accept-email's absolute ceiling).
+ */
+export const PLAN_ATTACHMENT_BYTES: Record<Plan, number> = {
+  free: 1 * 1024 * 1024,
+  starter: 1 * 1024 * 1024,
+  pro: 5 * 1024 * 1024,
+  scale: 10 * 1024 * 1024,
+  system: 10 * 1024 * 1024,
+};
+
+/** The attachment ceiling a plan gets. */
+export function attachmentLimit(plan: Plan): number {
+  const limit = PLAN_ATTACHMENT_BYTES[plan];
+  if (limit === undefined) throw new Error(`plan ${plan} has no attachment limit`);
+  return limit;
+}
+
+/**
  * With overage on, sends still stop at this multiple of the included volume
  * until the period renews: a runaway integration (or a stolen key) can run
  * up at most a few times the plan, never an open-ended bill.
