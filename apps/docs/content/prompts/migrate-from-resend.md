@@ -6,7 +6,7 @@ You are migrating an application from Resend to MepMail. MepMail's REST API is w
 
 - Cloud API base URL: `https://api-mepmail.agenciamep.com`. Self-hosted: the instance's own API origin (ask if it is not in the repo).
 - API keys start with `ms_` and are created in the dashboard under **API keys**. Use a full-access key for the migration and sending-access keys for production senders.
-- Documentation: the docs live in the repository under `apps/docs/content/` — raw markdown is the same path on `raw.githubusercontent.com/JE4NVRG/millionsend/main/`, and the API itself serves its OpenAPI 3.1 spec at `/openapi.json`. The migration guide is https://github.com/JE4NVRG/millionsend/blob/main/apps/docs/content/prompts/migrate-from-resend.md and the CLI reference is https://github.com/JE4NVRG/millionsend/blob/main/apps/docs/content/docs/cli.mdx.
+- Documentation: the docs live in the repository under `apps/docs/content/` — raw markdown is the same path on `raw.githubusercontent.com/JE4NVRG/mepmail/main/`, and the API itself serves its OpenAPI 3.1 spec at `/openapi.json`. The migration guide is https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/prompts/migrate-from-resend.md and the CLI reference is https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/docs/cli.mdx.
 - The migration CLI (`@millionsend/cli`) only ever reads from Resend (`GET` requests), keeps keys in memory, writes them to no file, and sends no telemetry.
 - Ids differ between providers: contacts are matched by email, everything else by name, key, alias or endpoint. The CLI's report carries an id map for topics and segments.
 
@@ -54,7 +54,7 @@ Choose one of the two, with the user:
    RESEND_BASE_URL=https://api-mepmail.agenciamep.com
    ```
    Confirm the installed SDK version reads `RESEND_BASE_URL` (or its base URL constructor option) and replace any hardcoded `https://api.resend.com`.
-2. **Keep the Resend SDK you already have — there is no first-party client of ours to switch to.** Point it at the instance through its base URL option (`baseUrl` in Node, `base_url` in Python, `RESEND_BASE_URL` in the others, `BaseURL` in Go; whether the value wants a trailing slash differs per language) and leave the import and class names alone. Details per language: https://github.com/JE4NVRG/millionsend/blob/main/apps/docs/content/docs/sdks.mdx.
+2. **Keep the Resend SDK you already have — there is no first-party client of ours to switch to.** Point it at the instance through its base URL option (`baseUrl` in Node, `base_url` in Python, `RESEND_BASE_URL` in the others, `BaseURL` in Go; whether the value wants a trailing slash differs per language) and leave the import and class names alone. Details per language: https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/docs/sdks.mdx.
    PHP: `Resend::client()` returns a `Client` that keeps its `HttpClient` private. For a request the SDK has no method for, construct `HttpClient` yourself with the same arguments the factory passes (read `Resend::client()` in the package): same package, same behavior, one level lower.
 
 Then fix what the report lists:

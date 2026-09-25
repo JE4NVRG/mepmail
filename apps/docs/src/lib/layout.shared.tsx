@@ -5,6 +5,6 @@ export function baseOptions(): BaseLayoutProps {
     nav: {
       title: "MepMail Docs",
     },
-    githubUrl: "https://github.com/JE4NVRG/millionsend",
+    githubUrl: "https://github.com/JE4NVRG/mepmail",
   };
 }

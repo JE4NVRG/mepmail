@@ -34,8 +34,8 @@ The manual equivalent runs the same multi-arch prebuilt image:
 
 ```sh
 mkdir millionsend && cd millionsend
-curl -O https://raw.githubusercontent.com/JE4NVRG/millionsend/main/deploy/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/JE4NVRG/millionsend/main/.env.example
+curl -O https://raw.githubusercontent.com/JE4NVRG/mepmail/main/deploy/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/JE4NVRG/mepmail/main/.env.example
 ```
 
 Fill in `.env` (see the [environment reference](#environment-reference) —
@@ -92,7 +92,7 @@ only when its image changed.
 For contributors, or when you want to modify the code:
 
 ```sh
-git clone https://github.com/JE4NVRG/millionsend.git
+git clone https://github.com/JE4NVRG/mepmail.git
 cd millionsend
 cp .env.example .env   # fill it as in the quickstart
 docker compose up --build -d

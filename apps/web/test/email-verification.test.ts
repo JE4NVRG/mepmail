@@ -74,7 +74,7 @@ describe("email verification", () => {
       kind: "email_verification",
       to: "ada@example.com",
       from: "MillionSend <no-reply@mail.example.com>",
-      subject: "Verify your MillionSend email",
+      subject: "Verify your MepMail email",
     });
     const url = new URL(sent[0]?.text.match(/https?:\/\/\S+/)?.[0] ?? "");
     expect(url.pathname).toBe("/api/auth/verify-email");
@@ -99,7 +99,7 @@ describe("email verification", () => {
       "email_verification",
       "welcome",
     ]);
-    expect(sent[2]).toMatchObject({ to: "ada@example.com", subject: "Bem-vindo ao MillionSend" });
+    expect(sent[2]).toMatchObject({ to: "ada@example.com", subject: "Bem-vindo ao MepMail" });
     expect((await signIn(a)).token).toBeTruthy();
     expect(sent).toHaveLength(3);
   });
@@ -121,7 +121,7 @@ describe("email verification", () => {
       url: "https://x.com/v?token=t",
       locale: "en",
     });
-    expect(mail.subject).toBe("Verify your MillionSend email");
+    expect(mail.subject).toBe("Verify your MepMail email");
     expect(mail.html).not.toContain('<img src="x">');
     expect(mail.html).toContain("&lt;img");
     expect(mail.html).toContain("https://x.com/v?token=t");
@@ -134,6 +134,6 @@ describe("email verification", () => {
         url: "https://x.com/v",
         locale: "pt-BR",
       }).subject,
-    ).toBe("Confirme seu e-mail do MillionSend");
+    ).toBe("Confirme seu e-mail do MepMail");
   });
 });

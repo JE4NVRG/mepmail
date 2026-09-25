@@ -63,7 +63,7 @@ describe("buildResetEmail", () => {
       url: "https://app.example.com/api/auth/reset-password/tok?callbackURL=%2Freset",
       locale: "en",
     });
-    expect(en.subject).toBe("Reset your MillionSend password");
+    expect(en.subject).toBe("Reset your MepMail password");
     expect(en.from).toBe("MillionSend <no-reply@mail.example.com>");
     expect(en.text).toContain("Hi Ada,");
     expect(en.text).toContain("https://app.example.com/api/auth/reset-password/tok");
@@ -76,7 +76,7 @@ describe("buildResetEmail", () => {
       url: "https://x.com/r",
       locale: "pt-BR",
     });
-    expect(pt.subject).toBe("Redefina sua senha do MillionSend");
+    expect(pt.subject).toBe("Redefina sua senha do MepMail");
   });
 
   it("escapes the user-controlled name in the html body", () => {
@@ -162,7 +162,7 @@ describe("sendPasswordResetEmail", () => {
       "tok1",
       new Request("https://x.com", { headers: { cookie: "NEXT_LOCALE=pt-BR" } }),
     );
-    expect(sent[0]?.subject).toBe("Redefina sua senha do MillionSend");
+    expect(sent[0]?.subject).toBe("Redefina sua senha do MepMail");
 
     const beforeWindow = new Date(Date.now() - RESET_EMAIL_THROTTLE_MS - 1000);
     await db.update(schema.verification).set({ createdAt: beforeWindow });
@@ -170,14 +170,14 @@ describe("sendPasswordResetEmail", () => {
       "tok2",
       new Request("https://x.com", { headers: { "accept-language": "pt-BR,pt;q=0.9,en;q=0.5" } }),
     );
-    expect(sent[1]?.subject).toBe("Redefina sua senha do MillionSend");
+    expect(sent[1]?.subject).toBe("Redefina sua senha do MepMail");
 
     await db.update(schema.verification).set({ createdAt: beforeWindow });
     await requestReset(
       "tok3",
       new Request("https://x.com", { headers: { "accept-language": "de" } }),
     );
-    expect(sent[2]?.subject).toBe("Reset your MillionSend password");
+    expect(sent[2]?.subject).toBe("Reset your MepMail password");
   });
 });
 
@@ -255,7 +255,7 @@ describe("password changed receipt", () => {
       expect(sent.map((m) => m.kind)).toEqual(["password_reset", "password_changed"]);
       expect(sent[1]).toMatchObject({
         to: "ada@example.com",
-        subject: "Sua senha do MillionSend foi alterada",
+        subject: "Sua senha do MepMail foi alterada",
       });
       expect(sent[1]?.text).toContain("http://localhost:3000/forgot-password");
     } finally {
