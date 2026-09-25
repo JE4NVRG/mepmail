@@ -8,8 +8,8 @@ export const REPO_URL = "https://github.com/JE4NVRG/mepmail";
 /** Sent on every request: Resend rejects requests without a User-Agent. */
 export const USER_AGENT = `millionsend-cli/${VERSION} (+${REPO_URL})`;
 
-export const CLOUD_API_URL = "https://api.millionsend.com";
-export const CLOUD_BILLING_URL = "https://app.millionsend.com/settings/billing";
+export const CLOUD_API_URL = "https://api-mepmail.agenciamep.com";
+export const CLOUD_BILLING_URL = "https://mepmail.agenciamep.com/settings/billing";
 
 export const TRADEMARK_NOTICE =
   "Resend is a trademark of Plus Five Five, Inc. MepMail is not affiliated with or endorsed by Resend.";
