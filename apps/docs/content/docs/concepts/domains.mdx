@@ -11,7 +11,7 @@ the dashboard.
 
 Adding a domain registers it with SES and shows the DNS records to add:
 
-- **DKIM** — a single `millionsend._domainkey` TXT record. MillionSend
+- **DKIM** — a single `millionsend._domainkey` TXT record. MepMail
   generates an RSA-2048 keypair per domain and hands the private key to SES
   (BYODKIM), so verification is one TXT record instead of three CNAMEs. The
   private key is never stored.
@@ -21,7 +21,7 @@ Two verification signals are shown side by side:
 
 - **SES status** — what SES reports. SES caches verification and can lag
   after you change records.
-- **Live DNS check** — MillionSend resolves each record itself and reports
+- **Live DNS check** — MepMail resolves each record itself and reports
   Found / Missing / Mismatch immediately.
 
 The API (`GET /domains/{id}`, `POST /domains/{id}/verify`, and the `get_domain`
@@ -40,7 +40,7 @@ what public DNS answers right now) and, when a row is not verified, a one-line
 ## Regions
 
 A deployment provisions identities in the SES regions it serves — its
-`AWS_REGIONS`, or the one region in `AWS_REGION`; MillionSend Cloud serves
+`AWS_REGIONS`, or the one region in `AWS_REGION`; MepMail Cloud serves
 `sa-east-1` (São Paulo) today. The dashboard's add-domain form lists the
 served regions, holds back one still in the SES sandbox while another has
 production access, and defaults to the first production region. The API's
@@ -52,7 +52,7 @@ anywhere else would hand out DNS records but never send or report events.
 
 A domain has exactly one region. To move it, delete it and add it again in
 the other region — its DNS records change, since SES identities are per
-region. On MillionSend Cloud a domain name another team holds is taken in
+region. On MepMail Cloud a domain name another team holds is taken in
 every region.
 
 ## Per-domain configuration
@@ -74,14 +74,14 @@ up in one call (a Resend-shaped call that omits them is unchanged).
 Tracking is served from the domain's own tracking subdomain: pass
 `tracking_subdomain` (a label such as `links`) and the response's `records[]`
 gains a Tracking CNAME whose status turns `verified` once it resolves. On
-MillionSend Cloud, turning either kind on without a subdomain is refused with a
+MepMail Cloud, turning either kind on without a subdomain is refused with a
 422. Until the CNAME resolves, links are not routed through it — Cloud ships
 them clean, self-host falls back to the app host — and the domain shows as
 **Partial** in the dashboard: verified for sending, tracking not yet live. On
 Cloudflare the tracking record must stay **DNS only** (grey cloud): a proxied
 CNAME answers with Cloudflare's addresses instead of the target, which the
 records table reports as a mismatch, and TLS for the tracking host is served
-by MillionSend.
+by MepMail.
 
 ## Open-rate accuracy
 

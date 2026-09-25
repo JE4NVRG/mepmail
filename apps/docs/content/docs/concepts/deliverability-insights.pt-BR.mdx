@@ -3,7 +3,7 @@ title: Insights de Entregabilidade
 description: Verificações de boas práticas e uma nota para cada email enviado.
 ---
 
-O MillionSend executa um conjunto de verificações de boas práticas de envio
+O MepMail executa um conjunto de verificações de boas práticas de envio
 em cada email no momento do envio, e transforma os resultados em dois
 números: uma nota de 0 a 10 por email, e uma nota da conta sobre uma janela
 móvel de 30 dias. A nota mede **conformidade com boas práticas de envio** —
@@ -55,14 +55,14 @@ pontos.
 | `bimi_ready` | info | 0 | Todos | Política DMARC forte o suficiente para BIMI (`p=quarantine` ou `p=reject`). |
 | `reply_to_present` | info | 0 | Todos | Um Reply-To existe quando o From é `no-reply@`. |
 
-Algumas verificações não podem falhar no MillionSend e reportam
+Algumas verificações não podem falhar no MepMail e reportam
 `passed_by_design`:
 
 - `auth_alignment` — sempre. Você só envia de um domínio verificado, e a
   verificação de domínio é um portão obrigatório antes de qualquer envio,
   então o alinhamento de SPF e DKIM é garantido por construção.
 - `list_unsubscribe` — em broadcasts e envios por tópico, onde o próprio
-  MillionSend injeta os headers de descadastro em um clique. Em envios pela
+  MepMail injeta os headers de descadastro em um clique. Em envios pela
   API a verificação lê os headers que você forneceu.
 
 No Cloud, o tracking de abertura/clique só roda no seu subdomínio de
