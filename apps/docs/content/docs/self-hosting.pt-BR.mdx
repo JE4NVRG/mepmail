@@ -36,8 +36,8 @@ O equivalente manual usa a mesma imagem multi-arch pré-construída:
 
 ```sh
 mkdir millionsend && cd millionsend
-curl -O https://raw.githubusercontent.com/JE4NVRG/millionsend/main/deploy/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/JE4NVRG/millionsend/main/.env.example
+curl -O https://raw.githubusercontent.com/JE4NVRG/mepmail/main/deploy/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/JE4NVRG/mepmail/main/.env.example
 ```
 
 Preencha o `.env` (veja a [referência de ambiente](#referência-de-ambiente) —
@@ -96,7 +96,7 @@ Atualizações automáticas, para um host que só consegue sair para a internet
 Para quem contribui, ou quando você quer modificar o código:
 
 ```sh
-git clone https://github.com/JE4NVRG/millionsend.git
+git clone https://github.com/JE4NVRG/mepmail.git
 cd millionsend
 cp .env.example .env   # preencha como no início rápido
 docker compose up --build -d

@@ -297,7 +297,7 @@ export async function menuLoop(wizard: Wizard): Promise<number> {
 }
 
 const ENV_EXAMPLE_URL =
-  "https://raw.githubusercontent.com/JE4NVRG/millionsend/main/.env.example";
+  "https://raw.githubusercontent.com/JE4NVRG/mepmail/main/.env.example";
 
 /** Creates .env from the built-in template when there is none. */
 async function envStep(wizard: Wizard): Promise<void> {

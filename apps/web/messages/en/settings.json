@@ -252,7 +252,7 @@
     "save": "Save",
     "saved": "Saved",
     "error": "Could not save.",
-    "updates": "Product updates from MepMail: <link>changes land at github.com/JE4NVRG/millionsend/commits/main</link>. This instance never contacts mepmail.agenciamep.com on its own."
+    "updates": "Product updates from MepMail: <link>changes land at github.com/JE4NVRG/mepmail/commits/main</link>. This instance never contacts mepmail.agenciamep.com on its own."
   },
   "language": {
     "title": "Language",

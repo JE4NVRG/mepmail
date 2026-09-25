@@ -11,4 +11,4 @@ export const SMTP_DOCS_URL = `${DOCS_URL}/self-hosting#smtp-relay`;
 export const OPEN_TRACKING_DOCS_URL = `${DOCS_URL}/concepts/domains#open-rate-accuracy`;
 export const CONTENT_MONITORING_DOCS_URL = `${DOCS_URL}/self-hosting#content-monitoring-optional`;
 /** Product updates land as commits; a self-hosted instance only links here. */
-export const UPDATES_URL = "https://github.com/JE4NVRG/millionsend/commits/main";
+export const UPDATES_URL = "https://github.com/JE4NVRG/mepmail/commits/main";
