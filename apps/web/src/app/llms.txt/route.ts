@@ -1,10 +1,10 @@
 const BODY = `# MepMail
 
-> This host is the MepMail dashboard (sign-in required). Documentation and product information live on the public hosts below.
+> This host is the MepMail dashboard (sign-in required). The documentation source is public in the repository below.
 
-- Documentation index: https://docs.millionsend.com/llms.txt
-- Full documentation in one file: https://docs.millionsend.com/llms-full.txt
-- Product site: https://millionsend.com/llms.txt
+- Documentation source: https://github.com/JE4NVRG/millionsend/tree/main/apps/docs/content
+- OpenAPI 3.1 spec: https://api-mepmail.agenciamep.com/openapi.json
+- Repository: https://github.com/JE4NVRG/millionsend
 `;
 
 export function GET(): Response {

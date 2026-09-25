@@ -1,6 +1,6 @@
 ---
 title: Billing (hosted deployments)
-description: How plans, Stripe Checkout, and the webhook fit together on a hosted MillionSend deployment, and how to provision a Stripe account for it.
+description: How plans, Stripe Checkout, and the webhook fit together on a hosted MepMail deployment, and how to provision a Stripe account for it.
 ---
 
 Billing exists only when `IS_CLOUD=true`. A self-hosted instance has no
@@ -263,7 +263,7 @@ What it does, and why re-running is safe:
   the features (invoice history, payment method, customer details including
   tax id, and cancel at period end with a cancellation reason collected;
   subscription updates are off, see [the flow](#the-flow)), the business
-  profile's terms and privacy links (`millionsend.com/terms`, `/privacy`)
+  profile's terms and privacy links (`mepmail.agenciamep.com/terms`, `/privacy`)
   and, with `--app-url`, the return URL.
 
 Test and live are separate Stripe accounts: run once with each key.

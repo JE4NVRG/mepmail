@@ -252,7 +252,7 @@
     "save": "Salvar",
     "saved": "Salvo",
     "error": "Não foi possível salvar.",
-    "updates": "Novidades do MepMail: <link>inscreva-se em app.millionsend.com/updates</link>. Esta instância nunca contata millionsend.com por conta própria."
+    "updates": "Novidades do MepMail: <link>as mudanças ficam em github.com/JE4NVRG/millionsend/commits/main</link>. Esta instância nunca contata mepmail.agenciamep.com por conta própria."
   },
   "language": {
     "title": "Idioma",
@@ -339,7 +339,7 @@
     "serverUrlNote": "Endpoint HTTP (Streamable). Os clientes entram com sua conta MepMail via OAuth — sem chaves de API e nada secreto para colar.",
     "connectTitle": "Conectar um cliente",
     "notes": {
-      "claudeCode": "Depois rode <code>/mcp</code> dentro do Claude Code e escolha millionsend para entrar.",
+      "claudeCode": "Depois rode <code>/mcp</code> dentro do Claude Code e escolha mepmail para entrar.",
       "claudeDesktop": "Adicione ao <code>claude_desktop_config.json</code> — ou pule o arquivo: Settings → Connectors → Add custom connector, e cole a URL do servidor.",
       "cursor": "Salve como <code>.cursor/mcp.json</code> no projeto, ou <code>~/.cursor/mcp.json</code> para todos os projetos.",
       "vscode": "Salve como <code>.vscode/mcp.json</code> no workspace e inicie o servidor pela visão de MCP do editor."
