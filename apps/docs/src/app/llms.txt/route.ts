@@ -16,7 +16,7 @@ export function GET(): Response {
   const body = [
     "# MepMail Docs",
     "",
-    "> MepMail is an open-source, Resend-compatible email platform — hosted at millionsend.com (API: api.millionsend.com) or self-hosted on your own AWS SES.",
+    "> MepMail is an open-source, Resend-compatible email platform — hosted at mepmail.agenciamep.com (API: api-mepmail.agenciamep.com) or self-hosted on your own AWS SES.",
     "",
     "Every page is available as raw markdown by appending `.md` to its URL.",
     `The full documentation in one file: ${absoluteUrl("/llms-full.txt")}`,

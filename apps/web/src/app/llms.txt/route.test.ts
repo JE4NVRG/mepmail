@@ -7,7 +7,7 @@ describe("crawler entry points", () => {
     const res = GET();
     expect(res.status).toBe(200);
     const body = await res.text();
-    expect(body).toContain("https://github.com/JE4NVRG/millionsend/tree/main/apps/docs/content");
+    expect(body).toContain("https://docs-mepmail.agenciamep.com");
     expect(body).not.toContain("millionsend.com");
   });
 
