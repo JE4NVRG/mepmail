@@ -77,11 +77,11 @@ describe("enrollment and the sign-up flag", () => {
       kind: "welcome",
       to: "ada@example.com",
       from: "MillionSend <no-reply@mail.example.com>",
-      subject: "Bem-vindo ao MillionSend",
+      subject: "Bem-vindo ao MepMail",
     });
     expect(sends[0]?.text).toContain("Olá, Ada Lovelace");
     expect(sends[0]?.text).toContain("http://localhost:3000/domains");
-    expect(sends[0]?.text).toContain("https://docs.millionsend.com");
+    expect(sends[0]?.text).toContain("https://docs-mepmail.agenciamep.com");
   });
 
   it("the cloud enrolls whatever the flag says", async () => {

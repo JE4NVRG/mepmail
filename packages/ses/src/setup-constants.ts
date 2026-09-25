@@ -96,12 +96,11 @@ DATABASE_URL=postgres://millionsend:millionsend@postgres:5432/millionsend
 POSTGRES_PASSWORD=millionsend
 
 # Standalone deploy/docker-compose.yml only: the image to run. The default,
-# ghcr.io/millionsend/millionsend:latest, is the latest tagged release, so
-# \`docker compose pull\` is the upgrade; :edge follows main (every build there
-# passed the test suite first). Set a version tag or an immutable @sha256
+# ghcr.io/je4nvrg/mepmail:edge, follows main (every build there passed the test
+# suite first), so \`docker compose pull\` is the upgrade. Set a version tag or an immutable @sha256
 # digest here to hold a version; the backup sidecar pins the same way.
-# MILLIONSEND_IMAGE=ghcr.io/millionsend/millionsend@sha256:<digest>
-# MILLIONSEND_BACKUP_IMAGE=ghcr.io/millionsend/backup@sha256:<digest>
+# MILLIONSEND_IMAGE=ghcr.io/je4nvrg/mepmail@sha256:<digest>
+# MILLIONSEND_BACKUP_IMAGE=ghcr.io/je4nvrg/mepmail-backup@sha256:<digest>
 
 # Optional compose services, comma-separated: smtp (the relay; mount a
 # STARTTLS keypair first), and in deploy/docker-compose.yml also docs (the

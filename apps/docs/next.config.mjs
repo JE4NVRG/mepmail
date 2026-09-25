@@ -26,7 +26,7 @@ const config = {
       "img-src 'self' data: https:",
       "font-src 'self'",
       // The API playground calls the hosted API straight from the browser.
-      "connect-src 'self' https://api.millionsend.com",
+      `connect-src 'self' ${process.env.NEXT_PUBLIC_API_ORIGIN ?? "https://api-mepmail.agenciamep.com"}`,
       "object-src 'none'",
       "frame-src 'none'",
       "base-uri 'self'",

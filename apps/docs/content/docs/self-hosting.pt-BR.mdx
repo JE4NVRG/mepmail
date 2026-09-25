@@ -1,13 +1,13 @@
 ---
 title: Auto-hospedagem
-description: Implante o MillionSend na sua própria infraestrutura com Docker Compose e sua própria conta AWS SES.
+description: Implante o MepMail na sua própria infraestrutura com Docker Compose e sua própria conta AWS SES.
 ---
 
-O MillionSend auto-hospedado envia pela sua própria conta AWS SES. Uma
+O MepMail auto-hospedado envia pela sua própria conta AWS SES. Uma
 implantação são dois contêineres: Postgres e um contêiner de app rodando a
 API (porta 3001), o worker e o painel web (porta 3000). Um terceiro contêiner
 opcional roda o relay SMTP (porta 2587). (Prefere não operar infraestrutura?
-O [MillionSend Cloud](https://millionsend.com) é a mesma plataforma,
+O [MepMail Cloud](https://mepmail.agenciamep.com) é a mesma plataforma,
 hospedada.)
 
 **Pré-requisitos:** Docker com Compose; uma conta AWS com acesso ao SES na
@@ -36,8 +36,8 @@ O equivalente manual usa a mesma imagem multi-arch pré-construída:
 
 ```sh
 mkdir millionsend && cd millionsend
-curl -O https://raw.githubusercontent.com/MillionSend/millionsend/main/deploy/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/MillionSend/millionsend/main/.env.example
+curl -O https://raw.githubusercontent.com/JE4NVRG/mepmail/main/deploy/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/JE4NVRG/mepmail/main/.env.example
 ```
 
 Preencha o `.env` (veja a [referência de ambiente](#referência-de-ambiente) —
@@ -59,11 +59,11 @@ docker compose up -d
 
 As migrações rodam no boot, então, para uma instância pequena, a atualização é
 só isso. O arquivo compose
-roda `ghcr.io/millionsend/millionsend:latest`, a release mais recente com tag
-(as tags `:1.2.3` e `:1.2` existem ao lado dela; `:edge` acompanha a `main`,
-onde todo build passou pela suíte de testes antes). Para segurar uma versão, defina
+roda `ghcr.io/je4nvrg/mepmail:edge`, que acompanha a `main` (onde todo build
+passou pela suíte de testes antes). Publicar uma tag `v*` acrescenta `:1.2.3` e
+`:1.2` ao lado. Para segurar uma versão, defina
 `MILLIONSEND_IMAGE` no `.env` com uma tag de versão ou um digest imutável
-(`ghcr.io/millionsend/millionsend@sha256:…`; `docker image ls --digests`
+(`ghcr.io/je4nvrg/mepmail@sha256:…`; `docker image ls --digests`
 mostra o que está rodando) e rode `docker compose up -d`. Colocar de volta o
 pin anterior é o rollback — com a ressalva de que as migrações de schema só
 andam para frente, então faça um dump antes de um salto grande
@@ -96,7 +96,7 @@ Atualizações automáticas, para um host que só consegue sair para a internet
 Para quem contribui, ou quando você quer modificar o código:
 
 ```sh
-git clone https://github.com/MillionSend/millionsend.git
+git clone https://github.com/JE4NVRG/mepmail.git
 cd millionsend
 cp .env.example .env   # preencha como no início rápido
 docker compose up --build -d
@@ -146,7 +146,7 @@ auto-hospedada não tem limites de plano.
 
 | Variável | Propósito |
 | --- | --- |
-| `MILLIONSEND_IMAGE` | Só no deploy standalone: qual imagem rodar. O padrão `ghcr.io/millionsend/millionsend:latest` é a release mais recente com tag (`:edge` acompanha a `main`), então `docker compose pull` é a atualização. Defina uma tag de versão ou um digest imutável `ghcr.io/millionsend/millionsend@sha256:…` para segurar uma versão (`MILLIONSEND_BACKUP_IMAGE` fixa o sidecar de backup do mesmo jeito). |
+| `MILLIONSEND_IMAGE` | Só no deploy standalone: qual imagem rodar. O padrão `ghcr.io/je4nvrg/mepmail:edge` acompanha a `main`, então `docker compose pull` é a atualização. Defina uma tag de versão ou um digest imutável `ghcr.io/je4nvrg/mepmail@sha256:…` para segurar uma versão (`MILLIONSEND_BACKUP_IMAGE` fixa o sidecar de backup do mesmo jeito). |
 | `ALLOW_SIGNUP` | O primeiro usuário sempre pode se registrar; depois disso o cadastro fica fechado a menos que isto seja `true`. Mantenha `false` quando o painel é acessível pela internet. |
 | `TRUSTED_PROXIES` | Reverse proxies cujos headers de IP do cliente (`X-Forwarded-For`, `CF-Connecting-IP`) são confiáveis, IPs ou CIDRs separados por vírgula. O padrão `127.0.0.1,::1` cobre um proxy no mesmo host; adicione o endereço do seu proxy quando ele roda em outro lugar. Veja a [seção de nginx](#produção-nginx--tls). |
 | `WEBHOOK_ALLOW_LOCALHOST` | Só para desenvolvimento local: permite que endpoints de webhook (disparos de teste incluídos) apontem para `http://` e endereços de loopback/privados em qualquer porta. Mantenha `false` em qualquer instância acessível pela internet. |
@@ -197,17 +197,17 @@ worker cabem sem ajuste.
 
 ## Configuração da AWS
 
-A etapa de AWS do `npx @millionsend/setup` cria tudo de que o MillionSend
+A etapa de AWS do `npx @millionsend/setup` cria tudo de que o MepMail
 precisa na AWS — política IAM + usuário + chave de acesso, o tópico SNS de
 eventos, a fila SQS de eventos (`millionsend-events`) que o worker consome por
 long polling e o configuration set do SES. Um `APP_BASE_URL` HTTPS recebe
 adicionalmente os eventos por push; a fila funciona sem URL pública nenhuma.
 
 Rode onde houver Node 18+ e suas credenciais de admin da AWS — laptop ou
-servidor; o servidor do MillionSend nunca precisa de credenciais de admin.
+servidor; o servidor do MepMail nunca precisa de credenciais de admin.
 Ele verifica sua identidade AWS, mostra o plano, cria tudo e escreve as
 linhas `AWS_*` no `.env` do diretório atual (sem `.env` lá → imprime para
-você colar onde o MillionSend roda). `--dry-run` imprime o plano completo e
+você colar onde o MepMail roda). `--dry-run` imprime o plano completo e
 sai.
 
 `npx @millionsend/setup teardown` apaga tudo que o setup criou, incluindo
@@ -221,7 +221,7 @@ escreve nada fora dele, então rode-o como o seu usuário e o `.env` criado fica
 seu, com modo 600):
 
 ```sh
-docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms -v ~/.aws:/home/ms/.aws:ro -v "$PWD":/work -w /work ghcr.io/millionsend/millionsend:latest setup
+docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms -v ~/.aws:/home/ms/.aws:ro -v "$PWD":/work -w /work ghcr.io/je4nvrg/mepmail:edge setup
 ```
 
 Prefere não rodar um CLI? A página **Configurações → SES** do painel oferece
@@ -245,7 +245,7 @@ npx @millionsend/setup add-region us-east-1
 # ou, no servidor, a partir do diretório de deploy:
 docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms \
   -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
-  -v "$PWD":/work -w /work ghcr.io/millionsend/millionsend:latest setup add-region us-east-1
+  -v "$PWD":/work -w /work ghcr.io/je4nvrg/mepmail:edge setup add-region us-east-1
 ```
 
 O assistente interativo oferece a mesma etapa como **Add a region** na etapa
@@ -275,7 +275,7 @@ segura só os próprios domínios quando sua cota de 24 horas acaba.
 Preço: desde 2026-07-21 uma conta × região do SES sem envios anteriores começa
 no plano Essentials (US$ 0,16 por 1.000 mensagens em vez dos US$ 0,10 à la
 carte). Depois de provisionar, o assistente lê o plano da região e, se for
-Essentials, pergunta se deve cancelá-lo; nada que o MillionSend usa precisa de
+Essentials, pergunta se deve cancelá-lo; nada que o MepMail usa precisa de
 plano, e o cancelamento de um plano atribuído por padrão vale na hora. À mão:
 `aws sesv2 put-account-pricing-attributes --plan NONE --region <região>`.
 
@@ -304,7 +304,7 @@ ARN no `.env` como `SNS_TOPIC_ARNS`; um configuration set do SES com um event
 destination apontando para o tópico (tipos de evento: Delivery, Delivery
 Delay, Bounce, Complaint, Reject, Rendering Failure — NÃO inscreva Open nem
 Click, pois isso faz o SES reescrever todo link e injetar o próprio pixel,
-enquanto o MillionSend rastreia o engajamento por conta própria), com o nome
+enquanto o MepMail rastreia o engajamento por conta própria), com o nome
 no `.env` como `SES_CONFIGURATION_SET`. Reinicie depois de defini-los. Sem
 `SES_CONFIGURATION_SET`, os envios saem sem configuration set e não emitem
 eventos.
@@ -313,7 +313,7 @@ O assistente também configura a lista de supressão da conta do SES para
 apenas bounces. Essa lista é por região e compartilhada por todos os times da
 instância: uma caixa que deu hard bounce está morta para todo mundo, então o
 SES pode barrá-la para a conta inteira, mas uma denúncia de spam diz respeito
-ao e-mail de um remetente — o MillionSend a suprime só para aquele time, e
+ao e-mail de um remetente — o MepMail a suprime só para aquele time, e
 deixada na lista do SES ela bloquearia também o recibo de outro time ou uma
 redefinição de senha para a mesma pessoa. Se você provisionou à mão ou com o
 template do CloudFormation, ajuste você mesmo no console do SES (Suppression
@@ -588,7 +588,7 @@ sudo ufw enable
 
 Opcional. Com um bucket compatível com S3 configurado, admins do time podem
 enviar um logo pelo dashboard; ele também marca as páginas hospedadas de
-descadastro quando a marca do MillionSend está oculta. UM conjunto de
+descadastro quando a marca do MepMail está oculta. UM conjunto de
 credenciais `S3_*` é compartilhado com o job de backup abaixo — cada recurso
 é então habilitado pela sua própria variável de bucket.
 
@@ -662,7 +662,7 @@ faça backup dessa chave separadamente, ou os corpos restaurados ficam
 irrecuperáveis.
 
 O `deploy/docker-compose.yml` standalone roda a imagem publicada
-`ghcr.io/millionsend/backup` (`MILLIONSEND_BACKUP_IMAGE` a fixa, como
+`ghcr.io/je4nvrg/mepmail-backup` (`MILLIONSEND_BACKUP_IMAGE` a fixa, como
 `MILLIONSEND_IMAGE` fixa o app); um clone do repositório a constrói a partir de
 `scripts/backup`. A restauração usa o mesmo contêiner nos dois casos.
 
@@ -693,7 +693,7 @@ deliberadamente.
 
 ## E-mails de conta, contatos e novidades
 
-Os e-mails do próprio MillionSend — redefinição de senha, confirmação de
+Os e-mails do próprio MepMail — redefinição de senha, confirmação de
 e-mail, convites para times e os avisos de cota e entregabilidade aos donos
 dos times — saem de `AUTH_EMAIL_FROM` e `NOTIFICATIONS_EMAIL_FROM`.
 Verifique o domínio do remetente em **Domínios** em um time e, a partir daí,
@@ -741,13 +741,13 @@ cadastro por senha não recebe sessão até o link enviado ser aberto; contas
 anteriores confirmam no próximo login. Onde a instância confirma e-mails, o
 remetente do onboarding só alcança membros que confirmaram.
 
-Nada em uma instância auto-hospedada contata millionsend.com por conta
+Nada em uma instância auto-hospedada contata mepmail.agenciamep.com por conta
 própria. O assistente de configuração oferece, uma vez e só de forma
 interativa, inscrever o e-mail do operador nas notas de lançamento do
-MillionSend; é o assistente na sua máquina enviando a sua resposta, e um link
+MepMail; é o assistente na sua máquina enviando a sua resposta, e um link
 de confirmação chega antes de qualquer coisa ser armazenada. Quando não
-consegue alcançar millionsend.com, ele imprime a página,
-[app.millionsend.com/updates?source=self-host](https://app.millionsend.com/updates?source=self-host), e **Configurações →
+consegue alcançar mepmail.agenciamep.com, ele imprime a página,
+[app.mepmail.agenciamep.com/updates?source=self-host](https://app.mepmail.agenciamep.com/updates?source=self-host), e **Configurações →
 Instância** leva à mesma página; o `source` marca você como auto-hospedado
 nos dois casos.
 

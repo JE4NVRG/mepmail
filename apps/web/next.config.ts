@@ -17,7 +17,7 @@ const config: NextConfig = {
     return [
       {
         source: "/llms-full.txt",
-        destination: "https://docs.millionsend.com/llms-full.txt",
+        destination: "https://docs-mepmail.agenciamep.com/llms-full.txt",
         permanent: true,
       },
     ];

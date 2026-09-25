@@ -83,11 +83,11 @@ docker compose up -d
 ```
 
 Migrations run on boot, so that is the whole upgrade for a small instance. The compose file runs
-`ghcr.io/millionsend/millionsend:latest`, the latest tagged release (`:1.2.3`
-and `:1.2` tags exist alongside it; `:edge` follows `main`, where every build
-passed the test suite first). To hold a version, set `MILLIONSEND_IMAGE`
+`ghcr.io/je4nvrg/mepmail:edge`, which follows `main` — every build there
+passed the test suite first. Publishing a `v*` tag adds `:1.2.3` and `:1.2`
+alongside it. To hold a version, set `MILLIONSEND_IMAGE`
 in `.env` to a version tag or an immutable digest
-(`ghcr.io/millionsend/millionsend@sha256:…`; `docker image ls --digests` shows
+(`ghcr.io/je4nvrg/mepmail@sha256:…`; `docker image ls --digests` shows
 what is running) and `docker compose up -d`. The previous pin put back is the
 rollback — with the caveat that schema migrations run forward only, so take a
 dump before a big jump (Backups below); a rolled-back image may not start on a
@@ -168,7 +168,7 @@ No Node on the server? The same CLI ships inside the image — run it from the
 deploy directory, which it reads and writes as `/work` (the wizard writes
 nothing outside it, so run it as yourself and the `.env` it creates is yours,
 mode 600):
-`docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms -v ~/.aws:/home/ms/.aws:ro -v "$PWD":/work -w /work ghcr.io/millionsend/millionsend:latest setup`.
+`docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms -v ~/.aws:/home/ms/.aws:ro -v "$PWD":/work -w /work ghcr.io/je4nvrg/mepmail:edge setup`.
 
 Prefer not to run a CLI? The dashboard's Settings → SES page offers a CloudFormation
 quick-create link and a pre-filled shell script that create the same resources.
@@ -193,7 +193,7 @@ npx @millionsend/setup add-region us-east-1
 # or, on the server, from the deploy directory:
 docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms \
   -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
-  -v "$PWD":/work -w /work ghcr.io/millionsend/millionsend:latest setup add-region us-east-1
+  -v "$PWD":/work -w /work ghcr.io/je4nvrg/mepmail:edge setup add-region us-east-1
 ```
 
 The interactive wizard offers the same step as **Add a region** at its AWS
@@ -621,7 +621,7 @@ The dumps contain email bodies encrypted with `MASTER_ENCRYPTION_KEY` — back
 that key up separately, or restored bodies are unrecoverable.
 
 The standalone `deploy/docker-compose.yml` runs the published
-`ghcr.io/millionsend/backup` image (`MILLIONSEND_BACKUP_IMAGE` pins it, the way
+`ghcr.io/je4nvrg/mepmail-backup` image (`MILLIONSEND_BACKUP_IMAGE` pins it, the way
 `MILLIONSEND_IMAGE` pins the app); a repository clone builds it from
 `scripts/backup`.
 Restores use the same container either way.

@@ -32,7 +32,7 @@ services:
       retries: 10
 
   millionsend:
-    image: "${MILLIONSEND_IMAGE:-ghcr.io/millionsend/millionsend:latest}"
+    image: "${MILLIONSEND_IMAGE:-ghcr.io/je4nvrg/mepmail:edge}"
     env_file: .env
     environment:
       PROCESS: all
@@ -58,7 +58,7 @@ services:
       - /app/apps/docs/.source
 
   docs:
-    image: "${MILLIONSEND_IMAGE:-ghcr.io/millionsend/millionsend:latest}"
+    image: "${MILLIONSEND_IMAGE:-ghcr.io/je4nvrg/mepmail:edge}"
     env_file: .env
     environment:
       PROCESS: docs
@@ -80,7 +80,7 @@ services:
       - /app/apps/docs/.source
 
   smtp:
-    image: "${MILLIONSEND_IMAGE:-ghcr.io/millionsend/millionsend:latest}"
+    image: "${MILLIONSEND_IMAGE:-ghcr.io/je4nvrg/mepmail:edge}"
     env_file: .env
     environment:
       PROCESS: smtp
@@ -107,7 +107,7 @@ services:
 
   backup:
     # Published from scripts/backup on the same tags as the app.
-    image: "${MILLIONSEND_BACKUP_IMAGE:-ghcr.io/millionsend/backup:latest}"
+    image: "${MILLIONSEND_BACKUP_IMAGE:-ghcr.io/je4nvrg/mepmail-backup:edge}"
     env_file: .env
     # Stays a no-op (prints a hint, exits 0, restart "no") until
     # S3_BACKUP_BUCKET and the S3_* credentials are set in .env.

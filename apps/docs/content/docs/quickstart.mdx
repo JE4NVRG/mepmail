@@ -1,21 +1,21 @@
 ---
 title: Quickstart
-description: Get MillionSend and send your first email in a few minutes.
+description: Get MepMail running and send your first email in a few minutes.
 ---
 
-MillionSend runs the same on [MillionSend Cloud](https://millionsend.com) and
-on your own infrastructure — same dashboard, same API, same SDKs. Pick your
-deployment below; the tabs remember your choice across the docs.
+MepMail runs the same whether we host it for you or you run it yourself — same
+dashboard, same API, same SDKs. Pick your deployment below; the tabs remember
+your choice across the docs.
 
-## 1. Get MillionSend
+## 1. Get MepMail
 
 <DeploymentTabs>
 <DeploymentTab deployment="cloud">
 
-Sign up at [millionsend.com](https://millionsend.com). That's it — no
-infrastructure, no AWS account. The dashboard is at
-[millionsend.com](https://millionsend.com) and the API at
-`api.millionsend.com`.
+Accounts are provisioned by invitation — there is no public signup. Write to us
+and we set up your account, then you sign in at
+[mepmail.agenciamep.com](https://mepmail.agenciamep.com). The API is at
+`api-mepmail.agenciamep.com`.
 
 </DeploymentTab>
 <DeploymentTab deployment="self-hosted">
@@ -25,38 +25,54 @@ New AWS accounts start in the SES sandbox, which can only send to verified
 recipients — [request production access](https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html)
 to send to anyone.
 
-One command, in an empty directory — no clone needed:
+Build from source — this is the same tree we run in production, and it needs no
+published image:
 
 ```sh
-mkdir millionsend && cd millionsend
-npx @millionsend/setup
+git clone https://github.com/JE4NVRG/mepmail.git mepmail
+cd mepmail
+cp .env.example .env
 ```
 
-The wizard detects what is already in the directory and offers each step:
-create `.env` with generated secrets, provision the AWS resources (IAM user +
-policy, SNS event topic, SQS events queue, SES configuration set — plus a push
-subscription when your deployment has a public HTTPS URL), then download the compose file and
-start the prebuilt image with `docker compose up -d`. Every step is skippable
-and safe to re-run; `--dry-run` prints the full plan and touches nothing.
+Two secrets have to be filled in before the first boot — `.env` says so next to
+each one, and both take the same command:
 
-When it finishes: dashboard at `http://localhost:3000`, API at
-`http://localhost:3001`. The first user to register becomes the initial
-account — after that, signup is closed unless you opt in. Prefer doing it by
-hand, or ready for production? See [Self-hosting](/self-hosting).
+```sh
+openssl rand -base64 32   # MASTER_ENCRYPTION_KEY
+openssl rand -base64 32   # BETTER_AUTH_SECRET
+```
+
+Then bring the stack up:
+
+```sh
+docker compose up --build -d
+```
+
+Dashboard at `http://localhost:3000`, API at `http://localhost:3001`. The first
+user to register becomes the initial account — after that, signup is closed
+unless you opt in. The AWS pieces (IAM user and policy, SNS event topic, SES
+configuration set) are **not** created by the compose file: walk
+[Self-hosting](/self-hosting) for those, for the full environment reference, and
+for the event pipeline that turns `delivered` and `bounced` into rows you can
+see.
 
 </DeploymentTab>
 </DeploymentTabs>
 
 ## 2. Verify a sending domain
 
-MillionSend only sends from domains you have verified.
+MepMail only sends from domains you have verified.
 
 1. In the dashboard, go to **Domains** and add a domain you control
    (e.g. `acme.dev`).
 2. Add the DNS records it shows you — a DKIM TXT record plus MAIL FROM
    records — at your DNS provider.
-3. Click **Verify DNS records**. MillionSend also resolves the records live,
+3. Click **Verify DNS records**. MepMail also resolves the records live,
    so you can see immediately which ones are still missing.
+
+Validation is asynchronous on the DNS provider's side: DKIM usually resolves in
+minutes, MAIL FROM can take longer. MepMail re-checks on its own every 15
+minutes, so you never have to click twice.
 
 ## 3. Create an API key
 
@@ -71,14 +87,14 @@ Your API base URL:
 <DeploymentTabs>
 <DeploymentTab deployment="cloud">
 
-`https://api.millionsend.com`
+`https://api-mepmail.agenciamep.com`
 
 </DeploymentTab>
 <DeploymentTab deployment="self-hosted">
 
 Your instance's API origin — `http://localhost:3001` on a local compose
 setup, or the hostname your reverse proxy serves the API on (`PUBLIC_API_URL`,
-e.g. `https://api.acme.dev`). The examples below use the Cloud URL; swap in
+e.g. `https://api.acme.dev`). The examples below use the managed URL; swap in
 yours.
 
 </DeploymentTab>
@@ -87,28 +103,31 @@ yours.
 With curl:
 
 ```sh
-curl -X POST https://api.millionsend.com/emails \
+curl -X POST https://api-mepmail.agenciamep.com/emails \
   -H "Authorization: Bearer ms_..." \
   -H "Content-Type: application/json" \
   -d '{
     "from": "Acme <onboarding@acme.dev>",
     "to": ["delivered@example.com"],
-    "subject": "Hello from MillionSend",
+    "subject": "Hello from MepMail",
     "html": "<strong>It works!</strong>"
   }'
 ```
 
-Or with the Node SDK (`npm install millionsend`):
+Or with the official Resend SDK for Node (`npm install resend`), pointed at your
+base URL:
 
 ```ts
-import { MillionSend } from "millionsend";
+import { Resend } from "resend";
 
-const ms = new MillionSend("ms_...", { baseUrl: "https://api.millionsend.com" });
+const resend = new Resend("ms_...", {
+  baseUrl: "https://api-mepmail.agenciamep.com",
+});
 
-const { data, error } = await ms.emails.send({
+const { data, error } = await resend.emails.send({
   from: "Acme <onboarding@acme.dev>",
   to: "delivered@example.com",
-  subject: "Hello from MillionSend",
+  subject: "Hello from MepMail",
   html: "<strong>It works!</strong>",
 });
 
@@ -121,20 +140,21 @@ Both return `{ "id": "..." }`. Watch the email move from `queued` to
 
 <Callout type="info">
 On a self-hosted instance, delivery events (delivered, bounced, complained)
-require the SES event pipeline the setup wizard configures — see
+require the SES event pipeline configured in
 [Self-hosting → SES events](/self-hosting#ses-events-bounces-complaints-deliveries).
-On Cloud they flow automatically.
+On the managed service they flow automatically.
 </Callout>
 
-Already on Resend? Point the official Resend SDK at MillionSend instead — set
-`RESEND_BASE_URL` to your base URL and use your `ms_` key. The wire format is
-identical.
+Already on Resend? Keep the SDK you have and point it here: set the base URL to
+your MepMail origin and use your `ms_` key. The wire format is identical, and
+[SDKs](/sdks) has the exact option for each language — including the ones that
+only read it from an environment variable.
 
 ## Next steps
 
 - [Concepts](/concepts/contacts) for contacts, segments, topics, and
   broadcasts.
-- [SDKs](/sdks) for the nine official client libraries.
+- [SDKs](/sdks) for how to point each official Resend SDK at your instance.
 - [API reference](/api-reference) for every endpoint.
 - [Self-hosting](/self-hosting) for production deployment, the environment
   reference, and the SMTP relay.

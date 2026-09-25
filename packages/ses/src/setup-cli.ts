@@ -297,7 +297,7 @@ export async function menuLoop(wizard: Wizard): Promise<number> {
 }
 
 const ENV_EXAMPLE_URL =
-  "https://raw.githubusercontent.com/JE4NVRG/millionsend/main/.env.example";
+  "https://raw.githubusercontent.com/JE4NVRG/mepmail/main/.env.example";
 
 /** Creates .env from the built-in template when there is none. */
 async function envStep(wizard: Wizard): Promise<void> {
@@ -489,8 +489,8 @@ async function socialLoginStep(wizard: Wizard): Promise<void> {
 /** Accepted shapes mirror packages/config parseEmailFrom; boot re-validates. */
 const EMAIL_FROM_RE = /^(?:[^<>]+<)?[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>?$/;
 
-const UPDATES_SUBSCRIBE_URL = "https://app.millionsend.com/api/updates/subscribe";
-const UPDATES_PAGE_URL = "https://app.millionsend.com/updates?source=self-host";
+const UPDATES_SUBSCRIBE_URL = "https://mepmail.agenciamep.com/api/updates/subscribe";
+const UPDATES_PAGE_URL = "https://mepmail.agenciamep.com/updates?source=self-host";
 
 /**
  * Optional, interactive only: the operator's one-time opt-in to release
@@ -520,7 +520,7 @@ async function updatesStep(wizard: Wizard): Promise<void> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     flow.note("Check your inbox for the confirmation link.");
   } catch {
-    flow.note(`Couldn't reach millionsend.com — subscribe any time at ${UPDATES_PAGE_URL}.`);
+    flow.note(`Couldn't reach the MepMail updates service — subscribe any time at ${UPDATES_PAGE_URL}.`);
   }
 }
 
