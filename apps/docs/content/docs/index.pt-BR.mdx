@@ -1,15 +1,15 @@
 ---
 title: Introdução
-description: O que é o MillionSend e como as peças se encaixam.
+description: O que é o MepMail e como as peças se encaixam.
 ---
 
-MillionSend é a plataforma de email open source. Envie um. Envie um milhão.
+MepMail é a plataforma de email open source. Envie um. Envie um milhão.
 
 Use de duas formas, com o mesmo código nas duas:
 
-- **MillionSend Cloud** — o serviço hospedado em
-  [millionsend.com](https://millionsend.com). Cadastre-se, verifique um
-  domínio, envie. API em `api.millionsend.com`.
+- **MepMail Cloud** — o serviço hospedado em
+  [mepmail.agenciamep.com](https://mepmail.agenciamep.com). Cadastre-se, verifique um
+  domínio, envie. API em `api-mepmail.agenciamep.com`.
 - **Auto-hospedado** — rode na sua própria infraestrutura com Docker Compose,
   enviando pela **sua própria conta AWS SES**. Veja
   [Auto-hospedagem](/pt-BR/self-hosting).
@@ -26,7 +26,7 @@ A API HTTP é compatível na comunicação com a do Resend: mesmos formatos de
 requisição e resposta, mesmo formato de erro. Os SDKs oficiais do Resend
 respeitam uma URL base configurável, então migrar uma integração existente
 significa trocar duas variáveis de ambiente — a chave de API e a URL base —
-sem reescrever seu código. O MillionSend também publica
+sem reescrever seu código. O MepMail também publica
 [SDKs próprios](/pt-BR/sdks) para nove linguagens, espelhando o formato dos
 SDKs do Resend.
 
@@ -56,7 +56,7 @@ você segmenta com [segmentos](/pt-BR/concepts/segments) (filtros salvos) e
 
 ## Arquitetura em resumo
 
-O MillionSend envia pelo AWS SES — na Nuvem isso é gerenciado para você; em
+O MepMail envia pelo AWS SES — na Nuvem isso é gerenciado para você; em
 uma implantação auto-hospedada é a sua própria conta SES, então você mantém a
 entregabilidade e o preço do SES. Uma implantação auto-hospedada são dois
 contêineres:
@@ -94,5 +94,5 @@ do código da API.
 
 ## Licença
 
-A plataforma é [AGPL-3.0](https://github.com/MillionSend/millionsend/blob/main/LICENSE).
+A plataforma é [AGPL-3.0](https://github.com/JE4NVRG/millionsend/blob/main/LICENSE).
 Os SDKs são publicados separadamente sob MIT.
