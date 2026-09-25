@@ -12,7 +12,13 @@ import {
   verifyOnboardingSender,
 } from "../src/accept-email.js";
 import { EnvKeyring } from "../src/crypto/keyring.js";
-import { OVERAGE_HARD_CAP, QUOTA_TOLERANCE, type QuotaTeamRow, teamRung } from "../src/plans.js";
+import {
+  attachmentLimit,
+  OVERAGE_HARD_CAP,
+  QUOTA_TOLERANCE,
+  type QuotaTeamRow,
+  teamRung,
+} from "../src/plans.js";
 import { readPeriodUsage } from "../src/quota.js";
 import { DAY_MS, utcDay } from "../src/utc-day.js";
 
@@ -102,6 +108,13 @@ const FREE: QuotaTeamRow = {
   currentPeriodEnd: null,
   overageEnabled: false,
 };
+const PRO: QuotaTeamRow = {
+  plan: "pro",
+  planQuota: 100_000,
+  currentPeriodStart: null,
+  currentPeriodEnd: null,
+  overageEnabled: false,
+};
 const auth = () => ({ teamId, billing: FREE, apiKeyId: null });
 const payload = (over: Partial<AcceptEmailPayload> = {}): AcceptEmailPayload => ({
   from: "a@acme.dev",
@@ -148,16 +161,42 @@ describe("acceptEmail", () => {
     expect(row?.accepted).toBe(1);
   });
 
-  it("rejects attachments whose decoded bytes exceed the cap", async () => {
-    const content = Buffer.alloc(MAX_ATTACHMENT_BYTES / 2 + 1).toString("base64");
+  it("refuses attachments past the PLAN's own ceiling, below the instance one", async () => {
+    // SES bills outbound data apart from the per-recipient rate, so a free
+    // team may not carry what the instance-wide ceiling would allow.
+    const freeLimit = attachmentLimit("free");
+    const over = Buffer.alloc(freeLimit + 64 * 1024).toString("base64");
     const result = await acceptEmail(deps(), auth(), {
       ...payload(),
-      attachments: [
-        { filename: "a.bin", content },
-        { filename: "b.bin", content },
-      ],
+      attachments: [{ filename: "a.bin", content: over }],
     });
     expect(result).toEqual({
+      ok: false,
+      reason: "attachments_too_large",
+      maxBytes: freeLimit,
+    });
+  });
+
+  it("lets a top plan carry its ceiling, and still refuses past the absolute one", async () => {
+    const pro = { teamId, billing: PRO, apiKeyId: null };
+    const within = Buffer.alloc(attachmentLimit("pro") - 64 * 1024).toString("base64");
+    expect(
+      await acceptEmail(deps(), pro, {
+        ...payload(),
+        attachments: [{ filename: "a.bin", content: within }],
+      }),
+    ).toMatchObject({ ok: true });
+
+    const half = Buffer.alloc(MAX_ATTACHMENT_BYTES / 2 + 1).toString("base64");
+    expect(
+      await acceptEmail(deps(), pro, {
+        ...payload(),
+        attachments: [
+          { filename: "a.bin", content: half },
+          { filename: "b.bin", content: half },
+        ],
+      }),
+    ).toEqual({
       ok: false,
       reason: "attachments_too_large",
       maxBytes: MAX_ATTACHMENT_BYTES,
