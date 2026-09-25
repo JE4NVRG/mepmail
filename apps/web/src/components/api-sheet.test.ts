@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { RESOURCE_SHEETS, type ResourceSheet } from "./api-sheet";
-import { LANGS } from "./api-sheet-snippets";
 
 const LOCALES = ["en", "pt-BR"] as const;
 
@@ -24,30 +23,13 @@ describe("RESOURCE_SHEETS", () => {
       });
     }
 
-    if (sheet.sdk) {
-      const sdk = sheet.sdk;
-      it(`${resource}: every emails-sheet language carries every section, with the placeholder key up front`, () => {
-        for (const lang of LANGS) {
-          for (const section of sheet.sections) {
-            expect(sdk[lang][section], `${resource}.${lang}.${section}`).toEqual(
-              expect.any(String),
-            );
-          }
-          // Client setup convention: the first section constructs the client
-          // with the placeholder key the keyHint tells users to replace.
-          expect(sdk[lang][sheet.sections[0] ?? ""], `${resource}.${lang} setup`).toContain(
-            "ms_xxxxxxxxx",
-          );
-        }
-      });
-    } else {
-      it(`${resource}: every curl snippet is an authenticated call to the public API`, () => {
-        for (const section of sheet.sections) {
-          const code = sheet.curl[section];
-          expect(code, `${resource}.${section}`).toContain("https://api.millionsend.com/");
-          expect(code, `${resource}.${section}`).toContain("Authorization: Bearer ms_");
-        }
-      });
-    }
+    it(`${resource}: every section carries an authenticated curl call to the public API`, () => {
+      for (const section of sheet.sections) {
+        const code = sheet.curl[section];
+        expect(code, `${resource}.${section}`).toBeTruthy();
+        expect(code, `${resource}.${section}`).toContain("https://api-mepmail.agenciamep.com/");
+        expect(code, `${resource}.${section}`).toContain("Authorization: Bearer ms_xxxxxxxxx");
+      }
+    });
   }
 });
