@@ -4,11 +4,11 @@
 # :edge tracks main; pin a version tag for production.
 services:
   millionsend:
-    image: ghcr.io/millionsend/millionsend:edge
+    image: ghcr.io/je4nvrg/mepmail:edge
     build: !reset null
   smtp:
-    image: ghcr.io/millionsend/millionsend:edge
+    image: ghcr.io/je4nvrg/mepmail:edge
     build: !reset null
   docs:
-    image: ghcr.io/millionsend/millionsend:edge
+    image: ghcr.io/je4nvrg/mepmail:edge
     build: !reset null

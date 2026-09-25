@@ -59,11 +59,11 @@ docker compose up -d
 
 As migrações rodam no boot, então, para uma instância pequena, a atualização é
 só isso. O arquivo compose
-roda `ghcr.io/millionsend/millionsend:latest`, a release mais recente com tag
-(as tags `:1.2.3` e `:1.2` existem ao lado dela; `:edge` acompanha a `main`,
-onde todo build passou pela suíte de testes antes). Para segurar uma versão, defina
+roda `ghcr.io/je4nvrg/mepmail:edge`, que acompanha a `main` (onde todo build
+passou pela suíte de testes antes). Publicar uma tag `v*` acrescenta `:1.2.3` e
+`:1.2` ao lado. Para segurar uma versão, defina
 `MILLIONSEND_IMAGE` no `.env` com uma tag de versão ou um digest imutável
-(`ghcr.io/millionsend/millionsend@sha256:…`; `docker image ls --digests`
+(`ghcr.io/je4nvrg/mepmail@sha256:…`; `docker image ls --digests`
 mostra o que está rodando) e rode `docker compose up -d`. Colocar de volta o
 pin anterior é o rollback — com a ressalva de que as migrações de schema só
 andam para frente, então faça um dump antes de um salto grande
@@ -146,7 +146,7 @@ auto-hospedada não tem limites de plano.
 
 | Variável | Propósito |
 | --- | --- |
-| `MILLIONSEND_IMAGE` | Só no deploy standalone: qual imagem rodar. O padrão `ghcr.io/millionsend/millionsend:latest` é a release mais recente com tag (`:edge` acompanha a `main`), então `docker compose pull` é a atualização. Defina uma tag de versão ou um digest imutável `ghcr.io/millionsend/millionsend@sha256:…` para segurar uma versão (`MILLIONSEND_BACKUP_IMAGE` fixa o sidecar de backup do mesmo jeito). |
+| `MILLIONSEND_IMAGE` | Só no deploy standalone: qual imagem rodar. O padrão `ghcr.io/je4nvrg/mepmail:edge` acompanha a `main`, então `docker compose pull` é a atualização. Defina uma tag de versão ou um digest imutável `ghcr.io/je4nvrg/mepmail@sha256:…` para segurar uma versão (`MILLIONSEND_BACKUP_IMAGE` fixa o sidecar de backup do mesmo jeito). |
 | `ALLOW_SIGNUP` | O primeiro usuário sempre pode se registrar; depois disso o cadastro fica fechado a menos que isto seja `true`. Mantenha `false` quando o painel é acessível pela internet. |
 | `TRUSTED_PROXIES` | Reverse proxies cujos headers de IP do cliente (`X-Forwarded-For`, `CF-Connecting-IP`) são confiáveis, IPs ou CIDRs separados por vírgula. O padrão `127.0.0.1,::1` cobre um proxy no mesmo host; adicione o endereço do seu proxy quando ele roda em outro lugar. Veja a [seção de nginx](#produção-nginx--tls). |
 | `WEBHOOK_ALLOW_LOCALHOST` | Só para desenvolvimento local: permite que endpoints de webhook (disparos de teste incluídos) apontem para `http://` e endereços de loopback/privados em qualquer porta. Mantenha `false` em qualquer instância acessível pela internet. |
@@ -221,7 +221,7 @@ escreve nada fora dele, então rode-o como o seu usuário e o `.env` criado fica
 seu, com modo 600):
 
 ```sh
-docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms -v ~/.aws:/home/ms/.aws:ro -v "$PWD":/work -w /work ghcr.io/millionsend/millionsend:latest setup
+docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms -v ~/.aws:/home/ms/.aws:ro -v "$PWD":/work -w /work ghcr.io/je4nvrg/mepmail:edge setup
 ```
 
 Prefere não rodar um CLI? A página **Configurações → SES** do painel oferece
@@ -245,7 +245,7 @@ npx @millionsend/setup add-region us-east-1
 # ou, no servidor, a partir do diretório de deploy:
 docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms \
   -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
-  -v "$PWD":/work -w /work ghcr.io/millionsend/millionsend:latest setup add-region us-east-1
+  -v "$PWD":/work -w /work ghcr.io/je4nvrg/mepmail:edge setup add-region us-east-1
 ```
 
 O assistente interativo oferece a mesma etapa como **Add a region** na etapa
@@ -662,7 +662,7 @@ faça backup dessa chave separadamente, ou os corpos restaurados ficam
 irrecuperáveis.
 
 O `deploy/docker-compose.yml` standalone roda a imagem publicada
-`ghcr.io/millionsend/backup` (`MILLIONSEND_BACKUP_IMAGE` a fixa, como
+`ghcr.io/je4nvrg/mepmail-backup` (`MILLIONSEND_BACKUP_IMAGE` a fixa, como
 `MILLIONSEND_IMAGE` fixa o app); um clone do repositório a constrói a partir de
 `scripts/backup`. A restauração usa o mesmo contêiner nos dois casos.
 
