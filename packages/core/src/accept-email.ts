@@ -4,7 +4,7 @@ import { schema } from "@millionsend/db";
 import { and, count, eq } from "drizzle-orm";
 import { type EmailAttachment, encryptEmailBody, sealAttachments } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
-import { type QuotaTeamRow, type TeamQuota, teamQuota } from "./plans.js";
+import { attachmentLimit, type QuotaTeamRow, type TeamQuota, teamQuota } from "./plans.js";
 import { reserveQuota } from "./quota.js";
 import { parseSingleSender } from "./sender-address.js";
 import { extractAddrSpec, findSuppressed, normalizeAddress } from "./suppressions.js";
@@ -154,8 +154,29 @@ export interface AcceptEmailPayload {
   topicId?: string | undefined;
 }
 
-/** Decoded attachment bytes allowed per email, summed across attachments. */
+/**
+ * Decoded attachment bytes allowed per email, summed across attachments. The
+ * absolute ceiling: every send surface also applies the plan's own (lower)
+ * limit through teamAttachmentLimit, since SES bills the outbound data at
+ * US$ 0.12/GB on top of the per-recipient rate.
+ */
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+/**
+ * The attachment ceiling that applies to a team right now — derived from the
+ * same row and the same plan as teamQuota, so a plan change moves the quota
+ * and the attachment limit together. `uncapped` (the instance's own team) and
+ * self-host (kind "none") take the absolute ceiling: no ladder, no limit.
+ */
+export function teamAttachmentLimit(
+  billing: QuotaTeamRow | "uncapped",
+  isCloud: boolean,
+  now: Date = new Date(),
+): number {
+  if (billing === "uncapped") return MAX_ATTACHMENT_BYTES;
+  const quota = teamQuota(billing, isCloud, now);
+  return quota.kind === "none" ? MAX_ATTACHMENT_BYTES : attachmentLimit(quota.plan);
+}
 
 /** Decoded size of base64 attachments: 3 bytes per 4 chars; padding makes this a ≤2-byte overestimate. */
 export function estimateAttachmentBytes(
@@ -237,8 +258,15 @@ export async function acceptEmail(
     quota?: "deferred" | undefined;
   } = {},
 ): Promise<AcceptEmailResult> {
+  // Two ceilings: the absolute one first (cheap, no plan needed), then the
+  // plan's own — a team on a small plan may not carry the megabytes the
+  // instance-wide ceiling allows, because SES bills that data separately.
   if (estimateAttachmentBytes(payload.attachments ?? []) > MAX_ATTACHMENT_BYTES) {
     return { ok: false, reason: "attachments_too_large", maxBytes: MAX_ATTACHMENT_BYTES };
+  }
+  const attachmentCeiling = teamAttachmentLimit(auth.billing, deps.isCloud);
+  if (estimateAttachmentBytes(payload.attachments ?? []) > attachmentCeiling) {
+    return { ok: false, reason: "attachments_too_large", maxBytes: attachmentCeiling };
   }
 
   // Suppression: dedupe, check every recipient field, and strip suppressed
