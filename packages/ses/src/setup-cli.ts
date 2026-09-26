@@ -38,7 +38,6 @@ import {
 import {
   addRegionEnvEntries,
   CLOUD_REQUIRED_KEYS,
-  COMPOSE_DOWNLOAD_URL,
   composeUpArgs,
   type DirState,
   detectDirState,
@@ -296,8 +295,7 @@ export async function menuLoop(wizard: Wizard): Promise<number> {
   }
 }
 
-const ENV_EXAMPLE_URL =
-  "https://raw.githubusercontent.com/JE4NVRG/mepmail/main/.env.example";
+const ENV_EXAMPLE_URL = "https://raw.githubusercontent.com/JE4NVRG/mepmail/main/.env.example";
 
 /** Creates .env from the built-in template when there is none. */
 async function envStep(wizard: Wizard): Promise<void> {
@@ -520,7 +518,9 @@ async function updatesStep(wizard: Wizard): Promise<void> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     flow.note("Check your inbox for the confirmation link.");
   } catch {
-    flow.note(`Couldn't reach the MepMail updates service — subscribe any time at ${UPDATES_PAGE_URL}.`);
+    flow.note(
+      `Couldn't reach the MepMail updates service — subscribe any time at ${UPDATES_PAGE_URL}.`,
+    );
   }
 }
 
@@ -1071,18 +1071,14 @@ export async function essentialsPlanPrompt(
   }
 }
 
-async function download(url: string): Promise<string> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.text();
-}
-
-/** The launch step: optional compose download, then docker compose up. */
+/** Starts a source checkout without presenting an unverified registry image as our distribution. */
 async function launchStep(wizard: Wizard): Promise<number> {
   const { flow, state } = wizard;
   if (state.docker === null) {
     flow.outro(
-      "docker not found — install it (https://docs.docker.com/get-docker/), then run: docker compose up -d",
+      state.composeContent === null
+        ? "docker not found and no compose file is present. Install Docker, clone https://github.com/JE4NVRG/mepmail, copy this .env into that checkout, then run: docker compose up --build -d"
+        : "docker not found — install it (https://docs.docker.com/get-docker/), then run: docker compose up -d",
     );
     return 0;
   }
@@ -1095,31 +1091,16 @@ async function launchStep(wizard: Wizard): Promise<number> {
     ],
   });
 
-  let composeContent = state.composeContent;
-  if (choice === "start" && composeContent === null) {
-    if (
-      await flow.confirm(
-        "No compose file here — download the standalone deploy/docker-compose.yml?",
-        wizard.interactive,
-      )
-    ) {
-      try {
-        composeContent = await download(COMPOSE_DOWNLOAD_URL);
-        writeFileSync(join(process.cwd(), "docker-compose.yml"), composeContent);
-        flow.step("Wrote docker-compose.yml.");
-      } catch (error) {
-        flow.error(`Download failed (${(error as Error).message}).`);
-      }
-    }
-  }
-
+  const composeContent = state.composeContent;
   const command = `docker ${composeUpArgs(composeContent).join(" ")}`;
-  if (choice !== "start" || composeContent === null) {
-    const curl =
-      composeContent === null && state.composeFile === null
-        ? `\n  curl -O ${COMPOSE_DOWNLOAD_URL}`
-        : "";
-    flow.outro(`Start later with:${curl}\n  ${command}`);
+  if (composeContent === null) {
+    flow.outro(
+      "No compose file here. To avoid pulling an upstream image, clone https://github.com/JE4NVRG/mepmail, copy this .env into that checkout, then run: docker compose up --build -d",
+    );
+    return 0;
+  }
+  if (choice !== "start") {
+    flow.outro(`Start later with:\n  ${command}`);
     return 0;
   }
 
