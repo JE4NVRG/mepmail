@@ -174,6 +174,13 @@ describe("envTemplate", () => {
   it.skipIf(!existsSync(envExamplePath))("is byte-identical to the repo's .env.example", () => {
     expect(envTemplate()).toBe(readFileSync(envExamplePath, "utf8"));
   });
+
+  it("uses the MepMail brand in customer copy without renaming technical identifiers", () => {
+    const template = envTemplate();
+    expect(template).toContain("delivery events\n# reach MepMail");
+    expect(template).not.toContain("delivery events\n# reach MillionSend");
+    expect(template).toContain("# MILLIONSEND_IMAGE=");
+  });
 });
 
 describe("supported source-checkout commands", () => {

@@ -183,7 +183,7 @@ SQS_QUEUE_URL=
 
 # SES configuration set applied to sends that have no per-domain configuration
 # set. Point its event destination at the SNS topic above so delivery events
-# reach MillionSend. Unset sends without a configuration set.
+# reach MepMail. Unset sends without a configuration set.
 SES_CONFIGURATION_SET=
 
 # One SES tenant per team, so SES tracks bounce/complaint reputation per
