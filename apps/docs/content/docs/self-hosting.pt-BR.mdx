@@ -16,36 +16,28 @@ verificados — solicite acesso de produção para enviar a qualquer um); um
 domínio de envio que você controla. A verificação do domínio (registros DKIM)
 é feita pelo painel depois do boot.
 
-## Início rápido (sem clone)
+## Início rápido (build a partir do código)
 
-Um comando, em um diretório vazio (Node 18+):
-
-```sh
-mkdir millionsend && cd millionsend
-npx @millionsend/setup
-```
-
-O assistente detecta o que já existe e oferece cada etapa — criar o `.env` a
-partir de um template embutido com segredos gerados, provisionar os recursos
-da AWS e os buckets S3 para uploads e backups (ambos abaixo), baixar o
-arquivo compose standalone e rodar `docker compose up -d`. Toda etapa pode
-ser pulada e é segura de repetir; `--dry-run` imprime o plano completo sem
-tocar em nada. Em uma instalação já configurada, uma execução no terminal abre um menu de próximos passos em vez de percorrer cada etapa de novo.
-
-O equivalente manual usa a mesma imagem multi-arch pré-construída:
+Clone o fork do MepMail e use o arquivo Compose da raiz, que constrói a imagem
+localmente a partir do código obtido:
 
 ```sh
-mkdir millionsend && cd millionsend
-curl -O https://raw.githubusercontent.com/JE4NVRG/mepmail/main/deploy/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/JE4NVRG/mepmail/main/.env.example
+git clone https://github.com/JE4NVRG/mepmail.git mepmail
+cd mepmail
+cp .env.example .env
 ```
 
 Preencha o `.env` (veja a [referência de ambiente](#referência-de-ambiente) —
 todo o resto tem padrões que funcionam localmente), depois:
 
 ```sh
-docker compose up -d
+docker compose up --build -d
 ```
+
+No momento não existe instalador nem imagem de contêiner públicos do MepMail.
+Em especial, o pacote `@millionsend/setup` no npm e as imagens referenciadas
+por `deploy/docker-compose.yml` não são um canal de release suportado para este
+fork.
 
 As migrações rodam automaticamente no boot. Painel: `http://localhost:3000`.
 API: `http://localhost:3001`.
@@ -53,22 +45,15 @@ API: `http://localhost:3001`.
 ## Atualizações
 
 ```sh
-docker compose pull
-docker compose up -d
+git pull --ff-only
+docker compose up --build -d
 ```
 
 As migrações rodam no boot, então, para uma instância pequena, a atualização é
-só isso. O arquivo compose
-roda `ghcr.io/je4nvrg/mepmail:edge`, que acompanha a `main` (onde todo build
-passou pela suíte de testes antes). Publicar uma tag `v*` acrescenta `:1.2.3` e
-`:1.2` ao lado. Para segurar uma versão, defina
-`MILLIONSEND_IMAGE` no `.env` com uma tag de versão ou um digest imutável
-(`ghcr.io/je4nvrg/mepmail@sha256:…`; `docker image ls --digests`
-mostra o que está rodando) e rode `docker compose up -d`. Colocar de volta o
-pin anterior é o rollback — com a ressalva de que as migrações de schema só
-andam para frente, então faça um dump antes de um salto grande
-([Backups](#backups)); uma imagem revertida pode não subir em um schema mais
-novo.
+só isso. Fixe a revisão Git implantada quando precisar de uma release ou
+rollback reproduzível. As migrações de schema só andam para frente, então faça
+um dump antes de um salto grande ([Backups](#backups)); uma revisão anterior
+pode não subir em um schema mais novo.
 
 Quando as tabelas ficam grandes (milhões de emails ou contatos), uma migração
 que as reescreve ou indexa leva minutos. As migrações rodam em uma transação
@@ -80,33 +65,12 @@ antigo atendendo em vez de um contêiner que não sobe, e a passagem do boot
 então não encontra nada pendente:
 
 ```sh
-docker compose pull && docker compose run --rm --no-deps millionsend migrate && docker compose up -d
+docker compose build && docker compose run --rm --no-deps millionsend migrate && docker compose up -d
 ```
 
-Atualizações automáticas, para um host que só consegue sair para a internet
-(atrás de um firewall só-CDN, por exemplo): uma linha de cron basta, já que o
-`up -d` só recria um contêiner quando a imagem dele mudou.
+## Desenvolvimento sem Docker
 
-```sh
-( crontab -l 2>/dev/null; echo "*/5 * * * * cd /opt/millionsend && docker compose pull -q && docker compose up -d" ) | crontab -
-```
-
-## A partir do código-fonte
-
-Para quem contribui, ou quando você quer modificar o código:
-
-```sh
-git clone https://github.com/JE4NVRG/mepmail.git
-cd millionsend
-cp .env.example .env   # preencha como no início rápido
-docker compose up --build -d
-```
-
-O `docker-compose.yml` da raiz constrói a imagem localmente a partir do
-`Dockerfile`. Para rodar um clone contra a imagem publicada:
-`docker compose -f docker-compose.yml -f docker-compose.prebuilt.yml up -d`.
-
-Sem Docker (Node 24+, pnpm 11, Postgres local): `pnpm install`, aponte
+Com Node 24+, pnpm 11 e Postgres local: `pnpm install`, aponte
 `DATABASE_URL` para o seu Postgres, `pnpm --filter @millionsend/db db:migrate`,
 depois rode `pnpm --filter @millionsend/api dev`,
 `pnpm --filter @millionsend/worker dev` e
@@ -146,7 +110,6 @@ auto-hospedada não tem limites de plano.
 
 | Variável | Propósito |
 | --- | --- |
-| `MILLIONSEND_IMAGE` | Só no deploy standalone: qual imagem rodar. O padrão `ghcr.io/je4nvrg/mepmail:edge` acompanha a `main`, então `docker compose pull` é a atualização. Defina uma tag de versão ou um digest imutável `ghcr.io/je4nvrg/mepmail@sha256:…` para segurar uma versão (`MILLIONSEND_BACKUP_IMAGE` fixa o sidecar de backup do mesmo jeito). |
 | `ALLOW_SIGNUP` | O primeiro usuário sempre pode se registrar; depois disso o cadastro fica fechado a menos que isto seja `true`. Mantenha `false` quando o painel é acessível pela internet. |
 | `TRUSTED_PROXIES` | Reverse proxies cujos headers de IP do cliente (`X-Forwarded-For`, `CF-Connecting-IP`) são confiáveis, IPs ou CIDRs separados por vírgula. O padrão `127.0.0.1,::1` cobre um proxy no mesmo host; adicione o endereço do seu proxy quando ele roda em outro lugar. Veja a [seção de nginx](#produção-nginx--tls). |
 | `WEBHOOK_ALLOW_LOCALHOST` | Só para desenvolvimento local: permite que endpoints de webhook (disparos de teste incluídos) apontem para `http://` e endereços de loopback/privados em qualquer porta. Mantenha `false` em qualquer instância acessível pela internet. |
@@ -197,32 +160,31 @@ worker cabem sem ajuste.
 
 ## Configuração da AWS
 
-A etapa de AWS do `npx @millionsend/setup` cria tudo de que o MepMail
+O assistente do checkout do código cria tudo de que o MepMail
 precisa na AWS — política IAM + usuário + chave de acesso, o tópico SNS de
 eventos, a fila SQS de eventos (`millionsend-events`) que o worker consome por
 long polling e o configuration set do SES. Um `APP_BASE_URL` HTTPS recebe
 adicionalmente os eventos por push; a fila funciona sem URL pública nenhuma.
 
-Rode onde houver Node 18+ e suas credenciais de admin da AWS — laptop ou
-servidor; o servidor do MepMail nunca precisa de credenciais de admin.
+Instale as dependências travadas do workspace e rode-o no checkout onde fica o
+`.env` (Node 22+, pnpm 11):
+
+```sh
+pnpm install --frozen-lockfile
+pnpm setup:aws
+```
+
+Rode onde estiverem suas credenciais de admin da AWS — laptop ou servidor; o
+servidor do MepMail nunca precisa de credenciais de admin.
 Ele verifica sua identidade AWS, mostra o plano, cria tudo e escreve as
 linhas `AWS_*` no `.env` do diretório atual (sem `.env` lá → imprime para
 você colar onde o MepMail roda). `--dry-run` imprime o plano completo e
 sai.
 
-`npx @millionsend/setup teardown` apaga tudo que o setup criou, incluindo
+`pnpm setup:aws teardown` apaga tudo que o setup criou, incluindo
 todas as chaves de acesso do usuário IAM `millionsend`, então um servidor em
 execução para de enviar. Repetir o setup é seguro, mas cada execução gera uma
 nova chave de acesso — apague as antigas no console do IAM.
-
-Sem Node no servidor? O mesmo CLI vem dentro da imagem — rode-o a partir do
-diretório de deploy, que ele lê e escreve como `/work` (o assistente não
-escreve nada fora dele, então rode-o como o seu usuário e o `.env` criado fica
-seu, com modo 600):
-
-```sh
-docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms -v ~/.aws:/home/ms/.aws:ro -v "$PWD":/work -w /work ghcr.io/je4nvrg/mepmail:edge setup
-```
 
 Prefere não rodar um CLI? A página **Configurações → SES** do painel oferece
 um link de quick-create do CloudFormation e um shell script pré-preenchido
@@ -236,16 +198,12 @@ de novo); identidades, cota de 24 horas, taxa de envio e status de sandbox são
 todos por região; os eventos de todas as regiões caem na única fila SQS,
 porque o SNS entrega entre regiões.
 
-Rode o comando `add-region` do assistente onde o `.env` está — o diretório de
-deploy, ou no servidor pela imagem, com credenciais de admin de curta duração
-no ambiente (nada fica gravado):
+Rode o comando `add-region` do assistente do código a partir do checkout onde o
+`.env` está, com credenciais de admin de curta duração no ambiente (nada fica
+gravado):
 
 ```sh
-npx @millionsend/setup add-region us-east-1
-# ou, no servidor, a partir do diretório de deploy:
-docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms \
-  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
-  -v "$PWD":/work -w /work ghcr.io/je4nvrg/mepmail:edge setup add-region us-east-1
+pnpm setup:aws add-region us-east-1
 ```
 
 O assistente interativo oferece a mesma etapa como **Add a region** na etapa
@@ -592,7 +550,7 @@ descadastro quando a marca do MepMail está oculta. UM conjunto de
 credenciais `S3_*` é compartilhado com o job de backup abaixo — cada recurso
 é então habilitado pela sua própria variável de bucket.
 
-A etapa de armazenamento do `npx @millionsend/setup` pergunta o endpoint e as
+A etapa de armazenamento do `pnpm setup:aws` pergunta o endpoint e as
 chaves, cria (ou adota) os dois buckets — `millionsend-storage` e
 `millionsend-backups` por padrão — e escreve as linhas `S3_*` no `.env`. A
 única coisa que ela não consegue fazer pela API S3 é tornar público o bucket
@@ -661,10 +619,8 @@ Os dumps contêm corpos de email criptografados com `MASTER_ENCRYPTION_KEY` —
 faça backup dessa chave separadamente, ou os corpos restaurados ficam
 irrecuperáveis.
 
-O `deploy/docker-compose.yml` standalone roda a imagem publicada
-`ghcr.io/je4nvrg/mepmail-backup` (`MILLIONSEND_BACKUP_IMAGE` a fixa, como
-`MILLIONSEND_IMAGE` fixa o app); um clone do repositório a constrói a partir de
-`scripts/backup`. A restauração usa o mesmo contêiner nos dois casos.
+O arquivo Compose da raiz constrói o serviço de backup localmente a partir de
+`scripts/backup`.
 
 ### Restauração
 
