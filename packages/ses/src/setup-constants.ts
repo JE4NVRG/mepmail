@@ -29,6 +29,13 @@ export const SES_EVENT_TYPES = [
   "RENDERING_FAILURE",
 ] as const;
 
+/** Supported setup commands, run from this fork's source checkout. */
+export const AWS_SETUP_COMMAND = "pnpm setup:aws";
+
+export function awsAddRegionCommand(region: string): string {
+  return `${AWS_SETUP_COMMAND} add-region ${region}`;
+}
+
 /**
  * Every SES action the instance issues — infra/millionsend-ses.cfn.yaml
  * mirrors the same set. Identity actions support resource-level permissions
@@ -80,7 +87,7 @@ export const SES_IAM_POLICY_JSON = JSON.stringify(SES_IAM_POLICY, null, 2);
  */
 export function envTemplate(): string {
   return `# MepMail self-host configuration.
-# Save as .env, generate the two secrets below, and \`docker compose up -d\`.
+# Save as .env, generate the two secrets below, and \`docker compose up --build -d\`.
 # This file holds every secret the instance has: keep it readable by its
 # owner only (chmod 600 .env) and out of version control and backups.
 
@@ -95,12 +102,14 @@ DATABASE_URL=postgres://millionsend:millionsend@postgres:5432/millionsend
 # puts it in DATABASE_URL too. Keep both in sync.
 POSTGRES_PASSWORD=millionsend
 
-# Standalone deploy/docker-compose.yml only: the image to run. The default,
-# ghcr.io/je4nvrg/mepmail:edge, follows main (every build there passed the test
-# suite first), so \`docker compose pull\` is the upgrade. Set a version tag or an immutable @sha256
-# digest here to hold a version; the backup sidecar pins the same way.
-# MILLIONSEND_IMAGE=ghcr.io/je4nvrg/mepmail@sha256:<digest>
-# MILLIONSEND_BACKUP_IMAGE=ghcr.io/je4nvrg/mepmail-backup@sha256:<digest>
+# Standalone deploy/docker-compose.yml only: private image references published
+# by the operator. The supported installation path for this fork uses the root
+# docker-compose.yml, which builds locally and ignores these variables.
+# Images referenced by deploy/docker-compose.yml are not a supported release
+# channel for this fork.
+# Prefer immutable @sha256 digests when operating your own image registry.
+# MILLIONSEND_IMAGE=
+# MILLIONSEND_BACKUP_IMAGE=
 
 # Optional compose services, comma-separated: smtp (the relay; mount a
 # STARTTLS keypair first), and in deploy/docker-compose.yml also docs (the
@@ -157,7 +166,8 @@ AWS_SECRET_ACCESS_KEY=
 # Serve more than one SES region from this deployment, comma-separated; the
 # first is the default (platform mail and sends with no domain row). Each
 # region needs its own SNS topic, configuration set and production access —
-# \`npx @millionsend/setup\` adds one to an existing install. Unset: AWS_REGION.
+# \`pnpm setup:aws add-region <region>\` from the source checkout adds one to an
+# existing install. Unset: AWS_REGION.
 # AWS_REGIONS=sa-east-1,us-east-1
 
 # Comma-separated SNS topic ARNs allowed to deliver SES events (bounces,
@@ -173,7 +183,7 @@ SQS_QUEUE_URL=
 
 # SES configuration set applied to sends that have no per-domain configuration
 # set. Point its event destination at the SNS topic above so delivery events
-# reach MepMail. Unset sends without a configuration set.
+# reach MillionSend. Unset sends without a configuration set.
 SES_CONFIGURATION_SET=
 
 # One SES tenant per team, so SES tracks bounce/complaint reputation per

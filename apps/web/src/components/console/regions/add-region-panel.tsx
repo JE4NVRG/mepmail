@@ -1,5 +1,6 @@
 "use client";
 
+import { awsAddRegionCommand } from "@millionsend/ses/setup-constants";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { regionFlag } from "@/app/(dashboard)/domains/regions";
@@ -127,9 +128,7 @@ export function AddRegionPanel({
           <h4 style={h4}>{t("step1")}</h4>
           <p style={p}>{t("step1Body")}</p>
           <pre className="ms-mono" style={codeBlock}>
-            {"$ npx @millionsend/setup\n"}
-            <span style={muted}>{t("cliRegion")}</span>
-            {`  ${region}  `}
+            {`$ ${awsAddRegionCommand(region)}  `}
             <span style={faint}>{domains(`regions.${region}`)}</span>
             {"\n"}
             <span style={faint}>{t("cliAdopted")}</span>

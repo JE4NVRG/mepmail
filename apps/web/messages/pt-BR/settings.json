@@ -76,7 +76,7 @@
       "viewInstructions": "Ver instruções",
       "recommended": "Recomendado",
       "cliTitle": "Execute o CLI de configuração",
-      "cliNote": "Execute em qualquer lugar com Node 18+ e as SUAS credenciais AWS de administrador — seu laptop ou o servidor. Ele cria tudo e imprime as linhas do <code>.env</code> para colar se o MepMail rodar em outro lugar.",
+      "cliNote": "Execute a partir do checkout do código-fonte do MepMail com Node 22+ e as SUAS credenciais AWS de administrador — no seu laptop ou servidor. Ele cria tudo e imprime as linhas do <code>.env</code> para colar se o MepMail rodar em outro lugar.",
       "cfnButton": "Criar a stack no CloudFormation",
       "scriptTitle": "Alternativa: cole este script",
       "scriptNote": "Cole em um terminal onde o AWS CLI tenha credenciais de administrador. Ele cria o usuário IAM, a política, o tópico SNS, a fila SQS de eventos e o conjunto de configuração, e então imprime as linhas do seu <code>.env</code>.",

@@ -369,7 +369,7 @@
       "subtitle": "Nada muda nas regiões em produção enquanto isso roda.",
       "notStarted": "Não iniciado",
       "step1": "Rode a ferramenta de configuração para a nova região",
-      "step1Body": "O mesmo assistente interativo da primeira instalação. Escolha a região na etapa da AWS; ele adota o usuário e a política IAM que já existem e cria só as peças regionais.",
+      "step1Body": "No checkout do código-fonte do MepMail, execute o comando add-region. Ele adota o usuário e a política IAM que já existem e cria só as peças regionais.",
       "step2": "Adicione as linhas que ela imprime ao .env e reinicie",
       "step2Note": "AWS_REGION continua funcionando como o apelido de região única, então uma instância que nunca adiciona região não muda nada.",
       "step3": "A região aparece aqui como Sandbox",

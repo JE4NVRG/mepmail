@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { upsertEnv } from "../src/setup.js";
-import { envTemplate } from "../src/setup-constants.js";
+import { AWS_SETUP_COMMAND, awsAddRegionCommand, envTemplate } from "../src/setup-constants.js";
 import {
   addRegionEnvEntries,
   composeUpArgs,
@@ -173,6 +173,13 @@ const envExamplePath = fileURLToPath(new URL("../../../.env.example", import.met
 describe("envTemplate", () => {
   it.skipIf(!existsSync(envExamplePath))("is byte-identical to the repo's .env.example", () => {
     expect(envTemplate()).toBe(readFileSync(envExamplePath, "utf8"));
+  });
+});
+
+describe("supported source-checkout commands", () => {
+  it("uses the workspace setup script for initial setup and added regions", () => {
+    expect(AWS_SETUP_COMMAND).toBe("pnpm setup:aws");
+    expect(awsAddRegionCommand("sa-east-1")).toBe("pnpm setup:aws add-region sa-east-1");
   });
 });
 
