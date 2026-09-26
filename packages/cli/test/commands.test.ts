@@ -148,7 +148,7 @@ describe("millionsend migrate", () => {
       expect(stderr).toBe("");
       expect(code).toBe(0);
       expect(stdout).toContain("✓ Resend · connected");
-      expect(stdout).toContain("✓ MillionSend Cloud · plan Free");
+      expect(stdout).toContain("✓ MepMail Cloud · plan Free");
       expect(stdout).toContain("Plan: ");
       expect(stdout).toContain("Resend was only read; nothing there was changed.");
       expect(stdout).toContain("contacts created");
@@ -449,7 +449,7 @@ describe("millionsend migrate", () => {
         readFileSync(new URL("../package.json", import.meta.url), "utf8"),
       ) as { version: string };
       expect(result.stdout).toContain(
-        `millionsend ${packageVersion} — Moves your Resend account into MillionSend.`,
+        `millionsend ${packageVersion} — Moves your Resend account into MepMail.`,
       );
       expect(result.stdout).toContain("contacts (3)\n  + contacts  batch upsert");
       expect(result.stdout).toContain("Estimate: ~");
@@ -523,7 +523,7 @@ describe("migrate rollback", () => {
     return { code, stdout: stdout.text, stderr: stderr.text };
   }
 
-  it("refuses a state file whose ids are not MillionSend ids before connecting", async () => {
+  it("refuses a state file whose ids are not MepMail ids before connecting", async () => {
     const dir = mkdtempSync(join(tmpdir(), "millionsend-cli-rb-"));
     const state: MigrateState = {
       version: 1,
@@ -542,8 +542,8 @@ describe("migrate rollback", () => {
     const { code, stdout, stderr } = await run(["migrate", "rollback", "--yes"], { cwd: dir });
     expect(code).toBe(1);
     expect(stderr).toContain(`${migratePaths(dir).state} lists 1 id under "templates"`);
-    expect(stderr).toContain("not MillionSend ids");
-    expect(stdout).not.toContain("✓ MillionSend");
+    expect(stderr).toContain("not MepMail ids");
+    expect(stdout).not.toContain("✓ MepMail");
     expect(stdout).not.toContain("welcome");
   });
 
@@ -581,7 +581,7 @@ describe("migrate rollback", () => {
       expect(JSON.parse(stdout)).toEqual({ deleted: { contacts: 5 }, failures: [] });
       // The plain header wraps at the layout width (80 here) with a hanging indent.
       expect(stderr).toContain(
-        "— Deletes what an earlier run created on your MillionSend\n  instance; nothing on Resend is touched.\n",
+        "— Deletes what an earlier run created on your MepMail\n  instance; nothing on Resend is touched.\n",
       );
       expect(stderr).not.toContain("Reads only");
       expect(stderr).toContain(`${ids.slice(0, 3).join(", ")} … and 2 more`);
@@ -748,13 +748,13 @@ describe("plan, apply and status edge cases (own target)", () => {
     SLOW,
   );
 
-  it("refuses to send the Resend key to the MillionSend host, before connecting", async () => {
+  it("refuses to send the Resend key to the MepMail host, before connecting", async () => {
     const { code, stdout, stderr } = await run(["migrate", "plan", "--from", "resend"], {
       cwd: freshDir(),
       env: { ...target(), MILLIONSEND_CLI_RESEND_URL: mine.baseUrl },
     });
     expect(code).toBe(1);
-    expect(stderr).toContain("is the MillionSend host");
+    expect(stderr).toContain("is the MepMail host");
     expect(stderr).toContain("MILLIONSEND_CLI_RESEND_URL");
     expect(stderr).toContain("MILLIONSEND_BASE_URL");
     expect(stdout).not.toContain("✓ Resend");
