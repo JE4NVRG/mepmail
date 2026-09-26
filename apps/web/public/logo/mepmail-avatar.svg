@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<title>MepMail</title>
 <defs><linearGradient id="avbg" x1="0" y1="0" x2="0.25" y2="1"><stop offset="0" stop-color="#16183A"/><stop offset="1" stop-color="#080A16"/></linearGradient></defs>
 <rect width="1024" height="1024" fill="url(#avbg)"/>
 <g transform="translate(182.0 402.4) scale(1.2891)">

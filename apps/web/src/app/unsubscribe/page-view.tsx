@@ -138,12 +138,7 @@ function Wordmark() {
   return (
     <>
       {/* biome-ignore lint/performance/noImgElement: static pre-sized svg, nothing for next/image to optimize */}
-      <img
-        className="ms-dark-only"
-        src="/logo/mepmail-wordmark.svg"
-        alt="MepMail"
-        height={20}
-      />
+      <img className="ms-dark-only" src="/logo/mepmail-wordmark.svg" alt="MepMail" height={20} />
       {/* biome-ignore lint/performance/noImgElement: static pre-sized svg, nothing for next/image to optimize */}
       <img
         className="ms-light-only"

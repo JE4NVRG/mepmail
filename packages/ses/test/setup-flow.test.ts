@@ -143,7 +143,11 @@ describe("flowPlan", () => {
     expect(plan).toContain("PUBLIC_API_URL prompt");
     expect(plan).toContain("aws: IAM user millionsend");
     expect(plan).toContain("delivering to SQS queue millionsend-events");
-    expect(plan).toContain("download deploy/docker-compose.yml, then docker compose up -d");
+    expect(plan).toContain(
+      "clone https://github.com/JE4NVRG/mepmail, copy this .env into that checkout, then docker compose up --build -d",
+    );
+    expect(plan).not.toContain("download deploy/docker-compose.yml");
+    expect(plan).not.toContain("ghcr.io/millionsend");
   });
 
   it("keeps an existing .env with secrets set and honors the compose build key", () => {
