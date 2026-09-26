@@ -49,10 +49,11 @@ cd mepmail
 cp .env.example .env
 ```
 
-Fill the two required secrets in `.env` before boot. There is currently no
-public MepMail installer or container image; `@millionsend/setup` on npm is the
-upstream package, not this fork. The source wizard (`pnpm setup:aws`) and the
-full SES/SNS event pipeline are documented in the
+Fill the two required secrets in `.env` before boot. The supported installation
+path for this fork is a local build from source. `@millionsend/setup` on npm and
+the images referenced by `deploy/docker-compose.yml` are not supported release
+channels for this fork. The source wizard (`pnpm setup:aws`) and the full SES/SNS
+event pipeline are documented in the
 [self-hosting guide](apps/docs/content/docs/self-hosting.mdx).
 
 ```sh
