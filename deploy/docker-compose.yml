@@ -1,12 +1,8 @@
-# Standalone self-host compose file — no repo clone needed. Quickstart:
-#   curl -O https://raw.githubusercontent.com/MillionSend/millionsend/main/deploy/docker-compose.yml
-#   curl -o .env https://raw.githubusercontent.com/MillionSend/millionsend/main/.env.example
-#   (generate the two secrets in .env, then)
-#   docker compose up -d
-# Upgrade: docker compose pull && docker compose up -d — migrations run on boot.
-# The default image is the latest tagged release (:edge follows main); to hold
-# a version, set MILLIONSEND_IMAGE in .env to a version tag or an immutable
-# @sha256 digest.
+# Legacy standalone compose definition, retained for operators that publish
+# their own private images. It is not a supported installation or release
+# channel for this fork. Use the root docker-compose.yml and build from source.
+# If you maintain this file privately, set MILLIONSEND_IMAGE and
+# MILLIONSEND_BACKUP_IMAGE explicitly, preferably to immutable @sha256 digests.
 #
 # Optional services sit behind compose profiles — COMPOSE_PROFILES in .env:
 #   docs    the documentation site on DOCS_PORT
@@ -32,7 +28,7 @@ services:
       retries: 10
 
   millionsend:
-    image: "${MILLIONSEND_IMAGE:-ghcr.io/je4nvrg/mepmail:edge}"
+    image: "${MILLIONSEND_IMAGE:?Set MILLIONSEND_IMAGE to an operator-published private image}"
     env_file: .env
     environment:
       PROCESS: all
@@ -58,7 +54,7 @@ services:
       - /app/apps/docs/.source
 
   docs:
-    image: "${MILLIONSEND_IMAGE:-ghcr.io/je4nvrg/mepmail:edge}"
+    image: "${MILLIONSEND_IMAGE:?Set MILLIONSEND_IMAGE to an operator-published private image}"
     env_file: .env
     environment:
       PROCESS: docs
@@ -80,7 +76,7 @@ services:
       - /app/apps/docs/.source
 
   smtp:
-    image: "${MILLIONSEND_IMAGE:-ghcr.io/je4nvrg/mepmail:edge}"
+    image: "${MILLIONSEND_IMAGE:?Set MILLIONSEND_IMAGE to an operator-published private image}"
     env_file: .env
     environment:
       PROCESS: smtp
@@ -106,8 +102,8 @@ services:
       - /app/apps/docs/.source
 
   backup:
-    # Published from scripts/backup on the same tags as the app.
-    image: "${MILLIONSEND_BACKUP_IMAGE:-ghcr.io/je4nvrg/mepmail-backup:edge}"
+    # Must be built and published by the operator from scripts/backup.
+    image: "${MILLIONSEND_BACKUP_IMAGE:?Set MILLIONSEND_BACKUP_IMAGE to an operator-published private image}"
     env_file: .env
     # Stays a no-op (prints a hint, exits 0, restart "no") until
     # S3_BACKUP_BUCKET and the S3_* credentials are set in .env.

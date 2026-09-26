@@ -76,7 +76,7 @@
       "viewInstructions": "View instructions",
       "recommended": "Recommended",
       "cliTitle": "Run the setup CLI",
-      "cliNote": "Run it anywhere Node 18+ and YOUR AWS admin credentials live — your laptop or the server. It creates everything and prints the <code>.env</code> lines to paste if MepMail runs elsewhere.",
+      "cliNote": "Run it from the MepMail source checkout with Node 22+ and YOUR AWS admin credentials — on your laptop or the server. It creates everything and prints the <code>.env</code> lines to paste if MepMail runs elsewhere.",
       "cfnButton": "Create the stack in CloudFormation",
       "scriptTitle": "Alternative: paste this script",
       "scriptNote": "Paste into a terminal where the AWS CLI has admin credentials. It creates the IAM user, policy, SNS topic, SQS events queue, and configuration set, then prints your <code>.env</code> lines.",

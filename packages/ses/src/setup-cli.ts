@@ -3,7 +3,7 @@ import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
 // Relative import, not a workspace dependency: this file is bundled into
-// @millionsend/setup and run under tsx from the repo root, and neither path
+// the setup package and run under tsx from the repo root, and neither path
 // resolves package names. The prompt kit lives in the MIT package so the
 // AGPL wizard consumes it, never the reverse.
 import { createFlow, type Flow } from "../../cli/src/flow.js";
@@ -191,8 +191,8 @@ const pasteBlock = (entries: Record<string, string>): string =>
     .join("\n");
 
 /**
- * End-to-end self-host wizard behind `npx @millionsend/setup`, `pnpm
- * setup:aws`, and the container's `setup` argv mode. Works from an empty
+ * End-to-end self-host wizard behind `pnpm setup:aws` and the container's
+ * `setup` argv mode. Works from an empty
  * directory: env → secrets → AWS → object storage → social login → launch,
  * each step offered, state-aware, and idempotent on re-runs. An install that
  * is already set up opens on a menu of things to do instead.
