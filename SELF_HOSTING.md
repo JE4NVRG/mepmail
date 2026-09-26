@@ -24,8 +24,9 @@ cd mepmail
 cp .env.example .env
 ```
 
-There is currently no public MepMail installer or container image.
-`@millionsend/setup` on npm is the upstream package, not this fork.
+The supported installation path for this fork is a local build from source.
+`@millionsend/setup` on npm and the images referenced by
+`deploy/docker-compose.yml` are not supported release channels for this fork.
 
 In `.env` (everything else defaults to a working local setup):
 
