@@ -1,16 +1,15 @@
 # @millionsend/setup
 
-The self-hosting setup wizard for
-[MillionSend](https://github.com/MillionSend/millionsend). One command in an
-empty directory takes you from nothing to a running instance. Not to be
-confused with `@millionsend/cli`, the end-user CLI that talks to the
-MillionSend API (migrations from other providers).
+The self-hosting setup wizard source for
+[MepMail](https://github.com/JE4NVRG/mepmail). This fork does not currently
+publish the package to npm; `@millionsend/setup` there is the upstream package.
+Run the wizard from a source checkout instead:
 
 ```sh
-npx @millionsend/setup            # the wizard
-npx @millionsend/setup --dry-run  # print the full plan, touch nothing
-npx @millionsend/setup teardown   # delete the AWS resources it created
-npx @millionsend/setup add-region us-east-1   # a further SES region on an existing install
+pnpm setup:aws            # the wizard
+pnpm setup:aws --dry-run  # print the full plan, touch nothing
+pnpm setup:aws teardown   # delete the AWS resources it created
+pnpm setup:aws add-region us-east-1   # a further SES region on an existing install
 ```
 
 On an install that is already set up, a terminal run opens on a menu of next
@@ -36,9 +35,8 @@ and re-running is safe:
    `millionsend-backups` by default — and writes the `S3_*` lines. Public
    access for the uploads bucket cannot be enabled over the S3 API, so it
    prints the manual R2 instruction; keep the backups bucket private.
-4. **launch** — downloads the standalone `docker-compose.yml` if the directory
-   has none, then runs `docker compose up -d` (`--build` when your compose file
-   builds from source).
+4. **launch** — uses the root `docker-compose.yml` and runs
+   `docker compose up --build -d`.
 
 In a terminal every choice is interactive (arrow-key lists, Enter accepts the
 default). Piped input still works deterministically — answers one per line;
@@ -52,4 +50,4 @@ credential check fails on a machine with the aws CLI. Each AWS run mints a
 new access key — delete stale ones in the IAM console.
 
 Full self-hosting guide:
-[SELF_HOSTING.md](https://github.com/MillionSend/millionsend/blob/main/SELF_HOSTING.md).
+[self-hosting.mdx](../../apps/docs/content/docs/self-hosting.mdx).
