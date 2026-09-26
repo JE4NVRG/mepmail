@@ -155,8 +155,8 @@ describe("parseConfig", () => {
     );
     expect(() =>
       parseConfig(["migrate", "--from", "resend"], { RESEND_API_KEY: "re_x" }, false),
-    ).toThrow("Missing MillionSend API key. Set MILLIONSEND_API_KEY or pass --to-key-stdin");
-    // No instance named: MillionSend Cloud, like the SDKs.
+    ).toThrow("Missing MepMail API key. Set MILLIONSEND_API_KEY or pass --to-key-stdin");
+    // No instance named: MepMail Cloud, like the SDKs.
     expect(
       parseConfig(
         ["migrate", "--from", "resend", "--yes"],
@@ -165,7 +165,7 @@ describe("parseConfig", () => {
       ).toUrl,
     ).toBe(CLOUD_API_URL);
     expect(() => parseConfig(["migrate", "rollback"], {}, false)).toThrow(
-      "Missing MillionSend API key",
+      "Missing MepMail API key",
     );
   });
 
