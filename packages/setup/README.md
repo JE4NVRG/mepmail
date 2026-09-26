@@ -43,7 +43,7 @@ default). Piped input still works deterministically — answers one per line;
 on EOF every offer defaults to "skip", so scripted runs never create anything
 by surprise.
 
-Run it anywhere Node 18+ lives; the AWS step wants your admin AWS credentials
+Run it anywhere Node 22+ lives; the AWS step wants your admin AWS credentials
 (laptop or server — the MillionSend server itself never needs admin
 credentials) and offers `aws login`/`aws sso login`/`aws configure` when the
 credential check fails on a machine with the aws CLI. Each AWS run mints a
