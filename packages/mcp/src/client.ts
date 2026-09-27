@@ -1,7 +1,7 @@
 /**
  * Minimal HTTP client for one MepMail instance. The local MCP server speaks the
  * public REST API over HTTPS exactly like any other integration — it holds an
- * API key (`ms_...`) and nothing else. Env conventions match `@millionsend/cli`.
+ * API key (`ms_...`) and nothing else. Env conventions match `@mepmail/cli`.
  */
 export interface MepMailClient {
   request(method: string, path: string, body?: unknown): Promise<unknown>;
