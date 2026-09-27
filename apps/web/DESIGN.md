@@ -1,4 +1,4 @@
-# MillionSend dashboard design system — "Rollover"
+# MepMail dashboard design system — "Rollover"
 
 Scale stated as numbers that keep counting. Black void, bone type, one steel
 accent per view. **Dark theme only.** All values live in `src/styles/` as
