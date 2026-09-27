@@ -347,6 +347,12 @@ export const env = createEnv({
     STRIPE_SECRET_KEY: z.string().optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),
     STRIPE_PORTAL_CONFIG: z.string().optional(),
+    // Stripe Tax needs an account country from Stripe's supported list; BR is
+    // not one, so the hosted instance turns automatic tax off at Checkout.
+    STRIPE_AUTOMATIC_TAX: z
+      .enum(["true", "false", "1", "0"])
+      .transform((v) => v === "true" || v === "1")
+      .optional(),
 
     // S3-compatible object storage (Cloudflare R2 first-class). ONE credential
     // set shared by every S3-backed feature; each feature is enabled by its

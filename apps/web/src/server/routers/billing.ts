@@ -139,6 +139,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
             email: ctx.session.user.email,
             successUrl: `${billingPageUrl()}?checkout=success`,
             cancelUrl: billingPageUrl(),
+            automaticTax: env.STRIPE_AUTOMATIC_TAX ?? true,
           },
         );
         await recordAudit(ctx, {
