@@ -42,11 +42,8 @@ claude mcp add mepmail -e MEPMAIL_API_KEY=ms_... -e MEPMAIL_BASE_URL=https://api
 
 | Variable | Required | Default | Meaning |
 | --- | --- | --- | --- |
-| `MEPMAIL_API_KEY` | yes | — | Team API key (`ms_...`). Sent as `Bearer` to your instance only. Alias: `MILLIONSEND_API_KEY`. |
-| `MEPMAIL_BASE_URL` | no | `https://api-mepmail.je4ndev.com` | Your instance's API URL. Alias: `MILLIONSEND_BASE_URL`. |
-
-The `MILLIONSEND_*` aliases are the instance's historical env conventions and
-keep working — handy if you already drive MepMail through the upstream CLI.
+| `MEPMAIL_API_KEY` | yes | — | Team API key (`ms_...`). Sent as `Bearer` to your instance only. |
+| `MEPMAIL_BASE_URL` | no | `https://api-mepmail.je4ndev.com` | Your instance's API URL. |
 
 ## Tools (22)
 

@@ -1,18 +1,15 @@
-<!-- je4ndev-fork -->
-> **MepMail** - fork mantido pela JE4NDEV.
-> Este repositorio e um fork de [MillionSend](https://github.com/MillionSend/millionsend) (AGPL-3.0) com rebranding e customizacoes proprias. Veja `NOTICE.md`.
-
 <p align="center">
   <img src="apps/web/public/logo/mepmail-banner.svg" alt="MepMail" width="560">
 </p>
 
-<p align="center"><b>The open-source email platform. Send one. Send a million.</b></p>
+<p align="center"><b>Transactional email with a Resend-compatible API.</b></p>
 
-Self-host on your own AWS SES, or use the hosted cloud. Resend-compatible API — migrating
-means changing two environment variables, not rewriting your integration.
+Self-host on your own AWS SES, or use the hosted cloud at
+[mepmail.je4ndev.com](https://mepmail.je4ndev.com). Migrating from Resend means
+changing two environment variables — not rewriting your integration.
 
 <p align="center">
-  <img src=".github/screenshots/emails.png" alt="The MillionSend dashboard: the Emails page, with each send's delivery status" width="900">
+  <img src=".github/screenshots/emails.png" alt="The MepMail dashboard: the Emails page, with each send's delivery status" width="900">
 </p>
 
 ## Features
@@ -34,14 +31,14 @@ means changing two environment variables, not rewriting your integration.
 | SMTP relay | ✅ | Drop-in SMTP on port 2587; authenticate with an API key. |
 | Dashboard (en/pt-BR) | ✅ | Full dashboard in English and Brazilian Portuguese. |
 | Self-host (Docker) | ✅ | Source-built Compose stack plus a setup wizard; sends through your own AWS SES. |
-| Migrate from Resend | ✅ | `npx @millionsend/cli migrate --from resend` moves contacts, segments, topics, templates, webhooks, domains and suppressions; read-only against Resend, safe to re-run before cutover. |
-| Content monitoring | ✅ | Optional outbound judge via [TypeSafe Jev](https://typesafe.ai). Off by default on self-host. |
-
-The hosted monitor uses [TypeSafe](https://typesafe.ai)'s Jev, a System One model built for typed decisions in software. After SES accepts a message, a sample is scored in the background; sending never waits on it. Self-hosters leave it off unless they set `ABUSE_JUDGE=typesafe`.
+| Migrate from Resend | ✅ | `migrate --from resend` (in this repo: `packages/cli`) moves contacts, segments, topics, templates, webhooks, domains and suppressions; read-only against Resend, safe to re-run before cutover. |
+| MCP for AI agents | ✅ | Hosted MCP server (`https://api-mepmail.je4ndev.com/mcp`, OAuth) and a local stdio server: `npx @mepmail/mcp`. |
+| Agent discovery | ✅ | `/.well-known/ai-catalog.json`, `/llms.txt` and `/auth.md` served by the web app. |
+| Docs (en/pt-BR) | ✅ | Full documentation at [docs-mepmail.je4ndev.com](https://docs-mepmail.je4ndev.com). |
 
 ## Run it locally
 
-Build the MepMail fork locally from its source checkout:
+Build from this source checkout:
 
 ```sh
 git clone https://github.com/JE4NVRG/mepmail.git mepmail
@@ -49,11 +46,13 @@ cd mepmail
 cp .env.example .env
 ```
 
-Fill the two required secrets in `.env` before boot. The supported installation
-path for this fork is a local build from source. `@millionsend/setup` on npm and
-the images referenced by `deploy/docker-compose.yml` are not supported release
-channels for this fork. The source wizard (`pnpm setup:aws`) and the full SES/SNS
-event pipeline are documented in the
+Fill the two required secrets in `.env` before boot (`MASTER_ENCRYPTION_KEY` and
+`BETTER_AUTH_SECRET`; generate each with `openssl rand -base64 32`).
+
+The supported installation path is a local source build (root `Dockerfile` /
+`docker-compose.yml`); third-party installers or prebuilt images are not
+supported release channels for this project. The source wizard (`pnpm setup:aws`)
+and the full SES/SNS event pipeline are documented in the
 [self-hosting guide](apps/docs/content/docs/self-hosting.mdx).
 
 ```sh
@@ -62,14 +61,28 @@ docker compose up --build -d
 
 Dashboard at http://localhost:3000, API at http://localhost:3001.
 
+## Migrating from Resend
+
+Keep your Resend SDK: point its `baseUrl` at your MepMail instance and swap the
+API key. The wire protocol is compatible, so request shapes do not change.
+
+## MCP for AI agents
+
+```sh
+npx -y @mepmail/mcp   # stdio server for Claude Code, Cursor and any MCP client
+```
+
+## Links
+
+- Cloud: [mepmail.je4ndev.com](https://mepmail.je4ndev.com)
+- Docs: [docs-mepmail.je4ndev.com](https://docs-mepmail.je4ndev.com)
+- API: [api-mepmail.je4ndev.com](https://api-mepmail.je4ndev.com)
+
 ## License
 
-Code is licensed under [AGPL-3.0](LICENSE). SDKs ship separately under MIT
-(npm/PyPI package: `millionsend`).
+Code is licensed under [AGPL-3.0](LICENSE).
 
-The MillionSend name, wordmark, and logos are trademarks of the MillionSend project and are
-not licensed under the AGPL.
-
-## Community
-
-Questions, ideas and roadmap talk live in the [Discussions](https://github.com/orgs/MillionSend/discussions).
+This project is derived from [MillionSend](https://github.com/MillionSend/millionsend);
+attribution and notices live in `NOTICE.md`. The `@mepmail/mcp` server ships
+under MIT. Upstream names, wordmarks and logos remain property of their
+respective owners and are not licensed under the AGPL.
