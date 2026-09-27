@@ -68,15 +68,20 @@
   top: 8px;
 }
 .gtm-header {
-  background: var(--ms-void);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--ms-void) 84%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--ms-line-strong);
 }
 .gtm-header-inner {
-  min-height: 80px;
+  min-height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
 }
 .gtm-brand {
   display: inline-flex;
@@ -103,22 +108,53 @@
 .gtm-nav {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 20px;
 }
-.gtm-nav > a:not(.ms-btn),
-.gtm-footer nav a {
+.gtm-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.gtm-nav-links a {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
-  padding-inline: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--ms-muted);
   text-decoration: none;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
-.gtm-nav > a:not(.ms-btn):hover,
-.gtm-footer nav a:hover {
-  text-decoration: underline;
+.gtm-nav-links a:hover {
+  color: var(--ms-bone);
+  background: color-mix(in srgb, var(--ms-bone) 8%, transparent);
 }
-.gtm-nav > a.gtm-nav-extra {
-  display: none;
+.gtm-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.gtm-nav-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--ms-line-strong);
+}
+.gtm-nav-login {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--ms-bone);
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+.gtm-nav-login:hover {
+  background: color-mix(in srgb, var(--ms-bone) 8%, transparent);
 }
 .gtm-action.ms-btn {
   height: auto;
@@ -312,23 +348,53 @@
 }
 .gtm-footer {
   border-top: 1px solid var(--ms-line-strong);
-  padding-block: 32px;
+  background: var(--ms-ground);
+  padding-block: 56px 0;
 }
-.gtm-footer-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 24px;
+.gtm-footer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 36px;
+  padding-bottom: 40px;
 }
-.gtm-footer p {
+.gtm-footer-brand p {
   font-size: 14px;
   color: var(--ms-muted);
-  margin: 8px 0 0;
+  margin: 12px 0 0;
+  max-width: 340px;
 }
-.gtm-footer nav {
-  display: flex;
-  gap: 16px;
+.gtm-footer-col {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+.gtm-footer-col h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+}
+.gtm-footer-col a {
+  justify-self: start;
+  font-size: 14px;
+  color: var(--ms-bone);
+  text-decoration: none;
+  opacity: 0.85;
+  transition: opacity 0.15s ease;
+}
+.gtm-footer-col a:hover {
+  opacity: 1;
+}
+.gtm-footer-base {
+  border-top: 1px solid var(--ms-line-strong);
+  padding-block: 20px;
+}
+.gtm-footer-base p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ms-muted);
 }
 .gtm code {
   overflow-wrap: anywhere;
@@ -340,6 +406,9 @@
   }
   .gtm-plan-grid,
   .gtm-offers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .gtm-footer-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -360,8 +429,13 @@
   .gtm h2 {
     font-size: 36px;
   }
-  .gtm-nav > a.gtm-nav-extra {
-    display: inline-flex;
+  .gtm-mcp-grid {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 56px;
+  }
+  .gtm-footer-grid {
+    grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr));
+    gap: 48px;
   }
   .gtm-plan-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -371,20 +445,21 @@
 @media (max-width: 390px) {
   .gtm-header-inner {
     flex-wrap: wrap;
-    padding-block: 12px;
+    padding-block: 10px;
   }
   .gtm-nav {
     width: 100%;
     justify-content: space-between;
+    gap: 12px;
   }
-  .gtm-wordmark img {
-    width: 100px;
-  }
-  .gtm-nav {
+  .gtm-nav-links {
     gap: 0;
   }
-  .gtm-nav > a:not(.ms-btn) {
-    padding-inline: 4px;
+  .gtm-nav-links a {
+    padding: 0 8px;
+  }
+  .gtm-wordmark img {
+    width: 108px;
   }
   .gtm-header .gtm-action {
     padding-inline: 10px;
@@ -406,10 +481,11 @@
 .gtm-lang {
   display: inline-flex;
   align-items: center;
-  gap: 1px;
-  margin-inline-end: 4px;
-  border: 0;
-  padding: 0;
+  gap: 2px;
+  margin: 0;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  padding: 2px;
 }
 .gtm-lang legend {
   position: absolute;
@@ -423,24 +499,27 @@
   appearance: none;
   background: none;
   border: 0;
-  border-radius: 6px;
-  padding: 4px 6px;
+  border-radius: 999px;
+  padding: 3px 9px;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.02em;
-  color: inherit;
-  opacity: 0.55;
+  color: var(--ms-muted);
   cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 .gtm-lang button:hover {
-  opacity: 1;
+  color: var(--ms-bone);
 }
 .gtm-lang button.is-current {
-  opacity: 1;
-  font-weight: 600;
+  color: var(--ms-void);
+  background: var(--ms-bone);
 }
 .gtm-lang button:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 2px solid var(--ms-violet);
   outline-offset: 2px;
 }
 /* ----- Hero com demo, faixa de confiança, pricing e FAQ (28/09) ----- */
@@ -450,6 +529,15 @@
   align-items: center;
 }
 .gtm-hero-demo {
+  margin: 0;
+  min-width: 0;
+}
+.gtm-mcp-grid {
+  display: grid;
+  gap: 40px;
+  align-items: center;
+}
+.gtm-mcp-demo {
   margin: 0;
   min-width: 0;
 }
