@@ -8,16 +8,16 @@ import {
 } from "@millionsend/ses/setup-constants";
 
 export const CFN_DEPLOY_COMMAND =
-  "aws cloudformation deploy --template-file infra/millionsend-ses.cfn.yaml --stack-name millionsend --capabilities CAPABILITY_NAMED_IAM";
+  "aws cloudformation deploy --template-file infra/mepmail-ses.cfn.yaml --stack-name mepmail --capabilities CAPABILITY_NAMED_IAM";
 
-const CFN_TEMPLATE_URL = "https://millionsend-public.s3.amazonaws.com/millionsend-ses.cfn.yaml";
+const CFN_TEMPLATE_URL = "https://mepmail-public.s3.amazonaws.com/mepmail-ses.cfn.yaml";
 
 /**
  * CloudFormation quick-create review page for the hosted template
  * (maintainer notes on the hosted copy: SELF_HOSTING.md).
  */
 export function cfnQuickCreateUrl(region: string): string {
-  return `https://console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/create/review?templateURL=${CFN_TEMPLATE_URL}&stackName=millionsend`;
+  return `https://console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/create/review?templateURL=${CFN_TEMPLATE_URL}&stackName=mepmail`;
 }
 
 // The shell script interpolates $TOPIC_ARN/$ACCOUNT_ID at run time, so the

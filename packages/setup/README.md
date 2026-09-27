@@ -25,14 +25,14 @@ and re-running is safe:
    or keeps your existing one and only fills gaps. Offers to generate
    `MASTER_ENCRYPTION_KEY` and `BETTER_AUTH_SECRET` for you, and prompts once
    for `APP_BASE_URL`.
-2. **AWS** — IAM policy + `millionsend` user + access key (least-privilege
+2. **AWS** — IAM policy + `mepmail` user + access key (least-privilege
    sending); with an https `APP_BASE_URL`, also the SNS event topic and SES
    configuration set so bounces, complaints, and deliveries flow back into
    your instance. Keys are written into the same `.env`.
 3. **object storage & backups** — one S3-compatible credential set (Cloudflare
    R2 works out of the box) enables team logo uploads and scheduled database
-   backups. Creates (or adopts) both buckets — `millionsend-storage` and
-   `millionsend-backups` by default — and writes the `S3_*` lines. Public
+   backups. Creates (or adopts) both buckets — `mepmail-storage` and
+   `mepmail-backups` by default — and writes the `S3_*` lines. Public
    access for the uploads bucket cannot be enabled over the S3 API, so it
    prints the manual R2 instruction; keep the backups bucket private.
 4. **launch** — uses the root `docker-compose.yml` and runs

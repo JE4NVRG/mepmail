@@ -54,7 +54,7 @@ describe("main add-region --dry-run", () => {
     expect(await main(["add-region", "us-east-1", "--dry-run"])).toBe(0);
     const out = lines.join("\n");
     expect(out).toContain("Plan:");
-    expect(out).toContain("SNS topic millionsend-events in us-east-1");
+    expect(out).toContain("SNS topic mepmail-events in us-east-1");
     expect(out).toContain("us-east-1 appended to AWS_REGIONS");
     expect(out).toContain("nothing was created or written");
   });

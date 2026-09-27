@@ -4,12 +4,12 @@
 
 /** AWS resource names every setup path (CLI, shell script, CloudFormation) creates. */
 export const SETUP_NAMES = {
-  policy: "millionsend-ses",
-  user: "millionsend",
-  topic: "millionsend-events",
-  queue: "millionsend-events",
-  configurationSet: "millionsend",
-  eventDestination: "millionsend-events",
+  policy: "mepmail-ses",
+  user: "mepmail",
+  topic: "mepmail-events",
+  queue: "mepmail-events",
+  configurationSet: "mepmail",
+  eventDestination: "mepmail-events",
 } as const;
 
 /**
@@ -37,7 +37,7 @@ export function awsAddRegionCommand(region: string): string {
 }
 
 /**
- * Every SES action the instance issues — infra/millionsend-ses.cfn.yaml
+ * Every SES action the instance issues — infra/mepmail-ses.cfn.yaml
  * mirrors the same set. Identity actions support resource-level permissions
  * and are confined to identities; sending stays account-wide because a send
  * that names a configuration set is authorized against that resource too,
@@ -213,6 +213,12 @@ CONTENT_REVEAL=off
 # The first user can always register; after that, signup stays closed unless
 # this is true. Keep false when the dashboard is reachable from the internet.
 ALLOW_SIGNUP=false
+# Optional closed-beta controls for a self-host that opens sign-up:
+# BETA_MAX_USERS caps how many accounts are admitted in total;
+# BETA_DEFAULT_DAILY_CEILING stamps a daily send ceiling on newly created
+# teams (adjust per team later in the operator console). Unset = no cap.
+# BETA_MAX_USERS=100
+# BETA_DEFAULT_DAILY_CEILING=100
 
 # Hosted cloud only (ignored when IS_CLOUD=false): force branded tracking
 # subdomains on even without a TRACKING_EDGE_HOST — for a cloud that serves
@@ -256,7 +262,7 @@ WEB_PORT=3000
 DOCS_PORT=3002
 
 # SMTP relay (the optional smtp compose service) listen port. Clients
-# authenticate with username "millionsend" and an ms_ API key as the password.
+# authenticate with username "mepmail" and an ms_ API key as the password.
 SMTP_PORT=2587
 
 # STARTTLS keypair for the SMTP relay (PEM paths inside the container). Both
@@ -307,7 +313,7 @@ NOTIFICATIONS_EMAIL_FROM=
 # CF-Connecting-IP) are trusted, comma-separated. Default: loopback only,
 # which covers a proxy on the same host. Add your proxy's address when it
 # runs elsewhere; an untrusted source's headers are ignored and the socket
-# address is used instead. A tracking edge (millionsend-tracking-edge) that
+# address is used instead. A tracking edge (mepmail-tracking-edge) that
 # forwards branded links through Cloudflare belongs here too, or every
 # tracking hit records the edge as the client.
 # TRUSTED_PROXIES=127.0.0.1,::1
@@ -439,7 +445,7 @@ export function snsTopicPolicy(topicArn: string, accountId: string): object {
 
 /**
  * Events-queue policy: only the events topics may write (one per served
- * region; SNS delivers across regions), and the millionsend IAM user may
+ * region; SNS delivers across regions), and the mepmail IAM user may
  * consume. The consume grant lives here (resource policy) rather than in
  * SES_IAM_POLICY because a same-account resource policy suffices on SQS, and
  * the identity policy — created once, adopted on re-runs — could not gain new

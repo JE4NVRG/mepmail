@@ -638,7 +638,7 @@ it("account mail ships untracked on a tracking domain and loses its body once SE
   const { ses, sends } = fakeSes("mid-system");
   const url = "https://app.example.com/reset-password?token=secret";
   const emailId = await insertEmail(
-    { tags: { millionsend_system: "password_reset" } },
+    { tags: { mepmail_system: "password_reset" } },
     `<a href="${url}">reset</a>`,
   );
   const deps: SendDeps = {
@@ -663,7 +663,7 @@ it("account mail without a credential ships untracked and keeps its body", async
   const { ses, sends } = fakeSes("mid-system-notice");
   const url = "https://app.example.com/domains";
   const emailId = await insertEmail(
-    { tags: { millionsend_system: "domain.verified" } },
+    { tags: { mepmail_system: "domain.verified" } },
     `<a href="${url}">domains</a>`,
   );
   const deps: SendDeps = {
@@ -1343,21 +1343,21 @@ it("drops the tenant when the send's configuration set is not the one associated
   const { ses, sends } = fakeSes("mid-drift");
   const emailId = await insertEmail({ domainId: drifted.id, from: "Acme <a@drift.dev>" });
   expect(
-    await sendEmail(db, { keyring, ses, defaultConfigurationSet: "millionsend" }, { emailId }),
+    await sendEmail(db, { keyring, ses, defaultConfigurationSet: "mepmail" }, { emailId }),
   ).toBe("sent");
-  expect(sends[0]?.configurationSetName).toBe("millionsend");
+  expect(sends[0]?.configurationSetName).toBe("mepmail");
   expect(sends[0]?.tenantName).toBeUndefined();
   // Once the association matches the set in force, the tenant rides along.
   await db
     .update(schema.domains)
-    .set({ sesTenantConfigSet: "millionsend" })
+    .set({ sesTenantConfigSet: "mepmail" })
     .where(eq(schema.domains.id, drifted.id));
   const again = fakeSes("mid-drift-2");
   const secondId = await insertEmail({ domainId: drifted.id, from: "Acme <a@drift.dev>" });
   expect(
     await sendEmail(
       db,
-      { keyring, ses: again.ses, defaultConfigurationSet: "millionsend" },
+      { keyring, ses: again.ses, defaultConfigurationSet: "mepmail" },
       { emailId: secondId },
     ),
   ).toBe("sent");

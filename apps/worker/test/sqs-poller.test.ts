@@ -7,7 +7,7 @@ import type { SerializedSesEvent } from "@millionsend/queue";
 import { describe, expect, it } from "vitest";
 import { pollSqsOnce, type SqsPollerDeps } from "../src/sqs-poller.js";
 
-const TOPIC = "arn:aws:sns:us-east-1:123456789012:millionsend-events";
+const TOPIC = "arn:aws:sns:us-east-1:123456789012:mepmail-events";
 
 function envelope(overrides: Partial<Record<string, string>> = {}): string {
   return JSON.stringify({
@@ -19,7 +19,7 @@ function envelope(overrides: Partial<Record<string, string>> = {}): string {
       mail: {
         messageId: "ses-1",
         timestamp: "2026-08-16T12:00:00.000Z",
-        tags: { millionsend_email_id: ["00000000-0000-4000-8000-000000000001"] },
+        tags: { mepmail_email_id: ["00000000-0000-4000-8000-000000000001"] },
       },
       delivery: { timestamp: "2026-08-16T12:00:01.000Z", smtpResponse: "250 ok" },
     }),
@@ -44,7 +44,7 @@ function fakeDeps(messages: Message[], options: { enqueueError?: Error } = {}) {
         return {};
       },
     },
-    queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/millionsend-events",
+    queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/mepmail-events",
     allowedTopicArns: [TOPIC],
     enqueueSesEvent: async (event, snsMessageId) => {
       if (options.enqueueError) throw options.enqueueError;

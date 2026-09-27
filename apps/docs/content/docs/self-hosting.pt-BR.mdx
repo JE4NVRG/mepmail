@@ -162,7 +162,7 @@ worker cabem sem ajuste.
 
 O assistente do checkout do código cria tudo de que o MepMail
 precisa na AWS — política IAM + usuário + chave de acesso, o tópico SNS de
-eventos, a fila SQS de eventos (`millionsend-events`) que o worker consome por
+eventos, a fila SQS de eventos (`mepmail-events`) que o worker consome por
 long polling e o configuration set do SES. Um `APP_BASE_URL` HTTPS recebe
 adicionalmente os eventos por push; a fila funciona sem URL pública nenhuma.
 
@@ -182,7 +182,7 @@ você colar onde o MepMail roda). `--dry-run` imprime o plano completo e
 sai.
 
 `pnpm setup:aws teardown` apaga tudo que o setup criou, incluindo
-todas as chaves de acesso do usuário IAM `millionsend`, então um servidor em
+todas as chaves de acesso do usuário IAM `mepmail`, então um servidor em
 execução para de enviar. Repetir o setup é seguro, mas cada execução gera uma
 nova chave de acesso — apague as antigas no console do IAM.
 
@@ -245,7 +245,7 @@ de `.env` acima e um reinício.
 
 ## Eventos do SES (bounces, reclamações e entregas)
 
-O CLI de setup sempre configura isto: uma fila SQS (`millionsend-events`) que o
+O CLI de setup sempre configura isto: uma fila SQS (`mepmail-events`) que o
 worker consome por long polling, com a URL no `.env` como `SQS_QUEUE_URL`. A
 fila segura os eventos durante reinícios e não precisa de acesso externo, por
 isso é o transporte que toda implantação recebe; um `APP_BASE_URL` HTTPS
@@ -303,14 +303,14 @@ assistente e o template do CloudFormation instalam inclui as ações
 `ses:CreateTenant`, `ses:GetTenant`, `ses:DeleteTenant`,
 `ses:CreateTenantResourceAssociation` e `ses:DeleteTenantResourceAssociation`;
 uma implantação existente roda o assistente de novo (ou atualiza a política
-`millionsend-ses`) antes de ligar a flag.
+`mepmail-ses`) antes de ligar a flag.
 
 Para atualizar a política sem recriar nada, publique o JSON que a página de
 configurações do SES mostra como nova versão padrão:
 
 ```bash
-aws iam create-policy-version --policy-arn arn:aws:iam::<account-id>:policy/millionsend-ses \
-  --policy-document file://millionsend-ses.json --set-as-default
+aws iam create-policy-version --policy-arn arn:aws:iam::<account-id>:policy/mepmail-ses \
+  --policy-document file://mepmail-ses.json --set-as-default
 ```
 
 ## Relay SMTP
@@ -326,7 +326,7 @@ Dados de conexão:
 - **Host:** onde o serviço `smtp` estiver acessível (os arquivos compose o
   publicam no host do Docker).
 - **Porta:** `2587` (`SMTP_PORT` para mudar).
-- **Usuário:** `millionsend` (fixo).
+- **Usuário:** `mepmail` (fixo).
 - **Senha:** uma chave de API `ms_` do painel.
 - **Criptografia:** STARTTLS é oferecido (e exigido antes do AUTH) quando
   `SMTP_TLS_CERT_PATH` e `SMTP_TLS_KEY_PATH` apontam para um par PEM. Sem ele,
@@ -360,7 +360,7 @@ credenciais nunca cruzam a rede sem criptografia. Monte o diretório
 `live/<domínio>` (um symlink que o certbot mantém atualizado), não uma cópia
 dos arquivos, para que a renovação caia no mesmo caminho — e reinicie o relay
 depois de cada renovação, já que ele lê o par de chaves ao iniciar (certbot:
-`--deploy-hook 'docker compose -f /opt/millionsend/docker-compose.yml restart smtp'`).
+`--deploy-hook 'docker compose -f /opt/mepmail/docker-compose.yml restart smtp'`).
 Um wildcard ou qualquer outro PEM emitido por CA funciona da mesma
 forma.
 
@@ -372,7 +372,7 @@ import nodemailer from "nodemailer";
 const transport = nodemailer.createTransport({
   host: "localhost",
   port: 2587,
-  auth: { user: "millionsend", pass: "ms_..." },
+  auth: { user: "mepmail", pass: "ms_..." },
 });
 
 await transport.sendMail({
@@ -407,7 +407,7 @@ hostname — é o que o painel mostra como base da API e ao que os tokens MCP
 ficam vinculados; sem definir, a API é assumida na porta 3001 do host do
 painel.
 
-`/etc/nginx/conf.d/millionsend.conf`:
+`/etc/nginx/conf.d/mepmail.conf`:
 
 ```nginx
 map $http_upgrade $connection_upgrade {
@@ -551,8 +551,8 @@ credenciais `S3_*` é compartilhado com o job de backup abaixo — cada recurso
 é então habilitado pela sua própria variável de bucket.
 
 A etapa de armazenamento do `pnpm setup:aws` pergunta o endpoint e as
-chaves, cria (ou adota) os dois buckets — `millionsend-storage` e
-`millionsend-backups` por padrão — e escreve as linhas `S3_*` no `.env`. A
+chaves, cria (ou adota) os dois buckets — `mepmail-storage` e
+`mepmail-backups` por padrão — e escreve as linhas `S3_*` no `.env`. A
 única coisa que ela não consegue fazer pela API S3 é tornar público o bucket
 de uploads: no R2, habilite o acesso público no bucket (ou conecte um domínio
 customizado) e defina essa URL — os uploads são endereçados como
@@ -562,7 +562,7 @@ customizado) e defina essa URL — os uploads são endereçados como
 S3_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com
 S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
-S3_STORAGE_BUCKET=millionsend-storage
+S3_STORAGE_BUCKET=mepmail-storage
 S3_STORAGE_PUBLIC_URL=https://<url-publica-do-bucket-ou-dominio-customizado>
 ```
 
@@ -590,7 +590,7 @@ público de uploads. Para o R2 os padrões `S3_PROVIDER=Cloudflare` e
 S3_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com
 S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
-S3_BACKUP_BUCKET=millionsend-backups
+S3_BACKUP_BUCKET=mepmail-backups
 ```
 
 Depois adicione `backup` a `COMPOSE_PROFILES` no `.env` e rode
@@ -601,7 +601,7 @@ um por dia no `BACKUP_CRON` (padrão `0 3 * * *`, UTC). Só a forma diária
 sleep em vez de crond, e qualquer outro formato faz o serviço sair com código
 1. Cada dump é um
 `pg_dump -Fc` (formato custom comprimido, nomeado
-`millionsend-YYYYMMDD-HHMMSS.dump`), o tamanho enviado é verificado contra o
+`mepmail-YYYYMMDD-HHMMSS.dump`), o tamanho enviado é verificado contra o
 bucket antes de qualquer outra coisa, e dumps mais antigos que
 `BACKUP_RETENTION_DAYS` (padrão 14) são removidos. `S3_BACKUP_PREFIX` (padrão
 `backups`) define o prefixo das chaves. Outros serviços compatíveis com S3
@@ -633,7 +633,7 @@ docker compose run --rm --entrypoint /usr/local/bin/backup.sh backup \
   sh -c 'rclone lsl ":s3:$S3_BACKUP_BUCKET/${S3_BACKUP_PREFIX:-backups}"'
 # baixe-o e restaure por cima do banco atual
 docker compose run --rm --entrypoint /usr/local/bin/backup.sh backup \
-  sh -c 'rclone copyto ":s3:$S3_BACKUP_BUCKET/${S3_BACKUP_PREFIX:-backups}/millionsend-YYYYMMDD-HHMMSS.dump" /tmp/restore.dump \
+  sh -c 'rclone copyto ":s3:$S3_BACKUP_BUCKET/${S3_BACKUP_PREFIX:-backups}/mepmail-YYYYMMDD-HHMMSS.dump" /tmp/restore.dump \
     && pg_restore --clean --if-exists -d "$DATABASE_URL" /tmp/restore.dump'
 docker compose start millionsend smtp
 ```
@@ -654,7 +654,7 @@ e-mail, convites para times e os avisos de cota e entregabilidade aos donos
 dos times — saem de `AUTH_EMAIL_FROM` e `NOTIFICATIONS_EMAIL_FROM`.
 Verifique o domínio do remetente em **Domínios** em um time e, a partir daí,
 esses e-mails são registrados e medidos nesse time como qualquer outro:
-aparecem na lista de E-mails com a tag `millionsend_system`, contam nas
+aparecem na lista de E-mails com a tag `mepmail_system`, contam nas
 Métricas e as Supressões se preenchem com os bounces deles. O corpo é
 descartado assim que o SES aceita a mensagem, já que um link de redefinição é
 uma credencial válida, e os links nunca são reescritos para rastreio de
