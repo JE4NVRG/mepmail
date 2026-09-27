@@ -14,8 +14,8 @@ implantação abaixo; as abas lembram sua escolha em toda a documentação.
 
 As contas são provisionadas por convite — não há cadastro público. Fale com a
 gente e configuramos sua conta; o acesso é em
-[mepmail.agenciamep.com](https://mepmail.agenciamep.com). A API fica em
-`api-mepmail.agenciamep.com`.
+[mepmail.je4ndev.com](https://mepmail.je4ndev.com). A API fica em
+`api-mepmail.je4ndev.com`.
 
 </DeploymentTab>
 <DeploymentTab deployment="self-hosted">
@@ -88,7 +88,7 @@ Sua URL base da API:
 <DeploymentTabs>
 <DeploymentTab deployment="cloud">
 
-`https://api-mepmail.agenciamep.com`
+`https://api-mepmail.je4ndev.com`
 
 </DeploymentTab>
 <DeploymentTab deployment="self-hosted">
@@ -104,7 +104,7 @@ pela sua.
 Com curl:
 
 ```sh
-curl -X POST https://api-mepmail.agenciamep.com/emails \
+curl -X POST https://api-mepmail.je4ndev.com/emails \
   -H "Authorization: Bearer ms_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -122,7 +122,7 @@ sua URL base:
 import { Resend } from "resend";
 
 const resend = new Resend("ms_...", {
-  baseUrl: "https://api-mepmail.agenciamep.com",
+  baseUrl: "https://api-mepmail.je4ndev.com",
 });
 
 const { data, error } = await resend.emails.send({

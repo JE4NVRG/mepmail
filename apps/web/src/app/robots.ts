@@ -1,8 +1,14 @@
 import type { MetadataRoute } from "next";
 
-// The dashboard is private; only the auth entry points are worth a search
-// result. Pages inherit noindex from the root layout, which login and signup
-// override.
+// The dashboard is private: crawlers get the public pages (the landing and
+// the auth entry points) plus the static assets those pages need to render,
+// and nothing else.
 export default function robots(): MetadataRoute.Robots {
-  return { rules: { userAgent: "*", allow: ["/login", "/signup"], disallow: "/" } };
+  return {
+    rules: {
+      userAgent: "*",
+      allow: ["/$", "/login", "/signup", "/_next/", "/logo/", "/fonts/", "/og.png", "/favicon.ico"],
+      disallow: "/",
+    },
+  };
 }

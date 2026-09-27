@@ -387,7 +387,7 @@ export default async function RootPage() {
             <p>
               Cada cliente usa um domínio de envio próprio verificado com DKIM e MAIL FROM no Amazon
               SES, com reputação isolada. Escolha a API HTTPS compatível com chamadas de envio do
-              Resend, com base URL <code>api-mepmail.agenciamep.com</code>, ou o relay SMTP com
+              Resend, com base URL <code>api-mepmail.je4ndev.com</code>, ou o relay SMTP com
               STARTTLS em <code>smtp-mepmail.agenciamep.com:2587</code>. A chave de API é dedicada à
               sua operação.
             </p>

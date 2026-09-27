@@ -100,7 +100,7 @@ dashboard (Resend returns it on `GET /webhooks/{id}`) and create the endpoint
 here with the same value:
 
 ```sh
-curl -X POST "https://api-mepmail.agenciamep.com/webhooks" \
+curl -X POST "https://api-mepmail.je4ndev.com/webhooks" \
   -H "Authorization: Bearer ms_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -125,7 +125,7 @@ only the new secret signs. `0` drops the old secret at once, for a leaked one.
 and a second rotation inside the window replaces the previous secret.
 
 ```sh
-curl -X POST "https://api-mepmail.agenciamep.com/webhooks/{id}/rotate" \
+curl -X POST "https://api-mepmail.je4ndev.com/webhooks/{id}/rotate" \
   -H "Authorization: Bearer ms_..." \
   -H "Content-Type: application/json" \
   -d '{ "overlap_hours": 24 }'

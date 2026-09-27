@@ -4,7 +4,7 @@ Você está migrando uma aplicação do Resend para o MepMail. A API REST do Mep
 
 ## Fatos em que você pode confiar
 
-- URL base da API Cloud: `https://api-mepmail.agenciamep.com`. Auto-hospedado: a origem da API da própria instância (pergunte se não estiver no repositório).
+- URL base da API Cloud: `https://api-mepmail.je4ndev.com`. Auto-hospedado: a origem da API da própria instância (pergunte se não estiver no repositório).
 - Chaves de API começam com `ms_` e são criadas no painel em **Chaves de API**. Use uma chave de acesso total para a migração e chaves de acesso de envio para os remetentes de produção.
 - Documentação: os documentos ficam no repositório, em `apps/docs/content/` — o markdown cru está no mesmo caminho em `raw.githubusercontent.com/JE4NVRG/mepmail/main/`, e a própria API serve a especificação OpenAPI 3.1 em `/openapi.json`. O guia de migração está em https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/docs/migrate-from-resend.pt-BR.mdx e a referência da CLI em https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/docs/cli.pt-BR.mdx.
 - A CLI de migração (`@millionsend/cli`) só lê do Resend (requisições `GET`), mantém as chaves em memória, não as grava em arquivo algum e não envia telemetria.
@@ -29,7 +29,7 @@ Primeiro o plano (somente leitura; código de saída 2 significa que há mudanç
 ```sh
 export RESEND_API_KEY=re_...
 export MILLIONSEND_API_KEY=ms_...
-export MILLIONSEND_BASE_URL=https://api-mepmail.agenciamep.com   # ou a URL da instância
+export MILLIONSEND_BASE_URL=https://api-mepmail.je4ndev.com   # ou a URL da instância
 
 npx @millionsend/cli migrate plan --from resend --out plan.json
 ```
@@ -51,7 +51,7 @@ Escolha uma das duas opções, com o usuário:
 1. **Mantenha o SDK do Resend.** Os SDKs oficiais do Resend respeitam uma URL base. Defina, em todo ambiente que envia:
    ```sh
    RESEND_API_KEY=ms_...
-   RESEND_BASE_URL=https://api-mepmail.agenciamep.com
+   RESEND_BASE_URL=https://api-mepmail.je4ndev.com
    ```
    Confirme que a versão instalada do SDK lê `RESEND_BASE_URL` (ou a opção de URL base do construtor) e substitua qualquer `https://api.resend.com` fixo no código.
 2. **Mantenha o SDK do Resend que você já tem — não existe cliente nosso para trocar.** Aponte-o para a instância pela opção de URL base dele (`baseUrl` no Node, `base_url` no Python, `RESEND_BASE_URL` nos demais, `BaseURL` no Go; se o valor quer barra final varia por linguagem) e deixe imports e nomes de classe como estão. Detalhes por linguagem: https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/docs/sdks.pt-BR.mdx.

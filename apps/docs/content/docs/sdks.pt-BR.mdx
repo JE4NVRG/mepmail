@@ -26,7 +26,7 @@ costuma ser trabalho de um dia, não de um redesenho.
 <DeploymentTabs>
 <DeploymentTab deployment="cloud">
 
-`https://api-mepmail.agenciamep.com` — o que todos os exemplos desta página usam.
+`https://api-mepmail.je4ndev.com` — o que todos os exemplos desta página usam.
 
 As contas são provisionadas por convite: não há cadastro público. Fale com a
 gente e configuramos sua conta, seu domínio e sua primeira chave de API.
@@ -69,7 +69,7 @@ npm install resend
 import { Resend } from "resend";
 
 const resend = new Resend("ms_123", {
-  baseUrl: "https://api-mepmail.agenciamep.com",
+  baseUrl: "https://api-mepmail.je4ndev.com",
 });
 
 const { data, error } = await resend.emails.send({
@@ -92,7 +92,7 @@ pip install resend
 import resend
 
 resend.api_key = "ms_123"
-resend.api_url = "https://api-mepmail.agenciamep.com"  # sem barra no final
+resend.api_url = "https://api-mepmail.je4ndev.com"  # sem barra no final
 
 email = resend.Emails.send({
     "from": "Acme <onboarding@acme.dev>",
@@ -114,7 +114,7 @@ composer require resend/resend-php
 ```
 
 ```php
-putenv("RESEND_BASE_URL=https://api-mepmail.agenciamep.com");
+putenv("RESEND_BASE_URL=https://api-mepmail.je4ndev.com");
 
 $resend = Resend::client('ms_123');
 
@@ -139,7 +139,7 @@ gem install resend
 ```
 
 ```ruby
-ENV["RESEND_BASE_URL"] = "https://api-mepmail.agenciamep.com/"
+ENV["RESEND_BASE_URL"] = "https://api-mepmail.je4ndev.com/"
 
 require "resend"
 Resend.api_key = "ms_123"
@@ -171,7 +171,7 @@ import (
 )
 
 client := resend.NewClient("ms_123")
-client.BaseURL, _ = url.Parse("https://api-mepmail.agenciamep.com/")
+client.BaseURL, _ = url.Parse("https://api-mepmail.je4ndev.com/")
 
 sent, err := client.Emails.Send(&resend.SendEmailRequest{
     From:    "Acme <onboarding@acme.dev>",
@@ -198,7 +198,7 @@ use resend_rs::{Config, Resend};
 
 let resend = Resend::with_config(
     Config::builder("ms_123")
-        .base_url("https://api-mepmail.agenciamep.com".parse()?)
+        .base_url("https://api-mepmail.je4ndev.com".parse()?)
         .build(),
 );
 
@@ -232,7 +232,7 @@ var body = """
     """;
 
 var request = HttpRequest.newBuilder()
-    .uri(URI.create("https://api-mepmail.agenciamep.com/emails"))
+    .uri(URI.create("https://api-mepmail.je4ndev.com/emails"))
     .header("Authorization", "Bearer ms_123")
     .header("Content-Type", "application/json")
     .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -256,7 +256,7 @@ using Resend;
 var options = new ResendClientOptions
 {
     ApiToken = "ms_123",
-    ApiUrl = "https://api-mepmail.agenciamep.com",
+    ApiUrl = "https://api-mepmail.je4ndev.com",
 };
 
 var resend = ResendClient.Create(options);
@@ -286,7 +286,7 @@ end
 ```elixir
 client = Resend.client(
   api_key: "ms_123",
-  base_url: "https://api-mepmail.agenciamep.com"
+  base_url: "https://api-mepmail.je4ndev.com"
 )
 
 {:ok, email} =

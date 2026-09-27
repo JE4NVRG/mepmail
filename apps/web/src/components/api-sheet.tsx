@@ -77,7 +77,7 @@ const SNIPPETS: Record<Lang, Snippets> = {
     send: `import { Resend } from "resend";
 
 const resend = new Resend("ms_xxxxxxxxx", {
-  baseUrl: "https://api-mepmail.agenciamep.com",
+  baseUrl: "https://api-mepmail.je4ndev.com",
 });
 
 const { data, error } = await resend.emails.send({
@@ -108,7 +108,7 @@ const { data, error } = await resend.emails.send({
     send: `import resend
 
 resend.api_key = "ms_xxxxxxxxx"
-resend.api_url = "https://api-mepmail.agenciamep.com"  # sem barra no final
+resend.api_url = "https://api-mepmail.je4ndev.com"  # sem barra no final
 
 email = resend.Emails.send({
     "from": "Acme <onboarding@yourdomain.com>",
@@ -135,7 +135,7 @@ email = resend.Emails.send({
 )`,
   },
   php: {
-    send: `putenv("RESEND_BASE_URL=https://api-mepmail.agenciamep.com");
+    send: `putenv("RESEND_BASE_URL=https://api-mepmail.je4ndev.com");
 
 $resend = Resend::client("ms_xxxxxxxxx");
 
@@ -145,7 +145,7 @@ $resend->emails->send([
     "subject" => "hello world",
     "html" => "<h1>it works!</h1>",
 ]);`,
-    batch: `putenv("RESEND_BASE_URL=https://api-mepmail.agenciamep.com");
+    batch: `putenv("RESEND_BASE_URL=https://api-mepmail.je4ndev.com");
 
 $resend = Resend::client("ms_xxxxxxxxx");
 
@@ -163,14 +163,14 @@ $resend->batch->send([
         "html" => "<p>it works!</p>",
     ],
 ]);`,
-    retrieve: `putenv("RESEND_BASE_URL=https://api-mepmail.agenciamep.com");
+    retrieve: `putenv("RESEND_BASE_URL=https://api-mepmail.je4ndev.com");
 
 $resend = Resend::client("ms_xxxxxxxxx");
 
 $email = $resend->emails->get("4ef9a417-02e9-4d39-ad75-9611e0fcc33c");`,
   },
   ruby: {
-    send: `ENV["RESEND_BASE_URL"] = "https://api-mepmail.agenciamep.com/"  # barra final obrigatoria
+    send: `ENV["RESEND_BASE_URL"] = "https://api-mepmail.je4ndev.com/"  # barra final obrigatoria
 
 require "resend"
 Resend.api_key = "ms_xxxxxxxxx"
@@ -181,7 +181,7 @@ r = Resend::Emails.send({
   "subject" => "hello world",
   "html" => "<h1>it works!</h1>"
 })`,
-    batch: `ENV["RESEND_BASE_URL"] = "https://api-mepmail.agenciamep.com/"  # barra final obrigatoria
+    batch: `ENV["RESEND_BASE_URL"] = "https://api-mepmail.je4ndev.com/"  # barra final obrigatoria
 
 r = Resend::Batch.send([
   {
@@ -207,7 +207,7 @@ r = Resend::Batch.send([
 )
 
 client := resend.NewClient("ms_xxxxxxxxx")
-client.BaseURL, _ = url.Parse("https://api-mepmail.agenciamep.com/")  // barra final obrigatoria
+client.BaseURL, _ = url.Parse("https://api-mepmail.je4ndev.com/")  // barra final obrigatoria
 
 sent, err := client.Emails.Send(&resend.SendEmailRequest{
 	From:    "Acme <onboarding@yourdomain.com>",
@@ -237,7 +237,7 @@ use resend_rs::{Config, Resend};
 
 let resend = Resend::with_config(
     Config::builder("ms_xxxxxxxxx")
-        .base_url("https://api-mepmail.agenciamep.com".parse().context("failed to parse URL")?)
+        .base_url("https://api-mepmail.je4ndev.com".parse().context("failed to parse URL")?)
         .build(),
 );
 
@@ -284,7 +284,7 @@ var body = """
     """;
 
 var request = HttpRequest.newBuilder()
-    .uri(URI.create("https://api-mepmail.agenciamep.com/emails"))
+    .uri(URI.create("https://api-mepmail.je4ndev.com/emails"))
     .header("Authorization", "Bearer ms_xxxxxxxxx")
     .header("Content-Type", "application/json")
     .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -293,7 +293,7 @@ var request = HttpRequest.newBuilder()
 var response = HttpClient.newHttpClient()
     .send(request, HttpResponse.BodyHandlers.ofString());`,
     batch: `var request = HttpRequest.newBuilder()
-    .uri(URI.create("https://api-mepmail.agenciamep.com/emails/batch"))
+    .uri(URI.create("https://api-mepmail.je4ndev.com/emails/batch"))
     .header("Authorization", "Bearer ms_xxxxxxxxx")
     .header("Content-Type", "application/json")
     .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -302,7 +302,7 @@ var response = HttpClient.newHttpClient()
 var response = HttpClient.newHttpClient()
     .send(request, HttpResponse.BodyHandlers.ofString());`,
     retrieve: `var request = HttpRequest.newBuilder()
-    .uri(URI.create("https://api-mepmail.agenciamep.com/emails/4ef9a417-02e9-4d39-ad75-9611e0fcc33c"))
+    .uri(URI.create("https://api-mepmail.je4ndev.com/emails/4ef9a417-02e9-4d39-ad75-9611e0fcc33c"))
     .header("Authorization", "Bearer ms_xxxxxxxxx")
     .GET()
     .build();
@@ -316,7 +316,7 @@ var response = HttpClient.newHttpClient()
 var options = new ResendClientOptions
 {
     ApiToken = "ms_xxxxxxxxx",
-    ApiUrl = "https://api-mepmail.agenciamep.com",
+    ApiUrl = "https://api-mepmail.je4ndev.com",
 };
 
 var resend = ResendClient.Create(options);
@@ -346,7 +346,7 @@ await resend.EmailBatchAsync(messages);`,
     send: `# pacote da comunidade: hex "resend" (elixir-saas/resend-elixir)
 client = Resend.client(
   api_key: "ms_xxxxxxxxx",
-  base_url: "https://api-mepmail.agenciamep.com"
+  base_url: "https://api-mepmail.je4ndev.com"
 )
 
 {:ok, email} = Resend.Emails.send(client, %{
@@ -386,7 +386,7 @@ client = Resend.client(
    to be read out of that language's source before being published. The email
    sheet (SNIPPETS above) carries the language tabs, because there every
    language's send/batch/get was checked against its own package source. */
-const API_BASE = "https://api-mepmail.agenciamep.com";
+const API_BASE = "https://api-mepmail.je4ndev.com";
 const AUTH = `-H "Authorization: Bearer ms_xxxxxxxxx"`;
 const JSON_CT = `-H "Content-Type: application/json"`;
 const SAMPLE_ID = "4ef9a417-02e9-4d39-ad75-9611e0fcc33c";

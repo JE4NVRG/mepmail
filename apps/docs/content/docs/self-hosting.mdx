@@ -7,7 +7,7 @@ Self-hosted MepMail sends through your own AWS SES account. A deployment
 is two containers: Postgres and one app container running the API (port
 3001), the worker, and the web dashboard (port 3000). An optional third
 container runs the SMTP relay (port 2587). (Prefer not to run
-infrastructure? [MepMail Cloud](https://mepmail.agenciamep.com) is the same
+infrastructure? [MepMail Cloud](https://mepmail.je4ndev.com) is the same
 platform, hosted.)
 
 **Prerequisites:** Docker with Compose; an AWS account with SES access in your
@@ -691,12 +691,12 @@ On an instance upgrading to this release, domains already verified and
 day-old audit rows are marked as told, but a domain that is demoted at the
 moment of the upgrade is reported as lost on the first sweep.
 
-Nothing on a self-hosted instance contacts mepmail.agenciamep.com on its own. The
+Nothing on a self-hosted instance contacts mepmail.je4ndev.com on its own. The
 setup wizard offers, once and interactively, to subscribe the operator's
 address to MepMail release notes; that is the wizard on your machine
 posting your answer, and a confirmation link is sent before anything is
-stored. When it cannot reach mepmail.agenciamep.com it prints the page instead,
-[app.mepmail.agenciamep.com/updates?source=self-host](https://app.mepmail.agenciamep.com/updates?source=self-host), and **Settings →
+stored. When it cannot reach mepmail.je4ndev.com it prints the page instead,
+[app.mepmail.je4ndev.com/updates?source=self-host](https://app.mepmail.je4ndev.com/updates?source=self-host), and **Settings →
 Instance** links to the same page; the `source` tags you as a self-hoster
 either way.
 

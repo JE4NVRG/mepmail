@@ -7,7 +7,7 @@ O MepMail auto-hospedado envia pela sua própria conta AWS SES. Uma
 implantação são dois contêineres: Postgres e um contêiner de app rodando a
 API (porta 3001), o worker e o painel web (porta 3000). Um terceiro contêiner
 opcional roda o relay SMTP (porta 2587). (Prefere não operar infraestrutura?
-O [MepMail Cloud](https://mepmail.agenciamep.com) é a mesma plataforma,
+O [MepMail Cloud](https://mepmail.je4ndev.com) é a mesma plataforma,
 hospedada.)
 
 **Pré-requisitos:** Docker com Compose; uma conta AWS com acesso ao SES na
@@ -697,13 +697,13 @@ cadastro por senha não recebe sessão até o link enviado ser aberto; contas
 anteriores confirmam no próximo login. Onde a instância confirma e-mails, o
 remetente do onboarding só alcança membros que confirmaram.
 
-Nada em uma instância auto-hospedada contata mepmail.agenciamep.com por conta
+Nada em uma instância auto-hospedada contata mepmail.je4ndev.com por conta
 própria. O assistente de configuração oferece, uma vez e só de forma
 interativa, inscrever o e-mail do operador nas notas de lançamento do
 MepMail; é o assistente na sua máquina enviando a sua resposta, e um link
 de confirmação chega antes de qualquer coisa ser armazenada. Quando não
-consegue alcançar mepmail.agenciamep.com, ele imprime a página,
-[app.mepmail.agenciamep.com/updates?source=self-host](https://app.mepmail.agenciamep.com/updates?source=self-host), e **Configurações →
+consegue alcançar mepmail.je4ndev.com, ele imprime a página,
+[app.mepmail.je4ndev.com/updates?source=self-host](https://app.mepmail.je4ndev.com/updates?source=self-host), e **Configurações →
 Instância** leva à mesma página; o `source` marca você como auto-hospedado
 nos dois casos.
 
