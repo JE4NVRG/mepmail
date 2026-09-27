@@ -4,7 +4,7 @@ import {
   type ContactBatchItem,
   type MepMailTarget,
   type WriteResult,
-} from "./millionsend.js";
+} from "./mepmail-target.js";
 import type {
   DnsRecord,
   MigrateState,

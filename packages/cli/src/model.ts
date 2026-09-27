@@ -266,7 +266,7 @@ export interface Plan {
   manual: { title: string; detail: string }[];
 }
 
-/** .millionsend/migrate-state.json — never holds a key. */
+/** .mepmail/migrate-state.json — never holds a key. */
 export interface MigrateState {
   version: 1;
   startedAt: string;

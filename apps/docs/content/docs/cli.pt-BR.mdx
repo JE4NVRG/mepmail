@@ -1,9 +1,9 @@
 ---
 title: CLI
-description: "@millionsend/cli — mova uma conta de e-mail para o MepMail pelo terminal: plan, apply, status, rollback."
+description: "@mepmail/cli — mova uma conta de e-mail para o MepMail pelo terminal: plan, apply, status, rollback."
 ---
 
-`@millionsend/cli` move uma conta de e-mail para o MepMail — Cloud ou sua
+`@mepmail/cli` move uma conta de e-mail para o MepMail — Cloud ou sua
 própria instância. Ele lê o provedor de origem, compara com o destino, aplica
 a diferença e grava um relatório. Hoje a única origem é o Resend.
 
@@ -12,25 +12,25 @@ a diferença e grava um relatório. Hoje a única origem é o Resend.
 Node 18 ou mais novo, sem dependências. Rode sem instalar:
 
 ```sh
-npx @millionsend/cli migrate --from resend
+npx @mepmail/cli migrate --from resend
 ```
 
 Ou instale uma vez:
 
 ```sh
-npm install -g @millionsend/cli
-millionsend --version
+npm install -g @mepmail/cli
+mepmail --version
 ```
 
 ## Comandos
 
 ```sh
-millionsend migrate --from resend                          # conectar, escolher recursos, planejar, confirmar, aplicar, resumo
-millionsend migrate plan --from resend [--out plan.json]   # somente leitura; saída 0 nada a fazer, 2 há mudanças, 1 erro
-millionsend migrate apply [plan.json] [--yes]              # aplica um plano salvo, ou planeja e aplica de uma vez
-millionsend migrate status                                 # o que a última execução criou e o que falta
-millionsend migrate rollback [--yes]                       # exclui apenas o que esta ferramenta criou
-millionsend --help | --version
+mepmail migrate --from resend                          # conectar, escolher recursos, planejar, confirmar, aplicar, resumo
+mepmail migrate plan --from resend [--out plan.json]   # somente leitura; saída 0 nada a fazer, 2 há mudanças, 1 erro
+mepmail migrate apply [plan.json] [--yes]              # aplica um plano salvo, ou planeja e aplica de uma vez
+mepmail migrate status                                 # o que a última execução criou e o que falta
+mepmail migrate rollback [--yes]                       # exclui apenas o que esta ferramenta criou
+mepmail --help | --version
 ```
 
 - **`migrate`** é o caminho interativo: pergunta o que falta (chaves, URL de
@@ -71,7 +71,7 @@ millionsend --help | --version
 | `--on-conflict <mode>` | Contatos que já existem no destino: `upsert` (padrão), `skip`, `error`. |
 | `--include-sent` | Importa broadcasts enviados como rascunhos. Pulados por padrão. |
 | `--fresh-webhook-secrets` | Gera segredos de assinatura de webhook novos em vez de copiá-los. Mostrados uma vez, no relatório. |
-| `--fresh` | Esquece o progresso de retomada em `.millionsend/migrate-state.json` e lê tudo de novo. Os ids criados por execuções anteriores são mantidos, então o `rollback` continua funcionando. |
+| `--fresh` | Esquece o progresso de retomada em `.mepmail/migrate-state.json` e lê tudo de novo. Os ids criados por execuções anteriores são mantidos, então o `rollback` continua funcionando. |
 | `--out <file>` | `migrate plan`: grava o plano como JSON. |
 | `--report <file>` | Grava também o relatório em Markdown neste caminho. |
 | `-y`, `--yes` | Pula confirmações. |
@@ -91,15 +91,15 @@ Nomes de recurso para `--only` e `--skip`, na ordem de aplicação: `domains`,
 | Variável | Significado |
 | --- | --- |
 | `RESEND_API_KEY` | Chave de API de origem, acesso total. A ferramenta só lê do Resend. |
-| `MILLIONSEND_API_KEY` | Chave de API do MepMail, acesso total. |
-| `MILLIONSEND_BASE_URL` | URL da API de uma instância auto-hospedada, igual a `--to-url`. Sem ela, MepMail Cloud. |
+| `MEPMAIL_API_KEY` | Chave de API do MepMail, acesso total. |
+| `MEPMAIL_BASE_URL` | URL da API de uma instância auto-hospedada, igual a `--to-url`. Sem ela, MepMail Cloud. |
 | `NO_COLOR` | Desativa cores. |
 | `FORCE_COLOR` | Cores mesmo num pipe, o mesmo que `--color always`. |
 | `DO_NOT_TRACK` | Respeitada, sem efeito: a ferramenta não envia telemetria, nunca liga para casa e nunca verifica atualizações. |
 
 Cada chave é resolvida nesta ordem: variável de ambiente, depois a flag
 `-stdin`, depois a flag de argumento, depois — num terminal — um prompt
-mascarado. A URL de destino vem de `MILLIONSEND_BASE_URL` ou `--to-url`; sem
+mascarado. A URL de destino vem de `MEPMAIL_BASE_URL` ou `--to-url`; sem
 nenhuma das duas, um terminal oferece a escolha entre o MepMail Cloud e uma
 URL auto-hospedada, e uma execução não interativa mira o MepMail Cloud,
 como nos SDKs.
@@ -111,18 +111,18 @@ uma chave:
 
 | Arquivo | Conteúdo |
 | --- | --- |
-| `.millionsend/migrate-state.json` | Cada id que a ferramenta criou por recurso, cursores de retomada, o hash do plano. Gravado após cada lote, então uma execução interrompida retoma de onde parou. |
-| `.millionsend/migrate-report.json` | O relatório da última execução como dados. |
-| `.millionsend/migrate-report.md` | O mesmo relatório em Markdown: contagens, o checklist, os registros DNS por domínio, o mapa de ids (ids de tópicos e segmentos na origem → ids no MepMail, para código que os referencia), os itens manuais. |
+| `.mepmail/migrate-state.json` | Cada id que a ferramenta criou por recurso, cursores de retomada, o hash do plano. Gravado após cada lote, então uma execução interrompida retoma de onde parou. |
+| `.mepmail/migrate-report.json` | O relatório da última execução como dados. |
+| `.mepmail/migrate-report.md` | O mesmo relatório em Markdown: contagens, o checklist, os registros DNS por domínio, o mapa de ids (ids de tópicos e segmentos na origem → ids no MepMail, para código que os referencia), os itens manuais. |
 
-`.millionsend/` é acrescentado ao `.gitignore` quando existe um no diretório
+`.mepmail/` é acrescentado ao `.gitignore` quando existe um no diretório
 atual; a ferramenta avisa uma vez.
 
 ## Modelo de segurança
 
 - **Somente leitura na origem.** Toda requisição ao Resend é um `GET` a um
   endpoint documentado, enviada com o `User-Agent`
-  `millionsend-cli/<versão>`. Escritas vão apenas para a sua API do
+  `mepmail-cli/<versão>`. Escritas vão apenas para a sua API do
   MepMail.
 - **As chaves ficam em memória.** Nunca são gravadas em arquivo e são
   redigidas de toda linha de log (`re_…`, `ms_…`, `whsec_…` e headers
@@ -157,18 +157,18 @@ stdin, nunca como argumentos:
 
 ```sh
 export RESEND_API_KEY=re_...
-export MILLIONSEND_API_KEY=ms_...
-export MILLIONSEND_BASE_URL=https://api-mepmail.je4ndev.com   # ou a URL da sua instância
+export MEPMAIL_API_KEY=ms_...
+export MEPMAIL_BASE_URL=https://api-mepmail.je4ndev.com   # ou a URL da sua instância
 
-millionsend migrate plan --from resend --out plan.json
+mepmail migrate plan --from resend --out plan.json
 # saída 2 quando há algo a aplicar
-millionsend migrate apply plan.json --yes
+mepmail migrate apply plan.json --yes
 ```
 
 Ou pelo stdin, primeira linha origem, segunda linha destino:
 
 ```sh
-printf '%s\n%s\n' "$RESEND_KEY" "$MS_KEY" | millionsend migrate plan --from resend --from-key-stdin --to-key-stdin --to-url https://api.sua-instancia
+printf '%s\n%s\n' "$RESEND_KEY" "$MS_KEY" | mepmail migrate plan --from resend --from-key-stdin --to-key-stdin --to-url https://api.sua-instancia
 ```
 
 O progresso é impresso uma linha por passo (`✓`, `✗`, `⟳` com contadores
@@ -183,7 +183,7 @@ pode ser encadeada no `jq` ou salva como artefato. `--json` implica
 `--non-interactive`.
 
 ```sh
-millionsend migrate plan --from resend --json | jq '.counts'
+mepmail migrate plan --from resend --json | jq '.counts'
 ```
 
 ---

@@ -7,7 +7,7 @@ You are migrating an application from Resend to MepMail. MepMail's REST API is w
 - Cloud API base URL: `https://api-mepmail.je4ndev.com`. Self-hosted: the instance's own API origin (ask if it is not in the repo).
 - API keys start with `ms_` and are created in the dashboard under **API keys**. Use a full-access key for the migration and sending-access keys for production senders.
 - Documentation: the docs live in the repository under `apps/docs/content/` — raw markdown is the same path on `raw.githubusercontent.com/JE4NVRG/mepmail/main/`, and the API itself serves its OpenAPI 3.1 spec at `/openapi.json`. The migration guide is https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/prompts/migrate-from-resend.md and the CLI reference is https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/docs/cli.mdx.
-- The migration CLI (`@millionsend/cli`) only ever reads from Resend (`GET` requests), keeps keys in memory, writes them to no file, and sends no telemetry.
+- The migration CLI (`@mepmail/cli`) only ever reads from Resend (`GET` requests), keeps keys in memory, writes them to no file, and sends no telemetry.
 - Ids differ between providers: contacts are matched by email, everything else by name, key, alias or endpoint. The CLI's report carries an id map for topics and segments.
 
 ## Step 1 — Inventory this codebase
@@ -28,21 +28,21 @@ Plan first (read-only; exit code 2 means there are changes, 0 nothing to do, 1 a
 
 ```sh
 export RESEND_API_KEY=re_...
-export MILLIONSEND_API_KEY=ms_...
-export MILLIONSEND_BASE_URL=https://api-mepmail.je4ndev.com   # or the instance's URL
+export MEPMAIL_API_KEY=ms_...
+export MEPMAIL_BASE_URL=https://api-mepmail.je4ndev.com   # or the instance's URL
 
-npx @millionsend/cli migrate plan --from resend --out plan.json
+npx @mepmail/cli migrate plan --from resend --out plan.json
 ```
 
 Show the user the plan summary, including any plan-limit warnings (for example "7 domains to create; the Free plan allows 3"), and wait for approval. Then apply:
 
 ```sh
-npx @millionsend/cli migrate apply plan.json --yes
+npx @mepmail/cli migrate apply plan.json --yes
 ```
 
 Flags worth knowing: `--rps <n>` lowers the read rate against Resend (default 8, Resend allows 10 per team shared with production sending); `--skip enrichment` skips the second per-contact pass for properties and topics; `--include-sent` also imports sent broadcasts as drafts; `--fresh-webhook-secrets` mints new webhook secrets instead of copying them; `--on-conflict skip|error` changes how existing contacts are treated (default upsert).
 
-Afterwards read `.millionsend/migrate-report.md`: counts per resource, the checklist of manual items, the DNS records per domain, and the id map. The tool adds `.millionsend/` to `.gitignore` when one exists; confirm it did.
+Afterwards read `.mepmail/migrate-report.md`: counts per resource, the checklist of manual items, the DNS records per domain, and the id map. The tool adds `.mepmail/` to `.gitignore` when one exists; confirm it did.
 
 ## Step 3 — Point the code at MepMail
 
@@ -73,7 +73,7 @@ MepMail uses its own DKIM keypair, so every domain needs new DNS records even if
 1. Re-run `migrate plan` and `migrate apply` right before switching traffic: runs are diffs, so contacts that arrived in between come across and nothing is duplicated.
 2. Deploy the environment changes from step 3.
 3. Send one email through the new base URL and confirm it reaches **Delivered** on the Emails page; confirm a webhook delivery arrives at the receiver.
-4. Keep the Resend account untouched until the user is confident. If something must be undone on the MepMail side, `npx @millionsend/cli migrate rollback` deletes only what the tool created, after listing it and asking.
+4. Keep the Resend account untouched until the user is confident. If something must be undone on the MepMail side, `npx @mepmail/cli migrate rollback` deletes only what the tool created, after listing it and asking.
 
 ## Rules
 

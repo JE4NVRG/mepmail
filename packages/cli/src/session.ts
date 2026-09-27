@@ -9,7 +9,7 @@ import {
 import type { Context } from "./context.js";
 import { AuthError, createHttp } from "./http.js";
 import { CLOUD_API_URL, USER_AGENT, VERSION } from "./meta.js";
-import { createMepMailTarget, type MepMailTarget } from "./millionsend.js";
+import { createMepMailTarget, type MepMailTarget } from "./mepmail-target.js";
 import { type ProviderId, RESOURCES, type Resource, type TargetUsage } from "./model.js";
 import type { Progress, StepHandle } from "./progress.js";
 import { type OnProgress, type Provider, providers, type Source } from "./providers/index.js";
@@ -37,7 +37,7 @@ export function printHeader(ctx: Context, text: string): void {
   const { out } = ctx;
   const tier = pickBannerTier(out.columns ?? 0, out.isTTY === true);
   if (tier === "plain") {
-    out.write(`${wrapIndent(`millionsend ${VERSION} — ${text}`, { hanging: "  " })}\n\n`);
+    out.write(`${wrapIndent(`mepmail ${VERSION} — ${text}`, { hanging: "  " })}\n\n`);
     return;
   }
   for (const line of banner(tier)) out.write(`${line}\n`);

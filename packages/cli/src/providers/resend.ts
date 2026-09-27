@@ -20,7 +20,7 @@ export const RESEND_BASE_URL = "https://api.resend.com";
  * not RESEND_BASE_URL: that is what users set in their app to point Resend
  * SDKs at MepMail, and it must never redirect this tool's Resend key.
  */
-export const RESEND_BASE_URL_ENV = "MILLIONSEND_CLI_RESEND_URL";
+export const RESEND_BASE_URL_ENV = "MEPMAIL_CLI_RESEND_URL";
 
 export const resendBaseUrl = (env: NodeJS.ProcessEnv = process.env): string => {
   const override = env[RESEND_BASE_URL_ENV];
