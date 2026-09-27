@@ -1,0 +1,131 @@
+{
+  "meta": {
+    "title": "MepMail — E-mail transacional com API compatível com Resend",
+    "description": "E-mail transacional com onboarding assistido no Brasil. Compare planos MepMail, envie pela API compatível com Resend ou relay SMTP e crie sua conta grátis no beta."
+  },
+  "skip": "Pular para o conteúdo",
+  "brandAria": "MepMail — início",
+  "navAria": "Navegação principal",
+  "nav": {
+    "compare": "Comparar preços",
+    "plans": "Planos",
+    "how": "Como funciona",
+    "login": "Entrar",
+    "signup": "Criar conta"
+  },
+  "lang": {
+    "aria": "Idioma da página"
+  },
+  "hero": {
+    "eyebrow": "E-mail transacional para quem constrói produtos no Brasil <badge>Beta · 100 contas grátis</badge>",
+    "title": "Mesma API do Resend. <highlight>Até 60% mais barato.</highlight>",
+    "lead": "Envie e-mails transacionais com API HTTPS compatível com o Resend ou relay SMTP. Nós ajudamos a configurar seu domínio, DKIM e MAIL FROM. Planos em USD, atendimento em português e implantação assistida.",
+    "ctaSignup": "Criar conta grátis",
+    "ctaPlans": "Ver planos",
+    "note": "Beta aberto: 100 contas grátis, teto de 100 e-mails por dia em cada uma. Crie a sua em 1 minuto — sem cartão."
+  },
+  "compare": {
+    "eyebrow": "Preço sem adivinhação",
+    "title": "Compare pelo volume que você realmente envia.",
+    "intro": "Os valores abaixo comparam o menor plano que cobre cada volume mensal. A economia varia por faixa e fornecedor; confirme condições atuais antes de contratar.",
+    "tableAria": "Comparativo de preços por volume",
+    "columns": ["Envios/mês", "MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "Vantagem"],
+    "slideNote": "Deslize a tabela para ver todos os fornecedores em telas menores.",
+    "refNote": "Referência da análise comercial de 27/09/2026; preços públicos de terceiros podem mudar e condições/recursos não são equivalentes. Valores em USD por mês, sem impostos ou excedentes. “(vendas)” indica cotação comercial, não preço público."
+  },
+  "structure": {
+    "eyebrow": "Nossa estrutura",
+    "title": "Menos camadas entre sua aplicação e a entrega.",
+    "body": "Operamos nossa própria camada de API, relay e painel sobre o Amazon SES. O envio é contratado à la carte, sem repassar a estrutura de preços de um intermediário. É assim que oferecemos preços menores sem vender uma cópia de todas as funcionalidades de outros provedores.",
+    "points": [
+      "Infraestrutura de operação própria: API, relay e painel MepMail.",
+      "Envio via Amazon SES à la carte.",
+      "Implantação acompanhada, sem intermediário de atendimento."
+    ]
+  },
+  "plans": {
+    "eyebrow": "Planos",
+    "title": "Escolha o volume. Nós ajudamos na configuração.",
+    "intro": "Todos os planos incluem onboarding assistido e suporte em português. Preços mensais em USD; para os primeiros clientes, cobrança via PIX em BRL pela cotação do dia.",
+    "perMonth": "/mês",
+    "limitsLabel": "Workspaces e limites",
+    "overageLabel": "Excedente",
+    "attachmentLabel": "Anexos por mensagem",
+    "cta": "Começar grátis",
+    "items": [
+      { "volume": "100/dia (~3k/mês)", "limits": "1 domínio · 1 workspace · 1.000 contatos", "overage": "para no cap", "attachment": "1 MB" },
+      { "volume": "1.500/dia (~45k/mês)", "limits": "3 domínios · 2 workspaces · 10.000 contatos", "overage": "para no cap", "attachment": "1 MB" },
+      { "volume": "100.000/mês", "limits": "10 domínios · 5 workspaces · contatos ilimitados", "overage": "US$ 0,30/1k", "attachment": "5 MB" },
+      { "volume": "200.000/mês", "limits": "10 domínios · 5 workspaces · contatos ilimitados", "overage": "US$ 0,30/1k", "attachment": "5 MB" },
+      { "volume": "500.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,25/1k", "attachment": "10 MB" },
+      { "volume": "1.000.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,20/1k", "attachment": "10 MB" },
+      { "volume": "1.500.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,18/1k", "attachment": "10 MB" },
+      { "volume": "2.500.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,16/1k", "attachment": "10 MB" }
+    ],
+    "note": "Free e Starter têm limite diário (UTC); o volume mensal é apenas ilustrativo. Em Pro e Scale, o excedente por 1.000 depende de habilitação no provisionamento; sem ele, os envios param na cota. Mesmo com excedente habilitado, vale o teto de segurança de 5× o volume incluído.",
+    "offerProactive": "<strong>Gestão proativa opcional: +US$ 29/mês.</strong> Inclui monitoramento de reputação, ajustes de DNS/entregabilidade e prioridade de atendimento. Sem gestão, você continua com onboarding assistido e suporte. Sem fidelidade.",
+    "offerFirst3": "<strong>Para os 3 primeiros clientes: setup grátis e 2 meses de gestão grátis.</strong> Crie sua conta grátis e fale com a gente para garantir a sua.",
+    "noteAttach": "Limite por e-mail: tamanho total dos anexos após decodificação, não por arquivo."
+  },
+  "how": {
+    "eyebrow": "Implantação assistida",
+    "title": "Da conversa ao primeiro envio, com ajuda de quem construiu.",
+    "items": [
+      "Crie sua conta grátis e conte como você envia hoje. Indicamos o degrau certo e acompanhamos a migração.",
+      "Configuramos seu domínio de envio com você: registros DNS para DKIM e MAIL FROM, verificação e chave de API dedicada ou credenciais do relay SMTP.",
+      "Faça um envio de teste pela API ou pelo relay. Você acompanha logs, domínios, supressões e métricas no painel MepMail."
+    ],
+    "note": "A configuração assistida costuma levar cerca de 15 minutos depois que você tem acesso ao DNS; a propagação e a verificação do domínio podem levar mais tempo. A verificação automática roda a cada 15 minutos."
+  },
+  "deliverability": {
+    "eyebrow": "Entregabilidade e integração",
+    "title": "Sua identidade de envio, sua integração.",
+    "body": "Cada cliente usa um domínio de envio próprio verificado com DKIM e MAIL FROM no Amazon SES, com reputação isolada. Escolha a API HTTPS compatível com chamadas de envio do Resend, com base URL <api>api-mepmail.je4ndev.com</api>, ou o relay SMTP com STARTTLS em <smtp>smtp-mepmail.je4ndev.com:2587</smtp>. A chave de API é dedicada à sua operação.",
+    "note": "Compatibilidade de API não significa paridade de recursos: inbound, IP dedicado e SSO não fazem parte desta promessa. A entrega na caixa de entrada depende também do domínio, do conteúdo e da reputação de envio."
+  },
+  "faq": {
+    "eyebrow": "Perguntas frequentes",
+    "title": "Perguntas antes de migrar",
+    "items": [
+      {
+        "q": "Já uso Resend. Preciso reescrever minha integração?",
+        "a": "Para os fluxos de envio compatíveis, você pode manter o SDK oficial do Resend e trocar a base URL e a chave. Revisamos sua integração na migração para identificar recursos que não são equivalentes. Não prometemos paridade total de funcionalidades."
+      },
+      {
+        "q": "Vocês garantem entrega na caixa de entrada?",
+        "a": "Não. Configuramos DKIM e MAIL FROM no domínio de envio e acompanhamos a reputação, mas a classificação final depende dos provedores de destino, do seu conteúdo e do histórico do domínio. Não existe garantia honesta de caixa de entrada."
+      },
+      {
+        "q": "Existe fidelidade ou multa para cancelar?",
+        "a": "Não há fidelidade. Você pode pedir o cancelamento sem multa; combinamos o encerramento dos envios e a retirada das configurações de DNS quando aplicável."
+      },
+      {
+        "q": "Qual o limite de anexos?",
+        "a": "O limite total por mensagem é de 1 MB no Free e Starter, 5 MB no Pro e 10 MB no Scale. Vale para a soma dos anexos decodificados, não para cada arquivo separadamente."
+      },
+      {
+        "q": "O que acontece quando passo da cota?",
+        "a": "No Free e Starter, os envios param no limite diário. Nos planos Pro e Scale, com excedente habilitado, os envios adicionais são cobrados pela tarifa de cada plano por 1.000 e respeitam o teto de segurança de 5× o volume incluído; sem excedente habilitado, param na cota mensal. Se você prevê aumento de volume, fale conosco antes."
+      },
+      {
+        "q": "O suporte é em português?",
+        "a": "Sim. O onboarding é assistido e o suporte é direto em português com quem construiu o produto. A gestão proativa é opcional e adiciona monitoramento, ajustes e prioridade de atendimento."
+      },
+      {
+        "q": "Como funciona o beta?",
+        "a": "O beta é limitado a 100 contas grátis, cada uma com teto de 100 e-mails por dia no plano Free. Quando as vagas acabam, novos cadastros pausam até a próxima leva; para volume maior, fale com a gente e combinamos o plano."
+      }
+    ]
+  },
+  "close": {
+    "title": "Vamos encontrar o plano para o seu volume?",
+    "body": "Crie sua conta grátis, faça seus primeiros envios e conte como você envia hoje — na migração, a gente vai junto.",
+    "cta": "Criar conta grátis"
+  },
+  "footer": {
+    "navAria": "Rodapé",
+    "tagline": "MepMail · E-mail transacional com implantação assistida no Brasil",
+    "login": "Entrar",
+    "contact": "Contato"
+  }
+}

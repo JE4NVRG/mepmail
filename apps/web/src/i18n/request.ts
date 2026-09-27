@@ -1,6 +1,12 @@
 import { cookies, headers } from "next/headers";
 import { getRequestConfig } from "next-intl/server";
-import { type AppLocale, DEFAULT_LOCALE, LOCALE_COOKIE, LOCALES, pickLocale } from "@/lib/locale-cookie";
+import {
+  type AppLocale,
+  DEFAULT_LOCALE,
+  LOCALE_COOKIE,
+  LOCALES,
+  pickLocale,
+} from "@/lib/locale-cookie";
 
 export { type AppLocale, DEFAULT_LOCALE, LOCALE_COOKIE, LOCALES };
 
@@ -12,6 +18,7 @@ const NAMESPACES = [
   "broadcasts",
   "console",
   "deliverability",
+  "landing",
   "nav",
   "emails",
   "bounce-guidance",

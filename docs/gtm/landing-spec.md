@@ -73,7 +73,7 @@ Fonte de verdade da oferta e dos comparativos: `JE4NDEV-Memory-Vault/02_Projects
 ### 6. Entregabilidade e integração
 
 - H2: «Sua identidade de envio, sua integração.»
-- Texto: «Cada cliente usa um domínio de envio próprio verificado com DKIM e MAIL FROM no Amazon SES, com reputação isolada. Escolha a API HTTPS compatível com chamadas de envio do Resend, com base URL `api-mepmail.je4ndev.com`, ou o relay SMTP com STARTTLS em `smtp-mepmail.agenciamep.com:2587`. A chave de API é dedicada à sua operação.»
+- Texto: «Cada cliente usa um domínio de envio próprio verificado com DKIM e MAIL FROM no Amazon SES, com reputação isolada. Escolha a API HTTPS compatível com chamadas de envio do Resend, com base URL `api-mepmail.je4ndev.com`, ou o relay SMTP com STARTTLS em `smtp-mepmail.je4ndev.com:2587`. A chave de API é dedicada à sua operação.»
 - Nota: «Compatibilidade de API não significa paridade de recursos: inbound, IP dedicado e SSO não fazem parte desta promessa. A entrega na caixa de entrada depende também do domínio, do conteúdo e da reputação de envio.»
 
 ### 7. Perguntas frequentes

@@ -403,6 +403,46 @@
   vertical-align: middle;
   white-space: nowrap;
 }
+.gtm-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-inline-end: 4px;
+  border: 0;
+  padding: 0;
+}
+.gtm-lang legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.gtm-lang button {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+}
+.gtm-lang button:hover {
+  opacity: 1;
+}
+.gtm-lang button.is-current {
+  opacity: 1;
+  font-weight: 600;
+}
+.gtm-lang button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
 @media (prefers-reduced-motion: reduce) {
   .gtm .ms-btn {
     transition: none;
