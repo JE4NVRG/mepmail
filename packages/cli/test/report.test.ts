@@ -15,7 +15,7 @@ const report: Report = {
   finishedAt: "2026-09-01T00:00:00.000Z",
   source: "resend",
   sourceLabel: "Resend",
-  target: { baseUrl: "https://api.millionsend.com", cloud: true, plan: "free" },
+  target: { baseUrl: "https://api-mepmail.je4ndev.com", cloud: true, plan: "free" },
   counts: {},
   sourceReadOnly: true,
   freshWebhookSecrets: [],
@@ -139,7 +139,7 @@ describe("printSummary layout", () => {
     // Prose wraps at the layout width (80 here); the words and their order are what matter.
     const prose = text.replace(/\n/g, " ");
     expect(prose).toContain(
-      " Run `millionsend migrate --from resend` again right before cutover to sync new contacts. ",
+      " Run `mepmail migrate --from resend` again right before cutover to sync new contacts. ",
     );
     expect(prose).toContain("Upgrade: https://app.example.test:3000/settings/billing ");
     for (const l of text.split("\n")) expect(l.length).toBeLessThanOrEqual(80);
