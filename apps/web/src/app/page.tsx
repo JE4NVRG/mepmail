@@ -9,10 +9,10 @@ const contact = "mailto:jean@je4ndev.com";
 
 const comparison = [
   ["100k", "US$ 20", "US$ 35", "US$ 34,95", "US$ 115", "US$ 90", "43%"],
-  ["200k", "US$ 69", "US$ 160", "US$ 249", "US$ 245", "US$ 215", "57–72%"],
-  ["500k", "US$ 159", "US$ 350", "US$ 499", "US$ 455", "US$ 400", "55–68%"],
-  ["1M", "US$ 259", "US$ 650", "US$ 799", "US$ 775", "US$ 700", "60–68%"],
-  ["1,5M", "US$ 369", "US$ 825", "US$ 799", "US$ 775", "US$ 700", "47–55%"],
+  ["200k", "US$ 100", "US$ 160", "US$ 249", "US$ 245", "US$ 215", "38–60%"],
+  ["500k", "US$ 199", "US$ 350", "US$ 499", "US$ 455", "US$ 400", "43–60%"],
+  ["1M", "US$ 319", "US$ 650", "US$ 799", "US$ 775", "US$ 700", "51–60%"],
+  ["1,5M", "US$ 429", "US$ 825", "US$ 799", "US$ 775", "US$ 700", "39–48%"],
   ["2,5M", "US$ 549", "US$ 1.150", "US$ 1.099", "(vendas)", "US$ 1.250", "50–56%"],
 ] as const;
 
@@ -22,10 +22,10 @@ const plans = [
   { name: "Free", price: "US$ 0" },
   { name: "Starter", price: "US$ 9" },
   { name: "Pro 100K", price: "US$ 20" },
-  { name: "Pro 200K", price: "US$ 69" },
-  { name: "Scale 500K", price: "US$ 159" },
-  { name: "Scale 1M", price: "US$ 259" },
-  { name: "Scale 1.5M", price: "US$ 369" },
+  { name: "Pro 200K", price: "US$ 100" },
+  { name: "Scale 500K", price: "US$ 199" },
+  { name: "Scale 1M", price: "US$ 319" },
+  { name: "Scale 1.5M", price: "US$ 429" },
   { name: "Scale 2.5M", price: "US$ 549" },
 ] as const;
 

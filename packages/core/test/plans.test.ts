@@ -61,10 +61,10 @@ describe("PLAN_RUNGS", () => {
       ["free", "free", 100, "day", 0, null],
       ["starter", "starter", 1_500, "day", 900, null],
       ["pro_100k", "pro", 100_000, "month", 2_000, 30],
-      ["pro_200k", "pro", 200_000, "month", 6_900, 30],
-      ["scale_500k", "scale", 500_000, "month", 15_900, 25],
-      ["scale_1m", "scale", 1_000_000, "month", 25_900, 20],
-      ["scale_1_5m", "scale", 1_500_000, "month", 36_900, 18],
+      ["pro_200k", "pro", 200_000, "month", 10_000, 30],
+      ["scale_500k", "scale", 500_000, "month", 19_900, 25],
+      ["scale_1m", "scale", 1_000_000, "month", 31_900, 20],
+      ["scale_1_5m", "scale", 1_500_000, "month", 42_900, 18],
       ["scale_2_5m", "scale", 2_500_000, "month", 54_900, 16],
     ]);
   });
