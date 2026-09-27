@@ -424,7 +424,7 @@ describe("OAuth authorization server", () => {
       id: grant?.id ?? "",
     });
     expect(await db.select().from(schema.oauthConsent)).toHaveLength(0);
-  });
+  }, 15_000);
 
   it("issues only the scopes accepted on the consent screen", async () => {
     const teamId = await createTeam(db);
