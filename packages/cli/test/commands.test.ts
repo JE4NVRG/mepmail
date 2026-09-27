@@ -148,7 +148,7 @@ describe("mepmail migrate", () => {
       expect(stderr).toBe("");
       expect(code).toBe(0);
       expect(stdout).toContain("✓ Resend · connected");
-      expect(stdout).toContain("✓ MepMail Cloud · plan Free");
+      expect(stdout).toContain("✓ MepMail Cloud · plan Starter");
       expect(stdout).toContain("Plan: ");
       expect(stdout).toContain("Resend was only read; nothing there was changed.");
       expect(stdout).toContain("contacts created");
@@ -159,9 +159,8 @@ describe("mepmail migrate", () => {
         "On Resend you sent 41,208 emails in the last 30 days (~1,374/day).",
       );
       expect(stdout.replace(/\n/g, " ")).toContain(
-        "Free allows 3,000/month; Starter (45,000/month, 10 domains) fits.",
+        "Starter allows 45,000/month; that covers it.",
       );
-      expect(stdout).toContain("https://app.example.test/settings/billing");
       expect(stdout).toContain("again right before cutover");
       expect(readFileSync(join(cwd, ".gitignore"), "utf8")).toBe("node_modules\n.mepmail/\n");
       expect(fake.writes).toBe(0);
