@@ -6,7 +6,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JE4NVRG/mepmail",
+    "url": "git+https://github.com/JE4NVRG/mepmail.git",
     "directory": "packages/mcp"
   },
   "bin": {
