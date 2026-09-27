@@ -55,10 +55,10 @@
     "items": [
       { "volume": "100/dia (~3k/mês)", "limits": "1 domínio · 1 workspace · 1.000 contatos", "overage": "para no cap", "attachment": "1 MB" },
       { "volume": "1.500/dia (~45k/mês)", "limits": "3 domínios · 2 workspaces · 10.000 contatos", "overage": "para no cap", "attachment": "1 MB" },
-      { "volume": "100.000/mês", "limits": "10 domínios · 5 workspaces · contatos ilimitados", "overage": "US$ 0,30/1k", "attachment": "5 MB" },
-      { "volume": "200.000/mês", "limits": "10 domínios · 5 workspaces · contatos ilimitados", "overage": "US$ 0,30/1k", "attachment": "5 MB" },
+      { "volume": "100.000/mês", "limits": "10 domínios · 5 workspaces · contatos ilimitados", "overage": "US$ 0,90/1k", "attachment": "5 MB" },
+      { "volume": "200.000/mês", "limits": "10 domínios · 5 workspaces · contatos ilimitados", "overage": "US$ 0,35/1k", "attachment": "5 MB" },
       { "volume": "500.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,25/1k", "attachment": "10 MB" },
-      { "volume": "1.000.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,20/1k", "attachment": "10 MB" },
+      { "volume": "1.000.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,23/1k", "attachment": "10 MB" },
       { "volume": "1.500.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,18/1k", "attachment": "10 MB" },
       { "volume": "2.500.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,16/1k", "attachment": "10 MB" }
     ],

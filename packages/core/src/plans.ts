@@ -83,7 +83,7 @@ export const PLAN_RUNGS = [
     included: 100_000,
     period: "month",
     priceCents: 2_000,
-    overageCentsPer1k: 30,
+    overageCentsPer1k: 90,
   },
   {
     key: "pro_200k",
@@ -91,7 +91,7 @@ export const PLAN_RUNGS = [
     included: 200_000,
     period: "month",
     priceCents: 10_000,
-    overageCentsPer1k: 30,
+    overageCentsPer1k: 35,
   },
   {
     key: "scale_500k",
@@ -107,7 +107,7 @@ export const PLAN_RUNGS = [
     included: 1_000_000,
     period: "month",
     priceCents: 31_900,
-    overageCentsPer1k: 20,
+    overageCentsPer1k: 23,
   },
   {
     key: "scale_1_5m",
