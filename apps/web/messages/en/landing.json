@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "MepMail — Transactional email with a Resend-compatible API",
-    "description": "Transactional email with assisted onboarding in Brazil. Compare MepMail plans, send through the Resend-compatible API or the SMTP relay, and create your free beta account."
+    "description": "Transactional email with a Resend-compatible API. Compare MepMail plans, send through the API or the SMTP relay, and create your free beta account."
   },
   "skip": "Skip to content",
   "brandAria": "MepMail — home",
@@ -17,9 +17,9 @@
     "aria": "Page language"
   },
   "hero": {
-    "eyebrow": "Transactional email for people building products in Brazil <badge>Beta · 100 free accounts</badge>",
+    "eyebrow": "Transactional email for people building products <badge>Beta · 100 free accounts</badge>",
     "title": "The same Resend API. <highlight>Up to 60% cheaper.</highlight>",
-    "lead": "Send transactional email with a Resend-compatible HTTPS API or the SMTP relay. We help you set up your domain, DKIM and MAIL FROM. USD pricing, support in Portuguese and assisted deployment.",
+    "lead": "Send transactional email with a Resend-compatible HTTPS API or the SMTP relay. We help you set up your domain, DKIM and MAIL FROM. USD pricing and assisted deployment.",
     "ctaSignup": "Create free account",
     "ctaPlans": "See plans",
     "note": "Open beta: 100 free accounts, each capped at 100 emails per day. Create yours in one minute — no card required.",
@@ -27,7 +27,7 @@
       "Resend-compatible API",
       "SMTP relay with STARTTLS",
       "DKIM and MAIL FROM on your domain",
-      "Support in Portuguese"
+      "Assisted onboarding"
     ],
     "demo": {
       "subject": "Hello from MepMail",
@@ -70,7 +70,7 @@
   "plans": {
     "eyebrow": "Plans",
     "title": "Pick your volume. We help with the setup.",
-    "intro": "Every plan includes assisted onboarding and support in Portuguese. Monthly prices in USD; for the first customers, billing via PIX in BRL at the day's exchange rate.",
+    "intro": "Every plan includes assisted onboarding and support. Monthly prices in USD, billed monthly, no lock-in.",
     "perMonth": "/month",
     "limitsLabel": "Workspaces and limits",
     "overageLabel": "Overage",
@@ -94,7 +94,7 @@
       "items": [
         "Free assisted setup for the first 3 customers.",
         "2 months of free proactive management: reputation, DNS/deliverability and priority support.",
-        "Billing via PIX in BRL at the day's rate — no international card."
+        "A direct line to the team that builds the product."
       ],
       "note": "After the founder period, proactive management stays optional at +US$ 29/month. No lock-in: cancel anytime.",
       "cta": "Claim my spot"
@@ -142,8 +142,8 @@
         "a": "On Free and Starter, sending stops at the daily limit. On Pro and Scale, with overage enabled, extra sends are billed at each plan's per-1,000 rate and respect the safety ceiling of 5× the included volume; without overage enabled, they stop at the monthly quota. If you expect volume growth, talk to us first."
       },
       {
-        "q": "Is support in Portuguese?",
-        "a": "Yes. Onboarding is assisted and support is direct, in Portuguese, with the people who built the product. Proactive management is optional and adds monitoring, tuning and priority handling."
+        "q": "Do I need a credit card to start?",
+        "a": "No. The beta is free — create your account and send your first emails without adding a payment method. Paid plans are billed monthly in USD."
       },
       {
         "q": "How does the beta work?",
@@ -158,7 +158,7 @@
   },
   "footer": {
     "navAria": "Footer",
-    "tagline": "MepMail · Transactional email with assisted onboarding in Brazil",
+    "tagline": "MepMail · Transactional email with assisted onboarding",
     "login": "Sign in",
     "contact": "Contact"
   }
