@@ -8,6 +8,7 @@ import { captchaHeaders, useTurnstile } from "@/components/turnstile";
 import { authClient } from "@/lib/auth-client";
 import { safeNextPath } from "@/lib/nav";
 import { passwordStrength } from "@/lib/password-strength";
+import { signupFieldMismatch } from "@/lib/signup-validation";
 import styles from "./auth.module.css";
 import { AuthScreen } from "./auth-screen";
 import { SilkCanvas } from "./silk-canvas";
@@ -30,6 +31,27 @@ export function StrengthMeter({ password }: { password: string }) {
       </div>
       <span className={styles.strengthLabel}>{t(STRENGTH_KEYS[score])}</span>
     </div>
+  );
+}
+
+/** Show/hide glyph for the password fields: open eye, or struck when revealed. */
+function EyeGlyph({ off }: { off: boolean }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="2.6" />
+      {off ? <path d="m4 4 16 16" /> : null}
+    </svg>
   );
 }
 
@@ -77,6 +99,11 @@ export function AuthForm({
   // An invite link carries the invited address; signup starts from it.
   const [email, setEmail] = useState(mode === "signup" ? (params.get("email") ?? "") : "");
   const [password, setPassword] = useState("");
+  // Signup only: the two confirmation entries and the show/hide eyes.
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [revealPassword, setRevealPassword] = useState(false);
+  const [revealConfirm, setRevealConfirm] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(
     socialFailed ? tSocial("error") : null,
   );
@@ -101,6 +128,13 @@ export function AuthForm({
       setPasswordShown(true);
       requestAnimationFrame(() => passwordRef.current?.focus());
       return;
+    }
+    if (mode === "signup") {
+      const mismatch = signupFieldMismatch({ email, confirmEmail, password, confirmPassword });
+      if (mismatch) {
+        setErrorMessage(t(mismatch));
+        return;
+      }
     }
     setPending("email");
     setErrorMessage(null);
@@ -307,6 +341,21 @@ export function AuthForm({
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
+          {mode === "signup" ? (
+            <div className={`ms-field ${styles.field}`}>
+              <label htmlFor="confirm-email">{t("confirmEmail")}</label>
+              <input
+                id="confirm-email"
+                type="email"
+                className={`ms-input ${styles.control}`}
+                autoComplete="email"
+                placeholder={t("confirmEmailPlaceholder")}
+                required
+                value={confirmEmail}
+                onChange={(e) => setConfirmEmail(e.target.value)}
+              />
+            </div>
+          ) : null}
           {passwordShown ? (
             <div className={`ms-field ${styles.field}`}>
               <div className={styles.labelRow}>
@@ -324,19 +373,57 @@ export function AuthForm({
                   </Link>
                 ) : null}
               </div>
-              <input
-                ref={passwordRef}
-                id="password"
-                type="password"
-                className={`ms-input ${styles.control}`}
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
-                placeholder={t("passwordPlaceholder")}
-                required
-                minLength={mode === "signup" ? 8 : undefined}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div className={styles.passwordWrap}>
+                <input
+                  ref={passwordRef}
+                  id="password"
+                  type={revealPassword ? "text" : "password"}
+                  className={`ms-input ${styles.control}`}
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  placeholder={t("passwordPlaceholder")}
+                  required
+                  minLength={mode === "signup" ? 8 : undefined}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className={styles.eye}
+                  aria-pressed={revealPassword}
+                  aria-label={revealPassword ? t("hidePassword") : t("showPassword")}
+                  onClick={() => setRevealPassword((v) => !v)}
+                >
+                  <EyeGlyph off={revealPassword} />
+                </button>
+              </div>
               {mode === "signup" ? <StrengthMeter password={password} /> : null}
+            </div>
+          ) : null}
+          {mode === "signup" ? (
+            <div className={`ms-field ${styles.field}`}>
+              <label htmlFor="confirm-password">{t("confirmPassword")}</label>
+              <div className={styles.passwordWrap}>
+                <input
+                  id="confirm-password"
+                  type={revealConfirm ? "text" : "password"}
+                  className={`ms-input ${styles.control}`}
+                  autoComplete="new-password"
+                  placeholder={t("confirmPasswordPlaceholder")}
+                  required
+                  minLength={8}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className={styles.eye}
+                  aria-pressed={revealConfirm}
+                  aria-label={revealConfirm ? t("hidePassword") : t("showPassword")}
+                  onClick={() => setRevealConfirm((v) => !v)}
+                >
+                  <EyeGlyph off={revealConfirm} />
+                </button>
+              </div>
             </div>
           ) : null}
           {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}

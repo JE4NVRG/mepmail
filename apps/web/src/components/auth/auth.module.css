@@ -225,3 +225,35 @@
   text-align: center;
   line-height: 1.6;
 }
+
+/* Password fields: the show/hide eye pinned inside the control. */
+.passwordWrap {
+  position: relative;
+}
+
+.passwordWrap input {
+  padding-right: 38px;
+}
+
+.eye {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.eye:hover,
+.eye:focus-visible {
+  opacity: 1;
+}
