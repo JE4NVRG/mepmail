@@ -96,6 +96,36 @@ Save in the project, or in `~/.cursor/mcp.json` for every project.
 Self-hosted: replace `https://api-mepmail.je4ndev.com/mcp` with your instance's
 server URL from above.
 
+## Local server (stdio)
+
+Clients that launch local servers from config — Claude Desktop's config file,
+Cursor's `mcp.json`, Codex, any stdio client — can run the
+[`@millionsend/mcp`](https://www.npmjs.com/package/@millionsend/mcp) package
+instead of bridging to the HTTP endpoint. It runs on your machine and reaches
+this instance's REST API directly with a team API key: no OAuth, no browser
+step.
+
+```json title="claude_desktop_config.json"
+{
+  "mcpServers": {
+    "mepmail": {
+      "command": "npx",
+      "args": ["-y", "@millionsend/mcp"],
+      "env": {
+        "MILLIONSEND_API_KEY": "ms_...",
+        "MILLIONSEND_BASE_URL": "https://api-mepmail.je4ndev.com"
+      }
+    }
+  }
+}
+```
+
+Create the key under **API keys** in the dashboard. The tools mirror the key's
+reach exactly — a sending-access key sends and reports `restricted_api_key` on
+reads, same as the REST API. Tool names and the `untrusted_data` result
+envelope match the hosted server, so prompts and integrations move between the
+two unchanged.
+
 ## Authentication
 
 The MCP server uses OAuth, not API keys. On first connect the client opens

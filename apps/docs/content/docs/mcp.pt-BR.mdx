@@ -97,6 +97,36 @@ Salve no projeto, ou em `~/.cursor/mcp.json` para todos os projetos.
 Auto-hospedado: troque `https://api-mepmail.je4ndev.com/mcp` pela URL do servidor
 da sua instância, mostrada acima.
 
+## Servidor local (stdio)
+
+Clientes que iniciam servidores locais pela configuração — o arquivo do Claude
+Desktop, o `mcp.json` do Cursor, Codex, qualquer cliente stdio — podem rodar o
+pacote [`@millionsend/mcp`](https://www.npmjs.com/package/@millionsend/mcp) em
+vez de fazer ponte para o endpoint HTTP. Ele roda na sua máquina e fala direto
+com a API REST desta instância usando uma chave de API do time: sem OAuth, sem
+etapa no navegador.
+
+```json title="claude_desktop_config.json"
+{
+  "mcpServers": {
+    "mepmail": {
+      "command": "npx",
+      "args": ["-y", "@millionsend/mcp"],
+      "env": {
+        "MILLIONSEND_API_KEY": "ms_...",
+        "MILLIONSEND_BASE_URL": "https://api-mepmail.je4ndev.com"
+      }
+    }
+  }
+}
+```
+
+Crie a chave em **Chaves de API** no dashboard. As ferramentas espelham
+exatamente o alcance da chave — uma chave de envio envia e reporta
+`restricted_api_key` nas leituras, igual à API REST. Os nomes das ferramentas e
+o envelope `untrusted_data` dos resultados batem com o servidor hospedado, então
+prompts e integrações migram entre os dois sem mudança.
+
 ## Autenticação
 
 O servidor MCP usa OAuth, não chaves de API. Na primeira conexão o cliente
