@@ -1,0 +1,948 @@
+---
+title: Auto-hospedagem
+description: Implante o MepMail na sua própria infraestrutura com Docker Compose e sua própria conta AWS SES.
+---
+
+O MepMail auto-hospedado envia pela sua própria conta AWS SES. Uma
+implantação são dois contêineres: Postgres e um contêiner de app rodando a
+API (porta 3001), o worker e o painel web (porta 3000). Um terceiro contêiner
+opcional roda o relay SMTP (porta 2587). (Prefere não operar infraestrutura?
+O [MepMail Cloud](https://mepmail.je4ndev.com) é a mesma plataforma,
+hospedada.)
+
+**Pré-requisitos:** Docker com Compose; uma conta AWS com acesso ao SES na
+região escolhida (contas em sandbox só enviam para destinatários
+verificados — solicite acesso de produção para enviar a qualquer um); um
+domínio de envio que você controla. A verificação do domínio (registros DKIM)
+é feita pelo painel depois do boot.
+
+## Início rápido (build a partir do código)
+
+Clone o fork do MepMail e use o arquivo Compose da raiz, que constrói a imagem
+localmente a partir do código obtido:
+
+```sh
+git clone https://github.com/JE4NVRG/mepmail.git mepmail
+cd mepmail
+cp .env.example .env
+```
+
+Preencha o `.env` (veja a [referência de ambiente](#referência-de-ambiente) —
+todo o resto tem padrões que funcionam localmente), depois:
+
+```sh
+docker compose up --build -d
+```
+
+O caminho de instalação suportado por este fork é o build local a partir do
+código-fonte. O pacote `@millionsend/setup` no npm e as imagens referenciadas
+por `deploy/docker-compose.yml` não são canais de release suportados para este
+fork.
+
+As migrações rodam automaticamente no boot. Painel: `http://localhost:3000`.
+API: `http://localhost:3001`.
+
+## Atualizações
+
+```sh
+git pull --ff-only
+docker compose up --build -d
+```
+
+As migrações rodam no boot, então, para uma instância pequena, a atualização é
+só isso. Fixe a revisão Git implantada quando precisar de uma release ou
+rollback reproduzível. As migrações de schema só andam para frente, então faça
+um dump antes de um salto grande ([Backups](#backups)); uma revisão anterior
+pode não subir em um schema mais novo.
+
+Quando as tabelas ficam grandes (milhões de emails ou contatos), uma migração
+que as reescreve ou indexa leva minutos. As migrações rodam em uma transação
+e seus bloqueios impedem leituras e escritas nas tabelas tocadas até o
+commit, então essa espera é indisponibilidade tanto no boot quanto antes da
+troca. Mesmo assim, rode-a antes da troca, a partir de um contêiner
+descartável, em um horário calmo: uma migração que falha deixa o contêiner
+antigo atendendo em vez de um contêiner que não sobe, e a passagem do boot
+então não encontra nada pendente:
+
+```sh
+docker compose build && docker compose run --rm --no-deps millionsend migrate && docker compose up -d
+```
+
+## Desenvolvimento sem Docker
+
+Com Node 24+, pnpm 11 e Postgres local: `pnpm install`, aponte
+`DATABASE_URL` para o seu Postgres, `pnpm --filter @millionsend/db db:migrate`,
+depois rode `pnpm --filter @millionsend/api dev`,
+`pnpm --filter @millionsend/worker dev` e
+`pnpm --filter @millionsend/web dev` em terminais separados.
+
+## Referência de ambiente
+
+Do `.env.example`. Só os dois segredos são obrigatórios; todo o resto tem
+padrões que funcionam localmente. Cobrança (planos, Stripe) só existe em
+implantações hospedadas — veja [Cobrança](/pt-BR/billing); uma instância
+auto-hospedada não tem limites de plano.
+
+### Obrigatórias
+
+| Variável | Propósito |
+| --- | --- |
+| `DATABASE_URL` | String de conexão do Postgres. O padrão corresponde ao serviço `postgres` do compose. |
+| `POSTGRES_PASSWORD` | Senha do serviço `postgres` do compose (padrão `millionsend`); o assistente de setup gera uma e a coloca também em `DATABASE_URL`. Mantenha as duas em sincronia. |
+| `MASTER_ENCRYPTION_KEY` | Chave de criptografia dos corpos de email em repouso. Gere com `openssl rand -base64 32`. Perdê-la torna os corpos armazenados irrecuperáveis; trocá-la órfã os corpos antigos. Faça backup junto com o banco. |
+| `BETTER_AUTH_SECRET` | Segredo de assinatura das sessões do painel. Gere com `openssl rand -base64 32`. |
+| `APP_BASE_URL` | URL base pública da implantação — a origem que os navegadores usam para acessar o painel (ex.: `https://mail.example.com`). O login só é aceito a partir dessa origem; assinaturas SNS, links de descadastro e links de rastreamento derivam dela. Precisa corresponder exatamente ao esquema+host+porta em que você abre o painel — inclusive um `WEB_PORT` customizado — ou login e cadastro falham com erro de "invalid origin". Padrão `http://localhost:3000`. |
+| `PUBLIC_API_URL` | Origem pública da API quando um reverse proxy a serve no próprio hostname (ex.: `https://api.example.com`). É o que o painel mostra como base da API e ao que os tokens MCP ficam vinculados; sem definir, a API é assumida na porta 3001 do host do painel. |
+
+### AWS SES
+
+| Variável | Propósito |
+| --- | --- |
+| `AWS_REGION` | Região do SES (padrão `us-east-1`); também a região dos clientes KMS e SQS. |
+| `AWS_REGIONS` | Regiões do SES pelas quais esta instalação envia, separadas por vírgula, a primeira sendo a padrão; sem definir, a única região em `AWS_REGION`. Cada região precisa do próprio tópico SNS e configuration set — veja [Adicionando uma região](#adicionando-uma-região). |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Credenciais IAM com `ses:SendEmail` / `ses:SendRawEmail`. Omita para usar a cadeia padrão de credenciais da AWS (instance profile, SSO, …). |
+| `SNS_TOPIC_ARNS` | ARNs de tópicos SNS (separados por vírgula) autorizados a entregar eventos do SES. Sem definir, a ingestão de eventos fica desativada. |
+| `SQS_QUEUE_URL` | Fila SQS que o worker consome por long polling para eventos do SES. O setup sempre a cria; mantenha definida mesmo quando o SNS também faz push em `https://<seu-host>/ses/events` (o app deduplica os dois). |
+| `SES_CONFIGURATION_SET` | Configuration set do SES aplicado a envios sem configuration set por domínio. Sem definir, envia sem (e sem eventos de entrega). |
+| `SES_TENANTS` | Um tenant do SES por equipe, para o SES medir a reputação de bounces/reclamações por cliente e pausar um remetente sem pausar os demais. Padrão = `IS_CLOUD`; exige as ações IAM `ses:*Tenant*`. |
+
+### Opcionais
+
+| Variável | Propósito |
+| --- | --- |
+| `ALLOW_SIGNUP` | O primeiro usuário sempre pode se registrar; depois disso o cadastro fica fechado a menos que isto seja `true`. Mantenha `false` quando o painel é acessível pela internet. |
+| `TRUSTED_PROXIES` | Reverse proxies cujos headers de IP do cliente (`X-Forwarded-For`, `CF-Connecting-IP`) são confiáveis, IPs ou CIDRs separados por vírgula. O padrão `127.0.0.1,::1` cobre um proxy no mesmo host; adicione o endereço do seu proxy quando ele roda em outro lugar. Veja a [seção de nginx](#produção-nginx--tls). |
+| `WEBHOOK_ALLOW_LOCALHOST` | Só para desenvolvimento local: permite que endpoints de webhook (disparos de teste incluídos) apontem para `http://` e endereços de loopback/privados em qualquer porta. Mantenha `false` em qualquer instância acessível pela internet. |
+| `COMPOSE_PROFILES` | Serviços opcionais do compose, separados por vírgula: `smtp` (o relay; monte um par de chaves STARTTLS antes) e, no arquivo standalone, também `docs` (este site de documentação) e `backup` (dumps agendados). |
+| `PORT` | Porta da API (padrão `3001`). No compose, move junto a porta interna do contêiner e a porta publicada no host. |
+| `UNSUBSCRIBE_BASE_URL` | Host próprio, opcional, para as páginas hospedadas de descadastro (ex.: `https://unsubscribe.example.com`), apontado para o mesmo processo web. Os links de descadastro nos e-mails e os redirecionamentos da página usam esse host, e ele serve só o fluxo de descadastro, então destinatários e scanners de links nunca alcançam a origem, os cookies nem a reputação do painel. Sem definir: `APP_BASE_URL`. |
+| `WEB_PORT` | Porta do host em que o compose publica o painel (o processo web é sempre 3000 dentro do contêiner). Mantenha `APP_BASE_URL` em sincronia. |
+| `DOCS_PORT` | Porta do host em que o compose publica este site de documentação (o processo docs é sempre 3002 dentro do contêiner). |
+| `SMTP_PORT` | Porta do relay SMTP (padrão `2587`). |
+| `SMTP_TLS_CERT_PATH` / `SMTP_TLS_KEY_PATH` | Par de chaves STARTTLS do relay SMTP (caminhos PEM dentro do contêiner). Com ambos definidos: STARTTLS é oferecido e exigido antes do AUTH. Sem o par, o relay se recusa a iniciar (a menos que `SMTP_ALLOW_INSECURE_AUTH=true`). |
+| `SMTP_ALLOW_INSECURE_AUTH` | Escape explícito para SMTP AUTH em texto puro apenas em rede local/privada. Mantenha `false`; nunca combine `true` com bind público. |
+| `IS_CLOUD` | Deixe `false`. `true` ativa comportamento de nuvem hospedada (KMS, cobrança via Stripe). |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PORTAL_CONFIG` | Somente na nuvem hospedada; ignorados quando `IS_CLOUD=false`. Chave de API do Stripe, o segredo de assinatura do endpoint de webhook em `/api/billing/webhook` e um id opcional de configuração do portal do cliente. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Credenciais OAuth do "Continuar com Google". O botão só aparece com ambas definidas. URL de callback: `{APP_BASE_URL}/api/auth/callback/google`. |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | O mesmo, para GitHub. URL de callback: `{APP_BASE_URL}/api/auth/callback/github`. |
+| `AUTH_EMAIL_FROM` | Remetente dos e-mails de conta (redefinição de senha, confirmação de e-mail), como `Nome <usuario@dominio>` ou um endereço simples; o domínio precisa ser uma identidade verificada na conta SES desta instância. A recuperação de senha e a confirmação no cadastro só existem com isto definido e credenciais SES configuradas — deixe vazio para pular as duas. Verifique o domínio em um time em **Domínios** e esses e-mails passam a ser registrados lá, com as novas contas como seus contatos (veja [E-mails de conta](#e-mails-de-conta-contatos-e-novidades)). |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Chaves do Cloudflare Turnstile, as duas ou nenhuma. Definidas, o login, o cadastro, a redefinição de senha e o botão "Enviar e-mail" do onboarding verificam um token de desafio (widgets invisíveis ou gerenciados funcionam). Sem elas, todos os formulários funcionam sem captcha. |
+| `ONBOARDING_EMAIL_FROM` | Remetente compartilhado do botão "Enviar e-mail" e do snippet do onboarding, como `Nome <usuario@dominio>` ou um endereço simples em um domínio verificado nesta conta SES. Qualquer time pode enviar por ele, só para membros que confirmaram o e-mail (onde a instância confirma e-mails), e sempre com este nome de exibição exato. Deixe vazio para ocultar o botão; o snippet então pede o domínio do próprio time. |
+| `NOTIFICATIONS_EMAIL_FROM` | Remetente das notificações de conta aos donos do time (cota quase ou totalmente usada, taxas de bounce/reclamação em risco ou pausadas) e dos e-mails de convite para o time, nos mesmos formatos de `AUTH_EMAIL_FROM`, que é o fallback. Sem nenhum dos dois, só os eventos de webhook saem e os convites ficam só por link. Verifique o domínio em um time para registrar esses e-mails lá. |
+
+### Dimensionamento do worker
+
+Os padrões atendem à taxa de envio de 14/s. O Postgres roda com
+`max_connections=200` nos arquivos compose; cada processo (api, worker, web)
+mantém um pool de até 24 conexões, então contêineres separados e réplicas de
+worker cabem sem ajuste.
+
+| Variável | Propósito |
+| --- | --- |
+| `SEND_CONCURRENCY` | Faixas de envio paralelas no worker (padrão `16`) — cerca de 1,2 por mensagem/segundo da taxa de envio do SES. |
+| `WORKER_REPLICAS` | Quantos processos de worker estão rodando (padrão `1`). O limitador de taxa do SES é um token bucket por processo, então cada worker divide a taxa de envio por este número para manter a conta no total. |
+| `SES_TRANSACTIONAL_RESERVE` | Percentual da cota móvel de 24 horas do SES de cada região que as transmissões nunca usam (padrão `30`, permitido `5`–`90`). O e-mail transacional pode usar toda essa parte e tomar emprestado além dela; uma transmissão maior que o restante é distribuída pelos dias seguintes. Valor inicial apenas: Console → Regiões sobrescreve em tempo de execução. |
+| `SQS_POLL_CONCURRENCY` | Loops paralelos de long polling no SQS para eventos do SES (padrão `4`). |
+| `WEBHOOK_DELIVERY_RETENTION_DAYS` | Por quanto tempo as linhas e payloads de entrega de webhook ficam legíveis no log de entregas (padrão `30`); as mais antigas são expurgadas. |
+| `EMAIL_METADATA_RETENTION_DAYS` | Dias que as linhas inteiras de email (destinatários, assunto, status, eventos) são mantidas (padrão `30`, a norma do setor); os corpos saem antes pela configuração de retenção do painel, e contadores diários e resultados de broadcasts são mantidos sempre. Versões anteriores à v0.6.30 usavam `365`: defina explicitamente antes de atualizar se esse histórico precisa ficar. |
+| `OPEN_PREFETCH_WINDOW_SECONDS` | Uma busca do pixel de rastreamento até esta quantidade de segundos após a entrega (ou antes dela) é registrada como pré-carregada, não como abertura (padrão `10`); `0` mantém só as regras por user agent. Veja [precisão da taxa de abertura](/pt-BR/concepts/domains#precisão-da-taxa-de-abertura). |
+
+### Armazenamento de objetos (uploads e backups)
+
+| Variável | Propósito |
+| --- | --- |
+| `S3_ENDPOINT` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | UM conjunto de credenciais compatível com S3, compartilhado entre uploads de logo do time e backups do banco (o Cloudflare R2 funciona sem ajustes). Defina as três juntas. |
+| `S3_REGION` / `S3_PROVIDER` | Os padrões `auto` / `Cloudflare` servem para o R2. Outros serviços compatíveis com S3 definem uma região real se o endpoint exigir, e o nome do provider no rclone (`AWS`, `Minio`, …) para o job de backup. |
+| `S3_STORAGE_BUCKET` / `S3_STORAGE_PUBLIC_URL` | Bucket público de uploads (logos de time) e a URL base pública de onde ele serve. Defina juntas; sem elas a UI de upload não aparece em lugar nenhum. |
+| `S3_BACKUP_BUCKET` | Bucket PRIVADO para os dumps agendados do banco — nunca o bucket público de uploads. Sem ele o serviço `backup` fica desligado. |
+| `S3_BACKUP_PREFIX` / `BACKUP_CRON` / `BACKUP_RETENTION_DAYS` | Ajustes do backup: prefixo das chaves (padrão `backups`), agenda diária dos dumps (`<minuto> <hora> * * *`, UTC, padrão `0 3 * * *`; qualquer outro formato faz o serviço sair com código 1) e dias de dumps mantidos (padrão 14). |
+| `BACKUP_AGE_RECIPIENT` | Chave pública age (`age1…`); defina para criptografar os dumps antes do upload. Para restaurar, rode `age --decrypt -i <arquivo da chave>` primeiro. |
+
+## Configuração da AWS
+
+O assistente do checkout do código cria tudo de que o MepMail
+precisa na AWS — política IAM + usuário + chave de acesso, o tópico SNS de
+eventos, a fila SQS de eventos (`mepmail-events`) que o worker consome por
+long polling e o configuration set do SES. Um `APP_BASE_URL` HTTPS recebe
+adicionalmente os eventos por push; a fila funciona sem URL pública nenhuma.
+
+Instale as dependências travadas do workspace e rode-o no checkout onde fica o
+`.env` (Node 22+, pnpm 11):
+
+```sh
+pnpm install --frozen-lockfile
+pnpm setup:aws
+```
+
+Rode onde estiverem suas credenciais de admin da AWS — laptop ou servidor; o
+servidor do MepMail nunca precisa de credenciais de admin.
+Ele verifica sua identidade AWS, mostra o plano, cria tudo e escreve as
+linhas `AWS_*` no `.env` do diretório atual (sem `.env` lá → imprime para
+você colar onde o MepMail roda). `--dry-run` imprime o plano completo e
+sai.
+
+`pnpm setup:aws teardown` apaga tudo que o setup criou, incluindo
+todas as chaves de acesso do usuário IAM `mepmail`, então um servidor em
+execução para de enviar. Repetir o setup é seguro, mas cada execução gera uma
+nova chave de acesso — apague as antigas no console do IAM.
+
+Prefere não rodar um CLI? A página **Configurações → SES** do painel oferece
+um link de quick-create do CloudFormation e um shell script pré-preenchido
+que criam os mesmos recursos.
+
+## Adicionando uma região
+
+Uma instalação pode enviar por várias regiões do SES. Um domínio vive em uma
+região, a escolhida ao adicioná-lo (para mudá-la, exclua o domínio e adicione
+de novo); identidades, cota de 24 horas, taxa de envio e status de sandbox são
+todos por região; os eventos de todas as regiões caem na única fila SQS,
+porque o SNS entrega entre regiões.
+
+Rode o comando `add-region` do assistente do código a partir do checkout onde o
+`.env` está, com credenciais de admin de curta duração no ambiente (nada fica
+gravado):
+
+```sh
+pnpm setup:aws add-region us-east-1
+```
+
+O assistente interativo oferece a mesma etapa como **Add a region** na etapa
+de AWS. Rodado em qualquer outro lugar, sem `.env`, o comando pergunta
+`SQS_QUEUE_URL`, `SNS_TOPIC_ARNS`, `AWS_REGIONS` e o `APP_BASE_URL` opcional
+(vazio: só a fila), confirma antes de criar qualquer coisa e imprime as duas
+linhas em vez de gravá-las.
+
+Ele mantém o usuário IAM, a política e a chave de acesso (nenhuma chave nova),
+cria na nova região o tópico SNS, o configuration set do SES com seu event
+destination e a supressão apenas de bounces, inscreve o tópico na fila
+existente e acrescenta ao `.env`:
+
+```sh
+AWS_REGIONS=sa-east-1,us-east-1   # a primeira entrada continua sendo a região padrão
+SNS_TOPIC_ARNS=<ARN do primeiro tópico>,<ARN do novo tópico>
+```
+
+`AWS_REGION` e `SQS_QUEUE_URL` ficam como estão. Reinicie a stack
+(`docker compose up -d`): a região passa a aparecer no formulário de novo
+domínio e em Configurações → SES, marcada como **Sandbox** até a AWS conceder
+acesso de produção lá — peça por região, como na primeira. Enquanto uma região
+tem acesso de produção, uma região em sandbox aparece no formulário mas não
+pode ser escolhida; uma região em sandbox ritma os próprios envios a 1/s e
+segura só os próprios domínios quando sua cota de 24 horas acaba.
+
+Preço: desde 2026-07-21 uma conta × região do SES sem envios anteriores começa
+no plano Essentials (US$ 0,16 por 1.000 mensagens em vez dos US$ 0,10 à la
+carte). Depois de provisionar, o assistente lê o plano da região e, se for
+Essentials, pergunta se deve cancelá-lo; nada que o MepMail usa precisa de
+plano, e o cancelamento de um plano atribuído por padrão vale na hora. À mão:
+`aws sesv2 put-account-pricing-attributes --plan NONE --region <região>`.
+
+Equivalente manual: na nova região, o tópico SNS, o configuration set e a
+supressão exatamente como em [Eventos do SES](#eventos-do-ses-bounces-reclamações-e-entregas); uma inscrição `sqs` desse
+tópico no ARN da fila existente, e a política da fila estendida para permitir
+`sqs:SendMessage` também a partir do ARN do novo tópico; depois as duas linhas
+de `.env` acima e um reinício.
+
+## Eventos do SES (bounces, reclamações e entregas)
+
+O CLI de setup sempre configura isto: uma fila SQS (`mepmail-events`) que o
+worker consome por long polling, com a URL no `.env` como `SQS_QUEUE_URL`. A
+fila segura os eventos durante reinícios e não precisa de acesso externo, por
+isso é o transporte que toda implantação recebe; um `APP_BASE_URL` HTTPS
+público recebe adicionalmente uma assinatura SNS com push para o seu host, e o
+app deduplica os dois. `SNS_TOPIC_ARNS` controla a ingestão nos dois casos:
+eventos só são aceitos de tópicos nessa lista. Mantenha `SQS_QUEUE_URL`
+definida mesmo depois de trocar para um `APP_BASE_URL` HTTPS — apagá-la deixa
+os eventos acumulando na fila.
+
+Equivalente manual: um tópico SNS standard (mesma região do SES) inscrito em
+`https://<seu-host>/ses/events` (ou em uma fila SQS cuja política permita o
+envio pelo tópico e cuja URL esteja no `.env` como `SQS_QUEUE_URL`), com o
+ARN no `.env` como `SNS_TOPIC_ARNS`; um configuration set do SES com um event
+destination apontando para o tópico (tipos de evento: Delivery, Delivery
+Delay, Bounce, Complaint, Reject, Rendering Failure — NÃO inscreva Open nem
+Click, pois isso faz o SES reescrever todo link e injetar o próprio pixel,
+enquanto o MepMail rastreia o engajamento por conta própria), com o nome
+no `.env` como `SES_CONFIGURATION_SET`. Reinicie depois de defini-los. Sem
+`SES_CONFIGURATION_SET`, os envios saem sem configuration set e não emitem
+eventos.
+
+O assistente também configura a lista de supressão da conta do SES para
+apenas bounces. Essa lista é por região e compartilhada por todos os times da
+instância: uma caixa que deu hard bounce está morta para todo mundo, então o
+SES pode barrá-la para a conta inteira, mas uma denúncia de spam diz respeito
+ao e-mail de um remetente — o MepMail a suprime só para aquele time, e
+deixada na lista do SES ela bloquearia também o recibo de outro time ou uma
+redefinição de senha para a mesma pessoa. Se você provisionou à mão ou com o
+template do CloudFormation, ajuste você mesmo no console do SES (Suppression
+list → Account-level settings) ou com
+`aws sesv2 put-account-suppression-attributes --suppressed-reasons BOUNCE`.
+
+A assinatura SNS por HTTPS se confirma sozinha quando o app roda com
+`SNS_TOPIC_ARNS` definido; se ficar pendente, use "Request confirmation" nela
+no console do SNS. Assinaturas SQS na mesma conta não precisam de
+confirmação.
+
+O endpoint da assinatura é `{APP_BASE_URL}/ses/events`, mas quem serve esse
+caminho é o processo da API, não o painel: um reverse proxy na frente do
+hostname do painel precisa encaminhar esse único caminho para a API (a [seção
+de nginx](#produção-nginx--tls) faz isso), ou o POST de confirmação cai no
+painel, recebe 404, e a assinatura fica pendente com todo bounce e entrega
+perdidos.
+
+## Tenants do SES (reputação por equipe)
+
+Com `SES_TENANTS=true` (padrão no Cloud) cada equipe ganha o próprio tenant do
+SES, nomeado pelo id da equipe, em cada região onde tem um domínio. A identidade
+do domínio e o `SES_CONFIGURATION_SET` compartilhado são associados ao tenant na
+criação do domínio, e todo envio a partir dele nomeia o tenant, então o SES
+mantém as métricas de bounce e reclamação — e a própria pausa de envio — por
+cliente, não por conta. Domínios anteriores à flag, ou cuja associação falhou,
+são tratados pelo job `tenants.sync` de hora em hora. A política IAM que o
+assistente e o template do CloudFormation instalam inclui as ações
+`ses:CreateTenant`, `ses:GetTenant`, `ses:DeleteTenant`,
+`ses:CreateTenantResourceAssociation` e `ses:DeleteTenantResourceAssociation`;
+uma implantação existente roda o assistente de novo (ou atualiza a política
+`mepmail-ses`) antes de ligar a flag.
+
+Para atualizar a política sem recriar nada, publique o JSON que a página de
+configurações do SES mostra como nova versão padrão:
+
+```bash
+aws iam create-policy-version --policy-arn arn:aws:iam::<account-id>:policy/mepmail-ses \
+  --policy-document file://mepmail-ses.json --set-as-default
+```
+
+## Relay SMTP
+
+Um relay SMTP pronto para software que fala SMTP em vez de HTTP — apps
+legados, plugins de CMS, qualquer coisa com um formulário de "configurações
+SMTP". As mensagens passam pelo mesmo pipeline de aceitação do
+`POST /emails`: mesma verificação de domínio, checagens de supressão, log de
+requisições e eventos de entrega.
+
+Dados de conexão:
+
+- **Host:** onde o serviço `smtp` estiver acessível (os arquivos compose o
+  publicam no host do Docker).
+- **Porta:** `2587` (`SMTP_PORT` para mudar).
+- **Usuário:** `mepmail` (fixo).
+- **Senha:** uma chave de API `ms_` do painel.
+- **Criptografia:** STARTTLS é oferecido (e exigido antes do AUTH) quando
+  `SMTP_TLS_CERT_PATH` e `SMTP_TLS_KEY_PATH` apontam para um par PEM. Sem ele,
+  o relay se recusa a iniciar, a menos que `SMTP_ALLOW_INSECURE_AUTH=true` seja
+  habilitado explicitamente para uma rede privada confiável.
+
+### STARTTLS com os certificados que você já tem
+
+Antes de expor o relay à internet, dê a ele um certificado — sem isso, o
+SMTP AUTH envia a chave de API em texto puro. Qualquer par PEM funciona, e se
+você seguiu o guia de nginx acima já tem um: reutilize o certificado Let's
+Encrypt que o certbot emitiu para o seu domínio. Monte-o no contêiner `smtp`
+com um `docker-compose.override.yml`:
+
+```yaml
+services:
+  smtp:
+    volumes:
+      - /etc/letsencrypt/live/mail.example.com:/certs:ro
+```
+
+e aponte as variáveis no `.env`:
+
+```sh
+SMTP_TLS_CERT_PATH=/certs/fullchain.pem
+SMTP_TLS_KEY_PATH=/certs/privkey.pem
+```
+
+Com ambos definidos, o STARTTLS passa a ser exigido antes do AUTH — as
+credenciais nunca cruzam a rede sem criptografia. Monte o diretório
+`live/<domínio>` (um symlink que o certbot mantém atualizado), não uma cópia
+dos arquivos, para que a renovação caia no mesmo caminho — e reinicie o relay
+depois de cada renovação, já que ele lê o par de chaves ao iniciar (certbot:
+`--deploy-hook 'docker compose -f /opt/mepmail/docker-compose.yml restart smtp'`).
+Um wildcard ou qualquer outro PEM emitido por CA funciona da mesma
+forma.
+
+Exemplo com Nodemailer:
+
+```js
+import nodemailer from "nodemailer";
+
+const transport = nodemailer.createTransport({
+  host: "localhost",
+  port: 2587,
+  auth: { user: "mepmail", pass: "ms_..." },
+});
+
+await transport.sendMail({
+  from: "you@yourdomain.com",
+  to: "someone@example.com",
+  subject: "Hello",
+  html: "<p>Sent over SMTP.</p>",
+});
+```
+
+O serviço `smtp` está definido nos dois arquivos compose atrás do profile
+`smtp`, então fica desligado até ser pedido: com o par de chaves montado,
+adicione `smtp` a `COMPOSE_PROFILES` no `.env` (separado por vírgula de
+outros) e rode `docker compose up -d`.
+
+## Site de documentação
+
+A imagem também pode servir este site de documentação: um serviço `docs` do
+compose roda com `PROCESS=docs` e publica a porta `3002` (ajustável no host
+via `DOCS_PORT`). Não precisa de banco e é totalmente opcional; no arquivo
+standalone ele fica atrás do profile `docs` (`COMPOSE_PROFILES=docs`).
+
+## Produção: nginx + TLS
+
+O formato recomendado de produção: o nginx no host termina o TLS e faz proxy
+de um hostname por serviço, e as portas do compose ficam vinculadas ao
+loopback para que o nginx seja o único caminho de entrada. A API precisa do
+próprio hostname (ou de uma porta exposta): as rotas dela (`/emails`,
+`/domains`, …) dividem caminhos com páginas do painel, então os dois não
+conseguem repartir um hostname por caminho. Defina `PUBLIC_API_URL` com esse
+hostname — é o que o painel mostra como base da API e ao que os tokens MCP
+ficam vinculados; sem definir, a API é assumida na porta 3001 do host do
+painel.
+
+`/etc/nginx/conf.d/mepmail.conf`:
+
+```nginx
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ""      close;
+}
+
+# Painel.
+server {
+    listen 80;
+    server_name mail.example.com;
+
+    # O editor de broadcasts envia corpos HTML completos pelo painel.
+    client_max_body_size 25m;
+
+    # Eventos do SES: o SNS é inscrito em {APP_BASE_URL}/ses/events, e quem
+    # serve esse caminho é o processo da API, não o painel.
+    location = /ses/events {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+    }
+}
+
+# API.
+server {
+    listen 80;
+    server_name api.example.com;
+
+    # POST /emails/batch aceita até 100 emails por requisição; os corpos
+    # html/text não têm teto de bytes no schema, mas o SES rejeita mensagens
+    # acima de 10 MB de qualquer forma. 25m cobre um lote cheio de corpos
+    # grandes sem permitir uploads ilimitados.
+    client_max_body_size 25m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Docs (opcional).
+server {
+    listen 80;
+    server_name docs.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+    }
+}
+```
+
+TLS e o redirecionamento http→https em uma linha — o certbot reescreve os
+blocos acima para escutar na 443 com certificados Let's Encrypt, adiciona o
+redirecionamento e instala a renovação automática:
+
+```sh
+sudo certbot --nginx --redirect -d mail.example.com -d api.example.com -d docs.example.com
+```
+
+Depois defina `APP_BASE_URL=https://mail.example.com` e
+`PUBLIC_API_URL=https://api.example.com` no `.env` e reinicie. `APP_BASE_URL`
+precisa ser a **origem https pública exata do painel** — qualquer outro valor
+faz login e cadastro falharem com erro de "invalid origin". Encaminhe `Host` e
+`X-Forwarded-Host` para os upstreams do painel e da documentação como acima,
+para que qualquer URL absoluta que os apps derivem da requisição use o
+hostname público em vez de `localhost`.
+
+Os endereços dos clientes (limites de tentativas de login, entradas de
+auditoria) vêm de `X-Forwarded-For`, e só os proxies listados em
+`TRUSTED_PROXIES` (IPs ou CIDRs separados por vírgula; padrão `127.0.0.1,::1`,
+que cobre o nginx no mesmo host) são levados em conta. Com
+`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for` cada salto se
+acrescenta à lista, e a cadeia é percorrida da direita para a esquerda pulando
+todos os proxies confiáveis, então o primeiro endereço não confiável é o
+cliente. Adicione o endereço do seu proxy quando ele roda em outro host, e as
+faixas de um CDN quando houver um na frente do nginx; headers de qualquer outra
+origem são ignorados e o endereço do socket é usado no lugar.
+
+Os arquivos compose vinculam toda porta de aplicação ao loopback por padrão
+(`WEB_BIND_ADDRESS`, `API_BIND_ADDRESS`, `DOCS_BIND_ADDRESS`,
+`SMTP_BIND_ADDRESS`, todas `127.0.0.1`), então só um reverse proxy local as
+alcança. O Docker publica portas editando o iptables diretamente, então não
+conte com um firewall de host para compensar um bind público: defina um
+`*_BIND_ADDRESS` como `0.0.0.0` só para um serviço que precise ser alcançado
+diretamente.
+
+O relay SMTP (`:2587`) é TCP, não HTTP — um bloco `server` de `http` não
+consegue fazer proxy dele. Ou publique-o diretamente
+(`SMTP_BIND_ADDRESS=0.0.0.0` e abra o firewall), ou mantenha-o no loopback e passe o stream
+TCP pelo módulo stream do nginx — os bytes passam intactos, então o STARTTLS
+continua terminando no relay via `SMTP_TLS_CERT_PATH`/`SMTP_TLS_KEY_PATH`:
+
+```nginx
+# /etc/nginx/nginx.conf — nível superior, fora do bloco http {}
+stream {
+    server {
+        listen 2587;
+        proxy_pass 127.0.0.1:2587;
+    }
+}
+```
+
+Firewall: libere 80 e 443, mais a 2587 só se o relay SMTP for usado de fora;
+todo o resto fechado:
+
+```sh
+sudo ufw default deny incoming
+sudo ufw allow 80,443/tcp
+sudo ufw allow 2587/tcp   # só se o relay SMTP estiver exposto
+sudo ufw enable
+```
+
+## Armazenamento de objetos (logos de time)
+
+Opcional. Com um bucket compatível com S3 configurado, admins do time podem
+enviar um logo pelo dashboard; ele também marca as páginas hospedadas de
+descadastro quando a marca do MepMail está oculta. UM conjunto de
+credenciais `S3_*` é compartilhado com o job de backup abaixo — cada recurso
+é então habilitado pela sua própria variável de bucket.
+
+A etapa de armazenamento do `pnpm setup:aws` pergunta o endpoint e as
+chaves, cria (ou adota) os dois buckets — `mepmail-storage` e
+`mepmail-backups` por padrão — e escreve as linhas `S3_*` no `.env`. A
+única coisa que ela não consegue fazer pela API S3 é tornar público o bucket
+de uploads: no R2, habilite o acesso público no bucket (ou conecte um domínio
+customizado) e defina essa URL — os uploads são endereçados como
+`${S3_STORAGE_PUBLIC_URL}/<chave>`:
+
+```sh
+S3_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+S3_STORAGE_BUCKET=mepmail-storage
+S3_STORAGE_PUBLIC_URL=https://<url-publica-do-bucket-ou-dominio-customizado>
+```
+
+Mantenha os dois buckets separados: o acesso público do R2 vale para o bucket
+inteiro, então um dump do banco no bucket público de uploads ficaria legível
+para o mundo todo.
+
+## Backups
+
+O serviço `backup` do compose faz um `pg_dump` agendado do Postgres e o envia
+para qualquer bucket compatível com S3 via rclone — o Cloudflare R2 funciona
+sem ajustes. Vem desligado por padrão: sem `S3_BACKUP_BUCKET` o contêiner
+imprime `backups disabled — set S3_BACKUP_BUCKET to enable` e sai com
+código 0, inofensivo.
+
+Ative definindo as credenciais S3 compartilhadas e um bucket de backup no
+`.env` (a etapa de armazenamento do assistente de setup cria o bucket e
+escreve essas linhas). O bucket precisa existir antes do primeiro dump e deve
+permanecer privado — os dumps contêm o banco de dados inteiro, e o acesso
+público do R2 vale para o bucket inteiro, então nunca reutilize o bucket
+público de uploads. Para o R2 os padrões `S3_PROVIDER=Cloudflare` e
+`S3_REGION=auto` já estão corretos:
+
+```sh
+S3_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+S3_BACKUP_BUCKET=mepmail-backups
+```
+
+Depois adicione `backup` a `COMPOSE_PROFILES` no `.env` e rode
+`docker compose up -d`: o serviço faz um dump imediatamente e, depois disso,
+um por dia no `BACKUP_CRON` (padrão `0 3 * * *`, UTC). Só a forma diária
+`<minuto> <hora> * * *` é aceita — o sidecar roda sem privilégios como
+`postgres`, com todas as capabilities removidas, então a agenda é um loop de
+sleep em vez de crond, e qualquer outro formato faz o serviço sair com código
+1. Cada dump é um
+`pg_dump -Fc` (formato custom comprimido, nomeado
+`mepmail-YYYYMMDD-HHMMSS.dump`), o tamanho enviado é verificado contra o
+bucket antes de qualquer outra coisa, e dumps mais antigos que
+`BACKUP_RETENTION_DAYS` (padrão 14) são removidos. `S3_BACKUP_PREFIX` (padrão
+`backups`) define o prefixo das chaves. Outros serviços compatíveis com S3
+funcionam definindo `S3_PROVIDER` com o nome do provider no rclone
+(`AWS`, `Minio`, …) e uma região real se o endpoint exigir.
+
+Defina `BACKUP_AGE_RECIPIENT` com uma chave pública
+[age](https://age-encryption.org) (`age1…`) para criptografar cada dump antes
+do upload (`.dump.age`); o bucket nunca guarda uma cópia legível do banco.
+Mantenha a chave privada correspondente junto com `MASTER_ENCRYPTION_KEY`, e
+na restauração rode `age --decrypt -i <arquivo da chave>` antes do
+`pg_restore`.
+
+Os dumps contêm corpos de email criptografados com `MASTER_ENCRYPTION_KEY` —
+faça backup dessa chave separadamente, ou os corpos restaurados ficam
+irrecuperáveis.
+
+O arquivo Compose da raiz constrói o serviço de backup localmente a partir de
+`scripts/backup`.
+
+### Restauração
+
+Pare o app antes para que nada escreva no meio da restauração:
+
+```sh
+docker compose stop millionsend smtp
+# liste o bucket, escolha um dump
+docker compose run --rm --entrypoint /usr/local/bin/backup.sh backup \
+  sh -c 'rclone lsl ":s3:$S3_BACKUP_BUCKET/${S3_BACKUP_PREFIX:-backups}"'
+# baixe-o e restaure por cima do banco atual
+docker compose run --rm --entrypoint /usr/local/bin/backup.sh backup \
+  sh -c 'rclone copyto ":s3:$S3_BACKUP_BUCKET/${S3_BACKUP_PREFIX:-backups}/mepmail-YYYYMMDD-HHMMSS.dump" /tmp/restore.dump \
+    && pg_restore --clean --if-exists -d "$DATABASE_URL" /tmp/restore.dump'
+docker compose start millionsend smtp
+```
+
+## Política de cadastro
+
+O primeiro usuário a se registrar vira a conta inicial — sem configuração
+nenhuma. Depois disso o registro fica fechado: qualquer pessoa com conta pode
+criar chaves de API que enviam pela sua conta SES, então o cadastro fica
+desligado a menos que você opte por abri-lo com `ALLOW_SIGNUP=true`. Mantenha
+a porta 3000 fora da internet pública a menos que tenha aberto o cadastro
+deliberadamente.
+
+## E-mails de conta, contatos e novidades
+
+Os e-mails do próprio MepMail — redefinição de senha, confirmação de
+e-mail, convites para times e os avisos de cota e entregabilidade aos donos
+dos times — saem de `AUTH_EMAIL_FROM` e `NOTIFICATIONS_EMAIL_FROM`.
+Verifique o domínio do remetente em **Domínios** em um time e, a partir daí,
+esses e-mails são registrados e medidos nesse time como qualquer outro:
+aparecem na lista de E-mails com a tag `mepmail_system`, contam nas
+Métricas e as Supressões se preenchem com os bounces deles. O corpo é
+descartado assim que o SES aceita a mensagem, já que um link de redefinição é
+uma credencial válida, e os links nunca são reescritos para rastreio de
+cliques. Enquanto nenhum time tiver o domínio, eles saem direto pelo SES sem
+deixar rastro, como antes.
+
+Esse time é o da própria instância, e o operador pode marcá-lo como tal: no
+plano `system` ele nunca tem limite nem cobrança, o selo diz System e a aba
+Cobrança mostra um aviso no lugar dos planos. Numa instância auto-hospedada
+os planos não impõem limites, então a marca só o rotula.
+
+O mesmo time é a audiência das novidades do produto. Em uma instância com
+`ALLOW_SIGNUP=true`, toda conta nova vira um contato ali com a propriedade
+`source: signup` (nome, endereço, data do cadastro e idioma do painel) assim
+que o endereço é confirmado — um login social já chega confirmado, um cadastro
+por senha conta quando o link enviado é aberto. A tela de cadastro avisa, e
+excluir a conta exclui o contato e apaga o endereço do histórico desse time.
+Uma instância fechada não inscreve ninguém. Para inscrever contas que existiam
+antes de o domínio ser verificado, rode uma vez (contas que nunca confirmaram
+se inscrevem sozinhas no próximo login):
+
+```sql
+insert into contacts (team_id, email, first_name, last_name, properties)
+select '<id do time>', email,
+       split_part(name, ' ', 1),
+       nullif(substr(name, length(split_part(name, ' ', 1)) + 2), ''),
+       jsonb_build_object('source', 'backfill', 'signed_up_at', to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
+from "user"
+where email_verified
+on conflict do nothing;
+```
+
+Os envios a esses contatos seguem as regras de sempre: crie um tópico (por
+exemplo, "Novidades") para que um cancelamento valha para ele e nunca para os
+e-mails de conta, e envie broadcasts pelo domínio verificado do time.
+
+A confirmação de e-mail fica ligada sempre que `AUTH_EMAIL_FROM` está
+definido e há credenciais SES — a mesma condição da recuperação de senha. Um
+cadastro por senha não recebe sessão até o link enviado ser aberto; contas
+anteriores confirmam no próximo login. Onde a instância confirma e-mails, o
+remetente do onboarding só alcança membros que confirmaram.
+
+Nada em uma instância auto-hospedada contata mepmail.je4ndev.com por conta
+própria. O assistente de configuração oferece, uma vez e só de forma
+interativa, inscrever o e-mail do operador nas notas de lançamento do
+MepMail; é o assistente na sua máquina enviando a sua resposta, e um link
+de confirmação chega antes de qualquer coisa ser armazenada. Quando não
+consegue alcançar mepmail.je4ndev.com, ele imprime a página,
+[app.mepmail.je4ndev.com/updates?source=self-host](https://app.mepmail.je4ndev.com/updates?source=self-host), e **Configurações →
+Instância** leva à mesma página; o `source` marca você como auto-hospedado
+nos dois casos.
+
+## Console
+
+`/console` é a visão do operador sobre toda a implantação: uma visão geral
+(envios, entregabilidade, equipes, contatos, domínios, fila, um cartão por
+região do SES com cota, plano de preços e status de enforcement, e as sondas
+de saúde com histórico), uma página de Regiões, uma página de Equipes com
+ações do operador (alterar plano ou tipo, teto diário de envio, pausar
+transmissões, suspender e reativar), uma página de Confiança e segurança
+construída sobre o guardrail, o score da conta, os insights de conteúdo
+armazenados (nunca o corpo dos e-mails) e, quando o monitor de conteúdo
+opcional está ligado, os veredictos amostrados do modelo, e um log de
+auditoria da instância.
+
+Só o operador da instância (o primeiro usuário cadastrado) consegue abri-lo;
+todos os outros recebem 404, e nada no app leva até ele. Em uma instância
+self-hosted, **Configurações → SES** mostra ao operador um cartão "Console da
+instância" com o botão "Abrir console"; a URL direta
+`https://<seu-host>/console` também funciona. Todo número vem do Postgres ou
+de uma leitura gratuita de `GetAccount` do SESv2 por região; nenhuma API paga
+da AWS é chamada, e o custo por região é uma estimativa local.
+
+Uma equipe suspensa mantém os dados e as chaves continuam autenticando, mas
+todo envio responde `403 team_suspended` (SMTP `550`); uma pausa de
+transmissões retém as transmissões enquanto o e-mail transacional continua;
+um teto diário limita o dia da equipe abaixo do plano. Os proprietários são
+avisados por e-mail a cada ação (exceto suspensão por phishing), e cada ação
+entra no log de auditoria com o motivo.
+
+## Monitoramento de conteúdo (opcional)
+
+Desligado por padrão. Com um juiz configurado, uma amostra do e-mail aceito é
+pontuada de 0 a 100 pelo TypeSafe Jev depois que o SES o recebeu e incorporada
+a um risco por equipe que o operador vê em Confiança e segurança. Nada no caminho de envio espera por
+isso: um veredicto nunca atrasa, retém ou recusa uma mensagem, e uma falha do
+juiz de qualquer tipo (recurso desligado, credenciais ausentes, limitação de
+taxa, timeout, erro do provedor, resposta que não parseia, corpo já removido
+pela retenção) registra a amostra como sem julgamento e não muda mais nada.
+As verificações determinísticas de conteúdo (os insights, o guardrail, o
+score da conta) rodam em todo envio com ou sem o juiz. Quem hospeda por
+conta própria pode deixá-lo desligado.
+
+**O que ele faz.** Abre a sinalização `monitor` em Confiança e segurança
+quando o risco de uma equipe cruza a linha de sinalização, avisa o operador
+por e-mail uma vez por dia por equipe acima da linha de alerta e, só para uma
+equipe no nível Nova (nos primeiros 1.000 envios ou 72 horas, ou abaixo de
+10.000 envios em 7 dias), pausa os broadcasts quando o risco passa da
+linha de pausa e uma mensagem amostrada pontuou 90 ou mais no último dia (o
+e-mail transacional continua saindo; a equipe vê "pausados aguardando
+revisão"; o operador retoma pela página de revisão). Nunca suspende uma
+equipe e nunca retém e-mail transacional: uma pessoa decide. A política de
+pausa é uma configuração e pode ser desligada.
+
+**Para ligar**, no `.env` da instância, lido pelo worker e pelo app (um
+reinício aplica):
+
+```bash
+ABUSE_JUDGE=typesafe
+ABUSE_JUDGE_API_KEY=...
+# Opcional; jev-latest é o padrão.
+ABUSE_JUDGE_MODEL=jev-latest
+ABUSE_JUDGE_TIMEOUT_MS=20000
+```
+
+Uma chave de API ausente falha a inicialização. As perguntas que o Jev
+responde estão em `packages/core/src/abuse-judge/questions.ts`. A TypeSafe é
+um subprocessador nos EUA do texto amostrado abaixo; nomeie-a nos termos e
+no aviso de privacidade da instância antes de ligar o juiz.
+
+**Exatamente o que o Jev vê**, montado em memória a cada chamada e nunca
+armazenado: o nome da equipe, os domínios verificados, os dias desde o
+primeiro envio e o plano; os cabeçalhos `From`, `Reply-To` e `Subject`; o
+texto visível renderizado com os elementos ocultos removidos (até 6.000
+caracteres); uma tabela com os textos dos links e seus domínios registráveis
+(até 30); a contagem de imagens, os nomes e tipos dos anexos e a contagem de
+caracteres ocultos. Nunca um endereço de destinatário, nunca o HTML bruto,
+nunca o conteúdo de um anexo. Uma amostra julgada guarda a pontuação, o
+veredicto, as categorias, os códigos de motivo, a marca imitada, o idioma, o
+id do modelo, a latência e a classe de erro; a página de revisão mostra isso
+e nunca um assunto ou um corpo. As linhas de amostra são removidas após 90
+dias.
+
+**Amostragem.** Depois de cada mensagem aceita, um sorteio com chave decide
+se ela é julgada. Cada valor abaixo é editado no console em Confiança e
+segurança → Configurações de monitoramento, ou definido na variável de
+ambiente `MONITOR_*` até lá; o console prevalece.
+
+| Variável | Padrão | Significado |
+| --- | --- | --- |
+| `MONITOR_FIRST_SENDS` | 1000 | As primeiras N mensagens aceitas de uma equipe são julgadas por inteiro |
+| `MONITOR_FIRST_HOURS` | 72 | Tudo nas primeiras H horas após o primeiro envio da equipe é julgado por inteiro |
+| `MONITOR_RAMP_SENDS` | 10000 | Até esta contagem acumulada vale a taxa da rampa |
+| `MONITOR_RAMP_RATE` | 0.25 | A taxa da rampa; a rampa termina na contagem acima ou no dia abaixo, o que vier primeiro |
+| `MONITOR_RAMP_DAYS` | 7 | |
+| `MONITOR_PROBATION_RATE` | 0.05 | Do fim da rampa ao dia 30 |
+| `MONITOR_ESTABLISHED_RATE` | 0.02 | Do dia 30 em diante |
+| `MONITOR_TRUSTED_RATE` | 0.005 | 120 dias, 50.000 envios e nenhuma sinalização em 90 dias |
+| `MONITOR_BROADCAST_COPIES` | 3 | Cópias renderizadas julgadas por broadcast (mais o HTML do próprio broadcast), equipes estabelecidas e confiáveis |
+| `MONITOR_BROADCAST_COPIES_NEW` | 10 | O mesmo para equipes novas, em rampa e probatórias |
+| `MONITOR_ANOMALY_MULTIPLIER` | 20 | Uma checagem de domínio de link, encurtador ou padrão de phishing falhando multiplica a taxa; duas forçam a amostra |
+| `MONITOR_TEAM_DAILY_CAP` | 600 | Mensagens julgadas por equipe por dia UTC; além disso a amostragem para em silêncio |
+| `MONITOR_INSTANCE_DAILY_CAP` | 50000 | Para a instância toda; além disso a amostragem por nível para, primeiros envios e anomalias continuam |
+| `MONITOR_FLAG_RISK` | 0.5 | A equipe recebe a sinalização `monitor` e é amostrada quatro vezes mais |
+| `MONITOR_ALERT_RISK` | 0.7 | O operador é avisado por e-mail, uma vez por equipe por dia |
+| `MONITOR_PAUSE_RISK` | 0.85 | Só equipes novas: os broadcasts pausam, com um veredicto de 90 ou mais no último dia |
+| `MONITOR_AUTO_PAUSE` | true | Se a política de pausa se aplica |
+| `MONITOR_FLAG_SCORE` | 70 | Uma amostra conta como sinalizada no console a partir desta pontuação |
+
+O risco é uma média decaída dos veredictos (meia-vida de 7 dias) com um
+prior que começa mais alto para equipes novas. O cartão Monitoramento da
+visão geral mostra a contagem de amostras por hora, e o operador é avisado
+por e-mail quando mais de 20% das amostras de uma hora (pelo menos 20 delas)
+ficaram sem julgamento, no máximo a cada seis horas.
+
+## Acesso ao conteúdo (quebra de vidro)
+
+Desligado por padrão. Com ele ligado, um operador autorizado pode ler o
+assunto e o texto visível renderizado de mensagens específicas de uma equipe
+sinalizada, por um motivo de segurança que ele nomeia e justifica antes de
+qualquer coisa ser descriptografada, por no máximo 30 minutos. É o caminho
+de emergência para os casos que os metadados armazenados não resolvem: as
+métricas sabem que um link aponta para um encurtador, não se o texto ao
+redor é uma isca bancária ou uma newsletter.
+
+**O que um operador vê.** O assunto e o texto visível renderizado do HTML
+com os elementos ocultos removidos (ou a parte em texto puro, quando não há
+HTML), cortado em 20.000 caracteres e ocultado na saída: todo link — escrito com
+esquema ou como um host `www.` puro — é reduzido ao esquema, ao domínio registrável e a no máximo 24 caracteres de
+caminho, sem a query nem o fragmento, de modo que um link de uso único não
+possa ser seguido; qualquer
+coisa com forma de credencial (um JWT, 32 ou mais caracteres hexadecimais,
+40 ou mais de base64, uma das chaves de API `ms_` da própria instância) é
+mascarada, assim como uma sequência de 4 a 8 dígitos
+a até 40 caracteres de uma palavra como *código*, *code*, *OTP*, *PIN*,
+*token*, *senha*, *password* ou *verification*. Nunca o HTML bruto, os
+endereços dos destinatários, os cabeçalhos, os anexos ou os destinos de
+rastreamento de cliques, e a tela não oferece copiar nem baixar. Um corpo
+que a retenção já expurgou não pode ser revelado por ninguém.
+
+**Por quanto tempo.** Uma autorização dura 30 minutos a partir do momento em
+que é criada e nunca é estendida; uma nova olhada é uma nova autorização,
+com um novo motivo e uma nova linha de auditoria. Cada visualização é
+contada na autorização.
+
+**O que fica registrado.** A linha da autorização (`content_access_grants`)
+guarda o operador, o motivo, a justificativa que ele escreveu, o alcance, os
+ids das mensagens, a contagem de visualizações e os horários. Nada expurga
+essas linhas: elas são o inventário de quem leu o quê. Uma linha na
+auditoria da instância (`content.revealed`) é escrita antes de qualquer
+coisa ser descriptografada, com o id da autorização, o motivo e a quantidade
+de mensagens — nunca o texto da justificativa e nunca qualquer conteúdo.
+
+**O que a equipe vê, e quando.** Sete dias depois, uma rotina diária
+acrescenta uma linha `content.accessed` ao log de auditoria da própria
+equipe — datada no acesso, não na divulgação — e envia um e-mail aos donos
+da equipe no idioma de cada um: quando aconteceu, o motivo, quantas
+mensagens e o que não foi acessado. A única exceção é uma equipe suspensa
+por phishing depois da autorização, em que a linha e o aviso são retidos; a
+autorização registra que a etapa de divulgação rodou de qualquer forma, para
+não ser repetida toda noite.
+
+**Como ligar**, no `.env` da instância, lido pelo worker e pelo app (um
+restart aplica):
+
+```bash
+CONTENT_REVEAL=on
+```
+
+Desligado, os botões do console aparecem desabilitados com uma dica nomeando
+a variável e os dois procedimentos recusam. Ler as mensagens de outras
+pessoas só é lícito como uma medida de segurança estreita, registrada e
+informada: diga isso nos termos e no aviso de privacidade da instância antes
+de ligar.
+
+## Modo de suporte (opcional)
+
+Desligado por padrão; `SUPPORT_VIEW=on` liga. Na lista de Equipes do
+console, "Ver como proprietário" abre o painel de uma equipe como o
+proprietário o vê, em modo somente leitura, por 30 minutos, depois que o
+operador informa um motivo (chamado de suporte, disputa de cobrança, outro)
+e a referência do chamado. Todo motivo é um pedido feito pelo cliente; um
+operador que verifica uma denúncia de abuso usa as páginas de Trust & safety
+do console e, quando precisa do texto da mensagem, a revelação de conteúdo.
+A sessão usa o login do próprio operador; nenhuma sessão é criada em nome
+do proprietário.
+
+**O que o operador vê.** O painel sob uma faixa ("Modo de suporte de
+&lt;equipe&gt; · somente leitura · termina em mm:ss"): e-mails e seus
+eventos, contatos, domínios, transmissões, templates, nomes de chaves de
+API, endpoints de webhook, configurações e uso.
+
+**O que fica oculto.** O conteúdo do que já foi enviado: corpos de e-mail
+(o detalhe diz "O conteúdo do e-mail fica oculto no modo de suporte"); o
+corpo e o preheader de uma transmissão que começou a sair, já saiu ou foi
+cancelada no meio do envio; o corpo de todo template, já que o texto de um
+template é copiado para as transmissões enviadas a partir dele e nada
+registra quais; corpos de requisição e resposta dos logs de API; exportações
+CSV (a rota de exportação responde 403); e todo segredo, então chaves de
+API, segredos de assinatura de webhook e credenciais SMTP nunca são
+devolvidos. Um rascunho ou transmissão agendada continua legível, já que
+nada dele chegou a ninguém. Toda alteração é recusada: o servidor responde
+`FORBIDDEN` a qualquer mutação enquanto o modo está ativo, independentemente
+do que a tela mostra.
+
+**Por quanto tempo.** 30 minutos, verificados a cada requisição. Um modo
+ativo por operador; iniciar outro encerra o anterior, e um modo não inicia
+outro. O operador encerra pela faixa, o proprietário em Configurações →
+Acesso de suporte, e a expiração encerra na requisição seguinte.
+
+**O que é registrado.** `support.view_started` e `support.view_ended`, na
+auditoria da instância e, na hora, no Log de auditoria da própria equipe em
+Configurações: quem, o motivo, a referência, como terminou, os minutos e
+quantos procedimentos distintos foram lidos. O registro guarda uma contagem
+por nome de procedimento e nunca o que um procedimento devolveu.
+
+**O que o proprietário recebe.** Um e-mail quando a sessão começa, dizendo
+quem abriu, por quê, a referência, até quando e onde encerrar; e o cartão
+Acesso de suporte em Configurações enquanto ela está ativa, com um botão
+"Encerrar sessão".
+
+```sh
+SUPPORT_VIEW=on
+```
+
+## Operações
+
+- Taxa de envio e retenção de emails são gerenciadas no painel:
+  **Configurações → Instância** (owner/admin). Os padrões são 14/s e 30 dias
+  até serem alterados lá; o worker aplica mudança de taxa em até um minuto, e
+  a retenção na próxima execução do expurgo.
+- Dimensionamento do worker: `SEND_CONCURRENCY` pistas (padrão 16, cerca de 1,2 por mensagem/segundo da taxa do SES) e `WORKER_REPLICAS` (padrão 1). O limitador de taxa do SES vive em cada processo do worker, então cada worker divide a taxa da conta por `WORKER_REPLICAS`; defina-o como o número de contêineres de worker em execução.
+- Para rodar processos em contêineres separados, defina `PROCESS` como
+  `api`, `worker`, `web`, `smtp` ou `docs` por contêiner (padrão `all` =
+  api + worker + web). Atualize todos no mesmo `up -d`: o gráfico de Métricas
+  só conta o que processos atualizados escrevem, então um processo deixado em
+  uma imagem antiga durante a troca some do gráfico daquele dia (os números de
+  uso diário não são afetados).
+- Os corpos dos emails são comprimidos com gzip, criptografados em repouso com
+  `MASTER_ENCRYPTION_KEY` e expurgados após a janela de retenção. Faça backup
+  da chave junto com o banco.

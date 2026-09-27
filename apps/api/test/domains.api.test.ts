@@ -1,0 +1,1174 @@
+import { randomBytes } from "node:crypto";
+import {
+  DOMAIN_CREATE_LIMIT_PER_HOUR,
+  EnvKeyring,
+  generateApiKey,
+  hashApiKey,
+  PLAN_DOMAIN_LIMIT,
+} from "@millionsend/core";
+import type { Db } from "@millionsend/db";
+import { schema } from "@millionsend/db";
+import type { DkimVerificationStatus, DnsResolver, SesIdentityClient } from "@millionsend/ses";
+import { createTeam, createTestDb } from "@millionsend/test-utils";
+import { eq } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { type ApiDeps, createApi } from "../src/app.js";
+
+let db: Db;
+let close: () => Promise<void>;
+let teamId: string;
+let otherTeamId: string;
+let fullKey: string;
+let sendKey: string;
+let otherTeamKey: string;
+
+interface FakeSesState {
+  dkimStatus?: DkimVerificationStatus;
+  verifiedForSending?: boolean;
+  createError?: Error;
+  deleteError?: Error;
+}
+
+/** Fake SesIdentityClient discriminating on AWS command class names. */
+function fakeSes(state: FakeSesState = {}) {
+  const calls: { name: string; input: Record<string, unknown> }[] = [];
+  const client: SesIdentityClient = {
+    async send(command) {
+      const name = command.constructor.name;
+      calls.push({
+        name,
+        input: (command as unknown as { input: Record<string, unknown> }).input,
+      });
+      if (name === "CreateEmailIdentityCommand" && state.createError) throw state.createError;
+      if (name === "DeleteEmailIdentityCommand" && state.deleteError) throw state.deleteError;
+      if (name === "GetEmailIdentityCommand") {
+        return {
+          VerifiedForSendingStatus: state.verifiedForSending ?? false,
+          DkimAttributes: { Status: state.dkimStatus ?? "PENDING" },
+          MailFromAttributes: {
+            MailFromDomainStatus: state.verifiedForSending ? "SUCCESS" : "PENDING",
+          },
+        };
+      }
+      if (name === "CreateTenantCommand" || name === "GetTenantCommand") {
+        const tenantName = (command as unknown as { input: { TenantName: string } }).input
+          .TenantName;
+        const arn = `arn:aws:ses:sa-east-1:123456789012:tenant/${tenantName}`;
+        return name === "CreateTenantCommand" ? { TenantArn: arn } : { Tenant: { TenantArn: arn } };
+      }
+      return {};
+    },
+  };
+  return { client, calls };
+}
+
+// Default resolver answers nothing (every record reads Missing) and touches
+// no network; tests that verify override the methods they exercise.
+function fakeDns(overrides: Partial<DnsResolver> = {}): DnsResolver {
+  return {
+    resolveTxt: overrides.resolveTxt ?? (async () => []),
+    resolveMx: overrides.resolveMx ?? (async () => []),
+    resolveCname: overrides.resolveCname ?? (async () => []),
+  };
+}
+
+function makeApp(opts: {
+  client: SesIdentityClient;
+  dns?: DnsResolver;
+  appBaseUrl?: string | undefined;
+  trackingSubdomains?: boolean | undefined;
+  isCloud?: boolean;
+  authEmailFrom?: string;
+  tenants?: { configurationSet?: string | undefined };
+  regions?: string[];
+}) {
+  const deps: ApiDeps = {
+    db,
+    keyring: EnvKeyring.fromBase64(randomBytes(32).toString("base64")),
+    isCloud: opts.isCloud ?? false,
+    enqueueEmailSend: async () => {},
+    appBaseUrl: opts.appBaseUrl,
+    trackingSubdomains: opts.trackingSubdomains,
+    ses: {
+      clientForRegion: () => opts.client,
+      dns: opts.dns ?? fakeDns(),
+      regions: opts.regions ?? ["sa-east-1"],
+      authEmailFrom: opts.authEmailFrom,
+      tenants: opts.tenants,
+    },
+  };
+  return createApi(deps);
+}
+
+function call(
+  app: ReturnType<typeof createApi>,
+  token: string,
+  method: string,
+  path: string,
+  body?: unknown,
+) {
+  return app.request(path, {
+    method,
+    headers: {
+      authorization: `Bearer ${token}`,
+      ...(body !== undefined ? { "content-type": "application/json" } : {}),
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+}
+
+async function insertKey(
+  team: string,
+  overrides: Partial<typeof schema.apiKeys.$inferInsert> = {},
+) {
+  const key = generateApiKey();
+  await db.insert(schema.apiKeys).values({
+    teamId: team,
+    name: "k",
+    tokenPrefix: key.tokenPrefix,
+    keyHash: key.keyHash,
+    last4: key.last4,
+    ...overrides,
+  });
+  return key.token;
+}
+
+async function createDomain(
+  app: ReturnType<typeof createApi>,
+  name: string,
+  extra: Record<string, unknown> = {},
+) {
+  const res = await call(app, fullKey, "POST", "/domains", { name, ...extra });
+  expect(res.status).toBe(200);
+  return (await res.json()) as Record<string, unknown> & { id: string };
+}
+
+beforeAll(async () => {
+  ({ db, close } = await createTestDb());
+  teamId = await createTeam(db, "domains-team");
+  otherTeamId = await createTeam(db, "domains-other-team");
+  fullKey = await insertKey(teamId);
+  sendKey = await insertKey(teamId, { permission: "sending_access" });
+  otherTeamKey = await insertKey(otherTeamId);
+});
+afterAll(() => close());
+
+describe("POST /domains", () => {
+  it("registers a BYODKIM SES identity and returns the DNS records", async () => {
+    const { client, calls } = fakeSes();
+    const app = makeApp({ client });
+    const body = await createDomain(app, "updates.example.com", { region: "sa-east-1" });
+
+    expect(calls.map((c) => c.name)).toEqual([
+      "CreateEmailIdentityCommand",
+      "PutEmailIdentityMailFromAttributesCommand",
+    ]);
+    expect(calls[1]?.input).toMatchObject({ MailFromDomain: "send.updates.example.com" });
+
+    const [row] = await db
+      .select()
+      .from(schema.domains)
+      .where(eq(schema.domains.id, body.id as string));
+    expect(row).toMatchObject({
+      teamId,
+      name: "updates.example.com",
+      region: "sa-east-1",
+      status: "pending",
+      dkimSelector: "millionsend",
+    });
+
+    expect(body).toMatchObject({
+      name: "updates.example.com",
+      status: "pending",
+      region: "sa-east-1",
+      // Both tracking kinds start off, as the Domains docs promise.
+      open_tracking: false,
+      click_tracking: false,
+      tracking_subdomain: null,
+      capabilities: { sending: "enabled", receiving: "disabled" },
+    });
+    expect(body.records).toContainEqual({
+      record: "DKIM",
+      name: "millionsend._domainkey.updates.example.com",
+      type: "TXT",
+      ttl: "Auto",
+      status: "not_started",
+      value: `"v=DKIM1; k=rsa; p=${row?.dkimPublicKey}"`,
+    });
+    expect(body.records).toContainEqual({
+      record: "SPF",
+      name: "send.updates.example.com",
+      type: "MX",
+      ttl: "Auto",
+      status: "not_started",
+      value: "feedback-smtp.sa-east-1.amazonses.com",
+      priority: 10,
+    });
+    // The response never carries private-key material.
+    expect(JSON.stringify(body)).not.toContain("PRIVATE");
+  });
+
+  it("defaults region to the deployment's SES region and echoes it", async () => {
+    const app = makeApp(fakeSes());
+    const body = await createDomain(app, "default-region.example.com");
+    expect(body.region).toBe("sa-east-1");
+  });
+
+  it("accepts every served region and defaults to the first when several are served", async () => {
+    const { client, calls } = fakeSes();
+    const app = makeApp({ client, regions: ["sa-east-1", "us-east-1"] });
+    const us = await createDomain(app, "us.example.com", { region: "us-east-1" });
+    expect(us.region).toBe("us-east-1");
+    const first = await createDomain(app, "first.example.com");
+    expect(first.region).toBe("sa-east-1");
+    expect(calls.filter((c) => c.name === "CreateEmailIdentityCommand")).toHaveLength(2);
+    const unserved = await call(app, fullKey, "POST", "/domains", {
+      name: "far.example.com",
+      region: "eu-west-1",
+    });
+    expect(unserved.status).toBe(422);
+  });
+
+  it("applies optional tracking settings at creation and returns the Tracking CNAME", async () => {
+    const app = makeApp({ ...fakeSes(), appBaseUrl: "https://app.example.dev" });
+    const res = await call(app, fullKey, "POST", "/domains", {
+      name: "tracked.example.com",
+      click_tracking: true,
+      tracking_subdomain: "links",
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string; records: unknown[] } & Record<string, unknown>;
+    expect(body).toMatchObject({
+      open_tracking: false,
+      click_tracking: true,
+      tracking_subdomain: "links",
+    });
+    // The CNAME rides the create response like DKIM does, not_started like them.
+    expect(body.records).toContainEqual(
+      expect.objectContaining({
+        record: "Tracking",
+        name: "links.tracked.example.com",
+        value: "app.example.dev",
+        status: "not_started",
+      }),
+    );
+    const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, body.id));
+    expect(row).toMatchObject({
+      clickTracking: true,
+      openTracking: false,
+      trackingSubdomain: "links",
+    });
+    expect(row?.trackingSubdomainSetAt).toBeInstanceOf(Date);
+  });
+
+  it("with SES tenants on, creates the team's tenant and associates the identity and configuration set", async () => {
+    const t = await (async () => {
+      const id = await createTeam(db, "cloud-tenant-team");
+      return { id, key: await insertKey(id) };
+    })();
+    const { client, calls } = fakeSes();
+    const app = makeApp({ client, isCloud: true, tenants: { configurationSet: "millionsend" } });
+    const created = await call(app, t.key, "POST", "/domains", { name: "tenant.example.com" });
+    expect(created.status).toBe(200);
+    const { id } = (await created.json()) as { id: string };
+
+    expect(calls.map((c) => c.name)).toEqual([
+      "CreateEmailIdentityCommand",
+      "PutEmailIdentityMailFromAttributesCommand",
+      "CreateTenantCommand",
+      "CreateTenantResourceAssociationCommand",
+      "CreateTenantResourceAssociationCommand",
+    ]);
+    expect(calls[2]?.input).toEqual({ TenantName: t.id });
+    expect(calls.slice(3).map((c) => c.input.ResourceArn)).toEqual([
+      "arn:aws:ses:sa-east-1:123456789012:identity/tenant.example.com",
+      "arn:aws:ses:sa-east-1:123456789012:configuration-set/millionsend",
+    ]);
+    const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.sesTenantAssociatedAt).toBeInstanceOf(Date);
+    expect(row?.sesTenantConfigSet).toBe("millionsend");
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, t.id));
+    expect(team?.sesTenantName).toBe(t.id);
+
+    // Deleting detaches the identity from the tenant before dropping it.
+    calls.length = 0;
+    expect((await call(app, t.key, "DELETE", `/domains/${id}`)).status).toBe(200);
+    expect(calls.map((c) => c.name)).toEqual([
+      "GetTenantCommand",
+      "DeleteTenantResourceAssociationCommand",
+      "DeleteEmailIdentityCommand",
+    ]);
+  });
+
+  it("with SES tenants on, delete detaches an identity whose association never completed", async () => {
+    const t = await (async () => {
+      const id = await createTeam(db, "cloud-tenant-partial");
+      return { id, key: await insertKey(id) };
+    })();
+    const { client, calls } = fakeSes();
+    // Identity association succeeds, configuration-set association fails: the
+    // identity is attached to the tenant while the row stays unmarked.
+    const partial: SesIdentityClient = {
+      async send(command) {
+        const input = (command as unknown as { input: { ResourceArn?: string } }).input;
+        if (
+          command.constructor.name === "CreateTenantResourceAssociationCommand" &&
+          input.ResourceArn?.includes(":configuration-set/")
+        ) {
+          throw Object.assign(new Error("no such set"), { name: "NotFoundException" });
+        }
+        return client.send(command);
+      },
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const app = makeApp({
+      client: partial,
+      isCloud: true,
+      tenants: { configurationSet: "millionsend" },
+    });
+    const created = await call(app, t.key, "POST", "/domains", { name: "partial.example.com" });
+    expect(created.status).toBe(200);
+    warn.mockRestore();
+    const { id } = (await created.json()) as { id: string };
+    const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.sesTenantAssociatedAt).toBeNull();
+
+    // SES refuses to delete an attached identity, so the delete detaches first
+    // even though nothing on the row says the identity is attached.
+    calls.length = 0;
+    expect((await call(app, t.key, "DELETE", `/domains/${id}`)).status).toBe(200);
+    expect(calls.map((c) => c.name)).toEqual([
+      "GetTenantCommand",
+      "DeleteTenantResourceAssociationCommand",
+      "DeleteEmailIdentityCommand",
+    ]);
+  });
+
+  it("with SES tenants on, a failed association never fails the create and leaves the marker for the backfill", async () => {
+    const t = await (async () => {
+      const id = await createTeam(db, "cloud-tenant-fail");
+      return { id, key: await insertKey(id) };
+    })();
+    const { client, calls } = fakeSes();
+    const throwing: SesIdentityClient = {
+      async send(command) {
+        if (command.constructor.name === "CreateTenantCommand") {
+          throw Object.assign(new Error("throttled"), { name: "TooManyRequestsException" });
+        }
+        return client.send(command);
+      },
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const app = makeApp({ client: throwing, isCloud: true, tenants: {} });
+    const created = await call(app, t.key, "POST", "/domains", { name: "later.example.com" });
+    expect(created.status).toBe(200);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+    const { id } = (await created.json()) as { id: string };
+    const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.sesTenantAssociatedAt).toBeNull();
+    expect(calls.filter((c) => c.name.includes("Tenant"))).toHaveLength(0);
+  });
+
+  it("cloud: refuses creating with tracking on and no subdomain before touching SES", async () => {
+    const key = await insertKey(await createTeam(db, "cloud-create-tracking"));
+    const { client, calls } = fakeSes();
+    const app = makeApp({ client, isCloud: true, appBaseUrl: "https://app.example.dev" });
+    const res = await call(app, key, "POST", "/domains", {
+      name: "untracked.example.com",
+      open_tracking: true,
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { message: string }).message).toContain("tracking_subdomain");
+    expect(calls.filter((c) => c.name === "CreateEmailIdentityCommand")).toHaveLength(0);
+    const rows = await db
+      .select({ id: schema.domains.id })
+      .from(schema.domains)
+      .where(eq(schema.domains.name, "untracked.example.com"));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("422s a tracking subdomain equal to the return path on create", async () => {
+    const app = makeApp({ ...fakeSes(), appBaseUrl: "https://app.example.dev" });
+    const res = await call(app, fullKey, "POST", "/domains", {
+      name: "collide.example.com",
+      custom_return_path: "send",
+      tracking_subdomain: "send",
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects a region the deployment does not serve, an unknown region, and an uppercase name", async () => {
+    const { client, calls } = fakeSes();
+    const app = makeApp({ client });
+    // A real SES region, just not this deployment's: refused by name before
+    // any identity is created or DNS record handed out.
+    const unserved = await call(app, fullKey, "POST", "/domains", {
+      name: "r.example.com",
+      region: "eu-west-1",
+    });
+    expect(unserved.status).toBe(422);
+    expect(await unserved.json()).toMatchObject({
+      name: "validation_error",
+      message: expect.stringContaining("sa-east-1"),
+    });
+    expect(calls).toHaveLength(0);
+    const badRegion = await call(app, fullKey, "POST", "/domains", {
+      name: "r.example.com",
+      region: "us-west-2",
+    });
+    expect(badRegion.status).toBe(422);
+    const badName = await call(app, fullKey, "POST", "/domains", { name: "Upper.Example.com" });
+    expect(badName.status).toBe(422);
+  });
+
+  it("409s a duplicate name within the team", async () => {
+    const app = makeApp(fakeSes());
+    await createDomain(app, "dupe.example.com");
+    const res = await call(app, fullKey, "POST", "/domains", { name: "dupe.example.com" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ statusCode: 409, name: "conflict" });
+  });
+});
+
+describe("POST /domains in cloud (shared AWS account)", () => {
+  const ALREADY_EXISTS = Object.assign(new Error("exists"), { name: "AlreadyExistsException" });
+  async function cloudTeam(slug: string) {
+    const id = await createTeam(db, slug);
+    return { id, key: await insertKey(id) };
+  }
+
+  it("in cloud, 409s a domain another team holds in another served region", async () => {
+    const { client, calls } = fakeSes();
+    const app = makeApp({ client, isCloud: true, regions: ["sa-east-1", "us-east-1"] });
+    await db
+      .insert(schema.domains)
+      .values({ teamId: otherTeamId, name: "elsewhere.example.com", region: "sa-east-1" });
+    const res = await call(app, fullKey, "POST", "/domains", {
+      name: "elsewhere.example.com",
+      region: "us-east-1",
+    });
+    expect(res.status).toBe(409);
+    expect(calls.filter((c) => c.name === "CreateEmailIdentityCommand")).toHaveLength(0);
+  });
+
+  it("409s a domain another team holds in the same region and never re-keys it", async () => {
+    const a = await cloudTeam("cloud-a");
+    const b = await cloudTeam("cloud-b");
+    const { client, calls } = fakeSes();
+    const app = makeApp({ client, isCloud: true });
+    const first = await call(app, a.key, "POST", "/domains", {
+      name: "victim.example.com",
+      region: "sa-east-1",
+    });
+    expect(first.status).toBe(200);
+    const second = await call(app, b.key, "POST", "/domains", {
+      name: "victim.example.com",
+      region: "sa-east-1",
+    });
+    expect(second.status).toBe(409);
+    expect(calls.filter((c) => c.name === "CreateEmailIdentityCommand")).toHaveLength(1);
+  });
+
+  it("409s instead of adopting an identity SES already holds", async () => {
+    const t = await cloudTeam("cloud-c");
+    const { client, calls } = fakeSes({ createError: ALREADY_EXISTS });
+    const res = await call(makeApp({ client, isCloud: true }), t.key, "POST", "/domains", {
+      name: "taken.example.com",
+    });
+    expect(res.status).toBe(409);
+    expect(calls.map((c) => c.name)).toEqual(["CreateEmailIdentityCommand"]);
+    expect(
+      await db.select().from(schema.domains).where(eq(schema.domains.teamId, t.id)),
+    ).toHaveLength(0);
+  });
+
+  it("still adopts an orphaned identity on self-host", async () => {
+    const { client, calls } = fakeSes({ createError: ALREADY_EXISTS });
+    const res = await call(makeApp({ client }), fullKey, "POST", "/domains", {
+      name: "orphan.example.com",
+    });
+    expect(res.status).toBe(200);
+    expect(calls.map((c) => c.name)).toContain("PutEmailIdentityDkimSigningAttributesCommand");
+  });
+
+  it("422s public mailbox providers everywhere and platform/system-mail domains in cloud", async () => {
+    const authEmailFrom = "MillionSend <no-reply@mail.ms-ops.dev>";
+    const cloud = makeApp({ ...fakeSes(), isCloud: true, authEmailFrom });
+    for (const name of ["gmail.com", "millionsend.com", "mail.ms-ops.dev"]) {
+      const res = await call(cloud, fullKey, "POST", "/domains", { name });
+      expect(res.status, name).toBe(422);
+    }
+    const selfHost = makeApp({ ...fakeSes(), authEmailFrom });
+    expect((await call(selfHost, fullKey, "POST", "/domains", { name: "gmail.com" })).status).toBe(
+      422,
+    );
+    expect(
+      (await call(selfHost, fullKey, "POST", "/domains", { name: "mail.ms-ops.dev" })).status,
+    ).toBe(200);
+  });
+
+  it("caps domains per plan and rate-limits creation", async () => {
+    const t = await cloudTeam("cloud-d");
+    const app = makeApp({ ...fakeSes(), isCloud: true });
+    const create = (i: number) =>
+      call(app, t.key, "POST", "/domains", { name: `d${i}.example.com` });
+    const freeLimit = PLAN_DOMAIN_LIMIT.free ?? 0;
+    for (let i = 0; i < freeLimit; i++) expect((await create(i)).status).toBe(200);
+    const capped = await create(freeLimit);
+    expect(capped.status).toBe(403);
+    expect(await capped.json()).toMatchObject({ name: "plan_limit_reached" });
+
+    // Scale has unlimited domains, so the rate limiter is what stops the loop
+    // here — a domain-capped plan (Pro caps at 10) would answer 403 first.
+    await db.update(schema.teams).set({ plan: "scale" }).where(eq(schema.teams.id, t.id));
+    for (let i = freeLimit; i < DOMAIN_CREATE_LIMIT_PER_HOUR; i++) {
+      expect((await create(i)).status).toBe(200);
+    }
+    const limited = await create(DOMAIN_CREATE_LIMIT_PER_HOUR);
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toMatchObject({ name: "rate_limit_exceeded" });
+    // Each successful create runs a real RSA keygen; 11 of them overrun the
+    // default 5s on loaded CI runners.
+  }, 30_000);
+});
+
+describe("GET /domains", () => {
+  it("lists only the caller team's domains in the list envelope", async () => {
+    const app = makeApp(fakeSes());
+    await createDomain(app, "list-a.example.com");
+    const foreign = await call(app, otherTeamKey, "POST", "/domains", {
+      name: "foreign.example.com",
+    });
+    expect(foreign.status).toBe(200);
+
+    const res = await call(app, fullKey, "GET", "/domains");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      object: string;
+      has_more: boolean;
+      data: { name: string }[];
+    };
+    expect(body.object).toBe("list");
+    expect(body.has_more).toBe(false);
+    expect(body.data.some((d) => d.name === "list-a.example.com")).toBe(true);
+    expect(body.data.some((d) => d.name === "foreign.example.com")).toBe(false);
+  });
+});
+
+type WireRecord = {
+  record: string;
+  name: string;
+  status: string;
+  live?: string;
+  detail?: string;
+  inherited_from?: string;
+  policy?: string;
+};
+
+/** A resolver publishing exactly the SES checklist for `domain`, plus any extra TXT answers. */
+function dnsFor(domain: string, dkimPublicKey: string, txt: Record<string, string[]> = {}) {
+  return fakeDns({
+    resolveTxt: async (name: string) => {
+      if (name in txt) return [txt[name] ?? []];
+      if (name === `millionsend._domainkey.${domain}`)
+        return [[`v=DKIM1; k=rsa; p=${dkimPublicKey}`]];
+      if (name === `send.${domain}`) return [["v=spf1 include:amazonses.com ~all"]];
+      return [];
+    },
+    resolveMx: async (name: string) =>
+      name === `send.${domain}`
+        ? [{ priority: 10, exchange: "feedback-smtp.sa-east-1.amazonses.com" }]
+        : [],
+  });
+}
+
+async function dkimKeyOf(id: string): Promise<string> {
+  const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+  return row?.dkimPublicKey ?? "";
+}
+
+describe("GET /domains/{id}", () => {
+  async function getRecords(app: ReturnType<typeof createApi>, id: string) {
+    const res = await call(app, fullKey, "GET", `/domains/${id}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { object: string; status: string; records: WireRecord[] };
+    expect(body.object).toBe("domain");
+    return body;
+  }
+
+  it("combines SES with live DNS per record, the way the dashboard badge does", async () => {
+    const { id } = await createDomain(makeApp(fakeSes()), "get.example.com");
+    const app = makeApp({
+      client: fakeSes({ dkimStatus: "SUCCESS", verifiedForSending: true }).client,
+      dns: dnsFor("get.example.com", await dkimKeyOf(id)),
+    });
+    const { records, status } = await getRecords(app, id);
+    // A read reports, never persists: the stored status stays pending.
+    expect(status).toBe("pending");
+    expect(records.find((r) => r.record === "DKIM")).toMatchObject({
+      status: "verified",
+      live: "found",
+    });
+    expect(records.filter((r) => r.record === "SPF").every((r) => r.status === "verified")).toBe(
+      true,
+    );
+    expect(records.find((r) => r.record === "SPF")).not.toHaveProperty("detail");
+    // No DMARC anywhere: recommended, so not_started rather than failed.
+    expect(records.find((r) => r.record === "DMARC")).toEqual({
+      record: "DMARC",
+      name: "_dmarc.get.example.com",
+      type: "TXT",
+      ttl: "Auto",
+      status: "not_started",
+      value: '"v=DMARC1; p=none;"',
+      live: "missing",
+      detail:
+        "No DMARC policy at this name or at _dmarc.example.com; recommended, not required for sending.",
+    });
+  });
+
+  it("reads DMARC published only at the organizational domain as verified, naming the inherited record", async () => {
+    const { id } = await createDomain(makeApp(fakeSes()), "sub.example.com");
+    const app = makeApp({
+      client: fakeSes({ dkimStatus: "SUCCESS", verifiedForSending: true }).client,
+      dns: dnsFor("sub.example.com", await dkimKeyOf(id), {
+        "_dmarc.example.com": ["v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"],
+      }),
+    });
+    const { records } = await getRecords(app, id);
+    expect(records.find((r) => r.record === "DMARC")).toMatchObject({
+      status: "verified",
+      live: "found",
+      inherited_from: "_dmarc.example.com",
+      policy: "quarantine",
+      detail:
+        "No record at this name; receivers apply _dmarc.example.com (p=quarantine), which covers this subdomain.",
+    });
+  });
+
+  it("an apex sender missing DMARC is told about its own name only", async () => {
+    const { id } = await createDomain(makeApp(fakeSes()), "apex-example.com");
+    const app = makeApp({
+      client: fakeSes().client,
+      dns: dnsFor("apex-example.com", await dkimKeyOf(id)),
+    });
+    const { records } = await getRecords(app, id);
+    expect(records.find((r) => r.record === "DMARC")).toMatchObject({
+      status: "not_started",
+      live: "missing",
+      detail: "No DMARC policy at this name; recommended, not required for sending.",
+    });
+  });
+
+  it("a DKIM record found in DNS while SES is still pending reads pending and says so", async () => {
+    const { id } = await createDomain(makeApp(fakeSes()), "waiting.example.com");
+    const app = makeApp({
+      client: fakeSes().client,
+      dns: dnsFor("waiting.example.com", await dkimKeyOf(id)),
+    });
+    const { records } = await getRecords(app, id);
+    expect(records.find((r) => r.record === "DKIM")).toMatchObject({
+      status: "pending",
+      live: "found",
+      detail:
+        "Record found in DNS; the provider has not confirmed it yet (usually minutes, up to 72 hours).",
+    });
+  });
+
+  it("a wrong published value reads failed and carries what DNS answered", async () => {
+    const { id } = await createDomain(makeApp(fakeSes()), "wrong.example.com");
+    const app = makeApp({
+      client: fakeSes({ dkimStatus: "SUCCESS", verifiedForSending: true }).client,
+      dns: dnsFor("wrong.example.com", await dkimKeyOf(id), {
+        "millionsend._domainkey.wrong.example.com": ["v=DKIM1; k=rsa; p=STALEKEY"],
+      }),
+    });
+    const { records } = await getRecords(app, id);
+    expect(records.find((r) => r.record === "DKIM")).toMatchObject({
+      status: "failed",
+      live: "mismatch",
+      detail: "A different value is published: v=DKIM1; k=rsa; p=STALEKEY",
+    });
+    // A record nobody published: not_started, no live-found note.
+    const missing = await getRecords(makeApp(fakeSes({ dkimStatus: "SUCCESS" })), id);
+    expect(missing.records.find((r) => r.record === "DKIM")).toMatchObject({
+      status: "not_started",
+      live: "missing",
+      detail: "No record at this name.",
+    });
+  });
+
+  it("404s a foreign team's domain", async () => {
+    const app = makeApp(fakeSes());
+    const { id } = await createDomain(app, "isolated.example.com");
+    const res = await call(app, otherTeamKey, "GET", `/domains/${id}`);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ statusCode: 404, name: "not_found" });
+  });
+});
+
+describe("POST /domains/{id}/verify", () => {
+  it("flips the stored status to verified when SES and live DNS both pass", async () => {
+    const bootstrap = makeApp(fakeSes());
+    const { id } = await createDomain(bootstrap, "verify.example.com");
+    const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    const dkimPublicKey = row?.dkimPublicKey ?? "";
+
+    const app = makeApp({
+      client: fakeSes({ dkimStatus: "SUCCESS", verifiedForSending: true }).client,
+      dns: fakeDns({
+        resolveTxt: async (name: string) => {
+          if (name === "millionsend._domainkey.verify.example.com") {
+            return [[`v=DKIM1; k=rsa; p=${dkimPublicKey}`]];
+          }
+          if (name === "send.verify.example.com") return [["v=spf1 include:amazonses.com ~all"]];
+          return [];
+        },
+        resolveMx: async (name: string) =>
+          name === "send.verify.example.com"
+            ? [{ priority: 10, exchange: "feedback-smtp.sa-east-1.amazonses.com" }]
+            : [],
+      }),
+    });
+    const res = await call(app, fullKey, "POST", `/domains/${id}/verify`);
+    expect(res.status).toBe(200);
+    // Full object with the freshly computed status — no get_domain round-trip.
+    const verifyBody = (await res.json()) as Record<string, unknown>;
+    expect(verifyBody).toMatchObject({ object: "domain", id, status: "verified" });
+    expect(Array.isArray(verifyBody.records)).toBe(true);
+
+    const [after] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(after?.status).toBe("verified");
+    expect(after?.verifiedAt).toBeInstanceOf(Date);
+    expect(after?.lastCheckedAt).toBeInstanceOf(Date);
+  });
+
+  it("clears the tracking subdomain's 72h clock once its CNAME resolves", async () => {
+    const app = makeApp({
+      ...fakeSes(),
+      appBaseUrl: "https://app.example.dev",
+      dns: fakeDns({
+        resolveCname: async (name: string) =>
+          name === "links.cname.example.com" ? ["app.example.dev"] : [],
+      }),
+    });
+    const { id } = await createDomain(app, "cname.example.com");
+    await call(app, fullKey, "PATCH", `/domains/${id}`, { tracking_subdomain: "links" });
+    let [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.trackingSubdomainSetAt).toBeInstanceOf(Date);
+
+    const res = await call(app, fullKey, "POST", `/domains/${id}/verify`);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { records: unknown[] }).records).toContainEqual(
+      expect.objectContaining({
+        record: "Tracking",
+        name: "links.cname.example.com",
+        status: "verified",
+      }),
+    );
+    [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.trackingSubdomainSetAt).toBeNull();
+  });
+
+  it("a plain GET that sees the CNAME resolve clears the clock too, so the row never reads verified while sends ship untracked", async () => {
+    const app = makeApp({
+      ...fakeSes(),
+      appBaseUrl: "https://app.example.dev",
+      dns: fakeDns({
+        resolveCname: async (name: string) =>
+          name === "links.readonly.example.com" ? ["app.example.dev"] : [],
+      }),
+    });
+    const { id } = await createDomain(app, "readonly.example.com");
+    await call(app, fullKey, "PATCH", `/domains/${id}`, { tracking_subdomain: "links" });
+    const res = await call(app, fullKey, "GET", `/domains/${id}`);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { records: unknown[] }).records).toContainEqual(
+      expect.objectContaining({ record: "Tracking", status: "verified" }),
+    );
+    const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.trackingSubdomainSetAt).toBeNull();
+  });
+
+  it("leaves the clock armed and the Tracking row pending while the CNAME does not resolve", async () => {
+    const app = makeApp({
+      ...fakeSes(),
+      appBaseUrl: "https://app.example.dev",
+      dns: fakeDns({ resolveCname: async () => ["elsewhere.example.net"] }),
+    });
+    const { id } = await createDomain(app, "unresolved.example.com");
+    await call(app, fullKey, "PATCH", `/domains/${id}`, { tracking_subdomain: "links" });
+
+    const res = await call(app, fullKey, "POST", `/domains/${id}/verify`);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { records: unknown[] }).records).toContainEqual(
+      expect.objectContaining({ record: "Tracking", status: "pending" }),
+    );
+    const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.trackingSubdomainSetAt).toBeInstanceOf(Date);
+  });
+
+  it("stays pending when a required record is live-missing despite SES success", async () => {
+    const app = makeApp(fakeSes({ dkimStatus: "SUCCESS", verifiedForSending: true }));
+    const { id } = await createDomain(app, "half.example.com");
+    const res = await call(app, fullKey, "POST", `/domains/${id}/verify`);
+    expect(res.status).toBe(200);
+    const [after] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(after?.status).toBe("pending");
+    expect(after?.verifiedAt).toBeNull();
+  });
+});
+
+describe("PATCH /domains/{id}", () => {
+  it("persists the tracking toggles and the branded subdomain", async () => {
+    const app = makeApp({ ...fakeSes(), appBaseUrl: "https://app.example.dev" });
+    const { id } = await createDomain(app, "patch.example.com");
+
+    const res = await call(app, fullKey, "PATCH", `/domains/${id}`, {
+      open_tracking: true,
+      click_tracking: false,
+      tracking_subdomain: "email",
+    });
+    expect(res.status).toBe(200);
+    // Full object echoing the settings just changed.
+    expect(await res.json()).toMatchObject({
+      object: "domain",
+      id,
+      open_tracking: true,
+      click_tracking: false,
+      tracking_subdomain: "email",
+    });
+
+    const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row).toMatchObject({
+      openTracking: true,
+      clickTracking: false,
+      trackingSubdomain: "email",
+    });
+
+    // The branded tracking CNAME now appears in the record list, pointed at
+    // the app host.
+    const get = await call(app, fullKey, "GET", `/domains/${id}`);
+    const body = (await get.json()) as {
+      records: { record: string; name: string; value: string }[];
+    };
+    expect(body.records).toContainEqual(
+      expect.objectContaining({
+        record: "Tracking",
+        name: "email.patch.example.com",
+        value: "app.example.dev",
+      }),
+    );
+
+    // Empty string clears the subdomain.
+    await call(app, fullKey, "PATCH", `/domains/${id}`, { tracking_subdomain: "" });
+    const [cleared] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(cleared?.trackingSubdomain).toBeNull();
+  });
+
+  it("cloud: refuses to leave tracking on without a tracking subdomain", async () => {
+    // A fresh team: the shared one already sits at its cloud plan cap.
+    const t = { key: await insertKey(await createTeam(db, "cloud-tracking")) };
+    const app = makeApp({ ...fakeSes(), isCloud: true, appBaseUrl: "https://app.example.dev" });
+    const created = await call(app, t.key, "POST", "/domains", { name: "gated.example.com" });
+    expect(created.status).toBe(200);
+    const { id } = (await created.json()) as { id: string };
+
+    const refused = await call(app, t.key, "PATCH", `/domains/${id}`, { click_tracking: true });
+    expect(refused.status).toBe(422);
+    expect(((await refused.json()) as { message: string }).message).toContain("tracking_subdomain");
+    let [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.clickTracking).toBe(false);
+
+    // A subdomain in the same request is accepted, and the CNAME to add comes
+    // back pending until it resolves.
+    const ok = await call(app, t.key, "PATCH", `/domains/${id}`, {
+      click_tracking: true,
+      tracking_subdomain: "links",
+    });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { records: unknown[] }).records).toContainEqual(
+      expect.objectContaining({
+        record: "Tracking",
+        name: "links.gated.example.com",
+        status: "pending",
+      }),
+    );
+
+    // Removing the subdomain while tracking stays on is the same unserved state.
+    const clearing = await call(app, t.key, "PATCH", `/domains/${id}`, { tracking_subdomain: "" });
+    expect(clearing.status).toBe(422);
+    [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.trackingSubdomain).toBe("links");
+
+    // Turning tracking off is always allowed, subdomain or not.
+    const off = await call(app, t.key, "PATCH", `/domains/${id}`, {
+      click_tracking: false,
+      tracking_subdomain: "",
+    });
+    expect(off.status).toBe(200);
+    [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row).toMatchObject({ clickTracking: false, trackingSubdomain: null });
+  });
+
+  it("cloud without subdomain support: says tracking cannot be turned on at all", async () => {
+    const t = { key: await insertKey(await createTeam(db, "cloud-nosub")) };
+    const app = makeApp({
+      ...fakeSes(),
+      isCloud: true,
+      appBaseUrl: "https://app.example.dev",
+      trackingSubdomains: false,
+    });
+    const created = await call(app, t.key, "POST", "/domains", { name: "nosub.example.com" });
+    expect(created.status).toBe(200);
+    const { id } = (await created.json()) as { id: string };
+    const res = await call(app, t.key, "PATCH", `/domains/${id}`, { open_tracking: true });
+    expect(res.status).toBe(422);
+    const { message } = (await res.json()) as { message: string };
+    expect(message).toContain("cannot be turned on");
+    expect(message).not.toContain("Pass tracking_subdomain");
+  });
+
+  it("self-host: tracking may turn on without a subdomain (the app host serves it)", async () => {
+    const app = makeApp({ ...fakeSes(), appBaseUrl: "https://app.example.dev" });
+    const { id } = await createDomain(app, "shared.example.com");
+    const res = await call(app, fullKey, "PATCH", `/domains/${id}`, { click_tracking: true });
+    expect(res.status).toBe(200);
+  });
+
+  it("422s adopting a tracking subdomain where the deployment cannot serve one", async () => {
+    const gated = makeApp({
+      ...fakeSes(),
+      appBaseUrl: "https://app.example.dev",
+      trackingSubdomains: false,
+    });
+    const { id } = await createDomain(gated, "gated.example.com");
+
+    const adopt = await call(gated, fullKey, "PATCH", `/domains/${id}`, {
+      tracking_subdomain: "email",
+    });
+    expect(adopt.status).toBe(422);
+    expect(await adopt.json()).toMatchObject({
+      statusCode: 422,
+      name: "validation_error",
+      message: expect.stringContaining("not available"),
+    });
+    const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.trackingSubdomain).toBeNull();
+  });
+
+  // Turning the flag off must not strand a subdomain adopted while it was on.
+  it("still clears a stored tracking subdomain once the deployment stops serving them", async () => {
+    const open = makeApp({ ...fakeSes(), appBaseUrl: "https://app.example.dev" });
+    const { id } = await createDomain(open, "stranded.example.com");
+    await call(open, fullKey, "PATCH", `/domains/${id}`, { tracking_subdomain: "email" });
+
+    const gated = makeApp({
+      ...fakeSes(),
+      appBaseUrl: "https://app.example.dev",
+      trackingSubdomains: false,
+    });
+    const cleared = await call(gated, fullKey, "PATCH", `/domains/${id}`, {
+      tracking_subdomain: "",
+    });
+    expect(cleared.status).toBe(200);
+    const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.trackingSubdomain).toBeNull();
+  });
+
+  it("422s a tracking subdomain equal to the return-path (MAIL FROM) subdomain", async () => {
+    const app = makeApp({ ...fakeSes(), appBaseUrl: "https://app.example.dev" });
+    // custom_return_path defaults to "send".
+    const { id } = await createDomain(app, "clash.example.com");
+
+    const res = await call(app, fullKey, "PATCH", `/domains/${id}`, { tracking_subdomain: "send" });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ statusCode: 422, name: "validation_error" });
+    const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
+    expect(row?.trackingSubdomain).toBeNull();
+  });
+
+  it("omits the tracking CNAME from the checklist where subdomains are not served", async () => {
+    const open = makeApp({ ...fakeSes(), appBaseUrl: "https://app.example.dev" });
+    const { id } = await createDomain(open, "hidden.example.com");
+    await call(open, fullKey, "PATCH", `/domains/${id}`, { tracking_subdomain: "email" });
+
+    const gated = makeApp({
+      ...fakeSes(),
+      appBaseUrl: "https://app.example.dev",
+      trackingSubdomains: false,
+    });
+    const res = await call(gated, fullKey, "GET", `/domains/${id}`);
+    const body = (await res.json()) as { records: { record: string }[] };
+    expect(body.records.some((r) => r.record === "Tracking")).toBe(false);
+  });
+
+  it("422s enabling tracking when APP_BASE_URL is loopback or unset", async () => {
+    const loopback = makeApp({ ...fakeSes(), appBaseUrl: "http://localhost:3000" });
+    const { id } = await createDomain(loopback, "loop.example.com");
+
+    const enable = await call(loopback, fullKey, "PATCH", `/domains/${id}`, {
+      open_tracking: true,
+    });
+    expect(enable.status).toBe(422);
+    expect(await enable.json()).toMatchObject({
+      statusCode: 422,
+      name: "validation_error",
+      message: expect.stringContaining("loopback"),
+    });
+
+    const unset = makeApp({ ...fakeSes(), appBaseUrl: undefined });
+    const subdomain = await call(unset, fullKey, "PATCH", `/domains/${id}`, {
+      tracking_subdomain: "email",
+    });
+    expect(subdomain.status).toBe(422);
+    expect(await subdomain.json()).toMatchObject({
+      message: expect.stringContaining("APP_BASE_URL"),
+    });
+
+    // Disabling is always possible — it needs no reachable host.
+    const disable = await call(loopback, fullKey, "PATCH", `/domains/${id}`, {
+      open_tracking: false,
+      click_tracking: false,
+    });
+    expect(disable.status).toBe(200);
+  });
+
+  it("422s tls and capabilities as unsupported", async () => {
+    const app = makeApp({ ...fakeSes(), appBaseUrl: "https://app.example.dev" });
+    const { id } = await createDomain(app, "tls.example.com");
+
+    const tls = await call(app, fullKey, "PATCH", `/domains/${id}`, { tls: "enforced" });
+    expect(tls.status).toBe(422);
+    expect(await tls.json()).toMatchObject({ message: expect.stringContaining("tls") });
+
+    const capabilities = await call(app, fullKey, "PATCH", `/domains/${id}`, {
+      capabilities: { sending: "enabled" },
+    });
+    expect(capabilities.status).toBe(422);
+  });
+});
+
+describe("DELETE /domains/{id}", () => {
+  it("deletes the SES identity, revokes scoped keys, and removes the row", async () => {
+    const { client, calls } = fakeSes();
+    const app = makeApp({ client });
+    const { id } = await createDomain(app, "delete.example.com");
+    await db.update(schema.domains).set({ status: "verified" }).where(eq(schema.domains.id, id));
+    const scopedToken = await insertKey(teamId, { domainId: id });
+
+    const res = await call(app, fullKey, "DELETE", `/domains/${id}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ object: "domain", id, deleted: true });
+
+    expect(calls.at(-1)).toMatchObject({
+      name: "DeleteEmailIdentityCommand",
+      input: { EmailIdentity: "delete.example.com" },
+    });
+    expect(await db.select().from(schema.domains).where(eq(schema.domains.id, id))).toHaveLength(0);
+    const [key] = await db
+      .select()
+      .from(schema.apiKeys)
+      .where(eq(schema.apiKeys.keyHash, hashApiKey(scopedToken)));
+    expect(key?.revokedAt).not.toBeNull();
+    expect(key?.domainId).toBeNull();
+  });
+
+  it("fails the domain's queued emails in the delete and keeps an identity other rows share", async () => {
+    const { client, calls } = fakeSes();
+    const app = makeApp({ client });
+    const { id } = await createDomain(app, "cascade.example.com");
+    const base = {
+      teamId,
+      domainId: id,
+      from: "a@cascade.example.com",
+      to: ["r@x.com"],
+      subject: "s",
+    };
+    const [queued, sent] = await db
+      .insert(schema.emails)
+      .values([
+        { ...base, latestStatus: "queued", scheduledAt: new Date(Date.now() + 60_000) },
+        { ...base, latestStatus: "delivered", sentAt: new Date() },
+      ])
+      .returning({ id: schema.emails.id });
+    // Self-host: another team registered the same identity in the same region.
+    await db
+      .insert(schema.domains)
+      .values({ teamId: otherTeamId, name: "cascade.example.com", region: "sa-east-1" });
+
+    const res = await call(app, fullKey, "DELETE", `/domains/${id}`);
+    expect(res.status).toBe(200);
+    expect(calls.some((c) => c.name === "DeleteEmailIdentityCommand")).toBe(false);
+    expect(await db.select().from(schema.domains).where(eq(schema.domains.id, id))).toHaveLength(0);
+
+    const status = async (emailId: string | undefined) =>
+      (
+        await db
+          .select({ s: schema.emails.latestStatus })
+          .from(schema.emails)
+          .where(eq(schema.emails.id, emailId ?? ""))
+      )[0]?.s;
+    expect(await status(queued?.id)).toBe("failed");
+    expect(await status(sent?.id)).toBe("delivered");
+    const events = await db
+      .select({ type: schema.emailEvents.type })
+      .from(schema.emailEvents)
+      .where(eq(schema.emailEvents.emailId, queued?.id ?? ""));
+    expect(events).toEqual([{ type: "failed" }]);
+  });
+
+  it("tolerates an identity already gone from SES", async () => {
+    const app = makeApp(
+      fakeSes({
+        deleteError: Object.assign(new Error("gone"), { name: "NotFoundException" }),
+      }),
+    );
+    const { id } = await createDomain(app, "gone.example.com");
+    const res = await call(app, fullKey, "DELETE", `/domains/${id}`);
+    expect(res.status).toBe(200);
+    expect(await db.select().from(schema.domains).where(eq(schema.domains.id, id))).toHaveLength(0);
+  });
+
+  it("404s a foreign team's domain without touching SES", async () => {
+    const { client, calls } = fakeSes();
+    const app = makeApp({ client });
+    const { id } = await createDomain(app, "keep.example.com");
+    const before = calls.length;
+    const res = await call(app, otherTeamKey, "DELETE", `/domains/${id}`);
+    expect(res.status).toBe(404);
+    expect(calls.length).toBe(before);
+    expect(await db.select().from(schema.domains).where(eq(schema.domains.id, id))).toHaveLength(1);
+  });
+});
+
+describe("permission confinement", () => {
+  it("403s a sending_access key on every /domains route", async () => {
+    const app = makeApp(fakeSes());
+    const { id } = await createDomain(app, "confined.example.com");
+    for (const [method, path] of [
+      ["GET", "/domains"],
+      ["POST", "/domains"],
+      ["GET", `/domains/${id}`],
+      ["POST", `/domains/${id}/verify`],
+      ["PATCH", `/domains/${id}`],
+      ["DELETE", `/domains/${id}`],
+    ] as const) {
+      const res = await call(app, sendKey, method, path, method === "GET" ? undefined : {});
+      expect(res.status, `${method} ${path}`).toBe(403);
+      expect(await res.json()).toMatchObject({ name: "restricted_api_key" });
+    }
+  });
+
+  it("omitting the ses dep leaves the /domains surface unregistered (404)", async () => {
+    const bare = createApi({
+      db,
+      keyring: EnvKeyring.fromBase64(randomBytes(32).toString("base64")),
+      isCloud: false,
+      enqueueEmailSend: async () => {},
+    });
+    const res = await call(bare, fullKey, "GET", "/domains");
+    expect(res.status).toBe(404);
+  });
+});

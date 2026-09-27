@@ -1,0 +1,34 @@
+{
+  "name": "@millionsend/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sesv2": "^3.1130.0",
+    "@aws-sdk/client-sqs": "^3.1130.0",
+    "@millionsend/billing": "workspace:*",
+    "@millionsend/config": "workspace:*",
+    "@millionsend/core": "workspace:*",
+    "@millionsend/db": "workspace:*",
+    "@millionsend/queue": "workspace:*",
+    "@millionsend/ses": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "nodemailer": "^10.0.3",
+    "tsx": "^4.23.13"
+  },
+  "devDependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@millionsend/api": "workspace:*",
+    "@millionsend/test-utils": "workspace:*",
+    "@types/node": "^22.20.2",
+    "@types/nodemailer": "^8.0.1",
+    "resend": "^6.27.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

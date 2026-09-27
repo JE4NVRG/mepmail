@@ -1,0 +1,184 @@
+---
+title: Migrar do Resend
+description: Um comando move sua conta do Resend; duas linhas de ambiente movem seu código — o formato de wire é idêntico.
+---
+
+A API REST do MepMail é compatível no wire com a do Resend: mesmos
+endpoints, mesmos formatos de requisição e resposta. Migrar é uma mudança de
+configuração, não uma reescrita. Os dados da conta — contatos, segmentos,
+tópicos, templates, webhooks, domínios, supressões — vêm com um comando.
+
+## Entregue a um agente
+
+A migração inteira — inventário, movimentação da conta, mudanças de código,
+DNS, virada — está escrita como um único prompt que um agente pode seguir de
+ponta a ponta, incluindo as salvaguardas (Resend somente leitura, chaves nunca
+em arquivos, perguntar antes de aplicar).
+
+<CopyPrompt href="/pt-BR/prompts/migrate-from-resend.md" copied="Copiado">Copiar o prompt de migração</CopyPrompt>
+
+Ou aponte o agente para ele: `https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/prompts/migrate-from-resend.pt-BR.md`.
+
+## 1. Mova sua conta
+
+Crie uma chave de API `ms_` com acesso total em **Chaves de API** (MepMail
+Cloud, ou sua própria instância [auto-hospedada](/pt-BR/self-hosting)) e rode,
+na sua máquina:
+
+```sh
+npx @millionsend/cli migrate --from resend
+```
+
+Ele pede sua chave do Resend (acesso total) e sua chave do MepMail, lê sua
+conta no Resend, mostra um plano, aguarda a confirmação, aplica e imprime um
+resumo. Auto-hospedado, informe a URL da API da sua instância:
+
+```sh
+npx @millionsend/cli migrate --from resend --to-url https://api.sua-instancia
+```
+
+O que ele faz:
+
+- **O Resend é apenas lido.** Toda requisição ao Resend é um `GET` a um
+  endpoint documentado; nada lá é criado, alterado ou excluído. A CLI mostra
+  ao conectar o limite de taxa que o Resend informa e se mantém abaixo dele:
+  8 requisições por segundo por padrão (o limite do time no Resend é 10,
+  compartilhado com o seu envio em produção), recuando pelos cabeçalhos
+  `ratelimit-*` e a cada `429`. `--rps` muda o ritmo.
+- **Suas chaves nunca saem da sua máquina.** A ferramenta fala apenas com
+  `api.resend.com` e com a sua API do MepMail. As chaves ficam em memória
+  durante a execução, nunca são gravadas em arquivo e são redigidas de toda
+  linha de log. Sem telemetria, sem verificação de atualização.
+- **Virada primeiro, enriquecimento depois.** A passagem 1 cria propriedades,
+  tópicos, segmentos, domínios, webhooks, templates, broadcasts e supressões e
+  faz upsert dos contatos com suas associações a segmentos e o `unsubscribed`.
+  Ela termina em minutos, e a CLI então imprime **Cutover ready** com os
+  registros DNS e a linha do `RESEND_BASE_URL`: o envio transacional já pode
+  mudar nesse ponto. O enriquecimento — só quando a conta usa tópicos ou
+  propriedades de contato — lê então cada contato uma vez por faceta, primeiro
+  as inscrições em tópicos (para os opt-outs chegarem antes das propriedades),
+  depois as propriedades, com ritmo e tempo restante ao vivo. Segure envios
+  por tópico e broadcasts até ele terminar. As duas passagens retomam de onde
+  pararam após um Ctrl-C e uma nova execução, e `--skip enrichment` as deixa
+  de fora.
+- **Rode de novo antes da virada.** Cada execução é um diff: linhas existentes
+  são atualizadas quando diferem e deixadas como estão quando são iguais;
+  contatos passam por upsert pelo e-mail. Rode o mesmo comando de novo logo
+  antes de virar o tráfego e os contatos que chegaram nesse meio-tempo vêm
+  junto. Uma nova execução lê todos os contatos de novo, então custa o tempo
+  inteiro de enriquecimento; `--only enrichment` roda só as duas passagens
+  sobre contatos que já estão no destino, e `--only properties,enrichment`
+  roda só a passagem de propriedades. Contas migradas com a CLI 0.1.x não
+  receberam valores de propriedades (o formato do fio foi lido errado); esse
+  único comando os preenche. Um contato que surgiu no Resend desde a última
+  execução é criado por essa passagem com o `unsubscribed` e os nomes, e fica
+  registrado para o rollback como qualquer outro. O checklist de virada só é
+  impresso quando contatos, domínios e supressões fazem parte da execução.
+
+### Antes de uma migração grande
+
+O enriquecimento domina: dois `GET`s por contato contra um limite
+compartilhado com o envio que o seu app faz no mesmo time do Resend. A
+estimativa que o plano imprime segue de `contatos × facetas ÷ ritmo`:
+
+| Contatos | Facetas | A 8 req/s | A 10 req/s | A 50 req/s |
+| --- | --- | --- | --- | --- |
+| 36.685 | tópicos + propriedades | cerca de 2 h 30 min | cerca de 2 h | cerca de 25 min |
+| 160.000 | tópicos + propriedades | cerca de 11 h | cerca de 9 h | cerca de 1 h 50 min |
+| 160.000 | só tópicos | cerca de 5 h 30 min | cerca de 4 h 30 min | cerca de 55 min |
+
+Três coisas encurtam isso:
+
+- **Peça ao Resend um aumento temporário.** A documentação do Resend diz que o
+  limite do time "pode ser aumentado para remetentes confiáveis sob pedido"
+  (Settings → Usage mostra o atual). Passe o ritmo concedido explicitamente —
+  `--rps 50` — a CLI aceita valores acima de 10 e avisa quando o ritmo passa
+  do limite que detectou.
+- **Rode fora do horário de pico.** O limite é por time, então o
+  enriquecimento compete com os envios da sua produção; os `429` caem nos
+  dois lados. Uma segunda chave de API não ajuda.
+- **Deixe folga.** Quando a CLI detecta um limite acima de 10 e `--rps` não
+  foi passado, ela usa o limite menos 2 para o seu app continuar enviando.
+
+| Recurso | O que vem |
+| --- | --- |
+| Contatos | E-mail, nomes, `unsubscribed`, propriedades, inscrições em tópicos, associações a segmentos. Descadastros são preservados; ninguém é reinscrito. |
+| Segmentos, tópicos, propriedades | Casados por nome / nome / chave: criados quando faltam, atualizados quando diferem. |
+| Templates | Nome, alias, assunto, html, texto. `from`, `reply_to` e `variables` não podem ser armazenados — listados como passos manuais. |
+| Webhooks | Endpoint e eventos. O segredo de assinatura é copiado, então o receptor que você já roda continua verificando (as entregas carregam os headers `svix-*`). `--fresh-webhook-secrets` gera segredos novos. Eventos que o MepMail também emite são levados junto — os sete tipos `email.*` mais `contact.created`, `contact.updated` e `contact.deleted`; os demais (`domain.*`, `email.suppressed`) são descartados por webhook e listados. |
+| Supressões | Bounces, reclamações e entradas manuais, com sua origem. |
+| Domínios | Criados com return path e configurações de rastreamento, na única região do SES atendida pela sua instância do MepMail (MepMail Cloud: `sa-east-1`) — a região do Resend não é levada junto. No MepMail Cloud, os toggles de rastreamento só vêm junto com um subdomínio de rastreamento; sem ele, o relatório os lista para você configurar no painel. Os registros DNS precisam ser adicionados de novo — veja o passo 3. |
+| Broadcasts | Rascunhos e agendados entram como rascunhos. Enviados são pulados, a menos que `--include-sent`. |
+
+O que não vem: **chaves de API** (o Resend expõe apenas os nomes — o relatório
+as lista como pendência), **registros DKIM/DNS** (as chaves são por provedor) e
+o **histórico de e-mails enviados**. Audiências, descontinuadas no Resend, são
+puladas — segmentos as cobrem.
+
+Flags, variáveis de ambiente, arquivos, códigos de saída e uso em CI estão na
+[referência da CLI](/pt-BR/cli).
+
+## 2. Aponte seu código existente para o MepMail
+
+Os SDKs oficiais do Resend respeitam `RESEND_BASE_URL`, então a migração são
+duas linhas de ambiente — nenhuma mudança de código:
+
+```sh
+RESEND_API_KEY=ms_...
+RESEND_BASE_URL=https://api-mepmail.je4ndev.com
+```
+
+Auto-hospedado, use a origem da API da sua instância.
+
+Três detalhes que diferem do que uma integração com o Resend pode assumir:
+
+- Os campos de remetente e destinatário aceitam exatamente uma caixa postal
+  cada, nas formas da RFC 5322 `ada@example.com`, `Ada <ada@example.com>` ou
+  `"Ada, Inc." <ada@example.com>`. Um nome de exibição com vírgula precisa
+  estar entre aspas; sem elas, é lido como dois endereços e o envio é
+  rejeitado com `422`. O Resend aceita a forma sem aspas.
+
+- `PATCH /contacts/{id}/topics` recebe um array JSON puro de entradas
+  `{ "id": "<topic-id>", "subscription": "opt_in" | "opt_out" }`, não um objeto
+  em volta dele; `GET /contacts/{id}/topics` lê de volta a escolha efetiva por
+  tópico.
+- Não existe `POST /contacts/imports` (CSV). Contatos em massa vão por
+  `POST /contacts/batch?on_conflict=upsert` em JSON, até 1.000 por chamada, com
+  `x-batch-validation: permissive` para manter as linhas válidas quando algumas
+  falham.
+
+Não há cliente nosso para instalar: os SDKs oficiais do Resend são o cliente,
+[apontados para a sua instância](/pt-BR/sdks). As duas linhas de ambiente acima
+já bastam para o SDK de Node; para definir a URL base em código:
+
+```ts
+import { Resend } from "resend";
+
+const resend = new Resend("ms_...", { baseUrl: "https://api-mepmail.je4ndev.com" });
+```
+
+## 3. Conclua o que a CLI lista
+
+O resumo termina com um checklist. Três itens sempre estão nele:
+
+- **Adicione os registros DNS de cada domínio.** O MepMail usa um par de
+  chaves DKIM próprio, então os registros são novos mesmo para um domínio que
+  já envia pelo Resend. O relatório imprime uma tabela pronta para copiar com
+  os registros por domínio (também em **Domínios** no painel). Os dois
+  provedores podem ficar verificados lado a lado durante a migração.
+- **Defina `RESEND_BASE_URL`** (passo 2) em todo ambiente que envia.
+- **Crie as chaves de API** — uma por nome que o relatório lista (por exemplo
+  `prod`, `staging`) em **Chaves de API**.
+
+Mais dois aparecem quando se aplicam: valores de `from` / `reply_to` de
+templates para definir por envio, e tipos de evento de webhook que o
+MepMail não emite. Corpos de broadcast não precisam de mudança:
+`{{{RESEND_UNSUBSCRIBE_URL}}}` é um alias suportado de
+`{{{UNSUBSCRIBE_URL}}}`.
+
+Envie um email pela nova base URL e veja-o chegar a **Entregue** na página de
+Emails — a migração é isso.
+
+---
+
+Resend é uma marca registrada da Plus Five Five, Inc. O MepMail não é afiliado nem endossado pelo Resend.

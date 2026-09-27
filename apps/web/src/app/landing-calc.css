@@ -1,0 +1,48 @@
+/* Calculadora de economia da landing (componente client). */
+.gtm-calc {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  max-width: 720px;
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: var(--ms-r-card);
+  background: var(--ms-panel-raised);
+}
+.gtm-calc h3 {
+  margin: 0;
+}
+.gtm-calc .gtm-note {
+  margin: 0;
+}
+.gtm-calc label {
+  font-weight: 600;
+}
+.gtm-calc input[type="range"] {
+  width: 100%;
+  accent-color: var(--ms-violet);
+}
+.gtm-calc-result {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding-top: 8px;
+  border-top: 1px solid var(--ms-line-strong);
+}
+.gtm-calc-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  max-width: none;
+}
+.gtm-calc-line span {
+  color: var(--ms-muted);
+}
+.gtm-calc-savings {
+  margin: 4px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ms-violet);
+}

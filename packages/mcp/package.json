@@ -1,0 +1,37 @@
+{
+  "name": "@mepmail/mcp",
+  "version": "0.1.1",
+  "description": "MepMail MCP server for local clients (stdio): send and inspect transactional email from Claude, Cursor and any MCP client. MepMail's API is compatible with the Resend wire protocol.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JE4NVRG/mepmail.git",
+    "directory": "packages/mcp"
+  },
+  "bin": {
+    "mepmail-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist/index.js --banner:js='#!/usr/bin/env node' --define:__MCP_VERSION__=\"\\\"$npm_package_version\\\"\"",
+    "prepublishOnly": "pnpm build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/server": "2.0.0",
+    "@types/node": "^22.20.2",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0",
+    "zod": "^4.6.3"
+  }
+}

@@ -1,0 +1,167 @@
+---
+title: Webhooks
+description: Entregas de eventos assinadas para o ciclo de vida do email, seguindo a especificação Standard Webhooks.
+---
+
+Webhooks enviam eventos do ciclo de vida do email aos seus endpoints conforme
+acontecem. Crie endpoints no painel, escolha quais tipos de evento cada um
+recebe e inspecione cada entrega (payload, resposta, tentativas) no log de
+entregas por endpoint.
+
+## Tipos de evento
+
+| Evento | Disparado quando |
+| --- | --- |
+| `email.sent` | O SES aceitou a mensagem para entrega. |
+| `email.delivered` | O servidor do destinatário a aceitou. |
+| `email.delivery_delayed` | A entrega está sendo repetida (ex.: caixa cheia, greylisting). |
+| `email.bounced` | A mensagem teve hard bounce. O endereço também é [suprimido](/pt-BR/concepts/suppressions). |
+| `email.complained` | O destinatário marcou como spam. Também suprimido. |
+| `email.opened` | Uma pessoa carregou o pixel de rastreamento (exige rastreamento de aberturas no [domínio](/pt-BR/concepts/domains)). `data.open` traz `ipAddress`, `userAgent` e `timestamp` da busca. Um clique numa mensagem ainda sem abertura também registra uma, com `data.open.reason: "click"`: ninguém clica no que nunca renderizou, e para leitores do Apple Mail é a única abertura que pode ser vista. |
+| `email.clicked` | Uma pessoa clicou num link reescrito (exige rastreamento de cliques). `data.click` traz `link`, `ipAddress`, `userAgent` e `timestamp`, como no Resend. Um link que uma máquina seguiu — gateway de segurança, pré-visualização de link, busca segundos após a entrega — é registrado como `email.prefetched`. |
+| `email.prefetched` | O pixel foi buscado, ou um link seguido, por uma máquina — o Mail Privacy Protection da Apple, o pré-carregamento do Gmail, um scanner de segurança, uma identidade de navegador que nenhum navegador real envia, uma busca segundos após a entrega ou todos os links da mensagem em um segundo; `data.open.reason` ou `data.click.reason` diz qual (veja [precisão da taxa de abertura](/pt-BR/concepts/domains#precisão-da-taxa-de-abertura)). Um clique registrado antes de o resto da rajada chegar é registrado de novo aqui com o mesmo `data.click.timestamp` que seu `email.clicked` levou: trate isso como a retratação do clique e de qualquer `email.opened` com `data.open.reason: "click"` marcado um milissegundo antes dele. Opt-in: entregue só a endpoints que o listam, nunca a "todos os eventos". |
+
+Eventos de conta não carregam email; `data` descreve a situação do time:
+
+| Evento | Disparado quando | `data` |
+| --- | --- | --- |
+| `deliverability.warning` | A taxa de hard bounce ou de reclamação do time cruzou a linha de risco (uma vez por episódio). | `{ metric, rate, limit, window_days, dashboard_url }` |
+| `deliverability.paused` | A taxa cruzou a linha de pausa; novos envios são recusados até se recuperar. | igual ao anterior |
+| `quota.warning` | 80% da cota foi usada: a cota diária de hoje no Free e no Starter, o volume incluído do período de cobrança no Pro e no Scale (uma vez por dia UTC ou por período, só na nuvem). | `{ used, limit, period, resets_at, dashboard_url }` — `period` é `"day"` ou `"month"`; `resets_at` é a próxima meia-noite UTC ou o fim do período. No dia, `ceiling` é onde os envios começam a estacionar; no mês, `overage` diz se os envios além de `limit` são cobrados ou recusados. |
+| `quota.reached` | A cota foi usada. Planos diários passam até 50% a mais e depois estacionam até a meia-noite UTC; planos mensais cobram excedente quando ele está ativo e, senão, recusam envios pela API e estacionam broadcasts até o período renovar. | igual ao anterior |
+| `quota.paused` | Só em planos diários: 50% além da cota, novos envios ficam estacionados até a meia-noite UTC, ou até um upgrade de plano liberá-los (uma vez por dia UTC, só na nuvem). | igual ao anterior, sempre `period: "day"` |
+
+Eventos de audiência disparam quando um contato ou a lista de supressão muda,
+seja quem for que mudou. `data` traz o contato no formato do Resend — `id`,
+`email`, `first_name`, `last_name`, `unsubscribed`, `created_at`, `updated_at`
+— mais `source`: `api`, `dashboard`, `hosted_page` (a central de preferências)
+ou `one_click` (um POST de header RFC 8058). O Resend emite apenas
+`contact.created`, `contact.updated` e `contact.deleted`; os demais são
+extensões do MepMail.
+
+| Evento | Disparado quando | `data` extra |
+| --- | --- | --- |
+| `contact.created` | Um contato foi adicionado: API, lote, importação CSV ou painel. | |
+| `contact.updated` | Nome, propriedades ou o flag de descadastro mudaram pela API ou pelo painel. Uma escrita que repete os valores já guardados (uma reimportação completa, por exemplo) não emite nada e deixa `updated_at` intacto. | |
+| `contact.deleted` | Um contato foi excluído. Depois de um apagamento (`erase=true` na API, ou a ação de apagar do dashboard) o `email` guardado vem como `[erased]`; use o `id`. | |
+| `contact.unsubscribed` | O contato saiu de todo e-mail de marketing. | |
+| `contact.resubscribed` | Uma reinscrição explícita (`unsubscribed: false`). | |
+| `contact.topic_opt_in` / `contact.topic_opt_out` | A inscrição efetiva do contato em um tópico mudou. | `topic_id`, `topic_name` |
+| `suppression.added` / `suppression.removed` | Um endereço entrou ou saiu da [lista de supressão](/pt-BR/concepts/suppressions). Linhas de bounce e reclamação vêm do SES, com `source: null`. | `data` é `{ id, email, origin, source, created_at }` |
+
+## Assinaturas (Standard Webhooks)
+
+As entregas são assinadas seguindo a especificação
+[Standard Webhooks](https://www.standardwebhooks.com) — o mesmo esquema que
+Resend e Svix usam, então código de verificação existente funciona sem
+mudanças.
+
+Cada endpoint tem um segredo `whsec_...`, exibido uma única vez na criação.
+Toda requisição carrega:
+
+```
+webhook-id: <message id>
+webhook-timestamp: <unix seconds>
+webhook-signature: v1,<base64 HMAC-SHA256>
+```
+
+Os mesmos três valores também vão como `svix-id`, `svix-timestamp` e
+`svix-signature` — os nomes que a documentação do Resend manda ler. Uma
+assinatura, dois nomes de header: um handler escrito para qualquer uma das
+famílias verifica sem mudanças.
+
+O conteúdo assinado é `{webhook-id}.{webhook-timestamp}.{raw body}`.
+Verifique com qualquer biblioteca Standard Webhooks, por exemplo em Node:
+
+```ts
+import { Webhook } from "standardwebhooks";
+
+const wh = new Webhook("whsec_...");
+const event = wh.verify(rawBody, {
+  "webhook-id": req.headers["webhook-id"],
+  "webhook-timestamp": req.headers["webhook-timestamp"],
+  "webhook-signature": req.headers["webhook-signature"],
+});
+```
+
+Sempre verifique contra o corpo **bruto** da requisição, e rejeite timestamps
+antigos.
+
+## Trazendo seu próprio segredo
+
+`POST /webhooks` aceita um `signing_secret` opcional: `whsec_` seguido de
+base64 padrão de 24 a 64 bytes — o formato que Resend e Svix emitem. Passe o
+segredo com que seu receptor já verifica e o endpoint continua funcionando sem
+novo deploy; omita e o MepMail gera um. Qualquer outra coisa é rejeitada
+com `422 signing_secret must be whsec_ followed by base64 of 24-64 bytes`.
+
+Para trazer um segredo de outro provedor, leia-o na API ou no painel dele (o
+Resend o retorna em `GET /webhooks/{id}`) e crie o endpoint aqui com o mesmo
+valor:
+
+```sh
+curl -X POST "https://api-mepmail.je4ndev.com/webhooks" \
+  -H "Authorization: Bearer ms_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "endpoint": "https://example.com/webhooks/email",
+    "events": ["email.delivered", "email.bounced"],
+    "signing_secret": "whsec_..."
+  }'
+```
+
+O segredo é retornado na criação e em `GET /webhooks/{id}`, nunca nas linhas
+da listagem.
+
+## Rotacionando o segredo
+
+`POST /webhooks/{id}/rotate` (ou **Rotacionar segredo** no painel) gera um
+novo segredo, ou usa o de `signing_secret`, e o retorna. Durante
+`overlap_hours` (padrão 24, até 72) o segredo anterior continua assinando:
+toda entrega nessa janela leva as duas assinaturas, separadas por espaço em
+`webhook-signature`, então um receptor com qualquer um dos dois verifica.
+Troque o receptor em qualquer momento da janela; depois dela só o novo
+assina. `0` descarta o antigo na hora, para um segredo vazado.
+`GET /webhooks/{id}` informa o fim da janela em `previous_secret_expires_at`,
+e uma segunda rotação dentro da janela substitui o segredo anterior.
+
+```sh
+curl -X POST "https://api-mepmail.je4ndev.com/webhooks/{id}/rotate" \
+  -H "Authorization: Bearer ms_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "overlap_hours": 24 }'
+```
+
+## Entrega
+
+Uma entrega é bem-sucedida em qualquer resposta 2xx. Cada endpoint tem a
+própria fila, iniciada na ordem de vencimento com até oito requisições em
+voo a até **50 requisições por segundo**; uma rajada de eventos espera na fila em vez de
+atingir o receptor de uma vez.
+
+Uma tentativa que falha (não-2xx, timeout, erro de conexão) é repetida em um
+cronograma fixo: **5 s, 5 min, 30 min, 2 h, 5 h, 10 h** — seis tentativas em
+cerca de 18 horas. Um `429` com header `Retry-After` é respeitado (até uma
+hora) e não conta como tentativa: é o receptor pedindo espaço, não falhando.
+Um evento ainda não entregue **24 horas** depois de enfileirado é descartado
+como `exhausted`, sem nova tentativa.
+
+Após **20 entregas esgotadas consecutivas** o endpoint é desativado
+automaticamente e não recebe mais nada até você reativá-lo na página dele;
+os eventos do intervalo não são reenviados. Os donos do time recebem um
+e-mail quando as entregas de um endpoint começam a falhar (as últimas dez
+entregas encerradas todas esgotadas), quando ele é desativado e — no máximo
+uma vez por dia — quando a fila dele tem mais de seis horas de atraso. O painel
+mostra a profundidade da fila de cada endpoint e há quanto tempo a entrega
+mais antiga espera.
+
+Um job de reconciliação rearma filas perdidas em quedas, então a entrega é
+pelo-menos-uma-vez — torne seus handlers idempotentes, chaveados por
+`webhook-id`. As linhas de entrega (payload, resposta, tentativas) são
+mantidas por `WEBHOOK_DELIVERY_RETENTION_DAYS` (padrão 30) e depois
+expurgadas.
+
+Inscreva cada endpoint só nos eventos de que ele precisa. Uma reimportação
+completa de contatos não emite nada para os contatos que não mudaram, mas
+cada contato novo é uma entrega `contact.created` — um endpoint inscrito em
+"todos os eventos" recebe todas elas.

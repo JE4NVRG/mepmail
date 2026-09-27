@@ -1,0 +1,306 @@
+---
+title: SDKs
+description: Use the official Resend SDKs against your MepMail instance — there is no client of ours to install.
+---
+
+MepMail speaks the Resend wire protocol, so there is no SDK of ours to install.
+The **official Resend SDKs** work as-is once you point them at your instance's
+API origin — which also means that moving off Resend costs you one line, not a
+rewrite of every call site.
+
+Every snippet below was checked against the SDK's own source, and Node and
+Python were run against a live instance (send, `delivered`).
+
+## What the official SDKs can reach
+
+| Reaches MepMail | Not implemented |
+| --- | --- |
+| `emails` `domains` `contacts` `audiences` `broadcasts` `contactProperties` `segments` `suppressions` `templates` `topics` `webhooks` | `automations` `events` `logs` `oauthGrants` |
+
+The right-hand column answers `404`. If a call you depend on is there, tell us —
+the wire format is compatible, so the endpoint is usually a day's work rather
+than a redesign.
+
+## Base URL
+
+<DeploymentTabs>
+<DeploymentTab deployment="cloud">
+
+`https://api-mepmail.je4ndev.com` — what every example on this page uses.
+
+Accounts are provisioned by invitation: there is no public signup. Write to us
+and we set up your account, domain, and first API key.
+
+</DeploymentTab>
+<DeploymentTab deployment="self-hosted">
+
+Your instance's API origin — `http://localhost:3001` on a local compose setup,
+or the hostname your reverse proxy serves the API on (`PUBLIC_API_URL`, e.g.
+`https://api.acme.dev`). Swap it into the examples below.
+
+Keep it on TLS. The API key travels in a header on every request, so a plain
+`http://` origin puts that key on the wire; terminate HTTPS in front of the
+instance and give the SDKs the `https://` origin.
+
+</DeploymentTab>
+</DeploymentTabs>
+
+## Trailing slash
+
+The base URL is joined with the request path by each SDK, and they disagree
+about whether the path already starts with a slash. Getting it wrong is a 404
+on every call, so it is worth copying exactly:
+
+| Base URL | SDKs |
+| --- | --- |
+| **No** trailing slash | Node, Python, Rust, Elixir |
+| **Trailing slash required** | Go, Ruby |
+| Either works | PHP, .NET |
+
+## Node.js / TypeScript
+
+[`resend` on npm](https://www.npmjs.com/package/resend) — Node 18+.
+
+```sh
+npm install resend
+```
+
+```ts
+import { Resend } from "resend";
+
+const resend = new Resend("ms_123", {
+  baseUrl: "https://api-mepmail.je4ndev.com",
+});
+
+const { data, error } = await resend.emails.send({
+  from: "Acme <onboarding@acme.dev>",
+  to: "delivered@example.com",
+  subject: "Hello from MepMail",
+  html: "<strong>It works!</strong>",
+});
+```
+
+## Python
+
+[`resend` on PyPI](https://pypi.org/project/resend/) — Python 3.9+.
+
+```sh
+pip install resend
+```
+
+```python
+import resend
+
+resend.api_key = "ms_123"
+resend.api_url = "https://api-mepmail.je4ndev.com"  # no trailing slash
+
+email = resend.Emails.send({
+    "from": "Acme <onboarding@acme.dev>",
+    "to": "delivered@example.com",
+    "subject": "Hello from MepMail",
+    "html": "<strong>It works!</strong>",
+})
+```
+
+## PHP
+
+[`resend/resend-php` on Packagist](https://packagist.org/packages/resend/resend-php) — PHP 8.1+.
+
+The base URL is not a constructor argument in PHP: the SDK reads it from the
+`RESEND_BASE_URL` environment variable when the client is created.
+
+```sh
+composer require resend/resend-php
+```
+
+```php
+putenv("RESEND_BASE_URL=https://api-mepmail.je4ndev.com");
+
+$resend = Resend::client('ms_123');
+
+$email = $resend->emails->send([
+    'from' => 'Acme <onboarding@acme.dev>',
+    'to' => 'delivered@example.com',
+    'subject' => 'Hello from MepMail',
+    'html' => '<strong>It works!</strong>',
+]);
+```
+
+## Ruby
+
+[`resend` on RubyGems](https://rubygems.org/gems/resend) — Ruby 3.0+.
+
+Ruby also reads only the environment variable — and it reads it **once, when the
+library is loaded**, so it has to be set before `require "resend"`. Note the
+trailing slash.
+
+```sh
+gem install resend
+```
+
+```ruby
+ENV["RESEND_BASE_URL"] = "https://api-mepmail.je4ndev.com/"
+
+require "resend"
+Resend.api_key = "ms_123"
+
+email = Resend::Emails.send({
+  "from" => "Acme <onboarding@acme.dev>",
+  "to" => "delivered@example.com",
+  "subject" => "Hello from MepMail",
+  "html" => "<strong>It works!</strong>"
+})
+```
+
+## Go
+
+[`github.com/resend/resend-go/v4`](https://pkg.go.dev/github.com/resend/resend-go/v4) — Go 1.21+.
+
+Use the `/v4` module path. The older `github.com/resend/resend-go` without the
+suffix is a 2023 tag that no longer compiles.
+
+```sh
+go get github.com/resend/resend-go/v4
+```
+
+```go
+import (
+    "net/url"
+
+    "github.com/resend/resend-go/v4"
+)
+
+client := resend.NewClient("ms_123")
+client.BaseURL, _ = url.Parse("https://api-mepmail.je4ndev.com/")
+
+sent, err := client.Emails.Send(&resend.SendEmailRequest{
+    From:    "Acme <onboarding@acme.dev>",
+    To:      []string{"delivered@example.com"},
+    Subject: "Hello from MepMail",
+    Html:    "<strong>It works!</strong>",
+})
+```
+
+## Rust
+
+[`resend-rs` on crates.io](https://crates.io/crates/resend-rs) — async
+(`tokio` + `reqwest`).
+
+```toml
+[dependencies]
+resend-rs = "0.32"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+```
+
+```rust
+use resend_rs::types::CreateEmailBaseOptions;
+use resend_rs::{Config, Resend};
+
+let resend = Resend::with_config(
+    Config::builder("ms_123")
+        .base_url("https://api-mepmail.je4ndev.com".parse()?)
+        .build(),
+);
+
+let sent = resend
+    .emails
+    .send(
+        CreateEmailBaseOptions::new(
+            "Acme <onboarding@acme.dev>",
+            ["delivered@example.com"],
+            "Hello from MepMail",
+        )
+        .with_html("<strong>It works!</strong>"),
+    )
+    .await?;
+```
+
+## Java
+
+The official Java SDK pins `https://api.resend.com` in a constant and exposes no
+way to change it, so there is no Java snippet to point at us — talk HTTP
+directly instead:
+
+```java
+var body = """
+    {
+      "from": "Acme <onboarding@acme.dev>",
+      "to": ["delivered@example.com"],
+      "subject": "Hello from MepMail",
+      "html": "<strong>It works!</strong>"
+    }
+    """;
+
+var request = HttpRequest.newBuilder()
+    .uri(URI.create("https://api-mepmail.je4ndev.com/emails"))
+    .header("Authorization", "Bearer ms_123")
+    .header("Content-Type", "application/json")
+    .POST(HttpRequest.BodyPublishers.ofString(body))
+    .build();
+
+var response = HttpClient.newHttpClient()
+    .send(request, HttpResponse.BodyHandlers.ofString());
+```
+
+## .NET
+
+[`Resend` on NuGet](https://www.nuget.org/packages/Resend) — targets net8.0.
+
+```sh
+dotnet add package Resend
+```
+
+```csharp
+using Resend;
+
+var options = new ResendClientOptions
+{
+    ApiToken = "ms_123",
+    ApiUrl = "https://api-mepmail.je4ndev.com",
+};
+
+var resend = ResendClient.Create(options);
+
+await resend.EmailSendAsync(new EmailMessage
+{
+    From = "Acme <onboarding@acme.dev>",
+    To = { "delivered@example.com" },
+    Subject = "Hello from MepMail",
+    HtmlBody = "<strong>It works!</strong>",
+});
+```
+
+## Elixir
+
+[`resend` on Hex](https://hex.pm/packages/resend) — Elixir 1.15+. This one is
+**community-maintained**, not published by Resend, so treat its release cadence
+accordingly.
+
+```elixir
+# mix.exs
+def deps do
+  [{:resend, "~> 1.0-rc"}]
+end
+```
+
+```elixir
+client = Resend.client(
+  api_key: "ms_123",
+  base_url: "https://api-mepmail.je4ndev.com"
+)
+
+{:ok, email} =
+  Resend.Emails.send(client, %{
+    from: "Acme <onboarding@acme.dev>",
+    to: "delivered@example.com",
+    subject: "Hello from MepMail",
+    html: "<strong>It works!</strong>"
+  })
+```
+
+## The SMTP relay
+
+Prefer SMTP? MepMail also runs a submission relay (`STARTTLS`, port 2587) for
+legacy clients and libraries that cannot change their base URL — Java above
+being one of them. Credentials are an API key, and the sending domain rules are
+the same as the API's. See [Self-hosting → SMTP relay](/self-hosting).

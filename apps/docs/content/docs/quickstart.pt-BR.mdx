@@ -1,0 +1,162 @@
+---
+title: Início rápido
+description: Coloque o MepMail no ar e envie seu primeiro email em poucos minutos.
+---
+
+O MepMail funciona igual quando hospedamos para você e quando você roda na sua
+própria infraestrutura — mesmo painel, mesma API, mesmos SDKs. Escolha sua
+implantação abaixo; as abas lembram sua escolha em toda a documentação.
+
+## 1. Obtenha o MepMail
+
+<DeploymentTabs>
+<DeploymentTab deployment="cloud">
+
+As contas são provisionadas por convite — não há cadastro público. Fale com a
+gente e configuramos sua conta; o acesso é em
+[mepmail.je4ndev.com](https://mepmail.je4ndev.com). A API fica em
+`api-mepmail.je4ndev.com`.
+
+</DeploymentTab>
+<DeploymentTab deployment="self-hosted">
+
+Você precisa de Docker (com Compose), Node 22+ e uma conta AWS com acesso ao
+SES. Contas AWS novas começam no sandbox do SES, que só envia para
+destinatários verificados —
+[solicite acesso de produção](https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html)
+para enviar a qualquer um.
+
+Compile a partir do código — é a mesma árvore que roda em produção, e não
+depende de imagem publicada:
+
+```sh
+git clone https://github.com/JE4NVRG/mepmail.git mepmail
+cd mepmail
+cp .env.example .env
+```
+
+Dois segredos precisam ser preenchidos antes do primeiro boot — o próprio `.env`
+avisa ao lado de cada um, e ambos usam o mesmo comando:
+
+```sh
+openssl rand -base64 32   # MASTER_ENCRYPTION_KEY
+openssl rand -base64 32   # BETTER_AUTH_SECRET
+```
+
+Depois suba a stack:
+
+```sh
+docker compose up --build -d
+```
+
+Painel em `http://localhost:3000`, API em `http://localhost:3001`. O primeiro
+usuário a se registrar vira a conta inicial — depois disso o cadastro fica
+fechado, a menos que você opte por abri-lo. As peças da AWS (usuário e política
+IAM, tópico SNS de eventos, configuration set do SES) **não** são criadas pelo
+compose: percorra a [Auto-hospedagem](/pt-BR/self-hosting) para isso, para a
+referência completa de ambiente e para o pipeline de eventos que transforma
+`delivered` e `bounced` em linhas que você pode ver.
+
+</DeploymentTab>
+</DeploymentTabs>
+
+## 2. Verifique um domínio de envio
+
+O MepMail só envia a partir de domínios que você verificou.
+
+1. No painel, vá em **Domínios** e adicione um domínio que você controla
+   (ex.: `acme.dev`).
+2. Adicione os registros DNS exibidos — um registro TXT de DKIM e os
+   registros de MAIL FROM — no seu provedor de DNS.
+3. Clique em **Verificar registros DNS**. O MepMail também resolve os
+   registros ao vivo, então você vê na hora quais ainda faltam.
+
+A validação é assíncrona do lado do provedor de DNS: o DKIM costuma resolver em
+minutos e o MAIL FROM pode levar mais. O MepMail reconfere sozinho a cada 15
+minutos, então você nunca precisa clicar duas vezes.
+
+## 3. Crie uma chave de API
+
+Vá em **Chaves de API** e crie uma. O token `ms_` é exibido uma única vez —
+copie agora. Chaves podem ter acesso total ou somente envio, e opcionalmente
+ficar restritas a um único domínio.
+
+## 4. Envie um email
+
+Sua URL base da API:
+
+<DeploymentTabs>
+<DeploymentTab deployment="cloud">
+
+`https://api-mepmail.je4ndev.com`
+
+</DeploymentTab>
+<DeploymentTab deployment="self-hosted">
+
+A origem da API da sua instância — `http://localhost:3001` em um compose
+local, ou o hostname em que seu reverse proxy serve a API (`PUBLIC_API_URL`,
+ex.: `https://api.acme.dev`). Os exemplos abaixo usam a URL gerenciada; troque
+pela sua.
+
+</DeploymentTab>
+</DeploymentTabs>
+
+Com curl:
+
+```sh
+curl -X POST https://api-mepmail.je4ndev.com/emails \
+  -H "Authorization: Bearer ms_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "Acme <onboarding@acme.dev>",
+    "to": ["delivered@example.com"],
+    "subject": "Olá do MepMail",
+    "html": "<strong>Funciona!</strong>"
+  }'
+```
+
+Ou com o SDK oficial do Resend para Node (`npm install resend`), apontado para a
+sua URL base:
+
+```ts
+import { Resend } from "resend";
+
+const resend = new Resend("ms_...", {
+  baseUrl: "https://api-mepmail.je4ndev.com",
+});
+
+const { data, error } = await resend.emails.send({
+  from: "Acme <onboarding@acme.dev>",
+  to: "delivered@example.com",
+  subject: "Olá do MepMail",
+  html: "<strong>Funciona!</strong>",
+});
+
+if (error) console.error(error.name, error.message);
+else console.log("sent", data.id);
+```
+
+Ambos retornam `{ "id": "..." }`. Acompanhe o email indo de `queued` a
+`delivered` na página **Emails**.
+
+<Callout type="info">
+Em uma instância auto-hospedada, eventos de entrega (entregue, bounce,
+reclamação) exigem o pipeline de eventos do SES configurado na
+[Auto-hospedagem → Eventos do SES](/pt-BR/self-hosting#eventos-do-ses-bounces-reclamações-e-entregas).
+No serviço gerenciado eles fluem automaticamente.
+</Callout>
+
+Já usa o Resend? Fique com o SDK que você tem e aponte-o para cá: defina a URL
+base para a sua origem MepMail e use sua chave `ms_`. O formato de comunicação é
+idêntico, e a página [SDKs](/pt-BR/sdks) traz a opção exata de cada linguagem —
+inclusive das que só a leem de variável de ambiente.
+
+## Próximos passos
+
+- [Conceitos](/pt-BR/concepts/contacts) para contatos, segmentos, tópicos e
+  broadcasts.
+- [SDKs](/pt-BR/sdks) para apontar cada SDK oficial do Resend para a sua
+  instância.
+- [Referência da API](/pt-BR/api-reference) para todos os endpoints.
+- [Auto-hospedagem](/pt-BR/self-hosting) para implantação em produção,
+  referência de ambiente e o relay SMTP.

@@ -1,0 +1,26 @@
+.git
+.github
+node_modules
+**/node_modules
+**/.next
+**/.source
+**/.turbo
+**/dist
+**/build
+**/*.tsbuildinfo
+**/test
+**/*.test.ts
+.env
+.env.*
+!.env.example
+
+# Sibling repos and private material staged inside this folder (see .gitignore)
+sdks
+org
+design
+docs
+
+Dockerfile
+docker-compose*.yml
+deploy
+.DS_Store

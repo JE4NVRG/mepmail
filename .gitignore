@@ -1,0 +1,23 @@
+# Independent sibling repos staged locally inside this folder
+sdks/
+org/
+
+# Internal planning and design material — private, never committed.
+# Root-anchored: apps/docs is the public documentation site and IS tracked.
+/design/
+/docs/
+
+# OS / editor
+.DS_Store
+
+# Dependencies & builds (for when code lands)
+node_modules/
+.pnpm-store/
+dist/
+build/
+.env
+.env.*
+
+# Turborepo cache
+.turbo/
+!.env.example

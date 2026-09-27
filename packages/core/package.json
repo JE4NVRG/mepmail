@@ -1,0 +1,72 @@
+{
+  "name": "@millionsend/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./audit-actions": {
+      "types": "./src/audit-actions.ts",
+      "default": "./src/audit-actions.ts"
+    },
+    "./support-view-reasons": {
+      "types": "./src/support-view-reasons.ts",
+      "default": "./src/support-view-reasons.ts"
+    },
+    "./content-reveal": {
+      "types": "./src/content-reveal.ts",
+      "default": "./src/content-reveal.ts"
+    },
+    "./bounce-guidance": {
+      "types": "./src/bounce-guidance.ts",
+      "default": "./src/bounce-guidance.ts"
+    },
+    "./deliverability": {
+      "types": "./src/deliverability.ts",
+      "default": "./src/deliverability.ts"
+    },
+    "./domain-status": {
+      "types": "./src/domain-status.ts",
+      "default": "./src/domain-status.ts"
+    },
+    "./html": {
+      "types": "./src/html.ts",
+      "default": "./src/html.ts"
+    },
+    "./open-classifier": {
+      "types": "./src/open-classifier.ts",
+      "default": "./src/open-classifier.ts"
+    },
+    "./org-domain": {
+      "types": "./src/org-domain.ts",
+      "default": "./src/org-domain.ts"
+    },
+    "./plans": {
+      "types": "./src/plans.ts",
+      "default": "./src/plans.ts"
+    },
+    "./mail-preferences": {
+      "types": "./src/mail-preferences.ts",
+      "default": "./src/mail-preferences.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@millionsend/db": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "zod": "^4.6.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.14",
+    "@millionsend/test-utils": "workspace:*",
+    "@types/node": "^22.20.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

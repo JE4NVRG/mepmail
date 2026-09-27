@@ -1,0 +1,131 @@
+---
+title: API reference
+description: The MepMail HTTP API — Resend wire-compatible, generated from the server code.
+---
+
+The endpoint pages under this section are generated from the API's own route
+definitions at build time, so they always reflect the code. The raw spec is at
+[/openapi.json](/openapi.json) (OpenAPI 3.1).
+
+## Base URL
+
+<DeploymentTabs>
+<DeploymentTab deployment="cloud">
+
+`https://api-mepmail.je4ndev.com`
+
+</DeploymentTab>
+<DeploymentTab deployment="self-hosted">
+
+Your instance's API origin — `http://localhost:3001` on a local compose
+setup, or wherever you exposed port 3001 (e.g. `https://api.acme.dev`). See
+[Self-hosting](/self-hosting).
+
+</DeploymentTab>
+</DeploymentTabs>
+
+## Authentication
+
+Every endpoint (except the SES event ingestion webhook) requires an API key
+created in the dashboard:
+
+```
+Authorization: Bearer ms_...
+```
+
+Keys have a permission level: **full access** keys can use every endpoint,
+**sending only** keys are confined to `/emails*` (anything else returns
+`403 restricted_api_key`) — and even there, `GET /emails`, `GET /emails/{id}`
+and `DELETE /emails/{id}` need full access, since reads return stored bodies
+and the team's whole archive. A key can additionally be scoped to a single
+domain, restricting which `from` addresses it may send.
+
+## Resend compatibility
+
+Request and response shapes match Resend's API, so official Resend SDKs work
+against MepMail by pointing their base URL at it. CI runs the official
+`resend` npm package against every endpoint as a conformance gate. The few
+remaining deltas are deliberate and loud:
+
+- Attachments take inline base64 `content` only — a remote `path` URL is
+  rejected with `422` (never fetched), as is `content_id` (inline images).
+- Contacts are team-global — audience endpoints are served as aliases of
+  segments, and contact endpoints work with or without an audience id (see
+  [Contacts](/concepts/contacts)).
+- `POST /domains` takes an optional `region`, which must be one of the SES
+  regions the deployment serves — the values its request schema lists, the
+  first being the default — and is rejected with `422` otherwise. A domain
+  has one region: to move it, delete it and add it again.
+- Broadcasts support `canceled`, a status outside Resend's union, and
+  broadcast sends, `POST /emails` and `POST /emails/batch` can return
+  `403 sending_paused` when your bounce or complaint rate crosses the SES
+  enforcement thresholds. Broadcast sends alone can also return
+  `403 broadcasts_paused` while the platform's aggregate rate in the sender's
+  SES region is recovering; it is per region, leaves transactional email
+  untouched, and clears on its own.
+- A broadcast send answers with `finishes_at` (the estimated instant the last
+  email goes out, or `null`), `estimated: true` and, when the audience exceeds
+  the capacity available now, a `warning` (`paced` or `queued_behind`, with
+  `days` and a message). Broadcast reads carry `sent_count` and a live
+  `finishes_at`; a cancel answers with `canceled_remaining`. An audience that
+  needs more than 24 days of capacity is refused with
+  `422 broadcast_too_large`. See [Broadcasts](/concepts/broadcasts#pacing).
+- `POST /emails` and `POST /emails/batch` return `429 daily_quota_exceeded`
+  on a daily plan (Free, Starter) when the day's sending quota is spent and
+  the queued backlog is full — retry after the UTC day rolls over — and
+  `429 monthly_quota_exceeded` on a monthly plan (Pro, Scale) at its included
+  volume with overage off; turn on overage in Billing or wait for the period
+  to renew (the message names the date). A batch is accepted or refused
+  whole.
+- `POST /contacts`, `POST /contacts/batch` and the audience alias return
+  `403 plan_limit_reached` when a new contact would take the team past its
+  plan's contact cap (1,000 on Free; paid plans are unlimited). Existing
+  contacts still update; in a batch only the new ones fail.
+- `GET /usage` exists (Resend has no usage endpoint): the effective plan, its
+  limits (`emails_per_day` on daily plans, `emails_per_month` on monthly ones,
+  `domains`, `contacts`), today's accepted count and, on a monthly plan, a `period` object
+  — `emails_sent`, `included`, `overage_enabled`, `overage_usd_per_1k`,
+  `starts_at`, `ends_at`. Self-hosted instances report `cloud: false` with
+  null plan, limits and period.
+- `DELETE /emails/{id}` exists (Resend has no email deletion).
+- Custom `headers` are allowlisted: any `X-*` name (except `X-SES-*` and
+  `X-MillionSend-*`) plus `In-Reply-To`, `References`, `Importance`,
+  `Priority`, `Comments`, `Keywords`, `Organization`, and the one-click
+  unsubscribe pair — `List-Unsubscribe` (one or more `<https://…>` or
+  `<mailto:…>` targets) with `List-Unsubscribe-Post`
+  (`List-Unsubscribe=One-Click`); anything else is a `422`. The two must come
+  together, and `List-Unsubscribe` needs an `https` target. On a send with a
+  `topic_id`, a pair you supply replaces the generated one: one-click requests
+  then reach your endpoint, MepMail records no opt-out for them, and an
+  `{{{UNSUBSCRIBE_URL}}}` placeholder in the body still resolves to
+  MepMail's page.
+- A send whose every `to` recipient is on the suppression list or opted out of
+  the `topic_id` is refused with `422 all_recipients_suppressed` (message
+  `All recipients are suppressed`); recipients dropped from a send that still
+  has someone left are simply omitted. Unsubscribe-origin entries count only
+  when the send has a `topic_id`; bounce, complaint and manual entries always.
+- `to`, `cc` and `bcc` together cannot exceed 50 recipients, and each address
+  must be a single mailbox — a display name containing `@` is rejected, and
+  accepted addresses read back in canonical `Name <user@host>` form.
+- Anything unsupported is rejected with `422` rather than silently dropped
+  (e.g. `tls` on domain update).
+
+## Errors
+
+Errors use Resend's format:
+
+```json
+{ "statusCode": 422, "name": "validation_error", "message": "..." }
+```
+
+## Idempotency
+
+`POST /emails` and `POST /emails/batch` accept an `Idempotency-Key` header.
+Retrying with the same key and payload returns the original response instead
+of sending again; the same key with a different payload returns `409`.
+
+## Pagination
+
+List endpoints accept `limit` (1–100, default 20) plus `after` / `before`
+cursors carrying an item id from a previous page. Responses include
+`has_more`.

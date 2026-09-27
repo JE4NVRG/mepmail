@@ -1,0 +1,15 @@
+{
+  "title": "Conceitos",
+  "defaultOpen": true,
+  "pages": [
+    "contacts",
+    "segments",
+    "topics",
+    "broadcasts",
+    "templates",
+    "domains",
+    "webhooks",
+    "suppressions",
+    "deliverability-insights"
+  ]
+}

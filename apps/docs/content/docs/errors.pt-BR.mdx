@@ -1,0 +1,65 @@
+---
+title: Erros
+description: Todos os erros que o MepMail retorna — nomes, códigos HTTP, o que significam e o que é seguro repetir.
+---
+
+Todo erro da API usa a mesma forma JSON, compatível com o protocolo do Resend:
+
+```json
+{"statusCode": 422, "name": "validation_error", "message": "…"}
+```
+
+`name` é um código de máquina estável (a chave que os SDKs usam); `message`
+é legível por humanos e pode mudar. Decida por `statusCode` e `name`, nunca
+por `message`.
+
+## Códigos de erro
+
+| `name` | HTTP | O que significa | O que fazer |
+| --- | --- | --- | --- |
+| `missing_api_key` | 401 | Sem cabeçalho `Authorization` | Envie `Authorization: Bearer ms_...` |
+| `invalid_api_key` | 401 | A chave é desconhecida ou foi revogada | Releia a chave uma vez (rotação?); se ainda falhar, pare — não repita |
+| `restricted_api_key` | 403 | A chave é válida, mas não vale para este recurso (nível de permissão, ou domínio remetente fora do escopo da chave) | Use uma chave com o escopo certo, ou peça uma ao operador |
+| `plan_limit_reached` | 403 | Um teto do plano foi atingido (contatos, domínios, times) | Libere espaço dentro dos limites do plano, ou faça upgrade |
+| `forbidden` | 403 | O papel do usuário no time não permite esta ação | Confira o papel por trás da credencial |
+| `not_found` | 404 | O recurso não existe (ou é de outro time) | Confira o id e o endpoint |
+| `conflict` | 409 | O recurso está em estado conflitante | Leia o estado atual e repita a operação |
+| `concurrent_idempotent_requests` | 409 | Já existe uma requisição em andamento com a mesma chave de idempotência | Aguarde e repita com a mesma chave |
+| `invalid_parameter` | 400 | Um valor de parâmetro não é permitido (ex.: editar broadcast já enviado) | Corrija a requisição |
+| `invalid_payload` | 400 | O corpo da requisição não pôde ser interpretado | Envie JSON válido |
+| `validation_error` | 422 | O payload falhou na validação de esquema | Leia o `message`; corrija o campo indicado |
+| `all_recipients_suppressed` | 422 | Todos os destinatários estão na lista de supressão | Confira as supressões antes de reenviar |
+| `payload_too_large` | 413 | Anexos passam do teto do plano (1/1/5/10 MB por plano) | Reduza os anexos ou mude para um plano maior |
+| `rate_limit_exceeded` | 429 | Requisições demais em pouco tempo | Faça backoff exponencial — veja [limites de taxa](/pt-BR/rate-limits) |
+| `monthly_quota_exceeded` | 429 | O volume incluído do plano acabou e o excedente está desligado | Espere o período renovar, ligue o excedente, ou faça upgrade |
+| `internal_server_error` | 500 | Um bug do nosso lado | Repita com backoff; reporte se persistir |
+
+## Repetir requisições
+
+- **4xx**: repita apenas `409 concurrent_idempotent_requests` (com a mesma
+  chave de idempotência) e `429` (com backoff). O resto da faixa 4xx é
+  determinístico — corrija a requisição ou a credencial.
+- **5xx**: repita com backoff exponencial e jitter. Envios com chave de
+  idempotência são seguros de repetir; sem ela, um reenvio pode entregar duas
+  vezes.
+
+## Idempotência
+
+Os endpoints de envio aceitam um cabeçalho `Idempotency-Key`. Duas
+requisições com a mesma chave rodam uma vez; enquanto a primeira executa, a
+segunda responde `409 concurrent_idempotent_requests`. Reuse a mesma chave ao
+repetir depois de um timeout — é isso que torna o reenvio seguro.
+
+## Envios em lote
+
+`POST /emails/batch` aceita até 100 e-mails. Com o cabeçalho
+`x-batch-validation: permissive`, itens inválidos voltam em `errors` por
+índice enquanto o subconjunto válido é aceito; por padrão (strict), um item
+inválido rejeita o lote inteiro. Um array acima do teto responde `422`.
+
+## MCP
+
+O servidor MCP expõe as mesmas condições: `429 rate_limit_exceeded` no
+endpoint quando o orçamento de chamadas da conta acaba, e falhas de ferramenta
+como resultados com `isError` — leia o conteúdo de texto para o código e a
+mensagem.

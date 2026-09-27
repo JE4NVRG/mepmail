@@ -1,0 +1,16 @@
+{
+  "pages": [
+    "index",
+    "quickstart",
+    "migrate-from-resend",
+    "self-hosting",
+    "billing",
+    "errors",
+    "rate-limits",
+    "concepts",
+    "sdks",
+    "mcp",
+    "cli",
+    "api-reference"
+  ]
+}

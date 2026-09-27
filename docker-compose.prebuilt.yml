@@ -1,0 +1,15 @@
+# Unsupported prebuilt-image override for operators that publish their own
+# private image. The supported path for this fork is the root compose file's
+# local source build. Private-registry usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prebuilt.yml up
+# Set MILLIONSEND_IMAGE explicitly, preferably to an immutable @sha256 digest.
+services:
+  millionsend:
+    image: "${MILLIONSEND_IMAGE:?Set MILLIONSEND_IMAGE to an operator-published private image}"
+    build: !reset null
+  smtp:
+    image: "${MILLIONSEND_IMAGE:?Set MILLIONSEND_IMAGE to an operator-published private image}"
+    build: !reset null
+  docs:
+    image: "${MILLIONSEND_IMAGE:?Set MILLIONSEND_IMAGE to an operator-published private image}"
+    build: !reset null
