@@ -40,7 +40,13 @@ const plans: readonly Plan[] = [
   { name: "Scale 2.5M", price: "US$ 549", tier: "scale" },
 ];
 
-type PlanCopy = { volume: string; limits: string; overage: string; attachment: string };
+type PlanCopy = {
+  volume: string;
+  limits: string;
+  overage: string;
+  attachment: string;
+  cta?: string;
+};
 type FaqItem = { q: string; a: string };
 
 const EMPTY_PLAN_COPY: PlanCopy = { volume: "", limits: "", overage: "", attachment: "" };
@@ -171,7 +177,8 @@ export default async function RootPage() {
           <dd>{plan.copy.attachment}</dd>
         </div>
       </dl>
-      <SignupLink label={t("plans.cta")} />
+      <SignupLink label={plan.copy.cta ?? t("plans.cta")} />
+      {plan.price !== "US$ 0" ? <p className="gtm-cta-note">{t("plans.ctaNote")}</p> : null}
     </article>
   );
 
