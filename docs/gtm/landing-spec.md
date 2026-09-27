@@ -15,7 +15,7 @@ Fonte de verdade da oferta e dos comparativos: `JE4NDEV-Memory-Vault/02_Projects
 - H1: «Mesma API do Resend. Até 85% mais barato.»
 - Subtítulo: «Envie e-mails transacionais com API HTTPS compatível com o Resend ou relay SMTP. Nós ajudamos a configurar seu domínio, DKIM e MAIL FROM. Planos em USD, atendimento em português e implantação assistida.»
 - CTA principal, rótulo exato «Solicitar acesso»: `mailto:jean@je4ndev.com` (sem assunto predefinido). Apoio sob CTA: «Sem cadastro público. Conte seu volume de envio e receba orientação sobre o plano.»
-- Link secundário «Ver planos» → `#planos`. Sem formulário de cadastro ou promessa de ativação automática. Se a URL real do WhatsApp for fornecida, exibir botão secundário «Conversar no WhatsApp»; sem ela, omitir o botão por completo.
+- Link secundário «Ver planos» → `#planos`. Sem formulário de cadastro ou promessa de ativação automática. **WhatsApp descartado (decisão do Jean, 27/09/2026): nenhum botão/link de WhatsApp deve existir, em nenhuma hipótese.**
 
 ### 2. Prova de preço (`#comparativo`)
 
@@ -109,10 +109,10 @@ H2: «Perguntas antes de migrar»; seis pares de pergunta/resposta, nessa ordem:
 
 - Confere os oito degraus, anexos, excedentes e seis linhas do comparativo com as fontes citadas; nenhuma porcentagem nova foi derivada. Condições de excedente e PIX visíveis; Free/Starter têm cota diária, não mensal garantida.
 - Headline, CTA por e-mail, FAQ completo e nenhuma alegação de inbox garantida, feature parity total ou prova social não verificada. Checagem responsiva em 320, 390, 768 e 1280 px, zoom 200%, navegação somente por teclado, contraste AA e preferência por movimento reduzido.
-- Na implementação, conferir que a URL opcional do WhatsApp só aparece quando houver URL real aprovada. Nenhum placeholder deve ser exibido na página.
+- Na implementação: **WhatsApp descartado (27/09/2026)** — nenhum botão/link de WhatsApp; nenhum placeholder deve ser exibido na página.
 
 ## Decisões pendentes do Jean / placeholders
 
 | Placeholder | Decisão e comportamento enquanto pendente |
 |---|---|
-| `[WHATSAPP_URL]` | Jean fornece URL oficial e aprova o canal; até lá, não renderizar botão/link de WhatsApp. Todos os CTAs principais continuam no e-mail acima. |
+| ~~`[WHATSAPP_URL]`~~ | **Descartado (27/09/2026)**: Jean não usará WhatsApp por ora; sem URL oficial. Nenhum botão/link de WhatsApp. Todos os CTAs continuam no e-mail acima. |
