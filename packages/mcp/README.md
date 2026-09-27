@@ -1,4 +1,4 @@
-# @millionsend/mcp
+# @mepmail/mcp
 
 Official **MepMail** MCP server for local MCP clients — Claude Desktop, Claude
 Code, Cursor, Codex and anything that speaks stdio. It drives your MepMail
@@ -22,10 +22,10 @@ same config shape (Cursor: `mcp.json`):
   "mcpServers": {
     "mepmail": {
       "command": "npx",
-      "args": ["-y", "@millionsend/mcp"],
+      "args": ["-y", "@mepmail/mcp"],
       "env": {
-        "MILLIONSEND_API_KEY": "ms_...",
-        "MILLIONSEND_BASE_URL": "https://api-mepmail.je4ndev.com"
+        "MEPMAIL_API_KEY": "ms_...",
+        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
       }
     }
   }
@@ -35,15 +35,18 @@ same config shape (Cursor: `mcp.json`):
 **Claude Code**:
 
 ```bash
-claude mcp add mepmail -e MILLIONSEND_API_KEY=ms_... -e MILLIONSEND_BASE_URL=https://api-mepmail.je4ndev.com -- npx -y @millionsend/mcp
+claude mcp add mepmail -e MEPMAIL_API_KEY=ms_... -e MEPMAIL_BASE_URL=https://api-mepmail.je4ndev.com -- npx -y @mepmail/mcp
 ```
 
 ## Environment
 
 | Variable | Required | Default | Meaning |
 | --- | --- | --- | --- |
-| `MILLIONSEND_API_KEY` | yes | — | Team API key (`ms_...`). Sent as `Bearer` to your instance only. |
-| `MILLIONSEND_BASE_URL` | no | `https://api-mepmail.je4ndev.com` | Your instance's API URL. |
+| `MEPMAIL_API_KEY` | yes | — | Team API key (`ms_...`). Sent as `Bearer` to your instance only. Alias: `MILLIONSEND_API_KEY`. |
+| `MEPMAIL_BASE_URL` | no | `https://api-mepmail.je4ndev.com` | Your instance's API URL. Alias: `MILLIONSEND_BASE_URL`. |
+
+The `MILLIONSEND_*` aliases are the instance's historical env conventions and
+keep working — handy if you already drive MepMail through the upstream CLI.
 
 ## Tools (22)
 

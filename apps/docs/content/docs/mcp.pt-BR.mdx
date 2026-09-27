@@ -101,7 +101,7 @@ da sua instância, mostrada acima.
 
 Clientes que iniciam servidores locais pela configuração — o arquivo do Claude
 Desktop, o `mcp.json` do Cursor, Codex, qualquer cliente stdio — podem rodar o
-pacote [`@millionsend/mcp`](https://www.npmjs.com/package/@millionsend/mcp) em
+pacote [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) em
 vez de fazer ponte para o endpoint HTTP. Ele roda na sua máquina e fala direto
 com a API REST desta instância usando uma chave de API do time: sem OAuth, sem
 etapa no navegador.
@@ -111,10 +111,10 @@ etapa no navegador.
   "mcpServers": {
     "mepmail": {
       "command": "npx",
-      "args": ["-y", "@millionsend/mcp"],
+      "args": ["-y", "@mepmail/mcp"],
       "env": {
-        "MILLIONSEND_API_KEY": "ms_...",
-        "MILLIONSEND_BASE_URL": "https://api-mepmail.je4ndev.com"
+        "MEPMAIL_API_KEY": "ms_...",
+        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
       }
     }
   }

@@ -1,5 +1,5 @@
 {
-  "name": "@millionsend/mcp",
+  "name": "@mepmail/mcp",
   "version": "0.1.0",
   "description": "MepMail MCP server for local clients (stdio): send and inspect transactional email from Claude, Cursor and any MCP client. MepMail's API is compatible with the Resend wire protocol.",
   "license": "MIT",

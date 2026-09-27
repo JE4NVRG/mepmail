@@ -100,7 +100,7 @@ server URL from above.
 
 Clients that launch local servers from config — Claude Desktop's config file,
 Cursor's `mcp.json`, Codex, any stdio client — can run the
-[`@millionsend/mcp`](https://www.npmjs.com/package/@millionsend/mcp) package
+[`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) package
 instead of bridging to the HTTP endpoint. It runs on your machine and reaches
 this instance's REST API directly with a team API key: no OAuth, no browser
 step.
@@ -110,10 +110,10 @@ step.
   "mcpServers": {
     "mepmail": {
       "command": "npx",
-      "args": ["-y", "@millionsend/mcp"],
+      "args": ["-y", "@mepmail/mcp"],
       "env": {
-        "MILLIONSEND_API_KEY": "ms_...",
-        "MILLIONSEND_BASE_URL": "https://api-mepmail.je4ndev.com"
+        "MEPMAIL_API_KEY": "ms_...",
+        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
       }
     }
   }
