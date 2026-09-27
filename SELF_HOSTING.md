@@ -14,29 +14,19 @@ access to send to anyone); a sending domain you control. Domain verification (DK
 records) is done from the dashboard after boot.
 
 <details open>
-<summary><b>Quickstart (no clone)</b></summary>
+<summary><b>Quickstart (build from source)</b></summary>
 
-One command, in an empty directory (Node 18+):
-
-```sh
-mkdir millionsend && cd millionsend
-npx @millionsend/setup
-```
-
-The wizard detects what is already there and offers each step — create `.env`
-from a built-in template with generated secrets, provision the AWS resources
-and the S3 buckets for uploads and backups (both below), download the
-standalone compose file, and `docker compose up -d`. Every step is skippable
-and safe to re-run; `--dry-run` prints the full plan and touches nothing. On an install that is already set up, a terminal run opens on a menu of next steps instead of walking every step again.
-
-Prefer doing it by hand? The manual equivalent runs the same multi-arch
-prebuilt image:
+Clone the MepMail fork and build the image locally:
 
 ```sh
-mkdir millionsend && cd millionsend
-curl -O https://raw.githubusercontent.com/MillionSend/millionsend/main/deploy/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/MillionSend/millionsend/main/.env.example
+git clone https://github.com/JE4NVRG/mepmail.git mepmail
+cd mepmail
+cp .env.example .env
 ```
+
+The supported installation path for this fork is a local build from source.
+`@millionsend/setup` on npm and the images referenced by
+`deploy/docker-compose.yml` are not supported release channels for this fork.
 
 In `.env` (everything else defaults to a working local setup):
 
@@ -66,7 +56,7 @@ In `.env` (everything else defaults to a working local setup):
   `AWS_REGION`. See "Adding a region" below.
 
 ```sh
-docker compose up -d
+docker compose up --build -d
 ```
 
 Migrations run automatically on boot. Dashboard: http://localhost:3000.
@@ -78,20 +68,15 @@ API: http://localhost:3001.
 <summary><b>Upgrades</b></summary>
 
 ```sh
-docker compose pull
-docker compose up -d
+git pull --ff-only
+docker compose up --build -d
 ```
 
-Migrations run on boot, so that is the whole upgrade for a small instance. The compose file runs
-`ghcr.io/millionsend/millionsend:latest`, the latest tagged release (`:1.2.3`
-and `:1.2` tags exist alongside it; `:edge` follows `main`, where every build
-passed the test suite first). To hold a version, set `MILLIONSEND_IMAGE`
-in `.env` to a version tag or an immutable digest
-(`ghcr.io/millionsend/millionsend@sha256:…`; `docker image ls --digests` shows
-what is running) and `docker compose up -d`. The previous pin put back is the
-rollback — with the caveat that schema migrations run forward only, so take a
-dump before a big jump (Backups below); a rolled-back image may not start on a
-newer schema. Upgrading from a release before v0.6.30: the metadata window
+Migrations run on boot, so that is the whole upgrade for a small instance.
+Pin the Git revision you deploy when you need a reproducible release or
+rollback. Schema migrations run forward only, so take a dump before a big jump
+(Backups below); an older revision may not start on a newer schema. Upgrading
+from a release before v0.6.30: the metadata window
 default drops from 365 to 30 days, and the first hourly purge after boot
 deletes email rows older than that (counters and broadcast results stay). Set
 `EMAIL_METADATA_RETENTION_DAYS=365` first if that history must remain.
@@ -105,34 +90,13 @@ migration that fails leaves the old container serving instead of a container
 that will not boot, and the boot-time pass then finds nothing pending:
 
 ```sh
-docker compose pull && docker compose run --rm --no-deps millionsend migrate && docker compose up -d
-```
-
-Automatic upgrades, for a host that can only reach out (behind a CDN-only
-firewall, say): a cron line is enough, since `up -d` recreates a container
-only when its image changed.
-
-```sh
-( crontab -l 2>/dev/null; echo "*/5 * * * * cd /opt/millionsend && docker compose pull -q && docker compose up -d" ) | crontab -
+docker compose build && docker compose run --rm --no-deps millionsend migrate && docker compose up -d
 ```
 
 </details>
 
 <details>
-<summary><b>From source</b></summary>
-
-For contributors, or when you want to modify the code:
-
-```sh
-git clone https://github.com/MillionSend/millionsend.git
-cd millionsend
-cp .env.example .env   # fill it as in the quickstart
-docker compose up --build -d
-```
-
-The root `docker-compose.yml` builds the image locally from the `Dockerfile`. To run
-a clone against the published image instead:
-`docker compose -f docker-compose.yml -f docker-compose.prebuilt.yml up -d`.
+<summary><b>Development without Docker</b></summary>
 
 Without Docker (Node 24+, pnpm 11, local Postgres): `pnpm install`, point
 `DATABASE_URL` at your Postgres, `pnpm --filter @millionsend/db db:migrate`, then run
@@ -144,7 +108,7 @@ Without Docker (Node 24+, pnpm 11, local Postgres): `pnpm install`, point
 <details>
 <summary><b>AWS setup</b></summary>
 
-The AWS step of `npx @millionsend/setup` creates everything MillionSend needs in
+The source checkout's setup wizard creates everything MillionSend needs in
 AWS — IAM policy + user + access key, the SNS event topic, the SQS events queue
 the worker long-polls, and the SES configuration set. The policy also carries the
 `ses:*Tenant*` actions behind `SES_TENANTS` (one SES tenant per team); a
@@ -153,22 +117,23 @@ deployment set up before those existed re-runs the wizard, or updates the
 additionally gets events pushed to your host; the queue works without any public
 URL.
 
-Run it anywhere Node 18+ and your AWS admin credentials live — laptop or server; the
+Install the locked workspace dependencies and run it from the checkout where
+`.env` lives (Node 22+, pnpm 11):
+
+```sh
+pnpm install --frozen-lockfile
+pnpm setup:aws
+```
+
+Run it where your AWS admin credentials live — laptop or server; the
 MillionSend server never needs admin credentials. It verifies your AWS identity,
 shows the plan, creates everything, and writes the `AWS_*` lines into the `.env` in
 the current directory (no `.env` there → it prints them to paste where MillionSend
 runs). `--dry-run` prints the full plan and exits.
-`teardown` deletes everything the setup created, including all access keys of the
+`pnpm setup:aws teardown` deletes everything the setup created, including all access keys of the
 `millionsend` user, so a running server stops sending. Re-running is safe, but each
 run mints a new access key — delete stale ones in the IAM console.
-(`@millionsend/setup` is the self-host setup tool; `@millionsend/cli` is the end-user
-CLI that talks to the MillionSend API — migrations from other providers.)
 
-No Node on the server? The same CLI ships inside the image — run it from the
-deploy directory, which it reads and writes as `/work` (the wizard writes
-nothing outside it, so run it as yourself and the `.env` it creates is yours,
-mode 600):
-`docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms -v ~/.aws:/home/ms/.aws:ro -v "$PWD":/work -w /work ghcr.io/millionsend/millionsend:latest setup`.
 
 Prefer not to run a CLI? The dashboard's Settings → SES page offers a CloudFormation
 quick-create link and a pre-filled shell script that create the same resources.
@@ -184,16 +149,12 @@ again); identities, the 24-hour quota, the send rate and the sandbox status
 are all per region; every region's events land in the one SQS queue, because
 SNS delivers across regions.
 
-Run the wizard's `add-region` command where the `.env` lives — the deploy
-directory, or on the server through the image with short-lived admin
-credentials in the environment (nothing is stored):
+Run the source wizard's `add-region` command from the checkout where `.env`
+lives, with short-lived admin credentials in the environment (nothing is
+stored):
 
 ```sh
-npx @millionsend/setup add-region us-east-1
-# or, on the server, from the deploy directory:
-docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/ms \
-  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
-  -v "$PWD":/work -w /work ghcr.io/millionsend/millionsend:latest setup add-region us-east-1
+pnpm setup:aws add-region us-east-1
 ```
 
 The interactive wizard offers the same step as **Add a region** at its AWS
@@ -557,7 +518,7 @@ team logo in the dashboard; it also brands hosted unsubscribe pages when
 MillionSend branding is hidden. ONE `S3_*` credential set is shared with the
 backup job below — each feature is then enabled by its own bucket variable.
 
-The storage step of `npx @millionsend/setup` prompts for the endpoint and
+The storage step of `pnpm setup:aws` prompts for the endpoint and
 keys, creates (or adopts) both buckets — `millionsend-storage` and
 `millionsend-backups` by default — and writes the `S3_*` lines to `.env`.
 The one thing it cannot do over the S3 API is make the uploads bucket serve
@@ -620,11 +581,8 @@ before `pg_restore`.
 The dumps contain email bodies encrypted with `MASTER_ENCRYPTION_KEY` — back
 that key up separately, or restored bodies are unrecoverable.
 
-The standalone `deploy/docker-compose.yml` runs the published
-`ghcr.io/millionsend/backup` image (`MILLIONSEND_BACKUP_IMAGE` pins it, the way
-`MILLIONSEND_IMAGE` pins the app); a repository clone builds it from
-`scripts/backup`.
-Restores use the same container either way.
+The root Compose file builds the backup service locally from `scripts/backup`;
+restores use that locally built container too.
 
 Restore (stop the app first so nothing writes mid-restore):
 

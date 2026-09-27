@@ -12,9 +12,6 @@ export const COMPOSE_FILENAMES = [
   "compose.yaml",
 ] as const;
 
-export const COMPOSE_DOWNLOAD_URL =
-  "https://raw.githubusercontent.com/JE4NVRG/millionsend/main/deploy/docker-compose.yml";
-
 /** .env keys the wizard offers to generate when missing or empty. */
 export const SECRET_KEYS = ["MASTER_ENCRYPTION_KEY", "BETTER_AUTH_SECRET"] as const;
 
@@ -341,7 +338,7 @@ export function flowPlan(
   const upCommand = `docker ${composeUpArgs(state.composeContent).join(" ")}`;
   lines.push(
     state.composeFile === null
-      ? `launch: offer to download deploy/docker-compose.yml, then ${upCommand}`
+      ? "launch: clone https://github.com/JE4NVRG/mepmail, copy this .env into that checkout, then docker compose up --build -d"
       : `launch: offer ${upCommand} (${state.composeFile})`,
   );
   return lines;

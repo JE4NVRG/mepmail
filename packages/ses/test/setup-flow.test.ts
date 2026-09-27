@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { upsertEnv } from "../src/setup.js";
-import { envTemplate } from "../src/setup-constants.js";
+import { AWS_SETUP_COMMAND, awsAddRegionCommand, envTemplate } from "../src/setup-constants.js";
 import {
   addRegionEnvEntries,
   composeUpArgs,
@@ -143,7 +143,11 @@ describe("flowPlan", () => {
     expect(plan).toContain("PUBLIC_API_URL prompt");
     expect(plan).toContain("aws: IAM user millionsend");
     expect(plan).toContain("delivering to SQS queue millionsend-events");
-    expect(plan).toContain("download deploy/docker-compose.yml, then docker compose up -d");
+    expect(plan).toContain(
+      "clone https://github.com/JE4NVRG/mepmail, copy this .env into that checkout, then docker compose up --build -d",
+    );
+    expect(plan).not.toContain("download deploy/docker-compose.yml");
+    expect(plan).not.toContain("ghcr.io/millionsend");
   });
 
   it("keeps an existing .env with secrets set and honors the compose build key", () => {
@@ -169,6 +173,20 @@ const envExamplePath = fileURLToPath(new URL("../../../.env.example", import.met
 describe("envTemplate", () => {
   it.skipIf(!existsSync(envExamplePath))("is byte-identical to the repo's .env.example", () => {
     expect(envTemplate()).toBe(readFileSync(envExamplePath, "utf8"));
+  });
+
+  it("uses the MepMail brand in customer copy without renaming technical identifiers", () => {
+    const template = envTemplate();
+    expect(template).toContain("delivery events\n# reach MepMail");
+    expect(template).not.toContain("delivery events\n# reach MillionSend");
+    expect(template).toContain("# MILLIONSEND_IMAGE=");
+  });
+});
+
+describe("supported source-checkout commands", () => {
+  it("uses the workspace setup script for initial setup and added regions", () => {
+    expect(AWS_SETUP_COMMAND).toBe("pnpm setup:aws");
+    expect(awsAddRegionCommand("sa-east-1")).toBe("pnpm setup:aws add-region sa-east-1");
   });
 });
 

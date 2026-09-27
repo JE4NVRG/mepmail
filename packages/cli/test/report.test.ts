@@ -131,7 +131,7 @@ describe("printSummary layout", () => {
       "\nDNS records for news.example.com:\n  TXT  ms._domainkey.news.example.com\n    v=DKIM1\n\n  MX  news.example.com  priority 10\n    mx.example\n",
     );
     expect(text).toContain(
-      `\nId map (Resend → MillionSend; full pairs in migrate-report.md):\n  topics/Product updates\n    05cda767… → ${UUID}\n`,
+      `\nId map (Resend → MepMail; full pairs in migrate-report.md):\n  topics/Product updates\n    05cda767… → ${UUID}\n`,
     );
     expect(text).toContain(
       "\nManual notes:\n  ! topics/T — from domain x is not verified here\n  ! 4 broadcasts — from domain x is not verified here\n    A, B … and 2 more\n  ! broadcasts/E — something else\n",

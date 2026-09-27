@@ -8,8 +8,8 @@ import { createLogger } from "../src/log.js";
 import { VERSION } from "../src/meta.js";
 import {
   BATCH_MAX,
-  createMillionSendTarget,
-  type MillionSendTarget,
+  createMepMailTarget,
+  type MepMailTarget,
   type WriteResult,
 } from "../src/millionsend.js";
 import type { Snapshot } from "../src/model.js";
@@ -19,21 +19,18 @@ import { createApiKey, type LiveApi, startLiveApi } from "./helpers/live-api.js"
 
 let cloud: LiveApi;
 let selfHost: LiveApi;
-let target: MillionSendTarget;
+let target: MepMailTarget;
 
 const log = createLogger({ level: "error" });
 
-function targetFor(
-  api: Pick<LiveApi, "baseUrl" | "apiKey">,
-  token = api.apiKey,
-): MillionSendTarget {
-  return createMillionSendTarget(
+function targetFor(api: Pick<LiveApi, "baseUrl" | "apiKey">, token = api.apiKey): MepMailTarget {
+  return createMepMailTarget(
     createHttp({
       baseUrl: api.baseUrl,
       token,
       userAgent: "millionsend-cli/test",
       rps: 1000,
-      name: "MillionSend",
+      name: "MepMail",
       log,
     }),
     log,
@@ -127,7 +124,7 @@ describe("probe", () => {
         .probe()
         .catch((e: unknown) => e)) as Error;
       expect(error.message).toBe(
-        `MillionSend at ${baseUrl} has no GET /usage: either ${baseUrl} is not the API URL of your instance (check --to-url / MILLIONSEND_BASE_URL) or the instance predates CLI ${VERSION}; upgrade it.`,
+        `MepMail at ${baseUrl} has no GET /usage: either ${baseUrl} is not the API URL of your instance (check --to-url / MILLIONSEND_BASE_URL) or the instance predates CLI ${VERSION}; upgrade it.`,
       );
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));

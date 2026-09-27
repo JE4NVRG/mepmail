@@ -369,7 +369,7 @@
       "subtitle": "Nothing in the serving regions changes while this runs.",
       "notStarted": "Not started",
       "step1": "Run the setup tool for the new region",
-      "step1Body": "The same interactive wizard as the first install. Pick the region at the AWS step; it adopts the IAM user and policy that already exist and creates only the regional pieces.",
+      "step1Body": "From the MepMail source checkout, run the add-region command. It adopts the IAM user and policy that already exist and creates only the regional pieces.",
       "step2": "Add the lines it prints to .env, restart",
       "step2Note": "AWS_REGION keeps working as the one-region alias, so an instance that never adds a region changes nothing.",
       "step3": "The region appears here as Sandbox",

@@ -51,7 +51,7 @@ export async function getLLMText(page: InferPageType<typeof source>): Promise<st
       : "";
     return `# ${method?.toUpperCase() ?? ""} ${page.data.title} (${page.url})${description}
 
-MepMail API operation. Base URL https://api.millionsend.com (self-hosted: the instance's own API origin); authenticate with \`Authorization: Bearer ms_...\`. The wire format is Resend-compatible. Full OpenAPI 3.1 spec: /openapi.json.${spec}`;
+MepMail API operation. Base URL https://api-mepmail.agenciamep.com (self-hosted: the instance's own API origin); authenticate with \`Authorization: Bearer ms_...\`. The wire format is Resend-compatible. Full OpenAPI 3.1 spec: /openapi.json.${spec}`;
   }
 
   const processed = await page.data.getText("processed");

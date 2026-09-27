@@ -3300,7 +3300,7 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
     // Servers drive the docs playground's target picker: Cloud first (docs
     // convention), then a variable entry self-hosters point at their origin.
     servers: [
-      { url: "https://api.millionsend.com", description: "MepMail Cloud" },
+      { url: "https://api-mepmail.agenciamep.com", description: "MepMail Cloud" },
       {
         url: "{baseUrl}",
         description: "Self-hosted instance",

@@ -1,6 +1,6 @@
 ---
 title: Cobrança (implantações hospedadas)
-description: Como planos, Stripe Checkout e o webhook se encaixam em uma implantação hospedada do MillionSend, e como provisionar uma conta Stripe para ela.
+description: Como planos, Stripe Checkout e o webhook se encaixam em uma implantação hospedada do MepMail, e como provisionar uma conta Stripe para ela.
 ---
 
 A cobrança só existe quando `IS_CLOUD=true`. Uma instância auto-hospedada
@@ -270,7 +270,7 @@ O que ele faz, e por que rodar de novo é seguro:
   pagamento, dados do cliente incluindo id fiscal e cancelamento ao fim do
   período com coleta do motivo; atualização de assinatura fica desligada,
   veja [o fluxo](#o-fluxo)), os links de termos e privacidade do perfil da
-  empresa (`millionsend.com/terms`, `/privacy`) e, com `--app-url`, a URL de
+  empresa (`mepmail.agenciamep.com/terms`, `/privacy`) e, com `--app-url`, a URL de
   retorno.
 
 Teste e produção são contas Stripe separadas: rode uma vez com cada chave.

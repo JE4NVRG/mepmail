@@ -33,7 +33,7 @@ means changing two environment variables, not rewriting your integration.
 | API request logs | ✅ | Every API request recorded with request/response bodies, secrets redacted. |
 | SMTP relay | ✅ | Drop-in SMTP on port 2587; authenticate with an API key. |
 | Dashboard (en/pt-BR) | ✅ | Full dashboard in English and Brazilian Portuguese. |
-| Self-host (Docker) | ✅ | Compose file plus a setup wizard; sends through your own AWS SES. |
+| Self-host (Docker) | ✅ | Source-built Compose stack plus a setup wizard; sends through your own AWS SES. |
 | Migrate from Resend | ✅ | `npx @millionsend/cli migrate --from resend` moves contacts, segments, topics, templates, webhooks, domains and suppressions; read-only against Resend, safe to re-run before cutover. |
 | Content monitoring | ✅ | Optional outbound judge via [TypeSafe Jev](https://typesafe.ai). Off by default on self-host. |
 
@@ -41,18 +41,24 @@ The hosted monitor uses [TypeSafe](https://typesafe.ai)'s Jev, a System One mode
 
 ## Run it locally
 
-One command, in an empty directory — no clone needed:
+Build the MepMail fork locally from its source checkout:
 
 ```sh
-npx @millionsend/setup
+git clone https://github.com/JE4NVRG/mepmail.git mepmail
+cd mepmail
+cp .env.example .env
 ```
 
-The wizard creates `.env` (secrets generated for you), optionally provisions
-the AWS resources (IAM user, SNS event topic, SES configuration set), and
-starts the prebuilt image with `docker compose up -d`. Every step is offered,
-skippable, and safe to re-run. Prefer doing it by hand? The manual curl path
-and everything else — from-source build, SES/SNS event pipeline, Docker-less
-development — is in [SELF_HOSTING.md](SELF_HOSTING.md).
+Fill the two required secrets in `.env` before boot. The supported installation
+path for this fork is a local build from source. `@millionsend/setup` on npm and
+the images referenced by `deploy/docker-compose.yml` are not supported release
+channels for this fork. The source wizard (`pnpm setup:aws`) and the full SES/SNS
+event pipeline are documented in the
+[self-hosting guide](apps/docs/content/docs/self-hosting.mdx).
+
+```sh
+docker compose up --build -d
+```
 
 Dashboard at http://localhost:3000, API at http://localhost:3001.
 

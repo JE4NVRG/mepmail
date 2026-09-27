@@ -1,9 +1,9 @@
 ---
 title: CLI
-description: "@millionsend/cli — mova uma conta de e-mail para o MillionSend pelo terminal: plan, apply, status, rollback."
+description: "@millionsend/cli — mova uma conta de e-mail para o MepMail pelo terminal: plan, apply, status, rollback."
 ---
 
-`@millionsend/cli` move uma conta de e-mail para o MillionSend — Cloud ou sua
+`@millionsend/cli` move uma conta de e-mail para o MepMail — Cloud ou sua
 própria instância. Ele lê o provedor de origem, compara com o destino, aplica
 a diferença e grava um relatório. Hoje a única origem é o Resend.
 
@@ -62,9 +62,9 @@ millionsend --help | --version
 | `--from <provider>` | Provedor de origem. Só existe `resend`. |
 | `--from-key-stdin` | Lê a chave de API de origem do stdin (primeira linha). |
 | `--from-key <key>` | Chave de API de origem como argumento. Visível em listas de processos; a ferramenta avisa. Prefira a variável de ambiente. |
-| `--to-url <url>` | URL da API de uma instância auto-hospedada do MillionSend. Sem ela, o destino é o MillionSend Cloud (`https://api.millionsend.com`), como nos SDKs. |
-| `--to-key-stdin` | Lê a chave de API do MillionSend do stdin (segunda linha quando as duas flags de stdin estão presentes). |
-| `--to-key <key>` | Chave de API do MillionSend como argumento. Mesma ressalva. |
+| `--to-url <url>` | URL da API de uma instância auto-hospedada do MepMail. Sem ela, o destino é o MepMail Cloud (`https://api-mepmail.agenciamep.com`), como nos SDKs. |
+| `--to-key-stdin` | Lê a chave de API do MepMail do stdin (segunda linha quando as duas flags de stdin estão presentes). |
+| `--to-key <key>` | Chave de API do MepMail como argumento. Mesma ressalva. |
 | `--rps <n>` | Requisições por segundo contra a origem; padrão 8. O limite do time no Resend é 10, compartilhado com o seu envio em produção; a CLI mostra ao conectar o limite que detecta, se mantém abaixo dele e avisa quando o ritmo passa dele. Valores acima de 10 (até 100) são para um limite que o Resend aumentou sob pedido. |
 | `--only <a,b>` | Migra apenas estes recursos. |
 | `--skip <a,b>` | Pula estes recursos. `enrichment` é a passagem por contato que roda por último: inscrições em tópicos, depois propriedades, cada uma retomável. |
@@ -91,8 +91,8 @@ Nomes de recurso para `--only` e `--skip`, na ordem de aplicação: `domains`,
 | Variável | Significado |
 | --- | --- |
 | `RESEND_API_KEY` | Chave de API de origem, acesso total. A ferramenta só lê do Resend. |
-| `MILLIONSEND_API_KEY` | Chave de API do MillionSend, acesso total. |
-| `MILLIONSEND_BASE_URL` | URL da API de uma instância auto-hospedada, igual a `--to-url`. Sem ela, MillionSend Cloud. |
+| `MILLIONSEND_API_KEY` | Chave de API do MepMail, acesso total. |
+| `MILLIONSEND_BASE_URL` | URL da API de uma instância auto-hospedada, igual a `--to-url`. Sem ela, MepMail Cloud. |
 | `NO_COLOR` | Desativa cores. |
 | `FORCE_COLOR` | Cores mesmo num pipe, o mesmo que `--color always`. |
 | `DO_NOT_TRACK` | Respeitada, sem efeito: a ferramenta não envia telemetria, nunca liga para casa e nunca verifica atualizações. |
@@ -100,8 +100,8 @@ Nomes de recurso para `--only` e `--skip`, na ordem de aplicação: `domains`,
 Cada chave é resolvida nesta ordem: variável de ambiente, depois a flag
 `-stdin`, depois a flag de argumento, depois — num terminal — um prompt
 mascarado. A URL de destino vem de `MILLIONSEND_BASE_URL` ou `--to-url`; sem
-nenhuma das duas, um terminal oferece a escolha entre o MillionSend Cloud e uma
-URL auto-hospedada, e uma execução não interativa mira o MillionSend Cloud,
+nenhuma das duas, um terminal oferece a escolha entre o MepMail Cloud e uma
+URL auto-hospedada, e uma execução não interativa mira o MepMail Cloud,
 como nos SDKs.
 
 ## Arquivos
@@ -113,7 +113,7 @@ uma chave:
 | --- | --- |
 | `.millionsend/migrate-state.json` | Cada id que a ferramenta criou por recurso, cursores de retomada, o hash do plano. Gravado após cada lote, então uma execução interrompida retoma de onde parou. |
 | `.millionsend/migrate-report.json` | O relatório da última execução como dados. |
-| `.millionsend/migrate-report.md` | O mesmo relatório em Markdown: contagens, o checklist, os registros DNS por domínio, o mapa de ids (ids de tópicos e segmentos na origem → ids no MillionSend, para código que os referencia), os itens manuais. |
+| `.millionsend/migrate-report.md` | O mesmo relatório em Markdown: contagens, o checklist, os registros DNS por domínio, o mapa de ids (ids de tópicos e segmentos na origem → ids no MepMail, para código que os referencia), os itens manuais. |
 
 `.millionsend/` é acrescentado ao `.gitignore` quando existe um no diretório
 atual; a ferramenta avisa uma vez.
@@ -123,12 +123,12 @@ atual; a ferramenta avisa uma vez.
 - **Somente leitura na origem.** Toda requisição ao Resend é um `GET` a um
   endpoint documentado, enviada com o `User-Agent`
   `millionsend-cli/<versão>`. Escritas vão apenas para a sua API do
-  MillionSend.
+  MepMail.
 - **As chaves ficam em memória.** Nunca são gravadas em arquivo e são
   redigidas de toda linha de log (`re_…`, `ms_…`, `whsec_…` e headers
   `Authorization`).
 - **Dois hosts, nenhum terceiro.** A ferramenta contata `api.resend.com` e a
-  URL da API do MillionSend que você informou. Sem telemetria, sem
+  URL da API do MepMail que você informou. Sem telemetria, sem
   verificação de atualização.
 - **401 ou 403 de qualquer lado interrompe a execução.** Sem retentativa,
   sem contorno.
@@ -158,7 +158,7 @@ stdin, nunca como argumentos:
 ```sh
 export RESEND_API_KEY=re_...
 export MILLIONSEND_API_KEY=ms_...
-export MILLIONSEND_BASE_URL=https://api.millionsend.com   # ou a URL da sua instância
+export MILLIONSEND_BASE_URL=https://api-mepmail.agenciamep.com   # ou a URL da sua instância
 
 millionsend migrate plan --from resend --out plan.json
 # saída 2 quando há algo a aplicar
@@ -188,4 +188,4 @@ millionsend migrate plan --from resend --json | jq '.counts'
 
 ---
 
-Resend é uma marca registrada da Plus Five Five, Inc. O MillionSend não é afiliado nem endossado pelo Resend.
+Resend é uma marca registrada da Plus Five Five, Inc. O MepMail não é afiliado nem endossado pelo Resend.
