@@ -141,8 +141,8 @@ describe("flowPlan", () => {
     expect(plan).toContain("generate MASTER_ENCRYPTION_KEY and BETTER_AUTH_SECRET");
     expect(plan).toContain("APP_BASE_URL prompt (default http://localhost:3000)");
     expect(plan).toContain("PUBLIC_API_URL prompt");
-    expect(plan).toContain("aws: IAM user millionsend");
-    expect(plan).toContain("delivering to SQS queue millionsend-events");
+    expect(plan).toContain("aws: IAM user mepmail");
+    expect(plan).toContain("delivering to SQS queue mepmail-events");
     expect(plan).toContain(
       "clone https://github.com/JE4NVRG/mepmail, copy this .env into that checkout, then docker compose up --build -d",
     );
@@ -161,7 +161,7 @@ describe("flowPlan", () => {
     ).join("\n");
     expect(plan).toContain("keep the existing .env");
     expect(plan).toContain("MASTER_ENCRYPTION_KEY and BETTER_AUTH_SECRET already set");
-    expect(plan).toContain("aws: SNS topic millionsend-events in eu-west-1");
+    expect(plan).toContain("aws: SNS topic mepmail-events in eu-west-1");
     expect(plan).toContain("docker compose up --build -d (docker-compose.yml)");
   });
 });
@@ -191,7 +191,7 @@ describe("supported source-checkout commands", () => {
 });
 
 describe("addRegionEnvEntries / servedRegionsInEnv", () => {
-  const topic = "arn:aws:sns:us-east-1:123456789012:millionsend-events";
+  const topic = "arn:aws:sns:us-east-1:123456789012:mepmail-events";
 
   it("reads the served regions the way the app does", () => {
     expect(servedRegionsInEnv("AWS_REGIONS=sa-east-1, us-east-1\nAWS_REGION=sa-east-1\n")).toEqual([

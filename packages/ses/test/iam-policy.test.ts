@@ -41,8 +41,8 @@ describe("SES_IAM_POLICY", () => {
   });
 });
 
-describe("infra/millionsend-ses.cfn.yaml", () => {
-  const cfn = read("../../../infra/millionsend-ses.cfn.yaml");
+describe("infra/mepmail-ses.cfn.yaml", () => {
+  const cfn = read("../../../infra/mepmail-ses.cfn.yaml");
 
   it("grants exactly the wizard's SES actions", () => {
     expect(new Set(cfn.match(/ses:[A-Za-z]+/g))).toEqual(policyActions);

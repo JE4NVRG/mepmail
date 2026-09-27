@@ -10,6 +10,8 @@ export {
   accountEmailFrom,
   accountMailDeliverable,
   assertEnvConsistency,
+  betaDefaultDailyCeiling,
+  betaMaxUsers,
   CONTENT_REVEAL_MODES,
   type ContentRevealMode,
   contentRevealOn,

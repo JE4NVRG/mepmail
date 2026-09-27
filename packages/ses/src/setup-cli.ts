@@ -211,7 +211,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     // Hosted-cloud mode adds the prompts boot demands under IS_CLOUD=true. An
     // .env that already says so keeps the mode on re-runs without the flag.
     const cloud = argv.includes("--cloud") || isCloudEnv(state.envContent);
-    flow.intro("millionsend", "setup", cloud ? "cloud" : "self-host");
+    flow.intro("mepmail", "setup", cloud ? "cloud" : "self-host");
     flow.note(DESCRIPTION_TEXT);
     flow.note(stateSummary(state));
 
@@ -967,7 +967,7 @@ async function addRegionMain(flow: Flow, args: string[], dryRun: boolean): Promi
     flow.error(`Not an AWS region name: ${preset}`);
     return 1;
   }
-  flow.intro("millionsend", "add-region", preset ?? undefined);
+  flow.intro("mepmail", "add-region", preset ?? undefined);
   const envPath = join(process.cwd(), ".env");
   const state = detectDirState(readCwdFile, null);
   let queueUrl = envValue(state.envContent, "SQS_QUEUE_URL") || process.env.SQS_QUEUE_URL || "";
@@ -1133,7 +1133,7 @@ async function launchStep(wizard: Wizard): Promise<number> {
 
 /** The pre-wizard teardown flow, unchanged: identity, region, delete. */
 async function teardownMain(flow: Flow, dryRun: boolean): Promise<number> {
-  flow.intro("millionsend", "teardown");
+  flow.intro("mepmail", "teardown");
   let accountId = "";
   if (dryRun) {
     flow.note("--dry-run: skipping the AWS credential check.");

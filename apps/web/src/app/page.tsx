@@ -98,10 +98,14 @@ const questions = [
     "O suporte é em português?",
     "Sim. O onboarding é assistido e o suporte é direto em português com quem construiu o produto. A gestão proativa é opcional e adiciona monitoramento, ajustes e prioridade de atendimento.",
   ],
+  [
+    "Como funciona o beta?",
+    "O beta é limitado a 100 contas grátis, cada uma com teto de 100 e-mails por dia no plano Free. Quando as vagas acabam, novos cadastros pausam até a próxima leva; para volume maior, fale com a gente e combinamos o plano.",
+  ],
 ] as const;
 
 const description =
-  "E-mail transacional com onboarding assistido no Brasil. Compare planos MepMail, envie pela API compatível com Resend ou relay SMTP e solicite acesso.";
+  "E-mail transacional com onboarding assistido no Brasil. Compare planos MepMail, envie pela API compatível com Resend ou relay SMTP e crie sua conta grátis no beta.";
 
 export const metadata: Metadata = {
   title: { absolute: "MepMail — E-mail transacional com API compatível com Resend" },
@@ -136,10 +140,10 @@ function Wordmark() {
   );
 }
 
-function ContactLink() {
+function SignupLink({ label = "Criar conta grátis" }: { label?: string }) {
   return (
-    <a className="ms-btn ms-btn-primary gtm-action" href={contact}>
-      Solicitar acesso
+    <a className="ms-btn ms-btn-primary gtm-action" href="/signup">
+      {label}
     </a>
   );
 }
@@ -168,14 +172,17 @@ export default async function RootPage() {
               Como funciona
             </a>
             <a href="/login">Entrar</a>
-            <ContactLink />
+            <SignupLink label="Criar conta" />
           </nav>
         </div>
       </header>
       <main id="conteudo">
         <section className="gtm-section gtm-hero">
           <div className="gtm-container">
-            <p className="gtm-eyebrow">E-mail transacional para quem constrói produtos no Brasil</p>
+            <p className="gtm-eyebrow">
+              E-mail transacional para quem constrói produtos no Brasil{" "}
+              <span className="gtm-beta-badge">Beta · 100 contas grátis</span>
+            </p>
             <h1>
               Mesma API do Resend. <span>Até 85% mais barato.</span>
             </h1>
@@ -185,13 +192,14 @@ export default async function RootPage() {
               português e implantação assistida.
             </p>
             <div className="gtm-actions">
-              <ContactLink />
+              <SignupLink />
               <a className="ms-btn ms-btn-secondary gtm-action" href="#planos">
                 Ver planos
               </a>
             </div>
             <p className="gtm-note">
-              Sem cadastro público. Conte seu volume de envio e receba orientação sobre o plano.
+              Beta aberto: 100 contas grátis, teto de 100 e-mails por dia em cada uma. Crie a sua
+              em 1 minuto — sem cartão.
             </p>
           </div>
         </section>
@@ -304,7 +312,7 @@ export default async function RootPage() {
                       <dd>{plan.attachment}</dd>
                     </div>
                   </dl>
-                  <ContactLink />
+                  <SignupLink label="Começar grátis" />
                 </article>
               ))}
             </div>
@@ -324,7 +332,7 @@ export default async function RootPage() {
                 <strong>
                   Para os 3 primeiros clientes: setup grátis e 2 meses de gestão grátis.
                 </strong>{" "}
-                Consulte a disponibilidade ao solicitar acesso.
+                Crie sua conta grátis e fale com a gente para garantir a sua.
               </p>
             </div>
             <p className="gtm-note">
@@ -339,7 +347,8 @@ export default async function RootPage() {
             <h2>Da conversa ao primeiro envio, com ajuda de quem construiu.</h2>
             <ol className="gtm-steps">
               <li>
-                Conte seu volume mensal e como envia hoje. Indicamos o degrau e combinamos o acesso.
+                Crie sua conta grátis e conte como você envia hoje. Indicamos o degrau certo e
+                acompanhamos a migração.
               </li>
               <li>
                 Configuramos seu domínio de envio com você: registros DNS para DKIM e MAIL FROM,
@@ -355,7 +364,7 @@ export default async function RootPage() {
               ao DNS; a propagação e a verificação do domínio podem levar mais tempo. A verificação
               automática roda a cada 15 minutos.
             </p>
-            <ContactLink />
+            <SignupLink />
           </div>
         </section>
 
@@ -397,10 +406,10 @@ export default async function RootPage() {
           <div className="gtm-container">
             <h2>Vamos encontrar o plano para o seu volume?</h2>
             <p>
-              Conte como você envia hoje e receba uma orientação de migração, sem criar conta nem
-              mudar tudo de uma vez.
+              Crie sua conta grátis, faça seus primeiros envios e conte como você envia hoje — na
+              migração, a gente vai junto.
             </p>
-            <ContactLink />
+            <SignupLink />
           </div>
         </section>
       </main>

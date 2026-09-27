@@ -247,6 +247,13 @@ export const env = createEnv({
     MONITOR_ANOMALY_MULTIPLIER: z.coerce.number().min(1).optional(),
     MONITOR_TEAM_DAILY_CAP: z.coerce.number().int().min(0).optional(),
     MONITOR_INSTANCE_DAILY_CAP: z.coerce.number().int().min(0).optional(),
+
+    // Self-host beta controls (optional): how many accounts sign-up admits
+    // in total, and the daily send ceiling stamped on newly created teams.
+    // Unset (or 0 for the cap) keeps classic self-host behavior: no seat cap,
+    // no ceiling. Read through betaMaxUsers() / betaDefaultDailyCeiling().
+    BETA_MAX_USERS: z.coerce.number().int().min(0).optional(),
+    BETA_DEFAULT_DAILY_CEILING: z.coerce.number().int().min(1).max(100_000_000).optional(),
     MONITOR_FLAG_RISK: z.coerce.number().min(0).max(1).optional(),
     MONITOR_ALERT_RISK: z.coerce.number().min(0).max(1).optional(),
     MONITOR_PAUSE_RISK: z.coerce.number().min(0).max(1).optional(),
@@ -318,7 +325,7 @@ export const env = createEnv({
     ALLOW_TRACKING_SUBDOMAINS: boolFromString,
 
     // Host a customer's branded tracking subdomain CNAMEs at. Set to a
-    // dedicated tracking edge (e.g. track.millionsend-dns.com — a small box
+    // dedicated tracking edge (e.g. track.mepmail-dns.com — a small box
     // that terminates TLS per customer hostname and proxies /t/* here) when
     // this app itself cannot hold a certificate for customer hostnames, as on
     // a multi-tenant cloud behind a CDN. Unset: the CNAME targets this app's
@@ -474,6 +481,26 @@ export function abuseJudgeConfig(e: Env = env): AbuseJudgeConfig | null {
 /** Whether the operator may open a team's dashboard read-only; raw-string safe under SKIP_ENV_VALIDATION. */
 export function supportViewEnabled(e: Env = env): boolean {
   return (e.SUPPORT_VIEW as unknown) === "on";
+}
+
+/**
+ * Beta seat cap: how many accounts this instance admits in total
+ * (BETA_MAX_USERS). Undefined — unset or 0 — means no cap, the classic
+ * self-host behavior. Raw-string safe under SKIP_ENV_VALIDATION.
+ */
+export function betaMaxUsers(e: Env = env): number | undefined {
+  const n = Number(e.BETA_MAX_USERS);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
+}
+
+/**
+ * Daily send ceiling stamped on newly created teams
+ * (BETA_DEFAULT_DAILY_CEILING); undefined means none. The operator can raise
+ * or lower it per team later in the console.
+ */
+export function betaDefaultDailyCeiling(e: Env = env): number | undefined {
+  const n = Number(e.BETA_DEFAULT_DAILY_CEILING);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
 }
 
 /**

@@ -12,7 +12,7 @@ import { THEME_INIT_SCRIPT, THEME_KEY } from "@/lib/theme";
 
 // metadataBase comes from the runtime APP_BASE_URL, so a self-hosted instance
 // emits its own absolute Open Graph URLs rather than ours. Copy mirrors the
-// LP's meta (millionsend-lp src/messages) so a shared app link reads the same
+// LP's meta (mepmail-lp src/messages) so a shared app link reads the same
 // as the site's; keep the two in step.
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("common");

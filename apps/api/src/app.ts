@@ -4225,7 +4225,7 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
           ? email.sesMessageId.startsWith("<")
             ? email.sesMessageId
             : `<${email.sesMessageId}@email.amazonses.com>`
-          : `<${email.id}@unsent.millionsend>`,
+          : `<${email.id}@unsent.mepmail>`,
         // Internal quota-parking is invisible on the wire: the SDK's
         // last_event union has no 'queued_quota'.
         last_event: email.latestStatus === "queued_quota" ? "queued" : email.latestStatus,
