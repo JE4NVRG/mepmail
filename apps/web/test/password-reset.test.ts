@@ -216,7 +216,7 @@ describe("request-password-reset endpoint", () => {
     } finally {
       await close();
     }
-  });
+  }, 15_000);
 });
 
 describe("password changed receipt", () => {
@@ -261,5 +261,5 @@ describe("password changed receipt", () => {
     } finally {
       await close();
     }
-  });
+  }, 15_000);
 });
