@@ -40,7 +40,15 @@
     "title": "Compare by the volume you actually send.",
     "intro": "The numbers below compare the cheapest plan covering each monthly volume. Savings vary by tier and provider; confirm current terms before subscribing.",
     "tableAria": "Price comparison by volume",
-    "columns": ["Emails/month", "MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "Advantage"],
+    "columns": [
+      "Emails/month",
+      "MepMail",
+      "Resend",
+      "SendGrid",
+      "Postmark",
+      "Mailgun",
+      "Advantage"
+    ],
     "slideNote": "Swipe the table to see every provider on smaller screens.",
     "refNote": "Reference: commercial analysis of 2026-09-27; third-party public prices can change and features/terms are not equivalent. USD per month, excluding taxes and overages. “(sales)” means a commercial quote, not a public price."
   },
@@ -78,15 +86,64 @@
     "cta": "Start free",
     "featuredBadge": "Most popular",
     "showScale": "Scale plans (500K–2.5M)",
+    "ctaNote": "Create your free account first — activating the plan is one click in the panel.",
     "items": [
-      { "volume": "100/day (~3k/month)", "limits": "1 domain · 1 workspace · 1,000 contacts", "overage": "stops at cap", "attachment": "1 MB" },
-      { "volume": "1,500/day (~45k/month)", "limits": "3 domains · 2 workspaces · 10,000 contacts", "overage": "stops at cap", "attachment": "1 MB" },
-      { "volume": "100,000/month", "limits": "10 domains · 5 workspaces · unlimited contacts", "overage": "US$ 0.90/1k", "attachment": "5 MB" },
-      { "volume": "200,000/month", "limits": "10 domains · 5 workspaces · unlimited contacts", "overage": "US$ 0.35/1k", "attachment": "5 MB" },
-      { "volume": "500,000/month", "limits": "Unlimited domains · 10 workspaces · unlimited contacts", "overage": "US$ 0.25/1k", "attachment": "10 MB" },
-      { "volume": "1,000,000/month", "limits": "Unlimited domains · 10 workspaces · unlimited contacts", "overage": "US$ 0.23/1k", "attachment": "10 MB" },
-      { "volume": "1,500,000/month", "limits": "Unlimited domains · 10 workspaces · unlimited contacts", "overage": "US$ 0.18/1k", "attachment": "10 MB" },
-      { "volume": "2,500,000/month", "limits": "Unlimited domains · 10 workspaces · unlimited contacts", "overage": "US$ 0.16/1k", "attachment": "10 MB" }
+      {
+        "volume": "100/day (~3k/month)",
+        "limits": "1 domain · 1 workspace · 1,000 contacts",
+        "overage": "stops at cap",
+        "attachment": "1 MB",
+        "cta": "Start free"
+      },
+      {
+        "volume": "1,500/day (~45k/month)",
+        "limits": "3 domains · 2 workspaces · 10,000 contacts",
+        "overage": "stops at cap",
+        "attachment": "1 MB",
+        "cta": "Start with Starter"
+      },
+      {
+        "volume": "100,000/month",
+        "limits": "10 domains · 5 workspaces · unlimited contacts",
+        "overage": "US$ 0.90/1k",
+        "attachment": "5 MB",
+        "cta": "Start with Pro 100K"
+      },
+      {
+        "volume": "200,000/month",
+        "limits": "10 domains · 5 workspaces · unlimited contacts",
+        "overage": "US$ 0.35/1k",
+        "attachment": "5 MB",
+        "cta": "Start with Pro 200K"
+      },
+      {
+        "volume": "500,000/month",
+        "limits": "Unlimited domains · 10 workspaces · unlimited contacts",
+        "overage": "US$ 0.25/1k",
+        "attachment": "10 MB",
+        "cta": "Start with Scale 500K"
+      },
+      {
+        "volume": "1,000,000/month",
+        "limits": "Unlimited domains · 10 workspaces · unlimited contacts",
+        "overage": "US$ 0.23/1k",
+        "attachment": "10 MB",
+        "cta": "Start with Scale 1M"
+      },
+      {
+        "volume": "1,500,000/month",
+        "limits": "Unlimited domains · 10 workspaces · unlimited contacts",
+        "overage": "US$ 0.18/1k",
+        "attachment": "10 MB",
+        "cta": "Start with Scale 1.5M"
+      },
+      {
+        "volume": "2,500,000/month",
+        "limits": "Unlimited domains · 10 workspaces · unlimited contacts",
+        "overage": "US$ 0.16/1k",
+        "attachment": "10 MB",
+        "cta": "Start with Scale 2.5M"
+      }
     ],
     "note": "Free and Starter have a daily limit (UTC); the monthly volume is illustrative only. On Pro and Scale, per-1,000 overage depends on enablement at provisioning; without it, sending stops at the quota. Even with overage enabled, the safety ceiling of 5× the included volume applies.",
     "founders": {
