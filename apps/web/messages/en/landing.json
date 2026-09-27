@@ -9,6 +9,7 @@
   "nav": {
     "compare": "Compare prices",
     "plans": "Plans",
+    "mcp": "MCP",
     "how": "How it works",
     "login": "Sign in",
     "signup": "Create account"
@@ -208,6 +209,18 @@
       }
     ]
   },
+  "mcp": {
+    "eyebrow": "Agent-ready",
+    "title": "Let your AI agents send email.",
+    "body": "MepMail ships an official <b>MCP server</b>. Claude, Cursor, Codex and any MCP client connect straight to your sending domain — hosted (OAuth, nothing to install) or local (npx @mepmail/mcp).",
+    "points": [
+      "Hosted: connect with OAuth at api-mepmail.je4ndev.com/mcp.",
+      "Local: npx @mepmail/mcp with a dedicated API key.",
+      "Both modes expose the same tools."
+    ],
+    "caption": "Paste it into your MCP client. Done.",
+    "cta": "Create account and connect"
+  },
   "close": {
     "title": "Shall we find the plan for your volume?",
     "body": "Create your free account, make your first sends and tell us how you send today — during migration, we come along.",
@@ -216,7 +229,10 @@
   "footer": {
     "navAria": "Footer",
     "tagline": "MepMail · Transactional email with assisted onboarding",
+    "colProduct": "Product",
+    "colAccount": "Account",
     "login": "Sign in",
-    "contact": "Contact"
+    "contact": "Contact",
+    "rights": "© 2026 MepMail. All rights reserved."
   }
 }

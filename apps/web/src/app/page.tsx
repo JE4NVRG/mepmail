@@ -51,6 +51,19 @@ type FaqItem = { q: string; a: string };
 
 const EMPTY_PLAN_COPY: PlanCopy = { volume: "", limits: "", overage: "", attachment: "" };
 
+const MCP_CONFIG = `{
+  "mcpServers": {
+    "mepmail": {
+      "command": "npx",
+      "args": ["-y", "@mepmail/mcp"],
+      "env": {
+        "MEPMAIL_API_KEY": "ms_...",
+        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
+      }
+    }
+  }
+}`;
+
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("landing");
   const description = t("meta.description");
@@ -143,6 +156,7 @@ export default async function RootPage() {
   const faq = t.raw("faq.items") as FaqItem[];
   const calc = t.raw("calc") as CalcLabels;
   const trust = t.raw("hero.trust") as string[];
+  const mcpPoints = t.raw("mcp.points") as string[];
   const founders = t.raw("plans.founders") as {
     title: string;
     items: string[];
@@ -193,18 +207,20 @@ export default async function RootPage() {
             <Wordmark />
           </a>
           <nav className="gtm-nav" aria-label={t("navAria")}>
-            <a className="gtm-nav-extra" href="#comparativo">
-              {t("nav.compare")}
-            </a>
-            <a className="gtm-nav-extra" href="#planos">
-              {t("nav.plans")}
-            </a>
-            <a className="gtm-nav-extra" href="#como-funciona">
-              {t("nav.how")}
-            </a>
-            <LandingLangSwitch label={t("lang.aria")} />
-            <a href="/login">{t("nav.login")}</a>
-            <SignupLink label={t("nav.signup")} />
+            <div className="gtm-nav-links">
+              <a href="#comparativo">{t("nav.compare")}</a>
+              <a href="#planos">{t("nav.plans")}</a>
+              <a href="#mcp">{t("nav.mcp")}</a>
+              <a href="#como-funciona">{t("nav.how")}</a>
+            </div>
+            <div className="gtm-nav-actions">
+              <LandingLangSwitch label={t("lang.aria")} />
+              <span className="gtm-nav-divider" aria-hidden="true" />
+              <a className="gtm-nav-login" href="/login">
+                {t("nav.login")}
+              </a>
+              <SignupLink label={t("nav.signup")} />
+            </div>
           </nav>
         </div>
       </header>
@@ -337,6 +353,34 @@ export default async function RootPage() {
           </div>
         </section>
 
+        <section className="gtm-section gtm-alt" id="mcp">
+          <div className="gtm-container gtm-mcp-grid">
+            <div>
+              <p className="gtm-eyebrow">{t("mcp.eyebrow")}</p>
+              <h2>{t("mcp.title")}</h2>
+              <p>{t.rich("mcp.body", { b: (chunks) => <strong>{chunks}</strong> })}</p>
+              <ul className="gtm-points">
+                {mcpPoints.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+              <SignupLink label={t("mcp.cta")} />
+            </div>
+            <figure className="gtm-mcp-demo">
+              <div className="gtm-demo-window">
+                <div className="gtm-demo-bar" aria-hidden="true">
+                  <span className="gtm-demo-dot" />
+                  <span className="gtm-demo-dot" />
+                  <span className="gtm-demo-dot" />
+                  <span className="gtm-demo-file">mcp.json</span>
+                </div>
+                <pre className="gtm-demo-code">{MCP_CONFIG}</pre>
+              </div>
+              <figcaption className="gtm-demo-caption">{t("mcp.caption")}</figcaption>
+            </figure>
+          </div>
+        </section>
+
         <section className="gtm-section gtm-alt">
           <div className="gtm-container">
             <p className="gtm-eyebrow">{t("deliverability.eyebrow")}</p>
@@ -375,17 +419,29 @@ export default async function RootPage() {
         </section>
       </main>
       <footer className="gtm-footer">
-        <div className="gtm-container gtm-footer-inner">
-          <div>
+        <div className="gtm-container gtm-footer-grid">
+          <div className="gtm-footer-brand">
             <a className="gtm-brand" href="/" aria-label={t("brandAria")}>
               <Wordmark />
             </a>
             <p>{t("footer.tagline")}</p>
           </div>
-          <nav aria-label={t("footer.navAria")}>
+          <nav className="gtm-footer-col" aria-label={t("footer.colProduct")}>
+            <h3>{t("footer.colProduct")}</h3>
+            <a href="#comparativo">{t("nav.compare")}</a>
+            <a href="#planos">{t("nav.plans")}</a>
+            <a href="#mcp">{t("nav.mcp")}</a>
+            <a href="#como-funciona">{t("nav.how")}</a>
+          </nav>
+          <nav className="gtm-footer-col" aria-label={t("footer.colAccount")}>
+            <h3>{t("footer.colAccount")}</h3>
+            <a href="/signup">{t("nav.signup")}</a>
             <a href="/login">{t("footer.login")}</a>
             <a href={contact}>{t("footer.contact")}</a>
           </nav>
+        </div>
+        <div className="gtm-container gtm-footer-base">
+          <p>{t("footer.rights")}</p>
         </div>
       </footer>
     </div>
