@@ -1,19 +1,19 @@
-# MillionSend AWS setup as CloudFormation — same resources as the setup script
+# MepMail AWS setup as CloudFormation — same resources as the setup script
 # on /settings/ses: IAM policy + user + access key, SNS event topic, the SQS
 # events queue the worker polls, and the SESv2 configuration set with an SNS
 # event destination.
 #
 # Deploy:
-#   aws cloudformation deploy --template-file infra/millionsend-ses.cfn.yaml \
-#     --stack-name millionsend --capabilities CAPABILITY_NAMED_IAM \
+#   aws cloudformation deploy --template-file infra/mepmail-ses.cfn.yaml \
+#     --stack-name mepmail --capabilities CAPABILITY_NAMED_IAM \
 #     --parameter-overrides AppBaseUrl=https://your-host
 #
 # Then read the .env values from the stack outputs:
-#   aws cloudformation describe-stacks --stack-name millionsend \
+#   aws cloudformation describe-stacks --stack-name mepmail \
 #     --query "Stacks[0].Outputs" --output table
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  MillionSend sending resources: IAM user + minimal SES policy, SNS event
+  MepMail sending resources: IAM user + minimal SES policy, SNS event
   topic, SQS events queue, and SES configuration set. Outputs map 1:1 to .env
   keys.
 
@@ -34,7 +34,7 @@ Resources:
   SendPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      ManagedPolicyName: millionsend-ses
+      ManagedPolicyName: mepmail-ses
       # Every SES action the instance issues — mirrors SES_IAM_POLICY in
       # packages/ses/src/setup-constants.ts (a test pins the two equal).
       PolicyDocument:
@@ -68,7 +68,7 @@ Resources:
   SendUser:
     Type: AWS::IAM::User
     Properties:
-      UserName: millionsend
+      UserName: mepmail
       ManagedPolicyArns:
         - {Ref: SendPolicy}
 
@@ -80,7 +80,7 @@ Resources:
   EventsTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: millionsend-events
+      TopicName: mepmail-events
 
   # SES cannot publish to the topic without this; the event destination below
   # is rejected at creation time if the topic policy is missing.
@@ -107,7 +107,7 @@ Resources:
   EventsQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: millionsend-events
+      QueueName: mepmail-events
 
   EventsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -157,7 +157,7 @@ Resources:
   ConfigurationSet:
     Type: AWS::SES::ConfigurationSet
     Properties:
-      Name: millionsend
+      Name: mepmail
 
   EventDestination:
     Type: AWS::SES::ConfigurationSetEventDestination
@@ -165,7 +165,7 @@ Resources:
     Properties:
       ConfigurationSetName: {Ref: ConfigurationSet}
       EventDestination:
-        Name: millionsend-events
+        Name: mepmail-events
         Enabled: true
         # Mirrors SES_EVENT_TYPES in packages/ses/src/setup-constants.ts: no
         # open/click (subscribing them makes SES rewrite links and inject its

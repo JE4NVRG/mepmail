@@ -503,7 +503,7 @@ export function SesSetupView() {
                 </p>
               )}
               <MonoBlock
-                title="millionsend-aws-setup.sh"
+                title="mepmail-aws-setup.sh"
                 value={setupScript}
                 maxHeight={300}
                 collapsible

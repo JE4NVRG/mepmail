@@ -1,5 +1,5 @@
 import { oauthProvider } from "@better-auth/oauth-provider";
-import { accountEmailFrom, env, isCloudDeployment, signupOpen } from "@millionsend/config";
+import { accountEmailFrom, betaMaxUsers, env, isCloudDeployment, signupOpen } from "@millionsend/config";
 import {
   ALL_TEAMS_GRANT,
   enrollSystemContact,
@@ -92,12 +92,24 @@ export async function assertNotSoleOwner(db: Db, userId: string): Promise<void> 
  * has no other path to an account); after that, registration requires
  * ALLOW_SIGNUP=true. Open signup on a reachable dashboard would let anyone
  * mint API keys and send through the operator's SES account.
+ *
+ * On top of the policy, an operator may set a beta seat cap
+ * (BETA_MAX_USERS): once that many accounts exist, sign-up closes itself —
+ * the closed-beta door, without flipping ALLOW_SIGNUP back.
  */
 export async function assertSignupAllowed(db: Db, allowSignup: boolean): Promise<void> {
-  if (allowSignup) return;
-  const [existing] = await db.select({ id: schema.user.id }).from(schema.user).limit(1);
-  if (existing) {
-    throw new APIError("FORBIDDEN", { message: "Signup is disabled." });
+  if (!allowSignup) {
+    const [existing] = await db.select({ id: schema.user.id }).from(schema.user).limit(1);
+    if (existing) {
+      throw new APIError("FORBIDDEN", { message: "Signup is disabled." });
+    }
+  }
+  const cap = betaMaxUsers();
+  if (cap !== undefined) {
+    const admitted = await db.select({ id: schema.user.id }).from(schema.user).limit(cap);
+    if (admitted.length >= cap) {
+      throw new APIError("FORBIDDEN", { message: "Beta is full." });
+    }
   }
 }
 

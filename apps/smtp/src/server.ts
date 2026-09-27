@@ -46,5 +46,5 @@ server.on("error", (err) => {
 });
 
 server.listen(env.SMTP_PORT, () => {
-  console.log(`millionsend smtp listening on :${env.SMTP_PORT}`);
+  console.log(`mepmail smtp listening on :${env.SMTP_PORT}`);
 });

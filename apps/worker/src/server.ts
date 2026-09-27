@@ -653,7 +653,7 @@ await queue.work(
   },
   { pollingIntervalSeconds: 30 },
 );
-console.log("millionsend worker running");
+console.log("mepmail worker running");
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
