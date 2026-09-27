@@ -68,6 +68,8 @@ export async function createCheckoutSession(
     email: string;
     successUrl: string;
     cancelUrl: string;
+    /** Stripe Tax is unavailable on some account countries (e.g. BR); off falls back to untaxed checkout. */
+    automaticTax?: boolean;
   },
 ): Promise<string> {
   const rung = rungByKey(input.rung);
@@ -87,8 +89,8 @@ export async function createCheckoutSession(
       line_items: [{ price, quantity: 1 }, ...(overagePrice ? [{ price: overagePrice }] : [])],
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
-      automatic_tax: { enabled: true },
-      tax_id_collection: { enabled: true },
+      automatic_tax: { enabled: input.automaticTax ?? true },
+      tax_id_collection: { enabled: input.automaticTax ?? true },
       allow_promotion_codes: true,
       billing_address_collection: "auto",
       // Automatic tax on an existing customer requires Checkout to persist the

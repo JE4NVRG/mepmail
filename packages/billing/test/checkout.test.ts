@@ -52,6 +52,24 @@ describe("createCheckoutSession", () => {
     ]);
   });
 
+  it("automaticTax off (account country without Stripe Tax, e.g. BR) leaves checkout untaxed", async () => {
+    const teamId = await createTeam(db);
+    await createCheckoutSession(
+      { db, stripe },
+      {
+        team: { id: teamId, name: "acme", stripeCustomerId: null },
+        rung: "pro_200k",
+        email: "o@x",
+        automaticTax: false,
+        ...urls,
+      },
+    );
+    expect(state.checkouts[0]).toMatchObject({
+      automatic_tax: { enabled: false },
+      tax_id_collection: { enabled: false },
+    });
+  });
+
   it("refuses the free rung", async () => {
     const teamId = await createTeam(db);
     await expect(
