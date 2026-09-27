@@ -3,7 +3,7 @@
 > Este repositorio e um fork de [MillionSend](https://github.com/MillionSend/millionsend) (AGPL-3.0) com rebranding e customizacoes proprias. Veja `NOTICE.md`.
 
 <p align="center">
-  <img src="apps/web/public/logo/millionsend-banner.svg" alt="MillionSend" width="560">
+  <img src="apps/web/public/logo/mepmail-banner.svg" alt="MepMail" width="560">
 </p>
 
 <p align="center"><b>The open-source email platform. Send one. Send a million.</b></p>

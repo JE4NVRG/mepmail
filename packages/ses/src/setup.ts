@@ -599,8 +599,8 @@ export async function runTeardown(
 
 /** Default bucket names the storage step offers; the prompts allow overrides. */
 export const STORAGE_BUCKET_DEFAULTS = {
-  storage: "millionsend-storage",
-  backup: "millionsend-backups",
+  storage: "mepmail-storage",
+  backup: "mepmail-backups",
 } as const;
 
 type StorageCommand = HeadBucketCommand | CreateBucketCommand;

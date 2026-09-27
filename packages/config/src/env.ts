@@ -325,7 +325,7 @@ export const env = createEnv({
     ALLOW_TRACKING_SUBDOMAINS: boolFromString,
 
     // Host a customer's branded tracking subdomain CNAMEs at. Set to a
-    // dedicated tracking edge (e.g. track.millionsend-dns.com — a small box
+    // dedicated tracking edge (e.g. track.mepmail-dns.com — a small box
     // that terminates TLS per customer hostname and proxies /t/* here) when
     // this app itself cannot hold a certificate for customer hostnames, as on
     // a multi-tenant cloud behind a CDN. Unset: the CNAME targets this app's

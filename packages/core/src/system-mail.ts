@@ -12,7 +12,7 @@ import { parseSingleSender } from "./sender-address.js";
  * the links untracked and, for the kinds in CREDENTIAL_MAIL_KINDS, to purge
  * the body after SES accepts the message.
  */
-export const SYSTEM_MAIL_TAG = "millionsend_system";
+export const SYSTEM_MAIL_TAG = "mepmail_system";
 
 /**
  * Kinds whose body holds a live credential (a signed link that resets a

@@ -31,7 +31,7 @@ if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
 
-name="millionsend-$(date -u +%Y%m%d-%H%M%S).dump"
+name="mepmail-$(date -u +%Y%m%d-%H%M%S).dump"
 dump="/tmp/${name}"
 trap 'rm -f "$dump"' EXIT
 
@@ -60,6 +60,6 @@ fi
 # shares the bucket path is left alone.
 echo "backup: pruning dumps older than ${BACKUP_RETENTION_DAYS:-14} days"
 rclone delete --min-age "${BACKUP_RETENTION_DAYS:-14}d" --max-depth 1 \
-  --include 'millionsend-*.dump' --include 'millionsend-*.dump.age' "$remote"
+  --include 'mepmail-*.dump' --include 'mepmail-*.dump.age' "$remote"
 
 echo "backup: done (${name})"
