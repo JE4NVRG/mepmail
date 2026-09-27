@@ -153,7 +153,7 @@ beforeAll(async () => {
   cwd = mkdtempSync(join(tmpdir(), "mepmail-e2e-"));
   writeFileSync(join(cwd, ".gitignore"), "node_modules\n");
   // What the team already has on MepMail: a verified sender (so drafts
-  // from it can be imported), an unrelated domain (pushing the Free plan's
+  // from it can be imported), an unrelated domain (pushing the Starter plan's
   // 3-domain cap), and a topic whose description differs (an update).
   const verified = await post<{ id: string }>(cloud, "/domains", {
     name: "example.com",
@@ -369,7 +369,7 @@ describe("mepmail (built bundle)", () => {
 
       expect(stdout).toContain(`mepmail ${VERSION} — Moves your Resend account into MepMail.`);
       expect(stdout).toContain("✓ Resend · connected");
-      expect(stdout).toContain("✓ MepMail Cloud · plan Free");
+      expect(stdout).toContain("✓ MepMail Cloud · plan Starter");
       expect(stdout).toContain("0 of 1 domains will be created; the rest are listed as manual.");
       expect(stdout).toContain("Resend was only read; nothing there was changed.");
       expect(stdout).toContain(`${CONTACT_COUNT.toLocaleString("en-US")}  contacts updated`);
@@ -394,7 +394,7 @@ describe("mepmail (built bundle)", () => {
         "Run `mepmail migrate --from resend` again right before cutover to sync new contacts.",
       );
       expect(stdout.replace(/\n/g, " ")).toContain(
-        `On Resend you sent ${EMAILS_SENT_30D.toLocaleString("en-US")} emails in the last 30 days (~1,374/day). Free allows 3,000/month; Starter (45,000/month, 10 domains) fits. Upgrade: https://app.example.test/settings/billing`,
+        `On Resend you sent ${EMAILS_SENT_30D.toLocaleString("en-US")} emails in the last 30 days (~1,374/day). Starter allows 45,000/month; that covers it.`,
       );
       expect(stdout).not.toContain("Webhook signing secrets");
 
@@ -438,7 +438,7 @@ describe("mepmail (built bundle)", () => {
       expect(report.offer).toMatchObject({
         emailsLast30Days: EMAILS_SENT_30D,
         perDay: 1374,
-        plan: "free",
+        plan: "starter",
         fits: "starter",
       });
       expect(readFileSync(paths.reportMd, "utf8")).toContain(
@@ -678,7 +678,7 @@ describe("mepmail (built bundle)", () => {
         expect(stdout).toContain(`✓ MepMail · ${self.baseUrl} (self-hosted)`);
         expect(stdout).not.toContain("Cloud");
         expect(stdout).not.toContain("Upgrade");
-        expect(stdout).not.toContain("plan Free");
+        expect(stdout).not.toMatch(/plan (Free|Starter|Pro|Scale)/);
         expect(stdout).toContain(
           "Webhook signing secrets, shown once (they are not saved anywhere):",
         );

@@ -1,6 +1,41 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { dnsCards, idRows, printSummary, type Report, renderReportMd } from "../src/report.js";
+import { buildOffer, dnsCards, idRows, printSummary, type Report, renderReportMd } from "../src/report.js";
+import type { Snapshot, TargetUsage } from "../src/model.js";
 import { setColorMode } from "../src/theme.js";
+
+describe("buildOffer", () => {
+  const usage: TargetUsage = {
+    cloud: true,
+    plan: "free",
+    limits: { emailsPerDay: 100, emailsPerMonth: null, domains: 1, contacts: 1000 },
+    today: { emailsSent: 0 },
+    period: null,
+    appUrl: "https://app.example.test:3000",
+  };
+  const snapshot = {
+    metrics: { emailsLast30Days: 41_208 },
+    contacts: Array.from({ length: 500 }, () => ({})),
+  } as unknown as Snapshot;
+
+  it("up-sells a busy Free team to Starter with the current rung limits", () => {
+    const offer = buildOffer(usage, snapshot, 1, "Resend");
+    expect(offer).toMatchObject({ plan: "free", fits: "starter", perDay: 1374 });
+    expect(offer?.text.join(" ")).toContain(
+      "Free allows 3,000/month; Starter (45,000/month, 3 domains) fits. Upgrade: https://app.example.test:3000/settings/billing",
+    );
+  });
+
+  it("still suggests Starter when the team is already on it and inside every limit", () => {
+    const offer = buildOffer(
+      { ...usage, plan: "starter", limits: { ...usage.limits, domains: 3, contacts: 10_000 } },
+      snapshot,
+      2,
+      "Resend",
+    );
+    expect(offer).toMatchObject({ plan: "starter", fits: "starter" });
+    expect(offer?.text.join(" ")).toContain("Starter allows 45,000/month; that covers it.");
+  });
+});
 
 async function summary(r: Report): Promise<string> {
   const chunks: string[] = [];
@@ -107,7 +142,7 @@ const full: Report = {
     url: "https://app.example.test:3000/settings/billing",
     text: [
       "On Resend you sent 41,208 emails in the last 30 days (~1,374/day).",
-      "Free allows 3,000/month; Starter (45,000/month, 10 domains) fits. Upgrade: https://app.example.test:3000/settings/billing",
+      "Free allows 3,000/month; Starter (45,000/month, 3 domains) fits. Upgrade: https://app.example.test:3000/settings/billing",
     ],
   },
 };

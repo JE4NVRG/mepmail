@@ -95,7 +95,7 @@ const perMonthText = (n: number | null): string =>
 const domainsText = (n: number | null): string =>
   n === null ? "unlimited domains" : pluralize(n, "domain");
 
-function buildOffer(
+export function buildOffer(
   usage: TargetUsage,
   snapshot: Snapshot,
   domains: number,
