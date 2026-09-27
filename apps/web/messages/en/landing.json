@@ -22,7 +22,18 @@
     "lead": "Send transactional email with a Resend-compatible HTTPS API or the SMTP relay. We help you set up your domain, DKIM and MAIL FROM. USD pricing, support in Portuguese and assisted deployment.",
     "ctaSignup": "Create free account",
     "ctaPlans": "See plans",
-    "note": "Open beta: 100 free accounts, each capped at 100 emails per day. Create yours in one minute — no card required."
+    "note": "Open beta: 100 free accounts, each capped at 100 emails per day. Create yours in one minute — no card required.",
+    "trust": [
+      "Resend-compatible API",
+      "SMTP relay with STARTTLS",
+      "DKIM and MAIL FROM on your domain",
+      "Support in Portuguese"
+    ],
+    "demo": {
+      "subject": "Hello from MepMail",
+      "responseLabel": "Response",
+      "caption": "The same official Resend SDK, pointed at MepMail."
+    }
   },
   "compare": {
     "eyebrow": "Pricing without guesswork",
@@ -65,6 +76,8 @@
     "overageLabel": "Overage",
     "attachmentLabel": "Attachments per message",
     "cta": "Start free",
+    "featuredBadge": "Most popular",
+    "showScale": "Scale plans (500K–2.5M)",
     "items": [
       { "volume": "100/day (~3k/month)", "limits": "1 domain · 1 workspace · 1,000 contacts", "overage": "stops at cap", "attachment": "1 MB" },
       { "volume": "1,500/day (~45k/month)", "limits": "3 domains · 2 workspaces · 10,000 contacts", "overage": "stops at cap", "attachment": "1 MB" },
@@ -76,8 +89,16 @@
       { "volume": "2,500,000/month", "limits": "Unlimited domains · 10 workspaces · unlimited contacts", "overage": "US$ 0.16/1k", "attachment": "10 MB" }
     ],
     "note": "Free and Starter have a daily limit (UTC); the monthly volume is illustrative only. On Pro and Scale, per-1,000 overage depends on enablement at provisioning; without it, sending stops at the quota. Even with overage enabled, the safety ceiling of 5× the included volume applies.",
-    "offerProactive": "<strong>Optional proactive management: +US$ 29/month.</strong> Includes reputation monitoring, DNS/deliverability tuning and priority support. Without management, you keep assisted onboarding and support. No lock-in.",
-    "offerFirst3": "<strong>For the first 3 customers: free setup and 2 months of free management.</strong> Create your free account and talk to us to claim yours.",
+    "founders": {
+      "title": "Founders program (beta)",
+      "items": [
+        "Free assisted setup for the first 3 customers.",
+        "2 months of free proactive management: reputation, DNS/deliverability and priority support.",
+        "Billing via PIX in BRL at the day's rate — no international card."
+      ],
+      "note": "After the founder period, proactive management stays optional at +US$ 29/month. No lock-in: cancel anytime.",
+      "cta": "Claim my spot"
+    },
     "noteAttach": "Per-email limit: total attachment size after decoding, not per file."
   },
   "how": {
