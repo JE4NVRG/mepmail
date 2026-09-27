@@ -71,9 +71,9 @@ function run(
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     RESEND_API_KEY: fake.token,
-    MILLIONSEND_CLI_RESEND_URL: fake.url,
-    MILLIONSEND_API_KEY: cloud.apiKey,
-    MILLIONSEND_BASE_URL: cloud.baseUrl,
+    MEPMAIL_CLI_RESEND_URL: fake.url,
+    MEPMAIL_API_KEY: cloud.apiKey,
+    MEPMAIL_BASE_URL: cloud.baseUrl,
   };
   delete env.NO_COLOR;
   delete env.FORCE_COLOR;
@@ -148,9 +148,9 @@ const occurrences = (haystack: string, needle: string): number => haystack.split
 beforeAll(async () => {
   [fake, cloud] = await Promise.all([
     startFakeResend(realisticAccount()),
-    startLiveApi({ isCloud: true, appBaseUrl: "https://app.example.test", slug: "cloud" }),
+    startLiveApi({ isCloud: true, appBaseUrl: "https://app.example.test", slug: "cloud", plan: "starter" }),
   ]);
-  cwd = mkdtempSync(join(tmpdir(), "millionsend-e2e-"));
+  cwd = mkdtempSync(join(tmpdir(), "mepmail-e2e-"));
   writeFileSync(join(cwd, ".gitignore"), "node_modules\n");
   // What the team already has on MepMail: a verified sender (so drafts
   // from it can be imported), an unrelated domain (pushing the Free plan's
@@ -174,13 +174,13 @@ afterAll(async () => {
   await Promise.all([fake.close(), cloud.stop()]);
 });
 
-describe("millionsend (built bundle)", () => {
+describe("mepmail (built bundle)", () => {
   it(
     "--help and --version",
     async () => {
       const help = await run(["--help"], { env: { NO_COLOR: "1" } });
       expect(help.code).toBe(0);
-      expect(help.stdout).toContain("millionsend migrate --from resend");
+      expect(help.stdout).toContain("mepmail migrate --from resend");
       expect(help.stdout).toContain("migrate rollback [--yes]");
       expect(help.stdout).toContain("DO_NOT_TRACK");
       expect(help.stdout).toContain("Resend is a trademark of Plus Five Five, Inc.");
@@ -198,7 +198,7 @@ describe("millionsend (built bundle)", () => {
       expect(code).toBe(2);
       const plan = JSON.parse(stdout) as Plan;
       expect(plan.version).toBe(1);
-      expect(plan.target).toEqual({ baseUrl: cloud.baseUrl, cloud: true, plan: "free" });
+      expect(plan.target).toEqual({ baseUrl: cloud.baseUrl, cloud: true, plan: "starter" });
       expect(plan.counts).toEqual({ create: 22, update: 2, unchanged: 1, manual: 12, skip: 3 });
       expect(stderr).toMatch(new RegExp(`✓ Contacts\\s+${CONTACT_COUNT.toLocaleString("en-US")}`));
       expect(stderr).toMatch(/✓ MepMail\s+current state read/);
@@ -258,7 +258,7 @@ describe("millionsend (built bundle)", () => {
         "templates/Receipt — reply_to support@example.com is not stored on templates; pass it when sending",
       );
       expect(plan.warnings).toEqual([
-        "2 domains to create; the Free plan allows 3 (2 already there)",
+        "2 domains to create; the Starter plan allows 3 (2 already there)",
       ]);
       expect(stderr).toContain("1 of 2 domains will be created; the rest are listed as manual.");
       expect(plan.estimate.requests).toBeGreaterThan(2 * CONTACT_COUNT);
@@ -266,7 +266,7 @@ describe("millionsend (built bundle)", () => {
       expect(fake.writes).toBe(0);
       for (const request of fake.requests) {
         expect(request.method).toBe("GET");
-        expect(request.userAgent).toMatch(new RegExp(`^millionsend-cli/${VERSION} \\(\\+https://`));
+        expect(request.userAgent).toMatch(new RegExp(`^mepmail-cli/${VERSION} \\(\\+https://`));
       }
       expect(fake.requests.some((r) => r.path.startsWith("/audiences"))).toBe(false);
     },
@@ -323,7 +323,7 @@ describe("millionsend (built bundle)", () => {
       ]);
       expect(code).toBe(1);
       expect(stderr).toContain("Resend rejected the API key (401)");
-      expect(stdout).toContain("Added .millionsend/ to .gitignore.");
+      expect(stdout).toContain("Added .mepmail/ to .gitignore.");
       const n = CONTACT_COUNT.toLocaleString("en-US");
       expect(stdout).toMatch(new RegExp(`✓ Contacts\\s+${n}/${n}`));
       const state = readState();
@@ -367,7 +367,7 @@ describe("millionsend (built bundle)", () => {
       expect(code).toBe(0);
       expect(fake.writes).toBe(0);
 
-      expect(stdout).toContain(`millionsend ${VERSION} — Moves your Resend account into MepMail.`);
+      expect(stdout).toContain(`mepmail ${VERSION} — Moves your Resend account into MepMail.`);
       expect(stdout).toContain("✓ Resend · connected");
       expect(stdout).toContain("✓ MepMail Cloud · plan Free");
       expect(stdout).toContain("0 of 1 domains will be created; the rest are listed as manual.");
@@ -391,7 +391,7 @@ describe("millionsend (built bundle)", () => {
       expect(stdout).toMatch(/\n {2}TXT {2}\S+\n {4}\S/);
       // Prose wraps at the layout width (80 on a pipe).
       expect(stdout.replace(/\n/g, " ")).toContain(
-        "Run `millionsend migrate --from resend` again right before cutover to sync new contacts.",
+        "Run `mepmail migrate --from resend` again right before cutover to sync new contacts.",
       );
       expect(stdout.replace(/\n/g, " ")).toContain(
         `On Resend you sent ${EMAILS_SENT_30D.toLocaleString("en-US")} emails in the last 30 days (~1,374/day). Free allows 3,000/month; Starter (45,000/month, 10 domains) fits. Upgrade: https://app.example.test/settings/billing`,
@@ -590,8 +590,8 @@ describe("millionsend (built bundle)", () => {
       const { code, stdout } = await run(["migrate", "status"], {
         env: {
           RESEND_API_KEY: undefined,
-          MILLIONSEND_API_KEY: undefined,
-          MILLIONSEND_BASE_URL: undefined,
+          MEPMAIL_API_KEY: undefined,
+          MEPMAIL_BASE_URL: undefined,
         },
       });
       expect(code).toBe(0);
@@ -657,7 +657,7 @@ describe("millionsend (built bundle)", () => {
     "self-hosted target via --to-url: neutral copy, no offer, fresh webhook secrets shown once",
     async () => {
       const self = await startLiveApi({ isCloud: false, slug: "selfhost" });
-      const dir = mkdtempSync(join(tmpdir(), "millionsend-e2e-self-"));
+      const dir = mkdtempSync(join(tmpdir(), "mepmail-e2e-self-"));
       try {
         const { code, stdout, stderr } = await run(
           [
@@ -671,7 +671,7 @@ describe("millionsend (built bundle)", () => {
             "--to-url",
             `${self.baseUrl}/`,
           ],
-          { cwd: dir, env: { MILLIONSEND_API_KEY: self.apiKey, MILLIONSEND_BASE_URL: undefined } },
+          { cwd: dir, env: { MEPMAIL_API_KEY: self.apiKey, MEPMAIL_BASE_URL: undefined } },
         );
         expect(stderr).toBe("");
         expect(code).toBe(0);

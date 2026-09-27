@@ -62,8 +62,11 @@ export const RPS_CEILING = 100;
 /** Requests per second left to production sending when a raised limit is detected and --rps was not given. */
 export const RPS_HEADROOM = 2;
 
-export const TARGET_KEY_ENV = "MILLIONSEND_API_KEY";
-export const TARGET_URL_ENV = "MILLIONSEND_BASE_URL";
+export const TARGET_KEY_ENV = "MEPMAIL_API_KEY";
+export const TARGET_URL_ENV = "MEPMAIL_BASE_URL";
+/** Historical alias env names, still honored when the primary is unset. */
+export const TARGET_KEY_ENV_ALIAS = "MILLIONSEND_API_KEY";
+export const TARGET_URL_ENV_ALIAS = "MILLIONSEND_BASE_URL";
 
 /** RESEND_API_KEY for `resend`. */
 export const sourceKeyEnv = (provider: ProviderId): string => `${provider.toUpperCase()}_API_KEY`;
@@ -96,7 +99,7 @@ const OPTIONS = {
 
 const SUBCOMMANDS = ["plan", "apply", "status", "rollback"] as const;
 const GRAMMAR =
-  "millionsend migrate --from resend | migrate plan | migrate apply [plan.json] | migrate status | migrate rollback";
+  "mepmail migrate --from resend | migrate plan | migrate apply [plan.json] | migrate status | migrate rollback";
 
 function resourceList(flag: string, value: string | undefined): Resource[] | null {
   if (value === undefined) return null;
@@ -170,7 +173,7 @@ export function parseConfig(
     }));
   } catch (error) {
     const reason = (error as Error).message.split(". ")[0] ?? "Bad arguments";
-    throw new ConfigError(`${reason}. See millionsend --help`);
+    throw new ConfigError(`${reason}. See mepmail --help`);
   }
 
   if (values.version === true) return minimal("version");
@@ -208,10 +211,16 @@ export function parseConfig(
   const needsSource = command === "migrate" || command === "plan" || command === "apply";
   if (needsSource && from === null && planFile === null) {
     throw new ConfigError(
-      `Missing --from <provider>. Only \`resend\` is supported: millionsend migrate${sub === undefined ? "" : ` ${sub}`} --from resend`,
+      `Missing --from <provider>. Only \`resend\` is supported: mepmail migrate${sub === undefined ? "" : ` ${sub}`} --from resend`,
     );
   }
 
+  /** Primary env names first; the historical aliases keep working when unset. */
+  const envResolved: typeof env = {
+    ...env,
+    [TARGET_KEY_ENV]: env[TARGET_KEY_ENV] ?? env[TARGET_KEY_ENV_ALIAS],
+    [TARGET_URL_ENV]: env[TARGET_URL_ENV] ?? env[TARGET_URL_ENV_ALIAS],
+  };
   const fromKey = keyInput(
     sourceKeyEnv(from ?? "resend"),
     env,
@@ -222,13 +231,13 @@ export function parseConfig(
   );
   const toKey = keyInput(
     TARGET_KEY_ENV,
-    env,
+    envResolved,
     values["to-key-stdin"] === true,
     values["to-key"],
     "--to-key",
     warnings,
   );
-  const toUrlRaw = values["to-url"] ?? env[TARGET_URL_ENV];
+  const toUrlRaw = values["to-url"] ?? envResolved[TARGET_URL_ENV];
   let toUrl = toUrlRaw === undefined || toUrlRaw === "" ? null : apiUrl(toUrlRaw);
 
   const needsTarget = needsSource || command === "rollback";
@@ -336,15 +345,15 @@ function minimal(command: "help" | "version"): Config {
 }
 
 export function helpText(): string {
-  return `millionsend ${VERSION} — move an email account to MepMail
+  return `mepmail ${VERSION} — move an email account to MepMail
 
 Usage
-  millionsend migrate --from resend                          connect, choose resources, plan, confirm, apply, summary
-  millionsend migrate plan --from resend [--out plan.json]   read-only; exit 0 nothing to do, 2 changes, 1 error
-  millionsend migrate apply [plan.json] [--yes]              apply a saved plan, or plan and apply in one go
-  millionsend migrate status                                 what the last run created and what is left
-  millionsend migrate rollback [--yes]                       delete only what this tool created
-  millionsend --help | --version
+  mepmail migrate --from resend                          connect, choose resources, plan, confirm, apply, summary
+  mepmail migrate plan --from resend [--out plan.json]   read-only; exit 0 nothing to do, 2 changes, 1 error
+  mepmail migrate apply [plan.json] [--yes]              apply a saved plan, or plan and apply in one go
+  mepmail migrate status                                 what the last run created and what is left
+  mepmail migrate rollback [--yes]                       delete only what this tool created
+  mepmail --help | --version
 
 Options
   --from <provider>          source provider; only \`resend\` exists
@@ -385,8 +394,8 @@ Environment
   DO_NOT_TRACK               honored, as a no-op: this tool sends no telemetry, never phones home and never checks for updates
 
 Files (mode 0600, never a key)
-  .millionsend/migrate-state.json    ids created, resume cursors, plan hash
-  .millionsend/migrate-report.json   the last run's report, also as migrate-report.md
+  .mepmail/migrate-state.json    ids created, resume cursors, plan hash
+  .mepmail/migrate-report.json   the last run's report, also as migrate-report.md
 
 Exit codes
   0 ok · 1 error · 2 plan has changes (plan only) · 3 partial, some items failed (details in the report)
