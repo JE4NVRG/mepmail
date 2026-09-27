@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "MepMail — E-mail transacional com API compatível com Resend",
-    "description": "E-mail transacional com API compatível com Resend. Compare planos MepMail, envie pela API ou pelo relay SMTP e crie sua conta grátis no beta."
+    "description": "E-mail transacional com API compatível com Resend e onboarding assistido. Compare planos MepMail, envie pela API ou pelo relay SMTP e crie sua conta grátis no beta."
   },
   "skip": "Pular para o conteúdo",
   "brandAria": "MepMail — início",
@@ -17,7 +17,7 @@
     "aria": "Idioma da página"
   },
   "hero": {
-    "eyebrow": "E-mail transacional para quem constrói produtos <badge>Beta · 100 contas grátis</badge>",
+    "eyebrow": "E-mail transacional para quem constrói produtos, em qualquer lugar <badge>Beta · 100 contas grátis</badge>",
     "title": "Mesma API do Resend. <highlight>Até 60% mais barato.</highlight>",
     "lead": "Envie e-mails transacionais com API HTTPS compatível com o Resend ou relay SMTP. Nós ajudamos a configurar seu domínio, DKIM e MAIL FROM. Planos em USD e implantação assistida.",
     "ctaSignup": "Criar conta grátis",

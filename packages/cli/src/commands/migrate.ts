@@ -6,7 +6,7 @@ import {
   RESOURCE_LABEL,
 } from "../apply.js";
 import type { Context } from "../context.js";
-import type { MepMailTarget } from "../millionsend.js";
+import type { MepMailTarget } from "../mepmail-target.js";
 import {
   type MigrateState,
   type Plan,
@@ -290,7 +290,7 @@ export async function execute(ctx: Context, prepared: Prepared): Promise<number>
   const state = loadState(ctx, prepared.baseUrl, hash);
   const save = (s: MigrateState): void => writePrivateJson(paths.state, s);
   save(state);
-  if (ensureGitignored(ctx.cwd)) out.write("Added .millionsend/ to .gitignore.\n");
+  if (ensureGitignored(ctx.cwd)) out.write("Added .mepmail/ to .gitignore.\n");
   out.write(`\n${heading("Applying")}\n`);
   // Per-resource write totals, so the `n/total` counters share a right edge.
   const totals = new Map<Resource, number>();

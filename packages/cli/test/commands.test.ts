@@ -41,9 +41,9 @@ function collector() {
 function env(extra: Record<string, string> = {}): Record<string, string> {
   return {
     RESEND_API_KEY: fake.token,
-    MILLIONSEND_CLI_RESEND_URL: fake.url,
-    MILLIONSEND_API_KEY: api.apiKey,
-    MILLIONSEND_BASE_URL: api.baseUrl,
+    MEPMAIL_CLI_RESEND_URL: fake.url,
+    MEPMAIL_API_KEY: api.apiKey,
+    MEPMAIL_BASE_URL: api.baseUrl,
     ...extra,
   };
 }
@@ -115,16 +115,16 @@ beforeAll(async () => {
   delete process.env.FORCE_COLOR;
   [fake, api] = await Promise.all([
     startFakeResend(),
-    startLiveApi({ isCloud: true, appBaseUrl: "https://app.example.test" }),
+    startLiveApi({ isCloud: true, appBaseUrl: "https://app.example.test", plan: "starter" }),
   ]);
-  cwd = mkdtempSync(join(tmpdir(), "millionsend-cli-"));
+  cwd = mkdtempSync(join(tmpdir(), "mepmail-cli-"));
   writeFileSync(join(cwd, ".gitignore"), "node_modules\n");
 });
 afterAll(async () => {
   await Promise.all([fake.close(), api.stop()]);
 });
 
-describe("millionsend migrate", () => {
+describe("mepmail migrate", () => {
   it("rejects a bad source key with exit 1 and names the env var", async () => {
     const { code, stderr } = await run(["migrate", "--from", "resend", "--yes"], {
       env: { RESEND_API_KEY: "re_wrong_1234567890abcdef" },
@@ -148,22 +148,21 @@ describe("millionsend migrate", () => {
       expect(stderr).toBe("");
       expect(code).toBe(0);
       expect(stdout).toContain("✓ Resend · connected");
-      expect(stdout).toContain("✓ MepMail Cloud · plan Free");
+      expect(stdout).toContain("✓ MepMail Cloud · plan Starter");
       expect(stdout).toContain("Plan: ");
       expect(stdout).toContain("Resend was only read; nothing there was changed.");
       expect(stdout).toContain("contacts created");
-      expect(stdout).toContain("Added .millionsend/ to .gitignore.");
+      expect(stdout).toContain("Added .mepmail/ to .gitignore.");
       expect(stdout).toContain("add DNS records for news.example.com");
       expect(stdout).toContain("create API keys: Production, Staging");
       expect(stdout).toContain(
         "On Resend you sent 41,208 emails in the last 30 days (~1,374/day).",
       );
       expect(stdout.replace(/\n/g, " ")).toContain(
-        "Free allows 3,000/month; Starter (45,000/month, 10 domains) fits.",
+        "Starter allows 45,000/month; that covers it.",
       );
-      expect(stdout).toContain("https://app.example.test/settings/billing");
       expect(stdout).toContain("again right before cutover");
-      expect(readFileSync(join(cwd, ".gitignore"), "utf8")).toBe("node_modules\n.millionsend/\n");
+      expect(readFileSync(join(cwd, ".gitignore"), "utf8")).toBe("node_modules\n.mepmail/\n");
       expect(fake.writes).toBe(0);
 
       const state = readState();
@@ -376,7 +375,7 @@ describe("millionsend migrate", () => {
     "an auth failure mid-apply is exit 1 with the state saved",
     async () => {
       const other = await startLiveApi({ isCloud: false, slug: "auth" });
-      const dir = mkdtempSync(join(tmpdir(), "millionsend-cli-auth-"));
+      const dir = mkdtempSync(join(tmpdir(), "mepmail-cli-auth-"));
       try {
         const steve = fake.data.contacts[0]?.id ?? "";
         fake.injectOnce(`/contacts/${steve}`, {
@@ -385,7 +384,7 @@ describe("millionsend migrate", () => {
         });
         const { code, stderr } = await run(["migrate", "--from", "resend", "--yes"], {
           cwd: dir,
-          env: { MILLIONSEND_API_KEY: other.apiKey, MILLIONSEND_BASE_URL: other.baseUrl },
+          env: { MEPMAIL_API_KEY: other.apiKey, MEPMAIL_BASE_URL: other.baseUrl },
         });
         expect(code).toBe(1);
         expect(stderr).toContain("Resend rejected the API key (401)");
@@ -449,7 +448,7 @@ describe("millionsend migrate", () => {
         readFileSync(new URL("../package.json", import.meta.url), "utf8"),
       ) as { version: string };
       expect(result.stdout).toContain(
-        `millionsend ${packageVersion} — Moves your Resend account into MepMail.`,
+        `mepmail ${packageVersion} — Moves your Resend account into MepMail.`,
       );
       expect(result.stdout).toContain("contacts (3)\n  + contacts  batch upsert");
       expect(result.stdout).toContain("Estimate: ~");
@@ -524,7 +523,7 @@ describe("migrate rollback", () => {
   }
 
   it("refuses a state file whose ids are not MepMail ids before connecting", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "millionsend-cli-rb-"));
+    const dir = mkdtempSync(join(tmpdir(), "mepmail-cli-rb-"));
     const state: MigrateState = {
       version: 1,
       startedAt: "",
@@ -550,7 +549,7 @@ describe("migrate rollback", () => {
   it(
     "prints its own header and the first ids, writes a JSON summary, and clears the resume cursor",
     async () => {
-      const dir = mkdtempSync(join(tmpdir(), "millionsend-cli-rb-"));
+      const dir = mkdtempSync(join(tmpdir(), "mepmail-cli-rb-"));
       const extra = ["one", "two"].map((n, i) => ({
         id: `00000000-0000-4000-8000-00000000000${i + 1}`,
         email: `${n}@example.org`,
@@ -600,7 +599,7 @@ describe("migrate rollback", () => {
   it(
     "keeps suppression ids in the state when the batch remove fails",
     async () => {
-      const dir = mkdtempSync(join(tmpdir(), "millionsend-cli-rb-"));
+      const dir = mkdtempSync(join(tmpdir(), "mepmail-cli-rb-"));
       const migrated = await run(
         ["migrate", "--from", "resend", "--yes", "--only", "suppressions"],
         { cwd: dir },
@@ -629,7 +628,7 @@ describe("migrate rollback", () => {
   it(
     "retries failed enrichment on the next run, clears the cursor when it completes, never re-subscribes",
     async () => {
-      const dir = mkdtempSync(join(tmpdir(), "millionsend-cli-rb-"));
+      const dir = mkdtempSync(join(tmpdir(), "mepmail-cli-rb-"));
       const argv = [
         "migrate",
         "--from",
@@ -695,8 +694,8 @@ describe("plan, apply and status edge cases (own target)", () => {
   });
   afterAll(() => mine.stop());
 
-  const target = () => ({ MILLIONSEND_API_KEY: mine.apiKey, MILLIONSEND_BASE_URL: mine.baseUrl });
-  const freshDir = () => mkdtempSync(join(tmpdir(), "millionsend-cli-edge-"));
+  const target = () => ({ MEPMAIL_API_KEY: mine.apiKey, MEPMAIL_BASE_URL: mine.baseUrl });
+  const freshDir = () => mkdtempSync(join(tmpdir(), "mepmail-cli-edge-"));
   const seed = (dir: string, partial: Partial<MigrateState>): MigrateState => {
     const state: MigrateState = {
       version: 1,
@@ -751,12 +750,12 @@ describe("plan, apply and status edge cases (own target)", () => {
   it("refuses to send the Resend key to the MepMail host, before connecting", async () => {
     const { code, stdout, stderr } = await run(["migrate", "plan", "--from", "resend"], {
       cwd: freshDir(),
-      env: { ...target(), MILLIONSEND_CLI_RESEND_URL: mine.baseUrl },
+      env: { ...target(), MEPMAIL_CLI_RESEND_URL: mine.baseUrl },
     });
     expect(code).toBe(1);
     expect(stderr).toContain("is the MepMail host");
-    expect(stderr).toContain("MILLIONSEND_CLI_RESEND_URL");
-    expect(stderr).toContain("MILLIONSEND_BASE_URL");
+    expect(stderr).toContain("MEPMAIL_CLI_RESEND_URL");
+    expect(stderr).toContain("MEPMAIL_BASE_URL");
     expect(stdout).not.toContain("✓ Resend");
   });
 
@@ -844,7 +843,7 @@ describe("cutover-first run shape", () => {
   it(
     "prints the connected limit, the cutover block before enrichment, and per-pass counts",
     async () => {
-      const dir = mkdtempSync(join(tmpdir(), "millionsend-cli-cut-"));
+      const dir = mkdtempSync(join(tmpdir(), "mepmail-cli-cut-"));
       // A full run: the cutover-ready block presumes contacts, domains and suppressions came along.
       const result = await run(["migrate", "--from", "resend", "--yes"], { cwd: dir });
       expect(result.code).toBe(0);
@@ -877,7 +876,7 @@ describe("cutover-first run shape", () => {
   it(
     "runs the properties pass alone when topics are left out of the include set",
     async () => {
-      const dir = mkdtempSync(join(tmpdir(), "millionsend-cli-props-"));
+      const dir = mkdtempSync(join(tmpdir(), "mepmail-cli-props-"));
       // The contacts must already be on the target for enrichment to plan on its own.
       expect(
         (await run(["migrate", "--from", "resend", "--yes", "--only", "contacts"], { cwd: dir }))
@@ -904,7 +903,7 @@ describe("cutover-first run shape", () => {
   it(
     "creates a contact that appeared since the last run with its unsubscribed flag, and records it for rollback",
     async () => {
-      const dir = mkdtempSync(join(tmpdir(), "millionsend-cli-signup-"));
+      const dir = mkdtempSync(join(tmpdir(), "mepmail-cli-signup-"));
       expect(
         (await run(["migrate", "--from", "resend", "--yes", "--only", "contacts"], { cwd: dir }))
           .code,
@@ -949,7 +948,7 @@ describe("cutover-first run shape", () => {
   it(
     "refuses a stale plan file before reading the source again",
     async () => {
-      const dir = mkdtempSync(join(tmpdir(), "millionsend-cli-stale-"));
+      const dir = mkdtempSync(join(tmpdir(), "mepmail-cli-stale-"));
       const planFile = join(dir, "plan.json");
       const planned = await run(
         ["migrate", "plan", "--from", "resend", "--only", "topics", "--out", planFile],
