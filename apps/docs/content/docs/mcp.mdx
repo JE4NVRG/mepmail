@@ -138,6 +138,9 @@ and admins.
 | `list_emails` | `emails:read` | List sent, queued and scheduled emails. |
 | `get_email` | `emails:read` | Get one email with its delivery status. |
 | `get_usage` | `emails:read` | Plan, send limit (daily on Free and Starter, monthly on Pro and Scale), domain limit, today's accepted count and, on monthly plans, the billing period's usage — check before bulk work. |
+| `get_deliverability` | `emails:read` | The team's deliverability standing over the trailing 30 days: a 0-10 headline score with band, content and outcome sub-scores, complaint and hard-bounce rates, and guardrail status. |
+| `get_email_insights` | `emails:read` | Best-practice report for one sent email: per-check pass/fail, points deducted and a 0-10 score — fix what each failing check describes. |
+| `list_teams` | — | **All teams grants only** List the teams the connection can act in; the first is the default `team_id`. |
 | `list_contacts` | `audience:read` | List contacts, optionally one segment's members. |
 | `get_contact` | `audience:read` | Get a contact by id or email address. |
 | `get_contact_topics` | `audience:read` | Every topic with the contact's effective subscription and whether it was explicit. |
