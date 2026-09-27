@@ -13,21 +13,34 @@ import {
   siRuby,
   siRust,
 } from "simple-icons";
-import {
-  BROADCASTS_SNIPPETS,
-  CONTACTS_SNIPPETS,
-  LANGS,
-  type Lang,
-  SEGMENTS_SNIPPETS,
-  TOPICS_SNIPPETS,
-  WEBHOOKS_SNIPPETS,
-} from "@/components/api-sheet-snippets";
 import { CodeHighlight, type HighlightLanguage } from "@/components/code-highlight";
 import { Drawer } from "@/components/drawer";
 import { CodeGlyph } from "@/components/icons/nav-icons";
 
-/* Snippets per SDK — the real published packages, shown with a placeholder
-   key. Kept to the three calls people reach for from the Emails surface. */
+/* Snippets per language — the OFFICIAL Resend SDK, pointed at the MepMail
+   API through its own base-URL option, plus the three calls people reach for
+   from the Emails surface. Nothing here is our own client: `resend` is the
+   published package, installed from the registry, and every method name below
+   was checked against that package's source. Java is the exception — the
+   official SDK hardcodes api.resend.com and offers no override, so its tab
+   shows the plain HTTP call. */
+
+/* The nine languages the sheets offer. Java is included even though the
+   official Resend SDK can't be pointed at another base URL: the tab shows the
+   plain HTTP call instead, which is what that SDK would do anyway. */
+export const LANGS = [
+  "node",
+  "python",
+  "php",
+  "ruby",
+  "go",
+  "rust",
+  "java",
+  "dotnet",
+  "elixir",
+] as const;
+
+export type Lang = (typeof LANGS)[number];
 
 export const LANG_META: Record<
   Lang,
@@ -61,260 +74,302 @@ interface Snippets {
 
 const SNIPPETS: Record<Lang, Snippets> = {
   node: {
-    send: `import { MillionSend } from "millionsend";
+    send: `import { Resend } from "resend";
 
-const ms = new MillionSend("ms_xxxxxxxxx");
+const resend = new Resend("ms_xxxxxxxxx", {
+  baseUrl: "https://api-mepmail.agenciamep.com",
+});
 
-await ms.emails.send({
+const { data, error } = await resend.emails.send({
   from: "Acme <onboarding@yourdomain.com>",
-  to: ["delivered@resend.dev"],
+  to: ["delivered@example.com"],
   subject: "hello world",
-  html: "<p>it works!</p>",
+  html: "<h1>it works!</h1>",
 });`,
-    batch: `await ms.batch.send([
+    batch: `const { data, error } = await resend.batch.send([
   {
     from: "Acme <onboarding@yourdomain.com>",
-    to: ["foo@gmail.com"],
+    to: ["delivered@example.com"],
     subject: "hello world",
     html: "<h1>it works!</h1>",
   },
   {
     from: "Acme <onboarding@yourdomain.com>",
-    to: ["bar@outlook.com"],
+    to: ["bounced@example.com"],
     subject: "world hello",
     html: "<p>it works!</p>",
   },
 ]);`,
-    retrieve: `const { data, error } = await ms.emails.get(
+    retrieve: `const { data, error } = await resend.emails.get(
   "4ef9a417-02e9-4d39-ad75-9611e0fcc33c",
 );`,
   },
   python: {
-    send: `import millionsend
+    send: `import resend
 
-millionsend.api_key = "ms_xxxxxxxxx"
+resend.api_key = "ms_xxxxxxxxx"
+resend.api_url = "https://api-mepmail.agenciamep.com"  # sem barra no final
 
-millionsend.Emails.send({
+email = resend.Emails.send({
     "from": "Acme <onboarding@yourdomain.com>",
-    "to": ["delivered@resend.dev"],
+    "to": ["delivered@example.com"],
     "subject": "hello world",
-    "html": "<p>it works!</p>",
+    "html": "<h1>it works!</h1>",
 })`,
-    batch: `millionsend.Batch.send([
+    batch: `emails = resend.Batch.send([
     {
         "from": "Acme <onboarding@yourdomain.com>",
-        "to": ["foo@gmail.com"],
+        "to": ["delivered@example.com"],
         "subject": "hello world",
         "html": "<h1>it works!</h1>",
     },
     {
         "from": "Acme <onboarding@yourdomain.com>",
-        "to": ["bar@outlook.com"],
+        "to": ["bounced@example.com"],
         "subject": "world hello",
         "html": "<p>it works!</p>",
     },
 ])`,
-    retrieve: `email = millionsend.Emails.get(
-    "4ef9a417-02e9-4d39-ad75-9611e0fcc33c"
-)`,
-  },
-  php: {
-    send: `$ms = MillionSend\\MillionSend::client('ms_xxxxxxxxx');
-
-$ms->emails->send([
-    'from' => 'Acme <onboarding@yourdomain.com>',
-    'to' => ['delivered@resend.dev'],
-    'subject' => 'hello world',
-    'html' => '<p>it works!</p>',
-]);`,
-    batch: `$ms->batch->send([
-    [
-        'from' => 'Acme <onboarding@yourdomain.com>',
-        'to' => ['foo@gmail.com'],
-        'subject' => 'hello world',
-        'html' => '<h1>it works!</h1>',
-    ],
-    [
-        'from' => 'Acme <onboarding@yourdomain.com>',
-        'to' => ['bar@outlook.com'],
-        'subject' => 'world hello',
-        'html' => '<p>it works!</p>',
-    ],
-]);`,
-    retrieve: `$email = $ms->emails->get(
-    '4ef9a417-02e9-4d39-ad75-9611e0fcc33c'
-);`,
-  },
-  ruby: {
-    send: `Millionsend.api_key = "ms_xxxxxxxxx"
-
-Millionsend::Emails.send(
-  from: "Acme <onboarding@yourdomain.com>",
-  to: "delivered@resend.dev",
-  subject: "hello world",
-  html: "<p>it works!</p>"
-)`,
-    batch: `Millionsend::Batch.send([
-  {
-    from: "Acme <onboarding@yourdomain.com>",
-    to: ["foo@gmail.com"],
-    subject: "hello world",
-    html: "<h1>it works!</h1>"
-  },
-  {
-    from: "Acme <onboarding@yourdomain.com>",
-    to: ["bar@outlook.com"],
-    subject: "world hello",
-    html: "<p>it works!</p>"
-  }
-])`,
-    retrieve: `email = Millionsend::Emails.get(
-  "4ef9a417-02e9-4d39-ad75-9611e0fcc33c"
-)`,
-  },
-  go: {
-    send: `client := millionsend.NewClient("ms_xxxxxxxxx")
-
-sent, err := client.Emails.Send(&millionsend.SendEmailRequest{
-    From:    "Acme <onboarding@yourdomain.com>",
-    To:      []string{"delivered@resend.dev"},
-    Subject: "hello world",
-    Html:    "<p>it works!</p>",
-})`,
-    batch: `batch, err := client.Batch.Send([]*millionsend.SendEmailRequest{
-    {
-        From:    "Acme <onboarding@yourdomain.com>",
-        To:      []string{"foo@gmail.com"},
-        Subject: "hello world",
-        Html:    "<h1>it works!</h1>",
-    },
-    {
-        From:    "Acme <onboarding@yourdomain.com>",
-        To:      []string{"bar@outlook.com"},
-        Subject: "world hello",
-        Html:    "<p>it works!</p>",
-    },
-})`,
-    retrieve: `email, err := client.Emails.Get(
+    retrieve: `email = resend.Emails.get(
     "4ef9a417-02e9-4d39-ad75-9611e0fcc33c",
 )`,
   },
-  rust: {
-    send: `let ms = MillionSend::new("ms_xxxxxxxxx");
+  php: {
+    send: `putenv("RESEND_BASE_URL=https://api-mepmail.agenciamep.com");
 
-let email = CreateEmailBaseOptions::new(
-    "Acme <onboarding@yourdomain.com>",
-    ["delivered@resend.dev"],
-    "hello world",
+$resend = Resend::client("ms_xxxxxxxxx");
+
+$resend->emails->send([
+    "from" => "Acme <onboarding@yourdomain.com>",
+    "to" => "delivered@example.com",
+    "subject" => "hello world",
+    "html" => "<h1>it works!</h1>",
+]);`,
+    batch: `putenv("RESEND_BASE_URL=https://api-mepmail.agenciamep.com");
+
+$resend = Resend::client("ms_xxxxxxxxx");
+
+$resend->batch->send([
+    [
+        "from" => "Acme <onboarding@yourdomain.com>",
+        "to" => "delivered@example.com",
+        "subject" => "hello world",
+        "html" => "<h1>it works!</h1>",
+    ],
+    [
+        "from" => "Acme <onboarding@yourdomain.com>",
+        "to" => "bounced@example.com",
+        "subject" => "world hello",
+        "html" => "<p>it works!</p>",
+    ],
+]);`,
+    retrieve: `putenv("RESEND_BASE_URL=https://api-mepmail.agenciamep.com");
+
+$resend = Resend::client("ms_xxxxxxxxx");
+
+$email = $resend->emails->get("4ef9a417-02e9-4d39-ad75-9611e0fcc33c");`,
+  },
+  ruby: {
+    send: `ENV["RESEND_BASE_URL"] = "https://api-mepmail.agenciamep.com/"  # barra final obrigatoria
+
+require "resend"
+Resend.api_key = "ms_xxxxxxxxx"
+
+r = Resend::Emails.send({
+  "from" => "Acme <onboarding@yourdomain.com>",
+  "to" => ["delivered@example.com"],
+  "subject" => "hello world",
+  "html" => "<h1>it works!</h1>"
+})`,
+    batch: `ENV["RESEND_BASE_URL"] = "https://api-mepmail.agenciamep.com/"  # barra final obrigatoria
+
+r = Resend::Batch.send([
+  {
+    "from" => "Acme <onboarding@yourdomain.com>",
+    "to" => ["delivered@example.com"],
+    "subject" => "hello world",
+    "html" => "<h1>it works!</h1>"
+  },
+  {
+    "from" => "Acme <onboarding@yourdomain.com>",
+    "to" => ["bounced@example.com"],
+    "subject" => "world hello",
+    "html" => "<p>it works!</p>"
+  }
+])`,
+    retrieve: `r = Resend::Emails.get("4ef9a417-02e9-4d39-ad75-9611e0fcc33c")`,
+  },
+  go: {
+    send: `import (
+	"net/url"
+
+	"github.com/resend/resend-go/v4"
 )
-.with_html("<p>it works!</p>");
 
-ms.emails.send(email).await?;`,
-    batch: `let emails = vec![
-    CreateEmailBaseOptions::new(
-        "Acme <onboarding@yourdomain.com>",
-        ["foo@gmail.com"],
-        "hello world",
-    )
-    .with_html("<h1>it works!</h1>"),
-    CreateEmailBaseOptions::new(
-        "Acme <onboarding@yourdomain.com>",
-        ["bar@outlook.com"],
-        "world hello",
-    )
-    .with_html("<p>it works!</p>"),
-];
+client := resend.NewClient("ms_xxxxxxxxx")
+client.BaseURL, _ = url.Parse("https://api-mepmail.agenciamep.com/")  // barra final obrigatoria
 
-ms.batch.send(emails).await?;`,
-    retrieve: `let email = ms
+sent, err := client.Emails.Send(&resend.SendEmailRequest{
+	From:    "Acme <onboarding@yourdomain.com>",
+	To:      []string{"delivered@example.com"},
+	Subject: "hello world",
+	Html:    "<h1>it works!</h1>",
+})`,
+    batch: `batch, err := client.Batch.Send([]*resend.SendEmailRequest{
+	{
+		From:    "Acme <onboarding@yourdomain.com>",
+		To:      []string{"delivered@example.com"},
+		Subject: "hello world",
+		Html:    "<h1>it works!</h1>",
+	},
+	{
+		From:    "Acme <onboarding@yourdomain.com>",
+		To:      []string{"bounced@example.com"},
+		Subject: "world hello",
+		Html:    "<p>it works!</p>",
+	},
+})`,
+    retrieve: `email, err := client.Emails.Get("4ef9a417-02e9-4d39-ad75-9611e0fcc33c")`,
+  },
+  rust: {
+    send: `use resend_rs::types::CreateEmailBaseOptions;
+use resend_rs::{Config, Resend};
+
+let resend = Resend::with_config(
+    Config::builder("ms_xxxxxxxxx")
+        .base_url("https://api-mepmail.agenciamep.com".parse().context("failed to parse URL")?)
+        .build(),
+);
+
+let email = resend
     .emails
-    .get("4ef9a417-02e9-4d39-ad75-9611e0fcc33c")
+    .send(
+        CreateEmailBaseOptions::new(
+            "Acme <onboarding@yourdomain.com>",
+            ["delivered@example.com"],
+            "hello world",
+        )
+        .with_html("<h1>it works!</h1>"),
+    )
     .await?;`,
+    batch: `let emails = resend
+    .batch
+    .send([
+        CreateEmailBaseOptions::new(
+            "Acme <onboarding@yourdomain.com>",
+            ["delivered@example.com"],
+            "hello world",
+        )
+        .with_html("<h1>it works!</h1>"),
+        CreateEmailBaseOptions::new(
+            "Acme <onboarding@yourdomain.com>",
+            ["bounced@example.com"],
+            "world hello",
+        )
+        .with_html("<p>it works!</p>"),
+    ])
+    .await?;`,
+    retrieve: `let email = resend.emails.get("4ef9a417-02e9-4d39-ad75-9611e0fcc33c").await?;`,
   },
   java: {
-    send: `MillionSend ms = new MillionSend("ms_xxxxxxxxx");
+    send: `// O SDK Java oficial fixa https://api.resend.com e nao aceita outra base,
+// entao aqui vai a chamada HTTP direta na MepMail.
+var body = """
+    {
+      "from": "Acme <onboarding@yourdomain.com>",
+      "to": ["delivered@example.com"],
+      "subject": "hello world",
+      "html": "<h1>it works!</h1>"
+    }
+    """;
 
-CreateEmailOptions email = CreateEmailOptions.builder()
-    .from("Acme <onboarding@yourdomain.com>")
-    .to("delivered@resend.dev")
-    .subject("hello world")
-    .html("<p>it works!</p>")
+var request = HttpRequest.newBuilder()
+    .uri(URI.create("https://api-mepmail.agenciamep.com/emails"))
+    .header("Authorization", "Bearer ms_xxxxxxxxx")
+    .header("Content-Type", "application/json")
+    .POST(HttpRequest.BodyPublishers.ofString(body))
     .build();
 
-ms.emails().send(email);`,
-    batch: `ms.batch().send(List.of(
-    CreateEmailOptions.builder()
-        .from("Acme <onboarding@yourdomain.com>")
-        .to("foo@gmail.com")
-        .subject("hello world")
-        .html("<h1>it works!</h1>")
-        .build(),
-    CreateEmailOptions.builder()
-        .from("Acme <onboarding@yourdomain.com>")
-        .to("bar@outlook.com")
-        .subject("world hello")
-        .html("<p>it works!</p>")
-        .build()
-));`,
-    retrieve: `Email email = ms.emails().get(
-    "4ef9a417-02e9-4d39-ad75-9611e0fcc33c"
-);`,
+var response = HttpClient.newHttpClient()
+    .send(request, HttpResponse.BodyHandlers.ofString());`,
+    batch: `var request = HttpRequest.newBuilder()
+    .uri(URI.create("https://api-mepmail.agenciamep.com/emails/batch"))
+    .header("Authorization", "Bearer ms_xxxxxxxxx")
+    .header("Content-Type", "application/json")
+    .POST(HttpRequest.BodyPublishers.ofString(body))
+    .build();
+
+var response = HttpClient.newHttpClient()
+    .send(request, HttpResponse.BodyHandlers.ofString());`,
+    retrieve: `var request = HttpRequest.newBuilder()
+    .uri(URI.create("https://api-mepmail.agenciamep.com/emails/4ef9a417-02e9-4d39-ad75-9611e0fcc33c"))
+    .header("Authorization", "Bearer ms_xxxxxxxxx")
+    .GET()
+    .build();
+
+var response = HttpClient.newHttpClient()
+    .send(request, HttpResponse.BodyHandlers.ofString());`,
   },
   dotnet: {
-    send: `var ms = new MillionSendClient("ms_xxxxxxxxx");
+    send: `using Resend;
 
-await ms.EmailSendAsync(new EmailMessage
+var options = new ResendClientOptions
 {
-    From = "Acme <onboarding@yourdomain.com>",
-    To = new[] { "delivered@resend.dev" },
-    Subject = "hello world",
-    Html = "<p>it works!</p>",
-});`,
-    batch: `await ms.EmailBatchAsync(new[]
-{
-    new EmailMessage
-    {
-        From = "Acme <onboarding@yourdomain.com>",
-        To = new[] { "foo@gmail.com" },
-        Subject = "hello world",
-        Html = "<h1>it works!</h1>",
-    },
-    new EmailMessage
-    {
-        From = "Acme <onboarding@yourdomain.com>",
-        To = new[] { "bar@outlook.com" },
-        Subject = "world hello",
-        Html = "<p>it works!</p>",
-    },
-});`,
-    retrieve: `var email = await ms.EmailRetrieveAsync(
-    Guid.Parse("4ef9a417-02e9-4d39-ad75-9611e0fcc33c")
+    ApiToken = "ms_xxxxxxxxx",
+    ApiUrl = "https://api-mepmail.agenciamep.com",
+};
+
+var resend = ResendClient.Create(options);
+
+var message = new EmailMessage();
+message.From = "Acme <onboarding@yourdomain.com>";
+message.To.Add("delivered@example.com");
+message.Subject = "hello world";
+message.HtmlBody = "<h1>it works!</h1>";
+
+await resend.EmailSendAsync(message);`,
+    batch: `var messages = new List<EmailMessage>();
+
+var first = new EmailMessage();
+first.From = "Acme <onboarding@yourdomain.com>";
+first.To.Add("delivered@example.com");
+first.Subject = "hello world";
+first.HtmlBody = "<h1>it works!</h1>";
+messages.Add(first);
+
+await resend.EmailBatchAsync(messages);`,
+    retrieve: `var email = await resend.EmailRetrieveAsync(
+    new Guid("4ef9a417-02e9-4d39-ad75-9611e0fcc33c"),
 );`,
   },
   elixir: {
-    send: `client = MillionSend.client(api_key: "ms_xxxxxxxxx")
+    send: `# pacote da comunidade: hex "resend" (elixir-saas/resend-elixir)
+client = Resend.client(
+  api_key: "ms_xxxxxxxxx",
+  base_url: "https://api-mepmail.agenciamep.com"
+)
 
-MillionSend.Emails.send(client, %{
+{:ok, email} = Resend.Emails.send(client, %{
   from: "Acme <onboarding@yourdomain.com>",
-  to: ["delivered@resend.dev"],
+  to: "delivered@example.com",
   subject: "hello world",
-  html: "<p>it works!</p>"
+  html: "<h1>it works!</h1>"
 })`,
-    batch: `MillionSend.Emails.send_batch(client, [
+    batch: `{:ok, emails} = Resend.Emails.send_batch(client, [
   %{
     from: "Acme <onboarding@yourdomain.com>",
-    to: ["foo@gmail.com"],
+    to: "delivered@example.com",
     subject: "hello world",
     html: "<h1>it works!</h1>"
   },
   %{
     from: "Acme <onboarding@yourdomain.com>",
-    to: ["bar@outlook.com"],
+    to: "bounced@example.com",
     subject: "world hello",
     html: "<p>it works!</p>"
   }
 ])`,
-    retrieve: `{:ok, email} = MillionSend.Emails.get(
+    retrieve: `{:ok, email} = Resend.Emails.get(
   client,
   "4ef9a417-02e9-4d39-ad75-9611e0fcc33c"
 )`,
@@ -322,26 +377,41 @@ MillionSend.Emails.send(client, %{
 };
 
 /* Sheets for the non-email resources; `ns` is the message-namespace prefix
-   carrying apiSheet.{title,<section>} keys. Resources every SDK implements
-   carry `sdk` snippets (api-sheet-snippets.ts) and get the emails sheet's
-   language tabs; the rest have no SDK surface to document, so they carry
-   copy-ready `curl` calls (paths mirror apps/api exactly: /contact-properties,
-   /domains, /api-keys, /webhooks). */
-const API_BASE = "https://api.millionsend.com";
+   carrying apiSheet.{title,<section>} keys. Every one of them carries
+   copy-ready `curl` calls whose verb and path mirror apps/api exactly —
+   /contacts, /segments, /topics, /broadcasts, /webhooks, /contact-properties,
+   /domains, /api-keys. There are no per-language snippets here on purpose:
+   the only client we could honestly document is the official Resend SDK, and
+   the resource methods it exposes differ per language, so each one would have
+   to be read out of that language's source before being published. The email
+   sheet (SNIPPETS above) carries the language tabs, because there every
+   language's send/batch/get was checked against its own package source. */
+const API_BASE = "https://api-mepmail.agenciamep.com";
 const AUTH = `-H "Authorization: Bearer ms_xxxxxxxxx"`;
 const JSON_CT = `-H "Content-Type: application/json"`;
 const SAMPLE_ID = "4ef9a417-02e9-4d39-ad75-9611e0fcc33c";
 
-export type ResourceSheet = { ns: string; sections: readonly string[] } & (
-  | { sdk: Record<Lang, Record<string, string>>; curl?: undefined }
-  | { curl: Record<string, string>; sdk?: undefined }
-);
+export type ResourceSheet = {
+  ns: string;
+  sections: readonly string[];
+  curl: Record<string, string>;
+};
 
 export const RESOURCE_SHEETS = {
   contacts: {
     ns: "audience.contacts",
     sections: ["list", "create", "update"],
-    sdk: CONTACTS_SNIPPETS,
+    curl: {
+      list: `curl "${API_BASE}/contacts" \\\n  ${AUTH}`,
+      create: `curl -X POST "${API_BASE}/contacts" \\\n
+  ${AUTH}
+  ${JSON_CT} \\\n
+  -d '{ "email": "ada@example.com", "first_name": "Ada", "last_name": "Lovelace" }'`,
+      update: `curl -X PATCH "${API_BASE}/contacts/${SAMPLE_ID}" \\\n
+  ${AUTH}
+  ${JSON_CT} \\\n
+  -d '{ "first_name": "Augusta" }'`,
+    },
   },
   contactProperties: {
     ns: "audience.properties",
@@ -361,17 +431,42 @@ export const RESOURCE_SHEETS = {
   segments: {
     ns: "audience.segments",
     sections: ["list", "create", "update"],
-    sdk: SEGMENTS_SNIPPETS,
+    curl: {
+      list: `curl "${API_BASE}/segments" \\\n  ${AUTH}`,
+      create: `curl -X POST "${API_BASE}/segments" \\\n
+  ${AUTH}
+  ${JSON_CT} \\\n
+  -d '{ "name": "Power users" }'`,
+      update: `curl -X PATCH "${API_BASE}/segments/${SAMPLE_ID}" \\\n
+  ${AUTH}
+  ${JSON_CT} \\\n
+  -d '{ "name": "Paying users" }'`,
+    },
   },
   topics: {
     ns: "audience.topics",
     sections: ["list", "create", "get"],
-    sdk: TOPICS_SNIPPETS,
+    curl: {
+      list: `curl "${API_BASE}/topics" \\\n  ${AUTH}`,
+      create: `curl -X POST "${API_BASE}/topics" \\\n
+  ${AUTH}
+  ${JSON_CT} \\\n
+  -d '{ "name": "Product updates", "description": "New features", "default_subscription": "opt_in" }'`,
+      get: `curl "${API_BASE}/topics/${SAMPLE_ID}" \\\n  ${AUTH}`,
+    },
   },
   broadcasts: {
     ns: "broadcasts",
     sections: ["list", "create", "send"],
-    sdk: BROADCASTS_SNIPPETS,
+    curl: {
+      list: `curl "${API_BASE}/broadcasts" \\\n  ${AUTH}`,
+      create: `curl -X POST "${API_BASE}/broadcasts" \\\n
+  ${AUTH}
+  ${JSON_CT} \\\n
+  -d '{ "segment_id": "6f1c8a2e-2f8b-4a1e-9c3d-7b5a0e4d2f11", "from": "Acme <news@yourdomain.com>", "subject": "October update", "html": "<h1>Fresh news</h1>" }'`,
+      send: `curl -X POST "${API_BASE}/broadcasts/${SAMPLE_ID}/send" \\\n
+  ${AUTH}`,
+    },
   },
   domains: {
     ns: "domains",
@@ -400,7 +495,17 @@ export const RESOURCE_SHEETS = {
   webhooks: {
     ns: "webhooks",
     sections: ["list", "create", "update"],
-    sdk: WEBHOOKS_SNIPPETS,
+    curl: {
+      list: `curl "${API_BASE}/webhooks" \\\n  ${AUTH}`,
+      create: `curl -X POST "${API_BASE}/webhooks" \\\n
+  ${AUTH}
+  ${JSON_CT} \\\n
+  -d '{ "endpoint": "https://example.com/hooks/mepmail", "events": ["email.delivered", "email.bounced"] }'`,
+      update: `curl -X PATCH "${API_BASE}/webhooks/${SAMPLE_ID}" \\\n
+  ${AUTH}
+  ${JSON_CT} \\\n
+  -d '{ "status": "disabled" }'`,
+    },
   },
 } satisfies Record<string, ResourceSheet>;
 
@@ -408,14 +513,13 @@ type Resource = keyof typeof RESOURCE_SHEETS;
 
 /**
  * "</>" affordance for the non-email list surfaces: same drawer as
- * ApiDocsButton. SDK-covered resources get the same language tabs and
- * highlighted snippets as the emails sheet; the rest show copy-ready curl
- * calls. The key hint is shared with the emails sheet (emails.apiSheet.keyHint).
+ * ApiDocsButton, with copy-ready curl calls for the resource's three main
+ * operations. The key hint is shared with the emails sheet
+ * (emails.apiSheet.keyHint).
  */
 export function ResourceApiButton({ resource }: { resource: Resource }) {
   const t = useTranslations();
   const [open, setOpen] = useState(false);
-  const [lang, setLang] = useState<Lang>("node");
   const sheet: ResourceSheet = RESOURCE_SHEETS[resource];
   const title = t(`${sheet.ns}.apiSheet.title`);
 
@@ -430,13 +534,12 @@ export function ResourceApiButton({ resource }: { resource: Resource }) {
         <CodeGlyph size={14} />
       </button>
       <Drawer open={open} onClose={() => setOpen(false)} title={title}>
-        {sheet.sdk ? <LangTabs label={title} value={lang} onChange={setLang} /> : null}
         {sheet.sections.map((section) => (
           <SheetSection
             key={section}
             title={t(`${sheet.ns}.apiSheet.${section}`)}
-            code={(sheet.sdk ? sheet.sdk[lang][section] : sheet.curl[section]) ?? ""}
-            language={sheet.sdk ? LANG_META[lang].hljs : "bash"}
+            code={sheet.curl[section] ?? ""}
+            language="bash"
           />
         ))}
         <p style={{ margin: "20px 0 0", fontSize: 12.5, color: "var(--ms-muted)" }}>

@@ -1,6 +1,6 @@
 ---
 title: Referência da API
-description: A API HTTP do MillionSend — compatível com Resend, gerada a partir do código do servidor.
+description: A API HTTP do MepMail — compatível com Resend, gerada a partir do código do servidor.
 ---
 
 As páginas de endpoint desta seção são geradas a partir das próprias
@@ -13,7 +13,7 @@ código. A especificação bruta está em [/openapi.json](/openapi.json)
 <DeploymentTabs>
 <DeploymentTab deployment="cloud">
 
-`https://api.millionsend.com`
+`https://api-mepmail.agenciamep.com`
 
 </DeploymentTab>
 <DeploymentTab deployment="self-hosted">
@@ -45,7 +45,7 @@ quais endereços `from` ela pode enviar.
 ## Compatibilidade com Resend
 
 Os formatos de requisição e resposta correspondem aos da API do Resend, então
-os SDKs oficiais do Resend funcionam contra o MillionSend apontando a URL
+os SDKs oficiais do Resend funcionam contra o MepMail apontando a URL
 base para ele. O CI executa o pacote oficial `resend` do npm contra todos os
 endpoints como um teste de conformidade. As poucas diferenças restantes são
 deliberadas e explícitas:
@@ -102,9 +102,9 @@ deliberadas e explícitas:
   (`List-Unsubscribe=One-Click`); qualquer outro é `422`. Os dois vêm juntos, e
   `List-Unsubscribe` precisa de um alvo `https`. Em um envio com `topic_id`, o
   par que você informa substitui o gerado: os pedidos de um clique passam a
-  chegar no seu endpoint, o MillionSend não registra opt-out por eles, e um
+  chegar no seu endpoint, o MepMail não registra opt-out por eles, e um
   placeholder `{{{UNSUBSCRIBE_URL}}}` no corpo continua apontando para a página
-  do MillionSend.
+  do MepMail.
 - Um envio em que todos os destinatários de `to` estão na lista de supressão ou
   saíram do `topic_id` é recusado com `422 all_recipients_suppressed` (mensagem
   `All recipients are suppressed`); destinatários removidos de um envio que

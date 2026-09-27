@@ -1,6 +1,6 @@
 ---
 title: API reference
-description: The MillionSend HTTP API — Resend wire-compatible, generated from the server code.
+description: The MepMail HTTP API — Resend wire-compatible, generated from the server code.
 ---
 
 The endpoint pages under this section are generated from the API's own route
@@ -12,7 +12,7 @@ definitions at build time, so they always reflect the code. The raw spec is at
 <DeploymentTabs>
 <DeploymentTab deployment="cloud">
 
-`https://api.millionsend.com`
+`https://api-mepmail.agenciamep.com`
 
 </DeploymentTab>
 <DeploymentTab deployment="self-hosted">
@@ -43,7 +43,7 @@ domain, restricting which `from` addresses it may send.
 ## Resend compatibility
 
 Request and response shapes match Resend's API, so official Resend SDKs work
-against MillionSend by pointing their base URL at it. CI runs the official
+against MepMail by pointing their base URL at it. CI runs the official
 `resend` npm package against every endpoint as a conformance gate. The few
 remaining deltas are deliberate and loud:
 
@@ -96,9 +96,9 @@ remaining deltas are deliberate and loud:
   (`List-Unsubscribe=One-Click`); anything else is a `422`. The two must come
   together, and `List-Unsubscribe` needs an `https` target. On a send with a
   `topic_id`, a pair you supply replaces the generated one: one-click requests
-  then reach your endpoint, MillionSend records no opt-out for them, and an
+  then reach your endpoint, MepMail records no opt-out for them, and an
   `{{{UNSUBSCRIBE_URL}}}` placeholder in the body still resolves to
-  MillionSend's page.
+  MepMail's page.
 - A send whose every `to` recipient is on the suppression list or opted out of
   the `topic_id` is refused with `422 all_recipients_suppressed` (message
   `All recipients are suppressed`); recipients dropped from a send that still

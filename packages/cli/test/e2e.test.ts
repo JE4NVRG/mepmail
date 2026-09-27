@@ -152,7 +152,7 @@ beforeAll(async () => {
   ]);
   cwd = mkdtempSync(join(tmpdir(), "millionsend-e2e-"));
   writeFileSync(join(cwd, ".gitignore"), "node_modules\n");
-  // What the team already has on MillionSend: a verified sender (so drafts
+  // What the team already has on MepMail: a verified sender (so drafts
   // from it can be imported), an unrelated domain (pushing the Free plan's
   // 3-domain cap), and a topic whose description differs (an update).
   const verified = await post<{ id: string }>(cloud, "/domains", {
@@ -201,7 +201,7 @@ describe("millionsend (built bundle)", () => {
       expect(plan.target).toEqual({ baseUrl: cloud.baseUrl, cloud: true, plan: "free" });
       expect(plan.counts).toEqual({ create: 22, update: 2, unchanged: 1, manual: 12, skip: 3 });
       expect(stderr).toMatch(new RegExp(`✓ Contacts\\s+${CONTACT_COUNT.toLocaleString("en-US")}`));
-      expect(stderr).toMatch(/✓ MillionSend\s+current state read/);
+      expect(stderr).toMatch(/✓ MepMail\s+current state read/);
 
       const item = (resource: string, key: string) =>
         plan.items.find((i) => i.resource === resource && i.key === key);
@@ -367,11 +367,9 @@ describe("millionsend (built bundle)", () => {
       expect(code).toBe(0);
       expect(fake.writes).toBe(0);
 
-      expect(stdout).toContain(
-        `millionsend ${VERSION} — Moves your Resend account into MillionSend.`,
-      );
+      expect(stdout).toContain(`millionsend ${VERSION} — Moves your Resend account into MepMail.`);
       expect(stdout).toContain("✓ Resend · connected");
-      expect(stdout).toContain("✓ MillionSend Cloud · plan Free");
+      expect(stdout).toContain("✓ MepMail Cloud · plan Free");
       expect(stdout).toContain("0 of 1 domains will be created; the rest are listed as manual.");
       expect(stdout).toContain("Resend was only read; nothing there was changed.");
       expect(stdout).toContain(`${CONTACT_COUNT.toLocaleString("en-US")}  contacts updated`);
@@ -385,7 +383,7 @@ describe("millionsend (built bundle)", () => {
       expect(stdout).toContain(
         "[ ] replace Resend topic and segment ids in your code (id map below)",
       );
-      expect(stdout).toContain("Id map (Resend → MillionSend; full pairs in migrate-report.md):");
+      expect(stdout).toContain("Id map (Resend → MepMail; full pairs in migrate-report.md):");
       expect(stdout).toMatch(
         new RegExp(`topics/${TOPICS[0].name}\\n    [0-9a-f]{8}… → [0-9a-f-]{36}`),
       );
@@ -516,7 +514,7 @@ describe("millionsend (built bundle)", () => {
         .where(eq(schema.segmentMembers.contactId, overlapping?.id ?? ""));
       expect(overlap?.n).toBe(2);
 
-      // Webhooks keep Resend's signing secret and every event MillionSend emits.
+      // Webhooks keep Resend's signing secret and every event MepMail emits.
       for (const id of state.created.webhooks ?? []) {
         const hook = await api<{ endpoint: string; events: string[]; signing_secret: string }>(
           cloud,
@@ -677,7 +675,7 @@ describe("millionsend (built bundle)", () => {
         );
         expect(stderr).toBe("");
         expect(code).toBe(0);
-        expect(stdout).toContain(`✓ MillionSend · ${self.baseUrl} (self-hosted)`);
+        expect(stdout).toContain(`✓ MepMail · ${self.baseUrl} (self-hosted)`);
         expect(stdout).not.toContain("Cloud");
         expect(stdout).not.toContain("Upgrade");
         expect(stdout).not.toContain("plan Free");

@@ -1,14 +1,15 @@
-# Prebuilt-image variant: skips the local build and pulls the published
-# image instead. Usage:
+# Unsupported prebuilt-image override for operators that publish their own
+# private image. The supported path for this fork is the root compose file's
+# local source build. Private-registry usage:
 #   docker compose -f docker-compose.yml -f docker-compose.prebuilt.yml up
-# :edge tracks main; pin a version tag for production.
+# Set MILLIONSEND_IMAGE explicitly, preferably to an immutable @sha256 digest.
 services:
   millionsend:
-    image: ghcr.io/millionsend/millionsend:edge
+    image: "${MILLIONSEND_IMAGE:?Set MILLIONSEND_IMAGE to an operator-published private image}"
     build: !reset null
   smtp:
-    image: ghcr.io/millionsend/millionsend:edge
+    image: "${MILLIONSEND_IMAGE:?Set MILLIONSEND_IMAGE to an operator-published private image}"
     build: !reset null
   docs:
-    image: ghcr.io/millionsend/millionsend:edge
+    image: "${MILLIONSEND_IMAGE:?Set MILLIONSEND_IMAGE to an operator-published private image}"
     build: !reset null

@@ -3,7 +3,7 @@ title: Migrate from Resend
 description: One command moves your Resend account; two environment lines move your code — the wire format is identical.
 ---
 
-MillionSend's REST API is wire-compatible with Resend's: same endpoints, same
+MepMail's REST API is wire-compatible with Resend's: same endpoints, same
 request and response shapes. Migrating is a configuration change, not a
 rewrite. The account data — contacts, segments, topics, templates, webhooks,
 domains, suppressions — moves with one command.
@@ -16,11 +16,11 @@ guardrails (Resend read-only, keys never in files, ask before applying).
 
 <CopyPrompt href="/prompts/migrate-from-resend.md" copied="Copied">Copy the migration prompt</CopyPrompt>
 
-Or point the agent at it: `https://docs.millionsend.com/prompts/migrate-from-resend.md`.
+Or point the agent at it: `https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/prompts/migrate-from-resend.md`.
 
 ## 1. Move your account
 
-Create an `ms_` API key with full access under **API keys** (MillionSend
+Create an `ms_` API key with full access under **API keys** (MepMail
 Cloud, or your own [self-hosted](/self-hosting) instance), then run, on your
 machine:
 
@@ -28,7 +28,7 @@ machine:
 npx @millionsend/cli migrate --from resend
 ```
 
-It asks for your Resend key (full access) and your MillionSend key, reads
+It asks for your Resend key (full access) and your MepMail key, reads
 your Resend account, shows a plan, waits for confirmation, applies it and
 prints a summary. Self-hosted, name your instance's API URL:
 
@@ -45,7 +45,7 @@ What it does:
   your production sending), backing off on the `ratelimit-*` headers and on
   every `429`. `--rps` changes the rate.
 - **Your keys never leave your machine.** The tool talks to `api.resend.com`
-  and to your MillionSend API only. Keys live in memory for the run, are never
+  and to your MepMail API only. Keys live in memory for the run, are never
   written to a file, and are redacted from every log line. No telemetry, no
   update check.
 - **Cutover first, enrichment after.** Pass 1 creates properties, topics,
@@ -102,9 +102,9 @@ Three things shorten it:
 | Contacts | Email, names, `unsubscribed`, properties, topic subscriptions, segment memberships. Opt-outs are preserved; nobody is re-subscribed. |
 | Segments, topics, properties | Matched by name / name / key: created when missing, updated when different. |
 | Templates | Name, alias, subject, html, text. `from`, `reply_to` and `variables` cannot be stored — listed as manual steps. |
-| Webhooks | Endpoint and events. The signing secret is copied, so the receiver you already run keeps verifying (deliveries carry the `svix-*` headers). `--fresh-webhook-secrets` mints new ones. Events MillionSend also emits carry over — the seven `email.*` types plus `contact.created`, `contact.updated` and `contact.deleted`; the rest (`domain.*`, `email.suppressed`) are dropped per webhook and listed. |
+| Webhooks | Endpoint and events. The signing secret is copied, so the receiver you already run keeps verifying (deliveries carry the `svix-*` headers). `--fresh-webhook-secrets` mints new ones. Events MepMail also emits carry over — the seven `email.*` types plus `contact.created`, `contact.updated` and `contact.deleted`; the rest (`domain.*`, `email.suppressed`) are dropped per webhook and listed. |
 | Suppressions | Bounces, complaints and manual entries, with their origin. |
-| Domains | Created with return path and tracking settings, in the one SES region your MillionSend instance serves (MillionSend Cloud: `sa-east-1`) — the Resend region does not carry over. On MillionSend Cloud, tracking toggles only carry over together with a tracking subdomain; without one the report lists them for you to set up in the dashboard. DNS records must be added again — see step 3. |
+| Domains | Created with return path and tracking settings, in the one SES region your MepMail instance serves (MepMail Cloud: `sa-east-1`) — the Resend region does not carry over. On MepMail Cloud, tracking toggles only carry over together with a tracking subdomain; without one the report lists them for you to set up in the dashboard. DNS records must be added again — see step 3. |
 | Broadcasts | Drafts and scheduled ones import as drafts. Sent ones are skipped unless `--include-sent`. |
 
 What cannot move: **API keys** (Resend exposes their names only — the report
@@ -115,14 +115,14 @@ segments cover them.
 Flags, environment variables, files, exit codes and CI usage are on the
 [CLI reference](/cli).
 
-## 2. Point your existing code at MillionSend
+## 2. Point your existing code at MepMail
 
 The official Resend SDKs honor `RESEND_BASE_URL`, so the migration is two
 environment lines — no code changes:
 
 ```sh
 RESEND_API_KEY=ms_...
-RESEND_BASE_URL=https://api.millionsend.com
+RESEND_BASE_URL=https://api-mepmail.agenciamep.com
 ```
 
 Self-hosted, use your instance's API origin instead.
@@ -143,20 +143,21 @@ Three details that differ from what a Resend integration may assume:
   `POST /contacts/batch?on_conflict=upsert` as JSON, up to 1,000 per call, with
   `x-batch-validation: permissive` to keep the valid rows when some fail.
 
-Prefer first-party clients? The [MillionSend SDKs](/sdks) cover nine
-languages with the same surface:
+There is no client of ours to install: the official Resend SDKs are the client,
+[pointed at your instance](/sdks). The two environment lines above cover the
+Node SDK unchanged; to set the base URL in code:
 
 ```ts
-import { MillionSend } from "millionsend";
+import { Resend } from "resend";
 
-const ms = new MillionSend("ms_...", { baseUrl: "https://api.millionsend.com" });
+const resend = new Resend("ms_...", { baseUrl: "https://api-mepmail.agenciamep.com" });
 ```
 
 ## 3. Finish what the CLI lists
 
 The summary ends with a checklist. Three items are always on it:
 
-- **Add DNS records for each domain.** MillionSend uses its own DKIM keypair,
+- **Add DNS records for each domain.** MepMail uses its own DKIM keypair,
   so the records are new even for a domain that already sends through
   Resend. The report prints a copy-ready table of the records per domain
   (also under **Domains** in the dashboard). Both providers can stay verified
@@ -166,7 +167,7 @@ The summary ends with a checklist. Three items are always on it:
   `staging`) under **API keys**.
 
 Two more appear when they apply: template `from` / `reply_to` values to set
-per send, and webhook event types MillionSend does not emit. Broadcast bodies
+per send, and webhook event types MepMail does not emit. Broadcast bodies
 need no change: `{{{RESEND_UNSUBSCRIBE_URL}}}` is a supported alias of
 `{{{UNSUBSCRIBE_URL}}}`.
 
@@ -175,4 +176,4 @@ the Emails page — that is the whole migration.
 
 ---
 
-Resend is a registered trademark of Plus Five Five, Inc. MillionSend is not affiliated with or endorsed by Resend.
+Resend is a registered trademark of Plus Five Five, Inc. MepMail is not affiliated with or endorsed by Resend.

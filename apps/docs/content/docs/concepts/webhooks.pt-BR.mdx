@@ -37,7 +37,7 @@ seja quem for que mudou. `data` traz o contato no formato do Resend — `id`,
 — mais `source`: `api`, `dashboard`, `hosted_page` (a central de preferências)
 ou `one_click` (um POST de header RFC 8058). O Resend emite apenas
 `contact.created`, `contact.updated` e `contact.deleted`; os demais são
-extensões do MillionSend.
+extensões do MepMail.
 
 | Evento | Disparado quando | `data` extra |
 | --- | --- | --- |
@@ -92,7 +92,7 @@ antigos.
 `POST /webhooks` aceita um `signing_secret` opcional: `whsec_` seguido de
 base64 padrão de 24 a 64 bytes — o formato que Resend e Svix emitem. Passe o
 segredo com que seu receptor já verifica e o endpoint continua funcionando sem
-novo deploy; omita e o MillionSend gera um. Qualquer outra coisa é rejeitada
+novo deploy; omita e o MepMail gera um. Qualquer outra coisa é rejeitada
 com `422 signing_secret must be whsec_ followed by base64 of 24-64 bytes`.
 
 Para trazer um segredo de outro provedor, leia-o na API ou no painel dele (o
@@ -100,7 +100,7 @@ Resend o retorna em `GET /webhooks/{id}`) e crie o endpoint aqui com o mesmo
 valor:
 
 ```sh
-curl -X POST "https://api.millionsend.com/webhooks" \
+curl -X POST "https://api-mepmail.agenciamep.com/webhooks" \
   -H "Authorization: Bearer ms_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -126,7 +126,7 @@ assina. `0` descarta o antigo na hora, para um segredo vazado.
 e uma segunda rotação dentro da janela substitui o segredo anterior.
 
 ```sh
-curl -X POST "https://api.millionsend.com/webhooks/{id}/rotate" \
+curl -X POST "https://api-mepmail.agenciamep.com/webhooks/{id}/rotate" \
   -H "Authorization: Bearer ms_..." \
   -H "Content-Type: application/json" \
   -d '{ "overlap_hours": 24 }'
