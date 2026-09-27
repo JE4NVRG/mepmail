@@ -80,10 +80,10 @@ const TOP: PlanRow = {
 
 /** Mirror of packages/core/src/plans.ts PLAN_RUNGS / PLAN_DOMAIN_LIMIT / PLAN_CONTACT_LIMIT, cheapest first. */
 const PLANS: PlanRow[] = [
-  { id: "free", label: "Free", perMonth: 3_000, domains: 3, contacts: 1_000 },
-  { id: "starter", label: "Starter", perMonth: 45_000, domains: 10, contacts: null },
-  { id: "pro", label: "Pro 100K", perMonth: 100_000, domains: null, contacts: null },
-  { id: "pro", label: "Pro 200K", perMonth: 200_000, domains: null, contacts: null },
+  { id: "free", label: "Free", perMonth: 3_000, domains: 1, contacts: 1_000 },
+  { id: "starter", label: "Starter", perMonth: 45_000, domains: 3, contacts: 10_000 },
+  { id: "pro", label: "Pro 100K", perMonth: 100_000, domains: 10, contacts: null },
+  { id: "pro", label: "Pro 200K", perMonth: 200_000, domains: 10, contacts: null },
   { id: "scale", label: "Scale 500K", perMonth: 500_000, domains: null, contacts: null },
   { id: "scale", label: "Scale 1M", perMonth: 1_000_000, domains: null, contacts: null },
   { id: "scale", label: "Scale 1.5M", perMonth: 1_500_000, domains: null, contacts: null },
@@ -95,7 +95,7 @@ const perMonthText = (n: number | null): string =>
 const domainsText = (n: number | null): string =>
   n === null ? "unlimited domains" : pluralize(n, "domain");
 
-function buildOffer(
+export function buildOffer(
   usage: TargetUsage,
   snapshot: Snapshot,
   domains: number,
@@ -336,7 +336,7 @@ export function countRows(
 }
 
 export const SYNC_HINT = (source: ProviderId): string =>
-  `Run \`millionsend migrate --from ${source}\` again right before cutover to sync new contacts.`;
+  `Run \`mepmail migrate --from ${source}\` again right before cutover to sync new contacts.`;
 
 /** The numbers, the read-only assurance, secrets once, the checklist, the sync hint, then the plan offer. */
 export async function printSummary(out: OutStream, raw: Report): Promise<void> {

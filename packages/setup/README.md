@@ -1,9 +1,8 @@
-# @millionsend/setup
+# @mepmail/setup
 
 The self-hosting setup wizard source for
-[MepMail](https://github.com/JE4NVRG/mepmail). This fork does not currently
-publish the package to npm; `@millionsend/setup` there is the upstream package.
-Run the wizard from a source checkout instead:
+[MepMail](https://github.com/JE4NVRG/mepmail). This package is not currently
+published to npm; run the wizard from a source checkout:
 
 ```sh
 pnpm setup:aws            # the wizard
@@ -44,7 +43,7 @@ on EOF every offer defaults to "skip", so scripted runs never create anything
 by surprise.
 
 Run it anywhere Node 22+ lives; the AWS step wants your admin AWS credentials
-(laptop or server — the MillionSend server itself never needs admin
+(laptop or server — the MepMail server itself never needs admin
 credentials) and offers `aws login`/`aws sso login`/`aws configure` when the
 credential check fails on a machine with the aws CLI. Each AWS run mints a
 new access key — delete stale ones in the IAM console.

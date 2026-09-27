@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { serve } from "@hono/node-server";
+import { eq } from "drizzle-orm";
 import { createApi } from "@millionsend/api";
 import { EnvKeyring, generateApiKey } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
@@ -37,10 +38,19 @@ export async function createApiKey(
  * local port, with one team and one full-access key.
  */
 export async function startLiveApi(
-  options: { isCloud?: boolean; appBaseUrl?: string | undefined; slug?: string } = {},
+  options: {
+    isCloud?: boolean;
+    appBaseUrl?: string | undefined;
+    slug?: string;
+    /** Team plan; unset keeps the schema default (free). */
+    plan?: "free" | "starter" | "pro" | "scale";
+  } = {},
 ): Promise<LiveApi> {
   const { db, close } = await createTestDb();
   const teamId = await createTeam(db, options.slug ?? "migrate");
+  if (options.plan !== undefined) {
+    await db.update(schema.teams).set({ plan: options.plan }).where(eq(schema.teams.id, teamId));
+  }
   const apiKey = await createApiKey(db, teamId);
   const app = createApi({
     db,
