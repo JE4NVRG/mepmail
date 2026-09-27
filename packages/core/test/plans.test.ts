@@ -61,11 +61,11 @@ describe("PLAN_RUNGS", () => {
       ["free", "free", 100, "day", 0, null],
       ["starter", "starter", 1_500, "day", 900, null],
       ["pro_100k", "pro", 100_000, "month", 2_000, 30],
-      ["pro_200k", "pro", 200_000, "month", 3_500, 30],
-      ["scale_500k", "scale", 500_000, "month", 7_500, 25],
-      ["scale_1m", "scale", 1_000_000, "month", 14_000, 20],
-      ["scale_1_5m", "scale", 1_500_000, "month", 20_000, 18],
-      ["scale_2_5m", "scale", 2_500_000, "month", 33_000, 16],
+      ["pro_200k", "pro", 200_000, "month", 6_900, 30],
+      ["scale_500k", "scale", 500_000, "month", 15_900, 25],
+      ["scale_1m", "scale", 1_000_000, "month", 25_900, 20],
+      ["scale_1_5m", "scale", 1_500_000, "month", 36_900, 18],
+      ["scale_2_5m", "scale", 2_500_000, "month", 54_900, 16],
     ]);
   });
 });
@@ -74,7 +74,7 @@ describe("PLAN_CONTACT_LIMIT", () => {
   it("caps contacts on Free only", () => {
     expect(PLAN_CONTACT_LIMIT).toEqual({
       free: 1_000,
-      starter: null,
+      starter: 10_000,
       pro: null,
       scale: null,
       system: null,

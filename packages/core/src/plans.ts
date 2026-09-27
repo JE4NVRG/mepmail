@@ -90,7 +90,7 @@ export const PLAN_RUNGS = [
     plan: "pro",
     included: 200_000,
     period: "month",
-    priceCents: 3_500,
+    priceCents: 6_900,
     overageCentsPer1k: 30,
   },
   {
@@ -98,7 +98,7 @@ export const PLAN_RUNGS = [
     plan: "scale",
     included: 500_000,
     period: "month",
-    priceCents: 7_500,
+    priceCents: 15_900,
     overageCentsPer1k: 25,
   },
   {
@@ -106,7 +106,7 @@ export const PLAN_RUNGS = [
     plan: "scale",
     included: 1_000_000,
     period: "month",
-    priceCents: 14_000,
+    priceCents: 25_900,
     overageCentsPer1k: 20,
   },
   {
@@ -114,7 +114,7 @@ export const PLAN_RUNGS = [
     plan: "scale",
     included: 1_500_000,
     period: "month",
-    priceCents: 20_000,
+    priceCents: 36_900,
     overageCentsPer1k: 18,
   },
   {
@@ -122,7 +122,7 @@ export const PLAN_RUNGS = [
     plan: "scale",
     included: 2_500_000,
     period: "month",
-    priceCents: 33_000,
+    priceCents: 54_900,
     overageCentsPer1k: 16,
   },
 ] as const satisfies readonly PlanRung[];
@@ -299,18 +299,18 @@ export function raisesQuota(before: TeamQuota, after: TeamQuota): boolean {
  * Self-host has no cap.
  */
 export const PLAN_TEAM_LIMIT: Record<Plan, number> = {
-  free: 3,
-  starter: 5,
-  pro: 10,
-  scale: 15,
+  free: 1,
+  starter: 2,
+  pro: 5,
+  scale: 10,
   system: Number.POSITIVE_INFINITY,
 };
 
 /** Sender domains per team per plan; null = unlimited. Self-host ignores plans entirely. */
 export const PLAN_DOMAIN_LIMIT: Record<Plan, number | null> = {
-  free: 3,
-  starter: 10,
-  pro: null,
+  free: 1,
+  starter: 3,
+  pro: 10,
   scale: null,
   system: null,
 };
@@ -318,7 +318,7 @@ export const PLAN_DOMAIN_LIMIT: Record<Plan, number | null> = {
 /** Contacts a team may hold per plan; null = unlimited. Self-host ignores plans entirely. */
 export const PLAN_CONTACT_LIMIT: Record<Plan, number | null> = {
   free: 1_000,
-  starter: null,
+  starter: 10_000,
   pro: null,
   scale: null,
   system: null,

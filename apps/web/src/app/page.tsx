@@ -7,11 +7,11 @@ const contact = "mailto:jean@je4ndev.com";
 
 const comparison = [
   ["100k", "US$ 20", "US$ 35", "US$ 34,95", "US$ 115", "US$ 90", "43%"],
-  ["200k", "US$ 35", "US$ 160", "US$ 249", "US$ 245", "US$ 215", "78–86%"],
-  ["500k", "US$ 75", "US$ 350", "US$ 499", "US$ 455", "US$ 400", "79–85%"],
-  ["1M", "US$ 140", "US$ 650", "US$ 799", "US$ 775", "US$ 700", "78–82%"],
-  ["1,5M", "US$ 200", "US$ 825", "US$ 799", "US$ 775", "US$ 700", "71–76%"],
-  ["2,5M", "US$ 330", "US$ 1.150", "US$ 1.099", "(vendas)", "US$ 1.250", "70–74%"],
+  ["200k", "US$ 69", "US$ 160", "US$ 249", "US$ 245", "US$ 215", "57–72%"],
+  ["500k", "US$ 159", "US$ 350", "US$ 499", "US$ 455", "US$ 400", "55–68%"],
+  ["1M", "US$ 259", "US$ 650", "US$ 799", "US$ 775", "US$ 700", "60–68%"],
+  ["1,5M", "US$ 369", "US$ 825", "US$ 799", "US$ 775", "US$ 700", "47–55%"],
+  ["2,5M", "US$ 549", "US$ 1.150", "US$ 1.099", "(vendas)", "US$ 1.250", "50–56%"],
 ] as const;
 
 const plans = [
@@ -21,6 +21,7 @@ const plans = [
     price: "US$ 0",
     overage: "para no cap",
     attachment: "1 MB",
+    limits: "1 domínio · 1 workspace · 1.000 contatos",
   },
   {
     name: "Starter",
@@ -28,6 +29,7 @@ const plans = [
     price: "US$ 9",
     overage: "para no cap",
     attachment: "1 MB",
+    limits: "3 domínios · 2 workspaces · 10.000 contatos",
   },
   {
     name: "Pro 100K",
@@ -35,41 +37,47 @@ const plans = [
     price: "US$ 20",
     overage: "US$ 0,30/1k",
     attachment: "5 MB",
+    limits: "10 domínios · 5 workspaces · contatos ilimitados",
   },
   {
     name: "Pro 200K",
     volume: "200.000/mês",
-    price: "US$ 35",
+    price: "US$ 69",
     overage: "US$ 0,30/1k",
     attachment: "5 MB",
+    limits: "10 domínios · 5 workspaces · contatos ilimitados",
   },
   {
     name: "Scale 500K",
     volume: "500.000/mês",
-    price: "US$ 75",
+    price: "US$ 159",
     overage: "US$ 0,25/1k",
     attachment: "10 MB",
+    limits: "Domínios ilimitados · 10 workspaces · contatos ilimitados",
   },
   {
     name: "Scale 1M",
     volume: "1.000.000/mês",
-    price: "US$ 140",
+    price: "US$ 259",
     overage: "US$ 0,20/1k",
     attachment: "10 MB",
+    limits: "Domínios ilimitados · 10 workspaces · contatos ilimitados",
   },
   {
     name: "Scale 1.5M",
     volume: "1.500.000/mês",
-    price: "US$ 200",
+    price: "US$ 369",
     overage: "US$ 0,18/1k",
     attachment: "10 MB",
+    limits: "Domínios ilimitados · 10 workspaces · contatos ilimitados",
   },
   {
     name: "Scale 2.5M",
     volume: "2.500.000/mês",
-    price: "US$ 330",
+    price: "US$ 549",
     overage: "US$ 0,16/1k",
     attachment: "10 MB",
+    limits: "Domínios ilimitados · 10 workspaces · contatos ilimitados",
   },
 ] as const;
 
@@ -184,7 +192,7 @@ export default async function RootPage() {
               <span className="gtm-beta-badge">Beta · 100 contas grátis</span>
             </p>
             <h1>
-              Mesma API do Resend. <span>Até 85% mais barato.</span>
+              Mesma API do Resend. <span>Até 60% mais barato.</span>
             </h1>
             <p className="gtm-lead">
               Envie e-mails transacionais com API HTTPS compatível com o Resend ou relay SMTP. Nós
@@ -303,6 +311,10 @@ export default async function RootPage() {
                   </p>
                   <p className="gtm-volume">{plan.volume}</p>
                   <dl>
+                    <div>
+                      <dt>Workspaces e limites</dt>
+                      <dd>{plan.limits}</dd>
+                    </div>
                     <div>
                       <dt>Excedente</dt>
                       <dd>{plan.overage}</dd>
