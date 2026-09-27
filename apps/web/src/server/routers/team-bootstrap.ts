@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { env, supportViewEnabled } from "@millionsend/config";
+import { betaDefaultDailyCeiling, env, supportViewEnabled } from "@millionsend/config";
 import {
   ALL_TEAMS_GRANT,
   endSupportView,
@@ -161,7 +161,14 @@ export const teamBootstrapRouter = router({
           const created = await ctx.db.transaction(async (tx) => {
             const [team] = await tx
               .insert(schema.teams)
-              .values({ name: input.name.trim(), slug })
+              .values({
+                name: input.name.trim(),
+                slug,
+                // Beta default: an operator-set ceiling so a self-serve team
+                // starts capped; unset on classic self-host and adjustable
+                // per team later in the operator console.
+                dailySendCeiling: betaDefaultDailyCeiling() ?? null,
+              })
               .returning({ id: schema.teams.id });
             if (!team) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
             await tx.insert(schema.teamMembers).values({
