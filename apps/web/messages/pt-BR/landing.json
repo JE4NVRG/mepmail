@@ -33,6 +33,19 @@
     "slideNote": "Deslize a tabela para ver todos os fornecedores em telas menores.",
     "refNote": "Referência da análise comercial de 27/09/2026; preços públicos de terceiros podem mudar e condições/recursos não são equivalentes. Valores em USD por mês, sem impostos ou excedentes. “(vendas)” indica cotação comercial, não preço público."
   },
+  "calc": {
+    "title": "Arraste o volume e veja a economia.",
+    "lead": "Escolha o volume mensal que você envia; comparamos o preço MepMail com os concorrentes de preço público e mostramos a diferença.",
+    "volumeLabel": "Envios por mês",
+    "ours": "MepMail",
+    "cheapest": "Concorrente mais barato ({name})",
+    "savings": "Economia de {percent}% (~{usd}/mês)",
+    "annual": "≈ {usd} por ano",
+    "cta": "Quero esse preço",
+    "ctaSubject": "Calculadora MepMail — {volume} e-mails/mês",
+    "note": "Estimativa com preços públicos de 27/09/2026, em USD/mês; os concorrentes podem mudar valores e os recursos não são equivalentes.",
+    "a11y": "Volume mensal de envios"
+  },
   "structure": {
     "eyebrow": "Nossa estrutura",
     "title": "Menos camadas entre sua aplicação e a entrega.",

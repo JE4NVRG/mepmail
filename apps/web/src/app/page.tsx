@@ -1,20 +1,24 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { LandingCalculator, type CalcLabels } from "@/components/landing-calculator";
 import { LandingLangSwitch } from "@/components/landing-lang-switch";
+import { PRICE_ROWS, formatUsd } from "@/lib/landing-pricing";
 import { hasSession } from "@/server/auth";
+import "./landing-calc.css";
 import "./landing.css";
 
 const contact = "mailto:jean@je4ndev.com";
 
-const comparison = [
-  ["100k", "US$ 20", "US$ 35", "US$ 34,95", "US$ 115", "US$ 90", "43%"],
-  ["200k", "US$ 100", "US$ 160", "US$ 249", "US$ 245", "US$ 215", "38–60%"],
-  ["500k", "US$ 199", "US$ 350", "US$ 499", "US$ 455", "US$ 400", "43–60%"],
-  ["1M", "US$ 319", "US$ 650", "US$ 799", "US$ 775", "US$ 700", "51–60%"],
-  ["1,5M", "US$ 429", "US$ 825", "US$ 799", "US$ 775", "US$ 700", "39–48%"],
-  ["2,5M", "US$ 549", "US$ 1.150", "US$ 1.099", "(vendas)", "US$ 1.250", "50–56%"],
-] as const;
+const comparison = PRICE_ROWS.map((row) => [
+  row.label,
+  formatUsd(row.mepmail),
+  formatUsd(row.resend),
+  formatUsd(row.sendgrid),
+  formatUsd(row.postmark),
+  formatUsd(row.mailgun),
+  row.savings,
+]);
 
 const cellKeys = ["MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "vantagem"] as const;
 
@@ -88,6 +92,7 @@ export default async function RootPage() {
   const columns = t.raw("compare.columns") as string[];
   const steps = t.raw("how.items") as string[];
   const faq = t.raw("faq.items") as FaqItem[];
+  const calc = t.raw("calc") as CalcLabels;
 
   return (
     <div className="gtm">
@@ -173,6 +178,7 @@ export default async function RootPage() {
               </table>
             </section>
             <p className="gtm-note">{t("compare.slideNote")}</p>
+            <LandingCalculator labels={{ ...calc, contact }} />
             <p className="gtm-note">{t("compare.refNote")}</p>
           </div>
         </section>
