@@ -31,7 +31,7 @@ changing two environment variables — not rewriting your integration.
 | SMTP relay | ✅ | Drop-in SMTP on port 2587; authenticate with an API key. |
 | Dashboard (en/pt-BR) | ✅ | Full dashboard in English and Brazilian Portuguese. |
 | Self-host (Docker) | ✅ | Source-built Compose stack plus a setup wizard; sends through your own AWS SES. |
-| Migrate from Resend | ✅ | `migrate --from resend` (in this repo: `packages/cli`) moves contacts, segments, topics, templates, webhooks, domains and suppressions; read-only against Resend, safe to re-run before cutover. |
+| Migrate from Resend | ✅ | `npx @mepmail/cli migrate --from resend` moves contacts, segments, topics, templates, webhooks, domains and suppressions; read-only against Resend, safe to re-run before cutover. |
 | MCP for AI agents | ✅ | Hosted MCP server (`https://api-mepmail.je4ndev.com/mcp`, OAuth) and a local stdio server: `npx @mepmail/mcp`. |
 | Agent discovery | ✅ | `/.well-known/ai-catalog.json`, `/llms.txt` and `/auth.md` served by the web app. |
 | Docs (en/pt-BR) | ✅ | Full documentation at [docs-mepmail.je4ndev.com](https://docs-mepmail.je4ndev.com). |
