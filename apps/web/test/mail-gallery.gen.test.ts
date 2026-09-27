@@ -270,7 +270,7 @@ describe.skipIf(process.env.MAIL_GALLERY !== "1")("mail gallery generator", () =
           <strong>${esc(r.subject)}</strong>
           <span class="meta">${esc(r.locale)} · ${esc(r.label)}</span>
         </figcaption>
-        <iframe loading="lazy" title="${esc(r.label)} ${esc(r.locale)}" src="html/${esc(r.locale)}__${esc(r.label)}.html"></iframe>
+        <iframe loading="lazy" title="${esc(r.label)} ${esc(r.locale)}" srcdoc="${esc(r.html)}"></iframe>
       </figure>`;
           return `
     <section class="tpl" data-name="${esc(label.toLowerCase())}">
