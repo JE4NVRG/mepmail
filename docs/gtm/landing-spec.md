@@ -12,7 +12,7 @@ Fonte de verdade da oferta e dos comparativos: `JE4NDEV-Memory-Vault/02_Projects
 
 - Logo: wordmark MepMail existente, à esquerda, com link para `/`. À direita: âncoras `#comparativo` («Comparar preços»), `#planos` («Planos»), `#como-funciona` («Como funciona») e link `/login` («Entrar»); em largura estreita, manter logo, «Entrar» e CTA, e mover âncoras para navegação acessível ou omiti-las (as seções continuam no fluxo).
 - Sobretítulo: «E-mail transacional para quem constrói produtos no Brasil».
-- H1: «Mesma API do Resend. Até 85% mais barato.»
+- H1: «Mesma API do Resend. Até 60% mais barato.»
 - Subtítulo: «Envie e-mails transacionais com API HTTPS compatível com o Resend ou relay SMTP. Nós ajudamos a configurar seu domínio, DKIM e MAIL FROM. Planos em USD, atendimento em português e implantação assistida.»
 - CTA principal, rótulo exato «Solicitar acesso»: `mailto:jean@je4ndev.com` (sem assunto predefinido). Apoio sob CTA: «Sem cadastro público. Conte seu volume de envio e receba orientação sobre o plano.»
 - Link secundário «Ver planos» → `#planos`. Sem formulário de cadastro ou promessa de ativação automática. **WhatsApp descartado (decisão do Jean, 27/09/2026): nenhum botão/link de WhatsApp deve existir, em nenhuma hipótese.**
@@ -26,11 +26,11 @@ Fonte de verdade da oferta e dos comparativos: `JE4NDEV-Memory-Vault/02_Projects
 | Envios/mês | MepMail | Resend | SendGrid | Postmark | Mailgun | Vantagem |
 |---|---:|---:|---:|---:|---:|---:|
 | 100k | US$ 20 | US$ 35 | US$ 34,95 | US$ 115 | US$ 90 | 43% |
-| 200k | US$ 35 | US$ 160 | US$ 249 | US$ 245 | US$ 215 | 78–86% |
-| 500k | US$ 75 | US$ 350 | US$ 499 | US$ 455 | US$ 400 | 79–85% |
-| 1M | US$ 140 | US$ 650 | US$ 799 | US$ 775 | US$ 700 | 78–82% |
-| 1,5M | US$ 200 | US$ 825 | US$ 799 | US$ 775 | US$ 700 | 71–76% |
-| 2,5M | US$ 330 | US$ 1.150 | US$ 1.099 | (vendas) | US$ 1.250 | 70–74% |
+| 200k | US$ 69 | US$ 160 | US$ 249 | US$ 245 | US$ 215 | 57–72% |
+| 500k | US$ 159 | US$ 350 | US$ 499 | US$ 455 | US$ 400 | 55–68% |
+| 1M | US$ 259 | US$ 650 | US$ 799 | US$ 775 | US$ 700 | 60–68% |
+| 1,5M | US$ 369 | US$ 825 | US$ 799 | US$ 775 | US$ 700 | 47–55% |
+| 2,5M | US$ 549 | US$ 1.150 | US$ 1.099 | (vendas) | US$ 1.250 | 50–56% |
 
 - Nota visível abaixo: «Referência da análise comercial de 27/09/2026; preços públicos de terceiros podem mudar e condições/recursos não são equivalentes. Valores em USD por mês, sem impostos ou excedentes. “(vendas)” indica cotação comercial, não preço público.» Não calcular outro percentual nem transformar a faixa «78–86%» em uma promessa superior à âncora do hero.
 
@@ -51,11 +51,11 @@ Fonte de verdade da oferta e dos comparativos: `JE4NDEV-Memory-Vault/02_Projects
 | Free | 100/dia (~3k/mês) | US$ 0 | para no cap | 1 MB |
 | Starter | 1.500/dia (~45k/mês) | US$ 9 | para no cap | 1 MB |
 | Pro 100K | 100.000/mês | US$ 20 | US$ 0,30/1k | 5 MB |
-| Pro 200K | 200.000/mês | US$ 35 | US$ 0,30/1k | 5 MB |
-| Scale 500K | 500.000/mês | US$ 75 | US$ 0,25/1k | 10 MB |
-| Scale 1M | 1.000.000/mês | US$ 140 | US$ 0,20/1k | 10 MB |
-| Scale 1.5M | 1.500.000/mês | US$ 200 | US$ 0,18/1k | 10 MB |
-| Scale 2.5M | 2.500.000/mês | US$ 330 | US$ 0,16/1k | 10 MB |
+| Pro 200K | 200.000/mês | US$ 69 | US$ 0,30/1k | 5 MB |
+| Scale 500K | 500.000/mês | US$ 159 | US$ 0,25/1k | 10 MB |
+| Scale 1M | 1.000.000/mês | US$ 259 | US$ 0,20/1k | 10 MB |
+| Scale 1.5M | 1.500.000/mês | US$ 369 | US$ 0,18/1k | 10 MB |
+| Scale 2.5M | 2.500.000/mês | US$ 549 | US$ 0,16/1k | 10 MB |
 
 - Abaixo da grade: «Gestão proativa opcional: +US$ 29/mês. Inclui monitoramento de reputação, ajustes de DNS/entregabilidade e prioridade de atendimento. Sem gestão, você continua com onboarding assistido e suporte. Sem fidelidade.»
 - Faixa de lançamento: «Para os 3 primeiros clientes: setup grátis e 2 meses de gestão grátis. Consulte a disponibilidade ao solicitar acesso.» Não aplicar o desconto automaticamente em um total calculado; o prazo depende do fechamento dos clientes.
