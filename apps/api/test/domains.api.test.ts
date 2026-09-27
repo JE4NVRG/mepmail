@@ -519,7 +519,9 @@ describe("POST /domains in cloud (shared AWS account)", () => {
     expect(capped.status).toBe(403);
     expect(await capped.json()).toMatchObject({ name: "plan_limit_reached" });
 
-    await db.update(schema.teams).set({ plan: "pro" }).where(eq(schema.teams.id, t.id));
+    // Scale has unlimited domains, so the rate limiter is what stops the loop
+    // here — a domain-capped plan (Pro caps at 10) would answer 403 first.
+    await db.update(schema.teams).set({ plan: "scale" }).where(eq(schema.teams.id, t.id));
     for (let i = freeLimit; i < DOMAIN_CREATE_LIMIT_PER_HOUR; i++) {
       expect((await create(i)).status).toBe(200);
     }

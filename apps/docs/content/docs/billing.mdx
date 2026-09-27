@@ -11,9 +11,9 @@ Stripe key. This page is for operating a hosted deployment.
 
 One ladder, cheapest first. Free and Starter cap sends per UTC day; Pro and
 Scale include a monthly volume per Stripe billing period and can bill overage
-past it. Free holds up to 1,000 contacts; segments and topics are unlimited
-everywhere, and so are contacts from Starter up. Sending domains are capped
-at 3 on Free and 10 on Starter, unlimited above. At either cap the API
+past it. Free holds up to 1,000 contacts and Starter up to 10,000; segments,
+topics and contacts are unlimited from Pro up. Sending domains: 1 on Free,
+3 on Starter, 10 on Pro and unlimited on Scale. At either cap the API
 answers `403 plan_limit_reached` ("Your plan allows up to 1000 contacts")
 and the dashboard shows the same sentence.
 
@@ -22,11 +22,11 @@ and the dashboard shows the same sentence.
 | `free` | Free | $0 | 100 | per day | — |
 | `starter` | Starter | $9 | 1,500 | per day | — |
 | `pro_100k` | Pro | $20 | 100,000 | per month | $0.30 |
-| `pro_200k` | Pro | $35 | 200,000 | per month | $0.30 |
-| `scale_500k` | Scale | $75 | 500,000 | per month | $0.25 |
-| `scale_1m` | Scale | $140 | 1,000,000 | per month | $0.20 |
-| `scale_1_5m` | Scale | $200 | 1,500,000 | per month | $0.18 |
-| `scale_2_5m` | Scale | $330 | 2,500,000 | per month | $0.16 |
+| `pro_200k` | Pro | $69 | 200,000 | per month | $0.30 |
+| `scale_500k` | Scale | $159 | 500,000 | per month | $0.25 |
+| `scale_1m` | Scale | $259 | 1,000,000 | per month | $0.20 |
+| `scale_1_5m` | Scale | $369 | 1,500,000 | per month | $0.18 |
+| `scale_2_5m` | Scale | $549 | 2,500,000 | per month | $0.16 |
 
 The ladder is `PLAN_RUNGS` in `packages/core/src/plans.ts`; Checkout, the
 dashboard, `GET /usage` and the account mails all read it from there. The
