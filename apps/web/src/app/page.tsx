@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { LandingCalculator, type CalcLabels } from "@/components/landing-calculator";
+import { type CalcLabels, LandingCalculator } from "@/components/landing-calculator";
 import { LandingLangSwitch } from "@/components/landing-lang-switch";
-import { PRICE_ROWS, formatUsd } from "@/lib/landing-pricing";
+import { formatUsd, PRICE_ROWS } from "@/lib/landing-pricing";
 import { hasSession } from "@/server/auth";
 import "./landing-calc.css";
 import "./landing.css";
@@ -22,16 +22,23 @@ const comparison = PRICE_ROWS.map((row) => [
 
 const cellKeys = ["MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "vantagem"] as const;
 
-const plans = [
-  { name: "Free", price: "US$ 0" },
-  { name: "Starter", price: "US$ 9" },
-  { name: "Pro 100K", price: "US$ 20" },
-  { name: "Pro 200K", price: "US$ 100" },
-  { name: "Scale 500K", price: "US$ 199" },
-  { name: "Scale 1M", price: "US$ 319" },
-  { name: "Scale 1.5M", price: "US$ 429" },
-  { name: "Scale 2.5M", price: "US$ 549" },
-] as const;
+type Plan = {
+  name: string;
+  price: string;
+  tier: "core" | "scale";
+  featured?: boolean;
+};
+
+const plans: readonly Plan[] = [
+  { name: "Free", price: "US$ 0", tier: "core" },
+  { name: "Starter", price: "US$ 9", tier: "core" },
+  { name: "Pro 100K", price: "US$ 20", tier: "core", featured: true },
+  { name: "Pro 200K", price: "US$ 100", tier: "core" },
+  { name: "Scale 500K", price: "US$ 199", tier: "scale" },
+  { name: "Scale 1M", price: "US$ 319", tier: "scale" },
+  { name: "Scale 1.5M", price: "US$ 429", tier: "scale" },
+  { name: "Scale 2.5M", price: "US$ 549", tier: "scale" },
+];
 
 type PlanCopy = { volume: string; limits: string; overage: string; attachment: string };
 type FaqItem = { q: string; a: string };
@@ -83,6 +90,42 @@ function SignupLink({ label }: { label: string }) {
   );
 }
 
+function CodeDemo({ subject, caption }: { subject: string; caption: string }) {
+  return (
+    <figure className="gtm-hero-demo">
+      <div className="gtm-demo-window">
+        <div className="gtm-demo-bar" aria-hidden="true">
+          <span className="gtm-demo-dot" />
+          <span className="gtm-demo-dot" />
+          <span className="gtm-demo-dot" />
+          <span className="gtm-demo-file">send.ts</span>
+        </div>
+        <pre className="gtm-demo-code">
+          <code>
+            <span className="gtm-k">import</span> {"{ Resend }"} <span className="gtm-k">from</span>{" "}
+            <span className="gtm-s">&quot;resend&quot;</span>;{"\n\n"}
+            <span className="gtm-k">const</span> resend = <span className="gtm-k">new</span> Resend(
+            <span className="gtm-s">&quot;ms_…&quot;</span>, {"{"}
+            {"\n  "}baseUrl:{" "}
+            <span className="gtm-s">&quot;https://api-mepmail.je4ndev.com&quot;</span>,{"\n"}
+            {"}"});{"\n\n"}
+            <span className="gtm-k">await</span> resend.emails.send({"{"}
+            {"\n  "}from: &quot;Acme &lt;onboarding@acme.dev&gt;&quot;,{"\n"}
+            {"  "}to: <span className="gtm-s">&quot;delivered@example.com&quot;</span>,{"\n"}
+            {"  "}subject: <span className="gtm-s">&quot;{subject}&quot;</span>,{"\n"}
+            {"}"});{"\n"}
+          </code>
+        </pre>
+        <div className="gtm-demo-response">
+          <span className="gtm-demo-status">200 OK</span>
+          <code>{'{ "id": "a1b2c3d4-…" }'}</code>
+        </div>
+      </div>
+      <figcaption className="gtm-demo-caption">{caption}</figcaption>
+    </figure>
+  );
+}
+
 export default async function RootPage() {
   if (await hasSession()) redirect("/emails");
 
@@ -93,6 +136,44 @@ export default async function RootPage() {
   const steps = t.raw("how.items") as string[];
   const faq = t.raw("faq.items") as FaqItem[];
   const calc = t.raw("calc") as CalcLabels;
+  const trust = t.raw("hero.trust") as string[];
+  const founders = t.raw("plans.founders") as {
+    title: string;
+    items: string[];
+    note: string;
+    cta: string;
+  };
+  const allPlans = plans.map((plan, index) => ({
+    ...plan,
+    copy: planCopy[index] ?? EMPTY_PLAN_COPY,
+  }));
+
+  const renderPlan = (plan: (typeof allPlans)[number]) => (
+    <article className={`ms-card gtm-plan${plan.featured ? " is-featured" : ""}`} key={plan.name}>
+      {plan.featured ? <span className="gtm-plan-badge">{t("plans.featuredBadge")}</span> : null}
+      <h3>{plan.name}</h3>
+      <p className="gtm-price">
+        {plan.price}
+        <span>{t("plans.perMonth")}</span>
+      </p>
+      <p className="gtm-volume">{plan.copy.volume}</p>
+      <dl>
+        <div>
+          <dt>{t("plans.limitsLabel")}</dt>
+          <dd>{plan.copy.limits}</dd>
+        </div>
+        <div>
+          <dt>{t("plans.overageLabel")}</dt>
+          <dd>{plan.copy.overage}</dd>
+        </div>
+        <div>
+          <dt>{t("plans.attachmentLabel")}</dt>
+          <dd>{plan.copy.attachment}</dd>
+        </div>
+      </dl>
+      <SignupLink label={t("plans.cta")} />
+    </article>
+  );
 
   return (
     <div className="gtm">
@@ -123,24 +204,34 @@ export default async function RootPage() {
       <main id="conteudo">
         <section className="gtm-section gtm-hero">
           <div className="gtm-container">
-            <p className="gtm-eyebrow">
-              {t.rich("hero.eyebrow", {
-                badge: (chunks) => <span className="gtm-beta-badge">{chunks}</span>,
-              })}
-            </p>
-            <h1>
-              {t.rich("hero.title", {
-                highlight: (chunks) => <span>{chunks}</span>,
-              })}
-            </h1>
-            <p className="gtm-lead">{t("hero.lead")}</p>
-            <div className="gtm-actions">
-              <SignupLink label={t("hero.ctaSignup")} />
-              <a className="ms-btn ms-btn-secondary gtm-action" href="#planos">
-                {t("hero.ctaPlans")}
-              </a>
+            <div className="gtm-hero-grid">
+              <div className="gtm-hero-copy">
+                <p className="gtm-eyebrow">
+                  {t.rich("hero.eyebrow", {
+                    badge: (chunks) => <span className="gtm-beta-badge">{chunks}</span>,
+                  })}
+                </p>
+                <h1>
+                  {t.rich("hero.title", {
+                    highlight: (chunks) => <span>{chunks}</span>,
+                  })}
+                </h1>
+                <p className="gtm-lead">{t("hero.lead")}</p>
+                <div className="gtm-actions">
+                  <SignupLink label={t("hero.ctaSignup")} />
+                  <a className="ms-btn ms-btn-secondary gtm-action" href="#planos">
+                    {t("hero.ctaPlans")}
+                  </a>
+                </div>
+                <p className="gtm-note">{t("hero.note")}</p>
+              </div>
+              <CodeDemo subject={t("hero.demo.subject")} caption={t("hero.demo.caption")} />
             </div>
-            <p className="gtm-note">{t("hero.note")}</p>
+            <ul className="gtm-trust">
+              {trust.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </div>
         </section>
 
@@ -202,47 +293,24 @@ export default async function RootPage() {
             <h2>{t("plans.title")}</h2>
             <p>{t("plans.intro")}</p>
             <div className="gtm-plan-grid">
-              {plans.map((plan, index) => {
-                const copy = planCopy[index] ?? EMPTY_PLAN_COPY;
-                return (
-                  <article className="ms-card gtm-plan" key={plan.name}>
-                    <h3>{plan.name}</h3>
-                    <p className="gtm-price">
-                      {plan.price}
-                      <span>{t("plans.perMonth")}</span>
-                    </p>
-                    <p className="gtm-volume">{copy.volume}</p>
-                    <dl>
-                      <div>
-                        <dt>{t("plans.limitsLabel")}</dt>
-                        <dd>{copy.limits}</dd>
-                      </div>
-                      <div>
-                        <dt>{t("plans.overageLabel")}</dt>
-                        <dd>{copy.overage}</dd>
-                      </div>
-                      <div>
-                        <dt>{t("plans.attachmentLabel")}</dt>
-                        <dd>{copy.attachment}</dd>
-                      </div>
-                    </dl>
-                    <SignupLink label={t("plans.cta")} />
-                  </article>
-                );
-              })}
+              {allPlans.filter((plan) => plan.tier === "core").map(renderPlan)}
             </div>
+            <details className="gtm-plans-more">
+              <summary>{t("plans.showScale")}</summary>
+              <div className="gtm-plan-grid">
+                {allPlans.filter((plan) => plan.tier === "scale").map(renderPlan)}
+              </div>
+            </details>
             <p className="gtm-note">{t("plans.note")}</p>
-            <div className="gtm-offers">
-              <p>
-                {t.rich("plans.offerProactive", {
-                  strong: (chunks) => <strong>{chunks}</strong>,
-                })}
-              </p>
-              <p>
-                {t.rich("plans.offerFirst3", {
-                  strong: (chunks) => <strong>{chunks}</strong>,
-                })}
-              </p>
+            <div className="gtm-founders">
+              <h3>{founders.title}</h3>
+              <ul>
+                {founders.items.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              <p className="gtm-note">{founders.note}</p>
+              <SignupLink label={founders.cta} />
             </div>
             <p className="gtm-note">{t("plans.noteAttach")}</p>
           </div>
