@@ -8,6 +8,8 @@ describe("crawler entry points", () => {
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain("https://docs-mepmail.je4ndev.com");
+    expect(body).toContain("https://mepmail.je4ndev.com/auth.md");
+    expect(body).toContain("https://api-mepmail.je4ndev.com/mcp");
     expect(body).not.toContain("millionsend.com");
   });
 

@@ -1,0 +1,65 @@
+---
+title: Errors
+description: Every error MepMail returns — names, status codes, what they mean, and what is safe to retry.
+---
+
+Every API error uses the same JSON shape, matching the Resend wire protocol:
+
+```json
+{"statusCode": 422, "name": "validation_error", "message": "…"}
+```
+
+`name` is a stable machine-readable code (and the key the SDKs branch on);
+`message` is human-readable and may change. Branch on `statusCode` and
+`name`, never on `message`.
+
+## Error codes
+
+| `name` | HTTP | What it means | What to do |
+| --- | --- | --- | --- |
+| `missing_api_key` | 401 | No `Authorization` header | Send `Authorization: Bearer ms_...` |
+| `invalid_api_key` | 401 | The key is unknown or was revoked | Re-read the key once (rotation?); if it still fails, stop — do not retry |
+| `restricted_api_key` | 403 | The key is valid but not allowed for this resource (permission level, or a sender domain outside the key's scope) | Use a key whose scope covers the call, or ask the operator for one |
+| `plan_limit_reached` | 403 | A plan cap was hit (contacts, domains, teams) | Free space within the plan's limits, or upgrade |
+| `forbidden` | 403 | The caller's team role does not allow this action | Check the role behind the credential |
+| `not_found` | 404 | The resource does not exist (or belongs to another team) | Verify the id and the endpoint |
+| `conflict` | 409 | The resource is in a conflicting state | Read the current state, then retry the operation |
+| `concurrent_idempotent_requests` | 409 | A request with the same idempotency key is still in flight | Wait, then retry with the same key |
+| `invalid_parameter` | 400 | A parameter value is not allowed (e.g. editing a sent broadcast) | Fix the request |
+| `invalid_payload` | 400 | The request body could not be parsed | Send valid JSON |
+| `validation_error` | 422 | The payload failed schema validation | Read `message`; fix the field it names |
+| `all_recipients_suppressed` | 422 | Every recipient is on the suppression list | Check suppressions before resending |
+| `payload_too_large` | 413 | Attachments exceed the plan's ceiling (1/1/5/10 MB by plan) | Shrink attachments, or move to a higher plan |
+| `rate_limit_exceeded` | 429 | Too many requests in a short window | Back off with exponential delay — see [rate limits](/rate-limits) |
+| `monthly_quota_exceeded` | 429 | The plan's included volume is exhausted and overage is off | Wait for the period to renew, enable overage, or upgrade |
+| `internal_server_error` | 500 | A bug on our side | Retry with backoff; report it if it persists |
+
+## Retrying
+
+- **4xx**: retry only `409 concurrent_idempotent_requests` (same idempotency
+  key) and `429` (with backoff). Everything else in the 4xx range is
+  deterministic — fix the request or the credential.
+- **5xx**: retry with exponential backoff and jitter. Sends carrying an
+  idempotency key are safe to retry; without one, a retried send can deliver
+  twice.
+
+## Idempotency
+
+Sending endpoints accept an `Idempotency-Key` header. Two requests with the same
+key run once; while the first is still executing, the second answers
+`409 concurrent_idempotent_requests`. Reuse the same key when retrying after a
+timeout — that is what makes a retried send safe.
+
+## Batch sends
+
+`POST /emails/batch` accepts up to 100 emails. With the
+`x-batch-validation: permissive` header, invalid items are returned in
+`errors` by index while the valid subset is accepted; by default (strict), one
+invalid item rejects the whole batch. An over-cap array is a `422`.
+
+## MCP
+
+The MCP server surfaces the same conditions: `429 rate_limit_exceeded` on the
+endpoint when the account's call budget is exhausted, and tool-level failures
+as tool results with `isError` — read the text content for the code and
+message.
