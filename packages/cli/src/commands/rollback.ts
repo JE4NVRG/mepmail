@@ -1,6 +1,6 @@
 import { RESOURCE_LABEL, ROLLBACK_ORDER } from "../apply.js";
 import type { Context } from "../context.js";
-import type { MepMailTarget, WriteResult } from "../millionsend.js";
+import type { MepMailTarget, WriteResult } from "../mepmail-target.js";
 import type { MigrateState, Resource } from "../model.js";
 import { migratePaths, readJson, STATE_DIR, writePrivateJson } from "../paths.js";
 import { connectTarget, printHeader, TARGET_RPS } from "../session.js";

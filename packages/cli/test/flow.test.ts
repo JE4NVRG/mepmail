@@ -49,7 +49,7 @@ describe("flow on a pipe", () => {
       },
     };
     const flow = createFlow(asking, { rail: false });
-    flow.intro("millionsend", "setup", "self-host");
+    flow.intro("mepmail", "setup", "self-host");
     flow.note("some help");
     flow.list("Plan:", ["one", "two"]);
     flow.step("created");
@@ -61,7 +61,7 @@ describe("flow on a pipe", () => {
     expect(await flow.confirm("Go?", true)).toBe(false);
     flow.outro("bye");
     expect(lines).toEqual([
-      "millionsend setup · self-host",
+      "mepmail setup · self-host",
       "some help",
       "Plan:",
       "  · one",
@@ -107,10 +107,10 @@ describe("flow on a terminal", () => {
     const { out, text } = screen();
     const rl = reader("https://mail.example.com\n\n");
     const flow = createFlow(rl, { rail: true, out });
-    flow.intro("millionsend", "setup", "self-host");
+    flow.intro("mepmail", "setup", "self-host");
     flow.note("Every step is offered and skippable.");
     flow.list("Plan:", ["IAM user", "SNS topic"]);
-    flow.step("IAM policy millionsend-ses");
+    flow.step("IAM policy mepmail-ses");
     flow.warn("careful");
     expect(await flow.ask({ label: "APP_BASE_URL", hint: "dashboard origin" })).toBe(
       "https://mail.example.com",
@@ -118,12 +118,12 @@ describe("flow on a terminal", () => {
     expect(await flow.ask({ label: "PUBLIC_API_URL", initial: "" })).toBe("");
     flow.outro("Done.");
     const shown = text();
-    expect(shown).toContain(`${RAIL.start}   millionsend  setup · self-host`);
+    expect(shown).toContain(`${RAIL.start}   mepmail  setup · self-host`);
     expect(shown).toContain(`${RAIL.bar}  Every step is offered and skippable.`);
     expect(shown).toContain(
       `${RAIL.done}  Plan:\n${RAIL.bar}  · IAM user\n${RAIL.bar}  · SNS topic`,
     );
-    expect(shown).toContain(`${RAIL.done}  IAM policy millionsend-ses`);
+    expect(shown).toContain(`${RAIL.done}  IAM policy mepmail-ses`);
     expect(shown).toContain(`${RAIL.warn}  careful`);
     // The live question is erased by a relative cursor-up, then the hollow diamond stays.
     expect(shown).toContain(`${RAIL.active}  APP_BASE_URL (dashboard origin)\n`);

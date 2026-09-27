@@ -1,6 +1,6 @@
-# Self-hosting MillionSend
+# Self-hosting MepMail
 
-MillionSend sends through your own AWS SES account. Two containers: Postgres and one
+MepMail sends through your own AWS SES account. Two containers: Postgres and one
 app container running the api (port 3001), worker, and web dashboard (port 3000).
 All three ports are `.env`-tunable: `WEB_PORT` republishes the dashboard on another
 host port, `PORT` moves the api, and `SMTP_PORT` moves the optional relay. If you
@@ -24,9 +24,9 @@ cd mepmail
 cp .env.example .env
 ```
 
-The supported installation path for this fork is a local build from source.
-`@millionsend/setup` on npm and the images referenced by
-`deploy/docker-compose.yml` are not supported release channels for this fork.
+The supported installation path for this project is a local build from source.
+Packages or images published under other names are not supported release
+channels; always build from this repository.
 
 In `.env` (everything else defaults to a working local setup):
 
@@ -108,7 +108,7 @@ Without Docker (Node 24+, pnpm 11, local Postgres): `pnpm install`, point
 <details>
 <summary><b>AWS setup</b></summary>
 
-The source checkout's setup wizard creates everything MillionSend needs in
+The source checkout's setup wizard creates everything MepMail needs in
 AWS — IAM policy + user + access key, the SNS event topic, the SQS events queue
 the worker long-polls, and the SES configuration set. The policy also carries the
 `ses:*Tenant*` actions behind `SES_TENANTS` (one SES tenant per team); a
@@ -126,9 +126,9 @@ pnpm setup:aws
 ```
 
 Run it where your AWS admin credentials live — laptop or server; the
-MillionSend server never needs admin credentials. It verifies your AWS identity,
+MepMail server never needs admin credentials. It verifies your AWS identity,
 shows the plan, creates everything, and writes the `AWS_*` lines into the `.env` in
-the current directory (no `.env` there → it prints them to paste where MillionSend
+the current directory (no `.env` there → it prints them to paste where MepMail
 runs). `--dry-run` prints the full plan and exits.
 `pnpm setup:aws teardown` deletes everything the setup created, including all access keys of the
 `mepmail` user, so a running server stops sending. Re-running is safe, but each
@@ -184,7 +184,7 @@ region paces its own sends at its 1/s and holds only its own domains when its
 Pricing: since 2026-07-21 an SES account × region with no prior sending starts
 on the Essentials plan ($0.16 per 1,000 messages instead of the à la carte
 $0.10). After provisioning, the wizard reads the region's plan and, on
-Essentials, asks whether to cancel it; nothing MillionSend uses needs a plan,
+Essentials, asks whether to cancel it; nothing MepMail uses needs a plan,
 and a defaulted plan's cancellation takes effect immediately. By hand:
 `aws sesv2 put-account-pricing-attributes --plan NONE --region <region>`.
 
@@ -215,12 +215,12 @@ send and whose URL is in `.env` as `SQS_QUEUE_URL`), its ARN in `.env` as
 the topic (event types: Delivery, Delivery Delay, Bounce, Complaint, Reject,
 Rendering Failure), its name in `.env` as `SES_CONFIGURATION_SET`. Do NOT
 subscribe Open or Click: that makes SES rewrite every link and inject its own
-pixel, while MillionSend tracks engagement itself. Restart after setting them. Without `SES_CONFIGURATION_SET`, sends go out without
+pixel, while MepMail tracks engagement itself. Restart after setting them. Without `SES_CONFIGURATION_SET`, sends go out without
 a configuration set and emit no events.
 
 The wizard also sets SES's account-level suppression list (per region, shared by every
 team) to bounces only: a dead mailbox is dead for everyone, but a spam report is one
-sender's problem and MillionSend suppresses it per team — on the SES list it would block
+sender's problem and MepMail suppresses it per team — on the SES list it would block
 an unrelated team's mail to that person too. Provisioned by hand? Set it yourself:
 `aws sesv2 put-account-suppression-attributes --suppressed-reasons BOUNCE`.
 
@@ -321,7 +321,7 @@ signup deliberately.
 <details>
 <summary><b>Account mail, contacts and product updates</b></summary>
 
-MillionSend's own emails go out from `AUTH_EMAIL_FROM` / `NOTIFICATIONS_EMAIL_FROM`: to a
+MepMail's own emails go out from `AUTH_EMAIL_FROM` / `NOTIFICATIONS_EMAIL_FROM`: to a
 person about their account (password reset, verification, welcome, a password-changed
 receipt, an app granted access) and to a team's owners (invitations, quota and
 deliverability notices, a domain verifying or losing its records, a new API key, a rotated
@@ -347,11 +347,11 @@ account removes the contact and scrubs the address from that team's history. A c
 verification is on whenever `AUTH_EMAIL_FROM` and SES credentials are set; earlier accounts
 verify at their next sign-in.
 
-Nothing on the instance contacts millionsend.com on its own. The wizard offers, once and
+Nothing on the instance phones home on its own. The wizard offers, once and
 interactively, to subscribe your address to release notes (a confirmation link comes first);
-when it cannot reach millionsend.com it prints the page instead,
-<https://app.millionsend.com/updates?source=self-host>, and **Settings → Instance** links to
-the same page. Full text: docs, "Account mail, contacts and product updates".
+without outbound access it prints the release-notes page instead, and
+**Settings → Instance** links to the same page. Full text: docs, "Account mail,
+contacts and product updates".
 
 </details>
 
@@ -515,7 +515,7 @@ sudo ufw enable
 
 Optional. With an S3-compatible bucket configured, team admins can upload a
 team logo in the dashboard; it also brands hosted unsubscribe pages when
-MillionSend branding is hidden. ONE `S3_*` credential set is shared with the
+MepMail branding is hidden. ONE `S3_*` credential set is shared with the
 backup job below — each feature is then enabled by its own bucket variable.
 
 The storage step of `pnpm setup:aws` prompts for the endpoint and

@@ -1,6 +1,6 @@
 # @millionsend/i18n
 
-One catalog, three renderers: the dashboard, MillionSend's own transactional emails, and the
+One catalog, three renderers: the dashboard, MepMail's own transactional emails, and the
 hosted unsubscribe/preferences pages all read from `messages/` (ICU MessageFormat, consumed
 via next-intl).
 

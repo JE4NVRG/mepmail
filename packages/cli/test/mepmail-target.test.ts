@@ -11,7 +11,7 @@ import {
   createMepMailTarget,
   type MepMailTarget,
   type WriteResult,
-} from "../src/millionsend.js";
+} from "../src/mepmail-target.js";
 import type { Snapshot } from "../src/model.js";
 import { buildPlan } from "../src/plan.js";
 import { TARGET_WEBHOOK_EVENTS } from "../src/translate.js";
@@ -28,7 +28,7 @@ function targetFor(api: Pick<LiveApi, "baseUrl" | "apiKey">, token = api.apiKey)
     createHttp({
       baseUrl: api.baseUrl,
       token,
-      userAgent: "millionsend-cli/test",
+      userAgent: "mepmail-cli/test",
       rps: 1000,
       name: "MepMail",
       log,
@@ -76,7 +76,7 @@ describe("probe", () => {
     expect(await target.probe()).toEqual({
       cloud: true,
       plan: "free",
-      limits: { emailsPerDay: 100, emailsPerMonth: null, domains: 3, contacts: 1000 },
+      limits: { emailsPerDay: 100, emailsPerMonth: null, domains: 1, contacts: 1000 },
       today: { emailsSent: 0 },
       period: null,
       appUrl: "https://app.example.test",
@@ -103,7 +103,7 @@ describe("probe", () => {
     expect(restricted).toBeInstanceOf(AuthError);
     expect((restricted as AuthError).status).toBe(403);
     expect((restricted as Error).message).toContain("full-access key (ms_…)");
-    expect((restricted as Error).message).toContain("MILLIONSEND_API_KEY");
+    expect((restricted as Error).message).toContain("MEPMAIL_API_KEY");
 
     const wrong = await targetFor(cloud, "ms_not_a_key")
       .probe()
@@ -124,7 +124,7 @@ describe("probe", () => {
         .probe()
         .catch((e: unknown) => e)) as Error;
       expect(error.message).toBe(
-        `MepMail at ${baseUrl} has no GET /usage: either ${baseUrl} is not the API URL of your instance (check --to-url / MILLIONSEND_BASE_URL) or the instance predates CLI ${VERSION}; upgrade it.`,
+        `MepMail at ${baseUrl} has no GET /usage: either ${baseUrl} is not the API URL of your instance (check --to-url / MEPMAIL_BASE_URL) or the instance predates CLI ${VERSION}; upgrade it.`,
       );
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
