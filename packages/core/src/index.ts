@@ -93,6 +93,7 @@ export {
   QUOTA_BACKLOG_DAYS,
   type SenderDomainVerdict,
   senderDomain,
+  teamAttachmentLimit,
   verifyOnboardingSender,
   verifySenderDomain,
 } from "./accept-email.js";
@@ -387,6 +388,7 @@ export {
   monthlyCapacity,
   OVERAGE_HARD_CAP,
   PAID_RUNGS,
+  PLAN_ATTACHMENT_BYTES,
   PLAN_CONTACT_LIMIT,
   PLAN_DOMAIN_LIMIT,
   PLAN_GRACE_DAYS,
