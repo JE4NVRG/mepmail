@@ -117,7 +117,7 @@
 .gtm-footer nav a:hover {
   text-decoration: underline;
 }
-.gtm-nav > .gtm-nav-extra {
+.gtm-nav > a.gtm-nav-extra {
   display: none;
 }
 .gtm-action.ms-btn {
@@ -360,7 +360,7 @@
   .gtm h2 {
     font-size: 36px;
   }
-  .gtm-nav > .gtm-nav-extra {
+  .gtm-nav > a.gtm-nav-extra {
     display: inline-flex;
   }
   .gtm-plan-grid {
