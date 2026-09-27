@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "MepMail — Transactional email with a Resend-compatible API",
-    "description": "Transactional email with assisted onboarding in Brazil. Compare MepMail plans, send through the Resend-compatible API or the SMTP relay, and create your free beta account."
+    "description": "Transactional email with assisted onboarding. Compare MepMail plans, send through the Resend-compatible API or the SMTP relay, and create your free beta account."
   },
   "skip": "Skip to content",
   "brandAria": "MepMail — home",
@@ -17,9 +17,9 @@
     "aria": "Page language"
   },
   "hero": {
-    "eyebrow": "Transactional email for people building products in Brazil <badge>Beta · 100 free accounts</badge>",
+    "eyebrow": "Transactional email for people building products, anywhere <badge>Beta · 100 free accounts</badge>",
     "title": "The same Resend API. <highlight>Up to 60% cheaper.</highlight>",
-    "lead": "Send transactional email with a Resend-compatible HTTPS API or the SMTP relay. We help you set up your domain, DKIM and MAIL FROM. USD pricing, support in Portuguese and assisted deployment.",
+    "lead": "Send transactional email with a Resend-compatible HTTPS API or the SMTP relay. We help you set up your domain, DKIM and MAIL FROM. USD pricing and assisted onboarding.",
     "ctaSignup": "Create free account",
     "ctaPlans": "See plans",
     "note": "Open beta: 100 free accounts, each capped at 100 emails per day. Create yours in one minute — no card required."
@@ -137,7 +137,7 @@
   },
   "footer": {
     "navAria": "Footer",
-    "tagline": "MepMail · Transactional email with assisted onboarding in Brazil",
+    "tagline": "MepMail · Transactional email with assisted onboarding",
     "login": "Sign in",
     "contact": "Contact"
   }
