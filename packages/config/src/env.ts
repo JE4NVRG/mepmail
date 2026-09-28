@@ -491,13 +491,18 @@ export function telegramSignupAlert(e: Env = env): {
 } | null {
   if (!e.TELEGRAM_BOT_TOKEN || !e.TELEGRAM_CHAT_ID) return null;
   // Tests run with SKIP_ENV_VALIDATION, where the proxy hands the raw string
-  // through uncoerced; coerce here so a caller always sees a number or null.
-  const raw = e.TELEGRAM_MESSAGE_THREAD_ID;
-  const threadId = raw === undefined || raw === null || raw === "" ? null : Number(raw);
+  // through uncoerced; read both shapes and answer a positive integer or null.
+  const raw: unknown = e.TELEGRAM_MESSAGE_THREAD_ID;
+  const numeric =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string" && raw.trim() !== ""
+        ? Number(raw)
+        : Number.NaN;
   return {
     token: e.TELEGRAM_BOT_TOKEN,
     chatId: e.TELEGRAM_CHAT_ID,
-    threadId: threadId !== null && Number.isFinite(threadId) ? threadId : null,
+    threadId: Number.isInteger(numeric) && numeric > 0 ? numeric : null,
   };
 }
 

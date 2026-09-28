@@ -95,7 +95,7 @@ describe("notifySignupAlert", () => {
     vi.stubGlobal("fetch", fetchSpy);
     notifySignupAlert({ email: "ada@example.com", name: "Ada" }, attribution(), "pt-BR");
     await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
-    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain("/bot123456:TEST-TOKEN-VALUE-000000000000000000000/sendMessage");
     const body = JSON.parse(String(init.body)) as Record<string, unknown>;
     expect(body.chat_id).toBe("-1003838851729");
