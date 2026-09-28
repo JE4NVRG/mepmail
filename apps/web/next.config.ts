@@ -3,6 +3,12 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
+// Analytics self-hosted (Umami). O tracker é servido de OUTRA origem, logo
+// precisa estar liberado em script-src (carregar o script) e em connect-src
+// (o beacon de pageview/evento). Manter em sincronia com UMAMI_SCRIPT_URL em
+// src/lib/analytics.ts — as duas pontas mudam juntas.
+const UMAMI_ORIGIN = "https://umami.je4ndev.com";
+
 const config: NextConfig = {
   poweredByHeader: false,
   experimental: {
@@ -25,8 +31,8 @@ const config: NextConfig = {
   async headers() {
     const scriptPolicy =
       process.env.NODE_ENV === "development"
-        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com"
-        : "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com";
+        ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com ${UMAMI_ORIGIN}`
+        : `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com ${UMAMI_ORIGIN}`;
     const contentSecurityPolicy = [
       "default-src 'self'",
       scriptPolicy,
@@ -36,7 +42,8 @@ const config: NextConfig = {
       // origin is acceptable.
       "img-src 'self' data: blob: https:",
       "font-src 'self'",
-      "connect-src 'self'",
+      // Umami envia pageviews e eventos por fetch/beacon para a própria origem.
+      `connect-src 'self' ${UMAMI_ORIGIN}`,
       "media-src 'self'",
       "object-src 'none'",
       // Turnstile renders its challenge in a Cloudflare frame.
