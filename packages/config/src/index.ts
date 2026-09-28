@@ -33,6 +33,7 @@ export {
   sesTenantsEnabled,
   signupOpen,
   supportViewEnabled,
+  telegramSignupAlert,
   trackingCnameTarget,
   trackingSubdomainsSupported,
   umamiFunnel,

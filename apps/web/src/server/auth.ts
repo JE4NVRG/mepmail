@@ -23,6 +23,7 @@ import { attributionProps, emitFunnel, recordSignupAttribution } from "./funnel"
 import { localeFromHeaders } from "./locale";
 import { getActiveMembership, listMemberships } from "./membership";
 import { enqueueRecipientErase } from "./queue";
+import { notifySignupAlert } from "./signup-alert";
 import {
   buildMcpConnectedEmail,
   buildPasswordChangedEmail,
@@ -249,8 +250,10 @@ export function createAuth(
         // No team exists yet, so the plan is the one every new account starts on.
         props: { ...attributionProps(attribution, localeFromHeaders(requestHeaders)), plan: "free" },
       });
+      return attribution;
     } catch (error) {
       console.error("signup funnel tracking failed", error);
+      return null;
     }
   };
   const trackEmailVerified = async (user: { id: string }, requestHeaders: Headers | undefined) => {
@@ -549,7 +552,10 @@ export function createAuth(
           after: async (user, ctx) => {
             const requestHeaders = ctx?.headers ?? ctx?.request?.headers;
             await enrollAccount(user, requestHeaders);
-            await trackSignup(user, requestHeaders);
+            const attribution = await trackSignup(user, requestHeaders);
+            // Operator alert, fire-and-forget: it must never slow a sign-up,
+            // and it is a no-op on an instance with no alert chat configured.
+            notifySignupAlert(user, attribution, localeFromHeaders(requestHeaders));
           },
         },
       },

@@ -303,6 +303,15 @@ export const env = createEnv({
     // nothing, so a typo means no data rather than a failing request.
     UMAMI_WEBSITE_ID: z.string().optional(),
 
+    // Signup alerts: one Telegram message per new account, naming the address
+    // and the channel the visit cookie carried (source, campaign, utm_content).
+    // BOTH values or neither — unset, nothing is ever sent, so a self-host
+    // with no chat to notify never pays for the alert with a failed request.
+    // TELEGRAM_MESSAGE_THREAD_ID targets one topic of a forum supergroup.
+    TELEGRAM_BOT_TOKEN: z.string().optional(),
+    TELEGRAM_CHAT_ID: z.string().optional(),
+    TELEGRAM_MESSAGE_THREAD_ID: z.coerce.number().int().positive().optional(),
+
     // Sender for system emails (password reset), as `Name <user@domain>` or a
     // bare address; its domain must be a verified identity in this instance's
     // SES account. Unset disables password recovery entirely.
@@ -467,6 +476,25 @@ export function appHostname(e: Env = env): string {
 export function umamiFunnel(e: Env = env): { endpoint: string | null; websiteId: string | null } {
   if (!e.UMAMI_ENDPOINT || !e.UMAMI_WEBSITE_ID) return { endpoint: null, websiteId: null };
   return { endpoint: e.UMAMI_ENDPOINT, websiteId: e.UMAMI_WEBSITE_ID };
+}
+
+/**
+ * The Telegram target the signup alert posts to, or null when this instance
+ * does not alert. Both values are required together: a token without a chat
+ * (or the reverse) is a misconfiguration, and staying silent is the only
+ * honest reading of it.
+ */
+export function telegramSignupAlert(e: Env = env): {
+  token: string;
+  chatId: string;
+  threadId: number | null;
+} | null {
+  if (!e.TELEGRAM_BOT_TOKEN || !e.TELEGRAM_CHAT_ID) return null;
+  return {
+    token: e.TELEGRAM_BOT_TOKEN,
+    chatId: e.TELEGRAM_CHAT_ID,
+    threadId: e.TELEGRAM_MESSAGE_THREAD_ID ?? null,
+  };
 }
 
 /**
