@@ -1,3 +1,5 @@
+import { MCP_TOOLS } from "@/app/(dashboard)/settings/mcp/mcp-tools";
+
 /**
  * MCP server card for the hosted MepMail MCP server. Advertised by
  * /.well-known/ai-catalog.json and linked from auth.md.
@@ -6,7 +8,20 @@
  * hosted MCP endpoint: streamable HTTP authenticated with OAuth 2.1, so the
  * card carries the resource/authorization-server discovery URLs instead of a
  * launch command.
+ *
+ * The card is also what a directory reads when it cannot scan the endpoint
+ * itself: an OAuth 2.1 server answers the scanner with a 401, so a scan can
+ * only finish once a signed-in human grants consent. Smithery and Glama fall
+ * back to this document ("publish a static server card",
+ * smithery.mintlify.app/build/external), which only helps if it spells out the
+ * tool surface. `tools` carries the registry the settings page mirrors — name
+ * and description per tool, taken from apps/api/src/mcp.ts — so a token's
+ * tools/list and this card cannot drift.
  */
+
+/** What the card publishes per tool: the fields it can attest to. */
+const TOOLS = MCP_TOOLS.map(({ name, description }) => ({ name, description }));
+
 const BODY = JSON.stringify(
   {
     $schema: "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json",
@@ -34,8 +49,10 @@ const BODY = JSON.stringify(
         "Hosted MCP server for transactional email, broadcasts, domains, contacts, templates and webhooks.",
     },
     capabilities: {
-      tools: {},
+      // The tool set follows the token's scopes and never changes mid-connection.
+      tools: { listChanged: false },
     },
+    tools: TOOLS,
     transport: {
       type: "streamable-http",
       url: "https://api-mepmail.je4ndev.com/mcp",
@@ -43,9 +60,9 @@ const BODY = JSON.stringify(
     authentication: {
       required: true,
       type: "oauth2",
+      schemes: ["oauth2"],
       authorizationServer: "https://mepmail.je4ndev.com",
-      resourceMetadata:
-        "https://api-mepmail.je4ndev.com/.well-known/oauth-protected-resource",
+      resourceMetadata: "https://api-mepmail.je4ndev.com/.well-known/oauth-protected-resource",
       authorizationServerMetadata:
         "https://mepmail.je4ndev.com/.well-known/oauth-authorization-server",
       scopes: [
