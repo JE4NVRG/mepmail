@@ -91,7 +91,10 @@ describe("notifySignupAlert", () => {
     vi.stubEnv("TELEGRAM_BOT_TOKEN", "123456:TEST-TOKEN-VALUE-000000000000000000000");
     vi.stubEnv("TELEGRAM_CHAT_ID", "-1003838851729");
     vi.stubEnv("TELEGRAM_MESSAGE_THREAD_ID", "1");
-    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ ok: true, result: { message_id: 7 } }), { status: 200 }));
+    const fetchSpy = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, result: { message_id: 7 } }), { status: 200 }),
+    );
     vi.stubGlobal("fetch", fetchSpy);
     notifySignupAlert({ email: "ada@example.com", name: "Ada" }, attribution(), "pt-BR");
     await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
@@ -106,7 +109,10 @@ describe("notifySignupAlert", () => {
   it("never rejects when the Bot API refuses", async () => {
     vi.stubEnv("TELEGRAM_BOT_TOKEN", "123456:TEST-TOKEN-VALUE-000000000000000000000");
     vi.stubEnv("TELEGRAM_CHAT_ID", "42");
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("bad request", { status: 400 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("bad request", { status: 400 })),
+    );
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() =>
       notifySignupAlert({ email: "ada@example.com", name: "Ada" }, null, "pt-BR"),

@@ -55,8 +55,6 @@ export const CAMPAIGN_SLUGS: Record<string, string> = {
 /** How long the Bot API call may take before it is abandoned. */
 export const SIGNUP_ALERT_TIMEOUT_MS = 3_000;
 
-const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-
 /** The moment as the operator reads it: Sao Paulo wall clock, short. */
 export function alertTimestamp(now: Date): string {
   const parts = new Intl.DateTimeFormat("pt-BR", {
@@ -84,7 +82,8 @@ export function originLabel(attribution: SignupAttribution | null): string {
   const parts = [network];
   if (group) parts.push(`grupo "${group}"`);
   else if (attribution.content) parts.push(`utm_content=${attribution.content}`);
-  if (attribution.referrer && attribution.referrer !== network) parts.push(`via ${attribution.referrer}`);
+  if (attribution.referrer && attribution.referrer !== network)
+    parts.push(`via ${attribution.referrer}`);
   return parts.join(" · ");
 }
 
@@ -146,9 +145,9 @@ export function notifySignupAlert(
         console.error("signup alert rejected", response.status, detail.slice(0, 300));
         return;
       }
-      const payload = (await response.json().catch(() => null)) as
-        | { result?: { message_id?: number } }
-        | null;
+      const payload = (await response.json().catch(() => null)) as {
+        result?: { message_id?: number };
+      } | null;
       console.info("signup alert sent", `message_id=${payload?.result?.message_id ?? "?"}`);
     })
     .catch((error) => console.error("signup alert failed", error));

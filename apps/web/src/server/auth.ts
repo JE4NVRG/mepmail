@@ -1,5 +1,11 @@
 import { oauthProvider } from "@better-auth/oauth-provider";
-import { accountEmailFrom, betaMaxUsers, env, isCloudDeployment, signupOpen } from "@millionsend/config";
+import {
+  accountEmailFrom,
+  betaMaxUsers,
+  env,
+  isCloudDeployment,
+  signupOpen,
+} from "@millionsend/config";
 import {
   ALL_TEAMS_GRANT,
   enrollSystemContact,
@@ -248,7 +254,10 @@ export function createAuth(
         name: "signup",
         dedupeKey: `signup:${user.id}`,
         // No team exists yet, so the plan is the one every new account starts on.
-        props: { ...attributionProps(attribution, localeFromHeaders(requestHeaders)), plan: "free" },
+        props: {
+          ...attributionProps(attribution, localeFromHeaders(requestHeaders)),
+          plan: "free",
+        },
       });
       return attribution;
     } catch (error) {
