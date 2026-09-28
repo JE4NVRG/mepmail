@@ -7,7 +7,19 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      allow: ["/$", "/login", "/signup", "/_next/", "/logo/", "/fonts/", "/og.png", "/favicon.ico"],
+      allow: [
+        "/$",
+        "/login",
+        "/signup",
+        "/terms",
+        "/privacy",
+        "/refund",
+        "/_next/",
+        "/logo/",
+        "/fonts/",
+        "/og.png",
+        "/favicon.ico",
+      ],
       disallow: "/",
     },
   };

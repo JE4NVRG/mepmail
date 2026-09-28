@@ -17,7 +17,19 @@ describe("crawler entry points", () => {
     const rules = robots().rules;
     expect(Array.isArray(rules) ? rules[0] : rules).toEqual({
       userAgent: "*",
-      allow: ["/$", "/login", "/signup", "/_next/", "/logo/", "/fonts/", "/og.png", "/favicon.ico"],
+      allow: [
+        "/$",
+        "/login",
+        "/signup",
+        "/terms",
+        "/privacy",
+        "/refund",
+        "/_next/",
+        "/logo/",
+        "/fonts/",
+        "/og.png",
+        "/favicon.ico",
+      ],
       disallow: "/",
     });
   });
