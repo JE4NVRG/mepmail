@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { type CalcLabels, LandingCalculator } from "@/components/landing-calculator";
 import { LandingLangSwitch } from "@/components/landing-lang-switch";
+import { SignupCta } from "@/components/signup-cta";
 import { formatUsd, PRICE_ROWS } from "@/lib/landing-pricing";
 import { hasSession } from "@/server/auth";
 import "./landing-calc.css";
@@ -107,12 +108,17 @@ function Wordmark() {
   );
 }
 
-function SignupLink({ label }: { label: string }) {
-  return (
-    <a className="ms-btn ms-btn-primary gtm-action" href="/signup">
-      {label}
-    </a>
-  );
+// CTA de criação de conta da landing. Todas as ocorrências (topo, hero, cards
+// de plano e rodapé) passam pelo mesmo componente — um único ponto dispara o
+// evento de conversão `signup-cta`.
+function SignupLink({
+  label,
+  className = "ms-btn ms-btn-primary gtm-action",
+}: {
+  label: string;
+  className?: string;
+}) {
+  return <SignupCta className={className} label={label} />;
 }
 
 function CodeDemo({ subject, caption }: { subject: string; caption: string }) {
@@ -459,7 +465,7 @@ export default async function RootPage() {
           </nav>
           <nav className="gtm-footer-col" aria-label={t("footer.colAccount")}>
             <h3>{t("footer.colAccount")}</h3>
-            <a href="/signup">{t("nav.signup")}</a>
+            <SignupCta label={t("nav.signup")} />
             <a href="/login">{t("footer.login")}</a>
             <a href={contact}>{t("footer.contact")}</a>
           </nav>
