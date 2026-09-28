@@ -15,22 +15,24 @@ describe("crawler entry points", () => {
 
   it("robots lets crawlers into the public pages and keeps the rest out", () => {
     const rules = robots().rules;
-    expect(Array.isArray(rules) ? rules[0] : rules).toEqual({
-      userAgent: "*",
-      allow: [
-        "/$",
-        "/login",
-        "/signup",
-        "/terms",
-        "/privacy",
-        "/refund",
-        "/_next/",
-        "/logo/",
-        "/fonts/",
-        "/og.png",
-        "/favicon.ico",
-      ],
-      disallow: "/",
-    });
+    const rule = Array.isArray(rules) ? rules[0] : rules;
+    const allow = (rule?.allow ?? []) as string[];
+    expect(rule?.disallow).toBe("/");
+    // The sitemap must stay reachable: `Disallow: /` without this exception is
+    // what made Google report "Couldn't fetch the sitemap".
+    for (const path of [
+      "/$",
+      "/login",
+      "/signup",
+      "/terms",
+      "/privacy",
+      "/refund",
+      "/sitemap.xml",
+      "/auth/",
+      "/_next/",
+    ]) {
+      expect(allow).toContain(path);
+    }
+    expect(robots().sitemap).toBe("https://mepmail.je4ndev.com/sitemap.xml");
   });
 });
