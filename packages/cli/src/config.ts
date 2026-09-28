@@ -285,7 +285,18 @@ export function parseConfig(
       );
     }
   }
-  const after = values.after ?? null;
+  // The API types the cursor as a uuid (`after: z.uuid()`), so a typo would only
+  // come back as a 422; caught here it costs no request and exits 1, as a usage
+  // error, exactly like the id of `emails get`.
+  let after: string | null = null;
+  if (values.after !== undefined) {
+    if (!isUuid(values.after)) {
+      throw new ConfigError(
+        `\`${values.after}\` is not an email id for --after. Use the id a previous page printed: \`mepmail emails list --limit 1\`.`,
+      );
+    }
+    after = values.after;
+  }
 
   let from: ProviderId | null = null;
   if (values.from !== undefined) {
@@ -453,7 +464,7 @@ Usage
   mepmail migrate status                                 what the last run created and what is left
   mepmail migrate rollback [--yes]                       delete only what this tool created
   mepmail doctor                                         version, key, API, domains and sending health
-  mepmail emails list [--limit ${EMAIL_PAGE}] [--after <id>]       the team's emails, oldest first
+  mepmail emails list [--limit ${EMAIL_PAGE}] [--after <id>]        the team's emails, oldest first
   mepmail emails get <id>                                one email, with its stored body
   mepmail --help | --version
 

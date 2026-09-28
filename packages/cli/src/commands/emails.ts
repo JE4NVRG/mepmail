@@ -71,7 +71,9 @@ async function get(ctx: Context, inspector: Inspector, baseUrl: string): Promise
   try {
     email = await inspector.getEmail(ctx.config.emailId ?? "");
   } catch (error) {
-    return reportFailure(ctx, error, baseUrl);
+    // An item route: a 404 here is the id, not the URL. The route-missing case
+    // (an instance older than the read API) is what `doctor` reports.
+    return reportFailure(ctx, error, baseUrl, "resource");
   }
   if (ctx.config.json) {
     ctx.stdout.write(`${JSON.stringify(email)}\n`);

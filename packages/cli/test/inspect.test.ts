@@ -5,7 +5,9 @@ import { PassThrough, Writable } from "node:stream";
 import { schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { ApiError } from "../src/http.js";
 import { main } from "../src/index.js";
+import { apiFailureHint } from "../src/inspect.js";
 import { VERSION } from "../src/meta.js";
 import { createApiKey, type LiveApi, startLiveApi } from "./helpers/live-api.js";
 
@@ -378,6 +380,22 @@ describe("mepmail emails", () => {
     expect(failing).not.toHaveBeenCalled();
   });
 
+  it("get: an id this team does not have blames the id, never the API URL", async () => {
+    const { code, stdout, stderr } = await run([
+      "emails",
+      "get",
+      "0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9",
+    ]);
+    expect(code).toBe(2);
+    expect(stdout).toBe("");
+    // The API's message names the cause; the hint points at the id and never at
+    // the base URL, which just answered every other request.
+    expect(stderr).toContain("Email not found");
+    expect(stderr).toContain("no email with this id in this team");
+    expect(stderr).not.toContain("has no such endpoint");
+    expectNoSecrets(stdout, stderr);
+  });
+
   it("list: exit 2 and a hint when the key is refused", async () => {
     const { code, stdout, stderr } = await run(["emails", "list", "--json"], {
       env: { MEPMAIL_API_KEY: "ms_not_a_real_key_000000000000" },
@@ -453,6 +471,18 @@ describe("mepmail emails: usage errors", () => {
     }
   });
 
+  it("rejects a --after that is not an id before calling the API", async () => {
+    const failing = vi.fn().mockRejectedValue(new Error("must not be called"));
+    const { code, stdout, stderr } = await run(["emails", "list", "--after", "not-a-uuid"], {
+      fetch: failing as unknown as typeof fetch,
+    });
+    expect(code).toBe(1);
+    expect(stdout).toBe("");
+    expect(stderr).toContain("`not-a-uuid` is not an email id for --after");
+    expect(stderr).not.toContain("retry");
+    expect(failing).not.toHaveBeenCalled();
+  });
+
   it("keeps --limit and --dry-run off the migration commands", async () => {
     const limited = await run(["migrate", "status", "--limit", "5"]);
     expect(limited.code).toBe(1);
@@ -462,5 +492,36 @@ describe("mepmail emails: usage errors", () => {
     });
     expect(dry.code).toBe(1);
     expect(dry.stderr).toContain("--dry-run");
+  });
+});
+
+describe("apiFailureHint", () => {
+  const baseUrl = "http://127.0.0.1:33917";
+
+  it("reads a 404 as the record for an item request, and as the route otherwise", () => {
+    // The API answers both with 404; only the caller knows which request it made.
+    const missing = new ApiError(
+      404,
+      "not_found",
+      "MepMail: Email not found (404 on GET /emails/)",
+    );
+    expect(apiFailureHint(missing, baseUrl, "resource")).toContain(
+      "no email with this id in this team",
+    );
+    expect(apiFailureHint(missing, baseUrl, "resource")).not.toContain("has no such endpoint");
+    expect(apiFailureHint(missing, baseUrl)).toContain("no such endpoint");
+    expect(apiFailureHint(missing, baseUrl, "route")).toContain(baseUrl);
+  });
+
+  it("never sends an operator to someone else's log for a request the API called invalid", () => {
+    const invalid = new ApiError(
+      422,
+      "validation_error",
+      "MepMail: limit: Too big (422 on GET /emails)",
+    );
+    const hint = apiFailureHint(invalid, baseUrl);
+    expect(hint).toContain("invalid");
+    expect(hint).not.toContain("retry in a moment");
+    expect(hint).not.toContain("instance logs");
   });
 });

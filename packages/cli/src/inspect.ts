@@ -118,10 +118,23 @@ export function createInspector(http: Http) {
 export type Inspector = ReturnType<typeof createInspector>;
 
 /**
+ * What a 404 means for the request that failed: `route` when the instance has
+ * no such endpoint at all (an older build, or a `--to-url` pointing at
+ * something else), `resource` when the route exists and the item behind it does
+ * not. The API answers both with the same status, so only the caller knows
+ * which request it made.
+ */
+export type NotFoundKind = "route" | "resource";
+
+/**
  * One actionable line for a failed request. The API's own message comes first
  * (it names the exact cause), this names what to do about it.
  */
-export function apiFailureHint(error: unknown, baseUrl: string): string {
+export function apiFailureHint(
+  error: unknown,
+  baseUrl: string,
+  notFound: NotFoundKind = "route",
+): string {
   if (error instanceof AuthError) {
     return error.status === 403
       ? `${TARGET_KEY_ENV} was accepted but is sending-only (403); the reads here need a full-access key (ms_…).`
@@ -132,10 +145,15 @@ export function apiFailureHint(error: unknown, baseUrl: string): string {
       return `no answer from ${baseUrl}: check --to-url / ${TARGET_URL_ENV}, DNS, and that the instance is up (docker compose ps).`;
     }
     if (error.status === 404) {
-      return `${baseUrl} has no such endpoint: either it is not the API URL of this team, or the instance predates this CLI version.`;
+      return notFound === "resource"
+        ? "no email with this id in this team: ids are per-team, and `mepmail emails list` prints the ones this key can read."
+        : `${baseUrl} has no such endpoint: either it is not the API URL of this team, or the instance predates this CLI version.`;
     }
     if (error.status === 429) {
       return "the key is rate limited right now; wait a few seconds and retry.";
+    }
+    if (error.status === 400 || error.status === 422) {
+      return "MepMail refused the request as invalid: retrying cannot fix it — correct the arguments above (`mepmail --help`).";
     }
     return `MepMail answered ${error.status}; retry in a moment, and check the instance logs if it keeps failing.`;
   }
@@ -143,9 +161,14 @@ export function apiFailureHint(error: unknown, baseUrl: string): string {
 }
 
 /** Reports a failed request on stderr (never on stdout, which `--json` owns) and its exit code. */
-export function reportFailure(ctx: Context, error: unknown, baseUrl: string): number {
+export function reportFailure(
+  ctx: Context,
+  error: unknown,
+  baseUrl: string,
+  notFound: NotFoundKind = "route",
+): number {
   ctx.log.error(error instanceof Error ? error.message : String(error));
-  ctx.log.error(apiFailureHint(error, baseUrl));
+  ctx.log.error(apiFailureHint(error, baseUrl, notFound));
   return API_FAILURE_EXIT;
 }
 

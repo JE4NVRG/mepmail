@@ -164,6 +164,7 @@ describe("parseConfig", () => {
       "`not-an-id` is not an email id. Usage: mepmail emails get <id>",
     ],
     [["emails", "list", "extra"], "Unexpected argument `extra`"],
+    [["emails", "list", "--after", "not-a-uuid"], "`not-a-uuid` is not an email id for --after"],
     [
       ["emails", "list", "--limit", "0"],
       "--limit must be a whole number between 1 and 100 (got 0)",
@@ -322,5 +323,18 @@ describe("helpText", () => {
       expect(text).toContain(needle);
     }
     expect(text).not.toMatch(/!\s/);
+  });
+
+  it("starts every usage description in the same column", () => {
+    // The Usage block is read column-wise: one line drifting a character is a
+    // defect in the help, not a matter of taste.
+    const descriptions = helpText()
+      .split("\n")
+      .filter((line) => line.startsWith("  mepmail "))
+      .map((line) => / {2,}\S/.exec(line.slice(3)))
+      .filter((match) => match !== null)
+      .map((match) => 3 + match.index + match[0].length - 1);
+    expect(descriptions.length).toBeGreaterThan(5);
+    expect(new Set(descriptions).size).toBe(1);
   });
 });
