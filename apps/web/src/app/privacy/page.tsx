@@ -15,5 +15,11 @@ export default async function PrivacyPage() {
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("legal");
-  return { title: t("privacy.title"), description: t("privacy.intro") };
+  // Legal pages are real public content (linked from the footer), so they opt
+  // back into indexing against the private-by-default robots in layout.tsx.
+  return {
+    title: t("privacy.title"),
+    description: t("privacy.intro"),
+    robots: { index: true, follow: true },
+  };
 }

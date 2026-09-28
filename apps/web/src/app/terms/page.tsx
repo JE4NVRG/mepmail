@@ -15,5 +15,11 @@ export default async function TermsPage() {
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("legal");
-  return { title: t("terms.title"), description: t("terms.intro") };
+  // Legal pages are real public content (linked from the footer), so they opt
+  // back into indexing against the private-by-default robots in layout.tsx.
+  return {
+    title: t("terms.title"),
+    description: t("terms.intro"),
+    robots: { index: true, follow: true },
+  };
 }
