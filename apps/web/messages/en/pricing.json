@@ -1,0 +1,62 @@
+{
+  "meta": {
+    "title": "Pricing — every MepMail plan on one page",
+    "description": "MepMail pricing in USD: free with 100 emails/day, Pro from US$ 20 for 100,000 emails/month and Scale up to 2.5M. Overage per 1,000 and no lock-in."
+  },
+  "eyebrow": "Pricing",
+  "title": "Pick your volume. <highlight>Pay for what you send.</highlight>",
+  "lead": "Monthly prices in USD, billed monthly, no lock-in. Every plan runs on your own verified domain and includes assisted onboarding — through the HTTPS API or the SMTP relay, whichever your stack already speaks.",
+  "note": "Starting is free: 100 emails a day, no card. Activating a paid plan is one click in the panel.",
+  "plans": {
+    "title": "The full ladder.",
+    "intro": "The same grid the landing shows, with the Scale rungs open. Overage is what each plan charges per 1,000 extra sends once its included volume ends."
+  },
+  "included": {
+    "eyebrow": "Included",
+    "title": "What every plan carries, Free included.",
+    "body": "None of it is an add-on — it is how the product ships.",
+    "points": [
+      "Resend-compatible HTTPS API at api-mepmail.je4ndev.com — keep the official SDK and change the base URL.",
+      "SMTP relay with STARTTLS at smtp-mepmail.je4ndev.com:2587.",
+      "Your own sending domain, verified with DKIM and MAIL FROM on Amazon SES.",
+      "Dedicated API key, delivery logs, suppression list and metrics in the panel.",
+      "The official MCP server, so agents send through the same account."
+    ]
+  },
+  "alternatives": {
+    "eyebrow": "Comparing",
+    "title": "Coming from Resend?",
+    "body": "We put both ladders side by side, with Resend's public prices and the date they were read.",
+    "cta": "Resend vs MepMail"
+  },
+  "faq": {
+    "title": "Pricing questions",
+    "items": [
+      {
+        "q": "How does overage work?",
+        "a": "On Pro and Scale, extra sends are billed per 1,000 at the plan's own rate, and the safety ceiling is 5× the included volume. Without overage enabled at provisioning, sending stops at the monthly quota. Free and Starter stop at the daily cap."
+      },
+      {
+        "q": "Is there a contract, and can I change plans later?",
+        "a": "No contract and no cancellation fee. Plans are month-to-month; tell us the volume you need and we move you to another rung."
+      },
+      {
+        "q": "What is the attachment limit per message?",
+        "a": "1 MB on Free and Starter, 5 MB on Pro and 10 MB on Scale — the sum of the decoded attachments, not each file separately."
+      },
+      {
+        "q": "Do I need a card to start?",
+        "a": "No. The beta is free, 100 emails a day per account. Paid plans are billed monthly in USD and activating one is a single click in the panel."
+      },
+      {
+        "q": "What happens above the top plan?",
+        "a": "The published ladder stops at 2.5M a month. Above that, talk to us: we size the volume with you instead of quoting an enterprise tier we do not publish."
+      }
+    ]
+  },
+  "close": {
+    "title": "Pick your rung and send.",
+    "body": "Create the account, verify your domain with our help, and go live through the API or the relay the same day.",
+    "cta": "Create free account"
+  }
+}

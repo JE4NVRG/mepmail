@@ -19,6 +19,8 @@ describe("crawler entry points", () => {
       userAgent: "*",
       allow: [
         "/$",
+        "/pricing",
+        "/alternatives",
         "/login",
         "/signup",
         "/terms",

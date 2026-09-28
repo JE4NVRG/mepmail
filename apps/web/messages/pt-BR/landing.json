@@ -11,6 +11,8 @@
     "plans": "Planos",
     "mcp": "MCP",
     "how": "Como funciona",
+    "pricing": "Preços",
+    "alternatives": "vs Resend",
     "login": "Entrar",
     "signup": "Criar conta",
     "badge": "Agent-ready"
@@ -226,7 +228,7 @@
     "navAria": "Rodapé",
     "tagline": "MepMail · E-mail transacional com implantação assistida",
     "points": [
-      "Amazon SES em produção — 500 mil e-mails/dia",
+      "Amazon SES em produção",
       "API compatível com a do Resend",
       "Migração em minutos, sem refazer código"
     ],
@@ -234,6 +236,8 @@
     "colProduct": "Produto",
     "colAccount": "Conta",
     "colLegal": "Legal",
+    "pricing": "Preços",
+    "alternatives": "vs Resend",
     "terms": "Termos",
     "privacy": "Privacidade",
     "refund": "Reembolso",

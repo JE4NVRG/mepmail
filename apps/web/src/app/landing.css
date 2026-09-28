@@ -199,6 +199,11 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  /* Com os dois links de página (/pricing e /alternatives/resend) o menu não
+     cabe em viewports médias: os chips quebram como unidades (nunca o texto
+     dentro do chip), no lugar de espremer o rótulo em duas linhas. */
+  flex-wrap: wrap;
+  row-gap: 4px;
 }
 .gtm-nav-links a {
   display: inline-flex;
@@ -207,6 +212,7 @@
   padding: 0 12px;
   border-radius: 999px;
   font-size: 14px;
+  white-space: nowrap;
   color: var(--ms-muted);
   text-decoration: none;
   transition:
@@ -580,6 +586,11 @@
   .gtm-container {
     padding-inline: 32px;
   }
+  /* Em desktop o menu inteiro (6 links + ações) cabe numa linha só se os chips
+     forem um pouco mais estreitos. */
+  .gtm-nav-links a {
+    padding: 0 10px;
+  }
   .gtm-section {
     padding-block: 96px;
   }
@@ -607,6 +618,41 @@
   .gtm-plan-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 20px;
+  }
+}
+/* Até 767px o menu (6 chips) não cabe em uma linha: o header passa a ter
+   duas linhas (marca / menu) e os chips viram uma faixa rolável na horizontal
+   — inteiros, sem quebrar rótulo nem empilhar cinco linhas dentro do sticky. */
+@media (max-width: 767px) {
+  .gtm-header-inner {
+    flex-wrap: wrap;
+    padding-block: 10px;
+  }
+  .gtm-nav {
+    width: 100%;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+  }
+  .gtm-nav-links {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .gtm-nav-links::-webkit-scrollbar {
+    display: none;
+  }
+  .gtm-nav-actions {
+    flex-shrink: 0;
+  }
+  /* Em telas estreitas o menu rolável precisa de espaço: o link "Entrar" (que
+     continua no rodapé) sai do header para o strip não ficar cortado. */
+  .gtm-nav-login,
+  .gtm-nav-divider {
+    display: none;
   }
 }
 @media (max-width: 390px) {
@@ -917,5 +963,33 @@
 @media (prefers-reduced-motion: reduce) {
   .gtm .ms-btn {
     transition: none;
+  }
+}
+
+/* Páginas públicas além da landing (/pricing e /alternatives/resend). */
+.gtm-claim {
+  max-width: 760px;
+  margin-top: 32px;
+}
+.gtm-claim h3 {
+  margin-bottom: 8px;
+}
+.gtm-claim p {
+  margin-bottom: 0;
+}
+.gtm-split {
+  display: grid;
+  gap: 40px;
+}
+.gtm-split h3 {
+  margin-bottom: 16px;
+}
+.gtm-split .gtm-points {
+  margin-top: 0;
+}
+@media (min-width: 1024px) {
+  .gtm-split {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 56px;
   }
 }

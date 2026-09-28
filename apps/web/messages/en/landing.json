@@ -11,6 +11,8 @@
     "plans": "Plans",
     "mcp": "MCP",
     "how": "How it works",
+    "pricing": "Pricing",
+    "alternatives": "vs Resend",
     "login": "Sign in",
     "signup": "Create account",
     "badge": "Agent-ready"
@@ -234,7 +236,7 @@
     "navAria": "Footer",
     "tagline": "MepMail · Transactional email with assisted onboarding",
     "points": [
-      "Amazon SES in production — 500k emails/day",
+      "Amazon SES in production",
       "Drop-in compatible with Resend's API",
       "Migrate in minutes, no code rewrite"
     ],
@@ -242,6 +244,8 @@
     "colProduct": "Product",
     "colAccount": "Account",
     "colLegal": "Legal",
+    "pricing": "Pricing",
+    "alternatives": "vs Resend",
     "terms": "Terms",
     "privacy": "Privacy",
     "refund": "Refunds",
