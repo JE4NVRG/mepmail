@@ -128,10 +128,11 @@ export async function assertSignupAllowed(db: Db, allowSignup: boolean): Promise
  * same condition that mounts it in `createAuth`, so the UI can never offer a
  * provider the server would reject.
  */
-export function enabledSocialProviders(): { google: boolean; github: boolean } {
+export function enabledSocialProviders(): { google: boolean; github: boolean; microsoft: boolean } {
   return {
     google: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
     github: Boolean(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET),
+    microsoft: Boolean(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET),
   };
 }
 
@@ -544,6 +545,14 @@ export function createAuth(
         : {}),
       ...(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
         ? { github: { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET } }
+        : {}),
+      ...(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET
+        ? {
+            microsoft: {
+              clientId: env.MICROSOFT_CLIENT_ID,
+              clientSecret: env.MICROSOFT_CLIENT_SECRET,
+            },
+          }
         : {}),
     },
     secret: env.BETTER_AUTH_SECRET,
