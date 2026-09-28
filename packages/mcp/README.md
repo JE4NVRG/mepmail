@@ -6,12 +6,22 @@ instance over the public REST API (Resend-compatible wire) with a team API key.
 
 MepMail also runs a **hosted** MCP server (OAuth, no install) at
 `https://api-mepmail.je4ndev.com/mcp`. This package is for clients that launch
-local servers from config. Both expose the same tool names.
+local servers from config. Tool names and result shapes match the hosted
+server's; it covers a subset — the reading, sending and contact tools (22) —
+and the write surfaces beyond contacts (segments, topics, broadcasts,
+templates, webhooks, domains, API keys) plus the team picker are hosted-only.
+
+Guide: <https://docs-mepmail.je4ndev.com/mcp> ·
+Packages: <https://docs-mepmail.je4ndev.com/packages> · Published as
+`@mepmail/mcp` on npm.
 
 ## Quickstart
 
-1. Create an API key in the MepMail dashboard (**API keys**) — a sending-access
-   key scoped to the domain your agent sends from.
+1. Create an API key in the MepMail dashboard (**API keys**) — a **full-access**
+   key, optionally scoped to the sender domain your agent sends from. A
+   sending-access key is confined to `/emails`, so it would 403 on the contact
+   tools (`list_contacts`, `get_contact`, `create_contact`, `update_contact`,
+   `delete_contact`) with `restricted_api_key`.
 2. Add the server to your client:
 
 **Claude Desktop** (`claude_desktop_config.json`) — and any client with the

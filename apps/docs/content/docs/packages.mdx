@@ -1,0 +1,86 @@
+---
+title: npm packages
+description: The two packages MepMail publishes on npm — @mepmail/mcp and @mepmail/cli — what each one does and how to install it.
+---
+
+MepMail publishes two npm packages. Neither is an SDK: the API speaks the
+Resend wire protocol, so sending mail means using the official Resend SDKs with
+your instance's base URL ([SDKs](/sdks)). These two cover what those SDKs cannot
+do — running MCP locally and moving an account over.
+
+| Package | Latest | What it is | Guide |
+| --- | --- | --- | --- |
+| [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) | 0.1.1 | MCP server for local clients (stdio): 22 tools to read, send and manage contacts from Claude, Cursor, Codex or any MCP client. | [MCP server](/mcp) |
+| [`@mepmail/cli`](https://www.npmjs.com/package/@mepmail/cli) | 0.2.2 | Migration CLI: reads a Resend account, diffs it against your instance, applies the difference and writes a report. | [CLI](/cli) |
+
+Both need Node 18 or newer and ship as a single bundle with no dependencies.
+Run them with `npx`, which always resolves the latest published version; the
+numbers above are the versions this page was written against.
+
+## @mepmail/mcp — the local MCP server
+
+```sh
+npx -y @mepmail/mcp
+```
+
+It speaks stdio, so your client launches it and the config block is the whole
+install:
+
+```json title="claude_desktop_config.json"
+{
+  "mcpServers": {
+    "mepmail": {
+      "command": "npx",
+      "args": ["-y", "@mepmail/mcp"],
+      "env": {
+        "MEPMAIL_API_KEY": "ms_...",
+        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
+      }
+    }
+  }
+}
+```
+
+| Variable | Required | Default | Meaning |
+| --- | --- | --- | --- |
+| `MEPMAIL_API_KEY` | yes | — | Team API key (`ms_...`) from **API keys** in the dashboard. The tools act with exactly this key's reach. |
+| `MEPMAIL_BASE_URL` | no | `https://api-mepmail.je4ndev.com` | Your instance's API origin. Set it for a self-hosted deployment. |
+
+It reaches your instance's REST API directly with that key — no OAuth, no
+browser step — and exposes the reading, sending and contact tools: 22 of the
+[hosted server's](/mcp) 68. Config for Claude Desktop, Cursor and VS Code, and
+the full tool list, are on the [MCP page](/mcp).
+
+## @mepmail/cli — the migration CLI
+
+```sh
+npx @mepmail/cli migrate --from resend
+```
+
+That is the interactive path: it connects to Resend, lets you pick resources,
+shows the plan, asks for confirmation, applies it and prints a report. For CI,
+run the read-only plan first — exit code 2 means there is something to apply:
+
+```sh
+export RESEND_API_KEY=re_...
+export MEPMAIL_API_KEY=ms_...
+
+npx @mepmail/cli migrate plan --from resend --out plan.json
+npx @mepmail/cli migrate apply plan.json --yes
+```
+
+| Variable | Meaning |
+| --- | --- |
+| `RESEND_API_KEY` | Source key, full access. The tool only ever reads from Resend. |
+| `MEPMAIL_API_KEY` | MepMail key, full access. |
+| `MEPMAIL_BASE_URL` | API origin of a self-hosted instance. Unset means MepMail Cloud. |
+
+Keys are read from the environment (or stdin), never written to disk, and
+redacted from every log line. Every flag, the state files and the exit codes
+are on the [CLI page](/cli).
+
+## License and releases
+
+Both packages are MIT-licensed and released from the same repository as the
+server, with their own version line. Nothing in either one phones home: no
+telemetry, no update check.
