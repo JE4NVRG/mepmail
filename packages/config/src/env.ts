@@ -287,6 +287,17 @@ export const env = createEnv({
     TERMS_URL: z.url().optional(),
     PRIVACY_URL: z.url().optional(),
 
+    // Umami collection endpoint for the SERVER-side funnel events (signup,
+    // email verified, first send, checkout, payment). Optional; a self-host
+    // deployment with neither of these set emits nothing, which is the point:
+    // product events never phone home from an operator's own instance.
+    UMAMI_ENDPOINT: z.url().optional(),
+    // Website the server-side events land on. Public by nature (the browser
+    // snippet carries it), so the cloud default lives in code — see
+    // umamiFunnel(). Unknown to Umami: the collector answers 200 and stores
+    // nothing, so a typo means no data rather than a failing request.
+    UMAMI_WEBSITE_ID: z.string().optional(),
+
     // Sender for system emails (password reset), as `Name <user@domain>` or a
     // bare address; its domain must be a verified identity in this instance's
     // SES account. Unset disables password recovery entirely.
@@ -424,6 +435,41 @@ export function sesTenantsEnabled(e: Env = env): boolean {
 /** The sender for account notifications; undefined when no system sender is configured. */
 export function notificationsEmailFrom(e: Env = env): string | undefined {
   return e.NOTIFICATIONS_EMAIL_FROM ?? e.AUTH_EMAIL_FROM;
+}
+
+/**
+ * Public origin of the JE4NDEV Umami instance, the one the browser snippet on
+ * the public pages already reports to (apps/web/src/lib/analytics.ts). Both
+ * values are public — they appear in the HTML of every marketing page — so
+ * the cloud default lives in code rather than in a file that would have to be
+ * kept in sync with the snippet.
+ */
+export const UMAMI_CLOUD_ENDPOINT = "https://umami.je4ndev.com/api/send";
+export const UMAMI_CLOUD_WEBSITE_ID = "167a3266-4a56-4fd1-8d14-59ed7437a313";
+
+/** Host the funnel events are attributed to: `new URL(APP_BASE_URL).host`, "localhost" when unset. */
+export function appHostname(e: Env = env): string {
+  try {
+    return e.APP_BASE_URL ? new URL(e.APP_BASE_URL).host : "localhost";
+  } catch {
+    return "localhost";
+  }
+}
+
+/**
+ * Where server-side funnel events go: the explicit env wins, else the cloud
+ * instance, else nothing. A self-host instance that sets neither emits no
+ * events at all — its signups are the operator's business, not ours — and the
+ * endpoint/website pair is all-or-nothing so a half-configured instance is
+ * treated as unconfigured.
+ */
+export function umamiFunnel(e: Env = env): { endpoint: string | null; websiteId: string | null } {
+  const explicit = e.UMAMI_ENDPOINT && e.UMAMI_WEBSITE_ID;
+  if (explicit) {
+    return { endpoint: e.UMAMI_ENDPOINT ?? null, websiteId: e.UMAMI_WEBSITE_ID ?? null };
+  }
+  if (!isCloudDeployment(e)) return { endpoint: null, websiteId: null };
+  return { endpoint: UMAMI_CLOUD_ENDPOINT, websiteId: UMAMI_CLOUD_WEBSITE_ID };
 }
 
 /**

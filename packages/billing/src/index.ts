@@ -28,4 +28,9 @@ export {
   reconcileTeamPlan,
   setOverage,
 } from "./subscription.js";
-export { handleWebhook, purgeStripeEvents, type WebhookDeps } from "./webhook.js";
+export {
+  type AppliedWebhookEvent,
+  handleWebhook,
+  purgeStripeEvents,
+  type WebhookDeps,
+} from "./webhook.js";

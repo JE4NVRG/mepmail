@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { env } from "@millionsend/config";
+import { appHostname, env, umamiFunnel } from "@millionsend/config";
 import { getDb } from "@millionsend/db";
 import { EMAIL_SEND_PRIORITY, Queue } from "@millionsend/queue";
 import { createKeyringFromEnv } from "@millionsend/ses";
@@ -35,6 +35,9 @@ const server = createSmtpServer({
       },
     );
   },
+  // A relay send is the team's send like any other: the funnel's activation
+  // step is claimed here too (no-op on self-host, where umamiFunnel is empty).
+  funnel: { ...umamiFunnel(), hostname: appHostname() },
   ...(certPath && keyPath
     ? { tls: { cert: readFileSync(certPath), key: readFileSync(keyPath) } }
     : {}),

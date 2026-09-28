@@ -5,6 +5,7 @@ import { and, count, eq } from "drizzle-orm";
 import { type EmailAttachment, encryptEmailBody, sealAttachments } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
 import { attachmentLimit, type QuotaTeamRow, type TeamQuota, teamQuota } from "./plans.js";
+import { emitFunnelEvent, type FunnelEventTarget, teamFunnelProps } from "./funnel-events.js";
 import { reserveQuota } from "./quota.js";
 import { parseSingleSender } from "./sender-address.js";
 import { extractAddrSpec, findSuppressed, normalizeAddress } from "./suppressions.js";
@@ -118,6 +119,12 @@ export interface AcceptEmailDeps {
   /** Cloud enforces plan quotas; self-host sends without caps. */
   isCloud: boolean;
   enqueueEmailSend: (emailId: string, opts?: { startAfter?: Date }) => Promise<void>;
+  /**
+   * Where the funnel's "first email sent" goes, when the deployment measures
+   * its funnel at all (see funnel-events). Absent — self-host, tests — the
+   * step is simply not recorded, and nothing else changes.
+   */
+  funnel?: FunnelEventTarget | undefined;
 }
 
 /** SECURITY: must come from verified authentication, never from the payload. */
@@ -413,6 +420,27 @@ export async function acceptEmail(
       );
     } catch (err) {
       console.error("email.send enqueue failed; reconcile sweep will recover", err);
+    }
+  }
+  // The funnel's activation step: the team's first accepted email. The claim
+  // is the ledger's unique key, so only the first accept of a team's life
+  // emits; every later one costs one conflict-checked insert and nothing
+  // else. Best-effort, like every measurement: it may never fail a send that
+  // is already committed. In the caller-owned transaction of a batch this
+  // runs before that caller commits, so a batch that is later rolled back can
+  // leave one claimed event behind — an accepted-then-retracted send counted
+  // once, which is the trade the funnel takes over reading the table on every
+  // accept.
+  if (deps.funnel) {
+    try {
+      await emitFunnelEvent(deps.db, deps.funnel, {
+        name: "first_email_sent",
+        dedupeKey: `first_email_sent:${auth.teamId}`,
+        teamId: auth.teamId,
+        resolve: (tx) => teamFunnelProps(tx, auth.teamId),
+      });
+    } catch (error) {
+      console.error("first_email_sent funnel event skipped", error);
     }
   }
   return { ok: true, id: accepted.id, parked: accepted.parked, recipientCount, day, quota };

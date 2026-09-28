@@ -31,6 +31,7 @@ import type { AppLocale } from "../../i18n/request";
 import { fetchQuotaRow } from "../billing";
 import { planBroadcastSend, planHoldUntil, sendingProgress } from "../broadcast-plan";
 import { resolveEditorSave } from "../email-content";
+import { funnelTarget } from "../funnel";
 import { getKeyring } from "../keyring";
 import { beforeCursor, createdAtCursorField, cursorSchema, paginate } from "../keyset";
 import { activeLocale } from "../locale";
@@ -661,6 +662,9 @@ export const broadcastsRouter = router({
           isCloud: env.IS_CLOUD,
           // Absent in tests: the reconcile sweep re-enqueues accepted rows.
           enqueueEmailSend: ctx.enqueueEmailSend ?? (async () => {}),
+          // A test send is an accepted email like any other: it claims the
+          // team's activation step when it happens to be the first.
+          funnel: funnelTarget(),
         },
         {
           teamId: ctx.teamId,

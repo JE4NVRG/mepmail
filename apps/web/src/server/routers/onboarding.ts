@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { fetchQuotaRow } from "../billing";
+import { funnelTarget } from "../funnel";
 import { getKeyring } from "../keyring";
 import { buildOnboardingEmail, MAIL_LOCALES } from "../onboarding-mail";
 import { router, teamProcedure } from "../trpc";
@@ -73,6 +74,9 @@ export const onboardingRouter = router({
           isCloud: env.IS_CLOUD,
           // Absent in tests: the reconcile sweep re-enqueues accepted rows.
           enqueueEmailSend: ctx.enqueueEmailSend ?? (async () => {}),
+          // The onboarding send is usually a team's very first accepted email,
+          // so this is where the funnel's activation step claims its row.
+          funnel: funnelTarget(),
         },
         {
           teamId: ctx.teamId,
