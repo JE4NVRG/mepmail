@@ -11,6 +11,7 @@ import {
   mcpResourceUrl,
   QUOTA_COLUMNS,
 } from "@millionsend/core";
+import { MCP_SERVER_CARD_CONTENT_TYPE, mcpServerCardBody } from "@millionsend/core/mcp-server-card";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import {
@@ -1223,6 +1224,15 @@ export function registerMcp(app: OpenAPIHono<Env>, deps: ApiDeps, appBaseUrl: st
   };
   app.get("/.well-known/oauth-protected-resource", (c) => c.json(metadata));
   app.get(`/.well-known/oauth-protected-resource${MCP_RESOURCE_PATH}`, (c) => c.json(metadata));
+  // Static server card, on this origin. A directory cannot scan an OAuth 2.1
+  // endpoint without a human granting consent, so Smithery's scanner falls back
+  // to /.well-known/mcp/server-card.json *on the MCP URL's origin* (its docs,
+  // "Option 3: Publish a static server card"). The dashboard serves the same
+  // document; both read @millionsend/core/mcp-server-card, so the tool surface
+  // published here is the one the settings page and the API's tools/list show.
+  app.get("/.well-known/mcp/server-card.json", (c) =>
+    c.body(mcpServerCardBody(), 200, { "content-type": MCP_SERVER_CARD_CONTENT_TYPE }),
+  );
   // Origin is not validated: auth is an explicit bearer (never cookies), so a
   // DNS-rebound page holds no credential — the same reasoning behind the REST
   // API's wildcard CORS.

@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { type ServerType, serve } from "@hono/node-server";
 import { DAY_MS, EnvKeyring, MCP_SCOPES, mcpResourceUrl } from "@millionsend/core";
+import { mcpServerCardBody } from "@millionsend/core/mcp-server-card";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
@@ -940,5 +941,26 @@ describe("REST parity tools", () => {
     );
     expect((await member.listTools()).tools.map((t) => t.name)).toEqual(["list_api_keys"]);
     await member.close();
+  });
+});
+
+describe("static server card", () => {
+  /**
+   * A directory's scanner reads the card from the origin of the MCP URL it was
+   * given, so this route — not the dashboard's copy — is what unblocks a scan
+   * behind the OAuth wall. Measured with SmitheryBot/1.0 on 2026-09-28: it
+   * fetched https://api-mepmail.je4ndev.com/.well-known/mcp/server-card.json.
+   */
+  it("serves the shared card on the endpoint's own origin", async () => {
+    const res = await app.request("/.well-known/mcp/server-card.json");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    const body = await res.text();
+    // Byte-identical to the dashboard's copy: one module, so a scanner and a
+    // human reading the card cannot see different tool surfaces.
+    expect(body).toBe(mcpServerCardBody());
+    const card = JSON.parse(body) as { tools: unknown[]; capabilities: { tools: unknown } };
+    expect(card.tools.length).toBeGreaterThan(50);
+    expect(card.capabilities.tools).toEqual({ listChanged: false });
   });
 });
