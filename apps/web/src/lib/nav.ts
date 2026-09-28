@@ -37,6 +37,20 @@ export function pickActive(pathname: string, hrefs: readonly string[]): string |
   return hrefs.filter((href) => isActive(pathname, href)).sort((a, b) => b.length - a.length)[0];
 }
 
+/**
+ * The dashboard nav a signed-in account sees. The operator console's row is
+ * appended for the instance operator and for nobody else — the item is UI
+ * convergence only: `/console` and every console procedure answer 404 for
+ * any other account, and that server gate is the access control.
+ */
+export function navItemsWithConsole<T>(
+  items: readonly T[],
+  consoleItem: T,
+  isOperator: boolean,
+): readonly T[] {
+  return isOperator ? [...items, consoleItem] : items;
+}
+
 /** The console's Teams list, searched down to one team (the search matches an id). */
 export function consoleTeamHref(teamId: string): string {
   return `/console/teams?q=${encodeURIComponent(teamId)}`;

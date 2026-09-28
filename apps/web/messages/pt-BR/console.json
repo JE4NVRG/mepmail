@@ -133,7 +133,9 @@
       "domainsSub": "verificados · {pending} pendentes · {failed} com DKIM falhando",
       "queue": "Fila",
       "queueSub": "{waiting} na fila · {held} retidos (plano + ritmo) · mais antigo {oldest}",
-      "queuePending": "contado na próxima sonda"
+      "queuePending": "contado na próxima sonda",
+      "users": "Usuários",
+      "usersSub": "{verified} com endereço verificado"
     },
     "sent": {
       "title": "Enviados por dia",

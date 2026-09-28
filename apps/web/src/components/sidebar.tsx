@@ -10,7 +10,7 @@ import { useDismiss } from "@/components/popover-menu";
 import { TeamSwitcher } from "@/components/team-switcher";
 import { authClient } from "@/lib/auth-client";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
-import { isActive } from "@/lib/nav";
+import { isActive, navItemsWithConsole } from "@/lib/nav";
 import { applyTheme, currentTheme, type Theme } from "@/lib/theme";
 import { useTRPC } from "@/lib/trpc";
 
@@ -27,6 +27,17 @@ export const NAV_ITEMS: ReadonlyArray<{ key: string; href: string; icon: NavIcon
   { key: "webhooks", href: "/webhooks", icon: "webhooks" },
   { key: "settings", href: "/settings", icon: "settings" },
 ];
+
+/**
+ * The operator console's row: rendered only for the instance operator (see
+ * navItemsWithConsole). Non-operators keep the plain list — and the console
+ * itself is a 404 for them, since the gate is the server's, not this item.
+ */
+export const CONSOLE_NAV_ITEM: (typeof NAV_ITEMS)[number] = {
+  key: "console",
+  href: "/console",
+  icon: "console",
+};
 
 // Hover state lives per link so a hover repaints one glyph, not the whole nav.
 function NavItem({
@@ -171,6 +182,13 @@ export function Sidebar({
   // The console is the operator's own: the item appears only for them, and
   // the gate is the server's (a 404 for anyone else), never this query.
   const operator = useQuery(trpc.system.operator.queryOptions());
+  // The console's row rides on the same query the account menu uses: an
+  // operator sees /console in the nav, everyone else keeps the plain list.
+  const navItems = navItemsWithConsole(
+    NAV_ITEMS,
+    CONSOLE_NAV_ITEM,
+    operator.data?.isOperator === true,
+  );
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -231,7 +249,7 @@ export function Sidebar({
             : undefined
         }
       >
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <NavItem
             key={item.key}
             item={item}
