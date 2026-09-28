@@ -4,6 +4,7 @@
     "overview": "Visão geral",
     "regions": "Regiões",
     "teams": "Equipes",
+    "users": "Usuários",
     "safety": "Confiança e segurança",
     "audit": "Auditoria",
     "operator": "Operador"
@@ -398,6 +399,30 @@
       "action": "Solicitar aumento de cota",
       "justification": "A fila de transmissões libera até {date}; os planos vendidos ultrapassam a parcela de transmissões da cota."
     }
+  },
+  "users": {
+    "title": "Usuários",
+    "proof": "{total} usuários · {verified} com endereço verificado",
+    "search": "Buscar nome, e-mail ou id",
+    "filters": {
+      "verified": "Verificado: {value}",
+      "all": "Todos"
+    },
+    "columns": {
+      "name": "Usuário",
+      "email": "E-mail",
+      "teams": "Equipes",
+      "sent30d": "Enviados 30d",
+      "joined": "Entrou em",
+      "seen": "Último acesso",
+      "verified": "Verificado"
+    },
+    "yes": "Verificado",
+    "no": "Não verificado",
+    "operatorBadge": "Operador",
+    "sentHint": "Envios de 30 dias de todas as equipes deste usuário.",
+    "ofUsers": "{shown} de {total} usuários",
+    "empty": "Nenhum usuário corresponde."
   },
   "teams": {
     "title": "Equipes",

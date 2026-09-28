@@ -707,16 +707,19 @@ either way.
 region with quota, pricing plan and enforcement status, and the health probes
 with their history), a Regions page, a Teams page with operator actions
 (change plan or type, daily send ceiling, pause broadcasts, suspend and
-reinstate), a Trust & safety page built on the guardrail, the account score,
+reinstate), a Users page listing every registered account with the teams it
+belongs to, the sends of those teams over 30 days, its sign-up and last
+sign-in dates, a Trust & safety page built on the guardrail, the account score,
 the stored content insights (never email bodies) and, when the optional
 content monitor is on, the model's sampled verdicts, and an instance-wide
 audit log.
 
 Only the instance operator (the first registered user) can open it; everyone
-else gets a 404, and nothing in the app links to it. On a self-hosted
-instance, **Settings → SES** shows the operator an "Instance console" card
-with an "Open console" button; the direct URL `https://<your-host>/console`
-works too. Every number comes from Postgres or a free SESv2 `GetAccount`
+else gets a 404. The operator reaches it from the account menu at the foot of
+the sidebar (**Operator console**), and on a self-hosted instance
+**Settings → SES** also shows an "Instance console" card with an "Open
+console" button; the direct URL `https://<your-host>/console` works too. Every
+number comes from Postgres or a free SESv2 `GetAccount`
 read per region; no paid AWS API is called, and the per-region cost is a
 local estimate.
 
