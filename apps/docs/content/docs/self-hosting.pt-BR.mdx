@@ -713,15 +713,18 @@ nos dois casos.
 região do SES com cota, plano de preços e status de enforcement, e as sondas
 de saúde com histórico), uma página de Regiões, uma página de Equipes com
 ações do operador (alterar plano ou tipo, teto diário de envio, pausar
-transmissões, suspender e reativar), uma página de Confiança e segurança
+transmissões, suspender e reativar), uma página de Usuários com todas as contas
+cadastradas, as equipes de cada uma, os envios dessas equipes em 30 dias e as
+datas de cadastro e do último acesso, uma página de Confiança e segurança
 construída sobre o guardrail, o score da conta, os insights de conteúdo
 armazenados (nunca o corpo dos e-mails) e, quando o monitor de conteúdo
 opcional está ligado, os veredictos amostrados do modelo, e um log de
 auditoria da instância.
 
 Só o operador da instância (o primeiro usuário cadastrado) consegue abri-lo;
-todos os outros recebem 404, e nada no app leva até ele. Em uma instância
-self-hosted, **Configurações → SES** mostra ao operador um cartão "Console da
+todos os outros recebem 404. O operador chega até ele pelo menu da conta, no
+rodapé da barra lateral (**Console do operador**), e em uma instância
+self-hosted **Configurações → SES** também mostra um cartão "Console da
 instância" com o botão "Abrir console"; a URL direta
 `https://<seu-host>/console` também funciona. Todo número vem do Postgres ou
 de uma leitura gratuita de `GetAccount` do SESv2 por região; nenhuma API paga
