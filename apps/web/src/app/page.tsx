@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { type CalcLabels, LandingCalculator } from "@/components/landing-calculator";
 import { LandingLangSwitch } from "@/components/landing-lang-switch";
+import { LandingNav } from "@/components/landing-nav";
 import { SignupCta } from "@/components/signup-cta";
 import { formatUsd, PRICE_ROWS } from "@/lib/landing-pricing";
 import { hasSession } from "@/server/auth";
@@ -230,7 +231,7 @@ export default async function RootPage() {
               {t("nav.badge")}
             </span>
           </div>
-          <nav className="gtm-nav" aria-label={t("navAria")}>
+          <LandingNav label={t("navAria")} menuLabel={t("nav.menu")}>
             <div className="gtm-nav-links">
               <a href="#comparativo">{t("nav.compare")}</a>
               <a href="#planos">{t("nav.plans")}</a>
@@ -243,9 +244,13 @@ export default async function RootPage() {
               <a className="gtm-nav-login" href="/login">
                 {t("nav.login")}
               </a>
-              <SignupLink label={t("nav.signup")} />
             </div>
-          </nav>
+          </LandingNav>
+          {/* A CTA fica FORA da .gtm-nav: ela precisa continuar visível na 1ª
+              linha do header quando a nav colapsa no mobile (ver landing.css). */}
+          <div className="gtm-header-cta">
+            <SignupLink label={t("nav.signup")} />
+          </div>
         </div>
       </header>
       <main id="conteudo">
