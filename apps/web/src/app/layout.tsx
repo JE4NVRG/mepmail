@@ -8,6 +8,7 @@ import { cookies } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Providers } from "@/components/providers";
+import { UmamiAnalytics } from "@/components/umami-analytics";
 import { THEME_INIT_SCRIPT, THEME_KEY } from "@/lib/theme";
 
 // metadataBase comes from the runtime APP_BASE_URL, so a self-hosted instance
@@ -48,6 +49,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="ms">
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static theme bootstrap, no user input */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <UmamiAnalytics />
         <NextIntlClientProvider>
           <Providers>{children}</Providers>
         </NextIntlClientProvider>
