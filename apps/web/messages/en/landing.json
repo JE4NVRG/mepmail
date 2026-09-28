@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "MepMail — Transactional email with a Resend-compatible API",
-    "description": "Transactional email with assisted onboarding. Compare MepMail plans, send through the Resend-compatible API or the SMTP relay, and create your free beta account."
+    "description": "Transactional email with a Resend-compatible API and assisted onboarding. Compare MepMail plans, send through the API or the SMTP relay, and create your free beta account."
   },
   "skip": "Skip to content",
   "brandAria": "MepMail — home",
@@ -9,9 +9,14 @@
   "nav": {
     "compare": "Compare prices",
     "plans": "Plans",
+    "mcp": "MCP",
     "how": "How it works",
     "login": "Sign in",
-    "signup": "Create account"
+    "signup": "Create account",
+    "badge": "Agent-ready"
+  },
+  "announce": {
+    "text": "Agent-ready — official MCP: your AI agents send email"
   },
   "lang": {
     "aria": "Page language"
@@ -22,14 +27,33 @@
     "lead": "Send transactional email with a Resend-compatible HTTPS API or the SMTP relay. We help you set up your domain, DKIM and MAIL FROM. USD pricing and assisted onboarding.",
     "ctaSignup": "Create free account",
     "ctaPlans": "See plans",
-    "note": "Open beta: 100 free accounts, each capped at 100 emails per day. Create yours in one minute — no card required."
+    "note": "Open beta: 100 free accounts, each capped at 100 emails per day. Create yours in one minute — no card required.",
+    "trust": [
+      "Resend-compatible API",
+      "SMTP relay with STARTTLS",
+      "DKIM and MAIL FROM on your domain",
+      "Assisted onboarding"
+    ],
+    "demo": {
+      "subject": "Hello from MepMail",
+      "responseLabel": "Response",
+      "caption": "The same official Resend SDK, pointed at MepMail."
+    }
   },
   "compare": {
     "eyebrow": "Pricing without guesswork",
     "title": "Compare by the volume you actually send.",
     "intro": "The numbers below compare the cheapest plan covering each monthly volume. Savings vary by tier and provider; confirm current terms before subscribing.",
     "tableAria": "Price comparison by volume",
-    "columns": ["Emails/month", "MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "Advantage"],
+    "columns": [
+      "Emails/month",
+      "MepMail",
+      "Resend",
+      "SendGrid",
+      "Postmark",
+      "Mailgun",
+      "Advantage"
+    ],
     "slideNote": "Swipe the table to see every provider on smaller screens.",
     "refNote": "Reference: commercial analysis of 2026-09-27; third-party public prices can change and features/terms are not equivalent. USD per month, excluding taxes and overages. “(sales)” means a commercial quote, not a public price."
   },
@@ -59,25 +83,84 @@
   "plans": {
     "eyebrow": "Plans",
     "title": "Pick your volume. We help with the setup.",
-    "intro": "Every plan includes assisted onboarding and support in Portuguese. Monthly prices in USD; for the first customers, billing via PIX in BRL at the day's exchange rate.",
+    "intro": "Every plan includes assisted onboarding and support. Monthly prices in USD, billed monthly, no lock-in.",
     "perMonth": "/month",
     "limitsLabel": "Workspaces and limits",
     "overageLabel": "Overage",
     "attachmentLabel": "Attachments per message",
     "cta": "Start free",
+    "featuredBadge": "Most popular",
+    "showScale": "Scale plans (500K–2.5M)",
+    "ctaNote": "Create your free account first — activating the plan is one click in the panel.",
     "items": [
-      { "volume": "100/day (~3k/month)", "limits": "1 domain · 1 workspace · 1,000 contacts", "overage": "stops at cap", "attachment": "1 MB" },
-      { "volume": "1,500/day (~45k/month)", "limits": "3 domains · 2 workspaces · 10,000 contacts", "overage": "stops at cap", "attachment": "1 MB" },
-      { "volume": "100,000/month", "limits": "10 domains · 5 workspaces · unlimited contacts", "overage": "US$ 0.90/1k", "attachment": "5 MB" },
-      { "volume": "200,000/month", "limits": "10 domains · 5 workspaces · unlimited contacts", "overage": "US$ 0.35/1k", "attachment": "5 MB" },
-      { "volume": "500,000/month", "limits": "Unlimited domains · 10 workspaces · unlimited contacts", "overage": "US$ 0.25/1k", "attachment": "10 MB" },
-      { "volume": "1,000,000/month", "limits": "Unlimited domains · 10 workspaces · unlimited contacts", "overage": "US$ 0.23/1k", "attachment": "10 MB" },
-      { "volume": "1,500,000/month", "limits": "Unlimited domains · 10 workspaces · unlimited contacts", "overage": "US$ 0.18/1k", "attachment": "10 MB" },
-      { "volume": "2,500,000/month", "limits": "Unlimited domains · 10 workspaces · unlimited contacts", "overage": "US$ 0.16/1k", "attachment": "10 MB" }
+      {
+        "volume": "100/day (~3k/month)",
+        "limits": "1 domain · 1 workspace · 1,000 contacts",
+        "overage": "stops at cap",
+        "attachment": "1 MB",
+        "cta": "Start free"
+      },
+      {
+        "volume": "1,500/day (~45k/month)",
+        "limits": "3 domains · 2 workspaces · 10,000 contacts",
+        "overage": "stops at cap",
+        "attachment": "1 MB",
+        "cta": "Start with Starter"
+      },
+      {
+        "volume": "100,000/month",
+        "limits": "10 domains · 5 workspaces · unlimited contacts",
+        "overage": "US$ 0.90/1k",
+        "attachment": "5 MB",
+        "cta": "Start with Pro 100K"
+      },
+      {
+        "volume": "200,000/month",
+        "limits": "10 domains · 5 workspaces · unlimited contacts",
+        "overage": "US$ 0.35/1k",
+        "attachment": "5 MB",
+        "cta": "Start with Pro 200K"
+      },
+      {
+        "volume": "500,000/month",
+        "limits": "Unlimited domains · 10 workspaces · unlimited contacts",
+        "overage": "US$ 0.25/1k",
+        "attachment": "10 MB",
+        "cta": "Start with Scale 500K"
+      },
+      {
+        "volume": "1,000,000/month",
+        "limits": "Unlimited domains · 10 workspaces · unlimited contacts",
+        "overage": "US$ 0.23/1k",
+        "attachment": "10 MB",
+        "cta": "Start with Scale 1M"
+      },
+      {
+        "volume": "1,500,000/month",
+        "limits": "Unlimited domains · 10 workspaces · unlimited contacts",
+        "overage": "US$ 0.18/1k",
+        "attachment": "10 MB",
+        "cta": "Start with Scale 1.5M"
+      },
+      {
+        "volume": "2,500,000/month",
+        "limits": "Unlimited domains · 10 workspaces · unlimited contacts",
+        "overage": "US$ 0.16/1k",
+        "attachment": "10 MB",
+        "cta": "Start with Scale 2.5M"
+      }
     ],
     "note": "Free and Starter have a daily limit (UTC); the monthly volume is illustrative only. On Pro and Scale, per-1,000 overage depends on enablement at provisioning; without it, sending stops at the quota. Even with overage enabled, the safety ceiling of 5× the included volume applies.",
-    "offerProactive": "<strong>Optional proactive management: +US$ 29/month.</strong> Includes reputation monitoring, DNS/deliverability tuning and priority support. Without management, you keep assisted onboarding and support. No lock-in.",
-    "offerFirst3": "<strong>For the first 3 customers: free setup and 2 months of free management.</strong> Create your free account and talk to us to claim yours.",
+    "founders": {
+      "title": "Founders program (beta)",
+      "items": [
+        "Free assisted setup for the first 3 customers.",
+        "2 months of free proactive management: reputation, DNS/deliverability and priority support.",
+        "A direct line to the team that builds the product."
+      ],
+      "note": "After the founder period, proactive management stays optional at +US$ 29/month. No lock-in: cancel anytime.",
+      "cta": "Claim my spot"
+    },
     "noteAttach": "Per-email limit: total attachment size after decoding, not per file."
   },
   "how": {
@@ -121,14 +204,26 @@
         "a": "On Free and Starter, sending stops at the daily limit. On Pro and Scale, with overage enabled, extra sends are billed at each plan's per-1,000 rate and respect the safety ceiling of 5× the included volume; without overage enabled, they stop at the monthly quota. If you expect volume growth, talk to us first."
       },
       {
-        "q": "Is support in Portuguese?",
-        "a": "Yes. Onboarding is assisted and support is direct, in Portuguese, with the people who built the product. Proactive management is optional and adds monitoring, tuning and priority handling."
+        "q": "Do I need a credit card to start?",
+        "a": "No. The beta is free — create your account and send your first emails without adding a payment method. Paid plans are billed monthly in USD."
       },
       {
         "q": "How does the beta work?",
         "a": "The beta is limited to 100 free accounts, each capped at 100 emails per day on the Free plan. When spots run out, new signups pause until the next batch; for higher volume, talk to us and we agree on a plan."
       }
     ]
+  },
+  "mcp": {
+    "eyebrow": "Agent-ready",
+    "title": "Let your AI agents send email.",
+    "body": "MepMail ships an official <b>MCP server</b>. Claude, Cursor, Codex and any MCP client connect straight to your sending domain — hosted (OAuth, nothing to install) or local (npx @mepmail/mcp).",
+    "points": [
+      "Hosted: connect with OAuth at api-mepmail.je4ndev.com/mcp.",
+      "Local: npx @mepmail/mcp with a dedicated API key.",
+      "Both modes expose the same tools."
+    ],
+    "caption": "Paste it into your MCP client. Done.",
+    "cta": "Create account and connect"
   },
   "close": {
     "title": "Shall we find the plan for your volume?",
@@ -138,7 +233,21 @@
   "footer": {
     "navAria": "Footer",
     "tagline": "MepMail · Transactional email with assisted onboarding",
+    "points": [
+      "Amazon SES in production — 500k emails/day",
+      "Drop-in compatible with Resend's API",
+      "Migrate in minutes, no code rewrite"
+    ],
+    "cta": "Create free account",
+    "colProduct": "Product",
+    "colAccount": "Account",
+    "colLegal": "Legal",
+    "terms": "Terms",
+    "privacy": "Privacy",
     "login": "Sign in",
-    "contact": "Contact"
+    "contact": "Contact",
+    "credit": "Created by",
+    "ghAria": "Je4nDev on GitHub",
+    "rights": "© 2026 MepMail. All rights reserved."
   }
 }

@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "MepMail — E-mail transacional com API compatível com Resend",
-    "description": "E-mail transacional com onboarding assistido. Compare planos MepMail, envie pela API compatível com Resend ou relay SMTP e crie sua conta grátis no beta."
+    "description": "E-mail transacional com API compatível com Resend e onboarding assistido. Compare planos MepMail, envie pela API ou pelo relay SMTP e crie sua conta grátis no beta."
   },
   "skip": "Pular para o conteúdo",
   "brandAria": "MepMail — início",
@@ -9,9 +9,14 @@
   "nav": {
     "compare": "Comparar preços",
     "plans": "Planos",
+    "mcp": "MCP",
     "how": "Como funciona",
     "login": "Entrar",
-    "signup": "Criar conta"
+    "signup": "Criar conta",
+    "badge": "Agent-ready"
+  },
+  "announce": {
+    "text": "Agent-ready — MCP oficial: seus agentes de IA enviam e-mail"
   },
   "lang": {
     "aria": "Idioma da página"
@@ -22,7 +27,18 @@
     "lead": "Envie e-mails transacionais com API HTTPS compatível com o Resend ou relay SMTP. Nós ajudamos a configurar seu domínio, DKIM e MAIL FROM. Planos em USD e implantação assistida.",
     "ctaSignup": "Criar conta grátis",
     "ctaPlans": "Ver planos",
-    "note": "Beta aberto: 100 contas grátis, teto de 100 e-mails por dia em cada uma. Crie a sua em 1 minuto — sem cartão."
+    "note": "Beta aberto: 100 contas grátis, teto de 100 e-mails por dia em cada uma. Crie a sua em 1 minuto — sem cartão.",
+    "trust": [
+      "API compatível com Resend",
+      "Relay SMTP com STARTTLS",
+      "DKIM e MAIL FROM no seu domínio",
+      "Onboarding assistido"
+    ],
+    "demo": {
+      "subject": "Olá do MepMail",
+      "responseLabel": "Resposta",
+      "caption": "O mesmo SDK oficial do Resend, com a base URL do MepMail."
+    }
   },
   "compare": {
     "eyebrow": "Preço sem adivinhação",
@@ -59,25 +75,84 @@
   "plans": {
     "eyebrow": "Planos",
     "title": "Escolha o volume. Nós ajudamos na configuração.",
-    "intro": "Todos os planos incluem onboarding assistido e suporte em português. Preços mensais em USD; para os primeiros clientes, cobrança via PIX em BRL pela cotação do dia.",
+    "intro": "Todos os planos incluem onboarding assistido e suporte. Preços mensais em USD, sem fidelidade.",
     "perMonth": "/mês",
     "limitsLabel": "Workspaces e limites",
     "overageLabel": "Excedente",
     "attachmentLabel": "Anexos por mensagem",
     "cta": "Começar grátis",
+    "featuredBadge": "Mais popular",
+    "showScale": "Planos Scale (500K–2.5M)",
+    "ctaNote": "Crie a conta grátis primeiro — a ativação do plano é feita no painel, em 1 clique.",
     "items": [
-      { "volume": "100/dia (~3k/mês)", "limits": "1 domínio · 1 workspace · 1.000 contatos", "overage": "para no cap", "attachment": "1 MB" },
-      { "volume": "1.500/dia (~45k/mês)", "limits": "3 domínios · 2 workspaces · 10.000 contatos", "overage": "para no cap", "attachment": "1 MB" },
-      { "volume": "100.000/mês", "limits": "10 domínios · 5 workspaces · contatos ilimitados", "overage": "US$ 0,90/1k", "attachment": "5 MB" },
-      { "volume": "200.000/mês", "limits": "10 domínios · 5 workspaces · contatos ilimitados", "overage": "US$ 0,35/1k", "attachment": "5 MB" },
-      { "volume": "500.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,25/1k", "attachment": "10 MB" },
-      { "volume": "1.000.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,23/1k", "attachment": "10 MB" },
-      { "volume": "1.500.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,18/1k", "attachment": "10 MB" },
-      { "volume": "2.500.000/mês", "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados", "overage": "US$ 0,16/1k", "attachment": "10 MB" }
+      {
+        "volume": "100/dia (~3k/mês)",
+        "limits": "1 domínio · 1 workspace · 1.000 contatos",
+        "overage": "para no cap",
+        "attachment": "1 MB",
+        "cta": "Começar grátis"
+      },
+      {
+        "volume": "1.500/dia (~45k/mês)",
+        "limits": "3 domínios · 2 workspaces · 10.000 contatos",
+        "overage": "para no cap",
+        "attachment": "1 MB",
+        "cta": "Começar no Starter"
+      },
+      {
+        "volume": "100.000/mês",
+        "limits": "10 domínios · 5 workspaces · contatos ilimitados",
+        "overage": "US$ 0,90/1k",
+        "attachment": "5 MB",
+        "cta": "Começar no Pro 100K"
+      },
+      {
+        "volume": "200.000/mês",
+        "limits": "10 domínios · 5 workspaces · contatos ilimitados",
+        "overage": "US$ 0,35/1k",
+        "attachment": "5 MB",
+        "cta": "Começar no Pro 200K"
+      },
+      {
+        "volume": "500.000/mês",
+        "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados",
+        "overage": "US$ 0,25/1k",
+        "attachment": "10 MB",
+        "cta": "Começar no Scale 500K"
+      },
+      {
+        "volume": "1.000.000/mês",
+        "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados",
+        "overage": "US$ 0,23/1k",
+        "attachment": "10 MB",
+        "cta": "Começar no Scale 1M"
+      },
+      {
+        "volume": "1.500.000/mês",
+        "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados",
+        "overage": "US$ 0,18/1k",
+        "attachment": "10 MB",
+        "cta": "Começar no Scale 1.5M"
+      },
+      {
+        "volume": "2.500.000/mês",
+        "limits": "Domínios ilimitados · 10 workspaces · contatos ilimitados",
+        "overage": "US$ 0,16/1k",
+        "attachment": "10 MB",
+        "cta": "Começar no Scale 2.5M"
+      }
     ],
     "note": "Free e Starter têm limite diário (UTC); o volume mensal é apenas ilustrativo. Em Pro e Scale, o excedente por 1.000 depende de habilitação no provisionamento; sem ele, os envios param na cota. Mesmo com excedente habilitado, vale o teto de segurança de 5× o volume incluído.",
-    "offerProactive": "<strong>Gestão proativa opcional: +US$ 29/mês.</strong> Inclui monitoramento de reputação, ajustes de DNS/entregabilidade e prioridade de atendimento. Sem gestão, você continua com onboarding assistido e suporte. Sem fidelidade.",
-    "offerFirst3": "<strong>Para os 3 primeiros clientes: setup grátis e 2 meses de gestão grátis.</strong> Crie sua conta grátis e fale com a gente para garantir a sua.",
+    "founders": {
+      "title": "Programa fundadores (beta)",
+      "items": [
+        "Setup assistido grátis para os 3 primeiros clientes.",
+        "2 meses de gestão proativa grátis: reputação, DNS/entregabilidade e prioridade de atendimento.",
+        "Contato direto com quem constrói o produto."
+      ],
+      "note": "Depois do período de fundador, a gestão proativa segue opcional a +US$ 29/mês. Sem fidelidade: cancele quando quiser.",
+      "cta": "Garantir minha vaga"
+    },
     "noteAttach": "Limite por e-mail: tamanho total dos anexos após decodificação, não por arquivo."
   },
   "how": {
@@ -121,14 +196,26 @@
         "a": "No Free e Starter, os envios param no limite diário. Nos planos Pro e Scale, com excedente habilitado, os envios adicionais são cobrados pela tarifa de cada plano por 1.000 e respeitam o teto de segurança de 5× o volume incluído; sem excedente habilitado, param na cota mensal. Se você prevê aumento de volume, fale conosco antes."
       },
       {
-        "q": "O suporte é em português?",
-        "a": "Sim. O onboarding é assistido e o suporte é direto em português com quem construiu o produto. A gestão proativa é opcional e adiciona monitoramento, ajustes e prioridade de atendimento."
+        "q": "Preciso de cartão de crédito para começar?",
+        "a": "Não. O beta é grátis — crie sua conta e faça seus primeiros envios sem cadastrar forma de pagamento. Os planos pagos são cobrados mensalmente em USD."
       },
       {
         "q": "Como funciona o beta?",
         "a": "O beta é limitado a 100 contas grátis, cada uma com teto de 100 e-mails por dia no plano Free. Quando as vagas acabam, novos cadastros pausam até a próxima leva; para volume maior, fale com a gente e combinamos o plano."
       }
     ]
+  },
+  "mcp": {
+    "eyebrow": "Agent-ready",
+    "title": "Deixe seus agentes de IA enviarem e-mail.",
+    "body": "O MepMail expõe um <b>MCP server</b> oficial. Claude, Cursor, Codex e qualquer cliente MCP conectam direto ao seu domínio de envio — no modo hospedado (OAuth, sem instalar) ou local (npx @mepmail/mcp).",
+    "points": [
+      "Hospedado: conecte com OAuth em api-mepmail.je4ndev.com/mcp.",
+      "Local: npx @mepmail/mcp com uma API key dedicada.",
+      "Os dois modos expõem as mesmas tools."
+    ],
+    "caption": "Cole no seu cliente MCP e pronto.",
+    "cta": "Criar conta e conectar"
   },
   "close": {
     "title": "Vamos encontrar o plano para o seu volume?",
@@ -138,7 +225,21 @@
   "footer": {
     "navAria": "Rodapé",
     "tagline": "MepMail · E-mail transacional com implantação assistida",
+    "points": [
+      "Amazon SES em produção — 500 mil e-mails/dia",
+      "API compatível com a do Resend",
+      "Migração em minutos, sem refazer código"
+    ],
+    "cta": "Criar conta grátis",
+    "colProduct": "Produto",
+    "colAccount": "Conta",
+    "colLegal": "Legal",
+    "terms": "Termos",
+    "privacy": "Privacidade",
     "login": "Entrar",
-    "contact": "Contato"
+    "contact": "Contato",
+    "credit": "Criado por",
+    "ghAria": "GitHub do Je4nDev",
+    "rights": "© 2026 MepMail. Todos os direitos reservados."
   }
 }
