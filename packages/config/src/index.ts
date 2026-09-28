@@ -35,8 +35,6 @@ export {
   supportViewEnabled,
   trackingCnameTarget,
   trackingSubdomainsSupported,
-  UMAMI_CLOUD_ENDPOINT,
-  UMAMI_CLOUD_WEBSITE_ID,
   umamiFunnel,
   unsubscribeBaseUrl,
 } from "./env.js";

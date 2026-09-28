@@ -197,8 +197,9 @@ export interface ApiDeps {
   /**
    * Where the funnel's activation step goes (core funnel-events): the API is a
    * producer like the dashboard's, so a team's first accepted email is claimed
-   * here too. Optional — a self-host with no collector emits nothing, which is
-   * the default (see umamiFunnel in @millionsend/config).
+   * here too. Optional — an environment that set no UMAMI_ENDPOINT/
+   * UMAMI_WEBSITE_ID pair emits nothing, and that is the default: nothing in
+   * @millionsend/config invents a collector (see umamiFunnel there).
    */
   funnel?: FunnelEventTarget | undefined;
   /**

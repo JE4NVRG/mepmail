@@ -86,8 +86,8 @@ const app = createApi({
       pacingHorizonDays((await settings()).emailRetentionDays ?? env.EMAIL_RETENTION_DAYS),
   },
   isCloud: env.IS_CLOUD,
-  // Cloud pins the funnel collector in code (umamiFunnel); a self-host with
-  // UMAMI_ENDPOINT unset gets nulls and emits nothing.
+  // The funnel collector is whatever THIS environment set explicitly
+  // (umamiFunnel, no cloud default): unset → nulls → nothing is emitted.
   funnel: { ...umamiFunnel(), hostname: appHostname() },
   onboardingEmailFrom: env.ONBOARDING_EMAIL_FROM,
   requireVerifiedMembers: accountMailDeliverable(),
