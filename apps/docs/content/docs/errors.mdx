@@ -15,30 +15,61 @@ Every API error uses the same JSON shape, matching the Resend wire protocol:
 
 ## Error codes
 
+Every code this deployment emits, by status. The same conditions reach the
+[MCP server](/mcp) as tool results carrying this body, and the SMTP relay as
+its own protocol status — the names are the API's.
+
 | `name` | HTTP | What it means | What to do |
 | --- | --- | --- | --- |
+| `invalid_parameter` | 400 | A parameter value is not allowed (e.g. editing a sent broadcast) | Fix the request |
+| `invalid_payload` | 400 | The request body could not be parsed | Send valid JSON |
 | `missing_api_key` | 401 | No `Authorization` header | Send `Authorization: Bearer ms_...` |
 | `invalid_api_key` | 401 | The key is unknown or was revoked | Re-read the key once (rotation?); if it still fails, stop — do not retry |
 | `restricted_api_key` | 403 | The key is valid but not allowed for this resource (permission level, or a sender domain outside the key's scope) | Use a key whose scope covers the call, or ask the operator for one |
 | `plan_limit_reached` | 403 | A plan cap was hit (contacts, domains, teams) | Free space within the plan's limits, or upgrade |
 | `forbidden` | 403 | The caller's team role does not allow this action | Check the role behind the credential |
+| `team_suspended` | 403 | The instance operator suspended the team. Keys still authenticate so the caller learns why; nothing leaves | Stop sending and talk to the instance operator — retrying only repeats it |
+| `sending_paused` | 403 | The team's own hard-bounce or complaint rate crossed the sending guardrail | Fix the list before sending again — see [sending pauses](#sending-pauses-and-holds) |
+| `broadcasts_paused` | 403 | Broadcast sending is paused for this team by the operator, or in the sender's SES region while the platform's rate recovers | Transactional email is unaffected; retry the broadcast later |
 | `not_found` | 404 | The resource does not exist (or belongs to another team) | Verify the id and the endpoint |
 | `conflict` | 409 | The resource is in a conflicting state | Read the current state, then retry the operation |
+| `invalid_idempotent_request` | 409 | The `Idempotency-Key` was already used with a different payload | Terminal — send the new payload under a new key, or resend the original body with the original key |
 | `concurrent_idempotent_requests` | 409 | A request with the same idempotency key is still in flight | Wait, then retry with the same key |
-| `invalid_parameter` | 400 | A parameter value is not allowed (e.g. editing a sent broadcast) | Fix the request |
-| `invalid_payload` | 400 | The request body could not be parsed | Send valid JSON |
-| `validation_error` | 422 | The payload failed schema validation | Read `message`; fix the field it names |
+| `payload_too_large` | 413 | The request body exceeds the deployment's 25 MiB ceiling — attachments travel inline (base64), so they are part of the body | Shrink the message, or send the file as a link instead |
+| `validation_error` | 422 | The payload failed schema validation — or a send was refused by a rule no field names: an unverified `from` domain, a `from` that is not a single address, the onboarding sender reaching outside the team, a suppressed batch item, attachments over the plan's ceiling (1 MB on Free and Starter, 5 MB on Pro, 10 MB on Scale) | Read `message`; fix what it names |
 | `all_recipients_suppressed` | 422 | Every recipient is on the suppression list | Check suppressions before resending |
-| `payload_too_large` | 413 | Attachments exceed the plan's ceiling (1/1/5/10 MB by plan) | Shrink attachments, or move to a higher plan |
+| `broadcast_too_large` | 422 | The audience needs more sending capacity than the deployment's horizon allows (over 24 days) | Split it into smaller segments, or ask the operator for more capacity |
 | `rate_limit_exceeded` | 429 | Too many requests in a short window | Back off with exponential delay — see [rate limits](/rate-limits) |
-| `monthly_quota_exceeded` | 429 | The plan's included volume is exhausted and overage is off | Wait for the period to renew, enable overage, or upgrade |
+| `daily_quota_exceeded` | 429 | The plan's daily send allowance is spent and the queued backlog is full (Free, Starter) | Retry after the UTC day rolls over; a higher plan buys headroom |
+| `monthly_quota_exceeded` | 429 | The plan's included monthly volume is exhausted and overage is off (Pro, Scale) — or its overage hard cap was reached | Wait for the period to renew, turn on overage in Billing, or upgrade |
 | `internal_server_error` | 500 | A bug on our side | Retry with backoff; report it if it persists |
+
+## Sending pauses and holds
+
+Three refusals mean "not now, and not because of your request". All three are
+`403` and deterministic — no retry loop clears them:
+
+- **`sending_paused`** — the team's own hard-bounce or complaint rate over the
+  trailing window is at or above the guardrail, so a send is refused before it
+  reaches the queue. The message names the metric, the rate, the window and the
+  limit. Clean the list and slow down until the rate falls back under the line;
+  [deliverability insights](/concepts/deliverability-insights) is the report
+  that says which addresses caused it.
+- **`broadcasts_paused`** — broadcast sending only
+  (`POST /broadcasts/{id}/send`). Either the instance operator paused
+  broadcasts for this team, or the platform's aggregate bounce/complaint rate
+  in the sender's SES region is recovering and that whole region waits.
+  **Transactional email is unaffected**, and it clears on its own.
+- **`team_suspended`** — the instance operator suspended the team. Nothing
+  sends until it is reinstated; only the operator can lift it.
 
 ## Retrying
 
 - **4xx**: retry only `409 concurrent_idempotent_requests` (same idempotency
   key) and `429` (with backoff). Everything else in the 4xx range is
-  deterministic — fix the request or the credential.
+  deterministic — fix the request or the credential. `403 sending_paused`,
+  `403 broadcasts_paused` and `403 team_suspended` are deterministic too:
+  waiting and retrying in a loop will not clear them.
 - **5xx**: retry with exponential backoff and jitter. Sends carrying an
   idempotency key are safe to retry; without one, a retried send can deliver
   twice.
@@ -48,14 +79,18 @@ Every API error uses the same JSON shape, matching the Resend wire protocol:
 Sending endpoints accept an `Idempotency-Key` header. Two requests with the same
 key run once; while the first is still executing, the second answers
 `409 concurrent_idempotent_requests`. Reuse the same key when retrying after a
-timeout — that is what makes a retried send safe.
+timeout — that is what makes a retried send safe. Reusing a key with a
+different payload is `409 invalid_idempotent_request`: give the new payload its
+own key instead of retrying.
 
 ## Batch sends
 
 `POST /emails/batch` accepts up to 100 emails. With the
 `x-batch-validation: permissive` header, invalid items are returned in
 `errors` by index while the valid subset is accepted; by default (strict), one
-invalid item rejects the whole batch. An over-cap array is a `422`.
+invalid item rejects the whole batch. An over-cap array is a `422`. A refusal
+that is not about one item — quota, a pause, the plan's contact cap — answers
+once for the whole call, in either validation mode.
 
 ## MCP
 
