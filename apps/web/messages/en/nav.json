@@ -8,5 +8,6 @@
   "apiKeys": "API keys",
   "webhooks": "Webhooks",
   "templates": "Templates",
-  "settings": "Settings"
+  "settings": "Settings",
+  "console": "Operator console"
 }

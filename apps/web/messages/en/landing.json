@@ -15,6 +15,7 @@
     "alternatives": "vs Resend",
     "login": "Sign in",
     "signup": "Create account",
+    "menu": "Open navigation menu",
     "badge": "Agent-ready"
   },
   "announce": {
@@ -24,12 +25,12 @@
     "aria": "Page language"
   },
   "hero": {
-    "eyebrow": "Transactional email for people building products, anywhere <badge>Beta · 100 free accounts</badge>",
+    "eyebrow": "Transactional email for people building products, anywhere <badge>Beta · open signup</badge>",
     "title": "The same Resend API. <highlight>Up to 60% cheaper.</highlight>",
     "lead": "Send transactional email with a Resend-compatible HTTPS API or the SMTP relay. We help you set up your domain, DKIM and MAIL FROM. USD pricing and assisted onboarding.",
     "ctaSignup": "Create free account",
     "ctaPlans": "See plans",
-    "note": "Open beta: 100 free accounts, each capped at 100 emails per day. Create yours in one minute — no card required.",
+    "note": "Open beta: no seat limit, each account capped at 100 emails per day. Create yours in one minute — no card required.",
     "trust": [
       "Resend-compatible API",
       "SMTP relay with STARTTLS",
@@ -211,7 +212,7 @@
       },
       {
         "q": "How does the beta work?",
-        "a": "The beta is limited to 100 free accounts, each capped at 100 emails per day on the Free plan. When spots run out, new signups pause until the next batch; for higher volume, talk to us and we agree on a plan."
+        "a": "The beta is open: no seat limit, each account is capped at 100 emails per day on the Free plan. For higher volume, talk to us and we agree on a plan."
       }
     ]
   },

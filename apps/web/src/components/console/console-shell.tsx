@@ -10,11 +10,12 @@ import { AppearanceRow, LanguageRow } from "@/components/sidebar";
 import { authClient } from "@/lib/auth-client";
 import { pickActive } from "@/lib/nav";
 
-/** The console's own nav: five screens, static lucide-style glyphs (no hover choreography). */
+/** The console's own nav: six screens, static lucide-style glyphs (no hover choreography). */
 export const CONSOLE_NAV = [
   { key: "overview", href: "/console" },
   { key: "regions", href: "/console/regions" },
   { key: "teams", href: "/console/teams" },
+  { key: "users", href: "/console/users" },
   { key: "safety", href: "/console/safety" },
   { key: "audit", href: "/console/audit" },
 ] as const;
@@ -43,6 +44,14 @@ function ConsoleGlyph({ name }: { name: ConsoleNavKey }) {
         <rect x="3" y="4" width="18" height="16" rx="2" />
         <path d="M3 10h18" />
         <path d="M9 10v10" />
+      </>
+    ),
+    users: (
+      <>
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </>
     ),
     safety: (

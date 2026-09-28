@@ -1,4 +1,5 @@
 import { visibleLength } from "./tty-ui.js";
+import { isUuid } from "./utils.js";
 
 export type ColorMode = "auto" | "always" | "never";
 
@@ -99,10 +100,8 @@ export function wrapIndent(
 export const heading = (title: string): string =>
   `${bold(title)}\n${dim("─".repeat(layoutWidth()))}`;
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** `05cda767-…` → `05cda767…`; anything that is not a UUID is returned as is. */
-export const shortId = (id: string): string => (UUID_RE.test(id) ? `${id.slice(0, 8)}…` : id);
+export const shortId = (id: string): string => (isUuid(id) ? `${id.slice(0, 8)}…` : id);
 
 export const VALUE_WIDTH = 7;
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { LandingLangSwitch } from "./landing-lang-switch";
+import { LandingNav } from "./landing-nav";
 import { SignupCta } from "./signup-cta";
 
 /**
@@ -26,6 +27,8 @@ export interface PublicSiteLabels {
     alternatives: string;
     login: string;
     signup: string;
+    /** Rótulo acessível do botão que abre a nav no mobile (ver landing-nav.tsx). */
+    menu: string;
     badge: string;
   };
   footer: {
@@ -108,7 +111,7 @@ export function PublicHeader({
               {labels.nav.badge}
             </span>
           </div>
-          <nav className="gtm-nav" aria-label={labels.navAria}>
+          <LandingNav label={labels.navAria} menuLabel={labels.nav.menu}>
             <div className="gtm-nav-links">
               <a href={anchorHref(page, "#comparativo")}>{labels.nav.compare}</a>
               <a href="/pricing" aria-current={page === "pricing" ? "page" : undefined}>
@@ -130,9 +133,13 @@ export function PublicHeader({
               <a className="gtm-nav-login" href="/login">
                 {labels.nav.login}
               </a>
-              <SignupLink label={labels.nav.signup} />
             </div>
-          </nav>
+          </LandingNav>
+          {/* A CTA fica FORA da .gtm-nav: ela precisa continuar visível na 1ª
+              linha do header quando a nav colapsa no mobile (ver landing.css). */}
+          <div className="gtm-header-cta">
+            <SignupLink label={labels.nav.signup} />
+          </div>
         </div>
       </header>
     </>

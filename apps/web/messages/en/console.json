@@ -4,6 +4,7 @@
     "overview": "Overview",
     "regions": "Regions",
     "teams": "Teams",
+    "users": "Users",
     "safety": "Trust & safety",
     "audit": "Audit",
     "operator": "Operator"
@@ -398,6 +399,30 @@
       "action": "Request quota increase",
       "justification": "Broadcast backlog clears by {date}; the plans sold outrun the broadcast share of the quota."
     }
+  },
+  "users": {
+    "title": "Users",
+    "proof": "{total} users · {verified} with a verified address",
+    "search": "Search name, e-mail or id",
+    "filters": {
+      "verified": "Verified: {value}",
+      "all": "All"
+    },
+    "columns": {
+      "name": "User",
+      "email": "E-mail",
+      "teams": "Teams",
+      "sent30d": "Sent 30d",
+      "joined": "Joined",
+      "seen": "Last sign-in",
+      "verified": "Verified"
+    },
+    "yes": "Verified",
+    "no": "Unverified",
+    "operatorBadge": "Operator",
+    "sentHint": "30-day sends of every team this user belongs to.",
+    "ofUsers": "{shown} of {total} users",
+    "empty": "0 users match."
   },
   "teams": {
     "title": "Teams",

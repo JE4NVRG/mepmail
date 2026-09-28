@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -11,6 +12,7 @@ import { authClient } from "@/lib/auth-client";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { isActive } from "@/lib/nav";
 import { applyTheme, currentTheme, type Theme } from "@/lib/theme";
+import { useTRPC } from "@/lib/trpc";
 
 // Canvas nav order (Row 1 chrome): Settings lives in the main list.
 export const NAV_ITEMS: ReadonlyArray<{ key: string; href: string; icon: NavIconName }> = [
@@ -162,9 +164,13 @@ export function Sidebar({
   const tCommon = useTranslations("common");
   const pathname = usePathname();
   const router = useRouter();
+  const trpc = useTRPC();
   const [menuOpen, setMenuOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   useDismiss(accountRef, menuOpen, () => setMenuOpen(false));
+  // The console is the operator's own: the item appears only for them, and
+  // the gate is the server's (a 404 for anyone else), never this query.
+  const operator = useQuery(trpc.system.operator.queryOptions());
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -257,6 +263,16 @@ export function Sidebar({
             >
               {t("settings")}
             </Link>
+            {operator.data?.isOperator ? (
+              <Link
+                href="/console"
+                role="menuitem"
+                className="ms-menu-item"
+                onClick={() => setMenuOpen(false)}
+              >
+                {t("console")}
+              </Link>
+            ) : null}
             <Link
               href="/onboarding"
               role="menuitem"

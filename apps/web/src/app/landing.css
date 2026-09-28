@@ -247,6 +247,42 @@
 .gtm-nav-login:hover {
   background: color-mix(in srgb, var(--ms-bone) 8%, transparent);
 }
+.gtm-header-cta {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.gtm-nav-burger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ms-bone);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+.gtm-nav-burger:hover {
+  background: color-mix(in srgb, var(--ms-bone) 8%, transparent);
+}
+.gtm-nav-burger[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--ms-bone) 10%, transparent);
+  border-color: color-mix(in srgb, var(--ms-violet) 55%, var(--ms-line-strong));
+}
+.gtm-nav-burger:focus-visible {
+  outline: 2px solid var(--ms-violet);
+  outline-offset: 3px;
+}
+.gtm-nav-burger svg {
+  display: block;
+}
 .gtm-action.ms-btn {
   height: auto;
   min-height: 44px;
@@ -612,71 +648,80 @@
     grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
     gap: 48px;
   }
-  .gtm-brand-badge {
-    display: inline-flex;
-  }
   .gtm-plan-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 20px;
   }
 }
-/* Até 767px o menu (6 chips) não cabe em uma linha: o header passa a ter
-   duas linhas (marca / menu) e os chips viram uma faixa rolável na horizontal
-   — inteiros, sem quebrar rótulo nem empilhar cinco linhas dentro do sticky. */
-@media (max-width: 767px) {
+/* Tablet e mobile: a nav colapsa num painel; logo e CTA seguem na 1ª linha.
+   O corte em 1024px é medido, não estético: com a linha completa o header pede
+   ~1050px para caber em EN (pior caso) e abaixo disso os rótulos quebravam a
+   palavra e a CTA saía da tela (card t_38d21dc4). */
+@media (max-width: 1023px) {
   .gtm-header-inner {
-    flex-wrap: wrap;
-    padding-block: 10px;
+    min-height: 60px;
+    padding-block: 8px;
+    gap: 10px;
   }
-  .gtm-nav {
-    width: 100%;
-    justify-content: space-between;
-    gap: 12px;
-    min-width: 0;
+  .gtm-brand-group {
+    order: 1;
   }
-  .gtm-nav-links {
-    flex: 1 1 auto;
-    min-width: 0;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+  .gtm-header-cta {
+    order: 2;
+    margin-inline-start: auto;
   }
-  .gtm-nav-links::-webkit-scrollbar {
-    display: none;
-  }
-  .gtm-nav-actions {
-    flex-shrink: 0;
-  }
-  /* Em telas estreitas o menu rolável precisa de espaço: o link "Entrar" (que
-     continua no rodapé) sai do header para o strip não ficar cortado. */
-  .gtm-nav-login,
-  .gtm-nav-divider {
-    display: none;
-  }
-}
-@media (max-width: 390px) {
-  .gtm-header-inner {
-    flex-wrap: wrap;
-    padding-block: 10px;
-  }
-  .gtm-nav {
-    width: 100%;
-    justify-content: space-between;
-    gap: 12px;
-  }
-  .gtm-nav-links {
-    gap: 0;
-  }
-  .gtm-nav-links a {
-    padding: 0 8px;
+  .gtm-nav-burger {
+    order: 3;
+    display: inline-flex;
   }
   .gtm-wordmark img {
-    width: 108px;
+    width: 112px;
+  }
+  .gtm-nav {
+    position: absolute;
+    inset: 100% 0 auto;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 6px 16px 14px;
+    background: var(--ms-void);
+    border-bottom: 1px solid var(--ms-line-strong);
+    box-shadow: 0 24px 44px rgb(0 0 0 / 40%);
+    max-height: calc(100dvh - 72px);
+    overflow-y: auto;
+  }
+  .gtm-nav.is-open {
+    display: flex;
+  }
+  .gtm-nav-links {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+  }
+  .gtm-nav-links a {
+    min-height: 44px;
+    padding: 0 12px;
+    font-size: 15px;
+    white-space: nowrap;
+  }
+  .gtm-nav-actions {
+    justify-content: space-between;
+    margin-top: 10px;
+    padding: 12px 12px 0;
+    border-top: 1px solid var(--ms-line);
   }
   .gtm-header .gtm-action {
-    padding-inline: 10px;
+    padding-inline: 12px;
     font-size: 14px;
+    white-space: nowrap;
+  }
+}
+/* A badge "agent-ready" só entra quando sobra espaço para ela: em 1024–1099px
+   ela empurrava os rótulos da nav até a quebra de palavra. */
+@media (min-width: 1100px) {
+  .gtm-brand-badge {
+    display: inline-flex;
   }
 }
 .gtm-beta-badge {

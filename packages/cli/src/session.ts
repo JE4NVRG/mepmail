@@ -8,8 +8,9 @@ import {
 } from "./config.js";
 import type { Context } from "./context.js";
 import { AuthError, createHttp } from "./http.js";
-import { CLOUD_API_URL, USER_AGENT, VERSION } from "./meta.js";
+import { createInspector, type Inspector } from "./inspect.js";
 import { createMepMailTarget, type MepMailTarget } from "./mepmail-target.js";
+import { CLOUD_API_URL, USER_AGENT, VERSION } from "./meta.js";
 import { type ProviderId, RESOURCES, type Resource, type TargetUsage } from "./model.js";
 import type { Progress, StepHandle } from "./progress.js";
 import { type OnProgress, type Provider, providers, type Source } from "./providers/index.js";
@@ -125,7 +126,7 @@ export async function connectSource(ctx: Context, id: ProviderId): Promise<Sourc
   return { provider, source };
 }
 
-async function resolveTargetUrl(ctx: Context): Promise<string> {
+export async function resolveTargetUrl(ctx: Context): Promise<string> {
   if (ctx.config.toUrl !== null) return ctx.config.toUrl;
   const choice = await selectPrompt(ctx.rl, {
     label: "Where is MepMail running?",
@@ -145,13 +146,36 @@ async function resolveTargetUrl(ctx: Context): Promise<string> {
   return stripTrailingSlashes(url);
 }
 
-export async function connectTarget(ctx: Context): Promise<TargetSession> {
-  const baseUrl = await resolveTargetUrl(ctx);
-  const token = await resolveKey(ctx, ctx.config.toKey, {
+/** The MepMail key for the day-to-day commands: same sources, same prompts as a migration. */
+export async function resolveTargetKey(ctx: Context): Promise<string> {
+  return resolveKey(ctx, ctx.config.toKey, {
     label: "MepMail API key",
     envName: TARGET_KEY_ENV,
     flag: "--to-key",
   });
+}
+
+/**
+ * Read-only client for `doctor` and `emails`: the URL and the key are already
+ * resolved and no endpoint is called yet — the command decides which one to ask.
+ */
+export function connectInspector(ctx: Context, baseUrl: string, token: string): Inspector {
+  return createInspector(
+    createHttp({
+      baseUrl,
+      token,
+      userAgent: USER_AGENT,
+      rps: TARGET_RPS,
+      log: ctx.log,
+      name: "MepMail",
+      fetch: ctx.fetch,
+    }),
+  );
+}
+
+export async function connectTarget(ctx: Context): Promise<TargetSession> {
+  const baseUrl = await resolveTargetUrl(ctx);
+  const token = await resolveTargetKey(ctx);
   const http = createHttp({
     baseUrl,
     token,

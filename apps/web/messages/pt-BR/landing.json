@@ -15,6 +15,7 @@
     "alternatives": "vs Resend",
     "login": "Entrar",
     "signup": "Criar conta",
+    "menu": "Abrir menu de navegação",
     "badge": "Agent-ready"
   },
   "announce": {
@@ -24,12 +25,12 @@
     "aria": "Idioma da página"
   },
   "hero": {
-    "eyebrow": "E-mail transacional para quem constrói produtos, em qualquer lugar <badge>Beta · 100 contas grátis</badge>",
+    "eyebrow": "E-mail transacional para quem constrói produtos, em qualquer lugar <badge>Beta · cadastro aberto</badge>",
     "title": "Mesma API do Resend. <highlight>Até 60% mais barato.</highlight>",
     "lead": "Envie e-mails transacionais com API HTTPS compatível com o Resend ou relay SMTP. Nós ajudamos a configurar seu domínio, DKIM e MAIL FROM. Planos em USD e implantação assistida.",
     "ctaSignup": "Criar conta grátis",
     "ctaPlans": "Ver planos",
-    "note": "Beta aberto: 100 contas grátis, teto de 100 e-mails por dia em cada uma. Crie a sua em 1 minuto — sem cartão.",
+    "note": "Beta aberto: sem limite de contas, teto de 100 e-mails por dia em cada uma. Crie a sua em 1 minuto — sem cartão.",
     "trust": [
       "API compatível com Resend",
       "Relay SMTP com STARTTLS",
@@ -203,7 +204,7 @@
       },
       {
         "q": "Como funciona o beta?",
-        "a": "O beta é limitado a 100 contas grátis, cada uma com teto de 100 e-mails por dia no plano Free. Quando as vagas acabam, novos cadastros pausam até a próxima leva; para volume maior, fale com a gente e combinamos o plano."
+        "a": "O beta está aberto: sem limite de contas, cada uma com teto de 100 e-mails por dia no plano Free. Para volume maior, fale com a gente e combinamos o plano."
       }
     ]
   },
