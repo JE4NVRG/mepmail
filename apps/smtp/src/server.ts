@@ -36,7 +36,8 @@ const server = createSmtpServer({
     );
   },
   // A relay send is the team's send like any other: the funnel's activation
-  // step is claimed here too (no-op on self-host, where umamiFunnel is empty).
+  // step is claimed here too (a no-op wherever UMAMI_ENDPOINT/UMAMI_WEBSITE_ID
+  // are not set explicitly — umamiFunnel has no default).
   funnel: { ...umamiFunnel(), hostname: appHostname() },
   ...(certPath && keyPath
     ? { tls: { cert: readFileSync(certPath), key: readFileSync(keyPath) } }

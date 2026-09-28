@@ -19,6 +19,16 @@ export default defineConfig({
     // for the same reason (packages/db says it outright: migrations run inside the test body).
     testTimeout: 60_000,
     include: ["test/**/*.test.ts", "src/**/*.test.ts"],
-    env: { SKIP_ENV_VALIDATION: "1" },
+    // SKIP_ENV_VALIDATION: tests stub the variables they need, so the schema
+    // must not demand a full production environment.
+    //
+    // The Umami pair is pinned empty on purpose (card t_47d43fde): the web
+    // suite is what emitted real `signup`/`checkout_started` events into the
+    // hosted collector — many of its files stub IS_CLOUD=true, and the server
+    // used to read that toggle as "report to the JE4NDEV Umami". A test run
+    // must never report into whichever collector the shell happens to export;
+    // suites that exercise the emission path (test/funnel-env-gate.test.ts)
+    // stub the pair themselves.
+    env: { SKIP_ENV_VALIDATION: "1", UMAMI_ENDPOINT: "", UMAMI_WEBSITE_ID: "" },
   },
 });

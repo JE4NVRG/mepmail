@@ -288,12 +288,17 @@ export const env = createEnv({
     PRIVACY_URL: z.url().optional(),
 
     // Umami collection endpoint for the SERVER-side funnel events (signup,
-    // email verified, first send, checkout, payment). Optional; a self-host
-    // deployment with neither of these set emits nothing, which is the point:
-    // product events never phone home from an operator's own instance.
+    // email verified, first send, checkout, payment). Optional, and with NO
+    // default in code: a server process emits only where an operator set BOTH
+    // this and UMAMI_WEBSITE_ID for THAT environment. A built-in cloud
+    // default made every dev instance and every test run phone the hosted
+    // collector (card t_47d43fde, 28/09/2026: 6 signups from
+    // hostname=localhost:3000 and 9 checkouts from hostname=app.example.com
+    // landed on the production Umami while the product had 1 account and 0
+    // payments).
     UMAMI_ENDPOINT: z.url().optional(),
     // Website the server-side events land on. Public by nature (the browser
-    // snippet carries it), so the cloud default lives in code — see
+    // snippet carries it) but the server never defaults it — see
     // umamiFunnel(). Unknown to Umami: the collector answers 200 and stores
     // nothing, so a typo means no data rather than a failing request.
     UMAMI_WEBSITE_ID: z.string().optional(),
@@ -437,16 +442,6 @@ export function notificationsEmailFrom(e: Env = env): string | undefined {
   return e.NOTIFICATIONS_EMAIL_FROM ?? e.AUTH_EMAIL_FROM;
 }
 
-/**
- * Public origin of the JE4NDEV Umami instance, the one the browser snippet on
- * the public pages already reports to (apps/web/src/lib/analytics.ts). Both
- * values are public — they appear in the HTML of every marketing page — so
- * the cloud default lives in code rather than in a file that would have to be
- * kept in sync with the snippet.
- */
-export const UMAMI_CLOUD_ENDPOINT = "https://umami.je4ndev.com/api/send";
-export const UMAMI_CLOUD_WEBSITE_ID = "167a3266-4a56-4fd1-8d14-59ed7437a313";
-
 /** Host the funnel events are attributed to: `new URL(APP_BASE_URL).host`, "localhost" when unset. */
 export function appHostname(e: Env = env): string {
   try {
@@ -457,19 +452,21 @@ export function appHostname(e: Env = env): string {
 }
 
 /**
- * Where server-side funnel events go: the explicit env wins, else the cloud
- * instance, else nothing. A self-host instance that sets neither emits no
- * events at all — its signups are the operator's business, not ours — and the
- * endpoint/website pair is all-or-nothing so a half-configured instance is
- * treated as unconfigured.
+ * Where server-side funnel events go: ONLY the endpoint/website pair this
+ * environment set. There is deliberately no built-in default, and cloud
+ * status does not imply one — the collector an instance reports to has to be
+ * a decision its own environment makes, never something the code assumes on
+ * its behalf. That assumption is what polluted the hosted Umami (card
+ * t_47d43fde): with `IS_CLOUD=true` and no UMAMI_* set, a dev box and the
+ * billing test suite emitted `signup`/`checkout_started` to
+ * umami.je4ndev.com for accounts and payments that never existed.
+ *
+ * Unconfigured — self-host, dev, CI, or a half-set pair — emits nothing at
+ * all, which is the safe direction for telemetry.
  */
 export function umamiFunnel(e: Env = env): { endpoint: string | null; websiteId: string | null } {
-  const explicit = e.UMAMI_ENDPOINT && e.UMAMI_WEBSITE_ID;
-  if (explicit) {
-    return { endpoint: e.UMAMI_ENDPOINT ?? null, websiteId: e.UMAMI_WEBSITE_ID ?? null };
-  }
-  if (!isCloudDeployment(e)) return { endpoint: null, websiteId: null };
-  return { endpoint: UMAMI_CLOUD_ENDPOINT, websiteId: UMAMI_CLOUD_WEBSITE_ID };
+  if (!e.UMAMI_ENDPOINT || !e.UMAMI_WEBSITE_ID) return { endpoint: null, websiteId: null };
+  return { endpoint: e.UMAMI_ENDPOINT, websiteId: e.UMAMI_WEBSITE_ID };
 }
 
 /**
