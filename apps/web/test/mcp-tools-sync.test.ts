@@ -19,6 +19,51 @@ describe("MCP tools manifest", () => {
   });
 
   /**
+   * The descriptions ride along to the static MCP server card
+   * (/.well-known/mcp/server-card.json), which a directory reads when it
+   * cannot scan the OAuth-protected endpoint. They must be the server's own
+   * words: this re-reads each description literal out of the API source —
+   * expanding the shared constants its template literals interpolate — so the
+   * card can never ship copy the server does not use.
+   */
+  it("carries the API's own tool descriptions", () => {
+    const source = readFileSync(join(__dirname, "../../api/src/mcp.ts"), "utf8");
+    const constants = new Map<string, string>(
+      [...source.matchAll(/^const ([A-Z][A-Z0-9_]*) =\s*\n?\s*("(?:[^"\\]|\\.)*");/gm)].map(
+        ([, name, literal]) => [name ?? "", JSON.parse(literal ?? '""') as string],
+      ),
+    );
+    const starts = [...source.matchAll(/\n\s+tool\(\n\s+"([a-z0-9_]+)",\n/g)];
+    expect(starts.length).toBe(MCP_TOOLS.length);
+
+    const described = starts.map((start, index) => {
+      const block = source.slice(start.index, starts[index + 1]?.index ?? source.length);
+      const literal = /description:\s*(`(?:[^`\\]|\\.)*`|"(?:[^"\\]|\\.)*")/s.exec(block)?.[1];
+      expect(literal, `no description literal for ${start[1]}`).toBeTruthy();
+      const text = (literal ?? "").startsWith("`")
+        ? (literal ?? "")
+            .slice(1, -1)
+            .replace(/\$\{([A-Z][A-Z0-9_]*)\}/g, (all, name: string) => {
+              const value = constants.get(name);
+              expect(value, `unknown constant ${name} in ${all}`).toBeTruthy();
+              return value ?? "";
+            })
+            .replace(/\\`/g, "`")
+        : (JSON.parse(literal ?? '""') as string);
+      // What is left interpolated is a deployment value (the SES regions in
+      // create_domain's description) that a static document cannot state: the
+      // sentences carrying one are dropped and the rest is published verbatim.
+      const published = text
+        .split(/(?<=\. )/)
+        .filter((sentence) => !sentence.includes("${"))
+        .join("");
+      return { name: start[1], description: published };
+    });
+
+    expect(MCP_TOOLS.map(({ name, description }) => ({ name, description }))).toEqual(described);
+  });
+
+  /**
    * The docs publish the same registry to the outside world — content/docs/mcp.mdx
    * and its pt-BR mirror — and that table is what a client author reads before
    * writing an integration. apps/docs guards its own build with
