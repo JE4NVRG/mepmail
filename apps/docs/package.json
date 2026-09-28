@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "SKIP_ENV_VALIDATION=1 tsx scripts/generate-openapi.ts",
     "dev": "next dev -p ${DOCS_PORT:-3002}",
-    "prebuild": "SKIP_ENV_VALIDATION=1 tsx scripts/generate-openapi.ts",
+    "prebuild": "SKIP_ENV_VALIDATION=1 tsx scripts/generate-openapi.ts && tsx scripts/check-mcp-parity.ts",
     "build": "next build",
     "start": "next start -p ${DOCS_PORT:-3002}",
     "postinstall": "fumadocs-mdx",

@@ -28,6 +28,86 @@ exact URL under **Settings → MCP**.
 </DeploymentTab>
 </DeploymentTabs>
 
+## Local server (stdio)
+
+Clients that launch local servers from config — Claude Desktop's config file,
+Cursor's `mcp.json`, Codex, VS Code — can run the
+[`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) package instead
+of bridging to the HTTP endpoint, and it is the only way to connect when the
+instance is not reachable from the client's network. It speaks stdio, reaches
+your instance's REST API with a team API key, and needs no OAuth and no
+browser step — the config block is the whole install:
+
+```sh
+npx -y @mepmail/mcp
+```
+
+| Variable | Required | Default | Meaning |
+| --- | --- | --- | --- |
+| `MEPMAIL_API_KEY` | yes | — | Team API key (`ms_...`), created under **API keys** in the dashboard. The agent acts with exactly this key's reach. |
+| `MEPMAIL_BASE_URL` | no | `https://api-mepmail.je4ndev.com` | Your instance's API origin. Set it for a self-hosted deployment. |
+
+**Claude Desktop** (`claude_desktop_config.json`), and any client with the same
+config shape:
+
+```json title="claude_desktop_config.json"
+{
+  "mcpServers": {
+    "mepmail": {
+      "command": "npx",
+      "args": ["-y", "@mepmail/mcp"],
+      "env": {
+        "MEPMAIL_API_KEY": "ms_...",
+        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
+      }
+    }
+  }
+}
+```
+
+**Cursor** (`.cursor/mcp.json` in a project, or `~/.cursor/mcp.json` for every
+project):
+
+```json title=".cursor/mcp.json"
+{
+  "mcpServers": {
+    "mepmail": {
+      "command": "npx",
+      "args": ["-y", "@mepmail/mcp"],
+      "env": { "MEPMAIL_API_KEY": "ms_..." }
+    }
+  }
+}
+```
+
+**VS Code** (`.vscode/mcp.json`):
+
+```json title=".vscode/mcp.json"
+{
+  "servers": {
+    "mepmail": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@mepmail/mcp"],
+      "env": { "MEPMAIL_API_KEY": "ms_..." }
+    }
+  }
+}
+```
+
+Omit `MEPMAIL_BASE_URL` to talk to MepMail Cloud.
+
+The package covers the reading, sending and contact surface — **22 of the
+tools** below — and mirrors the key's reach exactly: a sending-access key
+sends and reads its own emails, while the management reads (`get_usage`,
+`get_deliverability`, contacts, domains, broadcasts, templates, webhooks,
+suppressions) answer `restricted_api_key`, same as the REST API. The
+write surfaces beyond contacts (segments, topics, broadcasts, templates,
+webhooks, domains, API keys) and the team picker (`list_teams`) are
+hosted-only, so connect the hosted server below for those. Tool names and the
+`untrusted_data` result envelope are identical across both, so a prompt
+written against one moves to the other unchanged.
+
 ## Connect a client
 
 <Tabs items={["Claude Code", "Claude Desktop", "Cursor", "VS Code"]}>
@@ -48,7 +128,8 @@ Then run `/mcp` inside Claude Code and pick `mepmail` to sign in.
 Add a custom connector under **Settings → Connectors → Add custom connector**
 and paste the server URL. Or use the config file — Claude Desktop's
 `claude_desktop_config.json` only launches stdio servers, so `mcp-remote`
-bridges it to the HTTP endpoint:
+bridges it to the HTTP endpoint. If you would rather skip the bridge, run the
+[local server](#local-server-stdio) above instead: one `npx` line, no OAuth.
 
 ```json title="claude_desktop_config.json"
 {
@@ -95,36 +176,6 @@ Save in the project, or in `~/.cursor/mcp.json` for every project.
 
 Self-hosted: replace `https://api-mepmail.je4ndev.com/mcp` with your instance's
 server URL from above.
-
-## Local server (stdio)
-
-Clients that launch local servers from config — Claude Desktop's config file,
-Cursor's `mcp.json`, Codex, any stdio client — can run the
-[`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) package
-instead of bridging to the HTTP endpoint. It runs on your machine and reaches
-this instance's REST API directly with a team API key: no OAuth, no browser
-step.
-
-```json title="claude_desktop_config.json"
-{
-  "mcpServers": {
-    "mepmail": {
-      "command": "npx",
-      "args": ["-y", "@mepmail/mcp"],
-      "env": {
-        "MEPMAIL_API_KEY": "ms_...",
-        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
-      }
-    }
-  }
-}
-```
-
-Create the key under **API keys** in the dashboard. The tools mirror the key's
-reach exactly — a sending-access key sends and reports `restricted_api_key` on
-reads, same as the REST API. Tool names and the `untrusted_data` result
-envelope match the hosted server, so prompts and integrations move between the
-two unchanged.
 
 ## Authentication
 
