@@ -42,7 +42,9 @@ describe("robots.txt + sitemap.xml agreement", () => {
   it("allows every URL the sitemap advertises", () => {
     const allow = allowedPaths();
     const urls = sitemap();
-    expect(urls).toHaveLength(6);
+    // 6 URLs from the SEO fix + the two public pages added with /pricing and
+    // /alternatives/resend.
+    expect(urls).toHaveLength(8);
 
     for (const entry of urls) {
       const { pathname } = new URL(entry.url as string);

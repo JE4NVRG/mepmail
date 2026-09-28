@@ -1,0 +1,55 @@
+{
+  "meta": {
+    "title": "Alternativa ao Resend — mesma API, preço menor",
+    "description": "Resend vs MepMail lado a lado: a mesma API de envio e o mesmo SDK oficial, preços em USD com fonte e data, MCP nativo e plataforma open-source que você pode hospedar."
+  },
+  "eyebrow": "Alternativas",
+  "title": "Vindo do Resend? <highlight>Mantenha o SDK.</highlight>",
+  "lead": "O MepMail fala a API de envio do Resend. Nos fluxos compatíveis você troca a base URL e a chave — sem reescrever código. Abaixo: o que carrega junto, o que não carrega e a diferença de preço calculada a partir da lista pública do próprio Resend.",
+  "note": "Começar é grátis: 100 e-mails por dia, sem cartão. Migração assistida — configuramos seu domínio de envio com você.",
+  "table": {
+    "title": "Resend vs MepMail, volume por volume.",
+    "intro": "Em cada lado, o menor plano publicado que cobre o volume.",
+    "columns": ["Envios/mês", "Resend", "MepMail", "Vantagem MepMail"],
+    "rowAdvantage": "{percent}% menos · {usd}/mês de economia",
+    "source": "Coluna Resend: lista pública em <link>resend.com/pricing</link>, lida em {date}. Coluna MepMail: nossos preços publicados. Valores em USD por mês, sem impostos e sem excedentes."
+  },
+  "claim": {
+    "title": "Sobre o “até 60% mais barato”.",
+    "body": "A chamada compara com o degrau público mais caro do mercado — SendGrid em {volume}, {sendgrid}/mês contra os nossos {mepmail}. Contra o Resend especificamente, a diferença na tabela acima vai de {min}% a {max}%."
+  },
+  "same": {
+    "title": "O que carrega junto",
+    "items": [
+      "O SDK oficial do Resend: new Resend(\"ms_…\", { baseUrl: \"https://api-mepmail.je4ndev.com\" }).",
+      "Os endpoints de envio que você já chama: /emails, /emails/batch e /emails/{id}/cancel.",
+      "Gestão de domínios, chaves, webhooks, templates e supressões, com os mesmos formatos de requisição onde os dois se sobrepõem.",
+      "O relay SMTP, para stacks que já enviam por SMTP em vez de HTTPS."
+    ]
+  },
+  "different": {
+    "title": "O que não carrega junto",
+    "items": [
+      "Inbound, IP dedicado e SSO não fazem parte da promessa de compatibilidade.",
+      "A superfície de gestão é menor: cobrimos envio, domínios, chaves, webhooks, templates, supressões e contatos — não todo endpoint que eles publicam.",
+      "Free e Starter param no limite diário em vez de cobrar excedente.",
+      "Limite de anexos por mensagem: 1 MB no Free e Starter, 5 MB no Pro, 10 MB no Scale."
+    ]
+  },
+  "steps": {
+    "eyebrow": "Migração",
+    "title": "Três passos, cerca de 15 minutos.",
+    "items": [
+      "Crie a conta e adicione seu domínio de envio: geramos os registros de DKIM e MAIL FROM e esperamos a verificação junto com você.",
+      "Troque a base URL e a chave no seu client Resend. O SDK e as chamadas de envio ficam exatamente como estão.",
+      "Faça um envio de teste e acompanhe o log no painel. Depois, migre o tráfego de produção."
+    ],
+    "note": "A propagação e a verificação do domínio podem levar mais tempo que a migração em si; a verificação automática roda a cada 15 minutos. Usa fluxos fora do conjunto compatível? Conte antes de migrar: revisamos com você e dizemos com clareza o que não é equivalente."
+  },
+  "pricingLink": "Ver a escada completa",
+  "close": {
+    "title": "Migre e corte a conta.",
+    "body": "Crie a conta grátis, mantenha o SDK que você já tem e faça o primeiro envio de teste hoje.",
+    "cta": "Criar conta grátis"
+  }
+}

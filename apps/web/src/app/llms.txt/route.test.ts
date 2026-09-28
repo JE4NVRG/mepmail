@@ -22,6 +22,8 @@ describe("crawler entry points", () => {
     // what made Google report "Couldn't fetch the sitemap".
     for (const path of [
       "/$",
+      "/pricing",
+      "/alternatives",
       "/login",
       "/signup",
       "/terms",
@@ -30,6 +32,10 @@ describe("crawler entry points", () => {
       "/sitemap.xml",
       "/auth/",
       "/_next/",
+      "/logo/",
+      "/fonts/",
+      "/og.png",
+      "/favicon.ico",
     ]) {
       expect(allow).toContain(path);
     }

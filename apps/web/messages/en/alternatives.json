@@ -1,0 +1,55 @@
+{
+  "meta": {
+    "title": "Resend alternative — same API, lower price",
+    "description": "Resend vs MepMail side by side: the same sending API and the same official SDK, USD prices with source and date, native MCP and an open-source, self-hostable platform."
+  },
+  "eyebrow": "Alternatives",
+  "title": "Coming from Resend? <highlight>Keep the SDK.</highlight>",
+  "lead": "MepMail speaks the Resend sending API. For the compatible flows you change the base URL and the key — no rewrite. Below: what carries over, what does not, and the price difference computed from Resend's own public list.",
+  "note": "Free to start: 100 emails a day, no card. Assisted migration — we set up your sending domain with you.",
+  "table": {
+    "title": "Resend vs MepMail, volume by volume.",
+    "intro": "On each side, the cheapest published plan that covers the volume.",
+    "columns": ["Emails/month", "Resend", "MepMail", "MepMail advantage"],
+    "rowAdvantage": "{percent}% less · {usd}/month saved",
+    "source": "Resend column: public list at <link>resend.com/pricing</link>, read on {date}. MepMail column: our published prices. USD per month, taxes and overage excluded."
+  },
+  "claim": {
+    "title": "About “up to 60% cheaper”.",
+    "body": "The headline compares against the most expensive publicly priced rung of the market — SendGrid at {volume}, {sendgrid}/month versus our {mepmail}. Against Resend specifically, the difference in the table above runs from {min}% to {max}%."
+  },
+  "same": {
+    "title": "What carries over",
+    "items": [
+      "The official Resend SDK: new Resend(\"ms_…\", { baseUrl: \"https://api-mepmail.je4ndev.com\" }).",
+      "The sending endpoints you already call: /emails, /emails/batch and /emails/{id}/cancel.",
+      "Domain, key, webhook, template and suppression management, with the same request shapes where the two overlap.",
+      "The SMTP relay, for stacks that send over SMTP instead of HTTPS."
+    ]
+  },
+  "different": {
+    "title": "What does not carry over",
+    "items": [
+      "Inbound email, dedicated IPs and SSO are not part of the compatibility promise.",
+      "The management surface is smaller: we cover sending, domains, keys, webhooks, templates, suppressions and contacts — not every endpoint Resend ships.",
+      "Free and Starter stop at a daily cap instead of billing overage.",
+      "Attachment limit per message: 1 MB on Free and Starter, 5 MB on Pro, 10 MB on Scale."
+    ]
+  },
+  "steps": {
+    "eyebrow": "Migration",
+    "title": "Three steps, about 15 minutes.",
+    "items": [
+      "Create the account and add your sending domain: we generate the DKIM and MAIL FROM records and wait for verification with you.",
+      "Swap the base URL and the key in your Resend client. The SDK and your send calls stay exactly as they are.",
+      "Send a test and follow the log in the panel. Then move production traffic."
+    ],
+    "note": "Domain propagation and verification can take longer than the migration itself; automatic verification runs every 15 minutes. Using flows outside the compatible set? Tell us before migrating: we review them with you and say plainly what is not equivalent."
+  },
+  "pricingLink": "See the full ladder",
+  "close": {
+    "title": "Migrate and cut the bill.",
+    "body": "Create the free account, keep the SDK you already have and send the first test today.",
+    "cta": "Create free account"
+  }
+}
