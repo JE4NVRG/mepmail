@@ -12,7 +12,11 @@
     "mcp": "MCP",
     "how": "How it works",
     "login": "Sign in",
-    "signup": "Create account"
+    "signup": "Create account",
+    "badge": "Agent-ready"
+  },
+  "announce": {
+    "text": "Agent-ready — official MCP: your AI agents send email"
   },
   "lang": {
     "aria": "Page language"
@@ -229,10 +233,21 @@
   "footer": {
     "navAria": "Footer",
     "tagline": "MepMail · Transactional email with assisted onboarding",
+    "points": [
+      "Amazon SES in production — 500k emails/day",
+      "Drop-in compatible with Resend's API",
+      "Migrate in minutes, no code rewrite"
+    ],
+    "cta": "Create free account",
     "colProduct": "Product",
     "colAccount": "Account",
+    "colLegal": "Legal",
+    "terms": "Terms",
+    "privacy": "Privacy",
     "login": "Sign in",
     "contact": "Contact",
+    "credit": "Created by",
+    "ghAria": "Je4nDev on GitHub",
     "rights": "© 2026 MepMail. All rights reserved."
   }
 }

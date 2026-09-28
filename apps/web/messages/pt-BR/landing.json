@@ -12,7 +12,11 @@
     "mcp": "MCP",
     "how": "Como funciona",
     "login": "Entrar",
-    "signup": "Criar conta"
+    "signup": "Criar conta",
+    "badge": "Agent-ready"
+  },
+  "announce": {
+    "text": "Agent-ready — MCP oficial: seus agentes de IA enviam e-mail"
   },
   "lang": {
     "aria": "Idioma da página"
@@ -221,10 +225,21 @@
   "footer": {
     "navAria": "Rodapé",
     "tagline": "MepMail · E-mail transacional com implantação assistida",
+    "points": [
+      "Amazon SES em produção — 500 mil e-mails/dia",
+      "API compatível com a do Resend",
+      "Migração em minutos, sem refazer código"
+    ],
+    "cta": "Criar conta grátis",
     "colProduct": "Produto",
     "colAccount": "Conta",
+    "colLegal": "Legal",
+    "terms": "Termos",
+    "privacy": "Privacidade",
     "login": "Entrar",
     "contact": "Contato",
+    "credit": "Criado por",
+    "ghAria": "GitHub do Je4nDev",
     "rights": "© 2026 MepMail. Todos os direitos reservados."
   }
 }
