@@ -246,6 +246,25 @@ function SettingsGlyph({ on, size }: GlyphProps) {
   );
 }
 
+/**
+ * The operator console's glyph (lucide gauge): the needle sweeps on hover, the
+ * same choreography every other nav glyph carries.
+ */
+function ConsoleGlyph({ on, size }: GlyphProps) {
+  return (
+    <Svg size={size}>
+      <path d="M3.34 19a10 10 0 1 1 17.32 0" />
+      <motion.path
+        d="m12 14 4-4"
+        initial={false}
+        animate={{ rotate: on ? -40 : 0 }}
+        transition={TR}
+        style={{ transformBox: "view-box", transformOrigin: "12px 14px" }}
+      />
+    </Svg>
+  );
+}
+
 /** Static code glyph (lucide code-xml) for the square </> icon buttons. */
 export function CodeGlyph({ size = 16 }: { size?: number }) {
   return (
@@ -327,6 +346,7 @@ const GLYPHS = {
   "api-keys": ApiKeysGlyph,
   webhooks: WebhooksGlyph,
   settings: SettingsGlyph,
+  console: ConsoleGlyph,
 } as const;
 
 export type NavIconName = keyof typeof GLYPHS;

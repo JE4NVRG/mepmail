@@ -1,9 +1,13 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { ChartDialog, type Period } from "@/components/console/chart-dialog";
+import { Skeleton } from "@/components/skeleton";
 import { durationUnit, formatPercent } from "@/lib/console-format";
+import { useTRPC } from "@/lib/trpc";
 import { ProbeChart, TeamsChart } from "./charts";
 import type { Summary } from "./health-card";
 
@@ -12,44 +16,100 @@ function Tile({
   value,
   sub,
   title,
+  href,
   children,
 }: {
   label: string;
   value: React.ReactNode;
-  sub: string;
-  /** The history dialog's title. */
+  sub: React.ReactNode;
+  /** The history dialog's title, or the link's tooltip when `href` is set. */
   title: string;
-  children: (period: Period) => React.ReactNode;
+  /** A tile that opens another console screen instead of a history dialog. */
+  href?: string;
+  children?: (period: Period) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const body = (
+    <>
+      <div className="ms-microlabel">{label}</div>
+      <div className="ms-digits" style={{ fontSize: 26, lineHeight: 1.2, marginTop: 4 }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 13, color: "var(--ms-muted)", marginTop: 2 }}>{sub}</div>
+    </>
+  );
+  // A Link is not a button: it keeps the card's own emphasis and drops the
+  // global dotted underline, so both shapes read as the same tile.
+  const card = {
+    display: "block",
+    width: "100%",
+    padding: "16px 20px",
+    textAlign: "left",
+    font: "inherit",
+    color: "inherit",
+  } as const;
+  if (href) {
+    return (
+      <Link
+        href={href}
+        title={title}
+        className="ms-card"
+        style={{ ...card, textDecoration: "none", cursor: "pointer" }}
+      >
+        {body}
+      </Link>
+    );
+  }
   return (
     <>
       <button
         type="button"
         className="ms-card"
-        style={{
-          display: "block",
-          width: "100%",
-          padding: "16px 20px",
-          cursor: "pointer",
-          textAlign: "left",
-          font: "inherit",
-          color: "inherit",
-        }}
+        style={{ ...card, cursor: "pointer" }}
         onClick={() => setOpen(true)}
       >
-        <div className="ms-microlabel">{label}</div>
-        <div className="ms-digits" style={{ fontSize: 26, lineHeight: 1.2, marginTop: 4 }}>
-          {value}
-        </div>
-        <div style={{ fontSize: 13, color: "var(--ms-muted)", marginTop: 2 }}>{sub}</div>
+        {body}
       </button>
-      {open ? (
+      {open && children ? (
         <ChartDialog open onClose={() => setOpen(false)} title={title}>
           {children}
         </ChartDialog>
       ) : null}
     </>
+  );
+}
+
+/**
+ * The instance's people, from the Users screen's own query: the response
+ * carries the counters, so the first page's single row is enough for them.
+ * The tile opens that screen rather than a history dialog.
+ */
+function UsersTile() {
+  const t = useTranslations("console.overview");
+  const common = useTranslations("console.common");
+  const locale = useLocale();
+  const trpc = useTRPC();
+  const users = useQuery(
+    trpc.console.users.list.queryOptions({ limit: 1, sort: "joined", dir: "desc" }),
+  );
+  const data = users.data;
+  const fmt = new Intl.NumberFormat(locale);
+  return (
+    <Tile
+      label={t("tiles.users")}
+      value={data ? fmt.format(data.total) : <Skeleton width={48} height="1lh" />}
+      sub={
+        data ? (
+          t("tiles.usersSub", { verified: fmt.format(data.verified) })
+        ) : users.isError ? (
+          common("loadError")
+        ) : (
+          <Skeleton width={150} height="1lh" />
+        )
+      }
+      title={t("tiles.users")}
+      href="/console/users"
+    />
   );
 }
 
@@ -155,6 +215,7 @@ export function StatTiles({ summary }: { summary: Summary }) {
           />
         )}
       </Tile>
+      <UsersTile />
     </div>
   );
 }

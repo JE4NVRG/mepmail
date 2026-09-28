@@ -133,7 +133,9 @@
       "domainsSub": "verified · {pending} pending · {failed} failing DKIM",
       "queue": "Queue",
       "queueSub": "{waiting} queued · {held} held (plan + pacing) · oldest {oldest}",
-      "queuePending": "counted by the next probe"
+      "queuePending": "counted by the next probe",
+      "users": "Users",
+      "usersSub": "{verified} with a verified address"
     },
     "sent": {
       "title": "Sent per day",
