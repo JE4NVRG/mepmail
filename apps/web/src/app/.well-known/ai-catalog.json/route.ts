@@ -56,6 +56,14 @@ const BODY = JSON.stringify(
         url: "https://mepmail.je4ndev.com/auth.md",
       },
       {
+        identifier: "urn:air:je4ndev.com:mepmail:agent:skills",
+        displayName: "MepMail agent skills",
+        description:
+          "Skills index (agentskills.io discovery): the MepMail SKILL.md an agent loads to send, migrate and troubleshoot correctly — auth, quotas, rate limits and error names included.",
+        type: "application/json",
+        url: "https://mepmail.je4ndev.com/.well-known/agent-skills/index.json",
+      },
+      {
         identifier: "urn:air:je4ndev.com:mepmail:docs:llms-txt",
         displayName: "MepMail llms.txt",
         description: "A brief map of MepMail for LLMs.",
@@ -65,8 +73,7 @@ const BODY = JSON.stringify(
       {
         identifier: "urn:air:je4ndev.com:mepmail:docs:site",
         displayName: "MepMail documentation",
-        description:
-          "Human-facing guides: quickstart, SDKs, MCP, error reference and rate limits.",
+        description: "Human-facing guides: quickstart, SDKs, MCP, error reference and rate limits.",
         type: "text/html",
         url: "https://docs-mepmail.je4ndev.com",
       },

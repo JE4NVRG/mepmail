@@ -12,6 +12,7 @@ describe("ai-catalog.json", () => {
     const urls = body.entries.map((e: { url: string }) => e.url);
     expect(urls).toContain("https://mepmail.je4ndev.com/.well-known/mcp/server-card.json");
     expect(urls).toContain("https://mepmail.je4ndev.com/.well-known/api-catalog");
+    expect(urls).toContain("https://mepmail.je4ndev.com/.well-known/agent-skills/index.json");
     expect(urls).toContain("https://api-mepmail.je4ndev.com/openapi.json");
     expect(urls).toContain("https://mepmail.je4ndev.com/auth.md");
     expect(JSON.stringify(body)).not.toContain("millionsend.com");
