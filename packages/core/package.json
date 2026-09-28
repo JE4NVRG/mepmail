@@ -51,6 +51,14 @@
     "./mail-preferences": {
       "types": "./src/mail-preferences.ts",
       "default": "./src/mail-preferences.ts"
+    },
+    "./mcp-tools": {
+      "types": "./src/mcp-tools.ts",
+      "default": "./src/mcp-tools.ts"
+    },
+    "./mcp-server-card": {
+      "types": "./src/mcp-server-card.ts",
+      "default": "./src/mcp-server-card.ts"
     }
   },
   "scripts": {
