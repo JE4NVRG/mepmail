@@ -15,6 +15,7 @@ import {
   readPeriodUsage,
   rungByKey,
   type TeamQuota,
+  teamFunnelProps,
   teamQuota,
   teamRung,
   utcDay,
@@ -27,6 +28,7 @@ import { z } from "zod";
 import { recordAudit } from "../audit";
 import { resolveBaseUrl } from "../auth";
 import { getStripe, mailPlanMove } from "../billing";
+import { emitFunnel } from "../funnel";
 import { getQueue } from "../queue";
 import { adminProcedure, router, teamProcedure } from "../trpc";
 
@@ -146,6 +148,17 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
           action: "billing.checkout_started",
           target: { type: "team", id: ctx.teamId },
           metadata: { rung: input.rung },
+        });
+        // The funnel's checkout step. Claimed once per team per day: a visitor
+        // who opens Checkout three times is one intent, not three, while a
+        // second attempt next week is news again. Emitted here because this is
+        // the only place a Checkout session is created.
+        await emitFunnel(ctx.db, {
+          name: "checkout_started",
+          dedupeKey: `checkout_started:${ctx.teamId}:${utcDay(new Date())}`,
+          teamId: ctx.teamId,
+          props: { plan: input.rung.split("_")[0] ?? null },
+          resolve: (tx) => teamFunnelProps(tx, ctx.teamId),
         });
         return { url };
       }),

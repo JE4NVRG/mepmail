@@ -35,6 +35,7 @@ import {
   fetchTeamStanding,
   findSuppressed,
   findTopicOptOuts,
+  type FunnelEventTarget,
   isTeamSuspended,
   type Keyring,
   MAX_ATTACHMENT_BYTES,
@@ -193,6 +194,13 @@ export interface ApiDeps {
    * without a producer would strand it in "queued" forever.
    */
   enqueueEmailSend: (emailId: string, opts?: { startAfter?: Date }) => Promise<void>;
+  /**
+   * Where the funnel's activation step goes (core funnel-events): the API is a
+   * producer like the dashboard's, so a team's first accepted email is claimed
+   * here too. Optional — a self-host with no collector emits nothing, which is
+   * the default (see umamiFunnel in @millionsend/config).
+   */
+  funnel?: FunnelEventTarget | undefined;
   /**
    * Hands a scheduled broadcast to the fan-out queue. Optional: without it a
    * send still commits (status scheduled) and the broadcasts.reconcile sweep

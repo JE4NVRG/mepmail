@@ -1,10 +1,12 @@
 import { serve } from "@hono/node-server";
 import {
   accountMailDeliverable,
+  appHostname,
   env,
   servedRegions,
   sesTenantsEnabled,
   trackingSubdomainsSupported,
+  umamiFunnel,
   unsubscribeBaseUrl,
 } from "@millionsend/config";
 import {
@@ -84,6 +86,9 @@ const app = createApi({
       pacingHorizonDays((await settings()).emailRetentionDays ?? env.EMAIL_RETENTION_DAYS),
   },
   isCloud: env.IS_CLOUD,
+  // Cloud pins the funnel collector in code (umamiFunnel); a self-host with
+  // UMAMI_ENDPOINT unset gets nulls and emits nothing.
+  funnel: { ...umamiFunnel(), hostname: appHostname() },
   onboardingEmailFrom: env.ONBOARDING_EMAIL_FROM,
   requireVerifiedMembers: accountMailDeliverable(),
   rateLimitPerMinute: env.API_RATE_LIMIT_PER_MINUTE,

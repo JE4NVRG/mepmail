@@ -7,6 +7,7 @@ import {
   isLoopbackUrl,
   MCP_SCOPES,
   removeSystemContact,
+  userFunnelProps,
 } from "@millionsend/core";
 import { type Db, getDb, schema } from "@millionsend/db";
 import { type BetterAuthPlugin, betterAuth } from "better-auth";
@@ -18,6 +19,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { headers } from "next/headers";
 import { mcpResourceUrl, resolveBaseUrl } from "@/lib/api-base-url";
 import { httpOrigin } from "@/lib/http-url";
+import { attributionProps, emitFunnel, recordSignupAttribution } from "./funnel";
 import { localeFromHeaders } from "./locale";
 import { getActiveMembership, listMemberships } from "./membership";
 import { enqueueRecipientErase } from "./queue";
@@ -226,6 +228,43 @@ export function createAuth(
       await enrollSystemContact(db, owner.teamId, { email: user.email, name: user.name, locale });
     } catch (error) {
       console.error("Account-mail contact enrollment failed", error);
+    }
+  };
+  /**
+   * Funnel step 1 and 2: the channel the visit arrived on, kept on the
+   * account, and the events that say the account exists and its address was
+   * proven. Best-effort throughout — a measurement never fails the sign-up or
+   * the verification it is measuring.
+   */
+  const trackSignup = async (user: { id: string }, requestHeaders: Headers | undefined) => {
+    try {
+      const attribution = await recordSignupAttribution(
+        db,
+        user.id,
+        requestHeaders?.get("cookie") ?? null,
+      );
+      await emitFunnel(db, {
+        name: "signup",
+        dedupeKey: `signup:${user.id}`,
+        // No team exists yet, so the plan is the one every new account starts on.
+        props: { ...attributionProps(attribution, localeFromHeaders(requestHeaders)), plan: "free" },
+      });
+    } catch (error) {
+      console.error("signup funnel tracking failed", error);
+    }
+  };
+  const trackEmailVerified = async (user: { id: string }, requestHeaders: Headers | undefined) => {
+    try {
+      await emitFunnel(db, {
+        name: "email_verified",
+        dedupeKey: `email_verified:${user.id}`,
+        props: { locale: localeFromHeaders(requestHeaders) },
+        // The channel is read from the row sign-up wrote, so the two events
+        // agree even when the verification happens days later, from a phone.
+        resolve: (tx) => userFunnelProps(tx, user.id),
+      });
+    } catch (error) {
+      console.error("verification funnel tracking failed", error);
     }
   };
   /**
@@ -455,6 +494,7 @@ export function createAuth(
             expiresIn: VERIFY_TOKEN_TTL_MINUTES * 60,
             afterEmailVerification: async (user, request) => {
               await enrollAccount(user, request?.headers);
+              await trackEmailVerified(user, request?.headers);
             },
           },
         }
@@ -507,7 +547,9 @@ export function createAuth(
           // social first sign-in). Social sign-ins arrive verified and enroll
           // here; a password sign-up enrolls from afterEmailVerification.
           after: async (user, ctx) => {
-            await enrollAccount(user, ctx?.headers ?? ctx?.request?.headers);
+            const requestHeaders = ctx?.headers ?? ctx?.request?.headers;
+            await enrollAccount(user, requestHeaders);
+            await trackSignup(user, requestHeaders);
           },
         },
       },

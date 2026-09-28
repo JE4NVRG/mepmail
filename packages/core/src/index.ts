@@ -302,6 +302,29 @@ export { purgedEmailBodyColumns } from "./email-retention.js";
 export { ERASED_TOMBSTONE, type EraseRecipientResult, eraseRecipient } from "./erase-recipient.js";
 export { type SesEventsHealth, sesEventsHealth } from "./events-health.js";
 export {
+  ATTRIBUTION_COOKIE,
+  ATTRIBUTION_TTL_SECONDS,
+  attributionFromCookieValue,
+  attributionFromVisit,
+  buildFunnelEventPayload,
+  emitFunnelEvent,
+  FUNNEL_EVENT_NAMES,
+  FUNNEL_EVENT_PATHS,
+  FUNNEL_SEND_TIMEOUT_MS,
+  type FunnelEventName,
+  type FunnelEventProps,
+  type FunnelEventRequest,
+  type FunnelEventTarget,
+  funnelEventData,
+  type RawVisitAttribution,
+  sendFunnelEvent,
+  type SignupAttribution,
+  teamFunnelProps,
+  UMAMI_COLLECTOR_USER_AGENT,
+  type UmamiEventBody,
+  userFunnelProps,
+} from "./funnel-events.js";
+export {
   accountMailCard,
   EMAIL_WHITE_TILE_URL,
   EMAIL_WORDMARK_BONE_URL,

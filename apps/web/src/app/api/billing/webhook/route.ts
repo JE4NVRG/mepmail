@@ -17,12 +17,14 @@ import {
   QUOTA_COLUMNS,
   raisesQuota,
   recordAudit,
+  teamFunnelProps,
   teamQuota,
 } from "@millionsend/core";
 import { type Db, getDb, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import { appBaseUrl } from "@/lib/api-base-url";
 import { BILLING_PATH, getStripe, mailPlanMove } from "@/server/billing";
+import { emitFunnel } from "@/server/funnel";
 import { getQueue } from "@/server/queue";
 import { buildAccountEmail, sendAccountMail } from "@/server/system-mail";
 
@@ -44,6 +46,9 @@ export async function POST(request: Request) {
     stripe: getStripe(),
     webhookSecret: env.STRIPE_WEBHOOK_SECRET ?? "",
     livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
+    // Only for an event that was newly applied, so a redelivery stays silent;
+    // keyed by the Stripe event id, so a recurring invoice is one payment each.
+    afterApply: (applied) => trackPayment(db, applied),
   });
   if (status === 200 && event && before) {
     const after = await planOf(db, event.customerId);
@@ -146,6 +151,48 @@ function parseEvent(rawBody: string): BillingEvent | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Stripe event types that mean money was actually collected. `invoice.paid`
+ * is Stripe's own "this invoice is settled" signal and fires on every period,
+ * so a renewal is a payment too; `checkout.session.completed` is deliberately
+ * not here — a checkout that starts a trial completes without a payment.
+ */
+const PAYMENT_SUCCEEDED_EVENTS = new Set(["invoice.paid"]);
+
+/**
+ * The funnel's payment step, emitted from the webhook the plan already moves
+ * on: the team is resolved from the Stripe customer the event names, and the
+ * channel/plan come from the same row the other events read. Best-effort — a
+ * measurement never fails a webhook Stripe would then retry.
+ */
+async function trackPayment(
+  db: Db,
+  applied: { id: string; type: string; customerId: string | null },
+): Promise<void> {
+  try {
+    if (!PAYMENT_SUCCEEDED_EVENTS.has(applied.type) || !applied.customerId) return;
+    const team = await teamOfCustomer(db, applied.customerId);
+    if (!team) return;
+    await emitFunnel(db, {
+      name: "payment_succeeded",
+      dedupeKey: `payment_succeeded:${applied.id}`,
+      teamId: team.id,
+      resolve: (tx) => teamFunnelProps(tx, team.id),
+    });
+  } catch (error) {
+    console.error("payment_succeeded funnel event skipped", error);
+  }
+}
+
+/** The team a Stripe customer belongs to, id only: what the funnel event needs to key on. */
+async function teamOfCustomer(db: Db, customerId: string) {
+  const [team] = await db
+    .select({ id: schema.teams.id })
+    .from(schema.teams)
+    .where(eq(schema.teams.stripeCustomerId, customerId));
+  return team ?? null;
 }
 
 async function planOf(db: Db, customerId: string) {

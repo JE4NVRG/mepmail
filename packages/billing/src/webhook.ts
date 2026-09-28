@@ -10,6 +10,21 @@ export interface WebhookDeps extends BillingDeps {
   webhookSecret: string;
   /** Mode of the configured API key; events from the other mode are rejected. */
   livemode: boolean;
+  /**
+   * Runs after the transaction commits, once per event that was newly
+   * recorded and acted on — the same dedupe the ledger applies, so a
+   * redelivery stays silent here too. The route uses it to emit the funnel's
+   * payment event without billing knowing anything about analytics.
+   * Best-effort: a failure here is logged and the event stays applied.
+   */
+  afterApply?: ((event: AppliedWebhookEvent) => void | Promise<void>) | undefined;
+}
+
+/** What a newly applied event tells its caller: enough to key and classify it. */
+export interface AppliedWebhookEvent {
+  id: string;
+  type: string;
+  customerId: string | null;
 }
 
 /** Stripe redelivers for at most 3 days; older dedupe rows are dead weight. */
@@ -65,16 +80,16 @@ export async function handleWebhook(
   }
   if (event.livemode !== deps.livemode) return 400;
   const log = deps.log ?? console.warn;
-  await deps.db.transaction(async (tx) => {
+  const applied = await deps.db.transaction(async (tx): Promise<AppliedWebhookEvent | null> => {
     const inserted = await tx
       .insert(schema.stripeEvents)
       .values({ id: event.id, type: event.type })
       .onConflictDoNothing()
       .returning({ id: schema.stripeEvents.id });
-    if (inserted.length === 0) return;
+    if (inserted.length === 0) return null;
 
     const ref = subscriptionRef(event);
-    if (!ref?.subscriptionId) return;
+    if (!ref?.subscriptionId) return null;
     await lockCustomer(tx as unknown as Db, ref.customerId ?? ref.subscriptionId);
     const sub = await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
       expand: SUBSCRIPTION_EXPAND,
@@ -85,7 +100,18 @@ export async function handleWebhook(
       (m) => log(`stripe webhook ${event.id}: ${m}`),
       deps.stripe,
     );
+    return { id: event.id, type: event.type, customerId: ref.customerId };
   });
+  // After the commit, and never before it: the caller's hook reports on an
+  // event that is durable. A throwing hook is logged, not propagated — the
+  // event is applied, and Stripe must not be told to redeliver it.
+  if (applied && deps.afterApply) {
+    try {
+      await deps.afterApply(applied);
+    } catch (error) {
+      log(`stripe webhook ${applied.id}: afterApply failed (${String(error)})`);
+    }
+  }
   return 200;
 }
 
