@@ -1,0 +1,246 @@
+{
+  "terms": {
+    "title": "Termos de Uso",
+    "updated": "Última atualização: 28 de setembro de 2026",
+    "intro": "Estes termos regem o seu acesso e uso do MepMail, um serviço de e-mail transacional operado pela Je4nDev (\"nós\"). Ao criar uma conta ou usar o serviço, você concorda com estes termos. Se não concordar, não use o serviço.",
+    "sections": [
+      {
+        "title": "1. O serviço",
+        "body": [
+          "O MepMail permite enviar e-mails transacionais por API HTTPS, relay SMTP ou servidor MCP, e gerenciar domínios de envio, contatos, supressões e eventos de entrega. A entrega é feita pelo Amazon SES, que atua como nossa infraestrutura de envio.",
+          "O serviço é oferecido em degraus com volumes mensais de envio. Você é responsável por escolher o degrau adequado ao seu volume; excedê-lo move os envios para cobrança de excedente, conforme descrito na página de preços."
+        ]
+      },
+      {
+        "title": "2. Sua conta",
+        "body": [
+          "Você deve fornecer informações corretas, manter credenciais e chaves de API em sigilo, e ter pelo menos 18 anos (ou a maioridade legal onde você mora). Você é responsável por toda atividade na sua conta e pelo conteúdo que envia.",
+          "Você precisa ter base legal para enviar e-mail aos destinatários que cadastra — em regra, o consentimento deles ou uma relação de cliente existente."
+        ]
+      },
+      {
+        "title": "3. Uso aceitável",
+        "body": [
+          "O MepMail é para e-mail transacional e de marketing com permissão. Você não pode usar o serviço para:"
+        ],
+        "list": [
+          "Enviar e-mail em massa não solicitado (spam) ou para listas compradas, alugadas ou raspadas.",
+          "Enviar phishing, malware, mensagens fraudulentas ou enganosas, ou falsificar identidade de remetente.",
+          "Enviar conteúdo ilegal, abusivo, de ódio ou que viole direitos.",
+          "Processar dados sobre os quais você não tem direitos.",
+          "Sondar, sobrecarregar ou tentar burlar limites, cotas ou a segurança do serviço."
+        ]
+      },
+      {
+        "title": "4. Denúncias de spam e reputação",
+        "body": [
+          "A entregabilidade depende da reputação do remetente. Se os seus envios gerarem denúncias de spam, rejeições ou listagem em blocklists, podemos pausar o envio, exigir mudanças ou suspender a conta. Em casos graves, podemos encerrar imediatamente, sem reembolso, conforme a Política de Reembolso."
+        ]
+      },
+      {
+        "title": "5. Planos, cobrança e excedente",
+        "body": [
+          "Planos pagos são cobrados em dólar, via Stripe, mensalmente e antecipado. O volume é contado por destinatário distinto, como faz a nossa infraestrutura de entrega. Envios além do volume incluído são cobrados pela taxa de excedente do plano e podem ser limitados no painel.",
+          "Se um pagamento falhar, podemos suspender o envio até a regularização. Preços podem mudar com aviso de pelo menos 30 dias; mudanças nunca valem retroativamente para um período já pago."
+        ]
+      },
+      {
+        "title": "6. Cancelamento",
+        "body": [
+          "Você pode cancelar a qualquer momento pelo painel. O cancelamento interrompe as renovações futuras; a conta segue ativa até o fim do período pago e depois passa para o degrau gratuito com os seus limites de envio. Reembolsos seguem a Política de Reembolso."
+        ]
+      },
+      {
+        "title": "7. Disponibilidade e entrega",
+        "body": [
+          "Buscamos alta disponibilidade, mas durante o beta aberto o serviço é fornecido \"no estado em que se encontra\", sem SLA garantido. Podemos fazer manutenções e alterar ou descontinuar recursos.",
+          "Não é possível garantir que um e-mail específico seja aceito, entregue ou lido: servidores de destino, filtros e blocklists estão fora do nosso controle. Os eventos da nossa infraestrutura de entrega são a referência do que aconteceu com cada mensagem."
+        ]
+      },
+      {
+        "title": "8. Suspensão e encerramento",
+        "body": [
+          "Podemos suspender ou encerrar a sua conta em caso de violação destes termos, por exigência legal, ou para proteger o serviço e os demais clientes. Você pode excluir a sua conta a qualquer momento. As cláusulas que por natureza devem sobreviver ao encerramento (cobrança, responsabilidade, lei aplicável) permanecem válidas."
+        ]
+      },
+      {
+        "title": "9. Propriedade intelectual",
+        "body": [
+          "O software do MepMail é aberto sob a AGPL e pode ser auto-hospedado; o serviço hospedado, a marca e a documentação são nossos. Os seus dados — contatos, mensagens e domínios — continuam seus. Não reivindicamos propriedade sobre eles."
+        ]
+      },
+      {
+        "title": "10. Responsabilidade",
+        "body": [
+          "Na máxima extensão permitida em lei, a nossa responsabilidade total por reclamações ligadas ao serviço é limitada ao valor pago a nós nos 12 meses anteriores à reclamação. Não respondemos por danos indiretos ou consequenciais, lucros cessantes, nem pelo conteúdo enviado pelo serviço. Nada aqui exclui responsabilidades que a lei não permite excluir."
+        ]
+      },
+      {
+        "title": "11. Mudanças nestes termos",
+        "body": [
+          "Podemos atualizar estes termos. Mudanças materiais são anunciadas por e-mail ou nesta página com pelo menos 15 dias de antecedência. Continuar usando o serviço após a entrada em vigor significa que você aceita os novos termos."
+        ]
+      },
+      {
+        "title": "12. Lei aplicável",
+        "body": [
+          "Estes termos são regidos pelas leis do Brasil, onde o serviço é operado. Eventuais disputas são resolvidas no foro de Paranavaí, Paraná, salvo quando a lei de consumo obrigatória do seu país dispuser de forma diferente."
+        ]
+      }
+    ],
+    "contact": "Dúvidas sobre estes termos: jean@je4ndev.com"
+  },
+  "privacy": {
+    "title": "Política de Privacidade",
+    "updated": "Última atualização: 28 de setembro de 2026",
+    "intro": "Esta política explica quais dados o MepMail coleta, como eles são usados e quais escolhas você tem. Ela é curta de propósito: coletar pouco, criptografar o que é sensível e nomear os subprocessadores.",
+    "sections": [
+      {
+        "title": "1. Em resumo",
+        "body": [],
+        "list": [
+          "Coletamos os dados necessários para rodar a sua conta e a cobrança — nada além.",
+          "O conteúdo dos e-mails que você envia é criptografado em repouso e processado apenas para entregar as suas mensagens. Não lemos, não vendemos e não usamos esse conteúdo para treinar nada.",
+          "Os pagamentos rodam no Stripe; nunca vemos nem armazenamos o número do seu cartão.",
+          "Trabalhamos com uma lista curta de provedores de infraestrutura, nomeados abaixo.",
+          "Você pode exportar ou excluir os seus dados a qualquer momento."
+        ]
+      },
+      {
+        "title": "2. Dados que coletamos",
+        "body": [],
+        "list": [
+          "Conta: nome, e-mail, senha (armazenada como hash), vínculo com o time.",
+          "Cobrança: plano, status de pagamento e referências de fatura. Dados de cartão vão direto para o Stripe.",
+          "Dados de envio: domínios de envio, contatos que você cadastra, supressões e metadados das mensagens (destinatário, assunto, status, eventos).",
+          "Conteúdo das mensagens: o HTML/texto que você envia, armazenado criptografado em repouso e processado para entregar a mensagem.",
+          "Dados técnicos: endereço IP, user agent, cookies de sessão e logs da aplicação."
+        ]
+      },
+      {
+        "title": "3. Como usamos os dados",
+        "body": [],
+        "list": [
+          "Para prestar o serviço: autenticar você, enviar os seus e-mails pelo Amazon SES, mostrar eventos de entrega, aplicar cotas.",
+          "Para cobrar e processar reembolsos.",
+          "Para proteger o serviço: detectar abuso, spam e acessos não autorizados, e cumprir obrigações legais.",
+          "Para falar com você sobre a sua conta ou mudanças materiais no serviço."
+        ]
+      },
+      {
+        "title": "4. Bases legais",
+        "body": [
+          "Onde o GDPR se aplica, tratamos dados para executar o nosso contrato com você (operação do serviço), com base em interesse legítimo (segurança e prevenção de abuso), para cumprir obrigações legais (registros de cobrança) e com o seu consentimento quando exigido (cookies não essenciais). Sob a LGPD, aplicam-se as bases correspondentes."
+        ]
+      },
+      {
+        "title": "5. Subprocessadores",
+        "body": ["Usamos uma lista deliberadamente curta de provedores para operar o serviço:"],
+        "list": [
+          "Amazon Web Services (Amazon SES) — entrega de e-mails e notificações de eventos. Conteúdo e metadados das mensagens passam por ele para a entrega.",
+          "Stripe — processamento de pagamentos, faturas e recibos.",
+          "Cloudflare — DNS, CDN e proteção de rede na frente dos nossos servidores."
+        ]
+      },
+      {
+        "title": "6. Retenção",
+        "body": [
+          "Dados de conta e de envio são mantidos enquanto a conta estiver ativa. Após a exclusão da conta, removemos os dados pessoais em até 30 dias, exceto quando a retenção for exigida (por exemplo, registros de cobrança guardados por obrigações fiscais e contábeis) ou quando logs limitados de entrega forem necessários para segurança. Estatísticas agregadas e não identificáveis podem ser mantidas."
+        ]
+      },
+      {
+        "title": "7. Segurança",
+        "body": [
+          "O tráfego é criptografado em trânsito (TLS). O conteúdo das mensagens é criptografado em repouso. Senhas são armazenadas como hash. O acesso a sistemas de produção é restrito ao operador, e chaves de API são armazenadas apenas como hash, com um prefixo curto para identificação."
+        ]
+      },
+      {
+        "title": "8. Seus direitos",
+        "body": [
+          "Conforme onde você mora, você pode pedir acesso, correção, portabilidade, restrição ou exclusão dos seus dados pessoais, e se opor ao tratamento. Você pode excluir a sua conta direto pelo painel e falar conosco em privacy@je4ndev.com para qualquer pedido de privacidade. Respondemos em até 30 dias."
+        ]
+      },
+      {
+        "title": "9. Transferências internacionais",
+        "body": [
+          "A nossa infraestrutura, incluindo Amazon SES e Stripe, processa dados nos Estados Unidos e em outros países onde esses provedores operam. As transferências se apoiam nas cláusulas contratuais padrão desses provedores e salvaguardas equivalentes."
+        ]
+      },
+      {
+        "title": "10. Cookies",
+        "body": [
+          "Usamos apenas cookies essenciais: um cookie de sessão para o painel e um cookie de idioma que lembra a sua escolha de locale. Não usamos cookies de publicidade nem de rastreamento entre sites."
+        ]
+      },
+      {
+        "title": "11. Mudanças",
+        "body": [
+          "Podemos atualizar esta política. Mudanças materiais são anunciadas por e-mail ou nesta página antes de entrarem em vigor."
+        ]
+      }
+    ],
+    "contact": "Pedidos e dúvidas de privacidade: privacy@je4ndev.com"
+  },
+  "refund": {
+    "title": "Política de Reembolso",
+    "updated": "Última atualização: 28 de setembro de 2026",
+    "intro": "Queremos que você pague apenas se o MepMail funcionar para você. O degrau gratuito existe para você validar o serviço com e-mail real antes de gastar qualquer coisa.",
+    "sections": [
+      {
+        "title": "1. Teste grátis primeiro",
+        "body": [
+          "Toda conta começa gratuita, com um teto diário de envio e acesso à API completa, ao relay SMTP e ao servidor MCP. Recomendamos enviar e-mail real no degrau gratuito antes de escolher um plano pago."
+        ]
+      },
+      {
+        "title": "2. Garantia de 7 dias no primeiro pagamento",
+        "body": [
+          "Se você fizer upgrade e não ficar satisfeito, peça em até 7 dias após o primeiro pagamento e reembolsamos integralmente — sem interrogatório. Uma garantia por conta, no primeiro período pago."
+        ]
+      },
+      {
+        "title": "3. Depois dos primeiros 7 dias",
+        "body": [
+          "Passada a janela, os pagamentos não são reembolsáveis e não devolvemos volume não usado de forma proporcional: você pode cancelar a qualquer momento e continuar enviando até o fim do período pago; depois, a conta passa para o degrau gratuito."
+        ]
+      },
+      {
+        "title": "4. Cobranças duplicadas ou acidentais",
+        "body": [
+          "Se você foi cobrado duas vezes, cobrado após um cancelamento ou cobrado por engano, fale conosco e devolvemos a cobrança integralmente — isso não está sujeito à janela de 7 dias."
+        ]
+      },
+      {
+        "title": "5. Falhas da plataforma",
+        "body": [
+          "Se um envio falhar por falha técnica do nosso lado (não por filtros do destinatário, blocklists ou rejeições), avise com os IDs das mensagens. Investigamos e creditamos o volume afetado ou reembolsamos o valor equivalente, conforme o caso."
+        ]
+      },
+      {
+        "title": "6. Abuso e spam",
+        "body": [
+          "Contas suspensas ou encerradas por violar os Termos de Uso — spam, listas compradas, phishing, conteúdo proibido — não têm direito a reembolso."
+        ]
+      },
+      {
+        "title": "7. Como pedir reembolso",
+        "body": [
+          "Envie um e-mail para jean@je4ndev.com a partir do endereço da conta (ou informe o e-mail da conta) com a referência da cobrança. Os reembolsos são processados pelo Stripe, de volta ao meio de pagamento original, normalmente em 5 a 10 dias úteis, dependendo do seu banco."
+        ]
+      },
+      {
+        "title": "8. Cancelar x reembolsar",
+        "body": [
+          "Cancelar interrompe cobranças futuras; não reembolsa as passadas. Você pode cancelar pelo painel a qualquer momento — sem ligação, sem labirinto de retenção."
+        ]
+      },
+      {
+        "title": "9. Mudanças nesta política",
+        "body": [
+          "Podemos atualizar esta política. As mudanças valem para compras futuras a partir da entrada em vigor, nunca retroativamente."
+        ]
+      }
+    ],
+    "contact": "Pedidos e dúvidas de reembolso: jean@je4ndev.com"
+  }
+}

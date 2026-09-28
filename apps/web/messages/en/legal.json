@@ -1,0 +1,246 @@
+{
+  "terms": {
+    "title": "Terms of Service",
+    "updated": "Last updated: September 28, 2026",
+    "intro": "These terms govern your access to and use of MepMail, a transactional email service operated by Je4nDev (\"we\", \"us\"). By creating an account or using the service, you agree to these terms. If you do not agree, do not use the service.",
+    "sections": [
+      {
+        "title": "1. The service",
+        "body": [
+          "MepMail lets you send transactional email through an HTTPS API, an SMTP relay, or an MCP server, and to manage sending domains, contacts, suppressions and delivery events. Email is delivered through Amazon SES, which acts as our delivery infrastructure.",
+          "The service is offered in tiers with monthly send volumes. You are responsible for choosing the tier that fits your volume; exceeding it moves sends to overage billing as described on the pricing page."
+        ]
+      },
+      {
+        "title": "2. Your account",
+        "body": [
+          "You must provide accurate account information, keep your credentials and API keys secret, and be at least 18 years old (or the age of majority where you live). You are responsible for all activity under your account and for the content you send.",
+          "You must have a lawful basis to email the recipients you upload or send to — typically their consent or an existing customer relationship."
+        ]
+      },
+      {
+        "title": "3. Acceptable use",
+        "body": [
+          "MepMail is for permission-based transactional and marketing email. You must not use the service to:"
+        ],
+        "list": [
+          "Send unsolicited bulk email (spam) or email to purchased, rented or scraped lists.",
+          "Send phishing, malware, fraudulent or deceptive messages, or spoof sender identity.",
+          "Send content that is illegal, harassing, hateful or infringing.",
+          "Process data you do not have the right to process.",
+          "Probe, overload or attempt to bypass the service's limits, quotas or security."
+        ]
+      },
+      {
+        "title": "4. Spam complaints and reputation",
+        "body": [
+          "Email deliverability depends on sender reputation. If your sending generates spam complaints, bounces or blocklist listings, we may pause sending, require changes, or suspend the account. In severe cases we may terminate immediately without refund, as described in the Refund Policy."
+        ]
+      },
+      {
+        "title": "5. Plans, billing and overage",
+        "body": [
+          "Paid plans are billed in US dollars through Stripe, monthly, in advance. Volume is counted per distinct recipient, like our delivery infrastructure does. Sends beyond your plan's included volume are billed at the plan's overage rate, and can be capped from the dashboard.",
+          "If a payment fails, we may suspend sending until it is settled. Prices may change with at least 30 days' notice; changes never apply retroactively to a period you already paid."
+        ]
+      },
+      {
+        "title": "6. Cancellation",
+        "body": [
+          "You can cancel at any time from the dashboard. Cancellation stops future renewals; the account remains active until the end of the paid period and then moves to the free tier with its sending limits. Refunds are covered by the Refund Policy."
+        ]
+      },
+      {
+        "title": "7. Availability and delivery",
+        "body": [
+          "We aim for high availability, but during the open beta the service is provided \"as is\", without a guaranteed SLA. We may perform maintenance and may change or discontinue features.",
+          "We cannot guarantee that any individual email will be accepted, delivered or read: recipient servers, filters and blocklists are outside our control. Our delivery infrastructure's event data is the reference for what happened to a message."
+        ]
+      },
+      {
+        "title": "8. Suspension and termination",
+        "body": [
+          "We may suspend or terminate your account if you violate these terms, if required by law, or to protect the service or other customers. You may delete your account at any time. Sections that by their nature should survive termination (billing, liability, governing law) survive."
+        ]
+      },
+      {
+        "title": "9. Intellectual property",
+        "body": [
+          "The MepMail software is open source under the AGPL and can be self-hosted; the hosted service, brand and documentation are ours. Your data — contacts, messages and domains — remains yours. We claim no ownership over it."
+        ]
+      },
+      {
+        "title": "10. Liability",
+        "body": [
+          "To the maximum extent permitted by law, our total liability for claims related to the service is limited to the amount you paid us in the 12 months before the claim. We are not liable for indirect or consequential damages, lost profits, or the content sent through the service. Nothing here excludes liability that cannot be excluded by law."
+        ]
+      },
+      {
+        "title": "11. Changes to these terms",
+        "body": [
+          "We may update these terms. Material changes are announced by email or on this page at least 15 days before they take effect. Continuing to use the service after the effective date means you accept the new terms."
+        ]
+      },
+      {
+        "title": "12. Governing law",
+        "body": [
+          "These terms are governed by the laws of Brazil, where the service is operated. Disputes are settled in the courts of Paranavaí, Paraná, Brazil, unless mandatory consumer law in your country provides otherwise."
+        ]
+      }
+    ],
+    "contact": "Questions about these terms: jean@je4ndev.com"
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "updated": "Last updated: September 28, 2026",
+    "intro": "This policy explains what data MepMail collects, how it is used, and the choices you have. We keep it short on purpose: collect little, encrypt the sensitive parts, and name our subprocessors.",
+    "sections": [
+      {
+        "title": "1. In short",
+        "body": [],
+        "list": [
+          "We collect the data needed to run your account and billing — nothing more.",
+          "Email content you send is encrypted at rest and is processed only to deliver your messages. We do not read it, sell it or use it to train anything.",
+          "Payments run on Stripe; we never see or store your card number.",
+          "We work with a short list of infrastructure providers, named below.",
+          "You can export or delete your data at any time."
+        ]
+      },
+      {
+        "title": "2. Data we collect",
+        "body": [],
+        "list": [
+          "Account: name, email address, password (stored as a hash), team membership.",
+          "Billing: plan, payment status and invoice references. Card data goes directly to Stripe.",
+          "Sending data: sending domains, contacts you upload, suppressions, and message metadata (recipient, subject, status, events).",
+          "Message content: the HTML/text you send, stored encrypted at rest, processed to deliver the message.",
+          "Technical data: IP address, user agent, session cookies and application logs."
+        ]
+      },
+      {
+        "title": "3. How we use data",
+        "body": [],
+        "list": [
+          "To provide the service: authenticate you, send your email through Amazon SES, show delivery events, enforce quotas.",
+          "To bill you and handle refunds.",
+          "To secure the service: detect abuse, spam and unauthorized access, and comply with legal obligations.",
+          "To communicate with you about your account or material service changes."
+        ]
+      },
+      {
+        "title": "4. Legal bases",
+        "body": [
+          "Where the GDPR applies, we process data to perform our contract with you (running the service), on the basis of our legitimate interest (security and abuse prevention), to comply with legal obligations (billing records), and with your consent where required (non-essential cookies). Under Brazil's LGPD, the corresponding bases apply."
+        ]
+      },
+      {
+        "title": "5. Subprocessors",
+        "body": ["We use a deliberately short list of providers to run the service:"],
+        "list": [
+          "Amazon Web Services (Amazon SES) — email delivery and event notifications. Message content and metadata pass through it for delivery.",
+          "Stripe — payment processing, invoices and receipts.",
+          "Cloudflare — DNS, CDN and network protection in front of our servers."
+        ]
+      },
+      {
+        "title": "6. Retention",
+        "body": [
+          "Account and sending data are kept while your account is active. After you delete your account, we remove personal data within 30 days, except where retention is required (for example, billing records kept for tax and accounting obligations) or where limited delivery logs are needed for security. Aggregated, non-identifying statistics may be kept."
+        ]
+      },
+      {
+        "title": "7. Security",
+        "body": [
+          "Traffic is encrypted in transit (TLS). Message content is encrypted at rest. Passwords are hashed. Access to production systems is restricted to the operator, and API keys are stored only as hashes with a short prefix for identification."
+        ]
+      },
+      {
+        "title": "8. Your rights",
+        "body": [
+          "Depending on where you live, you can request access, correction, portability, restriction or deletion of your personal data, and object to processing. You can delete your account directly from the dashboard, and you can contact us at privacy@je4ndev.com for any privacy request. We respond within 30 days."
+        ]
+      },
+      {
+        "title": "9. International transfers",
+        "body": [
+          "Our infrastructure, including Amazon SES and Stripe, processes data in the United States and other countries where these providers operate. Transfers rely on the providers' standard contractual clauses and equivalent safeguards."
+        ]
+      },
+      {
+        "title": "10. Cookies",
+        "body": [
+          "We use only essential cookies: a session cookie for the dashboard, and a language cookie that remembers your locale choice. We do not use advertising or cross-site tracking cookies."
+        ]
+      },
+      {
+        "title": "11. Changes",
+        "body": [
+          "We may update this policy. Material changes are announced by email or on this page before they take effect."
+        ]
+      }
+    ],
+    "contact": "Privacy requests and questions: privacy@je4ndev.com"
+  },
+  "refund": {
+    "title": "Refund Policy",
+    "updated": "Last updated: September 28, 2026",
+    "intro": "We want you to pay only if MepMail works for you. The free tier exists so you can validate the service with real email before spending anything.",
+    "sections": [
+      {
+        "title": "1. Test free first",
+        "body": [
+          "Every account starts free, with a daily sending ceiling and access to the full API, SMTP relay and MCP server. We recommend sending real email on the free tier before choosing a paid plan."
+        ]
+      },
+      {
+        "title": "2. 7-day guarantee on your first payment",
+        "body": [
+          "If you upgrade and are not satisfied, ask us within 7 days of your first payment and we refund it in full — no interrogation. One guarantee per account, on the first paid period."
+        ]
+      },
+      {
+        "title": "3. After the first 7 days",
+        "body": [
+          "After that window, payments are non-refundable and we do not refund unused volume pro-rata: you can cancel at any time and keep sending until the end of the paid period, then the account moves to the free tier."
+        ]
+      },
+      {
+        "title": "4. Duplicate or accidental charges",
+        "body": [
+          "If you were charged twice, charged after a cancellation, or charged by mistake, contact us and we refund the charge in full — this is not subject to the 7-day window."
+        ]
+      },
+      {
+        "title": "5. Platform failures",
+        "body": [
+          "If a send fails due to a technical failure on our side (not recipient-side filters, blocklists or bounces), tell us with the message IDs. We investigate and credit the affected volume or refund the equivalent amount, as appropriate."
+        ]
+      },
+      {
+        "title": "6. Abuse and spam",
+        "body": [
+          "Accounts suspended or terminated for violating the Terms of Service — spam, purchased lists, phishing, prohibited content — are not eligible for refunds."
+        ]
+      },
+      {
+        "title": "7. How to request a refund",
+        "body": [
+          "Email jean@je4ndev.com from your account address (or tell us the account email) with the charge reference. Refunds are processed through Stripe back to the original payment method, typically within 5–10 business days depending on your bank."
+        ]
+      },
+      {
+        "title": "8. Cancelling vs refunding",
+        "body": [
+          "Cancelling stops future charges; it does not refund past ones. You can cancel from the dashboard at any time — no phone call, no retention maze."
+        ]
+      },
+      {
+        "title": "9. Changes to this policy",
+        "body": [
+          "We may update this policy. Changes apply to future purchases from the effective date, never retroactively."
+        ]
+      }
+    ],
+    "contact": "Refund requests and questions: jean@je4ndev.com"
+  }
+}

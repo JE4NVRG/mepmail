@@ -15,7 +15,7 @@ export default async function SignupPage() {
     <AuthForm
       mode="signup"
       providers={enabledSocialProviders()}
-      legal={{ termsUrl: env.TERMS_URL ?? null, privacyUrl: env.PRIVACY_URL ?? null }}
+      legal={{ termsUrl: env.TERMS_URL ?? "/terms", privacyUrl: env.PRIVACY_URL ?? "/privacy" }}
       turnstileSiteKey={env.TURNSTILE_SITE_KEY ?? null}
       productUpdates={signupOpen()}
     />

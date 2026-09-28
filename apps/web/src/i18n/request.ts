@@ -19,6 +19,7 @@ const NAMESPACES = [
   "console",
   "deliverability",
   "landing",
+  "legal",
   "nav",
   "emails",
   "bounce-guidance",
