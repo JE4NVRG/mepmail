@@ -4,62 +4,113 @@ description: Os limites de requisição, criação e envio que uma implantação
 ---
 
 O MepMail aplica limites em quatro camadas: taxa de requisições HTTP, proteção
-de credenciais, criação de recursos e volume de envio.
+de credencial, criação de recursos e volume de envio.
 
 ## Taxa de requisições HTTP
 
-- **600 requisições por minuto por chave de API** (padrão da implantação,
-  `API_RATE_LIMIT_PER_MINUTE`). Acima disso a API responde
-  `429 rate_limit_exceeded`.
-- As respostas ainda não trazem cabeçalhos `RateLimit-*`: trate qualquer `429`
-  como o sinal para fazer backoff exponencial e repetir.
+Duas janelas fixas de um minuto valem para toda chamada feita com chave de API,
+e um `429 rate_limit_exceeded` responde pela que estiver cheia:
 
-## Proteção de credenciais
+| Janela | Padrão | Definida por |
+| --- | --- | --- |
+| Por chave de API | 600 requisições/minuto | `API_RATE_LIMIT_PER_MINUTE` |
+| Por time, somando todas as chaves | 3.000 requisições/minuto | Implantação |
 
-- Tentativas de autenticação falhas repetidas de uma mesma origem são
-  limitadas com `429` (`"Too many failed authentication attempts"`). O limite
-  existe para tornar força bruta inútil — pare de repetir credenciais erradas.
+- Criar mais chaves não multiplica o teto — a janela do time cobre todas elas.
+- A janela fixa zera no minuto, então uma rajada que enche uma janela e outra
+  que enche a seguinte podem passar o dobro da cota em poucos segundos.
+  Dê ritmo ao cliente em vez de encher a janela.
+- Um `429` traz **`Retry-After`** (segundos inteiros restantes na janela):
+  espere esse tempo, ou faça backoff exponencial, antes de tentar de novo.
+- As respostas não trazem cabeçalhos `RateLimit-*`: hoje o `429` e o
+  `Retry-After` são como o cliente descobre que passou do limite.
+- Chamadas pelo [servidor MCP](/pt-BR/mcp) hospedado são contadas por usuário
+  autenticado — 600 chamadas/minuto, a mesma configuração — porque uma
+  concessão OAuth não tem chave de API para contar.
+
+## O que fazer em um 429
+
+1. **Espere.** Respeite o `Retry-After` quando ele vier; sem ele, faça backoff
+   exponencial com jitter: 1s, 2s, 4s, 8s… Um cliente que repete na hora só
+   reenche a janela e continua recusado.
+2. **Não repita outros 4xx.** Só `429` e `409 concurrent_idempotent_requests`
+   valem uma nova tentativa; o resto da faixa 4xx é determinístico
+   ([Erros](/pt-BR/errors)).
+3. **Torne a repetição segura.** `POST /emails` e `POST /emails/batch` aceitam
+   um `Idempotency-Key`: reuse a mesma chave para que uma repetição depois de um
+   timeout ou de um `429` não entregue duas vezes.
+4. **Reduza o tráfego.** Envie até 100 e-mails por chamada
+   (`POST /emails/batch`) e até 1.000 contatos por chamada
+   (`POST /contacts/batch`), e serialize rajadas em vez de disparar tudo junto.
+5. **Suba o teto** se a carga for realmente maior: a janela por chave é
+   `API_RATE_LIMIT_PER_MINUTE` em uma implantação auto-hospedada. Na Nuvem,
+   fale com o suporte — subir a janela do time é decisão do operador.
+
+## Proteção de credencial
+
+- **Mais de 20 tentativas de autenticação falhas por minuto vindas de um mesmo
+  IP** respondem `429` (`"Too many failed authentication attempts"`, com
+  `Retry-After`). Isso existe para tornar a força bruta inútil — pare de
+  repetir credenciais erradas e confira a chave.
+- Chaves inválidas, revogadas ou usadas fora do nível de permissão respondem
+  `401`/`403`, nunca são aceitas em silêncio ([Erros](/pt-BR/errors)).
 
 ## Criação de recursos
 
 - **10 domínios por hora por time.** Criar uma identidade de envio provisiona
   um recurso compartilhado no AWS SES, então o teto evita que um time esgote a
-  cota da conta. Ele reinicia a cada hora.
+  cota da conta. Ele zera a cada hora. O número de domínios do plano é um
+  limite separado e continua valendo.
+- **10 registros de cliente OAuth de MCP por 15 minutos por endereço.** Um
+  cliente que precise se registrar de novo deve reusar o registro existente —
+  registrar a cada inicialização é o que estoura esse limite.
 
 ## Volume de envio
 
-| Plano | Incluído | Período | Depois do teto |
+| Plano | Incluído | Período | Passando do teto |
 | --- | --- | --- | --- |
-| Free | 100 | dia UTC | Envios param (50% de graça antes) |
-| Starter | 1.500 | dia UTC | Envios param (50% de graça antes) |
-| Pro / Scale | volume contratado | mês | Excedente cobrado por 1.000 quando ligado; senão para |
+| Free | 100 | dia UTC | Envios ficam parqueados como `queued_quota` e drenam depois da virada do dia; quando o backlog parqueado chega a **3× o teto diário**, novos envios são recusados com `429 daily_quota_exceeded` |
+| Starter | 1.500 | dia UTC | Mesmo comportamento de parqueamento e mesma recusa com 3× de backlog |
+| Pro / Scale | volume comprado | mês | Excedente cobrado por 1.000 quando ligado; caso contrário, `429 monthly_quota_exceeded` |
 
-- Planos mensais com excedente ligado ainda param de forma dura em **5× o
-  volume incluído**: uma integração descontrolada (ou uma chave roubada) nunca
-  gera uma conta sem fim.
-- A taxa de envio por segundo é limitada pela cota do SES da implantação —
-  14/s por padrão, seguindo a taxa real da conta conforme ela escala.
-  Broadcasts são ritmados para deixar folga transacional (30% de reserva por
+- O parqueamento é deliberado: um envio diário acima da cota é **aceito** e
+  entra na fila — a API responde `200` com um id — para uma rajada perto da
+  meia-noite não se perder. Leia o status do e-mail para distinguir um envio
+  parqueado de um na fila.
+- Planos mensais com excedente ligado ainda param no rígido de **5× o volume
+  incluído**: uma integração descontrolada (ou uma chave roubada) nunca gera
+  uma conta sem fim.
+- A taxa de envio por segundo é limitada pela cota de SES da implantação —
+  14/s por padrão, acompanhando a taxa real da conta conforme ela cresce. Os
+  broadcasts são ritmados para deixar folga ao transacional (30% de reserva por
   padrão).
+- O envio pode parar antes da cota: um time cuja taxa de bounce duro ou de
+  reclamação cruze o guardrail recebe `403 sending_paused`, e o envio de
+  broadcast espera a taxa regional da plataforma (`403 broadcasts_paused`). Os
+  dois estão em [Erros](/pt-BR/errors#pausas-e-bloqueios-de-envio).
 
-## Limites de forma da mensagem
+## Limites de formato da mensagem
 
 - **50 destinatários por e-mail** (`to` + `cc` + `bcc` somados).
-- **100 e-mails por lote**; um array acima do teto responde `422`.
-- **Anexos** (somados na mensagem, medidos após decodificação): 1 MB no Free e
-  Starter, 5 MB no Pro, 10 MB no Scale.
+- **100 e-mails por chamada em lote**; um array acima do teto responde `422`.
+- **Anexos** (somados na mensagem, medidos depois da decodificação):
+  1 MB no Free e Starter, 5 MB no Pro, 10 MB no Scale.
 
 ## Limites por plano (objetos)
 
-- Contatos: 1.000 no Free, 10.000 no Starter, ilimitado do Pro em diante.
-- Domínios de envio: 1 / 3 / 10 / ilimitado (Free / Starter / Pro / Scale).
+- Contatos: 1.000 no Free, 10.000 no Starter, ilimitado do Pro para cima.
+- Domínios remetentes: 1 / 3 / 10 / ilimitado (Free / Starter / Pro / Scale).
 - Times por usuário: 1 / 2 / 5 / 10.
 
 Veja [Cobrança](/pt-BR/billing) para preços e a escada completa.
 
 ## MCP
 
-- **600 chamadas por minuto por conta** no endpoint MCP hospedado (padrão da
-  implantação), depois `429 rate_limit_exceeded`.
-- O registro dinâmico de clientes do OAuth é limitado por endereço; um cliente
-  que precise registrar de novo deve reutilizar o registro existente.
+- **600 chamadas por minuto por usuário autenticado** no endpoint MCP
+  hospedado (`API_RATE_LIMIT_PER_MINUTE`), depois `429 rate_limit_exceeded`. As
+  chamadas não são cobradas na janela de chaves do time.
+- O pacote local [`@mepmail/mcp`](/pt-BR/packages) fala com a API REST usando
+  uma chave de API, então ali valem as janelas por chave e por time acima.
+- O registro dinâmico de cliente OAuth do MCP é limitado por endereço (10 por
+  15 minutos); um cliente que precise se registrar de novo deve reusar o
+  registro existente.
