@@ -12,7 +12,7 @@ import { signupFieldMismatch } from "@/lib/signup-validation";
 import styles from "./auth.module.css";
 import { AuthScreen } from "./auth-screen";
 import { SilkCanvas } from "./silk-canvas";
-import { GitHubIcon, GoogleIcon } from "./social-icons";
+import { GitHubIcon, GoogleIcon, MicrosoftIcon } from "./social-icons";
 
 const STRENGTH_TONES = ["", "var(--ms-danger)", "var(--ms-warn)", "var(--ms-success)"] as const;
 const STRENGTH_KEYS = ["", "weak", "fair", "strong"] as const;
@@ -55,7 +55,7 @@ function EyeGlyph({ off }: { off: boolean }) {
   );
 }
 
-export type SocialProviderFlags = { google: boolean; github: boolean };
+export type SocialProviderFlags = { google: boolean; github: boolean; microsoft: boolean };
 export type LegalLinks = { termsUrl: string | null; privacyUrl: string | null };
 type SocialProvider = keyof SocialProviderFlags;
 
@@ -240,7 +240,7 @@ export function AuthForm({
       : nextParam
         ? `/login?next=${encodeURIComponent(next)}`
         : "/login";
-  const anySocial = providers.google || providers.github;
+  const anySocial = providers.google || providers.github || providers.microsoft;
 
   if (awaitingVerification) {
     return (
@@ -307,6 +307,17 @@ export function AuthForm({
               >
                 <GitHubIcon />
                 {tSocial("github")}
+              </button>
+            ) : null}
+            {providers.microsoft ? (
+              <button
+                type="button"
+                className={`ms-btn ms-btn-secondary ${styles.button}`}
+                disabled={pending !== null}
+                onClick={() => onSocial("microsoft")}
+              >
+                <MicrosoftIcon />
+                {tSocial("microsoft")}
               </button>
             ) : null}
           </div>

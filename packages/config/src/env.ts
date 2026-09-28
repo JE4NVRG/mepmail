@@ -366,6 +366,8 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     GITHUB_CLIENT_ID: z.string().optional(),
     GITHUB_CLIENT_SECRET: z.string().optional(),
+    MICROSOFT_CLIENT_ID: z.string().optional(),
+    MICROSOFT_CLIENT_SECRET: z.string().optional(),
 
     // Cloud-only (billing). STRIPE_PORTAL_CONFIG selects a customer-portal
     // configuration; unset uses the Stripe account's default one.
