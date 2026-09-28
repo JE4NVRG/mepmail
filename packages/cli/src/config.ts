@@ -3,9 +3,21 @@ import { CLOUD_API_URL, TRADEMARK_NOTICE, VERSION } from "./meta.js";
 import { PROVIDERS, type ProviderId, RESOURCES, type Resource } from "./model.js";
 import { providers } from "./providers/index.js";
 import { COLOR_MODES, type ColorMode } from "./theme.js";
-import { stripTrailingSlashes } from "./utils.js";
+import { isUuid, stripTrailingSlashes } from "./utils.js";
 
-export type Command = "migrate" | "plan" | "apply" | "status" | "rollback" | "help" | "version";
+export type Command =
+  | "migrate"
+  | "plan"
+  | "apply"
+  | "status"
+  | "rollback"
+  | "doctor"
+  | "emails"
+  | "help"
+  | "version";
+
+/** `emails list` / `emails get <id>`. */
+export type EmailsAction = "list" | "get";
 
 export type KeySource = "env" | "flag" | "stdin" | "prompt";
 
@@ -22,6 +34,16 @@ export interface Config {
   command: Command;
   /** `migrate apply <file>` */
   planFile: string | null;
+  /** `emails list` / `emails get`; null for every other command. */
+  emailsAction: EmailsAction | null;
+  /** `emails get <id>`; validated here so a typo costs no request. */
+  emailId: string | null;
+  /** `emails list` page size, 1-100. */
+  limit: number;
+  /** `emails list` cursor: the id of the last email of the previous page. */
+  after: string | null;
+  /** `doctor` / `emails`: name the requests and exit without calling anything. */
+  dryRun: boolean;
   from: ProviderId | null;
   fromKey: KeyInput;
   toKey: KeyInput;
@@ -62,6 +84,11 @@ export const RPS_CEILING = 100;
 /** Requests per second left to production sending when a raised limit is detected and --rps was not given. */
 export const RPS_HEADROOM = 2;
 
+/** `emails list` page size when --limit is not given (the API's own default). */
+export const EMAIL_PAGE = 20;
+/** The API's ceiling for one page (listQuerySchema: limit 1-100). */
+export const EMAIL_PAGE_MAX = 100;
+
 export const TARGET_KEY_ENV = "MEPMAIL_API_KEY";
 export const TARGET_URL_ENV = "MEPMAIL_BASE_URL";
 /** Historical alias env names, still honored when the primary is unset. */
@@ -86,6 +113,9 @@ const OPTIONS = {
   "non-interactive": { type: "boolean" },
   json: { type: "boolean" },
   out: { type: "string" },
+  limit: { type: "string" },
+  after: { type: "string" },
+  "dry-run": { type: "boolean" },
   report: { type: "string" },
   color: { type: "string" },
   "no-color": { type: "boolean" },
@@ -99,7 +129,8 @@ const OPTIONS = {
 
 const SUBCOMMANDS = ["plan", "apply", "status", "rollback"] as const;
 const GRAMMAR =
-  "mepmail migrate --from resend | migrate plan | migrate apply [plan.json] | migrate status | migrate rollback";
+  "mepmail migrate --from resend | migrate plan | migrate apply [plan.json] | migrate status | migrate rollback | doctor | emails list | emails get <id>";
+const EMAILS_GRAMMAR = "mepmail emails list | mepmail emails get <id>";
 
 function resourceList(flag: string, value: string | undefined): Resource[] | null {
   if (value === undefined) return null;
@@ -180,24 +211,81 @@ export function parseConfig(
   if (values.help === true || positionals.length === 0) return minimal("help");
 
   const [top, sub, file, ...rest] = positionals;
-  if (top !== "migrate") {
+  let command: Command;
+  let emailsAction: EmailsAction | null = null;
+  let planFile: string | null = null;
+  let emailId: string | null = null;
+  if (top === "migrate") {
+    if (sub !== undefined && !(SUBCOMMANDS as readonly string[]).includes(sub)) {
+      throw new ConfigError(`Unknown command \`migrate ${sub}\`. Usage: ${GRAMMAR}`);
+    }
+    command = (sub as Command | undefined) ?? "migrate";
+    if (file !== undefined && command !== "apply") {
+      throw new ConfigError(`Unexpected argument \`${file}\`. Usage: ${GRAMMAR}`);
+    }
+    planFile = file ?? null;
+  } else if (top === "doctor") {
+    if (sub !== undefined) {
+      throw new ConfigError(`Unexpected argument \`${sub}\`. Usage: ${GRAMMAR}`);
+    }
+    command = "doctor";
+  } else if (top === "emails") {
+    if (sub !== "list" && sub !== "get") {
+      throw new ConfigError(
+        sub === undefined
+          ? `Missing a subcommand for \`emails\`. Usage: ${EMAILS_GRAMMAR}`
+          : `Unknown command \`emails ${sub}\`. Usage: ${EMAILS_GRAMMAR}`,
+      );
+    }
+    command = "emails";
+    emailsAction = sub;
+    if (sub === "get") {
+      if (file === undefined) {
+        throw new ConfigError(`Missing <id> for \`emails get\`. Usage: ${EMAILS_GRAMMAR}`);
+      }
+      if (!isUuid(file)) {
+        throw new ConfigError(
+          `\`${file}\` is not an email id. Usage: mepmail emails get <id> — copy one from \`mepmail emails list\`.`,
+        );
+      }
+      emailId = file;
+    } else if (file !== undefined) {
+      throw new ConfigError(`Unexpected argument \`${file}\`. Usage: ${EMAILS_GRAMMAR}`);
+    }
+  } else {
     throw new ConfigError(`Unknown command \`${top}\`. Usage: ${GRAMMAR}`);
-  }
-  if (sub !== undefined && !(SUBCOMMANDS as readonly string[]).includes(sub)) {
-    throw new ConfigError(`Unknown command \`migrate ${sub}\`. Usage: ${GRAMMAR}`);
-  }
-  const command: Command = (sub as Command | undefined) ?? "migrate";
-  if (file !== undefined && command !== "apply") {
-    throw new ConfigError(`Unexpected argument \`${file}\`. Usage: ${GRAMMAR}`);
   }
   if (rest.length > 0) {
     throw new ConfigError(`Unexpected argument \`${rest[0]}\`. Usage: ${GRAMMAR}`);
   }
-  const planFile = file ?? null;
 
   const warnings: string[] = [];
   const json = values.json === true;
   const nonInteractive = values["non-interactive"] === true || json || !stdinIsTTY;
+  /** `doctor` and `emails`: read-only, and the only commands --dry-run speaks to. */
+  const inspectCommand = command === "doctor" || command === "emails";
+  const mutation = command === "migrate" || command === "apply" || command === "rollback";
+  const dryRun = values["dry-run"] === true;
+  if (dryRun && !inspectCommand) {
+    throw new ConfigError(
+      "--dry-run is only for `doctor` and `emails`; `migrate plan` is already read-only.",
+    );
+  }
+
+  const paged = command === "emails" && emailsAction === "list";
+  if ((values.limit !== undefined || values.after !== undefined) && !paged) {
+    throw new ConfigError("--limit and --after only apply to `emails list`.");
+  }
+  let limit = EMAIL_PAGE;
+  if (values.limit !== undefined) {
+    limit = Number(values.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > EMAIL_PAGE_MAX) {
+      throw new ConfigError(
+        `--limit must be a whole number between 1 and ${EMAIL_PAGE_MAX} (got ${values.limit}).`,
+      );
+    }
+  }
+  const after = values.after ?? null;
 
   let from: ProviderId | null = null;
   if (values.from !== undefined) {
@@ -240,8 +328,12 @@ export function parseConfig(
   const toUrlRaw = values["to-url"] ?? envResolved[TARGET_URL_ENV];
   let toUrl = toUrlRaw === undefined || toUrlRaw === "" ? null : apiUrl(toUrlRaw);
 
-  const needsTarget = needsSource || command === "rollback";
-  if (nonInteractive && needsTarget) {
+  const needsTarget = needsSource || command === "rollback" || inspectCommand;
+  // Like the SDKs, the target is MepMail Cloud unless an instance URL is named;
+  // a terminal still asks, since a self-hoster's key against Cloud is only a 401.
+  if (nonInteractive && needsTarget && toUrl === null) toUrl = CLOUD_API_URL;
+  // --dry-run never touches the API, so it must not demand a key either.
+  if (nonInteractive && needsTarget && !dryRun) {
     if (needsSource && fromKey.source === "prompt") {
       throw new ConfigError(
         `Missing ${providers[from ?? "resend"].label} API key. Set ${sourceKeyEnv(from ?? "resend")} or pass --from-key-stdin (non-interactive mode never prompts).`,
@@ -252,11 +344,8 @@ export function parseConfig(
         `Missing MepMail API key. Set ${TARGET_KEY_ENV} or pass --to-key-stdin (non-interactive mode never prompts).`,
       );
     }
-    // Like the SDKs, the target is MepMail Cloud unless an instance URL is named;
-    // a terminal still asks, since a self-hoster's key against Cloud is only a 401.
-    if (toUrl === null) toUrl = CLOUD_API_URL;
     // Decided here, before any network call: the confirmation would only come after the whole source is read.
-    if (command !== "plan" && values.yes !== true) {
+    if (mutation && values.yes !== true) {
       throw new ConfigError(
         "migrate/apply/rollback need --yes in non-interactive mode (or run `migrate plan` to only read).",
       );
@@ -294,6 +383,11 @@ export function parseConfig(
   return {
     command,
     planFile,
+    emailsAction,
+    emailId,
+    limit,
+    after,
+    dryRun,
     from,
     fromKey,
     toKey,
@@ -321,6 +415,11 @@ function minimal(command: "help" | "version"): Config {
   return {
     command,
     planFile: null,
+    emailsAction: null,
+    emailId: null,
+    limit: EMAIL_PAGE,
+    after: null,
+    dryRun: false,
     from: null,
     fromKey: { source: "prompt", value: null },
     toKey: { source: "prompt", value: null },
@@ -345,7 +444,7 @@ function minimal(command: "help" | "version"): Config {
 }
 
 export function helpText(): string {
-  return `mepmail ${VERSION} — move an email account to MepMail
+  return `mepmail ${VERSION} — move an email account to MepMail, and use it day to day
 
 Usage
   mepmail migrate --from resend                          connect, choose resources, plan, confirm, apply, summary
@@ -353,6 +452,9 @@ Usage
   mepmail migrate apply [plan.json] [--yes]              apply a saved plan, or plan and apply in one go
   mepmail migrate status                                 what the last run created and what is left
   mepmail migrate rollback [--yes]                       delete only what this tool created
+  mepmail doctor                                         version, key, API, domains and sending health
+  mepmail emails list [--limit ${EMAIL_PAGE}] [--after <id>]       the team's emails, oldest first
+  mepmail emails get <id>                                one email, with its stored body
   mepmail --help | --version
 
 Options
@@ -372,6 +474,9 @@ Options
   --fresh-webhook-secrets    mint new webhook signing secrets instead of copying them (shown once in the report)
   --fresh                    ignore resume progress; keeps what earlier runs created so rollback still works
   --out <file>               \`migrate plan\`: write the plan as JSON
+  --limit <n>                \`emails list\`: how many emails per page, 1-${EMAIL_PAGE_MAX} (default ${EMAIL_PAGE})
+  --after <id>               \`emails list\`: start after this email id (the last one a previous page printed)
+  --dry-run                  \`doctor\` / \`emails\`: print the requests that would be made and call nothing
   --report <file>            also write the Markdown report to this path
   -y, --yes                  skip confirmations
   --non-interactive          never prompt; a missing input is exit 1 (automatic when stdin is not a terminal, and with --json)
@@ -398,7 +503,7 @@ Files (mode 0600, never a key)
   .mepmail/migrate-report.json   the last run's report, also as migrate-report.md
 
 Exit codes
-  0 ok · 1 error · 2 plan has changes (plan only) · 3 partial, some items failed (details in the report)
+  0 ok · 1 error · 2 plan has changes (plan only), or the MepMail API could not be reached (doctor/emails) · 3 partial, some items failed (details in the report)
 
 ${TRADEMARK_NOTICE}
 `;

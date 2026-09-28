@@ -15,6 +15,8 @@ const aliasEnv = {
   MILLIONSEND_BASE_URL: "https://api.example.com/",
 };
 
+const EMAIL_ID = "0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9";
+
 describe("parseConfig", () => {
   it("resolves the interactive default command with env-provided credentials", () => {
     const config = parseConfig(["migrate", "--from", "resend"], env, true);
@@ -153,10 +155,28 @@ describe("parseConfig", () => {
       ["migrate", "--from", "resend", "--from-key", "a", "--from-key-stdin"],
       "either --from-key or --from-key-stdin",
     ],
+    [["migrate", "--from", "resend", "--bogus"], "Unknown option '--bogus'. See mepmail --help"],
+    [["emails"], "Missing a subcommand for `emails`. Usage: mepmail emails list"],
+    [["emails", "send"], "Unknown command `emails send`. Usage: mepmail emails list"],
+    [["emails", "get"], "Missing <id> for `emails get`"],
     [
-      ["migrate", "--from", "resend", "--bogus"],
-      "Unknown option '--bogus'. See mepmail --help",
+      ["emails", "get", "not-an-id"],
+      "`not-an-id` is not an email id. Usage: mepmail emails get <id>",
     ],
+    [["emails", "list", "extra"], "Unexpected argument `extra`"],
+    [
+      ["emails", "list", "--limit", "0"],
+      "--limit must be a whole number between 1 and 100 (got 0)",
+    ],
+    [["emails", "list", "--limit", "101"], "--limit must be a whole number between 1 and 100"],
+    [["emails", "list", "--limit", "many"], "--limit must be a whole number"],
+    [
+      ["emails", "get", EMAIL_ID, "--limit", "5"],
+      "--limit and --after only apply to `emails list`",
+    ],
+    [["doctor", "extra"], "Unexpected argument `extra`"],
+    [["migrate", "status", "--dry-run"], "--dry-run is only for `doctor` and `emails`"],
+    [["migrate", "plan", "--from", "resend", "--after", EMAIL_ID], "only apply to `emails list`"],
   ])("%j → %s", (argv, message) => {
     expect(() => parseConfig(argv, env, true)).toThrow(ConfigError);
     expect(() => parseConfig(argv, env, true)).toThrow(message);
@@ -200,6 +220,59 @@ describe("parseConfig", () => {
     expect(parseConfig(["migrate", "--from", "resend"], env, true).yes).toBe(false);
   });
 
+  it("doctor and emails resolve credentials like the migration commands", () => {
+    const doctor = parseConfig(["doctor"], env, true);
+    expect(doctor).toMatchObject({
+      command: "doctor",
+      toKey: { source: "env", value: "ms_y" },
+      toUrl: "https://api.example.com",
+      limit: 20,
+      after: null,
+      dryRun: false,
+    });
+    // The historical aliases cover the new commands too.
+    expect(parseConfig(["doctor"], aliasEnv, true).toKey).toEqual({ source: "env", value: "ms_y" });
+    expect(parseConfig(["emails", "list"], env, true)).toMatchObject({
+      command: "emails",
+      emailsAction: "list",
+      emailId: null,
+      limit: 20,
+    });
+    expect(
+      parseConfig(["emails", "list", "--limit", "100", "--after", EMAIL_ID], env, true),
+    ).toMatchObject({ limit: 100, after: EMAIL_ID });
+    expect(parseConfig(["emails", "get", EMAIL_ID, "--json"], env, true)).toMatchObject({
+      command: "emails",
+      emailsAction: "get",
+      emailId: EMAIL_ID,
+      json: true,
+      nonInteractive: true,
+    });
+    // No instance named → MepMail Cloud, exactly like a migration.
+    expect(parseConfig(["emails", "list"], { MEPMAIL_API_KEY: "ms_y" }, false).toUrl).toBe(
+      CLOUD_API_URL,
+    );
+    // The key is mandatory once piped, and named when it is missing.
+    expect(() => parseConfig(["doctor"], {}, false)).toThrow(
+      "Missing MepMail API key. Set MEPMAIL_API_KEY or pass --to-key-stdin",
+    );
+    expect(() => parseConfig(["emails", "list"], {}, false)).toThrow("Missing MepMail API key");
+  });
+
+  it("--dry-run needs no key: it is the one run that never reaches the API", () => {
+    const config = parseConfig(["doctor", "--dry-run"], {}, false);
+    expect(config).toMatchObject({ command: "doctor", dryRun: true, toUrl: CLOUD_API_URL });
+    expect(
+      parseConfig(["emails", "get", EMAIL_ID, "--dry-run", "--json"], {}, false),
+    ).toMatchObject({
+      dryRun: true,
+      emailId: EMAIL_ID,
+      toUrl: CLOUD_API_URL,
+    });
+    // Without --dry-run the same invocation is a usage error.
+    expect(() => parseConfig(["doctor"], {}, false)).toThrow(ConfigError);
+  });
+
   it("--color takes auto, always or never; --no-color is never; the default is auto", () => {
     const argv = ["migrate", "--from", "resend"];
     expect(parseConfig(argv, env, true).color).toBe("auto");
@@ -223,6 +296,13 @@ describe("helpText", () => {
       "migrate plan --from resend [--out plan.json]",
       "migrate apply [plan.json] [--yes]",
       "migrate rollback [--yes]",
+      "mepmail doctor",
+      "mepmail emails list [--limit 20]",
+      "mepmail emails get <id>",
+      "--limit <n>",
+      "--after <id>",
+      "--dry-run",
+      "the MepMail API could not be reached (doctor/emails)",
       "--from-key-stdin",
       "--to-key-stdin",
       "--fresh-webhook-secrets",

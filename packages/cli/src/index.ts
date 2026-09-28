@@ -1,6 +1,8 @@
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { apply } from "./commands/apply.js";
+import { doctor } from "./commands/doctor.js";
+import { emails } from "./commands/emails.js";
 import { migrate } from "./commands/migrate.js";
 import { plan } from "./commands/plan.js";
 import { rollback } from "./commands/rollback.js";
@@ -12,7 +14,7 @@ import { VERSION } from "./meta.js";
 const COMMANDS: Record<
   Exclude<Config["command"], "help" | "version">,
   (ctx: Context) => Promise<number>
-> = { migrate, plan, apply, status, rollback };
+> = { migrate, plan, apply, status, rollback, doctor, emails };
 
 /** The CLI as a function: the tests run it in-process with their own streams, env and cwd. */
 export async function main(argv = process.argv.slice(2), io: Io = {}): Promise<number> {

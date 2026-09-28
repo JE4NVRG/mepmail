@@ -75,6 +75,11 @@ export function truncate(s: string, width: number): string {
   return `${chars.slice(0, Math.max(0, width - 1)).join("")}…`;
 }
 
+/** Ids the API mints are UUIDs; anything else is rejected before a request is made. */
+export const isUuid = (value: string): boolean => UUID_RE.test(value);
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Runs `fn` over `items` with at most `limit` in flight; the first failure stops the walk and is rethrown. */
 export async function forEachConcurrent<T>(
   items: readonly T[],
