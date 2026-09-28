@@ -124,6 +124,12 @@ Erros usam o formato do Resend:
 { "statusCode": 422, "name": "validation_error", "message": "..." }
 ```
 
+O **`name`** é a parte pela qual decidir. Todo código que esta implantação
+emite — com o status, o que significa e o que fazer — está catalogado em
+[Erros](/pt-BR/errors), incluindo as pausas de envio e as recusas por cota
+listadas acima; o comportamento de taxa fica em
+[Limites de taxa](/pt-BR/rate-limits).
+
 ## Idempotência
 
 `POST /emails` e `POST /emails/batch` aceitam um header `Idempotency-Key`.

@@ -1,0 +1,89 @@
+---
+title: Pacotes npm
+description: Os dois pacotes que o MepMail publica no npm — @mepmail/mcp e @mepmail/cli — o que cada um faz e como instalar.
+---
+
+O MepMail publica dois pacotes npm. Nenhum dos dois é um SDK: a API fala o
+protocolo do Resend, então enviar e-mail significa usar os SDKs oficiais do
+Resend apontados para a origem da sua instância ([SDKs](/pt-BR/sdks)). Estes
+dois cobrem o que aqueles SDKs não fazem — rodar MCP localmente e mover uma
+conta de provedor.
+
+| Pacote | Última | O que é | Guia |
+| --- | --- | --- | --- |
+| [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) | 0.1.1 | Servidor MCP para clientes locais (stdio): 22 ferramentas para ler, enviar e gerenciar contatos no Claude, Cursor, Codex ou qualquer cliente MCP. | [Servidor MCP](/pt-BR/mcp) |
+| [`@mepmail/cli`](https://www.npmjs.com/package/@mepmail/cli) | 0.2.2 | CLI de migração: lê uma conta do Resend, compara com a sua instância, aplica a diferença e escreve um relatório. | [CLI](/pt-BR/cli) |
+
+Os dois exigem Node 18 ou superior e são publicados como um único bundle, sem
+dependências. Rode com `npx`, que sempre resolve a última versão publicada; os
+números acima são as versões com que esta página foi escrita.
+
+## @mepmail/mcp — o servidor MCP local
+
+```sh
+npx -y @mepmail/mcp
+```
+
+Ele fala stdio, então o seu cliente é quem o inicia e o bloco de configuração é
+a instalação inteira:
+
+```json title="claude_desktop_config.json"
+{
+  "mcpServers": {
+    "mepmail": {
+      "command": "npx",
+      "args": ["-y", "@mepmail/mcp"],
+      "env": {
+        "MEPMAIL_API_KEY": "ms_...",
+        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
+      }
+    }
+  }
+}
+```
+
+| Variável | Obrigatória | Padrão | Significado |
+| --- | --- | --- | --- |
+| `MEPMAIL_API_KEY` | sim | — | Chave de API do time (`ms_...`) de **Chaves de API** no painel. As ferramentas agem exatamente com o alcance dessa chave. |
+| `MEPMAIL_BASE_URL` | não | `https://api-mepmail.je4ndev.com` | Origem da API da sua instância. Defina em uma implantação auto-hospedada. |
+
+Ele chega à API REST da sua instância direto com essa chave — sem OAuth, sem
+passo no navegador — e expõe as ferramentas de leitura, envio e contatos: 22
+das 68 do [servidor hospedado](/pt-BR/mcp). A configuração para Claude Desktop,
+Cursor e VS Code, e a lista completa de ferramentas, estão na
+[página de MCP](/pt-BR/mcp).
+
+## @mepmail/cli — a CLI de migração
+
+```sh
+npx @mepmail/cli migrate --from resend
+```
+
+Esse é o caminho interativo: conecta ao Resend, permite escolher os recursos,
+mostra o plano, pede confirmação, aplica e imprime um relatório. Para CI, rode
+primeiro o plano somente leitura — código de saída 2 significa que há algo a
+aplicar:
+
+```sh
+export RESEND_API_KEY=re_...
+export MEPMAIL_API_KEY=ms_...
+
+npx @mepmail/cli migrate plan --from resend --out plan.json
+npx @mepmail/cli migrate apply plan.json --yes
+```
+
+| Variável | Significado |
+| --- | --- |
+| `RESEND_API_KEY` | Chave de origem, acesso total. A ferramenta só lê do Resend. |
+| `MEPMAIL_API_KEY` | Chave do MepMail, acesso total. |
+| `MEPMAIL_BASE_URL` | Origem da API de uma instância auto-hospedada. Sem ela, o alvo é o MepMail Cloud. |
+
+As chaves vêm do ambiente (ou do stdin), nunca são gravadas em disco e são
+mascaradas em toda linha de log. Todas as flags, os arquivos de estado e os
+códigos de saída estão na [página da CLI](/pt-BR/cli).
+
+## Licença e releases
+
+Os dois pacotes são licenciados em MIT e são publicados do mesmo repositório do
+servidor, com linha de versão própria. Nenhum dos dois liga para casa: sem
+telemetria, sem checagem de atualização.

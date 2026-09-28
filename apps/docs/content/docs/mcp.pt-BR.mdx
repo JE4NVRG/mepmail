@@ -29,6 +29,87 @@ exata em **Configurações → MCP**.
 </DeploymentTab>
 </DeploymentTabs>
 
+## Servidor local (stdio)
+
+Clientes que iniciam servidores locais por configuração — o arquivo de
+configuração do Claude Desktop, o `mcp.json` do Cursor, Codex, VS Code — podem
+rodar o pacote [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) em
+vez de fazer ponte para o endpoint HTTP, e é a única forma de conectar quando a
+instância não é alcançável a partir da rede do cliente. Ele fala stdio, chega
+à API REST da sua instância com uma chave de API do time e não precisa de OAuth
+nem de navegador — o bloco de configuração é a instalação inteira:
+
+```sh
+npx -y @mepmail/mcp
+```
+
+| Variável | Obrigatória | Padrão | Significado |
+| --- | --- | --- | --- |
+| `MEPMAIL_API_KEY` | sim | — | Chave de API do time (`ms_...`), criada em **Chaves de API** no painel. O agente age exatamente com o alcance dessa chave. |
+| `MEPMAIL_BASE_URL` | não | `https://api-mepmail.je4ndev.com` | Origem da API da sua instância. Defina em uma implantação auto-hospedada. |
+
+**Claude Desktop** (`claude_desktop_config.json`), e qualquer cliente com o
+mesmo formato de configuração:
+
+```json title="claude_desktop_config.json"
+{
+  "mcpServers": {
+    "mepmail": {
+      "command": "npx",
+      "args": ["-y", "@mepmail/mcp"],
+      "env": {
+        "MEPMAIL_API_KEY": "ms_...",
+        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
+      }
+    }
+  }
+}
+```
+
+**Cursor** (`.cursor/mcp.json` no projeto, ou `~/.cursor/mcp.json` para todos
+os projetos):
+
+```json title=".cursor/mcp.json"
+{
+  "mcpServers": {
+    "mepmail": {
+      "command": "npx",
+      "args": ["-y", "@mepmail/mcp"],
+      "env": { "MEPMAIL_API_KEY": "ms_..." }
+    }
+  }
+}
+```
+
+**VS Code** (`.vscode/mcp.json`):
+
+```json title=".vscode/mcp.json"
+{
+  "servers": {
+    "mepmail": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@mepmail/mcp"],
+      "env": { "MEPMAIL_API_KEY": "ms_..." }
+    }
+  }
+}
+```
+
+Omita `MEPMAIL_BASE_URL` para falar com o MepMail Cloud.
+
+O pacote cobre a superfície de leitura, envio e contatos — **22 das
+ferramentas** abaixo — e espelha exatamente o alcance da chave: uma chave de
+apenas envio envia e lê os próprios e-mails, enquanto as leituras de gestão
+(`get_usage`, `get_deliverability`, contatos, domínios, broadcasts, templates,
+webhooks, supressões) respondem `restricted_api_key`, igual à API REST. As
+superfícies de escrita além de contatos (segmentos, tópicos,
+broadcasts, templates, webhooks, domínios, chaves de API) e o seletor de time
+(`list_teams`) são exclusivos do servidor hospedado, então conecte o servidor
+hospedado abaixo para elas. Os nomes das ferramentas e o envelope de resultado
+`untrusted_data` são idênticos nos dois, então um prompt escrito para um
+funciona no outro sem mudança.
+
 ## Conectar um cliente
 
 <Tabs items={["Claude Code", "Claude Desktop", "Cursor", "VS Code"]}>
@@ -49,7 +130,9 @@ Depois rode `/mcp` dentro do Claude Code e escolha `mepmail` para entrar.
 Adicione um conector personalizado em **Settings → Connectors → Add custom
 connector** e cole a URL do servidor. Ou use o arquivo de configuração — o
 `claude_desktop_config.json` do Claude Desktop só inicia servidores stdio,
-então o `mcp-remote` faz a ponte para o endpoint HTTP:
+então o `mcp-remote` faz a ponte para o endpoint HTTP. Se você preferir não usar
+a ponte, rode o [servidor local](#servidor-local-stdio) acima: uma linha de
+`npx`, sem OAuth.
 
 ```json title="claude_desktop_config.json"
 {
@@ -96,36 +179,6 @@ Salve no projeto, ou em `~/.cursor/mcp.json` para todos os projetos.
 
 Auto-hospedado: troque `https://api-mepmail.je4ndev.com/mcp` pela URL do servidor
 da sua instância, mostrada acima.
-
-## Servidor local (stdio)
-
-Clientes que iniciam servidores locais pela configuração — o arquivo do Claude
-Desktop, o `mcp.json` do Cursor, Codex, qualquer cliente stdio — podem rodar o
-pacote [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) em
-vez de fazer ponte para o endpoint HTTP. Ele roda na sua máquina e fala direto
-com a API REST desta instância usando uma chave de API do time: sem OAuth, sem
-etapa no navegador.
-
-```json title="claude_desktop_config.json"
-{
-  "mcpServers": {
-    "mepmail": {
-      "command": "npx",
-      "args": ["-y", "@mepmail/mcp"],
-      "env": {
-        "MEPMAIL_API_KEY": "ms_...",
-        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
-      }
-    }
-  }
-}
-```
-
-Crie a chave em **Chaves de API** no dashboard. As ferramentas espelham
-exatamente o alcance da chave — uma chave de envio envia e reporta
-`restricted_api_key` nas leituras, igual à API REST. Os nomes das ferramentas e
-o envelope `untrusted_data` dos resultados batem com o servidor hospedado, então
-prompts e integrações migram entre os dois sem mudança.
 
 ## Autenticação
 

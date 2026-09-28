@@ -11,6 +11,7 @@
     "sdks",
     "mcp",
     "cli",
+    "packages",
     "api-reference"
   ]
 }

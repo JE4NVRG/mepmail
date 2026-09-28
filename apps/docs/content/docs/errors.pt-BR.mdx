@@ -15,30 +15,62 @@ por `message`.
 
 ## Códigos de erro
 
+Todos os códigos que esta implantação emite, por status. As mesmas condições
+chegam ao [servidor MCP](/pt-BR/mcp) como resultados de ferramenta com este
+corpo, e ao relé SMTP como status do próprio protocolo — os nomes são os da
+API.
+
 | `name` | HTTP | O que significa | O que fazer |
 | --- | --- | --- | --- |
+| `invalid_parameter` | 400 | Um valor de parâmetro não é permitido (ex.: editar broadcast já enviado) | Corrija a requisição |
+| `invalid_payload` | 400 | O corpo da requisição não pôde ser interpretado | Envie JSON válido |
 | `missing_api_key` | 401 | Sem cabeçalho `Authorization` | Envie `Authorization: Bearer ms_...` |
 | `invalid_api_key` | 401 | A chave é desconhecida ou foi revogada | Releia a chave uma vez (rotação?); se ainda falhar, pare — não repita |
 | `restricted_api_key` | 403 | A chave é válida, mas não vale para este recurso (nível de permissão, ou domínio remetente fora do escopo da chave) | Use uma chave com o escopo certo, ou peça uma ao operador |
 | `plan_limit_reached` | 403 | Um teto do plano foi atingido (contatos, domínios, times) | Libere espaço dentro dos limites do plano, ou faça upgrade |
 | `forbidden` | 403 | O papel do usuário no time não permite esta ação | Confira o papel por trás da credencial |
+| `team_suspended` | 403 | O operador da instância suspendeu o time. As chaves ainda autenticam para o chamador saber o motivo; nada sai | Pare de enviar e fale com o operador da instância — repetir só repete |
+| `sending_paused` | 403 | A taxa de bounce duro ou de reclamação do próprio time cruzou o guardrail de envio | Corrija a lista antes de enviar de novo — veja [pausas de envio](#pausas-e-bloqueios-de-envio) |
+| `broadcasts_paused` | 403 | O envio de broadcast está pausado para este time pelo operador, ou na região SES do remetente enquanto a taxa da plataforma se recupera | E-mail transacional não é afetado; tente o broadcast de novo depois |
 | `not_found` | 404 | O recurso não existe (ou é de outro time) | Confira o id e o endpoint |
 | `conflict` | 409 | O recurso está em estado conflitante | Leia o estado atual e repita a operação |
+| `invalid_idempotent_request` | 409 | A `Idempotency-Key` já foi usada com um payload diferente | Terminal — envie o novo payload com uma chave nova, ou reenvie o corpo original com a chave original |
 | `concurrent_idempotent_requests` | 409 | Já existe uma requisição em andamento com a mesma chave de idempotência | Aguarde e repita com a mesma chave |
-| `invalid_parameter` | 400 | Um valor de parâmetro não é permitido (ex.: editar broadcast já enviado) | Corrija a requisição |
-| `invalid_payload` | 400 | O corpo da requisição não pôde ser interpretado | Envie JSON válido |
-| `validation_error` | 422 | O payload falhou na validação de esquema | Leia o `message`; corrija o campo indicado |
+| `payload_too_large` | 413 | O corpo da requisição passa do teto de 25 MiB da implantação — anexos viajam no corpo (base64), então contam aqui | Reduza a mensagem, ou envie o arquivo como link |
+| `validation_error` | 422 | O payload falhou na validação de esquema — ou um envio foi recusado por uma regra que nenhum campo indica: domínio `from` não verificado, `from` que não é um único endereço, o remetente de onboarding alcançando fora do time, um item de lote suprimido, anexos acima do teto do plano (1 MB no Free e Starter, 5 MB no Pro, 10 MB no Scale) | Leia o `message`; corrija o que ele indicar |
 | `all_recipients_suppressed` | 422 | Todos os destinatários estão na lista de supressão | Confira as supressões antes de reenviar |
-| `payload_too_large` | 413 | Anexos passam do teto do plano (1/1/5/10 MB por plano) | Reduza os anexos ou mude para um plano maior |
+| `broadcast_too_large` | 422 | A audiência precisa de mais capacidade de envio do que o horizonte da implantação permite (mais de 24 dias) | Divida em segmentos menores ou peça mais capacidade ao operador |
 | `rate_limit_exceeded` | 429 | Requisições demais em pouco tempo | Faça backoff exponencial — veja [limites de taxa](/pt-BR/rate-limits) |
-| `monthly_quota_exceeded` | 429 | O volume incluído do plano acabou e o excedente está desligado | Espere o período renovar, ligue o excedente, ou faça upgrade |
+| `daily_quota_exceeded` | 429 | A cota diária de envio do plano acabou e a fila de espera está cheia (Free, Starter) | Tente depois da virada do dia em UTC; um plano maior dá mais folga |
+| `monthly_quota_exceeded` | 429 | O volume mensal incluído no plano acabou e o excedente está desligado (Pro, Scale) — ou o teto rígido do excedente foi atingido | Espere o período renovar, ligue o excedente em Cobrança, ou faça upgrade |
 | `internal_server_error` | 500 | Um bug do nosso lado | Repita com backoff; reporte se persistir |
+
+## Pausas e bloqueios de envio
+
+Três recusas significam "agora não, e não por causa da sua requisição". As três
+são `403` e determinísticas — nenhum laço de retentativa as resolve:
+
+- **`sending_paused`** — a taxa de bounce duro ou de reclamação do próprio time
+  na janela recente está no limite ou acima do guardrail, então o envio é
+  recusado antes de chegar à fila. A mensagem informa a métrica, a taxa, a
+  janela e o limite. Limpe a lista e diminua o ritmo até a taxa voltar para
+  baixo da linha; [insights de entregabilidade](/pt-BR/concepts/deliverability-insights)
+  é o relatório que mostra quais endereços causaram isso.
+- **`broadcasts_paused`** — só no envio de broadcast
+  (`POST /broadcasts/{id}/send`). Ou o operador da instância pausou broadcasts
+  para este time, ou a taxa agregada de bounce/reclamação da plataforma na
+  região SES do remetente está se recuperando e a região inteira espera.
+  **E-mail transacional não é afetado**, e a pausa se resolve sozinha.
+- **`team_suspended`** — o operador da instância suspendeu o time. Nada é
+  enviado até a reinstalação; só o operador pode liberar.
 
 ## Repetir requisições
 
 - **4xx**: repita apenas `409 concurrent_idempotent_requests` (com a mesma
   chave de idempotência) e `429` (com backoff). O resto da faixa 4xx é
-  determinístico — corrija a requisição ou a credencial.
+  determinístico — corrija a requisição ou a credencial. `403 sending_paused`,
+  `403 broadcasts_paused` e `403 team_suspended` também são determinísticos:
+  esperar e repetir em laço não resolve.
 - **5xx**: repita com backoff exponencial e jitter. Envios com chave de
   idempotência são seguros de repetir; sem ela, um reenvio pode entregar duas
   vezes.
@@ -48,14 +80,18 @@ por `message`.
 Os endpoints de envio aceitam um cabeçalho `Idempotency-Key`. Duas
 requisições com a mesma chave rodam uma vez; enquanto a primeira executa, a
 segunda responde `409 concurrent_idempotent_requests`. Reuse a mesma chave ao
-repetir depois de um timeout — é isso que torna o reenvio seguro.
+repetir depois de um timeout — é isso que torna o reenvio seguro. Reusar uma
+chave com payload diferente é `409 invalid_idempotent_request`: dê uma chave
+própria ao novo payload em vez de repetir.
 
 ## Envios em lote
 
 `POST /emails/batch` aceita até 100 e-mails. Com o cabeçalho
 `x-batch-validation: permissive`, itens inválidos voltam em `errors` por
 índice enquanto o subconjunto válido é aceito; por padrão (strict), um item
-inválido rejeita o lote inteiro. Um array acima do teto responde `422`.
+inválido rejeita o lote inteiro. Um array acima do teto responde `422`. Uma
+recusa que não é de um item — cota, uma pausa, o teto de contatos do plano —
+responde uma vez para a chamada inteira, nos dois modos de validação.
 
 ## MCP
 

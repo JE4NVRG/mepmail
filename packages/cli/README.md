@@ -7,6 +7,10 @@ suppressions. Reads from the source provider, writes to your MepMail
 instance (Cloud or self-hosted), and is safe to run again — a second run right
 before cutover syncs what changed since the first.
 
+Guide: <https://docs-mepmail.je4ndev.com/cli> ·
+Packages: <https://docs-mepmail.je4ndev.com/packages> · Published as
+`@mepmail/cli` on npm.
+
 ```sh
 npx @mepmail/cli migrate --from resend                    # interactive: connect, choose, plan, confirm, apply, summary
 npx @mepmail/cli migrate plan --from resend --out plan.json   # read-only; exit 0 nothing to do, 2 changes, 1 error

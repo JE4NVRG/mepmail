@@ -118,6 +118,11 @@ Errors use Resend's format:
 { "statusCode": 422, "name": "validation_error", "message": "..." }
 ```
 
+The **`name`** is the part to branch on. Every code this deployment emits — with
+its status, what it means and what to do — is catalogued in
+[Errors](/errors), including the sending pauses and the quota refusals listed
+above; request-rate behaviour is in [Rate limits](/rate-limits).
+
 ## Idempotency
 
 `POST /emails` and `POST /emails/batch` accept an `Idempotency-Key` header.

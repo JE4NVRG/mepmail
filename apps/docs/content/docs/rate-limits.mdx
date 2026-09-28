@@ -8,38 +8,84 @@ protection, resource creation, and sending volume.
 
 ## HTTP request rate
 
-- **600 requests per minute per API key** (deployment default,
-  `API_RATE_LIMIT_PER_MINUTE`). Past it the API answers
-  `429 rate_limit_exceeded`.
-- Responses do not currently carry `RateLimit-*` headers: treat any `429` as
-  the signal to back off with exponential delay and retry.
+Two fixed one-minute windows apply to every call made with an API key, and a
+`429 rate_limit_exceeded` answers whichever one is full:
+
+| Window | Default | Set by |
+| --- | --- | --- |
+| Per API key | 600 requests/minute | `API_RATE_LIMIT_PER_MINUTE` |
+| Per team, across every key | 3,000 requests/minute | Deployment |
+
+- Minting more keys does not multiply the cap — the team window spans them all.
+- A fixed window resets on the minute, so a burst that fills one window and
+  another that fills the next can pass twice the allowance inside a couple of
+  seconds. Pace the client instead of filling the window.
+- A `429` carries **`Retry-After`** (whole seconds left in the window): wait
+  that long, or back off exponentially, before trying again.
+- Responses do not carry `RateLimit-*` headers: today the `429` and its
+  `Retry-After` are how a client learns it went over.
+- Calls made through the hosted [MCP server](/mcp) are bucketed per signed-in
+  user instead — 600 calls/minute, the same setting — because an OAuth grant
+  has no API key to count against.
+
+## What to do on a 429
+
+1. **Wait.** Honour `Retry-After` when the response has it, otherwise back off
+   exponentially with jitter: 1s, 2s, 4s, 8s… A client that retries
+   immediately just refills the window and stays refused.
+2. **Stop retrying other 4xx.** Only `429` and `409
+   concurrent_idempotent_requests` are worth retrying; the rest of the 4xx
+   range is deterministic ([Errors](/errors)).
+3. **Make the retry safe.** `POST /emails` and `POST /emails/batch` accept an
+   `Idempotency-Key`: reuse the same one so a retry after a timeout or a `429`
+   cannot deliver twice.
+4. **Reduce the traffic.** Batch up to 100 sends per call
+   (`POST /emails/batch`) and up to 1,000 contacts per call
+   (`POST /contacts/batch`), and serialize bursts instead of fanning out.
+5. **Raise the ceiling** if the workload is genuinely above it: the per-key
+   window is `API_RATE_LIMIT_PER_MINUTE` on a self-hosted deployment. On Cloud,
+   contact support — raising the team window is an operator decision.
 
 ## Credential protection
 
-- Repeated failed authentication attempts from one source are throttled with a
-  `429` (`"Too many failed authentication attempts"`). This limit exists to
-  make brute force pointless — stop retrying wrong credentials.
+- **More than 20 failed authentication attempts per minute from one IP**
+  answers `429` (`"Too many failed authentication attempts"`, with
+  `Retry-After`). This exists to make brute force pointless — stop retrying
+  wrong credentials and check the key instead.
+- Invalid keys, revoked keys and keys used outside their permission level are
+  `401`/`403`, never silently accepted ([Errors](/errors)).
 
 ## Resource creation
 
 - **10 domains per hour per team.** Creating a sending identity provisions a
   shared AWS SES resource, so the cap keeps one team from exhausting the
-  account's quota. It resets hourly.
+  account's quota. It resets hourly. The plan's domain count is a separate
+  limit and still applies.
+- **10 MCP OAuth client registrations per 15 minutes per address.** A client
+  that needs to register again should reuse its existing registration —
+  re-registering on every launch is what trips this.
 
 ## Sending volume
 
 | Plan | Included | Period | Past the cap |
 | --- | --- | --- | --- |
-| Free | 100 | UTC day | Sends park (50% grace before stopping) |
-| Starter | 1,500 | UTC day | Sends park (50% grace before stopping) |
-| Pro / Scale | purchased volume | month | Overage billed per 1,000 when enabled; otherwise stops |
+| Free | 100 | UTC day | Sends park as `queued_quota` and drain after the midnight rollover; once the parked backlog reaches **3× the daily cap**, new sends are refused with `429 daily_quota_exceeded` |
+| Starter | 1,500 | UTC day | Same parking behaviour and the same 3× backlog refusal |
+| Pro / Scale | purchased volume | month | Overage billed per 1,000 when enabled; otherwise `429 monthly_quota_exceeded` |
 
+- Parking is deliberate: an over-quota daily send is **accepted** and queued —
+  the API answers `200` with an id — so a burst near midnight is not lost. Read
+  the email's status to tell a parked send from a queued one.
 - Monthly plans with overage enabled still hard-stop at **5× the included
   volume**: a runaway integration (or a stolen key) can never produce an
   open-ended bill.
 - The per-second send rate is bounded by the deployment's SES quota — 14/s by
   default, following the account's real SES rate as it scales. Broadcasts are
   paced to leave transactional headroom (a 30% reserve by default).
+- Sending can stop before the quota does: a team whose hard-bounce or complaint
+  rate crosses the guardrail gets `403 sending_paused`, and broadcast sending
+  waits on the platform's regional rate (`403 broadcasts_paused`). Both are in
+  [Errors](/errors#sending-pauses-and-holds).
 
 ## Message shape limits
 
@@ -58,7 +104,11 @@ See [Billing](/billing) for prices and the full ladder.
 
 ## MCP
 
-- **600 calls per minute per account** on the hosted MCP endpoint
-  (deployment default), then `429 rate_limit_exceeded`.
-- Dynamic client registration for MCP OAuth is rate-limited per address; a
-  client that needs to register again should reuse its existing registration.
+- **600 calls per minute per signed-in user** on the hosted MCP endpoint
+  (`API_RATE_LIMIT_PER_MINUTE`), then `429 rate_limit_exceeded`. Calls are not
+  charged against the team's key window.
+- The local [`@mepmail/mcp`](/packages) package talks to the REST API with an
+  API key, so there the per-key and per-team windows above apply.
+- Dynamic client registration for MCP OAuth is rate-limited per address (10 per
+  15 minutes); a client that needs to register again should reuse its existing
+  registration.

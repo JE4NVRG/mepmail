@@ -6,6 +6,7 @@ const BODY = `# MepMail
 - Full documentation in one file: https://docs-mepmail.je4ndev.com/llms-full.txt
 - OpenAPI 3.1 spec: https://api-mepmail.je4ndev.com/openapi.json
 - For agents (auth, MCP, discovery): https://mepmail.je4ndev.com/auth.md
+- Agent skills index: https://mepmail.je4ndev.com/.well-known/agent-skills/index.json
 - AI catalog (everything published for agents): https://mepmail.je4ndev.com/.well-known/ai-catalog.json
 - MCP server (hosted, OAuth): https://api-mepmail.je4ndev.com/mcp
 `;
