@@ -10,7 +10,11 @@ import "./landing-calc.css";
 import "./landing.css";
 
 const contact = "mailto:jean@je4ndev.com";
-const legal = { termsUrl: env.TERMS_URL ?? null, privacyUrl: env.PRIVACY_URL ?? null };
+const legal = {
+  termsUrl: env.TERMS_URL ?? "/terms",
+  privacyUrl: env.PRIVACY_URL ?? "/privacy",
+  refundUrl: "/refund",
+};
 
 const comparison = PRICE_ROWS.map((row) => [
   row.label,
@@ -459,13 +463,12 @@ export default async function RootPage() {
             <a href="/login">{t("footer.login")}</a>
             <a href={contact}>{t("footer.contact")}</a>
           </nav>
-          {legal.termsUrl || legal.privacyUrl ? (
-            <nav className="gtm-footer-col" aria-label={t("footer.colLegal")}>
-              <h3>{t("footer.colLegal")}</h3>
-              {legal.termsUrl ? <a href={legal.termsUrl}>{t("footer.terms")}</a> : null}
-              {legal.privacyUrl ? <a href={legal.privacyUrl}>{t("footer.privacy")}</a> : null}
-            </nav>
-          ) : null}
+          <nav className="gtm-footer-col" aria-label={t("footer.colLegal")}>
+            <h3>{t("footer.colLegal")}</h3>
+            <a href={legal.termsUrl}>{t("footer.terms")}</a>
+            <a href={legal.privacyUrl}>{t("footer.privacy")}</a>
+            <a href={legal.refundUrl}>{t("footer.refund")}</a>
+          </nav>
         </div>
         <div className="gtm-container gtm-footer-base">
           <p>{t("footer.rights")}</p>

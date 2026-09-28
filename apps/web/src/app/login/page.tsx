@@ -15,7 +15,7 @@ export default async function LoginPage() {
     <AuthForm
       mode="login"
       providers={enabledSocialProviders()}
-      legal={{ termsUrl: env.TERMS_URL ?? null, privacyUrl: env.PRIVACY_URL ?? null }}
+      legal={{ termsUrl: env.TERMS_URL ?? "/terms", privacyUrl: env.PRIVACY_URL ?? "/privacy" }}
       forgotPassword={passwordRecoveryEnabled()}
       turnstileSiteKey={env.TURNSTILE_SITE_KEY ?? null}
     />
