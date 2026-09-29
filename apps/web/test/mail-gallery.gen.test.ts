@@ -27,9 +27,9 @@ const SAMPLE_URL = "https://mepmail.je4ndev.com/sample?token=EXEMPLO";
 const VALUES: Record<string, string> = {
   name: "Jean",
   team: "Vultrix3D",
-  plan: "Pro 200K",
+  plan: "Pro 220K",
   date: "15 de outubro de 2026",
-  cap: "até 200.000 e-mails por mês",
+  cap: "até 220.000 e-mails por mês",
   freeCap: "100",
   app: "Claude (MCP)",
   scopes: "Enviar e-mails, Ler o status de entrega",
@@ -54,7 +54,7 @@ const VALUES: Record<string, string> = {
   window: "24 horas",
   host: "webhooks.vultrix3d.com.br",
   old: "Starter",
-  new: "Pro 200K",
+  new: "Pro 220K",
   parked: "37",
   rate: "12%",
   actor: "Jean Carlos",
@@ -85,7 +85,7 @@ const VALUES: Record<string, string> = {
 const LOCALE_VALUES: Record<(typeof LOCALES)[number], Record<string, string>> = {
   "pt-BR": {
     date: "15 de outubro de 2026",
-    cap: "até 200.000 e-mails por mês",
+    cap: "até 220.000 e-mails por mês",
     deadline: "O segredo antigo continua válido até 15 de outubro de 2026 às 14:00 UTC.",
     finishesAt: "20 de outubro de 2026, 14:00 UTC",
     until: "20 de outubro de 2026, 14:00 UTC",
@@ -95,7 +95,7 @@ const LOCALE_VALUES: Record<(typeof LOCALES)[number], Record<string, string>> = 
   },
   en: {
     date: "October 15, 2026",
-    cap: "up to 200,000 emails a month",
+    cap: "up to 220,000 emails a month",
     deadline: "The old secret stays valid until October 15, 2026 at 14:00 UTC.",
     finishesAt: "October 20, 2026, 14:00 UTC",
     until: "October 20, 2026, 14:00 UTC",

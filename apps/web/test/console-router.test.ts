@@ -123,7 +123,7 @@ describe("console.teams.changePlan", () => {
       .set({ stripeSubscriptionId: "sub_123", planStatus: "active" })
       .where(eq(schema.teams.id, managed));
     await expect(
-      operator().console.teams.changePlan({ id: managed, plan: "pro", planQuota: 100_000 }),
+      operator().console.teams.changePlan({ id: managed, plan: "pro", planQuota: 110_000 }),
     ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect((await team(managed)).plan).toBe("free");
 
@@ -132,13 +132,13 @@ describe("console.teams.changePlan", () => {
       .update(schema.teams)
       .set({ planStatus: "canceled" })
       .where(eq(schema.teams.id, managed));
-    await operator().console.teams.changePlan({ id: managed, plan: "pro", planQuota: 100_000 });
+    await operator().console.teams.changePlan({ id: managed, plan: "pro", planQuota: 110_000 });
     expect((await team(managed)).plan).toBe("pro");
   });
 
   it("writes the rung and records billing.plan_changed", async () => {
-    await operator().console.teams.changePlan({ id: teamId, plan: "pro", planQuota: 100_000 });
-    expect(await team()).toMatchObject({ plan: "pro", planQuota: 100_000 });
+    await operator().console.teams.changePlan({ id: teamId, plan: "pro", planQuota: 110_000 });
+    expect(await team()).toMatchObject({ plan: "pro", planQuota: 110_000 });
     const [row] = await auditRows("billing.plan_changed");
     expect(row).toMatchObject({
       teamId,
@@ -146,7 +146,7 @@ describe("console.teams.changePlan", () => {
       target: `team:${teamId}`,
       data: {
         from: { plan: "free", planQuota: null },
-        to: { plan: "pro", planQuota: 100_000 },
+        to: { plan: "pro", planQuota: 110_000 },
       },
     });
   });

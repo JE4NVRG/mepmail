@@ -25,7 +25,7 @@ afterEach(() => close());
 
 const deps = () => ({ db, stripe, log: () => {} });
 
-/** A Pro 100K team with one usage row; `overageItem: null` models a subscription without the metered item. */
+/** A Pro 110K team with one usage row; `overageItem: null` models a subscription without the metered item. */
 async function proTeam(
   slug: string,
   opts: {
@@ -41,7 +41,7 @@ async function proTeam(
     .update(schema.teams)
     .set({
       plan: "pro",
-      planQuota: 100_000,
+      planQuota: 110_000,
       overageEnabled: true,
       stripeCustomerId: `cus_${slug}`,
       stripeOverageItemId: opts.overageItem === undefined ? `si_${slug}` : opts.overageItem,
@@ -76,12 +76,12 @@ const settled = (reportedOverage: number) => ({ reportedOverage, pendingOverage:
 
 describe("reportOverage", () => {
   it("skips a system team that still carries Stripe ids and meters the rest", async () => {
-    const systemTeam = await proTeam("own", { accepted: 100_500 });
+    const systemTeam = await proTeam("own", { accepted: 110_500 });
     await db
       .update(schema.teams)
       .set({ plan: "system", planQuota: null })
       .where(eq(schema.teams.id, systemTeam));
-    const paying = await proTeam("acme", { accepted: 100_200 });
+    const paying = await proTeam("acme", { accepted: 110_200 });
     expect(await reportOverage(deps(), { now: NOW })).toEqual({ reported: 1, failed: 0 });
     expect(state.meterEvents.map((e) => e.payload.stripe_customer_id)).toEqual(["cus_acme"]);
     expect(await periodRow(paying)).toEqual(settled(200));
@@ -89,7 +89,7 @@ describe("reportOverage", () => {
   });
 
   it("meters what is past the included volume once, advancing from the last report", async () => {
-    const teamId = await proTeam("acme", { accepted: 100_500 });
+    const teamId = await proTeam("acme", { accepted: 110_500 });
 
     expect(await reportOverage(deps(), { now: NOW })).toEqual({ reported: 1, failed: 0 });
     expect(state.meterEvents).toEqual([
@@ -105,7 +105,7 @@ describe("reportOverage", () => {
     expect(await reportOverage(deps(), { now: NOW })).toEqual({ reported: 0, failed: 0 });
     expect(state.meterEvents).toHaveLength(1);
 
-    await setPeriod(teamId, { accepted: 101_200 });
+    await setPeriod(teamId, { accepted: 111_200 });
     expect(await reportOverage(deps(), { now: NOW })).toEqual({ reported: 1, failed: 0 });
     expect(state.meterEvents[1]).toMatchObject({
       identifier: `${teamId}:${START.getTime()}:500:1200`,
@@ -115,7 +115,7 @@ describe("reportOverage", () => {
   });
 
   it("keeps the pin when Stripe fails, so the next run re-sends the same step", async () => {
-    const teamId = await proTeam("acme", { accepted: 100_500 });
+    const teamId = await proTeam("acme", { accepted: 110_500 });
     state.meterError = new Error("stripe down");
     expect(await reportOverage(deps(), { now: NOW })).toEqual({ reported: 0, failed: 1 });
     expect(await periodRow(teamId)).toEqual({ reportedOverage: 0, pendingOverage: 500 });
@@ -130,9 +130,9 @@ describe("reportOverage", () => {
   });
 
   it("a pinned row re-sends the pinned value under the same identifier even after more sends", async () => {
-    const teamId = await proTeam("acme", { accepted: 100_500 });
+    const teamId = await proTeam("acme", { accepted: 110_500 });
     // The event went out but the row never caught up (crash after the send).
-    await setPeriod(teamId, { pendingOverage: 500, accepted: 101_200 });
+    await setPeriod(teamId, { pendingOverage: 500, accepted: 111_200 });
     expect(await reportOverage(deps(), { now: NOW })).toEqual({ reported: 1, failed: 0 });
     expect(state.meterEvents[0]).toMatchObject({
       identifier: `${teamId}:${START.getTime()}:0:500`,
@@ -150,7 +150,7 @@ describe("reportOverage", () => {
   });
 
   it("two runs over the same row: the one that pins sends, the other skips", async () => {
-    const teamId = await proTeam("acme", { accepted: 100_500 });
+    const teamId = await proTeam("acme", { accepted: 110_500 });
     const results = await Promise.all([
       reportOverage(deps(), { now: NOW }),
       reportOverage(deps(), { now: NOW }),
@@ -163,7 +163,7 @@ describe("reportOverage", () => {
 
   it("stamps usage of an ended period one second before the current one began", async () => {
     const previous = new Date("2026-02-01T00:00:00Z");
-    const teamId = await proTeam("acme", { accepted: 100_500, periodStart: previous });
+    const teamId = await proTeam("acme", { accepted: 110_500, periodStart: previous });
     expect(await reportOverage(deps(), { now: NOW })).toEqual({ reported: 1, failed: 0 });
     expect(state.meterEvents[0]).toMatchObject({
       identifier: `${teamId}:${previous.getTime()}:0:500`,
@@ -175,7 +175,7 @@ describe("reportOverage", () => {
 
   it("stamps a row keyed at the recorded period end (renewal webhook not landed) at now", async () => {
     const later = new Date("2026-04-01T06:00:00Z");
-    const teamId = await proTeam("acme", { accepted: 100_500, periodStart: END });
+    const teamId = await proTeam("acme", { accepted: 110_500, periodStart: END });
     expect(await reportOverage(deps(), { now: later })).toEqual({ reported: 1, failed: 0 });
     expect(state.meterEvents[0]).toMatchObject({
       identifier: `${teamId}:${END.getTime()}:0:500`,
@@ -186,10 +186,10 @@ describe("reportOverage", () => {
   });
 
   it("skips teams without the metered item or under their volume, and narrows to one team", async () => {
-    const off = await proTeam("off", { accepted: 100_500, overageItem: null });
-    const under = await proTeam("under", { accepted: 99_000 });
-    const a = await proTeam("a", { accepted: 100_100 });
-    const b = await proTeam("b", { accepted: 100_200 });
+    const off = await proTeam("off", { accepted: 110_500, overageItem: null });
+    const under = await proTeam("under", { accepted: 109_000 });
+    const a = await proTeam("a", { accepted: 110_100 });
+    const b = await proTeam("b", { accepted: 110_200 });
 
     expect(await reportOverage(deps(), { now: NOW, teamId: a })).toEqual({
       reported: 1,

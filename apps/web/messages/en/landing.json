@@ -96,7 +96,7 @@
     "attachmentLabel": "Attachments per message",
     "cta": "Start free",
     "featuredBadge": "Most popular",
-    "showScale": "Scale plans (500K–2.5M)",
+    "showScale": "Scale plans (550K–2.75M)",
     "ctaNote": "Create your free account first — activating the plan is one click in the panel.",
     "items": [
       {
@@ -114,46 +114,46 @@
         "cta": "Start with Starter"
       },
       {
-        "volume": "100,000/month",
+        "volume": "110,000/month",
         "limits": "25 domains · 10 workspaces · unlimited contacts",
         "overage": "US$ 0.90/1k",
         "attachment": "5 MB",
-        "cta": "Start with Pro 100K"
+        "cta": "Start with Pro 110K"
       },
       {
-        "volume": "200,000/month",
+        "volume": "220,000/month",
         "limits": "25 domains · 10 workspaces · unlimited contacts",
         "overage": "US$ 0.35/1k",
         "attachment": "5 MB",
-        "cta": "Start with Pro 200K"
+        "cta": "Start with Pro 220K"
       },
       {
-        "volume": "500,000/month",
+        "volume": "550,000/month",
         "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
         "overage": "US$ 0.25/1k",
         "attachment": "10 MB",
-        "cta": "Start with Scale 500K"
+        "cta": "Start with Scale 550K"
       },
       {
-        "volume": "1,000,000/month",
+        "volume": "1,100,000/month",
         "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
         "overage": "US$ 0.23/1k",
         "attachment": "10 MB",
-        "cta": "Start with Scale 1M"
+        "cta": "Start with Scale 1.1M"
       },
       {
-        "volume": "1,500,000/month",
+        "volume": "1,650,000/month",
         "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
         "overage": "US$ 0.18/1k",
         "attachment": "10 MB",
-        "cta": "Start with Scale 1.5M"
+        "cta": "Start with Scale 1.65M"
       },
       {
-        "volume": "2,500,000/month",
+        "volume": "2,750,000/month",
         "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
         "overage": "US$ 0.16/1k",
         "attachment": "10 MB",
-        "cta": "Start with Scale 2.5M"
+        "cta": "Start with Scale 2.75M"
       }
     ],
     "note": "Free and Starter have a daily limit (UTC); the monthly volume is illustrative only. On Pro and Scale, per-1,000 overage depends on enablement at provisioning; without it, sending stops at the quota. Even with overage enabled, the safety ceiling of 5× the included volume applies.",

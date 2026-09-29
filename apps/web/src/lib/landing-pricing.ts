@@ -105,7 +105,8 @@ export function formatUsd(value: number | null, locale: string): string {
  * Volume label for the table's first column and the calculator, derived from the
  * row's own `volume` so the label and the prices it heads can never drift apart:
  * "100k" in both locales, "1M" / "2.5M" in en against "1M" / "2,5M" in pt-BR.
- * Volumes are ≥ 1k by construction (the published ladder starts at 100k).
+ * Volumes are ≥ 1k by construction (the market rungs the table anchors start at
+ * 100k; the MepMail ladder prices the row that covers it).
  */
 export function formatVolume(volume: number, locale: string): string {
   const millions = volume >= 1_000_000;

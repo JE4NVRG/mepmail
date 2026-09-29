@@ -389,13 +389,13 @@ describe("smtp relay", () => {
       .update(schema.teams)
       .set({
         plan: "pro",
-        planQuota: 100_000,
+        planQuota: 110_000,
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd,
         overageEnabled: false,
       })
       .where(eq(schema.teams.id, teamId));
-    await db.insert(schema.usagePeriods).values({ teamId, periodStart, accepted: 100_000 });
+    await db.insert(schema.usagePeriods).values({ teamId, periodStart, accepted: 110_000 });
     const mail = { from: "a@acme.dev", to: "r@example.com", subject: "s", text: "t" };
     await expect(
       transport({ user: SMTP_USERNAME, pass: token }).sendMail(mail),
@@ -410,7 +410,7 @@ describe("smtp relay", () => {
   });
 
   it("with overage on, refuses with 452 at the hard cap and accepts below it", async () => {
-    const cap = 100_000 * OVERAGE_HARD_CAP;
+    const cap = 110_000 * OVERAGE_HARD_CAP;
     const setAccepted = (accepted: number) =>
       db
         .update(schema.usagePeriods)
