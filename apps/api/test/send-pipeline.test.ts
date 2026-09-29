@@ -118,7 +118,7 @@ it("a quota-parked email is NOT enqueued — the midnight drain owns it", async 
 });
 
 describe("monthly plan", () => {
-  const included = 100_000;
+  const included = 110_000;
   const start = new Date(Date.now() - 5 * DAY_MS);
   const end = new Date(start.getTime() + 30 * DAY_MS);
   const batch = () =>

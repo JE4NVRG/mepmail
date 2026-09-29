@@ -74,7 +74,7 @@ describe("authenticateApiKey billing", () => {
       .update(schema.teams)
       .set({
         plan: "pro",
-        planQuota: 200_000,
+        planQuota: 220_000,
         currentPeriodStart,
         currentPeriodEnd,
         overageEnabled: true,
@@ -84,7 +84,7 @@ describe("authenticateApiKey billing", () => {
     const auth = await authenticateApiKey(db, token);
     expect(auth?.billing).toEqual({
       plan: "pro",
-      planQuota: 200_000,
+      planQuota: 220_000,
       currentPeriodStart,
       currentPeriodEnd,
       overageEnabled: true,

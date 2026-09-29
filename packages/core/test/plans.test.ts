@@ -60,12 +60,32 @@ describe("PLAN_RUNGS", () => {
     ).toEqual([
       ["free", "free", 100, "day", 0, null],
       ["starter", "starter", 1_500, "day", 900, null],
-      ["pro_100k", "pro", 100_000, "month", 2_000, 90],
-      ["pro_200k", "pro", 200_000, "month", 10_000, 35],
-      ["scale_500k", "scale", 500_000, "month", 19_900, 25],
-      ["scale_1m", "scale", 1_000_000, "month", 31_900, 23],
-      ["scale_1_5m", "scale", 1_500_000, "month", 42_900, 18],
-      ["scale_2_5m", "scale", 2_500_000, "month", 54_900, 16],
+      ["pro_100k", "pro", 110_000, "month", 2_000, 90],
+      ["pro_200k", "pro", 220_000, "month", 10_000, 35],
+      ["scale_500k", "scale", 550_000, "month", 19_900, 25],
+      ["scale_1m", "scale", 1_100_000, "month", 31_900, 23],
+      ["scale_1_5m", "scale", 1_650_000, "month", 42_900, 18],
+      ["scale_2_5m", "scale", 2_750_000, "month", 54_900, 16],
+    ]);
+  });
+
+  it("keeps every monthly rung key and price intact, only the included volume moved", () => {
+    // The keys are the stem of the Stripe lookup keys and the pence of the
+    // ladder; the +10% bump touched `included` alone.
+    expect(
+      PLAN_RUNGS.filter((r) => r.period === "month").map((r) => [
+        r.key,
+        r.included,
+        r.priceCents,
+        r.overageCentsPer1k,
+      ]),
+    ).toEqual([
+      ["pro_100k", 110_000, 2_000, 90],
+      ["pro_200k", 220_000, 10_000, 35],
+      ["scale_500k", 550_000, 19_900, 25],
+      ["scale_1m", 1_100_000, 31_900, 23],
+      ["scale_1_5m", 1_650_000, 42_900, 18],
+      ["scale_2_5m", 2_750_000, 54_900, 16],
     ]);
   });
 });
@@ -96,31 +116,52 @@ describe("teamRung", () => {
     expect(teamRung("free", null).key).toBe("free");
     expect(teamRung("starter", null).key).toBe("starter");
     expect(teamRung("starter", 100_000).key).toBe("starter");
-    expect(teamRung("pro", 200_000).key).toBe("pro_200k");
+    expect(teamRung("pro", 220_000).key).toBe("pro_200k");
     expect(teamRung("pro", null).key).toBe("pro_100k");
     expect(teamRung("scale", 999).key).toBe("scale_500k");
-    expect(teamRung("scale", 2_500_000).key).toBe("scale_2_5m");
+    expect(teamRung("scale", 2_750_000).key).toBe("scale_2_5m");
+  });
+
+  it("resolves each bumped monthly volume to its own rung", () => {
+    expect(teamRung("pro", 110_000).key).toBe("pro_100k");
+    expect(teamRung("pro", 220_000).key).toBe("pro_200k");
+    expect(teamRung("scale", 550_000).key).toBe("scale_500k");
+    expect(teamRung("scale", 1_100_000).key).toBe("scale_1m");
+    expect(teamRung("scale", 1_650_000).key).toBe("scale_1_5m");
+    expect(teamRung("scale", 2_750_000).key).toBe("scale_2_5m");
+  });
+
+  it("sits a volume recorded before the bump on the plan's first rung", () => {
+    // No team bought these volumes while they were the rungs, but a row that
+    // still carries one resolves like any other unmatched volume: the plan's
+    // first rung, never another plan's.
+    expect(teamRung("pro", 100_000).key).toBe("pro_100k");
+    expect(teamRung("pro", 200_000).key).toBe("pro_100k");
+    expect(teamRung("scale", 2_500_000).key).toBe("scale_500k");
   });
 });
 
 describe("formatVolume and planLabel", () => {
   it("prints volumes the way plan cards do", () => {
-    expect([100, 1_500, 100_000, 1_000_000, 1_500_000, 2_500_000].map(formatVolume)).toEqual([
+    expect([100, 1_500, 110_000, 1_100_000, 1_650_000, 2_750_000].map(formatVolume)).toEqual([
       "100",
       "1.5K",
-      "100K",
-      "1M",
-      "1.5M",
-      "2.5M",
+      "110K",
+      "1.1M",
+      "1.65M",
+      "2.75M",
     ]);
   });
 
   it("labels a monthly rung with its volume and a daily plan by name alone", () => {
     expect(planLabel("free", null)).toBe("Free");
     expect(planLabel("starter", null)).toBe("Starter");
-    expect(planLabel("pro", 100_000)).toBe("Pro 100K");
-    expect(planLabel("pro", null)).toBe("Pro 100K");
-    expect(planLabel("scale", 2_500_000)).toBe("Scale 2.5M");
+    expect(planLabel("pro", 110_000)).toBe("Pro 110K");
+    expect(planLabel("pro", null)).toBe("Pro 110K");
+    expect(planLabel("pro", 220_000)).toBe("Pro 220K");
+    expect(planLabel("scale", 550_000)).toBe("Scale 550K");
+    expect(planLabel("scale", 1_650_000)).toBe("Scale 1.65M");
+    expect(planLabel("scale", 2_750_000)).toBe("Scale 2.75M");
     expect(planLabel("system", null)).toBe("System");
     expect(planLabel("system", 500_000)).toBe("System");
   });
@@ -130,7 +171,7 @@ const START = new Date("2026-09-03T10:00:00Z");
 const END = new Date("2026-10-03T10:00:00Z");
 const row = (over: Partial<QuotaTeamRow> = {}): QuotaTeamRow => ({
   plan: "pro",
-  planQuota: 100_000,
+  planQuota: 110_000,
   currentPeriodStart: START,
   currentPeriodEnd: END,
   overageEnabled: false,
@@ -203,7 +244,7 @@ describe("teamQuota", () => {
     expect(teamQuota(row(), true, now)).toEqual({
       kind: "month",
       plan: "pro",
-      included: 100_000,
+      included: 110_000,
       periodStart: START,
       periodEnd: END,
       overage: false,
@@ -213,11 +254,23 @@ describe("teamQuota", () => {
       overage: true,
     });
     expect(
-      teamQuota(row({ plan: "scale", planQuota: 1_500_000, overageEnabled: true }), true, now),
-    ).toMatchObject({ included: 1_500_000, overageCentsPer1k: 18, overage: true });
+      teamQuota(row({ plan: "scale", planQuota: 1_650_000, overageEnabled: true }), true, now),
+    ).toMatchObject({ included: 1_650_000, overageCentsPer1k: 18, overage: true });
+    expect(teamQuota(row({ planQuota: 220_000 }), true, now)).toMatchObject({
+      included: 220_000,
+      overageCentsPer1k: 35,
+    });
+    expect(teamQuota(row({ plan: "scale", planQuota: 1_100_000 }), true, now)).toMatchObject({
+      included: 1_100_000,
+      overageCentsPer1k: 23,
+    });
+    expect(teamQuota(row({ plan: "scale", planQuota: 2_750_000 }), true, now)).toMatchObject({
+      included: 2_750_000,
+      overageCentsPer1k: 16,
+    });
     // A monthly row written before rungs existed sits on the plan's first rung.
     expect(teamQuota(row({ plan: "scale", planQuota: null }), true, now)).toMatchObject({
-      included: 500_000,
+      included: 550_000,
     });
   });
 

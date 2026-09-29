@@ -20,7 +20,7 @@ beforeAll(async () => {
   // A monthly plan with room for the month, held to two sends a day by the operator.
   await db
     .update(schema.teams)
-    .set({ plan: "pro", planQuota: 100_000, dailySendCeiling: 2 })
+    .set({ plan: "pro", planQuota: 110_000, dailySendCeiling: 2 })
     .where(eq(schema.teams.id, teamId));
   await db.insert(schema.domains).values({
     teamId,
