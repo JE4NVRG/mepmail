@@ -1,10 +1,10 @@
 {
   "meta": {
-    "title": "MepMail — Send emails. Keep building.",
+    "title": "MepMail: Send emails. Keep building.",
     "description": "Notifications, receipts and campaigns through API, SMTP or AI agents. Manage your sending in one dashboard. Start free, no credit card."
   },
   "skip": "Skip to content",
-  "brandAria": "MepMail — home",
+  "brandAria": "MepMail home",
   "navAria": "Main navigation",
   "nav": {
     "product": "Product",
@@ -25,7 +25,7 @@
     "badge": "Agent-ready"
   },
   "announce": {
-    "text": "Agent-ready — official MCP: your AI agents send email"
+    "text": "Your AI agents send email with the official MepMail MCP"
   },
   "lang": {
     "aria": "Page language"
@@ -40,7 +40,7 @@
     "note": "100 emails a day on the free plan. No credit card.",
     "offer": "{volume} emails/month for {price}.",
     "trust": [
-      "Official MCP server — agents send on the same pipeline",
+      "Official MCP server: agents use the same sending pipeline",
       "Own API, relay and panel, with Amazon SES underneath",
       "Your verified sending domain",
       "Assisted onboarding by who builds the product"
@@ -83,7 +83,7 @@
     "savings": "{percent}% saved (~{usd}/month)",
     "annual": "≈ {usd} per year",
     "cta": "I want this price",
-    "ctaSubject": "MepMail calculator — {volume} emails/month",
+    "ctaSubject": "MepMail calculator: {volume} emails/month",
     "note": "Estimate over public prices of 2026-09-27, in USD/month; competitors may change theirs and features are not equivalent.",
     "a11y": "Monthly sending volume"
   },
@@ -107,7 +107,7 @@
     "eyebrow": "Connect your way",
     "title": "Your code. Your workflow. Your agent.",
     "aria": "Integration examples",
-    "example": "Configuration example — no email is sent from this page.",
+    "example": "Configuration example: no email is sent from this page.",
     "api": "API",
     "smtp": "SMTP",
     "agents": "Agents",
@@ -128,7 +128,7 @@
     "cta": "Start free",
     "featuredBadge": "For growth",
     "showScale": "More volumes: Pro 220K and Scale",
-    "ctaNote": "Create your free account first — activating the plan is one click in the panel.",
+    "ctaNote": "Create your free account first. Choose your plan in the dashboard.",
     "items": [
       {
         "volume": "100/day (~3k/month)",
@@ -242,7 +242,7 @@
       },
       {
         "q": "Do I need a credit card to start?",
-        "a": "No. The beta is free — create your account and send your first emails without adding a payment method. Paid plans are billed monthly in USD."
+        "a": "No. The beta is free. Create your account and send your first emails without adding a payment method. Paid plans are billed monthly in USD."
       },
       {
         "q": "How does the beta work?",
@@ -253,7 +253,7 @@
   "mcp": {
     "eyebrow": "Agent-ready",
     "title": "Let your AI agents send email.",
-    "body": "MepMail ships an official <b>MCP server</b>. Claude, Cursor, Codex and any MCP client connect straight to your sending domain — hosted (OAuth, nothing to install) or local (npx @mepmail/mcp).",
+    "body": "Connect Claude, Cursor, Codex or any MCP client to your sending domain with the official <b>MCP server</b>. Use hosted OAuth with nothing to install, or run it locally with npx @mepmail/mcp.",
     "points": [
       "Hosted: connect with OAuth at api-mepmail.je4ndev.com/mcp.",
       "Local: npx @mepmail/mcp with a dedicated API key.",
@@ -264,7 +264,7 @@
   },
   "close": {
     "title": "Your next email starts here.",
-    "body": "Create your free account, make your first sends and tell us how you send today — during migration, we come along.",
+    "body": "Create your free account and send your first emails. Moving from another service? We help with migration.",
     "cta": "Create free account"
   },
   "footer": {

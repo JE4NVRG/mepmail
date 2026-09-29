@@ -1,12 +1,12 @@
 {
   "meta": {
-    "title": "Pricing — every MepMail plan on one page",
+    "title": "Pricing: every MepMail plan on one page",
     "description": "MepMail pricing in USD: free with 100 emails/day, Pro from US$ 20 for 110,000 emails/month and Scale up to 2.75M. Overage per 1,000 and no lock-in."
   },
   "eyebrow": "Pricing",
   "title": "Pick your volume. <highlight>Pay for what you send.</highlight>",
-  "lead": "Monthly prices in USD, billed monthly, no lock-in. Every plan runs on your own verified domain and includes assisted onboarding — through the HTTPS API or the SMTP relay, whichever your stack already speaks.",
-  "note": "Starting is free: 100 emails a day, no card. Activating a paid plan is one click in the panel.",
+  "lead": "Monthly prices in USD, no lock-in. Every plan runs on your own verified domain and includes assisted onboarding. Use the HTTPS API or SMTP relay, whichever fits your stack.",
+  "note": "Starting is free: 100 emails a day, no card. Choose a paid plan in the dashboard when you need more volume.",
   "plans": {
     "title": "The full ladder.",
     "intro": "The same grid the landing shows, with the Scale rungs open. Overage is what each plan charges per 1,000 extra sends once its included volume ends."
@@ -14,9 +14,9 @@
   "included": {
     "eyebrow": "Included",
     "title": "What every plan carries, Free included.",
-    "body": "None of it is an add-on — it is how the product ships.",
+    "body": "Included in every plan. No add-ons needed.",
     "points": [
-      "Resend-compatible HTTPS API at api-mepmail.je4ndev.com — keep the official SDK and change the base URL.",
+      "Resend-compatible HTTPS API at api-mepmail.je4ndev.com. Keep the official SDK and change the base URL.",
       "SMTP relay with STARTTLS at smtp-mepmail.je4ndev.com:2587.",
       "Your own sending domain, verified with DKIM and MAIL FROM on Amazon SES.",
       "Dedicated API key, delivery logs, suppression list and metrics in the panel.",
@@ -42,11 +42,11 @@
       },
       {
         "q": "What is the attachment limit per message?",
-        "a": "1 MB on Free and Starter, 5 MB on Pro and 10 MB on Scale — the sum of the decoded attachments, not each file separately."
+        "a": "1 MB on Free and Starter, 5 MB on Pro and 10 MB on Scale. This is the sum of the decoded attachments, not each file separately."
       },
       {
         "q": "Do I need a card to start?",
-        "a": "No. The beta is free, 100 emails a day per account. Paid plans are billed monthly in USD and activating one is a single click in the panel."
+        "a": "No. The beta is free, 100 emails a day per account. Paid plans are billed monthly in USD and can be chosen in the dashboard."
       },
       {
         "q": "What happens above the top plan?",

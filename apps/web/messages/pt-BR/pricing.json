@@ -1,12 +1,12 @@
 {
   "meta": {
-    "title": "Preços — todos os planos MepMail em uma página",
+    "title": "Preços: todos os planos MepMail em uma página",
     "description": "Preços do MepMail em USD: grátis com 100 e-mails/dia, Pro a partir de US$ 20 para 110.000 e-mails/mês e Scale até 2,75M. Excedente por 1.000 e sem fidelidade."
   },
   "eyebrow": "Preços",
   "title": "Escolha o volume. <highlight>Pague pelo que envia.</highlight>",
-  "lead": "Preços mensais em USD, cobrados por mês, sem fidelidade. Todo plano roda no seu domínio verificado e inclui implantação assistida — pela API HTTPS ou pelo relay SMTP, o que seu stack já fala.",
-  "note": "Começar é grátis: 100 e-mails por dia, sem cartão. A ativação do plano pago é 1 clique no painel.",
+  "lead": "Preços mensais em USD, sem fidelidade. Todo plano roda no seu domínio verificado e inclui implantação assistida. Use a API HTTPS ou o relay SMTP, conforme sua aplicação.",
+  "note": "Começar é grátis: 100 e-mails por dia, sem cartão. Escolha um plano pago no painel quando precisar de mais volume.",
   "plans": {
     "title": "A escada completa.",
     "intro": "A mesma grade mostrada na landing, com os degraus Scale abertos. Excedente é o que cada plano cobra por 1.000 envios extras quando o volume incluído acaba."
@@ -14,9 +14,9 @@
   "included": {
     "eyebrow": "Incluído",
     "title": "O que todo plano carrega, Free incluído.",
-    "body": "Nada da lista abaixo é add-on — é como o produto sai de fábrica.",
+    "body": "Incluído em todos os planos. Sem adicionais.",
     "points": [
-      "API HTTPS compatível com Resend em api-mepmail.je4ndev.com — mantenha o SDK oficial e troque a base URL.",
+      "API HTTPS compatível com Resend em api-mepmail.je4ndev.com. Mantenha o SDK oficial e troque a base URL.",
       "Relay SMTP com STARTTLS em smtp-mepmail.je4ndev.com:2587.",
       "Seu domínio de envio próprio, verificado com DKIM e MAIL FROM no Amazon SES.",
       "Chave de API dedicada, logs de entrega, lista de supressão e métricas no painel.",
@@ -42,11 +42,11 @@
       },
       {
         "q": "Qual o limite de anexos por mensagem?",
-        "a": "1 MB no Free e Starter, 5 MB no Pro e 10 MB no Scale — a soma dos anexos decodificados, não cada arquivo separadamente."
+        "a": "1 MB no Free e Starter, 5 MB no Pro e 10 MB no Scale. É a soma dos anexos decodificados, não cada arquivo separadamente."
       },
       {
         "q": "Preciso de cartão para começar?",
-        "a": "Não. O beta é grátis, 100 e-mails por dia por conta. Os planos pagos são cobrados por mês em USD e a ativação é 1 clique no painel."
+        "a": "Não. O beta é grátis, 100 e-mails por dia por conta. Os planos pagos são cobrados por mês em USD e podem ser escolhidos no painel."
       },
       {
         "q": "E acima do maior plano?",

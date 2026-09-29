@@ -11,7 +11,7 @@ import { passwordStrength } from "@/lib/password-strength";
 import { signupFieldMismatch } from "@/lib/signup-validation";
 import styles from "./auth.module.css";
 import { AuthScreen } from "./auth-screen";
-import { SilkCanvas } from "./silk-canvas";
+
 import { GitHubIcon, GoogleIcon, MicrosoftIcon } from "./social-icons";
 
 const STRENGTH_TONES = ["", "var(--ms-danger)", "var(--ms-warn)", "var(--ms-success)"] as const;
@@ -85,7 +85,7 @@ export function AuthForm({
   const t = useTranslations(`auth.${mode}`);
   const tSocial = useTranslations("auth.social");
   const tLegal = useTranslations("auth.legal");
-  const tCommon = useTranslations("common");
+
   const tAuth = useTranslations("auth");
   const router = useRouter();
   const params = useSearchParams();
@@ -125,6 +125,7 @@ export function AuthForm({
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (pending !== null) return;
     if (!passwordShown) {
       setPasswordShown(true);
       requestAnimationFrame(() => passwordRef.current?.focus());
@@ -148,51 +149,56 @@ export function AuthForm({
       return;
     }
     const fetchOptions = { headers: captchaHeaders(token) };
-    // Login passes no callbackURL: the client would navigate to it, and the
-    // re-sent verification link may land on the default just as well.
-    const { data, error } =
-      mode === "login"
-        ? await authClient.signIn.email({ email, password, fetchOptions })
-        : await authClient.signUp.email({
-            name,
-            email,
-            password,
-            callbackURL: verifyCallback,
-            fetchOptions,
-          });
-    if (error) {
-      // The server re-sent the verification link with this attempt.
-      if (error.code === "EMAIL_NOT_VERIFIED") {
-        setNotice(t("unverified", { email }));
+    try {
+      // Login passes no callbackURL: the client would navigate to it, and the
+      // re-sent verification link may land on the default just as well.
+      const { data, error } =
+        mode === "login"
+          ? await authClient.signIn.email({ email, password, fetchOptions })
+          : await authClient.signUp.email({
+              name,
+              email,
+              password,
+              callbackURL: verifyCallback,
+              fetchOptions,
+            });
+      if (error) {
+        // The server re-sent the verification link with this attempt.
+        if (error.code === "EMAIL_NOT_VERIFIED") {
+          setNotice(t("unverified", { email }));
+          setPending(null);
+          return;
+        }
+        // Signup shows server messages (e.g. the signup-disabled policy)
+        // verbatim; login never echoes the server, only the catalog copy.
+        setErrorMessage(
+          error.code === "VERIFICATION_FAILED" || error.code === "MISSING_RESPONSE"
+            ? t("captcha")
+            : (mode === "signup" && error.message) || t("error"),
+        );
         setPending(null);
         return;
       }
-      // Signup shows server messages (e.g. the signup-disabled policy)
-      // verbatim; login never echoes the server, only the catalog copy.
-      setErrorMessage(
-        error.code === "VERIFICATION_FAILED" || error.code === "MISSING_RESPONSE"
-          ? t("captcha")
-          : (mode === "signup" && error.message) || t("error"),
-      );
+      // A sign-in that resumes a pending OAuth authorization answers with the
+      // consent URL; the auth client has already navigated there.
+      const resumed = data as { redirect?: boolean; url?: string; token?: string | null } | null;
+      if (resumed?.redirect && resumed.url) return;
+      // No session token: the address must be verified first.
+      if (mode === "signup" && !resumed?.token) {
+        setAwaitingVerification(email);
+        setPending(null);
+        return;
+      }
+      // The dashboard layout guard bounces team-less users to /onboarding.
+      router.push(next);
+    } catch {
+      setErrorMessage(tAuth("networkError"));
       setPending(null);
-      return;
     }
-    // A sign-in that resumes a pending OAuth authorization answers with the
-    // consent URL; the auth client has already navigated there.
-    const resumed = data as { redirect?: boolean; url?: string; token?: string | null } | null;
-    if (resumed?.redirect && resumed.url) return;
-    // No session token: the address must be verified first.
-    if (mode === "signup" && !resumed?.token) {
-      setAwaitingVerification(email);
-      setPending(null);
-      return;
-    }
-    // The dashboard layout guard bounces team-less users to /onboarding.
-    router.push(next);
   }
 
   async function resendVerification() {
-    if (!awaitingVerification) return;
+    if (!awaitingVerification || pending !== null) return;
     setPending("email");
     setResent(false);
     setNotice(null);
@@ -204,33 +210,44 @@ export function AuthForm({
       setPending(null);
       return;
     }
-    const { error } = await authClient.sendVerificationEmail({
-      email: awaitingVerification,
-      callbackURL: verifyCallback,
-      fetchOptions: { headers: captchaHeaders(token) },
-    });
-    if (error) {
-      setNotice(
-        error.code === "VERIFICATION_FAILED" || error.code === "MISSING_RESPONSE"
-          ? t("captcha")
-          : t("resendFailed"),
-      );
-    } else {
-      setResent(true);
+    try {
+      const { error } = await authClient.sendVerificationEmail({
+        email: awaitingVerification,
+        callbackURL: verifyCallback,
+        fetchOptions: { headers: captchaHeaders(token) },
+      });
+      if (error) {
+        setNotice(
+          error.code === "VERIFICATION_FAILED" || error.code === "MISSING_RESPONSE"
+            ? t("captcha")
+            : t("resendFailed"),
+        );
+      } else {
+        setResent(true);
+      }
+    } catch {
+      setNotice(tAuth("networkError"));
+    } finally {
+      setPending(null);
     }
-    setPending(null);
   }
 
   async function onSocial(provider: SocialProvider) {
+    if (pending !== null) return;
     setPending(provider);
     setErrorMessage(null);
-    const { error } = await authClient.signIn.social({
-      provider,
-      callbackURL: next,
-      errorCallbackURL: mode === "login" ? "/login" : "/signup",
-    });
-    if (error) {
-      setErrorMessage(error.message || tSocial("error"));
+    try {
+      const { error } = await authClient.signIn.social({
+        provider,
+        callbackURL: next,
+        errorCallbackURL: mode === "login" ? "/login" : "/signup",
+      });
+      if (error) {
+        setErrorMessage(tSocial("error"));
+        setPending(null);
+      }
+    } catch {
+      setErrorMessage(tAuth("networkError"));
       setPending(null);
     }
   }
@@ -255,10 +272,18 @@ export function AuthForm({
           disabled={pending !== null}
           onClick={resendVerification}
         >
-          {t("resend")}
+          {pending ? tAuth("pending.email") : t("resend")}
         </button>
-        {resent ? <p className={styles.notice}>{t("resent")}</p> : null}
-        {notice ? <p className={styles.error}>{notice}</p> : null}
+        {resent ? (
+          <p className={styles.notice} role="status">
+            {t("resent")}
+          </p>
+        ) : null}
+        {notice ? (
+          <p className={styles.error} role="alert">
+            {notice}
+          </p>
+        ) : null}
         {turnstile.slot}
         <p className={styles.subline}>
           <Link href={`/login?next=${encodeURIComponent(next)}`}>{t("backToLogin")}</Link>
@@ -268,221 +293,227 @@ export function AuthForm({
   }
 
   return (
-    <main className={styles.screen}>
-      {/* Every auth screen keeps the marketing site one click away. */}
-      <Link href="/" className={styles.back}>
-        <span aria-hidden="true">←</span> {tAuth("backToSite")}
-      </Link>
-      {/* biome-ignore lint/performance/noImgElement: decorative full-bleed backdrop, no optimization needed */}
-      <img src="/auth/waves-dark.webp" alt="" className={`ms-dark-only ${styles.backdrop}`} />
-      {/* biome-ignore lint/performance/noImgElement: decorative full-bleed backdrop, no optimization needed */}
-      <img src="/auth/waves-light.webp" alt="" className={`ms-light-only ${styles.backdrop}`} />
-      <SilkCanvas />
-      <div className={styles.column}>
-        <Link href="/" className={styles.brand}>
-          {/* biome-ignore lint/performance/noImgElement: static SVG logo, nothing for next/image to optimize */}
-          <img
-            src="/logo/mepmail-wordmark.svg"
-            className="ms-wordmark"
-            alt={tCommon("appName")}
-            height={22}
-          />
-        </Link>
-        <h1 className={`ms-display ${styles.headline}`}>{t("title")}</h1>
-        <p className={styles.subline}>
-          {t("subline")} <Link href={otherPage}>{t("sublineLink")}</Link>
-        </p>
-        {anySocial ? (
-          <div className={styles.social}>
-            {providers.google ? (
-              <button
-                type="button"
-                className={`ms-btn ms-btn-secondary ${styles.button}`}
-                disabled={pending !== null}
-                onClick={() => onSocial("google")}
-              >
-                <GoogleIcon />
-                {tSocial("google")}
-              </button>
-            ) : null}
-            {providers.github ? (
-              <button
-                type="button"
-                className={`ms-btn ms-btn-secondary ${styles.button}`}
-                disabled={pending !== null}
-                onClick={() => onSocial("github")}
-              >
-                <GitHubIcon />
-                {tSocial("github")}
-              </button>
-            ) : null}
-            {providers.microsoft ? (
-              <button
-                type="button"
-                className={`ms-btn ms-btn-secondary ${styles.button}`}
-                disabled={pending !== null}
-                onClick={() => onSocial("microsoft")}
-              >
-                <MicrosoftIcon />
-                {tSocial("microsoft")}
-              </button>
-            ) : null}
+    <AuthScreen title={t("title")}>
+      <p className={styles.subline}>
+        {t("subline")} <Link href={otherPage}>{t("sublineLink")}</Link>
+      </p>
+      {anySocial ? (
+        <div className={styles.social}>
+          {providers.google ? (
+            <button
+              type="button"
+              className={`ms-btn ms-btn-secondary ${styles.button}`}
+              disabled={pending !== null}
+              onClick={() => onSocial("google")}
+            >
+              <GoogleIcon />
+              {tSocial("google")}
+            </button>
+          ) : null}
+          {providers.github ? (
+            <button
+              type="button"
+              className={`ms-btn ms-btn-secondary ${styles.button}`}
+              disabled={pending !== null}
+              onClick={() => onSocial("github")}
+            >
+              <GitHubIcon />
+              {tSocial("github")}
+            </button>
+          ) : null}
+          {providers.microsoft ? (
+            <button
+              type="button"
+              className={`ms-btn ms-btn-secondary ${styles.button}`}
+              disabled={pending !== null}
+              onClick={() => onSocial("microsoft")}
+            >
+              <MicrosoftIcon />
+              {tSocial("microsoft")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {anySocial ? <div className={styles.divider}>{tSocial("or")}</div> : null}
+      <p className={styles.hint} id="auth-step" aria-live="polite">
+        {tAuth(
+          mode === "signup"
+            ? "shell.signupHint"
+            : passwordShown
+              ? "shell.passwordHint"
+              : "shell.emailHint",
+        )}
+      </p>
+      <p className={styles.pending} role="status" aria-live="polite">
+        {pending ? tAuth(`pending.${pending}`) : null}
+      </p>
+      <form
+        onSubmit={onSubmit}
+        className={styles.form}
+        aria-busy={pending !== null}
+        aria-describedby={errorMessage ? "auth-error auth-step" : "auth-step"}
+      >
+        {mode === "signup" ? (
+          <div className={`ms-field ${styles.field}`}>
+            <label htmlFor="name">{t("name")}</label>
+            <input
+              id="name"
+              type="text"
+              className={`ms-input ${styles.control}`}
+              autoComplete="name"
+              placeholder={t("namePlaceholder")}
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
         ) : null}
-        {anySocial ? <div className={styles.divider}>{tSocial("or")}</div> : null}
-        <form onSubmit={onSubmit} className={styles.form}>
-          {mode === "signup" ? (
-            <div className={`ms-field ${styles.field}`}>
-              <label htmlFor="name">{t("name")}</label>
-              <input
-                id="name"
-                type="text"
-                className={`ms-input ${styles.control}`}
-                autoComplete="name"
-                placeholder={t("namePlaceholder")}
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-          ) : null}
+        <div className={`ms-field ${styles.field}`}>
+          <label htmlFor="email">{t("email")}</label>
+          <input
+            id="email"
+            type="email"
+            aria-describedby={errorMessage ? "auth-error" : undefined}
+            className={`ms-input ${styles.control}`}
+            autoComplete="email"
+            placeholder={t("emailPlaceholder")}
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        {mode === "signup" ? (
           <div className={`ms-field ${styles.field}`}>
-            <label htmlFor="email">{t("email")}</label>
+            <label htmlFor="confirm-email">{t("confirmEmail")}</label>
             <input
-              id="email"
+              id="confirm-email"
               type="email"
               className={`ms-input ${styles.control}`}
               autoComplete="email"
-              placeholder={t("emailPlaceholder")}
+              placeholder={t("confirmEmailPlaceholder")}
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={confirmEmail}
+              onChange={(e) => setConfirmEmail(e.target.value)}
             />
           </div>
-          {mode === "signup" ? (
-            <div className={`ms-field ${styles.field}`}>
-              <label htmlFor="confirm-email">{t("confirmEmail")}</label>
+        ) : null}
+        {passwordShown ? (
+          <div className={`ms-field ${styles.field} ${styles.passwordStep}`}>
+            <div className={styles.labelRow}>
+              <label htmlFor="password">{t("password")}</label>
+              {mode === "login" && forgotPassword ? (
+                <Link
+                  href={
+                    email.trim()
+                      ? `/forgot-password?email=${encodeURIComponent(email.trim())}`
+                      : "/forgot-password"
+                  }
+                  className={styles.forgot}
+                >
+                  {t("forgot")}
+                </Link>
+              ) : null}
+            </div>
+            <div className={styles.passwordWrap}>
               <input
-                id="confirm-email"
-                type="email"
+                ref={passwordRef}
+                id="password"
+                aria-describedby={errorMessage ? "auth-error" : undefined}
+                type={revealPassword ? "text" : "password"}
                 className={`ms-input ${styles.control}`}
-                autoComplete="email"
-                placeholder={t("confirmEmailPlaceholder")}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                placeholder={t("passwordPlaceholder")}
                 required
-                value={confirmEmail}
-                onChange={(e) => setConfirmEmail(e.target.value)}
+                minLength={mode === "signup" ? 8 : undefined}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
+              <button
+                type="button"
+                className={styles.eye}
+                aria-pressed={revealPassword}
+                aria-label={revealPassword ? t("hidePassword") : t("showPassword")}
+                onClick={() => setRevealPassword((v) => !v)}
+              >
+                <EyeGlyph off={revealPassword} />
+              </button>
             </div>
-          ) : null}
-          {passwordShown ? (
-            <div className={`ms-field ${styles.field}`}>
-              <div className={styles.labelRow}>
-                <label htmlFor="password">{t("password")}</label>
-                {mode === "login" && forgotPassword ? (
-                  <Link
-                    href={
-                      email.trim()
-                        ? `/forgot-password?email=${encodeURIComponent(email.trim())}`
-                        : "/forgot-password"
-                    }
-                    className={styles.forgot}
-                  >
-                    {t("forgot")}
-                  </Link>
-                ) : null}
-              </div>
-              <div className={styles.passwordWrap}>
-                <input
-                  ref={passwordRef}
-                  id="password"
-                  type={revealPassword ? "text" : "password"}
-                  className={`ms-input ${styles.control}`}
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  placeholder={t("passwordPlaceholder")}
-                  required
-                  minLength={mode === "signup" ? 8 : undefined}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className={styles.eye}
-                  aria-pressed={revealPassword}
-                  aria-label={revealPassword ? t("hidePassword") : t("showPassword")}
-                  onClick={() => setRevealPassword((v) => !v)}
-                >
-                  <EyeGlyph off={revealPassword} />
-                </button>
-              </div>
-              {mode === "signup" ? <StrengthMeter password={password} /> : null}
+            {mode === "signup" ? <StrengthMeter password={password} /> : null}
+          </div>
+        ) : null}
+        {mode === "signup" ? (
+          <div className={`ms-field ${styles.field}`}>
+            <label htmlFor="confirm-password">{t("confirmPassword")}</label>
+            <div className={styles.passwordWrap}>
+              <input
+                id="confirm-password"
+                type={revealConfirm ? "text" : "password"}
+                className={`ms-input ${styles.control}`}
+                autoComplete="new-password"
+                placeholder={t("confirmPasswordPlaceholder")}
+                required
+                minLength={8}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className={styles.eye}
+                aria-pressed={revealConfirm}
+                aria-label={revealConfirm ? t("hidePassword") : t("showPassword")}
+                onClick={() => setRevealConfirm((v) => !v)}
+              >
+                <EyeGlyph off={revealConfirm} />
+              </button>
             </div>
-          ) : null}
-          {mode === "signup" ? (
-            <div className={`ms-field ${styles.field}`}>
-              <label htmlFor="confirm-password">{t("confirmPassword")}</label>
-              <div className={styles.passwordWrap}>
-                <input
-                  id="confirm-password"
-                  type={revealConfirm ? "text" : "password"}
-                  className={`ms-input ${styles.control}`}
-                  autoComplete="new-password"
-                  placeholder={t("confirmPasswordPlaceholder")}
-                  required
-                  minLength={8}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className={styles.eye}
-                  aria-pressed={revealConfirm}
-                  aria-label={revealConfirm ? t("hidePassword") : t("showPassword")}
-                  onClick={() => setRevealConfirm((v) => !v)}
-                >
-                  <EyeGlyph off={revealConfirm} />
-                </button>
-              </div>
-            </div>
-          ) : null}
-          {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
-          {notice ? (
-            <p className={styles.notice} aria-live="polite">
-              {notice}
-            </p>
-          ) : null}
-          {turnstile.slot}
-          <button
-            type="submit"
-            className={`ms-btn ms-btn-primary ${styles.button}`}
-            disabled={pending !== null}
-          >
-            {t("submit")}
-          </button>
-        </form>
-        {legal.termsUrl || legal.privacyUrl || productUpdates ? (
-          <p className={styles.legal}>
-            {legal.termsUrl || legal.privacyUrl
-              ? tLegal.rich(
-                  // The sentence names only the documents that exist.
-                  `${mode}.${legal.termsUrl && legal.privacyUrl ? "both" : legal.termsUrl ? "terms" : "privacy"}`,
-                  {
-                    terms: (chunks) => (
-                      <a href={legal.termsUrl ?? "#"} target="_blank" rel="noopener noreferrer">
-                        {chunks}
-                      </a>
-                    ),
-                    privacy: (chunks) => (
-                      <a href={legal.privacyUrl ?? "#"} target="_blank" rel="noopener noreferrer">
-                        {chunks}
-                      </a>
-                    ),
-                  },
-                )
-              : null}
-            {productUpdates ? ` ${tLegal("updates")}` : null}
+          </div>
+        ) : null}
+        {errorMessage ? (
+          <p className={styles.error} id="auth-error" role="alert">
+            {errorMessage}
           </p>
         ) : null}
-      </div>
-    </main>
+        {notice ? (
+          <p className={styles.notice} aria-live="polite">
+            {notice}
+          </p>
+        ) : null}
+        {turnstile.slot}
+        <button
+          type="submit"
+          className={`ms-btn ms-btn-primary ${styles.button}`}
+          disabled={pending !== null}
+        >
+          {pending
+            ? tAuth(`pending.${pending}`)
+            : !passwordShown
+              ? tAuth("continueEmail")
+              : t("submit")}
+        </button>
+      </form>
+      {legal.termsUrl || legal.privacyUrl || productUpdates ? (
+        <p className={styles.legal}>
+          {legal.termsUrl || legal.privacyUrl
+            ? tLegal.rich(
+                // The sentence names only the documents that exist.
+                `${mode}.${legal.termsUrl && legal.privacyUrl ? "both" : legal.termsUrl ? "terms" : "privacy"}`,
+                {
+                  terms: (chunks) => (
+                    <a href={legal.termsUrl ?? "#"} target="_blank" rel="noopener noreferrer">
+                      {chunks}
+                    </a>
+                  ),
+                  privacy: (chunks) => (
+                    <a href={legal.privacyUrl ?? "#"} target="_blank" rel="noopener noreferrer">
+                      {chunks}
+                    </a>
+                  ),
+                },
+              )
+            : null}
+          {productUpdates ? ` ${tLegal("updates")}` : null}
+        </p>
+      ) : null}
+    </AuthScreen>
   );
 }

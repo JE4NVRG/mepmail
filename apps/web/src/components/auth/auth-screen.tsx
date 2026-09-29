@@ -2,36 +2,51 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { LandingLangSwitch } from "@/components/landing-lang-switch";
 import styles from "./auth.module.css";
-import { SilkCanvas } from "./silk-canvas";
 
-/** Same screen chrome as AuthForm, for the recovery and OAuth consent screens. */
+/** Estrutura única de acesso, recuperação e consentimento. */
 export function AuthScreen({ title, children }: { title: string; children: React.ReactNode }) {
   const tCommon = useTranslations("common");
   const tAuth = useTranslations("auth");
+  const tLanding = useTranslations("landing");
   return (
     <main className={styles.screen}>
-      {/* Every auth screen keeps the marketing site one click away. */}
-      <Link href="/" className={styles.back}>
-        <span aria-hidden="true">←</span> {tAuth("backToSite")}
-      </Link>
-      {/* biome-ignore lint/performance/noImgElement: decorative full-bleed backdrop, no optimization needed */}
-      <img src="/auth/waves-dark.webp" alt="" className={`ms-dark-only ${styles.backdrop}`} />
-      {/* biome-ignore lint/performance/noImgElement: decorative full-bleed backdrop, no optimization needed */}
-      <img src="/auth/waves-light.webp" alt="" className={`ms-light-only ${styles.backdrop}`} />
-      <SilkCanvas />
-      <div className={styles.column}>
-        <Link href="/" className={styles.brand}>
-          {/* biome-ignore lint/performance/noImgElement: static SVG logo, nothing for next/image to optimize */}
-          <img
-            src="/logo/mepmail-wordmark.svg"
-            className="ms-wordmark"
-            alt={tCommon("appName")}
-            height={22}
-          />
+      <header className={styles.topbar}>
+        <Link href="/" className={styles.back}>
+          <span aria-hidden="true">←</span> {tAuth("backToSite")}
         </Link>
-        <h1 className={`ms-display ${styles.headline}`}>{title}</h1>
-        {children}
+        <LandingLangSwitch label={tLanding("lang.aria")} />
+      </header>
+      <div className={styles.layout}>
+        <aside className={styles.product} aria-label={tAuth("shell.productLabel")}>
+          <p className={styles.eyebrow}>MepMail / API · SMTP · MCP</p>
+          <h2>{tAuth("shell.title")}</h2>
+          <p className={styles.productLead}>{tAuth("shell.body")}</p>
+          <figure className={styles.proof}>
+            {/* biome-ignore lint/performance/noImgElement: prova real já sanitizada e otimizada, sem dados de conta */}
+            <img
+              src="/product/templates-hero.webp"
+              width={546}
+              height={614}
+              alt={tLanding("productProof.alt")}
+            />
+            <figcaption>{tLanding("productProof.caption")}</figcaption>
+          </figure>
+        </aside>
+        <div className={styles.column}>
+          <Link href="/" className={styles.brand}>
+            {/* biome-ignore lint/performance/noImgElement: static SVG logo, nothing for next/image to optimize */}
+            <img
+              src="/logo/mepmail-wordmark.svg"
+              className="ms-wordmark"
+              alt={tCommon("appName")}
+              height={22}
+            />
+          </Link>
+          <h1 className={`ms-display ${styles.headline}`}>{title}</h1>
+          {children}
+        </div>
       </div>
     </main>
   );

@@ -1,170 +1,196 @@
-/* Auth screens (login/signup) only — the shared control grammar stays in
-   styles/components.css; these rules just retune it for the auth column:
-   38px controls, full-width centered buttons, and the one backdrop glow. */
-
+/* Escopo exclusivo de auth: superfície calma e prova real do produto. */
+.screen,
+.screen * {
+  box-sizing: border-box;
+}
 .screen {
+  --auth-muted: #aaa7a0;
   min-height: 100dvh;
+  padding: 0 40px 40px;
+  background: var(--ms-ground);
+  color: var(--ms-bone);
+}
+:global([data-theme="light"]) .screen {
+  --auth-muted: #625f59;
+}
+.topbar {
+  max-width: 1200px;
+  margin: auto;
+  min-height: 88px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 24px;
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-}
-
-/* Silk-wave backdrop (per-theme webp) drifting slowly under a scrim. The
-   negative inset gives the drift room so edges never show. */
-.backdrop {
-  position: absolute;
-  inset: -6%;
-  width: 112%;
-  height: 112%;
-  object-fit: cover;
-  z-index: -2;
-  animation: drift 70s ease-in-out infinite alternate;
-}
-@keyframes drift {
-  from {
-    transform: translate3d(-1.2%, -0.8%, 0) scale(1);
-  }
-  to {
-    transform: translate3d(1.2%, 0.8%, 0) scale(1.06);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .backdrop {
-    animation: none;
-  }
-}
-
-/* The live shader paints over the static webp when it runs; when it cannot
-   (reduced motion, no WebGL), the imgs beneath remain the backdrop. */
-.canvas {
-  /* Hidden until the shader's first frame; the webp beneath is baked to the
-     shader's tone, so the switch is instant and imperceptible. */
-  opacity: 0;
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -2;
-}
-
-/* Legibility scrim between fabric and form: ground-tinted, heavier behind
-   the column, plus the steel glow the screen always had. */
-.screen::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(
-      640px 460px at 50% 18%,
-      color-mix(in srgb, var(--ms-steel) 9%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      760px 620px at 50% 46%,
-      color-mix(in srgb, var(--ms-ground) 62%, transparent),
-      color-mix(in srgb, var(--ms-ground) 26%, transparent) 78%
-    );
-}
-
-.column {
-  width: 360px;
-  max-width: 100%;
-  display: grid;
+  justify-content: space-between;
   gap: 16px;
-  justify-items: center;
 }
-
-/* One-click way back to the marketing site — the auth screens otherwise
-   dead-end a visitor who arrived from the site. */
+.layout {
+  max-width: 1200px;
+  min-height: calc(100dvh - 128px);
+  margin: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 80px;
+}
+.product {
+  padding: 28px 0;
+  animation: enter 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ms-violet);
+  margin: 0 0 20px;
+}
+.product h2 {
+  font-size: clamp(32px, 3.2vw, 46px);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  font-weight: 550;
+  text-wrap: balance;
+  margin: 0 0 16px;
+  max-width: 490px;
+}
+.productLead {
+  color: var(--auth-muted);
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 440px;
+}
+.proof {
+  margin: 28px 0 0;
+  max-width: 340px;
+  padding: 12px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 16px;
+  background: #0c0c0d;
+}
+.proof img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.proof figcaption {
+  color: #aaa7a0;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 12px;
+}
+.column {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+  padding: 40px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 20px;
+  background: var(--ms-panel);
+  animation: enter 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
 .back {
-  position: absolute;
-  top: 22px;
-  left: 24px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 44px;
   font-size: 13.5px;
-  color: var(--ms-muted);
+  color: var(--auth-muted);
   text-decoration: none;
-  transition: color 160ms ease;
-  z-index: 1;
+  transition: color 180ms ease;
 }
-
-.back:hover,
-.back:focus-visible {
+.back:hover {
   color: var(--ms-bone);
 }
-
-/* The wordmark doubles as the way home, per convention. */
 .brand {
   display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  justify-self: start;
 }
-
-/* Social providers: stacked on narrow screens, one row on desktop. auto-fit
-   makes a lone provider span the full width with no special case. */
 .social {
   width: 100%;
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
 }
-
-@media (min-width: 640px) {
-  .column {
-    width: 440px;
-  }
-  .social {
-    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  }
-}
-
-/* Composed with the global .ms-display — this only sizes/centers. */
 .headline {
-  margin: 8px 0 0;
-  font-size: var(--ms-fs-h2);
+  margin: 4px 0 0;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
   color: var(--ms-bone);
-  text-align: center;
+  text-align: left;
 }
-
 .subline {
-  margin: -8px 0 8px;
-  color: var(--ms-muted);
+  margin: -6px 0 4px;
+  color: var(--auth-muted);
   font-size: var(--ms-fs-label);
-  text-align: center;
+  text-align: left;
 }
-
-/* One auth-screen control height; inputs and buttons align at 38px. */
+/* Alvos de toque consistentes e inputs sem zoom automático no mobile. */
 .control {
   width: 100%;
-  height: 38px;
+  min-height: 48px;
+  height: 48px;
+  font-size: 16px;
 }
-
 .button {
   composes: control;
   justify-content: center;
+  transition:
+    transform 180ms ease,
+    background 180ms ease;
 }
-
+.button:active:not(:disabled) {
+  transform: scale(0.98);
+}
 .form {
   width: 100%;
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
-
 .field {
   width: 100%;
 }
-
+.field label {
+  color: var(--auth-muted);
+}
+.control::placeholder {
+  color: var(--auth-muted);
+  opacity: 1;
+}
+.screen a:focus-visible,
+.screen button:focus-visible,
+.screen input:focus-visible {
+  outline: 2px solid var(--ms-violet);
+  outline-offset: 3px;
+}
+.hint {
+  color: var(--auth-muted);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+.pending {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ms-violet);
+}
+.pending:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.passwordStep {
+  animation: enter 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
 .divider {
   width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--ms-faint);
+  color: var(--auth-muted);
   font-size: var(--ms-fs-label);
 }
 .divider::before,
@@ -174,14 +200,11 @@
   height: 1px;
   background: var(--ms-line);
 }
-
 .error {
   margin: 0;
   color: var(--ms-danger);
   font-size: var(--ms-fs-label);
 }
-
-/* Signup password meter: three bars + a word, tinted by score. */
 .strength {
   display: flex;
   align-items: center;
@@ -198,7 +221,7 @@
   height: 3px;
   border-radius: var(--ms-r-pill);
   background: var(--ms-inset);
-  transition: background var(--ms-dur-fast) var(--ms-ease);
+  transition: background 180ms ease;
 }
 .strengthBarOn {
   composes: strengthBar;
@@ -208,78 +231,152 @@
   font-size: var(--ms-fs-micro);
   white-space: nowrap;
 }
-
-/* Auth links underline on hover only (the emails-table affordance). */
 .column a {
   color: var(--ms-bone);
-  text-decoration: none;
-}
-.column a:hover {
-  text-decoration: underline dotted var(--ms-faint);
+  text-decoration: underline;
   text-underline-offset: 3px;
 }
-
-/* Consent line: quiet, small, only rendered when a legal URL exists. */
+.column a:hover {
+  text-decoration-thickness: 2px;
+}
 .legal {
   margin: 4px 0 0;
-  color: var(--ms-faint);
-  font-size: var(--ms-fs-micro);
-  text-align: center;
+  color: var(--auth-muted);
+  font-size: 12px;
+  text-align: left;
   line-height: 1.6;
 }
 .legal a {
-  color: var(--ms-muted);
+  color: var(--ms-bone);
 }
-
-/* Password label row: field label left, "Forgot password?" link right. */
 .labelRow {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: 8px;
 }
-
 .forgot {
   font-size: var(--ms-fs-label);
 }
-
-/* Neutral recovery outcome line ("check your email"): calm subline voice,
-   never a success/danger tint. */
 .notice {
   margin: 0;
-  color: var(--ms-muted);
+  color: var(--auth-muted);
   font-size: var(--ms-fs-label);
-  text-align: center;
+  text-align: left;
   line-height: 1.6;
 }
-
-/* Password fields: the show/hide eye pinned inside the control. */
 .passwordWrap {
   position: relative;
 }
-
 .passwordWrap input {
-  padding-right: 38px;
+  padding-right: 50px;
 }
-
 .eye {
   position: absolute;
-  right: 5px;
+  right: 2px;
   top: 50%;
   transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   background: none;
   color: inherit;
-  opacity: 0.55;
   cursor: pointer;
 }
-
-.eye:hover,
-.eye:focus-visible {
-  opacity: 1;
+.topbar :global(.gtm-lang) {
+  display: flex;
+  gap: 4px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 30px;
+  padding: 2px;
+  margin: 0;
+}
+.topbar :global(.gtm-lang) legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.topbar :global(.gtm-lang) button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  color: var(--auth-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.topbar :global(.gtm-lang) button[aria-pressed="true"] {
+  background: var(--ms-bone);
+  color: var(--ms-void);
+}
+@keyframes enter {
+  from {
+    opacity: 0.35;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 959px) {
+  .screen {
+    padding: 0 24px 32px;
+  }
+  .layout {
+    display: block;
+    min-height: 0;
+    max-width: 500px;
+    padding-top: 24px;
+  }
+  .product {
+    display: none;
+  }
+  .column {
+    padding: 32px;
+  }
+}
+@media (max-width: 479px) {
+  .screen {
+    padding: 0 20px 28px;
+  }
+  .topbar {
+    min-height: 72px;
+  }
+  .layout {
+    padding-top: 16px;
+  }
+  .column {
+    padding: 24px 0;
+    border: 0;
+    border-top: 1px solid var(--ms-line-strong);
+    border-radius: 0;
+    background: transparent;
+    gap: 16px;
+  }
+  .headline {
+    font-size: 28px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .column,
+  .product,
+  .passwordStep {
+    animation: none;
+  }
+  .button,
+  .strengthBar {
+    transition: none;
+  }
+  .button:active:not(:disabled) {
+    transform: none;
+  }
 }

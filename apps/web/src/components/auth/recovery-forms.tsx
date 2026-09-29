@@ -26,17 +26,21 @@ export function ForgotPasswordForm({
   turnstileSiteKey?: string | null;
 }) {
   const t = useTranslations("auth.forgot");
+  const tAuth = useTranslations("auth");
   const [email, setEmail] = useState(initialEmail);
   const [pending, setPending] = useState(false);
   const [sent, setSent] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
   const [captchaFailed, setCaptchaFailed] = useState(false);
+  const [networkFailed, setNetworkFailed] = useState(false);
   const turnstile = useTurnstile(turnstileSiteKey);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (pending) return;
     setPending(true);
     setCaptchaFailed(false);
+    setNetworkFailed(false);
     let token: string | null;
     try {
       token = await turnstile.getToken();
@@ -45,19 +49,25 @@ export function ForgotPasswordForm({
       setPending(false);
       return;
     }
-    // redirectTo becomes the callbackURL better-auth's emailed link lands on.
-    const { error } = await authClient.requestPasswordReset({
-      email,
-      redirectTo: "/reset-password",
-      fetchOptions: { headers: captchaHeaders(token) },
-    });
-    if (error?.code === "VERIFICATION_FAILED" || error?.code === "MISSING_RESPONSE") {
-      setCaptchaFailed(true);
+    try {
+      // redirectTo preserva o destino do link enviado pelo backend.
+      const { error } = await authClient.requestPasswordReset({
+        email,
+        redirectTo: "/reset-password",
+        fetchOptions: { headers: captchaHeaders(token) },
+      });
+      if (error?.code === "VERIFICATION_FAILED" || error?.code === "MISSING_RESPONSE") {
+        setCaptchaFailed(true);
+        setPending(false);
+        return;
+      }
+      setRateLimited(error?.status === 429);
+      setSent(true);
+    } catch {
+      setNetworkFailed(true);
+    } finally {
       setPending(false);
-      return;
     }
-    setRateLimited(error?.status === 429);
-    setSent(true);
   }
 
   return (
@@ -77,12 +87,13 @@ export function ForgotPasswordForm({
           <p className={styles.subline}>
             {t("subline")} <Link href="/login">{t("sublineLink")}</Link>
           </p>
-          <form onSubmit={onSubmit} className={styles.form}>
+          <form onSubmit={onSubmit} className={styles.form} aria-busy={pending}>
             <div className={`ms-field ${styles.field}`}>
               <label htmlFor="email">{t("email")}</label>
               <input
                 id="email"
                 type="email"
+                aria-describedby={captchaFailed || networkFailed ? "recovery-error" : undefined}
                 className={`ms-input ${styles.control}`}
                 autoComplete="email"
                 placeholder={t("emailPlaceholder")}
@@ -91,14 +102,21 @@ export function ForgotPasswordForm({
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            {captchaFailed ? <p className={styles.error}>{t("captcha")}</p> : null}
+            {captchaFailed || networkFailed ? (
+              <p className={styles.error} id="recovery-error" role="alert">
+                {captchaFailed ? t("captcha") : tAuth("networkError")}
+              </p>
+            ) : null}
+            <p className={styles.pending} role="status">
+              {pending ? tAuth("pending.recovery") : null}
+            </p>
             {turnstile.slot}
             <button
               type="submit"
               className={`ms-btn ms-btn-primary ${styles.button}`}
               disabled={pending}
             >
-              {t("submit")}
+              {pending ? tAuth("pending.recovery") : t("submit")}
             </button>
           </form>
         </>
@@ -114,6 +132,7 @@ export function ForgotPasswordForm({
  */
 export function ResetPasswordForm({ token: initialToken }: { token: string | null }) {
   const t = useTranslations("auth.reset");
+  const tAuth = useTranslations("auth");
   const router = useRouter();
   // Held in state so the token survives the URL scrub below.
   const [token] = useState(initialToken);
@@ -130,26 +149,32 @@ export function ResetPasswordForm({ token: initialToken }: { token: string | nul
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!token) return;
+    if (!token || pending) return;
     if (password !== confirm) {
       setErrorMessage(t("mismatch"));
       return;
     }
     setPending(true);
     setErrorMessage(null);
-    const { error } = await authClient.resetPassword({ newPassword: password, token });
-    if (error) {
-      if (error.code === "INVALID_TOKEN") {
-        setState("invalid");
-      } else {
-        setErrorMessage(error.message || t("error"));
-        setPending(false);
+    try {
+      const { error } = await authClient.resetPassword({ newPassword: password, token });
+      if (error) {
+        if (error.code === "INVALID_TOKEN") {
+          setState("invalid");
+        } else {
+          setErrorMessage(error.message || t("error"));
+          setPending(false);
+        }
+        return;
       }
-      return;
+      setState("done");
+      // Server revoked every session; a beat to read the confirmation, then in.
+      setTimeout(() => router.push("/login"), 1500);
+    } catch {
+      setErrorMessage(tAuth("networkError"));
+    } finally {
+      setPending(false);
     }
-    setState("done");
-    // Server revoked every session; a beat to read the confirmation, then in.
-    setTimeout(() => router.push("/login"), 1500);
   }
 
   return (
@@ -166,7 +191,12 @@ export function ResetPasswordForm({ token: initialToken }: { token: string | nul
           {t("done")}
         </p>
       ) : (
-        <form onSubmit={onSubmit} className={styles.form}>
+        <form
+          onSubmit={onSubmit}
+          className={styles.form}
+          aria-busy={pending}
+          aria-describedby={errorMessage ? "reset-error" : undefined}
+        >
           <div className={`ms-field ${styles.field}`}>
             <label htmlFor="password">{t("password")}</label>
             <input
@@ -196,13 +226,20 @@ export function ResetPasswordForm({ token: initialToken }: { token: string | nul
               onChange={(e) => setConfirm(e.target.value)}
             />
           </div>
-          {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
+          {errorMessage ? (
+            <p className={styles.error} id="reset-error" role="alert">
+              {errorMessage}
+            </p>
+          ) : null}
+          <p className={styles.pending} role="status">
+            {pending ? tAuth("pending.reset") : null}
+          </p>
           <button
             type="submit"
             className={`ms-btn ms-btn-primary ${styles.button}`}
             disabled={pending}
           >
-            {t("submit")}
+            {pending ? tAuth("pending.reset") : t("submit")}
           </button>
         </form>
       )}

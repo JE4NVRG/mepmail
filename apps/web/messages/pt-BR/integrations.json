@@ -1,12 +1,12 @@
 {
   "meta": {
-    "title": "Integrações — n8n, Slack, Discord, Telegram, MCP e SMTP",
+    "title": "Integrações: n8n, Slack, Discord, Telegram, MCP e SMTP",
     "description": "O MepMail se encaixa na sua stack: node comunitário do n8n, canais de notificação Slack/Discord/Telegram, servidor MCP para agentes de IA, relay SMTP, CLI e API compatível com a do Resend."
   },
   "hero": {
     "eyebrow": "Integrações",
     "title": "Sua stack continua. <highlight>A entrega sobe de nível.</highlight>",
-    "lead": "O MepMail se conecta às ferramentas que você já usa — automação de fluxo, chat do time, agentes de IA, aplicações legadas — e dá a todas o mesmo pipeline de envio: domínios verificados, supressões, cotas e logs.",
+    "lead": "Conecte seus fluxos, chat do time, agentes de IA e aplicações ao MepMail. Todos usam o mesmo fluxo de envio, com domínios verificados, supressões, cotas e logs.",
     "note": "Uma API key e um domínio verificado cobrem tudo nesta página.",
     "muralLabel": "Funciona com a sua stack"
   },
@@ -16,12 +16,12 @@
         "name": "n8n",
         "kind": "Node comunitário",
         "logos": ["n8n"],
-        "body": "Envie email e opere toda a superfície de gestão — contatos, broadcasts, domínios, supressões — dentro de qualquer fluxo, ou inicie um fluxo quando algo acontecer com seu email.",
+        "body": "Envie e-mail e gerencie contatos, broadcasts, domínios e supressões dentro dos seus fluxos. Ou inicie um fluxo quando algo acontecer com seu e-mail.",
         "bullets": [
           "Envie, agende, cancele e envie em lote direto de um node do fluxo.",
           "O MepMail Trigger assina os eventos que você escolher e registra (e remove) o próprio webhook automaticamente.",
           "Assinaturas de payload (Svix / Standard Webhooks) verificadas de fábrica.",
-          "Funciona com o MepMail Cloud ou qualquer instância auto-hospedada — exige API key de acesso total."
+          "Funciona com o MepMail Cloud ou qualquer instância auto-hospedada. Exige API key de acesso total."
         ],
         "links": [
           { "label": "Pacote no npm", "href": "https://www.npmjs.com/package/n8n-nodes-mepmail" },
@@ -32,11 +32,11 @@
         "name": "Slack · Discord · Telegram",
         "kind": "Canais de notificação",
         "logos": ["slack", "discord", "telegram"],
-        "body": "Aponte um webhook para o seu canal e o MepMail fala no formato nativo do serviço — sem middleware e sem serviço intermediário.",
+        "body": "Aponte um webhook para o seu canal. O MepMail usa o formato nativo do serviço, sem middleware ou intermediário.",
         "bullets": [
           "Cole a URL de incoming webhook: Slack, Discord e Telegram são detectados e formatados nativamente (no Telegram, a URL de sendMessage com o seu chat id).",
           "Entregas, bounces, reclamações e alertas de deliverability chegam onde o time já está.",
-          "Qualquer outro endpoint mantém o JSON cru assinado — os mesmos webhooks, nada extra para configurar."
+          "Qualquer outro endpoint mantém o JSON cru assinado. Os mesmos webhooks, sem configuração extra."
         ],
         "links": [
           {
@@ -49,7 +49,7 @@
         "name": "Agentes de IA",
         "kind": "Servidor MCP",
         "logos": ["mcp"],
-        "body": "Claude Code, Cursor, VS Code e qualquer cliente de Model Context Protocol operam a plataforma — envio e gestão — por 22 ferramentas, no mesmo pipeline da REST API.",
+        "body": "Claude Code, Cursor, VS Code e qualquer cliente de Model Context Protocol enviam e-mail e gerenciam a plataforma por 22 ferramentas, no mesmo pipeline da REST API.",
         "bullets": [
           "Endpoint Streamable HTTP em /mcp na origem da sua API, ou o servidor stdio no npm.",
           "Domínios verificados, supressões, opt-outs de tópicos, cotas e escopo de time valem igual."
@@ -60,7 +60,7 @@
         "name": "Relay SMTP",
         "kind": "Qualquer aplicação",
         "logos": [],
-        "body": "Qualquer aplicação que envie por SMTP — WordPress, WooCommerce, Ghost, Strapi, Supabase, um monolito legado — envia pelo relay com a sua chave.",
+        "body": "WordPress, WooCommerce, Ghost, Strapi, Supabase ou qualquer outra aplicação que envie por SMTP pode usar o relay com a sua chave.",
         "bullets": [
           "Host, porta e credenciais; TLS obrigatório.",
           "Os mesmos domínios, supressões, tracking e logs da API.",
@@ -77,7 +77,7 @@
         "name": "SDKs do Resend, drop-in",
         "kind": "Migração",
         "logos": ["nodedotjs", "python", "php", "ruby", "go"],
-        "body": "Vindo do Resend? Os SDKs oficiais continuam funcionando — troque a base URL e a chave, e suas chamadas de envio ficam exatamente como estão.",
+        "body": "Vindo do Resend? Mantenha os SDKs oficiais. Troque a base URL e a chave, e suas chamadas de envio ficam exatamente como estão.",
         "bullets": [
           "Nove linguagens documentadas, com as regras de base URL de cada SDK (barra no final incluída).",
           "A conta gratuita se move com um comando: npx @mepmail/cli migrate --from resend."
@@ -91,7 +91,7 @@
         "name": "CLI e REST API",
         "kind": "Para builders",
         "logos": ["curl"],
-        "body": "Scripts, pipelines e ferramentas internas chamam a mesma API pública que o painel usa — 44 endpoints documentados com referência interativa.",
+        "body": "Scripts, pipelines e ferramentas internas chamam a mesma API pública que o painel usa: 44 endpoints documentados com referência interativa.",
         "bullets": [
           "O @mepmail/cli roda a migração e as operações do dia a dia pelo terminal.",
           "OpenAPI em docs-mepmail.je4ndev.com, wire-compatible com a superfície da API do Resend."

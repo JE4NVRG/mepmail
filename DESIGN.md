@@ -1,5 +1,5 @@
 ---
-version: 1.1
+version: 1.2
 name: MepMail-design
 description: Product-led marketing for builders and AI agents. Dark canvas, bone text, steel and restrained violet accents. Executable tokens live in apps/web/src/styles/tokens/colors.css.
 colors:
@@ -49,5 +49,19 @@ Product benefits form an editorial sequence, not a generic icon wall. Integratio
 Plans derive from the shared catalog: Free, Starter and Pro 110K upfront; remaining volumes remain accessible. Editorial feature badge means "For growth", not a claim about popularity. Comparison follows plans with its calculator, dated caveat and native details disclosure. FAQs use native details.
 
 ## Guardrails and scope
+
+## Authentication presentation
+
+Login, signup and recovery share one AuthScreen shell. Desktop uses an asymmetric product panel with the existing sanitized template screenshot and a quiet form surface. Below 960px the product panel disappears: compact brand, left-aligned heading and form come first. No fabric image, shader or continuous background motion. Keep both home links and reuse the cookie-backed EN/PT control. Controls are 48px high, password eyes at least 44px, inputs 16px, and links underlined. Secondary text uses a scoped AA palette in both themes, not dashboard overrides.
+
+Preserve email-first login, provider flags, all callbacks and validation. The first action says Continue with email; the password step receives focus. Pending announces the operation, errors are live and associated, and rejected network promises restore the controls without clearing values. Existing password eyes, meter and confirmation fields remain, not new features.
+
+## Motion contract
+
+Use opacity/transform only for entrance: 520ms cubic-bezier(0.22, 1, 0.36, 1), 12px maximum displacement, hero stagger 70ms and proof entrance 650ms. Micro interactions use 180ms, password/tab transitions 400ms. Animate groups, not every text. CTA is immediately clickable; no pointer-event delay, scroll hijacking or permanent decorative loop.
+
+Viewport reveal is progressive enhancement: static CSS never hides content. IntersectionObserver triggers a one-shot Web Animation only on intersecting groups; missing observer/animation API leaves fully visible content. Reduced motion disables entrances, reveals, translations and badge loops, including a preference change during the session. No-JS SSR remains readable. Verify motion through runtime and a real recording, not still images alone.
+
+Scope extension and acceptance: docs/gtm/frontend-polish-spec.md. No backend authentication, sending, pricing or infrastructure changes.
 
 No global authenticated-UI restyling; no new dependencies, guaranteed delivery, isolated shared-IP reputation, MCP exclusivity or untested setup-time promises. Keep EN default and full PT parity. Preserve AGPL/NOTICE and logo licenses. Full direction: docs/gtm/landing-cro-spec.md; scope constitution: specs/constitution.md.

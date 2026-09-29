@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { IntegrationTabs } from "@/components/integration-tabs";
 import { type CalcLabels, LandingCalculator } from "@/components/landing-calculator";
+import { LandingMotion } from "@/components/landing-motion";
 import { PlanCard, type PlanCardLabels } from "@/components/plan-card";
 import { ArrivalTracker, McpConfigCopy } from "@/components/public-events";
 import {
@@ -106,6 +107,7 @@ export default async function RootPage() {
   return (
     <div className="gtm cro">
       <ArrivalTracker />
+      <LandingMotion />
       <PublicHeader
         labels={site}
         page="landing"

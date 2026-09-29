@@ -1,10 +1,10 @@
 {
   "meta": {
-    "title": "MepMail — Envie e-mails. Continue construindo.",
+    "title": "MepMail: Envie e-mails. Continue construindo.",
     "description": "Notificações, recibos e campanhas por API, SMTP ou agentes de IA. Controle seus envios em um só painel. Comece grátis, sem cartão."
   },
   "skip": "Pular para o conteúdo",
-  "brandAria": "MepMail — início",
+  "brandAria": "MepMail início",
   "navAria": "Navegação principal",
   "nav": {
     "product": "Produto",
@@ -25,7 +25,7 @@
     "badge": "Agent-ready"
   },
   "announce": {
-    "text": "Agent-ready — MCP oficial: seus agentes de IA enviam e-mail"
+    "text": "Seus agentes de IA enviam e-mail com o MCP oficial do MepMail"
   },
   "lang": {
     "aria": "Idioma da página"
@@ -40,7 +40,7 @@
     "note": "100 e-mails por dia no plano grátis. Sem cartão.",
     "offer": "{volume} e-mails/mês por {price}.",
     "trust": [
-      "MCP server oficial — agentes enviam no mesmo pipeline",
+      "MCP server oficial: agentes usam o mesmo fluxo de envio",
       "API, relay e painel próprios, com Amazon SES por baixo",
       "Seu domínio de envio verificado",
       "Onboarding assistido por quem constrói o produto"
@@ -75,7 +75,7 @@
     "savings": "Economia de {percent}% (~{usd}/mês)",
     "annual": "≈ {usd} por ano",
     "cta": "Quero esse preço",
-    "ctaSubject": "Calculadora MepMail — {volume} e-mails/mês",
+    "ctaSubject": "Calculadora MepMail: {volume} e-mails/mês",
     "note": "Estimativa com preços públicos de 27/09/2026, em USD/mês; os concorrentes podem mudar valores e os recursos não são equivalentes.",
     "a11y": "Volume mensal de envios"
   },
@@ -99,7 +99,7 @@
     "eyebrow": "Conecte do seu jeito",
     "title": "Seu código. Seu fluxo. Seu agente.",
     "aria": "Exemplos de integração",
-    "example": "Exemplo de configuração — esta página não envia e-mails.",
+    "example": "Exemplo de configuração: esta página não envia e-mails.",
     "api": "API",
     "smtp": "SMTP",
     "agents": "Agentes",
@@ -120,7 +120,7 @@
     "cta": "Começar grátis",
     "featuredBadge": "Para crescer",
     "showScale": "Mais volumes: Pro 220K e Scale",
-    "ctaNote": "Crie a conta grátis primeiro — a ativação do plano é feita no painel, em 1 clique.",
+    "ctaNote": "Crie sua conta grátis. Depois, escolha seu plano no painel.",
     "items": [
       {
         "volume": "100/dia (~3k/mês)",
@@ -234,7 +234,7 @@
       },
       {
         "q": "Preciso de cartão de crédito para começar?",
-        "a": "Não. O beta é grátis — crie sua conta e faça seus primeiros envios sem cadastrar forma de pagamento. Os planos pagos são cobrados mensalmente em USD."
+        "a": "Não. O beta é grátis. Crie sua conta e faça seus primeiros envios sem cadastrar forma de pagamento. Os planos pagos são cobrados mensalmente em USD."
       },
       {
         "q": "Como funciona o beta?",
@@ -245,7 +245,7 @@
   "mcp": {
     "eyebrow": "Agent-ready",
     "title": "Deixe seus agentes de IA enviarem e-mail.",
-    "body": "O MepMail expõe um <b>MCP server</b> oficial. Claude, Cursor, Codex e qualquer cliente MCP conectam direto ao seu domínio de envio — no modo hospedado (OAuth, sem instalar) ou local (npx @mepmail/mcp).",
+    "body": "Conecte Claude, Cursor, Codex ou qualquer cliente MCP ao seu domínio de envio com o <b>MCP server</b> oficial. Use OAuth hospedado, sem instalar, ou execute localmente com npx @mepmail/mcp.",
     "points": [
       "Hospedado: conecte com OAuth em api-mepmail.je4ndev.com/mcp.",
       "Local: npx @mepmail/mcp com uma API key dedicada.",
@@ -256,7 +256,7 @@
   },
   "close": {
     "title": "Seu próximo envio começa aqui.",
-    "body": "Crie sua conta grátis, faça seus primeiros envios e conte como você envia hoje — na migração, a gente vai junto.",
+    "body": "Crie sua conta grátis e faça seus primeiros envios. Vem de outro serviço? A gente ajuda na migração.",
     "cta": "Criar conta grátis"
   },
   "footer": {
