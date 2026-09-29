@@ -23,12 +23,12 @@ mostra a mesma frase.
 | --- | --- | --- | --- | --- | --- |
 | `free` | Free | US$ 0 | 100 | por dia | — |
 | `starter` | Starter | US$ 9 | 1.500 | por dia | — |
-| `pro_100k` | Pro | US$ 20 | 100.000 | por mês | US$ 0,90 |
-| `pro_200k` | Pro | US$ 100 | 200.000 | por mês | US$ 0,35 |
-| `scale_500k` | Scale | US$ 199 | 500.000 | por mês | US$ 0,25 |
-| `scale_1m` | Scale | US$ 319 | 1.000.000 | por mês | US$ 0,23 |
-| `scale_1_5m` | Scale | US$ 429 | 1.500.000 | por mês | US$ 0,18 |
-| `scale_2_5m` | Scale | US$ 549 | 2.500.000 | por mês | US$ 0,16 |
+| `pro_100k` | Pro | US$ 20 | 110.000 | por mês | US$ 0,90 |
+| `pro_200k` | Pro | US$ 100 | 220.000 | por mês | US$ 0,35 |
+| `scale_500k` | Scale | US$ 199 | 550.000 | por mês | US$ 0,25 |
+| `scale_1m` | Scale | US$ 319 | 1.100.000 | por mês | US$ 0,23 |
+| `scale_1_5m` | Scale | US$ 429 | 1.650.000 | por mês | US$ 0,18 |
+| `scale_2_5m` | Scale | US$ 549 | 2.750.000 | por mês | US$ 0,16 |
 
 A escada é `PLAN_RUNGS` em `packages/core/src/plans.ts`; Checkout, painel,
 `GET /usage` e os e-mails de conta leem tudo de lá. O relatório de migração da
@@ -242,7 +242,7 @@ STRIPE_SECRET_KEY=sk_test_… pnpm --filter @millionsend/billing provision \
 | `--webhook-url` | Localiza ou cria o endpoint de webhook para essa URL com exatamente os eventos que o handler consome. Omita em desenvolvimento local. |
 | `--portal` | Localiza ou cria a configuração do Customer Portal e imprime o id para `STRIPE_PORTAL_CONFIG`. |
 | `--app-url` | Origem do painel: a URL de retorno padrão do portal passa a ser `<app-url>/settings/billing`. Omita para usar o padrão do Stripe. |
-| `--move-legacy` | Move toda assinatura ainda num preço anterior à escada para o seu degrau (Pro 100K, Scale 500K) na hora, sem rateio, adicionando o item medido do degrau; um desconto na assinatura permanece. Idempotente. |
+| `--move-legacy` | Move toda assinatura ainda num preço anterior à escada para o seu degrau (Pro 110K, Scale 550K) na hora, sem rateio, adicionando o item medido do degrau; um desconto na assinatura permanece. Idempotente. |
 | `--dry-run` | Lê a conta e imprime o que seria escrito, sem escrever. |
 
 O que ele faz, e por que rodar de novo é seguro:
@@ -299,8 +299,10 @@ colunas de `teams` `plan_quota`, `current_period_start`,
 `stripe_overage_item_id`, `overage_enabled` (padrão true) e `pending_rung`,
 e a tabela `usage_periods` (`accepted`, `reported_overage`,
 `pending_overage`). Times `scale` existentes passam a Scale 500K
-(`plan_quota` 500000) e times `pro` a Pro 100K (100000);
-`current_period_start` é preenchido como `current_period_end − 1 mês`. As
+(`plan_quota` 500000) e times `pro` 100000 — volumes que não casam com nenhum
+degrau hoje, então cada um resolve para o primeiro degrau do plano (Scale
+550K, Pro 110K); `current_period_start` é preenchido como `current_period_end
+− 1 mês`. As
 assinaturas deles ficam nos preços legados, resolvidos pelo metadata do
 produto, até serem movidas, e não têm item medido, então os envios delas além
 do volume incluído passam (a chave começa ligada) mas não cobram nada até um

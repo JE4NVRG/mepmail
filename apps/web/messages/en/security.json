@@ -1,18 +1,111 @@
 {
   "meta": {
-    "title": "Security at MepMail — controls, subprocessors and disclosure",
-    "description": "How MepMail protects accounts and sending: encryption in transit, password and API key hashing, tenant isolation, abuse limits, monitoring, backups and DKIM/SPF/DMARC — who processes what, and how to report a vulnerability."
+    "title": "Security at MepMail — EU hosting, sealed content, self-hosting",
+    "description": "MepMail Cloud runs in Germany, ships as AGPL open source and can be self-hosted. Message bodies and attachments sealed at rest, HTTPS with HSTS and a strict CSP, scrypt passwords and hashed API keys, per-team isolation, verified backups, DKIM/SPF/DMARC — with the full subprocessor list, the compliance roadmap and the enterprise FAQ."
   },
   "hero": {
     "eyebrow": "Security",
-    "title": "Security at MepMail",
-    "lead": "MepMail is a small, founder-operated product. This page lists the controls that are actually in place today — the ones you can hold us to — and says plainly what is not.",
-    "note": "Last reviewed: September 29, 2026."
+    "title": "Security you can <highlight>verify</highlight>.",
+    "lead": "MepMail Cloud runs in Germany on Contabo hardware, the product is open source under AGPL-3.0, and you can self-host the whole thing. Your email content, and every claim on this page, sits somewhere you can check instead of somewhere you have to trust.",
+    "note": "Last reviewed: September 29, 2026. Every statement here is a property of the running product, or labelled as a roadmap item.",
+    "badges": [
+      "EU data residency · Germany",
+      "Open source · AGPL-3.0",
+      "Self-hostable",
+      "Encrypted in transit and at rest",
+      "DKIM · SPF · DMARC"
+    ],
+    "ctaDocs": "Read the docs"
+  },
+  "protection": {
+    "eyebrow": "Data protection",
+    "title": "Sealed at rest, encrypted in transit, restorable by design",
+    "body": "Three things decide how safe your email really is: what the database holds, what the network sees, and whether last night's backup actually opens.",
+    "items": [
+      {
+        "kind": "At rest",
+        "name": "Content is sealed before it is stored",
+        "body": "What lands in the database is ciphertext, not a copy of your customers' mail.",
+        "bullets": [
+          "Every message body (HTML and text) and every attachment is sealed with envelope encryption: a per-message data key encrypts the content and is itself wrapped by the instance key.",
+          "The wrapping key lives outside the database — the environment master key, or AWS KMS when a KMS key is configured, and both can run side by side while older rows keep opening.",
+          "A sealed row is bound to its own id, so a ciphertext moved to another row fails to open instead of leaking.",
+          "Passwords are hashed with scrypt, and API keys are shown once and stored only as a SHA-256 hash plus a short identifying prefix, compared in constant time."
+        ]
+      },
+      {
+        "kind": "In transit",
+        "name": "Every hop is encrypted, including the relay",
+        "body": "The panel, the API, the SMTP relay and the hand-off to the inbox all run over encrypted connections.",
+        "bullets": [
+          "The panel and the API are served over HTTPS, with HSTS (one year, subdomains included), a strict Content-Security-Policy, X-Frame-Options DENY, nosniff and a restricted Permissions-Policy.",
+          "The SMTP relay requires TLS: STARTTLS is offered with our certificate, and the relay refuses to start without a keypair unless the operator explicitly opts in for a trusted private network.",
+          "Mail leaves through Amazon SES over TLS, authenticated on your domain by DKIM and SPF."
+        ]
+      },
+      {
+        "kind": "Recovery",
+        "name": "Backups that are verified, not assumed",
+        "body": "A daily dump is not a backup until the file has been read back and trusted.",
+        "bullets": [
+          "The nightly dump (pg_dump, custom format) is validated with pg_restore --list and a checksum before it is trusted.",
+          "A copy is pushed to off-site object storage, and the uploaded object is re-read and required to match byte for byte.",
+          "Dumps older than 14 days are pruned, and a dump can be encrypted with an age key before it leaves the host."
+        ]
+      }
+    ]
+  },
+  "advantages": {
+    "eyebrow": "Why teams pick MepMail",
+    "title": "The security decisions a hosted-only platform cannot make for you",
+    "body": "The controls that matter most are the ones you still hold. MepMail is built so that control is real — auditable, portable and, if you want it, entirely inside your own infrastructure.",
+    "items": [
+      {
+        "kind": "Data residency",
+        "name": "Your data stays in the EU",
+        "body": "Germany is where MepMail Cloud runs, not a region you have to request in a sales call.",
+        "bullets": [
+          "The application and its database run on Contabo infrastructure in Germany — one hosting provider, named on this page.",
+          "GDPR is the frame the product was built in: EU hosting is the default, not a data-transfer footnote.",
+          "Delivery runs through Amazon SES (us-east-1) and payments through Stripe, both listed as subprocessors, and the Privacy Policy states what is stored, why and for how long."
+        ]
+      },
+      {
+        "kind": "Verifiability",
+        "name": "Open source under AGPL-3.0",
+        "body": "Trust through verifiability: the security claims here are claims about code anyone can read.",
+        "bullets": [
+          "The encryption, retention, isolation and API surface are all in the public repository — no trust center required to check them.",
+          "A claim that would not survive an audit of the source is not a claim we make; the trust-center language stays out.",
+          "Found a gap between this page and the code? That is a security report, and it goes straight to the people who fix it."
+        ]
+      },
+      {
+        "kind": "Sovereignty",
+        "name": "Self-host the whole product",
+        "body": "The option a hosted-only vendor cannot offer: run MepMail on your own infrastructure and your data never leaves it.",
+        "bullets": [
+          "The same panel, API and SDK compatibility, deployed with your own database, keys, object storage and SES account.",
+          "The subprocessor list on this page stops applying to you: you are the only processor of your data.",
+          "Useful when a client, a regulator or your own security team requires data to stay inside a boundary you control."
+        ]
+      },
+      {
+        "kind": "Isolation",
+        "name": "Per-team isolation, without a migration project",
+        "body": "Multi-tenant by design, and cheap to adopt if you are coming from another provider.",
+        "bullets": [
+          "Contacts, domains, templates, suppressions, keys, audit entries and API requests all carry the team that owns them, and membership is re-checked as tokens are issued.",
+          "Reputation is isolated too: per-team bounces and complaints, abuse limits on every plan, and an instance health signal that can pause one team's sending.",
+          "MepMail speaks the Resend sending API, so adopting it is a base URL and a key change rather than a rewrite."
+        ]
+      }
+    ]
   },
   "controls": {
-    "eyebrow": "Controls",
-    "title": "What is in place today",
-    "body": "Every item below is a property of the running product, not an aspiration. Where a control only covers part of the surface, the card says so.",
+    "eyebrow": "Security controls",
+    "title": "The controls running in production today",
+    "body": "Every item below is a property of the running product, not an aspiration. Where a control only covers part of the surface, the card says so — and the source is public, so you can check the ones that matter to you.",
     "items": [
       {
         "name": "Encryption in transit",
@@ -119,20 +212,91 @@
     ],
     "note": "A self-hosted instance runs on infrastructure you choose, so this list does not apply to it."
   },
-  "certifications": {
-    "eyebrow": "Honesty",
-    "title": "Certifications",
-    "body": "We do not hold SOC 2 or ISO 27001 today.",
+  "partners": {
+    "title": "Built on infrastructure you already trust",
+    "body": "No exotic dependencies to vet: the four providers behind every send are the same names most teams already run in production.",
     "items": [
-      "Both are on the roadmap. We are not announcing a date, and we will not describe an audit that has not happened.",
-      "We also publish no uptime percentage and no SLA today. When that changes, it will be written here first.",
-      "Until then, hold us to the specific control list above — and ask security@je4ndev.com anything that is missing from it."
+      { "provider": "Contabo GmbH", "role": "EU hosting · Germany" },
+      { "provider": "Amazon SES", "role": "Delivery over TLS" },
+      { "provider": "Cloudflare", "role": "DNS, CDN, edge protection" },
+      { "provider": "Stripe", "role": "Payments and invoices" }
+    ]
+  },
+  "compliance": {
+    "eyebrow": "Compliance",
+    "title": "Where compliance stands — in writing",
+    "body": "GDPR applies to MepMail Cloud from the first European team that signs up, and the application runs in the EU. Framework audits are a longer road, and this is exactly where that road is.",
+    "privacyLink": "Privacy Policy",
+    "note": "The rule behind all of it: every claim on this page is a property of the running product, or labelled as a roadmap item.",
+    "items": [
+      {
+        "label": "GDPR",
+        "state": "In place",
+        "tone": "ok",
+        "body": "MepMail Cloud is hosted in Germany and the Privacy Policy states what is stored, why and for how long. A DPA is agreed per customer — ask at security@je4ndev.com."
+      },
+      {
+        "label": "SOC 2 · ISO 27001",
+        "state": "In progress",
+        "tone": "progress",
+        "body": "Both are on the roadmap. No auditor is engaged and no date is announced: we will not describe an audit that has not happened, and no certificate is implied by this page."
+      },
+      {
+        "label": "SLA · uptime",
+        "state": "Not published",
+        "tone": "none",
+        "body": "No uptime percentage and no SLA are published today. When that changes, it is written here first — until then, the control list above is what to hold us to."
+      }
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "The questions an enterprise review asks",
+    "body": "Short answers, with the detail underneath. Anything missing is a fair question for security@je4ndev.com.",
+    "items": [
+      {
+        "q": "Is email content encrypted at rest?",
+        "a": "Yes. Message bodies (HTML and text) and attachments are sealed with envelope encryption before they are written: a per-message data key encrypts the content and is wrapped by the instance key, so the database holds ciphertext and a wrapped key. The wrapping key lives outside the database — the environment master key, or AWS KMS when configured. Recipients, subject and delivery events are stored as rows rather than secrets, and they age out on the retention window below."
+      },
+      {
+        "q": "Is MepMail SOC 2 compliant?",
+        "a": "Not today. SOC 2 and ISO 27001 are on the roadmap, no auditor is engaged and no date is announced. Until then, hold us to the control list on this page — and because the product is open source, you can verify those controls yourself instead of relying on a report."
+      },
+      {
+        "q": "Is MepMail GDPR compliant?",
+        "a": "MepMail Cloud is built for it: the application and its database run in Germany, inside the EU. Two subprocessors sit in the United States — Amazon SES (us-east-1) for delivery and Stripe for payments — and the Privacy Policy states those transfers. We do not claim a certification we do not hold."
+      },
+      {
+        "q": "How do I get a signed DPA?",
+        "a": "There is no pre-signed DPA published today: write to security@je4ndev.com with your legal entity and it is agreed per customer. Self-hosting removes the question entirely — the processing agreement is then between you and your own infrastructure."
+      },
+      {
+        "q": "Where is my data stored, and does it stay in the EU?",
+        "a": "MepMail Cloud: the application and its database in Germany; delivery events with Amazon SES in us-east-1; DNS and network protection through Cloudflare's global edge. The table above lists every provider and its role. A self-hosted instance stores everything wherever you deploy it."
+      },
+      {
+        "q": "How long is email data retained?",
+        "a": "Message bodies and attachments leave on the team's retention window — 30 days by default — and the row is stamped when it is purged. Recipients, subject, status and events age out on the same window, as do webhook delivery records. Nightly backups are pruned after 14 days."
+      },
+      {
+        "q": "How do I delete a contact's data?",
+        "a": "Delete the contact with erase=true on the API: the address is then erased from email history, event payloads and API logs — the GDPR/LGPD path. Without it, the send log ages out with the retention window. Suppressions keep only a hash of the address, as the do-not-contact record.",
+        "link": { "label": "API reference", "href": "https://docs-mepmail.je4ndev.com" }
+      },
+      {
+        "q": "Do AI or model subprocessors receive my email content?",
+        "a": "No. No AI provider processes your email content on MepMail Cloud. The open-source code ships an optional abuse monitor (ABUSE_JUDGE, off by default), which a self-hoster can turn on: an already-accepted send may then be sampled and sent to TypeSafe System One for an abuse verdict. MepMail Cloud runs with it off, and a self-hoster decides for themselves."
+      },
+      {
+        "q": "Where can I find the current subprocessor list?",
+        "a": "On this page — the table above, which mirrors the Privacy Policy. A self-hosted instance has no such list, because it runs on infrastructure you choose."
+      }
     ]
   },
   "disclosure": {
     "eyebrow": "Report",
     "title": "Responsible disclosure",
-    "body": "Found a vulnerability? Tell us and we will fix it.",
+    "body": "Found a vulnerability? Tell us and we will fix it — that is the same standard the code is held to.",
     "bullets": [
       "Email security@je4ndev.com with the details and, if you have one, a reproduction.",
       "We acknowledge the report and give a first answer within 72 hours.",
@@ -142,8 +306,8 @@
     "cta": "Email security@je4ndev.com"
   },
   "close": {
-    "title": "The details live in the docs",
-    "body": "Sending domains, authentication records, deliverability insights and the API reference — the same source the dashboard links to.",
+    "title": "Connect a domain and send in minutes",
+    "body": "Create an account, add your sending domain and publish the DKIM and MAIL FROM records the panel returns. If you would rather audit first, the source and the docs are open — both are one click away.",
     "cta": "Read the docs"
   }
 }

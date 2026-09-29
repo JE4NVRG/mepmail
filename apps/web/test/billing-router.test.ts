@@ -323,7 +323,7 @@ describe("billing router", () => {
       .values({ teamId, periodStart: PERIOD_START, accepted: 1234, reportedOverage: 0 });
     expect(await callerFor(teamId, "member").billing.status()).toMatchObject({
       plan: "pro",
-      planQuota: 200_000,
+      planQuota: 220_000,
       rung: "pro_200k",
       pendingRung: null,
       planStatus: "active",
@@ -331,7 +331,7 @@ describe("billing router", () => {
       quota: {
         kind: "month",
         plan: "pro",
-        included: 200_000,
+        included: 220_000,
         periodStart: PERIOD_START,
         periodEnd: PERIOD_END,
         overage: true,
@@ -464,7 +464,7 @@ describe("billing router", () => {
     expect(calls.scheduleCreates).toEqual([]);
     expect(await teamRow(teamId)).toMatchObject({
       plan: "scale",
-      planQuota: 500_000,
+      planQuota: 550_000,
       stripeOverageItemId: "si_overage",
       pendingRung: null,
     });
@@ -482,7 +482,7 @@ describe("billing router", () => {
       { price: "price_pro_200k_overage" },
     ]);
     expect(await teamRow(teamId)).toMatchObject({
-      planQuota: 200_000,
+      planQuota: 220_000,
       stripeOverageItemId: "si_overage",
     });
   });
@@ -519,7 +519,7 @@ describe("billing router", () => {
     ]);
     expect(await teamRow(teamId)).toMatchObject({
       plan: "scale",
-      planQuota: 500_000,
+      planQuota: 550_000,
       pendingRung: "pro_100k",
     });
     expect((await owner.billing.status()).pendingRung).toBe("pro_100k");
@@ -540,7 +540,7 @@ describe("billing router", () => {
     expect(calls.scheduleReleases).toEqual(["sub_sched_1"]);
     expect(await teamRow(teamId)).toMatchObject({
       plan: "scale",
-      planQuota: 500_000,
+      planQuota: 550_000,
       pendingRung: null,
     });
     expect(await auditRows()).toEqual([
@@ -558,7 +558,7 @@ describe("billing router", () => {
     const owner = callerFor(teamId, "owner");
     await owner.billing.changePlan({ rung: "scale_500k" });
     expect(h.sent.map((m) => [m.kind, m.to, m.subject])).toEqual([
-      ["billing.plan_changed", "ada@example.com", "acme moved from Pro 100K to Scale 500K"],
+      ["billing.plan_changed", "ada@example.com", "acme moved from Pro 110K to Scale 550K"],
     ]);
     expect(h.sent[0]?.from).toBe("MillionSend <notices@mail.example.com>");
     expect(h.sent[0]?.text).toContain("https://app.example.com/settings/billing");
@@ -572,8 +572,8 @@ describe("billing router", () => {
     await owner.billing.changePlan({ rung: "scale_1m" });
     expect(calls.scheduleReleases).toEqual(["sub_sched_1"]);
     expect(h.sent.map((m) => m.subject)).toEqual([
-      "acme moved from Pro 100K to Scale 500K",
-      "acme moved from Scale 500K to Scale 1M",
+      "acme moved from Pro 110K to Scale 550K",
+      "acme moved from Scale 550K to Scale 1.1M",
     ]);
     expect((await teamRow(teamId))?.pendingRung).toBeNull();
   });
@@ -603,7 +603,7 @@ describe("billing router", () => {
     h.runCronNow.mockClear();
     await db
       .insert(schema.usagePeriods)
-      .values({ teamId, periodStart: PERIOD_START, accepted: 100_500 });
+      .values({ teamId, periodStart: PERIOD_START, accepted: 110_500 });
     await owner.billing.setOverage({ enabled: false });
     expect(calls.meterEvents).toEqual([
       expect.objectContaining({

@@ -139,9 +139,9 @@ describe("priceMetadata", () => {
     expect(priceMetadata(rungByKey("pro_100k"))).toEqual({
       millionsend_rung: "pro_100k",
       plan: "pro",
-      included_emails: "100000",
+      included_emails: "110000",
       period: "month",
-      overage_cents_per_1k: "30",
+      overage_cents_per_1k: "90",
     });
     expect(priceMetadata(rungByKey("starter"))).toEqual({
       millionsend_rung: "starter",

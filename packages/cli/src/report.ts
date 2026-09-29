@@ -72,8 +72,8 @@ interface PlanRow {
 /** Above the top rung the volume still fits: the rest bills as overage. */
 const TOP: PlanRow = {
   id: "scale",
-  label: "Scale 2.5M",
-  perMonth: 2_500_000,
+  label: "Scale 2.75M",
+  perMonth: 2_750_000,
   domains: null,
   contacts: null,
 };
@@ -82,11 +82,11 @@ const TOP: PlanRow = {
 const PLANS: PlanRow[] = [
   { id: "free", label: "Free", perMonth: 3_000, domains: 1, contacts: 1_000 },
   { id: "starter", label: "Starter", perMonth: 45_000, domains: 10, contacts: null },
-  { id: "pro", label: "Pro 100K", perMonth: 100_000, domains: 25, contacts: null },
-  { id: "pro", label: "Pro 200K", perMonth: 200_000, domains: 25, contacts: null },
-  { id: "scale", label: "Scale 500K", perMonth: 500_000, domains: null, contacts: null },
-  { id: "scale", label: "Scale 1M", perMonth: 1_000_000, domains: null, contacts: null },
-  { id: "scale", label: "Scale 1.5M", perMonth: 1_500_000, domains: null, contacts: null },
+  { id: "pro", label: "Pro 110K", perMonth: 110_000, domains: 25, contacts: null },
+  { id: "pro", label: "Pro 220K", perMonth: 220_000, domains: 25, contacts: null },
+  { id: "scale", label: "Scale 550K", perMonth: 550_000, domains: null, contacts: null },
+  { id: "scale", label: "Scale 1.1M", perMonth: 1_100_000, domains: null, contacts: null },
+  { id: "scale", label: "Scale 1.65M", perMonth: 1_650_000, domains: null, contacts: null },
   TOP,
 ];
 

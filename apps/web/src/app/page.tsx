@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { CodeDemo } from "@/components/code-demo";
 import { type CalcLabels, LandingCalculator } from "@/components/landing-calculator";
 import { PlanCard, type PlanCardLabels } from "@/components/plan-card";
@@ -10,26 +10,25 @@ import {
   type PublicSiteLabels,
   SignupLink,
 } from "@/components/site-chrome";
+import { StackLogoRow } from "@/components/stack-logos";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
-import { formatUsd, PRICE_ROWS } from "@/lib/landing-pricing";
+import { formatUsd, formatVolume, PRICE_ROWS } from "@/lib/landing-pricing";
 import { legalLinks } from "@/lib/legal-links";
+import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
 import { hasSession } from "@/server/auth";
 import "./landing-calc.css";
 import "./landing.css";
 
 const contact = "mailto:jean@je4ndev.com";
 
-const comparison = PRICE_ROWS.map((row) => [
-  row.label,
-  formatUsd(row.mepmail),
-  formatUsd(row.resend),
-  formatUsd(row.sendgrid),
-  formatUsd(row.postmark),
-  formatUsd(row.mailgun),
-  row.savings,
-]);
-
 const cellKeys = ["MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "vantagem"] as const;
+
+/**
+ * The landing strip: only the surfaces we ship, as their own brand marks. The
+ * MCP text chip stays in the card that explains MCP — a logo band of vendor
+ * marks reads as one language.
+ */
+const stackSlugs = HOME_STACK_LOGOS.map((logo) => logo.slug);
 
 const MCP_CONFIG = `{
   "mcpServers": {
@@ -65,7 +64,19 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootPage() {
   if (await hasSession()) redirect("/emails");
 
+  const locale = await getLocale();
   const t = await getTranslations("landing");
+  // The public table is rendered per locale: shared numbers, locale separators
+  // and quote word (see @/lib/landing-pricing). English is the global default.
+  const comparison = PRICE_ROWS.map((row) => [
+    formatVolume(row.volume, locale),
+    formatUsd(row.mepmail, locale),
+    formatUsd(row.resend, locale),
+    formatUsd(row.sendgrid, locale),
+    formatUsd(row.postmark, locale),
+    formatUsd(row.mailgun, locale),
+    row.savings,
+  ]);
   // Chrome + plan copy live in the "landing" catalog: it is the public site's
   // catalog, shared by the landing, /pricing and /alternatives/resend.
   const site = {
@@ -136,6 +147,7 @@ export default async function RootPage() {
                   </a>
                 </div>
                 <p className="gtm-note">{t("hero.note")}</p>
+                <p className="gtm-migrate">{t("hero.migrate")}</p>
               </div>
               <CodeDemo subject={t("hero.demo.subject")} caption={t("hero.demo.caption")} />
             </div>
@@ -144,6 +156,19 @@ export default async function RootPage() {
                 <li key={item}>{item}</li>
               ))}
             </ul>
+          </div>
+        </section>
+
+        <section className="gtm-stack" aria-label={t("stack.aria")}>
+          <div className="gtm-container gtm-stack-inner">
+            <p className="gtm-stack-eyebrow">{t("stack.eyebrow")}</p>
+            <StackLogoRow slugs={stackSlugs} />
+            <p className="gtm-stack-note">
+              {t("stack.note")}{" "}
+              <a className="gtm-stack-cta" href="/integrations">
+                {t("stack.pageCta")}
+              </a>
+            </p>
           </div>
         </section>
 
@@ -186,7 +211,8 @@ export default async function RootPage() {
           </div>
         </section>
 
-        <section className="gtm-section">
+        {/* Seção do produto: alvo real do item "Product" da nav v2 (nav_rows==1). */}
+        <section className="gtm-section" id="product">
           <div className="gtm-container">
             <p className="gtm-eyebrow">{t("structure.eyebrow")}</p>
             <h2>{t("structure.title")}</h2>

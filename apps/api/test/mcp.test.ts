@@ -871,7 +871,7 @@ describe("REST parity tools", () => {
     const end = new Date(start.getTime() + 30 * DAY_MS);
     await db
       .update(schema.teams)
-      .set({ plan: "pro", planQuota: 100_000, currentPeriodStart: start, currentPeriodEnd: end })
+      .set({ plan: "pro", planQuota: 110_000, currentPeriodStart: start, currentPeriodEnd: end })
       .where(eq(schema.teams.id, teamId));
     await db.insert(schema.usagePeriods).values({ teamId, periodStart: start, accepted: 4321 });
     const cloud = createApi({
@@ -885,10 +885,10 @@ describe("REST parity tools", () => {
     expect(resultJson(await client.callTool({ name: "get_usage", arguments: {} }))).toMatchObject({
       cloud: true,
       plan: "pro",
-      limits: { emails_per_day: null, emails_per_month: 100_000, domains: 25, contacts: null },
+      limits: { emails_per_day: null, emails_per_month: 110_000, domains: 25, contacts: null },
       period: {
         emails_sent: 4321,
-        included: 100_000,
+        included: 110_000,
         overage_enabled: true,
         starts_at: start.toISOString(),
         ends_at: end.toISOString(),

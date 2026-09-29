@@ -14,7 +14,7 @@ export type FlagReason = "monitor" | "complaints" | "guardrail" | "score" | "rep
 const PAID = ["starter", "pro", "scale"];
 const PLAN_KEYS = ["free", "starter", "pro", "scale", "system"];
 
-/** "Pro 100K" when a quota is set, else the plan name; unknown plan values read raw. */
+/** "Pro 110K" when a quota is set, else the plan name; unknown plan values read raw. */
 export function usePlanLabel(): (plan: string, planQuota: number | null) => string {
   const t = useTranslations("console.plan");
   return (plan, planQuota) => planLabel(PLAN_KEYS.includes(plan) ? t(plan) : plan, planQuota);

@@ -167,6 +167,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  /* A linha do header nunca quebra: marca, nav (6 itens), idioma, entrar e CTA
+     dividem uma única linha — quem não cabe vira painel (ver @media 879px). */
+  flex-wrap: nowrap;
 }
 .gtm-brand {
   display: inline-flex;
@@ -199,11 +202,9 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  /* Com os dois links de página (/pricing e /alternatives/resend) o menu não
-     cabe em viewports médias: os chips quebram como unidades (nunca o texto
-     dentro do chip), no lugar de espremer o rótulo em duas linhas. */
-  flex-wrap: wrap;
-  row-gap: 4px;
+  /* Nav v2 é flat (6 itens): a linha não pode quebrar em duas — o que aperta é
+     o padding/fonte (ver faixa 880–1199px), nunca o wrap. */
+  flex-wrap: nowrap;
 }
 .gtm-nav-links a {
   display: inline-flex;
@@ -218,6 +219,14 @@
   transition:
     color 0.15s ease,
     background-color 0.15s ease;
+}
+/* Link externo (docs): seta discreta marcando que sai do domínio. */
+.gtm-ext-mark {
+  margin-left: 5px;
+  font-size: 10px;
+  line-height: 1;
+  vertical-align: super;
+  color: var(--ms-muted);
 }
 .gtm-nav-links a:hover {
   color: var(--ms-bone);
@@ -242,6 +251,7 @@
   font-size: 14px;
   color: var(--ms-bone);
   text-decoration: none;
+  white-space: nowrap;
   transition: background-color 0.15s ease;
 }
 .gtm-nav-login:hover {
@@ -289,6 +299,8 @@
   justify-content: center;
   padding: 10px 18px;
   font-size: 15px;
+  /* A CTA do header nunca quebra em duas linhas, em nenhuma faixa. */
+  white-space: nowrap;
 }
 .gtm-action.ms-btn:focus-visible {
   outline: 2px solid var(--ms-violet);
@@ -478,10 +490,13 @@
   background: var(--ms-ground);
   padding-block: 56px 0;
 }
+/* Rodapé v2 — grade balanceada por faixa (sem coluna órfã, sem vão morto):
+   ≤559px 1 coluna · 560–1023 marca em linha própria + colunas 2x2 · 1024–1279
+   marca em linha própria + 4 colunas de links · ≥1280 marca ao lado das 4. */
 .gtm-footer-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 36px;
+  gap: 32px;
   padding-bottom: 40px;
 }
 .gtm-footer-brand p {
@@ -614,29 +629,29 @@
   .gtm-offers {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+/* ≤559px fica em 1 coluna; daí até 1279 a marca ocupa a linha inteira e as
+   colunas de links se equilibram (2x2 até 1023, 4 em linha a partir de 1024). */
+@media (min-width: 560px) {
   .gtm-footer-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 32px 28px;
+  }
+  .gtm-footer-brand {
+    grid-column: 1 / -1;
+  }
+}
+@media (min-width: 768px) {
+  .gtm-footer-grid {
+    gap: 34px 32px;
   }
 }
 @media (min-width: 1024px) {
   .gtm-container {
     padding-inline: 32px;
   }
-  /* O header tem só os 1200px do container (1136 uteis com o inset padrao) e o
-     menu precisa caber numa linha nos DOIS idiomas. Medido com
-     flex-shrink:0 (senao o wrap esconde o deficit): com os chips em 10px e o
-     resto original o EN pede 1155 e o PT 1146 para 1136 disponiveis — por isso
-     os chips ficam em 9px, o miolo do header usa inset 28/gap 10 e o wordmark
-     139. "Plans" saiu da nav quando /integrations entrou (o rodape e os CTAs
-     do hero continuam levando a secao #planos); com 7 links nao cabe em
-     nenhuma largura. Cada px aqui conta: mexeu num rotulo, mede de novo. */
-  .gtm-header-inner {
-    gap: 10px;
-    padding-inline: 28px;
-  }
-  .gtm-nav-links a {
-    padding: 0 9px;
-  }
+  /* Header v2: a nav fica inline a partir de 880px e o miolo compacta até
+     1199px (ver as faixas abaixo). Aqui só o miolo da página. */
   .gtm-section {
     padding-block: 96px;
   }
@@ -655,20 +670,81 @@
     gap: 56px;
   }
   .gtm-footer-grid {
-    grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
-    gap: 48px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 36px 32px;
   }
   .gtm-plan-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 20px;
   }
 }
-/* Tablet e mobile: a nav colapsa num painel; logo e CTA seguem na 1ª linha.
-   O corte em 1200px é medido: a linha completa da nav (6 chips + ações +
-   wordmark 139) pede ~1130px dos 1136 úteis do container — abaixo disso os
-   rótulos quebravam a palavra e a CTA saía da tela (card t_38d21dc4; medidor
-   verify-header.cjs). */
-@media (max-width: 1199px) {
+/* Header v2 — nav flat de 6 itens INLINE a partir de 880px (hambúrguer só
+   abaixo disso; reclamação do fundador: em ~1100px a nav inteira sumia no
+   hambúrguer). Entre 880 e 1199px o miolo compacta (wordmark 112, chips 13.5px,
+   padding 7px) para os 6 itens + idioma + entrar + CTA caberem numa única linha
+   nos dois idiomas; medidor: verify-header (nav_rows == 1 em >=900). */
+@media (min-width: 880px) {
+  .gtm-nav-burger {
+    display: none;
+  }
+}
+@media (min-width: 880px) and (max-width: 1199px) {
+  .gtm-header-inner {
+    min-height: 60px;
+    padding-block: 8px;
+    padding-inline: 16px;
+    gap: 8px;
+  }
+  .gtm-wordmark img {
+    width: 112px;
+  }
+  .gtm-nav {
+    gap: 6px;
+  }
+  .gtm-nav-links {
+    gap: 0;
+  }
+  .gtm-nav-links a {
+    padding: 0 7px;
+    font-size: 13.5px;
+  }
+  .gtm-nav-actions {
+    gap: 6px;
+  }
+  .gtm-nav-divider {
+    height: 18px;
+  }
+  .gtm-nav-login {
+    padding: 0 6px;
+    font-size: 13.5px;
+  }
+  .gtm-lang {
+    padding: 1px;
+  }
+  .gtm-lang button {
+    padding: 3px 7px;
+    font-size: 11.5px;
+  }
+  .gtm-header .gtm-action {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 13.5px;
+  }
+}
+/* ≥1200px: respiro de volta — com 6 chips os rótulos folgam. */
+@media (min-width: 1200px) {
+  .gtm-header-inner {
+    gap: 12px;
+  }
+  .gtm-nav-links {
+    gap: 4px;
+  }
+  .gtm-nav-links a {
+    padding: 0 12px;
+  }
+}
+/* ≤879px: a nav colapsa num painel pendurado; logo e CTA seguem na 1ª linha. */
+@media (max-width: 879px) {
   .gtm-header-inner {
     min-height: 60px;
     padding-block: 8px;
@@ -726,6 +802,16 @@
     padding-inline: 12px;
     font-size: 14px;
     white-space: nowrap;
+  }
+}
+/* ≥1280px: marca e as 4 colunas de links na mesma linha (rodapé v2). */
+@media (min-width: 1280px) {
+  .gtm-footer-grid {
+    grid-template-columns: minmax(0, 1.4fr) repeat(4, minmax(0, 1fr));
+    gap: 40px 36px;
+  }
+  .gtm-footer-brand {
+    grid-column: auto;
   }
 }
 /* A badge "agent-ready" só entra quando sobra espaço para ela: em 1024–1099px
@@ -1099,5 +1185,266 @@
 @media (min-width: 1280px) {
   .gtm-integrations {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Faixa "works with your stack": as marcas oficiais dos fornecedores, em cor,
+   vendorizadas em public/logos/integrations (ver o README da pasta).
+   Normalização por ALTURA: o CSS fixa a altura e a largura acompanha a razão
+   de tinta de cada arquivo, então um lockup largo (Docker 4.4:1) não é
+   espremido num quadrado. A marca mais larga a 28px mede ~123px; o
+   max-width:100% existe para o caso responsivo, não como cap de design.
+   Repouso em 0.85 e hover para 1 + leve scale: colorido, não chapado. */
+.gtm-stack {
+  padding-block: var(--ms-sp-12);
+  border-block: 1px solid var(--ms-line-strong);
+  background: var(--ms-void);
+}
+.gtm-stack-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.gtm-stack-eyebrow {
+  margin: 0;
+  color: var(--ms-violet);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.gtm-stack-logos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px 40px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gtm-stack-logos li {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.85;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+.gtm-stack-logos li:hover {
+  opacity: 1;
+  transform: scale(1.06);
+}
+.gtm-stack-logos img {
+  display: block;
+  height: 28px;
+  width: auto;
+  max-width: 100%;
+}
+.gtm-mcp-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding-inline: 6px;
+  border: 1px solid color-mix(in srgb, var(--ms-violet) 60%, transparent);
+  border-radius: 6px;
+  color: var(--ms-violet);
+  font-family: var(--ms-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.gtm-stack-note {
+  margin: 0;
+  max-width: 90ch;
+  color: var(--ms-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.gtm-stack-cta {
+  color: var(--ms-violet);
+}
+/* Linha de migração do herói: compatibilidade como nota, não como manchete. */
+.gtm-migrate {
+  margin: 10px 0 0;
+  color: var(--ms-bone);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.gtm-integrations-mural {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 1px solid var(--ms-line-strong);
+}
+.gtm-stack-logos.gtm-integration-mark {
+  gap: 14px 18px;
+}
+.gtm-stack-logos.gtm-integration-mark li {
+  opacity: 0.85;
+}
+.gtm-stack-logos.gtm-integration-mark img {
+  height: 22px;
+}
+.gtm-integration-mark .gtm-mcp-chip {
+  min-width: 22px;
+  height: 22px;
+}
+/* O mural da home e o do /integrations respiram menos no estreito: gaps e
+   altura caem juntos para a grade quebrar em linhas limpas, sem sobras. */
+@media (max-width: 640px) {
+  .gtm-stack-logos {
+    gap: 18px 28px;
+  }
+  .gtm-stack-logos img {
+    height: 24px;
+  }
+  .gtm-integrations-mural {
+    margin-top: 32px;
+    padding-top: 24px;
+  }
+}
+
+/* Grade de 4 itens: 2x2 em vez de 3+1, que deixa uma célula vazia. */
+@media (min-width: 768px) {
+  .gtm-integrations.gtm-pairs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Chips de posicionamento do hero e faixa de provedores das páginas públicas
+   (/security e /support). Painel sobre painel e hairline de 1px, no mesmo
+   vocabulário dos cards; o violeta fica no marcador, não no texto. */
+.gtm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0;
+  margin: 0 0 32px;
+  list-style: none;
+}
+.gtm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  color: var(--ms-bone);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.gtm-chip::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ms-violet);
+}
+.gtm-subhead {
+  margin: 48px 0 0;
+}
+.gtm-partners {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 32px 0 0;
+  list-style: none;
+}
+.gtm-partners li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 20px;
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line);
+  border-radius: 12px;
+}
+.gtm-partners strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.gtm-partner-role {
+  color: var(--ms-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+/* Compliance com estado explícito: rótulo à esquerda, chip de estado, corpo.
+   Duas cores de ponto só (sucesso e violeta) — o acento continua contido. */
+.gtm-status-grid {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 32px 0 0;
+  list-style: none;
+}
+.gtm-status-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 24px;
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line);
+  border-radius: 12px;
+}
+.gtm-status-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.gtm-status-label {
+  font-size: 16px;
+  font-weight: 600;
+}
+.gtm-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 12px;
+  background: var(--ms-inset);
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  color: var(--ms-muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.gtm-status-chip::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ms-violet);
+}
+.gtm-status-chip.gtm-is-ok::before {
+  background: var(--ms-success);
+}
+.gtm-status-chip.gtm-is-none::before {
+  background: var(--ms-faint);
+}
+.gtm .gtm-status-body {
+  margin: 0;
+  max-width: none;
+}
+@media (min-width: 1024px) {
+  .gtm-status-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 768px) {
+  .gtm-partners {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  .gtm-partners {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

@@ -110,7 +110,7 @@ const FREE: QuotaTeamRow = {
 };
 const PRO: QuotaTeamRow = {
   plan: "pro",
-  planQuota: 100_000,
+  planQuota: 110_000,
   currentPeriodStart: null,
   currentPeriodEnd: null,
   overageEnabled: false,
@@ -242,14 +242,14 @@ describe("acceptEmail", () => {
     const periodEnd = new Date(Date.now() + 20 * DAY_MS);
     const billing: QuotaTeamRow = {
       plan: "pro",
-      planQuota: 100_000,
+      planQuota: 110_000,
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
       overageEnabled: false,
     };
     await db
       .insert(schema.usagePeriods)
-      .values({ teamId: monthly, periodStart, accepted: 100_000 });
+      .values({ teamId: monthly, periodStart, accepted: 110_000 });
     const refused = await acceptEmail(
       deps(),
       { teamId: monthly, billing, apiKeyId: null },
@@ -278,12 +278,12 @@ describe("acceptEmail", () => {
       quota: { kind: "month", overage: true },
     });
     expect(await readPeriodUsage(db, monthly, periodStart)).toEqual({
-      accepted: 100_001,
+      accepted: 110_001,
       reportedOverage: 0,
     });
     await db
       .update(schema.usagePeriods)
-      .set({ accepted: 100_000 * OVERAGE_HARD_CAP })
+      .set({ accepted: 110_000 * OVERAGE_HARD_CAP })
       .where(eq(schema.usagePeriods.teamId, monthly));
     const capped = await acceptEmail(
       deps(),

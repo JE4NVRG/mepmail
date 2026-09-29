@@ -25,15 +25,19 @@ export interface PublicSiteLabels {
   navAria: string;
   langAria: string;
   nav: {
+    /** Nav v2 (flat, 6 itens): Product · Integrations · Pricing · Docs · Security · Support. */
+    product: string;
+    integrations: string;
+    pricing: string;
+    docs: string;
+    security: string;
+    support: string;
+    /** Fora da nav principal — seguem vivos no rodapé e nas CTAs. */
     compare: string;
     plans: string;
     mcp: string;
     how: string;
-    pricing: string;
     alternatives: string;
-    integrations: string;
-    security: string;
-    support: string;
     login: string;
     signup: string;
     /** Rótulo acessível do botão que abre a nav no mobile (ver landing-nav.tsx). */
@@ -45,6 +49,7 @@ export interface PublicSiteLabels {
     points: string[];
     cta: string;
     colProduct: string;
+    colCompare: string;
     colAccount: string;
     colLegal: string;
     terms: string;
@@ -64,6 +69,9 @@ export interface PublicSiteLabels {
 function anchorHref(page: PublicPage, hash: string): string {
   return page === "landing" ? hash : `/${hash}`;
 }
+
+/** Documentação oficial do produto (host separado do painel). */
+const DOCS_URL = "https://docs-mepmail.je4ndev.com";
 
 export function Wordmark() {
   return (
@@ -122,21 +130,25 @@ export function PublicHeader({
           </div>
           <LandingNav label={labels.navAria} menuLabel={labels.nav.menu}>
             <div className="gtm-nav-links">
-              <a href={anchorHref(page, "#comparativo")}>{labels.nav.compare}</a>
-              <a href="/pricing" aria-current={page === "pricing" ? "page" : undefined}>
-                {labels.nav.pricing}
-              </a>
-              <a
-                href="/alternatives/resend"
-                aria-current={page === "alternatives" ? "page" : undefined}
-              >
-                {labels.nav.alternatives}
-              </a>
+              <a href={anchorHref(page, "#product")}>{labels.nav.product}</a>
               <a href="/integrations" aria-current={page === "integrations" ? "page" : undefined}>
                 {labels.nav.integrations}
               </a>
-              <a href={anchorHref(page, "#mcp")}>{labels.nav.mcp}</a>
-              <a href={anchorHref(page, "#como-funciona")}>{labels.nav.how}</a>
+              <a href="/pricing" aria-current={page === "pricing" ? "page" : undefined}>
+                {labels.nav.pricing}
+              </a>
+              <a className="gtm-ext" href={DOCS_URL} target="_blank" rel="noreferrer">
+                {labels.nav.docs}
+                <span className="gtm-ext-mark" aria-hidden="true">
+                  ↗
+                </span>
+              </a>
+              <a href="/security" aria-current={page === "security" ? "page" : undefined}>
+                {labels.nav.security}
+              </a>
+              <a href="/support" aria-current={page === "support" ? "page" : undefined}>
+                {labels.nav.support}
+              </a>
             </div>
             <div className="gtm-nav-actions">
               <LandingLangSwitch label={labels.langAria} />
@@ -191,13 +203,22 @@ export function PublicFooter({
         </div>
         <nav className="gtm-footer-col" aria-label={labels.footer.colProduct}>
           <h3>{labels.footer.colProduct}</h3>
-          <a href={anchorHref(page, "#comparativo")}>{labels.nav.compare}</a>
-          <a href="/pricing">{labels.footer.pricing}</a>
-          <a href="/alternatives/resend">{labels.footer.alternatives}</a>
-          <a href={anchorHref(page, "#planos")}>{labels.nav.plans}</a>
-          <a href={anchorHref(page, "#mcp")}>{labels.nav.mcp}</a>
-          <a href="/integrations">{labels.nav.integrations}</a>
           <a href={anchorHref(page, "#como-funciona")}>{labels.nav.how}</a>
+          <a href={anchorHref(page, "#planos")}>{labels.nav.plans}</a>
+          <a href="/integrations">{labels.nav.integrations}</a>
+          <a href={anchorHref(page, "#mcp")}>{labels.nav.mcp}</a>
+          <a className="gtm-ext" href={DOCS_URL} target="_blank" rel="noreferrer">
+            {labels.nav.docs}
+            <span className="gtm-ext-mark" aria-hidden="true">
+              ↗
+            </span>
+          </a>
+        </nav>
+        <nav className="gtm-footer-col" aria-label={labels.footer.colCompare}>
+          <h3>{labels.footer.colCompare}</h3>
+          <a href="/pricing">{labels.footer.pricing}</a>
+          <a href={anchorHref(page, "#comparativo")}>{labels.nav.compare}</a>
+          <a href="/alternatives/resend">{labels.footer.alternatives}</a>
         </nav>
         <nav className="gtm-footer-col" aria-label={labels.footer.colAccount}>
           <h3>{labels.footer.colAccount}</h3>

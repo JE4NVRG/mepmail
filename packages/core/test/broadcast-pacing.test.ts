@@ -153,7 +153,7 @@ it("plans a region's sends from its live state and names the rung that fits", as
   const pro100 = {
     kind: "month" as const,
     plan: "pro" as const,
-    included: 100_000,
+    included: 110_000,
     periodStart: new Date("2026-09-01T00:00:00Z"),
     periodEnd: new Date("2026-10-01T00:00:00Z"),
     overage: false,

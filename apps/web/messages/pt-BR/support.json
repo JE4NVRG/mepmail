@@ -7,7 +7,15 @@
     "eyebrow": "Suporte",
     "title": "Suporte no MepMail",
     "lead": "O MepMail é operado pelo fundador: quem constrói o produto responde o e-mail. Escolha o canal que serve — a maioria das dúvidas já está na documentação.",
-    "note": "O suporte é um time pequeno, então inclua o e-mail da conta em qualquer pergunta."
+    "note": "O suporte é um time pequeno, então inclua o e-mail da conta em qualquer pergunta.",
+    "badges": [
+      "Operado pelo fundador",
+      "Resposta em até 1 dia útil",
+      "Relatos de abuso são tratados",
+      "Docs · changelog · novidades"
+    ],
+    "ctaEmail": "Escrever para support@je4ndev.com",
+    "ctaDocs": "Abrir a documentação"
   },
   "channels": {
     "eyebrow": "Canais",

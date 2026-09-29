@@ -128,7 +128,7 @@ describe("handleWebhook", () => {
     await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
     expect(await team(teamId)).toEqual({
       plan: "scale",
-      planQuota: 500_000,
+      planQuota: 550_000,
       planStatus: "trialing",
       stripeCustomerId: "cus_1",
       stripeSubscriptionId: "sub_1",
@@ -147,7 +147,7 @@ describe("handleWebhook", () => {
     expect(state.calls.filter((c) => c === "subscriptionItems.create")).toHaveLength(1);
     expect(await team(teamId)).toMatchObject({
       plan: "pro",
-      planQuota: 100_000,
+      planQuota: 110_000,
       planStatus: "active",
       stripeOverageItemId: "si_sub_1_overage",
     });
@@ -172,7 +172,7 @@ describe("handleWebhook", () => {
       { product: legacyProduct("scale") },
     );
     await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
-    expect(await team(teamId)).toMatchObject({ plan: "scale", planQuota: 500_000 });
+    expect(await team(teamId)).toMatchObject({ plan: "scale", planQuota: 550_000 });
 
     state.subscriptions.sub_1 = subscription(
       "sub_1",
@@ -184,7 +184,7 @@ describe("handleWebhook", () => {
       },
     );
     await deliver(subEvent("customer.subscription.updated", state.subscriptions.sub_1));
-    expect(await team(teamId)).toMatchObject({ plan: "pro", planQuota: 100_000 });
+    expect(await team(teamId)).toMatchObject({ plan: "pro", planQuota: 110_000 });
   });
 
   it("mirrors a scheduled downgrade in pending_rung and clears it once the schedule is gone", async () => {
@@ -201,11 +201,11 @@ describe("handleWebhook", () => {
       { overageKey: "millionsend_pro_200k_overage", schedule: pending },
     );
     await deliver(subEvent("customer.subscription.updated", state.subscriptions.sub_1));
-    expect(await team(teamId)).toMatchObject({ planQuota: 200_000, pendingRung: "pro_100k" });
+    expect(await team(teamId)).toMatchObject({ planQuota: 220_000, pendingRung: "pro_100k" });
 
     state.subscriptions.sub_1.schedule = null;
     await deliver(subEvent("customer.subscription.updated", state.subscriptions.sub_1));
-    expect(await team(teamId)).toMatchObject({ planQuota: 200_000, pendingRung: null });
+    expect(await team(teamId)).toMatchObject({ planQuota: 220_000, pendingRung: null });
 
     // A subscription that is no longer entitled has nothing pending.
     state.subscriptions.sub_1.schedule = pending;
@@ -224,7 +224,7 @@ describe("handleWebhook", () => {
       { metadata: { millionsend_rung: "scale_1m" } },
     );
     await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
-    expect(await team(teamId)).toMatchObject({ plan: "scale", planQuota: 1_000_000 });
+    expect(await team(teamId)).toMatchObject({ plan: "scale", planQuota: 1_100_000 });
   });
 
   it("resolves a rotated (key-less) price through the product's plan metadata", async () => {
@@ -235,7 +235,7 @@ describe("handleWebhook", () => {
     await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
     expect(await team(teamId)).toMatchObject({
       plan: "scale",
-      planQuota: 500_000,
+      planQuota: 550_000,
       planStatus: "active",
     });
   });
@@ -258,7 +258,7 @@ describe("handleWebhook", () => {
     ]);
     expect(await team(teamId)).toMatchObject({
       plan: "pro",
-      planQuota: 200_000,
+      planQuota: 220_000,
       stripeOverageItemId: "si_sub_1_overage",
     });
 
@@ -280,7 +280,7 @@ describe("handleWebhook", () => {
     expect(state.itemUpdates).toEqual([]);
     expect(await team(teamId)).toMatchObject({
       plan: "pro",
-      planQuota: 200_000,
+      planQuota: 220_000,
       stripeOverageItemId: "si_sub_1_overage",
     });
   });
@@ -293,7 +293,7 @@ describe("handleWebhook", () => {
     await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
     await db
       .insert(schema.usagePeriods)
-      .values({ teamId, periodStart: new Date(PERIOD_START * 1000), accepted: 100_500 });
+      .values({ teamId, periodStart: new Date(PERIOD_START * 1000), accepted: 110_500 });
 
     state.subscriptions.sub_1.status = "canceled";
     await deliver(subEvent("customer.subscription.deleted", state.subscriptions.sub_1));
@@ -334,7 +334,7 @@ describe("handleWebhook", () => {
     );
     expect(await team(teamId)).toMatchObject({
       plan: "pro",
-      planQuota: 100_000,
+      planQuota: 110_000,
       planStatus: "past_due",
       stripeOverageItemId: "si_sub_1_overage",
     });
@@ -517,7 +517,7 @@ describe("reconcileTeamPlan", () => {
     ]);
     expect(await team(teamId)).toMatchObject({
       plan: "scale",
-      planQuota: 500_000,
+      planQuota: 550_000,
       planStatus: "active",
       stripeSubscriptionId: "sub_new",
     });

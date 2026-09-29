@@ -71,7 +71,7 @@ export function periodDayKeys(period: Period, now: Date = new Date()): string[] 
   return out;
 }
 
-/** "100K", "1M", "1.5M": mirrors formatVolume in @millionsend/core/plans. */
+/** "110K", "1.1M", "1.65M": mirrors formatVolume in @millionsend/core/plans. */
 export function formatVolume(n: number): string {
   if (n >= 1_000_000) return `${n / 1_000_000}M`;
   if (n >= 1_000) return `${n / 1_000}K`;
@@ -95,7 +95,7 @@ export const PLAN_DAY_LIMIT: Record<string, number> = {
   starter: 1_500,
 };
 
-/** "Pro 100K" on a monthly rung, the bare (already translated) plan name otherwise. */
+/** "Pro 110K" on a monthly rung, the bare (already translated) plan name otherwise. */
 export function planLabel(name: string, planQuota: number | null): string {
   return planQuota ? `${name} ${formatVolume(planQuota)}` : name;
 }
