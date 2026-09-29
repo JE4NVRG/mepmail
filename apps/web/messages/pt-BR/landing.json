@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "MepMail — Infraestrutura de e-mail que você entende",
-    "description": "E-mail transacional na nossa própria API e no relay SMTP: domínios verificados com reputação isolada, MCP server oficial para seus agentes enviarem, onboarding assistido e planos em USD a partir de US$ 20/mês."
+    "title": "MepMail — Envie e-mails. Continue construindo.",
+    "description": "Notificações, recibos e campanhas por API, SMTP ou agentes de IA. Controle seus envios em um só painel. Comece grátis, sem cartão."
   },
   "skip": "Pular para o conteúdo",
   "brandAria": "MepMail — início",
@@ -31,17 +31,18 @@
     "aria": "Idioma da página"
   },
   "hero": {
-    "eyebrow": "E-mail transacional para quem constrói produtos, em qualquer lugar <badge>Beta · cadastro aberto</badge>",
-    "title": "Infraestrutura de e-mail que você <highlight>entende.</highlight>",
-    "lead": "Operamos nossa própria API, relay e painel sobre o Amazon SES: seu domínio, sua reputação isolada e seus logs de entrega em um só lugar — a partir de US$ 20/mês por 110.000 e-mails. Um MCP server oficial deixa seus agentes enviarem pelo mesmo pipeline, e o onboarding assistido vem em todos os planos.",
-    "migrate": "Compatível por drop-in com o SDK do Resend — migre em minutos.",
-    "ctaSignup": "Criar conta grátis",
-    "ctaPlans": "Ver planos",
-    "note": "Beta aberto: sem limite de contas, teto de 100 e-mails por dia em cada uma. Crie a sua em 1 minuto — sem cartão.",
+    "eyebrow": "E-MAIL PARA PRODUTOS E AGENTES",
+    "title": "Envie e-mails. Continue construindo.",
+    "lead": "Notificações, recibos e campanhas por API, SMTP ou agentes de IA. Controle seus envios em um só painel.",
+    "migrate": "Fluxos de envio compatíveis com o SDK do Resend. Veja as diferenças no guia de migração.",
+    "ctaSignup": "Começar grátis",
+    "ctaPlans": "Conhecer o produto",
+    "note": "100 e-mails por dia no plano grátis. Sem cartão.",
+    "offer": "{volume} e-mails/mês por {price}.",
     "trust": [
       "MCP server oficial — agentes enviam no mesmo pipeline",
       "API, relay e painel próprios, com Amazon SES por baixo",
-      "Seu domínio, sua reputação, isolados",
+      "Seu domínio de envio verificado",
       "Onboarding assistido por quem constrói o produto"
     ],
     "demo": {
@@ -79,26 +80,46 @@
     "a11y": "Volume mensal de envios"
   },
   "structure": {
-    "eyebrow": "Nossa estrutura",
-    "title": "Menos camadas entre sua aplicação e a entrega.",
-    "body": "Operamos nossa própria camada de API, relay e painel sobre o Amazon SES. O envio é contratado à la carte, sem repassar a estrutura de preços de um intermediário. É assim que oferecemos preços menores sem vender uma cópia de todas as funcionalidades de outros provedores.",
+    "eyebrow": "Do primeiro envio ao próximo crescimento.",
+    "title": "Templates prontos. Menos trabalho para começar.",
+    "body": "Comece com boas-vindas, um recibo ou uma campanha. Personalize um template, conecte seu domínio e acompanhe o que acontece depois.",
     "points": [
-      "Infraestrutura de operação própria: API, relay e painel MepMail.",
-      "Envio via Amazon SES à la carte.",
-      "Implantação acompanhada, sem intermediário de atendimento."
+      "Verifique seu domínio com os registros DNS mostrados no painel.",
+      "Personalize templates prontos e monte campanhas.",
+      "Acompanhe status de entrega, logs e supressões em um só lugar."
     ]
+  },
+  "productProof": {
+    "caption": "Galeria de templates do MepMail · captura do produto em inglês",
+    "alt": "Galeria real do MepMail com templates prontos de boas-vindas, verificação e comércio",
+    "detail": "Escolha um ponto de partida. Deixe com a sua cara.",
+    "allPlans": "Conhecer o catálogo completo de planos"
+  },
+  "integration": {
+    "eyebrow": "Conecte do seu jeito",
+    "title": "Seu código. Seu fluxo. Seu agente.",
+    "aria": "Exemplos de integração",
+    "example": "Exemplo de configuração — esta página não envia e-mails.",
+    "api": "API",
+    "smtp": "SMTP",
+    "agents": "Agentes",
+    "smtpBody": "Conecte sua aplicação ao relay SMTP com STARTTLS. Gere suas credenciais em Configurações → SMTP; nunca coloque credenciais no código do navegador.",
+    "agentsBody": "Conecte seu cliente MCP com o pacote oficial @mepmail/mcp ou use o endpoint hospedado com OAuth. Seu agente trabalha com seu domínio de envio verificado.",
+    "agentsCta": "Ver a configuração MCP",
+    "migrationCta": "Guia de migração",
+    "tableSummary": "Abrir comparação detalhada de preços"
   },
   "plans": {
     "eyebrow": "Planos",
-    "title": "Escolha o volume. Nós ajudamos na configuração.",
+    "title": "Comece grátis. Cresça por volume.",
     "intro": "Todos os planos incluem onboarding assistido e suporte. Preços mensais em USD, sem fidelidade.",
     "perMonth": "/mês",
     "limitsLabel": "Workspaces e limites",
     "overageLabel": "Excedente",
     "attachmentLabel": "Anexos por mensagem",
     "cta": "Começar grátis",
-    "featuredBadge": "Mais popular",
-    "showScale": "Planos Scale (550K–2.75M)",
+    "featuredBadge": "Para crescer",
+    "showScale": "Mais volumes: Pro 220K e Scale",
     "ctaNote": "Crie a conta grátis primeiro — a ativação do plano é feita no painel, em 1 clique.",
     "items": [
       {
@@ -172,24 +193,24 @@
     "noteAttach": "Limite por e-mail: tamanho total dos anexos após decodificação, não por arquivo."
   },
   "how": {
-    "eyebrow": "Implantação assistida",
-    "title": "Da conversa ao primeiro envio, com ajuda de quem construiu.",
+    "eyebrow": "Seus próximos passos",
+    "title": "Crie. Verifique. Conecte.",
     "items": [
-      "Crie sua conta grátis e conte como você envia hoje. Indicamos o degrau certo e acompanhamos a migração.",
-      "Configuramos seu domínio de envio com você: registros DNS para DKIM e MAIL FROM, verificação e chave de API dedicada ou credenciais do relay SMTP.",
-      "Faça um envio de teste pela API ou pelo relay. Você acompanha logs, domínios, supressões e métricas no painel MepMail."
+      "Crie sua conta grátis. Não precisa de cartão.",
+      "Adicione seu domínio e publique os registros DNS de DKIM e MAIL FROM.",
+      "Conecte API, SMTP ou MCP e acompanhe seus envios no painel."
     ],
-    "note": "A configuração assistida costuma levar cerca de 15 minutos depois que você tem acesso ao DNS; a propagação e a verificação do domínio podem levar mais tempo. A verificação automática roda a cada 15 minutos."
+    "note": "A propagação do DNS e a verificação do domínio podem levar tempo. Onboarding assistido incluído."
   },
   "deliverability": {
     "eyebrow": "Entregabilidade e integração",
-    "title": "Sua identidade de envio, sua integração.",
-    "body": "Cada cliente usa um domínio de envio próprio verificado com DKIM e MAIL FROM no Amazon SES, com reputação isolada. Envie pela API HTTPS do MepMail em <api>api-mepmail.je4ndev.com</api>, compatível no protocolo com as chamadas de envio que muitos SDKs já fazem, ou pelo relay SMTP com STARTTLS em <smtp>smtp-mepmail.je4ndev.com:2587</smtp>. A chave de API é dedicada à sua operação.",
+    "title": "Domínio próprio. Visibilidade de cada envio. Apoio de quem constrói.",
+    "body": "Use seu domínio, verificado com DKIM e MAIL FROM, e acompanhe cada envio no painel. Envie por <api>api-mepmail.je4ndev.com</api> ou pelo relay SMTP com STARTTLS em <smtp>smtp-mepmail.je4ndev.com:2587</smtp>. Conte com onboarding direto do time que constrói o MepMail.",
     "note": "Compatibilidade de API não significa paridade de recursos: inbound, IP dedicado e SSO não fazem parte desta promessa. A entrega na caixa de entrada depende também do domínio, do conteúdo e da reputação de envio."
   },
   "faq": {
     "eyebrow": "Perguntas frequentes",
-    "title": "Perguntas antes de migrar",
+    "title": "Antes do primeiro envio",
     "items": [
       {
         "q": "Já uso Resend. Preciso reescrever minha integração?",
@@ -230,11 +251,11 @@
       "Local: npx @mepmail/mcp com uma API key dedicada.",
       "Os dois modos expõem as mesmas tools."
     ],
-    "caption": "Cole no seu cliente MCP e pronto.",
+    "caption": "Exemplo de configuração local. Substitua o placeholder pela sua API key no cliente MCP.",
     "cta": "Criar conta e conectar"
   },
   "close": {
-    "title": "Vamos encontrar o plano para o seu volume?",
+    "title": "Seu próximo envio começa aqui.",
     "body": "Crie sua conta grátis, faça seus primeiros envios e conte como você envia hoje — na migração, a gente vai junto.",
     "cta": "Criar conta grátis"
   },
@@ -244,7 +265,7 @@
     "points": [
       "Amazon SES em produção",
       "Auto-hospede com Docker, ou deixe com a gente",
-      "Migração em minutos, sem refazer código"
+      "Fluxos de envio compatíveis, migração acompanhada"
     ],
     "cta": "Criar conta grátis",
     "colProduct": "Produto",

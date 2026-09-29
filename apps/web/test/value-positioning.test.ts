@@ -52,10 +52,11 @@ describe("landing value-first positioning", () => {
       expect(raw.match(/resend/gi)?.length ?? 0).toBeLessThanOrEqual(5);
     });
 
-    it(`${locale}: the hero sells own infrastructure, MCP and price`, () => {
+    it(`${locale}: the hero leads with sending and separates the offer from the lead`, () => {
       const copy = landing(locale);
       expect(copy.hero.trust.join(" ")).toMatch(/MCP/);
-      expect(copy.hero.lead).toMatch(/US\$ 20/);
+      expect(copy.hero.lead).toMatch(/API, SMTP/);
+      expect(copy.hero.lead).not.toMatch(/US\$/);
       expect(copy.stack.eyebrow.trim().length).toBeGreaterThan(0);
       expect(copy.stack.note).toMatch(/n8n/);
     });

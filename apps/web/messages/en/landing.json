@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "MepMail — Email infrastructure you can reason about",
-    "description": "Transactional email on our own API and SMTP relay: verified domains with isolated reputation, an official MCP server so your agents send, assisted onboarding and USD pricing from US$ 20/month."
+    "title": "MepMail — Send emails. Keep building.",
+    "description": "Notifications, receipts and campaigns through API, SMTP or AI agents. Manage your sending in one dashboard. Start free, no credit card."
   },
   "skip": "Skip to content",
   "brandAria": "MepMail — home",
@@ -31,17 +31,18 @@
     "aria": "Page language"
   },
   "hero": {
-    "eyebrow": "Transactional email for people building products, anywhere <badge>Beta · open signup</badge>",
-    "title": "Email infrastructure you can <highlight>reason about.</highlight>",
-    "lead": "We run our own API, relay and panel on top of Amazon SES: your domain, your reputation isolated and your delivery logs in one place — from US$ 20/month for 110,000 emails. An official MCP server lets your agents send through the same pipeline, and assisted onboarding comes with every plan.",
-    "migrate": "Drop-in compatible with the Resend SDK — migrate in minutes.",
-    "ctaSignup": "Create free account",
-    "ctaPlans": "See plans",
-    "note": "Open beta: no seat limit, each account capped at 100 emails per day. Create yours in one minute — no card required.",
+    "eyebrow": "EMAIL FOR PRODUCTS AND AGENTS",
+    "title": "Send emails. Keep building.",
+    "lead": "Notifications, receipts and campaigns through API, SMTP or AI agents. Manage your sending in one dashboard.",
+    "migrate": "Compatible sending flows with the Resend SDK. See the migration guide for differences.",
+    "ctaSignup": "Start free",
+    "ctaPlans": "Explore the product",
+    "note": "100 emails a day on the free plan. No credit card.",
+    "offer": "{volume} emails/month for {price}.",
     "trust": [
       "Official MCP server — agents send on the same pipeline",
       "Own API, relay and panel, with Amazon SES underneath",
-      "Your domain, your reputation, isolated",
+      "Your verified sending domain",
       "Assisted onboarding by who builds the product"
     ],
     "demo": {
@@ -87,26 +88,46 @@
     "a11y": "Monthly sending volume"
   },
   "structure": {
-    "eyebrow": "Our stack",
-    "title": "Fewer layers between your application and delivery.",
-    "body": "We run our own API, relay and panel layer on top of Amazon SES. Sending is priced à la carte, without passing on an intermediary's pricing structure. That is how we offer lower prices without selling a copy of every feature other providers have.",
+    "eyebrow": "From your first send to your next stage of growth.",
+    "title": "Ready-made templates. Less work to get started.",
+    "body": "Start with a welcome email, receipt or campaign. Customize a template, connect your sending domain and follow what happens next.",
     "points": [
-      "Self-operated infrastructure: MepMail API, relay and panel.",
-      "Sending via Amazon SES, à la carte.",
-      "Guided deployment, with no support middleman."
+      "Verify your domain with the DNS records shown in the dashboard.",
+      "Customize ready-made templates and build campaigns.",
+      "Follow delivery status, logs and suppressions in one place."
     ]
+  },
+  "productProof": {
+    "caption": "MepMail template gallery · product screenshot in English",
+    "alt": "Real MepMail gallery showing ready-made welcome, verification and commerce email templates",
+    "detail": "Choose a starting point. Make it yours.",
+    "allPlans": "Explore the full pricing catalog"
+  },
+  "integration": {
+    "eyebrow": "Connect your way",
+    "title": "Your code. Your workflow. Your agent.",
+    "aria": "Integration examples",
+    "example": "Configuration example — no email is sent from this page.",
+    "api": "API",
+    "smtp": "SMTP",
+    "agents": "Agents",
+    "smtpBody": "Connect your application to the SMTP relay with STARTTLS. Generate your credentials in Settings → SMTP; never put them in client-side code.",
+    "agentsBody": "Connect your MCP client with the official @mepmail/mcp package, or use the hosted OAuth endpoint. Your agent works with your verified sending domain.",
+    "agentsCta": "See the MCP configuration",
+    "migrationCta": "Migration guide",
+    "tableSummary": "Open the detailed price comparison"
   },
   "plans": {
     "eyebrow": "Plans",
-    "title": "Pick your volume. We help with the setup.",
+    "title": "Start free. Scale by volume.",
     "intro": "Every plan includes assisted onboarding and support. Monthly prices in USD, billed monthly, no lock-in.",
     "perMonth": "/month",
     "limitsLabel": "Workspaces and limits",
     "overageLabel": "Overage",
     "attachmentLabel": "Attachments per message",
     "cta": "Start free",
-    "featuredBadge": "Most popular",
-    "showScale": "Scale plans (550K–2.75M)",
+    "featuredBadge": "For growth",
+    "showScale": "More volumes: Pro 220K and Scale",
     "ctaNote": "Create your free account first — activating the plan is one click in the panel.",
     "items": [
       {
@@ -180,24 +201,24 @@
     "noteAttach": "Per-email limit: total attachment size after decoding, not per file."
   },
   "how": {
-    "eyebrow": "Assisted deployment",
-    "title": "From the first conversation to your first send, with help from who built it.",
+    "eyebrow": "Your next steps",
+    "title": "Create. Verify. Connect.",
     "items": [
-      "Create your free account and tell us how you send today. We point you to the right tier and follow the migration with you.",
-      "We set up your sending domain with you: DNS records for DKIM and MAIL FROM, verification, and a dedicated API key or SMTP relay credentials.",
-      "Send a test through the API or the relay. You follow logs, domains, suppressions and metrics in the MepMail panel."
+      "Create your free account. No credit card needed.",
+      "Add your domain and publish its DKIM and MAIL FROM DNS records.",
+      "Connect API, SMTP or MCP, then follow your sending in the dashboard."
     ],
-    "note": "Assisted setup usually takes about 15 minutes once you have DNS access; propagation and domain verification can take longer. Automatic verification runs every 15 minutes."
+    "note": "DNS propagation and domain verification can take time. Assisted onboarding is included."
   },
   "deliverability": {
     "eyebrow": "Deliverability and integration",
-    "title": "Your sending identity, your integration.",
-    "body": "Every customer uses their own sending domain, verified with DKIM and MAIL FROM on Amazon SES, with isolated reputation. Send through the MepMail HTTPS API at <api>api-mepmail.je4ndev.com</api>, wire-compatible with the sending calls many SDKs already make, or through the SMTP relay with STARTTLS at <smtp>smtp-mepmail.je4ndev.com:2587</smtp>. The API key is dedicated to your operation.",
+    "title": "Your domain. Sending visibility. Support from the builders.",
+    "body": "Use your own domain, verified with DKIM and MAIL FROM, and follow each send in the dashboard. Send through <api>api-mepmail.je4ndev.com</api> or the SMTP relay with STARTTLS at <smtp>smtp-mepmail.je4ndev.com:2587</smtp>. Get onboarding help directly from the team building MepMail.",
     "note": "API compatibility is not feature parity: inbound, dedicated IPs and SSO are not part of this promise. Inbox placement also depends on your domain, your content and sending reputation."
   },
   "faq": {
     "eyebrow": "Frequently asked questions",
-    "title": "Questions before migrating",
+    "title": "Before your first send",
     "items": [
       {
         "q": "I already use Resend. Do I have to rewrite my integration?",
@@ -238,11 +259,11 @@
       "Local: npx @mepmail/mcp with a dedicated API key.",
       "Both modes expose the same tools."
     ],
-    "caption": "Paste it into your MCP client. Done.",
+    "caption": "Example local configuration. Replace the placeholder with your own API key in your MCP client.",
     "cta": "Create account and connect"
   },
   "close": {
-    "title": "Shall we find the plan for your volume?",
+    "title": "Your next email starts here.",
     "body": "Create your free account, make your first sends and tell us how you send today — during migration, we come along.",
     "cta": "Create free account"
   },
@@ -252,7 +273,7 @@
     "points": [
       "Amazon SES in production",
       "Self-host with Docker, or let us run it",
-      "Migrate in minutes, no code rewrite"
+      "Compatible sending flows, guided migration"
     ],
     "cta": "Create free account",
     "colProduct": "Product",

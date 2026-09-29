@@ -1,7 +1,8 @@
+import { PLAN_RUNGS } from "@millionsend/core";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
-import { CodeDemo } from "@/components/code-demo";
+import { IntegrationTabs } from "@/components/integration-tabs";
 import { type CalcLabels, LandingCalculator } from "@/components/landing-calculator";
 import { PlanCard, type PlanCardLabels } from "@/components/plan-card";
 import { ArrivalTracker, McpConfigCopy } from "@/components/public-events";
@@ -19,18 +20,12 @@ import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
 import { hasSession } from "@/server/auth";
 import "./landing-calc.css";
 import "./landing.css";
+import "./landing-cro.css";
 
 const contact = "mailto:jean@je4ndev.com";
-
 const cellKeys = ["MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "vantagem"] as const;
-
-/**
- * The landing strip: only the surfaces we ship, as their own brand marks. The
- * MCP text chip stays in the card that explains MCP — a logo band of vendor
- * marks reads as one language.
- */
 const stackSlugs = HOME_STACK_LOGOS.map((logo) => logo.slug);
-
+const proOffer = PLAN_RUNGS.find((rung) => rung.key === "pro_100k");
 const MCP_CONFIG = `{
   "mcpServers": {
     "mepmail": {
@@ -43,19 +38,27 @@ const MCP_CONFIG = `{
     }
   }
 }`;
+const API_EXAMPLE = `curl https://api-mepmail.je4ndev.com/emails \\
+  -H "Authorization: Bearer $MEPMAIL_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "from": "Your app <hello@your-domain.com>",
+    "to": ["recipient@example.com"],
+    "subject": "Hello from MepMail",
+    "html": "<p>Your next email starts here.</p>"
+  }'`;
 
 type FaqItem = { q: string; a: string };
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("landing");
-  const description = t("meta.description");
   return {
     title: { absolute: t("meta.title") },
-    description,
+    description: t("meta.description"),
     robots: { index: true, follow: true },
     openGraph: {
       title: t("meta.title"),
-      description,
+      description: t("meta.description"),
       type: "website",
       images: [{ url: "/og.png", width: 1280, height: 640, alt: "MepMail" }],
     },
@@ -64,11 +67,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootPage() {
   if (await hasSession()) redirect("/emails");
-
   const locale = await getLocale();
   const t = await getTranslations("landing");
-  // The public table is rendered per locale: shared numbers, locale separators
-  // and quote word (see @/lib/landing-pricing). English is the global default.
   const comparison = PRICE_ROWS.map((row) => [
     formatVolume(row.volume, locale),
     formatUsd(row.mepmail, locale),
@@ -78,8 +78,6 @@ export default async function RootPage() {
     formatUsd(row.mailgun, locale),
     row.savings,
   ]);
-  // Chrome + plan copy live in the "landing" catalog: it is the public site's
-  // catalog, shared by the landing, /pricing and /alternatives/resend.
   const site = {
     skip: t("skip"),
     brandAria: t("brandAria"),
@@ -103,17 +101,10 @@ export default async function RootPage() {
   const steps = t.raw("how.items") as string[];
   const faq = t.raw("faq.items") as FaqItem[];
   const calc = t.raw("calc") as CalcLabels;
-  const trust = t.raw("hero.trust") as string[];
   const mcpPoints = t.raw("mcp.points") as string[];
-  const founders = t.raw("plans.founders") as {
-    title: string;
-    items: string[];
-    note: string;
-    cta: string;
-  };
 
   return (
-    <div className="gtm">
+    <div className="gtm cro">
       <ArrivalTracker />
       <PublicHeader
         labels={site}
@@ -128,36 +119,45 @@ export default async function RootPage() {
       />
       <main id="conteudo">
         <section className="gtm-section gtm-hero">
-          <div className="gtm-container">
-            <div className="gtm-hero-grid">
-              <div className="gtm-hero-copy">
-                <p className="gtm-eyebrow">
-                  {t.rich("hero.eyebrow", {
-                    badge: (chunks) => <span className="gtm-beta-badge">{chunks}</span>,
-                  })}
-                </p>
-                <h1>
-                  {t.rich("hero.title", {
-                    highlight: (chunks) => <span>{chunks}</span>,
-                  })}
-                </h1>
-                <p className="gtm-lead">{t("hero.lead")}</p>
-                <div className="gtm-actions">
-                  <SignupLink label={t("hero.ctaSignup")} />
-                  <a className="ms-btn ms-btn-secondary gtm-action" href="#planos">
-                    {t("hero.ctaPlans")}
-                  </a>
-                </div>
-                <p className="gtm-note">{t("hero.note")}</p>
-                <p className="gtm-migrate">{t("hero.migrate")}</p>
+          <div className="gtm-container gtm-hero-grid">
+            <div className="gtm-hero-copy">
+              <p className="gtm-eyebrow">{t("hero.eyebrow")}</p>
+              <h1>{t("hero.title")}</h1>
+              <p className="gtm-lead">{t("hero.lead")}</p>
+              <div className="gtm-actions">
+                <SignupLink label={t("hero.ctaSignup")} />
+                <a className="ms-btn ms-btn-secondary gtm-action" href="#product">
+                  {t("hero.ctaPlans")}
+                </a>
               </div>
-              <CodeDemo subject={t("hero.demo.subject")} caption={t("hero.demo.caption")} />
+              <p className="gtm-note">{t("hero.note")}</p>
+              {proOffer && (
+                <p className="cro-offer">
+                  {t("hero.offer", {
+                    volume: new Intl.NumberFormat(locale).format(proOffer.included),
+                    price: formatUsd(proOffer.priceCents / 100, locale),
+                  })}{" "}
+                  <a href="#planos" aria-label={t("nav.plans")}>
+                    ↗
+                  </a>
+                </p>
+              )}
             </div>
-            <ul className="gtm-trust">
-              {trust.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+            <figure className="cro-hero-proof">
+              <div className="cro-proof-label">
+                <span aria-hidden="true" />
+                MepMail / templates
+              </div>
+              {/* biome-ignore lint/performance/noImgElement: WebP local já otimizado, com dimensões explícitas e sem serviço adicional */}
+              <img
+                src="/product/templates-hero.webp"
+                width={546}
+                height={614}
+                alt={t("productProof.alt")}
+                fetchPriority="high"
+              />
+              <figcaption>{t("productProof.caption")}</figcaption>
+            </figure>
           </div>
         </section>
 
@@ -174,107 +174,84 @@ export default async function RootPage() {
           </div>
         </section>
 
-        <section className="gtm-section gtm-alt" id="comparativo">
+        <section className="gtm-section gtm-alt" id="product">
           <div className="gtm-container">
-            <p className="gtm-eyebrow">{t("compare.eyebrow")}</p>
-            <h2>{t("compare.title")}</h2>
-            <p>{t("compare.intro")}</p>
-            <section
-              className="gtm-table-scroll"
-              aria-label={t("compare.tableAria")}
-              // biome-ignore lint/a11y/noNoninteractiveTabindex: a tabela com overflow precisa de foco para rolagem por teclado
-              tabIndex={0}
-            >
-              <table className="gtm-table">
-                <thead>
-                  <tr>
-                    {columns.map((label) => (
-                      <th scope="col" key={label}>
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparison.map(([volume, ...values]) => (
-                    <tr key={volume}>
-                      <th scope="row">{volume}</th>
-                      {values.map((value, index) => (
-                        <td key={cellKeys[index]}>{value}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-            <p className="gtm-note">{t("compare.slideNote")}</p>
-            <LandingCalculator labels={{ ...calc, contact }} />
-            <p className="gtm-note">{t("compare.refNote")}</p>
-          </div>
-        </section>
-
-        {/* Seção do produto: alvo real do item "Product" da nav v2 (nav_rows==1). */}
-        <section className="gtm-section" id="product">
-          <div className="gtm-container">
-            <p className="gtm-eyebrow">{t("structure.eyebrow")}</p>
-            <h2>{t("structure.title")}</h2>
-            <p>{t("structure.body")}</p>
-            <ul className="gtm-points">
-              {points.map((point) => (
-                <li key={point}>{point}</li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        <section className="gtm-section gtm-alt" id="planos">
-          <div className="gtm-container">
-            <p className="gtm-eyebrow">{t("plans.eyebrow")}</p>
-            <h2>{t("plans.title")}</h2>
-            <p>{t("plans.intro")}</p>
-            <div className="gtm-plan-grid">
-              {allPlans
-                .filter((plan) => plan.tier === "core")
-                .map((plan) => (
-                  <PlanCard key={plan.name} plan={plan} labels={cardLabels} />
-                ))}
-            </div>
-            <details className="gtm-plans-more">
-              <summary>{t("plans.showScale")}</summary>
-              <div className="gtm-plan-grid">
-                {allPlans
-                  .filter((plan) => plan.tier === "scale")
-                  .map((plan) => (
-                    <PlanCard key={plan.name} plan={plan} labels={cardLabels} />
-                  ))}
+            <div className="cro-product-intro">
+              <div>
+                <p className="gtm-eyebrow">{t("structure.eyebrow")}</p>
+                <h2>{t("structure.title")}</h2>
+                <p>{t("structure.body")}</p>
               </div>
-            </details>
-            <p className="gtm-note">{t("plans.note")}</p>
-            <div className="gtm-founders">
-              <h3>{founders.title}</h3>
-              <ul>
-                {founders.items.map((item) => (
-                  <li key={item}>{item}</li>
+              <ol className="cro-benefits">
+                {points.map((point) => (
+                  <li key={point}>{point}</li>
                 ))}
-              </ul>
-              <p className="gtm-note">{founders.note}</p>
-              <SignupLink label={founders.cta} />
+              </ol>
             </div>
-            <p className="gtm-note">{t("plans.noteAttach")}</p>
+            <figure className="cro-product-proof">
+              {/* biome-ignore lint/performance/noImgElement: captura WebP local já otimizada e carregada sob demanda */}
+              <img
+                src="/product/templates-gallery.webp"
+                width={1110}
+                height={614}
+                alt={t("productProof.alt")}
+                loading="lazy"
+              />
+              <figcaption>{t("productProof.caption")}</figcaption>
+            </figure>
+            <p className="cro-product-next">
+              {t("productProof.detail")} <SignupLink label={t("hero.ctaSignup")} />
+            </p>
           </div>
         </section>
 
-        <section className="gtm-section" id="como-funciona">
-          <div className="gtm-container">
-            <p className="gtm-eyebrow">{t("how.eyebrow")}</p>
-            <h2>{t("how.title")}</h2>
-            <ol className="gtm-steps">
-              {steps.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
-            <p className="gtm-note">{t("how.note")}</p>
-            <SignupLink label={t("hero.ctaSignup")} />
+        <section className="gtm-section" id="integration">
+          <div className="gtm-container cro-integration-grid">
+            <div>
+              <p className="gtm-eyebrow">{t("integration.eyebrow")}</p>
+              <h2>{t("integration.title")}</h2>
+              <p>{t("integration.example")}</p>
+              <p className="gtm-note">
+                {t("hero.migrate")}{" "}
+                <a href="/alternatives/resend">{t("integration.migrationCta")} →</a>
+              </p>
+            </div>
+            <IntegrationTabs
+              label={t("integration.aria")}
+              tabs={[
+                {
+                  label: t("integration.api"),
+                  content: (
+                    <pre>
+                      <code>{API_EXAMPLE}</code>
+                    </pre>
+                  ),
+                },
+                {
+                  label: t("integration.smtp"),
+                  content: (
+                    <>
+                      <p>{t("integration.smtpBody")}</p>
+                      <pre>
+                        <code>{"smtp-mepmail.je4ndev.com\nPort: 2587\nSecurity: STARTTLS"}</code>
+                      </pre>
+                    </>
+                  ),
+                },
+                {
+                  label: t("integration.agents"),
+                  content: (
+                    <>
+                      <p>{t("integration.agentsBody")}</p>
+                      <pre>
+                        <code>npx -y @mepmail/mcp</code>
+                      </pre>
+                      <a href="#mcp">{t("integration.agentsCta")} →</a>
+                    </>
+                  ),
+                },
+              ]}
+            />
           </div>
         </section>
 
@@ -294,9 +271,6 @@ export default async function RootPage() {
             <figure className="gtm-mcp-demo">
               <div className="gtm-demo-window">
                 <div className="gtm-demo-bar">
-                  <span className="gtm-demo-dot" aria-hidden="true" />
-                  <span className="gtm-demo-dot" aria-hidden="true" />
-                  <span className="gtm-demo-dot" aria-hidden="true" />
                   <span className="gtm-demo-file">mcp.json</span>
                   <McpConfigCopy value={MCP_CONFIG} />
                 </div>
@@ -307,7 +281,7 @@ export default async function RootPage() {
           </div>
         </section>
 
-        <section className="gtm-section gtm-alt">
+        <section className="gtm-section cro-value">
           <div className="gtm-container">
             <p className="gtm-eyebrow">{t("deliverability.eyebrow")}</p>
             <h2>{t("deliverability.title")}</h2>
@@ -321,6 +295,87 @@ export default async function RootPage() {
           </div>
         </section>
 
+        <section className="gtm-section gtm-alt" id="planos">
+          <div className="gtm-container">
+            <p className="gtm-eyebrow">{t("plans.eyebrow")}</p>
+            <h2>{t("plans.title")}</h2>
+            <p>{t("plans.intro")}</p>
+            <div className="gtm-plan-grid">
+              {allPlans.slice(0, 3).map((plan) => (
+                <PlanCard key={plan.name} plan={plan} labels={cardLabels} />
+              ))}
+            </div>
+            <details className="gtm-plans-more">
+              <summary>{t("plans.showScale")}</summary>
+              <div className="gtm-plan-grid">
+                {allPlans.slice(3).map((plan) => (
+                  <PlanCard key={plan.name} plan={plan} labels={cardLabels} />
+                ))}
+              </div>
+            </details>
+            <p>
+              <a href="/pricing">{t("productProof.allPlans")} →</a>
+            </p>
+            <p className="gtm-note">{t("plans.note")}</p>
+            <p className="gtm-note">{t("plans.noteAttach")}</p>
+          </div>
+        </section>
+
+        <section className="gtm-section" id="comparativo">
+          <div className="gtm-container">
+            <p className="gtm-eyebrow">{t("compare.eyebrow")}</p>
+            <h2>{t("compare.title")}</h2>
+            <p>{t("compare.intro")}</p>
+            <LandingCalculator labels={{ ...calc, contact }} />
+            <details className="cro-comparison">
+              <summary>{t("integration.tableSummary")}</summary>
+              <section
+                className="gtm-table-scroll"
+                aria-label={t("compare.tableAria")}
+                // biome-ignore lint/a11y/noNoninteractiveTabindex: foco permite rolar a tabela por teclado
+                tabIndex={0}
+              >
+                <table className="gtm-table">
+                  <thead>
+                    <tr>
+                      {columns.map((label) => (
+                        <th scope="col" key={label}>
+                          {label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparison.map(([volume, ...values]) => (
+                      <tr key={volume}>
+                        <th scope="row">{volume}</th>
+                        {values.map((value, index) => (
+                          <td key={cellKeys[index]}>{value}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+              <p className="gtm-note">{t("compare.slideNote")}</p>
+            </details>
+            <p className="gtm-note">{t("compare.refNote")}</p>
+          </div>
+        </section>
+
+        <section className="gtm-section gtm-alt" id="como-funciona">
+          <div className="gtm-container">
+            <p className="gtm-eyebrow">{t("how.eyebrow")}</p>
+            <h2>{t("how.title")}</h2>
+            <ol className="gtm-steps">
+              {steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+            <p className="gtm-note">{t("how.note")}</p>
+            <SignupLink label={t("hero.ctaSignup")} />
+          </div>
+        </section>
         <section className="gtm-section">
           <div className="gtm-container">
             <p className="gtm-eyebrow">{t("faq.eyebrow")}</p>
@@ -335,7 +390,6 @@ export default async function RootPage() {
             </div>
           </div>
         </section>
-
         <section className="gtm-section gtm-alt gtm-close">
           <div className="gtm-container">
             <h2>{t("close.title")}</h2>
