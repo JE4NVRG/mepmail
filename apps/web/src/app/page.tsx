@@ -10,9 +10,11 @@ import {
   type PublicSiteLabels,
   SignupLink,
 } from "@/components/site-chrome";
+import { StackLogoRow } from "@/components/stack-logos";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
 import { formatUsd, PRICE_ROWS } from "@/lib/landing-pricing";
 import { legalLinks } from "@/lib/legal-links";
+import { HOME_STACK_LOGOS, MCP_CHIP } from "@/lib/stack-logos";
 import { hasSession } from "@/server/auth";
 import "./landing-calc.css";
 import "./landing.css";
@@ -30,6 +32,9 @@ const comparison = PRICE_ROWS.map((row) => [
 ]);
 
 const cellKeys = ["MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "vantagem"] as const;
+
+/** The landing strip: the surfaces we ship, plus the drawn MCP chip. */
+const stackSlugs = [...HOME_STACK_LOGOS.map((logo) => logo.slug), MCP_CHIP];
 
 const MCP_CONFIG = `{
   "mcpServers": {
@@ -136,6 +141,7 @@ export default async function RootPage() {
                   </a>
                 </div>
                 <p className="gtm-note">{t("hero.note")}</p>
+                <p className="gtm-migrate">{t("hero.migrate")}</p>
               </div>
               <CodeDemo subject={t("hero.demo.subject")} caption={t("hero.demo.caption")} />
             </div>
@@ -144,6 +150,19 @@ export default async function RootPage() {
                 <li key={item}>{item}</li>
               ))}
             </ul>
+          </div>
+        </section>
+
+        <section className="gtm-stack" aria-label={t("stack.aria")}>
+          <div className="gtm-container gtm-stack-inner">
+            <p className="gtm-stack-eyebrow">{t("stack.eyebrow")}</p>
+            <StackLogoRow slugs={stackSlugs} />
+            <p className="gtm-stack-note">
+              {t("stack.note")}{" "}
+              <a className="gtm-stack-cta" href="/integrations">
+                {t("stack.pageCta")}
+              </a>
+            </p>
           </div>
         </section>
 
