@@ -13,8 +13,8 @@ Value-first landing, official logos and +10% quotas.
 
 ### Added
 
-- The landing now leads with the value proposition and a mural of real customer
-  logos instead of a feature wall.
+- The landing now leads with the value proposition and a mural of official
+  integration logos instead of a feature wall.
 - Official, full-colour brand marks across the home, `/integrations` and the
   product mockup.
 - A flat, responsive header with a balanced footer — Product, Compare, Account
