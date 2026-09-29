@@ -1187,6 +1187,100 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* Faixa "works with your stack": logos monocromáticos vendorizados em
+   public/logos/integrations (brancos, para o ground escuro). Discreta de
+   propósito: fica entre o herói e o produto e só ganha opacidade no hover. */
+.gtm-stack {
+  padding-block: 40px;
+  border-block: 1px solid var(--ms-line-strong);
+  background: var(--ms-void);
+}
+.gtm-stack-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.gtm-stack-eyebrow {
+  margin: 0;
+  color: var(--ms-violet);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.gtm-stack-logos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px 32px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gtm-stack-logos li {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.6;
+  transition: opacity 0.18s ease;
+}
+.gtm-stack-logos li:hover {
+  opacity: 1;
+}
+.gtm-stack-logos img {
+  display: block;
+}
+.gtm-mcp-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding-inline: 6px;
+  border: 1px solid color-mix(in srgb, var(--ms-violet) 60%, transparent);
+  border-radius: 6px;
+  color: var(--ms-violet);
+  font-family: var(--ms-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.gtm-stack-note {
+  margin: 0;
+  max-width: 90ch;
+  color: var(--ms-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.gtm-stack-cta {
+  color: var(--ms-violet);
+}
+/* Linha de migração do herói: compatibilidade como nota, não como manchete. */
+.gtm-migrate {
+  margin: 10px 0 0;
+  color: var(--ms-bone);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.gtm-integrations-mural {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--ms-line-strong);
+}
+.gtm-stack-logos.gtm-integration-mark {
+  gap: 14px 18px;
+}
+.gtm-stack-logos.gtm-integration-mark li {
+  opacity: 0.75;
+}
+.gtm-integration-mark .gtm-mcp-chip {
+  min-width: 22px;
+  height: 22px;
+}
+
 /* Grade de 4 itens: 2x2 em vez de 3+1, que deixa uma célula vazia. */
 @media (min-width: 768px) {
   .gtm-integrations.gtm-pairs {

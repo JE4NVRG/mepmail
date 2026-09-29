@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "MepMail — E-mail transacional com API compatível com Resend",
-    "description": "E-mail transacional com API compatível com Resend e onboarding assistido. Compare planos MepMail, envie pela API ou pelo relay SMTP e crie sua conta grátis no beta."
+    "title": "MepMail — Infraestrutura de e-mail que você entende",
+    "description": "E-mail transacional na nossa própria API e no relay SMTP: domínios verificados com reputação isolada, MCP server oficial para seus agentes enviarem, onboarding assistido e planos em USD a partir de US$ 20/mês."
   },
   "skip": "Pular para o conteúdo",
   "brandAria": "MepMail — início",
@@ -31,22 +31,29 @@
   },
   "hero": {
     "eyebrow": "E-mail transacional para quem constrói produtos, em qualquer lugar <badge>Beta · cadastro aberto</badge>",
-    "title": "Mesma API do Resend. <highlight>Até 60% mais barato.</highlight>",
-    "lead": "Envie e-mails transacionais com API HTTPS compatível com o Resend ou relay SMTP. Nós ajudamos a configurar seu domínio, DKIM e MAIL FROM. Planos em USD e implantação assistida.",
+    "title": "Infraestrutura de e-mail que você <highlight>entende.</highlight>",
+    "lead": "Operamos nossa própria API, relay e painel sobre o Amazon SES: seu domínio, sua reputação isolada e seus logs de entrega em um só lugar — a partir de US$ 20/mês por 110.000 e-mails. Um MCP server oficial deixa seus agentes enviarem pelo mesmo pipeline, e o onboarding assistido vem em todos os planos.",
+    "migrate": "Compatível por drop-in com o SDK do Resend — migre em minutos.",
     "ctaSignup": "Criar conta grátis",
     "ctaPlans": "Ver planos",
     "note": "Beta aberto: sem limite de contas, teto de 100 e-mails por dia em cada uma. Crie a sua em 1 minuto — sem cartão.",
     "trust": [
-      "API compatível com Resend",
-      "Relay SMTP com STARTTLS",
-      "DKIM e MAIL FROM no seu domínio",
-      "Onboarding assistido"
+      "MCP server oficial — agentes enviam no mesmo pipeline",
+      "API, relay e painel próprios, com Amazon SES por baixo",
+      "Seu domínio, sua reputação, isolados",
+      "Onboarding assistido por quem constrói o produto"
     ],
     "demo": {
       "subject": "Olá do MepMail",
       "responseLabel": "Resposta",
-      "caption": "O mesmo SDK oficial do Resend, com a base URL do MepMail."
+      "caption": "Uma base URL e o SDK que você já usa envia pelo MepMail."
     }
+  },
+  "stack": {
+    "eyebrow": "Funciona com a sua stack",
+    "aria": "Integrações e linguagens que funcionam com o MepMail",
+    "note": "Node comunitário do n8n, canais de notificação Slack/Discord/Telegram, os SDKs oficiais com os quais a API é compatível por drop-in, Docker para auto-hospedar e cURL puro. Uma API key e um domínio verificado cobrem tudo isso.",
+    "pageCta": "Ver todas as integrações"
   },
   "compare": {
     "eyebrow": "Preço sem adivinhação",
@@ -108,42 +115,42 @@
         "cta": "Começar no Starter"
       },
       {
-        "volume": "100.000/mês",
+        "volume": "110.000/mês",
         "limits": "25 domínios · 10 workspaces · contatos ilimitados",
         "overage": "US$ 0,90/1k",
         "attachment": "5 MB",
         "cta": "Começar no Pro 100K"
       },
       {
-        "volume": "200.000/mês",
+        "volume": "220.000/mês",
         "limits": "25 domínios · 10 workspaces · contatos ilimitados",
         "overage": "US$ 0,35/1k",
         "attachment": "5 MB",
         "cta": "Começar no Pro 200K"
       },
       {
-        "volume": "500.000/mês",
+        "volume": "550.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
         "overage": "US$ 0,25/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 500K"
       },
       {
-        "volume": "1.000.000/mês",
+        "volume": "1.100.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
         "overage": "US$ 0,23/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 1M"
       },
       {
-        "volume": "1.500.000/mês",
+        "volume": "1.650.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
         "overage": "US$ 0,18/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 1.5M"
       },
       {
-        "volume": "2.500.000/mês",
+        "volume": "2.750.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
         "overage": "US$ 0,16/1k",
         "attachment": "10 MB",
@@ -176,7 +183,7 @@
   "deliverability": {
     "eyebrow": "Entregabilidade e integração",
     "title": "Sua identidade de envio, sua integração.",
-    "body": "Cada cliente usa um domínio de envio próprio verificado com DKIM e MAIL FROM no Amazon SES, com reputação isolada. Escolha a API HTTPS compatível com chamadas de envio do Resend, com base URL <api>api-mepmail.je4ndev.com</api>, ou o relay SMTP com STARTTLS em <smtp>smtp-mepmail.je4ndev.com:2587</smtp>. A chave de API é dedicada à sua operação.",
+    "body": "Cada cliente usa um domínio de envio próprio verificado com DKIM e MAIL FROM no Amazon SES, com reputação isolada. Envie pela API HTTPS do MepMail em <api>api-mepmail.je4ndev.com</api>, compatível no protocolo com as chamadas de envio que muitos SDKs já fazem, ou pelo relay SMTP com STARTTLS em <smtp>smtp-mepmail.je4ndev.com:2587</smtp>. A chave de API é dedicada à sua operação.",
     "note": "Compatibilidade de API não significa paridade de recursos: inbound, IP dedicado e SSO não fazem parte desta promessa. A entrega na caixa de entrada depende também do domínio, do conteúdo e da reputação de envio."
   },
   "faq": {
@@ -185,7 +192,7 @@
     "items": [
       {
         "q": "Já uso Resend. Preciso reescrever minha integração?",
-        "a": "Para os fluxos de envio compatíveis, você pode manter o SDK oficial do Resend e trocar a base URL e a chave. Revisamos sua integração na migração para identificar recursos que não são equivalentes. Não prometemos paridade total de funcionalidades."
+        "a": "Para os fluxos de envio compatíveis, você mantém o SDK oficial e troca apenas a base URL e a chave. Revisamos sua integração na migração para identificar recursos que não são equivalentes. Não prometemos paridade total de funcionalidades."
       },
       {
         "q": "Vocês garantem entrega na caixa de entrada?",
@@ -235,7 +242,7 @@
     "tagline": "MepMail · E-mail transacional com implantação assistida",
     "points": [
       "Amazon SES em produção",
-      "API compatível com a do Resend",
+      "Auto-hospede com Docker, ou deixe com a gente",
       "Migração em minutos, sem refazer código"
     ],
     "cta": "Criar conta grátis",
