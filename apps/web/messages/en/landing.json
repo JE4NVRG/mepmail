@@ -59,7 +59,7 @@
   "compare": {
     "eyebrow": "Pricing without guesswork",
     "title": "Compare by the volume you actually send.",
-    "intro": "The numbers below compare the cheapest plan covering each monthly volume. Savings vary by tier and provider; confirm current terms before subscribing.",
+    "intro": "The numbers below compare the cheapest published way to send each monthly volume: the plan that covers it, or a smaller plan plus that provider's published overage. Savings vary by tier and provider; confirm current terms before subscribing.",
     "tableAria": "Price comparison by volume",
     "columns": [
       "Emails/month",
@@ -71,7 +71,7 @@
       "Advantage"
     ],
     "slideNote": "Swipe the table to see every provider on smaller screens.",
-    "refNote": "Reference: commercial analysis of 2026-09-27; third-party public prices can change and features/terms are not equivalent. USD per month, excluding taxes and overages. “(sales)” means a commercial quote, not a public price."
+    "refNote": "Reference: commercial analysis of 2026-09-27; third-party public prices can change and features/terms are not equivalent. USD per month, excluding taxes. Where a provider publishes its overage as a range, the table uses the midpoint."
   },
   "calc": {
     "title": "Slide the volume and see the savings.",

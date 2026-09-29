@@ -2,26 +2,27 @@ import { describe, expect, it } from "vitest";
 import { COMPETITORS, formatUsd, formatVolume, PRICE_ROWS } from "../src/lib/landing-pricing";
 import { computeSavings, savingsForIndex } from "../src/lib/landing-savings";
 
-// The exact cells the public table publishes, cell for cell. The numbers are
+// The exact cells the public table publishes, cell for cell, on the release
+// v.44 rungs (110K…2.75M, +10% volume at the same prices). The numbers are
 // shared across locales; the separators and the quote cell are not. English is
-// the default audience (US separators, "(sales)") and pt-BR mirrors it
-// ("1,5M", "US$ 1.150", "(vendas)").
+// the default audience (US separators) and pt-BR mirrors it ("1,65M",
+// "US$ 1.265").
 const EN_TABLE = [
-  ["100k", "US$ 20", "US$ 35", "US$ 34.95", "US$ 115", "US$ 90", "43%"],
-  ["200k", "US$ 100", "US$ 160", "US$ 249", "US$ 245", "US$ 215", "38–60%"],
-  ["500k", "US$ 199", "US$ 350", "US$ 499", "US$ 455", "US$ 400", "43–60%"],
-  ["1M", "US$ 319", "US$ 650", "US$ 799", "US$ 775", "US$ 700", "51–60%"],
-  ["1.5M", "US$ 429", "US$ 825", "US$ 799", "US$ 775", "US$ 700", "39–48%"],
-  ["2.5M", "US$ 549", "US$ 1,150", "US$ 1,099", "(sales)", "US$ 1,250", "50–56%"],
+  ["110k", "US$ 20", "US$ 44", "US$ 43.95", "US$ 115", "US$ 86", "54%"],
+  ["220k", "US$ 100", "US$ 143", "US$ 142.95", "US$ 245", "US$ 207", "30%"],
+  ["550k", "US$ 199", "US$ 385", "US$ 439.95", "US$ 455", "US$ 437.50", "48%"],
+  ["1.1M", "US$ 319", "US$ 715", "US$ 799", "US$ 775", "US$ 750", "55%"],
+  ["1.65M", "US$ 429", "US$ 903", "US$ 889", "US$ 1,037.50", "US$ 1,025", "52%"],
+  ["2.75M", "US$ 549", "US$ 1,265", "US$ 1,224", "US$ 2,962.50", "US$ 1,350", "55%"],
 ] as const;
 
 const PT_TABLE = [
-  ["100k", "US$ 20", "US$ 35", "US$ 34,95", "US$ 115", "US$ 90", "43%"],
-  ["200k", "US$ 100", "US$ 160", "US$ 249", "US$ 245", "US$ 215", "38–60%"],
-  ["500k", "US$ 199", "US$ 350", "US$ 499", "US$ 455", "US$ 400", "43–60%"],
-  ["1M", "US$ 319", "US$ 650", "US$ 799", "US$ 775", "US$ 700", "51–60%"],
-  ["1,5M", "US$ 429", "US$ 825", "US$ 799", "US$ 775", "US$ 700", "39–48%"],
-  ["2,5M", "US$ 549", "US$ 1.150", "US$ 1.099", "(vendas)", "US$ 1.250", "50–56%"],
+  ["110k", "US$ 20", "US$ 44", "US$ 43,95", "US$ 115", "US$ 86", "54%"],
+  ["220k", "US$ 100", "US$ 143", "US$ 142,95", "US$ 245", "US$ 207", "30%"],
+  ["550k", "US$ 199", "US$ 385", "US$ 439,95", "US$ 455", "US$ 437,50", "48%"],
+  ["1,1M", "US$ 319", "US$ 715", "US$ 799", "US$ 775", "US$ 750", "55%"],
+  ["1,65M", "US$ 429", "US$ 903", "US$ 889", "US$ 1.037,50", "US$ 1.025", "52%"],
+  ["2,75M", "US$ 549", "US$ 1.265", "US$ 1.224", "US$ 2.962,50", "US$ 1.350", "55%"],
 ] as const;
 
 // TS-safe accessor so the tests never need the non-null assertion operator.
@@ -52,40 +53,39 @@ describe("landing pricing data", () => {
   });
 
   it("keeps the quote cell inside the reader's locale", () => {
-    const en = JSON.stringify(renderTable("en"));
-    const pt = JSON.stringify(renderTable("pt-BR"));
-    expect(en).toContain("(sales)");
-    expect(en).not.toContain("(vendas)");
-    expect(pt).toContain("(vendas)");
+    // No published row is a quote today; the branch stays so a future one can
+    // never leak the pt-BR word into the English table.
+    expect(formatUsd(null, "en")).toBe("(sales)");
+    expect(formatUsd(null, "pt-BR")).toBe("(vendas)");
   });
 
   it("never mixes the two locales' separators", () => {
     const en = JSON.stringify(renderTable("en"));
     const pt = JSON.stringify(renderTable("pt-BR"));
-    // English cells: no pt-BR thousands dot ("1.150") nor decimal comma ("34,95").
+    // English cells: no pt-BR thousands dot ("1.265") nor decimal comma ("43,95").
     expect(en).not.toMatch(/\d+\.\d{3}\b/);
     expect(en).not.toMatch(/\d+,\d{2}\b/);
-    // pt-BR cells mirror it: no US thousands comma ("1,150") nor decimal dot ("34.95").
+    // pt-BR cells mirror it: no US thousands comma ("1,265") nor decimal dot ("43.95").
     expect(pt).not.toMatch(/\d+,\d{3}\b/);
     expect(pt).not.toMatch(/\d+\.\d{2}\b/);
   });
 
   it("renders the volume label from the row volume in each locale", () => {
     expect(PRICE_ROWS.map((row) => formatVolume(row.volume, "en"))).toEqual([
-      "100k",
-      "200k",
-      "500k",
-      "1M",
-      "1.5M",
-      "2.5M",
+      "110k",
+      "220k",
+      "550k",
+      "1.1M",
+      "1.65M",
+      "2.75M",
     ]);
     expect(PRICE_ROWS.map((row) => formatVolume(row.volume, "pt-BR"))).toEqual([
-      "100k",
-      "200k",
-      "500k",
-      "1M",
-      "1,5M",
-      "2,5M",
+      "110k",
+      "220k",
+      "550k",
+      "1,1M",
+      "1,65M",
+      "2,75M",
     ]);
   });
 
@@ -104,32 +104,41 @@ describe("landing pricing data", () => {
     const volumes = PRICE_ROWS.map((row) => row.volume);
     expect([...volumes].sort((a, b) => a - b)).toEqual(volumes);
   });
+
+  it("publishes exactly the advantage the calculator computes", () => {
+    // The Advantage column is data, not copy: it must be the same number the
+    // slider shows for that rung, so a table edit cannot outrun the arithmetic.
+    for (const row of PRICE_ROWS) {
+      expect(row.savings, `advantage at ${row.volume}`).toBe(`${computeSavings(row).savingsPct}%`);
+    }
+  });
 });
 
 describe("computeSavings", () => {
   it("uses the cheapest competitor with a public price", () => {
     const first = computeSavings(priceRow(0));
-    expect(first.competitor.name).toBe("SendGrid"); // US$ 34.95 < US$ 35 (Resend)
-    expect(first.savingsUsd).toBeCloseTo(14.95);
-    expect(first.savingsPct).toBe(43);
-    expect(first.savingsYearUsd).toBeCloseTo(179.4);
+    expect(first.competitor.name).toBe("SendGrid"); // US$ 43.95 < US$ 44 (Resend)
+    expect(first.savingsUsd).toBeCloseTo(23.95);
+    expect(first.savingsPct).toBe(54);
+    expect(first.savingsYearUsd).toBeCloseTo(287.4);
 
     const top = computeSavings(priceRow(5));
-    expect(top.competitor.name).toBe("SendGrid"); // US$ 1,099 < US$ 1,150 (Resend)
-    expect(top.savingsPct).toBe(50);
+    expect(top.competitor.name).toBe("SendGrid"); // US$ 1,224 < US$ 1,265 (Resend)
+    expect(top.savingsPct).toBe(55);
   });
 
-  it("skips rows without a public competitor price", () => {
-    // 2.5M has Postmark as "(sales)"/"(vendas)" — null must not win or crash the walk.
-    const savings = computeSavings(priceRow(5));
-    expect(savings.competitor.price).toBeGreaterThan(0);
+  it("skips a row whose cheapest competitor is a quote without a price", () => {
+    // A null cell must not win the walk nor crash it.
+    const savings = computeSavings({ ...priceRow(0), postmark: null });
+    expect(savings.competitor.name).toBe("SendGrid");
     expect(COMPETITORS.map((c) => c.key)).not.toContain(undefined);
   });
 
   it("resolves every index the calculator can reach", () => {
     for (let index = 0; index < PRICE_ROWS.length; index += 1) {
       const savings = savingsForIndex(index);
-      expect(savings.savingsPct).toBeGreaterThan(30);
+      // 30% is the 220K floor: the weakest rung of the ladder, published as is.
+      expect(savings.savingsPct).toBeGreaterThanOrEqual(30);
       expect(savings.savingsUsd).toBeGreaterThan(0);
     }
   });
