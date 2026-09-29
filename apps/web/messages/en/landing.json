@@ -7,19 +7,21 @@
   "brandAria": "MepMail — home",
   "navAria": "Main navigation",
   "nav": {
+    "product": "Product",
+    "integrations": "Integrations",
+    "pricing": "Pricing",
+    "docs": "Docs",
+    "security": "Security",
+    "support": "Support",
     "compare": "Compare prices",
     "plans": "Plans",
     "mcp": "MCP",
     "how": "How it works",
-    "pricing": "Pricing",
     "alternatives": "vs Resend",
     "login": "Sign in",
     "signup": "Create account",
     "menu": "Open navigation menu",
-    "badge": "Agent-ready",
-    "integrations": "Integrations",
-    "security": "Security",
-    "support": "Support"
+    "badge": "Agent-ready"
   },
   "announce": {
     "text": "Agent-ready — official MCP: your AI agents send email"
@@ -246,6 +248,7 @@
     ],
     "cta": "Create free account",
     "colProduct": "Product",
+    "colCompare": "Compare",
     "colAccount": "Account",
     "colLegal": "Legal",
     "pricing": "Pricing",
