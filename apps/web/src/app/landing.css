@@ -1101,3 +1101,143 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+/* Grade de 4 itens: 2x2 em vez de 3+1, que deixa uma célula vazia. */
+@media (min-width: 768px) {
+  .gtm-integrations.gtm-pairs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Chips de posicionamento do hero e faixa de provedores das páginas públicas
+   (/security e /support). Painel sobre painel e hairline de 1px, no mesmo
+   vocabulário dos cards; o violeta fica no marcador, não no texto. */
+.gtm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0;
+  margin: 0 0 32px;
+  list-style: none;
+}
+.gtm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  color: var(--ms-bone);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.gtm-chip::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ms-violet);
+}
+.gtm-subhead {
+  margin: 48px 0 0;
+}
+.gtm-partners {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 32px 0 0;
+  list-style: none;
+}
+.gtm-partners li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 20px;
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line);
+  border-radius: 12px;
+}
+.gtm-partners strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.gtm-partner-role {
+  color: var(--ms-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+/* Compliance com estado explícito: rótulo à esquerda, chip de estado, corpo.
+   Duas cores de ponto só (sucesso e violeta) — o acento continua contido. */
+.gtm-status-grid {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 32px 0 0;
+  list-style: none;
+}
+.gtm-status-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 24px;
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line);
+  border-radius: 12px;
+}
+.gtm-status-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.gtm-status-label {
+  font-size: 16px;
+  font-weight: 600;
+}
+.gtm-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 12px;
+  background: var(--ms-inset);
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  color: var(--ms-muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.gtm-status-chip::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ms-violet);
+}
+.gtm-status-chip.gtm-is-ok::before {
+  background: var(--ms-success);
+}
+.gtm-status-chip.gtm-is-none::before {
+  background: var(--ms-faint);
+}
+.gtm .gtm-status-body {
+  margin: 0;
+  max-width: none;
+}
+@media (min-width: 1024px) {
+  .gtm-status-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 768px) {
+  .gtm-partners {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  .gtm-partners {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
