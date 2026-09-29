@@ -79,6 +79,32 @@
   justify-items: center;
 }
 
+/* One-click way back to the marketing site — the auth screens otherwise
+   dead-end a visitor who arrived from the site. */
+.back {
+  position: absolute;
+  top: 22px;
+  left: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: var(--ms-muted);
+  text-decoration: none;
+  transition: color 160ms ease;
+  z-index: 1;
+}
+
+.back:hover,
+.back:focus-visible {
+  color: var(--ms-bone);
+}
+
+/* The wordmark doubles as the way home, per convention. */
+.brand {
+  display: inline-flex;
+}
+
 /* Social providers: stacked on narrow screens, one row on desktop. auto-fit
    makes a lone provider span the full width with no special case. */
 .social {

@@ -86,6 +86,7 @@ export function AuthForm({
   const tSocial = useTranslations("auth.social");
   const tLegal = useTranslations("auth.legal");
   const tCommon = useTranslations("common");
+  const tAuth = useTranslations("auth");
   const router = useRouter();
   const params = useSearchParams();
   // An invited user carries ?next=/invite/... — signup sends them to accept
@@ -268,19 +269,25 @@ export function AuthForm({
 
   return (
     <main className={styles.screen}>
+      {/* Every auth screen keeps the marketing site one click away. */}
+      <Link href="/" className={styles.back}>
+        <span aria-hidden="true">←</span> {tAuth("backToSite")}
+      </Link>
       {/* biome-ignore lint/performance/noImgElement: decorative full-bleed backdrop, no optimization needed */}
       <img src="/auth/waves-dark.webp" alt="" className={`ms-dark-only ${styles.backdrop}`} />
       {/* biome-ignore lint/performance/noImgElement: decorative full-bleed backdrop, no optimization needed */}
       <img src="/auth/waves-light.webp" alt="" className={`ms-light-only ${styles.backdrop}`} />
       <SilkCanvas />
       <div className={styles.column}>
-        {/* biome-ignore lint/performance/noImgElement: static SVG logo, nothing for next/image to optimize */}
-        <img
-          src="/logo/mepmail-wordmark.svg"
-          className="ms-wordmark"
-          alt={tCommon("appName")}
-          height={22}
-        />
+        <Link href="/" className={styles.brand}>
+          {/* biome-ignore lint/performance/noImgElement: static SVG logo, nothing for next/image to optimize */}
+          <img
+            src="/logo/mepmail-wordmark.svg"
+            className="ms-wordmark"
+            alt={tCommon("appName")}
+            height={22}
+          />
+        </Link>
         <h1 className={`ms-display ${styles.headline}`}>{t("title")}</h1>
         <p className={styles.subline}>
           {t("subline")} <Link href={otherPage}>{t("sublineLink")}</Link>
