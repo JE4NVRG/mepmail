@@ -207,7 +207,8 @@ export default async function RootPage() {
           </div>
         </section>
 
-        <section className="gtm-section">
+        {/* Seção do produto: alvo real do item "Product" da nav v2 (nav_rows==1). */}
+        <section className="gtm-section" id="product">
           <div className="gtm-container">
             <p className="gtm-eyebrow">{t("structure.eyebrow")}</p>
             <h2>{t("structure.title")}</h2>
