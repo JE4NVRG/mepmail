@@ -1,0 +1,171 @@
+{
+  "meta": {
+    "title": "Changelog — o que saiu no MepMail",
+    "description": "Todas as releases recentes do MepMail, mais novas primeiro: landing valor-primeiro e logos oficiais, /security e /support, canais de notificação, beta aberta, limites dos planos e a CLI de migração — com a data em que cada uma chegou à main."
+  },
+  "hero": {
+    "eyebrow": "Changelog",
+    "title": "O que <highlight>saiu</highlight>, release a release.",
+    "lead": "O MepMail é construído aberto. Esta é a lista corrida de releases, mais novas primeiro — o que mudou, datado pelo dia em que chegou ao produto. O mesmo histórico vive no CHANGELOG.md do repositório.",
+    "note": "A beta está aberta e é self-serve: crie uma conta grátis, sem cartão.",
+    "badges": [
+      "Beta aberta · self-serve",
+      "Releases datadas",
+      "EN + PT-BR",
+      "Apoiado no CHANGELOG.md"
+    ],
+    "ctaDocs": "Ler a documentação"
+  },
+  "feed": {
+    "eyebrow": "Releases",
+    "title": "Releases recentes",
+    "body": "Seis das releases mais recentes. O histórico anterior está no changelog do repositório.",
+    "labels": {
+      "added": "Adicionado",
+      "changed": "Alterado",
+      "fixed": "Corrigido"
+    }
+  },
+  "releases": [
+    {
+      "version": "0.44",
+      "date": "2026-09-29",
+      "title": "Landing valor-primeiro, logos oficiais e quotas +10%",
+      "summary": "O site público parte da proposta de valor e de logos reais das marcas, e toda cota de envio cresceu 10%.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A landing agora abre pela proposta de valor e por um mural com os logos oficiais das integrações, no lugar de uma parede de recursos.",
+            "Marcas oficiais coloridas na home, em /integrations e no mockup do produto.",
+            "Header flat e responsivo com rodapé balanceado — colunas Product, Compare, Account e Legal em toda página pública."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": ["Quotas de envio +10% de ponta a ponta (core, painel, docs e testes)."]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Link de volta ao site nas telas de autenticação, para login e cadastro não deixarem o visitante preso."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.43",
+      "date": "2026-09-29",
+      "title": "Páginas institucionais e limites v2",
+      "summary": "/security e /support saem como vitrines, /integrations abre, e os planos ganham mais domínios e workspaces.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "/security e /support como páginas de vitrine: controles, subprocessadores, o roadmap de compliance (SOC 2 / ISO 27001 como item de roadmap, nunca como manchete) e o FAQ enterprise.",
+            "/integrations, com o mural de fornecedores e cards de setup por ferramenta.",
+            "security.txt."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Limites dos planos v2: mais domínios e workspaces, contatos ilimitados no Starter."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Preços da landing localizados (separadores US em inglês, rótulos de volume por locale)."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.42",
+      "date": "2026-09-29",
+      "title": "Canais de notificação, modelos e login com Microsoft",
+      "summary": "Canais de Slack, Discord e Telegram, uma galeria de modelos prontos e login social com Microsoft.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Canais de notificação Slack, Discord e Telegram, formatados automaticamente pela URL do webhook.",
+            "Galeria de modelos prontos (10 starters, EN/PT) com preview e cópia em 1 clique.",
+            "Login social com Microsoft (better-auth), nos dois idiomas."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.41",
+      "date": "2026-09-28",
+      "title": "Console, ferramentas de operador e descoberta por agentes",
+      "summary": "Um Console do operador, o server card do MCP na origem do MCP, atribuição de canal no cadastro e a primeira onda de documentação.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Console do operador: usuários da instância, auditoria, regiões e segurança, mais um tile de Users no overview.",
+            "O server card do MCP também servido na origem do endpoint MCP, com os tools[] publicados.",
+            "Atribuição de canal no cadastro e eventos server-side do funil no Umami.",
+            "Alerta no Telegram a cada novo cadastro, com a origem (utm/campanha)."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Documentação onda 1: página dos pacotes npm, rate limits com Retry-After, catálogo de erros e o caminho de instalação do MCP."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.40",
+      "date": "2026-09-28",
+      "title": "Beta aberta, SEO e docs self-serve",
+      "summary": "Cadastro aberto na landing e na documentação, robots.txt e sitemap.xml destravados, analytics self-hosted e o comando doctor da CLI.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Cadastro aberto na landing e na documentação: sem convite, sem limite de vagas; cada conta é limitada a 100 e-mails por dia no plano Free.",
+            "Analytics self-hosted (Umami) instalado no app web.",
+            "doctor e emails list/get na CLI de migração."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": ["robots.txt e sitemap.xml destravados, com as páginas legais indexadas."]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "testTimeout do Vitest fixado em apps/web; um 404 da CLI não culpa mais a URL e --after é validado como UUID.",
+            "Header da landing no mobile dentro da tela, com a CTA de criar conta sempre visível."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.39",
+      "date": "2026-09-27",
+      "title": "Páginas legais e landing focada em conversão",
+      "summary": "Páginas de Termos, Privacidade e Reembolso mais uma rodada da landing em torno da demo, da confiança e do programa de fundadores.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Páginas de Termos, Privacidade e Reembolso (PT/EN) com a coluna Legal fixa no rodapé.",
+            "Rodada de conversão da landing: demo, confiança, programa de fundadores, FAQ, CTAs e a seção do MCP."
+          ]
+        }
+      ]
+    }
+  ],
+  "close": {
+    "title": "Veja a próxima release quando ela sair.",
+    "body": "Crie uma conta grátis e acompanhe o produto por dentro — a beta está aberta, sem cartão.",
+    "cta": "Ler a documentação"
+  }
+}

@@ -21,6 +21,7 @@ const NAMESPACES = [
   "alternatives",
   "landing",
   "integrations",
+  "changelog",
   "security",
   "support",
   "legal",
