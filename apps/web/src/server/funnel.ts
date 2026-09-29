@@ -50,9 +50,7 @@ export async function recordSignupAttribution(
   userId: string,
   cookieHeader: string | null,
 ): Promise<SignupAttribution | null> {
-  const visit = parseAttributionCookie(
-    cookieValue(cookieHeader, ATTRIBUTION_COOKIE) ?? undefined,
-  );
+  const visit = parseAttributionCookie(cookieValue(cookieHeader, ATTRIBUTION_COOKIE) ?? undefined);
   if (!visit) return null;
   const attribution = attributionFromVisit(visit);
   try {

@@ -41,9 +41,7 @@ describe("buildAwsSetupScript", () => {
     expect(script).not.toMatch(/__(QUEUE|TOPIC|ACCOUNT)__/);
     expect(script).toContain(`"arn:aws:iam::'"$ACCOUNT_ID"':user/mepmail"`);
     expect(script).toContain('echo "SQS_QUEUE_URL=$QUEUE_URL"');
-    expect(script).toContain(
-      "aws sesv2 create-configuration-set --configuration-set-name mepmail",
-    );
+    expect(script).toContain("aws sesv2 create-configuration-set --configuration-set-name mepmail");
     expect(script).toContain(
       '"MatchingEventTypes":["DELIVERY","DELIVERY_DELAY","BOUNCE","COMPLAINT","REJECT","RENDERING_FAILURE"]',
     );

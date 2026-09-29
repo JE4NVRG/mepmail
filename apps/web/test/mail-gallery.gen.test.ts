@@ -10,8 +10,8 @@
  */
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
 import { ACCOUNT_MAIL_KINDS, buildAccountMail } from "@millionsend/core";
+import { describe, expect, it } from "vitest";
 import {
   buildInvitationEmail,
   buildResetEmail,
@@ -90,7 +90,8 @@ const LOCALE_VALUES: Record<(typeof LOCALES)[number], Record<string, string>> = 
     finishesAt: "20 de outubro de 2026, 14:00 UTC",
     until: "20 de outubro de 2026, 14:00 UTC",
     when: "27 de setembro de 2026, 19:20 UTC",
-    release: "Quando a cota do novo período abrir, os e-mails parados saem sozinhos — nada precisa ser feito.",
+    release:
+      "Quando a cota do novo período abrir, os e-mails parados saem sozinhos — nada precisa ser feito.",
   },
   en: {
     date: "October 15, 2026",
@@ -101,7 +102,8 @@ const LOCALE_VALUES: Record<(typeof LOCALES)[number], Record<string, string>> = 
     when: "September 27, 2026, 19:20 UTC",
     failed: " 37 failed.",
     emails: "3 emails",
-    release: "When the new period's quota opens, the parked emails go out on their own — nothing to do.",
+    release:
+      "When the new period's quota opens, the parked emails go out on their own — nothing to do.",
   },
 };
 
@@ -152,7 +154,7 @@ const GROUPS: Record<string, string> = {
   welcome: "Conta & boas-vindas",
   password_changed: "Conta & boas-vindas",
   mcp: "Conta & boas-vindas",
-  "api_key": "Conta & boas-vindas",
+  api_key: "Conta & boas-vindas",
   webhook: "Conta & boas-vindas",
   member: "Conta & boas-vindas",
   invitation: "Conta & boas-vindas",
@@ -174,7 +176,11 @@ function groupOf(kind: string): string {
 }
 
 function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 describe.skipIf(process.env.MAIL_GALLERY !== "1")("mail gallery generator", () => {
@@ -212,7 +218,14 @@ describe.skipIf(process.env.MAIL_GALLERY !== "1")("mail gallery generator", () =
         url: SAMPLE_URL,
         locale,
       });
-      rendered.push({ group: groupOf("password_reset"), label: "password_reset", kind: "password_reset", locale, subject: reset.subject, html: reset.html });
+      rendered.push({
+        group: groupOf("password_reset"),
+        label: "password_reset",
+        kind: "password_reset",
+        locale,
+        subject: reset.subject,
+        html: reset.html,
+      });
       void probeR;
 
       const verify = buildVerificationEmail({
@@ -221,10 +234,24 @@ describe.skipIf(process.env.MAIL_GALLERY !== "1")("mail gallery generator", () =
         url: SAMPLE_URL,
         locale,
       });
-      rendered.push({ group: groupOf("email_verification"), label: "email_verification", kind: "email_verification", locale, subject: verify.subject, html: verify.html });
+      rendered.push({
+        group: groupOf("email_verification"),
+        label: "email_verification",
+        kind: "email_verification",
+        locale,
+        subject: verify.subject,
+        html: verify.html,
+      });
 
       const updates = buildUpdatesConfirmEmail({ to: "jean@je4ndev.com", url: SAMPLE_URL, locale });
-      rendered.push({ group: groupOf("updates"), label: "updates.confirm", kind: "updates.confirm", locale, subject: updates.subject, html: updates.html });
+      rendered.push({
+        group: groupOf("updates"),
+        label: "updates.confirm",
+        kind: "updates.confirm",
+        locale,
+        subject: updates.subject,
+        html: updates.html,
+      });
 
       const invite = buildInvitationEmail({
         to: "novo@exemplo.com",
@@ -235,7 +262,14 @@ describe.skipIf(process.env.MAIL_GALLERY !== "1")("mail gallery generator", () =
         expiresInDays: 7,
         locale,
       });
-      rendered.push({ group: groupOf("invitation"), label: "invitation", kind: "invitation", locale, subject: invite.subject, html: invite.html });
+      rendered.push({
+        group: groupOf("invitation"),
+        label: "invitation",
+        kind: "invitation",
+        locale,
+        subject: invite.subject,
+        html: invite.html,
+      });
     }
 
     // --- Write files ------------------------------------------------------

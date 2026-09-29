@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { PRICE_ROWS, formatUsd } from "@/lib/landing-pricing";
+import { formatUsd, PRICE_ROWS } from "@/lib/landing-pricing";
 import { savingsForIndex } from "@/lib/landing-savings";
 
 export interface CalcLabels {
@@ -67,7 +67,9 @@ export function LandingCalculator({ labels }: { labels: CalcLabels }) {
           <strong>{formatUsd(savings.competitor.price)}</strong>
         </p>
         <p className="gtm-calc-savings">{savingsText}</p>
-        <p className="gtm-note">{labels.annual.replace("{usd}", formatUsd(savings.savingsYearUsd))}</p>
+        <p className="gtm-note">
+          {labels.annual.replace("{usd}", formatUsd(savings.savingsYearUsd))}
+        </p>
       </div>
       <a className="ms-btn ms-btn-primary gtm-action" href={mailto}>
         {labels.cta}

@@ -74,7 +74,9 @@ describe("createClient", () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
-    const error = (await client.request("GET", "/usage").catch((e: unknown) => e)) as MepMailApiError;
+    const error = (await client
+      .request("GET", "/usage")
+      .catch((e: unknown) => e)) as MepMailApiError;
 
     expect(error.apiName).toBe("http_502");
     expect(error.payload).toBe("boom");

@@ -148,7 +148,12 @@ const occurrences = (haystack: string, needle: string): number => haystack.split
 beforeAll(async () => {
   [fake, cloud] = await Promise.all([
     startFakeResend(realisticAccount()),
-    startLiveApi({ isCloud: true, appBaseUrl: "https://app.example.test", slug: "cloud", plan: "starter" }),
+    startLiveApi({
+      isCloud: true,
+      appBaseUrl: "https://app.example.test",
+      slug: "cloud",
+      plan: "starter",
+    }),
   ]);
   cwd = mkdtempSync(join(tmpdir(), "mepmail-e2e-"));
   writeFileSync(join(cwd, ".gitignore"), "node_modules\n");

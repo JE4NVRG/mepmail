@@ -1,10 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { serve } from "@hono/node-server";
-import { eq } from "drizzle-orm";
 import { createApi } from "@millionsend/api";
 import { EnvKeyring, generateApiKey } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
+import { eq } from "drizzle-orm";
 
 export interface LiveApi {
   /** http://127.0.0.1:<ephemeral port> */

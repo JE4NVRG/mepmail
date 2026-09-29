@@ -39,9 +39,7 @@ function commandOf<T>(calls: object[], ctor: new (...args: never[]) => T): T {
 
 describe("domainConfigurationSetName", () => {
   it("sanitizes the domain into a deterministic name", () => {
-    expect(domainConfigurationSetName("Updates.Example.com")).toBe(
-      "mepmail-updates-example-com",
-    );
+    expect(domainConfigurationSetName("Updates.Example.com")).toBe("mepmail-updates-example-com");
   });
 });
 

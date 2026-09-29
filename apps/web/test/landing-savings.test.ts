@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COMPETITORS, PRICE_ROWS, formatUsd } from "../src/lib/landing-pricing";
+import { COMPETITORS, formatUsd, PRICE_ROWS } from "../src/lib/landing-pricing";
 import { computeSavings, savingsForIndex } from "../src/lib/landing-savings";
 
 // The exact cells the public table shipped before the calculator refactor; the
@@ -12,6 +12,13 @@ const ORIGINAL_TABLE = [
   ["1,5M", "US$ 429", "US$ 825", "US$ 799", "US$ 775", "US$ 700", "39–48%"],
   ["2,5M", "US$ 549", "US$ 1.150", "US$ 1.099", "(vendas)", "US$ 1.250", "50–56%"],
 ] as const;
+
+// TS-safe accessor so the tests never need the non-null assertion operator.
+const priceRow = (index: number) => {
+  const row = PRICE_ROWS[index];
+  if (!row) throw new Error(`missing PRICE_ROWS[${index}]`);
+  return row;
+};
 
 describe("landing pricing data", () => {
   it("reproduces the published table cell for cell", () => {
@@ -46,20 +53,20 @@ describe("landing pricing data", () => {
 
 describe("computeSavings", () => {
   it("uses the cheapest competitor with a public price", () => {
-    const first = computeSavings(PRICE_ROWS[0]!);
+    const first = computeSavings(priceRow(0));
     expect(first.competitor.name).toBe("SendGrid"); // 34,95 < 35 (Resend)
     expect(first.savingsUsd).toBeCloseTo(14.95);
     expect(first.savingsPct).toBe(43);
     expect(first.savingsYearUsd).toBeCloseTo(179.4);
 
-    const top = computeSavings(PRICE_ROWS[5]!);
+    const top = computeSavings(priceRow(5));
     expect(top.competitor.name).toBe("SendGrid"); // 1.099 < 1.150 (Resend)
     expect(top.savingsPct).toBe(50);
   });
 
   it("skips rows without a public competitor price", () => {
     // 2,5M has Postmark as "(vendas)" — null must not win or crash the walk.
-    const savings = computeSavings(PRICE_ROWS[5]!);
+    const savings = computeSavings(priceRow(5));
     expect(savings.competitor.price).toBeGreaterThan(0);
     expect(COMPETITORS.map((c) => c.key)).not.toContain(undefined);
   });

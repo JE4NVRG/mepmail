@@ -210,6 +210,26 @@ ABUSE_JUDGE_MODEL=jev-latest
 # it on.
 CONTENT_REVEAL=off
 
+# Server-side funnel events (signup, email verified, first send, checkout,
+# payment) are POSTed to the Umami collector named here — the browser pageview
+# snippet is separate and unaffected. BOTH values must be set: there is no
+# default, so nothing is ever reported to a collector this deployment did not
+# choose itself. Unset, the server emits no funnel events at all.
+# UMAMI_ENDPOINT=https://umami.example.com/api/send
+# UMAMI_WEBSITE_ID=00000000-0000-0000-0000-000000000000
+
+# Signup alerts (cloud operator): every new account posts one Telegram
+# message naming the address and the channel the visit carried — utm_source,
+# campaign and utm_content, resolved to the community the link was posted in
+# (apps/web/src/server/signup-alert.ts). BOTH values or neither; unset, no
+# alert is ever sent. TELEGRAM_MESSAGE_THREAD_ID targets one topic of a forum
+# supergroup. Get the token from @BotFather; the chat id from getUpdates or
+# the chat's link. Use a dedicated bot: the token grants send-only access to
+# that chat, and nothing else in this instance reads it.
+# TELEGRAM_BOT_TOKEN=
+# TELEGRAM_CHAT_ID=
+# TELEGRAM_MESSAGE_THREAD_ID=
+
 # The first user can always register; after that, signup stays closed unless
 # this is true. Keep false when the dashboard is reachable from the internet.
 ALLOW_SIGNUP=false
@@ -389,6 +409,10 @@ GOOGLE_CLIENT_SECRET=
 # GitHub: https://github.com/settings/developers (New OAuth App)
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
+
+# Microsoft: https://entra.microsoft.com (App registrations, Web platform)
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
 
 # Worker sizing. Lanes: about 1.2 per message/second of SES send rate (default fits 14/s).
 # WORKER_REPLICAS divides the send rate per process when more than one worker runs.

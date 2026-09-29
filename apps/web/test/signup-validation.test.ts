@@ -18,7 +18,9 @@ describe("signup field mismatch", () => {
   });
 
   it("flags a different password", () => {
-    expect(signupFieldMismatch({ ...base, confirmPassword: "supersecre" })).toBe("passwordMismatch");
+    expect(signupFieldMismatch({ ...base, confirmPassword: "supersecre" })).toBe(
+      "passwordMismatch",
+    );
   });
 
   it("reports the email mismatch first, before the password one", () => {

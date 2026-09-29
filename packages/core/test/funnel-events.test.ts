@@ -34,9 +34,8 @@ function target(overrides: Partial<FunnelEventTarget> = {}): FunnelEventTarget {
   return { endpoint: ENDPOINT, websiteId: WEBSITE, hostname: "mepmail.example.com", ...overrides };
 }
 
-const body = (init: RequestInit) => JSON.parse(String(init.body)) as ReturnType<
-  typeof buildFunnelEventPayload
->;
+const body = (init: RequestInit) =>
+  JSON.parse(String(init.body)) as ReturnType<typeof buildFunnelEventPayload>;
 
 describe("attributionFromVisit", () => {
   it("keeps the campaign fields and the landing path, dropping the query", () => {
@@ -63,9 +62,9 @@ describe("attributionFromVisit", () => {
   });
 
   it("falls back to the referrer's host, then to direct", () => {
-    expect(attributionFromVisit({ referrer: "https://news.ycombinator.com/item?id=1" }).source).toBe(
-      "news.ycombinator.com",
-    );
+    expect(
+      attributionFromVisit({ referrer: "https://news.ycombinator.com/item?id=1" }).source,
+    ).toBe("news.ycombinator.com");
     expect(attributionFromVisit({}).source).toBe("direct");
     // A value that is not parseable as a URL is kept as typed rather than lost.
     expect(attributionFromVisit({ referrer: "morning-brew" }).source).toBe("morning-brew");
@@ -152,7 +151,10 @@ describe("sendFunnelEvent", () => {
     const logs: string[] = [];
     const { fetchImpl } = stubFetch(500);
     expect(
-      await sendFunnelEvent(buildFunnelEventPayload({ name: "signup", websiteId: WEBSITE, hostname: "h" }), target({ fetch: fetchImpl, log: (m) => logs.push(m) })),
+      await sendFunnelEvent(
+        buildFunnelEventPayload({ name: "signup", websiteId: WEBSITE, hostname: "h" }),
+        target({ fetch: fetchImpl, log: (m) => logs.push(m) }),
+      ),
     ).toBe(false);
     expect(logs.join(" ")).toContain("collector answered 500");
 
@@ -160,7 +162,10 @@ describe("sendFunnelEvent", () => {
       throw new Error("offline");
     }) as unknown as typeof fetch;
     expect(
-      await sendFunnelEvent(buildFunnelEventPayload({ name: "signup", websiteId: WEBSITE, hostname: "h" }), target({ fetch: unreachable, log: (m) => logs.push(m) })),
+      await sendFunnelEvent(
+        buildFunnelEventPayload({ name: "signup", websiteId: WEBSITE, hostname: "h" }),
+        target({ fetch: unreachable, log: (m) => logs.push(m) }),
+      ),
     ).toBe(false);
     expect(logs.join(" ")).toContain("collector unreachable");
 
@@ -202,10 +207,10 @@ describe("emitFunnelEvent", () => {
     ({ db, close } = await createTestDb());
     teamId = await createTeam(db, "funnel-team");
     userId = `user_${Math.random().toString(36).slice(2)}`;
-    await db.insert(schema.user).values({ id: userId, name: "Ada", email: `${userId}@example.com` });
     await db
-      .insert(schema.teamMembers)
-      .values({ teamId, userId, role: "owner" });
+      .insert(schema.user)
+      .values({ id: userId, name: "Ada", email: `${userId}@example.com` });
+    await db.insert(schema.teamMembers).values({ teamId, userId, role: "owner" });
     await db.insert(schema.signupAttribution).values({
       userId,
       source: "linkedin",

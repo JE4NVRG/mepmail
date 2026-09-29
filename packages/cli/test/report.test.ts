@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildOffer, dnsCards, idRows, printSummary, type Report, renderReportMd } from "../src/report.js";
 import type { Snapshot, TargetUsage } from "../src/model.js";
+import {
+  buildOffer,
+  dnsCards,
+  idRows,
+  printSummary,
+  type Report,
+  renderReportMd,
+} from "../src/report.js";
 import { setColorMode } from "../src/theme.js";
 
 describe("buildOffer", () => {

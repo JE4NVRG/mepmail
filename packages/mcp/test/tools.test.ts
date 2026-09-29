@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { describe, expect, it, vi } from "vitest";
 import { MepMailApiError } from "../src/client.js";
-import { TOOLS, registerTools } from "../src/tools.js";
+import { registerTools, TOOLS } from "../src/tools.js";
 
 describe("tool registry", () => {
   it("has unique names, real descriptions and honest annotations", () => {
@@ -53,7 +53,9 @@ describe("tool registry", () => {
       path: "/emails/e_1/cancel",
     });
 
-    expect(byName.get("update_email")?.build({ id: "e_1", scheduled_at: "in 2 hours" })).toMatchObject({
+    expect(
+      byName.get("update_email")?.build({ id: "e_1", scheduled_at: "in 2 hours" }),
+    ).toMatchObject({
       method: "PATCH",
       path: "/emails/e_1",
       body: { scheduled_at: "in 2 hours" },

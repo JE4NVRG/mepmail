@@ -1,6 +1,6 @@
 import { index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { teams } from "./teams.js";
 import { user } from "./auth.js";
+import { teams } from "./teams.js";
 
 /**
  * Where a sign-up came from, as the visit's landing page could see it. One row
