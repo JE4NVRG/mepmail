@@ -8,14 +8,17 @@ import {
 } from "@/components/site-chrome";
 import { StackLogoRow } from "@/components/stack-logos";
 import { legalLinks } from "@/lib/legal-links";
-import { MCP_CHIP, STACK_LOGOS } from "@/lib/stack-logos";
+import { STACK_SLUGS } from "@/lib/stack-logos";
 import "../landing.css";
 
 const contact = "mailto:jean@je4ndev.com";
 const canonical = "/integrations";
 
-/** The hero mural: every mark the page can point at, plus the MCP chip. */
-const MURAL_SLUGS = [...STACK_LOGOS.map((logo) => logo.slug), MCP_CHIP];
+/**
+ * The hero mural: every vendor mark the page can point at. The MCP text chip is
+ * not a brand mark, so it stays inside the "AI agents" card instead.
+ */
+const MURAL_SLUGS = STACK_SLUGS;
 
 type IntegrationCard = {
   name: string;

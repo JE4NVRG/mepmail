@@ -1188,18 +1188,22 @@
   }
 }
 
-/* Faixa "works with your stack": logos monocromáticos vendorizados em
-   public/logos/integrations (brancos, para o ground escuro). Discreta de
-   propósito: fica entre o herói e o produto e só ganha opacidade no hover. */
+/* Faixa "works with your stack": as marcas oficiais dos fornecedores, em cor,
+   vendorizadas em public/logos/integrations (ver o README da pasta).
+   Normalização por ALTURA: o CSS fixa a altura e a largura acompanha a razão
+   de tinta de cada arquivo, então um lockup largo (Docker 4.4:1) não é
+   espremido num quadrado. A marca mais larga a 28px mede ~123px; o
+   max-width:100% existe para o caso responsivo, não como cap de design.
+   Repouso em 0.85 e hover para 1 + leve scale: colorido, não chapado. */
 .gtm-stack {
-  padding-block: 40px;
+  padding-block: var(--ms-sp-12);
   border-block: 1px solid var(--ms-line-strong);
   background: var(--ms-void);
 }
 .gtm-stack-inner {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 24px;
 }
 .gtm-stack-eyebrow {
   margin: 0;
@@ -1213,7 +1217,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 18px 32px;
+  gap: 24px 40px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -1221,14 +1225,20 @@
 .gtm-stack-logos li {
   display: inline-flex;
   align-items: center;
-  opacity: 0.6;
-  transition: opacity 0.18s ease;
+  opacity: 0.85;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
 }
 .gtm-stack-logos li:hover {
   opacity: 1;
+  transform: scale(1.06);
 }
 .gtm-stack-logos img {
   display: block;
+  height: 28px;
+  width: auto;
+  max-width: 100%;
 }
 .gtm-mcp-chip {
   display: inline-flex;
@@ -1265,20 +1275,37 @@
 .gtm-integrations-mural {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-top: 32px;
-  padding-top: 24px;
+  gap: 20px;
+  margin-top: 40px;
+  padding-top: 32px;
   border-top: 1px solid var(--ms-line-strong);
 }
 .gtm-stack-logos.gtm-integration-mark {
   gap: 14px 18px;
 }
 .gtm-stack-logos.gtm-integration-mark li {
-  opacity: 0.75;
+  opacity: 0.85;
+}
+.gtm-stack-logos.gtm-integration-mark img {
+  height: 22px;
 }
 .gtm-integration-mark .gtm-mcp-chip {
   min-width: 22px;
   height: 22px;
+}
+/* O mural da home e o do /integrations respiram menos no estreito: gaps e
+   altura caem juntos para a grade quebrar em linhas limpas, sem sobras. */
+@media (max-width: 640px) {
+  .gtm-stack-logos {
+    gap: 18px 28px;
+  }
+  .gtm-stack-logos img {
+    height: 24px;
+  }
+  .gtm-integrations-mural {
+    margin-top: 32px;
+    padding-top: 24px;
+  }
 }
 
 /* Grade de 4 itens: 2x2 em vez de 3+1, que deixa uma célula vazia. */

@@ -14,7 +14,7 @@ import { StackLogoRow } from "@/components/stack-logos";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
 import { formatUsd, formatVolume, PRICE_ROWS } from "@/lib/landing-pricing";
 import { legalLinks } from "@/lib/legal-links";
-import { HOME_STACK_LOGOS, MCP_CHIP } from "@/lib/stack-logos";
+import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
 import { hasSession } from "@/server/auth";
 import "./landing-calc.css";
 import "./landing.css";
@@ -23,8 +23,12 @@ const contact = "mailto:jean@je4ndev.com";
 
 const cellKeys = ["MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "vantagem"] as const;
 
-/** The landing strip: the surfaces we ship, plus the drawn MCP chip. */
-const stackSlugs = [...HOME_STACK_LOGOS.map((logo) => logo.slug), MCP_CHIP];
+/**
+ * The landing strip: only the surfaces we ship, as their own brand marks. The
+ * MCP text chip stays in the card that explains MCP — a logo band of vendor
+ * marks reads as one language.
+ */
+const stackSlugs = HOME_STACK_LOGOS.map((logo) => logo.slug);
 
 const MCP_CONFIG = `{
   "mcpServers": {
