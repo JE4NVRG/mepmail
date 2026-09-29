@@ -9,8 +9,8 @@
  * the referrer's host, then to "direct") live with the row that is written, in
  * packages/core funnel-events.
  *
- * The cookie is the encoded JSON, so a campaign name with a space, a quote or
- * an accent cannot produce a value a browser refuses to store.
+ * The cookie is JSON encoded by NextResponse.cookies at the HTTP boundary.
+ * The helper supplies raw JSON, avoiding a second layer of URI encoding.
  */
 
 /** Cookie the proxy writes and the sign-up hook reads. */
@@ -76,14 +76,20 @@ export function attributionCookieValue(url: URL, referer: string | null): string
   if (origin) visit.referrer = origin;
   if (!visit.source && !visit.referrer) return null;
   visit.path = url.pathname.slice(0, 200);
-  return encodeURIComponent(JSON.stringify(visit));
+  return JSON.stringify(visit);
 }
 
 /** The visit out of a cookie the proxy wrote; null when it is absent or malformed. */
 export function parseAttributionCookie(value: string | undefined | null): RawVisitCookie | null {
   if (!value) return null;
   try {
-    const parsed: unknown = JSON.parse(decodeURIComponent(value));
+    // Aceita JSON do NextRequest e até duas camadas do cookie legado.
+    // Não decodifica percentuais literais dentro de um objeto já decodificado.
+    let decoded = value;
+    for (let layer = 0; layer < 2 && decoded.startsWith("%"); layer++) {
+      decoded = decodeURIComponent(decoded);
+    }
+    const parsed: unknown = JSON.parse(decoded);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
     return parsed as RawVisitCookie;
   } catch {
