@@ -1,7 +1,7 @@
 "use client";
 
-import { TemplateEditor } from "../editor";
+import { StarterGallery } from "./starter-gallery";
 
 export default function NewTemplatePage() {
-  return <TemplateEditor />;
+  return <StarterGallery />;
 }

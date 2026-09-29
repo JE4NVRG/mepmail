@@ -18,6 +18,21 @@
     "deleteConfirm": "Delete",
     "htmlChipHint": "Created as HTML; opens in code mode"
   },
+  "starter": {
+    "title": "New template",
+    "subtitle": "Start from a ready-made design, or from a blank canvas.",
+    "blank": "Start blank",
+    "use": "Use this template",
+    "loadError": "Couldn't load the starting designs.",
+    "retry": "Retry",
+    "createError": "Couldn't create the template.",
+    "categories": {
+      "onboarding": "Onboarding",
+      "authentication": "Authentication",
+      "commerce": "Commerce",
+      "marketing": "Marketing"
+    }
+  },
   "html": {
     "banner": "Created as HTML. The block editor can't edit this layout faithfully, so it opens in code mode.",
     "editHtml": "Edit HTML",
