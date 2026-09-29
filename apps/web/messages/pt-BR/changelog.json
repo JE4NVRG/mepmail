@@ -1,12 +1,12 @@
 {
   "meta": {
     "title": "Changelog — o que saiu no MepMail",
-    "description": "Todas as releases recentes do MepMail, mais novas primeiro: landing valor-primeiro e logos oficiais, /security e /support, canais de notificação, beta aberta, limites dos planos e a CLI de migração — com a data em que cada uma chegou à main."
+    "description": "Todas as releases recentes do MepMail, mais novas primeiro — o que mudou pra você e o dia em que saiu."
   },
   "hero": {
     "eyebrow": "Changelog",
     "title": "O que <highlight>saiu</highlight>, release a release.",
-    "lead": "O MepMail é construído aberto. Esta é a lista corrida de releases, mais novas primeiro — o que mudou, datado pelo dia em que chegou ao produto. O mesmo histórico vive no CHANGELOG.md do repositório.",
+    "lead": "O MepMail é construído aberto. Esta é a lista corrida de releases, mais novas primeiro — o que mudou pra você, datado pelo dia em que saiu. O histórico bruto vive no CHANGELOG.md do repositório.",
     "note": "A beta está aberta e é self-serve: crie uma conta grátis, sem cartão.",
     "badges": [
       "Beta aberta · self-serve",
@@ -19,7 +19,7 @@
   "feed": {
     "eyebrow": "Releases",
     "title": "Releases recentes",
-    "body": "Seis das releases mais recentes. O histórico anterior está no changelog do repositório.",
+    "body": "As seis releases mais recentes. O histórico anterior está no changelog do repositório.",
     "labels": {
       "added": "Adicionado",
       "changed": "Alterado",
@@ -30,69 +30,57 @@
     {
       "version": "0.44",
       "date": "2026-09-29",
-      "title": "Landing valor-primeiro, logos oficiais e quotas +10%",
-      "summary": "O site público parte da proposta de valor e de logos reais das marcas, e toda cota de envio cresceu 10%.",
+      "title": "10% mais e-mail em todos os planos",
+      "summary": "Todo plano envia 10% mais e-mail pelo mesmo preço — e login/cadastro agora têm caminho de volta ao site.",
       "changes": [
         {
           "kind": "added",
           "items": [
-            "A landing agora abre pela proposta de valor e por um mural com os logos oficiais das integrações, no lugar de uma parede de recursos.",
-            "Marcas oficiais coloridas na home, em /integrations e no mockup do produto.",
-            "Header flat e responsivo com rodapé balanceado — colunas Product, Compare, Account e Legal em toda página pública."
+            "Login e cadastro agora linkam de volta ao site — ninguém fica preso no meio do fluxo.",
+            "Logos oficiais e coloridos de todos os serviços que o MepMail conecta, no site e no produto."
           ]
         },
         {
           "kind": "changed",
-          "items": ["Quotas de envio +10% de ponta a ponta (core, painel, docs e testes)."]
-        },
-        {
-          "kind": "fixed",
-          "items": [
-            "Link de volta ao site nas telas de autenticação, para login e cadastro não deixarem o visitante preso."
-          ]
+          "items": ["Quotas +10% em tudo: o Pro começa em 110.000 e-mails/mês e o Scale chega a 2,75M. Preços inalterados."]
         }
       ]
     },
     {
       "version": "0.43",
       "date": "2026-09-29",
-      "title": "Páginas institucionais e limites v2",
-      "summary": "/security e /support saem como vitrines, /integrations abre, e os planos ganham mais domínios e workspaces.",
+      "title": "Planos mais espaçosos e páginas de confiança",
+      "summary": "Mais domínios e workspaces por plano, contatos ilimitados no Starter, e duas páginas novas explicando segurança e suporte.",
       "changes": [
         {
           "kind": "added",
           "items": [
-            "/security e /support como páginas de vitrine: controles, subprocessadores, o roadmap de compliance (SOC 2 / ISO 27001 como item de roadmap, nunca como manchete) e o FAQ enterprise.",
-            "/integrations, com o mural de fornecedores e cards de setup por ferramenta.",
-            "security.txt."
+            "/security — os controles que protegem seus envios, os serviços em que confiamos e onde o compliance (SOC 2 / ISO 27001) está, sem enrolação.",
+            "/support — como falar com a gente e o que esperar, com FAQ pra times maiores.",
+            "/integrations — todos os serviços que conectam no MepMail, com guia de setup por ferramenta."
           ]
         },
         {
           "kind": "changed",
-          "items": [
-            "Limites dos planos v2: mais domínios e workspaces, contatos ilimitados no Starter."
-          ]
+          "items": ["Mais domínios e workspaces por plano; contatos ilimitados no Starter."]
         },
         {
           "kind": "fixed",
-          "items": [
-            "Preços da landing localizados (separadores US em inglês, rótulos de volume por locale)."
-          ]
+          "items": ["Preços exibidos corretamente em cada idioma."]
         }
       ]
     },
     {
       "version": "0.42",
       "date": "2026-09-29",
-      "title": "Canais de notificação, modelos e login com Microsoft",
-      "summary": "Canais de Slack, Discord e Telegram, uma galeria de modelos prontos e login social com Microsoft.",
+      "title": "Alertas no Slack, Discord e Telegram — e modelos prontos",
+      "summary": "Receba notificação onde seu time já conversa, e comece a partir de 10 modelos de e-mail prontos.",
       "changes": [
         {
           "kind": "added",
           "items": [
-            "Canais de notificação Slack, Discord e Telegram, formatados automaticamente pela URL do webhook.",
-            "Galeria de modelos prontos (10 starters, EN/PT) com preview e cópia em 1 clique.",
-            "Login social com Microsoft (better-auth), nos dois idiomas."
+            "Canais de notificação Slack, Discord e Telegram — cole a URL do webhook e o MepMail formata os alertas.",
+            "Galeria com 10 modelos de e-mail prontos (EN e PT) com preview ao vivo e cópia em 1 clique."
           ]
         }
       ]
@@ -100,64 +88,56 @@
     {
       "version": "0.41",
       "date": "2026-09-28",
-      "title": "Console, ferramentas de operador e descoberta por agentes",
-      "summary": "Um Console do operador, o server card do MCP na origem do MCP, atribuição de canal no cadastro e a primeira onda de documentação.",
+      "title": "Seus agentes de IA agora encontram o MepMail",
+      "summary": "O servidor MCP passa a se anunciar onde as ferramentas de agentes procuram, e a documentação ganhou a primeira grande rodada.",
       "changes": [
         {
           "kind": "added",
           "items": [
-            "Console do operador: usuários da instância, auditoria, regiões e segurança, mais um tile de Users no overview.",
-            "O server card do MCP também servido na origem do endpoint MCP, com os tools[] publicados.",
-            "Atribuição de canal no cadastro e eventos server-side do funil no Umami.",
-            "Alerta no Telegram a cada novo cadastro, com a origem (utm/campanha)."
+            "Auto-descoberta MCP: Claude e outros clientes MCP agora encontram as ferramentas do MepMail sem setup manual.",
+            "Pra quem self-hospeda: console do operador com usuários da instância, auditoria e regiões."
           ]
         },
         {
           "kind": "changed",
-          "items": [
-            "Documentação onda 1: página dos pacotes npm, rate limits com Retry-After, catálogo de erros e o caminho de instalação do MCP."
-          ]
+          "items": ["Documentação onda 1 — pacotes npm, rate limits com Retry-After, catálogo completo de erros e o caminho de instalação do MCP."]
         }
       ]
     },
     {
       "version": "0.40",
       "date": "2026-09-28",
-      "title": "Beta aberta, SEO e docs self-serve",
-      "summary": "Cadastro aberto na landing e na documentação, robots.txt e sitemap.xml destravados, analytics self-hosted e o comando doctor da CLI.",
+      "title": "Beta aberta: cadastre-se e envie hoje",
+      "summary": "Sem convite — crie a conta e comece a enviar. Docs e visibilidade em buscadores melhoraram no caminho.",
       "changes": [
         {
           "kind": "added",
           "items": [
-            "Cadastro aberto na landing e na documentação: sem convite, sem limite de vagas; cada conta é limitada a 100 e-mails por dia no plano Free.",
-            "Analytics self-hosted (Umami) instalado no app web.",
-            "doctor e emails list/get na CLI de migração."
+            "Cadastro aberto: sem convite, sem fila. O plano Free envia 100 e-mails/dia, sem cartão.",
+            "Comando doctor na CLI de migração pra checar seu setup, mais emails list/get."
           ]
         },
         {
           "kind": "changed",
-          "items": ["robots.txt e sitemap.xml destravados, com as páginas legais indexadas."]
+          "items": ["Docs e páginas legais agora são amigáveis a buscadores — mais fáceis de achar quando você pesquisa um erro."]
         },
         {
           "kind": "fixed",
-          "items": [
-            "testTimeout do Vitest fixado em apps/web; um 404 da CLI não culpa mais a URL e --after é validado como UUID.",
-            "Header da landing no mobile dentro da tela, com a CTA de criar conta sempre visível."
-          ]
+          "items": ["Header do mobile fica no lugar, com o botão de criar conta sempre visível."]
         }
       ]
     },
     {
       "version": "0.39",
       "date": "2026-09-27",
-      "title": "Páginas legais e landing focada em conversão",
-      "summary": "Páginas de Termos, Privacidade e Reembolso mais uma rodada da landing em torno da demo, da confiança e do programa de fundadores.",
+      "title": "Termos, Privacidade e Reembolso — em linguagem clara",
+      "summary": "As páginas legais que você espera, e uma landing que mostra o produto em vez de descrevê-lo.",
       "changes": [
         {
           "kind": "added",
           "items": [
-            "Páginas de Termos, Privacidade e Reembolso (PT/EN) com a coluna Legal fixa no rodapé.",
-            "Rodada de conversão da landing: demo, confiança, programa de fundadores, FAQ, CTAs e a seção do MCP."
+            "Políticas de Termos, Privacidade e Reembolso, em inglês e português.",
+            "Landing construída em volta do produto: demo ao vivo, programa de fundadores e respostas diretas no FAQ."
           ]
         }
       ]
