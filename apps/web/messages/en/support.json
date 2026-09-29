@@ -7,7 +7,15 @@
     "eyebrow": "Support",
     "title": "Support at MepMail",
     "lead": "MepMail is founder-operated: the people who build it answer the email. Pick the channel that fits — most questions are already answered in the docs.",
-    "note": "Support runs on a small team, so please include the account email with any question."
+    "note": "Support runs on a small team, so please include the account email with any question.",
+    "badges": [
+      "Founder-operated",
+      "Replies within one business day",
+      "Abuse reports acted on",
+      "Docs · changelog · updates"
+    ],
+    "ctaEmail": "Email support@je4ndev.com",
+    "ctaDocs": "Open the docs"
   },
   "channels": {
     "eyebrow": "Channels",

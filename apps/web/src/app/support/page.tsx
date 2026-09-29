@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { PublicFooter, PublicHeader, type PublicSiteLabels } from "@/components/site-chrome";
+import { DOCS_URL } from "@/lib/docs-links";
 import { legalLinks } from "@/lib/legal-links";
 import "../landing.css";
 
@@ -53,6 +54,7 @@ export default async function SupportPage() {
   } as PublicSiteLabels;
   const channels = t.raw("channels.items") as SupportChannel[];
   const faq = t.raw("faq.items") as FaqItem[];
+  const badges = t.raw("hero.badges") as string[];
 
   return (
     <div className="gtm">
@@ -63,6 +65,21 @@ export default async function SupportPage() {
             <p className="gtm-eyebrow">{t("hero.eyebrow")}</p>
             <h1>{t("hero.title")}</h1>
             <p className="gtm-lead">{t("hero.lead")}</p>
+            <ul className="gtm-chips">
+              {badges.map((badge) => (
+                <li className="gtm-chip" key={badge}>
+                  {badge}
+                </li>
+              ))}
+            </ul>
+            <div className="gtm-actions">
+              <a className="ms-btn ms-btn-primary gtm-action" href="mailto:support@je4ndev.com">
+                {t("hero.ctaEmail")}
+              </a>
+              <a className="ms-btn ms-btn-secondary gtm-action" href={DOCS_URL}>
+                {t("hero.ctaDocs")}
+              </a>
+            </div>
             <p className="gtm-note">{t("hero.note")}</p>
           </div>
         </section>
@@ -72,7 +89,7 @@ export default async function SupportPage() {
             <p className="gtm-eyebrow">{t("channels.eyebrow")}</p>
             <h2>{t("channels.title")}</h2>
             <p>{t("channels.body")}</p>
-            <div className="gtm-integrations">
+            <div className="gtm-integrations gtm-pairs">
               {/*
                 O card "Status page" sai sem href: não existe status page
                 pública (nem URL) hoje. Quando existir, basta preencher o

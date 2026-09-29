@@ -1,18 +1,111 @@
 {
   "meta": {
-    "title": "Segurança no MepMail — controles, subprocessadores e divulgação",
-    "description": "Como o MepMail protege contas e envios: criptografia em trânsito, hash de senhas e de API keys, isolamento por time, limites antiabuso, monitoramento, backups e DKIM/SPF/DMARC — quem processa o quê e como reportar uma vulnerabilidade."
+    "title": "Segurança no MepMail — hospedagem na UE, conteúdo selado, self-host",
+    "description": "O MepMail Cloud roda na Alemanha, é open source sob AGPL e pode ser self-hosted. Corpos de mensagem e anexos selados em repouso, HTTPS com HSTS e CSP estrita, senhas com scrypt e API keys com hash, isolamento por time, backups validados, DKIM/SPF/DMARC — com a lista completa de subprocessadores, o roadmap de compliance e o FAQ enterprise."
   },
   "hero": {
     "eyebrow": "Segurança",
-    "title": "Segurança no MepMail",
-    "lead": "O MepMail é um produto pequeno, operado pelo fundador. Esta página lista os controles que existem de fato hoje — aqueles que você pode cobrar — e diz com clareza o que não existe.",
-    "note": "Última revisão: 29 de setembro de 2026."
+    "title": "Segurança que você pode <highlight>verificar</highlight>.",
+    "lead": "O MepMail Cloud roda na Alemanha, em hardware da Contabo; o produto é open source sob AGPL-3.0 e você pode hospedar tudo no seu próprio servidor. O conteúdo dos seus e-mails — e cada afirmação desta página — está em algo que você confere, não em algo que você precisa acreditar.",
+    "note": "Última revisão: 29 de setembro de 2026. Toda afirmação aqui é uma propriedade do produto em execução, ou está marcada como item de roadmap.",
+    "badges": [
+      "Dados hospedados na UE · Alemanha",
+      "Open source · AGPL-3.0",
+      "Self-host disponível",
+      "Criptografia em trânsito e em repouso",
+      "DKIM · SPF · DMARC"
+    ],
+    "ctaDocs": "Ler a documentação"
+  },
+  "protection": {
+    "eyebrow": "Proteção de dados",
+    "title": "Selado em repouso, criptografado em trânsito, restaurável por construção",
+    "body": "Três coisas decidem a segurança real do seu e-mail: o que o banco guarda, o que a rede vê, e se o backup da noite passada realmente abre.",
+    "items": [
+      {
+        "kind": "Em repouso",
+        "name": "O conteúdo é selado antes de ser guardado",
+        "body": "O que fica no banco é texto cifrado, não uma cópia do e-mail dos seus clientes.",
+        "bullets": [
+          "Todo corpo de mensagem (HTML e texto) e todo anexo é selado com envelope encryption: uma chave de dados por mensagem criptografa o conteúdo e é ela mesma envolvida pela chave da instância.",
+          "A chave que envolve fica fora do banco — a chave mestra de ambiente, ou o AWS KMS quando uma chave KMS está configurada, e as duas podem conviver enquanto linhas antigas continuam abrindo.",
+          "Uma linha selada é vinculada ao próprio id, então um texto cifrado movido para outra linha falha ao abrir em vez de vazar.",
+          "Senhas são guardadas com scrypt, e API keys aparecem uma única vez e ficam apenas como hash SHA-256 mais um prefixo curto de identificação, comparado em tempo constante."
+        ]
+      },
+      {
+        "kind": "Em trânsito",
+        "name": "Todo trecho é criptografado, inclusive o relay",
+        "body": "Painel, API, relay SMTP e a entrega na caixa de entrada trafegam em conexões criptografadas.",
+        "bullets": [
+          "O painel e a API são servidos por HTTPS, com HSTS (um ano, subdomínios incluídos), Content-Security-Policy estrita, X-Frame-Options DENY, nosniff e Permissions-Policy restrita.",
+          "O relay SMTP exige TLS: o STARTTLS é oferecido com o nosso certificado, e o relay se recusa a iniciar sem o par de chaves — a menos que o operador opte explicitamente por uma rede privada confiável.",
+          "Os e-mails saem pelo Amazon SES por TLS, autenticados no seu domínio por DKIM e SPF."
+        ]
+      },
+      {
+        "kind": "Recuperação",
+        "name": "Backups verificados, não presumidos",
+        "body": "Um dump diário não é backup enquanto o arquivo não tiver sido relido e aprovado.",
+        "bullets": [
+          "O dump noturno (pg_dump, formato custom) é validado com pg_restore --list e um checksum antes de ser considerado confiável.",
+          "Uma cópia é enviada para armazenamento de objetos fora do servidor, e o objeto enviado é relido e precisa bater byte a byte.",
+          "Dumps com mais de 14 dias são removidos, e o dump pode ser criptografado com uma chave age antes de sair do servidor."
+        ]
+      }
+    ]
+  },
+  "advantages": {
+    "eyebrow": "Por que escolhem o MepMail",
+    "title": "As decisões de segurança que uma plataforma só-hospedada não pode tomar por você",
+    "body": "Os controles que mais importam são os que continuam na sua mão. O MepMail é construído para esse controle ser real — auditável, portátil e, se você quiser, inteiramente dentro da sua infraestrutura.",
+    "items": [
+      {
+        "kind": "Residência de dados",
+        "name": "Seus dados ficam na UE",
+        "body": "A Alemanha é onde o MepMail Cloud roda, não uma região que você precisa pedir em uma reunião comercial.",
+        "bullets": [
+          "A aplicação e o banco rodam em infraestrutura da Contabo na Alemanha — um provedor de hospedagem, nomeado nesta página.",
+          "O GDPR é o quadro em que o produto foi construído: hospedagem na UE é o padrão, não uma nota de rodapé sobre transferência de dados.",
+          "A entrega passa pelo Amazon SES (us-east-1) e os pagamentos pelo Stripe, ambos listados como subprocessadores, e a Política de Privacidade diz o que é guardado, por quê e por quanto tempo."
+        ]
+      },
+      {
+        "kind": "Verificabilidade",
+        "name": "Open source sob AGPL-3.0",
+        "body": "Confiança por verificabilidade: as afirmações de segurança aqui são afirmações sobre código que qualquer pessoa pode ler.",
+        "bullets": [
+          "Criptografia, retenção, isolamento e a superfície da API estão no repositório público — sem trust center para conferir.",
+          "Uma afirmação que não sobreviveria a uma auditoria do código não é uma afirmação que fazemos; o vocabulário de trust center fica de fora.",
+          "Achou divergência entre esta página e o código? Isso é um relato de segurança, e vai direto para quem corrige."
+        ]
+      },
+      {
+        "kind": "Soberania",
+        "name": "Hospede o produto inteiro",
+        "body": "A opção que um fornecedor só-hospedado não pode oferecer: rodar o MepMail na sua infraestrutura e os seus dados nunca saírem dela.",
+        "bullets": [
+          "O mesmo painel, a mesma API e a mesma compatibilidade de SDK, implantados com o seu banco, as suas chaves, o seu object storage e a sua conta SES.",
+          "A lista de subprocessadores desta página deixa de se aplicar a você: você é o único processador dos seus dados.",
+          "Útil quando um cliente, um regulador ou o seu próprio time de segurança exige que os dados fiquem dentro de um limite que você controla."
+        ]
+      },
+      {
+        "kind": "Isolamento",
+        "name": "Isolamento por time, sem projeto de migração",
+        "body": "Multi-tenant por construção, e barato de adotar se você vem de outro provedor.",
+        "bullets": [
+          "Contatos, domínios, modelos, supressões, chaves, registros de auditoria e requisições de API carregam o time dono de cada linha, e a associação é reconferida na emissão dos tokens.",
+          "A reputação também é isolada: bounces e reclamações por time, limites antiabuso em todos os planos, e um sinal de saúde da instância que pode pausar o envio de um time.",
+          "O MepMail fala a API de envio do Resend, então adotar é trocar a base URL e a chave, não reescrever código."
+        ]
+      }
+    ]
   },
   "controls": {
-    "eyebrow": "Controles",
-    "title": "O que existe hoje",
-    "body": "Cada item abaixo é uma propriedade do produto em execução, não uma intenção. Quando um controle cobre só parte da superfície, o card diz qual.",
+    "eyebrow": "Controles de segurança",
+    "title": "Os controles que rodam em produção hoje",
+    "body": "Cada item abaixo é uma propriedade do produto em execução, não uma intenção. Quando um controle cobre só parte da superfície, o card diz qual — e o código é público, então você confere os que importam para você.",
     "items": [
       {
         "name": "Criptografia em trânsito",
@@ -119,20 +212,91 @@
     ],
     "note": "Uma instância self-hosted roda na infraestrutura que você escolher, então esta lista não se aplica a ela."
   },
-  "certifications": {
-    "eyebrow": "Honestidade",
-    "title": "Certificações",
-    "body": "Não temos SOC 2 nem ISO 27001 hoje.",
+  "partners": {
+    "title": "Construído sobre infraestrutura em que você já confia",
+    "body": "Nenhuma dependência exótica para avaliar: os quatro provedores por trás de cada envio são os mesmos nomes que a maioria dos times já roda em produção.",
     "items": [
-      "As duas estão no roadmap. Não estamos anunciando data e não vamos descrever uma auditoria que não aconteceu.",
-      "Também não publicamos percentual de uptime nem SLA hoje. Quando isso mudar, será escrito aqui primeiro.",
-      "Até lá, cobre a lista específica de controles acima — e pergunte para security@je4ndev.com qualquer coisa que esteja faltando nela."
+      { "provider": "Contabo GmbH", "role": "Hospedagem na UE · Alemanha" },
+      { "provider": "Amazon SES", "role": "Entrega por TLS" },
+      { "provider": "Cloudflare", "role": "DNS, CDN, proteção de borda" },
+      { "provider": "Stripe", "role": "Pagamentos e faturas" }
+    ]
+  },
+  "compliance": {
+    "eyebrow": "Compliance",
+    "title": "Onde o compliance está — por escrito",
+    "body": "O GDPR se aplica ao MepMail Cloud desde o primeiro time europeu que se cadastra, e a aplicação roda na UE. Auditorias de framework são uma estrada mais longa, e é exatamente aqui que essa estrada está.",
+    "privacyLink": "Política de Privacidade",
+    "note": "A regra por trás de tudo: cada afirmação desta página é uma propriedade do produto em execução, ou está marcada como item de roadmap.",
+    "items": [
+      {
+        "label": "GDPR",
+        "state": "Em vigor",
+        "tone": "ok",
+        "body": "O MepMail Cloud é hospedado na Alemanha e a Política de Privacidade diz o que é guardado, por quê e por quanto tempo. O DPA é acordado por cliente — peça em security@je4ndev.com."
+      },
+      {
+        "label": "SOC 2 · ISO 27001",
+        "state": "Em andamento",
+        "tone": "progress",
+        "body": "Os dois estão no roadmap. Nenhum auditor está contratado e nenhuma data é anunciada: não vamos descrever uma auditoria que não aconteceu, e nenhuma certificação está implícita nesta página."
+      },
+      {
+        "label": "SLA · uptime",
+        "state": "Não publicado",
+        "tone": "none",
+        "body": "Nenhum percentual de uptime e nenhum SLA são publicados hoje. Quando isso mudar, será escrito aqui primeiro — até lá, a lista de controles acima é o que se pode cobrar da gente."
+      }
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "As perguntas que uma revisão enterprise faz",
+    "body": "Respostas curtas, com o detalhe embaixo. O que faltar é uma pergunta justa para security@je4ndev.com.",
+    "items": [
+      {
+        "q": "O conteúdo dos e-mails é criptografado em repouso?",
+        "a": "Sim. Corpos de mensagem (HTML e texto) e anexos são selados com envelope encryption antes de serem gravados: uma chave de dados por mensagem criptografa o conteúdo e é envolvida pela chave da instância, então o banco guarda texto cifrado e uma chave envolvida. A chave que envolve fica fora do banco — a chave mestra de ambiente, ou o AWS KMS quando configurado. Destinatários, assunto e eventos de entrega são guardados como linhas, não como segredos, e envelhecem na janela de retenção abaixo."
+      },
+      {
+        "q": "O MepMail tem SOC 2?",
+        "a": "Hoje não. SOC 2 e ISO 27001 estão no roadmap, nenhum auditor está contratado e nenhuma data é anunciada. Até lá, cobre a lista de controles desta página — e, como o produto é open source, você verifica esses controles você mesmo em vez de confiar em um relatório."
+      },
+      {
+        "q": "O MepMail está em conformidade com o GDPR?",
+        "a": "O MepMail Cloud foi construído para isso: a aplicação e o banco rodam na Alemanha, dentro da UE. Dois subprocessadores ficam nos Estados Unidos — o Amazon SES (us-east-1) para entrega e o Stripe para pagamentos — e a Política de Privacidade declara essas transferências. Não reivindicamos uma certificação que não temos."
+      },
+      {
+        "q": "Como consigo um DPA assinado?",
+        "a": "Não existe um DPA pré-assinado publicado hoje: escreva para security@je4ndev.com com os dados da sua empresa e ele é acordado por cliente. O self-host elimina a questão — o acordo de tratamento passa a ser entre você e a sua própria infraestrutura."
+      },
+      {
+        "q": "Onde os meus dados ficam, e eles permanecem na UE?",
+        "a": "MepMail Cloud: a aplicação e o banco na Alemanha; eventos de entrega no Amazon SES em us-east-1; DNS e proteção de rede pela borda global da Cloudflare. A tabela acima lista cada provedor e o seu papel. Uma instância self-hosted guarda tudo onde você implantar."
+      },
+      {
+        "q": "Por quanto tempo os dados de e-mail são retidos?",
+        "a": "Corpos de mensagem e anexos saem na janela de retenção do time — 30 dias por padrão — e a linha é marcada quando são purgados. Destinatários, assunto, status e eventos envelhecem na mesma janela, assim como os registros de entrega de webhook. Backups noturnos são removidos após 14 dias."
+      },
+      {
+        "q": "Como apago os dados de um contato?",
+        "a": "Apague o contato com erase=true pela API: o endereço é então apagado do histórico de e-mails, dos payloads de evento e dos logs de API — o caminho GDPR/LGPD. Sem isso, o log de envio envelhece na janela de retenção. As supressões guardam apenas um hash do endereço, como registro de não contatar.",
+        "link": { "label": "Referência da API", "href": "https://docs-mepmail.je4ndev.com" }
+      },
+      {
+        "q": "Subprocessadores de IA recebem o conteúdo dos meus e-mails?",
+        "a": "Não. Nenhum provedor de IA processa o conteúdo dos seus e-mails no MepMail Cloud. O código open source traz um monitor de abuso opcional (ABUSE_JUDGE, desligado por padrão), que o self-hoster pode ligar: um envio já aceito pode então ser amostrado e enviado ao TypeSafe System One para um veredito de abuso. O MepMail Cloud roda com ele desligado, e quem hospeda decide por si."
+      },
+      {
+        "q": "Onde encontro a lista atual de subprocessadores?",
+        "a": "Nesta página — a tabela acima, que espelha a Política de Privacidade. Uma instância self-hosted não tem essa lista, porque roda na infraestrutura que você escolher."
+      }
     ]
   },
   "disclosure": {
     "eyebrow": "Reportar",
     "title": "Divulgação responsável",
-    "body": "Encontrou uma vulnerabilidade? Avise e nós corrigimos.",
+    "body": "Encontrou uma vulnerabilidade? Avise e nós corrigimos — é o mesmo padrão que o código segue.",
     "bullets": [
       "Escreva para security@je4ndev.com com os detalhes e, se tiver, uma reprodução.",
       "Confirmamos o recebimento e damos a primeira resposta em até 72 horas.",
@@ -142,8 +306,8 @@
     "cta": "Escrever para security@je4ndev.com"
   },
   "close": {
-    "title": "Os detalhes estão na documentação",
-    "body": "Domínios de envio, registros de autenticação, insights de entregabilidade e a referência da API — a mesma fonte que o painel usa.",
+    "title": "Conecte um domínio e envie em minutos",
+    "body": "Crie uma conta, adicione o seu domínio de envio e publique os registros DKIM e MAIL FROM que o painel devolve. Se preferir auditar antes, o código e a documentação estão abertos — os dois a um clique.",
     "cta": "Ler a documentação"
   }
 }

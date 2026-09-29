@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { CodeDemo } from "@/components/code-demo";
 import {
   PublicFooter,
@@ -15,7 +15,7 @@ import {
   RESEND_ROWS,
   resendSavings,
 } from "@/lib/alternatives-resend";
-import { formatUsd } from "@/lib/landing-pricing";
+import { formatUsd, formatVolume } from "@/lib/landing-pricing";
 import { legalLinks } from "@/lib/legal-links";
 import "../../landing.css";
 
@@ -43,9 +43,11 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * Honest "Resend alternative" page: the compatible surface, what is explicitly
  * NOT promised, and the price difference computed from Resend's public list
- * (@/lib/alternatives-resend) with its source and read date on the page.
+ * (@/lib/alternatives-resend) with its source and read date on the page. Values
+ * render in the reader's locale (US separators in en, Brazilian ones in pt-BR).
  */
 export default async function ResendAlternativePage() {
+  const locale = await getLocale();
   const t = await getTranslations("alternatives");
   const l = await getTranslations("landing");
   const site = {
@@ -110,14 +112,14 @@ export default async function ResendAlternativePage() {
                   {RESEND_ROWS.map((row) => {
                     const savings = resendSavings(row);
                     return (
-                      <tr key={row.label}>
-                        <th scope="row">{row.label}</th>
-                        <td>{formatUsd(row.resend)}</td>
-                        <td>{formatUsd(row.mepmail)}</td>
+                      <tr key={row.volume}>
+                        <th scope="row">{formatVolume(row.volume, locale)}</th>
+                        <td>{formatUsd(row.resend, locale)}</td>
+                        <td>{formatUsd(row.mepmail, locale)}</td>
                         <td>
                           {t("table.rowAdvantage", {
                             percent: savings.pct,
-                            usd: formatUsd(savings.usd),
+                            usd: formatUsd(savings.usd, locale),
                           })}
                         </td>
                       </tr>
@@ -140,9 +142,9 @@ export default async function ResendAlternativePage() {
               <h3>{t("claim.title")}</h3>
               <p className="gtm-note">
                 {t("claim.body", {
-                  volume: CLAIM_ANCHOR_ROW.label,
-                  sendgrid: formatUsd(CLAIM_ANCHOR_ROW.sendgrid),
-                  mepmail: formatUsd(CLAIM_ANCHOR_ROW.mepmail),
+                  volume: formatVolume(CLAIM_ANCHOR_ROW.volume, locale),
+                  sendgrid: formatUsd(CLAIM_ANCHOR_ROW.sendgrid, locale),
+                  mepmail: formatUsd(CLAIM_ANCHOR_ROW.mepmail, locale),
                   min: MIN_RESEND_SAVINGS_PCT,
                   max: MAX_RESEND_SAVINGS_PCT,
                 })}
