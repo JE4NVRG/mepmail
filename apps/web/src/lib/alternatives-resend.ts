@@ -22,16 +22,13 @@ export const RESEND_PRICING_SOURCE = {
 } as const;
 
 export interface ResendRow {
-  /** Volume label as shown in the table ("100k", "1,5M"). */
-  label: string;
-  /** Emails per month this row refers to. */
+  /** Emails per month this row refers to; the table label renders from it (formatVolume). */
   volume: number;
   mepmail: number;
   resend: number;
 }
 
 export const RESEND_ROWS: readonly ResendRow[] = PRICE_ROWS.map((row) => ({
-  label: row.label,
   volume: row.volume,
   mepmail: row.mepmail,
   resend: row.resend,

@@ -18,7 +18,7 @@ export function computeSavings(row: PriceRow): Savings {
       best = { key: competitor.key, name: competitor.name, price };
     }
   }
-  if (best === null) throw new Error(`row ${row.label} has no competitor price`);
+  if (best === null) throw new Error(`row ${row.volume} has no competitor price`);
   const savingsUsd = best.price - row.mepmail;
   return {
     row,
