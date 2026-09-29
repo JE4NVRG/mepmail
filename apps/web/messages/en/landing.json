@@ -106,49 +106,49 @@
       },
       {
         "volume": "1,500/day (~45k/month)",
-        "limits": "3 domains · 2 workspaces · 10,000 contacts",
+        "limits": "10 domains · 3 workspaces · unlimited contacts",
         "overage": "stops at cap",
         "attachment": "1 MB",
         "cta": "Start with Starter"
       },
       {
         "volume": "100,000/month",
-        "limits": "10 domains · 5 workspaces · unlimited contacts",
+        "limits": "25 domains · 10 workspaces · unlimited contacts",
         "overage": "US$ 0.90/1k",
         "attachment": "5 MB",
         "cta": "Start with Pro 100K"
       },
       {
         "volume": "200,000/month",
-        "limits": "10 domains · 5 workspaces · unlimited contacts",
+        "limits": "25 domains · 10 workspaces · unlimited contacts",
         "overage": "US$ 0.35/1k",
         "attachment": "5 MB",
         "cta": "Start with Pro 200K"
       },
       {
         "volume": "500,000/month",
-        "limits": "Unlimited domains · 10 workspaces · unlimited contacts",
+        "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
         "overage": "US$ 0.25/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 500K"
       },
       {
         "volume": "1,000,000/month",
-        "limits": "Unlimited domains · 10 workspaces · unlimited contacts",
+        "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
         "overage": "US$ 0.23/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 1M"
       },
       {
         "volume": "1,500,000/month",
-        "limits": "Unlimited domains · 10 workspaces · unlimited contacts",
+        "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
         "overage": "US$ 0.18/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 1.5M"
       },
       {
         "volume": "2,500,000/month",
-        "limits": "Unlimited domains · 10 workspaces · unlimited contacts",
+        "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
         "overage": "US$ 0.16/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 2.5M"

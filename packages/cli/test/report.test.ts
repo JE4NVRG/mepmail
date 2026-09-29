@@ -28,13 +28,13 @@ describe("buildOffer", () => {
     const offer = buildOffer(usage, snapshot, 1, "Resend");
     expect(offer).toMatchObject({ plan: "free", fits: "starter", perDay: 1374 });
     expect(offer?.text.join(" ")).toContain(
-      "Free allows 3,000/month; Starter (45,000/month, 3 domains) fits. Upgrade: https://app.example.test:3000/settings/billing",
+      "Free allows 3,000/month; Starter (45,000/month, 10 domains) fits. Upgrade: https://app.example.test:3000/settings/billing",
     );
   });
 
   it("still suggests Starter when the team is already on it and inside every limit", () => {
     const offer = buildOffer(
-      { ...usage, plan: "starter", limits: { ...usage.limits, domains: 3, contacts: 10_000 } },
+      { ...usage, plan: "starter", limits: { ...usage.limits, domains: 10, contacts: null } },
       snapshot,
       2,
       "Resend",
@@ -149,7 +149,7 @@ const full: Report = {
     url: "https://app.example.test:3000/settings/billing",
     text: [
       "On Resend you sent 41,208 emails in the last 30 days (~1,374/day).",
-      "Free allows 3,000/month; Starter (45,000/month, 3 domains) fits. Upgrade: https://app.example.test:3000/settings/billing",
+      "Free allows 3,000/month; Starter (45,000/month, 10 domains) fits. Upgrade: https://app.example.test:3000/settings/billing",
     ],
   },
 };

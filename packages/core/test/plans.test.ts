@@ -74,7 +74,7 @@ describe("PLAN_CONTACT_LIMIT", () => {
   it("caps contacts on Free only", () => {
     expect(PLAN_CONTACT_LIMIT).toEqual({
       free: 1_000,
-      starter: 10_000,
+      starter: null,
       pro: null,
       scale: null,
       system: null,
