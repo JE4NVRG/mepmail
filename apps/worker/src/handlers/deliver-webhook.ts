@@ -1,5 +1,6 @@
 import {
   decryptWebhookSigningSecrets,
+  formatChannelPayload,
   type Keyring,
   type PostJsonResult,
   retryAfterMs,
@@ -8,6 +9,7 @@ import {
   WEBHOOK_MAX_ATTEMPTS,
   WEBHOOK_MAX_RATE_PER_SECOND,
   WEBHOOK_RETRY_SCHEDULE_MS,
+  type WebhookPayload,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
@@ -298,7 +300,13 @@ export async function drainWebhookEndpoint(
           handedBack.push(row);
           return;
         }
-        const body = JSON.stringify(row.payload);
+        // Chat services (Slack/Discord/Telegram) get their expected shape;
+        // anything else keeps the raw signed JSON envelope.
+        const channelPayload = formatChannelPayload(
+          endpoint.url,
+          row.payload as unknown as WebhookPayload,
+        );
+        const body = JSON.stringify(channelPayload ?? row.payload);
         const headers = signWebhook(signing, {
           msgId: row.messageId,
           timestamp: Math.floor(at.getTime() / 1000),

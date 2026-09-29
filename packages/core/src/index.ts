@@ -317,8 +317,8 @@ export {
   type FunnelEventTarget,
   funnelEventData,
   type RawVisitAttribution,
-  sendFunnelEvent,
   type SignupAttribution,
+  sendFunnelEvent,
   teamFunnelProps,
   UMAMI_COLLECTOR_USER_AGENT,
   type UmamiEventBody,
@@ -630,6 +630,11 @@ export {
 export { isLoopbackUrl } from "./url.js";
 export { bumpHourlyUsage, USAGE_COUNTERS, type UsageCounter, utcHour } from "./usage-hourly.js";
 export { DAY_MS, nextUtcDayStart, utcDay } from "./utc-day.js";
+export {
+  detectWebhookChannel,
+  formatChannelPayload,
+  type WebhookChannel,
+} from "./webhook-channels.js";
 export {
   buildWebhookPayload,
   clearWebhookEndpointNotifications,
