@@ -1,7 +1,8 @@
 "use client";
 
+import { useLocale } from "next-intl";
 import { useId, useMemo, useState } from "react";
-import { formatUsd, PRICE_ROWS } from "@/lib/landing-pricing";
+import { formatUsd, formatVolume, PRICE_ROWS } from "@/lib/landing-pricing";
 import { savingsForIndex } from "@/lib/landing-savings";
 
 export interface CalcLabels {
@@ -27,17 +28,20 @@ export interface CalcLabels {
 /**
  * Interactive savings estimate: slide to a published volume, see the MepMail
  * price, the cheapest public competitor and the yearly difference. Numbers come
- * from @/lib/landing-pricing — the same data the comparison table renders.
+ * from @/lib/landing-pricing — the same data the comparison table renders — and
+ * render in the reader's locale (US separators in en, Brazilian ones in pt-BR).
  */
 export function LandingCalculator({ labels }: { labels: CalcLabels }) {
   const [index, setIndex] = useState(2); // default: 500k, the middle rung
+  const locale = useLocale();
   const id = useId();
   const savings = useMemo(() => savingsForIndex(index), [index]);
+  const volume = formatVolume(savings.row.volume, locale);
   const savingsText = labels.savings
     .replace("{percent}", String(savings.savingsPct))
-    .replace("{usd}", formatUsd(savings.savingsUsd));
+    .replace("{usd}", formatUsd(savings.savingsUsd, locale));
   const mailto = `${labels.contact}?subject=${encodeURIComponent(
-    labels.ctaSubject.replace("{volume}", savings.row.label),
+    labels.ctaSubject.replace("{volume}", volume),
   )}`;
 
   return (
@@ -45,7 +49,7 @@ export function LandingCalculator({ labels }: { labels: CalcLabels }) {
       <h3>{labels.title}</h3>
       <p className="gtm-note">{labels.lead}</p>
       <label htmlFor={id}>
-        {labels.volumeLabel}: <strong>{savings.row.label}</strong>
+        {labels.volumeLabel}: <strong>{volume}</strong>
       </label>
       <input
         id={id}
@@ -60,15 +64,15 @@ export function LandingCalculator({ labels }: { labels: CalcLabels }) {
       <div className="gtm-calc-result" aria-live="polite">
         <p className="gtm-calc-line">
           <span>{labels.ours}</span>
-          <strong>{formatUsd(savings.row.mepmail)}</strong>
+          <strong>{formatUsd(savings.row.mepmail, locale)}</strong>
         </p>
         <p className="gtm-calc-line">
           <span>{labels.cheapest.replace("{name}", savings.competitor.name)}</span>
-          <strong>{formatUsd(savings.competitor.price)}</strong>
+          <strong>{formatUsd(savings.competitor.price, locale)}</strong>
         </p>
         <p className="gtm-calc-savings">{savingsText}</p>
         <p className="gtm-note">
-          {labels.annual.replace("{usd}", formatUsd(savings.savingsYearUsd))}
+          {labels.annual.replace("{usd}", formatUsd(savings.savingsYearUsd, locale))}
         </p>
       </div>
       <a className="ms-btn ms-btn-primary gtm-action" href={mailto}>

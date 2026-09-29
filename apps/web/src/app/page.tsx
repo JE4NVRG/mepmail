@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { CodeDemo } from "@/components/code-demo";
 import { type CalcLabels, LandingCalculator } from "@/components/landing-calculator";
 import { PlanCard, type PlanCardLabels } from "@/components/plan-card";
@@ -11,23 +11,13 @@ import {
   SignupLink,
 } from "@/components/site-chrome";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
-import { formatUsd, PRICE_ROWS } from "@/lib/landing-pricing";
+import { formatUsd, formatVolume, PRICE_ROWS } from "@/lib/landing-pricing";
 import { legalLinks } from "@/lib/legal-links";
 import { hasSession } from "@/server/auth";
 import "./landing-calc.css";
 import "./landing.css";
 
 const contact = "mailto:jean@je4ndev.com";
-
-const comparison = PRICE_ROWS.map((row) => [
-  row.label,
-  formatUsd(row.mepmail),
-  formatUsd(row.resend),
-  formatUsd(row.sendgrid),
-  formatUsd(row.postmark),
-  formatUsd(row.mailgun),
-  row.savings,
-]);
 
 const cellKeys = ["MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "vantagem"] as const;
 
@@ -65,7 +55,19 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootPage() {
   if (await hasSession()) redirect("/emails");
 
+  const locale = await getLocale();
   const t = await getTranslations("landing");
+  // The public table is rendered per locale: shared numbers, locale separators
+  // and quote word (see @/lib/landing-pricing). English is the global default.
+  const comparison = PRICE_ROWS.map((row) => [
+    formatVolume(row.volume, locale),
+    formatUsd(row.mepmail, locale),
+    formatUsd(row.resend, locale),
+    formatUsd(row.sendgrid, locale),
+    formatUsd(row.postmark, locale),
+    formatUsd(row.mailgun, locale),
+    row.savings,
+  ]);
   // Chrome + plan copy live in the "landing" catalog: it is the public site's
   // catalog, shared by the landing, /pricing and /alternatives/resend.
   const site = {
