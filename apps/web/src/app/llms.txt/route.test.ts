@@ -24,6 +24,7 @@ describe("crawler entry points", () => {
       "/$",
       "/pricing",
       "/alternatives",
+      "/changelog",
       "/login",
       "/signup",
       "/terms",

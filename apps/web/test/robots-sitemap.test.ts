@@ -44,8 +44,8 @@ describe("robots.txt + sitemap.xml agreement", () => {
     const urls = sitemap();
     // 6 URLs from the SEO fix + the three public pages added with /pricing,
     // /alternatives/resend and /integrations, plus the two institutional pages
-    // (/security and /support).
-    expect(urls).toHaveLength(11);
+    // (/security and /support) and /changelog.
+    expect(urls).toHaveLength(12);
 
     for (const entry of urls) {
       const { pathname } = new URL(entry.url as string);
@@ -63,7 +63,8 @@ describe("robots.txt + sitemap.xml agreement", () => {
 
     expect(priorityOf("/security")).toBe(0.7);
     expect(priorityOf("/support")).toBe(0.6);
-    // Both are linked from the public footer, so both must be crawlable.
-    expect(allowedPaths()).toEqual(expect.arrayContaining(["/security", "/support"]));
+    expect(priorityOf("/changelog")).toBe(0.6);
+    // All three are linked from the public footer, so all three must be crawlable.
+    expect(allowedPaths()).toEqual(expect.arrayContaining(["/security", "/support", "/changelog"]));
   });
 });

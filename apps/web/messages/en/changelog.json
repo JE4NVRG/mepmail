@@ -1,0 +1,164 @@
+{
+  "meta": {
+    "title": "Changelog — what shipped in MepMail",
+    "description": "Every recent MepMail release, newest first: value-first landing and official logos, /security and /support, notification channels, open beta, plan limits and the migration CLI — with the date each one reached main."
+  },
+  "hero": {
+    "eyebrow": "Changelog",
+    "title": "What <highlight>shipped</highlight>, release by release.",
+    "lead": "MepMail is built in the open. This is the running list of releases, newest first — what changed, dated by the day it reached the product. The same history lives in the repository's CHANGELOG.md.",
+    "note": "The beta is open and self-serve: create a free account, no card required.",
+    "badges": ["Open beta · self-serve", "Dated releases", "EN + PT-BR", "Backed by CHANGELOG.md"],
+    "ctaDocs": "Read the docs"
+  },
+  "feed": {
+    "eyebrow": "Releases",
+    "title": "Recent releases",
+    "body": "Six of the most recent releases. Earlier history is in the repository changelog.",
+    "labels": {
+      "added": "Added",
+      "changed": "Changed",
+      "fixed": "Fixed"
+    }
+  },
+  "releases": [
+    {
+      "version": "0.44",
+      "date": "2026-09-29",
+      "title": "Value-first landing, official logos and +10% quotas",
+      "summary": "The public site starts from the value proposition and real brand logos, and every sending quota grew by 10%.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "The landing now leads with the value proposition and a mural of real customer logos instead of a feature wall.",
+            "Official, full-colour brand marks across the home, /integrations and the product mockup.",
+            "A flat, responsive header with a balanced footer — Product, Compare, Account and Legal columns on every public page."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": ["Sending quotas raised by 10% end to end (core, panel, docs and tests)."]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "A back-to-site link on the authentication screens, so sign-in and sign-up no longer strand the visitor."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.43",
+      "date": "2026-09-29",
+      "title": "Institutional pages and plan limits v2",
+      "summary": "/security and /support ship as showcase pages, /integrations opens, and the plans carry more domains and workspaces.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "/security and /support as showcase pages: controls, subprocessors, the compliance roadmap (SOC 2 / ISO 27001 as roadmap items, never headlines) and the enterprise FAQ.",
+            "/integrations, with the vendor mural and per-tool setup cards.",
+            "security.txt."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": ["Plan limits v2: more domains and workspaces, unlimited contacts on Starter."]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Localised landing prices (US separators in English, per-locale volume labels)."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.42",
+      "date": "2026-09-29",
+      "title": "Notification channels, templates and Microsoft sign-in",
+      "summary": "Slack, Discord and Telegram channels, a gallery of ready-made templates and social sign-in with Microsoft.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Slack, Discord and Telegram notification channels, formatted automatically from the webhook URL.",
+            "A gallery of ready-made templates (10 starters, EN/PT) with preview and one-click copy.",
+            "Social sign-in with Microsoft (better-auth), in both locales."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.41",
+      "date": "2026-09-28",
+      "title": "Console, operator tooling and agent discovery",
+      "summary": "An operator Console, the MCP server card at the MCP origin, channel attribution on sign-up and the first documentation wave.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "An operator Console: instance users, audit, regions and safety, plus a Users tile in the overview.",
+            "The MCP server card now also served at the MCP endpoint origin, with its tools[] published.",
+            "Channel attribution on sign-up and server-side funnel events in Umami.",
+            "A Telegram alert on new sign-ups, carrying the utm/campaign origin."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Documentation wave 1: the npm packages page, rate limits with Retry-After, the error catalogue and the MCP install path."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.40",
+      "date": "2026-09-28",
+      "title": "Open beta, SEO and self-serve docs",
+      "summary": "Open sign-up on the landing and in the docs, robots.txt and sitemap.xml unblocked, self-hosted analytics and the CLI's doctor command.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Open sign-up on the landing and in the docs: no invite, no seat limit; each account is capped at 100 emails a day on the Free plan.",
+            "Self-hosted analytics (Umami) wired into the web app.",
+            "doctor and emails list/get in the migration CLI."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": ["robots.txt and sitemap.xml unblocked, with the legal pages indexed."]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Vitest testTimeout pinned in apps/web; a CLI 404 no longer blames the URL and --after is validated as a UUID.",
+            "Mobile landing header kept on-screen, with the sign-up CTA always visible."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.39",
+      "date": "2026-09-27",
+      "title": "Legal pages and a conversion-focused landing",
+      "summary": "Terms, Privacy and Refunds pages plus a landing round built around the demo, trust and the founders program.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Terms, Privacy and Refunds pages (PT/EN) with a fixed Legal column in the footer.",
+            "Landing conversion round: demo, trust, founders program, FAQ, CTAs and the MCP section."
+          ]
+        }
+      ]
+    }
+  ],
+  "close": {
+    "title": "See the next release as it lands.",
+    "body": "Create a free account and follow the product from the inside — the beta is open, no card required.",
+    "cta": "Read the docs"
+  }
+}

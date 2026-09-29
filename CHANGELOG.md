@@ -1,0 +1,112 @@
+# Changelog
+
+All notable changes to MepMail are documented in this file, newest first.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Version numbers are the platform's deployment sequence; each entry is dated by
+the day the change reached `main`. The same releases are published, per locale,
+on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
+
+## [0.44] - 2026-09-29
+
+Value-first landing, official logos and +10% quotas.
+
+### Added
+
+- The landing now leads with the value proposition and a mural of real customer
+  logos instead of a feature wall.
+- Official, full-colour brand marks across the home, `/integrations` and the
+  product mockup.
+- A flat, responsive header with a balanced footer — Product, Compare, Account
+  and Legal columns on every public page.
+
+### Changed
+
+- Sending quotas raised by 10% end to end (core, panel, docs and tests).
+
+### Fixed
+
+- A back-to-site link on the authentication screens, so sign-in and sign-up no
+  longer strand the visitor.
+
+## [0.43] - 2026-09-29
+
+Institutional pages and plan limits v2.
+
+### Added
+
+- `/security` and `/support` as showcase pages: controls, subprocessors, the
+  compliance roadmap (SOC 2 / ISO 27001 as roadmap items, never headlines) and
+  the enterprise FAQ.
+- `/integrations`, with the vendor mural and per-tool setup cards.
+- `security.txt`.
+
+### Changed
+
+- Plan limits v2: more domains and workspaces, unlimited contacts on Starter.
+
+### Fixed
+
+- Localised landing prices (US separators in English, per-locale volume labels).
+
+## [0.42] - 2026-09-29
+
+Notification channels, templates and Microsoft sign-in.
+
+### Added
+
+- Slack, Discord and Telegram notification channels, formatted automatically
+  from the webhook URL.
+- A gallery of ready-made templates (10 starters, EN/PT) with preview and
+  one-click copy.
+- Social sign-in with Microsoft (better-auth), in both locales.
+
+## [0.41] - 2026-09-28
+
+Console, operator tooling and agent discovery.
+
+### Added
+
+- An operator `Console`: instance users, audit, regions and safety, plus a Users
+  tile in the overview.
+- The MCP server card now also served at the MCP endpoint origin, with its
+  `tools[]` published.
+- Channel attribution on sign-up and server-side funnel events in Umami.
+- A Telegram alert on new sign-ups, carrying the utm/campaign origin.
+
+### Changed
+
+- Documentation wave 1: the npm packages page, rate limits with `Retry-After`,
+  the error catalogue and the MCP install path.
+
+## [0.40] - 2026-09-28
+
+Open beta, SEO and self-serve docs.
+
+### Added
+
+- Open sign-up on the landing and in the docs: no invite, no seat limit; each
+  account is capped at 100 emails a day on the Free plan.
+- Self-hosted analytics (Umami) wired into the web app.
+- `doctor` and `emails list/get` in the migration CLI.
+
+### Changed
+
+- `robots.txt` and `sitemap.xml` unblocked, with the legal pages indexed.
+
+### Fixed
+
+- Vitest `testTimeout` pinned in `apps/web`; a CLI 404 no longer blames the URL
+  and `--after` is validated as a UUID.
+- Mobile landing header kept on-screen, with the sign-up CTA always visible.
+
+## [0.39] - 2026-09-27
+
+Legal pages and a conversion-focused landing.
+
+### Added
+
+- Terms, Privacy and Refunds pages (PT/EN) with a fixed Legal column in the
+  footer.
+- Landing conversion round: demo, trust, founders program, FAQ, CTAs and the
+  MCP section.

@@ -17,7 +17,8 @@ export type PublicPage =
   | "alternatives"
   | "integrations"
   | "security"
-  | "support";
+  | "support"
+  | "changelog";
 
 export interface PublicSiteLabels {
   skip: string;
@@ -38,6 +39,7 @@ export interface PublicSiteLabels {
     mcp: string;
     how: string;
     alternatives: string;
+    changelog: string;
     login: string;
     signup: string;
     /** Rótulo acessível do botão que abre a nav no mobile (ver landing-nav.tsx). */
@@ -207,6 +209,9 @@ export function PublicFooter({
           <a href={anchorHref(page, "#planos")}>{labels.nav.plans}</a>
           <a href="/integrations">{labels.nav.integrations}</a>
           <a href={anchorHref(page, "#mcp")}>{labels.nav.mcp}</a>
+          <a href="/changelog" aria-current={page === "changelog" ? "page" : undefined}>
+            {labels.nav.changelog}
+          </a>
           <a className="gtm-ext" href={DOCS_URL} target="_blank" rel="noreferrer">
             {labels.nav.docs}
             <span className="gtm-ext-mark" aria-hidden="true">
