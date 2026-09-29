@@ -1,0 +1,149 @@
+{
+  "meta": {
+    "title": "Segurança no MepMail — controles, subprocessadores e divulgação",
+    "description": "Como o MepMail protege contas e envios: criptografia em trânsito, hash de senhas e de API keys, isolamento por time, limites antiabuso, monitoramento, backups e DKIM/SPF/DMARC — quem processa o quê e como reportar uma vulnerabilidade."
+  },
+  "hero": {
+    "eyebrow": "Segurança",
+    "title": "Segurança no MepMail",
+    "lead": "O MepMail é um produto pequeno, operado pelo fundador. Esta página lista os controles que existem de fato hoje — aqueles que você pode cobrar — e diz com clareza o que não existe.",
+    "note": "Última revisão: 29 de setembro de 2026."
+  },
+  "controls": {
+    "eyebrow": "Controles",
+    "title": "O que existe hoje",
+    "body": "Cada item abaixo é uma propriedade do produto em execução, não uma intenção. Quando um controle cobre só parte da superfície, o card diz qual.",
+    "items": [
+      {
+        "name": "Criptografia em trânsito",
+        "body": "Tudo entre você e o MepMail trafega em conexão criptografada.",
+        "bullets": [
+          "O painel e a API são servidos por HTTPS, com HSTS (um ano, subdomínios incluídos), Content-Security-Policy estrita, X-Frame-Options DENY, nosniff e Permissions-Policy restrita.",
+          "O relay SMTP exige TLS: o STARTTLS é oferecido com o nosso certificado, e o relay se recusa a iniciar sem o par de chaves — a menos que o operador opte explicitamente por uma rede privada confiável.",
+          "Os e-mails saem pelo Amazon SES por TLS, autenticados no seu domínio por DKIM e SPF."
+        ]
+      },
+      {
+        "name": "Senhas e API keys",
+        "body": "As credenciais são guardadas em formatos que não podem ser reutilizados.",
+        "bullets": [
+          "Senhas de conta são guardadas com scrypt (o crypto.scrypt do Node); nenhuma senha em texto claro é armazenada ou enviada ao navegador.",
+          "API keys aparecem uma única vez e ficam guardadas apenas como hash SHA-256 mais um prefixo curto para identificação, e a chave apresentada é comparada em tempo constante.",
+          "Um time pode ter no máximo 25 chaves ativas, então uma chave vazada não se multiplica em um conjunto ilimitado de credenciais.",
+          "Login, cadastro, redefinição de senha e reenvio da verificação têm limite de tentativas por janela e por IP."
+        ]
+      },
+      {
+        "name": "Isolamento por time",
+        "body": "O time é a fronteira: uma credencial só alcança o time ao qual está vinculada.",
+        "bullets": [
+          "Contatos, broadcasts, domínios de envio, modelos, supressões, API keys, registros de auditoria e requisições carregam o time dono de cada linha.",
+          "Uma credencial de API é vinculada a um time e a associação é reconferida na emissão e na renovação dos tokens — remover um membro interrompe tokens novos.",
+          "A exclusão de conta é recusada enquanto ela for a única dona de um time, para nenhum time ficar sem quem o administre."
+        ]
+      },
+      {
+        "name": "Limites antiabuso",
+        "body": "Os limites evitam que uma chave comprometida ou um script descontrolado queime a reputação de um domínio.",
+        "bullets": [
+          "Todo plano tem um volume incluído e um teto diário de envio; envios acima do teto diário ficam retidos em vez de rodar o dia inteiro.",
+          "Bounces e reclamações são registrados por time, e a saúde de entregabilidade da instância pode pausar o envio de um time.",
+          "O cadastro é fechado por padrão em uma instância acessível — só a primeira conta pode se registrar — e uma beta pode ser limitada por número de contas.",
+          "É possível exigir o desafio Cloudflare Turnstile no login, no cadastro, na redefinição de senha e no reenvio da verificação."
+        ]
+      },
+      {
+        "name": "Supressões",
+        "body": "Um registro de não contatar vence qualquer envio futuro, em qualquer superfície.",
+        "bullets": [
+          "Hard bounces, reclamações de spam, bloqueios manuais e descadastros em um clique são guardados por time em cima de um hash do endereço.",
+          "A lista é conferida em todos os caminhos de envio — API, relay SMTP e broadcasts agendados — e o e-mail transacional ainda chega a quem apenas se descadastrou do marketing.",
+          "As supressões sobrevivem à exclusão de dados: os dados da conta saem, o hash fica como registro de não contatar."
+        ]
+      },
+      {
+        "name": "Monitoramento",
+        "body": "O serviço e o caminho de deploy são observados, não só o caminho feliz.",
+        "bullets": [
+          "A API expõe um endpoint de health que informa o status do serviço e a revisão implantada.",
+          "Os containers têm health checks que condicionam a inicialização e os restarts.",
+          "Uma checagem de boot verifica os containers da aplicação e a porta do relay SMTP e alerta o operador, e cada deploy verifica o site público e os seus cabeçalhos de segurança antes de ser considerado pronto."
+        ]
+      },
+      {
+        "name": "Backups",
+        "body": "O banco é exportado em uma agenda diária e a cópia é verificada.",
+        "bullets": [
+          "O dump noturno (pg_dump, formato custom) é validado com pg_restore --list e um checksum antes de ser considerado confiável.",
+          "Uma cópia é enviada para armazenamento de objetos fora do servidor, e o objeto enviado é relido e precisa bater byte a byte.",
+          "Dumps com mais de 14 dias são removidos, e o dump pode ser criptografado com uma chave age antes de sair do servidor."
+        ]
+      },
+      {
+        "name": "DKIM, SPF e DMARC",
+        "body": "A autenticação é configurada por domínio de envio, não globalmente.",
+        "bullets": [
+          "Conectar um domínio devolve exatamente os registros DNS a publicar: o registro DKIM e o registro MAIL FROM (SPF).",
+          "Esses dois condicionam o envio — um domínio cujos registros deixam de resolver tem os envios recusados até voltarem — e um worker reconfere o DNS de cada domínio em uma agenda.",
+          "O DMARC é recomendado, não obrigatório, e o MepMail lê a política, inclusive uma herdada do domínio pai."
+        ]
+      }
+    ]
+  },
+  "subprocessors": {
+    "eyebrow": "Infraestrutura",
+    "title": "Subprocessadores",
+    "body": "A lista curta de provedores que processam dados do MepMail Cloud. Ela espelha a Política de Privacidade e acrescenta o provedor de hospedagem.",
+    "columns": ["Provedor", "Papel", "Local"],
+    "rows": [
+      {
+        "provider": "Contabo GmbH",
+        "role": "Servidores que hospedam a aplicação e o banco",
+        "location": "Alemanha"
+      },
+      {
+        "provider": "Amazon Web Services (Amazon SES)",
+        "role": "Entrega de e-mail e eventos de entrega",
+        "location": "us-east-1, Estados Unidos"
+      },
+      {
+        "provider": "Cloudflare",
+        "role": "DNS, CDN e proteção de rede na frente dos servidores",
+        "location": "Rede global de borda"
+      },
+      {
+        "provider": "Stripe",
+        "role": "Processamento de pagamento, faturas e recibos",
+        "location": "Estados Unidos"
+      }
+    ],
+    "note": "Uma instância self-hosted roda na infraestrutura que você escolher, então esta lista não se aplica a ela."
+  },
+  "certifications": {
+    "eyebrow": "Honestidade",
+    "title": "Certificações",
+    "body": "Não temos SOC 2 nem ISO 27001 hoje.",
+    "items": [
+      "As duas estão no roadmap. Não estamos anunciando data e não vamos descrever uma auditoria que não aconteceu.",
+      "Também não publicamos percentual de uptime nem SLA hoje. Quando isso mudar, será escrito aqui primeiro.",
+      "Até lá, cobre a lista específica de controles acima — e pergunte para security@je4ndev.com qualquer coisa que esteja faltando nela."
+    ]
+  },
+  "disclosure": {
+    "eyebrow": "Reportar",
+    "title": "Divulgação responsável",
+    "body": "Encontrou uma vulnerabilidade? Avise e nós corrigimos.",
+    "bullets": [
+      "Escreva para security@je4ndev.com com os detalhes e, se tiver, uma reprodução.",
+      "Confirmamos o recebimento e damos a primeira resposta em até 72 horas.",
+      "Não existe bounty hoje — damos crédito público se você quiser o crédito.",
+      "Dê um prazo razoável para corrigirmos antes de publicar; vamos contando o que estamos fazendo no caminho."
+    ],
+    "cta": "Escrever para security@je4ndev.com"
+  },
+  "close": {
+    "title": "Os detalhes estão na documentação",
+    "body": "Domínios de envio, registros de autenticação, insights de entregabilidade e a referência da API — a mesma fonte que o painel usa.",
+    "cta": "Ler a documentação"
+  }
+}

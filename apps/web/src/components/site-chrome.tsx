@@ -11,7 +11,13 @@ import { SignupCta } from "./signup-cta";
  */
 
 /** Which public page is rendering; only the landing has the in-page anchors. */
-export type PublicPage = "landing" | "pricing" | "alternatives" | "integrations";
+export type PublicPage =
+  | "landing"
+  | "pricing"
+  | "alternatives"
+  | "integrations"
+  | "security"
+  | "support";
 
 export interface PublicSiteLabels {
   skip: string;
@@ -26,6 +32,8 @@ export interface PublicSiteLabels {
     pricing: string;
     alternatives: string;
     integrations: string;
+    security: string;
+    support: string;
     login: string;
     signup: string;
     /** Rótulo acessível do botão que abre a nav no mobile (ver landing-nav.tsx). */
@@ -195,6 +203,7 @@ export function PublicFooter({
           <h3>{labels.footer.colAccount}</h3>
           <SignupCta label={labels.nav.signup} />
           <a href="/login">{labels.footer.login}</a>
+          <a href="/support">{labels.nav.support}</a>
           <a href={contact}>{labels.footer.contact}</a>
         </nav>
         <nav className="gtm-footer-col" aria-label={labels.footer.colLegal}>
@@ -202,6 +211,7 @@ export function PublicFooter({
           <a href={legal.terms}>{labels.footer.terms}</a>
           <a href={legal.privacy}>{labels.footer.privacy}</a>
           <a href={legal.refund}>{labels.footer.refund}</a>
+          <a href="/security">{labels.nav.security}</a>
         </nav>
       </div>
       <div className="gtm-container gtm-footer-base">

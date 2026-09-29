@@ -43,8 +43,9 @@ describe("robots.txt + sitemap.xml agreement", () => {
     const allow = allowedPaths();
     const urls = sitemap();
     // 6 URLs from the SEO fix + the three public pages added with /pricing,
-    // /alternatives/resend and /integrations.
-    expect(urls).toHaveLength(9);
+    // /alternatives/resend and /integrations, plus the two institutional pages
+    // (/security and /support).
+    expect(urls).toHaveLength(11);
 
     for (const entry of urls) {
       const { pathname } = new URL(entry.url as string);
@@ -53,5 +54,16 @@ describe("robots.txt + sitemap.xml agreement", () => {
         `${pathname} is advertised but not allowed by robots.txt`,
       ).toBe(true);
     }
+  });
+
+  it("advertises the institutional pages with their own priority and allows them", () => {
+    const urls = sitemap();
+    const priorityOf = (pathname: string): number | undefined =>
+      urls.find((entry) => new URL(entry.url as string).pathname === pathname)?.priority;
+
+    expect(priorityOf("/security")).toBe(0.7);
+    expect(priorityOf("/support")).toBe(0.6);
+    // Both are linked from the public footer, so both must be crawlable.
+    expect(allowedPaths()).toEqual(expect.arrayContaining(["/security", "/support"]));
   });
 });
