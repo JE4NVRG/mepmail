@@ -6,15 +6,22 @@ import {
   type PublicSiteLabels,
   SignupLink,
 } from "@/components/site-chrome";
+import { StackLogoRow } from "@/components/stack-logos";
 import { legalLinks } from "@/lib/legal-links";
+import { MCP_CHIP, STACK_LOGOS } from "@/lib/stack-logos";
 import "../landing.css";
 
 const contact = "mailto:jean@je4ndev.com";
 const canonical = "/integrations";
 
+/** The hero mural: every mark the page can point at, plus the MCP chip. */
+const MURAL_SLUGS = [...STACK_LOGOS.map((logo) => logo.slug), MCP_CHIP];
+
 type IntegrationCard = {
   name: string;
   kind: string;
+  /** Slugs of the logos shown inside the card; "mcp" draws the text chip. */
+  logos: string[];
   body: string;
   bullets: string[];
   links: { label: string; href: string }[];
@@ -71,6 +78,10 @@ export default async function IntegrationsPage() {
             </h1>
             <p className="gtm-lead">{t("hero.lead")}</p>
             <p className="gtm-note">{t("hero.note")}</p>
+            <div className="gtm-integrations-mural">
+              <p className="gtm-stack-eyebrow">{t("hero.muralLabel")}</p>
+              <StackLogoRow slugs={MURAL_SLUGS} />
+            </div>
           </div>
         </section>
 
@@ -81,6 +92,9 @@ export default async function IntegrationsPage() {
                 <article className="gtm-integration" key={card.name}>
                   <p className="gtm-integration-kind">{card.kind}</p>
                   <h3>{card.name}</h3>
+                  {card.logos.length > 0 ? (
+                    <StackLogoRow slugs={card.logos} size={22} className="gtm-integration-mark" />
+                  ) : null}
                   <p>{card.body}</p>
                   <ul className="gtm-points">
                     {card.bullets.map((bullet) => (

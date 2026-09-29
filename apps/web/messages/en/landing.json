@@ -1,25 +1,27 @@
 {
   "meta": {
-    "title": "MepMail — Transactional email with a Resend-compatible API",
-    "description": "Transactional email with a Resend-compatible API and assisted onboarding. Compare MepMail plans, send through the API or the SMTP relay, and create your free beta account."
+    "title": "MepMail — Email infrastructure you can reason about",
+    "description": "Transactional email on our own API and SMTP relay: verified domains with isolated reputation, an official MCP server so your agents send, assisted onboarding and USD pricing from US$ 20/month."
   },
   "skip": "Skip to content",
   "brandAria": "MepMail — home",
   "navAria": "Main navigation",
   "nav": {
+    "product": "Product",
+    "integrations": "Integrations",
+    "pricing": "Pricing",
+    "docs": "Docs",
+    "security": "Security",
+    "support": "Support",
     "compare": "Compare prices",
     "plans": "Plans",
     "mcp": "MCP",
     "how": "How it works",
-    "pricing": "Pricing",
     "alternatives": "vs Resend",
     "login": "Sign in",
     "signup": "Create account",
     "menu": "Open navigation menu",
-    "badge": "Agent-ready",
-    "integrations": "Integrations",
-    "security": "Security",
-    "support": "Support"
+    "badge": "Agent-ready"
   },
   "announce": {
     "text": "Agent-ready — official MCP: your AI agents send email"
@@ -29,22 +31,29 @@
   },
   "hero": {
     "eyebrow": "Transactional email for people building products, anywhere <badge>Beta · open signup</badge>",
-    "title": "The same Resend API. <highlight>Up to 60% cheaper.</highlight>",
-    "lead": "Send transactional email with a Resend-compatible HTTPS API or the SMTP relay. We help you set up your domain, DKIM and MAIL FROM. USD pricing and assisted onboarding.",
+    "title": "Email infrastructure you can <highlight>reason about.</highlight>",
+    "lead": "We run our own API, relay and panel on top of Amazon SES: your domain, your reputation isolated and your delivery logs in one place — from US$ 20/month for 110,000 emails. An official MCP server lets your agents send through the same pipeline, and assisted onboarding comes with every plan.",
+    "migrate": "Drop-in compatible with the Resend SDK — migrate in minutes.",
     "ctaSignup": "Create free account",
     "ctaPlans": "See plans",
     "note": "Open beta: no seat limit, each account capped at 100 emails per day. Create yours in one minute — no card required.",
     "trust": [
-      "Resend-compatible API",
-      "SMTP relay with STARTTLS",
-      "DKIM and MAIL FROM on your domain",
-      "Assisted onboarding"
+      "Official MCP server — agents send on the same pipeline",
+      "Own API, relay and panel, with Amazon SES underneath",
+      "Your domain, your reputation, isolated",
+      "Assisted onboarding by who builds the product"
     ],
     "demo": {
       "subject": "Hello from MepMail",
       "responseLabel": "Response",
-      "caption": "The same official Resend SDK, pointed at MepMail."
+      "caption": "One base URL and the SDK you already use sends through MepMail."
     }
+  },
+  "stack": {
+    "eyebrow": "Works with your stack",
+    "aria": "Integrations and languages that work with MepMail",
+    "note": "The n8n community node, Slack/Discord/Telegram notification channels, the official SDKs the API is drop-in compatible with, Docker for self-hosting and plain cURL. One API key and one verified domain cover all of them.",
+    "pageCta": "See all integrations"
   },
   "compare": {
     "eyebrow": "Pricing without guesswork",
@@ -182,7 +191,7 @@
   "deliverability": {
     "eyebrow": "Deliverability and integration",
     "title": "Your sending identity, your integration.",
-    "body": "Every customer uses their own sending domain, verified with DKIM and MAIL FROM on Amazon SES, with isolated reputation. Choose the HTTPS API compatible with Resend's sending calls, with base URL <api>api-mepmail.je4ndev.com</api>, or the SMTP relay with STARTTLS at <smtp>smtp-mepmail.je4ndev.com:2587</smtp>. The API key is dedicated to your operation.",
+    "body": "Every customer uses their own sending domain, verified with DKIM and MAIL FROM on Amazon SES, with isolated reputation. Send through the MepMail HTTPS API at <api>api-mepmail.je4ndev.com</api>, wire-compatible with the sending calls many SDKs already make, or through the SMTP relay with STARTTLS at <smtp>smtp-mepmail.je4ndev.com:2587</smtp>. The API key is dedicated to your operation.",
     "note": "API compatibility is not feature parity: inbound, dedicated IPs and SSO are not part of this promise. Inbox placement also depends on your domain, your content and sending reputation."
   },
   "faq": {
@@ -191,7 +200,7 @@
     "items": [
       {
         "q": "I already use Resend. Do I have to rewrite my integration?",
-        "a": "For the compatible sending flows, you can keep the official Resend SDK and just change the base URL and the key. We review your integration during migration to spot features that are not equivalent. We do not promise full feature parity."
+        "a": "For the compatible sending flows, you keep the official SDK and only change the base URL and the key. We review your integration during migration to spot features that are not equivalent. We do not promise full feature parity."
       },
       {
         "q": "Do you guarantee inbox placement?",
@@ -241,11 +250,12 @@
     "tagline": "MepMail · Transactional email with assisted onboarding",
     "points": [
       "Amazon SES in production",
-      "Drop-in compatible with Resend's API",
+      "Self-host with Docker, or let us run it",
       "Migrate in minutes, no code rewrite"
     ],
     "cta": "Create free account",
     "colProduct": "Product",
+    "colCompare": "Compare",
     "colAccount": "Account",
     "colLegal": "Legal",
     "pricing": "Pricing",

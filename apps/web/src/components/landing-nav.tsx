@@ -5,13 +5,16 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 /**
  * Casco de navegação do header da landing.
  *
- * Desktop (>=1024px): o botão fica escondido por CSS e a <nav> aparece na mesma
- * linha do logo, exatamente como antes.
+ * Desktop (>=880px): o botão fica escondido por CSS e a <nav> aparece na mesma
+ * linha do logo (nav v2 flat de 6 itens), com o miolo compactado entre 880 e
+ * 1199px.
  *
- * Mobile/tablet (<1024px): a <nav> colapsa num painel pendurado abaixo do header
- * fixo, aberto pelo hamburger. O corte em 1024px é medido: com a linha completa
- * o header precisa de ~1050px para não apertar os rótulos (EN é o pior caso) e
- * abaixo disso os links quebravam a palavra e a CTA saía da tela (t_38d21dc4).
+ * Mobile/tablet (<880px): a <nav> colapsa num painel pendurado abaixo do header
+ * fixo, aberto pelo hamburger. O corte em 880px é medido: a linha completa
+ * (6 chips + idioma + entrar + CTA + wordmark) cabe a partir daí em EN e PT-BR
+ * (medidor de header), e abaixo disso os rótulos apertavam e a CTA saía da tela
+ * (t_38d21dc4). Acima de 900px a nav é obrigatoriamente inline (reclamação do
+ * fundador: hambúrguer em ~1100px escondia os links).
  *
  * O painel fecha ao tocar num link (o alvo já rolou a página; o painel não pode
  * ficar por cima do conteúdo), com Escape e quando a viewport volta para
@@ -32,7 +35,7 @@ export function LandingNav({
 
   useEffect(() => {
     if (!open) return;
-    const desktop = window.matchMedia("(min-width: 1024px)");
+    const desktop = window.matchMedia("(min-width: 880px)");
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
