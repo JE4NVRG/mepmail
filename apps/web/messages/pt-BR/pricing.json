@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Preços — todos os planos MepMail em uma página",
-    "description": "Preços do MepMail em USD: grátis com 100 e-mails/dia, Pro a partir de US$ 20 para 110.000 e-mails/mês e Scale até 2,5M. Excedente por 1.000 e sem fidelidade."
+    "description": "Preços do MepMail em USD: grátis com 100 e-mails/dia, Pro a partir de US$ 20 para 110.000 e-mails/mês e Scale até 2,75M. Excedente por 1.000 e sem fidelidade."
   },
   "eyebrow": "Preços",
   "title": "Escolha o volume. <highlight>Pague pelo que envia.</highlight>",
@@ -50,7 +50,7 @@
       },
       {
         "q": "E acima do maior plano?",
-        "a": "A escada publicada termina em 2,5M por mês. Acima disso, fale com a gente: dimensionamos o volume com você em vez de cotar um plano enterprise que não publicamos."
+        "a": "A escada publicada termina em 2,75M por mês. Acima disso, fale com a gente: dimensionamos o volume com você em vez de cotar um plano enterprise que não publicamos."
       }
     ]
   },

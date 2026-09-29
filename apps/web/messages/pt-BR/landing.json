@@ -97,7 +97,7 @@
     "attachmentLabel": "Anexos por mensagem",
     "cta": "Começar grátis",
     "featuredBadge": "Mais popular",
-    "showScale": "Planos Scale (500K–2.5M)",
+    "showScale": "Planos Scale (550K–2.75M)",
     "ctaNote": "Crie a conta grátis primeiro — a ativação do plano é feita no painel, em 1 clique.",
     "items": [
       {
@@ -119,42 +119,42 @@
         "limits": "25 domínios · 10 workspaces · contatos ilimitados",
         "overage": "US$ 0,90/1k",
         "attachment": "5 MB",
-        "cta": "Começar no Pro 100K"
+        "cta": "Começar no Pro 110K"
       },
       {
         "volume": "220.000/mês",
         "limits": "25 domínios · 10 workspaces · contatos ilimitados",
         "overage": "US$ 0,35/1k",
         "attachment": "5 MB",
-        "cta": "Começar no Pro 200K"
+        "cta": "Começar no Pro 220K"
       },
       {
         "volume": "550.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
         "overage": "US$ 0,25/1k",
         "attachment": "10 MB",
-        "cta": "Começar no Scale 500K"
+        "cta": "Começar no Scale 550K"
       },
       {
         "volume": "1.100.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
         "overage": "US$ 0,23/1k",
         "attachment": "10 MB",
-        "cta": "Começar no Scale 1M"
+        "cta": "Começar no Scale 1.1M"
       },
       {
         "volume": "1.650.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
         "overage": "US$ 0,18/1k",
         "attachment": "10 MB",
-        "cta": "Começar no Scale 1.5M"
+        "cta": "Começar no Scale 1.65M"
       },
       {
         "volume": "2.750.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
         "overage": "US$ 0,16/1k",
         "attachment": "10 MB",
-        "cta": "Começar no Scale 2.5M"
+        "cta": "Começar no Scale 2.75M"
       }
     ],
     "note": "Free e Starter têm limite diário (UTC); o volume mensal é apenas ilustrativo. Em Pro e Scale, o excedente por 1.000 depende de habilitação no provisionamento; sem ele, os envios param na cota. Mesmo com excedente habilitado, vale o teto de segurança de 5× o volume incluído.",

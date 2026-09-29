@@ -21,12 +21,12 @@ and the dashboard shows the same sentence.
 | --- | --- | --- | --- | --- | --- |
 | `free` | Free | $0 | 100 | per day | — |
 | `starter` | Starter | $9 | 1,500 | per day | — |
-| `pro_100k` | Pro | $20 | 100,000 | per month | $0.90 |
-| `pro_200k` | Pro | $100 | 200,000 | per month | $0.35 |
-| `scale_500k` | Scale | $199 | 500,000 | per month | $0.25 |
-| `scale_1m` | Scale | $319 | 1,000,000 | per month | $0.23 |
-| `scale_1_5m` | Scale | $429 | 1,500,000 | per month | $0.18 |
-| `scale_2_5m` | Scale | $549 | 2,500,000 | per month | $0.16 |
+| `pro_100k` | Pro | $20 | 110,000 | per month | $0.90 |
+| `pro_200k` | Pro | $100 | 220,000 | per month | $0.35 |
+| `scale_500k` | Scale | $199 | 550,000 | per month | $0.25 |
+| `scale_1m` | Scale | $319 | 1,100,000 | per month | $0.23 |
+| `scale_1_5m` | Scale | $429 | 1,650,000 | per month | $0.18 |
+| `scale_2_5m` | Scale | $549 | 2,750,000 | per month | $0.16 |
 
 The ladder is `PLAN_RUNGS` in `packages/core/src/plans.ts`; Checkout, the
 dashboard, `GET /usage` and the account mails all read it from there. The
@@ -237,7 +237,7 @@ STRIPE_SECRET_KEY=sk_test_… pnpm --filter @millionsend/billing provision \
 | `--webhook-url` | Find-or-create the webhook endpoint for this URL with exactly the events the handler consumes. Omit for local development. |
 | `--portal` | Find-or-create the Customer Portal configuration and print its id for `STRIPE_PORTAL_CONFIG`. |
 | `--app-url` | Dashboard origin: the portal's default return URL becomes `<app-url>/settings/billing`. Omit for Stripe's default. |
-| `--move-legacy` | Move every subscription still on a pre-ladder price to its rung (Pro 100K, Scale 500K) at once, without proration, adding the rung's metered item; a discount on the subscription stays. Idempotent. |
+| `--move-legacy` | Move every subscription still on a pre-ladder price to its rung (Pro 110K, Scale 550K) at once, without proration, adding the rung's metered item; a discount on the subscription stays. Idempotent. |
 | `--dry-run` | Read the account and print what would be written, without writing. |
 
 What it does, and why re-running is safe:
@@ -291,9 +291,10 @@ Migration `0035_pricing_ladder` adds the `starter` plan value, the `teams`
 columns `plan_quota`, `current_period_start`, `stripe_overage_item_id`,
 `overage_enabled` (default true) and `pending_rung`, and the `usage_periods`
 table (`accepted`, `reported_overage`, `pending_overage`). Existing `scale`
-teams map to Scale 500K (`plan_quota` 500000) and `pro` teams to Pro 100K
-(100000); `current_period_start` is backfilled as `current_period_end − 1
-month`. Their subscriptions stay on the legacy prices, resolved through the
+teams get `plan_quota` 500000 and `pro` teams 100000 — volumes that match no
+rung today, so each resolves to its plan's first rung (Scale 550K, Pro 110K);
+`current_period_start` is backfilled as `current_period_end − 1 month`. Their
+subscriptions stay on the legacy prices, resolved through the
 product's metadata, until `provision --move-legacy` (or a manual update)
 moves them; the first sync of such a subscription (the worker reconciles at
 boot) adds the rung's metered item, so overage bills from the first period

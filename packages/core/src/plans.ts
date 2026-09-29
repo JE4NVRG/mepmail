@@ -80,7 +80,7 @@ export const PLAN_RUNGS = [
   {
     key: "pro_100k",
     plan: "pro",
-    included: 100_000,
+    included: 110_000,
     period: "month",
     priceCents: 2_000,
     overageCentsPer1k: 90,
@@ -88,7 +88,7 @@ export const PLAN_RUNGS = [
   {
     key: "pro_200k",
     plan: "pro",
-    included: 200_000,
+    included: 220_000,
     period: "month",
     priceCents: 10_000,
     overageCentsPer1k: 35,
@@ -96,7 +96,7 @@ export const PLAN_RUNGS = [
   {
     key: "scale_500k",
     plan: "scale",
-    included: 500_000,
+    included: 550_000,
     period: "month",
     priceCents: 19_900,
     overageCentsPer1k: 25,
@@ -104,7 +104,7 @@ export const PLAN_RUNGS = [
   {
     key: "scale_1m",
     plan: "scale",
-    included: 1_000_000,
+    included: 1_100_000,
     period: "month",
     priceCents: 31_900,
     overageCentsPer1k: 23,
@@ -112,7 +112,7 @@ export const PLAN_RUNGS = [
   {
     key: "scale_1_5m",
     plan: "scale",
-    included: 1_500_000,
+    included: 1_650_000,
     period: "month",
     priceCents: 42_900,
     overageCentsPer1k: 18,
@@ -120,7 +120,7 @@ export const PLAN_RUNGS = [
   {
     key: "scale_2_5m",
     plan: "scale",
-    included: 2_500_000,
+    included: 2_750_000,
     period: "month",
     priceCents: 54_900,
     overageCentsPer1k: 16,
@@ -156,14 +156,14 @@ export function teamRung(plan: Plan, planQuota: number | null): PlanRung {
   return rungs.find((r) => r.period === "month" && r.included === planQuota) ?? first;
 }
 
-/** "100K", "1M", "1.5M": a volume the way plan cards and mails print it. */
+/** "110K", "1.1M", "1.65M": a volume the way plan cards and mails print it. */
 export function formatVolume(n: number): string {
   if (n >= 1_000_000) return `${n / 1_000_000}M`;
   if (n >= 1_000) return `${n / 1_000}K`;
   return String(n);
 }
 
-/** "Pro 100K" on a monthly plan, the bare plan name on a daily one (and on System). */
+/** "Pro 110K" on a monthly plan, the bare plan name on a daily one (and on System). */
 export function planLabel(plan: Plan, planQuota: number | null): string {
   if (plan === "system") return PLAN_NAME.system;
   const rung = teamRung(plan, planQuota);
@@ -328,7 +328,7 @@ export const PLAN_CONTACT_LIMIT: Record<Plan, number | null> = {
  * Attachment bytes one email may carry per plan (decoded, summed across
  * attachments). SES bills outbound *data* apart from the per-recipient rate
  * (US$ 0.12/GB), so a plan that pays US$ 0.16 per 1,000 sends cannot also
- * absorb megabytes per message: 100k emails of 5 MB is ~490 GB, some US$ 59
+ * absorb megabytes per message: 110k emails of 5 MB is ~537 GB, some US$ 64
  * of data alone against a US$ 29 plan. The ceiling scales with the plan that
  * pays for it — never one instance-wide number. Self-host ignores plans
  * (accept-email's absolute ceiling).

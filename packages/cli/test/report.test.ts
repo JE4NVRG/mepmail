@@ -32,6 +32,41 @@ describe("buildOffer", () => {
     );
   });
 
+  it("names a bumped monthly rung by the volume the mirror carries, never the bare plan name", () => {
+    const offer = buildOffer(
+      {
+        ...usage,
+        plan: "pro",
+        limits: { emailsPerDay: null, emailsPerMonth: 110_000, domains: 25, contacts: null },
+      },
+      snapshot,
+      25,
+      "Resend",
+    );
+    expect(offer).toMatchObject({ plan: "pro", fits: "pro" });
+    expect(offer?.text.join(" ")).toContain("Pro 110K allows 110,000/month; that covers it.");
+    const overTop = buildOffer(
+      {
+        ...usage,
+        plan: "scale",
+        limits: { emailsPerDay: null, emailsPerMonth: 2_750_000, domains: null, contacts: null },
+        period: {
+          emailsSent: 3_000_000,
+          included: 2_750_000,
+          overageEnabled: false,
+          startsAt: "2026-09-01T00:00:00.000Z",
+          endsAt: "2026-10-01T00:00:00.000Z",
+        },
+      },
+      { ...snapshot, metrics: { emailsLast30Days: 3_000_000 } } as unknown as Snapshot,
+      1,
+      "Resend",
+    );
+    expect(overTop?.text.join(" ")).toContain(
+      "Scale 2.75M (2,750,000/month, unlimited domains) is the top rung",
+    );
+  });
+
   it("still suggests Starter when the team is already on it and inside every limit", () => {
     const offer = buildOffer(
       { ...usage, plan: "starter", limits: { ...usage.limits, domains: 10, contacts: null } },

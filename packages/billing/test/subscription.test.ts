@@ -70,7 +70,7 @@ const callOrder = (first: string, second: string) =>
 
 describe("changeRung up", () => {
   it("settles usage under the old rung, then re-prices both items at once and re-reads Stripe", async () => {
-    const teamId = await subscribedTeam(withOverage(), 100_500);
+    const teamId = await subscribedTeam(withOverage(), 110_500);
     expect(await changeRung(deps(), { teamId, rung: "pro_200k" })).toEqual({ applied: "now" });
     expect(state.meterEvents.map((e) => e.payload.value)).toEqual(["500"]);
     callOrder("billing.meterEvents.create", "subscriptions.update");
@@ -96,7 +96,7 @@ describe("changeRung up", () => {
     expect(await reportedOverage(teamId)).toBe(500);
     expect(await team(teamId)).toMatchObject({
       plan: "pro",
-      planQuota: 200_000,
+      planQuota: 220_000,
       stripeOverageItemId: "si_sub_1_overage",
       pendingRung: null,
     });
@@ -108,13 +108,13 @@ describe("changeRung up", () => {
         schedule: schedule([price("millionsend_pro_100k_monthly")]),
       }),
     );
-    expect(await team(teamId)).toMatchObject({ planQuota: 200_000, pendingRung: "pro_100k" });
+    expect(await team(teamId)).toMatchObject({ planQuota: 220_000, pendingRung: "pro_100k" });
     expect(await changeRung(deps(), { teamId, rung: "scale_500k" })).toEqual({ applied: "now" });
     expect(state.scheduleReleases).toEqual(["sched_0"]);
     callOrder("subscriptionSchedules.release", "subscriptions.update");
     expect(await team(teamId)).toMatchObject({
       plan: "scale",
-      planQuota: 500_000,
+      planQuota: 550_000,
       pendingRung: null,
     });
   });
@@ -125,7 +125,7 @@ describe("changeRung up", () => {
         product: legacyProduct("pro"),
       }),
     );
-    expect(await team(teamId)).toMatchObject({ planQuota: 100_000, stripeOverageItemId: null });
+    expect(await team(teamId)).toMatchObject({ planQuota: 110_000, stripeOverageItemId: null });
     await changeRung(deps(), { teamId, rung: "pro_200k" });
     expect(state.meterEvents).toEqual([]);
     expect(state.updates[0]?.[1].items).toEqual([
@@ -133,7 +133,7 @@ describe("changeRung up", () => {
       { price: priceId("millionsend_pro_200k_overage") },
     ]);
     expect(await team(teamId)).toMatchObject({
-      planQuota: 200_000,
+      planQuota: 220_000,
       stripeOverageItemId: "si_sub_1_overage",
     });
   });
@@ -187,7 +187,7 @@ describe("changeRung down", () => {
     expect(await reportedOverage(teamId)).toBe(0);
     expect(await team(teamId)).toMatchObject({
       plan: "pro",
-      planQuota: 200_000,
+      planQuota: 220_000,
       pendingRung: "pro_100k",
     });
   });
@@ -201,7 +201,7 @@ describe("changeRung down", () => {
     expect(state.scheduleReleases).toEqual(["sched_1"]);
     expect(state.scheduleCreates).toHaveLength(1);
     expect(state.updates).toEqual([]);
-    expect(await team(teamId)).toMatchObject({ planQuota: 200_000, pendingRung: null });
+    expect(await team(teamId)).toMatchObject({ planQuota: 220_000, pendingRung: null });
 
     // Nothing pending: choosing the current rung touches nothing.
     expect(await changeRung(deps(), { teamId, rung: "pro_200k" })).toEqual({
@@ -219,7 +219,7 @@ describe("changeRung down", () => {
     expect(state.scheduleUpdates[1]?.[1].phases?.[1]?.items).toEqual([
       { price: priceId("millionsend_starter_monthly"), quantity: 1 },
     ]);
-    expect(await team(teamId)).toMatchObject({ planQuota: 200_000, pendingRung: "starter" });
+    expect(await team(teamId)).toMatchObject({ planQuota: 220_000, pendingRung: "starter" });
   });
 });
 
@@ -242,7 +242,7 @@ describe("setOverage", () => {
     ]);
     expect(await team(teamId)).toMatchObject({
       plan: "pro",
-      planQuota: 100_000,
+      planQuota: 110_000,
       overageEnabled: true,
       stripeOverageItemId: "si_sub_1_overage",
     });
@@ -252,7 +252,7 @@ describe("setOverage", () => {
   });
 
   it("off flushes unreported usage, then flips the flag and leaves the item", async () => {
-    const teamId = await subscribedTeam(withOverage(), 100_500);
+    const teamId = await subscribedTeam(withOverage(), 110_500);
     await setOverage(deps(), { teamId, enabled: true });
     await setOverage(deps(), { teamId, enabled: false });
     expect(state.meterEvents.map((e) => e.payload.value)).toEqual(["500"]);

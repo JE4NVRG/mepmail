@@ -26,7 +26,7 @@ const FREE: QuotaTeamRow = {
   currentPeriodEnd: null,
   overageEnabled: false,
 };
-const PRO: QuotaTeamRow = { ...FREE, plan: "pro", planQuota: 100_000, overageEnabled: true };
+const PRO: QuotaTeamRow = { ...FREE, plan: "pro", planQuota: 110_000, overageEnabled: true };
 
 describe("teamQuota with an operator ceiling", () => {
   it("a daily plan takes the lower of the plan limit and the ceiling", () => {
@@ -49,7 +49,7 @@ describe("teamQuota with an operator ceiling", () => {
     expect(quota).toMatchObject({
       kind: "month",
       plan: "pro",
-      included: 100_000,
+      included: 110_000,
       overage: true,
       dailyCeiling: 1_000,
     });
@@ -103,7 +103,7 @@ describe("the ceiling is a hard line", () => {
     const teamId = await createTeam(db, "committed");
     await db
       .update(schema.teams)
-      .set({ plan: "pro", planQuota: 100_000, dailySendCeiling: 1_000 })
+      .set({ plan: "pro", planQuota: 110_000, dailySendCeiling: 1_000 })
       .where(eq(schema.teams.id, teamId));
     expect((await committedDailyVolume(db)) - before).toBe(1_000);
   });

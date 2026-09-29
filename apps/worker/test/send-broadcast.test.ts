@@ -659,14 +659,14 @@ it("cloud fan-out on a monthly plan parks at the included volume and names the r
     .update(schema.teams)
     .set({
       plan: "pro",
-      planQuota: 100_000,
+      planQuota: 110_000,
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
       overageEnabled: false,
     })
     .where(eq(schema.teams.id, mTeamId));
   // No tolerance on a monthly plan: one slot left means one of three goes.
-  await db.insert(schema.usagePeriods).values({ teamId: mTeamId, periodStart, accepted: 99_999 });
+  await db.insert(schema.usagePeriods).values({ teamId: mTeamId, periodStart, accepted: 109_999 });
   const broadcastId = await insertBroadcast({ teamId: mTeamId, from: "Acme <hi@monthly.dev>" });
   const mail = captureMailer();
   const { deps, enqueued } = makeDeps({ isCloud: true, ...mail });
@@ -676,7 +676,7 @@ it("cloud fan-out on a monthly plan parks at the included volume and names the r
     '"launch": 2 of 3 recipients are waiting for the quota',
   ]);
   expect(mail.sends[0]?.text).toContain(
-    "1 emails went out; 2 are parked because monthly reached its quota of 100,000.",
+    "1 emails went out; 2 are parked because monthly reached its quota of 110,000.",
   );
   expect(mail.sends[0]?.text).toContain(
     `They go out when the period renews on ${formatMailDate("en", periodEnd)}, as soon as overage is turned on in Billing`,
@@ -689,7 +689,7 @@ it("cloud fan-out on a monthly plan parks at the included volume and names the r
     .select({ accepted: schema.usagePeriods.accepted })
     .from(schema.usagePeriods)
     .where(eq(schema.usagePeriods.teamId, mTeamId));
-  expect(period?.accepted).toBe(100_000);
+  expect(period?.accepted).toBe(110_000);
 });
 
 it("cloud fan-out re-reads the billing period per page, so a renewal mid-walk counts the rest against the new period", async () => {

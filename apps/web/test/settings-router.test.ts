@@ -535,7 +535,7 @@ describe("settings.usage", () => {
       .update(schema.teams)
       .set({
         plan: "scale",
-        planQuota: 500_000,
+        planQuota: 550_000,
         currentPeriodStart: start,
         currentPeriodEnd: end,
         overageEnabled: true,
@@ -547,7 +547,7 @@ describe("settings.usage", () => {
     await addMember(teamId, "u1", "owner");
     const usage = await callerFor("u1", teamId, "owner").settings.usage.recent();
     expect(usage.today.limit).toBeNull();
-    expect(usage.period).toEqual({ accepted: 777, included: 500_000, start, end, overage: true });
+    expect(usage.period).toEqual({ accepted: 777, included: 550_000, start, end, overage: true });
   });
 
   it("reports no limit and no period on self-host, where plans are not enforced", async () => {

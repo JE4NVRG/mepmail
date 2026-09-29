@@ -397,7 +397,7 @@ describe("provision", () => {
     );
     expect(state.calls.filter((c) => c.includes("create"))).toEqual([]);
     expect(log).toContain(
-      `price ${overageLookupKey(rungByKey("scale_1m"))}: ${price.id} (existing, 20 cents per 1,000 over quota, metadata refreshed)`,
+      `price ${overageLookupKey(rungByKey("scale_1m"))}: ${price.id} (existing, 23 cents per 1,000 over quota, metadata refreshed)`,
     );
   });
 

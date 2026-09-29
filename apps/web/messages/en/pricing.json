@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Pricing — every MepMail plan on one page",
-    "description": "MepMail pricing in USD: free with 100 emails/day, Pro from US$ 20 for 110,000 emails/month and Scale up to 2.5M. Overage per 1,000 and no lock-in."
+    "description": "MepMail pricing in USD: free with 100 emails/day, Pro from US$ 20 for 110,000 emails/month and Scale up to 2.75M. Overage per 1,000 and no lock-in."
   },
   "eyebrow": "Pricing",
   "title": "Pick your volume. <highlight>Pay for what you send.</highlight>",
@@ -50,7 +50,7 @@
       },
       {
         "q": "What happens above the top plan?",
-        "a": "The published ladder stops at 2.5M a month. Above that, talk to us: we size the volume with you instead of quoting an enterprise tier we do not publish."
+        "a": "The published ladder stops at 2.75M a month. Above that, talk to us: we size the volume with you instead of quoting an enterprise tier we do not publish."
       }
     ]
   },

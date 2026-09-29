@@ -13,7 +13,7 @@ describe("auditDetail", () => {
   it("collapses a from/to plan pair to an arrow", () => {
     expect(
       auditDetail(
-        { from: { plan: "free", planQuota: null }, to: { plan: "pro", planQuota: 100000 } },
+        { from: { plan: "free", planQuota: null }, to: { plan: "pro", planQuota: 110000 } },
         bool,
       ),
     ).toBe("free → pro");
