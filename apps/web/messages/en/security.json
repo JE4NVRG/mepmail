@@ -1,0 +1,149 @@
+{
+  "meta": {
+    "title": "Security at MepMail — controls, subprocessors and disclosure",
+    "description": "How MepMail protects accounts and sending: encryption in transit, password and API key hashing, tenant isolation, abuse limits, monitoring, backups and DKIM/SPF/DMARC — who processes what, and how to report a vulnerability."
+  },
+  "hero": {
+    "eyebrow": "Security",
+    "title": "Security at MepMail",
+    "lead": "MepMail is a small, founder-operated product. This page lists the controls that are actually in place today — the ones you can hold us to — and says plainly what is not.",
+    "note": "Last reviewed: September 29, 2026."
+  },
+  "controls": {
+    "eyebrow": "Controls",
+    "title": "What is in place today",
+    "body": "Every item below is a property of the running product, not an aspiration. Where a control only covers part of the surface, the card says so.",
+    "items": [
+      {
+        "name": "Encryption in transit",
+        "body": "Everything between you and MepMail travels over an encrypted connection.",
+        "bullets": [
+          "The panel and the API are served over HTTPS, with HSTS (one year, subdomains included), a strict Content-Security-Policy, X-Frame-Options DENY, nosniff and a restricted Permissions-Policy.",
+          "The SMTP relay requires TLS: STARTTLS is offered with our certificate, and the relay refuses to start without a keypair unless the operator explicitly opts in for a trusted private network.",
+          "Mail leaves through Amazon SES over TLS, authenticated for your domain by DKIM and SPF."
+        ]
+      },
+      {
+        "name": "Passwords and API keys",
+        "body": "Credentials are stored in forms that cannot be replayed.",
+        "bullets": [
+          "Account passwords are hashed with scrypt (Node's crypto.scrypt); no plain-text password is stored or sent to the browser.",
+          "API keys are shown once and stored only as a SHA-256 hash plus a short prefix for identification, and a presented key is compared in constant time.",
+          "A team can hold at most 25 active keys, so a leaked key cannot fan out into an unbounded set of credentials.",
+          "Sign-in, sign-up, password reset and verification resend are rate-limited per window and IP."
+        ]
+      },
+      {
+        "name": "Team isolation",
+        "body": "The team is the boundary: a credential only ever reaches the team it is bound to.",
+        "bullets": [
+          "Contacts, broadcasts, sending domains, templates, suppressions, API keys, audit entries and API requests all carry the team that owns them.",
+          "An API grant is bound to a team, and membership is re-checked as tokens are issued or refreshed — removing a member stops new tokens.",
+          "Deleting an account is refused while it is the only owner of a team, so a team is never left with nobody able to administer it."
+        ]
+      },
+      {
+        "name": "Abuse limits",
+        "body": "Limits keep one compromised key or one runaway script from burning a domain's reputation.",
+        "bullets": [
+          "Every plan carries an included volume and a daily send ceiling; sends past the daily ceiling are held instead of running all day.",
+          "Bounces and complaints are recorded per team, and the instance's deliverability health can pause a team's sending.",
+          "Sign-up is closed by default on a reachable instance — only the first account may register — and a beta can be capped by seat count.",
+          "A Cloudflare Turnstile challenge can be turned on for sign-in, sign-up, password reset and the verification resend."
+        ]
+      },
+      {
+        "name": "Suppressions",
+        "body": "A do-not-contact record beats any future send, on every surface.",
+        "bullets": [
+          "Hard bounces, spam complaints, manual blocks and one-click unsubscribes are stored per team against a hash of the recipient address.",
+          "The list is checked on every send path — API, SMTP relay and scheduled broadcasts alike — while transactional mail still reaches a recipient who only unsubscribed from marketing.",
+          "Suppressions outlive erasure: account data is removed, the hash stays as the do-not-contact record."
+        ]
+      },
+      {
+        "name": "Monitoring",
+        "body": "The service and the deploy path are watched, not just the happy path.",
+        "bullets": [
+          "The API exposes a health endpoint that reports the service status and the deployed revision.",
+          "Containers run health checks that gate startup and restarts.",
+          "A boot check verifies the application containers and the SMTP relay port and alerts the operator, and each deploy verifies the public site and its security headers before it is called done."
+        ]
+      },
+      {
+        "name": "Backups",
+        "body": "The database is dumped on a daily schedule and the copy is verified.",
+        "bullets": [
+          "The nightly dump (pg_dump, custom format) is validated with pg_restore --list and a checksum before it is trusted.",
+          "A copy is pushed to off-site object storage, and the uploaded object is re-read and required to match byte for byte.",
+          "Dumps older than 14 days are pruned, and a dump can be encrypted with an age key before it leaves the host."
+        ]
+      },
+      {
+        "name": "DKIM, SPF and DMARC",
+        "body": "Authentication is configured per sending domain, not globally.",
+        "bullets": [
+          "Connecting a domain returns the exact DNS records to publish: the DKIM record and the MAIL FROM record (SPF).",
+          "Those two gate sending — a domain whose records stop resolving has its sends refused until they are back — and a background worker re-checks each domain's DNS on a schedule.",
+          "DMARC is recommended rather than required, and MepMail reads the policy, including one inherited from the parent domain."
+        ]
+      }
+    ]
+  },
+  "subprocessors": {
+    "eyebrow": "Infrastructure",
+    "title": "Subprocessors",
+    "body": "The short list of providers that process data for MepMail Cloud. It mirrors the Privacy Policy and adds the hosting provider.",
+    "columns": ["Provider", "Role", "Location"],
+    "rows": [
+      {
+        "provider": "Contabo GmbH",
+        "role": "Servers hosting the application and its database",
+        "location": "Germany"
+      },
+      {
+        "provider": "Amazon Web Services (Amazon SES)",
+        "role": "Email delivery and delivery events",
+        "location": "us-east-1, United States"
+      },
+      {
+        "provider": "Cloudflare",
+        "role": "DNS, CDN and network protection in front of our servers",
+        "location": "Global edge network"
+      },
+      {
+        "provider": "Stripe",
+        "role": "Payment processing, invoices and receipts",
+        "location": "United States"
+      }
+    ],
+    "note": "A self-hosted instance runs on infrastructure you choose, so this list does not apply to it."
+  },
+  "certifications": {
+    "eyebrow": "Honesty",
+    "title": "Certifications",
+    "body": "We do not hold SOC 2 or ISO 27001 today.",
+    "items": [
+      "Both are on the roadmap. We are not announcing a date, and we will not describe an audit that has not happened.",
+      "We also publish no uptime percentage and no SLA today. When that changes, it will be written here first.",
+      "Until then, hold us to the specific control list above — and ask security@je4ndev.com anything that is missing from it."
+    ]
+  },
+  "disclosure": {
+    "eyebrow": "Report",
+    "title": "Responsible disclosure",
+    "body": "Found a vulnerability? Tell us and we will fix it.",
+    "bullets": [
+      "Email security@je4ndev.com with the details and, if you have one, a reproduction.",
+      "We acknowledge the report and give a first answer within 72 hours.",
+      "There is no bug bounty today — we will credit you publicly if you want the credit.",
+      "Please give us a reasonable window to fix the issue before publishing it; we will tell you what we are doing along the way."
+    ],
+    "cta": "Email security@je4ndev.com"
+  },
+  "close": {
+    "title": "The details live in the docs",
+    "body": "Sending domains, authentication records, deliverability insights and the API reference — the same source the dashboard links to.",
+    "cta": "Read the docs"
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "title": "Support at MepMail — email, docs, changelog",
+    "description": "How to get help with MepMail: email support, the documentation, the changelog, and answers to the questions we get most — migration, domains, plan limits, billing and spam folders."
+  },
+  "hero": {
+    "eyebrow": "Support",
+    "title": "Support at MepMail",
+    "lead": "MepMail is founder-operated: the people who build it answer the email. Pick the channel that fits — most questions are already answered in the docs.",
+    "note": "Support runs on a small team, so please include the account email with any question."
+  },
+  "channels": {
+    "eyebrow": "Channels",
+    "title": "Where to reach us",
+    "body": "Four ways in, ordered by how fast they usually answer.",
+    "items": [
+      {
+        "name": "Email support",
+        "kind": "support@je4ndev.com",
+        "body": "Best for account, billing and deliverability questions the docs do not answer.",
+        "bullets": [
+          "Replies within one business day.",
+          "Include the account email and, for a sending problem, the message id from the logs."
+        ],
+        "links": [{ "label": "support@je4ndev.com", "href": "mailto:support@je4ndev.com" }]
+      },
+      {
+        "name": "Documentation",
+        "kind": "docs-mepmail.je4ndev.com",
+        "body": "Quickstart, concepts, integrations and the API reference — the same docs the dashboard links to.",
+        "bullets": [
+          "Sending domains and the DNS records to publish.",
+          "Rate limits, error codes and the compatible API surface."
+        ],
+        "links": [{ "label": "Open the docs", "href": "https://docs-mepmail.je4ndev.com" }]
+      },
+      {
+        "name": "Changelog",
+        "kind": "/updates",
+        "body": "Product updates land on the updates page, and you can subscribe by email.",
+        "bullets": ["One click to unsubscribe, no account needed."],
+        "links": [{ "label": "Product updates", "href": "/updates" }]
+      },
+      {
+        "name": "Status page",
+        "kind": "Coming soon",
+        "body": "There is no public status page yet, so there is no URL to link to. When it exists, this card will point at it.",
+        "bullets": ["Until then, material service changes reach you by email."],
+        "links": []
+      }
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "Questions we get most",
+    "items": [
+      {
+        "q": "How do I migrate from Resend?",
+        "a": "Point the official Resend SDKs at MepMail's base URL, swap the API key, and move your domains and contacts. The free account can be migrated with npx @mepmail/cli migrate --from resend. The per-language guide walks through each SDK.",
+        "link": {
+          "label": "Docs: migrate from Resend",
+          "href": "https://docs-mepmail.je4ndev.com/migrate-from-resend"
+        }
+      },
+      {
+        "q": "How do I connect and verify a domain?",
+        "a": "Add the domain in the panel and publish the DNS records it returns: the DKIM record and the MAIL FROM (SPF) record. Those two gate sending, DMARC is recommended, and the panel reports each record's live state until it resolves.",
+        "link": {
+          "label": "Docs: sending domains",
+          "href": "https://docs-mepmail.je4ndev.com/concepts/domains"
+        }
+      },
+      {
+        "q": "What are the plan limits?",
+        "a": "Every plan carries an included monthly volume and a daily send ceiling. Volume is counted per distinct recipient, and sends past the included volume are billed per 1,000 at the plan's overage rate. Prices and volumes are on the pricing page.",
+        "link": { "label": "Pricing", "href": "/pricing" }
+      },
+      {
+        "q": "How do billing and refunds work?",
+        "a": "Paid plans are billed in US dollars through Stripe, monthly and in advance. If a charge looks wrong, email us with the charge reference; refunds go back to the original payment method, typically within 5-10 business days depending on your bank.",
+        "link": { "label": "Refund policy", "href": "/refund" }
+      },
+      {
+        "q": "Why did my email land in spam?",
+        "a": "Usually DNS or reputation: a DKIM or MAIL FROM record that does not resolve, a DMARC policy that fails, or a domain with no sending history. MepMail's deliverability insights score each sending domain and point at the record that is failing.",
+        "link": {
+          "label": "Docs: deliverability insights",
+          "href": "https://docs-mepmail.je4ndev.com/concepts/deliverability-insights"
+        }
+      },
+      {
+        "q": "How do I report abuse or spam?",
+        "a": "Email security@je4ndev.com with the message id or the headers. We act on abuse reports, and sending that generates complaints can be paused or the account suspended.",
+        "link": { "label": "security@je4ndev.com", "href": "mailto:security@je4ndev.com" }
+      }
+    ]
+  },
+  "close": {
+    "title": "Nothing here answered it?",
+    "body": "Send the account email and what you expected to happen — that is usually enough to get a concrete answer.",
+    "cta": "Email support@je4ndev.com"
+  }
+}

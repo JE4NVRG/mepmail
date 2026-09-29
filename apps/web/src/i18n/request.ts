@@ -21,6 +21,8 @@ const NAMESPACES = [
   "alternatives",
   "landing",
   "integrations",
+  "security",
+  "support",
   "legal",
   "nav",
   "pricing",
