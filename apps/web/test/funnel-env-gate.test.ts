@@ -67,7 +67,9 @@ it("sends nothing when the environment configured no collector, IS_CLOUD or not"
       teamId,
     }),
   ).toBe(false);
-  expect(await emitFunnel(db, { name: "signup", dedupeKey: "signup:dev-user" })).toBe(false);
+  expect(await emitFunnel(db, { name: "signup_complete", dedupeKey: "signup:dev-user" })).toBe(
+    false,
+  );
 
   expect(calls).toEqual([]);
   expect(calls.map((call) => call.url)).not.toContain(HOSTED_ENDPOINT);
@@ -115,6 +117,6 @@ it("sends nothing when only half the pair is set", async () => {
   vi.stubEnv("UMAMI_ENDPOINT", ENDPOINT);
 
   expect(funnelTarget()).toEqual({ endpoint: null, websiteId: null, hostname: "localhost" });
-  expect(await emitFunnel(db, { name: "signup", dedupeKey: "signup:half" })).toBe(false);
+  expect(await emitFunnel(db, { name: "signup_complete", dedupeKey: "signup:half" })).toBe(false);
   expect(calls).toEqual([]);
 });

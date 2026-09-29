@@ -11,7 +11,7 @@ import { PRICE_ROWS, type PriceRow } from "./landing-pricing";
  *
  * The headline claim ("up to 60% cheaper") is anchored on the most expensive
  * publicly priced rung of the market (SendGrid), NOT on Resend: against Resend
- * the maximum is 52% at 2.5M. Both numbers are exported here so the page states
+ * the maximum is 57% at 2.75M. Both numbers are exported here so the page states
  * them from the data instead of restating them by hand.
  */
 
@@ -54,10 +54,10 @@ function sendgridSavingsPct(row: PriceRow): number {
 
 const RESEND_SAVINGS_PCT = RESEND_ROWS.map((row) => resendSavings(row).pct);
 
-/** Ceiling of the claim against Resend — 52% on the top rung. */
+/** Ceiling of the claim against Resend — 57% on the top rung. */
 export const MAX_RESEND_SAVINGS_PCT = Math.max(...RESEND_SAVINGS_PCT);
 
-/** Floor of the savings shown in the comparison table — 38% at 200k. */
+/** Floor of the savings shown in the comparison table — 30% at 220K. */
 export const MIN_RESEND_SAVINGS_PCT = Math.min(...RESEND_SAVINGS_PCT);
 
 /** Ceiling against the most expensive published market price — 60% (SendGrid). */

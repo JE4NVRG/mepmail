@@ -19,7 +19,7 @@ import { and, eq } from "drizzle-orm";
  * Umami as its own anonymous session, as the tracker's own events do.
  */
 export const FUNNEL_EVENT_NAMES = [
-  "signup",
+  "signup_complete",
   "email_verified",
   "first_email_sent",
   "checkout_started",
@@ -30,7 +30,7 @@ export type FunnelEventName = (typeof FUNNEL_EVENT_NAMES)[number];
 
 /** Where each event is attributed in Umami's page views; its dashboard reads the funnel by path. */
 export const FUNNEL_EVENT_PATHS: Record<FunnelEventName, string> = {
-  signup: "/signup",
+  signup_complete: "/signup",
   email_verified: "/verify-email",
   first_email_sent: "/emails",
   checkout_started: "/settings/billing",

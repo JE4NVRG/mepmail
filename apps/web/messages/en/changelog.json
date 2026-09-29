@@ -1,12 +1,12 @@
 {
   "meta": {
     "title": "Changelog — what shipped in MepMail",
-    "description": "Every recent MepMail release, newest first: value-first landing and official logos, /security and /support, notification channels, open beta, plan limits and the migration CLI — with the date each one reached main."
+    "description": "Every recent MepMail release, newest first — what changed for you, and the day it shipped."
   },
   "hero": {
     "eyebrow": "Changelog",
     "title": "What <highlight>shipped</highlight>, release by release.",
-    "lead": "MepMail is built in the open. This is the running list of releases, newest first — what changed, dated by the day it reached the product. The same history lives in the repository's CHANGELOG.md.",
+    "lead": "MepMail is built in the open. Here is every recent release, newest first — what changed for you, dated the day it shipped. The raw history lives in the repository's CHANGELOG.md.",
     "note": "The beta is open and self-serve: create a free account, no card required.",
     "badges": ["Open beta · self-serve", "Dated releases", "EN + PT-BR", "Backed by CHANGELOG.md"],
     "ctaDocs": "Read the docs"
@@ -14,7 +14,7 @@
   "feed": {
     "eyebrow": "Releases",
     "title": "Recent releases",
-    "body": "Six of the most recent releases. Earlier history is in the repository changelog.",
+    "body": "The six most recent releases. Older history lives in the repository changelog.",
     "labels": {
       "added": "Added",
       "changed": "Changed",
@@ -25,67 +25,57 @@
     {
       "version": "0.44",
       "date": "2026-09-29",
-      "title": "Value-first landing, official logos and +10% quotas",
-      "summary": "The public site starts from the value proposition and real brand logos, and every sending quota grew by 10%.",
+      "title": "10% more email on every plan",
+      "summary": "Every plan sends 10% more email for the same price — plus a way back from sign-in and a website that leads with what you get.",
       "changes": [
         {
           "kind": "added",
           "items": [
-            "The landing now leads with the value proposition and a mural of official integration logos instead of a feature wall.",
-            "Official, full-colour brand marks across the home, /integrations and the product mockup.",
-            "A flat, responsive header with a balanced footer — Product, Compare, Account and Legal columns on every public page."
+            "Sign-in and sign-up now link back to the site, so you're never stranded mid-flow.",
+            "Official, full-colour logos for every service MepMail connects to, across the site and the product."
           ]
         },
         {
           "kind": "changed",
-          "items": ["Sending quotas raised by 10% end to end (core, panel, docs and tests)."]
-        },
-        {
-          "kind": "fixed",
-          "items": [
-            "A back-to-site link on the authentication screens, so sign-in and sign-up no longer strand the visitor."
-          ]
+          "items": ["Quotas up 10% everywhere: Pro now starts at 110,000 emails/month and Scale reaches 2.75M. Prices unchanged."]
         }
       ]
     },
     {
       "version": "0.43",
       "date": "2026-09-29",
-      "title": "Institutional pages and plan limits v2",
-      "summary": "/security and /support ship as showcase pages, /integrations opens, and the plans carry more domains and workspaces.",
+      "title": "Roomier plans and pages you can trust",
+      "summary": "More domains and workspaces per plan, unlimited contacts on Starter, and two new pages that explain security and support up front.",
       "changes": [
         {
           "kind": "added",
           "items": [
-            "/security and /support as showcase pages: controls, subprocessors, the compliance roadmap (SOC 2 / ISO 27001 as roadmap items, never headlines) and the enterprise FAQ.",
-            "/integrations, with the vendor mural and per-tool setup cards.",
-            "security.txt."
+            "/security — the controls that protect your sending, the services we rely on, and exactly where compliance (SOC 2 / ISO 27001) stands.",
+            "/support — how to reach us and what to expect, with an FAQ for larger teams.",
+            "/integrations — every service that connects to MepMail, with a setup guide per tool."
           ]
         },
         {
           "kind": "changed",
-          "items": ["Plan limits v2: more domains and workspaces, unlimited contacts on Starter."]
+          "items": ["More domains and workspaces per plan; unlimited contacts on Starter."]
         },
         {
           "kind": "fixed",
-          "items": [
-            "Localised landing prices (US separators in English, per-locale volume labels)."
-          ]
+          "items": ["Prices display correctly in each language."]
         }
       ]
     },
     {
       "version": "0.42",
       "date": "2026-09-29",
-      "title": "Notification channels, templates and Microsoft sign-in",
-      "summary": "Slack, Discord and Telegram channels, a gallery of ready-made templates and social sign-in with Microsoft.",
+      "title": "Alerts in Slack, Discord and Telegram — and ready-made templates",
+      "summary": "Get notified where your team already talks, and start from 10 ready-to-use email templates.",
       "changes": [
         {
           "kind": "added",
           "items": [
-            "Slack, Discord and Telegram notification channels, formatted automatically from the webhook URL.",
-            "A gallery of ready-made templates (10 starters, EN/PT) with preview and one-click copy.",
-            "Social sign-in with Microsoft (better-auth), in both locales."
+            "Notification channels for Slack, Discord and Telegram — paste a webhook URL and MepMail formats the alerts.",
+            "A gallery of 10 ready-to-use email templates (EN and PT) with live preview and one-click copy."
           ]
         }
       ]
@@ -93,64 +83,56 @@
     {
       "version": "0.41",
       "date": "2026-09-28",
-      "title": "Console, operator tooling and agent discovery",
-      "summary": "An operator Console, the MCP server card at the MCP origin, channel attribution on sign-up and the first documentation wave.",
+      "title": "Your AI agents can discover MepMail",
+      "summary": "The MCP server now advertises itself where agent tools look, and the docs got a big first pass.",
       "changes": [
         {
           "kind": "added",
           "items": [
-            "An operator Console: instance users, audit, regions and safety, plus a Users tile in the overview.",
-            "The MCP server card now also served at the MCP endpoint origin, with its tools[] published.",
-            "Channel attribution on sign-up and server-side funnel events in Umami.",
-            "A Telegram alert on new sign-ups, carrying the utm/campaign origin."
+            "MCP auto-discovery: Claude and other MCP clients can now find MepMail's tools without manual setup.",
+            "For self-hosters: an operator console to manage instance users, audit and regions."
           ]
         },
         {
           "kind": "changed",
-          "items": [
-            "Documentation wave 1: the npm packages page, rate limits with Retry-After, the error catalogue and the MCP install path."
-          ]
+          "items": ["Docs wave 1 — npm packages, rate limits with Retry-After, a full error catalogue, and the MCP install path."]
         }
       ]
     },
     {
       "version": "0.40",
       "date": "2026-09-28",
-      "title": "Open beta, SEO and self-serve docs",
-      "summary": "Open sign-up on the landing and in the docs, robots.txt and sitemap.xml unblocked, self-hosted analytics and the CLI's doctor command.",
+      "title": "Open beta: sign up and send today",
+      "summary": "No invite needed — create an account and start sending. Docs and search visibility improved along the way.",
       "changes": [
         {
           "kind": "added",
           "items": [
-            "Open sign-up on the landing and in the docs: no invite, no seat limit; each account is capped at 100 emails a day on the Free plan.",
-            "Self-hosted analytics (Umami) wired into the web app.",
-            "doctor and emails list/get in the migration CLI."
+            "Open sign-up: no invite, no waiting list. The Free plan sends 100 emails/day, no card required.",
+            "A doctor command in the migration CLI to check your setup, plus emails list/get."
           ]
         },
         {
           "kind": "changed",
-          "items": ["robots.txt and sitemap.xml unblocked, with the legal pages indexed."]
+          "items": ["Docs and legal pages are now search-engine friendly — easier to find when you're googling an error."]
         },
         {
           "kind": "fixed",
-          "items": [
-            "Vitest testTimeout pinned in apps/web; a CLI 404 no longer blames the URL and --after is validated as a UUID.",
-            "Mobile landing header kept on-screen, with the sign-up CTA always visible."
-          ]
+          "items": ["The mobile header stays put, with the sign-up button always visible."]
         }
       ]
     },
     {
       "version": "0.39",
       "date": "2026-09-27",
-      "title": "Legal pages and a conversion-focused landing",
-      "summary": "Terms, Privacy and Refunds pages plus a landing round built around the demo, trust and the founders program.",
+      "title": "Terms, Privacy and Refunds — in plain language",
+      "summary": "The legal pages you expect, plus a landing that shows the product instead of describing it.",
       "changes": [
         {
           "kind": "added",
           "items": [
-            "Terms, Privacy and Refunds pages (PT/EN) with a fixed Legal column in the footer.",
-            "Landing conversion round: demo, trust, founders program, FAQ, CTAs and the MCP section."
+            "Terms, Privacy and Refund policies, in English and Portuguese.",
+            "A landing built around the product: a live demo, the founders program and straight answers in the FAQ."
           ]
         }
       ]

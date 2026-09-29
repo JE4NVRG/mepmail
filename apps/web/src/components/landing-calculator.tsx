@@ -2,6 +2,7 @@
 
 import { useLocale } from "next-intl";
 import { useId, useMemo, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { formatUsd, formatVolume, PRICE_ROWS } from "@/lib/landing-pricing";
 import { savingsForIndex } from "@/lib/landing-savings";
 
@@ -32,7 +33,7 @@ export interface CalcLabels {
  * render in the reader's locale (US separators in en, Brazilian ones in pt-BR).
  */
 export function LandingCalculator({ labels }: { labels: CalcLabels }) {
-  const [index, setIndex] = useState(2); // default: 500k, the middle rung
+  const [index, setIndex] = useState(2); // default: 550K, the middle rung
   const locale = useLocale();
   const id = useId();
   const savings = useMemo(() => savingsForIndex(index), [index]);
@@ -59,7 +60,13 @@ export function LandingCalculator({ labels }: { labels: CalcLabels }) {
         step={1}
         value={index}
         aria-label={labels.a11y}
-        onChange={(event) => setIndex(Number(event.target.value))}
+        onChange={(event) => {
+          const next = Number(event.target.value);
+          setIndex(next);
+          const row = PRICE_ROWS[next];
+          if (row)
+            trackEvent("pricing_slider_change", { volume: formatVolume(row.volume, locale) });
+        }}
       />
       <div className="gtm-calc-result" aria-live="polite">
         <p className="gtm-calc-line">
