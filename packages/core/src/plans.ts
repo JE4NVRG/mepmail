@@ -300,17 +300,17 @@ export function raisesQuota(before: TeamQuota, after: TeamQuota): boolean {
  */
 export const PLAN_TEAM_LIMIT: Record<Plan, number> = {
   free: 1,
-  starter: 2,
-  pro: 5,
-  scale: 10,
+  starter: 3,
+  pro: 10,
+  scale: Number.POSITIVE_INFINITY,
   system: Number.POSITIVE_INFINITY,
 };
 
 /** Sender domains per team per plan; null = unlimited. Self-host ignores plans entirely. */
 export const PLAN_DOMAIN_LIMIT: Record<Plan, number | null> = {
   free: 1,
-  starter: 3,
-  pro: 10,
+  starter: 10,
+  pro: 25,
   scale: null,
   system: null,
 };
@@ -318,7 +318,7 @@ export const PLAN_DOMAIN_LIMIT: Record<Plan, number | null> = {
 /** Contacts a team may hold per plan; null = unlimited. Self-host ignores plans entirely. */
 export const PLAN_CONTACT_LIMIT: Record<Plan, number | null> = {
   free: 1_000,
-  starter: 10_000,
+  starter: null,
   pro: null,
   scale: null,
   system: null,

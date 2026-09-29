@@ -885,7 +885,7 @@ describe("REST parity tools", () => {
     expect(resultJson(await client.callTool({ name: "get_usage", arguments: {} }))).toMatchObject({
       cloud: true,
       plan: "pro",
-      limits: { emails_per_day: null, emails_per_month: 100_000, domains: null, contacts: null },
+      limits: { emails_per_day: null, emails_per_month: 100_000, domains: 25, contacts: null },
       period: {
         emails_sent: 4321,
         included: 100_000,

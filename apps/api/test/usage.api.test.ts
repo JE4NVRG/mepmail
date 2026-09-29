@@ -65,7 +65,7 @@ describe("GET /usage", () => {
       object: "usage",
       cloud: true,
       plan: "free",
-      limits: { emails_per_day: 100, emails_per_month: null, domains: 3, contacts: 1000 },
+      limits: { emails_per_day: 100, emails_per_month: null, domains: 1, contacts: 1000 },
       today: { emails_sent: 0, resets_at: expect.any(String) },
       period: null,
       team: { id: teamId, name: "usage-team" },
@@ -108,12 +108,12 @@ describe("GET /usage", () => {
     await db.insert(schema.usagePeriods).values({ teamId, periodStart: start, accepted: 42 });
     expect(await (await get(cloud)).json()).toMatchObject({
       plan: "pro",
-      limits: { emails_per_day: null, emails_per_month: 100_000, domains: null, contacts: null },
+      limits: { emails_per_day: null, emails_per_month: 100_000, domains: 25, contacts: null },
       period: {
         emails_sent: 42,
         included: 100_000,
         overage_enabled: true,
-        overage_usd_per_1k: 0.3,
+        overage_usd_per_1k: 0.9,
         starts_at: start.toISOString(),
         ends_at: end.toISOString(),
       },

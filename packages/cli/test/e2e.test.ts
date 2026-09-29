@@ -158,8 +158,8 @@ beforeAll(async () => {
   cwd = mkdtempSync(join(tmpdir(), "mepmail-e2e-"));
   writeFileSync(join(cwd, ".gitignore"), "node_modules\n");
   // What the team already has on MepMail: a verified sender (so drafts
-  // from it can be imported), an unrelated domain (pushing the Starter plan's
-  // 3-domain cap), and a topic whose description differs (an update).
+  // from it can be imported), an unrelated domain, and a topic whose
+  // description differs (an update).
   const verified = await post<{ id: string }>(cloud, "/domains", {
     name: "example.com",
     region: "us-east-1",
@@ -204,7 +204,7 @@ describe("mepmail (built bundle)", () => {
       const plan = JSON.parse(stdout) as Plan;
       expect(plan.version).toBe(1);
       expect(plan.target).toEqual({ baseUrl: cloud.baseUrl, cloud: true, plan: "starter" });
-      expect(plan.counts).toEqual({ create: 22, update: 2, unchanged: 1, manual: 12, skip: 3 });
+      expect(plan.counts).toEqual({ create: 23, update: 2, unchanged: 1, manual: 12, skip: 3 });
       expect(stderr).toMatch(new RegExp(`✓ Contacts\\s+${CONTACT_COUNT.toLocaleString("en-US")}`));
       expect(stderr).toMatch(/✓ MepMail\s+current state read/);
 
@@ -249,9 +249,7 @@ describe("mepmail (built bundle)", () => {
       for (const name of API_KEY_NAMES)
         expect(manual).toContain(`api-keys/${name} — create by hand; Resend exposes only the name`);
       expect(manual).toContain("domains/news.example.com — add DNS records (shown after apply)");
-      expect(manual).toContain(
-        "domains/updates.example.com — over the plan's domain limit; add by hand after upgrading",
-      );
+      expect(manual).toContain("domains/updates.example.com — add DNS records (shown after apply)");
       expect(manual.filter((m) => m.startsWith(`webhooks/${WEBHOOK_ENDPOINTS[1]}`))).toEqual([]);
       expect(manual).toContain(
         "broadcasts/Spring sale — merge tags left as-is: {{{contact.address.city|your city}}}",
@@ -262,10 +260,9 @@ describe("mepmail (built bundle)", () => {
       expect(manual).toContain(
         "templates/Receipt — reply_to support@example.com is not stored on templates; pass it when sending",
       );
-      expect(plan.warnings).toEqual([
-        "2 domains to create; the Starter plan allows 3 (2 already there)",
-      ]);
-      expect(stderr).toContain("1 of 2 domains will be created; the rest are listed as manual.");
+      expect(plan.warnings).toEqual([]);
+      // Both domains fit the Starter plan now, so the cap prompt never prints.
+      expect(stderr).not.toContain("domains will be created; the rest are listed as manual.");
       expect(plan.estimate.requests).toBeGreaterThan(2 * CONTACT_COUNT);
       expect(stdout).not.toContain("whsec_");
       expect(fake.writes).toBe(0);
@@ -338,7 +335,7 @@ describe("mepmail (built bundle)", () => {
         properties: 3,
         topics: 4,
         segments: 3,
-        domains: 1,
+        domains: 2,
         webhooks: 2,
         templates: 4,
         contacts: CONTACT_COUNT,
@@ -368,14 +365,15 @@ describe("mepmail (built bundle)", () => {
         "10",
       ]);
       expect(stderr).toBe("");
-      // The domain cap yields manual items, not failures: exit 0, not 3.
+      // Both domains fit under the Starter plan: exit 0, not 3.
       expect(code).toBe(0);
       expect(fake.writes).toBe(0);
 
       expect(stdout).toContain(`mepmail ${VERSION} — Moves your Resend account into MepMail.`);
       expect(stdout).toContain("✓ Resend · connected");
       expect(stdout).toContain("✓ MepMail Cloud · plan Starter");
-      expect(stdout).toContain("0 of 1 domains will be created; the rest are listed as manual.");
+      // Nothing new to create, so the domain-cap line never prints.
+      expect(stdout).not.toContain("domains will be created; the rest are listed as manual.");
       expect(stdout).toContain("Resend was only read; nothing there was changed.");
       expect(stdout).toContain(`${CONTACT_COUNT.toLocaleString("en-US")}  contacts updated`);
       expect(stdout).toContain(`${enrichable().toLocaleString("en-US")}  contacts enriched`);
@@ -383,6 +381,7 @@ describe("mepmail (built bundle)", () => {
       expect(stdout).toContain("40  suppressions unchanged");
       expect(stdout).toContain("steps done — left:");
       expect(stdout).toContain("[ ] add DNS records for news.example.com");
+      expect(stdout).toContain("[ ] add DNS records for updates.example.com");
       expect(stdout).toContain(`[ ] set RESEND_BASE_URL=${cloud.baseUrl} in your app`);
       expect(stdout).toContain(`[ ] create API keys: ${API_KEY_NAMES.join(", ")}`);
       expect(stdout).toContain(
@@ -417,7 +416,7 @@ describe("mepmail (built bundle)", () => {
         properties: 3,
         topics: 4,
         segments: 3,
-        domains: 1,
+        domains: 2,
         webhooks: 2,
         templates: 4,
         contacts: CONTACT_COUNT,
@@ -434,11 +433,11 @@ describe("mepmail (built bundle)", () => {
         failed: 0,
       });
       expect(report.counts.enrichment).toMatchObject({ updated: enrichable(), failed: 0 });
-      expect(report.counts.domains).toMatchObject({ created: 0, unchanged: 2, manual: 2 });
+      expect(report.counts.domains).toMatchObject({ created: 0, unchanged: 3, manual: 2 });
       // Broadcasts and suppressions went across before the 401; this run finds them in place.
       expect(report.counts.broadcasts).toMatchObject({ created: 0, unchanged: 3, skipped: 3 });
       expect(report.counts.suppressions).toMatchObject({ created: 0, unchanged: 40 });
-      expect(report.dns.map((d) => d.domain)).toEqual(["news.example.com"]);
+      expect(report.dns.map((d) => d.domain)).toEqual(["news.example.com", "updates.example.com"]);
       expect(report.apiKeys).toEqual([...API_KEY_NAMES]);
       expect(report.offer).toMatchObject({
         emailsLast30Days: EMAILS_SENT_30D,
@@ -580,6 +579,7 @@ describe("mepmail (built bundle)", () => {
         "example.com",
         "legacy.example.net",
         "news.example.com",
+        "updates.example.com",
       ]);
       const newsletter = topics.find((t) => t.name === "Newsletter") as
         | { description?: string }
