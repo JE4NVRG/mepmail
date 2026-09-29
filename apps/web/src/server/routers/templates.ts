@@ -6,6 +6,12 @@ import { z } from "zod";
 import { mailyDocumentSchema } from "@/lib/email-doc";
 import { resolveEditorSave } from "../email-content";
 import { beforeCursor, createdAtCursorField, cursorSchema, paginate } from "../keyset";
+import {
+  listStartersWithContent,
+  renderStarter,
+  STARTER_KEYS,
+  type StarterKey,
+} from "../starter-templates";
 import { router, teamProcedure } from "../trpc";
 
 const nameSchema = z.string().trim().min(1).max(200);
@@ -155,4 +161,39 @@ export const templatesRouter = router({
     if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     return { id: row.id };
   }),
+
+  /** Ready-made starter designs; content included so the picker can preview. */
+  starters: teamProcedure
+    .input(
+      z.object({
+        locale: z.enum(["en", "pt-BR"]).optional(),
+      }),
+    )
+    .query(({ input }) => listStartersWithContent(input.locale)),
+
+  /** Copies a starter into the team's templates and returns the new id. */
+  createFromStarter: teamProcedure
+    .input(
+      z.object({
+        key: z.enum(STARTER_KEYS),
+        locale: z.enum(["en", "pt-BR"]).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const starter = renderStarter(input.key as StarterKey, input.locale);
+      const t = schema.templates;
+      const [row] = await ctx.db
+        .insert(t)
+        .values({
+          teamId: ctx.teamId,
+          name: starter.name,
+          subject: starter.subject || null,
+          html: starter.html,
+          text: starter.text || null,
+          document: null,
+        })
+        .returning({ id: t.id });
+      if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return { id: row.id };
+    }),
 });

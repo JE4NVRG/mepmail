@@ -18,6 +18,21 @@
     "deleteConfirm": "Excluir",
     "htmlChipHint": "Criado como HTML; abre no modo código"
   },
+  "starter": {
+    "title": "Novo modelo",
+    "subtitle": "Comece com um modelo pronto ou de uma tela em branco.",
+    "blank": "Começar em branco",
+    "use": "Usar este modelo",
+    "loadError": "Não foi possível carregar os modelos.",
+    "retry": "Tentar de novo",
+    "createError": "Não foi possível criar o modelo.",
+    "categories": {
+      "onboarding": "Primeiros passos",
+      "authentication": "Autenticação",
+      "commerce": "Comércio",
+      "marketing": "Marketing"
+    }
+  },
   "html": {
     "banner": "Criado como HTML. O editor de blocos não consegue editar este layout com fidelidade, por isso ele abre no modo código.",
     "editHtml": "Editar HTML",
