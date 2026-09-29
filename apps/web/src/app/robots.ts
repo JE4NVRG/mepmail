@@ -15,6 +15,7 @@ export default function robots(): MetadataRoute.Robots {
         "/$",
         "/pricing",
         "/alternatives",
+        "/integrations",
         "/login",
         "/signup",
         "/terms",

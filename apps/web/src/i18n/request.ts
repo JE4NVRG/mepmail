@@ -20,6 +20,7 @@ const NAMESPACES = [
   "deliverability",
   "alternatives",
   "landing",
+  "integrations",
   "legal",
   "nav",
   "pricing",

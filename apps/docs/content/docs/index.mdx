@@ -24,8 +24,9 @@ webhooks, contacts, broadcasts, and an SMTP relay.
 The HTTP API is wire-compatible with Resend: same request and response shapes,
 same error format. Official Resend SDKs honor a configurable base URL, so
 migrating an existing integration means changing two environment variables —
-the API key and the base URL — not rewriting your code. MepMail also ships
-[its own SDKs](/sdks) for nine languages that mirror the Resend SDK shapes.
+the API key and the base URL — not rewriting your code. There is no SDK of
+ours to install: [the SDKs page](/sdks) covers the official Resend SDKs for
+nine languages, base URL rules included.
 
 One deliberate difference: **contacts are team-global**. There is no
 "audiences" concept — every contact belongs to your team directly, and you

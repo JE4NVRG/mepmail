@@ -16,7 +16,8 @@
     "login": "Entrar",
     "signup": "Criar conta",
     "menu": "Abrir menu de navegação",
-    "badge": "Agent-ready"
+    "badge": "Agent-ready",
+    "integrations": "Integrações"
   },
   "announce": {
     "text": "Agent-ready — MCP oficial: seus agentes de IA enviam e-mail"

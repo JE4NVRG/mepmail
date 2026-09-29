@@ -16,7 +16,8 @@
     "login": "Sign in",
     "signup": "Create account",
     "menu": "Open navigation menu",
-    "badge": "Agent-ready"
+    "badge": "Agent-ready",
+    "integrations": "Integrations"
   },
   "announce": {
     "text": "Agent-ready — official MCP: your AI agents send email"

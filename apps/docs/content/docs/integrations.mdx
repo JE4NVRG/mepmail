@@ -1,0 +1,64 @@
+---
+title: Integrations
+description: n8n, Slack, Discord, Telegram, MCP, the SMTP relay and the API — how MepMail fits the tools you already run.
+---
+
+MepMail is one sending pipeline with several doors. Everything on this page
+rides the same domains, API keys, suppressions, quotas and logs as the REST
+API — there is no second system to keep in sync.
+
+## n8n
+
+The community node `n8n-nodes-mepmail` brings sending and management into any
+workflow, and its trigger starts workflows from MepMail events.
+
+- **Node** — send, schedule, cancel and batch emails; create, update, delete
+  and list contacts; manage domains, broadcasts and suppressions; read usage.
+- **Trigger** — pick the events and activate the workflow: the trigger
+  registers the webhook in MepMail itself (and removes it on deactivation),
+  and verifies payload signatures (Svix / Standard Webhooks) out of the box.
+- **Credential** — `MepMail API`: your API origin plus an `ms_` key with full
+  access (the trigger manages its own webhook, so full access is required).
+
+Install it from **Settings → Community nodes → Install** with the package
+name `n8n-nodes-mepmail`, or from
+[npm](https://www.npmjs.com/package/n8n-nodes-mepmail). Source:
+[github.com/JE4NVRG/n8n-nodes-mepmail](https://github.com/JE4NVRG/n8n-nodes-mepmail).
+
+## Slack, Discord and Telegram
+
+Webhook endpoints format themselves for the channel that owns the URL: create
+a webhook (Settings → Webhooks) whose URL is the service's incoming-webhook
+URL, and the payload arrives in that service's native shape.
+
+| Service  | URL you paste                                                    | Delivered as                          |
+| -------- | ---------------------------------------------------------------- | ------------------------------------- |
+| Slack    | `https://hooks.slack.com/services/…`                             | `{"text": "…"}`                       |
+| Discord  | `https://discord.com/api/webhooks/…`                             | markdown `{"content": "…"}`           |
+| Telegram | `https://api.telegram.org/bot<token>/sendMessage?chat_id=<id>`   | a `sendMessage` call                  |
+
+Every other URL keeps the raw, signed JSON envelope (Svix-style headers), so
+your own endpoints behave exactly as before. Subscribe the events your team
+cares about — `email.bounced`, `email.complained`, `quota.reached`,
+`deliverability.warning` and the rest of the event catalog.
+
+## MCP server
+
+AI agents — Claude Code, Cursor, VS Code, any MCP client — operate the
+platform through 22 tools on the same pipeline. See [MCP server](/mcp) for the
+Streamable HTTP endpoint at `/mcp` and the stdio package on npm.
+
+## SMTP relay
+
+Any application that speaks SMTP — WordPress, WooCommerce, Ghost, Strapi,
+Supabase, older stacks — sends through the relay with host, port and
+credentials (TLS required). Same domains, suppressions, tracking and logs as
+the API. See [Self-hosting → SMTP relay](/self-hosting#smtp-relay).
+
+## SDKs and drop-in migration
+
+There is no SDK of ours to install — the official Resend SDKs work against
+MepMail by changing the base URL and the key. [SDKs](/sdks) covers every
+language with each SDK's base-URL rules; [Migrate from
+Resend](/migrate-from-resend) moves the account with one command and walks
+through the code changes.

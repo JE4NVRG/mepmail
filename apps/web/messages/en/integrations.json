@@ -1,0 +1,107 @@
+{
+  "meta": {
+    "title": "Integrations — n8n, Slack, Discord, Telegram, MCP and SMTP",
+    "description": "MepMail meets your stack: the n8n community node, Slack/Discord/Telegram notification channels, an MCP server for AI agents, the SMTP relay, the CLI and a Resend-compatible API."
+  },
+  "hero": {
+    "eyebrow": "Integrations",
+    "title": "Your stack stays. <highlight>Delivery upgrades.</highlight>",
+    "lead": "MepMail plugs into the tools you already run — workflow automation, team chat, AI agents, legacy apps — and gives every one of them the same sending pipeline: verified domains, suppressions, quotas and logs.",
+    "note": "One API key and one verified domain cover everything on this page."
+  },
+  "cards": {
+    "items": [
+      {
+        "name": "n8n",
+        "kind": "Community node",
+        "body": "Send email and run the whole management surface — contacts, broadcasts, domains, suppressions — inside any workflow, or start a workflow when something happens to your email.",
+        "bullets": [
+          "Send, schedule, cancel and batch messages from a workflow node.",
+          "MepMail Trigger subscribes to the events you pick and registers (and removes) its own webhook automatically.",
+          "Payload signatures (Svix / Standard Webhooks) verified out of the box.",
+          "Works against MepMail Cloud or any self-hosted instance — requires a full access API key."
+        ],
+        "links": [
+          { "label": "npm package", "href": "https://www.npmjs.com/package/n8n-nodes-mepmail" },
+          { "label": "GitHub", "href": "https://github.com/JE4NVRG/n8n-nodes-mepmail" }
+        ]
+      },
+      {
+        "name": "Slack · Discord · Telegram",
+        "kind": "Notification channels",
+        "body": "Point a webhook at your channel and MepMail speaks the service's native format — no middleware and no relay service.",
+        "bullets": [
+          "Paste the incoming-webhook URL: Slack, Discord and Telegram are detected and formatted natively (Telegram takes the sendMessage URL with your chat id).",
+          "Deliveries, bounces, complaints and deliverability alerts land where the team already is.",
+          "Every other endpoint keeps the raw signed JSON — same webhooks, nothing extra to configure."
+        ],
+        "links": [
+          {
+            "label": "Docs: notification channels",
+            "href": "https://docs-mepmail.je4ndev.com/integrations"
+          }
+        ]
+      },
+      {
+        "name": "AI agents",
+        "kind": "MCP server",
+        "body": "Claude Code, Cursor, VS Code and any Model Context Protocol client operate the platform — send and manage — through 22 tools on the same pipeline as the REST API.",
+        "bullets": [
+          "Streamable HTTP endpoint at /mcp on your API origin, or the stdio server on npm.",
+          "Verified domains, suppressions, topic opt-outs, quotas and team scoping all apply unchanged."
+        ],
+        "links": [{ "label": "Docs: MCP", "href": "https://docs-mepmail.je4ndev.com/mcp" }]
+      },
+      {
+        "name": "SMTP relay",
+        "kind": "Any app",
+        "body": "Any application that sends over SMTP — WordPress, WooCommerce, Ghost, Strapi, Supabase, a legacy monolith — sends through the relay with your key.",
+        "bullets": [
+          "Host, port and credentials; TLS required.",
+          "Same domains, suppressions, tracking and logs as the API.",
+          "No plugin to install and nothing to patch."
+        ],
+        "links": [
+          {
+            "label": "Docs: SMTP relay",
+            "href": "https://docs-mepmail.je4ndev.com/self-hosting#smtp-relay"
+          }
+        ]
+      },
+      {
+        "name": "Resend SDKs, drop-in",
+        "kind": "Migration",
+        "body": "Coming from Resend? The official SDKs keep working — change the base URL and the key, and your send calls stay exactly as they are.",
+        "bullets": [
+          "Nine languages documented, with the base-URL rules of each SDK (trailing slash included).",
+          "The free account moves with one command: npx @mepmail/cli migrate --from resend."
+        ],
+        "links": [
+          { "label": "Docs: SDKs", "href": "https://docs-mepmail.je4ndev.com/sdks" },
+          { "label": "MepMail vs Resend", "href": "/alternatives/resend" }
+        ]
+      },
+      {
+        "name": "CLI and REST API",
+        "kind": "Builders",
+        "body": "Scripts, pipelines and back-office tools call the same public API the panel uses — 44 documented endpoints with an interactive reference.",
+        "bullets": [
+          "@mepmail/cli runs the migration and day-to-day operations from the terminal.",
+          "OpenAPI at docs-mepmail.je4ndev.com, wire-compatible with the Resend API surface."
+        ],
+        "links": [
+          { "label": "Docs: CLI", "href": "https://docs-mepmail.je4ndev.com/cli" },
+          {
+            "label": "Docs: API reference",
+            "href": "https://docs-mepmail.je4ndev.com/api-reference"
+          }
+        ]
+      }
+    ]
+  },
+  "close": {
+    "title": "Ship with the stack you already run.",
+    "body": "Create the free account, connect the first integration and send a real email today.",
+    "cta": "Create free account"
+  }
+}

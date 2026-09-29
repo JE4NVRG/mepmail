@@ -180,7 +180,7 @@
 }
 .gtm-wordmark img {
   display: block;
-  width: 143px;
+  width: 139px;
   height: auto;
 }
 .gtm-wordmark .gtm-wordmark-light,
@@ -193,7 +193,7 @@
 .gtm-nav {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 10px;
 }
 .gtm-nav-links {
   display: flex;
@@ -622,10 +622,20 @@
   .gtm-container {
     padding-inline: 32px;
   }
-  /* Em desktop o menu inteiro (6 links + ações) cabe numa linha só se os chips
-     forem um pouco mais estreitos. */
+  /* O header tem só os 1200px do container (1136 uteis com o inset padrao) e o
+     menu precisa caber numa linha nos DOIS idiomas. Medido com
+     flex-shrink:0 (senao o wrap esconde o deficit): com os chips em 10px e o
+     resto original o EN pede 1155 e o PT 1146 para 1136 disponiveis — por isso
+     os chips ficam em 9px, o miolo do header usa inset 28/gap 10 e o wordmark
+     139. "Plans" saiu da nav quando /integrations entrou (o rodape e os CTAs
+     do hero continuam levando a secao #planos); com 7 links nao cabe em
+     nenhuma largura. Cada px aqui conta: mexeu num rotulo, mede de novo. */
+  .gtm-header-inner {
+    gap: 10px;
+    padding-inline: 28px;
+  }
   .gtm-nav-links a {
-    padding: 0 10px;
+    padding: 0 9px;
   }
   .gtm-section {
     padding-block: 96px;
@@ -654,10 +664,11 @@
   }
 }
 /* Tablet e mobile: a nav colapsa num painel; logo e CTA seguem na 1ª linha.
-   O corte em 1024px é medido, não estético: com a linha completa o header pede
-   ~1050px para caber em EN (pior caso) e abaixo disso os rótulos quebravam a
-   palavra e a CTA saía da tela (card t_38d21dc4). */
-@media (max-width: 1023px) {
+   O corte em 1200px é medido: a linha completa da nav (6 chips + ações +
+   wordmark 139) pede ~1130px dos 1136 úteis do container — abaixo disso os
+   rótulos quebravam a palavra e a CTA saía da tela (card t_38d21dc4; medidor
+   verify-header.cjs). */
+@media (max-width: 1199px) {
   .gtm-header-inner {
     min-height: 60px;
     padding-block: 8px;
@@ -1036,5 +1047,57 @@
   .gtm-split {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 56px;
+  }
+}
+
+/* Página /integrations: cards das integrações (n8n, canais de chat, MCP,
+   SMTP, SDKs do Resend, CLI/API). Painel sobre painel, hairlines de 1px. */
+.gtm-integrations {
+  display: grid;
+  gap: 20px;
+}
+.gtm-integration {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line);
+  border-radius: 12px;
+}
+.gtm-integration-kind {
+  margin: 0;
+  color: var(--ms-violet);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.gtm-integration h3 {
+  margin: 0;
+  font-size: 20px;
+}
+.gtm-integrations .gtm-integration p {
+  margin: 0;
+}
+.gtm-integrations .gtm-integration .gtm-points {
+  margin: 0;
+}
+.gtm-integrations .gtm-integration .gtm-integration-links {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.gtm-integrations .gtm-integration .gtm-integration-links a {
+  font-size: 14px;
+}
+@media (min-width: 768px) {
+  .gtm-integrations {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  .gtm-integrations {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
