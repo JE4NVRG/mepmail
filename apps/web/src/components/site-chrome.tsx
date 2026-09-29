@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { LandingLangSwitch } from "./landing-lang-switch";
 import { LandingNav } from "./landing-nav";
+import { DocsLink, GithubLink } from "./public-events";
 import { SignupCta } from "./signup-cta";
 
 /**
@@ -139,12 +140,12 @@ export function PublicHeader({
               <a href="/pricing" aria-current={page === "pricing" ? "page" : undefined}>
                 {labels.nav.pricing}
               </a>
-              <a className="gtm-ext" href={DOCS_URL} target="_blank" rel="noreferrer">
+              <DocsLink className="gtm-ext" href={DOCS_URL}>
                 {labels.nav.docs}
                 <span className="gtm-ext-mark" aria-hidden="true">
                   ↗
                 </span>
-              </a>
+              </DocsLink>
               <a href="/security" aria-current={page === "security" ? "page" : undefined}>
                 {labels.nav.security}
               </a>
@@ -212,12 +213,12 @@ export function PublicFooter({
           <a href="/changelog" aria-current={page === "changelog" ? "page" : undefined}>
             {labels.nav.changelog}
           </a>
-          <a className="gtm-ext" href={DOCS_URL} target="_blank" rel="noreferrer">
+          <DocsLink className="gtm-ext" href={DOCS_URL}>
             {labels.nav.docs}
             <span className="gtm-ext-mark" aria-hidden="true">
               ↗
             </span>
-          </a>
+          </DocsLink>
         </nav>
         <nav className="gtm-footer-col" aria-label={labels.footer.colCompare}>
           <h3>{labels.footer.colCompare}</h3>
@@ -242,22 +243,14 @@ export function PublicFooter({
       </div>
       <div className="gtm-container gtm-footer-base">
         <p>{labels.footer.rights}</p>
-        <a
-          className="gtm-footer-gh"
-          href="https://github.com/je4ndev"
-          target="_blank"
-          rel="noreferrer"
-        >
+        <GithubLink className="gtm-footer-gh" href="https://github.com/je4ndev">
           <span className="gtm-sr-only">{labels.footer.ghAria}</span>
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.37-3.37-1.37-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.31 9.31 0 0 1 12 6.98c.85 0 1.7.12 2.5.35 1.9-1.33 2.74-1.05 2.74-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.81-4.57 5.07.36.32.68.94.68 1.9 0 1.37-.01 2.48-.01 2.82 0 .27.18.59.69.49A10.13 10.13 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z" />
           </svg>
-        </a>
+        </GithubLink>
         <p className="gtm-footer-credit">
-          {labels.footer.credit}{" "}
-          <a href="https://github.com/je4ndev" target="_blank" rel="noreferrer">
-            Je4nDev
-          </a>
+          {labels.footer.credit} <GithubLink href="https://github.com/je4ndev">Je4nDev</GithubLink>
         </p>
       </div>
     </footer>

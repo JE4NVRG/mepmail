@@ -4,6 +4,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { CodeDemo } from "@/components/code-demo";
 import { type CalcLabels, LandingCalculator } from "@/components/landing-calculator";
 import { PlanCard, type PlanCardLabels } from "@/components/plan-card";
+import { ArrivalTracker, McpConfigCopy } from "@/components/public-events";
 import {
   PublicFooter,
   PublicHeader,
@@ -113,6 +114,7 @@ export default async function RootPage() {
 
   return (
     <div className="gtm">
+      <ArrivalTracker />
       <PublicHeader
         labels={site}
         page="landing"
@@ -291,11 +293,12 @@ export default async function RootPage() {
             </div>
             <figure className="gtm-mcp-demo">
               <div className="gtm-demo-window">
-                <div className="gtm-demo-bar" aria-hidden="true">
-                  <span className="gtm-demo-dot" />
-                  <span className="gtm-demo-dot" />
-                  <span className="gtm-demo-dot" />
+                <div className="gtm-demo-bar">
+                  <span className="gtm-demo-dot" aria-hidden="true" />
+                  <span className="gtm-demo-dot" aria-hidden="true" />
+                  <span className="gtm-demo-dot" aria-hidden="true" />
                   <span className="gtm-demo-file">mcp.json</span>
+                  <McpConfigCopy value={MCP_CONFIG} />
                 </div>
                 <pre className="gtm-demo-code">{MCP_CONFIG}</pre>
               </div>

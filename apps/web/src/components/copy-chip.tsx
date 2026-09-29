@@ -102,12 +102,15 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
 }
 
 /** Bare copy→check button for table cells where a chip frame would be noise. */
-export function CopyGlyph({ value }: { value: string }) {
+export function CopyGlyph({ value, onCopy }: { value: string; onCopy?: () => void }) {
   const { copied, copy, label } = useCopy(value);
   return (
     <button
       type="button"
-      onClick={copy}
+      onClick={() => {
+        void copy();
+        onCopy?.();
+      }}
       aria-label={label}
       style={{
         background: "none",

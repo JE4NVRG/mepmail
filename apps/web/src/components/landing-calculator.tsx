@@ -2,6 +2,7 @@
 
 import { useLocale } from "next-intl";
 import { useId, useMemo, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { formatUsd, formatVolume, PRICE_ROWS } from "@/lib/landing-pricing";
 import { savingsForIndex } from "@/lib/landing-savings";
 
@@ -59,7 +60,13 @@ export function LandingCalculator({ labels }: { labels: CalcLabels }) {
         step={1}
         value={index}
         aria-label={labels.a11y}
-        onChange={(event) => setIndex(Number(event.target.value))}
+        onChange={(event) => {
+          const next = Number(event.target.value);
+          setIndex(next);
+          const row = PRICE_ROWS[next];
+          if (row)
+            trackEvent("pricing_slider_change", { volume: formatVolume(row.volume, locale) });
+        }}
       />
       <div className="gtm-calc-result" aria-live="polite">
         <p className="gtm-calc-line">

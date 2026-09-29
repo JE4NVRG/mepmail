@@ -923,6 +923,24 @@
   font-size: 12px;
   color: var(--ms-muted);
 }
+/* Copiar o bloco MCP da landing (evento `mcp_copy`, ver components/public-events). */
+.gtm-copy {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  font-family: var(--ms-font-mono);
+  font-size: 11.5px;
+  color: var(--ms-muted);
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.gtm-copy:hover {
+  color: var(--ms-bone);
+}
 .gtm-demo-code {
   margin: 0;
   padding: 18px 20px;

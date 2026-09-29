@@ -6,6 +6,7 @@ import { useState } from "react";
 import { CodeHighlight, type HighlightLanguage } from "@/components/code-highlight";
 import { CopyChip, CopyGlyph } from "@/components/copy-chip";
 import { Table } from "@/components/table";
+import { trackEvent } from "@/lib/analytics";
 import { codeRichTags } from "@/lib/code-rich-tags";
 import { MCP_DOCS_URL } from "@/lib/docs-links";
 import { MCP_TOOLS } from "./mcp-tools";
@@ -67,7 +68,24 @@ function clientSnippet(client: Client, url: string): { code: string; language: H
   }
 }
 
-function SnippetBlock({ code, language }: { code: string; language: HighlightLanguage }) {
+/**
+ * Whether copying a snippet is the `claude mcp add …` install command or the
+ * client's config block — the launch plan measures the two separately
+ * (launch-ops.md §3.2: `mcp_add_click` vs `mcp_copy`).
+ */
+function copyEvent(code: string): string {
+  return code.startsWith("claude mcp add") ? "mcp_add_click" : "mcp_copy";
+}
+
+function SnippetBlock({
+  code,
+  language,
+  mode,
+}: {
+  code: string;
+  language: HighlightLanguage;
+  mode: "stdio" | "http";
+}) {
   return (
     <div style={{ position: "relative" }}>
       <pre
@@ -87,7 +105,7 @@ function SnippetBlock({ code, language }: { code: string; language: HighlightLan
         <CodeHighlight code={code} language={language} />
       </pre>
       <span style={{ position: "absolute", top: 10, right: 12 }}>
-        <CopyGlyph value={code} />
+        <CopyGlyph value={code} onCopy={() => trackEvent(copyEvent(code), { mode })} />
       </span>
     </div>
   );
@@ -131,7 +149,9 @@ export function McpView({ serverUrl }: { serverUrl: string }) {
             </button>
           ))}
         </div>
-        <SnippetBlock code={snippet.code} language={snippet.language} />
+        {/* Toda snippet desta página é o servidor hospedado (HTTP): o Claude Code
+            traz `claude mcp add --transport http …`, os outros o config do mcp-remote. */}
+        <SnippetBlock code={snippet.code} language={snippet.language} mode="http" />
         <p style={{ margin: "10px 0 0", fontSize: 12.5, color: "var(--ms-muted)" }}>
           {t.rich(`notes.${client}`, codeRichTags)}
         </p>
