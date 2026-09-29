@@ -100,9 +100,11 @@ describe("attributionFromCookieValue", () => {
 
 describe("buildFunnelEventPayload", () => {
   it("defaults the url to the funnel path of the event", () => {
-    expect(buildFunnelEventPayload({ name: "signup", websiteId: WEBSITE, hostname: "h" })).toEqual({
+    expect(
+      buildFunnelEventPayload({ name: "signup_complete", websiteId: WEBSITE, hostname: "h" }),
+    ).toEqual({
       type: "event",
-      payload: { website: WEBSITE, hostname: "h", url: "/signup", name: "signup" },
+      payload: { website: WEBSITE, hostname: "h", url: "/signup", name: "signup_complete" },
     });
   });
 
@@ -126,7 +128,7 @@ describe("sendFunnelEvent", () => {
     const { calls, fetchImpl } = stubFetch();
     const sent = await sendFunnelEvent(
       buildFunnelEventPayload({
-        name: "signup",
+        name: "signup_complete",
         websiteId: WEBSITE,
         hostname: "mepmail.example.com",
         props: { source: "linkedin", locale: "pt-BR" },
@@ -143,7 +145,11 @@ describe("sendFunnelEvent", () => {
     expect(headers.get("user-agent")).toBe(UMAMI_COLLECTOR_USER_AGENT);
     expect(body(calls[0]?.init ?? {})).toMatchObject({
       type: "event",
-      payload: { website: WEBSITE, name: "signup", data: { source: "linkedin", locale: "pt-BR" } },
+      payload: {
+        website: WEBSITE,
+        name: "signup_complete",
+        data: { source: "linkedin", locale: "pt-BR" },
+      },
     });
   });
 
@@ -152,7 +158,7 @@ describe("sendFunnelEvent", () => {
     const { fetchImpl } = stubFetch(500);
     expect(
       await sendFunnelEvent(
-        buildFunnelEventPayload({ name: "signup", websiteId: WEBSITE, hostname: "h" }),
+        buildFunnelEventPayload({ name: "signup_complete", websiteId: WEBSITE, hostname: "h" }),
         target({ fetch: fetchImpl, log: (m) => logs.push(m) }),
       ),
     ).toBe(false);
@@ -163,7 +169,7 @@ describe("sendFunnelEvent", () => {
     }) as unknown as typeof fetch;
     expect(
       await sendFunnelEvent(
-        buildFunnelEventPayload({ name: "signup", websiteId: WEBSITE, hostname: "h" }),
+        buildFunnelEventPayload({ name: "signup_complete", websiteId: WEBSITE, hostname: "h" }),
         target({ fetch: unreachable, log: (m) => logs.push(m) }),
       ),
     ).toBe(false);
@@ -173,7 +179,7 @@ describe("sendFunnelEvent", () => {
     const { calls } = stubFetch();
     expect(
       await sendFunnelEvent(
-        buildFunnelEventPayload({ name: "signup", websiteId: WEBSITE, hostname: "h" }),
+        buildFunnelEventPayload({ name: "signup_complete", websiteId: WEBSITE, hostname: "h" }),
         target({ endpoint: null, websiteId: null, fetch: fetchImpl }),
       ),
     ).toBe(false);
@@ -189,7 +195,7 @@ describe("sendFunnelEvent", () => {
     const logs: string[] = [];
     expect(
       await sendFunnelEvent(
-        buildFunnelEventPayload({ name: "signup", websiteId: WEBSITE, hostname: "h" }),
+        buildFunnelEventPayload({ name: "signup_complete", websiteId: WEBSITE, hostname: "h" }),
         target({ fetch: hanging, timeoutMs: 10, log: (m) => logs.push(m) }),
       ),
     ).toBe(false);
@@ -225,7 +231,7 @@ describe("emitFunnelEvent", () => {
   it("claims the event once, stores the props it sent, and skips the second caller", async () => {
     const { calls, fetchImpl } = stubFetch();
     const first = await emitFunnelEvent(db, target({ fetch: fetchImpl }), {
-      name: "signup",
+      name: "signup_complete",
       dedupeKey: `signup:${userId}`,
       props: { locale: "pt-BR" },
       resolve: (tx) => userFunnelProps(tx, userId),
@@ -233,7 +239,7 @@ describe("emitFunnelEvent", () => {
     expect(first).toBe(true);
 
     const second = await emitFunnelEvent(db, target({ fetch: fetchImpl }), {
-      name: "signup",
+      name: "signup_complete",
       dedupeKey: `signup:${userId}`,
       props: { locale: "pt-BR" },
       resolve: (tx) => userFunnelProps(tx, userId),
@@ -245,7 +251,7 @@ describe("emitFunnelEvent", () => {
     const rows = await db.select().from(schema.funnelEvents);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      name: "signup",
+      name: "signup_complete",
       dedupeKey: `signup:${userId}`,
       props: { source: "linkedin", medium: "cpc", campaign: "beta", locale: "pt-BR" },
     });
@@ -272,7 +278,7 @@ describe("emitFunnelEvent", () => {
     const { calls, fetchImpl } = stubFetch();
     expect(
       await emitFunnelEvent(db, target({ endpoint: null, websiteId: null, fetch: fetchImpl }), {
-        name: "signup",
+        name: "signup_complete",
         dedupeKey: `signup:${userId}`,
       }),
     ).toBe(false);
@@ -289,7 +295,7 @@ describe("emitFunnelEvent", () => {
     // failed signup, and the row is there to replay by hand.
     await expect(
       emitFunnelEvent(db, target({ fetch: failing, log: (m) => logs.push(m) }), {
-        name: "signup",
+        name: "signup_complete",
         dedupeKey: `signup:${userId}`,
       }),
     ).resolves.toBe(true);

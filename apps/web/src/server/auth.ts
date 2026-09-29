@@ -252,7 +252,7 @@ export function createAuth(
         requestHeaders?.get("cookie") ?? null,
       );
       await emitFunnel(db, {
-        name: "signup",
+        name: "signup_complete",
         dedupeKey: `signup:${user.id}`,
         // No team exists yet, so the plan is the one every new account starts on.
         props: {
