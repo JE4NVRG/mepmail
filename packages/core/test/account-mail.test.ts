@@ -204,9 +204,9 @@ describe("billing phrases", () => {
   it("say a plan's cap as a clause and a date on its UTC day, each in the reader's language", () => {
     expect(planCapPhrase("en", "starter", null)).toBe("up to 1,500 emails a day");
     expect(planCapPhrase("pt-BR", "starter", null)).toBe("até 1.500 e-mails por dia");
-    expect(planCapPhrase("en", "pro", 100_000)).toBe("up to 100,000 emails a month");
-    expect(planCapPhrase("pt-BR", "pro", 100_000)).toBe("até 100.000 e-mails por mês");
-    expect(planCapPhrase("en", "scale", 2_500_000)).toBe("up to 2,500,000 emails a month");
+    expect(planCapPhrase("en", "pro", 110_000)).toBe("up to 110,000 emails a month");
+    expect(planCapPhrase("pt-BR", "pro", 110_000)).toBe("até 110.000 e-mails por mês");
+    expect(planCapPhrase("en", "scale", 2_750_000)).toBe("up to 2,750,000 emails a month");
     expect(planCapPhrase("en", "system", null)).toBe("with no sending cap");
     expect(planCapPhrase("pt-BR", "system", null)).toBe("sem limite de envio");
     const lateUtc = new Date("2026-09-30T23:30:00Z");
@@ -230,39 +230,39 @@ describe("planMove", () => {
   });
 
   it("keys an activation and a change by the period the new plan starts, and a downgrade by the period that ended", () => {
-    const up = planMove(row("free", null), row("pro", "2026-10-08T00:00:00Z", null, 100_000), now);
+    const up = planMove(row("free", null), row("pro", "2026-10-08T00:00:00Z", null, 110_000), now);
     expect(up?.kind).toBe("billing.plan_activated");
     expect(up?.periodKey).toBe("pro_100k:2026-10-08T00:00:00.000Z");
     expect(up?.values("en", "Acme")).toEqual({
       team: "Acme",
-      plan: "Pro 100K",
-      cap: "up to 100,000 emails a month",
+      plan: "Pro 110K",
+      cap: "up to 110,000 emails a month",
     });
     const moved = planMove(
-      row("pro", "2026-10-08T00:00:00Z", null, 100_000),
-      row("scale", "2026-10-08T00:00:00Z", null, 500_000),
+      row("pro", "2026-10-08T00:00:00Z", null, 110_000),
+      row("scale", "2026-10-08T00:00:00Z", null, 550_000),
       now,
     );
     expect(moved?.kind).toBe("billing.plan_changed");
     expect(moved?.periodKey).toBe("pro_100k>scale_500k:2026-10-08T00:00:00.000Z");
     expect(moved?.values("pt-BR", "Acme")).toMatchObject({
-      old: "Pro 100K",
-      new: "Scale 500K",
-      cap: "até 500.000 e-mails por mês",
+      old: "Pro 110K",
+      new: "Scale 550K",
+      cap: "até 550.000 e-mails por mês",
     });
     // A step between rungs of one plan is a change like any other.
     const stepped = planMove(
-      row("pro", "2026-10-08T00:00:00Z", null, 100_000),
-      row("pro", "2026-10-08T00:00:00Z", null, 200_000),
+      row("pro", "2026-10-08T00:00:00Z", null, 110_000),
+      row("pro", "2026-10-08T00:00:00Z", null, 220_000),
       now,
     );
     expect(stepped?.kind).toBe("billing.plan_changed");
     expect(stepped?.periodKey).toBe("pro_100k>pro_200k:2026-10-08T00:00:00.000Z");
     expect(stepped?.values("en", "Acme")).toEqual({
       team: "Acme",
-      old: "Pro 100K",
-      new: "Pro 200K",
-      cap: "up to 200,000 emails a month",
+      old: "Pro 110K",
+      new: "Pro 220K",
+      cap: "up to 220,000 emails a month",
     });
     const down = planMove(row("pro", "2026-09-30T00:00:00Z"), row("free", null), now);
     expect(down?.kind).toBe("billing.downgraded");
@@ -272,7 +272,7 @@ describe("planMove", () => {
 
   it("says nothing about a move into or out of the system plan", () => {
     expect(
-      planMove(row("scale", "2026-10-08T00:00:00Z", null, 500_000), row("system", null), now),
+      planMove(row("scale", "2026-10-08T00:00:00Z", null, 550_000), row("system", null), now),
     ).toBeNull();
     expect(planMove(row("system", null), row("free", null), now)).toBeNull();
     expect(planMove(row("system", null), row("system", null), now)).toBeNull();
@@ -293,7 +293,7 @@ describe("planMove", () => {
       now,
     );
     expect(lapsed?.values("pt-BR", "Acme")).toMatchObject({
-      plan: "Scale 500K",
+      plan: "Scale 550K",
       date: "30 de agosto de 2026",
       freeCap: "100",
     });
