@@ -32,7 +32,7 @@ export interface CalcLabels {
  * render in the reader's locale (US separators in en, Brazilian ones in pt-BR).
  */
 export function LandingCalculator({ labels }: { labels: CalcLabels }) {
-  const [index, setIndex] = useState(2); // default: 500k, the middle rung
+  const [index, setIndex] = useState(2); // default: 550K, the middle rung
   const locale = useLocale();
   const id = useId();
   const savings = useMemo(() => savingsForIndex(index), [index]);

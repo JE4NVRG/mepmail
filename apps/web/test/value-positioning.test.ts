@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PLAN_RUNGS } from "@millionsend/core";
 import { describe, expect, it } from "vitest";
 import { PRICE_ROWS } from "../src/lib/landing-pricing";
 
@@ -22,9 +23,9 @@ function landing(locale: string): {
 }
 
 /**
- * The card quotas after the +10% bump. The market ladder in the comparison table
- * stays at 100k…2.5M (it compares the volumes competitors sell); the cards show
- * what the MepMail plan includes.
+ * The card quotas after the +10% bump. The comparison table publishes the same
+ * rungs (it prices each MepMail volume against the cheapest competitor path);
+ * the cards show what the MepMail plan includes.
  */
 const PAID_CARD_QUOTAS: Record<(typeof LOCALES)[number], string[]> = {
   en: ["110,000", "220,000", "550,000", "1,100,000", "1,650,000", "2,750,000"],
@@ -70,9 +71,14 @@ describe("landing value-first positioning", () => {
     });
   }
 
-  it("keeps the comparison table on the market volumes", () => {
-    expect(PRICE_ROWS.map((row) => row.volume)).toEqual([
-      100_000, 200_000, 500_000, 1_000_000, 1_500_000, 2_500_000,
-    ]);
+  it("keeps the comparison table on the published MepMail rungs", () => {
+    // The rows are the plan ladder of release v.44 (+10% volume, same prices),
+    // not the competitors' own tier labels: the table prices each rung we sell,
+    // at the price the ladder charges for it.
+    const monthlyRungs = PLAN_RUNGS.filter((rung) => rung.period === "month");
+    expect(PRICE_ROWS.map((row) => row.volume)).toEqual(monthlyRungs.map((r) => r.included));
+    expect(PRICE_ROWS.map((row) => row.mepmail)).toEqual(
+      monthlyRungs.map((rung) => rung.priceCents / 100),
+    );
   });
 });

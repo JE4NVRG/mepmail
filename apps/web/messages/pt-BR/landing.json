@@ -59,11 +59,11 @@
   "compare": {
     "eyebrow": "Preço sem adivinhação",
     "title": "Compare pelo volume que você realmente envia.",
-    "intro": "Os valores abaixo comparam o menor plano que cobre cada volume mensal. A economia varia por faixa e fornecedor; confirme condições atuais antes de contratar.",
+    "intro": "Os valores abaixo comparam o caminho público mais barato para enviar cada volume mensal: o plano que cobre o volume, ou um plano menor mais o excedente publicado do fornecedor. A economia varia por faixa e fornecedor; confirme condições atuais antes de contratar.",
     "tableAria": "Comparativo de preços por volume",
     "columns": ["Envios/mês", "MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "Vantagem"],
     "slideNote": "Deslize a tabela para ver todos os fornecedores em telas menores.",
-    "refNote": "Referência da análise comercial de 27/09/2026; preços públicos de terceiros podem mudar e condições/recursos não são equivalentes. Valores em USD por mês, sem impostos ou excedentes. “(vendas)” indica cotação comercial, não preço público."
+    "refNote": "Referência da análise comercial de 27/09/2026; preços públicos de terceiros podem mudar e condições/recursos não são equivalentes. Valores em USD por mês, sem impostos. Onde o fornecedor publica o excedente como intervalo, usamos o ponto médio."
   },
   "calc": {
     "title": "Arraste o volume e veja a economia.",
