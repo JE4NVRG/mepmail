@@ -1,11 +1,11 @@
+import { env } from "@millionsend/config";
+import { type NextRequest, NextResponse } from "next/server";
 import {
   ATTRIBUTION_COOKIE,
   ATTRIBUTION_MAX_AGE_SECONDS,
   attributionCookieValue,
   shouldReplaceAttribution,
 } from "@/lib/attribution";
-import { env } from "@millionsend/config";
-import { type NextRequest, NextResponse } from "next/server";
 
 /** Paths the hosted unsubscribe flow needs; nothing else answers on its host. */
 const UNSUBSCRIBE_HOST_PATHS = ["/unsubscribe/", "/logo/", "/_next/", "/favicon.ico"];

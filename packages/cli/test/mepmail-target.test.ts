@@ -5,13 +5,13 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AuthError, createHttp } from "../src/http.js";
 import { createLogger } from "../src/log.js";
-import { VERSION } from "../src/meta.js";
 import {
   BATCH_MAX,
   createMepMailTarget,
   type MepMailTarget,
   type WriteResult,
 } from "../src/mepmail-target.js";
+import { VERSION } from "../src/meta.js";
 import type { Snapshot } from "../src/model.js";
 import { buildPlan } from "../src/plan.js";
 import { TARGET_WEBHOOK_EVENTS } from "../src/translate.js";

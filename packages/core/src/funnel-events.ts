@@ -132,7 +132,9 @@ export function attributionFromVisit(visit: RawVisitAttribution): SignupAttribut
  * from another tab). A value that is not the JSON object we wrote is treated
  * the same way: a broken cookie is not a channel.
  */
-export function attributionFromCookieValue(value: string | undefined | null): SignupAttribution | null {
+export function attributionFromCookieValue(
+  value: string | undefined | null,
+): SignupAttribution | null {
   if (!value) return null;
   try {
     const parsed: unknown = JSON.parse(value);
@@ -305,7 +307,10 @@ export async function teamFunnelProps(db: Db, teamId: string): Promise<FunnelEve
       campaign: schema.signupAttribution.campaign,
     })
     .from(schema.teamMembers)
-    .innerJoin(schema.signupAttribution, eq(schema.signupAttribution.userId, schema.teamMembers.userId))
+    .innerJoin(
+      schema.signupAttribution,
+      eq(schema.signupAttribution.userId, schema.teamMembers.userId),
+    )
     .where(and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamMembers.role, "owner")))
     .limit(1);
   return {

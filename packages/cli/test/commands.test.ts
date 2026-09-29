@@ -158,9 +158,7 @@ describe("mepmail migrate", () => {
       expect(stdout).toContain(
         "On Resend you sent 41,208 emails in the last 30 days (~1,374/day).",
       );
-      expect(stdout.replace(/\n/g, " ")).toContain(
-        "Starter allows 45,000/month; that covers it.",
-      );
+      expect(stdout.replace(/\n/g, " ")).toContain("Starter allows 45,000/month; that covers it.");
       expect(stdout).toContain("again right before cutover");
       expect(readFileSync(join(cwd, ".gitignore"), "utf8")).toBe("node_modules\n.mepmail/\n");
       expect(fake.writes).toBe(0);

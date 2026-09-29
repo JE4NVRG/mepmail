@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { type MepMailClient, MepMailApiError } from "./client.js";
+import { MepMailApiError, type MepMailClient } from "./client.js";
 
 /**
  * The exact tool surface shared with the hosted MCP server
@@ -25,7 +25,10 @@ interface ToolResult {
 function toolResult(data: unknown, ok = true): ToolResult {
   return {
     content: [
-      { type: "text", text: JSON.stringify({ notice: UNTRUSTED_NOTICE, untrusted_data: data }, null, 2) },
+      {
+        type: "text",
+        text: JSON.stringify({ notice: UNTRUSTED_NOTICE, untrusted_data: data }, null, 2),
+      },
     ],
     ...(ok ? {} : { isError: true }),
   };
@@ -65,7 +68,9 @@ const listQuery = {
   before: z
     .uuid()
     .optional()
-    .describe("Cursor: id of the first item of the previous page (backward paging; not with after)"),
+    .describe(
+      "Cursor: id of the first item of the previous page (backward paging; not with after)",
+    ),
 };
 
 const recipientList = z
@@ -85,7 +90,9 @@ const sendEmail = z
     from: z
       .string()
       .min(1)
-      .describe('Sender: "Name <user@domain>" or bare address; the domain must be verified for the team'),
+      .describe(
+        'Sender: "Name <user@domain>" or bare address; the domain must be verified for the team',
+      ),
     to: recipientList,
     subject: z.string().min(1),
     html: z.string().optional().describe("HTML body; at least one of html/text is required"),
@@ -115,8 +122,14 @@ const createContact = z.object({
   first_name: z.string().optional(),
   last_name: z.string().optional(),
   unsubscribed: z.boolean().optional().describe("Global opt-out from all marketing sends"),
-  properties: z.record(z.string(), z.unknown()).optional().describe("Flat map of custom properties"),
-  segments: z.array(z.object({ id: z.uuid() })).optional().describe("Segments to join on creation"),
+  properties: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Flat map of custom properties"),
+  segments: z
+    .array(z.object({ id: z.uuid() }))
+    .optional()
+    .describe("Segments to join on creation"),
   topics: z
     .array(z.object({ id: z.uuid(), subscription: z.enum(["opt_in", "opt_out"]) }))
     .optional()
@@ -182,7 +195,8 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "get_domain",
-    description: "Get one sending domain: status, region and required DNS records (DKIM, MAIL FROM).",
+    description:
+      "Get one sending domain: status, region and required DNS records (DKIM, MAIL FROM).",
     inputSchema: z.object({ id: z.uuid().describe("Domain id from list_domains") }),
     annotations: READ_ONLY,
     build: ({ id }) => ({ method: "GET", path: `/domains/${enc(String(id))}` }),
@@ -267,7 +281,11 @@ export const TOOLS: ToolSpec[] = [
     description:
       "Send up to 100 emails in one call; each entry has the same shape as send_email. Returns one id per accepted email.",
     inputSchema: z.object({
-      emails: z.array(sendEmail).min(1).max(100).describe("The emails to send, same shape as send_email"),
+      emails: z
+        .array(sendEmail)
+        .min(1)
+        .max(100)
+        .describe("The emails to send, same shape as send_email"),
     }),
     annotations: {},
     build: ({ emails }) => ({ method: "POST", path: "/emails/batch", body: emails }),
@@ -305,7 +323,9 @@ export const TOOLS: ToolSpec[] = [
     name: "update_contact",
     description:
       "Update a contact's name, custom properties or global unsubscribe flag. Omitted fields are left unchanged.",
-    inputSchema: z.object({ id: z.string().min(1).describe("Contact id or email address") }).extend(updateContact.shape),
+    inputSchema: z
+      .object({ id: z.string().min(1).describe("Contact id or email address") })
+      .extend(updateContact.shape),
     annotations: {},
     build: ({ id, ...body }) => ({ method: "PATCH", path: `/contacts/${enc(String(id))}`, body }),
   },

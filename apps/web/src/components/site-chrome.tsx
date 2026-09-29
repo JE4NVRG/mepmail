@@ -11,7 +11,7 @@ import { SignupCta } from "./signup-cta";
  */
 
 /** Which public page is rendering; only the landing has the in-page anchors. */
-export type PublicPage = "landing" | "pricing" | "alternatives";
+export type PublicPage = "landing" | "pricing" | "alternatives" | "integrations";
 
 export interface PublicSiteLabels {
   skip: string;
@@ -25,6 +25,7 @@ export interface PublicSiteLabels {
     how: string;
     pricing: string;
     alternatives: string;
+    integrations: string;
     login: string;
     signup: string;
     /** Rótulo acessível do botão que abre a nav no mobile (ver landing-nav.tsx). */
@@ -117,12 +118,14 @@ export function PublicHeader({
               <a href="/pricing" aria-current={page === "pricing" ? "page" : undefined}>
                 {labels.nav.pricing}
               </a>
-              <a href={anchorHref(page, "#planos")}>{labels.nav.plans}</a>
               <a
                 href="/alternatives/resend"
                 aria-current={page === "alternatives" ? "page" : undefined}
               >
                 {labels.nav.alternatives}
+              </a>
+              <a href="/integrations" aria-current={page === "integrations" ? "page" : undefined}>
+                {labels.nav.integrations}
               </a>
               <a href={anchorHref(page, "#mcp")}>{labels.nav.mcp}</a>
               <a href={anchorHref(page, "#como-funciona")}>{labels.nav.how}</a>
@@ -185,6 +188,7 @@ export function PublicFooter({
           <a href="/alternatives/resend">{labels.footer.alternatives}</a>
           <a href={anchorHref(page, "#planos")}>{labels.nav.plans}</a>
           <a href={anchorHref(page, "#mcp")}>{labels.nav.mcp}</a>
+          <a href="/integrations">{labels.nav.integrations}</a>
           <a href={anchorHref(page, "#como-funciona")}>{labels.nav.how}</a>
         </nav>
         <nav className="gtm-footer-col" aria-label={labels.footer.colAccount}>

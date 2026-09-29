@@ -1,4 +1,4 @@
-import { COMPETITORS, PRICE_ROWS, type CompetitorKey, type PriceRow } from "./landing-pricing";
+import { COMPETITORS, type CompetitorKey, PRICE_ROWS, type PriceRow } from "./landing-pricing";
 
 export interface Savings {
   row: PriceRow;

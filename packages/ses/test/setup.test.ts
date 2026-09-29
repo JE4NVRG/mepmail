@@ -193,9 +193,7 @@ describe("runSetup", () => {
     const { clients, calls } = fakeClients();
     const result = await runSetup(clients, { ...input, appBaseUrl: null });
     expect(result.topicArn).toBe("arn:aws:sns:us-east-1:123456789012:mepmail-events");
-    expect(result.queueUrl).toBe(
-      "https://sqs.us-east-1.amazonaws.com/123456789012/mepmail-events",
-    );
+    expect(result.queueUrl).toBe("https://sqs.us-east-1.amazonaws.com/123456789012/mepmail-events");
     expect(calls.map((c) => c.constructor)).toEqual([
       CreatePolicyCommand,
       CreateUserCommand,
@@ -243,9 +241,7 @@ describe("runSetup", () => {
       errors: { CreateQueueCommand: namedError("QueueNameExists") },
     });
     const result = await runSetup(clients, { ...input, appBaseUrl: null });
-    expect(result.queueUrl).toBe(
-      "https://sqs.us-east-1.amazonaws.com/123456789012/mepmail-events",
-    );
+    expect(result.queueUrl).toBe("https://sqs.us-east-1.amazonaws.com/123456789012/mepmail-events");
     expect(calls.some((c) => c instanceof GetQueueUrlCommand)).toBe(true);
   });
 
