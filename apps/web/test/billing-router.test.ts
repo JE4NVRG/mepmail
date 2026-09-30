@@ -197,6 +197,27 @@ const stripe = {
   },
 } as unknown as BillingStripe;
 
+describe("billing maintenance window", () => {
+  it("blocks financial mutations before loading team or calling Stripe", async () => {
+    vi.stubEnv("BILLING_MUTATIONS_PAUSED", "true");
+    const teamId = await createTeam(db, "Testes QA");
+    const caller = callerFor(teamId, "owner");
+    for (const action of [
+      () => caller.billing.checkout({ rung: "pro_100k" }),
+      () => caller.billing.changePlan({ rung: "pro_200k" }),
+      () => caller.billing.portal(),
+      () => caller.billing.setOverage({ enabled: true }),
+    ]) {
+      await expect(action()).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+    }
+    for (const writes of Object.values(calls)) expect(writes).toEqual([]);
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    expect(team?.plan).toBe("free");
+    expect(team?.stripeCustomerId).toBeNull();
+    expect((await caller.billing.status()).plan).toBe("free");
+  });
+});
+
 const createCaller = createCallerFactory(
   router({ billing: createBillingRouter({ stripe: () => stripe }) }),
 );

@@ -117,6 +117,12 @@ afterEach(async () => {
 });
 
 describe("POST /api/billing/webhook", () => {
+  it("keeps signed webhook ingestion open while customer mutations are paused", async () => {
+    vi.stubEnv("BILLING_MUTATIONS_PAUSED", "true");
+    const valid = webhooks.generateTestHeaderString({ payload, secret: SECRET });
+    expect((await post(valid)).status).toBe(200);
+    expect((await post(null)).status).toBe(400);
+  });
   it("is not mounted on self-host", async () => {
     vi.stubEnv("IS_CLOUD", "");
     const valid = webhooks.generateTestHeaderString({ payload, secret: SECRET });

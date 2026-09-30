@@ -371,6 +371,8 @@ export const env = createEnv({
 
     // Cloud-only (billing). STRIPE_PORTAL_CONFIG selects a customer-portal
     // configuration; unset uses the Stripe account's default one.
+    // Janela operacional: bloqueia mutações do cliente, nunca os webhooks.
+    BILLING_MUTATIONS_PAUSED: boolFromString,
     STRIPE_SECRET_KEY: z.string().optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),
     STRIPE_PORTAL_CONFIG: z.string().optional(),

@@ -238,6 +238,7 @@ export function PublicFooter({
           <a href={legal.terms}>{labels.footer.terms}</a>
           <a href={legal.privacy}>{labels.footer.privacy}</a>
           <a href={legal.refund}>{labels.footer.refund}</a>
+          <a href="/source">Source (AGPL-3.0)</a>
           <a href="/security">{labels.nav.security}</a>
         </nav>
       </div>

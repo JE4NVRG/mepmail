@@ -104,6 +104,17 @@ async function kickQuotaDrain(): Promise<void> {
 
 const billingPageUrl = () => `${resolveBaseUrl(env.APP_BASE_URL)}/settings/billing`;
 
+const billingMutationProcedure = adminProcedure.use(({ next }) => {
+  const paused: unknown = env.BILLING_MUTATIONS_PAUSED;
+  if (paused === true || paused === "true" || paused === "1") {
+    throw new TRPCError({
+      code: "SERVICE_UNAVAILABLE",
+      message: "Billing changes are temporarily paused. Please try again later.",
+    });
+  }
+  return next();
+});
+
 export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
   return router({
     status: teamProcedure.query(async ({ ctx }) => {
@@ -141,7 +152,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
       };
     }),
 
-    checkout: adminProcedure
+    checkout: billingMutationProcedure
       .input(z.object({ rung: paidRung }))
       .mutation(async ({ ctx, input }) => {
         requireCloud();
@@ -187,7 +198,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
      * portal cannot switch plans on a subscription carrying a metered item,
      * so every plan change happens here.
      */
-    changePlan: adminProcedure
+    changePlan: billingMutationProcedure
       .input(z.object({ rung: paidRung }))
       .mutation(async ({ ctx, input }) => {
         requireCloud();
@@ -217,7 +228,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         return change;
       }),
 
-    setOverage: adminProcedure
+    setOverage: billingMutationProcedure
       .input(z.object({ enabled: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
         requireCloud();
@@ -242,7 +253,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         return { enabled: input.enabled };
       }),
 
-    portal: adminProcedure.mutation(async ({ ctx }) => {
+    portal: billingMutationProcedure.mutation(async ({ ctx }) => {
       requireCloud();
       const team = await loadTeam(ctx.db, ctx.teamId);
       assertBillable(team);
