@@ -27,13 +27,17 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 function routeByHost(request: NextRequest): NextResponse {
+  const requestHeaders = new Headers(request.headers);
+  // Sobrescreve o valor recebido: somente a URL desta requisição é confiável.
+  requestHeaders.set("x-mepmail-next", request.nextUrl.pathname + request.nextUrl.search);
+  const next = () => NextResponse.next({ request: { headers: requestHeaders } });
   const own = env.UNSUBSCRIBE_BASE_URL;
-  if (!own) return NextResponse.next();
+  if (!own) return next();
   const host = request.headers.get("host")?.toLowerCase();
-  if (host !== new URL(own).host.toLowerCase()) return NextResponse.next();
+  if (host !== new URL(own).host.toLowerCase()) return next();
   const { pathname } = request.nextUrl;
   if (UNSUBSCRIBE_HOST_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(prefix))) {
-    return NextResponse.next();
+    return next();
   }
   return new NextResponse(null, { status: 404 });
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { ResetPasswordForm } from "@/components/auth/recovery-forms";
+import { postAuthNext } from "@/lib/nav";
 
 // The emailed link hits better-auth's GET /api/auth/reset-password/:token,
 // which validates the token and redirects here with ?token= on success or
@@ -8,10 +9,19 @@ import { ResetPasswordForm } from "@/components/auth/recovery-forms";
 export default async function ResetPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string; error?: string }>;
+  searchParams: Promise<{
+    token?: string | string[];
+    error?: string | string[];
+    next?: string | string[];
+  }>;
 }) {
   const query = await searchParams;
-  return <ResetPasswordForm token={query.error ? null : (query.token ?? null)} />;
+  return (
+    <ResetPasswordForm
+      token={query.error || typeof query.token !== "string" ? null : query.token}
+      next={postAuthNext(query.next, "", true)}
+    />
+  );
 }
 
 export async function generateMetadata(): Promise<Metadata> {

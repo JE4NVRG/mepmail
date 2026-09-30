@@ -6,9 +6,12 @@
  * the same numbers and the same words.
  */
 
+import type { PlanRungKey } from "@millionsend/core/plans";
+
 export type PlanTier = "core" | "scale";
 
 export interface PlanBase {
+  rung: PlanRungKey;
   name: string;
   price: string;
   tier: PlanTier;
@@ -28,14 +31,14 @@ export interface LandingPlan extends PlanBase {
 }
 
 export const PLANS: readonly PlanBase[] = [
-  { name: "Free", price: "US$ 0", tier: "core" },
-  { name: "Starter", price: "US$ 9", tier: "core" },
-  { name: "Pro 110K", price: "US$ 20", tier: "core", featured: true },
-  { name: "Pro 220K", price: "US$ 100", tier: "core" },
-  { name: "Scale 550K", price: "US$ 199", tier: "scale" },
-  { name: "Scale 1.1M", price: "US$ 319", tier: "scale" },
-  { name: "Scale 1.65M", price: "US$ 429", tier: "scale" },
-  { name: "Scale 2.75M", price: "US$ 549", tier: "scale" },
+  { rung: "free", name: "Free", price: "US$ 0", tier: "core" },
+  { rung: "starter", name: "Starter", price: "US$ 9", tier: "core" },
+  { rung: "pro_100k", name: "Pro 110K", price: "US$ 20", tier: "core", featured: true },
+  { rung: "pro_200k", name: "Pro 220K", price: "US$ 100", tier: "core" },
+  { rung: "scale_500k", name: "Scale 550K", price: "US$ 199", tier: "scale" },
+  { rung: "scale_1m", name: "Scale 1.1M", price: "US$ 319", tier: "scale" },
+  { rung: "scale_1_5m", name: "Scale 1.65M", price: "US$ 429", tier: "scale" },
+  { rung: "scale_2_5m", name: "Scale 2.75M", price: "US$ 549", tier: "scale" },
 ];
 
 export const EMPTY_PLAN_COPY: PlanCopy = { volume: "", limits: "", overage: "", attachment: "" };

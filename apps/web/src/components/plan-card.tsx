@@ -78,6 +78,7 @@ export function PlanCard({ plan, labels }: { plan: LandingPlan; labels: PlanCard
         className="ms-btn ms-btn-primary gtm-action"
         label={copy.cta ?? labels.cta}
         plan={plan.name}
+        rung={plan.rung}
       />
       {plan.price !== "US$ 0" ? <p className="gtm-cta-note">{labels.ctaNote}</p> : null}
     </article>

@@ -20,7 +20,9 @@ import { Skeleton } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
 import { Switch } from "@/components/switch";
 import { WarnCard } from "@/components/warn-card";
+import { estimateOverageCents } from "@/lib/billing-estimate";
 import { formatDay, formatDayTime, formatUsd } from "@/lib/format";
+import { paidRung } from "@/lib/purchase-intent";
 import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { QuotaRow } from "../usage/usage-view";
@@ -115,7 +117,13 @@ function Check() {
   );
 }
 
-export function BillingView({ checkout }: { checkout: "success" | "cancel" | null }) {
+export function BillingView({
+  checkout,
+  requestedRung = null,
+}: {
+  checkout: "success" | "cancel" | null;
+  requestedRung?: PlanRungKey | null;
+}) {
   const t = useTranslations("settings.billing");
   const planName = useTranslations("settings.plans");
   const usageT = useTranslations("settings.usage");
@@ -144,9 +152,10 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
         queryClient.invalidateQueries(trpc.team.list.queryFilter()),
       ]),
   };
-  // The slider follows the team's own rung until the viewer moves it.
+  // A intenção só abre a comparação; todas as mutações exigem clique e role.
+  const intent = paidRung(requestedRung);
   const [step, setStep] = useState<number | null>(null);
-  const [plansOpen, setPlansOpen] = useState(false);
+  const [plansOpen, setPlansOpen] = useState(intent !== null);
   const [changed, setChanged] = useState<{ rung: PlanRungKey; result: RungChange } | null>(null);
   const startCheckout = useMutation(trpc.billing.checkout.mutationOptions(redirect));
   const openPortal = useMutation(trpc.billing.portal.mutationOptions(redirect));
@@ -265,7 +274,7 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
     step ??
     Math.max(
       0,
-      PLAN_RUNGS.findIndex((r) => r.key === current.key),
+      PLAN_RUNGS.findIndex((r) => r.key === (intent ?? current.key)),
     );
   const selected = PLAN_RUNGS[at] ?? current;
   const over = quota.kind === "month" ? Math.max(0, usage.accepted - quota.included) : 0;
@@ -429,7 +438,7 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
                   <div style={{ fontSize: 12.5, color: "var(--ms-bone)", marginTop: 6 }}>
                     {t("overSoFar", {
                       n: over,
-                      amount: usd(Math.round((over * quota.overageCentsPer1k) / 1000)),
+                      amount: usd(estimateOverageCents(over, quota.overageCentsPer1k)),
                     })}
                   </div>
                 ) : null}

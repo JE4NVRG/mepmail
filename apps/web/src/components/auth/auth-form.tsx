@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { captchaHeaders, useTurnstile } from "@/components/turnstile";
 import { authClient } from "@/lib/auth-client";
-import { safeNextPath } from "@/lib/nav";
+import { postAuthNext, withNext } from "@/lib/nav";
 import { passwordStrength } from "@/lib/password-strength";
 
 import styles from "./auth.module.css";
@@ -91,8 +91,9 @@ export function AuthForm({
   const params = useSearchParams();
   // An invited user carries ?next=/invite/... — signup sends them to accept
   // the invite rather than /onboarding (which would create a new team).
-  const nextParam = params.get("next");
-  const next = safeNextPath(nextParam, mode === "login" ? "/emails" : "/onboarding");
+  const nextParam = params.getAll("next").length === 1 ? params.get("next") : null;
+  const next = postAuthNext(nextParam, mode === "login" ? "/emails" : "/onboarding", true);
+  const recoveryHref = withNext("/forgot-password", nextParam);
   // better-auth bounces failed OAuth callbacks to errorCallbackURL?error=code.
   const socialFailed = params.get("error") !== null;
 
@@ -142,11 +143,15 @@ export function AuthForm({
     }
     const fetchOptions = { headers: captchaHeaders(token) };
     try {
-      // Login passes no callbackURL: the client would navigate to it, and the
-      // re-sent verification link may land on the default just as well.
+      // O callback explícito também preserva a oferta no reenvio por login não verificado.
       const { data, error } =
         mode === "login"
-          ? await authClient.signIn.email({ email, password, fetchOptions })
+          ? await authClient.signIn.email({
+              email,
+              password,
+              ...(nextParam ? { callbackURL: next } : {}),
+              fetchOptions,
+            })
           : await authClient.signUp.email({
               name,
               email,
@@ -246,7 +251,7 @@ export function AuthForm({
       const { error } = await authClient.signIn.social({
         provider,
         callbackURL: next,
-        errorCallbackURL: mode === "login" ? "/login" : "/signup",
+        errorCallbackURL: withNext(mode === "login" ? "/login" : "/signup", nextParam),
       });
       if (error) {
         setErrorMessage(tSocial("error"));
@@ -403,8 +408,8 @@ export function AuthForm({
                 <Link
                   href={
                     email.trim()
-                      ? `/forgot-password?email=${encodeURIComponent(email.trim())}`
-                      : "/forgot-password"
+                      ? `${recoveryHref}${recoveryHref.includes("?") ? "&" : "?"}email=${encodeURIComponent(email.trim())}`
+                      : recoveryHref
                   }
                   className={styles.forgot}
                 >

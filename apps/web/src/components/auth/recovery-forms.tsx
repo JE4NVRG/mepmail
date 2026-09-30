@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { captchaHeaders, useTurnstile } from "@/components/turnstile";
 import { authClient } from "@/lib/auth-client";
+import { withNext } from "@/lib/nav";
 import styles from "./auth.module.css";
 import { StrengthMeter } from "./auth-form";
 import { AuthScreen } from "./auth-screen";
@@ -20,10 +21,12 @@ export function ForgotPasswordForm({
   minutes,
   initialEmail = "",
   turnstileSiteKey = null,
+  next = null,
 }: {
   minutes: number;
   initialEmail?: string;
   turnstileSiteKey?: string | null;
+  next?: string | null;
 }) {
   const t = useTranslations("auth.forgot");
   const tAuth = useTranslations("auth");
@@ -53,7 +56,7 @@ export function ForgotPasswordForm({
       // redirectTo preserva o destino do link enviado pelo backend.
       const { error } = await authClient.requestPasswordReset({
         email,
-        redirectTo: "/reset-password",
+        redirectTo: withNext("/reset-password", next),
         fetchOptions: { headers: captchaHeaders(token) },
       });
       if (error?.code === "VERIFICATION_FAILED" || error?.code === "MISSING_RESPONSE") {
@@ -79,13 +82,13 @@ export function ForgotPasswordForm({
           </p>
           {rateLimited ? <p className={styles.notice}>{t("rateLimited")}</p> : null}
           <p className={styles.subline}>
-            <Link href="/login">{t("backToLogin")}</Link>
+            <Link href={withNext("/login", next)}>{t("backToLogin")}</Link>
           </p>
         </>
       ) : (
         <>
           <p className={styles.subline}>
-            {t("subline")} <Link href="/login">{t("sublineLink")}</Link>
+            {t("subline")} <Link href={withNext("/login", next)}>{t("sublineLink")}</Link>
           </p>
           <form onSubmit={onSubmit} className={styles.form} aria-busy={pending}>
             <div className={`ms-field ${styles.field}`}>
@@ -130,7 +133,13 @@ export function ForgotPasswordForm({
  * better-auth's ?error=INVALID_TOKEN redirect) and a consumed/expired token on
  * submit both land in the same invalid view with a link to request a new one.
  */
-export function ResetPasswordForm({ token: initialToken }: { token: string | null }) {
+export function ResetPasswordForm({
+  token: initialToken,
+  next = null,
+}: {
+  token: string | null;
+  next?: string | null;
+}) {
   const t = useTranslations("auth.reset");
   const tAuth = useTranslations("auth");
   const router = useRouter();
@@ -139,8 +148,8 @@ export function ResetPasswordForm({ token: initialToken }: { token: string | nul
   // The bearer token arrived as ?token=; drop it from the address bar so it
   // does not linger in history, bookmarks, or anything that copies the URL.
   useEffect(() => {
-    if (initialToken) window.history.replaceState(null, "", window.location.pathname);
-  }, [initialToken]);
+    if (initialToken) window.history.replaceState(null, "", withNext("/reset-password", next));
+  }, [initialToken, next]);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -169,7 +178,7 @@ export function ResetPasswordForm({ token: initialToken }: { token: string | nul
       }
       setState("done");
       // Server revoked every session; a beat to read the confirmation, then in.
-      setTimeout(() => router.push("/login"), 1500);
+      setTimeout(() => router.push(withNext("/login", next)), 1500);
     } catch {
       setErrorMessage(tAuth("networkError"));
     } finally {
@@ -183,7 +192,7 @@ export function ResetPasswordForm({ token: initialToken }: { token: string | nul
         <>
           <p className={styles.notice}>{t("invalid")}</p>
           <p className={styles.subline}>
-            <Link href="/forgot-password">{t("requestNew")}</Link>
+            <Link href={withNext("/forgot-password", next)}>{t("requestNew")}</Link>
           </p>
         </>
       ) : state === "done" ? (

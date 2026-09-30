@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import styles from "@/components/auth/auth.module.css";
 import { AuthScreen } from "@/components/auth/auth-screen";
-import { safeNextPath } from "@/lib/nav";
+import { postAuthNext } from "@/lib/nav";
 import { hasSession } from "@/server/auth";
 
 /**
@@ -21,7 +21,7 @@ export default async function VerifyEmailPage({
   searchParams: Promise<{ next?: string | string[]; error?: string | string[] }>;
 }) {
   const params = await searchParams;
-  const next = safeNextPath(typeof params.next === "string" ? params.next : null, "/onboarding");
+  const next = postAuthNext(params.next, "/onboarding");
   if (await hasSession()) redirect(next);
   const t = await getTranslations("auth.verify");
   return (

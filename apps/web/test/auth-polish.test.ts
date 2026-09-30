@@ -104,6 +104,73 @@ beforeEach(() => {
 });
 
 describe("auth UX: synthetic component state harness", () => {
+  it("Free verification keeps the normal onboarding destination after login", async () => {
+    h.params = new URLSearchParams({ next: "/onboarding" });
+    await submit(render());
+    h.email.mockResolvedValue({ data: { token: "fixture" }, error: null });
+    await submit(render());
+    expect(h.push).toHaveBeenCalledWith("/onboarding");
+  });
+  it("login keeps the offer in the verification resend callback", async () => {
+    const next = "/settings/billing?rung=pro_200k";
+    h.params = new URLSearchParams({ next });
+    await submit(render());
+    h.email.mockResolvedValue({ error: { code: "EMAIL_NOT_VERIFIED" } });
+    await submit(render());
+    expect(h.email).toHaveBeenCalledWith(expect.objectContaining({ callbackURL: next }));
+    expect(h.push).not.toHaveBeenCalled();
+  });
+  it("preserves a paid offer on recovery, verification and OAuth failure", async () => {
+    const next = "/settings/billing?rung=pro_200k";
+    h.params = new URLSearchParams({ next });
+    await submit(render());
+    expect(
+      nodes(render()).some(
+        (n) => n.props.href === `/forgot-password?next=${encodeURIComponent(next)}`,
+      ),
+    ).toBe(true);
+    h.social.mockResolvedValue({ error: null });
+    const social = find(
+      render("login", { google: true, github: false, microsoft: false }),
+      (n) => n.type === "button" && Array.isArray(n.props.children),
+    );
+    await (social.props.onClick as () => Promise<void>)();
+    expect(h.social).toHaveBeenCalledWith(
+      expect.objectContaining({
+        callbackURL: next,
+        errorCallbackURL: `/login?next=${encodeURIComponent(next)}`,
+      }),
+    );
+    h.states = [];
+    h.signup.mockResolvedValue({ data: { token: null }, error: null });
+    await submit(render("signup"));
+    expect(h.signup).toHaveBeenCalledWith(
+      expect.objectContaining({ callbackURL: `/verify-email?next=${encodeURIComponent(next)}` }),
+    );
+  });
+  it("preserves recovery return links and reset callback without submission to a real backend", async () => {
+    const next = "/settings/billing?rung=pro_100k";
+    const recovery = () => {
+      h.cursor = 0;
+      return ForgotPasswordForm({ minutes: 60, ...{ next } });
+    };
+    expect(
+      nodes(recovery()).some((n) => n.props.href === `/login?next=${encodeURIComponent(next)}`),
+    ).toBe(true);
+    h.forgot.mockResolvedValue({ error: null });
+    await submit(recovery());
+    expect(h.forgot).toHaveBeenCalledWith(
+      expect.objectContaining({ redirectTo: `/reset-password?next=${encodeURIComponent(next)}` }),
+    );
+    h.states = [];
+    h.cursor = 0;
+    const reset = ResetPasswordForm({ token: null, ...{ next } });
+    expect(
+      nodes(reset).some(
+        (n) => n.props.href === `/forgot-password?next=${encodeURIComponent(next)}`,
+      ),
+    ).toBe(true);
+  });
   it("email-first reveals/focuses password without a request, preserving safe next", async () => {
     h.params = new URLSearchParams("next=%2Finvite%2Ftest");
     let tree = render();

@@ -1,5 +1,21 @@
 # Correções de confiança e conversão — t_b8f01b8a
 
+## Delta P0 t_c8f557ab — continuidade e estimativa (antes do código)
+
+Autorização focal sobre PRD/constitution: transportar chave estável de PLAN_RUNGS em `/signup?next=` até `/settings/billing?rung=`, mantendo Free/cadastro geral sem oferta. `pro_100k` e `pro_200k` continuam distintos. Billing apenas preseleciona comparação; mutações continuam exclusivamente em cliques explícitos com roles existentes. Não altera catálogo, contratos antigos, Stripe, plugin ou protocolo auth.
+
+Preservar destino interno validado na troca signup/login, verificação, erro OAuth, recuperação e dashboard/onboarding. O proxy sobrescreve header interno com pathname/query da própria requisição (não confiar no header fornecido pelo cliente); guards continuam validando sessão/time. Rejeitar next múltiplo, externo e ciclos de auth/onboarding. Após criar time, refresh existente retoma destino; sem next, onboarding conserva o passo de ativação atual. Estimativa usa `ceil(over/1000)*quota.overageCentsPer1k`, nunca taxa do catálogo em lugar da assinatura.
+
+Regressões RED→GREEN, gates focais e build no Windows existente, smoke anônimo EN/PT sem submit/charge; QA independente no SHA congelado. Nenhuma alegação de E2E pago, OAuth externo ou e-mail entregue. Publicação continua não autorizada; usar pipeline existente somente após autorização separada e nunca publicar build dummy.
+
+## Handoff P0 t_c8f557ab
+
+Implementação local: oferta validada até billing; comparação preselecionada sem mutação por query; Free mantém onboarding normal; recuperação, verificação e erro OAuth preservam destino seguro. Estimativa por blocos usa a taxa recebida da assinatura. Catálogo comercial/Stripe/plugin intactos.
+
+Gates Windows: RED inicial com 9 falhas demonstradas; GREEN final com 179 testes (125 web focais + 12 atribuição/funil + 23 planos + 19 preços/provisionamento), Biome22, TypeScript e build exit0. Preview http://127.0.0.1:9897, BUILD_ID Mvx6YydF8zuMfA1xUKPh4, manifest servido200. Navegação Chromium real: 16 cliques Free/Starter/Pro110K/Pro220K em home/pricing EN/PT, 138 checks, sem POST. Inspeção visual PT390/EN1440 sem overflow, campos vazios e opt-in desligado.
+
+Limites: preview dummy/self-host, sem banco real; GET direto ao dashboard retorna500 por inicialização auth/ECONNREFUSED. Guards com/sem time, UI billing/roles/ausência de auto-mutações foram exercitados em harness sintético e contratos PGlite, NÃO jornada autenticada/pagamento Stripe nem envio externo. QA independente deve revisar esses limites no SHA congelado. Não publicar o build dummy; somente após autorização separada, usar o pipeline existente com artefato de produção, conferir SHA servido e jornada. Fonte/export em paridade por manifesto; originais do export preservados por hash em F:/MepMail-preserved/t_c8f557ab.
+
 ## Delta aprovado pelo card (antes do código)
 
 Esta correção prevalece sobre a copy anterior de landing-cro-spec e a exigência de cinco campos de frontend-polish-spec. Reutiliza o visual, fonte e preview existentes; nenhuma publicação está autorizada.
