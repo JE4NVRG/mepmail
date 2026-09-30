@@ -7,7 +7,7 @@ const h = vi.hoisted(() => ({
   slots: [] as unknown[],
   cursor: 0,
   pending: [] as (() => void)[],
-  video: { play: vi.fn(), pause: vi.fn() },
+  video: { play: vi.fn(), pause: vi.fn(), playbackRate: 1, defaultPlaybackRate: 1 },
 }));
 vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
 vi.mock("react", async (original) => ({
@@ -89,6 +89,8 @@ beforeEach(() => {
   h.slots = [];
   h.pending = [];
   h.video.pause.mockReset();
+  h.video.playbackRate = 1;
+  h.video.defaultPlaybackRate = 1;
   h.video.play.mockResolvedValue(undefined);
   desktop = { matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() };
   reduce = { matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() };
@@ -142,6 +144,8 @@ describe("auth illustration: synthetic state harness", () => {
       preload: "none",
     });
     expect(h.video.play).toHaveBeenCalled();
+    expect(h.video.playbackRate).toBe(1.5);
+    expect(h.video.defaultPlaybackRate).toBe(1.5);
     event(video(tree), "onPlaying");
     expect(button(render()).props.children).toContain("pauseAnimation");
   });
@@ -162,6 +166,8 @@ describe("auth illustration: synthetic state harness", () => {
     reduce.matches = true;
     update();
     expect(video(settle())).toBeUndefined();
+    h.video.playbackRate = 1;
+    h.video.defaultPlaybackRate = 1;
     reduce.matches = false;
     update();
     tree = settle();
@@ -170,6 +176,8 @@ describe("auth illustration: synthetic state harness", () => {
     event(button(tree), "onClick");
     settle();
     expect(h.video.play).toHaveBeenCalled();
+    expect(h.video.playbackRate).toBe(1.5);
+    expect(h.video.defaultPlaybackRate).toBe(1.5);
   });
   it("visibility pauses automatic playback and resumes only on return", () => {
     settle();

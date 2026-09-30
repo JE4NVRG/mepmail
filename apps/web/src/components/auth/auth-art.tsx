@@ -6,6 +6,7 @@ import styles from "./auth.module.css";
 
 const POSTER = "/product/auth-personalization.webp";
 const VIDEO = "/product/auth-personalization.mp4";
+const PLAYBACK_RATE = 1.5;
 const EMPTY_IMAGE = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
 
 export function AuthArt() {
@@ -54,6 +55,8 @@ export function AuthArt() {
       setPlaying(false);
       return;
     }
+    video.defaultPlaybackRate = PLAYBACK_RATE;
+    video.playbackRate = PLAYBACK_RATE;
     const attempt = ++playAttempt.current;
     if (canPlay && !manualPause.current) {
       video.play().catch(() => {
