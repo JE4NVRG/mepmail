@@ -14,12 +14,14 @@ describe("frontend polish contracts", () => {
       });
     }
   }
-  it("auth uses one shell, sanitized product evidence and both home links", () => {
+  it("auth uses one shell, personalization illustration and both home links", () => {
     const shell = read("../src/components/auth/auth-screen.tsx");
     const form = read("../src/components/auth/auth-form.tsx");
     expect(form).toContain('<AuthScreen title={t("title")}>');
     expect(shell.match(/href="\/"/g)).toHaveLength(2);
-    expect(shell).toContain("/product/templates-hero.webp");
+    expect(shell).toContain("<AuthArt />");
+    expect(shell).not.toContain("/product/templates-hero.webp");
+    expect(read("../src/app/page.tsx")).toContain("/product/templates-hero.webp");
     expect(shell).toContain("LandingLangSwitch");
     expect(shell + form).not.toMatch(/SilkCanvas|waves-dark|waves-light/);
     expect(form).toContain("safeNextPath(nextParam");

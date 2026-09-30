@@ -1,4 +1,4 @@
-/* Escopo exclusivo de auth: superfície calma e prova real do produto. */
+/* Escopo exclusivo de auth: superfície calma e ilustração de personalização. */
 .screen,
 .screen * {
   box-sizing: border-box;
@@ -32,7 +32,7 @@
   gap: 80px;
 }
 .product {
-  padding: 28px 0;
+  padding: 12px 0;
   animation: enter 650ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .eyebrow {
@@ -57,25 +57,58 @@
   line-height: 1.6;
   max-width: 440px;
 }
-.proof {
-  margin: 28px 0 0;
-  max-width: 340px;
-  padding: 12px;
-  border: 1px solid var(--ms-line-strong);
-  border-radius: 16px;
-  background: #0c0c0d;
+.art {
+  margin: 20px 0 0;
+  max-width: 500px;
+  width: min(100%, max(320px, calc(100dvh - 370px)));
 }
-.proof img {
+.artFrame {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #080808;
+}
+.artFrame img,
+.artFrame video {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 8px;
+  aspect-ratio: 1;
+  object-fit: contain;
 }
-.proof figcaption {
-  color: #aaa7a0;
+.artFrame video {
+  position: absolute;
+  inset: 0;
+}
+.artFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  color: var(--auth-muted);
   font-size: 11px;
   line-height: 1.5;
-  margin-top: 12px;
+}
+.artControl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--auth-muted);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.artControl:hover {
+  color: var(--ms-bone);
+  background: var(--ms-panel);
 }
 .column {
   width: 100%;

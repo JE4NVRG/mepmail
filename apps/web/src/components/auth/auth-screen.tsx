@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { LandingLangSwitch } from "@/components/landing-lang-switch";
 import styles from "./auth.module.css";
+import { AuthArt } from "./auth-art";
 
 /** Estrutura única de acesso, recuperação e consentimento. */
 export function AuthScreen({ title, children }: { title: string; children: React.ReactNode }) {
@@ -23,16 +24,7 @@ export function AuthScreen({ title, children }: { title: string; children: React
           <p className={styles.eyebrow}>MepMail / API · SMTP · MCP</p>
           <h2>{tAuth("shell.title")}</h2>
           <p className={styles.productLead}>{tAuth("shell.body")}</p>
-          <figure className={styles.proof}>
-            {/* biome-ignore lint/performance/noImgElement: prova real já sanitizada e otimizada, sem dados de conta */}
-            <img
-              src="/product/templates-hero.webp"
-              width={546}
-              height={614}
-              alt={tLanding("productProof.alt")}
-            />
-            <figcaption>{tLanding("productProof.caption")}</figcaption>
-          </figure>
+          <AuthArt />
         </aside>
         <div className={styles.column}>
           <Link href="/" className={styles.brand}>
