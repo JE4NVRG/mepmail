@@ -1,5 +1,5 @@
 ---
-version: 1.2
+version: 1.3
 name: MepMail-design
 description: Product-led marketing for builders and AI agents. Dark canvas, bone text, steel and restrained violet accents. Executable tokens live in apps/web/src/styles/tokens/colors.css.
 colors:
@@ -52,13 +52,13 @@ Plans derive from the shared catalog: Free, Starter and Pro 110K upfront; remain
 
 ## Authentication presentation
 
-Login, signup and recovery share one AuthScreen shell. Desktop uses an asymmetric personalization illustration and a quiet form surface. This preview-only decorative exception replaces the auth screenshot, never the landing product evidence: an approved fictional FIRST_NAME template branches to Ana/Sam. Use the supplied square H264 without audio and a WebP poster from its first frame, object-fit contain, without nested frames or glow. Keep the dark illustration canvas in both themes. Below 960px the product panel disappears and neither MP4 nor poster is fetched: compact brand, left-aligned heading and form come first. Keep both home links and reuse the cookie-backed EN/PT control. Controls are 48px high, password eyes at least 44px, inputs 16px, and links underlined. Secondary text uses a scoped AA palette in both themes, not dashboard overrides.
+Login, signup and recovery share one AuthScreen shell. Desktop uses an asymmetric personalization illustration and a quiet form surface. This decorative exception replaces the auth screenshot, never the landing product evidence: an approved fictional FIRST_NAME template branches to Ana/Sam. Use only the existing static auth-personalization.webp, object-fit contain, without nested frames or glow. Video, playback controls and playback state are removed. Keep the dark illustration canvas in both themes. Below 960px the product panel disappears and the illustration is not fetched: compact brand, left-aligned heading and form come first. Keep both home links and reuse the cookie-backed EN/PT control. Controls are 48px high, password eyes at least 44px, inputs 16px, and links underlined. Secondary text uses a scoped AA palette in both themes, not dashboard overrides.
 
 Preserve email-first login, provider flags, all callbacks and validation. The first action says Continue with email; the password step receives focus. Pending announces the operation, errors are live and associated, and rejected network promises restore the controls without clearing values. Existing password eyes, meter and confirmation fields remain, not new features.
 
 ## Motion contract
 
-Use opacity/transform only for entrance: 520ms cubic-bezier(0.22, 1, 0.36, 1), 12px maximum displacement, hero stagger 70ms and proof entrance 650ms. Micro interactions use 180ms, password/tab transitions 400ms. Animate groups, not every text. CTA is immediately clickable; no pointer-event delay or scroll hijacking. The auth preview illustration is the only decorative-loop exception: visible desktop only, muted/inline, accessible 44px pause/play control, and manual pause survives locale/rerender/visibility changes. Hidden documents pause. Reduced motion uses only the static poster (no initial MP4 request), including dynamic changes; no-JS and denied autoplay retain a static usable presentation. Scope: docs/gtm/login-video-spec.md. Production publication remains unauthorized.
+Use opacity/transform only for entrance: 520ms cubic-bezier(0.22, 1, 0.36, 1), 12px maximum displacement, hero stagger 70ms and proof entrance 650ms. Micro interactions use 180ms, password/tab transitions 400ms. Animate groups, not every text. CTA is immediately clickable; no pointer-event delay or scroll hijacking. The auth illustration is static in all motion preferences and without JavaScript; there is no decorative video-loop exception. Scope: docs/gtm/login-video-spec.md. Mobile gate covers landing and auth at 360/390/430/768px plus desktop smoke at 1440px, EN/PT and representative light/dark. Production is authorized only after gates and independent QA, in a separate release stage, never from the dummy preview artifact.
 
 Viewport reveal is progressive enhancement: static CSS never hides content. IntersectionObserver triggers a one-shot Web Animation only on intersecting groups; missing observer/animation API leaves fully visible content. Reduced motion disables entrances, reveals, translations and badge loops, including a preference change during the session. No-JS SSR remains readable. Verify motion through runtime and a real recording, not still images alone.
 

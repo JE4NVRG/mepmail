@@ -69,17 +69,12 @@
   border-radius: 12px;
   background: #080808;
 }
-.artFrame img,
-.artFrame video {
+.artFrame img {
   display: block;
   width: 100%;
   height: auto;
   aspect-ratio: 1;
   object-fit: contain;
-}
-.artFrame video {
-  position: absolute;
-  inset: 0;
 }
 .artFooter {
   display: flex;
@@ -90,25 +85,6 @@
   color: var(--auth-muted);
   font-size: 11px;
   line-height: 1.5;
-}
-.artControl {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-height: 44px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--auth-muted);
-  font: inherit;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.artControl:hover {
-  color: var(--ms-bone);
-  background: var(--ms-panel);
 }
 .column {
   width: 100%;
