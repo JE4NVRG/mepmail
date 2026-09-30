@@ -1,5 +1,11 @@
 # Correções de confiança e conversão — t_b8f01b8a
 
+## Delta P0 t_8e779ff9 — tabela aprovada e contratos existentes (antes do código)
+
+Jean aprovou implementação LOCAL: pro_100k 2000/30; pro_200k 3900/28; scale_500k 9500/25; scale_1m 17900/23; scale_1_5m 26500/22; scale_2_5m 42900/21 (mensalidade/excedente por mil em centavos USD). Quotas, chaves, Free, Starter, limites e recursos intactos. Substitui a pendência comercial histórica abaixo; 19c uniforme NÃO aprovado. Comparativos mantêm as bases existentes dos concorrentes. Fórmula: base + taxa * ceil(max(0, volume - quota)/1000), aplicada aos DOIS planos.
+
+Catálogo novo não representa contrato existente. Resolver valores efetivos pelo Price/itens da assinatura, nunca lookup atual; sem taxa confiável, não apresentar estimativa como vigente. Nenhuma migração de banco, Stripe real, push ou publicação autorizada. Rotação de preços deve preservar valores/metadados históricos; round down não equivale a round up. Testes com cliente injetado são sintéticos, não prova de cobrança real. Preview/build/testes no Windows existente, QA independente e gate de publicação t_0ba7607f mantidos.
+
 ## Delta P0 t_c8f557ab — continuidade e estimativa (antes do código)
 
 Autorização focal sobre PRD/constitution: transportar chave estável de PLAN_RUNGS em `/signup?next=` até `/settings/billing?rung=`, mantendo Free/cadastro geral sem oferta. `pro_100k` e `pro_200k` continuam distintos. Billing apenas preseleciona comparação; mutações continuam exclusivamente em cliques explícitos com roles existentes. Não altera catálogo, contratos antigos, Stripe, plugin ou protocolo auth.

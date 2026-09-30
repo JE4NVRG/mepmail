@@ -15,7 +15,7 @@
     "source": "Coluna Resend: lista pública em <link>resend.com/pricing</link>, lida em {date}. Coluna MepMail: nossos preços publicados. Valores em USD por mês, sem impostos e sem excedentes."
   },
   "claim": {
-    "title": "Sobre o “até 60% mais barato”.",
+    "title": "Sobre o “até 78% mais barato”.",
     "body": "A chamada compara com o degrau público mais caro do mercado: SendGrid em {volume}, {sendgrid}/mês contra os nossos {mepmail}. Contra o Resend especificamente, a diferença na tabela acima vai de {min}% a {max}%."
   },
   "same": {

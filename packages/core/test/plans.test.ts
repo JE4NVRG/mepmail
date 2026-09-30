@@ -60,16 +60,16 @@ describe("PLAN_RUNGS", () => {
     ).toEqual([
       ["free", "free", 100, "day", 0, null],
       ["starter", "starter", 1_500, "day", 900, null],
-      ["pro_100k", "pro", 110_000, "month", 2_000, 90],
-      ["pro_200k", "pro", 220_000, "month", 10_000, 35],
-      ["scale_500k", "scale", 550_000, "month", 19_900, 25],
-      ["scale_1m", "scale", 1_100_000, "month", 31_900, 23],
-      ["scale_1_5m", "scale", 1_650_000, "month", 42_900, 18],
-      ["scale_2_5m", "scale", 2_750_000, "month", 54_900, 16],
+      ["pro_100k", "pro", 110_000, "month", 2_000, 30],
+      ["pro_200k", "pro", 220_000, "month", 3_900, 28],
+      ["scale_500k", "scale", 550_000, "month", 9_500, 25],
+      ["scale_1m", "scale", 1_100_000, "month", 17_900, 23],
+      ["scale_1_5m", "scale", 1_650_000, "month", 26_500, 22],
+      ["scale_2_5m", "scale", 2_750_000, "month", 42_900, 21],
     ]);
   });
 
-  it("keeps every monthly rung key and price intact, only the included volume moved", () => {
+  it("preserves keys and quotas with approved prices", () => {
     // The keys are the stem of the Stripe lookup keys and the pence of the
     // ladder; the +10% bump touched `included` alone.
     expect(
@@ -80,12 +80,12 @@ describe("PLAN_RUNGS", () => {
         r.overageCentsPer1k,
       ]),
     ).toEqual([
-      ["pro_100k", 110_000, 2_000, 90],
-      ["pro_200k", 220_000, 10_000, 35],
-      ["scale_500k", 550_000, 19_900, 25],
-      ["scale_1m", 1_100_000, 31_900, 23],
-      ["scale_1_5m", 1_650_000, 42_900, 18],
-      ["scale_2_5m", 2_750_000, 54_900, 16],
+      ["pro_100k", 110_000, 2_000, 30],
+      ["pro_200k", 220_000, 3_900, 28],
+      ["scale_500k", 550_000, 9_500, 25],
+      ["scale_1m", 1_100_000, 17_900, 23],
+      ["scale_1_5m", 1_650_000, 26_500, 22],
+      ["scale_2_5m", 2_750_000, 42_900, 21],
     ]);
   });
 });
@@ -248,17 +248,17 @@ describe("teamQuota", () => {
       periodStart: START,
       periodEnd: END,
       overage: false,
-      overageCentsPer1k: 90,
+      overageCentsPer1k: 30,
     });
     expect(teamQuota(row({ overageEnabled: true }), true, now)).toMatchObject({
       overage: true,
     });
     expect(
       teamQuota(row({ plan: "scale", planQuota: 1_650_000, overageEnabled: true }), true, now),
-    ).toMatchObject({ included: 1_650_000, overageCentsPer1k: 18, overage: true });
+    ).toMatchObject({ included: 1_650_000, overageCentsPer1k: 22, overage: true });
     expect(teamQuota(row({ planQuota: 220_000 }), true, now)).toMatchObject({
       included: 220_000,
-      overageCentsPer1k: 35,
+      overageCentsPer1k: 28,
     });
     expect(teamQuota(row({ plan: "scale", planQuota: 1_100_000 }), true, now)).toMatchObject({
       included: 1_100_000,
@@ -266,7 +266,7 @@ describe("teamQuota", () => {
     });
     expect(teamQuota(row({ plan: "scale", planQuota: 2_750_000 }), true, now)).toMatchObject({
       included: 2_750_000,
-      overageCentsPer1k: 16,
+      overageCentsPer1k: 21,
     });
     // A monthly row written before rungs existed sits on the plan's first rung.
     expect(teamQuota(row({ plan: "scale", planQuota: null }), true, now)).toMatchObject({

@@ -81,12 +81,12 @@ export function formatVolume(n: number): string {
 /** Monthly price in cents per plan rung key. */
 export const RUNG_PRICE_CENTS: Record<string, number> = {
   starter: 900,
-  pro_100k: 2_000,
-  pro_200k: 3_500,
-  scale_500k: 7_500,
-  scale_1m: 14_000,
-  scale_1_5m: 20_000,
-  scale_2_5m: 33_000,
+  pro_100k: 2000,
+  pro_200k: 3900,
+  scale_500k: 9500,
+  scale_1m: 17900,
+  scale_1_5m: 26500,
+  scale_2_5m: 42900,
 };
 
 /** Emails per day on the daily-capped plans. */

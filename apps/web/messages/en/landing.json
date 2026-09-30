@@ -129,7 +129,7 @@
     "featuredBadge": "For growth",
     "showScale": "More volumes: Pro 220K and Scale",
     "choiceTitle": "Pro 110K or Pro 220K?",
-    "choiceBody": "Pro 110K is US$20/month, plus US$0.90 per extra 1,000 emails when overage is enabled. At 220,000 emails, that is US$119 versus US$100 on Pro 220K, which includes that volume. Above 220K, its overage is US$0.35/1,000. Choose 110K for lower volume; consider 220K as your sending approaches 200K. Extra usage is rounded up to blocks of 1,000. Without overage enabled, Pro 110K stops at 110,000. Monthly USD prices, before taxes.",
+    "choiceBody": "Pro 110K is US$20/month, plus US$0.30 per extra 1,000 emails when overage is enabled. At 220,000 emails, that is US$53 versus US$39 on Pro 220K, which includes that volume. Above 220K, Pro 220K adds US$0.28/1,000. Compare both plans at your expected volume; extra usage on each is rounded up to blocks of 1,000. Without overage enabled, Pro 110K stops at 110,000. Monthly USD prices, before taxes.",
     "ctaNote": "Create your free account first. Choose your plan in the dashboard.",
     "items": [
       {
@@ -149,14 +149,14 @@
       {
         "volume": "110,000/month",
         "limits": "25 domains · 10 workspaces · unlimited contacts",
-        "overage": "US$ 0.90/1k",
+        "overage": "US$ 0.30/1k",
         "attachment": "5 MB",
         "cta": "Start with Pro 110K"
       },
       {
         "volume": "220,000/month",
         "limits": "25 domains · 10 workspaces · unlimited contacts",
-        "overage": "US$ 0.35/1k",
+        "overage": "US$ 0.28/1k",
         "attachment": "5 MB",
         "cta": "Start with Pro 220K"
       },
@@ -177,14 +177,14 @@
       {
         "volume": "1,650,000/month",
         "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
-        "overage": "US$ 0.18/1k",
+        "overage": "US$ 0.22/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 1.65M"
       },
       {
         "volume": "2,750,000/month",
         "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
-        "overage": "US$ 0.16/1k",
+        "overage": "US$ 0.21/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 2.75M"
       }

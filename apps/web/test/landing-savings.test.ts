@@ -9,20 +9,20 @@ import { computeSavings, savingsForIndex } from "../src/lib/landing-savings";
 // "US$ 1.265").
 const EN_TABLE = [
   ["110k", "US$ 20", "US$ 44", "US$ 43.95", "US$ 115", "US$ 86", "54%"],
-  ["220k", "US$ 100", "US$ 143", "US$ 142.95", "US$ 245", "US$ 207", "30%"],
-  ["550k", "US$ 199", "US$ 385", "US$ 439.95", "US$ 455", "US$ 437.50", "48%"],
-  ["1.1M", "US$ 319", "US$ 715", "US$ 799", "US$ 775", "US$ 750", "55%"],
-  ["1.65M", "US$ 429", "US$ 903", "US$ 889", "US$ 1,037.50", "US$ 1,025", "52%"],
-  ["2.75M", "US$ 549", "US$ 1,265", "US$ 1,224", "US$ 2,962.50", "US$ 1,350", "55%"],
+  ["220k", "US$ 39", "US$ 143", "US$ 142.95", "US$ 245", "US$ 207", "73%"],
+  ["550k", "US$ 95", "US$ 385", "US$ 439.95", "US$ 455", "US$ 437.50", "75%"],
+  ["1.1M", "US$ 179", "US$ 715", "US$ 799", "US$ 775", "US$ 750", "75%"],
+  ["1.65M", "US$ 265", "US$ 903", "US$ 889", "US$ 1,037.50", "US$ 1,025", "70%"],
+  ["2.75M", "US$ 429", "US$ 1,265", "US$ 1,224", "US$ 2,962.50", "US$ 1,350", "65%"],
 ] as const;
 
 const PT_TABLE = [
   ["110k", "US$ 20", "US$ 44", "US$ 43,95", "US$ 115", "US$ 86", "54%"],
-  ["220k", "US$ 100", "US$ 143", "US$ 142,95", "US$ 245", "US$ 207", "30%"],
-  ["550k", "US$ 199", "US$ 385", "US$ 439,95", "US$ 455", "US$ 437,50", "48%"],
-  ["1,1M", "US$ 319", "US$ 715", "US$ 799", "US$ 775", "US$ 750", "55%"],
-  ["1,65M", "US$ 429", "US$ 903", "US$ 889", "US$ 1.037,50", "US$ 1.025", "52%"],
-  ["2,75M", "US$ 549", "US$ 1.265", "US$ 1.224", "US$ 2.962,50", "US$ 1.350", "55%"],
+  ["220k", "US$ 39", "US$ 143", "US$ 142,95", "US$ 245", "US$ 207", "73%"],
+  ["550k", "US$ 95", "US$ 385", "US$ 439,95", "US$ 455", "US$ 437,50", "75%"],
+  ["1,1M", "US$ 179", "US$ 715", "US$ 799", "US$ 775", "US$ 750", "75%"],
+  ["1,65M", "US$ 265", "US$ 903", "US$ 889", "US$ 1.037,50", "US$ 1.025", "70%"],
+  ["2,75M", "US$ 429", "US$ 1.265", "US$ 1.224", "US$ 2.962,50", "US$ 1.350", "65%"],
 ] as const;
 
 // TS-safe accessor so the tests never need the non-null assertion operator.
@@ -124,7 +124,7 @@ describe("computeSavings", () => {
 
     const top = computeSavings(priceRow(5));
     expect(top.competitor.name).toBe("SendGrid"); // US$ 1,224 < US$ 1,265 (Resend)
-    expect(top.savingsPct).toBe(55);
+    expect(top.savingsPct).toBe(65);
   });
 
   it("skips a row whose cheapest competitor is a quote without a price", () => {
@@ -137,8 +137,8 @@ describe("computeSavings", () => {
   it("resolves every index the calculator can reach", () => {
     for (let index = 0; index < PRICE_ROWS.length; index += 1) {
       const savings = savingsForIndex(index);
-      // 30% is the 220K floor: the weakest rung of the ladder, published as is.
-      expect(savings.savingsPct).toBeGreaterThanOrEqual(30);
+      // O piso deriva do catálogo aprovado e da base concorrente preservada.
+      expect(savings.savingsPct).toBeGreaterThanOrEqual(54);
       expect(savings.savingsUsd).toBeGreaterThan(0);
     }
   });

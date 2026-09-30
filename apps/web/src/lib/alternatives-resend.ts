@@ -9,9 +9,9 @@ import { PRICE_ROWS, type PriceRow } from "./landing-pricing";
  * PRICE_ROWS — the same numbers the landing table renders — and every saving is
  * computed, never typed, so no cell can drift from the data.
  *
- * The headline claim ("up to 60% cheaper") is anchored on the most expensive
+ * The headline claim ("up to 78% cheaper") is anchored on the most expensive
  * publicly priced rung of the market (SendGrid), NOT on Resend: against Resend
- * the maximum is 57% at 2.75M. Both numbers are exported here so the page states
+ * the maximum is 75% at 550K/1.1M. Both numbers are exported here so the page states
  * them from the data instead of restating them by hand.
  */
 
@@ -54,13 +54,13 @@ function sendgridSavingsPct(row: PriceRow): number {
 
 const RESEND_SAVINGS_PCT = RESEND_ROWS.map((row) => resendSavings(row).pct);
 
-/** Ceiling of the claim against Resend — 57% on the top rung. */
+/** Ceiling of the claim against Resend — 75%. */
 export const MAX_RESEND_SAVINGS_PCT = Math.max(...RESEND_SAVINGS_PCT);
 
-/** Floor of the savings shown in the comparison table — 30% at 220K. */
+/** Floor of the savings shown in the comparison table — 55% at 110K. */
 export const MIN_RESEND_SAVINGS_PCT = Math.min(...RESEND_SAVINGS_PCT);
 
-/** Ceiling against the most expensive published market price — 60% (SendGrid). */
+/** Ceiling against the most expensive published market price — 78% (SendGrid). */
 export const MAX_MARKET_SAVINGS_PCT = PRICE_ROWS.reduce(
   (max, row) => Math.max(max, sendgridSavingsPct(row)),
   0,

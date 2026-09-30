@@ -121,7 +121,7 @@
     "featuredBadge": "Para crescer",
     "showScale": "Mais volumes: Pro 220K e Scale",
     "choiceTitle": "Pro 110K ou Pro 220K?",
-    "choiceBody": "O Pro 110K custa US$20/mês, mais US$0,90 por 1.000 e-mails extras com excedente habilitado. Para 220.000 e-mails, são US$119 contra US$100 no Pro 220K, que já inclui esse volume. Acima de 220K, o excedente dele custa US$0,35/1.000. Escolha 110K para volumes menores; considere 220K ao se aproximar de 200K envios. O excedente é arredondado para cima em blocos de 1.000. Sem excedente habilitado, o Pro 110K para em 110.000. Valores mensais em USD, sem impostos.",
+    "choiceBody": "O Pro 110K custa US$20/mês, mais US$0,30 por 1.000 e-mails extras com excedente habilitado. Para 220.000 e-mails, são US$53 contra US$39 no Pro 220K, que já inclui esse volume. Acima de 220K, o Pro 220K adiciona US$0,28/1.000. Compare os dois planos no volume esperado; o excedente de cada um é arredondado para cima em blocos de 1.000. Sem excedente habilitado, o Pro 110K para em 110.000. Valores mensais em USD, sem impostos.",
     "ctaNote": "Crie sua conta grátis. Depois, escolha seu plano no painel.",
     "items": [
       {
@@ -141,14 +141,14 @@
       {
         "volume": "110.000/mês",
         "limits": "25 domínios · 10 workspaces · contatos ilimitados",
-        "overage": "US$ 0,90/1k",
+        "overage": "US$ 0,30/1k",
         "attachment": "5 MB",
         "cta": "Começar no Pro 110K"
       },
       {
         "volume": "220.000/mês",
         "limits": "25 domínios · 10 workspaces · contatos ilimitados",
-        "overage": "US$ 0,35/1k",
+        "overage": "US$ 0,28/1k",
         "attachment": "5 MB",
         "cta": "Começar no Pro 220K"
       },
@@ -169,14 +169,14 @@
       {
         "volume": "1.650.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "US$ 0,18/1k",
+        "overage": "US$ 0,22/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 1.65M"
       },
       {
         "volume": "2.750.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "US$ 0,16/1k",
+        "overage": "US$ 0,21/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 2.75M"
       }

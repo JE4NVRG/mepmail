@@ -141,7 +141,7 @@ describe("priceMetadata", () => {
       plan: "pro",
       included_emails: "110000",
       period: "month",
-      overage_cents_per_1k: "90",
+      overage_cents_per_1k: "30",
     });
     expect(priceMetadata(rungByKey("starter"))).toEqual({
       millionsend_rung: "starter",

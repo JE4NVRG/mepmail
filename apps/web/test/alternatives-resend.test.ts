@@ -14,8 +14,8 @@ import { formatUsd, formatVolume, PRICE_ROWS } from "../src/lib/landing-pricing"
 // plus its published overage where that is cheaper than the next rung up. The
 // exact column /alternatives/resend publishes.
 const RESEND_PUBLIC = [44, 143, 385, 715, 903, 1265];
-const ADVANTAGE_PCT = [55, 30, 48, 55, 52, 57];
-const ADVANTAGE_USD = ["US$ 24", "US$ 43", "US$ 186", "US$ 396", "US$ 474", "US$ 716"];
+const ADVANTAGE_PCT = [55, 73, 75, 75, 71, 66];
+const ADVANTAGE_USD = ["US$ 24", "US$ 104", "US$ 290", "US$ 536", "US$ 638", "US$ 836"];
 
 describe("Resend comparison data", () => {
   it("publishes Resend's public prices, volume by volume", () => {
@@ -62,17 +62,17 @@ describe("Resend comparison data", () => {
     }
   });
 
-  it("caps the Resend claim at 57% and the floor at 30%", () => {
-    expect(MAX_RESEND_SAVINGS_PCT).toBe(57);
-    expect(MIN_RESEND_SAVINGS_PCT).toBe(30);
+  it("caps the Resend claim at 75% and the floor at 55%", () => {
+    expect(MAX_RESEND_SAVINGS_PCT).toBe(75);
+    expect(MIN_RESEND_SAVINGS_PCT).toBe(55);
   });
 
   it("anchors the headline claim on the most expensive public rung", () => {
-    // 60% is SendGrid's 1.5M rung (US$ 799) against Scale 1.1M (US$ 319) — never
+    // 78% compara SendGrid (US$ 799) ao Scale 1.1M (US$ 179); não é
     // a Resend comparison, which the page says out loud.
-    expect(MAX_MARKET_SAVINGS_PCT).toBe(60);
+    expect(MAX_MARKET_SAVINGS_PCT).toBe(78);
     expect(formatVolume(CLAIM_ANCHOR_ROW.volume, "en")).toBe("1.1M");
     expect(CLAIM_ANCHOR_ROW.sendgrid).toBe(799);
-    expect(CLAIM_ANCHOR_ROW.mepmail).toBe(319);
+    expect(CLAIM_ANCHOR_ROW.mepmail).toBe(179);
   });
 });
