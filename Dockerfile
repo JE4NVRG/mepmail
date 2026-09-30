@@ -19,7 +19,8 @@ RUN pnpm --filter @millionsend/docs build
 # prune --prod` is not workspace-aware — it empties the packages' own
 # node_modules — and a re-link over the existing tree keeps the orphans.)
 RUN rm -rf apps/*/.next/cache node_modules apps/*/node_modules packages/*/node_modules \
-  && CI=true pnpm install --prod --frozen-lockfile --offline
+  && CI=true pnpm install --prod --frozen-lockfile --offline \
+  && node scripts/prune-runtime-tooling.mjs
 
 # The runtime keeps the full workspace (source + node_modules): api and worker
 # run TypeScript directly via tsx (which resolves NodeNext ".js" specifiers to
