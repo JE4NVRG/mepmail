@@ -16,7 +16,8 @@ export function AuthArt() {
   const [reduced, setReduced] = useState(true);
   const [visible, setVisible] = useState(false);
   const [inView, setInView] = useState(false);
-  const [manualPause, setManualPause] = useState(false);
+  const manualPause = useRef(false);
+  const playAttempt = useRef(0);
   const [playing, setPlaying] = useState(false);
   const [failed, setFailed] = useState(false);
   const enabled = desktop && !reduced && !failed;
@@ -53,35 +54,39 @@ export function AuthArt() {
       setPlaying(false);
       return;
     }
-    let cancelled = false;
-    if (canPlay && !manualPause) {
+    const attempt = ++playAttempt.current;
+    if (canPlay && !manualPause.current) {
       video.play().catch(() => {
-        if (!cancelled) {
+        if (attempt === playAttempt.current) {
           setPlaying(false);
-          setManualPause(true);
+          manualPause.current = true;
         }
       });
     } else {
       video.pause();
     }
     return () => {
-      cancelled = true;
+      ++playAttempt.current;
       video.pause();
     };
-  }, [canPlay, manualPause]);
+  }, [canPlay]);
 
   function togglePlayback() {
     const video = videoRef.current;
     if (!video) return;
+    const attempt = ++playAttempt.current;
     if (playing) {
-      setManualPause(true);
+      manualPause.current = true;
       video.pause();
     } else if (canPlay) {
-      setManualPause(false);
+      manualPause.current = false;
       // Chamada no gesto do usuário também atende navegadores que negam autoplay.
+      // A intenção manual não reinicia o efeito; rejeições antigas não a sobrescrevem.
       video.play().catch(() => {
-        setPlaying(false);
-        setManualPause(true);
+        if (attempt === playAttempt.current) {
+          setPlaying(false);
+          manualPause.current = true;
+        }
       });
     }
   }

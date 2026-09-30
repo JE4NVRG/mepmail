@@ -22,9 +22,9 @@ vi.mock("react", async (original) => ({
       },
     ];
   },
-  useRef: () => {
+  useRef: (initial: unknown) => {
     const index = h.cursor++;
-    if (!(index in h.slots)) h.slots[index] = { current: null };
+    if (!(index in h.slots)) h.slots[index] = { current: initial };
     return h.slots[index];
   },
   useEffect: (effect: () => undefined | (() => void), deps: unknown[]) => {
@@ -88,6 +88,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.slots = [];
   h.pending = [];
+  h.video.pause.mockReset();
   h.video.play.mockResolvedValue(undefined);
   desktop = { matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() };
   reduce = { matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() };
@@ -183,6 +184,55 @@ describe("auth illustration: synthetic state harness", () => {
     update();
     settle();
     expect(h.video.play).toHaveBeenCalled();
+  });
+  it("one gesture after denied autoplay does not abort pending native playback", async () => {
+    h.video.play.mockRejectedValueOnce(new Error("NotAllowedError"));
+    settle();
+    await Promise.resolve();
+    const tree = settle();
+    let resolvePlay!: () => void;
+    let rejectPlay!: (error: Error) => void;
+    h.video.play.mockImplementation(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          resolvePlay = resolve;
+          rejectPlay = reject;
+        }),
+    );
+    h.video.pause.mockImplementation(() => rejectPlay?.(new Error("AbortError")));
+    h.video.play.mockClear();
+    h.video.pause.mockClear();
+    event(button(tree), "onClick");
+    settle();
+    expect(h.video.play).toHaveBeenCalledTimes(1);
+    expect(h.video.pause).not.toHaveBeenCalled();
+    resolvePlay();
+    await Promise.resolve();
+    event(video(render()), "onPlaying");
+    expect(button(settle()).props.children).toContain("pauseAnimation");
+  });
+  it("obsolete rejection cannot override a newer gesture across visibility changes", async () => {
+    let rejectOld!: (error: Error) => void;
+    h.video.play.mockImplementationOnce(
+      () =>
+        new Promise<void>((_, reject) => {
+          rejectOld = reject;
+        }),
+    );
+    const tree = settle();
+    event(button(tree), "onClick");
+    settle();
+    rejectOld(new Error("AbortError"));
+    await Promise.resolve();
+    settle();
+    h.video.play.mockClear();
+    visibility = "hidden";
+    update();
+    settle();
+    visibility = "visible";
+    update();
+    settle();
+    expect(h.video.play).toHaveBeenCalledTimes(1);
   });
   it("denied autoplay is caught; retry is a user gesture; media failure keeps poster", async () => {
     h.video.play.mockRejectedValue(new Error("NotAllowedError"));
