@@ -460,9 +460,12 @@ describe("handleWebhook", () => {
       plan: "free",
       planQuota: null,
       planStatus: "none",
-      stripeSubscriptionId: null,
+      stripeSubscriptionId: "sub_1",
       currentPeriodStart: null,
     });
+    expect(
+      (await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)))[0]?.billingTerms,
+    ).toBeNull();
     expect((await db.select().from(schema.stripeEvents)).length).toBe(3);
   });
 

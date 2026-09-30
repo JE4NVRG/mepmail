@@ -106,16 +106,18 @@ describe("GET /usage", () => {
       .set({ plan: "pro", planQuota: 110_000, currentPeriodStart: start, currentPeriodEnd: end })
       .where(eq(schema.teams.id, teamId));
     await db.insert(schema.usagePeriods).values({ teamId, periodStart: start, accepted: 42 });
-    expect(await (await get(cloud)).json()).toMatchObject({
-      plan: "pro",
-      limits: { emails_per_day: null, emails_per_month: 110_000, domains: 25, contacts: null },
-      period: {
-        emails_sent: 42,
-        included: 110_000,
-        overage_enabled: true,
-        overage_usd_per_1k: null,
-        starts_at: start.toISOString(),
-        ends_at: end.toISOString(),
+    const res = await get(cloud);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      name: "billing_terms_unavailable",
+      usage: {
+        period: {
+          emails_sent: 42,
+          included: 110_000,
+          overage_enabled: true,
+          starts_at: start.toISOString(),
+          ends_at: end.toISOString(),
+        },
       },
     });
     await db

@@ -882,12 +882,48 @@ describe("REST parity tools", () => {
       enqueueEmailSend: async () => {},
     });
     const client = await connect(await mintToken({ scope: "emails:read" }), cloud);
-    expect(resultJson(await client.callTool({ name: "get_usage", arguments: {} }))).toMatchObject({
+    const missing = await client.callTool({ name: "get_usage", arguments: {} });
+    expect(missing.isError).toBe(true);
+    expect(resultJson(missing)).toMatchObject({
+      name: "billing_terms_unavailable",
+      usage: { period: { emails_sent: 4321, included: 110000 } },
+    });
+    await db
+      .update(schema.teams)
+      .set({
+        planStatus: "active",
+        stripeCustomerId: "cus_mcp",
+        stripeSubscriptionId: "sub_mcp",
+        stripeOverageItemId: "si_mcp_overage",
+        billingTerms: {
+          version: 1,
+          teamId,
+          customerId: "cus_mcp",
+          subscriptionId: "sub_mcp",
+          baseItemId: "si_mcp",
+          basePriceId: "price_base_mcp",
+          overageItemId: "si_mcp_overage",
+          overagePriceId: "price_overage_mcp",
+          currency: "usd",
+          centsPerBlock: 90,
+          blockSize: 1000,
+          rounding: "up",
+          included: 110000,
+          periodStart: start.toISOString(),
+          periodEnd: end.toISOString(),
+          verifiedAt: new Date().toISOString(),
+        },
+      })
+      .where(eq(schema.teams.id, teamId));
+    const verified = await client.callTool({ name: "get_usage", arguments: {} });
+    expect(verified.isError).toBeFalsy();
+    expect(resultJson(verified)).toMatchObject({
       cloud: true,
       plan: "pro",
       limits: { emails_per_day: null, emails_per_month: 110_000, domains: 25, contacts: null },
       period: {
         emails_sent: 4321,
+        overage_usd_per_1k: 0.9,
         included: 110_000,
         overage_enabled: true,
         starts_at: start.toISOString(),

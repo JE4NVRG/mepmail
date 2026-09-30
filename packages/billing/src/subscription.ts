@@ -64,6 +64,7 @@ export async function applySubscription(
           plan: schema.teams.plan,
           planQuota: schema.teams.planQuota,
           stripeSubscriptionId: schema.teams.stripeSubscriptionId,
+          stripeSubscriptionCreated: schema.teams.stripeSubscriptionCreated,
           stripeOverageItemId: schema.teams.stripeOverageItemId,
         })
         .from(schema.teams)
@@ -80,6 +81,15 @@ export async function applySubscription(
     return;
   }
 
+  if (
+    (team.stripeSubscriptionId || team.stripeSubscriptionCreated !== null) &&
+    team.stripeSubscriptionId !== sub.id &&
+    (!Number.isSafeInteger(sub.created) ||
+      team.stripeSubscriptionCreated === null ||
+      sub.created <= team.stripeSubscriptionCreated)
+  )
+    return;
+
   const entitled = sub.status === "active" || sub.status === "trialing";
   // A superseded subscription ending must not revoke what the team's
   // current subscription grants: events about different subscriptions
@@ -95,6 +105,16 @@ export async function applySubscription(
     rung = rungFromSubscription(sub);
     if (!rung) {
       log(`subscription ${sub.id} has no known plan price`);
+      await tx
+        .update(schema.teams)
+        .set({
+          billingTerms: null,
+          stripeSubscriptionId: sub.id,
+          stripeSubscriptionCreated: Number.isSafeInteger(sub.created)
+            ? sub.created
+            : team.stripeSubscriptionCreated,
+        })
+        .where(eq(schema.teams.id, team.id));
       return;
     }
     plan = rung.plan;
@@ -139,9 +159,63 @@ export async function applySubscription(
   if (stripe && team.stripeOverageItemId && overageItemId === null) {
     await reportOverage({ db: tx, stripe, log }, { teamId: team.id });
   }
+  const resolved = rungFromSubscription({
+    ...sub,
+    items: {
+      ...sub.items,
+      data: [base, overage].filter((i): i is Stripe.SubscriptionItem => i !== null),
+    },
+  });
+  const included = Number(base?.price.metadata?.included_emails);
+  const start = stamp(base?.current_period_start);
+  const end = stamp(base?.current_period_end);
+  const valid =
+    (entitled || sub.status === "past_due") &&
+    base &&
+    overage &&
+    sub.items.data.length === 2 &&
+    base.quantity === 1 &&
+    base.price.recurring?.interval === "month" &&
+    (base.price.recurring.interval_count ?? 1) === 1 &&
+    (overage.price.recurring?.interval_count ?? 1) === 1 &&
+    Number.isSafeInteger(included) &&
+    included > 0 &&
+    included === planQuota &&
+    resolved?.overageCentsPer1k !== null &&
+    resolved?.overageCentsPer1k !== undefined &&
+    start &&
+    end &&
+    start < end &&
+    overage.current_period_start === base.current_period_start &&
+    overage.current_period_end === base.current_period_end;
+  const billingTerms: typeof schema.teams.$inferInsert.billingTerms =
+    valid && overage
+      ? {
+          version: 1,
+          teamId: team.id,
+          customerId: customerId as string,
+          subscriptionId: sub.id,
+          baseItemId: base.id,
+          basePriceId: base.price.id,
+          overageItemId: overage.id,
+          overagePriceId: overage.price.id,
+          currency: "usd",
+          centsPerBlock: resolved.overageCentsPer1k as number,
+          blockSize: 1000,
+          rounding: "up",
+          included,
+          periodStart: start.toISOString(),
+          periodEnd: end.toISOString(),
+          verifiedAt: new Date().toISOString(),
+        }
+      : null;
   await tx
     .update(schema.teams)
     .set({
+      billingTerms,
+      stripeSubscriptionCreated: Number.isSafeInteger(sub.created)
+        ? sub.created
+        : team.stripeSubscriptionCreated,
       plan,
       planQuota,
       planStatus: planStatusOf(sub.status),
@@ -384,6 +458,7 @@ export async function cancelTeamSubscription(deps: BillingDeps, teamId: string):
       planQuota: null,
       planStatus: "canceled",
       stripeSubscriptionId: null,
+      billingTerms: null,
       stripeOverageItemId: null,
       overageEnabled: false,
       pendingRung: null,

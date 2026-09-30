@@ -1,0 +1,13 @@
+# /usage: termos duráveis (delta local t_e07c19a6)
+
+Decisão aprovada: snapshot aditivo em teams, sem Stripe no GET e sem catálogo como contrato. Esta extensão local da constitution não autoriza banco/Stripe reais, provisão, publicação ou mudança comercial.
+
+Fonte: assinatura relida dentro do lock transacional do customer, pelos writers existentes (webhook, reconciliação e mudança de plano). Persistir tenant/customer/subscription, criação da assinatura, item/Price base e medido, moeda USD, centavos inteiros por bloco de 1000 arredondado para cima, quota e período verificados, momento da observação. Prices arquivados são válidos; lookup não é condição. Rejeitar múltiplos itens, quota sem metadado verificável, transform incompatível ou termos não resolvidos. A taxa vem exclusivamente do Price medido.
+
+Estados: ausente (null, precisa de cobertura); verificado (snapshot compatível com vínculo/quota/período da linha); inválido (snapshot removido por cancelamento, item ausente ou incompatibilidade); obsoleto (período/vínculo já não coincide). Falha temporária de leitura Stripe aborta a transação: não apaga snapshot. Período expirado não autoriza prometer tarifa da renovação. Nenhuma lacuna vira zero ou catálogo.
+
+Ordenação: ledger existente deduplica evento; lock é adquirido ANTES de reler Stripe, não se aplica payload antigo. Assinatura diferente mais antiga que a criação já persistida não substitui a atual; empate/ausência de ordenação verificável não substitui vínculo existente. Reconciliação usa a mesma aplicação. Sem novo serviço ou ledger.
+
+Wire: sucesso 200 restaura overage_usd_per_1k numérico. Exceção localizada: mensal sem termos válidos retorna 409 billing_terms_unavailable, contendo contadores diários e mensais, quota e datas (sem taxa inventada). Free/Starter/self-host/system continuam 200. Não introduzir versão nullable. Isso não promete cobertura universal: publicação bloqueada até inventário real e reconciliação autorizada mostrarem cobertura integral dos contratos suportados e exceções aceitas.
+
+Implantação futura (NÃO executar agora): revisar/aplicar migration aditiva pelo pipeline existente; inventariar mensalidades sem snapshot e casos incompatíveis em leitura autorizada; reconciliar explicitamente cada tenant com o fluxo existente após autorização financeira separada (esse fluxo existente pode escrever no Stripe). Nenhum backfill automático nesta migration e nenhum comando novo com apply implícito. Validar cobertura e consumidor antigo antes de liberar API. Rollback de código preserva coluna e snapshots; não remover dados nem reverter preço. Gates: API in-process/PGlite e fixtures Stripe offline no Windows existente; não são E2E Stripe real. Preview inalterado.

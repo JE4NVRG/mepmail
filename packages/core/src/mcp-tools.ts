@@ -50,7 +50,7 @@ export const MCP_TOOLS: {
     scope: "emails:read",
     readOnly: true,
     description:
-      "Get the team's plan and quota picture before bulk work: effective plan, its send limit (emails_per_day on Free and Starter, emails_per_month on Pro and Scale), domain limit and contact limit (`limits.contacts`, null when unlimited), emails accepted so far today (UTC) and when that counter resets, and on a monthly plan a `period` object with the billing period's emails_sent, included volume, whether overage is on and when the period ends. A self-hosted instance reports cloud=false with null plan, limits and period; the instance's own (system) team reports cloud=true with the same nulls.",
+      "Get the team's plan and quota picture before bulk work (monthly terms unavailable: billing_terms_unavailable error with counters under usage, never assume free overage): effective plan, its send limit (emails_per_day on Free and Starter, emails_per_month on Pro and Scale), domain limit and contact limit (`limits.contacts`, null when unlimited), emails accepted so far today (UTC) and when that counter resets, and on a monthly plan a `period` object with the billing period's emails_sent, included volume, whether overage is on and when the period ends. A self-hosted instance reports cloud=false with null plan, limits and period; the instance's own (system) team reports cloud=true with the same nulls.",
   },
   {
     name: "list_contacts",

@@ -30,7 +30,7 @@ mostra a mesma frase.
 | `scale_1_5m` | Scale | US$ 265 | 1.650.000 | por mês | US$ 0,22 |
 | `scale_2_5m` | Scale | US$ 429 | 2.750.000 | por mês | US$ 0,21 |
 
-Os preços do catálogo atual valem para novas contratações, não automaticamente para assinaturas existentes. Billing resolve a mensalidade e taxa efetivas pelos itens reais do Stripe, inclusive preços arquivados. Taxas desconhecidas ou incompatíveis ocultam a estimativa, sem substituição pela tabela nova. A API de uso retorna `overage_usd_per_1k: null` quando a taxa efetiva não está resolvida. Não requer migração de banco. Alterar o catálogo não migra assinaturas existentes.
+Os preços do catálogo atual valem para novas contratações, não automaticamente para assinaturas existentes. Billing resolve a mensalidade e taxa efetivas pelos itens reais do Stripe, inclusive preços arquivados. Taxas desconhecidas ou incompatíveis ocultam a estimativa, sem substituição pela tabela nova. A API de uso retorna `overage_usd_per_1k` numérico pelos termos duráveis verificados da assinatura, sem consultar Stripe por requisição. Termos mensais ausentes, incompatíveis ou fora do período verificado retornam HTTP 409 `billing_terms_unavailable`; contadores diários e mensais continuam em `usage.today` e `usage.period` dessa resposta. Não há fallback para null, zero ou catálogo. Exige migração aditiva de banco e reconciliação de cobertura autorizada separadamente antes da publicação. Alterar o catálogo não migra assinaturas existentes.
 
 A escada é `PLAN_RUNGS` em `packages/core/src/plans.ts`; Checkout, painel,
 `GET /usage` e os e-mails de conta leem tudo de lá. O relatório de migração da
@@ -163,7 +163,7 @@ não medido da assinatura nomeia o degrau, nesta ordem:
 
 | Status da assinatura rebuscada | `plan`, `plan_quota` | `plan_status` |
 | --- | --- | --- |
-| `active`, `trialing` | O plano e o volume incluído do degrau (`plan_quota` é nulo num degrau diário). Preço desconhecido: registrado em log, nada muda. | o mesmo |
+| `active`, `trialing` | O plano e o volume incluído do degrau (`plan_quota` é nulo num degrau diário). Preço desconhecido: registrado em log, direito ao plano inalterado; snapshot contratual invalidado e identidade da assinatura preservada para ordenação. | o mesmo |
 | `past_due` | Inalterado (carência de pagamento; o Stripe continua tentando) | `past_due` |
 | `unpaid`, `canceled`, `incomplete`, `incomplete_expired`, qualquer outro | `free`, nulo | `unpaid` / `canceled` / `incomplete` / `canceled` |
 

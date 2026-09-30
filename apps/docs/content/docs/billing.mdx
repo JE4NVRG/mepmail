@@ -28,7 +28,7 @@ and the dashboard shows the same sentence.
 | `scale_1_5m` | Scale | $265 | 1,650,000 | per month | $0.22 |
 | `scale_2_5m` | Scale | $429 | 2,750,000 | per month | $0.21 |
 
-Current catalog prices apply to new purchases, not automatically to existing subscriptions. Billing resolves the subscribed base amount and metered rate from the actual Stripe price items, including archived prices. Unknown or incompatible rates hide the estimate; they are never replaced with the current catalog. The usage API returns `overage_usd_per_1k: null` when the effective rate is unresolved. No database migration is required. Existing subscriptions are not migrated by a catalog edit.
+Current catalog prices apply to new purchases, not automatically to existing subscriptions. Billing resolves the subscribed base amount and metered rate from the actual Stripe price items, including archived prices. Unknown or incompatible rates hide the estimate; they are never replaced with the current catalog. The usage API returns numeric `overage_usd_per_1k` from durable verified subscription terms, without reading Stripe per request. Monthly terms that are missing, incompatible or outside their verified period return HTTP 409 `billing_terms_unavailable`; daily and monthly counters remain in `usage.today` and `usage.period` of that response. No null/zero/catalog fallback is used. This requires an additive database migration and separately authorized coverage reconciliation before release. Existing subscriptions are not migrated by a catalog edit.
 
 The ladder is `PLAN_RUNGS` in `packages/core/src/plans.ts`; Checkout, the
 dashboard, `GET /usage` and the account mails all read it from there. The
@@ -158,7 +158,7 @@ The subscription's non-metered item names the rung, tried in this order:
 
 | Re-fetched subscription status | `plan`, `plan_quota` | `plan_status` |
 | --- | --- | --- |
-| `active`, `trialing` | The rung's plan and included volume (`plan_quota` is null on a daily rung). Unknown price: logged, nothing changes. | same |
+| `active`, `trialing` | The rung's plan and included volume (`plan_quota` is null on a daily rung). Unknown price: logged, entitlement unchanged; contract snapshot invalidated and subscription identity retained for ordering. | same |
 | `past_due` | Unchanged (payment grace; Stripe keeps retrying) | `past_due` |
 | `unpaid`, `canceled`, `incomplete`, `incomplete_expired`, anything else | `free`, null | `unpaid` / `canceled` / `incomplete` / `canceled` |
 
