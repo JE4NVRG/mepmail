@@ -1,5 +1,20 @@
 # Correções de confiança e conversão — t_b8f01b8a
 
+## Delta P0 t_e07c19a6 — contrato /usage (diagnóstico; decisão pendente)
+
+Não é correção de produto nem autorização de publicação. A candidata 68239bc3 troca `period.overage_usd_per_1k: number` por `number | null` na mesma rota: quebra de wire para consumidores anteriores. Disponibilidade da taxa é problema distinto: `auth.billing` não contém os termos financeiros, `teams` persiste IDs/quota/período, não a taxa dos itens. Alteração comercial é um terceiro eixo: a tabela nova NÃO muda contratos existentes. Nenhum desses eixos autoriza inferir taxa por quota, devolver zero, esconder o período mensal ou usar catálogo atual como contrato.
+
+Invariante impeditiva: assinaturas com mesma quota podem ter taxas antigas e novas diferentes. Sem fonte adicional de termos contratados, /usage não consegue devolver um número verdadeiro em ambos os casos. ID de assinatura/item não codifica preço. Restaurar apenas `number` no schema ou adicionar opt-in nullable não resolve essa ausência de informação. Não implementar fallback nem 503 generalizado; preservar runtime e interromper para decisão da Luna.
+
+Duas opções, não implementadas:
+
+1. Recomendada: autorizar desenho de um snapshot durável dos termos dos itens efetivos, atualizado por eventos de assinatura e reconciliação controlada, com proveniência (assinatura/Price/moeda/unidade/arredondamento), ordenação/idempotência e política de validade. Exige aprovação separada de persistência/migração/backfill; não criar nesta entrega. Preservar o wire numérico de /usage somente quando a fonte confiável estiver disponível; inventariar e resolver lacunas antes de publicar. Indisponibilidade Stripe não invalida automaticamente snapshot contratual verificado, mas estado ausente/incompatível/invalidado não pode virar número. Cobertura incompleta mantém o gate fechado: não prometer 200 universal nem servir snapshot obsoleto como vigente. Novo contrato nullable apenas em opt-in explicitamente versionado (proposta `/v2/usage`), com OpenAPI separado; nunca alterar silenciosamente o default.
+2. Se a fonte durável não for autorizada: aprovar explicitamente transição incompatível, inventário de consumidores e janela de depreciação/migração para `/v2/usage`, mantendo publicação bloqueada até resolver o comportamento e retirada da rota antiga. V2 pode preservar uso/limites com taxa desconhecida; não é retrocompatibilidade e não corrige a semântica financeira do endpoint antigo. Não existe transição segura imediata garantida só por criar uma segunda rota.
+
+Contrato novo proposto: taxa nullable significa desconhecida, nunca grátis; valores conhecidos vêm dos itens efetivos (inclusive arquivados), não de metadados do catálogo novo. Free/Starter continuam com `period: null` e limites diários; planos mensais preservam contadores, quota e período mesmo sem taxa. MCP deve preservar null; CLI que só usa contadores/limites não demonstra compatibilidade dos demais consumidores. EN/PT e OpenAPI deverão documentar versão/default/depreciação, não apenas nullable. Consumidor representativo antigo deve rejeitar null, o novo deve tratá-lo explicitamente, e controle negativo deve detectar a quebra.
+
+Implantação: nenhuma nesta entrega. A escolha da arquitetura/versão é da Luna; depois exige implementação, testes focais e QA independente `qa`, antes de liberação separada no gate t_0ba7607f. Não publicar a candidata nullable atual nem o build dummy. Tabela aprovada, guards e pilha anterior preservados; sem nova stack, Stripe real, migração, push ou deploy.
+
 ## Delta P0 t_8e779ff9 — tabela aprovada e contratos existentes (antes do código)
 
 Jean aprovou implementação LOCAL: pro_100k 2000/30; pro_200k 3900/28; scale_500k 9500/25; scale_1m 17900/23; scale_1_5m 26500/22; scale_2_5m 42900/21 (mensalidade/excedente por mil em centavos USD). Quotas, chaves, Free, Starter, limites e recursos intactos. Substitui a pendência comercial histórica abaixo; 19c uniforme NÃO aprovado. Comparativos mantêm as bases existentes dos concorrentes. Fórmula: base + taxa * ceil(max(0, volume - quota)/1000), aplicada aos DOIS planos.
