@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "MepMail: Send emails. Keep building.",
-    "description": "Notifications, receipts and campaigns through API, SMTP or AI agents. Manage your sending in one dashboard. Start free, no credit card."
+    "title": "MepMail: Switch your email. Know your costs.",
+    "description": "Compatible sending flows, published pricing and assisted onboarding. Send through API or SMTP and manage your email in one dashboard."
   },
   "skip": "Skip to content",
   "brandAria": "MepMail home",
@@ -25,15 +25,15 @@
     "badge": "Agent-ready"
   },
   "announce": {
-    "text": "Your AI agents send email with the official MepMail MCP"
+    "text": "Switch with compatible sending flows and assisted onboarding"
   },
   "lang": {
     "aria": "Page language"
   },
   "hero": {
-    "eyebrow": "EMAIL FOR PRODUCTS AND AGENTS",
-    "title": "Send emails. Keep building.",
-    "lead": "Notifications, receipts and campaigns through API, SMTP or AI agents. Manage your sending in one dashboard.",
+    "eyebrow": "YOUR EMAIL. CLEAR PRICING.",
+    "title": "Switch your email. Know your costs.",
+    "lead": "Compatible sending flows through API or SMTP, published pricing and hands-on migration support. Keep building with a team to help you get started.",
     "migrate": "Compatible sending flows with the Resend SDK. See the migration guide for differences.",
     "ctaSignup": "Start free",
     "ctaPlans": "Explore the product",
@@ -128,6 +128,8 @@
     "cta": "Start free",
     "featuredBadge": "For growth",
     "showScale": "More volumes: Pro 220K and Scale",
+    "choiceTitle": "Pro 110K or Pro 220K?",
+    "choiceBody": "Pro 110K is US$20/month, plus US$0.90 per extra 1,000 emails when overage is enabled. At 220,000 emails, that is US$119 versus US$100 on Pro 220K, which includes that volume. Above 220K, its overage is US$0.35/1,000. Choose 110K for lower volume; consider 220K as your sending approaches 200K. Extra usage is rounded up to blocks of 1,000. Without overage enabled, Pro 110K stops at 110,000. Monthly USD prices, before taxes.",
     "ctaNote": "Create your free account first. Choose your plan in the dashboard.",
     "items": [
       {

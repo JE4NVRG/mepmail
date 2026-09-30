@@ -12,6 +12,7 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Auth, createAuth } from "@/server/auth";
+import { confirmUpdatesSubscription, requestUpdatesConfirmation } from "@/server/updates";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -84,24 +85,43 @@ describe("enrollment and the sign-up flag", () => {
     expect(sends[0]?.text).toContain("https://docs-mepmail.je4ndev.com");
   });
 
-  it("the cloud enrolls whatever the flag says", async () => {
+  it("cloud signup without explicit opt-in does not enroll", async () => {
     vi.stubEnv("ALLOW_SIGNUP", "false");
     vi.stubEnv("IS_CLOUD", "true");
     await signUp(createAuth(db, seam), "first@example.com");
-    expect(await contactsOf("first@example.com")).toHaveLength(1);
+    expect(await contactsOf("first@example.com")).toHaveLength(0);
   });
 });
 
 describe("accounts as contacts of the account-mail team", () => {
-  it("a sign-up becomes a contact with its name split and its provenance stamped", async () => {
+  it("the verified-user adapter path used by OAuth does not enroll", async () => {
+    const auth = createAuth(db, seam);
+    const context = await auth.$context;
+    await context.internalAdapter.createUser(
+      { email: "social@example.com", name: "Social Test", emailVerified: true },
+      { method: "oauth", oauth: { providerId: "google" } },
+    );
+    expect(await contactsOf("social@example.com")).toEqual([]);
+    expect(sends.map((message) => message.kind)).toEqual(["welcome"]);
+  });
+  it("legacy signup never enrolls; explicit separate confirmation does", async () => {
+    vi.stubEnv("MASTER_ENCRYPTION_KEY", randomBytes(32).toString("base64"));
     await signUp(createAuth(db, seam), "ada@example.com");
+    expect(await contactsOf("ada@example.com")).toEqual([]);
+    await requestUpdatesConfirmation(
+      db,
+      { email: "ada@example.com", source: "updates", locale: "pt-BR" },
+      seam,
+    );
+    expect(await contactsOf("ada@example.com")).toEqual([]);
+    const confirmation = sends.find((message) => message.kind === "updates.confirm");
+    const url = new URL(confirmation?.text.match(/https?:\/\/\S+/)?.[0] ?? "");
+    await confirmUpdatesSubscription(db, url.searchParams.get("token") ?? "", "pt-BR");
     const [contact] = await contactsOf("ada@example.com");
     expect(contact).toMatchObject({
       teamId,
-      firstName: "Ada",
-      lastName: "Lovelace",
       unsubscribed: false,
-      properties: { source: "signup", locale: "pt-BR" },
+      properties: { source: "updates", locale: "pt-BR" },
     });
     expect(contact?.properties.signed_up_at).toMatch(/^\d{4}-/);
     const activities = await db
@@ -136,7 +156,7 @@ describe("accounts as contacts of the account-mail team", () => {
     expect(rows[0]).toMatchObject({ unsubscribed: true, properties: { source: "import" } });
   });
 
-  it("where the instance verifies, a password sign-up enrolls only once the link is opened", async () => {
+  it("account email verification does not imply marketing consent", async () => {
     vi.stubEnv("AWS_ACCESS_KEY_ID", "test-key");
     vi.stubEnv("AWS_SECRET_ACCESS_KEY", "test-secret");
     const sent: SystemMailMessage[] = [];
@@ -148,8 +168,8 @@ describe("accounts as contacts of the account-mail team", () => {
     expect(await contactsOf("ada@example.com")).toHaveLength(0);
     const url = new URL(sent[0]?.text.match(/https?:\/\/\S+/)?.[0] ?? "");
     await auth.api.verifyEmail({ query: { token: url.searchParams.get("token") ?? "" } });
-    expect(await contactsOf("ada@example.com")).toHaveLength(1);
-    expect((await contactsOf("ada@example.com"))[0]?.properties.source).toBe("signup");
+    expect(await contactsOf("ada@example.com")).toHaveLength(0);
+    expect(sent.some((message) => message.kind === "welcome")).toBe(true);
   });
 
   it("deleting the account removes the contact and scrubs the address from the team's log", async () => {
@@ -157,6 +177,9 @@ describe("accounts as contacts of the account-mail team", () => {
       eraseRecipient: (teamId, address) => eraseRecipient(db, teamId, address),
     });
     const { cookie } = await signUp(auth, "ada@example.com");
+    await db
+      .insert(schema.contacts)
+      .values({ teamId, email: "ada@example.com", properties: { source: "updates" } });
     // A logged password reset addressed to the account, as the pipeline leaves it.
     const body = await encryptEmailBody({ html: "<p>x</p>", text: "x" }, keyring);
     const [logged] = await db

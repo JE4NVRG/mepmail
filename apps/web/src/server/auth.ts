@@ -8,7 +8,6 @@ import {
 } from "@millionsend/config";
 import {
   ALL_TEAMS_GRANT,
-  enrollSystemContact,
   findSenderDomainOwner,
   isLoopbackUrl,
   MCP_SCOPES,
@@ -210,17 +209,11 @@ export function createAuth(
   const baseURL = resolveBaseUrl(env.APP_BASE_URL);
   const erase = deps.eraseRecipient ?? enqueueRecipientErase;
   /**
-   * A proven account becomes a contact of the account-mail team. Proven:
-   * the address is verified, or this instance cannot verify anyone (no
-   * sender to send the link) and the account is all there is. An address
-   * merely typed at sign-up may be someone else's inbox, so it waits for
-   * the verification link. Every account the instance admits is welcomed
-   * then; a self-host closed to sign-up has nobody to market to and does not
-   * enroll, while the cloud enrolls whatever the flag says, since it closes
-   * sign-up for reasons of its own. Best-effort: the account exists whatever
-   * happens here.
+   * Boas-vindas transacionais somente após comprovar o endereço quando exigido.
+   * Cadastro e OAuth não são consentimento de marketing: novidades passam
+   * exclusivamente pelo double opt-in existente em /updates.
    */
-  const enrollAccount = async (
+  const welcomeAccount = async (
     user: { email: string; name: string; emailVerified: boolean },
     headers: Headers | undefined,
   ) => {
@@ -230,12 +223,8 @@ export function createAuth(
       if (accountEmailFrom()) {
         sendAccountMail(buildWelcomeEmail({ to: user.email, name: user.name, locale }), mail);
       }
-      if (!signupOpen() && !isCloudDeployment()) return;
-      const owner = await accountMailTeam(db);
-      if (!owner) return;
-      await enrollSystemContact(db, owner.teamId, { email: user.email, name: user.name, locale });
     } catch (error) {
-      console.error("Account-mail contact enrollment failed", error);
+      console.error("Account welcome failed", error);
     }
   };
   /**
@@ -506,7 +495,7 @@ export function createAuth(
             // password, which revokes the registrant's sessions.
             expiresIn: VERIFY_TOKEN_TTL_MINUTES * 60,
             afterEmailVerification: async (user, request) => {
-              await enrollAccount(user, request?.headers);
+              await welcomeAccount(user, request?.headers);
               await trackEmailVerified(user, request?.headers);
             },
           },
@@ -564,12 +553,11 @@ export function createAuth(
           before: async () => {
             await assertSignupAllowed(db, signupOpen());
           },
-          // Runs after the row exists (after the adapter's transaction for a
-          // social first sign-in). Social sign-ins arrive verified and enroll
-          // here; a password sign-up enrolls from afterEmailVerification.
+          // OAuth verificado recebe boas-vindas, nunca inscrição de marketing.
+          // Cadastro por senha aguarda afterEmailVerification quando exigido.
           after: async (user, ctx) => {
             const requestHeaders = ctx?.headers ?? ctx?.request?.headers;
-            await enrollAccount(user, requestHeaders);
+            await welcomeAccount(user, requestHeaders);
             const attribution = await trackSignup(user, requestHeaders);
             // Operator alert, fire-and-forget: it must never slow a sign-up,
             // and it is a no-op on an instance with no alert chat configured.

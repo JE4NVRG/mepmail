@@ -86,6 +86,27 @@
   font-size: 11px;
   line-height: 1.5;
 }
+.updatesChoice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--auth-muted);
+}
+.updatesChoice input {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--ms-violet);
+}
+.updatesChoice input:focus-visible {
+  outline: 2px solid var(--ms-violet);
+  outline-offset: 4px;
+}
 .column {
   width: 100%;
   min-width: 0;

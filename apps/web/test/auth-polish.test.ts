@@ -17,6 +17,7 @@ const h = vi.hoisted(() => ({
   forgot: vi.fn(),
   reset: vi.fn(),
   token: vi.fn(),
+  updates: vi.fn(),
 }));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
@@ -77,6 +78,7 @@ function render(
     providers,
     legal: { termsUrl: null, privacyUrl: null },
     forgotPassword: true,
+    productUpdates: true,
   });
 }
 function input(tree: ReactNode, id: string, value: string) {
@@ -97,6 +99,8 @@ beforeEach(() => {
   h.params = new URLSearchParams();
   h.token.mockResolvedValue(null);
   vi.stubGlobal("requestAnimationFrame", (callback: () => void) => callback());
+  vi.stubGlobal("fetch", h.updates);
+  h.updates.mockResolvedValue({ ok: true });
 });
 
 describe("auth UX: synthetic component state harness", () => {
@@ -140,19 +144,68 @@ describe("auth UX: synthetic component state harness", () => {
     expect(find(tree, (n) => n.props.id === "email").props.value).toBe("preview@example.invalid");
     expect(find(tree, (n) => n.props.id === "password").props.value).toBe("synthetic-test-only");
   });
-  it("signup retains five fields, invite email, eyes and mismatch validation", async () => {
+  it("signup keeps three essential fields, invite, password rules and opt-in off", async () => {
     h.params = new URLSearchParams("email=preview%40example.invalid&next=%2Finvite%2Ftest");
-    let tree = render("signup");
-    expect(nodes(tree).filter((n) => n.type === "input")).toHaveLength(5);
+    const tree = render("signup");
+    expect(
+      nodes(tree).filter((n) => n.type === "input" && n.props.type !== "checkbox"),
+    ).toHaveLength(3);
     expect(
       nodes(tree).filter((n) => n.props["aria-label"] === "auth.signup.showPassword"),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(find(tree, (n) => n.props.id === "email").props.value).toBe("preview@example.invalid");
-    input(tree, "confirm-email", "different@example.invalid");
+    expect(find(tree, (n) => n.props.id === "product-updates").props.checked).toBe(false);
+    expect(find(tree, (n) => n.props.id === "password").props.minLength).toBe(8);
+    h.signup.mockResolvedValue({ data: { token: null }, error: null });
     await submit(render("signup"));
-    tree = render("signup");
-    expect(alert(tree).props.children).toBe("auth.signup.emailMismatch");
-    expect(h.signup).not.toHaveBeenCalled();
+    expect(h.signup).toHaveBeenCalledWith(
+      expect.objectContaining({ callbackURL: "/verify-email?next=%2Finvite%2Ftest" }),
+    );
+    expect(h.updates).not.toHaveBeenCalled();
+  });
+  it("explicit opt-in requests the existing double opt-in only after signup succeeds", async () => {
+    const tree = render("signup");
+    input(tree, "email", "preview@example.invalid");
+    const checkbox = find(tree, (n) => n.props.id === "product-updates");
+    (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: true } });
+    h.signup.mockResolvedValue({ data: { token: null }, error: null });
+    await submit(render("signup"));
+    expect(h.updates).toHaveBeenCalledWith(
+      "/api/updates/subscribe",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ email: "preview@example.invalid", source: "updates" }),
+      }),
+    );
+    expect(
+      nodes(render("signup")).some(
+        (n) =>
+          Array.isArray(n.props.children) &&
+          n.props.children.includes("auth.legal.updatesRequested"),
+      ),
+    ).toBe(true);
+  });
+  it("a failed signup never requests updates even when checked", async () => {
+    const checkbox = find(render("signup"), (n) => n.props.id === "product-updates");
+    (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: true } });
+    h.signup.mockResolvedValue({ error: { code: "MISSING_RESPONSE" } });
+    await submit(render("signup"));
+    expect(h.updates).not.toHaveBeenCalled();
+  });
+  it("updates network failure preserves created account and provides separate retry", async () => {
+    input(render("signup"), "email", "preview@example.invalid");
+    const checkbox = find(render("signup"), (n) => n.props.id === "product-updates");
+    (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: true } });
+    h.signup.mockResolvedValue({ data: { token: null }, error: null });
+    h.updates.mockRejectedValue(new Error("offline"));
+    await submit(render("signup"));
+    expect(nodes(render("signup")).some((n) => n.props.href === "/updates")).toBe(true);
+    expect(
+      nodes(render("signup")).some(
+        (n) =>
+          Array.isArray(n.props.children) && n.props.children.includes("auth.legal.updatesFailed"),
+      ),
+    ).toBe(true);
   });
   for (const provider of ["google", "github", "microsoft"] as const) {
     it(`${provider}: respects flags, announces pending and recovers rejection`, async () => {

@@ -8,7 +8,7 @@ import { captchaHeaders, useTurnstile } from "@/components/turnstile";
 import { authClient } from "@/lib/auth-client";
 import { safeNextPath } from "@/lib/nav";
 import { passwordStrength } from "@/lib/password-strength";
-import { signupFieldMismatch } from "@/lib/signup-validation";
+
 import styles from "./auth.module.css";
 import { AuthScreen } from "./auth-screen";
 
@@ -79,7 +79,7 @@ export function AuthForm({
   forgotPassword?: boolean;
   /** Set when the instance verifies a Turnstile token on the email form. */
   turnstileSiteKey?: string | null;
-  /** Signup only: the instance enrolls new accounts for product updates, and says so. */
+  /** Cadastro: oferece o double opt-in separado de novidades. */
   productUpdates?: boolean;
 }) {
   const t = useTranslations(`auth.${mode}`);
@@ -100,11 +100,9 @@ export function AuthForm({
   // An invite link carries the invited address; signup starts from it.
   const [email, setEmail] = useState(mode === "signup" ? (params.get("email") ?? "") : "");
   const [password, setPassword] = useState("");
-  // Signup only: the two confirmation entries and the show/hide eyes.
-  const [confirmEmail, setConfirmEmail] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [updatesOptIn, setUpdatesOptIn] = useState(false);
+  const [updatesFailed, setUpdatesFailed] = useState(false);
   const [revealPassword, setRevealPassword] = useState(false);
-  const [revealConfirm, setRevealConfirm] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(
     socialFailed ? tSocial("error") : null,
   );
@@ -131,13 +129,7 @@ export function AuthForm({
       requestAnimationFrame(() => passwordRef.current?.focus());
       return;
     }
-    if (mode === "signup") {
-      const mismatch = signupFieldMismatch({ email, confirmEmail, password, confirmPassword });
-      if (mismatch) {
-        setErrorMessage(t(mismatch));
-        return;
-      }
-    }
+
     setPending("email");
     setErrorMessage(null);
     let token: string | null;
@@ -178,6 +170,20 @@ export function AuthForm({
         );
         setPending(null);
         return;
+      }
+      // A escolha apenas solicita confirmação; não cadastra contato de marketing.
+      if (mode === "signup" && productUpdates && updatesOptIn) {
+        try {
+          const response = await fetch("/api/updates/subscribe", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email, source: "updates" }),
+            signal: AbortSignal.timeout(5000),
+          });
+          setUpdatesFailed(!response.ok);
+        } catch {
+          setUpdatesFailed(true);
+        }
       }
       // A sign-in that resumes a pending OAuth authorization answers with the
       // consent URL; the auth client has already navigated there.
@@ -266,6 +272,12 @@ export function AuthForm({
         <p className={styles.notice} aria-live="polite">
           {t("verifySent", { email: awaitingVerification })}
         </p>
+        {updatesOptIn ? (
+          <p className={styles.notice} role="status">
+            {tLegal(updatesFailed ? "updatesFailed" : "updatesRequested")}{" "}
+            <Link href="/updates">{tLegal("updatesManage")}</Link>
+          </p>
+        ) : null}
         <button
           type="button"
           className={`ms-btn ms-btn-secondary ${styles.button}`}
@@ -382,21 +394,7 @@ export function AuthForm({
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
-        {mode === "signup" ? (
-          <div className={`ms-field ${styles.field}`}>
-            <label htmlFor="confirm-email">{t("confirmEmail")}</label>
-            <input
-              id="confirm-email"
-              type="email"
-              className={`ms-input ${styles.control}`}
-              autoComplete="email"
-              placeholder={t("confirmEmailPlaceholder")}
-              required
-              value={confirmEmail}
-              onChange={(e) => setConfirmEmail(e.target.value)}
-            />
-          </div>
-        ) : null}
+
         {passwordShown ? (
           <div className={`ms-field ${styles.field} ${styles.passwordStep}`}>
             <div className={styles.labelRow}>
@@ -441,32 +439,16 @@ export function AuthForm({
             {mode === "signup" ? <StrengthMeter password={password} /> : null}
           </div>
         ) : null}
-        {mode === "signup" ? (
-          <div className={`ms-field ${styles.field}`}>
-            <label htmlFor="confirm-password">{t("confirmPassword")}</label>
-            <div className={styles.passwordWrap}>
-              <input
-                id="confirm-password"
-                type={revealConfirm ? "text" : "password"}
-                className={`ms-input ${styles.control}`}
-                autoComplete="new-password"
-                placeholder={t("confirmPasswordPlaceholder")}
-                required
-                minLength={8}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-              <button
-                type="button"
-                className={styles.eye}
-                aria-pressed={revealConfirm}
-                aria-label={revealConfirm ? t("hidePassword") : t("showPassword")}
-                onClick={() => setRevealConfirm((v) => !v)}
-              >
-                <EyeGlyph off={revealConfirm} />
-              </button>
-            </div>
-          </div>
+        {mode === "signup" && productUpdates ? (
+          <label className={styles.updatesChoice} htmlFor="product-updates">
+            <input
+              id="product-updates"
+              type="checkbox"
+              checked={updatesOptIn}
+              onChange={(event) => setUpdatesOptIn(event.target.checked)}
+            />
+            <span>{tLegal("updates")}</span>
+          </label>
         ) : null}
         {errorMessage ? (
           <p className={styles.error} id="auth-error" role="alert">
@@ -491,7 +473,7 @@ export function AuthForm({
               : t("submit")}
         </button>
       </form>
-      {legal.termsUrl || legal.privacyUrl || productUpdates ? (
+      {legal.termsUrl || legal.privacyUrl ? (
         <p className={styles.legal}>
           {legal.termsUrl || legal.privacyUrl
             ? tLegal.rich(
@@ -511,7 +493,6 @@ export function AuthForm({
                 },
               )
             : null}
-          {productUpdates ? ` ${tLegal("updates")}` : null}
         </p>
       ) : null}
     </AuthScreen>

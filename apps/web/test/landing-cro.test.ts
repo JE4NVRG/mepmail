@@ -39,7 +39,9 @@ describe("landing CRO contract", () => {
         ),
       );
       expect(copy.hero.title).toBe(
-        locale === "en" ? "Send emails. Keep building." : "Envie e-mails. Continue construindo.",
+        locale === "en"
+          ? "Switch your email. Know your costs."
+          : "Migre seus e-mails. Saiba o custo.",
       );
       expect(JSON.stringify([copy.hero, copy.deliverability, copy.how])).not.toMatch(
         /reputation.{0,10}isolated|reputação isolada|one minute|1 minuto|15 minutes|15 minutos/i,

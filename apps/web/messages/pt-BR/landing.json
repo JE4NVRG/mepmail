@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "MepMail: Envie e-mails. Continue construindo.",
-    "description": "Notificações, recibos e campanhas por API, SMTP ou agentes de IA. Controle seus envios em um só painel. Comece grátis, sem cartão."
+    "title": "MepMail: Migre seus e-mails. Saiba o custo.",
+    "description": "Envios compatíveis, preços publicados e onboarding assistido. Envie por API ou SMTP e controle seus e-mails em um só painel."
   },
   "skip": "Pular para o conteúdo",
   "brandAria": "MepMail início",
@@ -25,15 +25,15 @@
     "badge": "Agent-ready"
   },
   "announce": {
-    "text": "Seus agentes de IA enviam e-mail com o MCP oficial do MepMail"
+    "text": "Migre com envios compatíveis e onboarding assistido"
   },
   "lang": {
     "aria": "Idioma da página"
   },
   "hero": {
-    "eyebrow": "E-MAIL PARA PRODUTOS E AGENTES",
-    "title": "Envie e-mails. Continue construindo.",
-    "lead": "Notificações, recibos e campanhas por API, SMTP ou agentes de IA. Controle seus envios em um só painel.",
+    "eyebrow": "SEUS E-MAILS. PREÇO CLARO.",
+    "title": "Migre seus e-mails. Saiba o custo.",
+    "lead": "Envios compatíveis por API ou SMTP, preços publicados e suporte na migração. Continue construindo com ajuda de quem faz o produto.",
     "migrate": "Fluxos de envio compatíveis com o SDK do Resend. Veja as diferenças no guia de migração.",
     "ctaSignup": "Começar grátis",
     "ctaPlans": "Conhecer o produto",
@@ -120,6 +120,8 @@
     "cta": "Começar grátis",
     "featuredBadge": "Para crescer",
     "showScale": "Mais volumes: Pro 220K e Scale",
+    "choiceTitle": "Pro 110K ou Pro 220K?",
+    "choiceBody": "O Pro 110K custa US$20/mês, mais US$0,90 por 1.000 e-mails extras com excedente habilitado. Para 220.000 e-mails, são US$119 contra US$100 no Pro 220K, que já inclui esse volume. Acima de 220K, o excedente dele custa US$0,35/1.000. Escolha 110K para volumes menores; considere 220K ao se aproximar de 200K envios. O excedente é arredondado para cima em blocos de 1.000. Sem excedente habilitado, o Pro 110K para em 110.000. Valores mensais em USD, sem impostos.",
     "ctaNote": "Crie sua conta grátis. Depois, escolha seu plano no painel.",
     "items": [
       {

@@ -57,6 +57,20 @@ function postForm(fields: Record<string, string>): Promise<Response> {
 }
 
 describe("subscribe route", () => {
+  it("accepts the signup checkbox JSON through the existing opt-in endpoint", async () => {
+    const response = await POST(
+      new Request("https://app.example.com/api/updates/subscribe", {
+        method: "POST",
+        headers: { "content-type": "application/json", "accept-language": "pt-BR" },
+        body: JSON.stringify({ email: "signup@example.com", source: "updates" }),
+      }),
+    );
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(h.requests).toEqual([
+      { email: "signup@example.com", source: "updates", locale: "pt-BR" },
+    ]);
+  });
   it("tags the request with the form's source and sends the reader back with it", async () => {
     const res = await postForm({ email: "op@example.com", source: "self-host" });
     expect(res.status).toBe(303);

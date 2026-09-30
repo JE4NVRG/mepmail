@@ -112,7 +112,7 @@ export default async function RootPage() {
         labels={site}
         page="landing"
         banner={
-          <a className="gtm-announce" href="#mcp">
+          <a className="gtm-announce" href="#integration">
             <span className="gtm-announce-dot" aria-hidden="true" />
             <span>{t("announce.text")}</span>
             <span aria-hidden="true">→</span>
