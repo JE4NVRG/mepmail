@@ -3,7 +3,6 @@ import type Stripe from "stripe";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   METER_EVENT_NAME,
-  overageLookupKey,
   PRODUCT_METADATA_KEY,
   priceMetadata,
   RUNG_METADATA_KEY,
@@ -380,25 +379,62 @@ describe("provision", () => {
     });
   });
 
-  it("refreshes stale price metadata in place", async () => {
-    const { stripe, state } = fakeStripe();
+  it.each([
+    ["round", "down"],
+    ["divide_by", 100],
+    ["rate", "90"],
+    ["included", "100000"],
+  ])("rotates incompatible terms without rewriting subscribed prices: %s", async (kind, value) => {
+    const { stripe, state, seedSubscription } = fakeStripe();
     const first = await provision(stripe, opts());
-    const price = state.prices.find((p) => p.id === first.overagePrices.scale_1m);
-    if (!price) throw new Error("no scale_1m overage price");
-    price.metadata = { [RUNG_METADATA_KEY]: "scale_1m" };
-    state.calls.length = 0;
-
+    const old = state.prices.find(
+      (p) =>
+        p.id ===
+        (kind === "rate" || kind === "included"
+          ? first.prices.pro_100k
+          : first.overagePrices.pro_100k),
+    );
+    if (!old) throw new Error("Missing price");
+    if (kind === "rate") old.metadata.overage_cents_per_1k = String(value);
+    else if (kind === "included") old.metadata.included_emails = String(value);
+    else
+      old.transform_quantity =
+        kind === "round" ? { divide_by: 1000, round: "down" } : { divide_by: 100, round: "up" };
+    const sub = seedSubscription(old);
+    const terms = {
+      unit_amount: old.unit_amount,
+      metadata: { ...old.metadata },
+      transform_quantity: old.transform_quantity,
+    };
     const second = await provision(stripe, opts());
+    expect(
+      second.prices.pro_100k === first.prices.pro_100k &&
+        second.overagePrices.pro_100k === first.overagePrices.pro_100k,
+    ).toBe(false);
+    expect(old).toMatchObject({ ...terms, active: false, lookup_key: null });
+    expect(sub.items.data[0]?.price.id).toBe(old.id);
+    expect(state.updates).toEqual([]);
+    const third = await provision(stripe, opts());
+    expect(third.prices).toEqual(second.prices);
+    expect(third.overagePrices).toEqual(second.overagePrices);
+  });
 
-    expect(second.overagePrices.scale_1m).toBe(first.overagePrices.scale_1m);
-    expect(price.metadata).toEqual(priceMetadata(rungByKey("scale_1m")));
-    expect(state.calls.filter((c) => c.startsWith("prices."))).toEqual(
-      expect.arrayContaining([`prices.update ${price.id}`]),
+  it("dry-run rotation never changes existing financial metadata or subscriptions", async () => {
+    const { stripe, state, seedSubscription } = fakeStripe();
+    const first = await provision(stripe, opts());
+    const old = state.prices.find((p) => p.id === first.prices.pro_100k);
+    if (!old) throw new Error("Missing price");
+    old.metadata.overage_cents_per_1k = "90";
+    seedSubscription(old);
+    const before = JSON.stringify([state.prices, state.subscriptions]);
+    const lines: string[] = [];
+    await provision(
+      dryRunStripe(stripe, (line) => lines.push(line)),
+      opts(),
     );
-    expect(state.calls.filter((c) => c.includes("create"))).toEqual([]);
-    expect(log).toContain(
-      `price ${overageLookupKey(rungByKey("scale_1m"))}: ${price.id} (existing, 23 cents per 1,000 over quota, metadata refreshed)`,
-    );
+    expect(JSON.stringify([state.prices, state.subscriptions])).toBe(before);
+    expect(lines.some((line) => line.includes("prices.create"))).toBe(true);
+    expect(state.updates).toEqual([]);
   });
 
   it("archives the pre-ladder prices but leaves their lookup keys in place", async () => {

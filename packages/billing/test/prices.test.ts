@@ -17,32 +17,36 @@ describe("rungFromPrice", () => {
       rungFromPrice(
         price("millionsend_pro_100k_monthly", { metadata: { millionsend_rung: "scale_1m" } }),
       ),
-    ).toBe(rungByKey("scale_1m"));
+    ).toMatchObject({ key: "scale_1m" });
     // Unknown metadata falls through to the key.
     expect(
       rungFromPrice(
         price("millionsend_pro_200k_monthly", { metadata: { millionsend_rung: "bogus" } }),
       ),
-    ).toBe(rungByKey("pro_200k"));
+    ).toMatchObject({ key: "pro_200k" });
   });
 
   it("reads the lookup key, then the product's plan", () => {
-    expect(rungFromPrice(price("millionsend_starter_monthly"))).toBe(rungByKey("starter"));
-    expect(rungFromPrice(price("millionsend_scale_2_5m_monthly"))).toBe(rungByKey("scale_2_5m"));
-    expect(rungFromPrice(price("millionsend_scale_1m_overage"))).toBe(rungByKey("scale_1m"));
-    expect(rungFromPrice(price(null, { product: scaleProduct }))).toBe(rungByKey("scale_500k"));
-    expect(rungFromPrice(price("someone_elses_price", { product: scaleProduct }))).toBe(
-      rungByKey("scale_500k"),
-    );
+    expect(rungFromPrice(price("millionsend_starter_monthly"))).toMatchObject({ key: "starter" });
+    expect(rungFromPrice(price("millionsend_scale_2_5m_monthly"))).toMatchObject({
+      key: "scale_2_5m",
+    });
+    expect(rungFromPrice(price("millionsend_scale_1m_overage"))).toMatchObject({ key: "scale_1m" });
+    expect(rungFromPrice(price(null, { product: scaleProduct }))).toMatchObject({
+      key: "scale_500k",
+    });
+    expect(rungFromPrice(price("someone_elses_price", { product: scaleProduct }))).toMatchObject({
+      key: "scale_500k",
+    });
   });
 
   it("product metadata lands a pre-ladder price on the plan's first rung", () => {
-    expect(rungFromPrice(price("millionsend_pro_monthly", { product: legacyProduct("pro") }))).toBe(
-      rungByKey("pro_100k"),
-    );
-    expect(rungFromPrice(price("millionsend_scale_monthly", { product: scaleProduct }))).toBe(
-      rungByKey("scale_500k"),
-    );
+    expect(
+      rungFromPrice(price("millionsend_pro_monthly", { product: legacyProduct("pro") })),
+    ).toMatchObject({ key: "pro_100k" });
+    expect(
+      rungFromPrice(price("millionsend_scale_monthly", { product: scaleProduct })),
+    ).toMatchObject({ key: "scale_500k" });
     // The key alone links to nothing.
     expect(rungFromPrice(price("millionsend_pro_monthly"))).toBeNull();
   });
@@ -63,7 +67,7 @@ describe("subscriptionItems", () => {
       base: both.items.data[0],
       overage: both.items.data[1],
     });
-    expect(rungFromSubscription(both)).toBe(rungByKey("pro_100k"));
+    expect(rungFromSubscription(both)).toMatchObject({ key: "pro_100k" });
 
     const planOnly = subscription("sub_2", "cus_1", "active");
     expect(subscriptionItems(planOnly)).toEqual({ base: planOnly.items.data[0], overage: null });

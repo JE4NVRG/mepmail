@@ -328,6 +328,12 @@ export function BillingView({
           </span>
         </div>
 
+        {status.data.effectiveRung ? (
+          <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+            {t("effectiveBasePrice", { price: usd(status.data.effectiveRung.priceCents) })}
+          </p>
+        ) : null}
+
         <div className="ms-kpi-row" style={{ display: "flex", gap: 48, marginTop: 22 }}>
           <div>
             <div className="ms-microlabel" style={{ fontSize: 10.5 }}>
@@ -432,9 +438,11 @@ export function BillingView({
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 14, color: "var(--ms-bone)" }}>{t("overage")}</div>
                 <div style={{ fontSize: 12.5, color: "var(--ms-muted)", marginTop: 2 }}>
-                  {t("overageCopy", { price: usd(quota.overageCentsPer1k) })}
+                  {quota.overageCentsPer1k === null
+                    ? t("effectiveRateUnavailable")
+                    : t("overageCopy", { price: usd(quota.overageCentsPer1k) })}
                 </div>
-                {over > 0 ? (
+                {over > 0 && quota.overageCentsPer1k !== null ? (
                   <div style={{ fontSize: 12.5, color: "var(--ms-bone)", marginTop: 6 }}>
                     {t("overSoFar", {
                       n: over,
@@ -592,7 +600,8 @@ export function BillingView({
                             }
                           />
                           {hasLiveSubscription
-                            ? r.priceCents < current.priceCents
+                            ? status.data.effectiveRung &&
+                              r.priceCents < status.data.effectiveRung.priceCents
                               ? t("switchAtPeriodEnd")
                               : t("switch")
                             : t("choose")}

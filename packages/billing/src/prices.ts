@@ -60,7 +60,7 @@ export const isMeteredPrice = (price: Stripe.Price): boolean =>
  * with neither (a rotated one, or the two sold before the ladder), landing
  * on the plan's first rung.
  */
-export function rungFromPrice(price: Stripe.Price): PlanRung | null {
+function catalogRungFromPrice(price: Stripe.Price): PlanRung | null {
   const tagged = price.metadata?.[RUNG_METADATA_KEY];
   if (isPlanRungKey(tagged)) return rungByKey(tagged);
   const key = price.lookup_key;
@@ -76,6 +76,48 @@ export function rungFromPrice(price: Stripe.Price): PlanRung | null {
   return PAID_RUNGS.find((r) => r.plan === plan) ?? null;
 }
 
+/** Resolve identity from the catalog, financial terms only from the subscribed price. */
+export function rungFromPrice(price: Stripe.Price): PlanRung | null {
+  const rung = catalogRungFromPrice(price);
+  if (!rung) return null;
+  if (
+    !isMeteredPrice(price) &&
+    (price.currency !== "usd" ||
+      !Number.isSafeInteger(price.unit_amount) ||
+      (price.unit_amount ?? -1) < 0)
+  )
+    return null;
+  const rawRate = price.metadata?.overage_cents_per_1k;
+  const rate = rawRate && /^\d+$/.test(rawRate) ? Number(rawRate) : null;
+  const included = Number(price.metadata?.included_emails);
+  return {
+    ...rung,
+    priceCents:
+      !isMeteredPrice(price) && Number.isSafeInteger(price.unit_amount)
+        ? (price.unit_amount as number)
+        : rung.priceCents,
+    included: Number.isSafeInteger(included) && included > 0 ? included : rung.included,
+    overageCentsPer1k: isMeteredPrice(price)
+      ? effectiveOverageRate(price)
+      : rate !== null && Number.isSafeInteger(rate)
+        ? rate
+        : null,
+  };
+}
+
+/** Unknown/custom transforms must not be presented as the catalog's roundup rate. */
+export function effectiveOverageRate(price: Stripe.Price): number | null {
+  return price.currency === "usd" &&
+    price.recurring?.interval === "month" &&
+    price.recurring.usage_type === "metered" &&
+    price.transform_quantity?.divide_by === 1000 &&
+    price.transform_quantity.round === "up" &&
+    Number.isSafeInteger(price.unit_amount) &&
+    (price.unit_amount ?? -1) >= 0
+    ? price.unit_amount
+    : null;
+}
+
 /** A subscription's plan item and, when overage is on, its metered item. */
 export function subscriptionItems(sub: Stripe.Subscription): {
   base: Stripe.SubscriptionItem | null;
@@ -89,8 +131,16 @@ export function subscriptionItems(sub: Stripe.Subscription): {
 }
 
 export function rungFromSubscription(sub: Stripe.Subscription): PlanRung | null {
-  const { base } = subscriptionItems(sub);
-  return base ? rungFromPrice(base.price) : null;
+  const { base, overage } = subscriptionItems(sub);
+  const rung = base ? rungFromPrice(base.price) : null;
+  if (!rung) return null;
+  return {
+    ...rung,
+    overageCentsPer1k:
+      overage && catalogRungFromPrice(overage.price)?.key === rung.key
+        ? effectiveOverageRate(overage.price)
+        : null,
+  };
 }
 
 /**

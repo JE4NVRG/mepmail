@@ -68,6 +68,49 @@ async function reportedOverage(teamId: string): Promise<number | undefined> {
 const callOrder = (first: string, second: string) =>
   expect(state.calls.indexOf(first)).toBeLessThan(state.calls.indexOf(second));
 
+describe("grandfathering during reconciliation", () => {
+  it("does not add current-catalog overage to an old or unknown contract", async () => {
+    const sub = subscription("sub_legacy", "cus_legacy", "active", "millionsend_pro_100k_monthly");
+    const base = sub.items.data[0];
+    if (!base) throw new Error("Missing base");
+    base.price = {
+      ...base.price,
+      active: false,
+      lookup_key: null,
+      metadata: { ...base.price.metadata, overage_cents_per_1k: "90" },
+    };
+    const teamId = await subscribedTeam(sub);
+    await applySubscription(db, sub, () => {}, stripe);
+    expect(state.itemCreates).toEqual([]);
+    expect(state.itemUpdates).toEqual([]);
+    await expect(setOverage(deps(), { teamId, enabled: true })).rejects.toThrow(
+      "explicit overage price review",
+    );
+    expect(state.itemCreates).toEqual([]);
+  });
+
+  it("keeps both archived items unchanged on a routine reconcile", async () => {
+    const sub = withOverage();
+    const base = sub.items.data[0];
+    const overage = sub.items.data[1];
+    if (!base || !overage) throw new Error("Missing items");
+    base.price = {
+      ...base.price,
+      active: false,
+      lookup_key: null,
+      metadata: { ...base.price.metadata, overage_cents_per_1k: "90" },
+    };
+    overage.price = { ...overage.price, active: false, lookup_key: null, unit_amount: 90 };
+    await subscribedTeam(sub);
+    const before = JSON.stringify(sub.items.data);
+    await applySubscription(db, sub, () => {}, stripe);
+    expect(JSON.stringify(sub.items.data)).toBe(before);
+    expect(state.itemCreates).toEqual([]);
+    expect(state.itemUpdates).toEqual([]);
+    expect(state.updates).toEqual([]);
+  });
+});
+
 describe("changeRung up", () => {
   it("settles usage under the old rung, then re-prices both items at once and re-reads Stripe", async () => {
     const teamId = await subscribedTeam(withOverage(), 110_500);

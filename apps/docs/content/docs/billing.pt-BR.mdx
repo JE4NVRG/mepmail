@@ -30,6 +30,8 @@ mostra a mesma frase.
 | `scale_1_5m` | Scale | US$ 265 | 1.650.000 | por mês | US$ 0,22 |
 | `scale_2_5m` | Scale | US$ 429 | 2.750.000 | por mês | US$ 0,21 |
 
+Os preços do catálogo atual valem para novas contratações, não automaticamente para assinaturas existentes. Billing resolve a mensalidade e taxa efetivas pelos itens reais do Stripe, inclusive preços arquivados. Taxas desconhecidas ou incompatíveis ocultam a estimativa, sem substituição pela tabela nova. A API de uso retorna `overage_usd_per_1k: null` quando a taxa efetiva não está resolvida. Não requer migração de banco. Alterar o catálogo não migra assinaturas existentes.
+
 A escada é `PLAN_RUNGS` em `packages/core/src/plans.ts`; Checkout, painel,
 `GET /usage` e os e-mails de conta leem tudo de lá. O relatório de migração da
 CLI mantém uma cópia em `packages/cli/src/report.ts` (ela roda sozinha contra
@@ -254,8 +256,9 @@ O que ele faz, e por que rodar de novo é seguro:
 - **Preços** são localizados por lookup key. Um valor diferente na escada
   cria um novo preço, move a lookup key para ele e arquiva o antigo;
   assinaturas existentes mantêm o preço antigo (ainda resolvido pelo
-  metadata), novos checkouts recebem o novo. Só o metadata é atualizado no
-  lugar. Os preços são `tax_behavior: exclusive`.
+  metadata), novos checkouts recebem o novo. Metadata financeiro (cota, período
+  e taxa de excedente) também exige rotação, mesmo com mensalidade inalterada.
+  Só metadata não financeiro é atualizado no lugar. Os preços são `tax_behavior: exclusive`.
 - **Preços legados** `millionsend_pro_monthly` e `millionsend_scale_monthly`
   são arquivados, não excluídos: assinaturas ainda neles continuam
   funcionando, resolvidas para o primeiro degrau do plano pelo metadata do

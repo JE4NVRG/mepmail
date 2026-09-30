@@ -329,7 +329,9 @@
     },
     "checkoutSuccess": "Obrigado! Seu plano é atualizado assim que o Stripe confirmar o pagamento — normalmente em poucos segundos.",
     "checkoutCancel": "Checkout cancelado. Seu plano não mudou.",
-    "error": "Algo deu errado com o Stripe. Tente novamente."
+    "error": "Algo deu errado com o Stripe. Tente novamente.",
+    "effectiveRateUnavailable": "Taxa vigente indisponível. Confira sua assinatura no portal de cobrança.",
+    "effectiveBasePrice": "Preço base contratado: {price}/mês, antes de descontos e impostos."
   },
   "mcp": {
     "title": "Servidor MCP",

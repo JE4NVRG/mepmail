@@ -70,7 +70,8 @@ export function registerUsageRoutes(
                   emails_sent: period?.accepted ?? 0,
                   included: quota.included,
                   overage_enabled: quota.overage,
-                  overage_usd_per_1k: quota.overageCentsPer1k / 100,
+                  overage_usd_per_1k:
+                    quota.overageCentsPer1k === null ? null : quota.overageCentsPer1k / 100,
                   starts_at: quota.periodStart.toISOString(),
                   ends_at: quota.periodEnd.toISOString(),
                 }

@@ -101,7 +101,12 @@ export async function applySubscription(
     planQuota = rung.period === "month" ? rung.included : null;
     // A monthly subscription from before the ladder has no metered item, so
     // its overage (on by default) would go unbilled; the first sync adds it.
-    if (stripe && !overage && rung.period === "month") {
+    const catalog = rungByKey(rung.key as PlanRungKey);
+    const baseTerms = base ? rungFromPrice(base.price) : null;
+    const matchesCatalog =
+      baseTerms?.priceCents === catalog.priceCents &&
+      baseTerms.overageCentsPer1k === catalog.overageCentsPer1k;
+    if (stripe && !overage && rung.period === "month" && matchesCatalog) {
       try {
         const price = await resolvePriceId(stripe, overageLookupKey(rung));
         overage = await stripe.subscriptionItems.create({ subscription: sub.id, price });
@@ -109,7 +114,7 @@ export async function applySubscription(
         log(`overage item not added to ${sub.id}: ${String(err)}`);
       }
     }
-    if (stripe && overage && rung.period === "month") {
+    if (stripe && overage && rung.period === "month" && matchesCatalog) {
       const expected = overageLookupKey(rung);
       if (rungFromPrice(overage.price)?.key !== rung.key) {
         try {
@@ -340,6 +345,13 @@ export async function setOverage(
   const rung = base ? rungFromPrice(base.price) : null;
   if (rung?.period !== "month") throw new Error("overage applies to monthly plans only");
   if (input.enabled && !overage) {
+    const catalog = rungByKey(rung.key as PlanRungKey);
+    if (
+      rung.priceCents !== catalog.priceCents ||
+      rung.overageCentsPer1k !== catalog.overageCentsPer1k
+    ) {
+      throw new Error("Existing subscription requires explicit overage price review");
+    }
     await deps.stripe.subscriptionItems.create({
       subscription: sub.id,
       price: await resolvePriceId(deps.stripe, overageLookupKey(rung)),

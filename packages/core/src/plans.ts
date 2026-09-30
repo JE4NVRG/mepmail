@@ -189,6 +189,8 @@ export interface QuotaTeamRow {
   currentPeriodStart: Date | null;
   currentPeriodEnd: Date | null;
   overageEnabled: boolean;
+  /** Effective subscription rate, never inferred from the current catalog. */
+  overageCentsPer1k?: number | null;
   /** Operator ceiling on the team's UTC day (instance console); null or absent = the plan decides. */
   dailySendCeiling?: number | null | undefined;
 }
@@ -212,7 +214,7 @@ export type TeamQuota =
       periodEnd: Date;
       /** Sends past `included` bill instead of stopping. */
       overage: boolean;
-      overageCentsPer1k: number;
+      overageCentsPer1k: number | null;
       /** An operator ceiling on each UTC day inside the period; absent or null = the period alone caps. */
       dailyCeiling?: number | null | undefined;
     };
@@ -254,7 +256,7 @@ function planQuota(team: QuotaTeamRow, isCloud: boolean, now: Date): TeamQuota {
     periodStart: period.start,
     periodEnd: period.end,
     overage: team.overageEnabled,
-    overageCentsPer1k: rung.overageCentsPer1k ?? 0,
+    overageCentsPer1k: team.overageCentsPer1k ?? null,
   };
 }
 

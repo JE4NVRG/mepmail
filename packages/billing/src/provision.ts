@@ -161,11 +161,16 @@ function priceMatches(price: Stripe.Price, spec: PriceSpec): boolean {
     return false;
   }
   if (price.recurring?.interval !== "month") return false;
+  // Termos econômicos são imutáveis também no metadata; nunca reprificar o price antigo.
+  for (const key of ["included_emails", "period", "overage_cents_per_1k"]) {
+    if (price.metadata?.[key] !== spec.metadata[key]) return false;
+  }
   if (spec.meter) {
     return (
       price.recurring.usage_type === "metered" &&
       price.recurring.meter === spec.meter &&
-      price.transform_quantity?.divide_by === 1000
+      price.transform_quantity?.divide_by === 1000 &&
+      price.transform_quantity.round === "up"
     );
   }
   return price.recurring.usage_type !== "metered";

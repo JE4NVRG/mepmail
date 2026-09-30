@@ -113,7 +113,7 @@ describe("GET /usage", () => {
         emails_sent: 42,
         included: 110_000,
         overage_enabled: true,
-        overage_usd_per_1k: 0.9,
+        overage_usd_per_1k: null,
         starts_at: start.toISOString(),
         ends_at: end.toISOString(),
       },

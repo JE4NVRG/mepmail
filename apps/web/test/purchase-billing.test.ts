@@ -5,6 +5,7 @@ import { BillingView } from "../src/app/(dashboard)/settings/billing/billing-vie
 
 const h = vi.hoisted(() => ({
   locale: "en",
+  rate: 123 as number | null,
   role: "owner",
   mutate: vi.fn(),
   translations: [] as { key: string; values: Record<string, unknown> }[],
@@ -46,6 +47,7 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { fixture?: string }) => ({
     data: options.fixture
       ? {
+          effectiveRung: { key: "pro_100k", priceCents: 2900 },
           plan: "pro",
           planQuota: 110000,
           rung: "pro_100k",
@@ -57,7 +59,7 @@ vi.mock("@tanstack/react-query", () => ({
             included: 110000,
             periodEnd: new Date("2026-10-01"),
             overage: true,
-            overageCentsPer1k: 123,
+            overageCentsPer1k: h.rate,
           },
           usage: { accepted: 111001 },
           hasCustomer: true,
@@ -83,9 +85,17 @@ beforeEach(() => {
   h.mutate.mockClear();
   h.translations = [];
   h.role = "owner";
+  h.rate = 123;
 });
 
 describe("billing selection synthetic UI contract, not paid E2E", () => {
+  it("hides the monetary estimate when the subscription rate is unavailable", () => {
+    h.rate = null;
+    BillingView({ checkout: null });
+    expect(h.translations.some((t) => t.key === "effectiveRateUnavailable")).toBe(true);
+    expect(h.translations.some((t) => t.key === "overSoFar")).toBe(false);
+    expect(h.mutate).not.toHaveBeenCalled();
+  });
   for (const locale of ["en", "pt-BR"]) {
     it.each(["starter", "pro_100k", "pro_200k"] as const)(
       `${locale} selects %s without mutation and keeps subscription overage rate`,
@@ -96,6 +106,9 @@ describe("billing selection synthetic UI contract, not paid E2E", () => {
         expect(slider?.props.value).toBe({ starter: 1, pro_100k: 2, pro_200k: 3 }[requestedRung]);
         expect(nodes(tree).some((n) => n.props.open === true)).toBe(true);
         expect(h.mutate).not.toHaveBeenCalled();
+        expect(h.translations.find((t) => t.key === "effectiveBasePrice")?.values.price).toBe(
+          formatUsd(2900, locale),
+        );
         expect(h.translations.find((t) => t.key === "overSoFar")?.values.amount).toBe(
           formatUsd(246, locale),
         );

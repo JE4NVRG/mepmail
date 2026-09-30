@@ -28,6 +28,8 @@ and the dashboard shows the same sentence.
 | `scale_1_5m` | Scale | $265 | 1,650,000 | per month | $0.22 |
 | `scale_2_5m` | Scale | $429 | 2,750,000 | per month | $0.21 |
 
+Current catalog prices apply to new purchases, not automatically to existing subscriptions. Billing resolves the subscribed base amount and metered rate from the actual Stripe price items, including archived prices. Unknown or incompatible rates hide the estimate; they are never replaced with the current catalog. The usage API returns `overage_usd_per_1k: null` when the effective rate is unresolved. No database migration is required. Existing subscriptions are not migrated by a catalog edit.
+
 The ladder is `PLAN_RUNGS` in `packages/core/src/plans.ts`; Checkout, the
 dashboard, `GET /usage` and the account mails all read it from there. The
 CLI's migration report keeps a copy in `packages/cli/src/report.ts` (it runs
@@ -248,8 +250,9 @@ What it does, and why re-running is safe:
 - **Prices** are found by lookup key. A changed amount in the ladder creates
   a new price, moves the lookup key onto it, and archives the old one;
   existing subscriptions keep their old price (still resolved by its
-  metadata), new checkouts get the new one. Metadata alone is refreshed in
-  place. Prices are `tax_behavior: exclusive`.
+  metadata), new checkouts get the new one. Financial metadata (quota, period
+  and overage rate) also requires rotation, even when the base amount is unchanged.
+  Only non-financial metadata is refreshed in place. Prices are `tax_behavior: exclusive`.
 - **Legacy prices** `millionsend_pro_monthly` and `millionsend_scale_monthly`
   are archived, not deleted: subscriptions still on them keep working,
   resolved to the plan's first rung through the product's metadata, until

@@ -4,6 +4,8 @@ import {
   createCheckoutSession,
   createPortalSession,
   hasLiveSubscription,
+  rungFromSubscription,
+  SUBSCRIPTION_EXPAND,
   setOverage as setSubscriptionOverage,
 } from "@millionsend/billing";
 import { env } from "@millionsend/config";
@@ -50,6 +52,7 @@ async function loadTeam(db: Db, teamId: string) {
       ...QUOTA_COLUMNS,
       planStatus: schema.teams.planStatus,
       stripeCustomerId: schema.teams.stripeCustomerId,
+      stripeSubscriptionId: schema.teams.stripeSubscriptionId,
       cancelAt: schema.teams.cancelAt,
       pendingRung: schema.teams.pendingRung,
     })
@@ -106,9 +109,25 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
     status: teamProcedure.query(async ({ ctx }) => {
       requireCloud();
       const team = await loadTeam(ctx.db, ctx.teamId);
-      const quota = teamQuota(team, true);
+      let effectiveRung = null;
+      if (team.plan !== "free" && team.plan !== "system" && team.stripeSubscriptionId) {
+        try {
+          const subscription = await deps
+            .stripe()
+            .subscriptions.retrieve(team.stripeSubscriptionId, { expand: SUBSCRIPTION_EXPAND });
+          effectiveRung = rungFromSubscription(subscription);
+        } catch {
+          // Falha de leitura não autoriza usar preço do catálogo como contrato vigente.
+          effectiveRung = null;
+        }
+      }
+      const quota = teamQuota(
+        { ...team, overageCentsPer1k: effectiveRung?.overageCentsPer1k ?? null },
+        true,
+      );
       const live = hasLiveSubscription(team.planStatus);
       return {
+        effectiveRung,
         plan: team.plan,
         planQuota: team.planQuota,
         rung: team.plan === "system" ? null : teamRung(team.plan, team.planQuota).key,

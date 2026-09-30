@@ -505,7 +505,12 @@ export const usageResponseSchema = z
         overage_enabled: z
           .boolean()
           .describe("Whether sends past `included` bill overage instead of being refused"),
-        overage_usd_per_1k: z.number().describe("Overage price per 1,000 emails, in USD"),
+        overage_usd_per_1k: z
+          .number()
+          .nullable()
+          .describe(
+            "Effective overage price per 1,000 emails in USD; null when the subscription rate is not resolved. See Billing for live terms.",
+          ),
         starts_at: z.string().describe("Billing period start"),
         ends_at: z.string().describe("Billing period end, when the counter resets"),
       })

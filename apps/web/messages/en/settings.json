@@ -329,7 +329,9 @@
     },
     "checkoutSuccess": "Thanks! Your plan updates as soon as Stripe confirms the payment — usually within a few seconds.",
     "checkoutCancel": "Checkout canceled. Your plan is unchanged.",
-    "error": "Something went wrong with Stripe. Try again."
+    "error": "Something went wrong with Stripe. Try again.",
+    "effectiveRateUnavailable": "Current rate unavailable. Check your subscription in the billing portal.",
+    "effectiveBasePrice": "Contracted base price: {price}/month, before discounts and taxes."
   },
   "mcp": {
     "title": "MCP server",

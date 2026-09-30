@@ -248,25 +248,25 @@ describe("teamQuota", () => {
       periodStart: START,
       periodEnd: END,
       overage: false,
-      overageCentsPer1k: 30,
+      overageCentsPer1k: null,
     });
     expect(teamQuota(row({ overageEnabled: true }), true, now)).toMatchObject({
       overage: true,
     });
     expect(
       teamQuota(row({ plan: "scale", planQuota: 1_650_000, overageEnabled: true }), true, now),
-    ).toMatchObject({ included: 1_650_000, overageCentsPer1k: 22, overage: true });
+    ).toMatchObject({ included: 1_650_000, overageCentsPer1k: null, overage: true });
     expect(teamQuota(row({ planQuota: 220_000 }), true, now)).toMatchObject({
       included: 220_000,
-      overageCentsPer1k: 28,
+      overageCentsPer1k: null,
     });
     expect(teamQuota(row({ plan: "scale", planQuota: 1_100_000 }), true, now)).toMatchObject({
       included: 1_100_000,
-      overageCentsPer1k: 23,
+      overageCentsPer1k: null,
     });
     expect(teamQuota(row({ plan: "scale", planQuota: 2_750_000 }), true, now)).toMatchObject({
       included: 2_750_000,
-      overageCentsPer1k: 21,
+      overageCentsPer1k: null,
     });
     // A monthly row written before rungs existed sits on the plan's first rung.
     expect(teamQuota(row({ plan: "scale", planQuota: null }), true, now)).toMatchObject({

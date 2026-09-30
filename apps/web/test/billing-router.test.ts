@@ -1,4 +1,4 @@
-import type { BillingStripe } from "@millionsend/billing";
+import { type BillingStripe, priceMetadata } from "@millionsend/billing";
 import {
   DAY_MS,
   PLAN_RUNGS,
@@ -51,11 +51,15 @@ const seconds = (d: Date) => d.getTime() / 1000;
 
 /** A ladder price as Stripe returns it; the rung is read back off the metadata. */
 function price(key: PlanRungKey, metered = false): Stripe.Price {
+  const rung = rungByKey(key);
   return {
+    currency: "usd",
+    unit_amount: metered ? rung.overageCentsPer1k : rung.priceCents,
+    transform_quantity: metered ? { divide_by: 1000, round: "up" } : null,
     id: `price_${key}${metered ? "_overage" : ""}`,
     lookup_key: `millionsend_${key}_${metered ? "overage" : "monthly"}`,
-    metadata: { millionsend_rung: key },
-    recurring: { usage_type: metered ? "metered" : "licensed" },
+    metadata: priceMetadata(rung),
+    recurring: { interval: "month", usage_type: metered ? "metered" : "licensed" },
     product: "prod_x",
   } as unknown as Stripe.Price;
 }
@@ -282,6 +286,50 @@ afterEach(async () => {
 });
 
 describe("billing router", () => {
+  it("status preserves archived subscription prices through the real resolver and quota path", async () => {
+    const teamId = await subscribedTeam("pro_100k", { overage: true });
+    const base = sub.items.data[0];
+    const metered = sub.items.data[1];
+    if (!base || !metered) throw new Error("Missing subscribed items");
+    base.price = {
+      ...base.price,
+      id: "price_old_base",
+      active: false,
+      lookup_key: null,
+      unit_amount: 2000,
+      metadata: { ...base.price.metadata, overage_cents_per_1k: "90" },
+    };
+    metered.price = {
+      ...metered.price,
+      id: "price_old_metered",
+      active: false,
+      lookup_key: null,
+      unit_amount: 90,
+    };
+    await db
+      .insert(schema.usagePeriods)
+      .values({ teamId, periodStart: PERIOD_START, accepted: 111001 });
+    const result = await callerFor(teamId, "member").billing.status();
+    expect(result.effectiveRung).toMatchObject({ priceCents: 2000, overageCentsPer1k: 90 });
+    expect(result.quota).toMatchObject({ kind: "month", overageCentsPer1k: 90 });
+    expect(calls.updates).toEqual([]);
+    expect(calls.itemCreates).toEqual([]);
+    metered.price.transform_quantity = { divide_by: 1000, round: "down" };
+    expect((await callerFor(teamId, "member").billing.status()).quota).toMatchObject({
+      overageCentsPer1k: null,
+    });
+  });
+
+  it("status keeps unknown rates unavailable rather than falling back to catalog", async () => {
+    const teamId = await subscribedTeam("pro_100k", { overage: true });
+    await db
+      .update(schema.teams)
+      .set({ stripeSubscriptionId: null })
+      .where(eq(schema.teams.id, teamId));
+    expect((await callerFor(teamId, "member").billing.status()).quota).toMatchObject({
+      overageCentsPer1k: null,
+    });
+  });
   it("does not exist on self-host", async () => {
     vi.stubEnv("IS_CLOUD", "");
     const teamId = await createTeam(db);
@@ -303,6 +351,7 @@ describe("billing router", () => {
   it("status reports the entitlement to any member", async () => {
     const teamId = await createTeam(db);
     expect(await callerFor(teamId, "member").billing.status()).toEqual({
+      effectiveRung: null,
       plan: "free",
       planQuota: null,
       rung: "free",
@@ -335,7 +384,7 @@ describe("billing router", () => {
         periodStart: PERIOD_START,
         periodEnd: PERIOD_END,
         overage: true,
-        overageCentsPer1k: 35,
+        overageCentsPer1k: 28,
       },
       usage: { accepted: 1234, reportedOverage: 0 },
       hasCustomer: true,

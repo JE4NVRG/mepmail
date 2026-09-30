@@ -1,7 +1,9 @@
+import { PLAN_RUNGS } from "@millionsend/core/plans";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import Stripe from "stripe";
+import { priceMetadata } from "../src/prices.js";
 import type { BillingStripe } from "../src/stripe.js";
 
 /** Signature verification is pure crypto; a key-less real client signs and verifies offline. */
@@ -27,12 +29,16 @@ export function price(
   lookupKey: string | null,
   extra: { product?: unknown; metadata?: Record<string, string>; metered?: boolean } = {},
 ): Stripe.Price {
+  const rung = PLAN_RUNGS.find((r) => lookupKey?.includes(r.key)) ?? PLAN_RUNGS[2];
   return {
+    currency: "usd",
+    unit_amount: extra.metered ? rung.overageCentsPer1k : rung.priceCents,
+    transform_quantity: extra.metered ? { divide_by: 1000, round: "up" } : null,
     id: priceId(lookupKey),
     object: "price",
     active: true,
     lookup_key: lookupKey,
-    metadata: extra.metadata ?? {},
+    metadata: extra.metadata ?? (lookupKey?.includes(rung.key) ? priceMetadata(rung) : {}),
     recurring: { interval: "month", usage_type: extra.metered ? "metered" : "licensed" },
     product: extra.product ?? "prod_1",
   } as unknown as Stripe.Price;
