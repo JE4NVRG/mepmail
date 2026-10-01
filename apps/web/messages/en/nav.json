@@ -9,5 +9,6 @@
   "webhooks": "Webhooks",
   "templates": "Templates",
   "settings": "Settings",
-  "console": "Operator console"
+  "console": "Operator console",
+  "docs": "Documentation"
 }

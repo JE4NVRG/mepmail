@@ -10,6 +10,7 @@ import { useDismiss } from "@/components/popover-menu";
 import { TeamSwitcher } from "@/components/team-switcher";
 import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
+import { DOCS_URL } from "@/lib/docs-links";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { isActive, navItemsWithConsole } from "@/lib/nav";
 import { applyTheme, currentTheme, type Theme } from "@/lib/theme";
@@ -258,6 +259,23 @@ export function Sidebar({
             label={t(item.key)}
           />
         ))}
+        <a href={DOCS_URL} target="_blank" rel="noreferrer">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            style={{ flex: "none", display: "block" }}
+          >
+            <path d="M12 7v14M3 3h6a3 3 0 0 1 3 3 3 3 0 0 1 3-3h6v16h-6a3 3 0 0 0-3 2 3 3 0 0 0-3-2H3Z" />
+          </svg>
+          {t("docs")}
+        </a>
       </nav>
       <div style={{ flex: 1 }} />
       <div ref={accountRef} style={{ position: "relative", borderTop: "1px solid var(--ms-line)" }}>
