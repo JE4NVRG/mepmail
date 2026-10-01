@@ -10,6 +10,7 @@ import { domainsRouter } from "./domains";
 import { emailRouter } from "./email";
 import { emailsRouter } from "./emails";
 import { logsRouter } from "./logs";
+import { mailboxesRouter } from "./mailboxes";
 import { metricsRouter } from "./metrics";
 import { onboardingRouter } from "./onboarding";
 import { segmentsRouter } from "./segments";
@@ -33,6 +34,7 @@ export const appRouter = router({
   domains: domainsRouter,
   apiKeys: apiKeysRouter,
   logs: logsRouter,
+  mailboxes: mailboxesRouter,
   metrics: metricsRouter,
   onboarding: onboardingRouter,
   segments: segmentsRouter,

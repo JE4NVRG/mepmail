@@ -18,6 +18,7 @@ import { useTRPC } from "@/lib/trpc";
 
 // Canvas nav order (Row 1 chrome): Settings lives in the main list.
 export const NAV_ITEMS: ReadonlyArray<{ key: string; href: string; icon: NavIconName }> = [
+  { key: "mailboxes", href: "/mailboxes", icon: "emails" },
   { key: "emails", href: "/emails", icon: "emails" },
   { key: "broadcasts", href: "/broadcasts", icon: "broadcasts" },
   { key: "templates", href: "/templates", icon: "templates" },
@@ -184,10 +185,11 @@ export function Sidebar({
   // The console is the operator's own: the item appears only for them, and
   // the gate is the server's (a 404 for anyone else), never this query.
   const operator = useQuery(trpc.system.operator.queryOptions());
+  const mailboxCapability = useQuery(trpc.mailboxes.capabilities.queryOptions());
   // The console's row rides on the same query the account menu uses: an
   // operator sees /console in the nav, everyone else keeps the plain list.
   const navItems = navItemsWithConsole(
-    NAV_ITEMS,
+    NAV_ITEMS.filter((item) => item.key !== "mailboxes" || mailboxCapability.data?.enabled),
     CONSOLE_NAV_ITEM,
     operator.data?.isOperator === true,
   );
@@ -203,8 +205,8 @@ export function Sidebar({
 
   async function signOut() {
     await authClient.signOut();
-    router.push("/login");
-    router.refresh();
+    // Private query cache must not survive a change of authenticated account.
+    window.location.assign("/login");
   }
 
   return (

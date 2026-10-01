@@ -43,6 +43,7 @@ import { and, count, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { recordAudit } from "../audit";
+import { withMailboxDomainDeletion } from "../mailboxes";
 import { resolveBaseUrl } from "../auth";
 import { adminProcedure, router, teamProcedure } from "../trpc";
 
@@ -521,45 +522,50 @@ export function createDomainsRouter(deps: DomainsSesDeps = defaultSesDeps) {
       }),
 
     delete: adminProcedure.input(z.object({ id: z.uuid() })).mutation(async ({ ctx, input }) => {
-      const domain = await requireDomain(ctx.db, ctx.teamId, input.id);
-      // The SES identity is shared by every row with the same (name, region):
-      // it goes only with the last of them.
-      if (!(await isIdentitySharedByOtherDomains(ctx.db, domain))) {
-        try {
-          // Detach whenever tenants are on, not only when the row is marked:
-          // the marker means the whole association (identity AND configuration
-          // set) succeeded, but the identity is attached as soon as its own
-          // association call returned — and SES refuses to delete an attached
-          // identity. A tenant or association that is not there is tolerated.
-          if (sesTenantsEnabled()) {
-            await disassociateIdentity(deps.clientForRegion(domain.region), {
-              tenantName: domain.teamId,
-              region: domain.region,
-              identity: domain.name,
+      const domain = await withMailboxDomainDeletion(ctx.db, ctx.teamId, input.id, async (db) => {
+        const domain = await requireDomain(db, ctx.teamId, input.id);
+        // The SES identity is shared by every row with the same (name, region):
+        // it goes only with the last of them.
+        if (!(await isIdentitySharedByOtherDomains(db, domain))) {
+          try {
+            // Detach whenever tenants are on, not only when the row is marked:
+            // the marker means the whole association (identity AND configuration
+            // set) succeeded, but the identity is attached as soon as its own
+            // association call returned — and SES refuses to delete an attached
+            // identity. A tenant or association that is not there is tolerated.
+            if (sesTenantsEnabled()) {
+              await disassociateIdentity(deps.clientForRegion(domain.region), {
+                tenantName: domain.teamId,
+                region: domain.region,
+                identity: domain.name,
+              });
+            }
+            await deleteDomainIdentity(deps.clientForRegion(domain.region), {
+              domain: domain.name,
             });
+          } catch (error) {
+            // An identity already gone from SES must not block removing the row.
+            if ((error as { name?: string }).name !== "NotFoundException") throw error;
           }
-          await deleteDomainIdentity(deps.clientForRegion(domain.region), { domain: domain.name });
-        } catch (error) {
-          // An identity already gone from SES must not block removing the row.
-          if ((error as { name?: string }).name !== "NotFoundException") throw error;
         }
-      }
-      await ctx.db.transaction(async (tx) => {
-        const txDb = tx as unknown as Db;
-        await failQueuedEmailsForDomain(txDb, { teamId: ctx.teamId, domainId: domain.id });
-        // api_keys.domainId is ON DELETE restrict: a key scoped to this domain
-        // would block the delete, and set-null would silently widen it to an
-        // all-domains key. So revoke every scoped key and drop its FK first — a
-        // revoked key never authenticates, and clearing domainId frees the delete.
-        await txDb
-          .update(schema.apiKeys)
-          .set({ revokedAt: new Date(), domainId: null })
-          .where(
-            and(eq(schema.apiKeys.teamId, ctx.teamId), eq(schema.apiKeys.domainId, domain.id)),
-          );
-        await txDb
-          .delete(schema.domains)
-          .where(and(eq(schema.domains.id, domain.id), eq(schema.domains.teamId, ctx.teamId)));
+        await db.transaction(async (tx) => {
+          const txDb = tx as unknown as Db;
+          await failQueuedEmailsForDomain(txDb, { teamId: ctx.teamId, domainId: domain.id });
+          // api_keys.domainId is ON DELETE restrict: a key scoped to this domain
+          // would block the delete, and set-null would silently widen it to an
+          // all-domains key. So revoke every scoped key and drop its FK first — a
+          // revoked key never authenticates, and clearing domainId frees the delete.
+          await txDb
+            .update(schema.apiKeys)
+            .set({ revokedAt: new Date(), domainId: null })
+            .where(
+              and(eq(schema.apiKeys.teamId, ctx.teamId), eq(schema.apiKeys.domainId, domain.id)),
+            );
+          await txDb
+            .delete(schema.domains)
+            .where(and(eq(schema.domains.id, domain.id), eq(schema.domains.teamId, ctx.teamId)));
+        });
+        return domain;
       });
       await recordAudit(ctx, {
         action: "domain.deleted",

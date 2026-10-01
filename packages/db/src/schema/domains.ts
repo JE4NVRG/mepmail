@@ -5,6 +5,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -73,5 +74,8 @@ export const domains = pgTable(
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
     lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
   },
-  (t) => [uniqueIndex("domains_team_name_idx").on(t.teamId, t.name)],
+  (t) => [
+    uniqueIndex("domains_team_name_idx").on(t.teamId, t.name),
+    unique("domains_id_team_unique").on(t.id, t.teamId),
+  ],
 );

@@ -636,6 +636,17 @@ export {
   type WebhookChannel,
 } from "./webhook-channels.js";
 export {
+  createMailboxRegistry,
+  grantMailboxRegistry,
+  listMailboxRegistry,
+  mailboxDomainLock,
+  MailboxRegistryError,
+  type MailboxRegistryActor,
+  revokeMailboxRegistry,
+  updateMailboxRegistry,
+  withMailboxRegistryAdmin,
+} from "./mailbox-registry.js";
+export {
   buildWebhookPayload,
   clearWebhookEndpointNotifications,
   decryptWebhookSecret,
