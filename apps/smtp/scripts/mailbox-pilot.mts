@@ -35,6 +35,41 @@ const html = await readFile(
   join(dirname(fileURLToPath(import.meta.url)), "mailbox-pilot.html"),
   "utf8",
 );
+const assets = new Map([
+  [
+    "/assets/mailbox-pilot.css",
+    {
+      type: "text/css; charset=utf-8",
+      bytes: await readFile(join(dirname(fileURLToPath(import.meta.url)), "mailbox-pilot.css")),
+    },
+  ],
+  [
+    "/assets/mailbox-pilot.js",
+    {
+      type: "text/javascript; charset=utf-8",
+      bytes: await readFile(join(dirname(fileURLToPath(import.meta.url)), "mailbox-pilot.js")),
+    },
+  ],
+  ...(await Promise.all(
+    [
+      ["colors.css", "src/styles/tokens/colors.css", "text/css; charset=utf-8"],
+      ["typography.css", "src/styles/tokens/typography.css", "text/css; charset=utf-8"],
+      ["spacing.css", "src/styles/tokens/spacing.css", "text/css; charset=utf-8"],
+      ["mepmail-wordmark.svg", "public/logo/mepmail-wordmark.svg", "image/svg+xml"],
+      ["mepmail-wordmark-light.svg", "public/logo/mepmail-wordmark-light.svg", "image/svg+xml"],
+      ["mepmail-favicon.svg", "public/logo/mepmail-favicon.svg", "image/svg+xml"],
+    ].map(
+      async ([name, path, type]) =>
+        [
+          `/assets/${name}`,
+          {
+            type,
+            bytes: await readFile(join(dirname(fileURLToPath(import.meta.url)), "../../web", path)),
+          },
+        ] as const,
+    ),
+  )),
+]);
 const sessions = new Map<string, "human" | "agent">();
 const captures = new Set<string>();
 let mutations: Promise<unknown> = Promise.resolve();
@@ -88,7 +123,7 @@ const server = createServer(async (req, res) => {
   const nonce = randomBytes(16).toString("base64");
   res.setHeader(
     "Content-Security-Policy",
-    `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`,
+    `default-src 'none'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'nonce-${nonce}'; font-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`,
   );
   try {
     if (req.headers.host !== "127.0.0.1:3186" || (req.url?.length ?? 0) > 1024)
@@ -97,6 +132,12 @@ const server = createServer(async (req, res) => {
     const token = session(req, res);
     const mode = sessions.get(token)!;
     const actor: MailboxActor = mode === "agent" ? agent : human;
+    const asset = assets.get(url.pathname);
+    if (req.method === "GET" && asset) {
+      res.setHeader("Content-Type", asset.type);
+      res.end(asset.bytes);
+      return;
+    }
     if (req.method === "GET" && url.pathname === "/") {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.end(html.replaceAll("__NONCE__", nonce));

@@ -29,6 +29,7 @@ export interface PilotMime {
   messageId: string;
   subject: string;
   from: string;
+  to: string[];
   replyTo: string;
   text: string;
   references: string[];
@@ -64,6 +65,8 @@ interface Draft {
   text: string;
   raw: string;
   status: "draft" | "sent";
+  createdBy?: string;
+  createdAt?: string;
 }
 interface State {
   version: 1;
@@ -285,6 +288,8 @@ export class MailboxPilot {
       receivedAt: item.receivedAt,
       subject: parsed.subject,
       from: parsed.from,
+      to: parsed.to,
+      replyTo: parsed.replyTo,
       text: parsed.text,
       messageId: parsed.messageId,
       untrustedContent: true as const,
@@ -313,9 +318,27 @@ export class MailboxPilot {
   async drafts(actor: MailboxActor, mailboxId: string) {
     await this.tail;
     this.allow(actor, mailboxId, "read");
-    return this.state.drafts
-      .filter((item) => item.mailboxId === mailboxId)
-      .map(({ raw: _raw, ...item }) => ({ ...item }));
+    const result = await Promise.all(
+      this.state.drafts
+        .filter((item) => item.mailboxId === mailboxId)
+        .map(async ({ raw, ...item }) => {
+          const mime = await this.mime.parse(Buffer.from(raw, "base64"));
+          return {
+            ...item,
+            from: mime.from,
+            to: mime.to,
+            subject: mime.subject,
+            attachments: mime.attachments.map((attachment) => ({
+              filename: attachment.filename,
+              contentType: attachment.contentType,
+              bytes: attachment.content.length,
+            })),
+          };
+        }),
+    );
+    await this.tail;
+    this.allow(actor, mailboxId, "read");
+    return result;
   }
   async reply(
     actor: MailboxActor,
@@ -362,6 +385,8 @@ export class MailboxPilot {
         text,
         raw: raw.toString("base64"),
         status: "draft",
+        createdBy: actor.principalId,
+        createdAt: new Date().toISOString(),
       });
       return {
         id,

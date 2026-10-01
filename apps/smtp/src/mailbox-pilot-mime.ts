@@ -12,6 +12,10 @@ export const mailboxPilotMime: PilotMimeAdapter = {
       messageId: value.messageId ?? "",
       subject: value.subject ?? "(sem assunto)",
       from,
+      to: (Array.isArray(value.to) ? value.to : value.to ? [value.to] : [])
+        .flatMap((item) => item.value)
+        .map((item) => item.address)
+        .filter((item): item is string => !!item),
       replyTo: value.replyTo?.value[0]?.address ?? from,
       text: value.text ?? "",
       references: [

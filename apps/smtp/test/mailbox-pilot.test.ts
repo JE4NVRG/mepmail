@@ -155,6 +155,12 @@ describe("mailbox product qualification with real MIME and private storage", () 
     expect(draft).toMatchObject({ status: "draft", canSend: false, threadId: row.threadId });
     expect(await service.list(agent, "agent")).toHaveLength(1);
     expect((await service.drafts(human, "agent"))[0].text).toBe("Recebi o resumo, obrigado.");
+    expect((await service.drafts(human, "agent"))[0]).toMatchObject({
+      from: "luna@piloto.test",
+      to: ["cliente@exemplo.test"],
+      createdBy: "pilot-agent",
+      attachments: [{ filename: "resumo-do-dominio.txt", bytes: attachmentBytes.length }],
+    });
     let called = false;
     await expect(
       service.send(agent, "agent", draft.id, async () => {
