@@ -237,6 +237,8 @@ export interface ApiDeps {
    * router enforces).
    */
   appBaseUrl?: string | undefined;
+  /** Single OAuth issuer; omitted preserves the dashboard issuer. */
+  oauthIssuerUrl?: string | undefined;
   /** Host of the hosted unsubscribe pages when they have their own; omitted → appBaseUrl. */
   unsubscribeBaseUrl?: string | undefined;
   /**

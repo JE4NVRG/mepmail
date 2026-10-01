@@ -4,6 +4,7 @@ import {
   betaMaxUsers,
   env,
   isCloudDeployment,
+  resolveOAuthIssuerUrl,
   signupOpen,
 } from "@millionsend/config";
 import {
@@ -208,6 +209,7 @@ export function createAuth(
     throw new Error("BETTER_AUTH_SECRET is required to run the web app");
   }
   const baseURL = resolveBaseUrl(env.APP_BASE_URL);
+  const issuer = resolveOAuthIssuerUrl(baseURL, env.OAUTH_ISSUER_URL, env.PUBLIC_API_URL);
   const erase = deps.eraseRecipient ?? enqueueRecipientErase;
   /**
    * A proven account becomes a contact of the account-mail team. Proven:
@@ -404,10 +406,9 @@ export function createAuth(
             }),
           ]
         : []),
-      // Issuer is the bare APP_BASE_URL (not .../api/auth) so RFC 8414
-      // discovery resolves at /.well-known/oauth-authorization-server
-      // (app/.well-known/oauth-authorization-server/route.ts).
-      jwt({ jwt: { issuer: baseURL } }),
+      // A single explicit issuer may outlive a dashboard-origin migration.
+      // Discovery endpoints/JWKS and trusted origins still follow baseURL.
+      jwt({ jwt: { issuer } }),
       oauthProvider({
         loginPage: "/login",
         consentPage: "/oauth/consent",

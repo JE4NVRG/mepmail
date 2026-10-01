@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { type OpenAPIHono, z } from "@hono/zod-openapi";
+import { resolveOAuthIssuerUrl } from "@millionsend/config";
 import {
   ADMIN_MCP_SCOPES,
   ALL_TEAMS_GRANT,
@@ -1188,16 +1189,17 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
 
 /**
  * MCP resource server (Streamable HTTP at /mcp) plus its RFC 9728 discovery
- * document. The dashboard (APP_BASE_URL) is the authorization server; tokens
- * are verified offline against its JWKS, so no cross-app import is needed.
+ * document. APP_BASE_URL locates the dashboard's JWKS; a single explicit
+ * OAuth issuer may remain stable when that dashboard origin changes.
  */
 export function registerMcp(app: OpenAPIHono<Env>, deps: ApiDeps, appBaseUrl: string): void {
+  const issuer = resolveOAuthIssuerUrl(appBaseUrl, deps.oauthIssuerUrl, deps.publicApiUrl);
   const resource = mcpResourceUrl(appBaseUrl, deps.publicApiUrl);
   const resourceMetadataUrl = getOAuthProtectedResourceMetadataUrl(new URL(resource));
   const bearer = {
     verifier: createTokenVerifier(
       deps.db,
-      appBaseUrl,
+      issuer,
       resource,
       createRemoteJWKSet(new URL(`${appBaseUrl}/api/auth/jwks`)),
       deps.rateLimitPerMinute ?? 600,
@@ -1218,7 +1220,7 @@ export function registerMcp(app: OpenAPIHono<Env>, deps: ApiDeps, appBaseUrl: st
   // client's session ends when the first access token expires.
   const metadata = {
     resource,
-    authorization_servers: [appBaseUrl],
+    authorization_servers: [issuer],
     scopes_supported: ["offline_access", ...MCP_SCOPES],
     bearer_methods_supported: ["header"],
   };

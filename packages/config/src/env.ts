@@ -51,6 +51,49 @@ export const ABUSE_JUDGE_TIMEOUT_MS_DEFAULT = 20_000;
 
 const emailAddress = z.email();
 
+const oauthIssuerSchema = z.string().refine(
+  (value) => {
+    try {
+      const url = new URL(value);
+      return (url.protocol === "https:" || url.protocol === "http:") && url.origin === value;
+    } catch {
+      return false;
+    }
+  },
+  { message: "OAUTH_ISSUER_URL must be a bare absolute HTTP(S) origin" },
+);
+
+/** Single issuer for emission, discovery and verification; legacy fallback unchanged. */
+export function resolveOAuthIssuerUrl(
+  appBaseUrl: string,
+  issuerUrl: string | undefined,
+  publicApiUrl: string | undefined,
+): string {
+  if (!issuerUrl) return appBaseUrl;
+  const parsed = oauthIssuerSchema.safeParse(issuerUrl);
+  if (!parsed.success) throw new Error("OAUTH_ISSUER_URL must be a bare absolute HTTP(S) origin");
+  if (issuerUrl !== appBaseUrl) {
+    if (!publicApiUrl) {
+      throw new Error("PUBLIC_API_URL is required when OAUTH_ISSUER_URL differs from APP_BASE_URL");
+    }
+    try {
+      const url = new URL(publicApiUrl);
+      if (
+        !/^https?:$/.test(url.protocol) ||
+        url.username ||
+        url.password ||
+        url.search ||
+        url.hash
+      ) {
+        throw new Error("invalid API URL");
+      }
+    } catch {
+      throw new Error("PUBLIC_API_URL must be an absolute HTTP(S) URL");
+    }
+  }
+  return parsed.data;
+}
+
 /**
  * Parse a mail From value — `Name <user@domain>` or a bare address — into its
  * display name and address. Null when the address part is not a valid email,
@@ -269,6 +312,9 @@ export const env = createEnv({
     // Public base URL of this deployment; SNS subscriptions and hosted
     // unsubscribe pages are derived from it.
     APP_BASE_URL: z.url().optional(),
+    // Optional single OAuth issuer, independent of the dashboard origin.
+    // Unset preserves the APP_BASE_URL issuer; never an issuer allowlist.
+    OAUTH_ISSUER_URL: oauthIssuerSchema.optional(),
     // Public base URL the hosted unsubscribe pages and their links use when
     // they live on their own host (e.g. https://unsubscribe.example.com):
     // the origin recipients' browsers and security scanners hit stays apart
@@ -639,6 +685,10 @@ const BACKUP_TUNING_KEYS = ["S3_BACKUP_PREFIX", "BACKUP_CRON", "BACKUP_RETENTION
 
 /** Cross-field rules that per-field schemas cannot express. */
 export function assertEnvConsistency(e: Env): void {
+  if (e.OAUTH_ISSUER_URL) {
+    if (!e.APP_BASE_URL) throw new Error("OAUTH_ISSUER_URL requires APP_BASE_URL");
+    resolveOAuthIssuerUrl(e.APP_BASE_URL, e.OAUTH_ISSUER_URL, e.PUBLIC_API_URL);
+  }
   if (Boolean(e.SMTP_TLS_CERT_PATH) !== Boolean(e.SMTP_TLS_KEY_PATH)) {
     throw new Error("SMTP_TLS_CERT_PATH and SMTP_TLS_KEY_PATH must be set together");
   }

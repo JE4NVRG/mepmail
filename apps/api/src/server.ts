@@ -94,6 +94,7 @@ const app = createApi({
   rateLimitPerMinute: env.API_RATE_LIMIT_PER_MINUTE,
   revision: env.MILLIONSEND_REVISION,
   appBaseUrl: env.APP_BASE_URL,
+  oauthIssuerUrl: env.OAUTH_ISSUER_URL,
   unsubscribeBaseUrl: unsubscribeBaseUrl(),
   publicApiUrl: env.PUBLIC_API_URL,
   unsubscribeSecretKey: deriveUnsubscribeKey(Buffer.from(env.MASTER_ENCRYPTION_KEY, "base64")),
