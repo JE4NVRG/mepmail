@@ -44,6 +44,16 @@ const AUDIENCE_TABS = [
   "/audience/topics",
 ];
 
+describe("console dashboard return", () => {
+  it("keeps /emails safe on deep entry without stealing the console highlight", () => {
+    const paths = ["/emails", "/console", "/console/regions"];
+    expect(safeNextPath("/emails", "/emails")).toBe("/emails");
+    expect(pickActive("/console", paths)).toBe("/console");
+    expect(pickActive("/console/regions", paths)).toBe("/console/regions");
+    expect(pickActive("/emails", paths)).toBe("/emails");
+  });
+});
+
 describe("pickActive (Audience tab highlight)", () => {
   it("keeps Contacts active on /audience and every per-audience URL", () => {
     expect(pickActive("/audience", AUDIENCE_TABS)).toBe("/audience");

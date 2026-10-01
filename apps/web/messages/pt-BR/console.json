@@ -1,6 +1,7 @@
 {
   "nav": {
     "console": "Console",
+    "backToDashboard": "Voltar ao painel",
     "overview": "Visão geral",
     "regions": "Regiões",
     "teams": "Equipes",

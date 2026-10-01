@@ -33,7 +33,7 @@
     "keyCommentLocked": "your key, once created",
     "sendCta": "Send email",
     "sending": "Sending…",
-    "sentTo": "Sent to {to}. It shows up below the moment it lands.",
+    "sentTo": "Send request accepted for {to}. Wait for the delivery event.",
     "sendError": "Could not send. Try again.",
     "selfHostBase": "Self-hosted: point the SDKs at this instance with MILLIONSEND_BASE_URL={url}.",
     "captchaFailed": "Verification failed. Try again.",
@@ -44,11 +44,33 @@
     "waiting": "waiting for your first email · checking every 5 s"
   },
   "success": {
+    "title": "Delivery confirmed",
+    "subtitle": "Your team has confirmed deliveries. Review your current setup and send history below.",
     "keyAdded": "API key added",
+    "domainVerified": "Verified domain: {domain}",
+    "deliveryConfirmed": "Your team has confirmed deliveries",
     "emailPending": "Email to {to} — not delivered yet",
     "emailDelivered": "Email sent · delivered to {to} in {seconds} s",
     "counting": "{count, plural, one {1 delivered. Counting.} other {# delivered. Counting.}}",
     "deliveredIn": "delivered in {seconds} s"
+  },
+  "attempt": {
+    "label": "Send history",
+    "first": "First attempt",
+    "latest": "Latest attempt",
+    "log": "View log",
+    "history": "Open email history",
+    "inFlightTitle": "Track your delivery",
+    "inFlight": "Send in transit — awaiting a delivery event. API acceptance is not delivery confirmation.",
+    "failedTitle": "Delivery needs attention",
+    "failed": "This attempt ended without a confirmed delivery.",
+    "retryTitle": "Review the log before retrying",
+    "retryBody": "Check the failure reason in the log and correct the recipient or sender settings before retrying. A new send happens only when you run the snippet or click the button.",
+    "retryCta": "Send another attempt",
+    "waiting": "Awaiting delivery",
+    "readUnavailableTitle": "Delivery status unavailable",
+    "readUnavailable": "We could not load your current delivery status. Reload it before making another attempt; you can still open the email history.",
+    "reload": "Reload status"
   },
   "explore": {
     "label": "Explore more",

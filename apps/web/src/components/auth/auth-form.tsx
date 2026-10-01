@@ -94,7 +94,8 @@ export function AuthForm({
   const nextParam = params.get("next");
   const next = safeNextPath(nextParam, mode === "login" ? "/emails" : "/onboarding");
   // better-auth bounces failed OAuth callbacks to errorCallbackURL?error=code.
-  const socialFailed = params.get("error") !== null;
+  const socialError = params.get("error");
+  const socialFailed = socialError !== null;
 
   const [name, setName] = useState("");
   // An invite link carries the invited address; signup starts from it.
@@ -106,7 +107,7 @@ export function AuthForm({
   const [revealPassword, setRevealPassword] = useState(false);
   const [revealConfirm, setRevealConfirm] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(
-    socialFailed ? tSocial("error") : null,
+    socialFailed ? tSocial(socialError === "account_not_linked" ? "notLinked" : "error") : null,
   );
   const [pending, setPending] = useState<"email" | SocialProvider | null>(null);
   // An instance that verifies addresses creates the account without a

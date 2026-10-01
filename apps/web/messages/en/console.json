@@ -1,6 +1,7 @@
 {
   "nav": {
     "console": "Console",
+    "backToDashboard": "Back to dashboard",
     "overview": "Overview",
     "regions": "Regions",
     "teams": "Teams",

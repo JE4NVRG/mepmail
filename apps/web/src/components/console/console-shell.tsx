@@ -165,6 +165,7 @@ function ConsoleSidebar({
             : undefined
         }
       >
+        <Link href="/emails">{t("backToDashboard")}</Link>
         {CONSOLE_NAV.map((item) => (
           <Link
             key={item.key}
@@ -260,8 +261,8 @@ function ConsoleSidebar({
 }
 
 /**
- * The console's chrome: its own sidebar (no team switcher, no link back to
- * the app) and the same off-canvas drawer treatment as the dashboard below
+ * The console's chrome: its own sidebar (no team switcher, a fixed return to
+ * the dashboard) and the same off-canvas drawer treatment as the dashboard below
  * 900px, so the responsive rules in components.css apply unchanged.
  */
 export function ConsoleShell({

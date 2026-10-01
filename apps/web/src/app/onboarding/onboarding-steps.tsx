@@ -28,6 +28,25 @@ import {
 /** Statuses that can still progress to delivered (see emailStatusEnum). */
 const IN_FLIGHT_STATUSES = new Set(["queued_quota", "queued", "sent", "delivery_delayed"]);
 
+const TERMINAL_STATUSES = new Set(["bounced", "complained", "suppressed", "failed", "canceled"]);
+
+/** A send attempt is not a delivery milestone; counters outlive email retention. */
+export function deriveOnboardingState({
+  hasEmail,
+  latestStatus,
+  allTimeDelivered,
+  hasDeliveredEvent = false,
+}: {
+  hasEmail: boolean;
+  latestStatus?: string | undefined;
+  allTimeDelivered: number;
+  hasDeliveredEvent?: boolean;
+}): "no-send" | "in-flight" | "failed" | "delivered" {
+  if (allTimeDelivered > 0 || hasDeliveredEvent || latestStatus === "delivered") return "delivered";
+  if (!hasEmail) return "no-send";
+  return TERMINAL_STATUSES.has(latestStatus ?? "") ? "failed" : "in-flight";
+}
+
 const EXPLORE = [
   { key: "domains", href: "/domains", recommended: true },
   { key: "mcp", href: "/settings/mcp" },
@@ -185,27 +204,32 @@ export function OnboardingSteps({
   const domainsQuery = useQuery(trpc.domains.list.queryOptions());
   const verifiedDomain = domainsQuery.data?.find((d) => d.status === "verified")?.name;
 
-  // Oldest-first so the team's true first email is found even past 50 sends.
+  // Keep the first attempt as history, not as the team's current progress.
+  // Reads must not depend on an active key: keys can be revoked after sending.
   const emailsQuery = useQuery({
     ...trpc.emails.list.queryOptions({ limit: 1, order: "asc" }),
-    enabled: hasKey,
-    refetchInterval: (query) => (query.state.data?.items.length ? false : 5000),
+    refetchInterval: 5000,
   });
   const firstEmail = emailsQuery.data?.items[0];
   const emailCount = emailsQuery.data?.total ?? 0;
 
+  const latestQuery = useQuery({
+    ...trpc.emails.list.queryOptions({ limit: 1, order: "desc" }),
+    enabled: emailCount > 1,
+    refetchInterval: 5000,
+  });
+  const currentEmail = emailCount > 1 ? latestQuery.data?.items[0] : firstEmail;
+
   // Keeps ticking while the page is open: the odometer rolls on every delivery.
   const metricsQuery = useQuery({
     ...trpc.metrics.window.queryOptions({}),
-    enabled: firstEmail !== undefined,
     refetchInterval: 5000,
   });
-  const deliveredCount = metricsQuery.data?.allTimeDelivered ?? 0;
 
   const detailQuery = useQuery({
-    ...trpc.emails.get.queryOptions({ id: firstEmail?.id ?? "" }),
-    enabled: firstEmail !== undefined,
-    // Poll while the first email is still in flight so its status stays honest.
+    ...trpc.emails.get.queryOptions({ id: currentEmail?.id ?? "" }),
+    enabled: currentEmail !== undefined,
+    // Poll the current attempt; an old bounce must not stop tracking a retry.
     refetchInterval: (query) => {
       const status = query.state.data?.latestStatus;
       return status === undefined || IN_FLIGHT_STATUSES.has(status) ? 5000 : false;
@@ -213,6 +237,19 @@ export function OnboardingSteps({
   });
   const detail = detailQuery.data;
   const deliveredEvent = detail?.events.find((e) => e.type === "delivered");
+  const currentStatus = detail?.latestStatus ?? currentEmail?.latestStatus;
+  // A confirmed event/status can arrive before the aggregate counter refreshes.
+  const deliveredCount = Math.max(
+    metricsQuery.data?.allTimeDelivered ?? 0,
+    deliveredEvent || currentStatus === "delivered" ? 1 : 0,
+  );
+  const deliveryState = deriveOnboardingState({
+    hasEmail: currentEmail !== undefined,
+    latestStatus: currentStatus,
+    allTimeDelivered: deliveredCount,
+    hasDeliveredEvent: deliveredEvent !== undefined,
+  });
+  const success = deliveryState === "delivered";
   const deliveredSeconds =
     detail && deliveredEvent
       ? (
@@ -247,7 +284,7 @@ export function OnboardingSteps({
     from: sender ?? (verifiedDomain ? `onboarding@${verifiedDomain}` : t("step2.fromPlaceholder")),
     to: userEmail,
     subject: t("step2.subject"),
-    html: t("step2.html"),
+    html: t.raw("step2.html"),
   };
   // Honest key handling: only while the real token is in memory may the
   // snippet promise (and deliver) the real key on copy. Otherwise both the
@@ -262,18 +299,20 @@ export function OnboardingSteps({
   const displayCode = onboardingSnippet(lang, displayParams);
   const copyCode = onboardingSnippet(lang, copyParams);
 
-  // Everything the layout hinges on loads before anything paints, so a team
-  // past its first email never flashes the stepper it already finished.
-  const loading =
-    keysQuery.isPending ||
-    features.isPending ||
-    (showInstanceHint && awsQuery.isPending) ||
-    (hasKey && emailsQuery.isPending);
+  // Wait for the real milestone and current attempt on reload/team navigation.
+  const progressQueries = [
+    keysQuery,
+    features,
+    emailsQuery,
+    metricsQuery,
+    ...(showInstanceHint ? [awsQuery] : []),
+    ...(emailCount > 1 ? [latestQuery] : []),
+    ...(currentEmail !== undefined ? [detailQuery] : []),
+  ];
+  const loading = progressQueries.some((query) => query.isPending);
+  const readUnavailable = progressQueries.some((query) => query.isError);
 
-  const success = firstEmail !== undefined;
-  const toDisplay = firstEmail?.to.join(", ") ?? userEmail;
-  // detail is polled while in flight, so it is the fresher status source.
-  const firstStatus = detail?.latestStatus ?? firstEmail?.latestStatus;
+  const toDisplay = currentEmail?.to.join(", ") ?? userEmail;
 
   const explore = (
     <div style={{ marginTop: 56 }}>
@@ -339,6 +378,40 @@ export function OnboardingSteps({
       ) : null}
     </div>
   );
+
+  if (readUnavailable) {
+    return (
+      <div>
+        <h1 className="ms-display" style={{ fontSize: "var(--ms-fs-h1)", margin: 0 }}>
+          {t("attempt.readUnavailableTitle")}
+        </h1>
+        <p role="alert" style={{ marginTop: 16, color: "var(--ms-muted)" }}>
+          {t("attempt.readUnavailable")}
+        </p>
+        <button
+          type="button"
+          className="ms-btn ms-btn-secondary"
+          disabled={progressQueries.some((query) => query.isFetching)}
+          onClick={() => void Promise.all(progressQueries.map((query) => query.refetch()))}
+        >
+          {t("attempt.reload")}
+        </button>
+        <div style={{ marginTop: 24, display: "grid", gap: 12 }}>
+          {firstEmail ? (
+            <Link href={`/emails/${firstEmail.id}`}>
+              {t("attempt.first")} · {t("attempt.log")}
+            </Link>
+          ) : null}
+          {currentEmail && currentEmail.id !== firstEmail?.id ? (
+            <Link href={`/emails/${currentEmail.id}`}>
+              {t("attempt.latest")} · {t("attempt.log")}
+            </Link>
+          ) : null}
+          <Link href="/emails">{t("attempt.history")}</Link>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -468,7 +541,7 @@ export function OnboardingSteps({
           <button
             type="button"
             className="ms-btn ms-btn-primary"
-            disabled={verifying || sendFirst.isPending}
+            disabled={verifying || sendFirst.isPending || deliveryState === "in-flight"}
             onClick={async () => {
               setCaptchaFailed(false);
               setVerifying(true);
@@ -483,10 +556,16 @@ export function OnboardingSteps({
             }}
           >
             <BtnSpinner on={verifying || sendFirst.isPending} />
-            {verifying || sendFirst.isPending ? t("step2.sending") : t("step2.sendCta")}
+            {verifying || sendFirst.isPending
+              ? t("step2.sending")
+              : deliveryState === "in-flight"
+                ? t("attempt.waiting")
+                : deliveryState === "failed"
+                  ? t("attempt.retryCta")
+                  : t("step2.sendCta")}
           </button>
           {turnstile.slot}
-          {sendFirst.isSuccess ? (
+          {sendFirst.isSuccess && deliveryState !== "failed" ? (
             <span style={{ fontSize: 13, color: "var(--ms-muted)" }}>
               {t("step2.sentTo", { to: userEmail })}
             </span>
@@ -507,29 +586,44 @@ export function OnboardingSteps({
   return (
     <div style={{ overflow: "hidden" }}>
       <h1 className="ms-display" style={{ fontSize: "var(--ms-fs-h1)", margin: 0 }}>
-        {t("title")}
+        {success
+          ? t("success.title")
+          : deliveryState === "in-flight"
+            ? t("attempt.inFlightTitle")
+            : deliveryState === "failed"
+              ? t("attempt.failedTitle")
+              : t("title")}
       </h1>
-      <div style={{ fontSize: 14, color: "var(--ms-muted)", marginTop: 6 }}>{t("subtitle")}</div>
+      <div style={{ fontSize: 14, color: "var(--ms-muted)", marginTop: 6 }}>
+        {success
+          ? t("success.subtitle")
+          : deliveryState === "in-flight"
+            ? t("attempt.inFlight")
+            : deliveryState === "failed"
+              ? t("attempt.failed")
+              : t("subtitle")}
+      </div>
 
       {success ? (
         <>
           <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 8 }}>
-            <StampRow at={bankedKey?.createdAt}>
+            {hasKey ? (
+              <StampRow at={bankedKey?.createdAt}>
+                <span style={{ color: "var(--ms-success)" }}>✓</span>
+                {t("success.keyAdded")}
+              </StampRow>
+            ) : null}
+            {verifiedDomain ? (
+              <StampRow>
+                <span style={{ color: "var(--ms-success)" }}>✓</span>
+                {t("success.domainVerified", { domain: verifiedDomain })}
+              </StampRow>
+            ) : null}
+            <StampRow at={deliveredEvent?.occurredAt}>
               <span style={{ color: "var(--ms-success)" }}>✓</span>
-              {t("success.keyAdded")}
-            </StampRow>
-            <StampRow at={firstEmail.createdAt}>
-              {deliveredSeconds ? (
-                <>
-                  <span style={{ color: "var(--ms-success)" }}>✓</span>
-                  {t("success.emailDelivered", { to: toDisplay, seconds: deliveredSeconds })}
-                </>
-              ) : (
-                <>
-                  {firstStatus ? <StatusBadge status={firstStatus} /> : null}
-                  {t("success.emailPending", { to: toDisplay })}
-                </>
-              )}
+              {deliveredSeconds
+                ? t("success.emailDelivered", { to: toDisplay, seconds: deliveredSeconds })
+                : t("success.deliveryConfirmed")}
             </StampRow>
           </div>
 
@@ -614,10 +708,25 @@ export function OnboardingSteps({
           <div className="ms-step" style={{ display: "flex", gap: 18 }}>
             <StepRail marker={marker(2)} color={hasKey ? "var(--ms-bone)" : "var(--ms-faint)"} />
             <StepCard
-              title={t("step2.title")}
-              body={hasKey ? t("step2.bodyReady") : t("step2.bodyLocked")}
+              title={deliveryState === "failed" ? t("attempt.retryTitle") : t("step2.title")}
+              body={
+                !hasKey
+                  ? t("step2.bodyLocked")
+                  : deliveryState === "failed"
+                    ? t("attempt.retryBody")
+                    : t("step2.bodyReady")
+              }
               locked={!hasKey}
             >
+              {deliveryState === "failed" && currentEmail ? (
+                <Link
+                  href={`/emails/${currentEmail.id}`}
+                  className="ms-btn ms-btn-secondary"
+                  style={{ marginTop: 14 }}
+                >
+                  {t("attempt.log")}
+                </Link>
+              ) : null}
               {codePanel}
               {showInstanceHint && lang !== "curl" ? (
                 <p
@@ -639,13 +748,46 @@ export function OnboardingSteps({
               </span>
               {hasKey ? (
                 <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-muted)" }}>
-                  {t("step3.waiting")}
+                  {deliveryState === "no-send"
+                    ? t("step3.waiting")
+                    : deliveryState === "failed"
+                      ? t("attempt.failed")
+                      : t("attempt.waiting")}
                 </span>
               ) : null}
             </div>
           </div>
         </div>
       )}
+
+      {firstEmail || success ? (
+        <section style={{ marginTop: 32 }}>
+          <h2 className="ms-microlabel">{t("attempt.label")}</h2>
+          {firstEmail
+            ? [
+                firstEmail,
+                ...(currentEmail && currentEmail.id !== firstEmail.id ? [currentEmail] : []),
+              ].map((email, index) => (
+                <StampRow key={email.id} at={email.createdAt}>
+                  {t(index === 0 ? "attempt.first" : "attempt.latest")}
+                  <StatusBadge
+                    status={
+                      email.id === currentEmail?.id
+                        ? (currentStatus ?? email.latestStatus)
+                        : email.latestStatus
+                    }
+                  />
+                  <Link href={`/emails/${email.id}`} style={{ color: "var(--ms-bone)" }}>
+                    {t("attempt.log")}
+                  </Link>
+                </StampRow>
+              ))
+            : null}
+          <Link href="/emails" className="ms-btn ms-btn-secondary" style={{ marginTop: 12 }}>
+            {t("attempt.history")}
+          </Link>
+        </section>
+      ) : null}
 
       {explore}
     </div>

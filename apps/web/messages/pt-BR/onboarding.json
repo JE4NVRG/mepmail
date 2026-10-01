@@ -33,7 +33,7 @@
     "keyCommentLocked": "sua chave, após a criação",
     "sendCta": "Enviar e-mail",
     "sending": "Enviando…",
-    "sentTo": "Enviado para {to}. Aparece abaixo assim que chegar.",
+    "sentTo": "Solicitação de envio aceita para {to}. Aguarde o evento de entrega.",
     "sendError": "Não foi possível enviar. Tente de novo.",
     "selfHostBase": "Self-host: aponte os SDKs para esta instância com MILLIONSEND_BASE_URL={url}.",
     "captchaFailed": "A verificação falhou. Tente de novo.",
@@ -44,11 +44,33 @@
     "waiting": "aguardando seu primeiro e-mail · verificando a cada 5 s"
   },
   "success": {
+    "title": "Entrega confirmada",
+    "subtitle": "Seu time já possui entregas confirmadas. Consulte a configuração atual e o histórico de envios abaixo.",
     "keyAdded": "Chave de API adicionada",
+    "domainVerified": "Domínio verificado: {domain}",
+    "deliveryConfirmed": "Seu time já possui entregas confirmadas",
     "emailPending": "E-mail para {to} — ainda não entregue",
     "emailDelivered": "E-mail enviado · entregue para {to} em {seconds} s",
     "counting": "{count, plural, one {1 entregue. Contando.} other {# entregues. Contando.}}",
     "deliveredIn": "entregue em {seconds} s"
+  },
+  "attempt": {
+    "label": "Histórico de envios",
+    "first": "Primeira tentativa",
+    "latest": "Tentativa mais recente",
+    "log": "Ver log",
+    "history": "Abrir histórico de e-mails",
+    "inFlightTitle": "Acompanhe a entrega",
+    "inFlight": "Envio em trânsito — aguardando um evento de entrega. O aceite da API não confirma a entrega.",
+    "failedTitle": "A entrega precisa de atenção",
+    "failed": "Esta tentativa terminou sem uma entrega confirmada.",
+    "retryTitle": "Revise o log antes de tentar novamente",
+    "retryBody": "Confira o motivo da falha no log e corrija o destinatário ou a configuração do remetente antes de tentar novamente. Um novo envio só acontece ao executar o snippet ou clicar no botão.",
+    "retryCta": "Enviar nova tentativa",
+    "waiting": "Aguardando entrega",
+    "readUnavailableTitle": "Status de entrega indisponível",
+    "readUnavailable": "Não foi possível consultar o status atual de entrega. Recarregue antes de tentar outro envio; o histórico de e-mails continua disponível.",
+    "reload": "Recarregar status"
   },
   "explore": {
     "label": "Explore mais",

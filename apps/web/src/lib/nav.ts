@@ -23,6 +23,37 @@ export function safeNextPath(next: string | null | undefined, fallback: string):
   return url.pathname + url.search + url.hash;
 }
 
+/** Destino após autenticação, sem ciclos nas telas intermediárias nem endpoints. */
+export function postAuthNext(
+  value: unknown,
+  fallback = "/emails",
+  allowOnboarding = false,
+): string {
+  const next = safeNextPath(typeof value === "string" ? value : null, fallback);
+  // O cadastro Free já usa este destino exato; nunca aceitar onboarding aninhado.
+  if (allowOnboarding && next === "/onboarding") return next;
+  let path: string;
+  try {
+    path = decodeURIComponent(new URL(next, "http://next.invalid").pathname);
+  } catch {
+    return fallback;
+  }
+  if (safeNextPath(path, "") !== path) return fallback;
+  if (
+    /^\/(?:login|signup|forgot-password|reset-password|verify-email|onboarding|api)(?:\/|$)/.test(
+      path,
+    )
+  )
+    return fallback;
+  return next;
+}
+
+/** Preserva somente o destino validado; não transporta tokens nem executa ações. */
+export function withNext(path: string, value: unknown): string {
+  const next = postAuthNext(value, "", path !== "/onboarding");
+  return next ? `${path}?next=${encodeURIComponent(next)}` : path;
+}
+
 /** True when `pathname` is `href` or nested under it ("/emails/123" → "/emails"). */
 export function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
