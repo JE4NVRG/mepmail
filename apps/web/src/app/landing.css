@@ -1466,3 +1466,54 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* Account controls shared by all public pages. */
+.gtm-public-account {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.gtm-account-error {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 10;
+  width: 220px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--ms-line);
+  background: var(--ms-panel);
+  color: var(--ms-danger);
+  font-size: 12px;
+}
+.gtm-account-photo {
+  display: inline-flex;
+  border-radius: 50%;
+}
+.gtm-account-signout {
+  background: none;
+  border: 0;
+  color: var(--ms-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 5px;
+}
+.gtm-account-signout:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.gtm-account-photo:focus-visible {
+  outline: 2px solid var(--ms-violet);
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .gtm-account-signout {
+    display: none;
+  }
+  .gtm-public-account {
+    gap: 7px;
+  }
+}

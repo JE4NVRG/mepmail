@@ -98,10 +98,12 @@
     ]
   },
   "productProof": {
-    "caption": "MepMail template gallery · product screenshot in English",
+    "caption": "Real MepMail templates. Click to open and customize.",
     "alt": "Real MepMail gallery showing ready-made welcome, verification and commerce email templates",
-    "detail": "Choose a starting point. Make it yours.",
-    "allPlans": "Explore the full pricing catalog"
+    "detail": "Choose a starting point. Your changes are saved when you click Save.",
+    "allPlans": "Explore the full pricing catalog",
+    "open": "Open template",
+    "viewAll": "View all templates"
   },
   "integration": {
     "eyebrow": "Connect your way",
@@ -290,5 +292,11 @@
     "credit": "Created by",
     "ghAria": "Je4nDev on GitHub",
     "rights": "© 2026 MepMail. All rights reserved."
+  },
+  "account": {
+    "dashboard": "Open dashboard",
+    "profile": "My profile",
+    "signOut": "Sign out",
+    "signOutError": "Couldn't sign out. Please try again."
   }
 }

@@ -554,5 +554,18 @@
     "end": "End session",
     "ended": "Support session ended",
     "error": "Could not end the session: {reason}"
+  },
+  "profile": {
+    "title": "My profile",
+    "preview": "Preview of your new profile photo",
+    "hint": "PNG, JPEG or WebP, up to 2 MB. The photo is cropped to a square.",
+    "choose": "Choose photo",
+    "save": "Save photo",
+    "cancel": "Cancel",
+    "remove": "Remove photo",
+    "saved": "Profile photo updated.",
+    "error": "Could not update your photo. Please try again.",
+    "invalid": "Choose a valid PNG, JPEG or WebP image up to 2 MB.",
+    "unavailable": "Photo uploads are temporarily unavailable on this instance."
   }
 }

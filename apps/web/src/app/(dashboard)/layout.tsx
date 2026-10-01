@@ -9,13 +9,16 @@ import { RegionBreakerBanner } from "@/components/region-breaker-banner";
 import { SupportViewBanner } from "@/components/support-view-banner";
 import { TeamStandingBanner } from "@/components/team-standing-banner";
 import { ToastHost } from "@/components/toast";
+import { postAuthNext, withNext } from "@/lib/nav";
 import { getAuth } from "@/server/auth";
 import { ACTIVE_TEAM_COOKIE, getActiveMembership } from "@/server/membership";
 import { resolveSupportView, SUPPORT_VIEW_COOKIE } from "@/server/support-view";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await getAuth().api.getSession({ headers: await headers() });
-  if (!session) redirect("/login");
+  const requestHeaders = await headers();
+  const next = postAuthNext(requestHeaders.get("x-mepmail-next"));
+  const session = await getAuth().api.getSession({ headers: requestHeaders });
+  if (!session) redirect(withNext("/login", next));
   const db = getDb();
   const cookieStore = await cookies();
   // A live support view stands in for the membership: the shell shows the
@@ -29,7 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ? null
     : await getActiveMembership(db, session.user.id, cookieStore.get(ACTIVE_TEAM_COOKIE)?.value);
   const team = view ?? membership;
-  if (!team) redirect("/onboarding");
+  if (!team) redirect(withNext("/onboarding", next));
 
   return (
     <AppShell

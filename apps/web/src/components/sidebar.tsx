@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { EllipsisGlyph, NavGlyph, type NavIconName } from "@/components/icons/nav-icons";
 import { useDismiss } from "@/components/popover-menu";
 import { TeamSwitcher } from "@/components/team-switcher";
+import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { isActive, navItemsWithConsole } from "@/lib/nav";
@@ -326,22 +327,7 @@ export function Sidebar({
             color: "inherit",
           }}
         >
-          <span
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: "50%",
-              background: "var(--ms-panel-raised)",
-              border: "1px solid var(--ms-line)",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 11,
-              flex: "none",
-            }}
-          >
-            {userEmail.charAt(0)}
-          </span>
+          <UserAvatar email={userEmail} size={24} />
           <span
             style={{
               fontSize: 12.5,

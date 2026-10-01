@@ -1,12 +1,12 @@
 import { PLAN_RUNGS } from "@millionsend/core";
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { IntegrationTabs } from "@/components/integration-tabs";
 import { type CalcLabels, LandingCalculator } from "@/components/landing-calculator";
 import { LandingMotion } from "@/components/landing-motion";
 import { PlanCard, type PlanCardLabels } from "@/components/plan-card";
 import { ArrivalTracker, McpConfigCopy } from "@/components/public-events";
+import { PublicStarterGallery } from "@/components/public-starter-gallery";
 import {
   PublicFooter,
   PublicHeader,
@@ -18,7 +18,6 @@ import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
 import { formatUsd, formatVolume, PRICE_ROWS } from "@/lib/landing-pricing";
 import { legalLinks } from "@/lib/legal-links";
 import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
-import { hasSession } from "@/server/auth";
 import "./landing-calc.css";
 import "./landing.css";
 import "./landing-cro.css";
@@ -67,7 +66,6 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootPage() {
-  if (await hasSession()) redirect("/emails");
   const locale = await getLocale();
   const t = await getTranslations("landing");
   const comparison = PRICE_ROWS.map((row) => [
@@ -150,14 +148,7 @@ export default async function RootPage() {
                 <span aria-hidden="true" />
                 MepMail / templates
               </div>
-              {/* biome-ignore lint/performance/noImgElement: WebP local já otimizado, com dimensões explícitas e sem serviço adicional */}
-              <img
-                src="/product/templates-hero.webp"
-                width={546}
-                height={614}
-                alt={t("productProof.alt")}
-                fetchPriority="high"
-              />
+              <PublicStarterGallery compact />
               <figcaption>{t("productProof.caption")}</figcaption>
             </figure>
           </div>
@@ -191,18 +182,14 @@ export default async function RootPage() {
               </ol>
             </div>
             <figure className="cro-product-proof">
-              {/* biome-ignore lint/performance/noImgElement: captura WebP local já otimizada e carregada sob demanda */}
-              <img
-                src="/product/templates-gallery.webp"
-                width={1110}
-                height={614}
-                alt={t("productProof.alt")}
-                loading="lazy"
-              />
+              <PublicStarterGallery />
               <figcaption>{t("productProof.caption")}</figcaption>
             </figure>
             <p className="cro-product-next">
-              {t("productProof.detail")} <SignupLink label={t("hero.ctaSignup")} />
+              {t("productProof.detail")}{" "}
+              <a className="ms-btn ms-btn-primary gtm-action" href="/templates/new">
+                {t("productProof.viewAll")}
+              </a>
             </p>
           </div>
         </section>

@@ -75,18 +75,27 @@ export function EditorSkeleton() {
   );
 }
 
-export function TemplateEditor({ initial }: { initial?: EditorInitial }) {
+export function TemplateEditor({
+  initial,
+  starter,
+  draftKey,
+}: {
+  initial?: EditorInitial;
+  starter?: Omit<EditorInitial, "id">;
+  draftKey?: string;
+}) {
   const t = useTranslations("templates");
   const common = useTranslations("common");
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const [name, setName] = useState(initial?.name ?? "");
-  const [subject, setSubject] = useState(initial?.subject ?? "");
-  const [html, setHtml] = useState(initial?.html ?? "");
-  const [text, setText] = useState(initial?.text ?? "");
-  const [document, setDocument] = useState<unknown>(initial?.document ?? null);
+  const seed = initial ?? starter;
+  const [name, setName] = useState(seed?.name ?? "");
+  const [subject, setSubject] = useState(seed?.subject ?? "");
+  const [html, setHtml] = useState(seed?.html ?? "");
+  const [text, setText] = useState(seed?.text ?? "");
+  const [document, setDocument] = useState<unknown>(seed?.document ?? null);
   // Armed by "Convert this template": the block editor then mounts on the
   // html seed and emits its parse. Until then a document-less row never
   // reaches the block editor — its html would be flattened on the first edit.
@@ -94,7 +103,7 @@ export function TemplateEditor({ initial }: { initial?: EditorInitial }) {
   const mode = bodyEditorMode({ document, html, converting });
   // Html-authored rows open on their faithful preview, not on an editor.
   const [tab, setTab] = useState<"edit" | "preview">(() =>
-    bodyEditorMode({ document: initial?.document ?? null, html: initial?.html ?? "" }) === "code"
+    bodyEditorMode({ document: seed?.document ?? null, html: seed?.html ?? "" }) === "code"
       ? "preview"
       : "edit",
   );
@@ -108,7 +117,7 @@ export function TemplateEditor({ initial }: { initial?: EditorInitial }) {
   const savedDoc = useRef<string | null>(
     initial !== undefined ? JSON.stringify(initial.document ?? null) : null,
   );
-  const savedHtml = useRef(initial?.html ?? "");
+  const savedHtml = useRef(seed?.html ?? "");
   useUnsavedChangesWarning(dirty, common("unsavedWarn"));
 
   // Local crash-recovery draft (browser-only, one key per template).
@@ -118,14 +127,14 @@ export function TemplateEditor({ initial }: { initial?: EditorInitial }) {
     [name, subject, html, text, document],
   );
   const draft = useLocalDraft<TemplateDraft>({
-    storageKey: `ms-draft:template:${initial?.id ?? "new"}`,
+    storageKey: `ms-draft:template:${initial?.id ?? draftKey ?? "new"}`,
     state: draftState,
     initialState: {
-      name: initial?.name ?? "",
-      subject: initial?.subject ?? "",
-      html: initial?.html ?? "",
-      text: initial?.text ?? "",
-      document: initial?.document ?? null,
+      name: seed?.name ?? "",
+      subject: seed?.subject ?? "",
+      html: seed?.html ?? "",
+      text: seed?.text ?? "",
+      document: seed?.document ?? null,
     },
   });
 

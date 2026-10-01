@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { LandingLangSwitch } from "./landing-lang-switch";
 import { LandingNav } from "./landing-nav";
+import { PublicAccount } from "./public-account";
 import { DocsLink, GithubLink } from "./public-events";
 import { SignupCta } from "./signup-cta";
 
@@ -155,16 +156,12 @@ export function PublicHeader({
             </div>
             <div className="gtm-nav-actions">
               <LandingLangSwitch label={labels.langAria} />
-              <span className="gtm-nav-divider" aria-hidden="true" />
-              <a className="gtm-nav-login" href="/login">
-                {labels.nav.login}
-              </a>
             </div>
           </LandingNav>
           {/* A CTA fica FORA da .gtm-nav: ela precisa continuar visível na 1ª
               linha do header quando a nav colapsa no mobile (ver landing.css). */}
           <div className="gtm-header-cta">
-            <SignupLink label={labels.nav.signup} />
+            <PublicAccount login={labels.nav.login} signup={labels.nav.signup} />
           </div>
         </div>
       </header>

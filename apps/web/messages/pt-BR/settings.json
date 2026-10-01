@@ -554,5 +554,18 @@
     "end": "Encerrar sessão",
     "ended": "Sessão de suporte encerrada",
     "error": "Não foi possível encerrar a sessão: {reason}"
+  },
+  "profile": {
+    "title": "Meu perfil",
+    "preview": "Prévia da nova foto de perfil",
+    "hint": "PNG, JPEG ou WebP, até 2 MB. A foto é ajustada para um formato quadrado.",
+    "choose": "Escolher foto",
+    "save": "Salvar foto",
+    "cancel": "Cancelar",
+    "remove": "Remover foto",
+    "saved": "Foto de perfil atualizada.",
+    "error": "Não foi possível atualizar a foto. Tente novamente.",
+    "invalid": "Escolha uma imagem PNG, JPEG ou WebP válida com até 2 MB.",
+    "unavailable": "O envio de fotos está temporariamente indisponível nesta instância."
   }
 }

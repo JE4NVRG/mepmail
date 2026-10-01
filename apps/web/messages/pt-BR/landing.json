@@ -90,10 +90,12 @@
     ]
   },
   "productProof": {
-    "caption": "Galeria de templates do MepMail · captura do produto em inglês",
+    "caption": "Modelos reais do MepMail. Clique para abrir e personalizar.",
     "alt": "Galeria real do MepMail com templates prontos de boas-vindas, verificação e comércio",
-    "detail": "Escolha um ponto de partida. Deixe com a sua cara.",
-    "allPlans": "Conhecer o catálogo completo de planos"
+    "detail": "Escolha um ponto de partida. Suas alterações são salvas quando você clicar em Salvar.",
+    "allPlans": "Conhecer o catálogo completo de planos",
+    "open": "Abrir modelo",
+    "viewAll": "Ver todos os modelos"
   },
   "integration": {
     "eyebrow": "Conecte do seu jeito",
@@ -282,5 +284,11 @@
     "credit": "Criado por",
     "ghAria": "GitHub do Je4nDev",
     "rights": "© 2026 MepMail. Todos os direitos reservados."
+  },
+  "account": {
+    "dashboard": "Abrir painel",
+    "profile": "Meu perfil",
+    "signOut": "Sair",
+    "signOutError": "Não foi possível sair. Tente novamente."
   }
 }
