@@ -64,6 +64,8 @@ export interface PublicSiteLabels {
     credit: string;
     ghAria: string;
     rights: string;
+    sourceCode: string;
+    sourceDownload: string;
     pricing: string;
     alternatives: string;
   };
@@ -236,6 +238,9 @@ export function PublicFooter({
           <a href={legal.privacy}>{labels.footer.privacy}</a>
           <a href={legal.refund}>{labels.footer.refund}</a>
           <a href="/security">{labels.nav.security}</a>
+          <a href="/source" title={labels.footer.sourceDownload}>
+            {labels.footer.sourceCode}
+          </a>
         </nav>
       </div>
       <div className="gtm-container gtm-footer-base">

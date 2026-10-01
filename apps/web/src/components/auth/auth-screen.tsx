@@ -38,6 +38,13 @@ export function AuthScreen({ title, children }: { title: string; children: React
           </Link>
           <h1 className={`ms-display ${styles.headline}`}>{title}</h1>
           {children}
+          <a
+            href="/source"
+            title={tCommon("sourceDownload")}
+            style={{ marginTop: 16, fontSize: 12, color: "var(--ms-muted)" }}
+          >
+            {tCommon("sourceCode")}
+          </a>
         </div>
       </div>
     </main>

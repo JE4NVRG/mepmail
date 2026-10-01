@@ -108,5 +108,7 @@
     "end": "End session",
     "back": "Back to console",
     "readOnly": "Read-only support view: nothing can be changed here."
-  }
+  },
+  "sourceCode": "Source code · AGPL-3.0",
+  "sourceDownload": "Download the corresponding source of this version for free"
 }

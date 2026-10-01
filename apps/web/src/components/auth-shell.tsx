@@ -25,6 +25,13 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
       <div className="ms-card" style={{ width: 380, maxWidth: "100%", padding: 28 }}>
         {children}
       </div>
+      <a
+        href="/source"
+        title={t("sourceDownload")}
+        style={{ marginTop: 16, fontSize: 12, color: "var(--ms-muted)" }}
+      >
+        {t("sourceCode")}
+      </a>
     </main>
   );
 }

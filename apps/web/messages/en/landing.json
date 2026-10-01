@@ -291,7 +291,9 @@
     "contact": "Contact",
     "credit": "Created by",
     "ghAria": "Je4nDev on GitHub",
-    "rights": "© 2026 MepMail. All rights reserved."
+    "rights": "© 2026 MepMail. All rights reserved.",
+    "sourceCode": "Source code · AGPL-3.0",
+    "sourceDownload": "Download the corresponding source of this version for free"
   },
   "account": {
     "dashboard": "Open dashboard",

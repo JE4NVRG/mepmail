@@ -276,6 +276,23 @@ export function Sidebar({
           </svg>
           {t("docs")}
         </a>
+        <a href="/source" title={t("sourceDownload")}>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            style={{ flex: "none", display: "block" }}
+          >
+            <path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 16" />
+          </svg>
+          {t("sourceCode")}
+        </a>
       </nav>
       <div style={{ flex: 1 }} />
       <div ref={accountRef} style={{ position: "relative", borderTop: "1px solid var(--ms-line)" }}>

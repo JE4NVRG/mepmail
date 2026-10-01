@@ -108,5 +108,7 @@
     "end": "Encerrar sessão",
     "back": "Voltar ao console",
     "readOnly": "Modo de suporte somente leitura: nada pode ser alterado aqui."
-  }
+  },
+  "sourceCode": "Código-fonte · AGPL-3.0",
+  "sourceDownload": "Baixe gratuitamente o código-fonte correspondente a esta versão"
 }

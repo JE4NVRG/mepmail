@@ -283,7 +283,9 @@
     "contact": "Contato",
     "credit": "Criado por",
     "ghAria": "GitHub do Je4nDev",
-    "rights": "© 2026 MepMail. Todos os direitos reservados."
+    "rights": "© 2026 MepMail. Todos os direitos reservados.",
+    "sourceCode": "Código-fonte · AGPL-3.0",
+    "sourceDownload": "Baixe gratuitamente o código-fonte correspondente a esta versão"
   },
   "account": {
     "dashboard": "Abrir painel",
