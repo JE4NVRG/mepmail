@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute } from "node:path";
 import { decryptPayload, encryptPayload } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
+import { pilotImageMetadata } from "./mailbox-pilot-images.js";
 
 // Local product qualification. Authentication and a production mailbox core are
 // separate adapters; caller-supplied principal IDs must never be trusted over HTTP.
@@ -271,6 +272,26 @@ export class MailboxPilot {
     this.allow(actor, mailboxId, "read");
     return result;
   }
+  async inbox(actor: MailboxActor) {
+    const mailboxes = await this.mailboxes(actor);
+    const data = await Promise.all(
+      mailboxes.map(async (box) => ({
+        messages: (await this.list(actor, box.id)).map((message) => ({
+          ...message,
+          mailboxId: box.id,
+        })),
+        drafts: await this.drafts(actor, box.id),
+      })),
+    );
+    await this.tail;
+    const current = await this.mailboxes(actor);
+    for (const box of mailboxes) this.allow(actor, box.id, "read");
+    return {
+      mailboxes: current,
+      messages: data.flatMap((item) => item.messages),
+      drafts: data.flatMap((item) => item.drafts),
+    };
+  }
   async read(actor: MailboxActor, mailboxId: string, messageId: string) {
     await this.tail;
     this.allow(actor, mailboxId, "read");
@@ -300,6 +321,7 @@ export class MailboxPilot {
         bytes: attachment.content.length,
         cid: attachment.cid,
         disposition: attachment.disposition,
+        preview: pilotImageMetadata(attachment.content),
       })),
     };
   }

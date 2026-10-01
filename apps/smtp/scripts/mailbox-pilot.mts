@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { MailboxPilotError, type MailboxActor } from "../../../packages/core/src/mailbox-pilot.js";
 import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
+import { pilotImageMetadata } from "../../../packages/core/src/mailbox-pilot-images.js";
 import { agent, human, openPilot, seedPilot } from "../test/mailbox-pilot-fixture.js";
 
 // Explicitly local, synthetic identities. This is not production authentication.
@@ -155,6 +156,10 @@ const server = createServer(async (req, res) => {
       send(res, { mode, mailboxes, captured: counts.reduce((sum, count) => sum + count, 0) });
       return;
     }
+    if (req.method === "GET" && url.pathname === "/api/inbox") {
+      send(res, { mode, ...(await service.inbox(actor)) });
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/api/session") {
       const input = await body(req);
       if (input.mode !== "human" && input.mode !== "agent") throw new MailboxPilotError("invalid");
@@ -173,7 +178,7 @@ const server = createServer(async (req, res) => {
       return;
     }
     const route =
-      /^\/api\/mailboxes\/([a-z]+)\/(messages|drafts)(?:\/([a-z0-9-]+))?(?:\/(reply|send|attachments)(?:\/(\d+))?)?$/.exec(
+      /^\/api\/mailboxes\/([a-z]+)\/(messages|drafts)(?:\/([a-z0-9-]+))?(?:\/(reply|send|attachments|preview)(?:\/(\d+))?)?$/.exec(
         url.pathname,
       );
     if (!route) throw new MailboxPilotError("not_found");
@@ -195,10 +200,19 @@ const server = createServer(async (req, res) => {
       req.method === "GET" &&
       collection === "messages" &&
       id &&
-      action === "attachments" &&
+      (action === "attachments" || action === "preview") &&
       attachmentId
     ) {
       const attachment = await service.attachment(actor, mailbox, id, Number(attachmentId));
+      if (action === "preview") {
+        const metadata = pilotImageMetadata(attachment.content);
+        if (!metadata) throw new MailboxPilotError("not_found");
+        res.setHeader("Content-Type", metadata.contentType);
+        res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+        res.setHeader("Content-Disposition", "inline");
+        res.end(attachment.content);
+        return;
+      }
       const name =
         attachment.filename.replaceAll(/[\/\\\r\n\x00-\x1f]/g, "_").slice(0, 128) || "anexo";
       res.setHeader("Content-Type", "application/octet-stream");

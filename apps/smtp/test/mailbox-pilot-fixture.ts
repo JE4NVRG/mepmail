@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import {
   MailboxPilot,
   type MailboxActor,
@@ -68,4 +69,39 @@ export async function seedPilot(service: MailboxPilot) {
       recipients: ["luna@piloto.test"],
       raw: await fixtureMime("Suporte ao domínio piloto", "jean@piloto.test"),
     });
+  if (
+    !(await service.list(human, "personal")).some(
+      (row) => row.subject === "Seu MepMail, agora com imagens",
+    )
+  )
+    await service.receive({
+      sourceId: "fixture-media-v1",
+      recipients: ["jean@piloto.test"],
+      raw: await fixtureImageMime(),
+    });
+}
+export async function fixtureImageMime() {
+  const logo = await readFile(new URL("../../web/public/email/wordmark-bone.png", import.meta.url));
+  const gallery = await readFile(
+    new URL("../../web/public/product/templates-hero.webp", import.meta.url),
+  );
+  return mailboxPilotMime.compose({
+    from: "equipe@exemplo.test",
+    to: "jean@piloto.test",
+    subject: "Seu MepMail, agora com imagens",
+    text: "Olá Jean,\n\nTodas as suas caixas em um só lugar, com a identidade do MepMail.\n\nA logo está incorporada à mensagem e a galeria segue como anexo. Toque em uma imagem para ampliar ou baixe o arquivo original.\n\nEsta é uma mensagem de demonstração do piloto local.",
+    messageId: "<media@exemplo.test>",
+    inReplyTo: "",
+    references: [],
+    attachments: [
+      {
+        filename: "mepmail.png",
+        contentType: "image/png",
+        content: logo,
+        cid: "mepmail@piloto.test",
+        disposition: "inline",
+      },
+      { filename: "templates.webp", contentType: "image/webp", content: gallery },
+    ],
+  });
 }

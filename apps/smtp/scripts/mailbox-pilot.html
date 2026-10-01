@@ -14,12 +14,14 @@
     <div class="mm-shell" id="app">
       <aside class="mm-sidebar" id="sidebar" aria-label="Navegação do correio">
         <div class="mm-brand"><img class="mm-wordmark-dark" src="/assets/mepmail-wordmark.svg" alt="MepMail" width="126" height="18"><img class="mm-wordmark-light" src="/assets/mepmail-wordmark-light.svg" alt="MepMail" width="126" height="18"></div>
+        <div class="mm-sidebar-scroll">
         <div class="mm-workspace-label">SEU ESPAÇO</div>
         <div class="mm-domain"><span class="mm-domain-monogram">p</span><div><strong>piloto.test</strong><span>Domínio de demonstração</span></div><span data-icon="lock"></span></div>
         <button class="mm-compose-button" id="compose"><span data-icon="edit"></span>Responder<span class="mm-key">R</span></button>
         <nav id="folders" class="mm-folders" aria-label="Pastas da caixa"></nav>
         <div class="mm-sidebar-section"><span>SUAS CAIXAS</span><span id="mailbox-total">02</span></div>
         <nav id="mailboxes" class="mm-mailboxes" aria-label="Caixas autorizadas"></nav>
+        </div>
         <div class="mm-sidebar-bottom">
           <button class="mm-sidebar-help" id="help"><span data-icon="help"></span>Guia do piloto<span data-icon="arrow-up-right"></span></button>
           <div class="mm-profile"><div class="mm-avatar" id="profile-avatar">J</div><div><strong id="profile-name">Jean</strong><span id="profile-role">Administrador · demonstração</span></div><button id="identity" class="mm-icon-button" aria-label="Trocar identidade de demonstração" title="Identidades de demonstração"><span data-icon="switch"></span></button></div>
@@ -51,6 +53,7 @@
     <div id="status" class="mm-toast" role="status" aria-live="polite"></div>
     <dialog id="identity-dialog" class="mm-dialog" aria-labelledby="identity-title"><div class="mm-dialog-head"><div><p class="mm-eyebrow">EXPLORE O PILOTO</p><h2 id="identity-title">Dois papéis. Seu controle.</h2></div><button class="mm-icon-button" data-close-dialog aria-label="Fechar"><span data-icon="close"></span></button></div><p class="mm-dialog-copy">Experimente a mesma conversa como pessoa ou agente. Estas são identidades de demonstração.</p><div class="mm-identity-options"><button id="human-mode"><span class="mm-avatar">J</span><span><strong>Jean</strong><small>Gerencia as caixas e aprova as respostas.</small></span><span data-icon="arrow-right"></span></button><button id="agent-mode"><span class="mm-avatar mm-avatar-agent">L</span><span><strong>Luna, agente</strong><small>Lê e prepara rascunhos na própria caixa.</small></span><span data-icon="arrow-right"></span></button></div><p class="mm-dialog-footnote">O piloto utiliza mensagens sintéticas e captura os envios localmente.</p></dialog>
     <dialog id="info-dialog" class="mm-dialog" aria-labelledby="info-title"><div class="mm-dialog-head"><div><p class="mm-eyebrow">ACESSO À CAIXA</p><h2 id="info-title">Suas permissões</h2></div><button class="mm-icon-button" data-close-dialog aria-label="Fechar"><span data-icon="close"></span></button></div><div id="permission-content"></div></dialog>
+    <dialog id="image-dialog" class="mm-dialog mm-image-dialog" aria-labelledby="image-title"><div class="mm-dialog-head"><h2 id="image-title">Imagem da mensagem</h2><button class="mm-icon-button" data-close-dialog aria-label="Fechar imagem"><span data-icon="close"></span></button></div><div class="mm-image-stage" data-theme="dark"><img id="image-full" alt="Imagem da mensagem"></div><a id="image-download" class="mm-secondary-button" download>Baixar original</a></dialog>
     <dialog id="help-dialog" class="mm-dialog" aria-labelledby="help-title"><div class="mm-dialog-head"><div><p class="mm-eyebrow">BEM-VINDO AO SEU CORREIO</p><h2 id="help-title">Pessoal. E dos seus agentes.</h2></div><button class="mm-icon-button" data-close-dialog aria-label="Fechar"><span data-icon="close"></span></button></div><ol class="mm-guide"><li><strong>Escolha uma caixa.</strong><span>Explore as conversas e baixe o anexo recebido.</span></li><li><strong>Prepare uma resposta.</strong><span>Salve um rascunho com os anexos que desejar incluir.</span></li><li><strong>Experimente como Luna.</strong><span>O agente acessa apenas sua caixa. A aprovação fica com Jean.</span></li></ol><div class="mm-help-note"><span data-icon="beaker"></span><p>Este é um piloto local com mensagens de demonstração. Os envios são simulados.</p></div><button id="reopen" class="mm-secondary-button"><span data-icon="refresh"></span>Reabrir dados salvos</button></dialog>
   </body>
 </html>

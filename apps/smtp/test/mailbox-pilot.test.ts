@@ -4,11 +4,13 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MailboxPilot } from "../../../packages/core/src/mailbox-pilot.js";
+import { pilotImageMetadata } from "../../../packages/core/src/mailbox-pilot-images.js";
 import { mailboxPilotMime } from "../src/mailbox-pilot-mime.js";
 import {
   agent,
   attachmentBytes,
   fixtureMime,
+  fixtureImageMime,
   human,
   keyring,
   mailboxes,
@@ -109,6 +111,63 @@ describe("mailbox product qualification with real MIME and private storage", () 
     ).toMatchObject({ accepted: 2 });
     expect(await service.list(human, "personal")).toHaveLength(1);
     expect(await service.list(agent, "agent")).toHaveLength(1);
+    const unified = await service.inbox(human);
+    expect(unified.messages.map((row) => row.mailboxId).sort()).toEqual(["agent", "personal"]);
+    const scoped = await service.inbox(agent);
+    expect(scoped.mailboxes.map((box) => box.id)).toEqual(["agent"]);
+    expect(scoped.messages.map((row) => row.mailboxId)).toEqual(["agent"]);
+  });
+  it("preserves incorporated and attached image bytes with protected preview metadata", async () => {
+    const row = await received("personal", "images", await fixtureImageMime());
+    const message = await service.read(human, "personal", row.id);
+    expect(message.attachments).toHaveLength(2);
+    expect(message.attachments[0]).toMatchObject({
+      cid: "mepmail@piloto.test",
+      disposition: "inline",
+      preview: { contentType: "image/png" },
+    });
+    expect(message.attachments[1]).toMatchObject({ preview: { contentType: "image/webp" } });
+    for (const item of message.attachments) {
+      const bytes = (await service.attachment(human, "personal", row.id, item.id)).content;
+      expect(pilotImageMetadata(bytes)).toMatchObject(item.preview!);
+      expect(item.preview!.width).toBeGreaterThan(0);
+    }
+    await expect(service.attachment(agent, "personal", row.id, 0)).rejects.toMatchObject({
+      code: "forbidden",
+    });
+  });
+  it("refuses active formats, mislabeled files and oversized decoded images for preview", async () => {
+    for (const content of [
+      Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'),
+      Buffer.from('<html><img src="https://tracker.invalid/pixel"></html>'),
+      Buffer.from("not a real image"),
+    ])
+      expect(pilotImageMetadata(content)).toBeNull();
+    const mime = await mailboxPilotMime.parse(await fixtureImageMime());
+    const oversized = Buffer.from(mime.attachments[0].content);
+    oversized.writeUInt32BE(9000, 16);
+    expect(pilotImageMetadata(oversized)).toBeNull();
+    const corrupt = Buffer.from(mime.attachments[1].content);
+    corrupt.writeUInt32LE(0, 4);
+    expect(pilotImageMetadata(corrupt)).toBeNull();
+  });
+  it("rechecks mailbox access while assembling the unified inbox", async () => {
+    await received("agent");
+    let revoke = false;
+    const adapter = {
+      ...mailboxPilotMime,
+      async parse(raw: Buffer) {
+        const result = await mailboxPilotMime.parse(raw);
+        if (revoke) {
+          revoke = false;
+          await service.revoke(human, "agent", agent.principalId);
+        }
+        return result;
+      },
+    };
+    service = await MailboxPilot.open(file, human.teamId, key, adapter);
+    revoke = true;
+    await expect(service.inbox(agent)).rejects.toMatchObject({ code: "forbidden" });
   });
   it("does not use untrusted Message-ID as transport deduplication", async () => {
     const raw = await fixtureMime();

@@ -124,6 +124,11 @@ p {
   padding: 23px 16px 0;
   border-right: 1px solid var(--ms-line);
   min-height: 0;
+  overflow: hidden;
+}
+.mm-sidebar-scroll {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
 }
 .mm-brand {
@@ -358,7 +363,8 @@ p {
 }
 .mm-sidebar-bottom {
   margin-top: auto;
-  padding-top: 30px;
+  padding-top: 16px;
+  flex-shrink: 0;
 }
 .mm-sidebar-help {
   display: flex;
@@ -707,6 +713,7 @@ p {
 }
 .mm-row-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-top: 12px;
@@ -884,6 +891,90 @@ p {
   overflow-wrap: anywhere;
   font-size: 14px;
   line-height: 1.8;
+}
+.mm-row-mailbox {
+  flex-basis: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 11px var(--ms-font-mono);
+  color: var(--ms-muted);
+}
+.mm-mailbox-unified {
+  margin-bottom: 7px;
+}
+.mm-mailbox-unified .mm-avatar {
+  border-radius: var(--ms-r-input);
+}
+.mm-mailbox-unified svg {
+  width: 17px;
+  height: 17px;
+}
+.mm-image-gallery {
+  padding: 0 20px 20px 64px;
+  display: grid;
+  gap: 16px;
+}
+.mm-image-figure {
+  margin: 0;
+  min-width: 0;
+}
+.mm-image-preview {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  background: var(--ms-panel-raised);
+}
+.mm-image-preview:hover {
+  border-color: var(--ms-line-strong);
+}
+.mm-image-preview img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  margin: auto;
+  height: auto;
+  max-height: 330px;
+  object-fit: contain;
+}
+.mm-image-caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-micro);
+}
+.mm-image-caption > span:first-child {
+  overflow-wrap: anywhere;
+}
+.mm-image-caption > span:last-child {
+  flex-shrink: 0;
+}
+.mm-image-dialog {
+  max-width: 1020px;
+}
+.mm-image-dialog h2 {
+  font-size: var(--ms-fs-section);
+  overflow-wrap: anywhere;
+}
+.mm-image-stage {
+  min-height: 120px;
+  padding: 20px;
+  display: grid;
+  place-items: center;
+  background: var(--ms-panel-raised);
+  border-radius: var(--ms-r-card);
+  margin-bottom: 18px;
+}
+.mm-image-stage img {
+  display: block;
+  max-width: 100%;
+  max-height: 65dvh;
+  object-fit: contain;
 }
 .mm-attachment-list {
   display: flex;
@@ -1544,6 +1635,10 @@ a.mm-attachment:hover {
     padding-right: 15px;
   }
   .mm-attachment-list {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+  .mm-image-gallery {
     padding-left: 15px;
     padding-right: 15px;
   }

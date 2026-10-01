@@ -19,6 +19,7 @@ const state = {
   mode: "human",
   mailboxes: [],
   box: null,
+  viewId: "all",
   rows: [],
   drafts: [],
   folder: "inbox",
@@ -146,18 +147,26 @@ const dateLabel = (value) =>
   new Date(value).toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
 const timeLabel = (value) =>
   new Date(value).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-const editorKey = (original) => `${state.mode}:${state.box.id}:${original}`;
+const editorKey = (box, original) => `${state.mode}:${box.id}:${original}`;
+const threadKey = (mailboxId, threadId) => JSON.stringify([mailboxId, threadId]);
 
 /* Selectors: mailbox → folder → thread. Counts always come from actual DTOs. */
 function threads() {
   const grouped = new Map();
   for (const row of [...state.rows].sort((a, b) => a.receivedAt.localeCompare(b.receivedAt))) {
-    if (!grouped.has(row.threadId))
-      grouped.set(row.threadId, { id: row.threadId, rows: [], pending: [] });
-    grouped.get(row.threadId).rows.push(row);
+    const key = threadKey(row.mailboxId, row.threadId);
+    if (!grouped.has(key))
+      grouped.set(key, {
+        id: key,
+        mailboxId: row.mailboxId,
+        threadId: row.threadId,
+        rows: [],
+        pending: [],
+      });
+    grouped.get(key).rows.push(row);
   }
   for (const draft of state.drafts.filter((item) => item.status === "draft"))
-    grouped.get(draft.threadId)?.pending.push(draft);
+    grouped.get(threadKey(draft.mailboxId, draft.threadId))?.pending.push(draft);
   return [...grouped.values()].sort((a, b) =>
     b.rows.at(-1).receivedAt.localeCompare(a.rows.at(-1).receivedAt),
   );
@@ -200,8 +209,12 @@ function closeSidebar() {
   if (wasOpen) $("menu").focus();
 }
 function renderMailboxNavigation() {
-  $("box-name").textContent = state.box?.label || "Correio";
-  $("box-address").textContent = state.box?.address || "";
+  const view = state.mailboxes.find((box) => box.id === state.viewId);
+  $("box-name").textContent = view?.label || "Todas as caixas";
+  $("box-address").textContent = view?.address || "Suas caixas em um só lugar";
+  $("search").placeholder =
+    state.viewId === "all" ? "Buscar em todas as caixas" : "Buscar nesta caixa";
+  $("search").setAttribute("aria-label", $("search").placeholder);
   $("mailbox-total").textContent = String(state.mailboxes.length).padStart(2, "0");
   $("profile-name").textContent = state.mode === "agent" ? "Luna" : "Jean";
   $("profile-avatar").textContent = state.mode === "agent" ? "L" : "J";
@@ -210,10 +223,30 @@ function renderMailboxNavigation() {
   $("scope").textContent =
     state.mode === "agent"
       ? "Luna pode ler e preparar rascunhos nesta caixa."
-      : "Jean administra esta caixa e aprova as respostas.";
+      : "A resposta sai pela caixa em que a conversa chegou.";
   $("reopen").hidden = state.mode !== "human";
   const nav = $("mailboxes");
   nav.replaceChildren();
+  const unified = button("", "", "mm-mailbox mm-mailbox-unified", () => {
+    state.folder = "inbox";
+    state.query = "";
+    $("search").value = "";
+    closeSidebar();
+    return loadMailbox("all");
+  });
+  const unifiedIcon = element("span", undefined, "mm-avatar");
+  unifiedIcon.append(icon("inbox"));
+  const unifiedLabel = element("span", undefined, "mm-mailbox-label");
+  unifiedLabel.append(
+    element("strong", "Todas as caixas"),
+    element(
+      "small",
+      `${state.mailboxes.length} ${state.mailboxes.length === 1 ? "caixa disponível" : "caixas disponíveis"}`,
+    ),
+  );
+  unified.append(unifiedIcon, unifiedLabel);
+  unified.setAttribute("aria-current", state.viewId === "all" ? "true" : "false");
+  nav.append(unified);
   for (const box of state.mailboxes) {
     const item = button("", "", "mm-mailbox", () => {
       state.folder = "inbox";
@@ -222,7 +255,7 @@ function renderMailboxNavigation() {
       closeSidebar();
       return loadMailbox(box.id);
     });
-    item.setAttribute("aria-current", box.id === state.box?.id ? "true" : "false");
+    item.setAttribute("aria-current", box.id === state.viewId ? "true" : "false");
     item.append(
       element(
         "span",
@@ -235,7 +268,7 @@ function renderMailboxNavigation() {
     if (box.kind === "agent") title.append(element("span", "AGENTE", "mm-agent-tag"));
     label.append(title, element("small", box.address));
     item.append(label);
-    if (box.id === state.box?.id) item.append(element("span", "", "mm-selected-dot"));
+    if (box.id === state.viewId) item.append(element("span", "", "mm-selected-dot"));
     nav.append(item);
   }
   renderFolderNavigation();
@@ -256,7 +289,12 @@ function renderFolderNavigation() {
     ["sent", "send"],
     ["all", "all"],
   ];
-  if (state.box?.kind === "agent") folders.splice(2, 0, ["review", "review"]);
+  if (
+    state.mailboxes.some(
+      (box) => box.kind === "agent" && (state.viewId === "all" || box.id === state.viewId),
+    )
+  )
+    folders.splice(2, 0, ["review", "review"]);
   for (const [folder, glyph] of folders) {
     const title =
       folder === "review" && state.mode === "agent" ? "Em revisão" : folderLabels[folder];
@@ -302,6 +340,10 @@ function renderConversationList(forceReader = false) {
       element("p", thread.pending.length ? thread.pending.at(-1).text : latest.preview),
     );
     const footer = element("span", undefined, "mm-row-footer");
+    if (state.viewId === "all") {
+      const box = state.mailboxes.find((item) => item.id === thread.mailboxId);
+      footer.append(element("span", box?.address || "", "mm-row-mailbox"));
+    }
     if (thread.pending.length) {
       const badge = element("span", "", "mm-row-badge");
       badge.append(icon("review"), element("span", "Aguardando revisão"));
@@ -321,6 +363,7 @@ function renderConversationList(forceReader = false) {
     container.append(item);
   }
   if (!rows.length) {
+    state.box = null;
     const noResults = state.query || state.attachmentsOnly;
     const node = empty(
       noResults
@@ -375,9 +418,11 @@ function updateThreadControls() {
   $("previous").disabled = state.busy || index <= 0;
   $("next").disabled = state.busy || index < 0 || index >= rows.length - 1;
   const thread = rows[index];
+  $("box-info").disabled = state.busy || !thread;
+  const box = state.mailboxes.find((item) => item.id === thread?.mailboxId);
   $("compose").disabled =
     state.busy ||
-    !state.box?.permissions.includes("draft") ||
+    !box?.permissions.includes("draft") ||
     !thread?.rows.some((row) => row.folder === "inbox") ||
     !!thread?.pending.length;
   $("compose").title = thread?.pending.length
@@ -391,35 +436,34 @@ async function loadMailbox(preferred) {
   $("messages").replaceChildren(loading());
   $("thread-content").replaceChildren(loading());
   try {
-    const data = await api("/api/mailboxes");
+    const data = await api("/api/inbox");
     if (epoch !== state.epoch) return;
-    const box =
-      data.mailboxes.find((item) => item.id === (preferred || state.box?.id)) || data.mailboxes[0];
-    if (!box) {
+    const requested = preferred || state.viewId;
+    const viewId = data.mailboxes.some((box) => box.id === requested) ? requested : "all";
+    if (!data.mailboxes.length) {
       state.mode = data.mode;
       state.busy = false;
       state.rows = [];
       state.drafts = [];
       state.mailboxes = [];
       state.box = null;
+      state.viewId = "all";
       renderMailboxNavigation();
       renderConversationList();
       return;
     }
-    const [messages, drafts] = await Promise.all([
-      api(`/api/mailboxes/${box.id}/messages`),
-      api(`/api/mailboxes/${box.id}/drafts`),
-    ]);
-    if (epoch !== state.epoch) return;
-    if (state.box?.id !== box.id || state.mode !== data.mode) {
+    if (state.viewId !== viewId || state.mode !== data.mode) {
       state.selected = null;
       state.reading = false;
     }
     state.mode = data.mode;
     state.mailboxes = data.mailboxes;
-    state.box = box;
-    state.rows = messages;
-    state.drafts = drafts;
+    state.viewId = viewId;
+    state.box = null;
+    state.rows = data.messages.filter(
+      (message) => viewId === "all" || message.mailboxId === viewId,
+    );
+    state.drafts = data.drafts.filter((draft) => viewId === "all" || draft.mailboxId === viewId);
     state.busy = false;
     $("app").dataset.reading = state.reading;
     renderMailboxNavigation();
@@ -455,7 +499,46 @@ function attachmentView(attachment, href) {
   if (href) node.append(icon("download"));
   return node;
 }
-function emailView(message, collapsed) {
+function imageView(attachment, message, box) {
+  const route = `/api/mailboxes/${box.id}/messages/${message.id}`;
+  const preview = `${route}/preview/${attachment.id}`;
+  const figure = element("figure", undefined, "mm-image-figure");
+  const expand = button("", "", "mm-image-preview", () => {
+    $("image-title").textContent = attachment.filename;
+    $("image-full").src = preview;
+    $("image-full").alt = attachment.filename;
+    $("image-download").href = `${route}/attachments/${attachment.id}`;
+    $("image-download").setAttribute("download", attachment.filename);
+    $("image-dialog").showModal();
+  });
+  expand.setAttribute("aria-label", "Ampliar imagem " + attachment.filename);
+  expand.dataset.theme = "dark";
+  const image = element("img");
+  image.src = preview;
+  image.alt = attachment.filename;
+  image.loading = "lazy";
+  image.decoding = "async";
+  image.width = attachment.preview.width;
+  image.height = attachment.preview.height;
+  const caption = element("figcaption", undefined, "mm-image-caption");
+  caption.append(
+    element("span", attachment.filename),
+    element(
+      "span",
+      `${attachment.cid || attachment.disposition === "inline" ? "Incorporada" : "Anexo"} · ${attachment.preview.width} × ${attachment.preview.height}`,
+    ),
+  );
+  image.onerror = () => {
+    expand.hidden = true;
+    caption.replaceChildren(
+      element("span", "A prévia não abriu. O arquivo continua disponível para baixar."),
+    );
+  };
+  expand.append(image);
+  figure.append(expand, caption);
+  return figure;
+}
+function emailView(message, collapsed, box) {
   const card = element(
     collapsed ? "details" : "div",
     undefined,
@@ -468,7 +551,7 @@ function emailView(message, collapsed) {
   if (message.folder === "sent") title.append(element("span", "ENVIO SIMULADO", "mm-inline-label"));
   sender.append(
     title,
-    element("span", `${message.from} → ${message.to.join(", ") || state.box.address}`),
+    element("span", `${message.from} → ${message.to.join(", ") || box.address}`),
   );
   if (collapsed)
     sender.append(element("p", message.text.replace(/\s+/g, " ").slice(0, 80), "mm-email-snippet"));
@@ -481,22 +564,27 @@ function emailView(message, collapsed) {
     card.append(summary);
   } else card.append(header);
   card.append(element("div", message.text, "mm-email-body"));
+  const images = message.attachments.filter((attachment) => attachment.preview);
+  if (images.length) {
+    const gallery = element("div", undefined, "mm-image-gallery");
+    for (const attachment of images) gallery.append(imageView(attachment, message, box));
+    card.append(gallery);
+  }
   if (message.attachments.length) {
     const files = element("div", undefined, "mm-attachment-list");
     for (const attachment of message.attachments)
       files.append(
         attachmentView(
           attachment,
-          `/api/mailboxes/${state.box.id}/messages/${message.id}/attachments/${attachment.id}`,
+          `/api/mailboxes/${box.id}/messages/${message.id}/attachments/${attachment.id}`,
         ),
       );
     card.append(files);
   }
   return card;
 }
-function reviewView(draft) {
-  const box = state.box,
-    card = element("section", undefined, "mm-review-card"),
+function reviewView(draft, box) {
+  const card = element("section", undefined, "mm-review-card"),
     header = element("div", undefined, "mm-review-header");
   header.append(
     icon("review"),
@@ -544,7 +632,8 @@ function reviewView(draft) {
     try {
       await api(`/api/mailboxes/${box.id}/drafts/${draft.id}/send`, {});
       notify("Resposta capturada no piloto. Envio externo não acionado.");
-      await loadMailbox(box.id);
+      state.folder = "sent";
+      await loadMailbox();
     } catch (error) {
       errorNode.textContent = error.message;
       approve.disabled = !canSend;
@@ -558,9 +647,8 @@ function reviewView(draft) {
   card.append(actions, errorNode);
   return card;
 }
-function composerView(original) {
-  const box = state.box,
-    key = editorKey(original.id),
+function composerView(original, box) {
+  const key = editorKey(box, original.id),
     stored = editors.get(key) || { text: "", attachments: false };
   const wrapper = element("section"),
     title = element("div", undefined, "mm-composer-title"),
@@ -618,7 +706,7 @@ function composerView(original) {
       });
       editors.delete(key);
       notify("Rascunho salvo e pronto para revisão.");
-      await loadMailbox(box.id);
+      await loadMailbox();
     } catch (error) {
       errorNode.textContent = error.message;
       save.disabled = false;
@@ -638,7 +726,9 @@ async function openThread(id, reading = false) {
   const thread = visibleThreads().find((item) => item.id === id);
   if (!thread) return;
   const epoch = ++state.epoch,
-    box = state.box;
+    box = state.mailboxes.find((item) => item.id === thread.mailboxId);
+  if (!box) return;
+  state.box = box;
   state.selected = id;
   state.reading = reading;
   $("app").dataset.reading = reading;
@@ -649,7 +739,7 @@ async function openThread(id, reading = false) {
   const messages = await Promise.all(
     thread.rows.map((row) => api(`/api/mailboxes/${box.id}/messages/${row.id}`)),
   );
-  if (epoch !== state.epoch || state.box.id !== box.id) return;
+  if (epoch !== state.epoch || state.box?.id !== box.id) return;
   const content = $("thread-content");
   content.replaceChildren();
   const heading = element("div", undefined, "mm-conversation-heading");
@@ -667,13 +757,18 @@ async function openThread(id, reading = false) {
       emailView(
         message,
         index < messages.length - 1 || (thread.pending.length && messages.length > 0),
+        box,
       ),
     ),
   );
-  for (const draft of thread.pending) content.append(reviewView(draft));
+  for (const draft of thread.pending) content.append(reviewView(draft, box));
   const original = messages.findLast((message) => message.folder === "inbox");
   if (original && box.permissions.includes("draft") && !thread.pending.length)
-    content.append(composerView(original));
+    content.append(composerView(original, box));
+  $("scope").textContent =
+    state.mode === "agent"
+      ? `Luna pode ler e preparar rascunhos em ${box.address}.`
+      : `Responder como ${box.address} · permissões desta caixa.`;
   $("thread-status").replaceChildren(
     icon(thread.pending.length ? "review" : "mail"),
     element(
@@ -694,11 +789,12 @@ async function changeMode(mode) {
   state.folder = "inbox";
   $("search").value = "";
   $("identity-dialog").close();
+  $("image-dialog").close();
   $("messages").replaceChildren(loading());
   $("thread-content").replaceChildren(loading());
   try {
     await api("/api/session", { mode });
-    await loadMailbox(mode === "agent" ? "agent" : undefined);
+    await loadMailbox("all");
   } finally {
     state.busy = false;
   }
@@ -750,6 +846,7 @@ function setTheme(theme) {
 }
 function start() {
   hydrateIcons();
+  $("image-dialog").onclose = () => $("image-full").removeAttribute("src");
   closeSidebar();
   window.matchMedia("(max-width: 760px)").addEventListener("change", closeSidebar);
   let theme = "dark";
