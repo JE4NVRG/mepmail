@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
-import { NAV_ITEMS } from "@/components/sidebar";
+import { MAIL_NAV_ITEM, ORGANIZATION_NAV_ITEMS, SEND_NAV_ITEMS } from "@/components/sidebar";
 import { useTRPC } from "@/lib/trpc";
 
 interface PaletteItem {
@@ -45,12 +45,30 @@ export function CommandPalette() {
       q ? items.filter((item) => item.label.toLowerCase().includes(q)) : items;
     return [
       {
-        id: "navigate",
-        label: t("navigate"),
+        id: "send",
+        label: tNav("products.send"),
         items: matches(
-          NAV_ITEMS.filter(
-            (item) => item.key !== "mailboxes" || mailboxCapability.data?.enabled,
-          ).map((item) => ({ id: item.key, label: tNav(item.key), href: item.href })),
+          SEND_NAV_ITEMS.map((item) => ({ id: item.key, label: tNav(item.key), href: item.href })),
+        ),
+      },
+      {
+        id: "mail",
+        label: tNav("products.mail"),
+        items: mailboxCapability.data?.enabled
+          ? matches([
+              { id: MAIL_NAV_ITEM.key, label: tNav(MAIL_NAV_ITEM.key), href: MAIL_NAV_ITEM.href },
+            ])
+          : [],
+      },
+      {
+        id: "organization",
+        label: tNav("products.organization"),
+        items: matches(
+          ORGANIZATION_NAV_ITEMS.map((item) => ({
+            id: item.key,
+            label: tNav(item.key),
+            href: item.href,
+          })),
         ),
       },
       {

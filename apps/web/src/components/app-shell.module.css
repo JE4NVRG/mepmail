@@ -1,0 +1,56 @@
+.products {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin: 14px 0 6px;
+  padding: 4px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  background: var(--ms-inset);
+}
+.products a {
+  min-width: 0;
+  padding: 9px 8px;
+  color: var(--ms-muted);
+  border: 1px solid transparent;
+  border-radius: var(--ms-r-chip);
+  text-decoration: none;
+  font-size: 12px;
+}
+.products small {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--ms-muted);
+}
+.products a:hover,
+.products a.selectedProduct {
+  color: var(--ms-bone);
+  background: var(--ms-panel-raised);
+  border-color: var(--ms-line);
+}
+.products a:focus-visible {
+  outline: 2px solid var(--ms-steel);
+  outline-offset: 2px;
+}
+.mail > :global(.ms-main) {
+  padding: 24px !important;
+}
+.mail > :global(.ms-main) > div {
+  max-width: none !important;
+}
+.mobileProduct {
+  margin-left: auto;
+  color: var(--ms-muted);
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  .mail > :global(.ms-main) {
+    padding: 16px !important;
+  }
+}
+@media (max-width: 600px) {
+  .mail > :global(.ms-main) {
+    padding: 12px !important;
+  }
+}

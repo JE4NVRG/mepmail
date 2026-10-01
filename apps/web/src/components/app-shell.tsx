@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import { CommandPalette } from "@/components/command-palette";
 import { MenuGlyph } from "@/components/icons/nav-icons";
 import { Sidebar } from "@/components/sidebar";
+import { isActive } from "@/lib/nav";
+import styles from "./app-shell.module.css";
 
 /**
  * Shared app chrome — sidebar plus the ⌘K palette — around a page's own
@@ -31,7 +33,9 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const t = useTranslations("common");
+  const tNav = useTranslations("nav");
   const pathname = usePathname();
+  const mailProduct = isActive(pathname, "/mailboxes");
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Any navigation closes the drawer (nav links, account menu, breadcrumbs).
@@ -58,7 +62,10 @@ export function AppShell({
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       {banner}
-      <div className="ms-app-shell" style={{ display: "flex", flex: 1 }}>
+      <div
+        className={`ms-app-shell ${mailProduct ? styles.mail : ""}`}
+        style={{ display: "flex", flex: 1 }}
+      >
         <header className="ms-mobile-topbar">
           <button
             type="button"
@@ -78,6 +85,9 @@ export function AppShell({
               style={{ height: 15, display: "block" }}
             />
           </Link>
+          {mailProduct ? (
+            <span className={styles.mobileProduct}>{tNav("products.mail")}</span>
+          ) : null}
         </header>
         {drawerOpen ? (
           // biome-ignore lint/a11y/noStaticElementInteractions: scrim click-to-dismiss; Esc handles keyboard

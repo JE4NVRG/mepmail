@@ -1,15 +1,17 @@
 .view {
   color: var(--ms-bone);
+  min-width: 0;
+  container-type: inline-size;
 }
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 28px;
+  margin-bottom: 12px;
 }
 .header h1 {
-  font-size: var(--ms-fs-page);
+  font-size: 24px;
   margin: 8px 0;
   letter-spacing: -0.03em;
 }
@@ -26,8 +28,8 @@
 }
 .workspace {
   display: grid;
-  grid-template-columns: 175px 240px minmax(0, 1fr);
-  min-height: 620px;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: min(660px, calc(100dvh - 200px));
   border: 1px solid var(--ms-line);
   border-radius: var(--ms-r-card);
   overflow: hidden;
@@ -72,6 +74,12 @@
   font-size: 11px;
   color: var(--ms-muted);
   overflow-wrap: anywhere;
+}
+.navigation button > span:last-child,
+.navigation small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .navigation svg {
   flex: none;
@@ -263,6 +271,7 @@
   line-height: 1.6;
 }
 .dialog {
+  box-sizing: border-box;
   width: min(560px, calc(100% - 32px));
   max-height: 90dvh;
   overflow: auto;
@@ -569,22 +578,246 @@
 .draftAttachments span {
   overflow-wrap: anywhere;
 }
-@media (max-width: 1100px) {
+/* Correio has its own content density; the Sending dashboard keeps its shell. */
+.productMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.serviceBadge {
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-badge);
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--ms-muted);
+}
+.header p {
+  margin: 0;
+  font-size: 13px;
+}
+.previewNote {
+  color: var(--ms-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+.previewNote > span {
+  color: var(--ms-bone);
+  margin-right: 8px;
+}
+.contentWorkspace {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  grid-column: 2;
+}
+.contentToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--ms-line);
+}
+.folderHeading {
+  min-width: 0;
+}
+.folderHeading h2 {
+  margin: 0 0 5px;
+  font-size: 18px;
+}
+.folderHeading > span {
+  display: block;
+  max-width: 340px;
+  color: var(--ms-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.contentActions {
+  align-items: center;
+  margin: 0;
+  flex-wrap: wrap;
+}
+.contentNotice {
+  flex-basis: 100%;
+  padding: 0;
+  margin: 0;
+}
+.contentPanels {
+  display: grid;
+  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  flex: 1;
+  min-width: 0;
+}
+.contentList {
+  background: var(--ms-panel);
+  min-width: 0;
+}
+.listSearch {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--ms-line);
+}
+.listSearch input {
+  width: 100%;
+  min-width: 0;
+}
+.contentPanels[data-empty="true"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.contentPanels[data-empty="true"] .contentList {
+  border-right: 0;
+  background: var(--ms-void);
+}
+.contentPanels[data-empty="true"] .listSearch {
+  max-width: 350px;
+  border-bottom: 0;
+}
+.messageRows button {
+  padding: 18px 16px;
+}
+.messageRows strong {
+  margin: 8px 0 5px;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.messageRows p {
+  margin: 5px 0 12px;
+  line-height: 1.6;
+}
+.rowMeta,
+.rowBottom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.rowMeta > span,
+.rowBottom > small:first-child {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rowMeta > span {
+  font-size: 12px;
+}
+.rowMeta time,
+.rowBottom > small:last-child {
+  flex: none;
+  font-size: 10px;
+  color: var(--ms-muted);
+}
+.rowBottom > small:first-child {
+  flex: 1;
+}
+.emptyFolder {
+  max-width: 470px;
+  padding: 60px 28px;
+  margin: auto;
+}
+.emptyFolder h3 {
+  font-size: 18px;
+  margin: 16px 0 8px;
+}
+.emptyFolder p {
+  font-size: 13px;
+  margin-bottom: 22px;
+}
+.emptyFolder > svg {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 4px;
+}
+.registryState {
+  grid-column: 2;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+.contentDetail .detailTop {
+  padding: 16px 24px;
+}
+.message {
+  padding: 26px 28px;
+}
+.hero {
+  align-self: center;
+  padding: 70px 30px;
+}
+.compactNavigation {
+  display: none;
+}
+.compactFolders {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.compactFolders button {
+  font: inherit;
+  font-size: 12px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--ms-r-input);
+  background: transparent;
+  color: var(--ms-muted);
+  cursor: pointer;
+}
+.compactFolders button[aria-current],
+.compactFolders button:hover {
+  border-color: var(--ms-line);
+  background: var(--ms-panel-raised);
+  color: var(--ms-bone);
+}
+@container (max-width: 1020px) {
   .workspace {
-    grid-template-columns: 160px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
-  .list {
+  .navigation {
     display: none;
   }
+  .compactNavigation {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .compactNavigation label {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    flex: 1 1 260px;
+    max-width: 450px;
+  }
+  .compactNavigation label > span {
+    font-size: 11px;
+    color: var(--ms-muted);
+  }
+  .compactNavigation select {
+    width: 100%;
+    min-width: 0;
+  }
+  .contentWorkspace,
+  .registryState {
+    grid-column: 1;
+  }
+}
+@container (max-width: 760px) {
+  .contentPanels {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .contentList {
-    display: block;
-    grid-column: 2;
+    border-right: 0;
   }
   .contentList[data-reading="true"] {
     display: none;
-  }
-  .contentDetail {
-    grid-column: 2;
   }
   .contentDetail[data-reading="false"] {
     display: none;
@@ -592,43 +825,56 @@
   .mobileBack {
     display: inline-flex;
   }
-}
-@media (max-width: 600px) {
-  .header {
-    align-items: flex-start;
-    flex-direction: column;
+  .contentToolbar {
+    padding: 16px;
+    gap: 12px;
   }
-  .workspace {
-    grid-template-columns: minmax(0, 1fr);
+  .folderHeading {
+    flex-basis: 100%;
   }
-  .navigation {
-    max-height: 250px;
-    overflow: auto;
-    border-bottom: 1px solid var(--ms-line);
+  .contentActions {
+    width: 100%;
+    justify-content: flex-start;
   }
-  .folderList {
-    display: flex;
-    margin: 0;
-    padding: 0;
-  }
-  .contentList,
-  .contentDetail,
-  .contentNotice {
-    grid-column: 1;
+  .contentActions > button:last-child {
+    margin-left: auto;
   }
   .message {
     padding: 24px 20px;
   }
   .contentDetail .detailTop {
-    flex-wrap: wrap;
-    padding: 18px 20px;
+    padding: 14px 18px;
   }
-  .privateNote {
-    display: none;
+  .contentPanels[data-empty="true"] .listSearch {
+    max-width: none;
   }
-  .hero {
-    padding: 25px 20px;
+  .compactFolders {
+    width: 100%;
   }
+  .compactFolders button {
+    flex: 1;
+  }
+}
+@container (max-width: 480px) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .header h1 {
+    font-size: 22px;
+  }
+  .compactNavigation label {
+    max-width: none;
+  }
+  .previewNote {
+    font-size: 11px;
+  }
+  .folderHeading > span {
+    max-width: 280px;
+  }
+}
+@media (max-width: 600px) {
   .dialog {
     padding: 20px;
   }

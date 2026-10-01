@@ -333,14 +333,10 @@ export function MailboxesView() {
   );
   const [selectedId, select] = useState<string | null>(null);
   const [folder, setFolder] = useState<"inbox" | "drafts" | "sent">("inbox");
-  const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState<"new" | "edit" | null>(null);
   // Team switches cause a full navigation. Every id is also resolved against this request's scoped DTO.
   const boxes = registry.data?.mailboxes ?? [];
   const selected = boxes.find((b) => b.id === selectedId) ?? null;
-  const filtered = boxes.filter((b) =>
-    `${b.label} ${b.address}`.toLowerCase().includes(search.toLowerCase().trim()),
-  );
   async function changed(id: string) {
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
     select(id);
@@ -373,7 +369,10 @@ export function MailboxesView() {
     <section className={styles.view}>
       <header className={styles.header}>
         <div>
-          <span className={styles.eyebrow}>{t("yourMail")}</span>
+          <div className={styles.productMeta}>
+            <span className={styles.eyebrow}>{t("yourMail")}</span>
+            <span className={styles.serviceBadge}>{t("paidService")}</span>
+          </div>
           <h1>{t("title")}</h1>
           <p>{t("subtitle")}</p>
         </div>
@@ -387,6 +386,9 @@ export function MailboxesView() {
           </button>
         ) : null}
       </header>
+      <p className={styles.previewNote}>
+        <span>{t("preview")}</span> {t("previewBody")}
+      </p>
       {registry.data?.canManage && options.data && !options.data.domains.length ? (
         <p className={styles.notice}>
           {t("noDomains")} <Link href="/domains">{t("domainsLink")} ↗</Link>
@@ -400,9 +402,39 @@ export function MailboxesView() {
           </button>
         </div>
       ) : null}
+      <div className={styles.compactNavigation}>
+        <label>
+          <span>{t("boxes")}</span>
+          <select
+            className="ms-input"
+            aria-label={t("chooseBox")}
+            value={selectedId ?? ""}
+            onChange={(e) => select(e.target.value || null)}
+          >
+            <option value="">{t("all")}</option>
+            {boxes.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.label} · {b.address}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className={styles.compactFolders} aria-label={t("folders")}>
+          {(["inbox", "drafts", "sent"] as const).map((f) => (
+            <button
+              key={f}
+              aria-current={f === folder ? "page" : undefined}
+              onClick={() => setFolder(f)}
+            >
+              {t(f)}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className={styles.workspace}>
         <aside className={styles.navigation} aria-label={t("boxes")}>
           <button
+            aria-pressed={selectedId === null}
             className={selectedId === null ? styles.active : undefined}
             onClick={() => select(null)}
           >
@@ -427,6 +459,8 @@ export function MailboxesView() {
           {boxes.map((b) => (
             <button
               key={b.id}
+              aria-pressed={selected?.id === b.id}
+              title={`${b.label} · ${b.address}`}
               className={selected?.id === b.id ? styles.active : undefined}
               onClick={() => select(b.id)}
             >
@@ -457,118 +491,41 @@ export function MailboxesView() {
             }
           />
         ) : (
-          <>
-            <div className={styles.list}>
-              <header>
-                <div className={styles.eyebrow}>{selected?.address ?? t("all")}</div>
-                <h2>{t(folder)}</h2>
-                <input
-                  className="ms-input"
-                  aria-label={t("search")}
-                  placeholder={t("search")}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </header>
-              {boxes.length ? (
-                <div className={styles.emptyFolder}>
-                  <NavGlyph name="emails" hovered={false} />
-                  <h3>{t("emptyFolder")}</h3>
-                  <p>{t("emptyFolderBody")}</p>
-                </div>
-              ) : (
-                <div className={styles.emptyFolder}>
-                  <h3>{t("emptyTitle")}</h3>
-                  <p>{t("emptyBody")}</p>
-                </div>
-              )}
-              {search ? (
-                <div className={styles.matches}>
-                  {filtered.length ? (
-                    filtered.map((b) => (
-                      <button key={b.id} onClick={() => select(b.id)}>
-                        {b.label}
-                        <small>{b.address}</small>
-                      </button>
-                    ))
-                  ) : (
-                    <p>{t("noMatches")}</p>
-                  )}
-                </div>
-              ) : null}
-            </div>
-            <div className={styles.detail}>
-              <div className={styles.detailTop}>{selected?.address ?? t("choose")}</div>
+          <div className={styles.registryState}>
+            <div className={styles.hero}>
+              <NavGlyph name="emails" hovered={false} />
+              <h2>{selected?.label ?? t("emptyTitle")}</h2>
               {selected ? (
                 <>
-                  <div className={styles.hero}>
-                    <span className={styles.tag}>{t(selected.status)}</span>
-                    <span className={styles.bigAvatar}>
-                      {selected.label.charAt(0).toUpperCase()}
-                    </span>
-                    <h2>{selected.label}</h2>
-                    <p className={styles.address}>{selected.address}</p>
-                    <span className={styles.type}>{t(selected.kind)}</span>
-                    <p>{t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}</p>
-                    {!selected.ownerActive ? (
-                      <p className={styles.hint}>{t("ownerMissing")}</p>
-                    ) : null}
-                    {!selected.canRead ? (
-                      <p className={styles.hint}>{t("managementOnly")}</p>
-                    ) : null}
-                    {registry.data?.canManage ? (
-                      <button
-                        className="ms-btn"
-                        disabled={!options.data}
-                        onClick={() => setDialog("edit")}
-                      >
-                        {t("manage")}
-                      </button>
-                    ) : null}
-                  </div>
-                  <ol className={styles.steps}>
-                    <li data-complete>
-                      <span>✓</span>
-                      <div>
-                        <strong>{t("registered")}</strong>
-                        <p>{t("registeredBody")}</p>
-                      </div>
-                    </li>
-                    <li>
-                      <span>02</span>
-                      <div>
-                        <strong>{t("transport")}</strong>
-                        <p>{t("transportBody")}</p>
-                      </div>
-                    </li>
-                    <li>
-                      <span>03</span>
-                      <div>
-                        <strong>{t("clients")}</strong>
-                        <p>{t("clientsBody")}</p>
-                      </div>
-                    </li>
-                  </ol>
+                  <p className={styles.address}>{selected.address}</p>
+                  <span className={styles.tag}>{t(selected.status)}</span>
+                  <p>{t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}</p>
+                  {!selected.ownerActive ? (
+                    <p className={styles.hint}>{t("ownerMissing")}</p>
+                  ) : null}
+                  {!selected.canRead ? <p className={styles.hint}>{t("managementOnly")}</p> : null}
+                  {registry.data?.canManage ? (
+                    <button
+                      className="ms-btn"
+                      disabled={!options.data}
+                      onClick={() => setDialog("edit")}
+                    >
+                      {t("manage")}
+                    </button>
+                  ) : null}
                 </>
               ) : (
-                <div className={styles.hero}>
-                  <NavGlyph name="emails" hovered={false} />
-                  <h2>{t("emptyTitle")}</h2>
+                <>
                   <p>{t("emptyBody")}</p>
                   {registry.data?.canManage && options.data?.domains.length ? (
                     <button className="ms-btn ms-btn-primary" onClick={() => setDialog("new")}>
-                      {t(boxes.length ? "new" : "createFirst")}
+                      {t("createFirst")}
                     </button>
                   ) : null}
-                  <div className={styles.privacy}>
-                    <h3>{t("private")}</h3>
-                    <p>{t("privateBody")}</p>
-                  </div>
-                </div>
+                </>
               )}
-              <footer>{t("domainNote")}</footer>
             </div>
-          </>
+          </div>
         )}
       </div>
       {dialog && options.data && (dialog === "new" || selected) ? (

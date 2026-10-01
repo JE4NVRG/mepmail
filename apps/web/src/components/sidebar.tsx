@@ -15,10 +15,10 @@ import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { isActive, navItemsWithConsole } from "@/lib/nav";
 import { applyTheme, currentTheme, type Theme } from "@/lib/theme";
 import { useTRPC } from "@/lib/trpc";
+import styles from "./app-shell.module.css";
 
 // Canvas nav order (Row 1 chrome): Settings lives in the main list.
 export const NAV_ITEMS: ReadonlyArray<{ key: string; href: string; icon: NavIconName }> = [
-  { key: "mailboxes", href: "/mailboxes", icon: "emails" },
   { key: "emails", href: "/emails", icon: "emails" },
   { key: "broadcasts", href: "/broadcasts", icon: "broadcasts" },
   { key: "templates", href: "/templates", icon: "templates" },
@@ -30,6 +30,16 @@ export const NAV_ITEMS: ReadonlyArray<{ key: string; href: string; icon: NavIcon
   { key: "webhooks", href: "/webhooks", icon: "webhooks" },
   { key: "settings", href: "/settings", icon: "settings" },
 ];
+
+export const MAIL_NAV_ITEM: (typeof NAV_ITEMS)[number] = {
+  key: "mailboxes",
+  href: "/mailboxes",
+  icon: "emails",
+};
+export const ORGANIZATION_NAV_ITEMS = NAV_ITEMS.filter((item) =>
+  ["domains", "settings"].includes(item.key),
+);
+export const SEND_NAV_ITEMS = NAV_ITEMS.filter((item) => !ORGANIZATION_NAV_ITEMS.includes(item));
 
 /**
  * The operator console's row: rendered only for the instance operator (see
@@ -186,10 +196,11 @@ export function Sidebar({
   // the gate is the server's (a 404 for anyone else), never this query.
   const operator = useQuery(trpc.system.operator.queryOptions());
   const mailboxCapability = useQuery(trpc.mailboxes.capabilities.queryOptions());
+  const mailProduct = isActive(pathname, "/mailboxes") && mailboxCapability.data?.enabled === true;
   // The console's row rides on the same query the account menu uses: an
   // operator sees /console in the nav, everyone else keeps the plain list.
   const navItems = navItemsWithConsole(
-    NAV_ITEMS.filter((item) => item.key !== "mailboxes" || mailboxCapability.data?.enabled),
+    mailProduct ? [MAIL_NAV_ITEM, ...ORGANIZATION_NAV_ITEMS] : NAV_ITEMS,
     CONSOLE_NAV_ITEM,
     operator.data?.isOperator === true,
   );
@@ -213,7 +224,7 @@ export function Sidebar({
     <aside
       className={className}
       style={{
-        width: 240,
+        width: mailProduct ? 200 : 240,
         flexShrink: 0,
         background: "var(--ms-panel)",
         borderRight: "1px solid var(--ms-line)",
@@ -237,6 +248,28 @@ export function Sidebar({
         />
       </div>
       <TeamSwitcher teamName={teamName} teamLogoUrl={teamLogoUrl} />
+      {mailboxCapability.data?.enabled ? (
+        <div className={styles.products} aria-label={t("products.choose")}>
+          <Link
+            href="/emails"
+            aria-current={!mailProduct ? "page" : undefined}
+            onClick={() => onNavigate?.()}
+            className={!mailProduct ? styles.selectedProduct : undefined}
+          >
+            <span>{t("products.send")}</span>
+            <small>{t("products.sendShort")}</small>
+          </Link>
+          <Link
+            href="/mailboxes"
+            aria-current={mailProduct ? "page" : undefined}
+            onClick={() => onNavigate?.()}
+            className={mailProduct ? styles.selectedProduct : undefined}
+          >
+            <span>{t("products.mail")}</span>
+            <small>{t("products.additional")}</small>
+          </Link>
+        </div>
+      ) : null}
       {/* The list scrolls, and a scroll container clips its children's
           focus ring at its own edges. Side padding pulled back by the same
           margin keeps the ring inside the scrollable box without moving the

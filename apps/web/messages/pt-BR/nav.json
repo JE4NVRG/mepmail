@@ -1,5 +1,5 @@
 {
-  "mailboxes": "Correio",
+  "mailboxes": "Caixas de e-mail",
   "emails": "E-mails",
   "broadcasts": "Transmissões",
   "audience": "Audiência",
@@ -13,5 +13,13 @@
   "console": "Console do operador",
   "docs": "Documentação",
   "sourceCode": "Código-fonte · AGPL-3.0",
-  "sourceDownload": "Baixe gratuitamente o código-fonte correspondente a esta versão"
+  "sourceDownload": "Baixe gratuitamente o código-fonte correspondente a esta versão",
+  "products": {
+    "choose": "Serviços MepMail",
+    "send": "Envio",
+    "mail": "Correio",
+    "sendShort": "API e campanhas",
+    "additional": "Adicional pago",
+    "organization": "Organização"
+  }
 }

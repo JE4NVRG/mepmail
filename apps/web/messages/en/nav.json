@@ -1,5 +1,5 @@
 {
-  "mailboxes": "Mail",
+  "mailboxes": "Email inboxes",
   "emails": "Emails",
   "broadcasts": "Broadcasts",
   "audience": "Audience",
@@ -13,5 +13,13 @@
   "console": "Operator console",
   "docs": "Documentation",
   "sourceCode": "Source code · AGPL-3.0",
-  "sourceDownload": "Download the corresponding source of this version for free"
+  "sourceDownload": "Download the corresponding source of this version for free",
+  "products": {
+    "choose": "MepMail services",
+    "send": "Send",
+    "mail": "Mail",
+    "sendShort": "API & campaigns",
+    "additional": "Paid add-on",
+    "organization": "Organization"
+  }
 }

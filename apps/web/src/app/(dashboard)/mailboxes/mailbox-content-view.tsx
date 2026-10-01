@@ -343,11 +343,17 @@ export function MailboxContentView({
     ),
   );
   const readable = boxes.filter((b) => b.canRead && b.status === "planned");
+  const rows =
+    listing.data?.items.filter((i) =>
+      `${i.subject} ${i.from} ${i.fromName} ${i.to.join(" ")} ${i.snippet} ${i.address}`
+        .toLowerCase()
+        .includes(search.toLowerCase().trim()),
+    ) ?? [];
   const selectedBox = readable.find((b) => b.id === selection?.mailboxId);
   const visibleItem =
     !listing.isError &&
     selectedBox &&
-    listing.data?.items.some((i) => i.id === selection?.id && i.mailboxId === selection?.mailboxId)
+    rows.some((i) => i.id === selection?.id && i.mailboxId === selection?.mailboxId)
       ? selection
       : null;
   const detail = useQuery(
@@ -359,12 +365,6 @@ export function MailboxContentView({
     }),
   );
   const item = visibleItem && !detail.isError ? detail.data : null;
-  const rows =
-    listing.data?.items.filter((i) =>
-      `${i.subject} ${i.from} ${i.fromName} ${i.to.join(" ")} ${i.snippet} ${i.address}`
-        .toLowerCase()
-        .includes(search.toLowerCase().trim()),
-    ) ?? [];
   const writable = boxes.filter((b) => b.canDraft && b.status === "planned");
   const denied = [listing.error, detail.error].some(
     (cause) => (cause as { data?: { code?: string } } | null)?.data?.code === "FORBIDDEN",
@@ -385,25 +385,32 @@ export function MailboxContentView({
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.items.queryKey() });
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.item.queryKey() });
   }
+  const hasRows = !listing.isError && !listing.isPending && rows.length > 0;
+  const shortDate = (value: Date) =>
+    new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(value);
+  const canCompose = writable.length > 0 && (!selected || selected.canDraft);
+  const newDraft = () => compose({ mailboxId: selected?.id ?? writable[0]!.id, source: null });
   return (
     <>
-      <div className={`${styles.list} ${styles.contentList}`} data-reading={!!visibleItem}>
-        <header>
+      <div className={styles.contentWorkspace}>
+        <header className={styles.contentToolbar}>
           {notice ? (
             <p role="alert" className={styles.contentNotice}>
               {notice}
             </p>
           ) : null}
-          <div className={styles.eyebrow}>{selected?.address ?? t("all")}</div>
-          <h2>{t(folder)}</h2>
+          <div className={styles.folderHeading}>
+            <h2>{t(folder)}</h2>
+            <span title={selected?.address}>{selected?.address ?? t("all")}</span>
+          </div>
           <div className={styles.contentActions}>
-            {writable.length && (!selected || selected.canDraft) ? (
-              <button
-                className="ms-btn ms-btn-primary"
-                onClick={() =>
-                  compose({ mailboxId: selected?.id ?? writable[0]!.id, source: null })
-                }
-              >
+            {manage ? (
+              <button className="ms-btn ms-btn-ghost" onClick={manage}>
+                {t("manage")}
+              </button>
+            ) : null}
+            {canCompose && folder !== "sent" ? (
+              <button className="ms-btn ms-btn-primary" onClick={newDraft}>
                 {t("newDraft")}
               </button>
             ) : null}
@@ -416,143 +423,188 @@ export function MailboxContentView({
               ↻
             </button>
           </div>
-          <input
-            className="ms-input"
-            aria-label={t("searchMessages")}
-            placeholder={t("searchMessages")}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
         </header>
-        {listing.isError ? (
-          <div role="alert" className={styles.emptyFolder}>
-            <p>{t("contentError")}</p>
-            <button className="ms-btn" onClick={() => void listing.refetch()}>
-              {t("retry")}
-            </button>
+        <div className={styles.contentPanels} data-empty={!hasRows}>
+          <div className={`${styles.list} ${styles.contentList}`} data-reading={!!visibleItem}>
+            <div className={styles.listSearch}>
+              <input
+                className="ms-input"
+                aria-label={t("searchMessages")}
+                placeholder={t("searchMessages")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            {listing.isError ? (
+              <div role="alert" className={styles.emptyFolder}>
+                <p>{t("contentError")}</p>
+                <button className="ms-btn" onClick={() => void listing.refetch()}>
+                  {t("retry")}
+                </button>
+              </div>
+            ) : listing.isPending ? (
+              <p className={styles.emptyFolder} aria-live="polite">
+                {t("loading")}
+              </p>
+            ) : rows.length ? (
+              <div className={styles.messageRows}>
+                {rows.map((row) => (
+                  <button
+                    key={`${row.mailboxId}:${row.id}`}
+                    aria-pressed={
+                      selection?.id === row.id && selection?.mailboxId === row.mailboxId
+                    }
+                    onClick={() => select({ mailboxId: row.mailboxId, id: row.id })}
+                  >
+                    <div className={styles.rowMeta}>
+                      <span>
+                        {row.kind === "draft"
+                          ? row.to.join(", ") || t("noRecipient")
+                          : row.fromName || row.from}
+                      </span>
+                      <time title={date(row.date)} dateTime={row.date.toISOString()}>
+                        {shortDate(row.date)}
+                      </time>
+                    </div>
+                    <strong>{row.subject || t("noSubject")}</strong>
+                    <p>{row.snippet}</p>
+                    <div className={styles.rowBottom}>
+                      <small title={row.address}>{row.address}</small>
+                      {row.attachmentCount ? (
+                        <small>{t("attachmentsCount", { count: row.attachmentCount })}</small>
+                      ) : null}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.emptyFolder}>
+                <NavGlyph name="emails" hovered={false} />
+                <h3>
+                  {t(
+                    search
+                      ? "noMessageMatches"
+                      : folder === "sent"
+                        ? "sentEmptyTitle"
+                        : folder === "drafts"
+                          ? "draftsEmptyTitle"
+                          : "inboxEmptyTitle",
+                  )}
+                </h3>
+                <p>
+                  {t(
+                    search
+                      ? "searchEmptyBody"
+                      : folder === "sent"
+                        ? "sentEmptyBody"
+                        : folder === "drafts"
+                          ? "draftsEmptyBody"
+                          : "inboxEmptyBody",
+                  )}
+                </p>
+                {search ? (
+                  <button className="ms-btn" onClick={() => setSearch("")}>
+                    {t("clearSearch")}
+                  </button>
+                ) : folder === "sent" ? (
+                  <button className="ms-btn" onClick={() => changeFolder("drafts")}>
+                    {t("viewDrafts")}
+                  </button>
+                ) : canCompose ? (
+                  <button className="ms-btn" onClick={newDraft}>
+                    {t("newDraft")}
+                  </button>
+                ) : null}
+              </div>
+            )}
+            {listing.data?.limited && !listing.isError ? (
+              <p className={styles.notice}>{t("listLimit")}</p>
+            ) : null}
           </div>
-        ) : listing.isPending ? (
-          <p className={styles.emptyFolder} aria-live="polite">
-            {t("loading")}
-          </p>
-        ) : rows.length ? (
-          <div className={styles.messageRows}>
-            {rows.map((row) => (
-              <button
-                key={`${row.mailboxId}:${row.id}`}
-                aria-pressed={selection?.id === row.id && selection?.mailboxId === row.mailboxId}
-                onClick={() => select({ mailboxId: row.mailboxId, id: row.id })}
-              >
-                <small>{row.address}</small>
-                <strong>{row.subject || t("noSubject")}</strong>
-                <span>
-                  {row.kind === "draft"
-                    ? row.to.join(", ") || t("noRecipient")
-                    : row.fromName || row.from}
-                </span>
-                <p>{row.snippet}</p>
-                <small>
-                  {date(row.date)}
-                  {row.attachmentCount
-                    ? ` · ${t("attachmentsCount", { count: row.attachmentCount })}`
-                    : ""}
-                </small>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className={styles.emptyFolder}>
-            <NavGlyph name="emails" hovered={false} />
-            <h3>{t(search ? "noMessageMatches" : "emptyFolder")}</h3>
-            <p>{t(folder === "sent" ? "sendingInactive" : "emptyFolderBody")}</p>
-          </div>
-        )}
-        {listing.data?.limited && !listing.isError ? (
-          <p className={styles.notice}>{t("listLimit")}</p>
-        ) : null}
-      </div>
-      <div className={`${styles.detail} ${styles.contentDetail}`} data-reading={!!visibleItem}>
-        <div className={styles.detailTop}>
-          <button
-            className={`ms-btn ms-btn-ghost ${styles.mobileBack}`}
-            onClick={() => select(null)}
-          >
-            ← {t("back")}
-          </button>
-          <span>{selectedBox?.address ?? selected?.address ?? t("all")}</span>
-          {manage ? (
-            <button className="ms-btn ms-btn-ghost" onClick={manage}>
-              {t("manage")}
-            </button>
+          {hasRows ? (
+            <div
+              className={`${styles.detail} ${styles.contentDetail}`}
+              data-reading={!!visibleItem}
+            >
+              <div className={styles.detailTop}>
+                <button
+                  className={`ms-btn ms-btn-ghost ${styles.mobileBack}`}
+                  onClick={() => select(null)}
+                >
+                  ← {t("back")}
+                </button>
+                <span>{selectedBox?.address ?? selected?.address ?? t("all")}</span>
+              </div>
+              {detail.isError && visibleItem ? (
+                <div role="alert" className={styles.emptyFolder}>
+                  <p>{t("accessLost")}</p>
+                  <button
+                    className="ms-btn"
+                    onClick={() => {
+                      select(null);
+                      void refresh();
+                    }}
+                  >
+                    {t("refresh")}
+                  </button>
+                </div>
+              ) : visibleItem && detail.isPending ? (
+                <p className={styles.emptyFolder} aria-live="polite">
+                  {t("loading")}
+                </p>
+              ) : item ? (
+                <article className={styles.message}>
+                  <header>
+                    <span className={styles.type}>
+                      {t(item.kind === "draft" ? "drafts" : "inbox")}
+                    </span>
+                    <h2>{item.subject || t("noSubject")}</h2>
+                    <dl>
+                      <div>
+                        <dt>{t("from")}</dt>
+                        <dd>
+                          {item.fromName ? `${item.fromName} · ` : ""}
+                          {item.from}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>{t("to")}</dt>
+                        <dd>{item.to.join(", ") || t("noRecipient")}</dd>
+                      </div>
+                    </dl>
+                    <small>{date(item.date ?? item.updatedAt)}</small>
+                  </header>
+                  <div className={styles.messageBody}>{item.text || t("noText")}</div>
+                  {item.attachments.length ? (
+                    <section aria-label={t("attachments")} className={styles.attachments}>
+                      {item.attachments.map((a) => (
+                        <Attachment
+                          key={`${item.id}:${item.revision}:${a.index}`}
+                          item={item}
+                          attachment={a}
+                        />
+                      ))}
+                    </section>
+                  ) : null}
+                  {selectedBox?.canDraft ? (
+                    <button
+                      className="ms-btn"
+                      onClick={() => compose({ mailboxId: item.mailboxId, source: item })}
+                    >
+                      {t(item.kind === "draft" ? "editDraft" : "replyDraft")}
+                    </button>
+                  ) : null}
+                </article>
+              ) : (
+                <div className={styles.hero}>
+                  <NavGlyph name="emails" hovered={false} />
+                  <h2>{t("selectMessage")}</h2>
+                  <p>{t("selectMessageBody")}</p>
+                </div>
+              )}
+            </div>
           ) : null}
         </div>
-        {detail.isError && visibleItem ? (
-          <div role="alert" className={styles.emptyFolder}>
-            <p>{t("accessLost")}</p>
-            <button
-              className="ms-btn"
-              onClick={() => {
-                select(null);
-                void refresh();
-              }}
-            >
-              {t("refresh")}
-            </button>
-          </div>
-        ) : visibleItem && detail.isPending ? (
-          <p className={styles.emptyFolder} aria-live="polite">
-            {t("loading")}
-          </p>
-        ) : item ? (
-          <article className={styles.message}>
-            <header>
-              <span className={styles.type}>{t(item.kind === "draft" ? "drafts" : "inbox")}</span>
-              <h2>{item.subject || t("noSubject")}</h2>
-              <dl>
-                <div>
-                  <dt>{t("from")}</dt>
-                  <dd>
-                    {item.fromName ? `${item.fromName} · ` : ""}
-                    {item.from}
-                  </dd>
-                </div>
-                <div>
-                  <dt>{t("to")}</dt>
-                  <dd>{item.to.join(", ") || t("noRecipient")}</dd>
-                </div>
-              </dl>
-              <small>{date(item.date ?? item.updatedAt)}</small>
-            </header>
-            <div className={styles.messageBody}>{item.text || t("noText")}</div>
-            {item.attachments.length ? (
-              <section aria-label={t("attachments")} className={styles.attachments}>
-                {item.attachments.map((a) => (
-                  <Attachment
-                    key={`${item.id}:${item.revision}:${a.index}`}
-                    item={item}
-                    attachment={a}
-                  />
-                ))}
-              </section>
-            ) : null}
-            {selectedBox?.canDraft ? (
-              <button
-                className="ms-btn"
-                onClick={() => compose({ mailboxId: item.mailboxId, source: item })}
-              >
-                {t(item.kind === "draft" ? "editDraft" : "replyDraft")}
-              </button>
-            ) : null}
-          </article>
-        ) : (
-          <div className={styles.hero}>
-            <NavGlyph name="emails" hovered={false} />
-            <h2>{t("selectMessage")}</h2>
-            <p>{t("selectMessageBody")}</p>
-            <p className={styles.hint}>{t("draftOnly")}</p>
-          </div>
-        )}
-        <footer>{t("contentPrivate")}</footer>
       </div>
       {composer && composerAllowed ? (
         <DraftDialog
@@ -569,6 +621,7 @@ export function MailboxContentView({
             void refresh();
           }}
           saved={async (saved) => {
+            setSearch("");
             changeFolder("drafts");
             await refresh();
             select({ mailboxId: saved.mailboxId, id: saved.id });
