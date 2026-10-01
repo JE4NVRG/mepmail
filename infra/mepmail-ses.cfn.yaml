@@ -104,10 +104,27 @@ Resources:
   # The transport every deployment gets: the worker long-polls it, so events
   # buffer through restarts and no inbound reachability is needed. Mirrors
   # runEventsSetup in packages/ses/src/setup.ts.
+  EventsDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      QueueName: mepmail-events-dlq
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      RedriveAllowPolicy:
+        redrivePermission: byQueue
+        sourceQueueArns:
+          - {"Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:mepmail-events"}
+
   EventsQueue:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: mepmail-events
+      MessageRetentionPeriod: 345600
+      RedrivePolicy:
+        deadLetterTargetArn: {"Fn::GetAtt": [EventsDeadLetterQueue, Arn]}
+        maxReceiveCount: 5
 
   EventsQueuePolicy:
     Type: AWS::SQS::QueuePolicy

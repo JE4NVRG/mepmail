@@ -34,9 +34,9 @@ export interface SqsPollerDeps {
 
 /**
  * One receive/process/delete round; returns how many messages arrived.
- * Unusable messages (non-JSON, foreign topic, unparseable event) are deleted —
- * redelivery can never fix them; only an enqueue failure keeps a message on
- * the queue for redelivery.
+ * Invalid messages remain on SQS for the configured dead-letter redrive.
+ * Only a valid event successfully enqueued enters the delete batch; enqueue
+ * failures remain available for redelivery too.
  */
 export async function pollSqsOnce(deps: SqsPollerDeps, waitSeconds = 20): Promise<number> {
   const log = deps.log ?? (() => {});
@@ -53,10 +53,9 @@ export async function pollSqsOnce(deps: SqsPollerDeps, waitSeconds = 20): Promis
   const done: Message[] = [];
   for (const message of messages) {
     try {
-      await processMessage(message, deps);
-      done.push(message);
-    } catch (error) {
-      log(`sqs poller: enqueue failed, leaving message for redelivery: ${String(error)}`);
+      if (await processMessage(message, deps)) done.push(message);
+    } catch {
+      log("sqs poller: enqueue failed, message retained for redelivery");
     }
   }
   if (done.length > 0) {
@@ -73,35 +72,43 @@ export async function pollSqsOnce(deps: SqsPollerDeps, waitSeconds = 20): Promis
   return messages.length;
 }
 
-async function processMessage(message: Message, deps: SqsPollerDeps): Promise<void> {
+async function processMessage(message: Message, deps: SqsPollerDeps): Promise<boolean> {
   const log = deps.log ?? (() => {});
   let raw: unknown;
   try {
     raw = JSON.parse(message.Body ?? "");
   } catch {
-    log("sqs poller: dropped non-JSON message");
-    return;
+    log("sqs poller: non-JSON message retained for redrive");
+    return false;
   }
   const parsed = snsMessageSchema.safeParse(raw);
-  if (!parsed.success || parsed.data.Type !== "Notification") return;
+  if (!parsed.success || parsed.data.Type !== "Notification") {
+    log("sqs poller: invalid SNS envelope retained for redrive");
+    return false;
+  }
   if (!deps.allowedTopicArns.includes(parsed.data.TopicArn)) {
-    log(`sqs poller: dropped message from unallowed topic ${parsed.data.TopicArn}`);
-    return;
+    log("sqs poller: unallowed topic message retained for redrive");
+    return false;
   }
   let inner: unknown;
   try {
     inner = JSON.parse(parsed.data.Message);
   } catch {
-    return;
+    log("sqs poller: non-JSON event retained for redrive");
+    return false;
   }
   const event = parseSesEvent(inner);
-  if (!event) return;
+  if (!event) {
+    log("sqs poller: invalid SES event retained for redrive");
+    return false;
+  }
   // The SNS MessageId dedupes with the https path: same key, same singleton
   // queue job, same durable email_events.sns_message_id uniqueness.
   await deps.enqueueSesEvent(
     { ...event, occurredAt: event.occurredAt.toISOString() },
     parsed.data.MessageId,
   );
+  return true;
 }
 
 /** Endless long-poll loop; receive errors back off instead of crashing the worker. */
