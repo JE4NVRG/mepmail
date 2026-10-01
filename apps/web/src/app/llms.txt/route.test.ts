@@ -40,6 +40,6 @@ describe("crawler entry points", () => {
     ]) {
       expect(allow).toContain(path);
     }
-    expect(robots().sitemap).toBe("https://mepmail.je4ndev.com/sitemap.xml");
+    expect(robots().sitemap).toBe("https://mepmail.dev/sitemap.xml");
   });
 });

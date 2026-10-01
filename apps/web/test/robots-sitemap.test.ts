@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import robots from "../src/app/robots";
 import sitemap from "../src/app/sitemap";
 
@@ -17,26 +17,49 @@ const allowedPaths = (): string[] => {
   return rule?.allow ?? [];
 };
 
-// Minimal robots matcher: "/$" only matches the root, everything else matches
-// the exact path or a path inside it.
-const isAllowed = (pathname: string, allow: string[]): boolean =>
+// These rules use prefix matching and an optional end anchor, including query.
+const isAllowed = (pathAndQuery: string, allow: string[]): boolean =>
   allow.some((entry) => {
     const prefix = entry.replace(/\$$/, "");
-    if (prefix === "/") return pathname === "/";
-    return pathname === prefix || pathname.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`);
+    return entry.endsWith("$") ? pathAndQuery === prefix : pathAndQuery.startsWith(prefix);
   });
 
 describe("robots.txt + sitemap.xml agreement", () => {
+  beforeEach(() => vi.stubEnv("APP_BASE_URL", undefined));
   afterEach(() => {
-    delete process.env.APP_BASE_URL;
+    vi.unstubAllEnvs();
   });
 
   it("declares the sitemap on the runtime base URL, like sitemap.ts does", () => {
-    expect(robots().sitemap).toBe("https://mepmail.je4ndev.com/sitemap.xml");
+    expect(robots().sitemap).toBe("https://mepmail.dev/sitemap.xml");
+    expect(sitemap().every((entry) => new URL(entry.url).origin === "https://mepmail.dev")).toBe(
+      true,
+    );
 
     // Self-hostable installs (AGPL) must never be pointed at our domain.
-    process.env.APP_BASE_URL = "https://mepmail.example.com/";
+    vi.stubEnv("APP_BASE_URL", "https://mepmail.example.com/");
     expect(robots().sitemap).toBe("https://mepmail.example.com/sitemap.xml");
+    expect(
+      sitemap().every((entry) => new URL(entry.url).origin === "https://mepmail.example.com"),
+    ).toBe(true);
+
+    vi.stubEnv("APP_BASE_URL", "https://moved.example.com");
+    expect(robots().sitemap).toBe("https://moved.example.com/sitemap.xml");
+    expect(sitemap()[0]?.url).toBe("https://moved.example.com/");
+  });
+
+  it("allows public landing query strings while keeping private routes blocked", () => {
+    const allow = allowedPaths();
+    for (const path of ["/", "/?utm_source=google", "/?next=%2Ftemplates%2Fnew"]) {
+      expect(isAllowed(path, allow), path).toBe(true);
+    }
+    for (const path of ["/emails", "/api/trpc", "/settings?tab=profile", "/console"]) {
+      expect(isAllowed(path, allow), path).toBe(false);
+    }
+  });
+
+  it("does not advertise request time as a page update", () => {
+    expect(sitemap().every((entry) => entry.lastModified === undefined)).toBe(true);
   });
 
   it("allows every URL the sitemap advertises", () => {

@@ -1,24 +1,27 @@
 import type { MetadataRoute } from "next";
 
+// Resolve APP_BASE_URL when requested, rather than freezing it at build time.
+export const dynamic = "force-dynamic";
+
 // Public, indexable pages: the landing, the standalone pricing page, the
 // "Resend alternative" comparison, the integrations, security and support
 // pages and the auth entry points (mirrors robots.ts). The dashboard has no
 // public URLs of its own.
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = (process.env.APP_BASE_URL ?? "https://mepmail.je4ndev.com").replace(/\/+$/, "");
-  const lastModified = new Date();
+  const base = (process.env.APP_BASE_URL ?? "https://mepmail.dev").replace(/\/+$/, "");
+  // Omit lastModified until each page has a reliable editorial update date.
   return [
-    { url: `${base}/`, lastModified, changeFrequency: "weekly", priority: 1 },
-    { url: `${base}/pricing`, lastModified, changeFrequency: "monthly", priority: 0.9 },
-    { url: `${base}/alternatives/resend`, lastModified, changeFrequency: "monthly", priority: 0.7 },
-    { url: `${base}/integrations`, lastModified, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${base}/security`, lastModified, changeFrequency: "yearly", priority: 0.7 },
-    { url: `${base}/support`, lastModified, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${base}/changelog`, lastModified, changeFrequency: "weekly", priority: 0.6 },
-    { url: `${base}/signup`, lastModified, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${base}/login`, lastModified, changeFrequency: "yearly", priority: 0.3 },
-    { url: `${base}/terms`, lastModified, changeFrequency: "yearly", priority: 0.4 },
-    { url: `${base}/privacy`, lastModified, changeFrequency: "yearly", priority: 0.4 },
-    { url: `${base}/refund`, lastModified, changeFrequency: "yearly", priority: 0.4 },
+    { url: `${base}/`, changeFrequency: "weekly", priority: 1 },
+    { url: `${base}/pricing`, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${base}/alternatives/resend`, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${base}/integrations`, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/security`, changeFrequency: "yearly", priority: 0.7 },
+    { url: `${base}/support`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/changelog`, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${base}/signup`, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/login`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${base}/terms`, changeFrequency: "yearly", priority: 0.4 },
+    { url: `${base}/privacy`, changeFrequency: "yearly", priority: 0.4 },
+    { url: `${base}/refund`, changeFrequency: "yearly", priority: 0.4 },
   ];
 }

@@ -24,5 +24,9 @@ export default async function LoginPage() {
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("auth");
-  return { title: t("login.submit"), robots: { index: true, follow: true } };
+  return {
+    title: t("login.submit"),
+    alternates: { canonical: "/login" },
+    robots: { index: true, follow: true },
+  };
 }

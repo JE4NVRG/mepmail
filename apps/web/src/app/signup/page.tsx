@@ -24,5 +24,9 @@ export default async function SignupPage() {
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("auth");
-  return { title: t("signup.submit"), robots: { index: true, follow: true } };
+  return {
+    title: t("signup.submit"),
+    alternates: { canonical: "/signup" },
+    robots: { index: true, follow: true },
+  };
 }

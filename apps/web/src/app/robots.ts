@@ -1,5 +1,8 @@
 import type { MetadataRoute } from "next";
 
+// Resolve APP_BASE_URL when requested, including after a domain migration.
+export const dynamic = "force-dynamic";
+
 // The dashboard is private: crawlers get the public pages (the landing, the
 // standalone pricing page, the comparison page, the integrations, security and
 // support pages, the auth entry points and the legal pages) plus the static
@@ -8,12 +11,13 @@ import type { MetadataRoute } from "next";
 // to crawlers. Keep this list in step with sitemap.ts whenever a public route
 // is added.
 export default function robots(): MetadataRoute.Robots {
-  const base = (process.env.APP_BASE_URL ?? "https://mepmail.je4ndev.com").replace(/\/+$/, "");
+  const base = (process.env.APP_BASE_URL ?? "https://mepmail.dev").replace(/\/+$/, "");
   return {
     rules: {
       userAgent: "*",
       allow: [
         "/$",
+        "/?",
         "/pricing",
         "/alternatives",
         "/integrations",
