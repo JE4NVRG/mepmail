@@ -647,6 +647,14 @@ export {
   withMailboxRegistryAdmin,
 } from "./mailbox-registry.js";
 export {
+  importMailboxMime,
+  listMailboxItems,
+  MailboxContentError,
+  type MailboxContentActor,
+  readMailboxItem,
+  saveMailboxDraft,
+} from "./mailbox-private-store.js";
+export {
   buildWebhookPayload,
   clearWebhookEndpointNotifications,
   decryptWebhookSecret,

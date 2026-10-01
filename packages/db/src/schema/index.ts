@@ -17,6 +17,7 @@ export * from "./instance-probes.js";
 export * from "./instance-settings.js";
 export * from "./monitor.js";
 export * from "./mailboxes.js";
+export * from "./mailbox-items.js";
 export * from "./region-breakers.js";
 export * from "./segments.js";
 export * from "./stripe-events.js";

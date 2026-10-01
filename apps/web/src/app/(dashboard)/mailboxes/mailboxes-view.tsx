@@ -531,7 +531,7 @@ export function MailboxesView() {
               <p>{t("emptyBody")}</p>
               {registry.data?.canManage && options.data?.domains.length ? (
                 <button className="ms-btn ms-btn-primary" onClick={() => setDialog("new")}>
-                  {t("createFirst")}
+                  {t(boxes.length ? "new" : "createFirst")}
                 </button>
               ) : null}
               <div className={styles.privacy}>

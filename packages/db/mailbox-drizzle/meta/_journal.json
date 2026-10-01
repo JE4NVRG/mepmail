@@ -2,6 +2,19 @@
   "version": "7",
   "dialect": "postgresql",
   "entries": [
-    { "idx": 0, "version": "7", "when": 1790866800000, "tag": "0000_registry", "breakpoints": true }
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790866800000,
+      "tag": "0000_registry",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790866800001,
+      "tag": "0001_private_items",
+      "breakpoints": true
+    }
   ]
 }
