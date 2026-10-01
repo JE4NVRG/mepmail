@@ -255,6 +255,9 @@ importers:
       lowlight:
         specifier: 3.3.0
         version: 3.3.0
+      mailparser:
+        specifier: 3.9.26
+        version: 3.9.26
       motion:
         specifier: 13.2.0
         version: 13.2.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -264,6 +267,9 @@ importers:
       next-intl:
         specifier: ^4.14.3
         version: 4.14.3(@swc/helpers@0.5.23)(next@16.3.8(@types/node@22.20.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)
+      nodemailer:
+        specifier: 10.0.3
+        version: 10.0.3
       react:
         specifier: ^19.3.0
         version: 19.3.0
@@ -283,9 +289,15 @@ importers:
       '@millionsend/test-utils':
         specifier: workspace:*
         version: link:../../packages/test-utils
+      '@types/mailparser':
+        specifier: 3.4.6
+        version: 3.4.6
       '@types/node':
         specifier: ^22.20.2
         version: 22.20.2
+      '@types/nodemailer':
+        specifier: 8.0.1
+        version: 8.0.1
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0

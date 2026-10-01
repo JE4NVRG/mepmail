@@ -10,6 +10,7 @@ export const AUDIT_ACTIONS = [
   "mailbox.updated",
   "mailbox.granted",
   "mailbox.revoked",
+  "mailbox.draft_saved",
   "webhook.created",
   "webhook.updated",
   "webhook.secret_rotated",

@@ -386,12 +386,211 @@
   outline: 2px solid var(--ms-steel);
   outline-offset: 3px;
 }
+.contentActions {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.contentNotice {
+  padding: 12px 18px;
+  color: var(--ms-muted);
+  font-size: 12px;
+}
+.messageRows button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--ms-line);
+  padding: 20px 18px;
+  background: transparent;
+  color: var(--ms-bone);
+  font: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+.messageRows button:hover,
+.messageRows button[aria-pressed="true"] {
+  background: var(--ms-panel-raised);
+}
+.messageRows strong,
+.messageRows span,
+.messageRows small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.messageRows strong {
+  margin: 10px 0 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.messageRows span,
+.messageRows p {
+  font-size: 12px;
+}
+.messageRows p {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.7;
+  color: var(--ms-muted);
+  margin: 7px 0 12px;
+}
+.messageRows small {
+  font-size: 10px;
+  color: var(--ms-muted);
+  line-height: 1.6;
+}
+.contentDetail .detailTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.contentDetail .detailTop > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.message {
+  padding: 30px 24px;
+}
+.message h2 {
+  font-size: var(--ms-fs-section);
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  margin: 18px 0;
+}
+.message dl {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+.message dl > div {
+  display: flex;
+  gap: 12px;
+}
+.message dt {
+  color: var(--ms-muted);
+  width: 34px;
+  flex: none;
+}
+.message dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.message header > small {
+  color: var(--ms-muted);
+  font-size: 11px;
+}
+.messageBody {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.8;
+  margin: 28px 0;
+}
+.attachments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
+  margin: 20px 0 28px;
+}
+.attachment {
+  margin: 0;
+  min-width: 0;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  overflow: hidden;
+  background: var(--ms-panel);
+}
+.attachment > svg {
+  margin: 20px;
+  color: var(--ms-muted);
+}
+.attachment img {
+  display: block;
+  width: 100%;
+  height: 160px;
+  object-fit: contain;
+  background: var(--ms-void);
+}
+.attachment figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px;
+  border-top: 1px solid var(--ms-line);
+  font-size: 12px;
+}
+.attachment figcaption > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.attachment small {
+  display: block;
+  color: var(--ms-muted);
+  margin-top: 5px;
+  font-size: 10px;
+}
+.mobileBack {
+  display: none;
+}
+.composer {
+  width: min(680px, calc(100% - 32px));
+}
+.composer textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 180px;
+  line-height: 1.7;
+  font: inherit;
+  font-size: 14px;
+}
+.draftAttachments {
+  display: grid;
+  gap: 6px;
+}
+.draftAttachments > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  padding: 4px 12px;
+  font-size: 12px;
+}
+.draftAttachments span {
+  overflow-wrap: anywhere;
+}
 @media (max-width: 1100px) {
   .workspace {
     grid-template-columns: 160px minmax(0, 1fr);
   }
   .list {
     display: none;
+  }
+  .contentList {
+    display: block;
+    grid-column: 2;
+  }
+  .contentList[data-reading="true"] {
+    display: none;
+  }
+  .contentDetail {
+    grid-column: 2;
+  }
+  .contentDetail[data-reading="false"] {
+    display: none;
+  }
+  .mobileBack {
+    display: inline-flex;
   }
 }
 @media (max-width: 600px) {
@@ -411,6 +610,18 @@
     display: flex;
     margin: 0;
     padding: 0;
+  }
+  .contentList,
+  .contentDetail,
+  .contentNotice {
+    grid-column: 1;
+  }
+  .message {
+    padding: 24px 20px;
+  }
+  .contentDetail .detailTop {
+    flex-wrap: wrap;
+    padding: 18px 20px;
   }
   .privateNote {
     display: none;

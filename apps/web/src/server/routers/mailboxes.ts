@@ -3,6 +3,7 @@ import {
   grantMailboxRegistry,
   listMailboxRegistry,
   MailboxRegistryError,
+  MailboxContentError,
   revokeMailboxRegistry,
   updateMailboxRegistry,
   withMailboxRegistryAdmin,
@@ -13,6 +14,11 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { recordAudit } from "../audit";
 import { mailboxRegistryEnabled } from "../mailboxes";
+import {
+  getMailboxContent,
+  getMailboxContentList,
+  saveMailboxContentDraft,
+} from "../mailbox-content";
 import { router, teamProcedure } from "../trpc";
 
 const enabled = teamProcedure.use(({ ctx, next }) => {
@@ -25,7 +31,7 @@ async function call<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();
   } catch (error) {
-    if (error instanceof MailboxRegistryError)
+    if (error instanceof MailboxRegistryError || error instanceof MailboxContentError)
       throw new TRPCError({
         code: {
           forbidden: "FORBIDDEN",
@@ -55,6 +61,46 @@ export const mailboxesRouter = router({
     deliveryReady: false as const,
   })),
   list: enabled.query(({ ctx }) => call(() => listMailboxRegistry(ctx.db, actor(ctx)))),
+  items: enabled
+    .input(
+      z.object({ mailboxId: z.uuid().nullable(), folder: z.enum(["inbox", "drafts", "sent"]) }),
+    )
+    .query(({ ctx, input }) => call(() => getMailboxContentList(ctx.db, actor(ctx), input))),
+  item: enabled
+    .input(z.object({ mailboxId: z.uuid(), id: z.uuid() }))
+    .query(({ ctx, input }) => call(() => getMailboxContent(ctx.db, actor(ctx), input))),
+  saveDraft: enabled
+    .input(
+      z.object({
+        mailboxId: z.uuid(),
+        id: z.uuid().optional(),
+        expectedRevision: z.number().int().min(0).max(2147483646),
+        sourceItemId: z.uuid().optional(),
+        to: z.array(z.email().max(254)).max(20),
+        subject: z
+          .string()
+          .max(998)
+          .regex(/^[^\r\n]*$/),
+        text: z.string().max(262144),
+        retainedAttachments: z.array(z.number().int().min(0).max(9)).max(10),
+        uploads: z
+          .array(
+            z.object({
+              filename: z.string().min(1).max(160),
+              base64: z.string().min(1).max(349528),
+            }),
+          )
+          .max(10),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const result = await call(() => saveMailboxContentDraft(ctx.db, actor(ctx), input));
+      await recordAudit(ctx, {
+        action: "mailbox.draft_saved",
+        target: { type: "mailbox_item", id: result.id },
+      });
+      return result;
+    }),
   options: enabled.query(({ ctx }) =>
     call(() =>
       withMailboxRegistryAdmin(ctx.db, actor(ctx), async (db) => {

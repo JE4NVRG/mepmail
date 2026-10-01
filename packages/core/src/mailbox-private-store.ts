@@ -170,6 +170,35 @@ export async function readMailboxItem(
   actor: MailboxContentActor,
   input: { mailboxId: string; id: string },
 ) {
+  return withMailboxItem(db, keyring, actor, input, async (item) => item);
+}
+
+/** Authorize a completed aggregate under one transaction before returning private DTOs. */
+export async function withMailboxContentAccess<T>(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxIds: string[],
+  operation: () => Promise<T>,
+): Promise<T> {
+  actor = { ...actor };
+  const ids = [...new Set(mailboxIds)].sort();
+  if (actor.supportView) throw new MailboxContentError("forbidden");
+  if (ids.length > 20) throw new MailboxContentError("invalid");
+  const visit = (tx: Db, index: number): Promise<T> =>
+    index === ids.length
+      ? operation()
+      : scoped(tx, actor, ids[index]!, "read", false, (locked) => visit(locked, index + 1));
+  return visit(db, 0);
+}
+
+/** Keep authorization locks through parsing/DTO or binary response construction. */
+export async function withMailboxItem<T>(
+  db: Db,
+  keyring: Keyring,
+  actor: MailboxContentActor,
+  input: { mailboxId: string; id: string },
+  operation: (item: ReturnType<typeof summary> & { raw: Buffer }) => Promise<T>,
+): Promise<T> {
   actor = { ...actor };
   input = { ...input };
   return scoped(db, actor, input.mailboxId, "read", false, async (tx) => {
@@ -184,7 +213,7 @@ export async function readMailboxItem(
         ),
       );
     if (!item) throw new MailboxContentError("not_found");
-    return { ...summary(item), raw: await open(item, keyring) };
+    return operation({ ...summary(item), raw: await open(item, keyring) });
   });
 }
 

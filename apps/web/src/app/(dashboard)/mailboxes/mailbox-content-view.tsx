@@ -1,0 +1,580 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { inferRouterOutputs } from "@trpc/server";
+import { useLocale, useTranslations } from "next-intl";
+import { useEffect, useRef, useState } from "react";
+import { NavGlyph } from "@/components/icons/nav-icons";
+import { useTRPC } from "@/lib/trpc";
+import type { AppRouter } from "@/server/routers";
+import styles from "./mailboxes.module.css";
+
+type Outputs = inferRouterOutputs<AppRouter>["mailboxes"];
+type Box = Outputs["list"]["mailboxes"][number];
+type Item = Outputs["item"];
+type Folder = "inbox" | "drafts" | "sent";
+const NIL = "00000000-0000-0000-0000-000000000000";
+function attachmentUrl(
+  item: { mailboxId: string; id: string; revision: number },
+  index: number,
+  preview = false,
+) {
+  return `/api/mailboxes/${item.mailboxId}/items/${item.id}/attachments/${index}?revision=${item.revision}${preview ? "&preview=1" : ""}`;
+}
+function Attachment({ item, attachment }: { item: Item; attachment: Item["attachments"][number] }) {
+  const t = useTranslations("mailboxes");
+  const [failed, fail] = useState(false);
+  return (
+    <figure className={styles.attachment}>
+      {attachment.image && !failed ? (
+        <a
+          href={attachmentUrl(item, attachment.index, true)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={t("openImage", { name: attachment.filename })}
+        >
+          {/* Private authenticated bytes: original route is bounded and never proxies external images. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={attachmentUrl(item, attachment.index, true)}
+            alt={attachment.filename}
+            loading="lazy"
+            width={attachment.image.width}
+            height={attachment.image.height}
+            onError={() => fail(true)}
+          />
+        </a>
+      ) : (
+        <NavGlyph name="emails" hovered={false} />
+      )}
+      <figcaption>
+        <span>
+          {attachment.filename}
+          <small>{Math.ceil(attachment.bytes / 1024)} KB</small>
+        </span>
+        <a className="ms-btn ms-btn-ghost" href={attachmentUrl(item, attachment.index)} download>
+          {t("download")}
+        </a>
+      </figcaption>
+    </figure>
+  );
+}
+
+function DraftDialog({
+  boxes,
+  mailboxId,
+  source,
+  close,
+  saved,
+  lost,
+  selectBox,
+}: {
+  boxes: Box[];
+  mailboxId: string;
+  source: Item | null;
+  close: () => void;
+  saved: (item: Outputs["saveDraft"]) => Promise<void>;
+  lost: () => void;
+  selectBox: (id: string) => void;
+}) {
+  const t = useTranslations("mailboxes");
+  const trpc = useTRPC();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const boxId = mailboxId;
+  const [to, setTo] = useState(
+    source ? (source.kind === "draft" ? source.to.join(", ") : source.replyTo) : "",
+  );
+  const [subject, setSubject] = useState(
+    source
+      ? source.kind === "draft" || /^re:/i.test(source.subject)
+        ? source.subject
+        : `Re: ${source.subject}`
+      : "",
+  );
+  const [text, setText] = useState(source?.kind === "draft" ? source.text : "");
+  const [retained, setRetained] = useState(source?.attachments.map((a) => a.index) ?? []);
+  const [uploads, setUploads] = useState<{ filename: string; base64: string }[]>([]);
+  const [loadingFiles, loadFiles] = useState(false);
+  const [error, setError] = useState("");
+  const mutation = useMutation(trpc.mailboxes.saveDraft.mutationOptions());
+  const busy = mutation.isPending || loadingFiles;
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
+  const allowed = boxes.some(
+    (b) => b.id === boxId && b.canRead && b.canDraft && b.status === "planned",
+  );
+  useEffect(() => {
+    if (!allowed) lost();
+  }, [allowed, lost]);
+  async function addFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setError("");
+    if (
+      retained.length + uploads.length + files.length > 10 ||
+      Array.from(files).some((f) => !f.size || f.size > 256 * 1024)
+    ) {
+      setError(t("attachmentLimit"));
+      return;
+    }
+    loadFiles(true);
+    try {
+      const incoming = await Promise.all(
+        Array.from(files).map(
+          (file) =>
+            new Promise<{ filename: string; base64: string }>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () =>
+                typeof reader.result === "string"
+                  ? resolve({
+                      filename: file.name.slice(0, 160),
+                      base64: reader.result.split(",")[1] ?? "",
+                    })
+                  : reject(new Error("file"));
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            }),
+        ),
+      );
+      setUploads((previous) => [...previous, ...incoming]);
+    } catch {
+      setError(t("attachmentError"));
+    } finally {
+      loadFiles(false);
+    }
+  }
+  return (
+    <dialog
+      ref={dialog}
+      className={`${styles.dialog} ${styles.composer}`}
+      aria-labelledby="draft-title"
+      onClose={close}
+      onCancel={(e) => {
+        if (busy) e.preventDefault();
+      }}
+    >
+      <header className={styles.dialogHeader}>
+        <h2 id="draft-title">
+          {t(source?.kind === "draft" ? "editDraft" : source ? "replyDraft" : "newDraft")}
+        </h2>
+        <button
+          className="ms-btn ms-btn-ghost"
+          aria-label={t("close")}
+          disabled={busy}
+          onClick={close}
+        >
+          ×
+        </button>
+      </header>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setError("");
+          try {
+            const result = await mutation.mutateAsync({
+              mailboxId: boxId,
+              id: source?.kind === "draft" ? source.id : undefined,
+              expectedRevision: source?.kind === "draft" ? source.revision : 0,
+              sourceItemId: source?.id,
+              to: to
+                .split(/[,;]/)
+                .map((v) => v.trim())
+                .filter(Boolean),
+              subject,
+              text,
+              retainedAttachments: retained,
+              uploads,
+            });
+            await saved(result);
+            close();
+          } catch (cause) {
+            const code = (cause as { data?: { code?: string } })?.data?.code;
+            if (code === "FORBIDDEN") {
+              lost();
+              return;
+            }
+            setError(
+              t(
+                code === "CONFLICT"
+                  ? "draftConflict"
+                  : code === "FORBIDDEN"
+                    ? "accessLost"
+                    : "draftError",
+              ),
+            );
+          }
+        }}
+      >
+        <fieldset className={styles.fields} disabled={busy || !allowed}>
+          <label>
+            {t("from")}
+            <select
+              className="ms-input"
+              value={boxId}
+              onChange={(e) => selectBox(e.target.value)}
+              disabled={!!source}
+            >
+              {boxes
+                .filter((b) => b.canDraft && b.status === "planned")
+                .map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.label} · {b.address}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>
+            {t("to")}
+            <input
+              className="ms-input"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              placeholder="pessoa@dominio.com"
+              maxLength={5100}
+            />
+          </label>
+          <label>
+            {t("subject")}
+            <input
+              className="ms-input"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              maxLength={998}
+            />
+          </label>
+          <label>
+            {t("message")}
+            <textarea
+              className="ms-input"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={262144}
+              rows={9}
+              autoFocus
+            />
+          </label>
+          <div className={styles.draftAttachments}>
+            {source?.attachments
+              .filter((a) => retained.includes(a.index))
+              .map((a) => (
+                <div key={a.index}>
+                  <span>{a.filename}</span>
+                  <button
+                    type="button"
+                    className="ms-btn ms-btn-ghost"
+                    aria-label={t("removeAttachment", { name: a.filename })}
+                    onClick={() => setRetained((v) => v.filter((i) => i !== a.index))}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            {uploads.map((a, i) => (
+              <div key={`${i}:${a.filename}`}>
+                <span>{a.filename}</span>
+                <button
+                  type="button"
+                  className="ms-btn ms-btn-ghost"
+                  aria-label={t("removeAttachment", { name: a.filename })}
+                  onClick={() => setUploads((v) => v.filter((_, index) => index !== i))}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <label>
+            {t("attach")}
+            <input
+              type="file"
+              multiple
+              onChange={(e) => {
+                void addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <small className={styles.hint}>{t("attachmentLimit")}</small>
+          </label>
+        </fieldset>
+        {error ? (
+          <p role="alert" className={styles.error}>
+            {error}
+          </p>
+        ) : null}
+        <p className={styles.hint}>{t("draftOnly")}</p>
+        <footer className={styles.dialogFooter}>
+          <button type="button" className="ms-btn" disabled={busy} onClick={close}>
+            {t("cancel")}
+          </button>
+          <button className="ms-btn ms-btn-primary" disabled={busy}>
+            {t(busy ? "saving" : "saveDraft")}
+          </button>
+        </footer>
+      </form>
+    </dialog>
+  );
+}
+
+export function MailboxContentView({
+  boxes,
+  selected,
+  folder,
+  manage,
+  changeFolder,
+}: {
+  boxes: Box[];
+  selected: Box | null;
+  folder: Folder;
+  manage?: (() => void) | undefined;
+  changeFolder: (folder: Folder) => void;
+}) {
+  const t = useTranslations("mailboxes");
+  const locale = useLocale();
+  const trpc = useTRPC();
+  const queries = useQueryClient();
+  const [selection, select] = useState<{ mailboxId: string; id: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [composer, compose] = useState<{ mailboxId: string; source: Item | null } | null>(null);
+  const [notice, setNotice] = useState("");
+  const listing = useQuery(
+    trpc.mailboxes.items.queryOptions(
+      { mailboxId: selected?.id ?? null, folder },
+      { retry: false, gcTime: 0, refetchInterval: 15000 },
+    ),
+  );
+  const readable = boxes.filter((b) => b.canRead && b.status === "planned");
+  const selectedBox = readable.find((b) => b.id === selection?.mailboxId);
+  const visibleItem =
+    !listing.isError &&
+    selectedBox &&
+    listing.data?.items.some((i) => i.id === selection?.id && i.mailboxId === selection?.mailboxId)
+      ? selection
+      : null;
+  const detail = useQuery(
+    trpc.mailboxes.item.queryOptions(visibleItem ?? { mailboxId: NIL, id: NIL }, {
+      enabled: !!visibleItem,
+      retry: false,
+      gcTime: 0,
+      refetchInterval: 15000,
+    }),
+  );
+  const item = visibleItem && !detail.isError ? detail.data : null;
+  const rows =
+    listing.data?.items.filter((i) =>
+      `${i.subject} ${i.from} ${i.fromName} ${i.to.join(" ")} ${i.snippet} ${i.address}`
+        .toLowerCase()
+        .includes(search.toLowerCase().trim()),
+    ) ?? [];
+  const writable = boxes.filter((b) => b.canDraft && b.status === "planned");
+  const denied = [listing.error, detail.error].some(
+    (cause) => (cause as { data?: { code?: string } } | null)?.data?.code === "FORBIDDEN",
+  );
+  const composerAllowed = !!composer && writable.some((b) => b.id === composer.mailboxId);
+  useEffect(() => {
+    if (denied) void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
+  }, [denied, queries, trpc]);
+  useEffect(() => {
+    if (composer && !composerAllowed) {
+      compose(null);
+      setNotice(t("accessLost"));
+    }
+  }, [composer, composerAllowed, t]);
+  const date = (value: Date) =>
+    new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(value);
+  async function refresh() {
+    await queries.invalidateQueries({ queryKey: trpc.mailboxes.items.queryKey() });
+    await queries.invalidateQueries({ queryKey: trpc.mailboxes.item.queryKey() });
+  }
+  return (
+    <>
+      <div className={`${styles.list} ${styles.contentList}`} data-reading={!!visibleItem}>
+        <header>
+          {notice ? (
+            <p role="alert" className={styles.contentNotice}>
+              {notice}
+            </p>
+          ) : null}
+          <div className={styles.eyebrow}>{selected?.address ?? t("all")}</div>
+          <h2>{t(folder)}</h2>
+          <div className={styles.contentActions}>
+            {writable.length && (!selected || selected.canDraft) ? (
+              <button
+                className="ms-btn ms-btn-primary"
+                onClick={() =>
+                  compose({ mailboxId: selected?.id ?? writable[0]!.id, source: null })
+                }
+              >
+                {t("newDraft")}
+              </button>
+            ) : null}
+            <button
+              className="ms-btn ms-btn-ghost"
+              aria-label={t("refresh")}
+              disabled={listing.isFetching}
+              onClick={() => void refresh()}
+            >
+              ↻
+            </button>
+          </div>
+          <input
+            className="ms-input"
+            aria-label={t("searchMessages")}
+            placeholder={t("searchMessages")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </header>
+        {listing.isError ? (
+          <div role="alert" className={styles.emptyFolder}>
+            <p>{t("contentError")}</p>
+            <button className="ms-btn" onClick={() => void listing.refetch()}>
+              {t("retry")}
+            </button>
+          </div>
+        ) : listing.isPending ? (
+          <p className={styles.emptyFolder} aria-live="polite">
+            {t("loading")}
+          </p>
+        ) : rows.length ? (
+          <div className={styles.messageRows}>
+            {rows.map((row) => (
+              <button
+                key={`${row.mailboxId}:${row.id}`}
+                aria-pressed={selection?.id === row.id && selection?.mailboxId === row.mailboxId}
+                onClick={() => select({ mailboxId: row.mailboxId, id: row.id })}
+              >
+                <small>{row.address}</small>
+                <strong>{row.subject || t("noSubject")}</strong>
+                <span>
+                  {row.kind === "draft"
+                    ? row.to.join(", ") || t("noRecipient")
+                    : row.fromName || row.from}
+                </span>
+                <p>{row.snippet}</p>
+                <small>
+                  {date(row.date)}
+                  {row.attachmentCount
+                    ? ` · ${t("attachmentsCount", { count: row.attachmentCount })}`
+                    : ""}
+                </small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.emptyFolder}>
+            <NavGlyph name="emails" hovered={false} />
+            <h3>{t(search ? "noMessageMatches" : "emptyFolder")}</h3>
+            <p>{t(folder === "sent" ? "sendingInactive" : "emptyFolderBody")}</p>
+          </div>
+        )}
+        {listing.data?.limited && !listing.isError ? (
+          <p className={styles.notice}>{t("listLimit")}</p>
+        ) : null}
+      </div>
+      <div className={`${styles.detail} ${styles.contentDetail}`} data-reading={!!visibleItem}>
+        <div className={styles.detailTop}>
+          <button
+            className={`ms-btn ms-btn-ghost ${styles.mobileBack}`}
+            onClick={() => select(null)}
+          >
+            ← {t("back")}
+          </button>
+          <span>{selectedBox?.address ?? selected?.address ?? t("all")}</span>
+          {manage ? (
+            <button className="ms-btn ms-btn-ghost" onClick={manage}>
+              {t("manage")}
+            </button>
+          ) : null}
+        </div>
+        {detail.isError && visibleItem ? (
+          <div role="alert" className={styles.emptyFolder}>
+            <p>{t("accessLost")}</p>
+            <button
+              className="ms-btn"
+              onClick={() => {
+                select(null);
+                void refresh();
+              }}
+            >
+              {t("refresh")}
+            </button>
+          </div>
+        ) : visibleItem && detail.isPending ? (
+          <p className={styles.emptyFolder} aria-live="polite">
+            {t("loading")}
+          </p>
+        ) : item ? (
+          <article className={styles.message}>
+            <header>
+              <span className={styles.type}>{t(item.kind === "draft" ? "drafts" : "inbox")}</span>
+              <h2>{item.subject || t("noSubject")}</h2>
+              <dl>
+                <div>
+                  <dt>{t("from")}</dt>
+                  <dd>
+                    {item.fromName ? `${item.fromName} · ` : ""}
+                    {item.from}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t("to")}</dt>
+                  <dd>{item.to.join(", ") || t("noRecipient")}</dd>
+                </div>
+              </dl>
+              <small>{date(item.date ?? item.updatedAt)}</small>
+            </header>
+            <div className={styles.messageBody}>{item.text || t("noText")}</div>
+            {item.attachments.length ? (
+              <section aria-label={t("attachments")} className={styles.attachments}>
+                {item.attachments.map((a) => (
+                  <Attachment
+                    key={`${item.id}:${item.revision}:${a.index}`}
+                    item={item}
+                    attachment={a}
+                  />
+                ))}
+              </section>
+            ) : null}
+            {selectedBox?.canDraft ? (
+              <button
+                className="ms-btn"
+                onClick={() => compose({ mailboxId: item.mailboxId, source: item })}
+              >
+                {t(item.kind === "draft" ? "editDraft" : "replyDraft")}
+              </button>
+            ) : null}
+          </article>
+        ) : (
+          <div className={styles.hero}>
+            <NavGlyph name="emails" hovered={false} />
+            <h2>{t("selectMessage")}</h2>
+            <p>{t("selectMessageBody")}</p>
+            <p className={styles.hint}>{t("draftOnly")}</p>
+          </div>
+        )}
+        <footer>{t("contentPrivate")}</footer>
+      </div>
+      {composer && composerAllowed ? (
+        <DraftDialog
+          key={`${composer.source?.id ?? "new"}:${composer.source?.revision ?? 0}`}
+          boxes={boxes}
+          mailboxId={composer.mailboxId}
+          source={composer.source}
+          close={() => compose(null)}
+          selectBox={(id) => compose((current) => (current ? { ...current, mailboxId: id } : null))}
+          lost={() => {
+            compose(null);
+            setNotice(t("accessLost"));
+            void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
+            void refresh();
+          }}
+          saved={async (saved) => {
+            changeFolder("drafts");
+            await refresh();
+            select({ mailboxId: saved.mailboxId, id: saved.id });
+          }}
+        />
+      ) : null}
+    </>
+  );
+}

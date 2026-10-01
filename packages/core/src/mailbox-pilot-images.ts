@@ -54,6 +54,7 @@ export function pilotImageMetadata(content: Buffer) {
     let offset = 2;
     while (offset + 4 <= content.length && content[offset] === 0xff) {
       const marker = content[offset + 1];
+      if (marker === undefined) break;
       if (marker === 0xda || marker === 0xd9) break;
       if (marker === 0xff) {
         offset++;

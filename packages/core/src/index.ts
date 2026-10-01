@@ -653,6 +653,8 @@ export {
   type MailboxContentActor,
   readMailboxItem,
   saveMailboxDraft,
+  withMailboxItem,
+  withMailboxContentAccess,
 } from "./mailbox-private-store.js";
 export {
   buildWebhookPayload,

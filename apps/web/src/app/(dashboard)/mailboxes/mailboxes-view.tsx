@@ -9,6 +9,7 @@ import { NavGlyph } from "@/components/icons/nav-icons";
 import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import styles from "./mailboxes.module.css";
+import { MailboxContentView } from "./mailbox-content-view";
 
 type Outputs = inferRouterOutputs<AppRouter>["mailboxes"];
 type Box = Outputs["list"]["mailboxes"][number];
@@ -322,7 +323,10 @@ export function MailboxesView() {
   const queries = useQueryClient();
   const capability = useQuery(trpc.mailboxes.capabilities.queryOptions());
   const registry = useQuery(
-    trpc.mailboxes.list.queryOptions(undefined, { enabled: capability.data?.enabled === true }),
+    trpc.mailboxes.list.queryOptions(undefined, {
+      enabled: capability.data?.enabled === true,
+      refetchInterval: 15000,
+    }),
   );
   const options = useQuery(
     trpc.mailboxes.options.queryOptions(undefined, { enabled: registry.data?.canManage === true }),
@@ -438,110 +442,134 @@ export function MailboxesView() {
             <span>{t("private")}</span>
           </div>
         </aside>
-        <div className={styles.list}>
-          <header>
-            <div className={styles.eyebrow}>{selected?.address ?? t("all")}</div>
-            <h2>{t(folder)}</h2>
-            <input
-              className="ms-input"
-              aria-label={t("search")}
-              placeholder={t("search")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </header>
-          {boxes.length ? (
-            <div className={styles.emptyFolder}>
-              <NavGlyph name="emails" hovered={false} />
-              <h3>{t("emptyFolder")}</h3>
-              <p>{t("emptyFolderBody")}</p>
-            </div>
-          ) : (
-            <div className={styles.emptyFolder}>
-              <h3>{t("emptyTitle")}</h3>
-              <p>{t("emptyBody")}</p>
-            </div>
-          )}
-          {search ? (
-            <div className={styles.matches}>
-              {filtered.length ? (
-                filtered.map((b) => (
-                  <button key={b.id} onClick={() => select(b.id)}>
-                    {b.label}
-                    <small>{b.address}</small>
-                  </button>
-                ))
+        {(!selected || (selected.canRead && selected.status === "planned")) &&
+        boxes.some((b) => b.canRead && b.status === "planned") ? (
+          <MailboxContentView
+            key={selected?.id ?? "all"}
+            boxes={boxes}
+            selected={selected}
+            folder={folder}
+            changeFolder={setFolder}
+            manage={
+              selected && registry.data?.canManage && options.data
+                ? () => setDialog("edit")
+                : undefined
+            }
+          />
+        ) : (
+          <>
+            <div className={styles.list}>
+              <header>
+                <div className={styles.eyebrow}>{selected?.address ?? t("all")}</div>
+                <h2>{t(folder)}</h2>
+                <input
+                  className="ms-input"
+                  aria-label={t("search")}
+                  placeholder={t("search")}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </header>
+              {boxes.length ? (
+                <div className={styles.emptyFolder}>
+                  <NavGlyph name="emails" hovered={false} />
+                  <h3>{t("emptyFolder")}</h3>
+                  <p>{t("emptyFolderBody")}</p>
+                </div>
               ) : (
-                <p>{t("noMatches")}</p>
+                <div className={styles.emptyFolder}>
+                  <h3>{t("emptyTitle")}</h3>
+                  <p>{t("emptyBody")}</p>
+                </div>
               )}
-            </div>
-          ) : null}
-        </div>
-        <div className={styles.detail}>
-          <div className={styles.detailTop}>{selected?.address ?? t("choose")}</div>
-          {selected ? (
-            <>
-              <div className={styles.hero}>
-                <span className={styles.tag}>{t(selected.status)}</span>
-                <span className={styles.bigAvatar}>{selected.label.charAt(0).toUpperCase()}</span>
-                <h2>{selected.label}</h2>
-                <p className={styles.address}>{selected.address}</p>
-                <span className={styles.type}>{t(selected.kind)}</span>
-                <p>{t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}</p>
-                {!selected.ownerActive ? <p className={styles.hint}>{t("ownerMissing")}</p> : null}
-                {!selected.canRead ? <p className={styles.hint}>{t("managementOnly")}</p> : null}
-                {registry.data?.canManage ? (
-                  <button
-                    className="ms-btn"
-                    disabled={!options.data}
-                    onClick={() => setDialog("edit")}
-                  >
-                    {t("manage")}
-                  </button>
-                ) : null}
-              </div>
-              <ol className={styles.steps}>
-                <li data-complete>
-                  <span>✓</span>
-                  <div>
-                    <strong>{t("registered")}</strong>
-                    <p>{t("registeredBody")}</p>
-                  </div>
-                </li>
-                <li>
-                  <span>02</span>
-                  <div>
-                    <strong>{t("transport")}</strong>
-                    <p>{t("transportBody")}</p>
-                  </div>
-                </li>
-                <li>
-                  <span>03</span>
-                  <div>
-                    <strong>{t("clients")}</strong>
-                    <p>{t("clientsBody")}</p>
-                  </div>
-                </li>
-              </ol>
-            </>
-          ) : (
-            <div className={styles.hero}>
-              <NavGlyph name="emails" hovered={false} />
-              <h2>{t("emptyTitle")}</h2>
-              <p>{t("emptyBody")}</p>
-              {registry.data?.canManage && options.data?.domains.length ? (
-                <button className="ms-btn ms-btn-primary" onClick={() => setDialog("new")}>
-                  {t(boxes.length ? "new" : "createFirst")}
-                </button>
+              {search ? (
+                <div className={styles.matches}>
+                  {filtered.length ? (
+                    filtered.map((b) => (
+                      <button key={b.id} onClick={() => select(b.id)}>
+                        {b.label}
+                        <small>{b.address}</small>
+                      </button>
+                    ))
+                  ) : (
+                    <p>{t("noMatches")}</p>
+                  )}
+                </div>
               ) : null}
-              <div className={styles.privacy}>
-                <h3>{t("private")}</h3>
-                <p>{t("privateBody")}</p>
-              </div>
             </div>
-          )}
-          <footer>{t("domainNote")}</footer>
-        </div>
+            <div className={styles.detail}>
+              <div className={styles.detailTop}>{selected?.address ?? t("choose")}</div>
+              {selected ? (
+                <>
+                  <div className={styles.hero}>
+                    <span className={styles.tag}>{t(selected.status)}</span>
+                    <span className={styles.bigAvatar}>
+                      {selected.label.charAt(0).toUpperCase()}
+                    </span>
+                    <h2>{selected.label}</h2>
+                    <p className={styles.address}>{selected.address}</p>
+                    <span className={styles.type}>{t(selected.kind)}</span>
+                    <p>{t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}</p>
+                    {!selected.ownerActive ? (
+                      <p className={styles.hint}>{t("ownerMissing")}</p>
+                    ) : null}
+                    {!selected.canRead ? (
+                      <p className={styles.hint}>{t("managementOnly")}</p>
+                    ) : null}
+                    {registry.data?.canManage ? (
+                      <button
+                        className="ms-btn"
+                        disabled={!options.data}
+                        onClick={() => setDialog("edit")}
+                      >
+                        {t("manage")}
+                      </button>
+                    ) : null}
+                  </div>
+                  <ol className={styles.steps}>
+                    <li data-complete>
+                      <span>✓</span>
+                      <div>
+                        <strong>{t("registered")}</strong>
+                        <p>{t("registeredBody")}</p>
+                      </div>
+                    </li>
+                    <li>
+                      <span>02</span>
+                      <div>
+                        <strong>{t("transport")}</strong>
+                        <p>{t("transportBody")}</p>
+                      </div>
+                    </li>
+                    <li>
+                      <span>03</span>
+                      <div>
+                        <strong>{t("clients")}</strong>
+                        <p>{t("clientsBody")}</p>
+                      </div>
+                    </li>
+                  </ol>
+                </>
+              ) : (
+                <div className={styles.hero}>
+                  <NavGlyph name="emails" hovered={false} />
+                  <h2>{t("emptyTitle")}</h2>
+                  <p>{t("emptyBody")}</p>
+                  {registry.data?.canManage && options.data?.domains.length ? (
+                    <button className="ms-btn ms-btn-primary" onClick={() => setDialog("new")}>
+                      {t(boxes.length ? "new" : "createFirst")}
+                    </button>
+                  ) : null}
+                  <div className={styles.privacy}>
+                    <h3>{t("private")}</h3>
+                    <p>{t("privateBody")}</p>
+                  </div>
+                </div>
+              )}
+              <footer>{t("domainNote")}</footer>
+            </div>
+          </>
+        )}
       </div>
       {dialog && options.data && (dialog === "new" || selected) ? (
         <RegistryDialog
