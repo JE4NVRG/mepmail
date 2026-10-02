@@ -1,0 +1,129 @@
+---
+title: Mailboxes for people and agents
+description: Separate a personal or agent mailbox from application and campaign sending.
+---
+
+**Pilot status:** Mail is being validated separately from Send. Receiving real
+messages and sending replies require an enabled deployment and a verified domain.
+A mailbox in the dashboard, a saved draft, or a completed Checkout does not confirm
+that these services are active.
+
+## Choose the service
+
+Use **Send** for application messages, signup emails and marketing campaigns.
+Use **Mail** for a named mailbox on your domain: personal conversations, a company
+address or an agent that reads and replies to messages. You can continue using
+Send without creating a mailbox.
+
+Mail licenses are counted per mailbox. People and agents use the same seat model;
+storage and outbound allowances come from the recorded service terms. Consult
+the dashboard for your current contract. Pilot allowances are not public prices.
+The outbound allowance counts recipients per mailbox and license period: when a
+send is admitted, one message to three distinct addresses reserves three units.
+
+## Prepare a mailbox
+
+1. Select the organization and domain in the dashboard.
+2. Open **Mail**, confirm the license period and available seats, then create a
+   person or agent mailbox with a current owner.
+3. Wait for the operator to confirm domain and transport readiness before moving
+   existing email traffic. Creating a mailbox does not change your domain's MX.
+4. For an agent, select the mailbox, open **Agent access** and create a key for it. The
+   owner selects read, draft and, optionally, send permissions. Store the key
+   privately when it appears; it is displayed once.
+
+Mailbox keys start with `mmb_`. They are different from Send API keys and from the
+OAuth connection described in [MCP server](/mcp). The existing Send MCP tools do
+not provide access to this mailbox API.
+
+## Connect an agent
+
+Use the **dashboard origin** of your enabled deployment for these endpoints.
+They run under `/api/mailbox-agent` on the Web application, rather than the Send
+API origin. Keep `MEPMAIL_MAIL_ORIGIN` and `MEPMAIL_MAIL_TOKEN` in your agent's
+private environment; do not include the token in source, URLs, prompts or logs.
+
+```js title="Read this mailbox's inbox"
+const origin = process.env.MEPMAIL_MAIL_ORIGIN;
+const token = process.env.MEPMAIL_MAIL_TOKEN;
+if (!origin || !token) throw new Error("Configure the mailbox origin and key");
+
+const response = await fetch(
+  new URL("/api/mailbox-agent/items?folder=inbox", origin),
+  { headers: { Authorization: `Bearer ${token}` } },
+);
+if (!response.ok) throw new Error(`Mailbox request failed: ${response.status}`);
+const { items, limited } = await response.json();
+// Handle private message data in the agent; avoid copying it into general logs.
+```
+
+The key selects one mailbox; the caller does not supply a team or mailbox ID.
+Use `folder=inbox`, `drafts` or `sent` to list messages. The list returns up to 50
+items and a `limited` flag; this API currently has no pagination cursor. To read
+a message's content and attachment metadata, use
+`GET /api/mailbox-agent/items?id=<message UUID>` with the same read permission.
+The response does not include attachment file contents.
+
+## Save a draft or reply
+
+`POST /api/mailbox-agent/drafts` requires draft permission, an active license with
+a seat for this mailbox, and available storage. Drafts and their attachments
+count toward mailbox storage. A new draft uses `expectedRevision: 0`. The sender
+address comes from the authorized mailbox.
+
+```json title="New draft body"
+{
+  "expectedRevision": 0,
+  "to": ["recipient@example.invalid"],
+  "subject": "Conversation",
+  "text": "A message prepared for review.",
+  "retainedAttachments": [],
+  "uploads": []
+}
+```
+
+Save the returned `id` and `revision`. To reply, add `sourceItemId` containing the
+inbox message UUID; the server preserves its reply references. To edit an
+existing draft, supply its `id`, the same ID as `sourceItemId`, and its latest
+`expectedRevision`. A conflict requires reloading the draft before editing.
+
+Recipient lists contain 1–20 addresses. The pilot supports up to 10 attachments,
+each at most 256 KiB, and a final MIME message at most 1 MiB. An upload is
+`{ "filename": "note.txt", "base64": "..." }`; retained attachments use the indexes
+from the source message. Empty arrays are still required when there are none.
+
+## Submit the saved revision
+
+Sending requires the owner's explicit **send** key permission, an active license,
+a verified domain, remaining allowances and enabled transport. A read/draft key
+cannot send. `POST /api/mailbox-agent/send` accepts only the saved draft's UUID
+and exact revision:
+
+```json title="Send request body — replace with the saved draft values"
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "expectedRevision": 1
+}
+```
+
+A `202` response means the request was admitted to the outbox. Repeating the same
+draft revision can return the existing outbox with `duplicate: true` and `200`;
+it does not create a new message. Admission and provider acceptance do not prove
+delivery. An `unknown` result requires operator investigation; do not create
+another draft or automate a resend to work around it.
+
+## Handle access and service errors
+
+| Status | Next step |
+| --- | --- |
+| `400` | Check the request fields, UUID and revision. |
+| `401` | Supply the mailbox key in the Bearer header. |
+| `403` | Check the key's scopes, expiration, revocation and current mailbox owner. |
+| `404` | Confirm the deployment feature is enabled and the requested message exists. |
+| `409` | Reload the draft and confirm the current license, storage and outbound allowance. |
+| `413` | Reduce the request size or attachments. |
+| `503` | Preserve the saved draft and consult the operator; do not assume a send was discarded. |
+
+Revoke a lost key from the mailbox panel. Ownership and membership changes are
+checked again by the server; copying a key to another agent does not grant a
+different mailbox or bypass the owner's permissions.

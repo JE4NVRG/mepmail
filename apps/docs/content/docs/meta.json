@@ -5,6 +5,7 @@
     "migrate-from-resend",
     "self-hosting",
     "billing",
+    "mailboxes",
     "errors",
     "rate-limits",
     "concepts",

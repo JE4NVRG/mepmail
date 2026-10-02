@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { DOCS_URL } from "@/lib/docs-links";
 import { useTRPC } from "@/lib/trpc";
 import styles from "./mailbox-service-panel.module.css";
 
@@ -28,6 +29,19 @@ export function formatMailboxPrice(amount: number, currency: string, locale: str
   const decimals =
     currency.toLowerCase() === "isk" ? 2 : format.resolvedOptions().maximumFractionDigits;
   return format.format(amount / 10 ** (decimals ?? 2));
+}
+
+/** A registered license may be internal or paid; its public DTO does not reveal its source. */
+export function mailboxServiceNotice(
+  availability: string | undefined,
+  periodEnd: Date | null | undefined,
+  existingFailure = false,
+) {
+  if (availability === "existing_subscription" || existingFailure)
+    return periodEnd ? "existingLicenseBody" : "existingBody";
+  if (availability === "recovery_required") return "recoveryBody";
+  if (availability === "forbidden") return "adminBody";
+  return "unavailableBody";
 }
 
 function storageLabel(bytes: number, locale: string): string {
@@ -107,14 +121,7 @@ export function MailboxServicePanel() {
     ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(plan.periodEnd)
     : null;
   const availability = billing.data?.availability;
-  const notice =
-    availability === "existing_subscription" || failure === "existing"
-      ? "existingBody"
-      : availability === "recovery_required"
-        ? "recoveryBody"
-        : availability === "forbidden"
-          ? "adminBody"
-          : "unavailableBody";
+  const notice = mailboxServiceNotice(availability, plan?.periodEnd, failure === "existing");
 
   function closeDialog() {
     dialog.current?.close();
@@ -362,10 +369,20 @@ export function MailboxServicePanel() {
                   </fieldset>
                 </form>
               ) : null}
-              <p className={styles.hint}>{t("confirmationHint")}</p>
+              {canPurchase || notice === "existingBody" ? (
+                <p className={styles.hint}>{t("confirmationHint")}</p>
+              ) : null}
             </>
           )}
           <footer className={styles.dialogFooter}>
+            <a
+              className={`ms-btn ms-btn-ghost ${styles.docsLink}`}
+              href={DOCS_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("documentation")}
+            </a>
             <button
               type="button"
               className="ms-btn ms-btn-ghost"

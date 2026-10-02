@@ -1,0 +1,129 @@
+---
+title: Caixas para pessoas e agentes
+description: Separe uma caixa pessoal ou de agente do envio de campanhas e mensagens da aplicação.
+---
+
+**Estado do piloto:** o Correio está sendo validado separadamente do Envio.
+Receber mensagens reais e enviar respostas exige uma instalação habilitada e
+um domínio verificado. Uma caixa no painel, um rascunho salvo ou um Checkout
+concluído não confirma que esses serviços estão ativos.
+
+## Escolha o serviço
+
+Use **Envio** para mensagens da aplicação, cadastro e campanhas de marketing.
+Use **Correio** para um endereço no seu domínio: conversas pessoais, uma caixa
+da empresa ou um agente que lê e responde mensagens. Você pode continuar usando
+Envio sem criar uma caixa.
+
+As licenças de Correio são contadas por caixa. Pessoas e agentes seguem o mesmo
+modelo; armazenamento e franquia de envio vêm dos termos registrados do serviço.
+Consulte o contrato atual no painel. Franquias do piloto não são preços públicos.
+A franquia de envio conta destinatários por caixa e período da licença. Na
+admissão do envio, uma mensagem para três endereços distintos reserva três unidades.
+
+## Prepare uma caixa
+
+1. Selecione a organização e o domínio no painel.
+2. Abra **Correio**, confira o período da licença e as unidades disponíveis e
+   crie uma caixa de pessoa ou agente com um dono atual.
+3. Aguarde a confirmação de domínio e transporte pelo operador antes de mover
+   seu e-mail existente. Criar uma caixa não altera o MX do domínio.
+4. Para um agente, selecione a caixa, abra **Acesso de agentes** e crie uma chave. O dono
+   escolhe leitura, rascunho e, opcionalmente, envio. Guarde a chave em local
+   privado quando ela aparecer; o segredo é exibido uma vez.
+
+As chaves de caixa começam com `mmb_`. Elas são diferentes das chaves de API de
+Envio e da conexão OAuth descrita em [Servidor MCP](/mcp). As ferramentas MCP
+de Envio existentes não dão acesso a esta API de caixas.
+
+## Conecte um agente
+
+Use a **origem do painel** da sua instalação habilitada. Estes endpoints ficam
+em `/api/mailbox-agent` na aplicação Web, separados da origem da API de Envio.
+Guarde `MEPMAIL_MAIL_ORIGIN` e `MEPMAIL_MAIL_TOKEN` no ambiente privado do agente;
+não coloque a chave no código, em URLs, prompts ou logs.
+
+```js title="Leia a entrada desta caixa"
+const origin = process.env.MEPMAIL_MAIL_ORIGIN;
+const token = process.env.MEPMAIL_MAIL_TOKEN;
+if (!origin || !token) throw new Error("Configure a origem e a chave da caixa");
+
+const response = await fetch(
+  new URL("/api/mailbox-agent/items?folder=inbox", origin),
+  { headers: { Authorization: `Bearer ${token}` } },
+);
+if (!response.ok) throw new Error(`Falha na consulta: ${response.status}`);
+const { items, limited } = await response.json();
+// Trate os dados privados no agente; evite copiá-los para logs gerais.
+```
+
+A chave seleciona uma caixa; a chamada não informa equipe nem ID da caixa.
+Use `folder=inbox`, `drafts` ou `sent` para listar mensagens. A lista retorna até
+50 itens e o indicador `limited`; esta API ainda não tem cursor de paginação.
+Para ler o conteúdo de uma mensagem e os metadados dos anexos, use
+`GET /api/mailbox-agent/items?id=<UUID da mensagem>` com a mesma permissão de leitura.
+A resposta não inclui o conteúdo dos arquivos anexados.
+
+## Salve um rascunho ou resposta
+
+`POST /api/mailbox-agent/drafts` exige permissão de rascunho, licença vigente com
+uma unidade para esta caixa e espaço disponível. Rascunhos e seus anexos contam
+no armazenamento da caixa. Um novo rascunho usa `expectedRevision: 0`. O remetente
+vem da caixa autorizada.
+
+```json title="Corpo de um novo rascunho"
+{
+  "expectedRevision": 0,
+  "to": ["recipient@example.invalid"],
+  "subject": "Conversa",
+  "text": "Mensagem preparada para revisão.",
+  "retainedAttachments": [],
+  "uploads": []
+}
+```
+
+Guarde o `id` e a `revision` retornados. Para responder, acrescente `sourceItemId`
+com o UUID da mensagem recebida; o servidor preserva as referências da resposta.
+Para editar um rascunho existente, informe seu `id`, o mesmo ID em `sourceItemId`
+e a última `expectedRevision`. Um conflito exige recarregar antes de editar.
+
+A lista aceita 1–20 destinatários. O piloto permite até 10 anexos, cada um com
+no máximo 256 KiB, e mensagem MIME final de até 1 MiB. Um upload usa
+`{ "filename": "nota.txt", "base64": "..." }`; anexos preservados usam os índices
+da mensagem de origem. As duas listas vazias continuam obrigatórias sem anexos.
+
+## Solicite o envio da revisão salva
+
+O envio exige permissão **enviar** concedida pelo dono à chave, licença vigente,
+domínio verificado, franquia disponível e transporte habilitado. Uma chave de
+leitura/rascunho não pode enviar. `POST /api/mailbox-agent/send` aceita somente
+o UUID do rascunho salvo e sua revisão exata:
+
+```json title="Corpo do pedido de envio — substitua pelos valores do rascunho salvo"
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "expectedRevision": 1
+}
+```
+
+Uma resposta `202` significa que o pedido entrou na outbox. Repetir a mesma
+revisão pode retornar a outbox existente com `duplicate: true` e `200`; isso não
+cria outra mensagem. Admissão e aceite do provedor não comprovam entrega. Um
+resultado `unknown` exige investigação pelo operador; não crie outro rascunho
+nem automatize um reenvio para contornar esse estado.
+
+## Trate erros de acesso e serviço
+
+| Status | Próximo passo |
+| --- | --- |
+| `400` | Confira campos, UUID e revisão. |
+| `401` | Informe a chave da caixa no cabeçalho Bearer. |
+| `403` | Confira permissões, expiração, revogação e o dono atual da caixa. |
+| `404` | Confirme que o recurso está habilitado e que a mensagem existe. |
+| `409` | Recarregue o rascunho e confira licença, armazenamento e franquia de envio. |
+| `413` | Reduza o tamanho do pedido ou dos anexos. |
+| `503` | Preserve o rascunho e consulte o operador; não suponha que o envio foi descartado. |
+
+Revogue uma chave perdida pelo painel da caixa. Mudanças de dono e membership
+são conferidas novamente pelo servidor; copiar uma chave para outro agente não
+concede outra caixa nem supera as permissões do dono.

@@ -16,6 +16,7 @@ import type Stripe from "stripe";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   formatMailboxPrice,
+  mailboxServiceNotice,
   safeMailboxCheckoutUrl,
 } from "@/app/(dashboard)/mailboxes/mailbox-service-panel";
 import { getStripe } from "@/server/billing";
@@ -343,6 +344,33 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
     }
     expect(getStripe).not.toHaveBeenCalled();
   });
+  it("presents an internal license without a catalog or Stripe identifiers as a registered license", async () => {
+    vi.stubEnv("MAILBOX_BILLING_CATALOG", "");
+    await db.insert(schema.mailboxSubscriptions).values({
+      teamId,
+      status: "active",
+      seats: 2,
+      storageBytesPerMailbox: 8192,
+      includedOutboundPerMailbox: 31,
+      periodStart: new Date(Date.now() - 86400000),
+      periodEnd: new Date(Date.now() + 86400000),
+    });
+    const presentation = await as().mailboxes.billing();
+    const service = await as().mailboxes.service();
+    expect(presentation).toMatchObject({
+      canPurchase: false,
+      availability: "existing_subscription",
+      offer: null,
+    });
+    expect(service).toMatchObject({ active: true, seats: 2 });
+    expect(mailboxServiceNotice(presentation.availability, service.periodEnd)).toBe(
+      "existingLicenseBody",
+    );
+    await expect(as().mailboxes.checkout({ seats: 2 })).rejects.toMatchObject({
+      message: "subscription_exists",
+    });
+    expect(getStripe).not.toHaveBeenCalled();
+  });
   it("resumes the immutable pending quantity, hides its identifiers, and never creates another session", async () => {
     const pending = await lease("ready");
     session = {
@@ -448,11 +476,14 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
   });
   it("keeps a completed Checkout in confirmation/recovery without offering a second purchase", async () => {
     await lease("completed");
-    expect(await as().mailboxes.billing()).toMatchObject({
+    const presentation = await as().mailboxes.billing();
+    const service = await as().mailboxes.service();
+    expect(presentation).toMatchObject({
       canPurchase: false,
       availability: "existing_subscription",
     });
-    expect((await as().mailboxes.service()).active).toBe(false);
+    expect(service.active).toBe(false);
+    expect(mailboxServiceNotice(presentation.availability, service.periodEnd)).toBe("existingBody");
     await expect(as().mailboxes.checkout({ seats: 3 })).rejects.toMatchObject({
       message: "subscription_exists",
     });
