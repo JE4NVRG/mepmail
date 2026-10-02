@@ -113,5 +113,10 @@
   "sentEmptyBody": "Quando o envio estiver ativo, suas mensagens enviadas aparecerão aqui.",
   "searchEmptyBody": "Tente outro termo ou limpe a busca para ver suas mensagens.",
   "clearSearch": "Limpar busca",
-  "viewDrafts": "Ver rascunhos"
+  "viewDrafts": "Ver rascunhos",
+  "downloadFile": "Baixar {name}",
+  "readingPane": "Leitura da conversa",
+  "mailControls": "Controles do correio",
+  "compose": "Escrever",
+  "messageCount": "{count, plural, =0 {Nenhuma mensagem} one {# mensagem} other {# mensagens}}"
 }

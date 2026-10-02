@@ -2,6 +2,10 @@
   color: var(--ms-bone);
   min-width: 0;
   container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 48px);
+  min-height: 520px;
 }
 .header {
   display: flex;
@@ -27,9 +31,10 @@
   letter-spacing: 0.05em;
 }
 .workspace {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  min-height: min(660px, calc(100dvh - 200px));
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   border: 1px solid var(--ms-line);
   border-radius: var(--ms-r-card);
   overflow: hidden;
@@ -578,69 +583,127 @@
 .draftAttachments span {
   overflow-wrap: anywhere;
 }
-/* Correio has its own content density; the Sending dashboard keeps its shell. */
+
+/* A single mail toolbar above the message list and reader. */
 .productMeta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+}
+.productMeta h1 {
+  margin: 0;
+  font-size: 24px;
 }
 .serviceBadge {
   border: 1px solid var(--ms-line);
   border-radius: var(--ms-r-badge);
   padding: 4px 8px;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--ms-muted);
+}
+.header {
+  flex: none;
+  margin-bottom: 14px;
+  gap: 12px;
 }
 .header p {
-  margin: 0;
-  font-size: 13px;
+  margin: 6px 0 0;
+  font-size: 12px;
 }
 .previewNote {
+  flex: none;
   color: var(--ms-muted);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.6;
-  margin: 0 0 20px;
+  margin: 0 0 16px;
 }
 .previewNote > span {
   color: var(--ms-bone);
-  margin-right: 8px;
+  margin-right: 6px;
 }
-.contentWorkspace {
+.contentWorkspace,
+.registryWorkspace {
   min-width: 0;
+  min-height: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  grid-column: 2;
 }
 .contentToolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 18px 22px;
+  gap: 12px 20px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--ms-line);
+  flex: none;
+  background: var(--ms-panel);
 }
-.folderHeading {
+.workspaceNavigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
   min-width: 0;
+  flex: 1;
 }
-.folderHeading h2 {
-  margin: 0 0 5px;
-  font-size: 18px;
+.workspaceNavigation label {
+  min-width: 0;
+  width: 250px;
+  max-width: 100%;
+  flex: 0 1 250px;
 }
-.folderHeading > span {
-  display: block;
-  max-width: 340px;
-  color: var(--ms-muted);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.workspaceNavigation select {
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.compactFolders {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+.compactFolders button {
+  font: inherit;
+  font-size: 12px;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ms-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.compactFolders button:hover {
+  color: var(--ms-bone);
+}
+.compactFolders button[aria-current] {
+  border-bottom-color: var(--ms-bone);
+  color: var(--ms-bone);
 }
 .contentActions {
   align-items: center;
   margin: 0;
   flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.contentActions .ms-btn,
+.contentActions button {
+  font-size: 12px;
 }
 .contentNotice {
   flex-basis: 100%;
@@ -649,46 +712,76 @@
 }
 .contentPanels {
   display: grid;
-  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 .contentList {
   background: var(--ms-panel);
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .listSearch {
-  padding: 14px 16px;
+  padding: 14px 16px 10px;
   border-bottom: 1px solid var(--ms-line);
+  flex: none;
+}
+.searchField {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.searchField > svg {
+  color: var(--ms-muted);
+  flex: none;
 }
 .listSearch input {
   width: 100%;
   min-width: 0;
+  background: transparent;
+  border: 0;
+  padding-left: 0;
+  box-shadow: none;
 }
-.contentPanels[data-empty="true"] {
-  grid-template-columns: minmax(0, 1fr);
+.messageCount {
+  display: block;
+  color: var(--ms-muted);
+  font-size: 10px;
+  padding: 8px 0 0;
 }
-.contentPanels[data-empty="true"] .contentList {
-  border-right: 0;
-  background: var(--ms-void);
+.listBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
-.contentPanels[data-empty="true"] .listSearch {
-  max-width: 350px;
-  border-bottom: 0;
+.messageRows {
+  min-height: 0;
 }
 .messageRows button {
-  padding: 18px 16px;
+  padding: 16px;
+  border-bottom: 1px solid var(--ms-line);
+  position: relative;
+}
+.messageRows button[aria-pressed="true"] {
+  box-shadow: inset 2px 0 var(--ms-bone);
 }
 .messageRows strong {
-  margin: 8px 0 5px;
+  margin: 7px 0 5px;
   font-size: 14px;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .messageRows p {
-  margin: 5px 0 12px;
-  line-height: 1.6;
+  margin: 5px 0 10px;
+  line-height: 1.55;
+  font-size: 12px;
 }
 .rowMeta,
 .rowBottom {
@@ -705,7 +798,8 @@
   text-overflow: ellipsis;
 }
 .rowMeta > span {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
 }
 .rowMeta time,
 .rowBottom > small:last-child {
@@ -713,12 +807,143 @@
   font-size: 10px;
   color: var(--ms-muted);
 }
-.rowBottom > small:first-child {
+.rowBottom > small:first-child,
+.rowBottom > span {
   flex: 1;
+}
+.contentDetail {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.contentDetail:focus {
+  outline: none;
+}
+.contentDetail:focus-visible {
+  outline: 2px solid var(--ms-steel);
+  outline-offset: -2px;
+}
+.contentDetail .detailTop {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ms-void);
+  padding: 10px 24px;
+  min-height: 52px;
+  flex: none;
+  box-sizing: border-box;
+}
+.contentDetail .detailTop > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+.detailTop button {
+  font-size: 12px;
+  flex: none;
+}
+.message {
+  padding: 26px 30px 30px;
+}
+.message h2 {
+  margin: 0 0 22px;
+  font-size: 22px;
+  line-height: 1.35;
+  font-weight: 500;
+}
+.senderDetails {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.senderAvatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--ms-line);
+  background: var(--ms-inset);
+  font-size: 13px;
+}
+.message dl {
+  margin: 2px 0 14px;
+  font-size: 12px;
+  gap: 6px;
+  min-width: 0;
+}
+.message header > small {
+  display: block;
+  padding-left: 48px;
+  font-size: 10px;
+}
+.messageBody {
+  margin: 26px 0;
+  font-size: 14px;
+  line-height: 1.75;
+}
+.attachments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 8px;
+  margin: 20px 0 0;
+}
+.attachment {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+}
+.attachment > a {
+  display: block;
+  width: 44px;
+  height: 44px;
+}
+.attachment > svg {
+  margin: 10px;
+  width: 24px;
+  height: 24px;
+}
+.attachment img {
+  width: 44px;
+  height: 44px;
+  border-radius: 4px;
+  object-fit: contain;
+  background: var(--ms-inset);
+}
+.attachment figcaption {
+  border: 0;
+  padding: 0;
+  gap: 8px;
+  font-size: 11px;
+}
+.attachment figcaption > span {
+  min-width: 0;
+}
+.attachment figcaption > span > span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.attachment figcaption a {
+  flex: none;
+  font-size: 10px;
+  padding: 5px;
+}
+.attachment small {
+  margin-top: 5px;
+  font-size: 10px;
 }
 .emptyFolder {
   max-width: 470px;
-  padding: 60px 28px;
+  padding: 50px 28px;
   margin: auto;
 }
 .emptyFolder h3 {
@@ -734,79 +959,41 @@
   height: 28px;
   margin-bottom: 4px;
 }
+.contentPanels[data-empty="true"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.contentPanels[data-empty="true"] .contentList {
+  border-right: 0;
+  background: var(--ms-void);
+}
+.contentPanels[data-empty="true"] .listSearch {
+  border-bottom: 0;
+}
+.contentPanels[data-empty="true"] .searchField {
+  max-width: 340px;
+}
 .registryState {
-  grid-column: 2;
   display: grid;
   place-items: center;
+  flex: 1;
   min-width: 0;
-}
-.contentDetail .detailTop {
-  padding: 16px 24px;
-}
-.message {
-  padding: 26px 28px;
+  min-height: 0;
+  overflow-y: auto;
 }
 .hero {
   align-self: center;
-  padding: 70px 30px;
+  padding: 50px 30px;
 }
-.compactNavigation {
-  display: none;
-}
-.compactFolders {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-.compactFolders button {
-  font: inherit;
-  font-size: 12px;
-  padding: 10px 14px;
-  border: 1px solid transparent;
-  border-radius: var(--ms-r-input);
-  background: transparent;
-  color: var(--ms-muted);
-  cursor: pointer;
-}
-.compactFolders button[aria-current],
-.compactFolders button:hover {
-  border-color: var(--ms-line);
-  background: var(--ms-panel-raised);
-  color: var(--ms-bone);
-}
-@container (max-width: 1020px) {
-  .workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .navigation {
-    display: none;
-  }
-  .compactNavigation {
-    display: flex;
-    align-items: end;
-    flex-wrap: wrap;
+@container (max-width: 920px) {
+  .workspaceNavigation {
+    flex-basis: 100%;
     justify-content: space-between;
-    gap: 14px;
-    margin-bottom: 16px;
   }
-  .compactNavigation label {
-    display: grid;
-    gap: 8px;
-    min-width: 0;
-    flex: 1 1 260px;
-    max-width: 450px;
+  .contentActions {
+    margin-left: auto;
   }
-  .compactNavigation label > span {
-    font-size: 11px;
-    color: var(--ms-muted);
-  }
-  .compactNavigation select {
-    width: 100%;
-    min-width: 0;
-  }
-  .contentWorkspace,
-  .registryState {
-    grid-column: 1;
+  .contentToolbar {
+    gap: 8px 16px;
   }
 }
 @container (max-width: 760px) {
@@ -816,21 +1003,55 @@
   .contentList {
     border-right: 0;
   }
-  .contentList[data-reading="true"] {
-    display: none;
-  }
+  .contentList[data-reading="true"],
   .contentDetail[data-reading="false"] {
     display: none;
   }
   .mobileBack {
     display: inline-flex;
   }
-  .contentToolbar {
-    padding: 16px;
-    gap: 12px;
+  .contentDetail .detailTop {
+    padding: 10px 16px;
   }
-  .folderHeading {
+  .contentDetail .detailTop > span {
+    display: none;
+  }
+  .contentDetail .detailTop > button:not(.mobileBack) {
+    margin-left: auto;
+  }
+  .message {
+    padding: 24px 20px;
+  }
+  .message h2 {
+    font-size: 20px;
+  }
+}
+@container (max-width: 480px) {
+  .header {
+    align-items: center;
+  }
+  .header p {
+    display: none;
+  }
+  .productMeta {
+    gap: 6px;
+  }
+  .productMeta h1 {
+    font-size: 22px;
+  }
+  .serviceBadge {
+    font-size: 9px;
+    padding: 3px 6px;
+  }
+  .workspaceNavigation label {
     flex-basis: 100%;
+    width: 100%;
+  }
+  .compactFolders {
+    gap: 22px;
+  }
+  .contentToolbar {
+    padding: 10px 14px;
   }
   .contentActions {
     width: 100%;
@@ -839,49 +1060,27 @@
   .contentActions > button:last-child {
     margin-left: auto;
   }
-  .message {
-    padding: 24px 20px;
+  .contentActions button {
+    padding: 8px 10px;
   }
-  .contentDetail .detailTop {
-    padding: 14px 18px;
-  }
-  .contentPanels[data-empty="true"] .listSearch {
-    max-width: none;
-  }
-  .compactFolders {
-    width: 100%;
-  }
-  .compactFolders button {
-    flex: 1;
-  }
-}
-@container (max-width: 480px) {
-  .header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .header h1 {
-    font-size: 22px;
-  }
-  .compactNavigation label {
-    max-width: none;
+  .messageBody {
+    font-size: 13px;
   }
   .previewNote {
-    font-size: 11px;
+    margin-bottom: 12px;
+    font-size: 10px;
   }
-  .folderHeading > span {
-    max-width: 280px;
+}
+@media (max-width: 900px) {
+  .view {
+    height: calc(100dvh - 96px);
   }
 }
 @media (max-width: 600px) {
+  .view {
+    height: calc(100dvh - 80px);
+  }
   .dialog {
     padding: 20px;
-  }
-  .addressFields {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .addressFields > span {
-    display: none;
   }
 }

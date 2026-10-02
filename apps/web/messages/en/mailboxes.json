@@ -113,5 +113,10 @@
   "sentEmptyBody": "Your sent messages will appear here when sending is active.",
   "searchEmptyBody": "Try another term or clear the search to see your messages.",
   "clearSearch": "Clear search",
-  "viewDrafts": "View drafts"
+  "viewDrafts": "View drafts",
+  "downloadFile": "Download {name}",
+  "readingPane": "Conversation reader",
+  "mailControls": "Mail controls",
+  "compose": "Compose",
+  "messageCount": "{count, plural, =0 {No messages} one {# message} other {# messages}}"
 }

@@ -365,20 +365,50 @@ export function MailboxesView() {
         <p>{t("disabled")}</p>
       </section>
     );
+  const navigation = (
+    <div className={styles.workspaceNavigation}>
+      <label>
+        <span className={styles.visuallyHidden}>{t("chooseBox")}</span>
+        <select
+          className="ms-input"
+          aria-label={t("chooseBox")}
+          value={selected?.id ?? ""}
+          onChange={(e) => select(e.target.value || null)}
+        >
+          <option value="">{t("all")}</option>
+          {boxes.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.label} · {b.address}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className={styles.compactFolders} aria-label={t("folders")}>
+        {(["inbox", "drafts", "sent"] as const).map((f) => (
+          <button
+            key={f}
+            aria-current={f === folder ? "page" : undefined}
+            onClick={() => setFolder(f)}
+          >
+            {t(f)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
   return (
     <section className={styles.view}>
       <header className={styles.header}>
         <div>
           <div className={styles.productMeta}>
-            <span className={styles.eyebrow}>{t("yourMail")}</span>
+            <h1>{t("title")}</h1>
             <span className={styles.serviceBadge}>{t("paidService")}</span>
           </div>
-          <h1>{t("title")}</h1>
           <p>{t("subtitle")}</p>
         </div>
         {registry.data?.canManage ? (
           <button
-            className="ms-btn ms-btn-primary"
+            className="ms-btn ms-btn-ghost"
             disabled={!options.data?.domains.length}
             onClick={() => setDialog("new")}
           >
@@ -402,84 +432,12 @@ export function MailboxesView() {
           </button>
         </div>
       ) : null}
-      <div className={styles.compactNavigation}>
-        <label>
-          <span>{t("boxes")}</span>
-          <select
-            className="ms-input"
-            aria-label={t("chooseBox")}
-            value={selectedId ?? ""}
-            onChange={(e) => select(e.target.value || null)}
-          >
-            <option value="">{t("all")}</option>
-            {boxes.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.label} · {b.address}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className={styles.compactFolders} aria-label={t("folders")}>
-          {(["inbox", "drafts", "sent"] as const).map((f) => (
-            <button
-              key={f}
-              aria-current={f === folder ? "page" : undefined}
-              onClick={() => setFolder(f)}
-            >
-              {t(f)}
-            </button>
-          ))}
-        </div>
-      </div>
       <div className={styles.workspace}>
-        <aside className={styles.navigation} aria-label={t("boxes")}>
-          <button
-            aria-pressed={selectedId === null}
-            className={selectedId === null ? styles.active : undefined}
-            onClick={() => select(null)}
-          >
-            <NavGlyph name="emails" hovered={false} />
-            <span>
-              {t("all")}
-              <small>{t("count", { count: boxes.length })}</small>
-            </span>
-          </button>
-          <div className={styles.folderList}>
-            {(["inbox", "drafts", "sent"] as const).map((f) => (
-              <button
-                key={f}
-                aria-current={f === folder ? "page" : undefined}
-                onClick={() => setFolder(f)}
-              >
-                {t(f)}
-              </button>
-            ))}
-          </div>
-          <div className={styles.sectionLabel}>{t("boxes")}</div>
-          {boxes.map((b) => (
-            <button
-              key={b.id}
-              aria-pressed={selected?.id === b.id}
-              title={`${b.label} · ${b.address}`}
-              className={selected?.id === b.id ? styles.active : undefined}
-              onClick={() => select(b.id)}
-            >
-              <span className={styles.avatar}>{b.label.charAt(0).toUpperCase()}</span>
-              <span>
-                {b.label}
-                <small>{b.address}</small>
-              </span>
-            </button>
-          ))}
-          <div className={styles.privateNote}>
-            <NavGlyph name="api-keys" hovered={false} />
-            <span>{t("private")}</span>
-          </div>
-        </aside>
         {(!selected || (selected.canRead && selected.status === "planned")) &&
         boxes.some((b) => b.canRead && b.status === "planned") ? (
           <MailboxContentView
             key={selected?.id ?? "all"}
+            navigation={navigation}
             boxes={boxes}
             selected={selected}
             folder={folder}
@@ -491,39 +449,44 @@ export function MailboxesView() {
             }
           />
         ) : (
-          <div className={styles.registryState}>
-            <div className={styles.hero}>
-              <NavGlyph name="emails" hovered={false} />
-              <h2>{selected?.label ?? t("emptyTitle")}</h2>
-              {selected ? (
-                <>
-                  <p className={styles.address}>{selected.address}</p>
-                  <span className={styles.tag}>{t(selected.status)}</span>
-                  <p>{t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}</p>
-                  {!selected.ownerActive ? (
-                    <p className={styles.hint}>{t("ownerMissing")}</p>
-                  ) : null}
-                  {!selected.canRead ? <p className={styles.hint}>{t("managementOnly")}</p> : null}
-                  {registry.data?.canManage ? (
-                    <button
-                      className="ms-btn"
-                      disabled={!options.data}
-                      onClick={() => setDialog("edit")}
-                    >
-                      {t("manage")}
-                    </button>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <p>{t("emptyBody")}</p>
-                  {registry.data?.canManage && options.data?.domains.length ? (
-                    <button className="ms-btn ms-btn-primary" onClick={() => setDialog("new")}>
-                      {t("createFirst")}
-                    </button>
-                  ) : null}
-                </>
-              )}
+          <div className={styles.registryWorkspace}>
+            <header className={styles.contentToolbar}>{navigation}</header>
+            <div className={styles.registryState}>
+              <div className={styles.hero}>
+                <NavGlyph name="emails" hovered={false} />
+                <h2>{selected?.label ?? t("emptyTitle")}</h2>
+                {selected ? (
+                  <>
+                    <p className={styles.address}>{selected.address}</p>
+                    <span className={styles.tag}>{t(selected.status)}</span>
+                    <p>{t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}</p>
+                    {!selected.ownerActive ? (
+                      <p className={styles.hint}>{t("ownerMissing")}</p>
+                    ) : null}
+                    {!selected.canRead ? (
+                      <p className={styles.hint}>{t("managementOnly")}</p>
+                    ) : null}
+                    {registry.data?.canManage ? (
+                      <button
+                        className="ms-btn"
+                        disabled={!options.data}
+                        onClick={() => setDialog("edit")}
+                      >
+                        {t("manage")}
+                      </button>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <p>{t("emptyBody")}</p>
+                    {registry.data?.canManage && options.data?.domains.length ? (
+                      <button className="ms-btn ms-btn-primary" onClick={() => setDialog("new")}>
+                        {t("createFirst")}
+                      </button>
+                    ) : null}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}
