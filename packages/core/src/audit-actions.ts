@@ -14,6 +14,8 @@ export const AUDIT_ACTIONS = [
   "mailbox.agent_key_created",
   "mailbox.agent_key_revoked",
   "mailbox.send_queued",
+  "mailbox.license_granted",
+  "mailbox.license_revoked",
   "webhook.created",
   "webhook.updated",
   "webhook.secret_rotated",

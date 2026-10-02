@@ -35,6 +35,7 @@ export class MailboxLifecycleError extends Error {
 export type MailboxCheckoutLease = typeof schema.mailboxCheckouts.$inferSelect;
 type MailboxSubscriptionRow = typeof schema.mailboxSubscriptions.$inferSelect;
 const OPEN_CHECKOUTS = ["prepared", "creating", "ready"] as const;
+const OCCUPIED_MAILBOX_PLANS = new Set(["active", "trialing", "past_due"]);
 const OCCUPIED_SUBSCRIPTIONS = new Set([
   "active",
   "trialing",
@@ -188,10 +189,12 @@ export async function applyMailboxSubscription(
       return result("revoked", true);
     }
     if (
-      current?.stripeSubscriptionId &&
+      current &&
       current.stripeSubscriptionId !== sub.id &&
-      ["active", "trialing", "past_due"].includes(current.status)
+      OCCUPIED_MAILBOX_PLANS.has(current.status)
     )
+      // An occupied internal grant has no Stripe subscription ID. Only an explicit
+      // closure may release it; linking a Customer never hands its seats to Stripe.
       return result("superseded");
     const next = { ...projection, lastEventCreated: eventCreated, updatedAt: new Date() };
     if (current) {
@@ -387,6 +390,7 @@ async function ensureMailboxCustomer(
     if (team.customerId) return null;
     await currentAdmin(db, input);
     if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
+    await assertNoOccupiedMailboxPlan(db, team.id);
     const [existing] = await tx
       .select()
       .from(schema.mailboxCustomerRequests)
@@ -437,6 +441,9 @@ async function ensureMailboxCustomer(
       if (team.customerId) return;
       await currentAdmin(db, input);
       if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
+      // The first Customer intent committed before this transaction. A grant may
+      // have arrived in that gap; preserve the intent and reject before the SDK call.
+      await assertNoOccupiedMailboxPlan(db, input.teamId);
       const [request] = await tx
         .select()
         .from(schema.mailboxCustomerRequests)
@@ -519,13 +526,7 @@ async function assertNoSubscription(
   teamId: string,
   customerId: string,
 ) {
-  const [plan] = await db
-    .select()
-    .from(schema.mailboxSubscriptions)
-    .where(eq(schema.mailboxSubscriptions.teamId, teamId))
-    .for("update");
-  if (plan && ["active", "trialing", "past_due"].includes(plan.status))
-    throw new MailboxLifecycleError("subscription_exists");
+  await assertNoOccupiedMailboxPlan(db, teamId);
   // A recovered complete Checkout does not grant access, but its known subscription
   // still prevents another purchase while the fulfillment webhook is outstanding.
   const [completed] = await db
@@ -571,6 +572,19 @@ async function assertNoSubscription(
     if (!lastId || lastId === startingAfter) throw new MailboxLifecycleError("unavailable");
     startingAfter = lastId;
   }
+}
+
+/** Call after the team/current-member locks, before intents or provider calls.
+ * Occupancy follows contract status, preserving the existing expired/grace rules.
+ */
+async function assertNoOccupiedMailboxPlan(db: Db, teamId: string) {
+  const [plan] = await db
+    .select({ status: schema.mailboxSubscriptions.status })
+    .from(schema.mailboxSubscriptions)
+    .where(eq(schema.mailboxSubscriptions.teamId, teamId))
+    .for("update");
+  if (plan && OCCUPIED_MAILBOX_PLANS.has(plan.status))
+    throw new MailboxLifecycleError("subscription_exists");
 }
 function safeUrl(value: string, httpsOnly = false) {
   try {

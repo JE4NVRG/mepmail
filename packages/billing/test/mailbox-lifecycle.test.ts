@@ -101,6 +101,20 @@ describe("Mailbox lifecycle with real optional migrations", () => {
       request(),
     );
   const customerRequests = () => db.select().from(schema.mailboxCustomerRequests);
+  // Qualification rows only: an operational internal grant has its own mandatory audit.
+  const internalPlan = (
+    status: typeof schema.mailboxSubscriptions.$inferSelect.status = "active",
+    seats = 2,
+  ) =>
+    db.insert(schema.mailboxSubscriptions).values({
+      teamId,
+      status,
+      seats,
+      storageBytesPerMailbox: 2048,
+      includedOutboundPerMailbox: 2,
+      periodStart: new Date(PERIOD_START * 1000),
+      periodEnd: new Date(PERIOD_END * 1000),
+    });
   const unlinkCustomer = () =>
     db.update(schema.teams).set({ stripeCustomerId: null }).where(eq(schema.teams.id, teamId));
   const resolveCustomer = (knownCustomerId = "cus_1", userId = USER, livemode = false) =>
@@ -299,6 +313,94 @@ describe("Mailbox lifecycle with real optional migrations", () => {
       (await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)))[0]
         ?.stripeCustomerId,
     ).toBeNull();
+  });
+
+  it.each(["active", "trialing", "past_due"] as const)(
+    "rejects an occupied %s internal plan before creating Customer or durable intents",
+    async (status) => {
+      await unlinkCustomer();
+      await internalPlan(status);
+      const beforePlan = await plan();
+      const beforeTeams = await db.select().from(schema.teams);
+      await expect(purchase()).rejects.toMatchObject({ code: "subscription_exists" });
+      expect(state.calls).toEqual([]);
+      expect(state.customers).toEqual([]);
+      expect(state.checkouts).toEqual([]);
+      expect(await customerRequests()).toEqual([]);
+      expect(await leases()).toEqual([]);
+      expect(await plan()).toEqual(beforePlan);
+      expect(await db.select().from(schema.teams)).toEqual(beforeTeams);
+    },
+  );
+
+  it("does not create a replacement Customer for an occupied Stripe contract with lost linkage", async () => {
+    await applyMailboxSubscription(db, mailSub(), CATALOG, EVENT);
+    await unlinkCustomer();
+    const beforePlan = await plan();
+    await expect(purchase()).rejects.toMatchObject({ code: "subscription_exists" });
+    expect(state.calls).toEqual([]);
+    expect(await customerRequests()).toEqual([]);
+    expect(await leases()).toEqual([]);
+    expect(await plan()).toEqual(beforePlan);
+  });
+
+  it("rechecks a grant committed after the Customer intent and preserves that intent without SDK calls", async () => {
+    await unlinkCustomer();
+    const transact = db.transaction.bind(db);
+    const interveningDb = Object.create(db) as Db;
+    let grantCommitted = false;
+    interveningDb.transaction = (async (...args: Parameters<Db["transaction"]>) => {
+      const result = await transact(...args);
+      if (!grantCommitted) {
+        await internalPlan();
+        grantCommitted = true;
+      }
+      return result;
+    }) as Db["transaction"];
+    await expect(
+      beginMailboxCheckout({ db: interveningDb, stripe }, CATALOG, request()),
+    ).rejects.toMatchObject({ code: "subscription_exists" });
+    expect(grantCommitted).toBe(true);
+    const requests = await customerRequests();
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ status: "creating", stripeCustomerId: null });
+    const beforePlan = await plan();
+    await expect(purchase()).rejects.toMatchObject({ code: "subscription_exists" });
+    expect(await customerRequests()).toEqual(requests);
+    expect(await plan()).toEqual(beforePlan);
+    expect(state.calls).toEqual([]);
+    expect(await leases()).toEqual([]);
+    expect(
+      (await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)))[0]
+        ?.stripeCustomerId,
+    ).toBeNull();
+  });
+
+  it("recovers an already-created Customer concurrently without replacing a later internal grant", async () => {
+    const { customer, reads } = await loseCustomerResponse();
+    await internalPlan();
+    const beforePlan = await plan();
+    const callsBefore = state.calls.slice();
+    const results = await Promise.all([resolveCustomer(customer.id), resolveCustomer(customer.id)]);
+    expect(results.filter((result) => !result.duplicate)).toHaveLength(1);
+    expect(results.filter((result) => result.duplicate)).toHaveLength(1);
+    expect(reads).toEqual([customer.id, customer.id]);
+    expect((await customerRequests())[0]).toMatchObject({
+      status: "ready",
+      stripeCustomerId: customer.id,
+    });
+    expect(await plan()).toEqual(beforePlan);
+    const incoming = mailSub();
+    incoming.customer = customer.id;
+    expect((await applyMailboxSubscription(db, incoming, CATALOG, EVENT)).reason).toBe(
+      "superseded",
+    );
+    await expect(purchase()).rejects.toMatchObject({ code: "subscription_exists" });
+    expect(state.calls).toEqual(callsBefore);
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toEqual([]);
+    expect(await leases()).toEqual([]);
+    expect(await plan()).toEqual(beforePlan);
   });
 
   it("does not replay a creating Customer intent after a crash before the provider call", async () => {
@@ -712,6 +814,73 @@ describe("Mailbox lifecycle with real optional migrations", () => {
       "superseded",
     );
     expect(await plan()).toEqual(before);
+  });
+
+  it.each(["active", "trialing", "past_due"] as const)(
+    "preserves an occupied %s internal plan against a linked Customer's Stripe projection",
+    async (status) => {
+      await internalPlan(status);
+      const beforePlan = await plan();
+      const beforeTeams = await db.select().from(schema.teams);
+      expect(await applyMailboxSubscription(db, mailSub(), CATALOG, EVENT)).toEqual({
+        applied: false,
+        teamId,
+        reason: "superseded",
+      });
+      expect(await plan()).toEqual(beforePlan);
+      expect(beforePlan).toMatchObject({
+        seats: 2,
+        stripeSubscriptionId: null,
+        stripeCustomerId: null,
+        stripePriceId: null,
+        currency: null,
+        unitAmount: null,
+        lastEventCreated: null,
+      });
+      expect(await db.select().from(schema.teams)).toEqual(beforeTeams);
+      expect(await leases()).toEqual([]);
+      expect(state.calls).toEqual([]);
+    },
+  );
+
+  it.each(["inactive", "canceled"] as const)(
+    "permits a verified Stripe projection after an internal plan is explicitly %s",
+    async (status) => {
+      await internalPlan(status, 0);
+      expect((await applyMailboxSubscription(db, mailSub(), CATALOG, EVENT)).reason).toBe(
+        "applied",
+      );
+      expect(await plan()).toMatchObject({
+        status: "active",
+        seats: 3,
+        stripeSubscriptionId: "sub_mail",
+      });
+    },
+  );
+
+  it("preserves an internal grant when a foreign projection is invalid", async () => {
+    await internalPlan();
+    const beforePlan = await plan();
+    const invalid = mailSub();
+    invalid.items.data[0]!.price.id = "price_unapproved";
+    expect((await applyMailboxSubscription(db, invalid, CATALOG, EVENT)).reason).toBe(
+      "invalid_projection",
+    );
+    expect(await plan()).toEqual(beforePlan);
+  });
+
+  it("keeps the same Stripe contract's grace, cancellation and non-entitled status transitions", async () => {
+    const sub = mailSub();
+    await applyMailboxSubscription(db, sub, CATALOG, EVENT);
+    sub.status = "past_due";
+    expect((await applyMailboxSubscription(db, sub, CATALOG, EVENT + 1)).reason).toBe("applied");
+    expect(await plan()).toMatchObject({ status: "past_due", stripeSubscriptionId: sub.id });
+    sub.status = "canceled";
+    expect((await applyMailboxSubscription(db, sub, CATALOG, EVENT + 2)).reason).toBe("applied");
+    expect(await plan()).toMatchObject({ status: "canceled", stripeSubscriptionId: sub.id });
+    sub.status = "paused";
+    expect((await applyMailboxSubscription(db, sub, CATALOG, EVENT + 3)).reason).toBe("applied");
+    expect(await plan()).toMatchObject({ status: "inactive", stripeSubscriptionId: sub.id });
   });
 
   it("revokes only the same invalid subscription and preserves its historical snapshot", async () => {
