@@ -20,6 +20,7 @@ import {
   revokeMailboxRegistry,
   updateMailboxRegistry,
 } from "../../../packages/core/src/mailbox-registry.js";
+import { seedMailboxTestService } from "./mailbox-service-fixture";
 
 let client: PGlite,
   db: Db,
@@ -62,6 +63,7 @@ beforeEach(async () => {
     .returning();
   teamId = teams[0]!.id;
   otherTeam = teams[1]!.id;
+  await seedMailboxTestService(db, [teamId, otherTeam]);
   for (const id of ["owner", "member", "admin", "outsider"])
     await db
       .insert(schema.user)

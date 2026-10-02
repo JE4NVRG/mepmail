@@ -27,6 +27,8 @@ import { BILLING_PATH, getStripe, mailPlanMove } from "@/server/billing";
 import { emitFunnel } from "@/server/funnel";
 import { getQueue } from "@/server/queue";
 import { buildAccountEmail, sendAccountMail } from "@/server/system-mail";
+import { mailboxRegistryEnabled } from "@/server/mailboxes";
+import { mailboxBillingCatalog } from "@/server/mailbox-billing";
 
 /**
  * Stripe webhook endpoint. Unauthenticated by design: the raw body is
@@ -41,16 +43,21 @@ export async function POST(request: Request) {
   // nothing is written unless handleWebhook accepts the signature.
   const event = parseEvent(rawBody);
   const before = event ? await planOf(db, event.customerId) : null;
+  let sendEvent = false;
   const status = await handleWebhook(rawBody, request.headers.get("stripe-signature"), {
     db,
     stripe: getStripe(),
     webhookSecret: env.STRIPE_WEBHOOK_SECRET ?? "",
     livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
+    ...(mailboxRegistryEnabled() ? { mailboxCatalog: mailboxBillingCatalog() } : {}),
     // Only for an event that was newly applied, so a redelivery stays silent;
     // keyed by the Stripe event id, so a recurring invoice is one payment each.
-    afterApply: (applied) => trackPayment(db, applied),
+    afterApply: (applied) => {
+      sendEvent = applied.service === "send";
+      return sendEvent ? trackPayment(db, applied) : undefined;
+    },
   });
-  if (status === 200 && event && before) {
+  if (status === 200 && sendEvent && event && before) {
     const after = await planOf(db, event.customerId);
     if (after) {
       if (

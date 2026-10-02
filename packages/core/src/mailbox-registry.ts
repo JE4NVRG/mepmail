@@ -1,5 +1,7 @@
 import { type Db, schema } from "@millionsend/db";
 import { and, asc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { mailboxServiceActive, reserveMailboxSeat } from "./mailbox-service.js";
+import { lockMailboxAgentKeysForOwnerChange } from "./mailbox-agent-access.js";
 
 export class MailboxRegistryError extends Error {
   constructor(public readonly code: "forbidden" | "not_found" | "invalid" | "conflict") {
@@ -12,6 +14,12 @@ export interface MailboxRegistryActor {
 }
 
 async function member(db: Db, actor: MailboxRegistryActor, lock = false) {
+  if (lock)
+    await db
+      .select({ id: schema.teams.id })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, actor.teamId))
+      .for("share");
   const query = db
     .select({ id: schema.teamMembers.id, role: schema.teamMembers.role })
     .from(schema.teamMembers)
@@ -62,6 +70,24 @@ export async function mailboxDomainLock(db: Db, domainId: string) {
 
 export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
   await member(db, actor);
+  const [team] = await db
+    .select({ suspendedAt: schema.teams.suspendedAt })
+    .from(schema.teams)
+    .where(eq(schema.teams.id, actor.teamId));
+  const [plan] = await db
+    .select()
+    .from(schema.mailboxSubscriptions)
+    .where(eq(schema.mailboxSubscriptions.teamId, actor.teamId));
+  const licensed =
+    !!team && !team.suspendedAt && mailboxServiceActive(plan)
+      ? await db
+          .select({ id: schema.mailboxes.id })
+          .from(schema.mailboxes)
+          .where(eq(schema.mailboxes.teamId, actor.teamId))
+          .orderBy(asc(schema.mailboxes.createdAt), asc(schema.mailboxes.id))
+          .limit(plan!.seats)
+      : [];
+  const licensedIds = new Set(licensed.map((b) => b.id));
   const rows = await db
     .select({
       id: schema.mailboxes.id,
@@ -119,7 +145,9 @@ export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
         ...row,
         ownerActive: !!ownerMembershipId,
         canRead: row.status === "planned" && (owned || !!permission),
-        canDraft: row.status === "planned" && (owned || permission === "draft"),
+        canDraft:
+          row.status === "planned" && licensedIds.has(row.id) && (owned || permission === "draft"),
+        canSend: row.status === "planned" && licensedIds.has(row.id) && owned,
         deliveryReady: false as const,
       };
     }),
@@ -152,6 +180,7 @@ export async function createMailboxRegistry(
   }
   return db.transaction(async (tx) => {
     await admin(tx as unknown as Db, actor);
+    await reserveMailboxSeat(tx as unknown as Db, actor.teamId);
     await mailboxDomainLock(tx as unknown as Db, input.domainId);
     const [domain] = await tx
       .select({ name: schema.domains.name })
@@ -204,12 +233,18 @@ export async function updateMailboxRegistry(
     throw new MailboxRegistryError("invalid");
   return db.transaction(async (tx) => {
     await admin(tx as unknown as Db, actor);
-    await box(tx as unknown as Db, actor, input.id);
     const ownerMembershipId = await requireMember(
       tx as unknown as Db,
       actor.teamId,
       input.ownerUserId,
     );
+    const invalidate = await lockMailboxAgentKeysForOwnerChange(
+      tx as unknown as Db,
+      actor.teamId,
+      input.id,
+    );
+    await box(tx as unknown as Db, actor, input.id);
+    await invalidate(input.ownerUserId, ownerMembershipId);
     const [row] = await tx
       .update(schema.mailboxes)
       .set({
@@ -238,8 +273,8 @@ export async function grantMailboxRegistry(
   if (!["read", "draft"].includes(input.permission)) throw new MailboxRegistryError("invalid");
   return db.transaction(async (tx) => {
     await admin(tx as unknown as Db, actor);
-    await box(tx as unknown as Db, actor, input.mailboxId);
     const membershipId = await requireMember(tx as unknown as Db, actor.teamId, input.userId);
+    await box(tx as unknown as Db, actor, input.mailboxId);
     await tx
       .update(schema.mailboxGrants)
       .set({ revokedAt: new Date() })

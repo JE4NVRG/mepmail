@@ -15,6 +15,48 @@
       "when": 1790866800001,
       "tag": "0001_private_items",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790866800002,
+      "tag": "0002_service_subscription",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790866800003,
+      "tag": "0003_mailbox_transport",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790866800004,
+      "tag": "0004_mailbox_checkout",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790866800005,
+      "tag": "0005_mailbox_agent_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790866800006,
+      "tag": "0006_mailbox_agent_outbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790866800007,
+      "tag": "0007_mailbox_customer_request",
+      "breakpoints": true
     }
   ]
 }

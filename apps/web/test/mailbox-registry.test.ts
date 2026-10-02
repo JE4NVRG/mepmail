@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { withMailboxDomainDeletion } from "@/server/mailboxes";
 import { mailboxesRouter } from "@/server/routers/mailboxes";
 import { type Context, createCallerFactory, router } from "@/server/trpc";
+import { seedMailboxTestService } from "./mailbox-service-fixture";
 
 let client: PGlite, db: Db;
 let team: string, otherTeam: string, domain: string, otherDomain: string;
@@ -67,6 +68,7 @@ beforeEach(async () => {
     .returning({ id: schema.teams.id });
   team = teams[0]!.id;
   otherTeam = teams[1]!.id;
+  await seedMailboxTestService(db, [team, otherTeam]);
   for (const id of ["owner", "member", "reader", "outsider"])
     await db
       .insert(schema.user)
@@ -291,7 +293,7 @@ describe("authenticated persistent mailbox registry", () => {
     expect((await db.select().from(schema.mailboxes)).length).toBe(1);
     expect(
       (await client.query("select count(*) as count from drizzle.__mailbox_migrations")).rows[0],
-    ).toMatchObject({ count: 2 });
+    ).toMatchObject({ count: 8 });
     expect(
       (await client.query("select to_regclass('drizzle.__drizzle_migrations') as ledger")).rows[0],
     ).toMatchObject({ ledger: null });

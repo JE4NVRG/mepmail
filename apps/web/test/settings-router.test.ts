@@ -1,9 +1,11 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { DAY_MS, utcDay } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { SES_REGIONS } from "@millionsend/ses";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TeamRole } from "@/server/membership";
 import { createCaller } from "@/server/routers";
@@ -24,6 +26,7 @@ let db: Db;
 let close: () => Promise<void>;
 
 beforeEach(async () => {
+  vi.stubEnv("MAILBOX_REGISTRY_ENABLED", "0");
   ({ db, close } = await createTestDb());
 });
 
@@ -198,6 +201,19 @@ describe("settings.members", () => {
 });
 
 describe("settings.team.delete", () => {
+  async function enableMailboxErasure() {
+    const extension = fileURLToPath(
+      new URL("../../../packages/db/mailbox-drizzle/", import.meta.url),
+    );
+    for (const name of readdirSync(extension)
+      .filter((name) => name.endsWith(".sql"))
+      .sort())
+      for (const statement of readFileSync(extension + name, "utf8")
+        .split("--> statement-breakpoint")
+        .filter((part) => part.trim()))
+        await db.execute(sql.raw(statement));
+    vi.stubEnv("MAILBOX_REGISTRY_ENABLED", "1");
+  }
   function deletionCaller(userId: string, teamId: string, role: TeamRole, deps: TeamDeletionDeps) {
     const factory = createCallerFactory(router({ settings: createSettingsRouter(deps) }));
     const ctx: Context = {
@@ -292,6 +308,99 @@ describe("settings.team.delete", () => {
     expect(await db.select().from(schema.apiKeys)).toEqual([]);
     expect(await db.select().from(schema.broadcasts)).toEqual([]);
     expect((await db.select().from(schema.oauthConsent)).map((c) => c.id)).toEqual(["there"]);
+  });
+  it("uses the current owner when Correio is enabled, preserves stale demotions and skips an unnecessary SDK factory", async () => {
+    stubCloud();
+    await enableMailboxErasure();
+    const teamId = await createTeam(db, "current-owner");
+    await addMember(teamId, "alice", "owner");
+    const factory = vi.fn(() => {
+      throw new Error("SDK must stay lazy for an unlinked team");
+    });
+    const cancel = vi.fn(async (_db: Db, _teamId: string) => {});
+    const deps: TeamDeletionDeps = {
+      cancelSubscription: cancel,
+      mailboxStripe: factory,
+      mailboxLivemode: () => false,
+      deleteSesIdentity: async () => {},
+      deleteSesTenant: async () => {},
+      deleteLogo: async () => {},
+    };
+    await db
+      .update(schema.teamMembers)
+      .set({ role: "admin" })
+      .where(eq(schema.teamMembers.teamId, teamId));
+    await expect(
+      deletionCaller("alice", teamId, "owner", deps).settings.team.delete(),
+    ).rejects.toMatchObject({ code: "FORBIDDEN", message: "mailbox_erasure_forbidden" });
+    expect((await db.select().from(schema.teams)).some((team) => team.id === teamId)).toBe(true);
+    expect(cancel).not.toHaveBeenCalled();
+    await db
+      .update(schema.teamMembers)
+      .set({ role: "owner" })
+      .where(eq(schema.teamMembers.teamId, teamId));
+    await deletionCaller("alice", teamId, "member", deps).settings.team.delete();
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(factory).not.toHaveBeenCalled();
+    expect(await db.select().from(schema.teams)).toHaveLength(0);
+  });
+  it("keeps an ambiguous first-Customer request and never reaches Send or external cleanup", async () => {
+    stubCloud();
+    await enableMailboxErasure();
+    const teamId = await createTeam(db, "pending-customer");
+    await addMember(teamId, "alice", "owner");
+    await db.insert(schema.mailboxCustomerRequests).values({
+      teamId,
+      createdBy: "alice",
+      status: "creating",
+      name: "Pending",
+      email: "alice@example.invalid",
+      livemode: false,
+      idempotencyKey: "mailbox-customer:pending-settings",
+    });
+    const cancel = vi.fn(async (_db: Db, _teamId: string) => {});
+    const cleanup = vi.fn(async () => {});
+    const factory = vi.fn(() => {
+      throw new Error("SDK must not be reached");
+    });
+    const deps: TeamDeletionDeps = {
+      cancelSubscription: cancel,
+      mailboxStripe: factory,
+      mailboxLivemode: () => false,
+      deleteSesIdentity: cleanup,
+      deleteSesTenant: cleanup,
+      deleteLogo: cleanup,
+    };
+    await expect(
+      deletionCaller("alice", teamId, "owner", deps).settings.team.delete(),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: "mailbox_erasure_pending" });
+    expect(await db.select().from(schema.teams)).toHaveLength(1);
+    expect((await db.select().from(schema.mailboxCustomerRequests))[0]!.status).toBe("creating");
+    expect(cancel).not.toHaveBeenCalled();
+    expect(cleanup).not.toHaveBeenCalled();
+    expect(factory).not.toHaveBeenCalled();
+  });
+  it("passes no Stripe dependencies or Send cancellation on a clean self-hosted Correio deletion", async () => {
+    vi.stubEnv("IS_CLOUD", "false");
+    await enableMailboxErasure();
+    const teamId = await createTeam(db, "self-hosted-mail");
+    await addMember(teamId, "alice", "owner");
+    const cancel = vi.fn(async (_db: Db, _teamId: string) => {});
+    const factory = vi.fn(() => {
+      throw new Error("Self-host must not access Stripe");
+    });
+    const deps: TeamDeletionDeps = {
+      cancelSubscription: cancel,
+      mailboxStripe: factory,
+      mailboxLivemode: () => false,
+      deleteSesIdentity: async () => {},
+      deleteSesTenant: async () => {},
+      deleteLogo: async () => {},
+    };
+    await deletionCaller("alice", teamId, "owner", deps).settings.team.delete();
+    expect(cancel).not.toHaveBeenCalled();
+    expect(factory).not.toHaveBeenCalled();
+    expect(await db.select().from(schema.teams)).toHaveLength(0);
   });
 });
 

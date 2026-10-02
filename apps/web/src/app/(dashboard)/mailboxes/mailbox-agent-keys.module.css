@@ -1,0 +1,194 @@
+.dialog {
+  width: min(660px, calc(100% - 32px));
+}
+.header {
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.header > div {
+  min-width: 0;
+}
+.address {
+  font-family: var(--ms-font-mono);
+  font-size: 12px;
+  color: var(--ms-muted);
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+}
+.description,
+.field small,
+.keyDetails p,
+.scope small,
+.secret p,
+.empty p:last-child {
+  color: var(--ms-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.description {
+  margin: 0 0 22px;
+}
+.form h3,
+.keys h3,
+.secret h3 {
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+.fields,
+.scopes {
+  min-width: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.fields {
+  display: grid;
+  gap: 18px;
+}
+.field {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ms-muted);
+  min-width: 0;
+}
+.field input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.scopes legend {
+  font-size: 12px;
+  margin-bottom: 10px;
+  color: var(--ms-muted);
+}
+.scope {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: 12px;
+  cursor: pointer;
+}
+.scope input {
+  flex: none;
+  margin: 3px 0 0;
+}
+.scope small {
+  display: block;
+  margin-top: 4px;
+}
+.sendScope {
+  border-top: 1px solid var(--ms-line);
+  margin-top: 4px;
+  padding-top: 14px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.feedback {
+  padding: 12px;
+  background: var(--ms-inset);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  font-size: 12px;
+  line-height: 1.65;
+  margin: 0 0 18px;
+}
+.secret {
+  border: 1px solid var(--ms-line-strong);
+  background: var(--ms-inset);
+  border-radius: var(--ms-r-card);
+  padding: 18px;
+}
+.secret label {
+  display: block;
+  font-size: 12px;
+  margin: 14px 0 8px;
+}
+.token {
+  display: block;
+  width: 100%;
+  min-height: 78px;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: var(--ms-font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  margin-bottom: 14px;
+}
+.copyStatus {
+  margin-bottom: 0;
+}
+.keys {
+  border-top: 1px solid var(--ms-line);
+  margin-top: 24px;
+  padding-top: 22px;
+}
+.keyList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.key {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  border-bottom: 1px solid var(--ms-line);
+  padding: 16px 0;
+}
+.keyDetails {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.keyHeading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+.badge {
+  color: var(--ms-muted);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-badge);
+  font-size: 10px;
+  padding: 3px 7px;
+}
+.keyDetails p {
+  margin: 5px 0 0;
+}
+.loadError,
+.empty {
+  font-size: 12px;
+}
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 22px;
+}
+.dialog button:focus-visible,
+.dialog input:focus-visible,
+.dialog textarea:focus-visible,
+.secret h3:focus-visible {
+  outline: 2px solid var(--ms-steel);
+  outline-offset: 3px;
+}
+@media (max-width: 520px) {
+  .dialog {
+    width: calc(100% - 20px);
+    max-height: calc(100dvh - 24px);
+    padding: 18px;
+  }
+  .key {
+    flex-direction: column;
+  }
+  .key > button,
+  .actions > button {
+    min-height: 40px;
+  }
+}

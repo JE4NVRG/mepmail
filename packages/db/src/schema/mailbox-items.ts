@@ -20,7 +20,7 @@ export const mailboxItems = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     teamId: uuid("team_id").notNull(),
     mailboxId: uuid("mailbox_id").notNull(),
-    kind: text("kind").$type<"inbox" | "draft">().notNull(),
+    kind: text("kind").$type<"inbox" | "draft" | "sent">().notNull(),
     sourceId: text("source_id"),
     revision: integer("revision").notNull().default(1),
     rawBytes: integer("raw_bytes").notNull(),
@@ -40,11 +40,12 @@ export const mailboxItems = pgTable(
     uniqueIndex("mailbox_items_source_idx")
       .on(t.mailboxId, t.sourceId)
       .where(sql`${t.sourceId} is not null`),
+    uniqueIndex("mailbox_items_id_box_team_idx").on(t.id, t.mailboxId, t.teamId),
     index("mailbox_items_box_created_idx").on(t.mailboxId, t.createdAt, t.id),
-    check("mailbox_items_kind_check", sql`${t.kind} in ('inbox', 'draft')`),
+    check("mailbox_items_kind_check", sql`${t.kind} in ('inbox', 'draft', 'sent')`),
     check(
       "mailbox_items_source_check",
-      sql`(${t.kind} = 'inbox' and ${t.sourceId} is not null and length(${t.sourceId}) between 1 and 128) or (${t.kind} = 'draft' and ${t.sourceId} is null)`,
+      sql`(${t.kind} in ('inbox', 'sent') and ${t.sourceId} is not null and length(${t.sourceId}) between 1 and 128) or (${t.kind} = 'draft' and ${t.sourceId} is null)`,
     ),
     check("mailbox_items_revision_check", sql`${t.revision} >= 1`),
     check("mailbox_items_raw_bytes_check", sql`${t.rawBytes} between 1 and 1048576`),

@@ -1,5 +1,14 @@
 export type { ContactActivityType, SegmentCondition, SegmentFilter } from "@millionsend/db/schema";
 export {
+  MailboxServiceError,
+  mailboxServiceActive,
+  mailboxServiceState,
+  lockMailboxService,
+  reserveMailboxSeat,
+  requireMailboxSeat,
+  assertMailboxStorage,
+} from "./mailbox-service.js";
+export {
   buildJudgeBlock,
   decodeEntities,
   JUDGE_LINK_ROWS_MAX,
@@ -691,3 +700,25 @@ export {
   type WebhookPayload,
   type WebhookSignatureHeaders,
 } from "./webhooks.js";
+export {
+  acceptMailboxOutbox,
+  queueMailboxDraft,
+  queueMailboxAgentDraft,
+  receiveMailboxMime,
+  reconcileMailboxOutbox,
+  sendMailboxOutbox,
+  failQueuedMailboxOutbox,
+  MailboxSendRejectedError,
+  MailboxSendDeferredError,
+  type MailboxOutboxSender,
+  type MailboxTransportMimeAdapter,
+} from "./mailbox-transport.js";
+export {
+  createMailboxAgentKey,
+  listMailboxAgentKeys,
+  revokeMailboxAgentKey,
+  withMailboxAgentAccess,
+  MailboxAgentAccessError,
+  type MailboxAgentScope,
+  type MailboxAgentAccessContext,
+} from "./mailbox-agent-access.js";

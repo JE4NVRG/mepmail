@@ -19,6 +19,7 @@ import { GET } from "@/app/api/mailboxes/[mailboxId]/items/[id]/attachments/[ind
 import { getKeyring } from "@/server/keyring";
 import { mailboxesRouter } from "@/server/routers/mailboxes";
 import { type Context, createCallerFactory, createContext, router } from "@/server/trpc";
+import { seedMailboxTestService } from "./mailbox-service-fixture";
 
 vi.mock("@/server/keyring", () => ({ getKeyring: vi.fn() }));
 vi.mock("@/server/trpc", async (original) => ({
@@ -95,6 +96,7 @@ beforeEach(async () => {
     .returning();
   teamId = teams[0]!.id;
   otherTeam = teams[1]!.id;
+  await seedMailboxTestService(db, [teamId, otherTeam]);
   for (const id of ["owner", "member", "admin", "outsider"])
     await db
       .insert(schema.user)

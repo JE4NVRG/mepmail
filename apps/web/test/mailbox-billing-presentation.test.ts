@@ -1,0 +1,512 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { PGlite } from "@electric-sql/pglite";
+import {
+  MAILBOX_CHECKOUT_METADATA_KEY,
+  MAILBOX_SERVICE_METADATA_KEY,
+  MAILBOX_SERVICE,
+  type BillingStripe,
+  type MailboxCatalog,
+} from "@millionsend/billing";
+import { type Db, schema } from "@millionsend/db";
+import { and, eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
+import type Stripe from "stripe";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  formatMailboxPrice,
+  safeMailboxCheckoutUrl,
+} from "@/app/(dashboard)/mailboxes/mailbox-service-panel";
+import { getStripe } from "@/server/billing";
+import { mailboxBillingOffer } from "@/server/mailbox-billing";
+import { mailboxesRouter } from "@/server/routers/mailboxes";
+import { type Context, createCallerFactory, router } from "@/server/trpc";
+
+vi.mock("@/server/billing", async (original) => ({
+  ...(await original<typeof import("@/server/billing")>()),
+  getStripe: vi.fn(),
+}));
+
+// Synthetic offline prices and credentials. No approved launch price is supplied by this test.
+const price = {
+  priceId: "price_mail_fixture",
+  currency: "usd",
+  unitAmount: 123,
+  interval: "month" as const,
+  storageBytesPerMailbox: 4096,
+  includedOutboundPerMailbox: 17,
+};
+const catalog: MailboxCatalog = {
+  livemode: false,
+  checkoutPriceId: price.priceId,
+  prices: [price],
+};
+const offer = {
+  currency: price.currency,
+  unitAmount: price.unitAmount,
+  interval: price.interval,
+  storageBytesPerMailbox: price.storageBytesPerMailbox,
+  includedOutboundPerMailbox: price.includedOutboundPerMailbox,
+};
+const caller = createCallerFactory(router({ mailboxes: mailboxesRouter }));
+const base = fileURLToPath(new URL("../../../packages/db/drizzle/", import.meta.url));
+const extension = fileURLToPath(new URL("../../../packages/db/mailbox-drizzle/", import.meta.url));
+let client: PGlite, db: Db, teamId: string, owner: string, member: string, customerId: string;
+let sessionId: string, subscriptionId: string, checkoutUrl: string;
+let sequence = 0;
+let session: Stripe.Checkout.Session | null;
+let stripe: BillingStripe;
+let createSession: ReturnType<typeof vi.fn>;
+let createCustomer: ReturnType<typeof vi.fn>;
+function as(userId = owner, role: Context["role"] = "owner", extra: Partial<Context> = {}) {
+  return caller({
+    db,
+    teamId,
+    role,
+    session: { user: { id: userId, name: userId, email: `${userId}@example.invalid` } },
+    ...extra,
+  });
+}
+async function lease(status: "creating" | "ready" | "completed" = "creating") {
+  const [row] = await db
+    .insert(schema.mailboxCheckouts)
+    .values({
+      teamId,
+      createdBy: owner,
+      status,
+      stripeCustomerId: customerId,
+      stripePriceId: price.priceId,
+      seats: 3,
+      livemode: false,
+      idempotencyKey: `fixture:${teamId}`,
+      ...offer,
+      successUrl: "https://app.example.invalid/mailboxes?checkout=success",
+      cancelUrl: "https://app.example.invalid/mailboxes",
+      ...(status === "ready"
+        ? {
+            stripeSessionId: sessionId,
+            checkoutUrl,
+          }
+        : {}),
+      ...(status === "completed"
+        ? { stripeSessionId: sessionId, stripeSubscriptionId: subscriptionId }
+        : {}),
+    })
+    .returning();
+  return row!;
+}
+beforeAll(async () => {
+  client = new PGlite();
+  for (const name of readdirSync(base)
+    .filter((n) => n.endsWith(".sql") && n.slice(0, 4) <= "0042")
+    .sort())
+    for (const statement of readFileSync(base + name, "utf8")
+      .split("--> statement-breakpoint")
+      .filter((s) => s.trim()))
+      await client.exec(statement);
+  const database = drizzle(client, { schema });
+  db = database as unknown as Db;
+  await migrate(database, { migrationsFolder: extension, migrationsTable: "__mailbox_migrations" });
+});
+beforeEach(async () => {
+  sequence++;
+  owner = `billing-owner-${sequence}`;
+  member = `billing-member-${sequence}`;
+  customerId = `cus_mail_fixture_${sequence}`;
+  sessionId = `cs_mail_fixture_${sequence}`;
+  subscriptionId = `sub_mail_fixture_${sequence}`;
+  checkoutUrl = `https://checkout.stripe.com/c/pay/${sessionId}`;
+  vi.stubEnv("IS_CLOUD", "true");
+  vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_offline_fixture");
+  vi.stubEnv("APP_BASE_URL", "https://app.example.invalid");
+  vi.stubEnv("BILLING_MUTATIONS_PAUSED", "");
+  vi.stubEnv("MAILBOX_REGISTRY_ENABLED", "1");
+  vi.stubEnv("MAILBOX_BILLING_CATALOG", JSON.stringify(catalog));
+  const [team] = await db
+    .insert(schema.teams)
+    .values({
+      name: "Offline Mail billing",
+      slug: `mail-billing-${sequence}`,
+      stripeCustomerId: customerId,
+    })
+    .returning({ id: schema.teams.id });
+  teamId = team!.id;
+  await db.insert(schema.user).values(
+    [owner, member].map((id) => ({
+      id,
+      name: id,
+      email: `${id}@example.invalid`,
+      emailVerified: true,
+    })),
+  );
+  await db.insert(schema.teamMembers).values([
+    { teamId, userId: owner, role: "owner" },
+    { teamId, userId: member, role: "member" },
+  ]);
+  session = null;
+  createCustomer = vi.fn(async () => {
+    throw new Error("Existing Customer must be reused");
+  });
+  createSession = vi.fn(async (params: Stripe.Checkout.SessionCreateParams) => {
+    session = {
+      id: sessionId,
+      url: checkoutUrl,
+      status: "open",
+      mode: params.mode,
+      customer: params.customer,
+      livemode: false,
+      metadata: params.metadata,
+      client_reference_id: params.client_reference_id,
+    } as unknown as Stripe.Checkout.Session;
+    return session;
+  });
+  stripe = {
+    customers: { create: createCustomer },
+    subscriptions: {
+      list: vi.fn(async () => ({ data: [], has_more: false })),
+      retrieve: vi.fn(async () => {
+        throw new Error("Unexpected subscription read");
+      }),
+    },
+    checkout: {
+      sessions: {
+        create: createSession,
+        retrieve: vi.fn(async () => session),
+        list: vi.fn(async () => ({ data: session ? [session] : [], has_more: false })),
+      },
+    },
+  } as unknown as BillingStripe;
+  vi.mocked(getStripe).mockReset().mockReturnValue(stripe);
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+afterAll(async () => {
+  await client.close();
+});
+
+describe("sanitized Mail billing presentation and guarded Checkout", () => {
+  it("publishes only approved terms, authority and pending quantity, without calling Stripe", async () => {
+    expect(await as().mailboxes.billing()).toEqual({
+      canManage: true,
+      canPurchase: true,
+      availability: "available",
+      offer,
+      checkoutPending: false,
+      pendingCheckoutSeats: null,
+    });
+    expect(getStripe).not.toHaveBeenCalled();
+    expect(await as().mailboxes.service()).toEqual({
+      active: false,
+      status: "inactive",
+      seats: 0,
+      reservedSeats: 0,
+      storageBytesPerMailbox: 0,
+      includedOutboundPerMailbox: 0,
+      periodStart: null,
+      periodEnd: null,
+    });
+    const serialized = JSON.stringify(await as().mailboxes.billing());
+    for (const hidden of [
+      "priceId",
+      price.priceId,
+      "stripeCustomerId",
+      customerId,
+      "livemode",
+      "idempotencyKey",
+      "checkoutId",
+      "sk_test_offline_fixture",
+    ])
+      expect(serialized).not.toContain(hidden);
+  });
+  it.each([
+    ["IS_CLOUD", "false"],
+    ["IS_CLOUD", "0"],
+    ["STRIPE_SECRET_KEY", ""],
+    ["STRIPE_SECRET_KEY", "invalid"],
+    ["MAILBOX_BILLING_CATALOG", ""],
+    ["MAILBOX_BILLING_CATALOG", "{}"],
+    ["MAILBOX_BILLING_CATALOG", "{broken"],
+    ["MAILBOX_BILLING_CATALOG", JSON.stringify({ ...catalog, checkoutPriceId: null })],
+    [
+      "MAILBOX_BILLING_CATALOG",
+      JSON.stringify({ ...catalog, checkoutPriceId: "price_not_approved" }),
+    ],
+    ["MAILBOX_BILLING_CATALOG", JSON.stringify({ ...catalog, livemode: true })],
+    ["MAILBOX_BILLING_CATALOG", JSON.stringify({ ...catalog, prices: [price, price] })],
+    ["BILLING_MUTATIONS_PAUSED", "1"],
+    ["BILLING_MUTATIONS_PAUSED", "true"],
+  ])("closes purchase when %s is unavailable (%s), with no SDK call", async (key, value) => {
+    vi.stubEnv(key, value);
+    expect(mailboxBillingOffer()).toBeNull();
+    expect(await as().mailboxes.billing()).toMatchObject({
+      canPurchase: false,
+      availability: "unavailable",
+      offer: null,
+    });
+    await expect(as().mailboxes.checkout({ seats: 2 })).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: "mailbox_billing_unavailable",
+    });
+    expect(getStripe).not.toHaveBeenCalled();
+    expect(createSession).not.toHaveBeenCalled();
+    expect(createCustomer).not.toHaveBeenCalled();
+  });
+  it("interprets string false as an unpaused flag and requires the current administrative role", async () => {
+    vi.stubEnv("BILLING_MUTATIONS_PAUSED", "false");
+    expect((await as().mailboxes.billing()).canPurchase).toBe(true);
+    expect(await as(member, "owner").mailboxes.billing()).toMatchObject({
+      canManage: false,
+      canPurchase: false,
+      availability: "forbidden",
+    });
+    await expect(as(member, "owner").mailboxes.checkout({ seats: 2 })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    await db
+      .update(schema.teamMembers)
+      .set({ role: "member" })
+      .where(and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamMembers.userId, owner)));
+    await expect(as().mailboxes.checkout({ seats: 2 })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    await db
+      .update(schema.teamMembers)
+      .set({ role: "admin" })
+      .where(and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamMembers.userId, member)));
+    expect((await as(member, "member").mailboxes.billing()).canPurchase).toBe(true);
+    expect(getStripe).not.toHaveBeenCalled();
+  });
+  it.each([0, 10001, 1.5])(
+    "rejects invalid mailbox quantity %s before SDK access",
+    async (seats) => {
+      await expect(as().mailboxes.checkout({ seats })).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+      });
+      expect(getStripe).not.toHaveBeenCalled();
+    },
+  );
+  it("denies removed members, suspended teams and a disabled feature before reaching Stripe", async () => {
+    await db
+      .delete(schema.teamMembers)
+      .where(and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamMembers.userId, member)));
+    await expect(as(member).mailboxes.billing()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(as(member).mailboxes.checkout({ seats: 1 })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    await db
+      .update(schema.teams)
+      .set({ suspendedAt: new Date() })
+      .where(eq(schema.teams.id, teamId));
+    expect((await as().mailboxes.billing()).canPurchase).toBe(false);
+    await expect(as().mailboxes.checkout({ seats: 1 })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    vi.stubEnv("MAILBOX_REGISTRY_ENABLED", "false");
+    await expect(as().mailboxes.billing()).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(as().mailboxes.checkout({ seats: 1 })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    expect(getStripe).not.toHaveBeenCalled();
+  });
+  it("offers recovery instead of another purchase for every registered subscription status", async () => {
+    await db.insert(schema.mailboxSubscriptions).values({
+      teamId,
+      status: "active",
+      seats: 2,
+      storageBytesPerMailbox: 8192,
+      includedOutboundPerMailbox: 31,
+      periodStart: new Date(Date.now() - 86400000),
+      periodEnd: new Date(Date.now() + 86400000),
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscriptionId,
+    });
+    for (const status of ["active", "trialing", "past_due", "canceled", "inactive"] as const) {
+      await db
+        .update(schema.mailboxSubscriptions)
+        .set({ status })
+        .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+      expect(await as().mailboxes.billing()).toMatchObject({
+        canPurchase: false,
+        availability: "existing_subscription",
+      });
+      expect(await as().mailboxes.service()).toMatchObject({
+        status,
+        seats: 2,
+        storageBytesPerMailbox: 8192,
+        includedOutboundPerMailbox: 31,
+      });
+      await expect(as().mailboxes.checkout({ seats: 2 })).rejects.toMatchObject({
+        message: "subscription_exists",
+      });
+    }
+    expect(getStripe).not.toHaveBeenCalled();
+  });
+  it("resumes the immutable pending quantity, hides its identifiers, and never creates another session", async () => {
+    const pending = await lease("ready");
+    session = {
+      id: sessionId,
+      mode: "subscription",
+      customer: customerId,
+      livemode: false,
+      status: "open",
+      url: checkoutUrl,
+      metadata: {
+        [MAILBOX_SERVICE_METADATA_KEY]: MAILBOX_SERVICE,
+        [MAILBOX_CHECKOUT_METADATA_KEY]: pending.idempotencyKey,
+        team_id: teamId,
+      },
+    } as unknown as Stripe.Checkout.Session;
+    const result = await as().mailboxes.billing();
+    expect(result).toMatchObject({
+      canPurchase: true,
+      checkoutPending: true,
+      pendingCheckoutSeats: 3,
+    });
+    expect(JSON.stringify(result)).not.toContain(pending.id);
+    expect(JSON.stringify(result)).not.toContain(pending.idempotencyKey);
+    await expect(as().mailboxes.checkout({ seats: 4 })).rejects.toMatchObject({
+      message: "conflict",
+    });
+    expect(getStripe).not.toHaveBeenCalled();
+    expect(await as().mailboxes.checkout({ seats: 3 })).toEqual({ url: session.url });
+    expect(createSession).not.toHaveBeenCalled();
+    expect(createCustomer).not.toHaveBeenCalled();
+  });
+  it("does not offer changed terms to an old pending purchase", async () => {
+    await lease();
+    vi.stubEnv(
+      "MAILBOX_BILLING_CATALOG",
+      JSON.stringify({ ...catalog, prices: [{ ...price, unitAmount: price.unitAmount + 1 }] }),
+    );
+    expect(await as().mailboxes.billing()).toMatchObject({
+      canPurchase: false,
+      availability: "recovery_required",
+      pendingCheckoutSeats: 3,
+    });
+    await expect(as().mailboxes.checkout({ seats: 3 })).rejects.toMatchObject({
+      message: "conflict",
+    });
+    expect(getStripe).not.toHaveBeenCalled();
+  });
+  it("keeps a lost Customer request pending without disclosing its immutable parameters", async () => {
+    await db.insert(schema.mailboxCustomerRequests).values({
+      teamId,
+      createdBy: owner,
+      status: "creating",
+      name: "Private snapshot",
+      email: "snapshot@example.invalid",
+      livemode: false,
+      idempotencyKey: `private-nonce:${teamId}`,
+    });
+    await db
+      .update(schema.teams)
+      .set({ stripeCustomerId: null })
+      .where(eq(schema.teams.id, teamId));
+    const result = await as().mailboxes.billing();
+    expect(result).toMatchObject({
+      canPurchase: true,
+      checkoutPending: true,
+      pendingCheckoutSeats: null,
+    });
+    expect(JSON.stringify(result)).not.toContain("Private snapshot");
+    expect(JSON.stringify(result)).not.toContain("snapshot@example.invalid");
+    await expect(as().mailboxes.checkout({ seats: 3 })).rejects.toMatchObject({
+      message: "pending",
+    });
+    expect(createCustomer).not.toHaveBeenCalled();
+    expect(createSession).not.toHaveBeenCalled();
+  });
+  it("returns only the hosted URL, reuses Customer, preserves Send and grants no entitlement on success", async () => {
+    const before = await client.query("select * from teams where id = $1", [teamId]);
+    expect(await as().mailboxes.checkout({ seats: 4 })).toEqual({
+      url: checkoutUrl,
+    });
+    expect(createSession).toHaveBeenCalledTimes(1);
+    expect(createSession.mock.calls[0]![0]).toMatchObject({
+      line_items: [{ price: price.priceId, quantity: 4 }],
+      customer: customerId,
+      success_url: "https://app.example.invalid/mailboxes?checkout=success",
+      automatic_tax: { enabled: false },
+    });
+    expect(createCustomer).not.toHaveBeenCalled();
+    expect((await client.query("select * from teams where id = $1", [teamId])).rows).toEqual(
+      before.rows,
+    );
+    expect(await as().mailboxes.service()).toMatchObject({
+      active: false,
+      status: "inactive",
+      seats: 0,
+    });
+    expect(
+      await db
+        .select()
+        .from(schema.mailboxSubscriptions)
+        .where(eq(schema.mailboxSubscriptions.teamId, teamId)),
+    ).toHaveLength(0);
+  });
+  it("keeps a completed Checkout in confirmation/recovery without offering a second purchase", async () => {
+    await lease("completed");
+    expect(await as().mailboxes.billing()).toMatchObject({
+      canPurchase: false,
+      availability: "existing_subscription",
+    });
+    expect((await as().mailboxes.service()).active).toBe(false);
+    await expect(as().mailboxes.checkout({ seats: 3 })).rejects.toMatchObject({
+      message: "subscription_exists",
+    });
+    expect(getStripe).not.toHaveBeenCalled();
+  });
+  it("rejects an arbitrary provider redirect without activating the plan", async () => {
+    createSession.mockImplementation(async (params: Stripe.Checkout.SessionCreateParams) => ({
+      id: sessionId,
+      url: "https://other.example.invalid/pay",
+      status: "open",
+      mode: "subscription",
+      customer: params.customer,
+      livemode: false,
+      metadata: params.metadata,
+    }));
+    await expect(as().mailboxes.checkout({ seats: 1 })).rejects.toMatchObject({
+      message: "pending",
+    });
+    expect((await as().mailboxes.service()).active).toBe(false);
+    expect(createSession).toHaveBeenCalledTimes(1);
+  });
+  it("sanitizes a lost provider response and rechecks the same pending intent without creating again", async () => {
+    createSession.mockRejectedValueOnce(new Error("private fixture provider payload"));
+    await expect(as().mailboxes.checkout({ seats: 2 })).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: "pending",
+    });
+    expect(await as().mailboxes.billing()).toMatchObject({
+      checkoutPending: true,
+      pendingCheckoutSeats: 2,
+    });
+    await expect(as().mailboxes.checkout({ seats: 2 })).rejects.toMatchObject({
+      message: "pending",
+    });
+    expect(createSession).toHaveBeenCalledTimes(1);
+    expect(createCustomer).not.toHaveBeenCalled();
+    expect((await as().mailboxes.service()).active).toBe(false);
+  });
+  it("validates the browser redirect and formats the approved minor-unit amount", () => {
+    expect(
+      safeMailboxCheckoutUrl("https://checkout.stripe.com/c/pay/cs_fixture#confirmation"),
+    ).toBe("https://checkout.stripe.com/c/pay/cs_fixture#confirmation");
+    for (const value of [
+      "javascript:alert(1)",
+      "/pay",
+      "http://checkout.stripe.com/pay",
+      "https://checkout.stripe.com.other.invalid/pay",
+      "https://other.invalid@checkout.stripe.com/pay",
+      "https://checkout.stripe.com:8443/pay",
+      "https://other.invalid/pay",
+    ])
+      expect(safeMailboxCheckoutUrl(value)).toBeNull();
+    expect(formatMailboxPrice(123 * 3, "usd", "en")).toBe("$3.69");
+    expect(formatMailboxPrice(123, "jpy", "en")).toBe("¥123");
+    expect(formatMailboxPrice(500, "isk", "en").replace(/\s/g, "")).toBe("ISK5");
+  });
+});

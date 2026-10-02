@@ -4,6 +4,13 @@ import {
   listMailboxRegistry,
   MailboxRegistryError,
   MailboxContentError,
+  MailboxServiceError,
+  mailboxServiceState,
+  createMailboxAgentKey,
+  listMailboxAgentKeys,
+  revokeMailboxAgentKey,
+  MailboxAgentAccessError,
+  queueMailboxDraft,
   revokeMailboxRegistry,
   updateMailboxRegistry,
   withMailboxRegistryAdmin,
@@ -20,6 +27,17 @@ import {
   saveMailboxContentDraft,
 } from "../mailbox-content";
 import { router, teamProcedure } from "../trpc";
+import { getKeyring } from "../keyring";
+import { mailboxTransportMime } from "../mailbox-transport";
+import { getQueue } from "../queue";
+import { beginMailboxCheckout, MailboxLifecycleError } from "@millionsend/billing";
+import { env } from "@millionsend/config";
+import {
+  mailboxBillingCatalog,
+  mailboxBillingPresentation,
+  mailboxPurchaseDeps,
+} from "../mailbox-billing";
+import { resolveBaseUrl } from "../auth";
 
 const enabled = teamProcedure.use(({ ctx, next }) => {
   if (!mailboxRegistryEnabled()) throw new TRPCError({ code: "NOT_FOUND" });
@@ -31,6 +49,32 @@ async function call<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();
   } catch (error) {
+    if (error instanceof MailboxLifecycleError)
+      throw new TRPCError({
+        code:
+          error.code === "forbidden"
+            ? "FORBIDDEN"
+            : error.code === "invalid"
+              ? "BAD_REQUEST"
+              : "PRECONDITION_FAILED",
+        message: error.code,
+      });
+    if (error instanceof MailboxAgentAccessError)
+      throw new TRPCError({
+        code:
+          error.code === "quota"
+            ? "PRECONDITION_FAILED"
+            : error.code === "invalid"
+              ? "BAD_REQUEST"
+              : error.code === "not_found"
+                ? "NOT_FOUND"
+                : "FORBIDDEN",
+      });
+    if (error instanceof MailboxServiceError)
+      throw new TRPCError({
+        code: error.code === "invalid" ? "BAD_REQUEST" : "PRECONDITION_FAILED",
+        message: error.code,
+      });
     if (error instanceof MailboxRegistryError || error instanceof MailboxContentError)
       throw new TRPCError({
         code: {
@@ -61,6 +105,132 @@ export const mailboxesRouter = router({
     deliveryReady: false as const,
   })),
   list: enabled.query(({ ctx }) => call(() => listMailboxRegistry(ctx.db, actor(ctx)))),
+  service: enabled.query(async ({ ctx }) => {
+    await call(() => listMailboxRegistry(ctx.db, actor(ctx)));
+    return mailboxServiceState(ctx.db, ctx.teamId);
+  }),
+  billing: enabled.query(({ ctx }) => call(() => mailboxBillingPresentation(ctx.db, actor(ctx)))),
+  checkout: enabled
+    .input(z.object({ seats: z.number().int().min(1).max(10000) }))
+    .mutation(async ({ ctx, input }) => {
+      const presentation = await call(() => mailboxBillingPresentation(ctx.db, actor(ctx)));
+      if (presentation.availability === "forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!presentation.canPurchase)
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            presentation.availability === "existing_subscription"
+              ? "subscription_exists"
+              : presentation.availability === "recovery_required"
+                ? "conflict"
+                : "mailbox_billing_unavailable",
+        });
+      if (
+        presentation.pendingCheckoutSeats !== null &&
+        presentation.pendingCheckoutSeats !== input.seats
+      )
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "conflict" });
+      const catalog = mailboxBillingCatalog();
+      if (!catalog)
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "mailbox_billing_unavailable",
+        });
+      const billingUrl = `${resolveBaseUrl(env.APP_BASE_URL)}/mailboxes`;
+      const checkout = await call(() =>
+        beginMailboxCheckout(mailboxPurchaseDeps(ctx.db), catalog, {
+          teamId: ctx.teamId,
+          userId: ctx.session.user.id,
+          seats: input.seats,
+          successUrl: `${billingUrl}?checkout=success`,
+          cancelUrl: billingUrl,
+        }),
+      ).catch((error: unknown) => {
+        if (error instanceof TRPCError) throw error;
+        // Provider/network errors may follow a committed purchase intent; expose no payload and preserve the lease.
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
+      });
+      let url: URL;
+      try {
+        url = new URL(checkout.url);
+      } catch {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
+      }
+      if (
+        url.protocol !== "https:" ||
+        url.hostname !== "checkout.stripe.com" ||
+        url.username ||
+        url.password ||
+        url.port
+      )
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
+      return { url: url.href };
+    }),
+  agentKeys: enabled
+    .input(z.object({ mailboxId: z.uuid() }))
+    .query(({ ctx, input }) =>
+      call(() => listMailboxAgentKeys(ctx.db, actor(ctx), input.mailboxId)),
+    ),
+  createAgentKey: enabled
+    .input(
+      z.object({
+        mailboxId: z.uuid(),
+        label: z.string().min(1).max(80),
+        scopes: z
+          .array(z.enum(["read", "draft", "send"]))
+          .min(1)
+          .max(3)
+          .optional(),
+        expiresAt: z.date().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const key = await call(() => createMailboxAgentKey(ctx.db, actor(ctx), input));
+      await recordAudit(ctx, {
+        action: "mailbox.agent_key_created",
+        target: { type: "mailbox_agent_key", id: key.id },
+      });
+      return key;
+    }),
+  revokeAgentKey: enabled
+    .input(z.object({ mailboxId: z.uuid(), id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const key = await call(() => revokeMailboxAgentKey(ctx.db, actor(ctx), input));
+      await recordAudit(ctx, {
+        action: "mailbox.agent_key_revoked",
+        target: { type: "mailbox_agent_key", id: key.id },
+      });
+      return key;
+    }),
+  queueDraft: enabled
+    .input(
+      z.object({
+        mailboxId: z.uuid(),
+        id: z.uuid(),
+        expectedRevision: z.number().int().min(1).max(2147483646),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (process.env.MAILBOX_TRANSPORT_ENABLED !== "1")
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "mailbox_transport_unavailable",
+        });
+      const result = await call(() =>
+        queueMailboxDraft(ctx.db, getKeyring(), actor(ctx), input, mailboxTransportMime),
+      );
+      // Commit-first outbox plus reconcile repairs a failed enqueue without another send.
+      await (await getQueue()).send(
+        "mailbox.send",
+        { outboxId: result.id },
+        { dedupeKey: result.id },
+      );
+      await recordAudit(ctx, {
+        action: "mailbox.send_queued",
+        target: { type: "mailbox_outbox", id: result.id },
+      });
+      return result;
+    }),
   items: enabled
     .input(
       z.object({ mailboxId: z.uuid().nullable(), folder: z.enum(["inbox", "drafts", "sent"]) }),

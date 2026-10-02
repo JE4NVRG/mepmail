@@ -9,6 +9,7 @@ import { PgBoss } from "pg-boss";
 
 export interface JobPayloads {
   "email.send": { emailId: string };
+  "mailbox.send": { outboxId: string };
   "broadcast.send": { broadcastId: string };
   // snsMessageId rides along for durable idempotency in the handler; queue
   // dedupe alone cannot cover an SNS redelivery after the job completed.
@@ -88,6 +89,7 @@ const JOB_QUEUE_POLICY = "short" as const;
  * the dead-letter queue must exist before the first send.
  */
 export const DEAD_LETTER_QUEUES = {
+  "mailbox.send": "mailbox.send.dead",
   "email.send": "email.send.dead",
   "webhook.drain": "webhook.drain.dead",
   "recipient.erase": "recipient.erase.dead",
@@ -97,6 +99,7 @@ export const DEAD_LETTER_QUEUES = {
 export type DeadLetteredJobName = keyof typeof DEAD_LETTER_QUEUES;
 
 const JOB_QUEUES = [
+  "mailbox.send",
   "email.send",
   "broadcast.send",
   "ses.event",
@@ -114,6 +117,7 @@ void _everyJobQueueListed;
  * queues are rare and never latency-sensitive, so they only poll, slowly.
  */
 const NOTIFY_QUEUES: ReadonlySet<string> = new Set<JobName>([
+  "mailbox.send",
   "email.send",
   "broadcast.send",
   "ses.event",

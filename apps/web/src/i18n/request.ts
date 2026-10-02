@@ -33,6 +33,8 @@ const NAMESPACES = [
   "api-keys",
   "logs",
   "mailboxes",
+  "mailboxes-agent",
+  "mailboxes-service",
   "merge-fields",
   "metrics",
   "onboarding",

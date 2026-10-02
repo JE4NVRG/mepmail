@@ -8,6 +8,13 @@ import {
 } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
 import type { MailboxRegistryActor } from "./mailbox-registry.js";
+import {
+  assertMailboxStorage,
+  lockMailboxService,
+  mailboxServiceActive,
+  MailboxServiceError,
+  requireMailboxSeat,
+} from "./mailbox-service.js";
 
 /** Actor comes from a trusted session adapter, never from an HTTP body or API key. */
 export interface MailboxContentActor extends MailboxRegistryActor {
@@ -70,6 +77,11 @@ async function scoped<T>(
   if (actor.supportView) throw new MailboxContentError("forbidden");
   return db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
+    const [team] = await tx
+      .select({ suspendedAt: schema.teams.suspendedAt })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, actor.teamId))
+      .for("share");
     const [member] = await tx
       .select({ id: schema.teamMembers.id })
       .from(schema.teamMembers)
@@ -81,6 +93,14 @@ async function scoped<T>(
       )
       .for("share");
     if (!member) throw new MailboxContentError("forbidden");
+    // Lock billing before mailbox, but report access failures before entitlements.
+    const [plan] = change
+      ? await tx
+          .select()
+          .from(schema.mailboxSubscriptions)
+          .where(eq(schema.mailboxSubscriptions.teamId, actor.teamId))
+          .for("update")
+      : [];
     const query = tx
       .select()
       .from(schema.mailboxes)
@@ -109,8 +129,25 @@ async function scoped<T>(
       )
         throw new MailboxContentError("forbidden");
     }
+    if (change) {
+      if (!team || team.suspendedAt) throw new MailboxServiceError("not_entitled");
+      if (!mailboxServiceActive(plan)) throw new MailboxServiceError("not_entitled");
+      await requireMailboxSeat(tx, actor.teamId, mailboxId, plan!);
+    }
     return operation(tx);
   });
+}
+
+/** Trusted server-side send admission. The session actor must own the box now;
+ * readers and draft delegates cannot enqueue a message. Keep locks through capture.
+ */
+export function withMailboxWriteAccess<T>(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxId: string,
+  operation: (tx: Db) => Promise<T>,
+): Promise<T> {
+  return scoped(db, { ...actor }, mailboxId, "owner", true, operation);
 }
 
 /** Owner-only import for local qualification/export restore. No inbound transport is activated. */
@@ -141,6 +178,8 @@ export async function importMailboxMime(
       return summary(previous);
     }
     const id = randomUUID();
+    const plan = await lockMailboxService(tx, actor.teamId);
+    await assertMailboxStorage(tx, actor.teamId, input.mailboxId, raw.length, plan);
     const sealed = await encryptPayload(
       raw,
       keyring,
@@ -275,6 +314,14 @@ export async function saveMailboxDraft(
     if (input.id && !previous) throw new MailboxContentError("not_found");
     if (previous && (previous.kind !== "draft" || previous.revision !== input.expectedRevision))
       throw new MailboxContentError("conflict");
+    const plan = await lockMailboxService(tx, actor.teamId);
+    await assertMailboxStorage(
+      tx,
+      actor.teamId,
+      input.mailboxId,
+      raw.length - (previous?.rawBytes ?? 0),
+      plan,
+    );
     const sealed = await encryptPayload(
       raw,
       keyring,

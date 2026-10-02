@@ -1,15 +1,19 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { lt } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import type Stripe from "stripe";
 import type { BillingDeps } from "./checkout.js";
 import { SUBSCRIPTION_EXPAND } from "./prices.js";
 import { applySubscription, idOf, lockCustomer } from "./subscription.js";
+import { isMailboxSubscription, type MailboxCatalog } from "./mailbox.js";
+import { applyMailboxSubscription } from "./mailbox-lifecycle.js";
 
 export interface WebhookDeps extends BillingDeps {
   webhookSecret: string;
   /** Mode of the configured API key; events from the other mode are rejected. */
   livemode: boolean;
+  /** Presence opts into the independent Mail ledger. Null closes paid Mail access. */
+  mailboxCatalog?: MailboxCatalog | null;
   /**
    * Runs after the transaction commits, once per event that was newly
    * recorded and acted on — the same dedupe the ledger applies, so a
@@ -25,6 +29,8 @@ export interface AppliedWebhookEvent {
   id: string;
   type: string;
   customerId: string | null;
+  subscriptionId: string;
+  service: "send" | "mailbox" | "ignored";
 }
 
 /** Stripe redelivers for at most 3 days; older dedupe rows are dead weight. */
@@ -94,13 +100,43 @@ export async function handleWebhook(
     const sub = await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
       expand: SUBSCRIPTION_EXPAND,
     });
-    await applySubscription(
-      tx as unknown as Db,
-      sub,
-      (m) => log(`stripe webhook ${event.id}: ${m}`),
-      deps.stripe,
-    );
-    return { id: event.id, type: event.type, customerId: ref.customerId };
+    const mail = isMailboxSubscription(sub);
+    const projected =
+      "mailboxCatalog" in deps
+        ? await applyMailboxSubscription(
+            tx as unknown as Db,
+            sub,
+            deps.mailboxCatalog ?? null,
+            event.created,
+          )
+        : null;
+    if (!mail)
+      await applySubscription(
+        tx as unknown as Db,
+        sub,
+        (m) => log(`stripe webhook ${event.id}: ${m}`),
+        deps.stripe,
+      );
+    const customerId = idOf(sub.customer);
+    const [sendTeam] =
+      customerId && !mail && !projected?.applied
+        ? await tx
+            .select({ subscriptionId: schema.teams.stripeSubscriptionId, plan: schema.teams.plan })
+            .from(schema.teams)
+            .where(eq(schema.teams.stripeCustomerId, customerId))
+        : [];
+    return {
+      id: event.id,
+      type: event.type,
+      customerId,
+      subscriptionId: sub.id,
+      service:
+        mail || projected?.applied
+          ? "mailbox"
+          : sendTeam?.plan !== "system" && sendTeam?.subscriptionId === sub.id
+            ? "send"
+            : "ignored",
+    };
   });
   // After the commit, and never before it: the caller's hook reports on an
   // event that is durable. A throwing hook is logged, not propagated — the

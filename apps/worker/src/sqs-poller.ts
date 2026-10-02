@@ -23,6 +23,12 @@ export interface SqsPollerDeps {
   queueUrl: string;
   allowedTopicArns: string[];
   enqueueSesEvent(event: SerializedSesEvent, snsMessageId: string): Promise<void>;
+  /** Trusted private-mail dispatcher. true means persistence is complete; a
+   * throw retains the receipt for retry/DLQ. It runs before outbound parsing.
+   */
+  dispatchPrivateMail?:
+    | ((input: { topicArn: string; snsMessageId: string; event: unknown }) => Promise<boolean>)
+    | undefined;
   log?: ((line: string) => void) | undefined;
   /**
    * Parallel long-poll loops. One loop is bounded by the round trip to the
@@ -34,9 +40,9 @@ export interface SqsPollerDeps {
 
 /**
  * One receive/process/delete round; returns how many messages arrived.
- * Invalid messages remain on SQS for the configured dead-letter redrive.
- * Only a valid event successfully enqueued enters the delete batch; enqueue
- * failures remain available for redelivery too.
+ * Unusable messages (non-JSON, foreign topic, unparseable event) are deleted —
+ * redelivery can never fix them. Private mail is acknowledged only after its
+ * dispatcher succeeds; disabled transport or persistence failure retains it.
  */
 export async function pollSqsOnce(deps: SqsPollerDeps, waitSeconds = 20): Promise<number> {
   const log = deps.log ?? (() => {});
@@ -53,9 +59,11 @@ export async function pollSqsOnce(deps: SqsPollerDeps, waitSeconds = 20): Promis
   const done: Message[] = [];
   for (const message of messages) {
     try {
-      if (await processMessage(message, deps)) done.push(message);
+      await processMessage(message, deps);
+      done.push(message);
     } catch {
-      log("sqs poller: enqueue failed, message retained for redelivery");
+      // Private MIME, object keys and provider request details stay out of logs.
+      log("sqs poller: processing failed, leaving message for redelivery");
     }
   }
   if (done.length > 0) {
@@ -72,43 +80,54 @@ export async function pollSqsOnce(deps: SqsPollerDeps, waitSeconds = 20): Promis
   return messages.length;
 }
 
-async function processMessage(message: Message, deps: SqsPollerDeps): Promise<boolean> {
+async function processMessage(message: Message, deps: SqsPollerDeps): Promise<void> {
   const log = deps.log ?? (() => {});
   let raw: unknown;
   try {
     raw = JSON.parse(message.Body ?? "");
   } catch {
-    log("sqs poller: non-JSON message retained for redrive");
-    return false;
+    log("sqs poller: dropped non-JSON message");
+    return;
   }
   const parsed = snsMessageSchema.safeParse(raw);
-  if (!parsed.success || parsed.data.Type !== "Notification") {
-    log("sqs poller: invalid SNS envelope retained for redrive");
-    return false;
-  }
+  if (!parsed.success || parsed.data.Type !== "Notification") return;
   if (!deps.allowedTopicArns.includes(parsed.data.TopicArn)) {
-    log("sqs poller: unallowed topic message retained for redrive");
-    return false;
+    log(`sqs poller: dropped message from unallowed topic ${parsed.data.TopicArn}`);
+    return;
   }
   let inner: unknown;
   try {
     inner = JSON.parse(parsed.data.Message);
   } catch {
-    log("sqs poller: non-JSON event retained for redrive");
-    return false;
+    return;
   }
+  if (
+    deps.dispatchPrivateMail &&
+    (await deps.dispatchPrivateMail({
+      topicArn: parsed.data.TopicArn,
+      snsMessageId: parsed.data.MessageId,
+      event: inner,
+    }))
+  )
+    return;
+  const candidate = inner as {
+    notificationType?: unknown;
+    mail?: { tags?: Record<string, unknown> };
+  } | null;
+  if (
+    candidate?.notificationType === "Received" ||
+    candidate?.mail?.tags?.mepmail_outbox_id !== undefined ||
+    candidate?.mail?.tags?.mepmail_attempt_id !== undefined
+  )
+    throw new Error("Private mail requires an enabled trusted dispatcher");
   const event = parseSesEvent(inner);
-  if (!event) {
-    log("sqs poller: invalid SES event retained for redrive");
-    return false;
-  }
+  if (!event) return;
   // The SNS MessageId dedupes with the https path: same key, same singleton
   // queue job, same durable email_events.sns_message_id uniqueness.
   await deps.enqueueSesEvent(
     { ...event, occurredAt: event.occurredAt.toISOString() },
     parsed.data.MessageId,
   );
-  return true;
 }
 
 /** Endless long-poll loop; receive errors back off instead of crashing the worker. */

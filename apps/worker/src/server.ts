@@ -35,6 +35,9 @@ import {
   recountStaleSegments,
   regionBulkCounts,
   sesEventsHealth,
+  sendMailboxOutbox,
+  reconcileMailboxOutbox,
+  failQueuedMailboxOutbox,
 } from "@millionsend/core";
 import { getDb, schema } from "@millionsend/db";
 import {
@@ -85,6 +88,12 @@ import { syncTenants } from "./handlers/tenants.js";
 import { createSesSender } from "./ses-sender.js";
 import { startSqsPoller } from "./sqs-poller.js";
 import { createSystemMailer } from "./system-mail.js";
+import {
+  createMailboxSesSender,
+  mailboxWorkerMime,
+  parseMailboxSesConfigurationSets,
+} from "./mailbox-sender.js";
+import { createMailboxIngress, parseMailboxInboundConfiguration } from "./mailbox-ingress.js";
 
 if (!env.MASTER_ENCRYPTION_KEY) {
   // Required even when cloud wraps DEKs with KMS: tracking/unsubscribe token
@@ -95,6 +104,26 @@ if (!env.MASTER_ENCRYPTION_KEY) {
 
 const db = getDb();
 const keyring = createKeyringFromEnv(env);
+// Opt-in only after mailbox schema, provider identity and recovery qualification.
+const mailboxTransportEnabled =
+  process.env.MAILBOX_TRANSPORT_ENABLED === "1" &&
+  ["1", "true"].includes(process.env.MAILBOX_REGISTRY_ENABLED ?? "");
+const mailboxIngress = createMailboxIngress({
+  db,
+  keys: keyring,
+  mime: mailboxWorkerMime,
+  enabled: mailboxTransportEnabled,
+  eventTopics: env.SNS_TOPIC_ARNS ?? [],
+  inbound: parseMailboxInboundConfiguration(process.env.MAILBOX_INBOUND_CONFIG),
+});
+const mailboxSes = mailboxTransportEnabled
+  ? createMailboxSesSender(db, {
+      configurationSets:
+        parseMailboxSesConfigurationSets(process.env.MAILBOX_SES_CONFIGURATION_SETS) ?? undefined,
+      exhausted: (region) => sendControls.exhausted(region),
+      throttle: (region) => sendControls.throttle(region),
+    })
+  : null;
 // Days whole email rows (recipients, subject, events) are kept; bodies age
 // out earlier on EMAIL_RETENTION_DAYS. Read here until it joins the env schema.
 const metadataRetentionDays = env.EMAIL_METADATA_RETENTION_DAYS;
@@ -270,6 +299,12 @@ await queue.scheduleCrons({
   "sends.reconcile": async () => {
     const requeued = await reconcileStalledSends(db, { enqueueSends });
     if (requeued > 0) console.log(`sends.reconcile: requeued=${requeued}`);
+    if (mailboxTransportEnabled)
+      await reconcileMailboxOutbox(db, {
+        enqueue: async (outboxId) => {
+          await queue.send("mailbox.send", { outboxId }, { dedupeKey: outboxId });
+        },
+      });
   },
   "retention.purge": async () => {
     const purged = await purgeExpiredEmailBodies(db, {
@@ -507,6 +542,25 @@ await queue.workDeadLetter("abuse.judge", async ({ sampleId }) => {
   console.error(`abuse.judge: dead-lettered sample ${sampleId}`);
 });
 
+if (mailboxSes) {
+  await queue.workDeadLetter("mailbox.send", async ({ outboxId }) => {
+    await failQueuedMailboxOutbox(db, outboxId);
+  });
+  await queue.work(
+    "mailbox.send",
+    async ({ outboxId }) => {
+      const result = await sendMailboxOutbox(db, keyring, outboxId, mailboxSes, mailboxWorkerMime);
+      if (result.status === "queued")
+        await queue.send(
+          "mailbox.send",
+          { outboxId },
+          { dedupeKey: outboxId, startAfter: new Date(Date.now() + 60000) },
+        );
+    },
+    { concurrency: 2, batchSize: 1 },
+  );
+}
+
 await queue.work(
   "email.send",
   async (payload) => {
@@ -594,7 +648,7 @@ await queue.work(
 // allowlist gates it exactly like the https endpoint — a queue URL without
 // the allowlist stays inert instead of accepting arbitrary payloads.
 if (env.SQS_QUEUE_URL) {
-  const allowedTopicArns = env.SNS_TOPIC_ARNS ?? [];
+  const allowedTopicArns = mailboxIngress.allowedTopicArns;
   if (allowedTopicArns.length === 0) {
     console.warn("SQS_QUEUE_URL is set but SNS_TOPIC_ARNS is empty — SQS event polling disabled");
   } else {
@@ -613,6 +667,7 @@ if (env.SQS_QUEUE_URL) {
       queueUrl: env.SQS_QUEUE_URL,
       allowedTopicArns,
       concurrency: env.SQS_POLL_CONCURRENCY,
+      dispatchPrivateMail: mailboxIngress.dispatch,
       enqueueSesEvent: async (event, snsMessageId) => {
         await queue.send("ses.event", { event, snsMessageId }, { dedupeKey: snsMessageId });
       },

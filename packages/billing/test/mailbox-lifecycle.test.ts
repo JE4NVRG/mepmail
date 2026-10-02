@@ -1,0 +1,1066 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { type Db, schema } from "@millionsend/db";
+import { createTeam, createTestDb } from "@millionsend/test-utils";
+import { eq, sql } from "drizzle-orm";
+import type Stripe from "stripe";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  applyMailboxSubscription,
+  beginMailboxCheckout,
+  resolveMailboxCustomer,
+  type BeginMailboxCheckoutInput,
+} from "../src/mailbox-lifecycle.js";
+import {
+  MAILBOX_CHECKOUT_METADATA_KEY,
+  MAILBOX_CUSTOMER_METADATA_KEY,
+  recoverMailboxCheckoutSession,
+  type MailboxBillingStripe,
+  type MailboxCatalog,
+} from "../src/mailbox.js";
+import { fakeStripe, PERIOD_END, PERIOD_START, subscription } from "./helpers.js";
+
+const CUSTOMER = "cus_mailbox_fixture";
+const USER = "buyer_fixture";
+const TERMS = {
+  priceId: "price_mailbox_fixture",
+  currency: "usd",
+  unitAmount: 123,
+  interval: "month" as const,
+  storageBytesPerMailbox: 4096,
+  includedOutboundPerMailbox: 7,
+};
+const CATALOG: MailboxCatalog = {
+  livemode: false,
+  checkoutPriceId: TERMS.priceId,
+  prices: [TERMS],
+};
+const EVENT = PERIOD_START + 100;
+const extension = fileURLToPath(new URL("../../db/mailbox-drizzle/", import.meta.url));
+
+function checkoutPage(
+  data: Stripe.Checkout.Session[],
+  hasMore = false,
+): Stripe.ApiList<Stripe.Checkout.Session> {
+  return { object: "list", data, has_more: hasMore, url: "/v1/checkout/sessions" };
+}
+
+function mailSub(id = "sub_mail", status: Stripe.Subscription.Status = "active") {
+  const sub = subscription(id, CUSTOMER, status);
+  sub.metadata = { mepmail_service: "mailbox", team_id: "metadata_is_not_ownership" };
+  sub.livemode = false;
+  sub.created = PERIOD_START - 100;
+  sub.cancel_at_period_end = false;
+  const item = sub.items.data[0]!;
+  item.quantity = 3;
+  item.price = {
+    ...item.price,
+    id: TERMS.priceId,
+    currency: TERMS.currency,
+    unit_amount: TERMS.unitAmount,
+    billing_scheme: "per_unit",
+    transform_quantity: null,
+    recurring: {
+      ...item.price.recurring!,
+      interval: "month",
+      interval_count: 1,
+      usage_type: "licensed",
+    },
+  };
+  return sub;
+}
+
+describe("Mailbox lifecycle with real optional migrations", () => {
+  let db: Db;
+  let close: () => Promise<void>;
+  let stripe: MailboxBillingStripe;
+  let state: ReturnType<typeof fakeStripe>["state"];
+  let teamId: string;
+  let sessions: Stripe.Checkout.Session[];
+  let customerOptions: (Stripe.RequestOptions | undefined)[];
+  const request = (): BeginMailboxCheckoutInput => ({
+    teamId,
+    userId: USER,
+    seats: 3,
+    successUrl: "https://app.example.com/mailboxes?checkout=success",
+    cancelUrl: "https://app.example.com/mailboxes",
+  });
+  const plan = async () =>
+    (
+      await db
+        .select()
+        .from(schema.mailboxSubscriptions)
+        .where(eq(schema.mailboxSubscriptions.teamId, teamId))
+    )[0];
+  const leases = () => db.select().from(schema.mailboxCheckouts);
+  const purchase = (input = request()) => beginMailboxCheckout({ db, stripe }, CATALOG, input);
+  const purchaseWithReadback = () =>
+    beginMailboxCheckout(
+      { db, stripe, recoverCheckout: (lease) => recoverMailboxCheckoutSession(stripe, lease) },
+      CATALOG,
+      request(),
+    );
+  const customerRequests = () => db.select().from(schema.mailboxCustomerRequests);
+  const unlinkCustomer = () =>
+    db.update(schema.teams).set({ stripeCustomerId: null }).where(eq(schema.teams.id, teamId));
+  const resolveCustomer = (knownCustomerId = "cus_1", userId = USER, livemode = false) =>
+    resolveMailboxCustomer({ db, stripe, livemode }, { teamId, userId, knownCustomerId });
+  const loseCustomerResponse = async () => {
+    await unlinkCustomer();
+    const create = stripe.customers.create;
+    let customer: Stripe.Customer | undefined;
+    stripe.customers.create = async (params, options) => {
+      customer = {
+        ...(await create(params, options)),
+        name: params.name ?? null,
+        email: params.email ?? null,
+        metadata: { ...((params.metadata ?? {}) as Stripe.Metadata) },
+      };
+      throw new Error("fixture lost Customer response");
+    };
+    await expect(purchase()).rejects.toMatchObject({ code: "pending" });
+    if (!customer) throw new Error("fixture Customer was not created");
+    const reads: string[] = [];
+    stripe.customers.retrieve = async (id) => {
+      reads.push(id);
+      return customer!;
+    };
+    return { customer, reads };
+  };
+
+  beforeEach(async () => {
+    ({ db, close } = await createTestDb());
+    // The qualified main baseline may stop at 0042; Mail uses its own migration chain.
+    for (const name of readdirSync(extension)
+      .filter((name) => name.endsWith(".sql"))
+      .sort()) {
+      for (const statement of readFileSync(extension + name, "utf8")
+        .split("--> statement-breakpoint")
+        .map((s) => s.trim())
+        .filter(Boolean))
+        await db.execute(sql.raw(statement));
+    }
+    ({ stripe, state } = fakeStripe());
+    teamId = await createTeam(db);
+    await db
+      .insert(schema.user)
+      .values({ id: USER, name: "Fixture buyer", email: "buyer@example.com" });
+    await db.insert(schema.teamMembers).values({ teamId, userId: USER, role: "owner" });
+    await db
+      .update(schema.teams)
+      .set({ stripeCustomerId: CUSTOMER })
+      .where(eq(schema.teams.id, teamId));
+    sessions = [];
+    customerOptions = [];
+    const createCustomer = stripe.customers.create;
+    stripe.customers.create = async (params, options) => {
+      customerOptions.push(options);
+      return { ...(await createCustomer(params)), livemode: false };
+    };
+    const create = stripe.checkout.sessions.create;
+    stripe.checkout.sessions.create = async (params, options) => {
+      const base = await create(params, options);
+      const session = {
+        ...base,
+        id: `cs_fixture_${sessions.length + 1}`,
+        mode: "subscription",
+        customer: params.customer,
+        livemode: false,
+        metadata: params.metadata,
+        status: "open",
+        subscription: null,
+      } as Stripe.Checkout.Session;
+      sessions.push(session);
+      return session;
+    };
+  });
+  afterEach(() => close());
+
+  it("creates one durable Customer for Mail only and preserves every Send field", async () => {
+    await unlinkCustomer();
+    const [before] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    const result = await purchase();
+    const [intent] = await customerRequests();
+    expect(intent).toMatchObject({
+      teamId,
+      status: "ready",
+      name: before!.name,
+      email: "buyer@example.com",
+      livemode: false,
+      stripeCustomerId: "cus_1",
+    });
+    expect(state.customers).toEqual([
+      {
+        name: before!.name,
+        email: "buyer@example.com",
+        metadata: { team_id: teamId, [MAILBOX_CUSTOMER_METADATA_KEY]: intent!.idempotencyKey },
+      },
+    ]);
+    expect(customerOptions).toEqual([{ idempotencyKey: intent!.idempotencyKey }]);
+    expect(await db.select().from(schema.teams).where(eq(schema.teams.id, teamId))).toEqual([
+      { ...before, stripeCustomerId: "cus_1" },
+    ]);
+    expect(state.checkouts[0]?.customer).toBe("cus_1");
+    expect(await purchase()).toEqual(result);
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toHaveLength(1);
+    expect(await plan()).toBeUndefined();
+  });
+
+  it("serializes first-Customer requests from concurrent tabs without creating duplicates", async () => {
+    await unlinkCustomer();
+    const results = await Promise.allSettled([purchase(), purchase(), purchase()]);
+    expect(results.some((result) => result.status === "fulfilled")).toBe(true);
+    for (const result of results) {
+      if (result.status === "rejected") expect(result.reason).toMatchObject({ code: "pending" });
+    }
+    expect(state.customers).toHaveLength(1);
+    expect(await customerRequests()).toHaveLength(1);
+    expect(state.checkouts).toHaveLength(1);
+    expect(await purchase()).toMatchObject({ url: sessions[0]!.url });
+    expect(await plan()).toBeUndefined();
+  });
+
+  it("checks catalog, current membership, suspension and system team before Customer creation", async () => {
+    await unlinkCustomer();
+    await expect(beginMailboxCheckout({ db, stripe }, null, request())).rejects.toMatchObject({
+      code: "unavailable",
+    });
+    await expect(
+      beginMailboxCheckout({ db, stripe }, { ...CATALOG, checkoutPriceId: null }, request()),
+    ).rejects.toMatchObject({ code: "unavailable" });
+    await db
+      .update(schema.teamMembers)
+      .set({ role: "member" })
+      .where(eq(schema.teamMembers.userId, USER));
+    await expect(purchase()).rejects.toMatchObject({ code: "forbidden" });
+    await db
+      .update(schema.teamMembers)
+      .set({ role: "admin" })
+      .where(eq(schema.teamMembers.userId, USER));
+    await db
+      .update(schema.teams)
+      .set({ suspendedAt: new Date() })
+      .where(eq(schema.teams.id, teamId));
+    await expect(purchase()).rejects.toMatchObject({ code: "forbidden" });
+    await db
+      .update(schema.teams)
+      .set({ suspendedAt: null, plan: "system" })
+      .where(eq(schema.teams.id, teamId));
+    await expect(purchase()).rejects.toMatchObject({ code: "forbidden" });
+    expect(state.customers).toEqual([]);
+    expect(state.checkouts).toEqual([]);
+    expect(await customerRequests()).toEqual([]);
+    expect(await leases()).toEqual([]);
+  });
+
+  it("keeps a lost Customer response pending across retries and immutable parameter changes", async () => {
+    await unlinkCustomer();
+    const create = stripe.customers.create;
+    stripe.customers.create = async (params, options) => {
+      await create(params, options);
+      throw new Error("fixture Customer response lost");
+    };
+    await expect(purchase()).rejects.toMatchObject({ code: "pending" });
+    const [intent] = await customerRequests();
+    expect(intent).toMatchObject({ status: "creating", stripeCustomerId: null });
+    // This marker survives the provider transaction's rollback: it committed before the call.
+    await db
+      .update(schema.mailboxCustomerRequests)
+      .set({ updatedAt: new Date("2000-01-01") })
+      .where(eq(schema.mailboxCustomerRequests.teamId, teamId));
+    await db
+      .update(schema.user)
+      .set({ email: "changed@example.com" })
+      .where(eq(schema.user.id, USER));
+    await db.update(schema.teams).set({ name: "Changed team" }).where(eq(schema.teams.id, teamId));
+    await expect(purchase()).rejects.toMatchObject({ code: "pending" });
+    await expect(purchase({ ...request(), seats: 4 })).rejects.toMatchObject({ code: "pending" });
+    expect((await customerRequests())[0]).toMatchObject({
+      name: intent!.name,
+      email: intent!.email,
+      idempotencyKey: intent!.idempotencyKey,
+    });
+    const beforeRejectedChange = await customerRequests();
+    await expect(
+      db
+        .update(schema.mailboxCustomerRequests)
+        .set({ email: "overwrite@example.com" })
+        .where(eq(schema.mailboxCustomerRequests.teamId, teamId)),
+    ).rejects.toMatchObject({
+      cause: { message: "Mailbox Customer request parameters are immutable" },
+    });
+    expect(await customerRequests()).toEqual(beforeRejectedChange);
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toEqual([]);
+    expect(await leases()).toEqual([]);
+    expect(await plan()).toBeUndefined();
+    expect(
+      (await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)))[0]
+        ?.stripeCustomerId,
+    ).toBeNull();
+  });
+
+  it("does not replay a creating Customer intent after a crash before the provider call", async () => {
+    await unlinkCustomer();
+    await db.insert(schema.mailboxCustomerRequests).values({
+      teamId,
+      createdBy: USER,
+      status: "creating",
+      name: "Saved team name",
+      email: "saved@example.com",
+      livemode: false,
+      idempotencyKey: "mailbox-customer:fixture-crash-before-call",
+      createdAt: new Date("2000-01-01"),
+      updatedAt: new Date("2000-01-01"),
+    });
+    await expect(purchase()).rejects.toMatchObject({ code: "pending" });
+    await expect(
+      beginMailboxCheckout({ db, stripe }, { ...CATALOG, livemode: true }, request()),
+    ).rejects.toMatchObject({ code: "conflict" });
+    expect(state.customers).toEqual([]);
+    expect(state.checkouts).toEqual([]);
+    expect(await customerRequests()).toHaveLength(1);
+  });
+
+  it.each([
+    { id: "bad_customer", livemode: false },
+    { id: "cus_wrong_mode", livemode: true },
+  ])("does not link an incompatible created Customer: %j", async (response) => {
+    await unlinkCustomer();
+    const create = stripe.customers.create;
+    stripe.customers.create = async (params, options) => ({
+      ...(await create(params, options)),
+      ...response,
+    });
+    await expect(purchase()).rejects.toMatchObject({ code: "pending" });
+    await expect(purchase()).rejects.toMatchObject({ code: "pending" });
+    expect(state.customers).toHaveLength(1);
+    expect((await customerRequests())[0]?.status).toBe("creating");
+    expect(
+      (await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)))[0]
+        ?.stripeCustomerId,
+    ).toBeNull();
+    expect(state.checkouts).toEqual([]);
+  });
+
+  it("reuses an existing linked Customer without creating a request or changing Send", async () => {
+    const before = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    await purchase();
+    expect(state.customers).toEqual([]);
+    expect(await customerRequests()).toEqual([]);
+    expect(state.checkouts[0]?.customer).toBe(CUSTOMER);
+    expect(await db.select().from(schema.teams).where(eq(schema.teams.id, teamId))).toEqual(before);
+  });
+
+  it("keeps Customer intent pending if the database rejects the post-provider binding", async () => {
+    await unlinkCustomer();
+    const otherTeam = await createTeam(db, "customer-owner-fixture");
+    await db
+      .update(schema.teams)
+      .set({ stripeCustomerId: "cus_1" })
+      .where(eq(schema.teams.id, otherTeam));
+    await expect(purchase()).rejects.toMatchObject({ code: "pending" });
+    expect((await customerRequests())[0]).toMatchObject({
+      status: "creating",
+      stripeCustomerId: null,
+    });
+    expect(
+      (await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)))[0]
+        ?.stripeCustomerId,
+    ).toBeNull();
+    expect(
+      (await db.select().from(schema.teams).where(eq(schema.teams.id, otherTeam)))[0]
+        ?.stripeCustomerId,
+    ).toBe("cus_1");
+    await expect(purchase()).rejects.toMatchObject({ code: "pending" });
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toEqual([]);
+  });
+
+  it("resolves the known Customer from the original snapshot atomically without Checkout or entitlement", async () => {
+    const { customer, reads } = await loseCustomerResponse();
+    const [intent] = await customerRequests();
+    // Current profile changes do not change the immutable parameters sent with this nonce.
+    await db
+      .update(schema.user)
+      .set({ email: "new-profile@example.com" })
+      .where(eq(schema.user.id, USER));
+    await db
+      .update(schema.teams)
+      .set({ name: "Renamed after submission" })
+      .where(eq(schema.teams.id, teamId));
+    const [before] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    expect(await resolveCustomer(customer.id)).toEqual({ resolved: true, duplicate: false });
+    const [ready] = await customerRequests();
+    expect(ready).toEqual({
+      ...intent,
+      status: "ready",
+      stripeCustomerId: customer.id,
+      updatedAt: expect.any(Date),
+    });
+    expect(await db.select().from(schema.teams).where(eq(schema.teams.id, teamId))).toEqual([
+      { ...before, stripeCustomerId: customer.id },
+    ]);
+    expect(await resolveCustomer(customer.id)).toEqual({ resolved: true, duplicate: true });
+    expect(await customerRequests()).toEqual([ready]);
+    expect(reads).toEqual([customer.id, customer.id]);
+    expect(state.customers).toHaveLength(1);
+    expect(customerOptions).toEqual([{ idempotencyKey: intent!.idempotencyKey }]);
+    expect(state.checkouts).toEqual([]);
+    expect(await leases()).toEqual([]);
+    expect(await plan()).toBeUndefined();
+  });
+
+  it("permits a current admin to recover another actor's request and serializes duplicate resolutions", async () => {
+    const { customer } = await loseCustomerResponse();
+    await db.insert(schema.user).values({
+      id: "recovery_admin",
+      name: "Recovery admin",
+      email: "recovery-admin@example.com",
+    });
+    await db.insert(schema.teamMembers).values({ teamId, userId: "recovery_admin", role: "admin" });
+    await db.delete(schema.teamMembers).where(eq(schema.teamMembers.userId, USER));
+    const results = await Promise.all([
+      resolveCustomer(customer.id, "recovery_admin"),
+      resolveCustomer(customer.id, "recovery_admin"),
+    ]);
+    expect(results.filter((result) => !result.duplicate)).toHaveLength(1);
+    expect(results.filter((result) => result.duplicate)).toHaveLength(1);
+    expect((await customerRequests())[0]).toMatchObject({
+      createdBy: USER,
+      status: "ready",
+      stripeCustomerId: customer.id,
+    });
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toEqual([]);
+    expect(await plan()).toBeUndefined();
+  });
+
+  it.each([
+    "id",
+    "name",
+    "email",
+    "team",
+    "nonce",
+    "missing_nonce",
+    "livemode",
+    "deleted",
+  ] as const)("does not resolve incompatible Customer readback: %s", async (field) => {
+    const { customer } = await loseCustomerResponse();
+    const incompatible = { ...customer, metadata: { ...customer.metadata } };
+    if (field === "id") incompatible.id = "cus_different";
+    if (field === "name") incompatible.name = "Different snapshot";
+    if (field === "email") incompatible.email = "different-snapshot@example.com";
+    if (field === "team") incompatible.metadata.team_id = "different_team";
+    if (field === "nonce") incompatible.metadata[MAILBOX_CUSTOMER_METADATA_KEY] = "different_nonce";
+    if (field === "missing_nonce") delete incompatible.metadata[MAILBOX_CUSTOMER_METADATA_KEY];
+    if (field === "livemode") incompatible.livemode = true;
+    stripe.customers.retrieve = async () =>
+      field === "deleted" ? { id: customer.id, object: "customer", deleted: true } : incompatible;
+    const beforeRequests = await customerRequests();
+    const beforeTeams = await db.select().from(schema.teams);
+    await expect(resolveCustomer(customer.id)).rejects.toMatchObject({ code: "pending" });
+    expect(await customerRequests()).toEqual(beforeRequests);
+    expect(await db.select().from(schema.teams)).toEqual(beforeTeams);
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toEqual([]);
+    expect(await plan()).toBeUndefined();
+  });
+
+  it("rejects runtime mode mismatch before reading the provider and keeps the saved request", async () => {
+    const { customer, reads } = await loseCustomerResponse();
+    const before = await customerRequests();
+    await expect(resolveCustomer(customer.id, USER, true)).rejects.toMatchObject({
+      code: "conflict",
+    });
+    expect(reads).toEqual([]);
+    expect(await customerRequests()).toEqual(before);
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toEqual([]);
+  });
+
+  it.each(["removed", "member", "suspended", "system"] as const)(
+    "denies Customer resolution before provider readback after %s",
+    async (reason) => {
+      const { customer, reads } = await loseCustomerResponse();
+      if (reason === "removed")
+        await db.delete(schema.teamMembers).where(eq(schema.teamMembers.userId, USER));
+      if (reason === "member")
+        await db
+          .update(schema.teamMembers)
+          .set({ role: "member" })
+          .where(eq(schema.teamMembers.userId, USER));
+      if (reason === "suspended")
+        await db
+          .update(schema.teams)
+          .set({ suspendedAt: new Date() })
+          .where(eq(schema.teams.id, teamId));
+      if (reason === "system")
+        await db.update(schema.teams).set({ plan: "system" }).where(eq(schema.teams.id, teamId));
+      const beforeRequests = await customerRequests();
+      const beforeTeams = await db.select().from(schema.teams);
+      await expect(resolveCustomer(customer.id)).rejects.toMatchObject({ code: "forbidden" });
+      expect(reads).toEqual([]);
+      expect(await customerRequests()).toEqual(beforeRequests);
+      expect(await db.select().from(schema.teams)).toEqual(beforeTeams);
+      expect(state.customers).toHaveLength(1);
+      expect(state.checkouts).toEqual([]);
+    },
+  );
+
+  it("never links a Customer already owned by another team", async () => {
+    const { customer, reads } = await loseCustomerResponse();
+    const other = await createTeam(db, "existing-customer-owner");
+    await db
+      .update(schema.teams)
+      .set({ stripeCustomerId: customer.id })
+      .where(eq(schema.teams.id, other));
+    const beforeRequests = await customerRequests();
+    const beforeTeams = await db.select().from(schema.teams);
+    await expect(resolveCustomer(customer.id)).rejects.toMatchObject({ code: "conflict" });
+    expect(reads).toEqual([]);
+    expect(await customerRequests()).toEqual(beforeRequests);
+    expect(await db.select().from(schema.teams)).toEqual(beforeTeams);
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toEqual([]);
+  });
+
+  it("does not replace a concurrent Send Customer binding", async () => {
+    const { customer, reads } = await loseCustomerResponse();
+    await db
+      .update(schema.teams)
+      .set({ stripeCustomerId: "cus_send_existing" })
+      .where(eq(schema.teams.id, teamId));
+    const beforeRequests = await customerRequests();
+    const beforeTeams = await db.select().from(schema.teams);
+    await expect(resolveCustomer(customer.id)).rejects.toMatchObject({ code: "conflict" });
+    expect(reads).toEqual([]);
+    expect(await customerRequests()).toEqual(beforeRequests);
+    expect(await db.select().from(schema.teams)).toEqual(beforeTeams);
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toEqual([]);
+  });
+
+  it("resolves creating bookkeeping for an already identical linked Customer", async () => {
+    const { customer } = await loseCustomerResponse();
+    await db
+      .update(schema.teams)
+      .set({ stripeCustomerId: customer.id })
+      .where(eq(schema.teams.id, teamId));
+    const beforeTeams = await db.select().from(schema.teams);
+    expect(await resolveCustomer(customer.id)).toEqual({ resolved: true, duplicate: false });
+    expect(await db.select().from(schema.teams)).toEqual(beforeTeams);
+    expect((await customerRequests())[0]).toMatchObject({
+      status: "ready",
+      stripeCustomerId: customer.id,
+    });
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toEqual([]);
+    expect(await plan()).toBeUndefined();
+  });
+
+  it.each(["timeout", "not_found", "reader_missing"] as const)(
+    "keeps old Customer intents pending without replay after readback %s",
+    async (kind) => {
+      const { customer } = await loseCustomerResponse();
+      await db
+        .update(schema.mailboxCustomerRequests)
+        .set({ updatedAt: new Date("2000-01-01") })
+        .where(eq(schema.mailboxCustomerRequests.teamId, teamId));
+      if (kind === "reader_missing") delete stripe.customers.retrieve;
+      else
+        stripe.customers.retrieve = async () => {
+          throw new Error(kind === "timeout" ? "fixture timeout" : "fixture Customer 404");
+        };
+      const beforeRequests = await customerRequests();
+      const beforeTeams = await db.select().from(schema.teams);
+      await expect(resolveCustomer(customer.id)).rejects.toMatchObject({ code: "pending" });
+      expect(await customerRequests()).toEqual(beforeRequests);
+      expect(await db.select().from(schema.teams)).toEqual(beforeTeams);
+      expect(state.customers).toHaveLength(1);
+      expect(state.checkouts).toEqual([]);
+      expect(await plan()).toBeUndefined();
+    },
+  );
+
+  it("rolls back both local bindings on failure and retries only the same Customer readback", async () => {
+    const { customer, reads } = await loseCustomerResponse();
+    await db.execute(
+      sql.raw(`
+      CREATE FUNCTION mailbox_customer_recovery_fixture_reject() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        RAISE EXCEPTION 'fixture request update unavailable';
+        RETURN NEW;
+      END;
+      $$;
+    `),
+    );
+    await db.execute(
+      sql.raw(`
+      CREATE TRIGGER mailbox_customer_recovery_fixture_reject BEFORE UPDATE ON mailbox_customer_requests
+      FOR EACH ROW WHEN (NEW.status = 'ready') EXECUTE FUNCTION mailbox_customer_recovery_fixture_reject();
+    `),
+    );
+    const beforeRequests = await customerRequests();
+    const beforeTeams = await db.select().from(schema.teams);
+    await expect(resolveCustomer(customer.id)).rejects.toMatchObject({ code: "pending" });
+    expect(await customerRequests()).toEqual(beforeRequests);
+    expect(await db.select().from(schema.teams)).toEqual(beforeTeams);
+    await db.execute(
+      sql.raw("DROP TRIGGER mailbox_customer_recovery_fixture_reject ON mailbox_customer_requests"),
+    );
+    await db.execute(sql.raw("DROP FUNCTION mailbox_customer_recovery_fixture_reject()"));
+    expect(await resolveCustomer(customer.id)).toEqual({ resolved: true, duplicate: false });
+    expect(reads).toEqual([customer.id, customer.id]);
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toEqual([]);
+    expect(await leases()).toEqual([]);
+    expect(await plan()).toBeUndefined();
+  });
+
+  it("requires a durable Customer request and rejects malformed known IDs without side effects", async () => {
+    let reads = 0;
+    stripe.customers.retrieve = async () => {
+      reads++;
+      throw new Error("fixture unexpected provider read");
+    };
+    const beforeTeams = await db.select().from(schema.teams);
+    await expect(resolveCustomer(CUSTOMER)).rejects.toMatchObject({ code: "not_found" });
+    await expect(resolveCustomer("not_a_customer")).rejects.toMatchObject({ code: "invalid" });
+    expect(reads).toBe(0);
+    expect(await customerRequests()).toEqual([]);
+    expect(await db.select().from(schema.teams)).toEqual(beforeTeams);
+    expect(state.customers).toEqual([]);
+    expect(state.checkouts).toEqual([]);
+  });
+
+  it("revalidates authorization even when a previous Customer resolution was ready", async () => {
+    const { customer, reads } = await loseCustomerResponse();
+    await resolveCustomer(customer.id);
+    const beforeRequests = await customerRequests();
+    const beforeTeams = await db.select().from(schema.teams);
+    await db.delete(schema.teamMembers).where(eq(schema.teamMembers.userId, USER));
+    await expect(resolveCustomer(customer.id)).rejects.toMatchObject({ code: "forbidden" });
+    expect(reads).toEqual([customer.id]);
+    expect(await customerRequests()).toEqual(beforeRequests);
+    expect(await db.select().from(schema.teams)).toEqual(beforeTeams);
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toEqual([]);
+  });
+
+  it("never reopens a ready Customer request for another ID", async () => {
+    const { customer, reads } = await loseCustomerResponse();
+    await resolveCustomer(customer.id);
+    const beforeRequests = await customerRequests();
+    const beforeTeams = await db.select().from(schema.teams);
+    await expect(resolveCustomer("cus_replacement")).rejects.toMatchObject({ code: "conflict" });
+    expect(reads).toEqual([customer.id]);
+    expect(await customerRequests()).toEqual(beforeRequests);
+    expect(await db.select().from(schema.teams)).toEqual(beforeTeams);
+    expect(state.customers).toHaveLength(1);
+    expect(state.checkouts).toEqual([]);
+  });
+
+  it("maps ownership through the linked Customer and changes only Mail tables", async () => {
+    const before = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    expect(await applyMailboxSubscription(db, mailSub(), CATALOG, EVENT)).toMatchObject({
+      applied: true,
+      teamId,
+      reason: "applied",
+    });
+    expect(await plan()).toMatchObject({
+      status: "active",
+      seats: 3,
+      stripeCustomerId: CUSTOMER,
+      stripeSubscriptionId: "sub_mail",
+      stripePriceId: TERMS.priceId,
+      unitAmount: 123,
+      lastEventCreated: EVENT,
+    });
+    expect(await db.select().from(schema.teams).where(eq(schema.teams.id, teamId))).toEqual(before);
+    const foreign = mailSub("sub_foreign");
+    foreign.customer = "cus_unlinked";
+    expect(await applyMailboxSubscription(db, foreign, CATALOG, EVENT + 1)).toMatchObject({
+      applied: false,
+      teamId: null,
+      reason: "unknown_customer",
+    });
+  });
+
+  it("keeps historical price/limits and monotonic event/subscription ownership", async () => {
+    const sub = mailSub();
+    await applyMailboxSubscription(db, sub, CATALOG, EVENT);
+    const rotated: MailboxCatalog = {
+      ...CATALOG,
+      checkoutPriceId: "price_new",
+      prices: [{ ...TERMS, priceId: "price_new", unitAmount: 456, storageBytesPerMailbox: 8192 }],
+    };
+    sub.items.data[0]!.quantity = 4;
+    await applyMailboxSubscription(db, sub, rotated, EVENT + 1);
+    expect(await plan()).toMatchObject({
+      seats: 4,
+      stripePriceId: TERMS.priceId,
+      unitAmount: 123,
+      storageBytesPerMailbox: 4096,
+    });
+    const before = await plan();
+    expect((await applyMailboxSubscription(db, sub, rotated, EVENT)).reason).toBe("stale_event");
+    const another = mailSub("sub_other");
+    another.created += 10;
+    expect((await applyMailboxSubscription(db, another, CATALOG, EVENT + 2)).reason).toBe(
+      "superseded",
+    );
+    expect(await plan()).toEqual(before);
+  });
+
+  it("revokes only the same invalid subscription and preserves its historical snapshot", async () => {
+    const sub = mailSub();
+    await applyMailboxSubscription(db, sub, CATALOG, EVENT);
+    const original = await plan();
+    const foreign = mailSub("sub_other");
+    foreign.created += 1;
+    foreign.items.data[0]!.price.id = "price_unapproved";
+    expect((await applyMailboxSubscription(db, foreign, CATALOG, EVENT + 1)).applied).toBe(false);
+    expect(await plan()).toEqual(original);
+    sub.items.data[0]!.price.id = "price_unapproved";
+    expect((await applyMailboxSubscription(db, sub, CATALOG, EVENT + 2)).reason).toBe("revoked");
+    expect(await plan()).toMatchObject({
+      status: "inactive",
+      seats: 0,
+      unitAmount: 123,
+      stripePriceId: TERMS.priceId,
+      stripeSubscriptionId: "sub_mail",
+    });
+    sub.items.data[0]!.price.id = TERMS.priceId;
+    await applyMailboxSubscription(db, sub, CATALOG, EVENT + 3);
+    expect((await applyMailboxSubscription(db, sub, null, EVENT + 4)).reason).toBe("revoked");
+  });
+
+  it("replaces a canceled old subscription, never accepting its later event over the new one", async () => {
+    const old = mailSub();
+    await applyMailboxSubscription(db, old, CATALOG, EVENT);
+    old.status = "canceled";
+    await applyMailboxSubscription(db, old, CATALOG, EVENT + 1);
+    const next = mailSub("sub_new");
+    next.created += 1;
+    await applyMailboxSubscription(db, next, CATALOG, EVENT + 2);
+    expect((await applyMailboxSubscription(db, old, CATALOG, EVENT + 3)).reason).toBe("superseded");
+    expect(await plan()).toMatchObject({ status: "active", stripeSubscriptionId: "sub_new" });
+  });
+
+  it("persists one immutable purchase and returns the saved URL on retry without entitlement", async () => {
+    const first = await purchase();
+    expect(await purchase()).toEqual(first);
+    expect(state.checkouts).toHaveLength(1);
+    const [lease] = await leases();
+    expect(lease).toMatchObject({
+      status: "ready",
+      seats: 3,
+      stripePriceId: TERMS.priceId,
+      livemode: false,
+      unitAmount: 123,
+    });
+    expect(lease!.idempotencyKey).toContain(lease!.id);
+    expect(await plan()).toBeUndefined();
+    await expect(purchase({ ...request(), seats: 4 })).rejects.toMatchObject({ code: "conflict" });
+    await expect(
+      db
+        .update(schema.mailboxCheckouts)
+        .set({ seats: 4 })
+        .where(eq(schema.mailboxCheckouts.id, lease!.id)),
+    ).rejects.toThrow();
+    expect((await leases())[0]!.seats).toBe(3);
+  });
+
+  it("concurrent tabs create one lease/Checkout; ready callers share the URL and others remain pending", async () => {
+    const results = await Promise.allSettled([purchase(), purchase()]);
+    const successes = results.filter(
+      (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof purchase>>> =>
+        r.status === "fulfilled",
+    );
+    expect(successes.length).toBeGreaterThan(0);
+    for (const result of results) {
+      if (result.status === "fulfilled") expect(result.value).toEqual(successes[0]!.value);
+      else expect(result.reason).toMatchObject({ code: "pending" });
+    }
+    expect(state.checkouts).toHaveLength(1);
+    expect(await leases()).toHaveLength(1);
+  });
+
+  it("checks current admin membership and provider subscriptions before opening any purchase", async () => {
+    await db
+      .update(schema.teamMembers)
+      .set({ role: "member" })
+      .where(eq(schema.teamMembers.userId, USER));
+    await expect(purchase()).rejects.toMatchObject({ code: "forbidden" });
+    await db
+      .update(schema.teamMembers)
+      .set({ role: "admin" })
+      .where(eq(schema.teamMembers.userId, USER));
+    await db
+      .update(schema.teams)
+      .set({ suspendedAt: new Date() })
+      .where(eq(schema.teams.id, teamId));
+    await expect(purchase()).rejects.toMatchObject({ code: "forbidden" });
+    await db.update(schema.teams).set({ suspendedAt: null }).where(eq(schema.teams.id, teamId));
+    state.subscriptions.sub_existing = mailSub("sub_existing");
+    await expect(purchase()).rejects.toMatchObject({ code: "subscription_exists" });
+    expect(await leases()).toEqual([]);
+    expect(state.checkouts).toEqual([]);
+  });
+
+  it("keeps ambiguous attempts blocked despite age and recovers the same provider session", async () => {
+    const create = stripe.checkout.sessions.create;
+    stripe.checkout.sessions.create = async (params, options) => {
+      await create(params, options);
+      throw new Error("fixture ambiguous network result");
+    };
+    await expect(purchase()).rejects.toThrow("fixture ambiguous");
+    const [lease] = await leases();
+    expect(lease!.status).toBe("creating");
+    await db
+      .update(schema.mailboxCheckouts)
+      .set({ updatedAt: new Date("2000-01-01") })
+      .where(eq(schema.mailboxCheckouts.id, lease!.id));
+    await expect(purchase()).rejects.toMatchObject({ code: "pending" });
+    await expect(
+      beginMailboxCheckout({ db, stripe, recoverCheckout: async () => null }, CATALOG, request()),
+    ).rejects.toMatchObject({ code: "pending" });
+    const recovered = await beginMailboxCheckout(
+      { db, stripe, recoverCheckout: async () => sessions[0]! },
+      CATALOG,
+      request(),
+    );
+    expect(recovered.checkoutId).toBe(lease!.id);
+    expect(recovered.url).toBe(sessions[0]!.url);
+    expect(state.checkouts).toHaveLength(1);
+    expect(await plan()).toBeUndefined();
+  });
+
+  it("accepts only owner-bound recovery and releases a lease only after confirmed provider expiration", async () => {
+    const create = stripe.checkout.sessions.create;
+    stripe.checkout.sessions.create = async (params, options) => {
+      await create(params, options);
+      throw new Error("fixture lost result");
+    };
+    await expect(purchase()).rejects.toThrow("fixture lost result");
+    const recoverWrong = async () => ({ ...sessions[0]!, customer: "cus_foreign" });
+    await expect(
+      beginMailboxCheckout({ db, stripe, recoverCheckout: recoverWrong }, CATALOG, request()),
+    ).rejects.toMatchObject({ code: "pending" });
+    await expect(
+      beginMailboxCheckout(
+        { db, stripe, recoverCheckout: async () => ({ ...sessions[0]!, status: "expired" }) },
+        CATALOG,
+        request(),
+      ),
+    ).rejects.toMatchObject({ code: "expired" });
+    expect((await leases())[0]!.status).toBe("expired");
+    stripe.checkout.sessions.create = create;
+    await purchase();
+    expect(state.checkouts).toHaveLength(2);
+    expect(await leases()).toHaveLength(2);
+  });
+
+  it("a complete Checkout does not grant access and its known subscription blocks another purchase", async () => {
+    const create = stripe.checkout.sessions.create;
+    stripe.checkout.sessions.create = async (params, options) => {
+      await create(params, options);
+      throw new Error("fixture lost result");
+    };
+    await expect(purchase()).rejects.toThrow("fixture lost result");
+    await expect(
+      beginMailboxCheckout(
+        {
+          db,
+          stripe,
+          recoverCheckout: async () => ({
+            ...sessions[0]!,
+            status: "complete",
+            subscription: "sub_paid",
+          }),
+        },
+        CATALOG,
+        request(),
+      ),
+    ).rejects.toMatchObject({ code: "pending" });
+    expect(await plan()).toBeUndefined();
+    state.subscriptions.sub_paid = mailSub("sub_paid");
+    await expect(purchase()).rejects.toMatchObject({ code: "subscription_exists" });
+    expect(state.checkouts).toHaveLength(1);
+    expect(sessions[0]!.metadata?.[MAILBOX_CHECKOUT_METADATA_KEY]).toBe(
+      (await leases())[0]!.idempotencyKey,
+    );
+    await applyMailboxSubscription(db, state.subscriptions.sub_paid, CATALOG, EVENT);
+    expect(await plan()).toMatchObject({ status: "active", seats: 3 });
+  });
+
+  it("releases a ready lease only after provider readback confirms expiration", async () => {
+    const original = await purchase();
+    await expect(
+      beginMailboxCheckout(
+        { db, stripe, recoverCheckout: async () => ({ ...sessions[0]!, status: "expired" }) },
+        CATALOG,
+        request(),
+      ),
+    ).rejects.toMatchObject({ code: "expired" });
+    expect((await leases())[0]!.status).toBe("expired");
+    const replacement = await purchase();
+    expect(replacement.checkoutId).not.toBe(original.checkoutId);
+    expect(state.checkouts).toHaveLength(2);
+  });
+
+  it("retrieves a known Checkout on the server instead of returning a stale saved URL", async () => {
+    const original = await purchase();
+    const retrieved: string[] = [];
+    stripe.checkout.sessions.retrieve = async (id) => {
+      retrieved.push(id);
+      return sessions[0]!;
+    };
+    stripe.checkout.sessions.list = async () => {
+      throw new Error("known session must not list");
+    };
+    expect(await purchaseWithReadback()).toEqual(original);
+    expect(retrieved).toEqual([sessions[0]!.id]);
+    sessions[0]!.status = "expired";
+    await expect(purchaseWithReadback()).rejects.toMatchObject({ code: "expired" });
+    expect((await leases())[0]?.status).toBe("expired");
+    expect(state.checkouts).toHaveLength(1);
+    expect(await plan()).toBeUndefined();
+  });
+
+  it("recovers a lost Checkout response through a Customer-scoped paginated list", async () => {
+    const create = stripe.checkout.sessions.create;
+    stripe.checkout.sessions.create = async (params, options) => {
+      await create(params, options);
+      throw new Error("fixture Checkout response lost");
+    };
+    await expect(purchase()).rejects.toThrow("fixture Checkout response lost");
+    const [lease] = await leases();
+    expect(lease).toMatchObject({ status: "creating", stripeSessionId: null });
+    const listed: Stripe.Checkout.SessionListParams[] = [];
+    stripe.checkout.sessions.list = async (params) => {
+      listed.push(params);
+      if (!params.starting_after)
+        return checkoutPage(
+          [
+            {
+              ...sessions[0]!,
+              id: "cs_unrelated",
+              metadata: { [MAILBOX_CHECKOUT_METADATA_KEY]: "different_key" },
+            },
+          ],
+          true,
+        );
+      return checkoutPage([sessions[0]!]);
+    };
+    const recovered = await purchaseWithReadback();
+    expect(recovered).toEqual({ checkoutId: lease!.id, url: sessions[0]!.url });
+    expect(listed).toEqual([
+      { customer: CUSTOMER, limit: 100 },
+      { customer: CUSTOMER, limit: 100, starting_after: "cs_unrelated" },
+    ]);
+    expect(state.checkouts).toHaveLength(1);
+    expect((await leases())[0]).toMatchObject({
+      status: "ready",
+      stripeSessionId: sessions[0]!.id,
+    });
+    expect(await plan()).toBeUndefined();
+  });
+
+  it.each(["none", "duplicate", "provider_error", "repeated_cursor"] as const)(
+    "keeps ambiguous Checkout list readback pending: %s",
+    async (kind) => {
+      const create = stripe.checkout.sessions.create;
+      stripe.checkout.sessions.create = async (params, options) => {
+        await create(params, options);
+        throw new Error("fixture lost response");
+      };
+      await expect(purchase()).rejects.toThrow("fixture lost response");
+      const before = await leases();
+      let calls = 0;
+      stripe.checkout.sessions.list = async () => {
+        calls++;
+        if (kind === "provider_error") throw new Error("fixture readback unavailable");
+        if (kind === "duplicate")
+          return checkoutPage([sessions[0]!, { ...sessions[0]!, id: "cs_duplicate" }]);
+        if (kind === "repeated_cursor")
+          return checkoutPage([{ ...sessions[0]!, id: "cs_cursor", metadata: {} }], true);
+        return checkoutPage([]);
+      };
+      await expect(purchaseWithReadback()).rejects.toMatchObject({ code: "pending" });
+      expect(calls).toBe(kind === "repeated_cursor" ? 2 : 1);
+      expect(await leases()).toEqual(before);
+      expect(state.checkouts).toHaveLength(1);
+      expect(await plan()).toBeUndefined();
+    },
+  );
+
+  it.each(["customer", "mode", "livemode", "service", "team", "key"] as const)(
+    "rejects an incompatible Customer-scoped Checkout result: %s",
+    async (field) => {
+      const create = stripe.checkout.sessions.create;
+      stripe.checkout.sessions.create = async (params, options) => {
+        await create(params, options);
+        throw new Error("fixture lost response");
+      };
+      await expect(purchase()).rejects.toThrow("fixture lost response");
+      const foreign = { ...sessions[0]!, metadata: { ...sessions[0]!.metadata } };
+      if (field === "customer") foreign.customer = "cus_foreign";
+      if (field === "mode") foreign.mode = "payment";
+      if (field === "livemode") foreign.livemode = true;
+      if (field === "service") foreign.metadata.mepmail_service = "send";
+      if (field === "team") foreign.metadata.team_id = "different_team";
+      if (field === "key") foreign.metadata[MAILBOX_CHECKOUT_METADATA_KEY] = "different_key";
+      stripe.checkout.sessions.list = async () => checkoutPage([foreign]);
+      await expect(purchaseWithReadback()).rejects.toMatchObject({ code: "pending" });
+      expect((await leases())[0]).toMatchObject({ status: "creating", stripeSessionId: null });
+      expect(state.checkouts).toHaveLength(1);
+      expect(await plan()).toBeUndefined();
+    },
+  );
+
+  it("rejects a retrieve response for a different known Session and keeps the saved lease", async () => {
+    await purchase();
+    const before = await leases();
+    stripe.checkout.sessions.retrieve = async () => ({ ...sessions[0]!, id: "cs_different" });
+    await expect(purchaseWithReadback()).rejects.toMatchObject({ code: "pending" });
+    expect(await leases()).toEqual(before);
+    expect(state.checkouts).toHaveLength(1);
+  });
+
+  it("records a complete readback without entitlement and blocks another paid subscription", async () => {
+    const create = stripe.checkout.sessions.create;
+    stripe.checkout.sessions.create = async (params, options) => {
+      await create(params, options);
+      throw new Error("fixture lost response");
+    };
+    await expect(purchase()).rejects.toThrow("fixture lost response");
+    stripe.checkout.sessions.list = async () =>
+      checkoutPage([
+        { ...sessions[0]!, status: "complete", subscription: "sub_paid_readback", url: null },
+      ]);
+    await expect(purchaseWithReadback()).rejects.toMatchObject({ code: "pending" });
+    expect((await leases())[0]).toMatchObject({
+      status: "completed",
+      stripeSubscriptionId: "sub_paid_readback",
+    });
+    expect(await plan()).toBeUndefined();
+    state.subscriptions.sub_paid_readback = mailSub("sub_paid_readback");
+    await expect(purchaseWithReadback()).rejects.toMatchObject({ code: "subscription_exists" });
+    expect(state.checkouts).toHaveLength(1);
+    expect(await plan()).toBeUndefined();
+  });
+
+  it("fails closed without an approved catalog before creating a lease", async () => {
+    await expect(beginMailboxCheckout({ db, stripe }, null, request())).rejects.toMatchObject({
+      code: "unavailable",
+    });
+    await expect(
+      beginMailboxCheckout({ db, stripe }, { ...CATALOG, checkoutPriceId: null }, request()),
+    ).rejects.toMatchObject({ code: "unavailable" });
+    expect(await leases()).toEqual([]);
+    expect(state.checkouts).toEqual([]);
+  });
+});

@@ -7,9 +7,12 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { useTRPC } from "@/lib/trpc";
+import { authClient } from "@/lib/auth-client";
 import type { AppRouter } from "@/server/routers";
 import styles from "./mailboxes.module.css";
 import { MailboxContentView } from "./mailbox-content-view";
+import { MailboxAgentKeysDialog } from "./mailbox-agent-keys";
+import { MailboxServicePanel } from "./mailbox-service-panel";
 
 type Outputs = inferRouterOutputs<AppRouter>["mailboxes"];
 type Box = Outputs["list"]["mailboxes"][number];
@@ -319,6 +322,8 @@ function RegistryDialog({
 
 export function MailboxesView() {
   const t = useTranslations("mailboxes");
+  const agentT = useTranslations("mailboxes-agent");
+  const { data: session } = authClient.useSession();
   const trpc = useTRPC();
   const queries = useQueryClient();
   const capability = useQuery(trpc.mailboxes.capabilities.queryOptions());
@@ -334,9 +339,13 @@ export function MailboxesView() {
   const [selectedId, select] = useState<string | null>(null);
   const [folder, setFolder] = useState<"inbox" | "drafts" | "sent">("inbox");
   const [dialog, setDialog] = useState<"new" | "edit" | null>(null);
+  const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
   // Team switches cause a full navigation. Every id is also resolved against this request's scoped DTO.
   const boxes = registry.data?.mailboxes ?? [];
   const selected = boxes.find((b) => b.id === selectedId) ?? null;
+  const agentBox = boxes.find(
+    (box) => box.id === agentDialogId && box.ownerActive && box.ownerUserId === session?.user.id,
+  );
   async function changed(id: string) {
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
     select(id);
@@ -406,19 +415,27 @@ export function MailboxesView() {
           </div>
           <p>{t("subtitle")}</p>
         </div>
-        {registry.data?.canManage ? (
-          <button
-            className="ms-btn ms-btn-ghost"
-            disabled={!options.data?.domains.length}
-            onClick={() => setDialog("new")}
-          >
-            + {t("new")}
-          </button>
-        ) : null}
+        <div className={styles.headerActions}>
+          {selected?.ownerActive && selected.ownerUserId === session?.user.id ? (
+            <button className="ms-btn ms-btn-ghost" onClick={() => setAgentDialogId(selected.id)}>
+              {agentT("title")}
+            </button>
+          ) : null}
+          {registry.data?.canManage ? (
+            <button
+              className="ms-btn ms-btn-ghost"
+              disabled={!options.data?.domains.length}
+              onClick={() => setDialog("new")}
+            >
+              + {t("new")}
+            </button>
+          ) : null}
+        </div>
       </header>
       <p className={styles.previewNote}>
         <span>{t("preview")}</span> {t("previewBody")}
       </p>
+      <MailboxServicePanel />
       {registry.data?.canManage && options.data && !options.data.domains.length ? (
         <p className={styles.notice}>
           {t("noDomains")} <Link href="/domains">{t("domainsLink")} ↗</Link>
@@ -498,6 +515,13 @@ export function MailboxesView() {
           options={options.data}
           close={() => setDialog(null)}
           changed={changed}
+        />
+      ) : null}
+      {agentBox ? (
+        <MailboxAgentKeysDialog
+          key={agentBox.id}
+          mailbox={{ id: agentBox.id, address: agentBox.address }}
+          onClose={() => setAgentDialogId(null)}
         />
       ) : null}
     </section>

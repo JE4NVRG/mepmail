@@ -98,8 +98,7 @@ export async function getMailboxContentList(
     (b) => b.canRead && b.status === "planned" && (!input.mailboxId || b.id === input.mailboxId),
   );
   if (input.mailboxId && !readable.length) throw new MailboxContentError("forbidden");
-  if (input.folder === "sent") return { items: [], limited: false };
-  const kind = input.folder === "drafts" ? "draft" : "inbox";
+  const kind = input.folder === "drafts" ? "draft" : input.folder === "sent" ? "sent" : "inbox";
   const metadata = [];
   let limited = readable.length > 20;
   for (const box of readable.slice(0, 20)) {
@@ -118,7 +117,7 @@ export async function getMailboxContentList(
     mailboxId: string;
     address: string;
     mailboxLabel: string;
-    kind: "inbox" | "draft";
+    kind: "inbox" | "draft" | "sent";
     revision: number;
     subject: string;
     from: string;

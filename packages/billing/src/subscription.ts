@@ -1,3 +1,4 @@
+import { isMailboxSubscription } from "./mailbox.js";
 import { type PlanRung, type PlanRungKey, rungByKey } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
@@ -56,6 +57,7 @@ export async function applySubscription(
   log: (message: string) => void,
   stripe?: BillingStripe,
 ): Promise<void> {
+  if (isMailboxSubscription(sub)) return;
   const customerId = idOf(sub.customer);
   const [team] = customerId
     ? await tx
@@ -80,6 +82,7 @@ export async function applySubscription(
     return;
   }
 
+  if (team.stripeSubscriptionId !== sub.id && !rungFromSubscription(sub)) return;
   const entitled = sub.status === "active" || sub.status === "trialing";
   // A superseded subscription ending must not revoke what the team's
   // current subscription grants: events about different subscriptions
@@ -172,18 +175,34 @@ export async function reconcileTeamPlan(deps: BillingDeps, teamId: string): Prom
   const customerId = team.stripeCustomerId;
   await deps.db.transaction(async (tx) => {
     await lockCustomer(tx as unknown as Db, customerId);
-    // A list expands from `data.`, one level deeper than a retrieve, and
-    // Stripe allows four: the list only names the newest subscription and
-    // the retrieve carries the expansions.
-    const { data } = await deps.stripe.subscriptions.list({
-      customer: customerId,
-      status: "all",
-      limit: 1,
-    });
-    const id = data[0]?.id;
-    if (!id) return;
-    const sub = await deps.stripe.subscriptions.retrieve(id, { expand: SUBSCRIPTION_EXPAND });
-    await applySubscription(tx as unknown as Db, sub, deps.log ?? console.warn, deps.stripe);
+    // Retrieve carries the expansions (a list is nested beyond Stripe's depth limit).
+    let startingAfter: string | undefined;
+    for (;;) {
+      const page = await deps.stripe.subscriptions.list({
+        customer: customerId,
+        status: "all",
+        limit: 100,
+        ...(startingAfter ? { starting_after: startingAfter } : {}),
+      });
+      for (const listed of page.data) {
+        if (isMailboxSubscription(listed)) continue;
+        const sub = await deps.stripe.subscriptions.retrieve(listed.id, {
+          expand: SUBSCRIPTION_EXPAND,
+        });
+        if (
+          isMailboxSubscription(sub) ||
+          idOf(sub.customer) !== customerId ||
+          (sub.id !== team.stripeSubscriptionId && !rungFromSubscription(sub))
+        )
+          continue;
+        await applySubscription(tx as unknown as Db, sub, deps.log ?? console.warn, deps.stripe);
+        return;
+      }
+      if (!page.has_more) return;
+      const lastId = page.data.at(-1)?.id;
+      if (!lastId || lastId === startingAfter) throw new Error("Stripe subscription pagination stalled");
+      startingAfter = lastId;
+    }
   });
 }
 

@@ -1,4 +1,10 @@
-import { cancelTeamSubscription } from "@millionsend/billing";
+import {
+  cancelTeamSubscription,
+  isLiveKey,
+  MailboxErasureError,
+  type MailboxErasureStripe,
+  withMailboxTeamErasure,
+} from "@millionsend/billing";
 import { env, isCloudDeployment, notificationsEmailFrom } from "@millionsend/config";
 import {
   createFixedWindowLimiter,
@@ -36,6 +42,7 @@ import { recordAudit } from "../audit";
 import { resolveBaseUrl } from "../auth";
 import { getStripe } from "../billing";
 import { activeLocale } from "../locale";
+import { mailboxRegistryEnabled } from "../mailboxes";
 import { poweredByLocked } from "../powered-by";
 import { smtpRelayOffered } from "../smtp";
 import { deletePublicObject, keyFromPublicUrl, uploadsEnabled } from "../storage";
@@ -60,6 +67,9 @@ function assertCanManageMembers(role: string): void {
  */
 export interface TeamDeletionDeps {
   cancelSubscription(db: Db, teamId: string): Promise<void>;
+  /** Optional seams are reached only by the explicitly enabled Correio deletion flow. */
+  mailboxStripe?: (() => MailboxErasureStripe) | undefined;
+  mailboxLivemode?: (() => boolean) | undefined;
   /** `tenant` set = the identity is associated with the team's SES tenant and must be detached first. */
   deleteSesIdentity(domain: {
     name: string;
@@ -82,6 +92,8 @@ const sesClientFor = (region: string) =>
 
 const defaultTeamDeletionDeps: TeamDeletionDeps = {
   cancelSubscription: (db, teamId) => cancelTeamSubscription({ stripe: getStripe(), db }, teamId),
+  mailboxStripe: () => getStripe() as unknown as MailboxErasureStripe,
+  mailboxLivemode: () => isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
   deleteSesIdentity: async ({ name, region, tenant }) => {
     const client = sesClientFor(region);
     if (tenant) await disassociateIdentity(client, { tenantName: tenant, region, identity: name });
@@ -306,9 +318,7 @@ export function createSettingsRouter(
        * commit and never fails the deletion — an orphaned identity is harmless.
        */
       delete: teamProcedure.mutation(async ({ ctx }) => {
-        if (ctx.role !== "owner") throw new TRPCError({ code: "FORBIDDEN" });
-        if (env.IS_CLOUD) await deps.cancelSubscription(ctx.db, ctx.teamId);
-        const { domains, logoUrl, name } = await ctx.db.transaction(async (tx) => {
+        const deleteRows = async (tx: Tx) => {
           const [team] = await tx
             .select({ logoUrl: schema.teams.logoUrl, name: schema.teams.name })
             .from(schema.teams)
@@ -327,7 +337,47 @@ export function createSettingsRouter(
           await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.teamId, ctx.teamId));
           await tx.delete(schema.teams).where(eq(schema.teams.id, ctx.teamId));
           return { domains, logoUrl: team.logoUrl, name: team.name };
-        });
+        };
+        let deleted: Awaited<ReturnType<typeof deleteRows>>;
+        if (mailboxRegistryEnabled()) {
+          try {
+            deleted = await withMailboxTeamErasure(
+              {
+                db: ctx.db,
+                ...(isCloudDeployment()
+                  ? {
+                      getStripe: deps.mailboxStripe,
+                      livemode: deps.mailboxLivemode?.(),
+                    }
+                  : {}),
+              },
+              { teamId: ctx.teamId, userId: ctx.session.user.id },
+              {
+                ...(isCloudDeployment()
+                  ? { cancelSend: (tx: Db, teamId: string) => deps.cancelSubscription(tx, teamId) }
+                  : {}),
+                delete: (tx) => deleteRows(tx as unknown as Tx),
+              },
+            );
+          } catch (error) {
+            if (!(error instanceof MailboxErasureError)) throw error;
+            throw new TRPCError({
+              code:
+                error.code === "forbidden"
+                  ? "FORBIDDEN"
+                  : error.code === "not_found"
+                    ? "NOT_FOUND"
+                    : "PRECONDITION_FAILED",
+              message: `mailbox_erasure_${error.code}`,
+            });
+          }
+        } else {
+          // Legacy deployments keep their baseline, without requiring optional Mail tables/SDK seams.
+          if (ctx.role !== "owner") throw new TRPCError({ code: "FORBIDDEN" });
+          if (env.IS_CLOUD) await deps.cancelSubscription(ctx.db, ctx.teamId);
+          deleted = await ctx.db.transaction(deleteRows);
+        }
+        const { domains, logoUrl, name } = deleted;
         await Promise.allSettled([
           ...domains.map((domain) =>
             deps.deleteSesIdentity({

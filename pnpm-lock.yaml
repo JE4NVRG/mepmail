@@ -343,6 +343,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@electric-sql/pglite@0.3.16)(kysely@0.29.5)(pg@8.23.0)(postgres@3.4.9)
+      mailparser:
+        specifier: 3.9.26
+        version: 3.9.26
       nodemailer:
         specifier: ^10.0.3
         version: 10.0.3
@@ -359,6 +362,9 @@ importers:
       '@millionsend/test-utils':
         specifier: workspace:*
         version: link:../../packages/test-utils
+      '@types/mailparser':
+        specifier: 3.4.6
+        version: 3.4.6
       '@types/node':
         specifier: ^22.20.2
         version: 22.20.2

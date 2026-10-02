@@ -7,7 +7,7 @@ import type { SerializedSesEvent } from "@millionsend/queue";
 import { describe, expect, it } from "vitest";
 import { pollSqsOnce, type SqsPollerDeps } from "../src/sqs-poller.js";
 
-const TOPIC = "arn:aws:sns:us-east-1:123456789012:mepmail-events";
+const TOPIC = "arn:aws:sns:us-east-1:123456789012:millionsend-events";
 
 function envelope(overrides: Partial<Record<string, string>> = {}): string {
   return JSON.stringify({
@@ -44,7 +44,7 @@ function fakeDeps(messages: Message[], options: { enqueueError?: Error } = {}) {
         return {};
       },
     },
-    queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/mepmail-events",
+    queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/millionsend-events",
     allowedTopicArns: [TOPIC],
     enqueueSesEvent: async (event, snsMessageId) => {
       if (options.enqueueError) throw options.enqueueError;
@@ -69,7 +69,7 @@ describe("pollSqsOnce", () => {
     expect(deleted).toEqual(["sqs-1"]);
   });
 
-  it("retains foreign-topic and malformed messages without enqueueing or ACK", async () => {
+  it("drops (and deletes) foreign-topic and malformed messages without enqueueing", async () => {
     const { deps, enqueued, deleted } = fakeDeps([
       {
         MessageId: "sqs-foreign",
@@ -81,7 +81,7 @@ describe("pollSqsOnce", () => {
     ]);
     expect(await pollSqsOnce(deps, 0)).toBe(3);
     expect(enqueued).toHaveLength(0);
-    expect(deleted).toEqual([]);
+    expect(deleted).toEqual(["sqs-foreign", "sqs-garbage", "sqs-inner"]);
   });
 
   it("keeps the message on the queue when enqueueing fails", async () => {
@@ -98,5 +98,69 @@ describe("pollSqsOnce", () => {
     const { deps, deleted } = fakeDeps([]);
     expect(await pollSqsOnce(deps, 0)).toBe(0);
     expect(deleted).toEqual([]);
+  });
+
+  it("dispatches trusted private mail before outbound parsing and acknowledges persistence", async () => {
+    const receipt = {
+      notificationType: "Received",
+      receipt: { recipients: ["box@example.invalid"] },
+    };
+    const { deps, enqueued, deleted } = fakeDeps([
+      {
+        MessageId: "private-1",
+        ReceiptHandle: "private-rh",
+        Body: envelope({ Message: JSON.stringify(receipt) }),
+      },
+    ]);
+    const seen: unknown[] = [];
+    deps.dispatchPrivateMail = async (input) => {
+      seen.push(input);
+      return true;
+    };
+    await pollSqsOnce(deps, 0);
+    expect(seen).toEqual([{ topicArn: TOPIC, snsMessageId: "sns-msg-1", event: receipt }]);
+    expect(enqueued).toHaveLength(0);
+    expect(deleted).toEqual(["private-1"]);
+  });
+
+  it("retains private receipts/evidence while the handler is unavailable or fails", async () => {
+    for (const privateEvent of [
+      { notificationType: "Received", receipt: { recipients: [] } },
+      { eventType: "Send", mail: { tags: { mepmail_outbox_id: ["pending"] } } },
+    ]) {
+      const { deps, enqueued, deleted } = fakeDeps([
+        {
+          MessageId: "private-1",
+          ReceiptHandle: "private-rh",
+          Body: envelope({ Message: JSON.stringify(privateEvent) }),
+        },
+      ]);
+      await pollSqsOnce(deps, 0);
+      expect(deleted).toEqual([]);
+      deps.dispatchPrivateMail = async () => {
+        throw new Error("private persistence unavailable");
+      };
+      await pollSqsOnce(deps, 0);
+      expect(deleted).toEqual([]);
+      expect(enqueued).toHaveLength(0);
+    }
+  });
+
+  it("never passes a foreign topic to the private dispatcher", async () => {
+    const { deps, deleted } = fakeDeps([
+      {
+        MessageId: "foreign",
+        ReceiptHandle: "rh",
+        Body: envelope({ TopicArn: "arn:aws:sns:us-east-1:999999999999:foreign" }),
+      },
+    ]);
+    let calls = 0;
+    deps.dispatchPrivateMail = async () => {
+      calls++;
+      return true;
+    };
+    await pollSqsOnce(deps, 0);
+    expect(calls).toBe(0);
+    expect(deleted).toEqual(["foreign"]);
   });
 });
