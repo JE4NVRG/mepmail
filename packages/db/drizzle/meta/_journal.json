@@ -309,6 +309,13 @@
       "when": 1790949355696,
       "tag": "0043_send_checkout_attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1791008652386,
+      "tag": "0044_meta_advertising",
+      "breakpoints": true
     }
   ]
 }

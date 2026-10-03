@@ -188,7 +188,7 @@
   display: grid;
   gap: 10px;
 }
-.cro .cro-starter-copy h3 {
+.cro .cro-starter-copy :is(h2, h3) {
   margin: 0;
   font-size: 14px;
   line-height: 1.35;
