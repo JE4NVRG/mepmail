@@ -1,7 +1,7 @@
 {
-  "subject": "Funciona.",
-  "heading": "0000001 e contando.",
-  "body": "Seu primeiro e-mail pelo MepMail acabou de chegar nesta caixa de entrada. Os próximos saem do seu próprio domínio — verifique um e o odômetro segue contando.",
+  "subject": "Seu e-mail de teste do MepMail",
+  "heading": "Seu e-mail de teste está aqui.",
+  "body": "Você solicitou este teste no MepMail para conferir o envio de e-mails. Acompanhe o status no painel. Para enviar do seu próprio endereço, verifique seu domínio e conecte a API.",
   "button": "Abrir o painel",
-  "footer": "Enviado pelo onboarding do seu time {team}."
+  "footer": "Teste solicitado no MepMail pelo seu time {team}."
 }

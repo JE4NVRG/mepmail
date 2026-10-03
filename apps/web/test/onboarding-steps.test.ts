@@ -9,6 +9,8 @@ import pt from "../messages/pt-BR/onboarding.json";
 type Attempt = { id: string; to: string[]; latestStatus: string; createdAt: Date };
 type Fixture = {
   hasKey: boolean;
+  onboardingSender?: string | null;
+  sendPending?: boolean;
   first?: Attempt;
   latest?: Attempt;
   delivered: number;
@@ -31,7 +33,7 @@ vi.mock("@/lib/trpc", () => {
     queryOptions: (input?: Record<string, unknown>) => ({ queryKey: [path, input] }),
     queryKey: () => [path],
     pathKey: () => [path],
-    mutationOptions: (options: unknown) => options,
+    mutationOptions: (options: Record<string, unknown>) => ({ ...options, mutationPath: path }),
   });
   return {
     useTRPC: () => ({
@@ -51,7 +53,11 @@ vi.mock("@tanstack/react-query", () => ({
     const f = hooks.fixture;
     let data: unknown;
     if (path === "aws") data = { credentialsConfigured: true };
-    if (path === "features") data = { onboardingSender: "welcome@example.com" };
+    if (path === "features")
+      data = {
+        onboardingSender:
+          f.onboardingSender === undefined ? "welcome@example.com" : f.onboardingSender,
+      };
     if (path === "keys")
       data = f.hasKey ? [{ tokenPrefix: "ms_fixture", last4: "0001", createdAt: new Date(0) }] : [];
     if (path === "domains")
@@ -82,10 +88,10 @@ vi.mock("@tanstack/react-query", () => ({
       refetch: hooks.refetch,
     };
   },
-  useMutation: () => ({
+  useMutation: (options: { mutationPath: string }) => ({
     mutate: hooks.mutate,
-    isPending: false,
-    isSuccess: hooks.fixture.sendAccepted === true,
+    isPending: options.mutationPath === "send" && hooks.fixture.sendPending === true,
+    isSuccess: options.mutationPath === "send" && hooks.fixture.sendAccepted === true,
     isError: false,
   }),
   useQueryClient: () => ({ invalidateQueries: hooks.invalidateQueries }),
@@ -203,9 +209,69 @@ for (const [locale, copy] of [
       expect(hooks.mutate).not.toHaveBeenCalled();
     });
 
+    it("offers the platform demonstration without a key or domain and does not send on render", () => {
+      hooks.fixture.hasKey = false;
+      const html = render(locale);
+      expect(html).toContain(copy.demo.title);
+      expect(html).toContain(
+        copy.demo.body
+          .replace("{from}", "welcome@example.com")
+          .replace("{to}", "member@example.com"),
+      );
+      const buttons = html.match(/<button[^>]*>.*?<\/button>/gs) ?? [];
+      const sendButton = buttons.find((button) => button.includes(copy.demo.sendCta));
+      expect(sendButton).toBeDefined();
+      expect(sendButton).not.toContain("disabled=");
+      expect(html).toContain(copy.step1.cta);
+      const snippets = html.match(/<pre[^>]*>.*?<\/pre>/gs) ?? [];
+      expect(snippets.join("")).toContain(copy.step2.fromPlaceholder);
+      expect(snippets.join("")).not.toContain("welcome@example.com");
+      expect(hooks.mutate).not.toHaveBeenCalled();
+      expect(hooks.getToken).not.toHaveBeenCalled();
+    });
+
+    it("does not offer a platform demonstration when no sender is configured", () => {
+      hooks.fixture.hasKey = false;
+      hooks.fixture.onboardingSender = null;
+      const html = render(locale);
+      expect(html).not.toContain(copy.demo.title);
+      expect(html).not.toContain(copy.demo.sendCta);
+      expect(html).toContain(copy.step1.cta);
+      expect(hooks.mutate).not.toHaveBeenCalled();
+    });
+
+    it("keeps the keyless demonstration disabled while its send is pending", () => {
+      hooks.fixture.hasKey = false;
+      hooks.fixture.sendPending = true;
+      const html = render(locale);
+      const buttons = html.match(/<button[^>]*>.*?<\/button>/gs) ?? [];
+      const sendButton = buttons.find((button) => button.includes(copy.step2.sending));
+      expect(sendButton).toContain('disabled=""');
+      expect(hooks.mutate).not.toHaveBeenCalled();
+    });
+
+    it("keeps the keyless demonstration disabled until the delivery resolves", () => {
+      hooks.fixture.hasKey = false;
+      hooks.fixture.first = attempt("keyless-queued", "queued");
+      const html = render(locale);
+      const buttons = html.match(/<button[^>]*>.*?<\/button>/gs) ?? [];
+      const sendButton = buttons.find((button) => button.includes(copy.attempt.waiting));
+      expect(sendButton).toContain('disabled=""');
+      expect(html).toContain('href="/emails/keyless-queued"');
+      expect(hooks.mutate).not.toHaveBeenCalled();
+    });
+
+    it("uses the team's verified domain for the API snippet, not the platform sender", () => {
+      hooks.fixture.verifiedDomain = true;
+      const html = render(locale);
+      const snippets = html.match(/<pre[^>]*>.*?<\/pre>/gs) ?? [];
+      expect(snippets.join("")).toContain("onboarding@example.com");
+      expect(snippets.join("")).not.toContain("welcome@example.com");
+    });
+
     it("keeps the guide available with a key and no send", () => {
       const html = render(locale);
-      expect(html).toContain(copy.step2.sendCta);
+      expect(html).toContain(copy.demo.sendCta);
       expect(html).toContain(copy.step2.keyCommentReplace);
       expect(html).not.toContain("data-delivered=");
     });
@@ -328,7 +394,7 @@ for (const [locale, copy] of [
         expect(html).toContain(copy.attempt.reload);
         expect(html).not.toContain(copy.attempt.failedTitle);
         expect(html).not.toContain(copy.attempt.retryCta);
-        expect(html).not.toContain(copy.step2.sendCta);
+        expect(html).not.toContain(copy.demo.sendCta);
         expect(html).not.toContain("data-delivered=");
         if (query !== "emails") expect(html).toContain('href="/emails/first-bounce"');
         expect(hooks.mutate).not.toHaveBeenCalled();

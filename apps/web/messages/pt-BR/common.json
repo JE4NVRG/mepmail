@@ -110,5 +110,21 @@
     "readOnly": "Modo de suporte somente leitura: nada pode ser alterado aqui."
   },
   "sourceCode": "Código-fonte · AGPL-3.0",
-  "sourceDownload": "Baixe gratuitamente o código-fonte correspondente a esta versão"
+  "sourceDownload": "Baixe gratuitamente o código-fonte correspondente a esta versão",
+  "advertising": {
+    "title": "Preferências de publicidade",
+    "body": "Com sua permissão, usamos a Meta para medir visitas públicas e compras de planos pagos. Os cookies essenciais continuam funcionando se você recusar. Você pode mudar sua escolha a qualquer momento.",
+    "accept": "Permitir mensuração de publicidade",
+    "deny": "Recusar mensuração opcional",
+    "settings": "Preferências de publicidade",
+    "withdraw": "Retirar permissão",
+    "close": "Fechar",
+    "pending": "Salvando sua escolha…",
+    "error": "Não conseguimos salvar sua escolha. A mensuração de publicidade continua desligada.",
+    "currentAccepted": "A mensuração de publicidade está permitida.",
+    "currentDenied": "A mensuração de publicidade está desligada.",
+    "privacyLink": "Ler a política de privacidade",
+    "save": "Salvar preferências",
+    "unknown": "Nenhuma permissão de publicidade foi dada."
+  }
 }
