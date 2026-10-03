@@ -1,9 +1,12 @@
+import { randomUUID } from "node:crypto";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { prepareMetaCheckout, saveAdvertisingConsent } from "../src/meta-advertising.js";
+import type { MetaConversionConfig } from "../src/meta-conversions.js";
 import type { BillingStripe } from "../src/stripe.js";
 import { cancelTeamSubscription, reconcileTeamPlan } from "../src/subscription.js";
 import { handleWebhook, purgeStripeEvents } from "../src/webhook.js";
@@ -466,14 +469,278 @@ describe("handleWebhook", () => {
     expect((await db.select().from(schema.stripeEvents)).length).toBe(3);
   });
 
+  it("recovers the same signed initial paid invoice atomically and deduplicates its Purchase", async () => {
+    const http = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      throw new Error("Webhook integration must not call Meta or any HTTP provider");
+    });
+    try {
+      const teamId = await customerTeam("cus_invoice");
+      const otherTeamId = await createTeam(db, "invoice-unrelated");
+      const actorId = "invoice-offline-owner";
+      await db.insert(schema.user).values({
+        id: actorId,
+        name: "Offline invoice fixture",
+        email: "invoice-owner@example.invalid",
+      });
+      const now = new Date();
+      const capturedAt = new Date(now.getTime() - 5_000);
+      const created = Math.floor(capturedAt.getTime() / 1_000) + 1;
+      const paidAt = Math.floor(now.getTime() / 1_000) - 1;
+      const attemptId = randomUUID();
+      const metadata = { mepmail_send_checkout: attemptId, team_id: teamId };
+      const basePrice = priceId("millionsend_pro_100k_monthly");
+      const overagePrice = priceId("millionsend_pro_100k_overage");
+      const [attempt] = await db
+        .insert(schema.sendCheckoutAttempts)
+        .values({
+          id: attemptId,
+          teamId,
+          createdBy: actorId,
+          status: "created",
+          rung: "pro_100k",
+          livemode: false,
+          stripeCustomerId: "cus_invoice",
+          stripeSessionId: "cs_invoice",
+          checkoutUrl: "https://checkout.stripe.com/c/pay/offline-invoice",
+          idempotencyKey: `send-${attemptId}`,
+          firstRequestedAt: capturedAt,
+          createdAt: capturedAt,
+          updatedAt: capturedAt,
+          parameters: {
+            mode: "subscription",
+            customer: "cus_invoice",
+            client_reference_id: teamId,
+            metadata,
+            subscription_data: { metadata },
+            line_items: [{ price: basePrice, quantity: 1 }, { price: overagePrice }],
+          },
+        })
+        .returning();
+      if (!attempt) throw new Error("Missing durable financial fixture");
+      const advertisingConfig: MetaConversionConfig = {
+        enabled: true,
+        datasetId: "123456789",
+        accessToken: "offline-placeholder-not-a-credential",
+        graphVersion: "v26.0",
+        mode: "production",
+      };
+      const consent = await saveAdvertisingConsent(
+        db,
+        {
+          granted: true,
+          proof: null,
+          userId: actorId,
+          sourceUrl: "https://mepmail.dev/pricing",
+        },
+        capturedAt,
+      );
+      await db.transaction(async (transaction) => {
+        await prepareMetaCheckout(
+          transaction as unknown as Db,
+          attempt,
+          {
+            config: advertisingConfig,
+            proof: consent.proof,
+            cookieHeader: `_fbp=fb.1.${capturedAt.getTime()}.123456789`,
+          },
+          capturedAt,
+        );
+      });
+      expect(await db.select().from(schema.metaCheckoutContexts)).toMatchObject([
+        { attemptId, eligible: true, consentReceiptId: consent.proof.id },
+      ]);
+
+      // Reuse the canonical subscription/price fixture; add its acquisition facts.
+      const recoveredSubscription = subscription(
+        "sub_invoice",
+        "cus_invoice",
+        "active",
+        "millionsend_pro_100k_monthly",
+        { overageKey: "millionsend_pro_100k_overage" },
+      );
+      Object.assign(recoveredSubscription, {
+        livemode: false,
+        metadata,
+        trial_start: null,
+        trial_end: null,
+        created,
+        start_date: created,
+        canceled_at: null,
+        cancel_at_period_end: false,
+        collection_method: "charge_automatically",
+        latest_invoice: "in_invoice",
+        currency: "usd",
+      });
+      recoveredSubscription.items.has_more = false;
+      recoveredSubscription.items.url = "/v1/subscription_items?subscription=sub_invoice";
+      const invoice = {
+        id: "in_invoice",
+        object: "invoice",
+        customer: "cus_invoice",
+        livemode: false,
+        status: "paid",
+        billing_reason: "subscription_create",
+        currency: "usd",
+        amount_due: 1_243,
+        amount_paid: 1_243,
+        amount_remaining: 0,
+        total: 1_243,
+        subtotal: 2_000,
+        total_discount_amounts: [{ amount: 757, discount: "di_invoice" }],
+        metadata,
+        created,
+        status_transitions: {
+          finalized_at: created,
+          paid_at: paidAt,
+          marked_uncollectible_at: null,
+          voided_at: null,
+        },
+        parent: {
+          type: "subscription_details",
+          subscription_details: { subscription: "sub_invoice", metadata },
+        },
+        lines: {
+          object: "list",
+          has_more: false,
+          url: "/v1/invoices/in_invoice/lines",
+          data: [
+            {
+              id: "il_invoice",
+              object: "line_item",
+              amount: 2_000,
+              currency: "usd",
+              quantity: 1,
+              pricing: {
+                type: "price_details",
+                price_details: { price: basePrice, product: "prod_1" },
+              },
+              parent: {
+                type: "subscription_item_details",
+                subscription_item_details: {
+                  subscription: "sub_invoice",
+                  subscription_item: "si_sub_invoice",
+                  proration: false,
+                },
+              },
+              period: { start: PERIOD_START, end: PERIOD_END },
+            },
+          ],
+        },
+      };
+      const payload = JSON.stringify({
+        ...JSON.parse(event("invoice.payment_succeeded", invoice, "evt_invoice")),
+        created: paidAt,
+        api_version: null,
+        pending_webhooks: 1,
+        request: null,
+      });
+      const signature = webhooks.generateTestHeaderString({ payload, secret: SECRET });
+      const deliverInvoice = () =>
+        handleWebhook(payload, signature, {
+          db,
+          stripe,
+          webhookSecret: SECRET,
+          livemode: false,
+          advertisingConfig,
+          log: (message) => logs.push(message),
+        });
+      const beforeTeam = await team(teamId);
+      const beforeAttempt = await db.select().from(schema.sendCheckoutAttempts);
+      const beforeContext = await db.select().from(schema.metaCheckoutContexts);
+      expect(await db.select().from(schema.stripeEvents)).toEqual([]);
+      expect(await db.select().from(schema.metaConversionOutbox)).toEqual([]);
+
+      // A signed invoice cannot commit its ledger before authoritative readback succeeds.
+      await expect(deliverInvoice()).rejects.toThrow("No such subscription");
+      expect(await db.select().from(schema.stripeEvents)).toEqual([]);
+      expect(await db.select().from(schema.metaConversionOutbox)).toEqual([]);
+      expect(await team(teamId)).toEqual(beforeTeam);
+      expect(await db.select().from(schema.sendCheckoutAttempts)).toEqual(beforeAttempt);
+      expect(await db.select().from(schema.metaCheckoutContexts)).toEqual(beforeContext);
+
+      // Retry the identical signed payload after recovering only the same Subscription.
+      state.subscriptions.sub_invoice = recoveredSubscription;
+      expect(await deliverInvoice()).toBe(200);
+      expect(await team(teamId)).toMatchObject({
+        plan: "pro",
+        planQuota: 110_000,
+        planStatus: "active",
+        stripeCustomerId: "cus_invoice",
+        stripeSubscriptionId: "sub_invoice",
+        stripeOverageItemId: "si_sub_invoice_overage",
+      });
+      expect(await team(otherTeamId)).toMatchObject({ plan: "free", stripeCustomerId: null });
+      const ledger = await db.select().from(schema.stripeEvents);
+      expect(ledger).toHaveLength(1);
+      expect(ledger[0]).toMatchObject({ id: "evt_invoice", type: "invoice.payment_succeeded" });
+      const purchases = await db.select().from(schema.metaConversionOutbox);
+      expect(purchases).toHaveLength(1);
+      expect(purchases[0]).toMatchObject({
+        eventName: "Purchase",
+        attemptId,
+        consentReceiptId: consent.proof.id,
+        livemode: false,
+        stripeInvoiceId: "in_invoice",
+        stripeSubscriptionId: "sub_invoice",
+        status: "waiting",
+        amountPaidMinor: 1_243,
+        currency: "usd",
+        eventTime: new Date(paidAt * 1_000),
+      });
+      expect(await db.select().from(schema.sendCheckoutAttempts)).toEqual(beforeAttempt);
+      expect(await db.select().from(schema.metaCheckoutContexts)).toEqual(beforeContext);
+      const planAfterRecovery = await team(teamId);
+      const callsAfterRecovery = [...state.calls];
+      const retrievesAfterRecovery = [...state.retrieves];
+      expect(retrievesAfterRecovery).toEqual(["sub_invoice", "sub_invoice"]);
+      expect(state.customers).toEqual([]);
+      expect(state.checkouts).toEqual([]);
+      expect(state.itemCreates).toEqual([]);
+      expect(state.itemUpdates).toEqual([]);
+      expect(state.meterEvents).toEqual([]);
+
+      expect(await deliverInvoice()).toBe(200);
+      expect(state.calls).toEqual(callsAfterRecovery);
+      expect(state.retrieves).toEqual(retrievesAfterRecovery);
+      expect(await team(teamId)).toEqual(planAfterRecovery);
+      expect(await team(otherTeamId)).toMatchObject({ plan: "free", stripeCustomerId: null });
+      expect(await db.select().from(schema.stripeEvents)).toEqual(ledger);
+      expect(await db.select().from(schema.metaConversionOutbox)).toEqual(purchases);
+      expect(await db.select().from(schema.sendCheckoutAttempts)).toEqual(beforeAttempt);
+      expect(await db.select().from(schema.metaCheckoutContexts)).toEqual(beforeContext);
+      expect(http).not.toHaveBeenCalled();
+    } finally {
+      http.mockRestore();
+    }
+  });
+
   it("rolls back the ledger row when Stripe cannot be reached, so the retry is processed", async () => {
-    await customerTeam();
-    await expect(
-      deliver(
-        subEvent("customer.subscription.created", subscription("sub_gone", "cus_1", "active")),
-      ),
-    ).rejects.toThrow("No such subscription");
+    const teamId = await customerTeam();
+    const recoveredSubscription = subscription("sub_gone", "cus_1", "active");
+    const payload = subEvent("customer.subscription.created", recoveredSubscription);
+
+    await expect(deliver(payload)).rejects.toThrow("No such subscription");
     expect(await db.select().from(schema.stripeEvents)).toEqual([]);
+    expect(await team(teamId)).toMatchObject({ plan: "free", stripeSubscriptionId: null });
+
+    // Redelivery must process the same event after the transient provider failure.
+    state.subscriptions.sub_gone = recoveredSubscription;
+    expect(await deliver(payload)).toBe(200);
+    expect(await team(teamId)).toMatchObject({
+      plan: "pro",
+      planStatus: "active",
+      stripeSubscriptionId: "sub_gone",
+    });
+    expect(await db.select({ id: schema.stripeEvents.id }).from(schema.stripeEvents)).toEqual([
+      { id: JSON.parse(payload).id },
+    ]);
+
+    const retrievesAfterRecovery = state.retrieves.length;
+    expect(await deliver(payload)).toBe(200);
+    expect(state.retrieves).toHaveLength(retrievesAfterRecovery);
+    expect(await db.select({ id: schema.stripeEvents.id }).from(schema.stripeEvents)).toEqual([
+      { id: JSON.parse(payload).id },
+    ]);
   });
 });
 

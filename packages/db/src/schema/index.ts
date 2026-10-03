@@ -23,6 +23,7 @@ export * from "./mailbox-management-requests.js";
 export * from "./mailbox-subscriptions.js";
 export * from "./mailbox-transport.js";
 export * from "./mailboxes.js";
+export * from "./meta-advertising.js";
 export * from "./monitor.js";
 export * from "./region-breakers.js";
 export * from "./segments.js";
