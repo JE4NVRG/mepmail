@@ -1,7 +1,7 @@
 {
-  "subject": "It works.",
-  "heading": "0000001 and counting.",
-  "body": "Your first email through MepMail just landed in this inbox. The next ones go out from your own domain — verify one and the odometer keeps counting.",
+  "subject": "Your MepMail test email",
+  "heading": "Your test email is here.",
+  "body": "You requested this test in MepMail to check email sending. Follow its status in your dashboard. To send email from your own address, verify your domain and connect the API.",
   "button": "Open the dashboard",
-  "footer": "Sent from the onboarding flow of your {team} team."
+  "footer": "Test requested in MepMail by your {team} team."
 }

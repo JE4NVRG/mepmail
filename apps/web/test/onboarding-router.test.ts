@@ -4,6 +4,7 @@ import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { buildOnboardingEmail } from "@/server/onboarding-mail";
 import { createCaller } from "@/server/routers";
 import type { Context } from "@/server/trpc";
 
@@ -49,7 +50,7 @@ describe("onboarding.sendFirstEmail", () => {
       apiKeyId: null,
       from: "MillionSend <onboarding@ms.example>",
       to: ["Ada@Example.com"],
-      subject: "Funciona.",
+      subject: "Seu e-mail de teste do MepMail",
       latestStatus: "queued",
     });
     expect(enqueued).toEqual([id]);
@@ -77,5 +78,42 @@ describe("onboarding.sendFirstEmail", () => {
     await expect(caller(teamId).onboarding.sendFirstEmail({ locale: "en" })).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
     });
+  });
+});
+
+describe("buildOnboardingEmail", () => {
+  it("uses the requested language and MepMail links without claiming inbox placement", () => {
+    for (const locale of ["en", "pt-BR"] as const) {
+      const mail = buildOnboardingEmail({
+        locale,
+        team: "Team",
+        dashboardUrl: "https://mepmail.dev/emails",
+      });
+      expect(mail.subject).toContain("MepMail");
+      expect(mail.html).toContain(`<html lang="${locale}">`);
+      expect(mail.html).toContain('href="https://mepmail.dev/"');
+      expect(mail.html).toContain('href="https://mepmail.dev/emails"');
+      for (const name of ["wordmark-ink", "wordmark-bone", "white"]) {
+        expect(mail.html).toContain(`https://mepmail.dev/email/${name}.png`);
+      }
+      expect(mail.html).not.toContain("mepmail.je4ndev.com");
+      expect(mail.html).not.toContain("mail.je4ndev.com");
+      expect(mail.text).not.toMatch(/inbox|caixa de entrada/i);
+    }
+  });
+
+  it("escapes the team and dashboard link while preserving plain text and a missing CTA", () => {
+    const mail = buildOnboardingEmail({
+      locale: "pt-BR",
+      team: '<img src=x onerror="alert(1)">',
+      dashboardUrl: 'https://mepmail.dev/emails?a=1&b="two"',
+    });
+    expect(mail.html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+    expect(mail.html).not.toContain("<img src=x");
+    expect(mail.html).toContain('href="https://mepmail.dev/emails?a=1&amp;b=&quot;two&quot;"');
+    expect(mail.text).toContain('<img src=x onerror="alert(1)">');
+    const withoutUrl = buildOnboardingEmail({ locale: "en", team: "Team", dashboardUrl: null });
+    expect(withoutUrl.html).not.toContain('class="ms-btn"');
+    expect(withoutUrl.html).not.toContain('class="ms-gmail"');
   });
 });
