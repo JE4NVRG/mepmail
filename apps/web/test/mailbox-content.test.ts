@@ -3,20 +3,26 @@ import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import {
+  acceptMailboxOutbox,
   createMailboxRegistry,
   EnvKeyring,
   grantMailboxRegistry,
   importMailboxMime,
+  queueMailboxDraft,
   readMailboxItem,
+  receiveMailboxMime,
   revokeMailboxRegistry,
+  sendMailboxOutbox,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { simpleParser } from "mailparser";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/mailboxes/[mailboxId]/items/[id]/attachments/[index]/route";
 import { getKeyring } from "@/server/keyring";
+import { mailboxTransportMime } from "@/server/mailbox-transport";
 import { mailboxesRouter } from "@/server/routers/mailboxes";
 import { type Context, createCallerFactory, createContext, router } from "@/server/trpc";
 import { seedMailboxTestService } from "./mailbox-service-fixture";
@@ -66,6 +72,45 @@ const draft = (extra = {}) => ({
   uploads: [] as { filename: string; base64: string }[],
   ...extra,
 });
+async function submittedSent(extra = {}) {
+  await db
+    .update(schema.domains)
+    .set({ status: "verified" })
+    .where(eq(schema.domains.teamId, teamId));
+  const saved = await as().saveDraft(draft(extra));
+  const raw = (
+    await readMailboxItem(db, keys, actor(), { mailboxId: saved.mailboxId, id: saved.id })
+  ).raw;
+  const queued = await queueMailboxDraft(
+    db,
+    keys,
+    actor(),
+    {
+      mailboxId: saved.mailboxId,
+      id: saved.id,
+      expectedRevision: saved.revision,
+    },
+    mailboxTransportMime,
+  );
+  const sender = vi.fn(async () => ({ messageId: `api-${queued.id}` }));
+  await sendMailboxOutbox(db, keys, queued.id, { send: sender }, mailboxTransportMime);
+  const [row] = await db
+    .select()
+    .from(schema.mailboxOutbox)
+    .where(eq(schema.mailboxOutbox.id, queued.id));
+  return { row: row!, raw, sender };
+}
+const aliasEvidence = (row: typeof schema.mailboxOutbox.$inferSelect, rfcMessageId: string) =>
+  acceptMailboxOutbox(db, row.id, {
+    attemptId: row.attemptId!,
+    messageId: row.providerMessageId!,
+    rfcMessageId,
+  });
+function responseMime(inReplyTo: string, refs: string[] = []) {
+  return Buffer.from(
+    `From: external@example.invalid\r\nTo: forged-visible@other.invalid\r\nSubject: Re: Local reply\r\nMessage-ID: <incoming@example.invalid>\r\nIn-Reply-To: ${inReplyTo}\r\nReferences: ${refs.join(" ")}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain\r\n\r\nExternal response fixture\r\n`,
+  );
+}
 async function download(id: string, index = "0", box = mailboxId, query = "", revision = 1) {
   return GET(
     new Request(
@@ -244,6 +289,143 @@ describe("session-authenticated mailbox content", () => {
     );
     expect((await as().items({ mailboxId: null, folder: "sent" })).items).toHaveLength(0);
   });
+  it("threads a follow-up to Sent with its observed final alias and blocks a pending alias instead of using submitted MIME headers", async () => {
+    const { row, raw, sender } = await submittedSent({
+      to: ["first@example.invalid", "second@example.invalid"],
+      uploads: [
+        { filename: "original.txt", base64: Buffer.from("original attachment").toString("base64") },
+      ],
+    });
+    const captured = await simpleParser(raw);
+    expect(await as().item({ mailboxId, id: row.id })).toMatchObject({
+      messageId: captured.messageId,
+      transportMessageId: null,
+      replyToSentItemId: null,
+      replyTo: "first@example.invalid, second@example.invalid",
+    });
+    await expect(as().saveDraft(draft({ sourceItemId: row.id }))).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    const alias = "<observed-final@email.amazonses.com>";
+    await aliasEvidence(row, alias);
+    const sentDetail = await as().item({ mailboxId, id: row.id });
+    expect(sentDetail.transportMessageId).toBe(alias);
+    const saved = await as().saveDraft(
+      draft({ sourceItemId: row.id, to: sentDetail.replyTo.split(", "), retainedAttachments: [0] }),
+    );
+    const reply = await simpleParser(
+      (await readMailboxItem(db, keys, actor(), { mailboxId, id: saved.id })).raw,
+    );
+    expect(reply.inReplyTo).toBe(alias);
+    expect(reply.references).toBe(alias);
+    expect(reply.messageId).not.toBe(captured.messageId);
+    expect(reply.messageId).not.toBe(alias);
+    expect(
+      (Array.isArray(reply.to) ? reply.to : [reply.to!])
+        .flatMap((entry) => entry.value)
+        .map((entry) => entry.address),
+    ).toEqual(["first@example.invalid", "second@example.invalid"]);
+    expect(reply.attachments[0]!.content.toString()).toBe("original attachment");
+    const updated = await as().saveDraft(
+      draft({
+        id: saved.id,
+        sourceItemId: saved.id,
+        expectedRevision: 1,
+        text: "Follow-up edited",
+      }),
+    );
+    const edited = await simpleParser(
+      (await readMailboxItem(db, keys, actor(), { mailboxId, id: updated.id })).raw,
+    );
+    expect(edited.messageId).toBe(reply.messageId);
+    expect(edited.inReplyTo).toBe(alias);
+    expect(edited.references).toBe(alias);
+    expect((await readMailboxItem(db, keys, actor(), { mailboxId, id: row.id })).raw).toEqual(raw);
+    expect(sender).toHaveBeenCalledTimes(1);
+  });
+
+  it("correlates response headers only to accepted Sent in the authorized RCPT mailbox, preferring the direct target then nearest reference", async () => {
+    const first = await submittedSent();
+    const second = await submittedSent();
+    const firstAlias = "<first-final@email.amazonses.com>";
+    const secondAlias = "<second-final@email.amazonses.com>";
+    await aliasEvidence(first.row, firstAlias);
+    await aliasEvidence(second.row, secondAlias);
+    const raw = responseMime(secondAlias, [firstAlias]);
+    const ingress = await receiveMailboxMime(
+      db,
+      keys,
+      {
+        sourceId: "trusted-reply:1",
+        recipients: ["person@content.invalid"],
+        raw,
+      },
+      mailboxTransportMime,
+    );
+    const received = ingress.items[0]!;
+    expect(await as().item({ mailboxId, id: received.id })).toMatchObject({
+      messageId: "<incoming@example.invalid>",
+      transportMessageId: null,
+      replyToSentItemId: second.row.id,
+    });
+    expect((await readMailboxItem(db, keys, actor(), { mailboxId, id: received.id })).raw).toEqual(
+      raw,
+    );
+    const replay = await receiveMailboxMime(
+      db,
+      keys,
+      {
+        sourceId: "trusted-reply:1",
+        recipients: ["person@content.invalid"],
+        raw,
+      },
+      mailboxTransportMime,
+    );
+    expect(replay.items[0]).toMatchObject({ id: received.id, duplicate: true });
+    const saved = await as().saveDraft(draft({ sourceItemId: received.id }));
+    const reply = await simpleParser(
+      (await readMailboxItem(db, keys, actor(), { mailboxId, id: saved.id })).raw,
+    );
+    expect(reply.inReplyTo).toBe("<incoming@example.invalid>");
+    expect(reply.references).toEqual([firstAlias, secondAlias, "<incoming@example.invalid>"]);
+    const fallback = await imported(
+      "reply:fallback",
+      mailboxId,
+      responseMime("<unmatched@example.invalid>", [firstAlias, secondAlias]),
+    );
+    expect((await as().item({ mailboxId, id: fallback.id })).replyToSentItemId).toBe(second.row.id);
+    const otherBox = await imported("reply:other-box", agentId, raw);
+    expect((await as().item({ mailboxId: agentId, id: otherBox.id })).replyToSentItemId).toBeNull();
+    await expect(as("member").item({ mailboxId, id: received.id })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    await expect(
+      as("owner", { teamId: otherTeam }).item({ mailboxId, id: received.id }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    const grant = await grantMailboxRegistry(db, actor(), {
+      mailboxId,
+      userId: "member",
+      permission: "read",
+    });
+    expect((await as("member").item({ mailboxId, id: received.id })).replyToSentItemId).toBe(
+      second.row.id,
+    );
+    await revokeMailboxRegistry(db, actor(), grant.id);
+    await expect(as("member").item({ mailboxId, id: received.id })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("does not infer the final transport alias from captured or bare API reply headers", async () => {
+    const { row, raw } = await submittedSent();
+    const captured = await simpleParser(raw);
+    for (const [index, id] of [captured.messageId!, row.providerMessageId!].entries()) {
+      const incoming = await imported(`pending-alias:${index}`, mailboxId, responseMime(id));
+      expect((await as().item({ mailboxId, id: incoming.id })).replyToSentItemId).toBeNull();
+    }
+    expect((await as().item({ mailboxId, id: row.id })).transportMessageId).toBeNull();
+  });
+
   it("protects existing drafts from stale edits, foreign sources and inbox replacement", async () => {
     const a = await imported();
     const saved = await as().saveDraft(draft());

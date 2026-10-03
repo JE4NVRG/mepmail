@@ -1,9 +1,11 @@
 import {
   type BillingStripe,
+  beginSendCheckout,
   changeRung,
-  createCheckoutSession,
   createPortalSession,
   hasLiveSubscription,
+  isLiveKey,
+  SendCheckoutError,
   setOverage as setSubscriptionOverage,
 } from "@millionsend/billing";
 import { env } from "@millionsend/config";
@@ -131,36 +133,54 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         // Plan changes on a live subscription go through changePlan; a second
         // Checkout would create a second subscription.
         if (hasLiveSubscription(team.planStatus)) {
-          throw new TRPCError({ code: "PRECONDITION_FAILED" });
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "SEND_CHECKOUT_SUBSCRIPTION_EXISTS",
+          });
         }
-        const url = await createCheckoutSession(
-          { db: ctx.db, stripe: deps.stripe() },
-          {
-            team,
-            rung: input.rung,
-            email: ctx.session.user.email,
-            successUrl: `${billingPageUrl()}?checkout=success`,
-            cancelUrl: billingPageUrl(),
-            automaticTax: env.STRIPE_AUTOMATIC_TAX ?? true,
-          },
-        );
+        let checkout: Awaited<ReturnType<typeof beginSendCheckout>>;
+        try {
+          checkout = await beginSendCheckout(
+            { db: ctx.db, stripe: deps.stripe(), livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? "") },
+            {
+              team,
+              userId: ctx.session.user.id,
+              rung: input.rung,
+              email: ctx.session.user.email,
+              successUrl: `${billingPageUrl()}?checkout=success`,
+              cancelUrl: billingPageUrl(),
+              automaticTax: env.STRIPE_AUTOMATIC_TAX ?? true,
+            },
+          );
+        } catch (error) {
+          if (!(error instanceof SendCheckoutError)) throw error;
+          const code =
+            error.code === "forbidden"
+              ? "FORBIDDEN"
+              : error.code === "not_found"
+                ? "NOT_FOUND"
+                : error.code === "invalid"
+                  ? "BAD_REQUEST"
+                  : error.code === "subscription_exists"
+                    ? "PRECONDITION_FAILED"
+                    : "CONFLICT";
+          throw new TRPCError({ code, message: `SEND_CHECKOUT_${error.code.toUpperCase()}` });
+        }
         await recordAudit(ctx, {
           action: "billing.checkout_started",
           target: { type: "team", id: ctx.teamId },
-          metadata: { rung: input.rung },
+          metadata: { rung: input.rung, checkoutAttemptId: checkout.attemptId },
         });
-        // The funnel's checkout step. Claimed once per team per day: a visitor
-        // who opens Checkout three times is one intent, not three, while a
-        // second attempt next week is news again. Emitted here because this is
-        // the only place a Checkout session is created.
+        // A durable, persisted Session defines this intent. Retrying its URL
+        // cannot count as another checkout or claim a successful payment.
         await emitFunnel(ctx.db, {
           name: "checkout_started",
-          dedupeKey: `checkout_started:${ctx.teamId}:${utcDay(new Date())}`,
+          dedupeKey: `checkout_started:${ctx.teamId}:${checkout.attemptId}`,
           teamId: ctx.teamId,
           props: { plan: input.rung.split("_")[0] ?? null },
           resolve: (tx) => teamFunnelProps(tx, ctx.teamId),
         });
-        return { url };
+        return { url: checkout.url };
       }),
 
     /**

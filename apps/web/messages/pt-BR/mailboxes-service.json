@@ -25,7 +25,7 @@
     "expired": "Período encerrado",
     "restricted": "Acesso limitado"
   },
-  "existingLicenseBody": "A licença de Correio deste time já está registrada. Contratos e pilotos internos usam as caixas e o período acima. Para renovar ou alterar a quantidade, fale com o responsável pela instalação; não abra outra assinatura.",
+  "existingLicenseBody": "A licença de Correio deste time já está registrada. Use as ações disponíveis abaixo para gerir uma assinatura. Licenças internas são geridas pelo responsável pela instalação.",
   "existingBody": "Este time já tem uma compra de Correio registrada e a licença ainda aguarda confirmação. Atualize o status. Se continuar pendente, fale com o responsável pela instalação; não abra outra assinatura.",
   "recoveryBody": "Há uma compra iniciada com condições anteriores. Ela precisa ser resolvida antes de uma nova assinatura.",
   "adminBody": "Somente o responsável ou um administrador do time pode assinar, quando a compra estiver disponível. Times suspensos não podem comprar.",
@@ -36,7 +36,10 @@
   "quantityLocked": "A quantidade desta compra foi preservada. Tentar novamente consulta a mesma compra.",
   "pricePerMailbox": "Preço por caixa",
   "included": "Incluído por caixa",
-  "interval": { "month": "mês", "year": "ano" },
+  "interval": {
+    "month": "mês",
+    "year": "ano"
+  },
   "priceInterval": "{amount} / {interval}",
   "total": "Total para {count, number} caixas",
   "checkoutTerms": "Confira o valor final e as condições no checkout seguro da Stripe antes de confirmar.",
@@ -48,5 +51,24 @@
   "confirmationHint": "Abrir o checkout ou voltar desta página não ativa a licença. O acesso muda somente após a confirmação do serviço.",
   "awaitingConfirmation": "Você voltou do checkout. Aguarde a confirmação da licença e atualize o status quando quiser.",
   "confirmed": "O serviço confirma que a licença está ativa.",
-  "documentation": "Documentação"
+  "documentation": "Documentação",
+  "cancelScheduled": "Renovação cancelada. O acesso atual continua até {date}.",
+  "reductionScheduled": "{count, number} caixas programadas para a renovação em {date}; a quantidade atual continua disponível até lá.",
+  "increasePending": "O aumento para {count, number} caixas aguarda pagamento confirmado. Os assentos atuais continuam iguais.",
+  "managementTerms": "Aumentos só liberam caixas após pagamento confirmado. Reduções entram na próxima renovação. Mensagens armazenadas são preservadas.",
+  "manageQuantity": "Nova quantidade de caixas",
+  "requestIncrease": "Solicitar aumento",
+  "requestReduction": "Programar quantidade na renovação",
+  "cancelTerms": "Cancelar a renovação mantém o acesso atual até {date} e remove uma redução futura programada. Mensagens continuam disponíveis para leitura e exportação por quem tem acesso à caixa.",
+  "cancelAtEnd": "Cancelar ao fim do período",
+  "resumeRenewal": "Retomar renovação",
+  "managementPending": "Há uma operação pendente. Atualizar status consulta a mesma operação; não inicia outra cobrança.",
+  "completeIncreasePayment": "Concluir pagamento do aumento",
+  "managementResult": {
+    "confirmed": "A alteração foi confirmada pelo serviço.",
+    "scheduled": "A redução foi confirmada para a próxima renovação.",
+    "pending": "A operação aguarda confirmação. Atualize o status para consultar novamente.",
+    "expired": "A operação terminou sem aplicar a alteração. Atualize o status antes de iniciar outra.",
+    "error": "Não foi possível confirmar a operação. Atualize o status; não abra outra cobrança."
+  }
 }

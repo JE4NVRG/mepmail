@@ -57,6 +57,20 @@
       "when": 1790866800007,
       "tag": "0007_mailbox_customer_request",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790866800008,
+      "tag": "0008_provider_rfc_message_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790866800009,
+      "tag": "0009_mailbox_management_requests",
+      "breakpoints": true
     }
   ]
 }

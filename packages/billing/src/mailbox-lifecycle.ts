@@ -1,16 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import type Stripe from "stripe";
+import { mailboxManagementRequests } from "../../db/src/schema/mailbox-management-requests.js";
 import {
   createMailboxCheckoutSession,
   isMailboxSubscription,
   MAILBOX_CUSTOMER_METADATA_KEY,
-  mailboxCheckoutSessionMatches,
-  mailboxCheckoutTerms,
   type MailboxBillingStripe,
   type MailboxCatalog,
   type MailboxPriceTerms,
+  mailboxCheckoutSessionMatches,
+  mailboxCheckoutTerms,
+  mailboxIncreasePaymentConfirmed,
   projectMailboxSubscription,
 } from "./mailbox.js";
 import type { BillingStripe } from "./stripe.js";
@@ -99,8 +101,31 @@ export async function applyMailboxSubscription(
   sub: Stripe.Subscription,
   catalog: MailboxCatalog | null,
   eventCreated: number,
+  paymentInvoice?: Stripe.Invoice,
 ): Promise<MailboxApplyResult> {
   if (!epoch(eventCreated)) throw new MailboxLifecycleError("invalid");
+  return applyMailboxProjection(db, sub, catalog, eventCreated, paymentInvoice);
+}
+
+/** Management readback keeps the existing webhook watermark; it cannot create a new grant. */
+export async function reconcileExistingMailboxSubscription(
+  db: Db,
+  sub: Stripe.Subscription,
+  catalog: MailboxCatalog | null,
+  paymentInvoice?: Stripe.Invoice,
+) {
+  return applyMailboxProjection(db, sub, catalog, null, paymentInvoice);
+}
+export function mailboxSubscriptionCatalog(catalog: MailboxCatalog, row: MailboxSubscriptionRow) {
+  return withHistoricalTerms(catalog, historicalTerms(row));
+}
+async function applyMailboxProjection(
+  db: Db,
+  sub: Stripe.Subscription,
+  catalog: MailboxCatalog | null,
+  eventCreated: number | null,
+  paymentInvoice?: Stripe.Invoice,
+): Promise<MailboxApplyResult> {
   const customerId = idOf(sub.customer);
   if (!customerId) return { applied: false, teamId: null, reason: "unknown_customer" };
   return db.transaction(async (tx): Promise<MailboxApplyResult> => {
@@ -123,7 +148,10 @@ export async function applyMailboxSubscription(
       .from(schema.mailboxSubscriptions)
       .where(eq(schema.mailboxSubscriptions.teamId, team.id))
       .for("update");
+    if (eventCreated === null && (!current || current.stripeSubscriptionId !== sub.id))
+      return result("invalid_projection");
     if (
+      eventCreated !== null &&
       current?.lastEventCreated !== null &&
       current?.lastEventCreated !== undefined &&
       eventCreated < current.lastEventCreated
@@ -182,7 +210,7 @@ export async function applyMailboxSubscription(
         .set({
           status: "inactive",
           seats: 0,
-          lastEventCreated: eventCreated,
+          lastEventCreated: eventCreated ?? current.lastEventCreated,
           updatedAt: new Date(),
         })
         .where(eq(schema.mailboxSubscriptions.teamId, team.id));
@@ -196,7 +224,143 @@ export async function applyMailboxSubscription(
       // An occupied internal grant has no Stripe subscription ID. Only an explicit
       // closure may release it; linking a Customer never hands its seats to Stripe.
       return result("superseded");
-    const next = { ...projection, lastEventCreated: eventCreated, updatedAt: new Date() };
+    const [increase] = current
+      ? await tx
+          .select()
+          .from(mailboxManagementRequests)
+          .where(
+            and(
+              eq(mailboxManagementRequests.teamId, team.id),
+              eq(mailboxManagementRequests.stripeSubscriptionId, sub.id),
+              eq(mailboxManagementRequests.action, "increase"),
+              inArray(mailboxManagementRequests.status, ["creating", "pending"]),
+            ),
+          )
+          .for("update")
+      : [];
+    const invoice =
+      paymentInvoice ?? (typeof sub.latest_invoice === "object" ? sub.latest_invoice : null);
+    const terminal = ["canceled", "incomplete_expired"].includes(sub.status);
+    if (
+      increase &&
+      !sub.pending_update &&
+      projection.seats === increase.seatsBefore &&
+      invoice?.id === increase.stripeInvoiceId &&
+      invoice.status === "void" &&
+      idOf(invoice.customer) === customerId &&
+      invoice.livemode === projection.livemode &&
+      idOf(invoice.parent?.subscription_details?.subscription) === sub.id
+    )
+      await tx
+        .update(mailboxManagementRequests)
+        .set({ status: "expired", updatedAt: new Date() })
+        .where(eq(mailboxManagementRequests.id, increase.id));
+    if (
+      !terminal &&
+      current?.stripeSubscriptionId === sub.id &&
+      current.seats > 0 &&
+      projection.seats > current.seats &&
+      !mailboxIncreasePaymentConfirmed(
+        sub,
+        {
+          customerId,
+          livemode: projection.livemode,
+          previousInvoiceId: increase?.previousInvoiceId,
+          invoiceId: increase?.stripeInvoiceId,
+          seats: projection.seats,
+          periodStart: increase?.periodStart ?? projection.periodStart,
+          periodEnd: increase?.periodEnd ?? projection.periodEnd,
+          prorationAt: increase?.createdAt,
+        },
+        paymentInvoice,
+      )
+    )
+      return result("invalid_projection");
+    const [reduction] = current
+      ? await tx
+          .select()
+          .from(mailboxManagementRequests)
+          .where(
+            and(
+              eq(mailboxManagementRequests.teamId, team.id),
+              eq(mailboxManagementRequests.stripeSubscriptionId, sub.id),
+              eq(mailboxManagementRequests.action, "decrease"),
+              eq(mailboxManagementRequests.status, "scheduled"),
+            ),
+          )
+          .for("update")
+      : [];
+    if (
+      reduction &&
+      ["active", "trialing"].includes(projection.status) &&
+      projection.seats < current!.seats &&
+      projection.periodStart < reduction.periodEnd
+    )
+      return result("invalid_projection");
+    if (
+      !terminal &&
+      increase &&
+      projection.seats === increase.seats &&
+      mailboxIncreasePaymentConfirmed(
+        sub,
+        {
+          customerId,
+          livemode: projection.livemode,
+          previousInvoiceId: increase.previousInvoiceId,
+          invoiceId: increase.stripeInvoiceId,
+          seats: increase.seats,
+          periodStart: increase.periodStart,
+          periodEnd: increase.periodEnd,
+          prorationAt: increase.createdAt,
+        },
+        paymentInvoice,
+      )
+    )
+      await tx
+        .update(mailboxManagementRequests)
+        .set({
+          status: "confirmed",
+          stripeInvoiceId: paymentInvoice?.id ?? idOf(sub.latest_invoice),
+          updatedAt: new Date(),
+        })
+        .where(eq(mailboxManagementRequests.id, increase.id));
+    await tx
+      .update(mailboxManagementRequests)
+      .set({ status: "confirmed", updatedAt: new Date() })
+      .where(
+        and(
+          eq(mailboxManagementRequests.teamId, team.id),
+          eq(mailboxManagementRequests.stripeSubscriptionId, sub.id),
+          eq(mailboxManagementRequests.action, "decrease"),
+          eq(mailboxManagementRequests.status, "scheduled"),
+          eq(mailboxManagementRequests.seats, projection.seats),
+          // Only a new period can fulfill a scheduled reduction.
+          sql`${mailboxManagementRequests.periodEnd} <= ${projection.periodStart}`,
+        ),
+      );
+    if (terminal)
+      await tx
+        .update(mailboxManagementRequests)
+        .set({ status: "expired", updatedAt: new Date() })
+        .where(
+          and(
+            eq(mailboxManagementRequests.teamId, team.id),
+            eq(mailboxManagementRequests.stripeSubscriptionId, sub.id),
+            eq(mailboxManagementRequests.stripeCustomerId, customerId),
+            eq(mailboxManagementRequests.livemode, projection.livemode),
+            inArray(mailboxManagementRequests.status, [
+              "prepared",
+              "creating",
+              "pending",
+              "scheduled",
+            ]),
+          ),
+        );
+    const next = {
+      ...projection,
+      lastEventCreated: eventCreated ?? current?.lastEventCreated ?? null,
+      updatedAt: new Date(),
+    };
     if (current) {
       await tx
         .update(schema.mailboxSubscriptions)

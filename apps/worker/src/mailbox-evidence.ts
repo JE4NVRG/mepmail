@@ -8,10 +8,12 @@ import {
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { and, eq } from "drizzle-orm";
+import { simpleParser } from "mailparser";
+import { mailboxMessageId } from "../../../packages/core/src/mailbox-message-id.js";
 import {
   assertMailboxNotificationTopic,
-  mailboxProviderAddress,
   MailboxProviderEventError,
+  mailboxProviderAddress,
   providerRecord,
   type TrustedMailboxNotification,
 } from "./mailbox-receiver.js";
@@ -181,7 +183,37 @@ export function createMailboxEvidenceHandler(options: {
       JSON.stringify(expected) !== JSON.stringify(destination)
     )
       throw new MailboxProviderEventError("evidence");
-    await acceptMailboxOutbox(options.db, outboxId, { attemptId, messageId });
+    const captured = await simpleParser(raw, { skipImageLinks: true, skipTextToHtml: true });
+    const originalId = mailboxMessageId(captured.messageId);
+    // headers contains the submitted headers, not SES's final Message-ID.
+    // It can bind evidence to the captured revision but must never be an alias.
+    if (Array.isArray(mail.headers)) {
+      const originalHeaders = mail.headers
+        .map(providerRecord)
+        .filter(
+          (header) =>
+            typeof header?.name === "string" && header.name.toLowerCase() === "message-id",
+        );
+      if (
+        originalHeaders.length > 1 ||
+        (originalHeaders.length === 1 &&
+          (!originalId || mailboxMessageId(originalHeaders[0]!.value) !== originalId))
+      )
+        throw new MailboxProviderEventError("evidence");
+    }
+    // Legacy notification commonHeaders is also original. Event publishing
+    // reports the assigned ID, often bare; only an observed complete RFC value
+    // distinct from the submitted ID can close the alias gap. No API derivation.
+    const observedId =
+      typeof event.eventType === "string"
+        ? mailboxMessageId(providerRecord(mail.commonHeaders)?.messageId)
+        : null;
+    const rfcMessageId = observedId && observedId !== originalId ? observedId : undefined;
+    await acceptMailboxOutbox(options.db, outboxId, {
+      attemptId,
+      messageId,
+      ...(rfcMessageId ? { rfcMessageId } : {}),
+    });
     return true;
   };
 }

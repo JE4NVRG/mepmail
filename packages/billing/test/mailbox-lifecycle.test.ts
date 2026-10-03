@@ -3,21 +3,21 @@ import { fileURLToPath } from "node:url";
 import { type Db, schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq, sql } from "drizzle-orm";
-import type Stripe from "stripe";
+import Stripe from "stripe";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  applyMailboxSubscription,
-  beginMailboxCheckout,
-  resolveMailboxCustomer,
-  type BeginMailboxCheckoutInput,
-} from "../src/mailbox-lifecycle.js";
 import {
   MAILBOX_CHECKOUT_METADATA_KEY,
   MAILBOX_CUSTOMER_METADATA_KEY,
-  recoverMailboxCheckoutSession,
   type MailboxBillingStripe,
   type MailboxCatalog,
+  recoverMailboxCheckoutSession,
 } from "../src/mailbox.js";
+import {
+  applyMailboxSubscription,
+  type BeginMailboxCheckoutInput,
+  beginMailboxCheckout,
+  resolveMailboxCustomer,
+} from "../src/mailbox-lifecycle.js";
 import { fakeStripe, PERIOD_END, PERIOD_START, subscription } from "./helpers.js";
 
 const CUSTOMER = "cus_mailbox_fixture";
@@ -68,6 +68,50 @@ function mailSub(id = "sub_mail", status: Stripe.Subscription.Status = "active")
     },
   };
   return sub;
+}
+
+function paidIncreaseInvoice(sub: Stripe.Subscription, seats = sub.items.data[0]!.quantity!) {
+  const id = "in_exact_external_increase",
+    item = sub.items.data[0]!;
+  return {
+    id,
+    customer: CUSTOMER,
+    livemode: false,
+    currency: TERMS.currency,
+    billing_reason: "subscription_update",
+    status: "paid",
+    amount_remaining: 0,
+    parent: { subscription_details: { subscription: sub.id } },
+    lines: {
+      object: "list",
+      has_more: false,
+      data: [
+        {
+          id: "il_exact_external_increase",
+          invoice: id,
+          livemode: false,
+          currency: TERMS.currency,
+          amount: TERMS.unitAmount * seats,
+          quantity: seats,
+          pricing: {
+            type: "price_details",
+            price_details: { price: TERMS.priceId },
+            unit_amount_decimal: Stripe.Decimal.from(TERMS.unitAmount),
+          },
+          period: { start: PERIOD_START + 200, end: PERIOD_END },
+          parent: {
+            type: "subscription_item_details",
+            subscription_item_details: {
+              subscription: sub.id,
+              subscription_item: item.id,
+              proration: true,
+              proration_details: null,
+            },
+          },
+        },
+      ],
+    },
+  } as unknown as Stripe.Invoice;
 }
 
 describe("Mailbox lifecycle with real optional migrations", () => {
@@ -799,6 +843,7 @@ describe("Mailbox lifecycle with real optional migrations", () => {
       prices: [{ ...TERMS, priceId: "price_new", unitAmount: 456, storageBytesPerMailbox: 8192 }],
     };
     sub.items.data[0]!.quantity = 4;
+    sub.latest_invoice = paidIncreaseInvoice(sub);
     await applyMailboxSubscription(db, sub, rotated, EVENT + 1);
     expect(await plan()).toMatchObject({
       seats: 4,
@@ -814,6 +859,44 @@ describe("Mailbox lifecycle with real optional migrations", () => {
       "superseded",
     );
     expect(await plan()).toEqual(before);
+  });
+
+  it("preserves initial purchase authority while refusing an old paid invoice for a later increase", async () => {
+    const sub = mailSub();
+    sub.latest_invoice = null;
+    expect((await applyMailboxSubscription(db, sub, CATALOG, EVENT)).applied).toBe(true);
+    const old = paidIncreaseInvoice(sub, 3);
+    sub.items.data[0]!.quantity = 5;
+    sub.latest_invoice = old;
+    expect((await applyMailboxSubscription(db, sub, CATALOG, EVENT + 1)).reason).toBe(
+      "invalid_projection",
+    );
+    const afterOldInvoice = await plan();
+    if (!afterOldInvoice)
+      throw new Error("Expected the Mail subscription after rejecting an old invoice");
+    expect(afterOldInvoice.seats).toBe(3);
+    sub.latest_invoice = paidIncreaseInvoice(sub);
+    expect((await applyMailboxSubscription(db, sub, CATALOG, EVENT + 2)).applied).toBe(true);
+    const afterPaidIncrease = await plan();
+    if (!afterPaidIncrease)
+      throw new Error("Expected the Mail subscription after the paid increase");
+    expect(afterPaidIncrease.seats).toBe(5);
+  });
+
+  it("refuses a paid debit from a previous period even when its quantity matches the external increase", async () => {
+    const sub = mailSub();
+    await applyMailboxSubscription(db, sub, CATALOG, EVENT);
+    sub.items.data[0]!.quantity = 5;
+    const evidence = paidIncreaseInvoice(sub);
+    evidence.lines.data[0]!.period = { start: PERIOD_START - 2592000, end: PERIOD_START };
+    sub.latest_invoice = evidence;
+    expect((await applyMailboxSubscription(db, sub, CATALOG, EVENT + 1)).reason).toBe(
+      "invalid_projection",
+    );
+    const afterOldPeriod = await plan();
+    if (!afterOldPeriod)
+      throw new Error("Expected the Mail subscription after rejecting an old period");
+    expect(afterOldPeriod.seats).toBe(3);
   });
 
   it.each(["active", "trialing", "past_due"] as const)(

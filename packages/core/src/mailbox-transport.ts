@@ -3,19 +3,20 @@ import { type Db, schema } from "@millionsend/db";
 import { and, asc, eq, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { mailboxOutbox } from "../../db/src/schema/mailbox-transport.js";
 import {
-  MailboxAgentAccessError,
-  withMailboxAgentAccess,
-  withMailboxAgentQueuedSendAccess,
-} from "./mailbox-agent-access.js";
-import {
   BOUND_ENVELOPE_VERSION_OFFSET,
   decryptPayload,
   encryptPayload,
 } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
 import {
-  MailboxContentError,
+  MailboxAgentAccessError,
+  withMailboxAgentAccess,
+  withMailboxAgentQueuedSendAccess,
+} from "./mailbox-agent-access.js";
+import { mailboxMessageId } from "./mailbox-message-id.js";
+import {
   type MailboxContentActor,
+  MailboxContentError,
   withMailboxWriteAccess,
 } from "./mailbox-private-store.js";
 import {
@@ -84,6 +85,15 @@ type Outbox = typeof mailboxOutbox.$inferSelect;
 const MAX_MIME_BYTES = 1024 * 1024;
 const MAX_RECIPIENTS = 20;
 const MAX_ATTACHMENT_BYTES = 256 * 1024;
+
+function hasAsciiControl(value: string, includeSpace = false) {
+  const limit = includeSpace ? 32 : 31;
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (code <= limit || code === 127) return true;
+  }
+  return false;
+}
 
 function copyRaw(value: Buffer) {
   if (!Buffer.isBuffer(value) || !value.length || value.length > MAX_MIME_BYTES)
@@ -198,7 +208,7 @@ export async function receiveMailboxMime(
     typeof input.sourceId !== "string" ||
     !input.sourceId ||
     input.sourceId.length > 512 ||
-    /[\x00-\x1f\x7f]/.test(input.sourceId)
+    hasAsciiControl(input.sourceId)
   )
     throw new MailboxContentError("invalid");
   const recipients = [...new Set(input.recipients.map(addr))].sort();
@@ -461,13 +471,17 @@ async function queueAuthorizedMailboxDraft(
 export async function acceptMailboxOutbox(
   db: Db,
   outboxId: string,
-  evidence: { attemptId: string; messageId: string; now?: Date },
+  evidence: { attemptId: string; messageId: string; rfcMessageId?: string; now?: Date },
 ) {
   if (
     !evidence.messageId ||
     evidence.messageId.length > 512 ||
-    /[\x00-\x20\x7f]/.test(evidence.messageId)
+    hasAsciiControl(evidence.messageId, true)
   )
+    throw new MailboxContentError("invalid");
+  const rfcMessageId =
+    evidence.rfcMessageId === undefined ? null : mailboxMessageId(evidence.rfcMessageId);
+  if (evidence.rfcMessageId !== undefined && !rfcMessageId)
     throw new MailboxContentError("invalid");
   const now = evidence.now ?? new Date();
   return db.transaction(async (transaction) => {
@@ -489,8 +503,32 @@ export async function acceptMailboxOutbox(
       .where(eq(mailboxOutbox.id, outboxId))
       .for("update");
     if (row!.attemptId !== evidence.attemptId) throw new MailboxContentError("conflict");
+    if (rfcMessageId) {
+      if (row!.providerRfcMessageId && row!.providerRfcMessageId !== rfcMessageId)
+        throw new MailboxContentError("conflict");
+      const [collision] = await tx
+        .select({ id: mailboxOutbox.id })
+        .from(mailboxOutbox)
+        .where(
+          and(
+            eq(mailboxOutbox.mailboxId, row!.mailboxId),
+            eq(mailboxOutbox.teamId, row!.teamId),
+            eq(mailboxOutbox.providerRfcMessageId, rfcMessageId),
+            ne(mailboxOutbox.id, row!.id),
+          ),
+        );
+      if (collision) throw new MailboxContentError("conflict");
+    }
     if (row!.status === "accepted") {
       if (row!.providerMessageId !== evidence.messageId) throw new MailboxContentError("conflict");
+      // A worker acknowledgement may arrive before a complete RFC header is
+      // observed. Enrich metadata only; preserve MIME, acceptance and no-replay.
+      if (rfcMessageId && !row!.providerRfcMessageId) {
+        await tx
+          .update(mailboxOutbox)
+          .set({ providerRfcMessageId: rfcMessageId, updatedAt: now })
+          .where(eq(mailboxOutbox.id, row!.id));
+      }
       return outboxDto(row!, true);
     }
     if (
@@ -520,6 +558,7 @@ export async function acceptMailboxOutbox(
       .set({
         status: "accepted",
         providerMessageId: evidence.messageId,
+        providerRfcMessageId: rfcMessageId,
         acceptedAt: now,
         updatedAt: now,
         ciphertext: null,

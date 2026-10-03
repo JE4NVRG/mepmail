@@ -1,8 +1,6 @@
-import { type PlanRungKey, rungByKey } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { eq, sql } from "drizzle-orm";
-import { overageLookupKey, resolvePriceId, rungLookupKey } from "./prices.js";
+import { beginSendCheckout, type SendCheckoutInput } from "./send-checkout.js";
 import type { BillingStripe } from "./stripe.js";
 
 export interface BillingDeps {
@@ -35,76 +33,12 @@ export function hasLiveSubscription(status: PlanStatus): boolean {
   return LIVE_SUBSCRIPTION_STATUSES.has(status);
 }
 
-/**
- * The customer is created before Checkout (not by it) so the webhook can
- * always locate the team by stripe_customer_id. Concurrent first checkouts
- * may each create a customer; COALESCE keeps whichever linked first and both
- * requests continue with it (the loser is an empty, never-referenced customer).
- */
-async function ensureCustomer(
-  deps: BillingDeps,
-  team: BillingTeam,
-  email: string,
-): Promise<string> {
-  if (team.stripeCustomerId) return team.stripeCustomerId;
-  const customer = await deps.stripe.customers.create({
-    name: team.name,
-    email,
-    metadata: { team_id: team.id },
-  });
-  const [linked] = await deps.db
-    .update(schema.teams)
-    .set({ stripeCustomerId: sql`coalesce(${schema.teams.stripeCustomerId}, ${customer.id})` })
-    .where(eq(schema.teams.id, team.id))
-    .returning({ stripeCustomerId: schema.teams.stripeCustomerId });
-  return linked?.stripeCustomerId ?? customer.id;
-}
-
+/** Financial intent and the real Session ID are durable; this compatibility API returns its URL. */
 export async function createCheckoutSession(
-  deps: BillingDeps,
-  input: {
-    team: BillingTeam;
-    rung: PlanRungKey;
-    email: string;
-    successUrl: string;
-    cancelUrl: string;
-    /** Stripe Tax is unavailable on some account countries (e.g. BR); off falls back to untaxed checkout. */
-    automaticTax?: boolean;
-  },
+  deps: BillingDeps & { livemode: boolean },
+  input: SendCheckoutInput,
 ): Promise<string> {
-  const rung = rungByKey(input.rung);
-  if (rung.priceCents <= 0) throw new Error(`rung ${input.rung} is not for sale`);
-  // A monthly plan carries its metered overage item from the first day;
-  // it bills only what the worker reports, so the customer's switch decides.
-  const [price, overagePrice, customer] = await Promise.all([
-    resolvePriceId(deps.stripe, rungLookupKey(rung)),
-    rung.period === "month" ? resolvePriceId(deps.stripe, overageLookupKey(rung)) : null,
-    ensureCustomer(deps, input.team, input.email),
-  ]);
-  const session = await deps.stripe.checkout.sessions.create(
-    {
-      mode: "subscription",
-      customer,
-      client_reference_id: input.team.id,
-      line_items: [{ price, quantity: 1 }, ...(overagePrice ? [{ price: overagePrice }] : [])],
-      success_url: input.successUrl,
-      cancel_url: input.cancelUrl,
-      automatic_tax: { enabled: input.automaticTax ?? true },
-      tax_id_collection: { enabled: input.automaticTax ?? true },
-      allow_promotion_codes: true,
-      billing_address_collection: "auto",
-      // Automatic tax on an existing customer requires Checkout to persist the
-      // collected address (and the business name for tax ids) onto it.
-      customer_update: { address: "auto", name: "auto" },
-    },
-    // A double-click or two tabs within the same minute replay one session
-    // instead of minting several.
-    {
-      idempotencyKey: `checkout:${input.team.id}:${input.rung}:${Math.floor(Date.now() / 60_000)}`,
-    },
-  );
-  if (!session.url) throw new Error("Stripe checkout session has no url");
-  return session.url;
+  return (await beginSendCheckout(deps, input)).url;
 }
 
 export async function createPortalSession(

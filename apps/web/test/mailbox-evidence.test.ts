@@ -13,9 +13,9 @@ import {
 } from "../../../packages/core/src/mailbox-private-store.js";
 import { createMailboxRegistry } from "../../../packages/core/src/mailbox-registry.js";
 import {
+  type MailboxOutboxSender,
   queueMailboxDraft,
   sendMailboxOutbox,
-  type MailboxOutboxSender,
 } from "../../../packages/core/src/mailbox-transport.js";
 import {
   createMailboxEvidenceHandler,
@@ -27,7 +27,7 @@ import { mailboxWorkerMime } from "../../worker/src/mailbox-sender.js";
 const topicArn = "arn:aws:sns:us-east-1:123456789012:private-ses-events";
 const westTopic = "arn:aws:sns:us-west-2:123456789012:private-ses-events";
 const raw = Buffer.from(
-  "From: person@evidence.invalid\r\nTo: recipient@example.invalid\r\nCc: copy@example.invalid\r\nSubject: Private evidence\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nprivate submitted revision\r\n",
+  "From: person@evidence.invalid\r\nTo: recipient@example.invalid\r\nCc: copy@example.invalid\r\nSubject: Private evidence\r\nMessage-ID: <submitted@evidence.invalid>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nprivate submitted revision\r\n",
 );
 
 describe("authenticated private SES acceptance evidence", () => {
@@ -150,15 +150,34 @@ describe("authenticated private SES acceptance evidence", () => {
       enabled,
       topics: [topicArn, westTopic],
     });
+  const headers = (input: TrustedMailboxNotification, messageId: string) => {
+    const event = input.event as { eventType: string; mail: Record<string, unknown> };
+    return {
+      ...input,
+      event: {
+        ...event,
+        mail: {
+          ...event.mail,
+          headers: [{ name: "Message-ID", value: "<submitted@evidence.invalid>" }],
+          commonHeaders: { messageId },
+        },
+      },
+    };
+  };
 
   it("reconciles a lost acknowledgement to one private Sent item, including duplicate notifications", async () => {
     const { row, send } = await unknown();
     const handle = handler();
-    expect(await handle(notification(row.id, row.attemptId!))).toBe(true);
-    expect(await handle(notification(row.id, row.attemptId!))).toBe(true);
+    const evidence = headers(
+      notification(row.id, row.attemptId!),
+      "<observed-final@email.amazonses.com>",
+    );
+    expect(await handle(evidence)).toBe(true);
+    expect(await handle(evidence)).toBe(true);
     const accepted = await outbox(row.id);
     expect(accepted.status).toBe("accepted");
     expect(accepted.providerMessageId).toBe("ses-private-accepted-1");
+    expect(accepted.providerRfcMessageId).toBe("<observed-final@email.amazonses.com>");
     expect(accepted.ciphertext).toBeNull();
     expect(accepted.attemptId).toBe(row.attemptId);
     const sent = (await db.select().from(schema.mailboxItems)).filter(
@@ -174,6 +193,65 @@ describe("authenticated private SES acceptance evidence", () => {
     );
     expect(send).toHaveBeenCalledTimes(1);
     expect(await db.select().from(schema.emails)).toHaveLength(0);
+  });
+
+  it("keeps bare API IDs and original/legacy headers pending, then enriches only a complete assigned event header", async () => {
+    const { row, send } = await unknown();
+    const handle = handler();
+    const input = notification(row.id, row.attemptId!);
+    await handle(headers(input, "ses-private-accepted-1"));
+    const accepted = await outbox(row.id);
+    expect(accepted.providerRfcMessageId).toBeNull();
+    await handle(headers(input, "<submitted@evidence.invalid>"));
+    const legacy = headers(input, "<legacy-original@example.invalid>");
+    await handle({
+      ...legacy,
+      event: { ...legacy.event, eventType: undefined, notificationType: "Send" },
+    });
+    expect((await outbox(row.id)).providerRfcMessageId).toBeNull();
+    const alias = "<observed-final@email.amazonses.com>";
+    await handle(headers(input, alias));
+    await handle(headers(input, alias));
+    expect(await outbox(row.id)).toMatchObject({
+      providerRfcMessageId: alias,
+      providerMessageId: "ses-private-accepted-1",
+      acceptedAt: accepted.acceptedAt,
+    });
+    await expect(
+      handle(headers(input, "<different-final@email.amazonses.com>")),
+    ).rejects.toMatchObject({ code: "conflict" });
+    const sent = (await db.select().from(schema.mailboxItems)).filter(
+      (item) => item.kind === "sent",
+    );
+    expect(sent).toHaveLength(1);
+    expect((await readMailboxItem(db, keys, owner(), { mailboxId, id: row.id })).raw).toEqual(raw);
+    await sendMailboxOutbox(db, keys, row.id, { send }, mailboxWorkerMime);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("binds original Message-ID headers to the encrypted submitted revision and rejects substituted or duplicate originals", async () => {
+    const { row } = await unknown();
+    const valid = headers(
+      notification(row.id, row.attemptId!),
+      "<observed-final@email.amazonses.com>",
+    );
+    for (const originalHeaders of [
+      [{ name: "Message-ID", value: "<substituted@example.invalid>" }],
+      [
+        { name: "Message-ID", value: "<submitted@evidence.invalid>" },
+        { name: "message-id", value: "<submitted@evidence.invalid>" },
+      ],
+    ]) {
+      await expect(
+        handler()({
+          ...valid,
+          event: { ...valid.event, mail: { ...valid.event.mail, headers: originalHeaders } },
+        }),
+      ).rejects.toThrow("evidence");
+    }
+    expect((await outbox(row.id)).status).toBe("unknown");
+    expect((await outbox(row.id)).providerRfcMessageId).toBeNull();
+    expect((await outbox(row.id)).ciphertext).not.toBeNull();
   });
 
   it("rejects spoofed/out-of-attempt evidence and binds exact source, envelope, count, account and region", async () => {

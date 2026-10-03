@@ -22,6 +22,20 @@ export function safeMailboxCheckoutUrl(value: string): string | null {
     return null;
   }
 }
+export function safeMailboxPaymentUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" &&
+      url.hostname === "invoice.stripe.com" &&
+      !url.username &&
+      !url.password &&
+      !url.port
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 export function formatMailboxPrice(amount: number, currency: string, locale: string): string {
   const format = new Intl.NumberFormat(locale, { style: "currency", currency });
@@ -58,9 +72,11 @@ export function MailboxServicePanel() {
   const service = useQuery(trpc.mailboxes.service.queryOptions(undefined, { retry: false }));
   const billing = useQuery(trpc.mailboxes.billing.queryOptions(undefined, { retry: false }));
   const checkout = useMutation(trpc.mailboxes.checkout.mutationOptions());
+  const management = useMutation(trpc.mailboxes.manage.mutationOptions());
   const dialog = useRef<HTMLDialogElement>(null);
   const alive = useRef(false);
   const returnChecked = useRef(false);
+  const managementSequence = useRef(0);
   const titleId = useId();
   const seatsId = useId();
   const seatsHintId = useId();
@@ -71,9 +87,72 @@ export function MailboxServicePanel() {
     null,
   );
   const [returned, setReturned] = useState(false);
+  const [managedSeats, setManagedSeats] = useState("");
+  const [managementNotice, setManagementNotice] = useState<
+    "confirmed" | "scheduled" | "pending" | "expired" | "error" | null
+  >(null);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [managementReadback, setManagementReadback] = useState<{
+    serviceUpdatedAt: number;
+    billingUpdatedAt: number;
+    requestedSeats: number | null;
+  } | null>(null);
+  const publishManagementResult = useCallback(
+    async (
+      outcome: {
+        status: "confirmed" | "scheduled" | "pending" | "expired";
+        paymentUrl: string | null;
+      },
+      requestedSeats: number | null,
+      sequence: number,
+    ) => {
+      if (!alive.current || managementSequence.current !== sequence) return;
+      const [serviceRead, billingRead] = await Promise.allSettled([
+        service.refetch(),
+        billing.refetch(),
+      ]);
+      if (!alive.current || managementSequence.current !== sequence) return;
+      setManagementNotice(outcome.status);
+      setPaymentUrl(outcome.paymentUrl ? safeMailboxPaymentUrl(outcome.paymentUrl) : null);
+      setManagementReadback(
+        serviceRead.status === "fulfilled" &&
+          serviceRead.value.isSuccess &&
+          billingRead.status === "fulfilled" &&
+          billingRead.value.isSuccess
+          ? {
+              serviceUpdatedAt: serviceRead.value.dataUpdatedAt,
+              billingUpdatedAt: billingRead.value.dataUpdatedAt,
+              requestedSeats,
+            }
+          : null,
+      );
+    },
+    [service.refetch, billing.refetch],
+  );
   const refresh = useCallback(async () => {
+    const sequence = ++managementSequence.current;
+    setManagementNotice(null);
+    setPaymentUrl(null);
+    setManagementReadback(null);
+    if (billing.data?.management.canReconcile) {
+      try {
+        const outcome = await management.mutateAsync({ action: "reconcile" });
+        await publishManagementResult(outcome, billing.data.management.requestedSeats, sequence);
+        return;
+      } catch {
+        if (!alive.current || managementSequence.current !== sequence) return;
+        setManagementNotice("error");
+      }
+    }
     await Promise.allSettled([service.refetch(), billing.refetch()]);
-  }, [service.refetch, billing.refetch]);
+  }, [
+    service.refetch,
+    billing.refetch,
+    billing.data?.management.canReconcile,
+    billing.data?.management.requestedSeats,
+    management.mutateAsync,
+    publishManagementResult,
+  ]);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -122,6 +201,53 @@ export function MailboxServicePanel() {
     : null;
   const availability = billing.data?.availability;
   const notice = mailboxServiceNotice(availability, plan?.periodEnd, failure === "existing");
+  const manage = billing.data?.management;
+  // DTOs omit contract IDs. A later query publication invalidates local success/
+  // payment feedback even when quantity and period happen to look identical.
+  const currentManagementReadback =
+    loaded &&
+    managementReadback !== null &&
+    managementReadback.serviceUpdatedAt === service.dataUpdatedAt &&
+    managementReadback.billingUpdatedAt === billing.dataUpdatedAt;
+  const visibleManagementNotice =
+    managementNotice === "error"
+      ? "error"
+      : currentManagementReadback && (managementNotice !== "pending" || manage?.pending)
+        ? managementNotice
+        : null;
+  const visiblePaymentUrl =
+    currentManagementReadback &&
+    managementNotice === "pending" &&
+    manage?.pending &&
+    manage.requestedSeats !== null &&
+    manage.requestedSeats === managementReadback?.requestedSeats
+      ? paymentUrl
+      : null;
+  const busy = checkout.isPending || management.isPending;
+  const changeSeats = Number(managedSeats);
+  const validChange = Number.isSafeInteger(changeSeats) && changeSeats >= 1 && changeSeats <= 10000;
+  async function runManagement(action: "cancel" | "resume" | "quantity", seats?: number) {
+    if (busy) return;
+    const sequence = ++managementSequence.current;
+    setManagementNotice(null);
+    setPaymentUrl(null);
+    setManagementReadback(null);
+    try {
+      const outcome = await management.mutateAsync({
+        action,
+        ...(seats !== undefined ? { seats } : {}),
+      });
+      await publishManagementResult(
+        outcome,
+        action === "quantity" ? (seats ?? null) : (manage?.requestedSeats ?? null),
+        sequence,
+      );
+    } catch {
+      if (!alive.current || managementSequence.current !== sequence) return;
+      setManagementNotice("error");
+      await Promise.allSettled([service.refetch(), billing.refetch()]);
+    }
+  }
 
   function closeDialog() {
     dialog.current?.close();
@@ -186,7 +312,7 @@ export function MailboxServicePanel() {
           aria-labelledby={titleId}
           onClose={() => setOpen(false)}
           onCancel={(event) => {
-            if (checkout.isPending) event.preventDefault();
+            if (busy) event.preventDefault();
           }}
         >
           <header className={styles.dialogHeader}>
@@ -198,7 +324,7 @@ export function MailboxServicePanel() {
               type="button"
               className="ms-btn ms-btn-ghost"
               aria-label={t("close")}
-              disabled={checkout.isPending}
+              disabled={busy}
               onClick={closeDialog}
             >
               ×
@@ -247,6 +373,90 @@ export function MailboxServicePanel() {
                   </div>
                 ) : null}
               </dl>
+              {plan!.cancelAtPeriodEnd ? (
+                <p className={styles.notice}>{t("cancelScheduled", { date: date ?? "" })}</p>
+              ) : null}
+              {manage?.scheduledSeats !== null && manage?.scheduledSeats !== undefined ? (
+                <p className={styles.notice}>
+                  {t("reductionScheduled", {
+                    count: manage.scheduledSeats,
+                    date: manage.effectiveAt
+                      ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
+                          manage.effectiveAt,
+                        )
+                      : "",
+                  })}
+                </p>
+              ) : null}
+              {manage?.requestedSeats !== null && manage?.requestedSeats !== undefined ? (
+                <p role="status">{t("increasePending", { count: manage.requestedSeats })}</p>
+              ) : null}
+              {manage?.canReconcile ? (
+                <div className={styles.management}>
+                  <p className={styles.hint}>{t("managementTerms")}</p>
+                  {manage.canAdjust ? (
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        if (validChange) void runManagement("quantity", changeSeats);
+                      }}
+                    >
+                      <label htmlFor={`${seatsId}-manage`}>{t("manageQuantity")}</label>
+                      <input
+                        id={`${seatsId}-manage`}
+                        className="ms-input"
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={10000}
+                        step={1}
+                        required
+                        value={managedSeats}
+                        placeholder={String(manage.scheduledSeats ?? plan!.seats)}
+                        disabled={busy}
+                        onChange={(event) => setManagedSeats(event.target.value)}
+                      />
+                      <button className="ms-btn" type="submit" disabled={busy || !validChange}>
+                        {t(changeSeats > plan!.seats ? "requestIncrease" : "requestReduction")}
+                      </button>
+                    </form>
+                  ) : null}
+                  {manage.canCancel ? (
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void runManagement("cancel");
+                      }}
+                    >
+                      <p>{t("cancelTerms", { date: date ?? "" })}</p>
+                      <button className="ms-btn ms-btn-ghost" type="submit" disabled={busy}>
+                        {t("cancelAtEnd")}
+                      </button>
+                    </form>
+                  ) : null}
+                  {manage.canResume ? (
+                    <button
+                      className="ms-btn"
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void runManagement("resume")}
+                    >
+                      {t("resumeRenewal")}
+                    </button>
+                  ) : null}
+                  {manage.pending ? <p role="status">{t("managementPending")}</p> : null}
+                  {visibleManagementNotice ? (
+                    <p role={visibleManagementNotice === "error" ? "alert" : "status"}>
+                      {t(`managementResult.${visibleManagementNotice}`)}
+                    </p>
+                  ) : null}
+                  {visiblePaymentUrl ? (
+                    <a className="ms-btn" href={visiblePaymentUrl} target="_blank" rel="noreferrer">
+                      {t("completeIncreasePayment")}
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
               {!canPurchase ? (
                 <div className={styles.notice}>
                   <p>{t(notice)}</p>
@@ -355,6 +565,7 @@ export function MailboxServicePanel() {
                       </p>
                     ) : null}
                     <button
+                      type="submit"
                       className="ms-btn ms-btn-primary"
                       disabled={!validSeats || checkout.isPending || refreshing}
                     >
@@ -386,17 +597,12 @@ export function MailboxServicePanel() {
             <button
               type="button"
               className="ms-btn ms-btn-ghost"
-              disabled={refreshing || checkout.isPending}
+              disabled={refreshing || busy}
               onClick={() => void refresh()}
             >
               {t("refresh")}
             </button>
-            <button
-              type="button"
-              className="ms-btn"
-              disabled={checkout.isPending}
-              onClick={closeDialog}
-            >
+            <button type="button" className="ms-btn" disabled={busy} onClick={closeDialog}>
               {t("close")}
             </button>
           </footer>

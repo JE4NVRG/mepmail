@@ -49,6 +49,9 @@ export const mailboxOutbox = pgTable(
     attemptedAt: timestamp("attempted_at", { withTimezone: true }),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
     providerMessageId: text("provider_message_id"),
+    // Complete RFC alias observed in authenticated provider event publishing.
+    // The API's bare MessageId must never be expanded into this field.
+    providerRfcMessageId: text("provider_rfc_message_id"),
     errorCode: text("error_code"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -65,6 +68,9 @@ export const mailboxOutbox = pgTable(
       foreignColumns: [mailboxItems.id, mailboxItems.mailboxId, mailboxItems.teamId],
     }).onDelete("restrict"),
     uniqueIndex("mailbox_outbox_draft_revision_idx").on(t.mailboxId, t.draftId, t.draftRevision),
+    uniqueIndex("mailbox_outbox_rfc_message_id_idx")
+      .on(t.mailboxId, t.providerRfcMessageId)
+      .where(sql`${t.providerRfcMessageId} is not null`),
     index("mailbox_outbox_pending_idx").on(t.status, t.createdAt, t.id),
     index("mailbox_outbox_period_idx").on(t.mailboxId, t.periodStart),
     check(
@@ -72,6 +78,10 @@ export const mailboxOutbox = pgTable(
       sql`${t.status} in ('queued','sending','accepted','unknown','failed')`,
     ),
     check("mailbox_outbox_revision_check", sql`${t.draftRevision} >= 1`),
+    check(
+      "mailbox_outbox_rfc_message_id_check",
+      sql`${t.providerRfcMessageId} is null or (${t.status} = 'accepted' and char_length(${t.providerRfcMessageId}) between 5 and 512 and ${t.providerRfcMessageId} !~ '[[:space:][:cntrl:]]' and ${t.providerRfcMessageId} ~ '^<[^<>@]+@[^<>@]+>$')`,
+    ),
     check(
       "mailbox_outbox_approval_check",
       sql`(${t.approvalKind} = 'human' and ${t.agentKeyId} is null) or (${t.approvalKind} = 'agent' and ${t.agentKeyId} is not null)`,

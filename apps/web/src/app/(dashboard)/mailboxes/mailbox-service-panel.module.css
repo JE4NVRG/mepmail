@@ -163,6 +163,22 @@
   gap: 8px;
   margin-top: 20px;
 }
+.management {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+.management form {
+  display: grid;
+  gap: 8px;
+}
+.management input {
+  max-width: 180px;
+}
+.management button,
+.management a {
+  justify-self: start;
+}
 .docsLink {
   margin-right: auto;
 }

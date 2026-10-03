@@ -329,7 +329,12 @@
     },
     "checkoutSuccess": "Obrigado! Seu plano é atualizado assim que o Stripe confirmar o pagamento — normalmente em poucos segundos.",
     "checkoutCancel": "Checkout cancelado. Seu plano não mudou.",
-    "error": "Algo deu errado com o Stripe. Tente novamente."
+    "error": "Algo deu errado com o Stripe. Tente novamente.",
+    "checkoutPending": "Sua tentativa anterior ainda está em verificação. Aguarde antes de iniciar outra compra; fale com o suporte se continuar pendente.",
+    "checkoutUnknown": "O resultado da tentativa anterior ainda não foi confirmado. Abra novamente o mesmo plano para verificar essa tentativa, ou fale com o suporte. Não inicie outra compra.",
+    "checkoutConflict": "Já existe uma tentativa com outro plano. Selecione o mesmo plano para reabri-la, ou aguarde a confirmação de expiração pela Stripe.",
+    "checkoutExpired": "A Stripe confirmou que esta tentativa expirou. Selecione seu plano novamente para abrir uma nova compra.",
+    "checkoutSubscriptionExists": "Sua assinatura já está ativa ou aguardando pagamento. Gerencie a assinatura existente para evitar outra compra."
   },
   "mcp": {
     "title": "Servidor MCP",

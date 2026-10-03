@@ -2,10 +2,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import {
-  MAILBOX_CHECKOUT_METADATA_KEY,
-  MAILBOX_SERVICE_METADATA_KEY,
-  MAILBOX_SERVICE,
   type BillingStripe,
+  MAILBOX_CHECKOUT_METADATA_KEY,
+  MAILBOX_SERVICE,
+  MAILBOX_SERVICE_METADATA_KEY,
   type MailboxCatalog,
 } from "@millionsend/billing";
 import { type Db, schema } from "@millionsend/db";
@@ -18,6 +18,7 @@ import {
   formatMailboxPrice,
   mailboxServiceNotice,
   safeMailboxCheckoutUrl,
+  safeMailboxPaymentUrl,
 } from "@/app/(dashboard)/mailboxes/mailbox-service-panel";
 import { getStripe } from "@/server/billing";
 import { mailboxBillingOffer } from "@/server/mailbox-billing";
@@ -109,6 +110,14 @@ beforeAll(async () => {
   const database = drizzle(client, { schema });
   db = database as unknown as Db;
   await migrate(database, { migrationsFolder: extension, migrationsTable: "__mailbox_migrations" });
+  const exists = await client.query<{ present: string | null }>(
+    "select to_regclass('public.mailbox_management_requests')::text as present",
+  );
+  if (!exists.rows[0]?.present)
+    for (const statement of readFileSync(extension + "0009_mailbox_management_requests.sql", "utf8")
+      .split("--> statement-breakpoint")
+      .filter((s) => s.trim()))
+      await client.exec(statement);
 });
 beforeEach(async () => {
   sequence++;
@@ -124,6 +133,7 @@ beforeEach(async () => {
   vi.stubEnv("BILLING_MUTATIONS_PAUSED", "");
   vi.stubEnv("MAILBOX_REGISTRY_ENABLED", "1");
   vi.stubEnv("MAILBOX_BILLING_CATALOG", JSON.stringify(catalog));
+  vi.stubEnv("MAILBOX_BILLING_MANAGEMENT_ENABLED", "");
   const [team] = await db
     .insert(schema.teams)
     .values({
@@ -196,6 +206,16 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
       offer,
       checkoutPending: false,
       pendingCheckoutSeats: null,
+      management: {
+        canReconcile: false,
+        canCancel: false,
+        canResume: false,
+        canAdjust: false,
+        pending: false,
+        requestedSeats: null,
+        scheduledSeats: null,
+        effectiveAt: null,
+      },
     });
     expect(getStripe).not.toHaveBeenCalled();
     expect(await as().mailboxes.service()).toEqual({
@@ -207,6 +227,8 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
       includedOutboundPerMailbox: 0,
       periodStart: null,
       periodEnd: null,
+      cancelAtPeriodEnd: false,
+      cancelAt: null,
     });
     const serialized = JSON.stringify(await as().mailboxes.billing());
     for (const hidden of [
@@ -539,5 +561,197 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
     expect(formatMailboxPrice(123 * 3, "usd", "en")).toBe("$3.69");
     expect(formatMailboxPrice(123, "jpy", "en")).toBe("¥123");
     expect(formatMailboxPrice(500, "isk", "en").replace(/\s/g, "")).toBe("ISK5");
+    expect(safeMailboxPaymentUrl("https://invoice.stripe.com/i/in_fixture")).toBe(
+      "https://invoice.stripe.com/i/in_fixture",
+    );
+    for (const url of [
+      "javascript:alert(1)",
+      "https://invoice.stripe.com.other.invalid/i",
+      "https://other.invalid@invoice.stripe.com/i",
+      "https://invoice.stripe.com:8443/i",
+    ])
+      expect(safeMailboxPaymentUrl(url)).toBeNull();
+  });
+  it("keeps management disabled by default and never calls the SDK", async () => {
+    await expect(as().mailboxes.manage({ action: "cancel" })).rejects.toMatchObject({
+      message: "mailbox_billing_unavailable",
+    });
+    expect(getStripe).not.toHaveBeenCalled();
+  });
+  it.each(["subscription", "customer", "livemode"])(
+    "does not show management from another %s on the current contract",
+    async (field) => {
+      vi.stubEnv("MAILBOX_BILLING_MANAGEMENT_ENABLED", "1");
+      const periodStart = new Date(Date.now() - 1000),
+        periodEnd = new Date(Date.now() + 86400000);
+      await db.insert(schema.mailboxSubscriptions).values({
+        teamId,
+        status: "active",
+        seats: 3,
+        storageBytesPerMailbox: price.storageBytesPerMailbox,
+        includedOutboundPerMailbox: price.includedOutboundPerMailbox,
+        periodStart,
+        periodEnd,
+        stripeCustomerId: customerId,
+        stripeSubscriptionId: subscriptionId,
+        stripeSubscriptionItemId: `si_${subscriptionId}`,
+        livemode: false,
+      });
+      await db.insert(schema.mailboxManagementRequests).values({
+        teamId,
+        action: "decrease",
+        status: "scheduled",
+        step: "configure_schedule",
+        seatsBefore: 3,
+        seats: 2,
+        periodStart,
+        periodEnd,
+        stripeCustomerId: field === "customer" ? `${customerId}_old` : customerId,
+        stripeSubscriptionId: field === "subscription" ? `${subscriptionId}_old` : subscriptionId,
+        stripeSubscriptionItemId: `si_${subscriptionId}`,
+        stripePriceId: price.priceId,
+        livemode: field === "livemode",
+        idempotencyKey: `old_management:${teamId}`,
+        stripeScheduleId: "sched_old_management_fixture",
+      });
+      expect((await as().mailboxes.billing()).management).toMatchObject({
+        canAdjust: true,
+        pending: false,
+        scheduledSeats: null,
+        effectiveAt: null,
+      });
+      expect(getStripe).not.toHaveBeenCalled();
+      expect(
+        await db
+          .select()
+          .from(schema.mailboxManagementRequests)
+          .where(eq(schema.mailboxManagementRequests.teamId, teamId)),
+      ).toHaveLength(1);
+    },
+  );
+  it("shows a reduction only on its current nonterminal contract and preserves historical rows", async () => {
+    vi.stubEnv("MAILBOX_BILLING_MANAGEMENT_ENABLED", "1");
+    const periodStart = new Date(Date.now() - 1000),
+      periodEnd = new Date(Date.now() + 86400000);
+    await db.insert(schema.mailboxSubscriptions).values({
+      teamId,
+      status: "active",
+      seats: 3,
+      storageBytesPerMailbox: price.storageBytesPerMailbox,
+      includedOutboundPerMailbox: price.includedOutboundPerMailbox,
+      periodStart,
+      periodEnd,
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscriptionId,
+      stripeSubscriptionItemId: `si_${subscriptionId}`,
+      livemode: false,
+    });
+    await db.insert(schema.mailboxManagementRequests).values({
+      teamId,
+      action: "decrease",
+      status: "scheduled",
+      step: "configure_schedule",
+      seatsBefore: 3,
+      seats: 2,
+      periodStart,
+      periodEnd,
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscriptionId,
+      stripeSubscriptionItemId: `si_${subscriptionId}`,
+      stripePriceId: price.priceId,
+      livemode: false,
+      idempotencyKey: `management:${teamId}`,
+      stripeScheduleId: "sched_management_fixture",
+    });
+    expect((await as().mailboxes.billing()).management).toMatchObject({
+      scheduledSeats: 2,
+      effectiveAt: periodEnd,
+    });
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({ status: "canceled" })
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+    expect((await as().mailboxes.billing()).management).toMatchObject({
+      scheduledSeats: null,
+      effectiveAt: null,
+    });
+    const [history] = await db
+      .select()
+      .from(schema.mailboxManagementRequests)
+      .where(eq(schema.mailboxManagementRequests.teamId, teamId));
+    expect(history).toMatchObject({ status: "scheduled", seats: 2 });
+    expect(getStripe).not.toHaveBeenCalled();
+  });
+  it("permits another guarded Checkout only after a canceled external contract is confirmed", async () => {
+    await db.insert(schema.mailboxSubscriptions).values({
+      teamId,
+      status: "canceled",
+      seats: 2,
+      storageBytesPerMailbox: price.storageBytesPerMailbox,
+      includedOutboundPerMailbox: price.includedOutboundPerMailbox,
+      periodStart: new Date(Date.now() - 86400000),
+      periodEnd: new Date(Date.now() - 1000),
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscriptionId,
+      lastEventCreated: Math.floor(Date.now() / 1000),
+    });
+    const previous = await lease("completed");
+    // Stripe creates a distinct Session for the new purchase; the old one remains unique.
+    sessionId = `${sessionId}_replacement`;
+    checkoutUrl = `https://checkout.stripe.com/c/pay/${sessionId}`;
+    expect(await as().mailboxes.billing()).toMatchObject({
+      canPurchase: true,
+      availability: "available",
+    });
+    stripe.subscriptions.retrieve = vi.fn(
+      async () =>
+        ({
+          id: subscriptionId,
+          customer: customerId,
+          livemode: false,
+          status: "canceled",
+        }) as Stripe.Subscription,
+    );
+    expect(await as().mailboxes.checkout({ seats: 2 })).toEqual({ url: checkoutUrl });
+    expect(createSession).toHaveBeenCalledTimes(1);
+    const purchases = await db
+      .select()
+      .from(schema.mailboxCheckouts)
+      .where(eq(schema.mailboxCheckouts.teamId, teamId));
+    expect(purchases).toHaveLength(2);
+    expect(purchases.find((row) => row.id === previous.id)).toMatchObject({
+      status: "completed",
+      stripeSessionId: previous.stripeSessionId,
+      stripeSubscriptionId: subscriptionId,
+    });
+    expect(purchases.find((row) => row.id !== previous.id)).toMatchObject({
+      status: "ready",
+      stripeSessionId: sessionId,
+      stripeCustomerId: customerId,
+      seats: 2,
+    });
+    expect(createCustomer).not.toHaveBeenCalled();
+  });
+  it("does not permit re-contracting from an unconfirmed canceled row or another completed purchase", async () => {
+    await db.insert(schema.mailboxSubscriptions).values({
+      teamId,
+      status: "canceled",
+      seats: 2,
+      storageBytesPerMailbox: price.storageBytesPerMailbox,
+      includedOutboundPerMailbox: price.includedOutboundPerMailbox,
+      periodStart: new Date(Date.now() - 86400000),
+      periodEnd: new Date(Date.now() - 1000),
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscriptionId,
+    });
+    expect(await as().mailboxes.billing()).toMatchObject({ canPurchase: false });
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({ lastEventCreated: Math.floor(Date.now() / 1000) })
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+    subscriptionId = "sub_other_pending_fixture";
+    await lease("completed");
+    expect(await as().mailboxes.billing()).toMatchObject({ canPurchase: false });
+    expect(getStripe).not.toHaveBeenCalled();
   });
 });

@@ -15,9 +15,10 @@ Use **Mail** for a named mailbox on your domain: personal conversations, a compa
 address or an agent that reads and replies to messages. You can continue using
 Send without creating a mailbox.
 
-Mail licenses are counted per mailbox. People and agents use the same seat model;
-storage and outbound allowances come from the recorded service terms. Consult
-the dashboard for your current contract. Pilot allowances are not public prices.
+Mail licenses are counted per mailbox. People and agents use the same per-mailbox
+price and seat model; storage and outbound allowances come from the recorded
+service terms. Consult the dashboard for your current contract. Pilot allowances
+are not public prices.
 The outbound allowance counts recipients per mailbox and license period: when a
 send is admitted, one message to three distinct addresses reserves three units.
 
@@ -35,6 +36,30 @@ send is admitted, one message to three distinct addresses reserves three units.
 Mailbox keys start with `mmb_`. They are different from Send API keys and from the
 OAuth connection described in [MCP server](/mcp). The existing Send MCP tools do
 not provide access to this mailbox API.
+
+## Manage the Mail subscription
+
+When subscription management is enabled for your deployment and contract,
+organization owners and admins can use the controls in the Mail dashboard.
+If they are unavailable, consult the installation operator. If you already have
+a pilot license, check its current terms instead of starting another purchase
+to work around unavailable controls or transport.
+
+- **Increase:** request the new quantity and use **Complete increase payment**
+  when offered. Extra seats become available only after confirmed payment;
+  the current quantity stays unchanged while payment is pending.
+- **Reduce:** schedule the quantity for the next renewal. The dashboard shows
+  the effective date; the current quantity remains available until then.
+- **Cancel renewal:** the confirmed cancellation takes effect at the displayed
+  period end and removes a scheduled future reduction. Use **Resume renewal**
+  before that date when the option is available.
+- **Pending or unconfirmed:** use **Refresh status** to check the same operation.
+  If it remains unresolved, consult the operator; do not start another charge
+  or subscription to work around it.
+
+Stored messages are preserved; reading and export still require current mailbox
+access. Mail license changes do not change your Send plan or enable receiving
+and transport. Keep the pilot readiness checks above.
 
 ## Connect an agent
 

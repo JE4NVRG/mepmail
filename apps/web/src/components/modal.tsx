@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { refusedAsReadOnly } from "@/lib/read-only";
 import { useScrollLock } from "@/lib/use-scroll-lock";
@@ -55,6 +55,7 @@ export function Modal({
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
 
   // Focus runs on open ONLY: with onClose in its deps, an unstable arrow
   // from a call site would re-run this every render and steal focus from
@@ -119,6 +120,7 @@ export function Modal({
         }
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         ref={ref}
         tabIndex={-1}
       >
@@ -131,7 +133,7 @@ export function Modal({
               gap: 12,
             }}
           >
-            <h2>{title}</h2>
+            <h2 id={titleId}>{title}</h2>
             <CloseGlyph onClose={onClose} />
           </div>
         ) : null}

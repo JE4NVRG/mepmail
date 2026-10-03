@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { BillingStripe } from "@millionsend/billing";
 import {
   DAY_MS,
@@ -9,7 +10,7 @@ import {
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type Stripe from "stripe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TeamRole } from "@/server/membership";
@@ -42,6 +43,10 @@ let calls: {
   meterEvents: Stripe.Billing.MeterEventCreateParams[];
 };
 let onCustomerCreate: (() => Promise<void>) | undefined;
+let checkoutSession: Stripe.Checkout.Session | null;
+async function seedBuyer(teamId: string) {
+  await db.insert(schema.teamMembers).values({ teamId, userId: "u1", role: "admin" });
+}
 
 // Stripe stamps whole seconds; rows and the fake agree from the start.
 const wholeSeconds = (ms: number) => new Date(Math.floor(ms / 1000) * 1000);
@@ -102,10 +107,17 @@ const stripe = {
     create: async (params: Stripe.CustomerCreateParams) => {
       calls.customers.push(params);
       await onCustomerCreate?.();
-      return { id: "cus_new" };
+      return {
+        id: "cus_new",
+        livemode: false,
+        name: params.name,
+        email: params.email,
+        metadata: params.metadata,
+      };
     },
   },
   subscriptions: {
+    list: async () => ({ data: [], has_more: false }),
     retrieve: async () => sub,
     update: async (_id: string, params: Stripe.SubscriptionUpdateParams) => {
       calls.updates.push(params);
@@ -173,13 +185,26 @@ const stripe = {
   },
   checkout: {
     sessions: {
+      list: async () => ({ data: checkoutSession ? [checkoutSession] : [], has_more: false }),
+      retrieve: async () => checkoutSession,
       create: async (
         params: Stripe.Checkout.SessionCreateParams,
         options?: Stripe.RequestOptions,
       ) => {
         calls.checkouts.push(params);
         calls.checkoutOptions.push(options);
-        return { url: "https://checkout.stripe.com/c/cs_1" };
+        checkoutSession = {
+          id: "cs_1",
+          url: "https://checkout.stripe.com/c/cs_1",
+          mode: "subscription",
+          status: "open",
+          livemode: false,
+          customer: params.customer,
+          client_reference_id: params.client_reference_id,
+          metadata: params.metadata,
+          expires_at: Math.floor(Date.now() / 1000) + 86400,
+        } as Stripe.Checkout.Session;
+        return checkoutSession;
       },
     },
   },
@@ -255,6 +280,17 @@ const notificationRows = () =>
 
 beforeEach(async () => {
   ({ db, close } = await createTestDb());
+  const ddl = readFileSync(
+    new URL(
+      "../../../packages/db/mailbox-drizzle/0007_mailbox_customer_request.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  for (const statement of ddl.split("--> statement-breakpoint").filter((s) => s.trim()))
+    await db.execute(sql.raw(statement));
+  await db.insert(schema.user).values({ id: "u1", name: "u1", email: "u1@example.com" });
+  checkoutSession = null;
   calls = {
     customers: [],
     checkouts: [],
@@ -276,6 +312,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   h.runCronNow.mockClear();
   h.sent = [];
   await close();
@@ -360,12 +397,17 @@ describe("billing router", () => {
 
   it("checkout creates the customer once, stores it, and sells the rung's price with its metered item", async () => {
     const teamId = await createTeam(db, "acme");
+    await seedBuyer(teamId);
     const admin = callerFor(teamId, "admin");
     expect(await admin.billing.checkout({ rung: "scale_1m" })).toEqual({
       url: "https://checkout.stripe.com/c/cs_1",
     });
     expect(calls.customers).toEqual([
-      { name: "acme", email: "u1@example.com", metadata: { team_id: teamId } },
+      {
+        name: "acme",
+        email: "u1@example.com",
+        metadata: { team_id: teamId, mepmail_customer_key: expect.any(String) },
+      },
     ]);
     expect(calls.checkouts[0]).toMatchObject({
       mode: "subscription",
@@ -379,29 +421,28 @@ describe("billing router", () => {
       allow_promotion_codes: true,
       billing_address_collection: "auto",
     });
-    expect(calls.checkoutOptions[0]?.idempotencyKey).toMatch(
-      new RegExp(`^checkout:${teamId}:scale_1m:\\d+$`),
-    );
+    expect(calls.checkoutOptions[0]?.idempotencyKey).toMatch(/^send-checkout:[a-f0-9-]{36}$/);
     expect(await teamRow(teamId)).toMatchObject({
       stripeCustomerId: "cus_new",
       plan: "free",
       planStatus: "none",
     });
     expect(await auditRows()).toEqual([
-      { action: "billing.checkout_started", data: { rung: "scale_1m" } },
+      {
+        action: "billing.checkout_started",
+        data: { rung: "scale_1m", checkoutAttemptId: expect.any(String) },
+      },
     ]);
 
-    // Abandoned checkouts (no subscription yet) may be retried freely.
-    await admin.billing.checkout({ rung: "pro_100k" });
+    // An open financial intent is reused, and changing its plan is refused.
+    await admin.billing.checkout({ rung: "scale_1m" });
     expect(calls.customers).toHaveLength(1);
-    expect(calls.checkouts[1]).toMatchObject({
-      customer: "cus_new",
-      line_items: [{ price: "price_pro_100k", quantity: 1 }, { price: "price_pro_100k_overage" }],
+    expect(calls.checkouts).toHaveLength(1);
+    await expect(admin.billing.checkout({ rung: "pro_100k" })).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "SEND_CHECKOUT_CONFLICT",
     });
-
-    // A daily rung has nothing to meter.
-    await admin.billing.checkout({ rung: "starter" });
-    expect(calls.checkouts[2]?.line_items).toEqual([{ price: "price_starter", quantity: 1 }]);
+    expect(calls.checkouts).toHaveLength(1);
   });
 
   it("checkout refuses the free rung: Free is reached by cancelling", async () => {
@@ -410,21 +451,30 @@ describe("billing router", () => {
     expect(calls.checkouts).toEqual([]);
   });
 
-  it("checkout keeps the customer a concurrent request linked first", async () => {
+  it("checkout exposes an uncertain Customer as pending without another POST", async () => {
     const teamId = await createTeam(db);
+    await seedBuyer(teamId);
     onCustomerCreate = async () => {
-      await db
-        .update(schema.teams)
-        .set({ stripeCustomerId: "cus_first" })
-        .where(eq(schema.teams.id, teamId));
+      throw new Error("lost provider reply");
     };
-    await callerFor(teamId, "owner").billing.checkout({ rung: "pro_100k" });
-    expect(calls.checkouts[0]).toMatchObject({ customer: "cus_first" });
-    expect((await teamRow(teamId))?.stripeCustomerId).toBe("cus_first");
+    const owner = callerFor(teamId, "owner");
+    await expect(owner.billing.checkout({ rung: "pro_100k" })).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "SEND_CHECKOUT_PENDING",
+    });
+    onCustomerCreate = undefined;
+    await expect(owner.billing.checkout({ rung: "pro_100k" })).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "SEND_CHECKOUT_PENDING",
+    });
+    expect(calls.customers).toHaveLength(1);
+    expect(calls.checkouts).toHaveLength(0);
+    expect(await auditRows()).toHaveLength(0);
   });
 
   it("checkout is refused while a subscription is live; status says so", async () => {
     const teamId = await createTeam(db);
+    await seedBuyer(teamId);
     const owner = callerFor(teamId, "owner");
     for (const planStatus of ["active", "trialing", "past_due", "unpaid"] as const) {
       await db
@@ -446,6 +496,51 @@ describe("billing router", () => {
     expect(await owner.billing.checkout({ rung: "scale_500k" })).toEqual({
       url: "https://checkout.stripe.com/c/cs_1",
     });
+  });
+
+  it("checkout rejects stale role context using current persisted membership", async () => {
+    const teamId = await createTeam(db);
+    await db.insert(schema.teamMembers).values({ teamId, userId: "u1", role: "member" });
+    await expect(
+      callerFor(teamId, "admin").billing.checkout({ rung: "pro_100k" }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN", message: "SEND_CHECKOUT_FORBIDDEN" });
+    expect(calls.customers).toHaveLength(0);
+  });
+
+  it("an incomplete subscription blocks a new checkout before creating a Customer", async () => {
+    const teamId = await createTeam(db);
+    await seedBuyer(teamId);
+    await db
+      .update(schema.teams)
+      .set({ planStatus: "incomplete", stripeSubscriptionId: "sub_pending" })
+      .where(eq(schema.teams.id, teamId));
+    await expect(
+      callerFor(teamId, "owner").billing.checkout({ rung: "pro_100k" }),
+    ).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: "SEND_CHECKOUT_SUBSCRIPTION_EXISTS",
+    });
+    expect(calls.customers).toHaveLength(0);
+    expect(calls.checkouts).toHaveLength(0);
+  });
+
+  it("a persisted checkout UUID deduplicates the funnel when the same Session is reopened", async () => {
+    vi.stubEnv("UMAMI_ENDPOINT", "https://collector.example.test/api/send");
+    vi.stubEnv("UMAMI_WEBSITE_ID", "00000000-0000-4000-8000-000000000001");
+    const collector = vi.fn(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", collector);
+    const teamId = await createTeam(db);
+    await seedBuyer(teamId);
+    const owner = callerFor(teamId, "owner");
+    await owner.billing.checkout({ rung: "pro_100k" });
+    await owner.billing.checkout({ rung: "pro_100k" });
+    const attempts = await db.select().from(schema.sendCheckoutAttempts);
+    const events = await db.select().from(schema.funnelEvents);
+    expect(attempts).toHaveLength(1);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.dedupeKey).toBe(`checkout_started:${teamId}:${attempts[0]?.id}`);
+    expect(calls.checkouts).toHaveLength(1);
+    expect(collector).toHaveBeenCalledTimes(1);
   });
 
   it("changePlan moves up at once with prorations, re-pricing the metered item, and drains on a raise", async () => {

@@ -72,6 +72,7 @@
   "download": "Download",
   "editDraft": "Edit draft",
   "replyDraft": "Reply as draft",
+  "sentReplyPending": "The final identifier for this sent message has not been confirmed yet. Reply is unavailable until it is confirmed so the conversation can stay connected.",
   "newDraft": "New draft",
   "from": "From",
   "to": "To",

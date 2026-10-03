@@ -41,6 +41,8 @@ export async function mailboxServiceState(db: Db, teamId: string) {
     includedOutboundPerMailbox: plan?.includedOutboundPerMailbox ?? 0,
     periodStart: plan?.periodStart ?? null,
     periodEnd: plan?.periodEnd ?? null,
+    cancelAtPeriodEnd: plan?.cancelAtPeriodEnd ?? false,
+    cancelAt: plan?.cancelAt ?? null,
   };
 }
 

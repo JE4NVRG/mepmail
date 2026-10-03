@@ -6,13 +6,13 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
-import { useTRPC } from "@/lib/trpc";
 import { authClient } from "@/lib/auth-client";
+import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
-import styles from "./mailboxes.module.css";
-import { MailboxContentView } from "./mailbox-content-view";
 import { MailboxAgentKeysDialog } from "./mailbox-agent-keys";
+import { MailboxContentView } from "./mailbox-content-view";
 import { MailboxServicePanel } from "./mailbox-service-panel";
+import styles from "./mailboxes.module.css";
 
 type Outputs = inferRouterOutputs<AppRouter>["mailboxes"];
 type Box = Outputs["list"]["mailboxes"][number];
@@ -215,6 +215,7 @@ function RegistryDialog({
             {t("cancel")}
           </button>
           <button
+            type="submit"
             className="ms-btn ms-btn-primary"
             disabled={busy || (!mailbox && !options.domains.length)}
           >
@@ -229,7 +230,7 @@ function RegistryDialog({
           {grants.isError ? (
             <div role="alert">
               <p>{t("loadError")}</p>
-              <button className="ms-btn" onClick={() => void grants.refetch()}>
+              <button type="button" className="ms-btn" onClick={() => void grants.refetch()}>
                 {t("retry")}
               </button>
             </div>
@@ -246,6 +247,7 @@ function RegistryDialog({
                     </small>
                   </span>
                   <button
+                    type="button"
                     className="ms-btn ms-btn-ghost"
                     disabled={busy}
                     onClick={async () => {
@@ -309,7 +311,7 @@ function RegistryDialog({
                   <option value="draft">{t("draft")}</option>
                 </select>
               </label>
-              <button className="ms-btn" disabled={busy || !person}>
+              <button type="submit" className="ms-btn" disabled={busy || !person}>
                 {t("grant")}
               </button>
             </fieldset>
@@ -337,6 +339,7 @@ export function MailboxesView() {
     trpc.mailboxes.options.queryOptions(undefined, { enabled: registry.data?.canManage === true }),
   );
   const [selectedId, select] = useState<string | null>(null);
+  const [itemSelection, selectItem] = useState<{ mailboxId: string; id: string } | null>(null);
   const [folder, setFolder] = useState<"inbox" | "drafts" | "sent">("inbox");
   const [dialog, setDialog] = useState<"new" | "edit" | null>(null);
   const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
@@ -346,9 +349,13 @@ export function MailboxesView() {
   const agentBox = boxes.find(
     (box) => box.id === agentDialogId && box.ownerActive && box.ownerUserId === session?.user.id,
   );
+  function selectMailbox(id: string | null) {
+    selectItem(null);
+    select(id);
+  }
   async function changed(id: string) {
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
-    select(id);
+    selectMailbox(id);
   }
   if (capability.isPending || (capability.data?.enabled && registry.isPending))
     return <p aria-live="polite">{t("loading")}</p>;
@@ -357,6 +364,7 @@ export function MailboxesView() {
       <div role="alert">
         <p>{t("loadError")}</p>
         <button
+          type="button"
           className="ms-btn"
           onClick={() => {
             void capability.refetch();
@@ -382,7 +390,7 @@ export function MailboxesView() {
           className="ms-input"
           aria-label={t("chooseBox")}
           value={selected?.id ?? ""}
-          onChange={(e) => select(e.target.value || null)}
+          onChange={(e) => selectMailbox(e.target.value || null)}
         >
           <option value="">{t("all")}</option>
           {boxes.map((b) => (
@@ -392,9 +400,10 @@ export function MailboxesView() {
           ))}
         </select>
       </label>
-      <div className={styles.compactFolders} aria-label={t("folders")}>
+      <nav className={styles.compactFolders} aria-label={t("folders")}>
         {(["inbox", "drafts", "sent"] as const).map((f) => (
           <button
+            type="button"
             key={f}
             aria-current={f === folder ? "page" : undefined}
             onClick={() => setFolder(f)}
@@ -402,7 +411,7 @@ export function MailboxesView() {
             {t(f)}
           </button>
         ))}
-      </div>
+      </nav>
     </div>
   );
   return (
@@ -417,12 +426,17 @@ export function MailboxesView() {
         </div>
         <div className={styles.headerActions}>
           {selected?.ownerActive && selected.ownerUserId === session?.user.id ? (
-            <button className="ms-btn ms-btn-ghost" onClick={() => setAgentDialogId(selected.id)}>
+            <button
+              type="button"
+              className="ms-btn ms-btn-ghost"
+              onClick={() => setAgentDialogId(selected.id)}
+            >
               {agentT("title")}
             </button>
           ) : null}
           {registry.data?.canManage ? (
             <button
+              type="button"
               className="ms-btn ms-btn-ghost"
               disabled={!options.data?.domains.length}
               onClick={() => setDialog("new")}
@@ -444,7 +458,7 @@ export function MailboxesView() {
       {options.isError && registry.data?.canManage ? (
         <div role="alert">
           <p>{t("loadError")}</p>
-          <button className="ms-btn" onClick={() => void options.refetch()}>
+          <button type="button" className="ms-btn" onClick={() => void options.refetch()}>
             {t("retry")}
           </button>
         </div>
@@ -459,6 +473,13 @@ export function MailboxesView() {
             selected={selected}
             folder={folder}
             changeFolder={setFolder}
+            selection={itemSelection}
+            select={selectItem}
+            draftSaved={(saved) => {
+              select(saved.mailboxId);
+              setFolder("drafts");
+              selectItem({ mailboxId: saved.mailboxId, id: saved.id });
+            }}
             manage={
               selected && registry.data?.canManage && options.data
                 ? () => setDialog("edit")
@@ -485,6 +506,7 @@ export function MailboxesView() {
                     ) : null}
                     {registry.data?.canManage ? (
                       <button
+                        type="button"
                         className="ms-btn"
                         disabled={!options.data}
                         onClick={() => setDialog("edit")}
@@ -497,7 +519,11 @@ export function MailboxesView() {
                   <>
                     <p>{t("emptyBody")}</p>
                     {registry.data?.canManage && options.data?.domains.length ? (
-                      <button className="ms-btn ms-btn-primary" onClick={() => setDialog("new")}>
+                      <button
+                        type="button"
+                        className="ms-btn ms-btn-primary"
+                        onClick={() => setDialog("new")}
+                      >
                         {t("createFirst")}
                       </button>
                     ) : null}

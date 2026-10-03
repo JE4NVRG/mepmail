@@ -24,12 +24,12 @@ import {
 import {
   acceptMailboxOutbox,
   failQueuedMailboxOutbox,
-  MailboxSendRejectedError,
-  MailboxSendDeferredError,
   type MailboxOutboxSender,
+  MailboxSendDeferredError,
+  MailboxSendRejectedError,
   type MailboxTransportMimeAdapter,
-  queueMailboxDraft,
   queueMailboxAgentDraft,
+  queueMailboxDraft,
   receiveMailboxMime,
   reconcileMailboxOutbox,
   sendMailboxOutbox,
@@ -293,6 +293,90 @@ describe("durable private Correio transport contracts with captured provider", (
     expect(sent.raw.equals(original)).toBe(true);
     expect(await db.select().from(schema.emails)).toHaveLength(0);
     expect(await db.select().from(schema.usageCounters)).toHaveLength(0);
+  });
+  it("enriches an accepted snapshot with an observed RFC alias without replay, mutation or ambiguous same-box matches", async () => {
+    const raw = fixture();
+    const admitted = await queue((await draft(raw)).id);
+    const captured = vi.fn<MailboxOutboxSender["send"]>(async () => ({ messageId: "api-id-1" }));
+    await send(admitted.id, { send: captured });
+    const accepted = await outbox(admitted.id);
+    expect(accepted.providerRfcMessageId).toBeNull();
+    const sentBefore = (
+      await db.select().from(schema.mailboxItems).where(eq(schema.mailboxItems.id, admitted.id))
+    )[0]!;
+    for (const rfcMessageId of [
+      "api-id-1",
+      "<api-id-1>",
+      "<id@example.invalid>\r\nInjected: yes",
+    ]) {
+      await expect(
+        acceptMailboxOutbox(db, admitted.id, {
+          attemptId: accepted.attemptId!,
+          messageId: "api-id-1",
+          rfcMessageId,
+        }),
+      ).rejects.toMatchObject({ code: "invalid" });
+    }
+    const alias = "<observed-id@email.amazonses.com>";
+    const evidence = { attemptId: accepted.attemptId!, messageId: "api-id-1", rfcMessageId: alias };
+    expect((await acceptMailboxOutbox(db, admitted.id, evidence)).duplicate).toBe(true);
+    expect((await acceptMailboxOutbox(db, admitted.id, evidence)).duplicate).toBe(true);
+    expect(await outbox(admitted.id)).toMatchObject({
+      status: "accepted",
+      providerMessageId: "api-id-1",
+      providerRfcMessageId: alias,
+      acceptedAt: accepted.acceptedAt,
+      ciphertext: null,
+    });
+    expect(
+      (
+        await db.select().from(schema.mailboxItems).where(eq(schema.mailboxItems.id, admitted.id))
+      )[0],
+    ).toEqual(sentBefore);
+    expect((await readMailboxItem(db, keys, owner(), { mailboxId, id: admitted.id })).raw).toEqual(
+      raw,
+    );
+    await expect(
+      acceptMailboxOutbox(db, admitted.id, {
+        ...evidence,
+        rfcMessageId: "<conflicting@email.amazonses.com>",
+      }),
+    ).rejects.toMatchObject({ code: "conflict" });
+    await send(admitted.id, { send: captured });
+    expect(captured).toHaveBeenCalledTimes(1);
+
+    const collision = await queue((await draft()).id);
+    await send(collision.id, {
+      send: async () => {
+        throw new Error("lost acknowledgement");
+      },
+    });
+    const ambiguous = await outbox(collision.id);
+    await expect(
+      acceptMailboxOutbox(db, collision.id, {
+        attemptId: ambiguous.attemptId!,
+        messageId: "api-id-2",
+        rfcMessageId: alias,
+      }),
+    ).rejects.toMatchObject({ code: "conflict" });
+    expect((await outbox(collision.id)).status).toBe("unknown");
+    expect((await outbox(collision.id)).ciphertext).not.toBeNull();
+    expect(
+      await db.select().from(schema.mailboxItems).where(eq(schema.mailboxItems.id, collision.id)),
+    ).toHaveLength(0);
+
+    const otherBox = await queue(
+      (await draft(fixture("agent@transport.invalid"), agentId)).id,
+      1,
+      agentId,
+    );
+    await send(otherBox.id, { send: async () => ({ messageId: "other-box-api" }) });
+    await acceptMailboxOutbox(db, otherBox.id, {
+      attemptId: (await outbox(otherBox.id)).attemptId!,
+      messageId: "other-box-api",
+      rfcMessageId: alias,
+    });
+    expect((await outbox(otherBox.id)).providerRfcMessageId).toBe(alias);
   });
   it("charges distinct recipients by box/period and keeps Envio quotas untouched", async () => {
     await db

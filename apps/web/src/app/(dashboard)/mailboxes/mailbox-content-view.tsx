@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useLocale, useTranslations } from "next-intl";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
@@ -73,6 +73,7 @@ function DraftDialog({
   saved,
   lost,
   selectBox,
+  current,
 }: {
   boxes: Box[];
   mailboxId: string;
@@ -81,6 +82,7 @@ function DraftDialog({
   saved: (item: Outputs["saveDraft"]) => Promise<void>;
   lost: () => void;
   selectBox: (id: string) => void;
+  current: () => boolean;
 }) {
   const t = useTranslations("mailboxes");
   const trpc = useTRPC();
@@ -98,13 +100,21 @@ function DraftDialog({
   );
   const [text, setText] = useState(source?.kind === "draft" ? source.text : "");
   const [retained, setRetained] = useState(source?.attachments.map((a) => a.index) ?? []);
-  const [uploads, setUploads] = useState<{ filename: string; base64: string }[]>([]);
+  const [uploads, setUploads] = useState<{ id: number; filename: string; base64: string }[]>([]);
+  const uploadSequence = useRef(0);
   const [loadingFiles, loadFiles] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
+  const active = useRef(true);
   const [error, setError] = useState("");
   const mutation = useMutation(trpc.mailboxes.saveDraft.mutationOptions());
-  const busy = mutation.isPending || loadingFiles;
+  const busy = saving || mutation.isPending || loadingFiles;
   useEffect(() => {
+    active.current = true;
     dialog.current?.showModal();
+    return () => {
+      active.current = false;
+    };
   }, []);
   const allowed = boxes.some(
     (b) => b.id === boxId && b.canRead && b.canDraft && b.status === "planned",
@@ -113,7 +123,7 @@ function DraftDialog({
     if (!allowed) lost();
   }, [allowed, lost]);
   async function addFiles(files: FileList | null) {
-    if (!files?.length) return;
+    if (!files?.length || submitting.current || !current()) return;
     setError("");
     if (
       retained.length + uploads.length + files.length > 10 ||
@@ -127,11 +137,12 @@ function DraftDialog({
       const incoming = await Promise.all(
         Array.from(files).map(
           (file) =>
-            new Promise<{ filename: string; base64: string }>((resolve, reject) => {
+            new Promise<{ id: number; filename: string; base64: string }>((resolve, reject) => {
               const reader = new FileReader();
               reader.onload = () =>
                 typeof reader.result === "string"
                   ? resolve({
+                      id: ++uploadSequence.current,
                       filename: file.name.slice(0, 160),
                       base64: reader.result.split(",")[1] ?? "",
                     })
@@ -148,14 +159,17 @@ function DraftDialog({
       loadFiles(false);
     }
   }
+  function dismiss() {
+    if (!submitting.current && !loadingFiles && current()) close();
+  }
   return (
     <dialog
       ref={dialog}
       className={`${styles.dialog} ${styles.composer}`}
       aria-labelledby="draft-title"
-      onClose={close}
+      onClose={dismiss}
       onCancel={(e) => {
-        if (busy) e.preventDefault();
+        if (submitting.current || loadingFiles) e.preventDefault();
       }}
     >
       <header className={styles.dialogHeader}>
@@ -163,10 +177,11 @@ function DraftDialog({
           {t(source?.kind === "draft" ? "editDraft" : source ? "replyDraft" : "newDraft")}
         </h2>
         <button
+          type="button"
           className="ms-btn ms-btn-ghost"
           aria-label={t("close")}
           disabled={busy}
-          onClick={close}
+          onClick={dismiss}
         >
           ×
         </button>
@@ -174,6 +189,9 @@ function DraftDialog({
       <form
         onSubmit={async (e) => {
           e.preventDefault();
+          if (submitting.current || loadingFiles || !allowed || !current()) return;
+          submitting.current = true;
+          setSaving(true);
           setError("");
           try {
             const result = await mutation.mutateAsync({
@@ -188,11 +206,13 @@ function DraftDialog({
               subject,
               text,
               retainedAttachments: retained,
-              uploads,
+              uploads: uploads.map(({ filename, base64 }) => ({ filename, base64 })),
             });
+            if (!active.current || !current()) return;
             await saved(result);
-            close();
+            if (active.current && current()) close();
           } catch (cause) {
+            if (!active.current || !current()) return;
             const code = (cause as { data?: { code?: string } })?.data?.code;
             if (code === "FORBIDDEN") {
               lost();
@@ -207,6 +227,9 @@ function DraftDialog({
                     : "draftError",
               ),
             );
+          } finally {
+            submitting.current = false;
+            if (active.current && current()) setSaving(false);
           }
         }}
       >
@@ -274,14 +297,14 @@ function DraftDialog({
                   </button>
                 </div>
               ))}
-            {uploads.map((a, i) => (
-              <div key={`${i}:${a.filename}`}>
+            {uploads.map((a) => (
+              <div key={a.id}>
                 <span>{a.filename}</span>
                 <button
                   type="button"
                   className="ms-btn ms-btn-ghost"
                   aria-label={t("removeAttachment", { name: a.filename })}
-                  onClick={() => setUploads((v) => v.filter((_, index) => index !== i))}
+                  onClick={() => setUploads((v) => v.filter((upload) => upload.id !== a.id))}
                 >
                   ×
                 </button>
@@ -308,10 +331,10 @@ function DraftDialog({
         ) : null}
         <p className={styles.hint}>{t("draftOnly")}</p>
         <footer className={styles.dialogFooter}>
-          <button type="button" className="ms-btn" disabled={busy} onClick={close}>
+          <button type="button" className="ms-btn" disabled={busy} onClick={dismiss}>
             {t("cancel")}
           </button>
-          <button className="ms-btn ms-btn-primary" disabled={busy}>
+          <button type="submit" className="ms-btn ms-btn-primary" disabled={busy}>
             {t(busy ? "saving" : "saveDraft")}
           </button>
         </footer>
@@ -327,6 +350,9 @@ export function MailboxContentView({
   folder,
   manage,
   changeFolder,
+  selection,
+  select,
+  draftSaved,
 }: {
   navigation: ReactNode;
   boxes: Box[];
@@ -334,16 +360,24 @@ export function MailboxContentView({
   folder: Folder;
   manage?: (() => void) | undefined;
   changeFolder: (folder: Folder) => void;
+  selection: { mailboxId: string; id: string } | null;
+  select: (item: { mailboxId: string; id: string } | null) => void;
+  draftSaved: (item: Outputs["saveDraft"]) => void;
 }) {
   const t = useTranslations("mailboxes");
   const locale = useLocale();
   const trpc = useTRPC();
   const queries = useQueryClient();
-  const [selection, select] = useState<{ mailboxId: string; id: string } | null>(null);
   const [search, setSearch] = useState("");
-  const [composer, compose] = useState<{ mailboxId: string; source: Item | null } | null>(null);
+  const [composer, compose] = useState<{
+    session: number;
+    mailboxId: string;
+    source: Item | null;
+  } | null>(null);
+  const composerSequence = useRef(0);
+  const composerSession = useRef<number | null>(null);
   const [notice, setNotice] = useState("");
-  const reader = useRef<HTMLDivElement>(null);
+  const reader = useRef<HTMLElement>(null);
   const rowButtons = useRef(new Map<string, HTMLButtonElement>());
   const listing = useQuery(
     trpc.mailboxes.items.queryOptions(
@@ -374,20 +408,37 @@ export function MailboxContentView({
     }),
   );
   const item = visibleItem && !detail.isError ? detail.data : null;
+  const pendingSentReply = item?.kind === "sent" && !item.transportMessageId;
   const writable = boxes.filter((b) => b.canDraft && b.status === "planned");
   const denied = [listing.error, detail.error].some(
     (cause) => (cause as { data?: { code?: string } } | null)?.data?.code === "FORBIDDEN",
   );
   const composerAllowed = !!composer && writable.some((b) => b.id === composer.mailboxId);
+  function openComposer(mailboxId: string, source: Item | null) {
+    const session = ++composerSequence.current;
+    composerSession.current = session;
+    compose({ session, mailboxId, source });
+  }
+  const closeComposer = useCallback((session: number) => {
+    if (composerSession.current !== session) return;
+    composerSession.current = null;
+    compose(null);
+  }, []);
+  useEffect(
+    () => () => {
+      composerSession.current = null;
+    },
+    [],
+  );
   useEffect(() => {
     if (denied) void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
   }, [denied, queries, trpc]);
   useEffect(() => {
     if (composer && !composerAllowed) {
-      compose(null);
+      closeComposer(composer.session);
       setNotice(t("accessLost"));
     }
-  }, [composer, composerAllowed, t]);
+  }, [closeComposer, composer, composerAllowed, t]);
   useEffect(() => {
     if (visibleItem) {
       reader.current?.focus({ preventScroll: true });
@@ -414,11 +465,11 @@ export function MailboxContentView({
   const shortDate = (value: Date) =>
     new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(value);
   const canCompose = writable.length > 0 && (!selected || selected.canDraft);
-  const newDraft = () => compose({ mailboxId: selected?.id ?? writable[0]!.id, source: null });
+  const newDraft = () => openComposer(selected?.id ?? writable[0]!.id, null);
   return (
     <>
       <div className={styles.contentWorkspace}>
-        <header className={styles.contentToolbar} aria-label={t("mailControls")}>
+        <section className={styles.contentToolbar} aria-label={t("mailControls")}>
           {notice ? (
             <p role="alert" className={styles.contentNotice}>
               {notice}
@@ -427,16 +478,17 @@ export function MailboxContentView({
           {navigation}
           <div className={styles.contentActions}>
             {manage ? (
-              <button className="ms-btn ms-btn-ghost" onClick={manage}>
+              <button type="button" className="ms-btn ms-btn-ghost" onClick={manage}>
                 {t("manage")}
               </button>
             ) : null}
             {canCompose && folder !== "sent" ? (
-              <button className="ms-btn ms-btn-primary" onClick={newDraft}>
+              <button type="button" className="ms-btn ms-btn-primary" onClick={newDraft}>
                 <span aria-hidden="true">✎</span> {t("compose")}
               </button>
             ) : null}
             <button
+              type="button"
               className="ms-btn ms-btn-ghost"
               aria-label={t("refresh")}
               disabled={listing.isFetching}
@@ -445,7 +497,7 @@ export function MailboxContentView({
               ↻
             </button>
           </div>
-        </header>
+        </section>
         <div className={styles.contentPanels} data-empty={!hasRows}>
           <div className={`${styles.list} ${styles.contentList}`} data-reading={!!visibleItem}>
             <div className={styles.listSearch}>
@@ -480,7 +532,7 @@ export function MailboxContentView({
               {listing.isError ? (
                 <div role="alert" className={styles.emptyFolder}>
                   <p>{t("contentError")}</p>
-                  <button className="ms-btn" onClick={() => void listing.refetch()}>
+                  <button type="button" className="ms-btn" onClick={() => void listing.refetch()}>
                     {t("retry")}
                   </button>
                 </div>
@@ -492,6 +544,7 @@ export function MailboxContentView({
                 <div className={styles.messageRows}>
                   {rows.map((row) => (
                     <button
+                      type="button"
                       key={`${row.mailboxId}:${row.id}`}
                       ref={(button) => {
                         const key = `${row.mailboxId}:${row.id}`;
@@ -550,15 +603,15 @@ export function MailboxContentView({
                     )}
                   </p>
                   {search ? (
-                    <button className="ms-btn" onClick={() => setSearch("")}>
+                    <button type="button" className="ms-btn" onClick={() => setSearch("")}>
                       {t("clearSearch")}
                     </button>
                   ) : folder === "sent" ? (
-                    <button className="ms-btn" onClick={() => changeFolder("drafts")}>
+                    <button type="button" className="ms-btn" onClick={() => changeFolder("drafts")}>
                       {t("viewDrafts")}
                     </button>
                   ) : canCompose ? (
-                    <button className="ms-btn" onClick={newDraft}>
+                    <button type="button" className="ms-btn" onClick={newDraft}>
                       {t("newDraft")}
                     </button>
                   ) : null}
@@ -570,16 +623,19 @@ export function MailboxContentView({
             </div>
           </div>
           {hasRows ? (
-            <div
+            <section
               ref={reader}
-              role="region"
               aria-label={t("readingPane")}
               tabIndex={-1}
               className={`${styles.detail} ${styles.contentDetail}`}
               data-reading={!!visibleItem}
             >
               <div className={styles.detailTop}>
-                <button className={`ms-btn ms-btn-ghost ${styles.mobileBack}`} onClick={backToList}>
+                <button
+                  type="button"
+                  className={`ms-btn ms-btn-ghost ${styles.mobileBack}`}
+                  onClick={backToList}
+                >
                   ← {t("back")}
                 </button>
                 <span title={selectedBox?.address ?? selected?.address}>
@@ -587,8 +643,11 @@ export function MailboxContentView({
                 </span>
                 {item && selectedBox?.canDraft ? (
                   <button
+                    type="button"
                     className="ms-btn"
-                    onClick={() => compose({ mailboxId: item.mailboxId, source: item })}
+                    disabled={pendingSentReply}
+                    aria-describedby={pendingSentReply ? "mailbox-sent-reply-pending" : undefined}
+                    onClick={() => openComposer(item.mailboxId, item)}
                   >
                     {t(item.kind === "draft" ? "editDraft" : "replyDraft")}
                   </button>
@@ -598,6 +657,7 @@ export function MailboxContentView({
                 <div role="alert" className={styles.emptyFolder}>
                   <p>{t("accessLost")}</p>
                   <button
+                    type="button"
                     className="ms-btn"
                     onClick={() => {
                       select(null);
@@ -635,6 +695,15 @@ export function MailboxContentView({
                     </div>
                     <small>{date(item.date ?? item.updatedAt)}</small>
                   </header>
+                  {pendingSentReply ? (
+                    <p
+                      id="mailbox-sent-reply-pending"
+                      className={styles.contentNotice}
+                      role="status"
+                    >
+                      {t("sentReplyPending")}
+                    </p>
+                  ) : null}
                   <div className={styles.messageBody}>{item.text || t("noText")}</div>
                   {item.attachments.length ? (
                     <section aria-label={t("attachments")} className={styles.attachments}>
@@ -655,29 +724,35 @@ export function MailboxContentView({
                   <p>{t("selectMessageBody")}</p>
                 </div>
               )}
-            </div>
+            </section>
           ) : null}
         </div>
       </div>
       {composer && composerAllowed ? (
         <DraftDialog
-          key={`${composer.source?.id ?? "new"}:${composer.source?.revision ?? 0}`}
+          key={composer.session}
           boxes={boxes}
           mailboxId={composer.mailboxId}
           source={composer.source}
-          close={() => compose(null)}
-          selectBox={(id) => compose((current) => (current ? { ...current, mailboxId: id } : null))}
+          current={() => composerSession.current === composer.session}
+          close={() => closeComposer(composer.session)}
+          selectBox={(id) =>
+            compose((current) =>
+              current?.session === composer.session ? { ...current, mailboxId: id } : current,
+            )
+          }
           lost={() => {
-            compose(null);
+            if (composerSession.current !== composer.session) return;
+            closeComposer(composer.session);
             setNotice(t("accessLost"));
             void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
             void refresh();
           }}
           saved={async (saved) => {
-            setSearch("");
-            changeFolder("drafts");
             await refresh();
-            select({ mailboxId: saved.mailboxId, id: saved.id });
+            if (composerSession.current !== composer.session) return;
+            setSearch("");
+            draftSaved(saved);
           }}
         />
       ) : null}

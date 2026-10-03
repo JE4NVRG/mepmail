@@ -1,16 +1,22 @@
 import {
+  beginMailboxCheckout,
+  MailboxLifecycleError,
+  manageMailboxSubscription,
+} from "@millionsend/billing";
+import { env } from "@millionsend/config";
+import {
+  createMailboxAgentKey,
   createMailboxRegistry,
   grantMailboxRegistry,
+  listMailboxAgentKeys,
   listMailboxRegistry,
-  MailboxRegistryError,
+  MailboxAgentAccessError,
   MailboxContentError,
+  MailboxRegistryError,
   MailboxServiceError,
   mailboxServiceState,
-  createMailboxAgentKey,
-  listMailboxAgentKeys,
-  revokeMailboxAgentKey,
-  MailboxAgentAccessError,
   queueMailboxDraft,
+  revokeMailboxAgentKey,
   revokeMailboxRegistry,
   updateMailboxRegistry,
   withMailboxRegistryAdmin,
@@ -20,24 +26,23 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { recordAudit } from "../audit";
-import { mailboxRegistryEnabled } from "../mailboxes";
+import { resolveBaseUrl } from "../auth";
+import { getKeyring } from "../keyring";
+import {
+  mailboxBillingCatalog,
+  mailboxBillingPresentation,
+  mailboxManagementEnabled,
+  mailboxPurchaseDeps,
+} from "../mailbox-billing";
 import {
   getMailboxContent,
   getMailboxContentList,
   saveMailboxContentDraft,
 } from "../mailbox-content";
-import { router, teamProcedure } from "../trpc";
-import { getKeyring } from "../keyring";
 import { mailboxTransportMime } from "../mailbox-transport";
+import { mailboxRegistryEnabled } from "../mailboxes";
 import { getQueue } from "../queue";
-import { beginMailboxCheckout, MailboxLifecycleError } from "@millionsend/billing";
-import { env } from "@millionsend/config";
-import {
-  mailboxBillingCatalog,
-  mailboxBillingPresentation,
-  mailboxPurchaseDeps,
-} from "../mailbox-billing";
-import { resolveBaseUrl } from "../auth";
+import { router, teamProcedure } from "../trpc";
 
 const enabled = teamProcedure.use(({ ctx, next }) => {
   if (!mailboxRegistryEnabled()) throw new TRPCError({ code: "NOT_FOUND" });
@@ -110,6 +115,41 @@ export const mailboxesRouter = router({
     return mailboxServiceState(ctx.db, ctx.teamId);
   }),
   billing: enabled.query(({ ctx }) => call(() => mailboxBillingPresentation(ctx.db, actor(ctx)))),
+  manage: enabled
+    .input(
+      z
+        .object({
+          action: z.enum(["cancel", "resume", "quantity", "reconcile"]),
+          seats: z.number().int().min(1).max(10000).optional(),
+        })
+        .strict(),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const presentation = await call(() => mailboxBillingPresentation(ctx.db, actor(ctx)));
+      if (!presentation.canManage) throw new TRPCError({ code: "FORBIDDEN" });
+      if (!mailboxManagementEnabled() || !presentation.management.canReconcile)
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "mailbox_billing_unavailable",
+        });
+      if (input.action === "quantity" && input.seats === undefined)
+        throw new TRPCError({ code: "BAD_REQUEST" });
+      const catalog = mailboxBillingCatalog();
+      if (!catalog)
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "mailbox_billing_unavailable",
+        });
+      return call(() =>
+        manageMailboxSubscription(mailboxPurchaseDeps(ctx.db), catalog, {
+          ...actor(ctx),
+          ...input,
+        }),
+      ).catch((error: unknown) => {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
+      });
+    }),
   checkout: enabled
     .input(z.object({ seats: z.number().int().min(1).max(10000) }))
     .mutation(async ({ ctx, input }) => {

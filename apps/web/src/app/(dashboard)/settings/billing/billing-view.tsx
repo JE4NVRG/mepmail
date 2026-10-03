@@ -148,10 +148,21 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
   const [step, setStep] = useState<number | null>(null);
   const [plansOpen, setPlansOpen] = useState(false);
   const [changed, setChanged] = useState<{ rung: PlanRungKey; result: RungChange } | null>(null);
-  const startCheckout = useMutation(trpc.billing.checkout.mutationOptions(redirect));
-  const openPortal = useMutation(trpc.billing.portal.mutationOptions(redirect));
+  const startCheckout = useMutation(
+    trpc.billing.checkout.mutationOptions({
+      ...redirect,
+      onMutate: () => resetOtherErrors("checkout"),
+    }),
+  );
+  const openPortal = useMutation(
+    trpc.billing.portal.mutationOptions({
+      ...redirect,
+      onMutate: () => resetOtherErrors("portal"),
+    }),
+  );
   const changePlan = useMutation(
     trpc.billing.changePlan.mutationOptions({
+      onMutate: () => resetOtherErrors("changePlan"),
       onSuccess: async (result, variables) => {
         await refresh.onSuccess();
         // The outcome shows on the plan card at the top of the page, so the
@@ -162,10 +173,35 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
       },
     }),
   );
-  const setOverage = useMutation(trpc.billing.setOverage.mutationOptions(refresh));
+  const setOverage = useMutation(
+    trpc.billing.setOverage.mutationOptions({
+      ...refresh,
+      onMutate: () => resetOtherErrors("setOverage"),
+    }),
+  );
+  // Callbacks run after all hooks have initialized. Clear only failures of
+  // other actions, preserving the mutation that the user just started.
+  function resetOtherErrors(action: "checkout" | "portal" | "changePlan" | "setOverage"): void {
+    if (action !== "checkout" && startCheckout.isError) startCheckout.reset();
+    if (action !== "portal" && openPortal.isError) openPortal.reset();
+    if (action !== "changePlan" && changePlan.isError) changePlan.reset();
+    if (action !== "setOverage" && setOverage.isError) setOverage.reset();
+  }
   const mutations = [startCheckout, openPortal, changePlan, setOverage];
   const busy = mutations.some((m) => m.isPending);
   const failed = mutations.some((m) => m.isError);
+  const checkoutErrors = {
+    SEND_CHECKOUT_PENDING: "checkoutPending",
+    SEND_CHECKOUT_UNKNOWN: "checkoutUnknown",
+    SEND_CHECKOUT_CONFLICT: "checkoutConflict",
+    SEND_CHECKOUT_EXPIRED: "checkoutExpired",
+    SEND_CHECKOUT_SUBSCRIPTION_EXISTS: "checkoutSubscriptionExists",
+  } as const;
+  const checkoutError = startCheckout.error?.message;
+  const failureText =
+    startCheckout.isError && checkoutError && Object.hasOwn(checkoutErrors, checkoutError)
+      ? t(checkoutErrors[checkoutError as keyof typeof checkoutErrors])
+      : t("error");
 
   const fmt = new Intl.NumberFormat(locale);
   const usd = (cents: number) => formatUsd(cents, locale);
@@ -391,7 +427,7 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
             color: failed ? "var(--ms-danger)" : "var(--ms-muted)",
           }}
         >
-          {failed ? t("error") : canManage ? t("manageHint") : t("readOnly")}
+          {failed ? failureText : canManage ? t("manageHint") : t("readOnly")}
         </p>
       </Card>
 
@@ -518,6 +554,14 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
             </div>
             <p className="ms-slider-hint">{t("sliderHint")}</p>
           </div>
+          {failed ? (
+            <p
+              role="alert"
+              style={{ color: "var(--ms-error, var(--ms-bone))", margin: "0 0 16px" }}
+            >
+              {failureText}
+            </p>
+          ) : null}
           <div className="ms-plans">
             {PLANS.map((p) => {
               const active = selected.plan === p;

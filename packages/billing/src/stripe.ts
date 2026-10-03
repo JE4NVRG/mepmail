@@ -6,13 +6,24 @@ import Stripe from "stripe";
  */
 export interface BillingStripe {
   prices: { list(params: Stripe.PriceListParams): Promise<Stripe.ApiList<Stripe.Price>> };
-  customers: { create(params: Stripe.CustomerCreateParams): Promise<Stripe.Customer> };
+  customers: {
+    create(
+      params: Stripe.CustomerCreateParams,
+      options?: Stripe.RequestOptions,
+    ): Promise<Stripe.Customer>;
+    retrieve?: (id: string) => Promise<Stripe.Customer | Stripe.DeletedCustomer>;
+  };
   subscriptions: {
     retrieve(id: string, params?: Stripe.SubscriptionRetrieveParams): Promise<Stripe.Subscription>;
     list(params: Stripe.SubscriptionListParams): Promise<Stripe.ApiList<Stripe.Subscription>>;
-    update(id: string, params?: Stripe.SubscriptionUpdateParams): Promise<Stripe.Subscription>;
+    update(
+      id: string,
+      params?: Stripe.SubscriptionUpdateParams,
+      options?: Stripe.RequestOptions,
+    ): Promise<Stripe.Subscription>;
     cancel(id: string, params?: Stripe.SubscriptionCancelParams): Promise<Stripe.Subscription>;
   };
+  invoices?: { retrieve(id: string): Promise<Stripe.Invoice> };
   subscriptionItems: {
     create(params: Stripe.SubscriptionItemCreateParams): Promise<Stripe.SubscriptionItem>;
     update(
@@ -25,12 +36,21 @@ export interface BillingStripe {
     ): Promise<Stripe.DeletedSubscriptionItem>;
   };
   subscriptionSchedules: {
-    create(params: Stripe.SubscriptionScheduleCreateParams): Promise<Stripe.SubscriptionSchedule>;
+    create(
+      params: Stripe.SubscriptionScheduleCreateParams,
+      options?: Stripe.RequestOptions,
+    ): Promise<Stripe.SubscriptionSchedule>;
     update(
       id: string,
       params: Stripe.SubscriptionScheduleUpdateParams,
+      options?: Stripe.RequestOptions,
     ): Promise<Stripe.SubscriptionSchedule>;
-    release(id: string): Promise<Stripe.SubscriptionSchedule>;
+    release(
+      id: string,
+      params?: Stripe.SubscriptionScheduleReleaseParams,
+      options?: Stripe.RequestOptions,
+    ): Promise<Stripe.SubscriptionSchedule>;
+    retrieve?: (id: string) => Promise<Stripe.SubscriptionSchedule>;
   };
   billing: {
     meterEvents: {
@@ -43,6 +63,10 @@ export interface BillingStripe {
         params: Stripe.Checkout.SessionCreateParams,
         options?: Stripe.RequestOptions,
       ): Promise<Stripe.Checkout.Session>;
+      retrieve?: (id: string) => Promise<Stripe.Checkout.Session>;
+      list?: (
+        params: Stripe.Checkout.SessionListParams,
+      ) => Promise<Stripe.ApiList<Stripe.Checkout.Session>>;
     };
   };
   billingPortal: {

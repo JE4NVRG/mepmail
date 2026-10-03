@@ -5,6 +5,50 @@ export {
   createPortalSession,
   hasLiveSubscription,
 } from "./checkout.js";
+export {
+  createMailboxCheckoutSession,
+  isMailboxSubscription,
+  MAILBOX_CHECKOUT_METADATA_KEY,
+  MAILBOX_CUSTOMER_METADATA_KEY,
+  MAILBOX_SERVICE,
+  MAILBOX_SERVICE_METADATA_KEY,
+  MailboxBillingError,
+  type MailboxBillingStripe,
+  type MailboxCatalog,
+  type MailboxCheckoutInput,
+  type MailboxCheckoutReadbackInput,
+  type MailboxPriceTerms,
+  type MailboxSubscriptionProjection,
+  mailboxCheckoutSessionMatches,
+  projectMailboxSubscription,
+  recoverMailboxCheckoutSession,
+} from "./mailbox.js";
+export {
+  type MailboxErasureDeps,
+  MailboxErasureError,
+  type MailboxErasureStripe,
+  withMailboxTeamErasure,
+} from "./mailbox-erasure.js";
+export {
+  applyMailboxSubscription,
+  type BeginMailboxCheckoutInput,
+  type BeginMailboxCheckoutResult,
+  beginMailboxCheckout,
+  type MailboxApplyResult,
+  type MailboxCheckoutLease,
+  type MailboxCustomerRecoveryDeps,
+  MailboxLifecycleError,
+  type MailboxPurchaseDeps,
+  type ResolveMailboxCustomerInput,
+  type ResolveMailboxCustomerResult,
+  resolveMailboxCustomer,
+} from "./mailbox-lifecycle.js";
+export {
+  type MailboxManagementDeps,
+  type MailboxManagementInput,
+  type MailboxManagementResult,
+  manageMailboxSubscription,
+} from "./mailbox-management.js";
 export { type OverageReport, reportOverage } from "./overage.js";
 export {
   METER_EVENT_NAME,
@@ -20,6 +64,14 @@ export {
   SUBSCRIPTION_EXPAND,
   subscriptionItems,
 } from "./prices.js";
+export {
+  beginSendCheckout,
+  SEND_CHECKOUT_METADATA_KEY,
+  type SendCheckoutDeps,
+  SendCheckoutError,
+  type SendCheckoutInput,
+  type SendCheckoutResult,
+} from "./send-checkout.js";
 export { type BillingStripe, createStripe, isLiveKey } from "./stripe.js";
 export {
   cancelTeamSubscription,
@@ -34,41 +86,3 @@ export {
   purgeStripeEvents,
   type WebhookDeps,
 } from "./webhook.js";
-export {
-  createMailboxCheckoutSession,
-  recoverMailboxCheckoutSession,
-  mailboxCheckoutSessionMatches,
-  isMailboxSubscription,
-  projectMailboxSubscription,
-  MailboxBillingError,
-  MAILBOX_SERVICE,
-  MAILBOX_SERVICE_METADATA_KEY,
-  MAILBOX_CHECKOUT_METADATA_KEY,
-  MAILBOX_CUSTOMER_METADATA_KEY,
-  type MailboxBillingStripe,
-  type MailboxCatalog,
-  type MailboxCheckoutInput,
-  type MailboxCheckoutReadbackInput,
-  type MailboxPriceTerms,
-  type MailboxSubscriptionProjection,
-} from "./mailbox.js";
-export {
-  applyMailboxSubscription,
-  beginMailboxCheckout,
-  resolveMailboxCustomer,
-  MailboxLifecycleError,
-  type MailboxCheckoutLease,
-  type MailboxApplyResult,
-  type MailboxPurchaseDeps,
-  type MailboxCustomerRecoveryDeps,
-  type ResolveMailboxCustomerInput,
-  type ResolveMailboxCustomerResult,
-  type BeginMailboxCheckoutInput,
-  type BeginMailboxCheckoutResult,
-} from "./mailbox-lifecycle.js";
-export {
-  withMailboxTeamErasure,
-  MailboxErasureError,
-  type MailboxErasureStripe,
-  type MailboxErasureDeps,
-} from "./mailbox-erasure.js";

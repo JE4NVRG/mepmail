@@ -2,15 +2,20 @@ import { randomUUID } from "node:crypto";
 import {
   listMailboxItems,
   listMailboxRegistry,
-  MailboxContentError,
   type MailboxContentActor,
+  MailboxContentError,
   saveMailboxDraft,
-  withMailboxItem,
   withMailboxContentAccess,
+  withMailboxItem,
 } from "@millionsend/core";
-import type { Db } from "@millionsend/db";
+import { type Db, schema } from "@millionsend/db";
+import { and, eq, inArray, type SQL } from "drizzle-orm";
 import { simpleParser } from "mailparser";
 import nodemailer from "nodemailer";
+import {
+  mailboxMessageId,
+  mailboxReplyIds,
+} from "../../../../packages/core/src/mailbox-message-id";
 import { pilotImageMetadata } from "../../../../packages/core/src/mailbox-pilot-images";
 import { getKeyring } from "./keyring";
 
@@ -26,9 +31,15 @@ export const MAILBOX_PRIVATE_HEADERS = {
 };
 
 function filename(value: string | undefined) {
-  return (
-    (value ?? "attachment").replace(/[\u0000-\u001f\u007f/\\]/g, "_").slice(0, 160) || "attachment"
-  );
+  const original = value ?? "attachment";
+  let sanitized = "";
+  for (let index = 0; index < original.length && index < 160; index++) {
+    const character = original.charAt(index);
+    const code = original.charCodeAt(index);
+    sanitized +=
+      code < 32 || code === 127 || character === "/" || character === "\\" ? "_" : character;
+  }
+  return sanitized || "attachment";
 }
 async function parse(raw: Buffer) {
   if (!raw.length || raw.length > MAX_MIME) throw new MailboxContentError("invalid");
@@ -57,7 +68,8 @@ function references(mime: Awaited<ReturnType<typeof parse>>) {
       ...(mime.inReplyTo ? [mime.inReplyTo] : []),
     ]),
   ]
-    .filter((v) => v.length <= 512 && !/[\r\n]/.test(v))
+    .map(mailboxMessageId)
+    .filter((v): v is string => v !== null)
     .slice(-50);
 }
 function dto(mime: Awaited<ReturnType<typeof parse>>) {
@@ -76,14 +88,91 @@ function dto(mime: Awaited<ReturnType<typeof parse>>) {
   };
 }
 
+/** Metadata is a correlation hint, never authority. Only accepted outboxes with
+ * an actual Sent item in this exact team/box can supply a confirmed alias.
+ */
+function acceptedSent(db: Db, actor: MailboxContentActor, mailboxId: string, match: SQL) {
+  return db
+    .select({
+      id: schema.mailboxOutbox.id,
+      messageId: schema.mailboxOutbox.providerRfcMessageId,
+    })
+    .from(schema.mailboxOutbox)
+    .innerJoin(
+      schema.mailboxItems,
+      and(
+        eq(schema.mailboxItems.id, schema.mailboxOutbox.id),
+        eq(schema.mailboxItems.mailboxId, schema.mailboxOutbox.mailboxId),
+        eq(schema.mailboxItems.teamId, schema.mailboxOutbox.teamId),
+        eq(schema.mailboxItems.kind, "sent"),
+      ),
+    )
+    .where(
+      and(
+        eq(schema.mailboxOutbox.teamId, actor.teamId),
+        eq(schema.mailboxOutbox.mailboxId, mailboxId),
+        eq(schema.mailboxOutbox.status, "accepted"),
+        match,
+      ),
+    );
+}
+
 export async function getMailboxContent(
   db: Db,
   actor: MailboxContentActor,
   input: { mailboxId: string; id: string },
 ) {
-  return withMailboxItem(db, getKeyring(), actor, input, async ({ raw, ...item }) => ({
-    ...item,
-    ...dto(await parse(raw)),
+  actor = { ...actor };
+  input = { ...input };
+  const { replyIds, ...content } = await withMailboxItem(
+    db,
+    getKeyring(),
+    actor,
+    input,
+    async ({ raw, ...item }) => {
+      const mime = await parse(raw);
+      const metadata = dto(mime);
+      return {
+        ...item,
+        ...metadata,
+        // Captured MIME ID; for Sent this is not a claim about SES's final ID.
+        messageId: mailboxMessageId(mime.messageId),
+        replyTo: item.kind === "sent" ? addresses(mime.to).join(", ") : metadata.replyTo,
+        replyIds: item.kind === "inbox" ? mailboxReplyIds(mime) : [],
+      };
+    },
+  );
+  // Do not use a second connection inside withMailboxItem's read transaction.
+  // Recheck current access before returning the content and correlated metadata.
+  let transportMessageId: string | null = null;
+  let replyToSentItemId: string | null = null;
+  if (content.kind === "sent") {
+    const [sent] = await acceptedSent(
+      db,
+      actor,
+      input.mailboxId,
+      eq(schema.mailboxOutbox.id, input.id),
+    );
+    transportMessageId = mailboxMessageId(sent?.messageId);
+  } else if (replyIds.length) {
+    const matches = await acceptedSent(
+      db,
+      actor,
+      input.mailboxId,
+      inArray(schema.mailboxOutbox.providerRfcMessageId, replyIds),
+    );
+    for (const id of replyIds) {
+      const match = matches.find((sent) => sent.messageId === id);
+      if (match) {
+        replyToSentItemId = match.id;
+        break;
+      }
+    }
+  }
+  return withMailboxContentAccess(db, actor, [input.mailboxId], async () => ({
+    ...content,
+    transportMessageId,
+    replyToSentItemId,
   }));
 }
 
@@ -221,14 +310,21 @@ export async function saveMailboxContentDraft(
     });
   }
   if (attachments.length > MAX_ATTACHMENTS) throw new MailboxContentError("invalid");
-  const reply = source?.kind === "inbox" ? source.mime : null;
+  const reply = source && source.kind !== "draft" ? source.mime : null;
   const refs = source ? references(source.mime) : [];
-  const originalId =
-    source?.mime.messageId &&
-    !/[\r\n]/.test(source.mime.messageId) &&
-    source.mime.messageId.length <= 512
-      ? source.mime.messageId
-      : undefined;
+  const originalId = mailboxMessageId(source?.mime.messageId) ?? undefined;
+  let replyId = originalId;
+  if (source?.kind === "sent") {
+    const [sent] = await acceptedSent(
+      db,
+      actor,
+      box.id,
+      eq(schema.mailboxOutbox.id, input.sourceItemId!),
+    );
+    replyId = mailboxMessageId(sent?.messageId) ?? undefined;
+    // A submitted ID cannot thread a reply to SES's overwritten Sent header.
+    if (!replyId) throw new MailboxContentError("conflict");
+  }
   // streamTransport buffers a MIME capture. It never connects to SMTP/SES.
   const transport = nodemailer.createTransport({
     streamTransport: true,
@@ -241,8 +337,8 @@ export async function saveMailboxContentDraft(
     subject: input.subject,
     text: input.text,
     messageId: input.id ? originalId : `<${randomUUID()}@${box.address.split("@")[1]}>`,
-    inReplyTo: reply ? originalId : source?.mime.inReplyTo,
-    references: reply && originalId ? [...refs, originalId] : refs,
+    inReplyTo: reply ? replyId : (mailboxMessageId(source?.mime.inReplyTo) ?? undefined),
+    references: reply && replyId ? [...new Set([...refs, replyId])].slice(-50) : refs,
     attachments,
   });
   if (!Buffer.isBuffer(result.message) || result.message.length > MAX_MIME)

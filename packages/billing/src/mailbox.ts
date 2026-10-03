@@ -98,6 +98,93 @@ function dateOf(seconds: number | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+export interface MailboxIncreaseEvidence {
+  customerId: string;
+  livemode: boolean;
+  seats: number;
+  periodStart: Date;
+  periodEnd: Date;
+  prorationAt?: Date | undefined;
+  previousInvoiceId?: string | null | undefined;
+  invoiceId?: string | null | undefined;
+}
+
+/** Match the billed debit, not an old paid invoice or a credit for the same contract. */
+export function mailboxIncreaseInvoiceMatches(
+  sub: Stripe.Subscription,
+  owner: MailboxIncreaseEvidence,
+  evidence: Stripe.Invoice | string | null = sub.latest_invoice,
+): boolean {
+  const invoice = evidence;
+  const item = sub.items.data[0];
+  const start = Math.floor(owner.periodStart.getTime() / 1000);
+  const end = Math.floor(owner.periodEnd.getTime() / 1000);
+  const proration = owner.prorationAt ? Math.floor(owner.prorationAt.getTime() / 1000) : null;
+  if (
+    !item ||
+    sub.items.data.length !== 1 ||
+    !Number.isSafeInteger(owner.seats) ||
+    owner.seats < 1 ||
+    !Number.isSafeInteger(start) ||
+    !Number.isSafeInteger(end) ||
+    end <= start ||
+    !invoice ||
+    typeof invoice !== "object" ||
+    !invoice.id ||
+    invoice.id === owner.previousInvoiceId ||
+    (owner.invoiceId && invoice.id !== owner.invoiceId) ||
+    idOf(invoice.customer) !== owner.customerId ||
+    invoice.livemode !== owner.livemode ||
+    invoice.currency !== item.price.currency ||
+    idOf(invoice.parent?.subscription_details?.subscription) !== sub.id ||
+    invoice.billing_reason !== "subscription_update" ||
+    invoice.lines?.has_more !== false ||
+    !Array.isArray(invoice.lines.data)
+  )
+    return false;
+  const debits = invoice.lines.data.filter((line) => {
+    const details = line.parent?.subscription_item_details;
+    return (
+      line.invoice === invoice.id &&
+      line.livemode === owner.livemode &&
+      line.currency === item.price.currency &&
+      line.parent?.type === "subscription_item_details" &&
+      details?.subscription === sub.id &&
+      details.subscription_item === item.id &&
+      !details.proration_details?.credited_items &&
+      Number.isSafeInteger(line.amount) &&
+      line.amount > 0 &&
+      line.pricing?.type === "price_details" &&
+      idOf(line.pricing.price_details?.price) === item.price.id &&
+      Number(line.pricing.unit_amount_decimal) === item.price.unit_amount &&
+      line.quantity === owner.seats &&
+      (line.quantity_decimal == null || Number(line.quantity_decimal) === owner.seats) &&
+      Number.isSafeInteger(line.period?.start) &&
+      line.period.start >= start &&
+      line.period.start < end &&
+      line.period.end === end &&
+      (proration === null || (details.proration && line.period.start === proration))
+    );
+  });
+  return debits.length === 1;
+}
+
+/** Subscription readback and the exact billed debit must both confirm the increase. */
+export function mailboxIncreasePaymentConfirmed(
+  sub: Stripe.Subscription,
+  owner: MailboxIncreaseEvidence,
+  evidence: Stripe.Invoice | string | null = sub.latest_invoice,
+): boolean {
+  return (
+    !sub.pending_update &&
+    !!evidence &&
+    typeof evidence === "object" &&
+    evidence.status === "paid" &&
+    evidence.amount_remaining === 0 &&
+    mailboxIncreaseInvoiceMatches(sub, owner, evidence)
+  );
+}
+
 type MailboxStatus = "inactive" | "trialing" | "active" | "past_due" | "canceled";
 
 export interface MailboxSubscriptionProjection {

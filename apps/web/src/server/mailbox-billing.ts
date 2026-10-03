@@ -1,14 +1,15 @@
 import {
   isLiveKey,
-  MailboxLifecycleError,
-  recoverMailboxCheckoutSession,
   type MailboxCatalog,
+  MailboxLifecycleError,
   type MailboxPurchaseDeps,
+  recoverMailboxCheckoutSession,
 } from "@millionsend/billing";
 import { env, isCloudDeployment } from "@millionsend/config";
 import { type Db, schema } from "@millionsend/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { mailboxManagementRequests } from "../../../../packages/db/src/schema/mailbox-management-requests";
 import { getStripe } from "./billing";
 
 const terms = z
@@ -68,6 +69,15 @@ export function mailboxBillingOffer() {
   };
 }
 
+export function mailboxManagementEnabled() {
+  return (
+    ["1", "true"].includes(process.env.MAILBOX_BILLING_MANAGEMENT_ENABLED ?? "") &&
+    isCloudDeployment() &&
+    /^(sk|rk)_(test|live)_\S+$/.test(env.STRIPE_SECRET_KEY ?? "") &&
+    !["1", "true"].includes(process.env.BILLING_MUTATIONS_PAUSED ?? "")
+  );
+}
+
 /** Read-only presentation, rechecking membership rather than trusting a cached session role. */
 export async function mailboxBillingPresentation(
   db: Db,
@@ -87,11 +97,14 @@ export async function mailboxBillingPresentation(
   if (!member) throw new MailboxLifecycleError("forbidden");
   const canManage = member.role === "owner" || member.role === "admin";
   const [subscription] = await db
-    .select({ teamId: schema.mailboxSubscriptions.teamId })
+    .select()
     .from(schema.mailboxSubscriptions)
     .where(eq(schema.mailboxSubscriptions.teamId, actor.teamId));
   const [completedCheckout] = await db
-    .select({ status: schema.mailboxCheckouts.status })
+    .select({
+      status: schema.mailboxCheckouts.status,
+      subscriptionId: schema.mailboxCheckouts.stripeSubscriptionId,
+    })
     .from(schema.mailboxCheckouts)
     .where(
       and(
@@ -99,6 +112,7 @@ export async function mailboxBillingPresentation(
         eq(schema.mailboxCheckouts.status, "completed"),
       ),
     )
+    .orderBy(desc(schema.mailboxCheckouts.createdAt))
     .limit(1);
   const [checkout] = await db
     .select({
@@ -135,10 +149,55 @@ export async function mailboxBillingPresentation(
       checkout.interval === offer.interval &&
       checkout.storageBytesPerMailbox === offer.storageBytesPerMailbox &&
       checkout.includedOutboundPerMailbox === offer.includedOutboundPerMailbox);
+  const ended =
+    subscription?.status === "canceled" &&
+    !!subscription.stripeSubscriptionId &&
+    subscription.lastEventCreated !== null;
+  const completedPending =
+    !!completedCheckout &&
+    (!ended || completedCheckout.subscriptionId !== subscription?.stripeSubscriptionId);
+  const [managementRequest] = await db
+    .select({
+      action: mailboxManagementRequests.action,
+      status: mailboxManagementRequests.status,
+      seats: mailboxManagementRequests.seats,
+      effectiveAt: mailboxManagementRequests.periodEnd,
+    })
+    .from(mailboxManagementRequests)
+    .where(
+      and(
+        eq(mailboxManagementRequests.teamId, actor.teamId),
+        eq(
+          mailboxManagementRequests.stripeSubscriptionId,
+          subscription?.stripeSubscriptionId ?? "",
+        ),
+        eq(mailboxManagementRequests.stripeCustomerId, subscription?.stripeCustomerId ?? ""),
+        eq(mailboxManagementRequests.livemode, subscription?.livemode ?? false),
+        inArray(mailboxManagementRequests.status, ["prepared", "creating", "pending", "scheduled"]),
+      ),
+    )
+    .orderBy(desc(mailboxManagementRequests.createdAt))
+    .limit(1);
+  const manageable =
+    canManage &&
+    !member.suspendedAt &&
+    member.plan !== "system" &&
+    mailboxManagementEnabled() &&
+    !!catalog &&
+    !!subscription?.stripeCustomerId &&
+    !!subscription.stripeSubscriptionId &&
+    !!subscription.stripeSubscriptionItemId &&
+    subscription.livemode === catalog.livemode;
+  const openManagement = !!managementRequest && managementRequest.status !== "scheduled";
+  const scheduledReduction =
+    managementRequest?.status === "scheduled" &&
+    !!subscription &&
+    ["active", "trialing", "past_due"].includes(subscription.status);
+  const beforeEnd = !!subscription && subscription.periodEnd.getTime() > Date.now();
   const availability =
     !canManage || member.suspendedAt || member.plan === "system"
       ? ("forbidden" as const)
-      : subscription || completedCheckout
+      : (subscription && !ended) || completedPending
         ? ("existing_subscription" as const)
         : !offer
           ? ("unavailable" as const)
@@ -152,6 +211,32 @@ export async function mailboxBillingPresentation(
     offer,
     checkoutPending: !!checkout || customerRequest?.status === "creating",
     pendingCheckoutSeats: checkout?.seats ?? null,
+    management: {
+      canReconcile: manageable,
+      canCancel:
+        manageable &&
+        beforeEnd &&
+        ["active", "trialing", "past_due"].includes(subscription!.status) &&
+        !subscription!.cancelAtPeriodEnd &&
+        !openManagement,
+      canResume:
+        manageable &&
+        beforeEnd &&
+        ["active", "trialing"].includes(subscription!.status) &&
+        subscription!.cancelAtPeriodEnd &&
+        !openManagement,
+      canAdjust:
+        manageable &&
+        beforeEnd &&
+        subscription!.status === "active" &&
+        !subscription!.cancelAtPeriodEnd &&
+        !openManagement,
+      pending: openManagement,
+      requestedSeats:
+        openManagement && managementRequest?.action === "increase" ? managementRequest.seats : null,
+      scheduledSeats: scheduledReduction ? managementRequest.seats : null,
+      effectiveAt: scheduledReduction ? managementRequest.effectiveAt : null,
+    },
   };
 }
 

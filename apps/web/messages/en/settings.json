@@ -329,7 +329,12 @@
     },
     "checkoutSuccess": "Thanks! Your plan updates as soon as Stripe confirms the payment — usually within a few seconds.",
     "checkoutCancel": "Checkout canceled. Your plan is unchanged.",
-    "error": "Something went wrong with Stripe. Try again."
+    "error": "Something went wrong with Stripe. Try again.",
+    "checkoutPending": "Your earlier checkout is still being verified. Wait before trying another purchase; contact support if it remains pending.",
+    "checkoutUnknown": "The result of your earlier checkout is not confirmed. Open the same plan again to verify that attempt, or contact support. Do not start another purchase.",
+    "checkoutConflict": "An earlier checkout already holds a different plan. Choose that same plan to reopen it, or wait until Stripe confirms it has expired.",
+    "checkoutExpired": "Stripe confirmed that this checkout has expired. Choose your plan again to start a new checkout.",
+    "checkoutSubscriptionExists": "Your subscription is already active or awaiting payment. Manage the existing subscription instead of starting another purchase."
   },
   "mcp": {
     "title": "MCP server",

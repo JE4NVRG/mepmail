@@ -1,12 +1,13 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { eq, lt } from "drizzle-orm";
+import { and, eq, inArray, lt } from "drizzle-orm";
 import type Stripe from "stripe";
+import { mailboxManagementRequests } from "../../db/src/schema/mailbox-management-requests.js";
 import type { BillingDeps } from "./checkout.js";
-import { SUBSCRIPTION_EXPAND } from "./prices.js";
-import { applySubscription, idOf, lockCustomer } from "./subscription.js";
 import { isMailboxSubscription, type MailboxCatalog } from "./mailbox.js";
 import { applyMailboxSubscription } from "./mailbox-lifecycle.js";
+import { SUBSCRIPTION_EXPAND } from "./prices.js";
+import { applySubscription, idOf, lockCustomer } from "./subscription.js";
 
 export interface WebhookDeps extends BillingDeps {
   webhookSecret: string;
@@ -97,10 +98,31 @@ export async function handleWebhook(
     const ref = subscriptionRef(event);
     if (!ref?.subscriptionId) return null;
     await lockCustomer(tx as unknown as Db, ref.customerId ?? ref.subscriptionId);
-    const sub = await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
+    let sub = await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
       expand: SUBSCRIPTION_EXPAND,
     });
     const mail = isMailboxSubscription(sub);
+    if (mail)
+      sub = await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
+        expand: [...SUBSCRIPTION_EXPAND, "latest_invoice"],
+      });
+    let paymentInvoice: Stripe.Invoice | undefined;
+    if (mail && "mailboxCatalog" in deps && deps.stripe.invoices) {
+      const [attempt] = await tx
+        .select({ invoiceId: mailboxManagementRequests.stripeInvoiceId })
+        .from(mailboxManagementRequests)
+        .where(
+          and(
+            eq(mailboxManagementRequests.stripeSubscriptionId, sub.id),
+            eq(mailboxManagementRequests.stripeCustomerId, idOf(sub.customer) ?? ""),
+            eq(mailboxManagementRequests.livemode, deps.livemode),
+            eq(mailboxManagementRequests.action, "increase"),
+            inArray(mailboxManagementRequests.status, ["creating", "pending"]),
+          ),
+        );
+      if (attempt?.invoiceId && attempt.invoiceId !== idOf(sub.latest_invoice))
+        paymentInvoice = await deps.stripe.invoices.retrieve(attempt.invoiceId);
+    }
     const projected =
       "mailboxCatalog" in deps
         ? await applyMailboxSubscription(
@@ -108,6 +130,7 @@ export async function handleWebhook(
             sub,
             deps.mailboxCatalog ?? null,
             event.created,
+            paymentInvoice,
           )
         : null;
     if (!mail)

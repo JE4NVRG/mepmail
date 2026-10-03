@@ -25,7 +25,7 @@
     "expired": "Period ended",
     "restricted": "Limited access"
   },
-  "existingLicenseBody": "This team's Mail license is already registered. Contracts and internal pilots use the mailboxes and period shown above. To renew or change the quantity, contact the installation operator; do not open another subscription.",
+  "existingLicenseBody": "This team already has a registered Mail license. Use the available actions below to manage a subscription. Internal licenses are managed by the installation owner.",
   "existingBody": "This team already has a recorded Mail purchase and the license is awaiting confirmation. Refresh the status. If it remains pending, contact the installation operator; do not open another subscription.",
   "recoveryBody": "A purchase was started under earlier terms. It must be resolved before a new subscription.",
   "adminBody": "Only the team owner or an administrator can subscribe when purchasing is available. Suspended teams cannot purchase.",
@@ -36,7 +36,10 @@
   "quantityLocked": "This purchase's quantity has been preserved. Trying again checks the same purchase.",
   "pricePerMailbox": "Price per mailbox",
   "included": "Included per mailbox",
-  "interval": { "month": "month", "year": "year" },
+  "interval": {
+    "month": "month",
+    "year": "year"
+  },
   "priceInterval": "{amount} / {interval}",
   "total": "Total for {count, number} mailboxes",
   "checkoutTerms": "Review the final amount and terms in Stripe's secure checkout before confirming.",
@@ -48,5 +51,24 @@
   "confirmationHint": "Opening checkout or returning from it does not activate the license. Access changes only after service confirmation.",
   "awaitingConfirmation": "You returned from checkout. Wait for license confirmation and refresh the status whenever you wish.",
   "confirmed": "The service confirms that the license is active.",
-  "documentation": "Documentation"
+  "documentation": "Documentation",
+  "cancelScheduled": "Renewal canceled. Current access continues until {date}.",
+  "reductionScheduled": "{count, number} mailboxes scheduled for renewal on {date}; the current quantity remains available until then.",
+  "increasePending": "The increase to {count, number} mailboxes is awaiting confirmed payment. Current seats remain unchanged.",
+  "managementTerms": "Increases release mailboxes only after confirmed payment. Reductions apply at the next renewal. Stored messages are preserved.",
+  "manageQuantity": "New mailbox quantity",
+  "requestIncrease": "Request increase",
+  "requestReduction": "Schedule renewal quantity",
+  "cancelTerms": "Canceling renewal preserves current access until {date} and removes a scheduled future reduction. Stored messages remain available for reading and export to authorized users.",
+  "cancelAtEnd": "Cancel at period end",
+  "resumeRenewal": "Resume renewal",
+  "managementPending": "An operation is pending. Refresh status reads back the same operation; it does not start another charge.",
+  "completeIncreasePayment": "Complete increase payment",
+  "managementResult": {
+    "confirmed": "The service confirmed the change.",
+    "scheduled": "The reduction was confirmed for the next renewal.",
+    "pending": "The operation is awaiting confirmation. Refresh status to check again.",
+    "expired": "The operation ended without applying the change. Refresh before starting another.",
+    "error": "The operation could not be confirmed. Refresh status; do not start another charge."
+  }
 }
