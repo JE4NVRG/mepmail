@@ -467,13 +467,32 @@ describe("handleWebhook", () => {
   });
 
   it("rolls back the ledger row when Stripe cannot be reached, so the retry is processed", async () => {
-    await customerTeam();
-    await expect(
-      deliver(
-        subEvent("customer.subscription.created", subscription("sub_gone", "cus_1", "active")),
-      ),
-    ).rejects.toThrow("No such subscription");
+    const teamId = await customerTeam();
+    const recoveredSubscription = subscription("sub_gone", "cus_1", "active");
+    const payload = subEvent("customer.subscription.created", recoveredSubscription);
+
+    await expect(deliver(payload)).rejects.toThrow("No such subscription");
     expect(await db.select().from(schema.stripeEvents)).toEqual([]);
+    expect(await team(teamId)).toMatchObject({ plan: "free", stripeSubscriptionId: null });
+
+    // Redelivery must process the same event after the transient provider failure.
+    state.subscriptions.sub_gone = recoveredSubscription;
+    expect(await deliver(payload)).toBe(200);
+    expect(await team(teamId)).toMatchObject({
+      plan: "pro",
+      planStatus: "active",
+      stripeSubscriptionId: "sub_gone",
+    });
+    expect(await db.select({ id: schema.stripeEvents.id }).from(schema.stripeEvents)).toEqual([
+      { id: JSON.parse(payload).id },
+    ]);
+
+    const retrievesAfterRecovery = state.retrieves.length;
+    expect(await deliver(payload)).toBe(200);
+    expect(state.retrieves).toHaveLength(retrievesAfterRecovery);
+    expect(await db.select({ id: schema.stripeEvents.id }).from(schema.stripeEvents)).toEqual([
+      { id: JSON.parse(payload).id },
+    ]);
   });
 });
 

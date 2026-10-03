@@ -54,6 +54,17 @@ const config: NextConfig = {
       "frame-ancestors 'none'",
       "form-action 'self'",
     ].join("; ");
+    // The optional Pixel is confined to public offer documents. A new document
+    // is required when leaving those routes after its SDK has loaded.
+    const publicMetaEnabled =
+      process.env.NEXT_PUBLIC_META_PIXEL_ENABLED === "true" &&
+      /^[0-9]{5,30}$/.test(process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "");
+    const publicContentSecurityPolicy = contentSecurityPolicy
+      .replace(scriptPolicy, `${scriptPolicy} https://connect.facebook.net`)
+      .replace(
+        `connect-src 'self' ${UMAMI_ORIGIN}`,
+        `connect-src 'self' ${UMAMI_ORIGIN} https://www.facebook.com`,
+      );
     return [
       {
         source: "/:path*",
@@ -76,6 +87,15 @@ const config: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
         ],
       },
+      ...(publicMetaEnabled
+        ? ["/", "/pricing"].map((source) => ({
+            source,
+            headers: [
+              { key: "Content-Security-Policy", value: publicContentSecurityPolicy },
+              { key: "Referrer-Policy", value: "no-referrer" },
+            ],
+          }))
+        : []),
     ];
   },
   // Workspace packages ship TS source with NodeNext-style "./file.js"

@@ -1,0 +1,62 @@
+.banner,
+.dialog {
+  background: var(--ms-void, #17151b);
+  color: var(--ms-bone, #f4f0e8);
+  border: 1px solid var(--ms-border, #625c70);
+  border-radius: 12px;
+  padding: 20px;
+  font-family: var(--ms-font-sans, sans-serif);
+  font-size: 14px;
+  line-height: 1.55;
+  box-shadow: 0 12px 40px #0005;
+}
+.banner {
+  position: fixed;
+  inset: auto 16px 16px;
+  z-index: 100;
+  max-width: 620px;
+  margin-left: auto;
+}
+.dialog {
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+}
+.dialog::backdrop {
+  background: #0009;
+}
+.banner h2,
+.dialog h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.banner p,
+.dialog p {
+  margin: 0 0 16px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.actions button {
+  flex: 1;
+  min-width: 140px;
+}
+.settings {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.dialog > .settings {
+  margin-top: 16px;
+}
+.settings:focus-visible {
+  outline: 2px solid var(--ms-violet, #aa88ee);
+  outline-offset: 4px;
+}
