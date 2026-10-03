@@ -17,6 +17,10 @@ const i18nMiddleware = createI18nMiddleware(i18n);
  */
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
   const { pathname } = request.nextUrl;
+  // The archive is locale-independent; bypass Markdown negotiation only.
+  if (/^\/(?:en\/|pt-BR\/)?source\/?$/.test(pathname)) {
+    return i18nMiddleware(request, event);
+  }
   if (pathname.includes(".")) return NextResponse.next();
   if (isMarkdownPreferred(request)) {
     const target = pathname === "/" ? "/llms.mdx/index" : `/llms.mdx${pathname}`;
