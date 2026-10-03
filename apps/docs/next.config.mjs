@@ -58,6 +58,10 @@ const config = {
         source: "/((?!_next/).*)",
         headers: [{ key: "Cache-Control", value: "s-maxage=300, stale-while-revalidate=86400" }],
       },
+      ...["/source", "/en/source", "/pt-BR/source"].map((source) => ({
+        source,
+        headers: [{ key: "Cache-Control", value: "no-store" }],
+      })),
     ];
   },
 };

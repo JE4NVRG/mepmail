@@ -6,5 +6,6 @@ export function baseOptions(): BaseLayoutProps {
       title: "MepMail Docs",
     },
     githubUrl: "https://github.com/JE4NVRG/mepmail",
+    links: [{ text: "Source (AGPL)", url: "/source" }],
   };
 }
