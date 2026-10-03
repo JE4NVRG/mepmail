@@ -1,10 +1,15 @@
 import {
+  ADVERTISING_CONSENT_COOKIE,
+  advertisingCookie,
   type BillingStripe,
   beginSendCheckout,
   changeRung,
   createPortalSession,
+  decodeConsentProof,
   hasLiveSubscription,
   isLiveKey,
+  metaConversionConfigured,
+  readMetaConversionConfig,
   SendCheckoutError,
   setOverage as setSubscriptionOverage,
 } from "@millionsend/billing";
@@ -26,6 +31,7 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { recordAudit } from "../audit";
 import { resolveBaseUrl } from "../auth";
@@ -103,6 +109,23 @@ async function kickQuotaDrain(): Promise<void> {
 
 const billingPageUrl = () => `${resolveBaseUrl(env.APP_BASE_URL)}/settings/billing`;
 
+/** Only trusted request cookies enter the server-only advertising context. */
+async function checkoutAdvertising() {
+  const config = readMetaConversionConfig(process.env);
+  if (!metaConversionConfigured(config)) return {};
+  const cookieHeader = (await headers()).get("cookie");
+  return {
+    advertising: {
+      config,
+      cookieHeader,
+      proof: decodeConsentProof(
+        advertisingCookie(cookieHeader, ADVERTISING_CONSENT_COOKIE),
+        env.BETTER_AUTH_SECRET ?? "",
+      ),
+    },
+  };
+}
+
 export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
   return router({
     status: teamProcedure.query(async ({ ctx }) => {
@@ -141,7 +164,12 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         let checkout: Awaited<ReturnType<typeof beginSendCheckout>>;
         try {
           checkout = await beginSendCheckout(
-            { db: ctx.db, stripe: deps.stripe(), livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? "") },
+            {
+              db: ctx.db,
+              stripe: deps.stripe(),
+              livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
+              ...(await checkoutAdvertising()),
+            },
             {
               team,
               userId: ctx.session.user.id,

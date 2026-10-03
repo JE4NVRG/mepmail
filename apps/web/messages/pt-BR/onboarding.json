@@ -9,7 +9,12 @@
     "error": "Falha ao criar o time. Tente de novo."
   },
   "title": "Envie seu primeiro e-mail",
-  "subtitle": "Siga os passos para enviar um e-mail pela API do MepMail.",
+  "subtitle": "Teste a entrega e prepare sua integração com a API.",
+  "demo": {
+    "title": "Teste um e-mail da plataforma",
+    "body": "A plataforma envia esta demonstração de {from} somente para {to}. Não precisa de chave de API ou domínio próprio.",
+    "sendCta": "Enviar teste para minha caixa"
+  },
   "step1": {
     "title": "Adicione uma chave de API",
     "body": "As chaves autenticam cada requisição. A chave completa aparece uma única vez, na criação.",
@@ -22,9 +27,9 @@
     "error": "Falha ao criar a chave. Tente de novo."
   },
   "step2": {
-    "title": "Envie um e-mail",
+    "title": "Envie pela API",
     "bodyLocked": "Para a sua própria caixa de entrada, de um domínio que você verificar — o snippet libera assim que você tiver uma chave.",
-    "bodyReady": "Sua chave e sua caixa de entrada já vêm preenchidas. Rode no seu terminal.",
+    "bodyReady": "Sua chave e sua caixa de entrada já vêm preenchidas. Verifique seu domínio, use um remetente dele e rode o snippet no terminal.",
     "subject": "Funciona.",
     "html": "<p>0000001 e contando.</p>",
     "fromPlaceholder": "voce@seudominio.com.br",
