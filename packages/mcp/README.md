@@ -15,6 +15,8 @@ Guide: <https://docs-mepmail.je4ndev.com/mcp> ·
 Packages: <https://docs-mepmail.je4ndev.com/packages> · Published as
 `@mepmail/mcp` on npm.
 
+Requires Node.js 20 or newer.
+
 ## Quickstart
 
 1. Create an API key in the MepMail dashboard (**API keys**) — a **full-access**
