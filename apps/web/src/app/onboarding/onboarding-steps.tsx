@@ -280,8 +280,8 @@ export function OnboardingSteps({
 
   const snippetBase = {
     apiUrl,
-    // The shared sender runs as written; otherwise the team's own domain.
-    from: sender ?? (verifiedDomain ? `onboarding@${verifiedDomain}` : t("step2.fromPlaceholder")),
+    // API requests use the team's own verified domain, not the platform demonstration sender.
+    from: verifiedDomain ? `onboarding@${verifiedDomain}` : t("step2.fromPlaceholder"),
     to: userEmail,
     subject: t("step2.subject"),
     html: t.raw("step2.html"),
@@ -527,61 +527,77 @@ export function OnboardingSteps({
       >
         <CodeHighlight code={displayCode} language={SNIPPET_HLJS[lang]} />
       </pre>
-      {sender && hasKey ? (
-        <div
-          className="ms-wrap-row"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "12px 14px",
-            borderTop: "1px solid var(--ms-line)",
-          }}
-        >
-          <button
-            type="button"
-            className="ms-btn ms-btn-primary"
-            disabled={verifying || sendFirst.isPending || deliveryState === "in-flight"}
-            onClick={async () => {
-              setCaptchaFailed(false);
-              setVerifying(true);
-              try {
-                const token = await turnstile.getToken();
-                sendFirst.mutate({ locale: mailLocale, ...(token ? { captchaToken: token } : {}) });
-              } catch {
-                setCaptchaFailed(true);
-              } finally {
-                setVerifying(false);
-              }
-            }}
-          >
-            <BtnSpinner on={verifying || sendFirst.isPending} />
-            {verifying || sendFirst.isPending
-              ? t("step2.sending")
-              : deliveryState === "in-flight"
-                ? t("attempt.waiting")
-                : deliveryState === "failed"
-                  ? t("attempt.retryCta")
-                  : t("step2.sendCta")}
-          </button>
-          {turnstile.slot}
-          {sendFirst.isSuccess && deliveryState !== "failed" ? (
-            <span style={{ fontSize: 13, color: "var(--ms-muted)" }}>
-              {t("step2.sentTo", { to: userEmail })}
-            </span>
-          ) : captchaFailed || sendFirst.error?.data?.code === "FORBIDDEN" ? (
-            <span style={{ fontSize: 13, color: "var(--ms-danger)" }}>
-              {t("step2.captchaFailed")}
-            </span>
-          ) : sendFirst.error?.data?.code === "TOO_MANY_REQUESTS" ? (
-            <span style={{ fontSize: 13, color: "var(--ms-muted)" }}>{t("step2.sendLimited")}</span>
-          ) : sendFirst.isError ? (
-            <span style={{ fontSize: 13, color: "var(--ms-danger)" }}>{t("step2.sendError")}</span>
-          ) : null}
-        </div>
-      ) : null}
     </div>
   );
+
+  const demoPanel = sender ? (
+    <StepCard title={t("demo.title")} body={t("demo.body", { from: sender, to: userEmail })}>
+      {deliveryState === "failed" && currentEmail ? (
+        <>
+          <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+            {t("attempt.retryBody")}
+          </p>
+          <Link
+            href={`/emails/${currentEmail.id}`}
+            className="ms-btn ms-btn-secondary"
+            style={{ marginTop: 14 }}
+          >
+            {t("attempt.log")}
+          </Link>
+        </>
+      ) : null}
+      <div
+        className="ms-wrap-row"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          marginTop: 14,
+        }}
+      >
+        <button
+          type="button"
+          className="ms-btn ms-btn-primary"
+          disabled={verifying || sendFirst.isPending || deliveryState === "in-flight"}
+          onClick={async () => {
+            setCaptchaFailed(false);
+            setVerifying(true);
+            try {
+              const token = await turnstile.getToken();
+              sendFirst.mutate({ locale: mailLocale, ...(token ? { captchaToken: token } : {}) });
+            } catch {
+              setCaptchaFailed(true);
+            } finally {
+              setVerifying(false);
+            }
+          }}
+        >
+          <BtnSpinner on={verifying || sendFirst.isPending} />
+          {verifying || sendFirst.isPending
+            ? t("step2.sending")
+            : deliveryState === "in-flight"
+              ? t("attempt.waiting")
+              : deliveryState === "failed"
+                ? t("attempt.retryCta")
+                : t("demo.sendCta")}
+        </button>
+        {turnstile.slot}
+        {sendFirst.isSuccess && deliveryState !== "failed" ? (
+          <span style={{ fontSize: 13, color: "var(--ms-muted)" }}>
+            {t("step2.sentTo", { to: userEmail })}
+          </span>
+        ) : captchaFailed || sendFirst.error?.data?.code === "FORBIDDEN" ? (
+          <span style={{ fontSize: 13, color: "var(--ms-danger)" }}>
+            {t("step2.captchaFailed")}
+          </span>
+        ) : sendFirst.error?.data?.code === "TOO_MANY_REQUESTS" ? (
+          <span style={{ fontSize: 13, color: "var(--ms-muted)" }}>{t("step2.sendLimited")}</span>
+        ) : sendFirst.isError ? (
+          <span style={{ fontSize: 13, color: "var(--ms-danger)" }}>{t("step2.sendError")}</span>
+        ) : null}
+      </div>
+    </StepCard>
+  ) : null;
 
   return (
     <div style={{ overflow: "hidden" }}>
@@ -669,6 +685,8 @@ export function OnboardingSteps({
             </div>
           ) : null}
 
+          {demoPanel}
+
           {/* Add an API key */}
           <div className="ms-step" style={{ display: "flex", gap: 18 }}>
             <StepRail
@@ -708,25 +726,10 @@ export function OnboardingSteps({
           <div className="ms-step" style={{ display: "flex", gap: 18 }}>
             <StepRail marker={marker(2)} color={hasKey ? "var(--ms-bone)" : "var(--ms-faint)"} />
             <StepCard
-              title={deliveryState === "failed" ? t("attempt.retryTitle") : t("step2.title")}
-              body={
-                !hasKey
-                  ? t("step2.bodyLocked")
-                  : deliveryState === "failed"
-                    ? t("attempt.retryBody")
-                    : t("step2.bodyReady")
-              }
+              title={t("step2.title")}
+              body={!hasKey ? t("step2.bodyLocked") : t("step2.bodyReady")}
               locked={!hasKey}
             >
-              {deliveryState === "failed" && currentEmail ? (
-                <Link
-                  href={`/emails/${currentEmail.id}`}
-                  className="ms-btn ms-btn-secondary"
-                  style={{ marginTop: 14 }}
-                >
-                  {t("attempt.log")}
-                </Link>
-              ) : null}
               {codePanel}
               {showInstanceHint && lang !== "curl" ? (
                 <p
