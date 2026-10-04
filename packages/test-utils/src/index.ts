@@ -22,9 +22,11 @@ export async function createTestDb(): Promise<{ db: Db; close: () => Promise<voi
       .split("--> statement-breakpoint")
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
-    for (const statement of statements) {
-      await client.exec(statement);
-    }
+    await client.transaction(async (tx) => {
+      for (const statement of statements) {
+        await tx.exec(statement);
+      }
+    });
   }
   const db = drizzle(client, { schema }) as unknown as Db;
   return { db, close: () => client.close() };
