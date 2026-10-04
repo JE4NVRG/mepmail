@@ -11,11 +11,14 @@ the dashboard.
 
 Adding a domain registers it with SES and shows the DNS records to add:
 
-- **DKIM** — a single `millionsend._domainkey` TXT record. MepMail
+- **DKIM** — a single `mepmail._domainkey` TXT record for new domains. MepMail
   generates an RSA-2048 keypair per domain and hands the private key to SES
   (BYODKIM), so verification is one TXT record instead of three CNAMEs. The
   private key is never stored.
 - **MAIL FROM** — MX and SPF (TXT) records for the bounce subdomain.
+
+Already-configured domains keep the selector shown in their own DNS checklist.
+Use those exact records when verifying an existing domain.
 
 Two verification signals are shown side by side:
 

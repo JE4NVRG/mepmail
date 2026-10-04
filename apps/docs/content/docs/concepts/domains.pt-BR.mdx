@@ -11,11 +11,14 @@ e verificados no painel.
 
 Adicionar um domínio o registra no SES e mostra os registros DNS a criar:
 
-- **DKIM** — um único registro TXT `millionsend._domainkey`. O MepMail
+- **DKIM** — um único registro TXT `mepmail._domainkey` para novos domínios. O MepMail
   gera um par de chaves RSA-2048 por domínio e entrega a chave privada ao SES
   (BYODKIM), então a verificação é um registro TXT em vez de três CNAMEs. A
   chave privada nunca é armazenada.
 - **MAIL FROM** — registros MX e SPF (TXT) para o subdomínio de bounce.
+
+Domínios já configurados mantêm o seletor indicado na própria lista de DNS.
+Para verificar um domínio existente, use os registros exibidos nessa lista.
 
 Dois sinais de verificação aparecem lado a lado:
 
