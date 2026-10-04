@@ -1,6 +1,6 @@
 import { env } from "@millionsend/config";
 import { acceptEmail } from "@millionsend/core";
-import { schema } from "@millionsend/db";
+import { type Db, schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -36,63 +36,80 @@ export const onboardingRouter = router({
       if (!(await verifyTurnstile(input.captchaToken))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "captcha" });
       }
-      // The shared sender carries the platform's reputation: cap what one
-      // team can push through it, counted from the rows the sends leave.
-      const t = schema.emails;
-      for (const { windowMs, max } of ONBOARDING_SEND_LIMITS) {
-        const [row] = await ctx.db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(t)
-          .where(
-            and(
-              eq(t.teamId, ctx.teamId),
-              isNull(t.domainId),
-              eq(t.from, from),
-              gt(t.createdAt, new Date(Date.now() - windowMs)),
-            ),
-          );
-        if ((row?.n ?? 0) >= max) {
-          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "onboarding send limit" });
+      const result = await ctx.db.transaction(async (tx) => {
+        // Count and accept under the same team lock. NO KEY UPDATE permits
+        // foreign-key checks while serializing concurrent onboarding sends.
+        const [team] = await tx
+          .select({ name: schema.teams.name, suspendedAt: schema.teams.suspendedAt })
+          .from(schema.teams)
+          .where(eq(schema.teams.id, ctx.teamId))
+          .for("no key update");
+        if (!team || team.suspendedAt) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: team ? "team suspended" : "team unavailable",
+          });
+        }
+        const t = schema.emails;
+        for (const { windowMs, max } of ONBOARDING_SEND_LIMITS) {
+          const [row] = await tx
+            .select({ n: sql<number>`count(*)::int` })
+            .from(t)
+            .where(
+              and(
+                eq(t.teamId, ctx.teamId),
+                isNull(t.domainId),
+                eq(t.from, from),
+                gt(t.createdAt, new Date(Date.now() - windowMs)),
+              ),
+            );
+          if ((row?.n ?? 0) >= max) {
+            throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "onboarding send limit" });
+          }
+        }
+        const message = buildOnboardingEmail({
+          locale: input.locale,
+          team: team.name,
+          dashboardUrl: env.APP_BASE_URL ? `${env.APP_BASE_URL}/emails` : null,
+        });
+        const txDb = tx as unknown as Db;
+        const accepted = await acceptEmail(
+          {
+            db: ctx.db,
+            keyring: getKeyring(),
+            isCloud: env.IS_CLOUD,
+            enqueueEmailSend: ctx.enqueueEmailSend ?? (async () => {}),
+            funnel: funnelTarget(),
+          },
+          {
+            teamId: ctx.teamId,
+            billing: await fetchQuotaRow(txDb, ctx.teamId),
+            apiKeyId: null,
+          },
+          {
+            from,
+            to: [ctx.session.user.email],
+            subject: message.subject,
+            html: message.html,
+            text: message.text,
+            domainId: null,
+          },
+          { tx: txDb },
+        );
+        if (!accepted.ok) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: accepted.reason });
+        }
+        return accepted;
+      });
+      // The caller-owned accept transaction is now committed. A lost queue job
+      // is recovered by the sweep; rejecting here would invite a duplicate send.
+      if (!result.parked) {
+        try {
+          await ctx.enqueueEmailSend?.(result.id);
+        } catch {
+          console.error("onboarding email enqueue failed; reconcile sweep will recover");
         }
       }
-      const [team] = await ctx.db
-        .select({ name: schema.teams.name, suspendedAt: schema.teams.suspendedAt })
-        .from(schema.teams)
-        .where(eq(schema.teams.id, ctx.teamId));
-      if (team?.suspendedAt) {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "team suspended" });
-      }
-      const message = buildOnboardingEmail({
-        locale: input.locale,
-        team: team?.name ?? "",
-        dashboardUrl: env.APP_BASE_URL ? `${env.APP_BASE_URL}/emails` : null,
-      });
-      const result = await acceptEmail(
-        {
-          db: ctx.db,
-          keyring: getKeyring(),
-          isCloud: env.IS_CLOUD,
-          // Absent in tests: the reconcile sweep re-enqueues accepted rows.
-          enqueueEmailSend: ctx.enqueueEmailSend ?? (async () => {}),
-          // The onboarding send is usually a team's very first accepted email,
-          // so this is where the funnel's activation step claims its row.
-          funnel: funnelTarget(),
-        },
-        {
-          teamId: ctx.teamId,
-          billing: await fetchQuotaRow(ctx.db, ctx.teamId),
-          apiKeyId: null,
-        },
-        {
-          from,
-          to: [ctx.session.user.email],
-          subject: message.subject,
-          html: message.html,
-          text: message.text,
-          domainId: null,
-        },
-      );
-      if (!result.ok) throw new TRPCError({ code: "PRECONDITION_FAILED", message: result.reason });
       return { id: result.id };
     }),
 });

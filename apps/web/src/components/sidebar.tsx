@@ -67,6 +67,7 @@ function NavItem({
     <Link
       href={item.href}
       className={active ? "active" : undefined}
+      aria-current={active ? "page" : undefined}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
@@ -187,7 +188,6 @@ export function Sidebar({
   const t = useTranslations("nav");
   const tCommon = useTranslations("common");
   const pathname = usePathname();
-  const router = useRouter();
   const trpc = useTRPC();
   const [menuOpen, setMenuOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -248,27 +248,23 @@ export function Sidebar({
         />
       </div>
       <TeamSwitcher teamName={teamName} teamLogoUrl={teamLogoUrl} />
-      {mailboxCapability.data?.enabled ? (
-        <div className={styles.products} aria-label={t("products.choose")}>
-          <Link
-            href="/emails"
-            aria-current={!mailProduct ? "page" : undefined}
-            onClick={() => onNavigate?.()}
-            className={!mailProduct ? styles.selectedProduct : undefined}
+      {mailProduct ? (
+        <Link href="/emails" className={styles.backToSend} onClick={() => onNavigate?.()}>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
           >
-            <span>{t("products.send")}</span>
-            <small>{t("products.sendShort")}</small>
-          </Link>
-          <Link
-            href="/mailboxes"
-            aria-current={mailProduct ? "page" : undefined}
-            onClick={() => onNavigate?.()}
-            className={mailProduct ? styles.selectedProduct : undefined}
-          >
-            <span>{t("products.mail")}</span>
-            <small>{t("products.additional")}</small>
-          </Link>
-        </div>
+            <path d="m12 5-7 7 7 7M5 12h14" />
+          </svg>
+          {t("products.backToSend")}
+        </Link>
       ) : null}
       {/* The list scrolls, and a scroll container clips its children's
           focus ring at its own edges. Side padding pulled back by the same
@@ -294,6 +290,11 @@ export function Sidebar({
             label={t(item.key)}
           />
         ))}
+        {mailboxCapability.data?.enabled === true && !mailProduct ? (
+          <div className={styles.serviceEntry}>
+            <NavItem item={MAIL_NAV_ITEM} active={false} label={t("products.mail")} />
+          </div>
+        ) : null}
         <a href={DOCS_URL} target="_blank" rel="noreferrer">
           <svg
             width="16"

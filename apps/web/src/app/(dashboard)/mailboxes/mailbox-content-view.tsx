@@ -13,6 +13,8 @@ type Outputs = inferRouterOutputs<AppRouter>["mailboxes"];
 type Box = Outputs["list"]["mailboxes"][number];
 type Item = Outputs["item"];
 type Folder = "inbox" | "drafts" | "sent";
+type ComposeMode = "reply" | "forward";
+type SendState = "requesting" | Outputs["queueDraft"]["status"];
 const NIL = "00000000-0000-0000-0000-000000000000";
 function attachmentUrl(
   item: { mailboxId: string; id: string; revision: number },
@@ -69,6 +71,8 @@ function DraftDialog({
   boxes,
   mailboxId,
   source,
+  mode,
+  deliveryReady,
   close,
   saved,
   lost,
@@ -78,6 +82,8 @@ function DraftDialog({
   boxes: Box[];
   mailboxId: string;
   source: Item | null;
+  mode: ComposeMode;
+  deliveryReady: boolean;
   close: () => void;
   saved: (item: Outputs["saveDraft"]) => Promise<void>;
   lost: () => void;
@@ -85,20 +91,51 @@ function DraftDialog({
   current: () => boolean;
 }) {
   const t = useTranslations("mailboxes");
+  const locale = useLocale();
   const trpc = useTRPC();
   const dialog = useRef<HTMLDialogElement>(null);
   const boxId = mailboxId;
   const [to, setTo] = useState(
-    source ? (source.kind === "draft" ? source.to.join(", ") : source.replyTo) : "",
+    source
+      ? source.kind === "draft"
+        ? source.to.join(", ")
+        : mode === "forward"
+          ? ""
+          : source.replyTo
+      : "",
   );
   const [subject, setSubject] = useState(
     source
-      ? source.kind === "draft" || /^re:/i.test(source.subject)
+      ? source.kind === "draft"
         ? source.subject
-        : `Re: ${source.subject}`
+        : mode === "forward"
+          ? /^fw(?:d)?:/i.test(source.subject)
+            ? source.subject
+            : `Fw: ${source.subject}`
+          : /^re:/i.test(source.subject)
+            ? source.subject
+            : `Re: ${source.subject}`
       : "",
   );
-  const [text, setText] = useState(source?.kind === "draft" ? source.text : "");
+  const [text, setText] = useState(
+    source?.kind === "draft"
+      ? source.text
+      : source && mode === "forward"
+        ? t("forwardedBody", {
+            sender: source.fromName ? `${source.fromName} <${source.from}>` : source.from,
+            date: new Intl.DateTimeFormat(locale, {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }).format(source.date ?? source.updatedAt),
+            recipients: source.to.join(", "),
+            subject: source.subject,
+            text: source.text
+              .split("\n")
+              .map((line) => `> ${line}`)
+              .join("\n"),
+          })
+        : "",
+  );
   const [retained, setRetained] = useState(source?.attachments.map((a) => a.index) ?? []);
   const [uploads, setUploads] = useState<{ id: number; filename: string; base64: string }[]>([]);
   const uploadSequence = useRef(0);
@@ -174,7 +211,15 @@ function DraftDialog({
     >
       <header className={styles.dialogHeader}>
         <h2 id="draft-title">
-          {t(source?.kind === "draft" ? "editDraft" : source ? "replyDraft" : "newDraft")}
+          {t(
+            source?.kind === "draft"
+              ? "editDraft"
+              : source
+                ? mode === "forward"
+                  ? "forwardDraft"
+                  : "replyDraft"
+                : "newDraft",
+          )}
         </h2>
         <button
           type="button"
@@ -199,6 +244,7 @@ function DraftDialog({
               id: source?.kind === "draft" ? source.id : undefined,
               expectedRevision: source?.kind === "draft" ? source.revision : 0,
               sourceItemId: source?.id,
+              mode: source?.kind === "draft" ? undefined : mode,
               to: to
                 .split(/[,;]/)
                 .map((v) => v.trim())
@@ -259,6 +305,7 @@ function DraftDialog({
               onChange={(e) => setTo(e.target.value)}
               placeholder="pessoa@dominio.com"
               maxLength={5100}
+              autoFocus={mode === "forward"}
             />
           </label>
           <label>
@@ -278,7 +325,7 @@ function DraftDialog({
               onChange={(e) => setText(e.target.value)}
               maxLength={262144}
               rows={9}
-              autoFocus
+              autoFocus={mode !== "forward"}
             />
           </label>
           <div className={styles.draftAttachments}>
@@ -329,7 +376,7 @@ function DraftDialog({
             {error}
           </p>
         ) : null}
-        <p className={styles.hint}>{t("draftOnly")}</p>
+        <p className={styles.hint}>{t(deliveryReady ? "draftSaveFirst" : "draftOnly")}</p>
         <footer className={styles.dialogFooter}>
           <button type="button" className="ms-btn" disabled={busy} onClick={dismiss}>
             {t("cancel")}
@@ -368,15 +415,22 @@ export function MailboxContentView({
   const locale = useLocale();
   const trpc = useTRPC();
   const queries = useQueryClient();
+  const capability = useQuery(trpc.mailboxes.capabilities.queryOptions());
+  const sendMutation = useMutation(trpc.mailboxes.queueDraft.mutationOptions({ retry: false }));
   const [search, setSearch] = useState("");
   const [composer, compose] = useState<{
     session: number;
     mailboxId: string;
     source: Item | null;
+    mode: ComposeMode;
   } | null>(null);
   const composerSequence = useRef(0);
   const composerSession = useRef<number | null>(null);
   const [notice, setNotice] = useState("");
+  const sending = useRef<string | null>(null);
+  const attempted = useRef(new Set<string>());
+  const [sendStates, setSendStates] = useState<Record<string, SendState>>({});
+  const mounted = useRef(true);
   const reader = useRef<HTMLElement>(null);
   const rowButtons = useRef(new Map<string, HTMLButtonElement>());
   const listing = useQuery(
@@ -414,22 +468,23 @@ export function MailboxContentView({
     (cause) => (cause as { data?: { code?: string } } | null)?.data?.code === "FORBIDDEN",
   );
   const composerAllowed = !!composer && writable.some((b) => b.id === composer.mailboxId);
-  function openComposer(mailboxId: string, source: Item | null) {
+  function openComposer(mailboxId: string, source: Item | null, mode: ComposeMode = "reply") {
     const session = ++composerSequence.current;
     composerSession.current = session;
-    compose({ session, mailboxId, source });
+    compose({ session, mailboxId, source, mode });
   }
   const closeComposer = useCallback((session: number) => {
     if (composerSession.current !== session) return;
     composerSession.current = null;
     compose(null);
   }, []);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
       composerSession.current = null;
-    },
-    [],
-  );
+      mounted.current = false;
+    };
+  }, []);
   useEffect(() => {
     if (denied) void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
   }, [denied, queries, trpc]);
@@ -460,6 +515,51 @@ export function MailboxContentView({
   async function refresh() {
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.items.queryKey() });
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.item.queryKey() });
+  }
+  const sendKey = item ? `${item.mailboxId}:${item.id}:${item.revision}` : null;
+  const sendState = item?.sendStatus ?? (sendKey ? sendStates[sendKey] : undefined);
+  const deliveryReady = capability.data?.deliveryReady === true;
+  const canSubmitDraft =
+    item?.kind === "draft" && selectedBox?.canSend === true && deliveryReady && !sendState;
+  async function submitDraft() {
+    if (!item || !sendKey || !canSubmitDraft || sending.current || attempted.current.has(sendKey))
+      return;
+    // Capture the displayed revision once. Never retry an uncertain submission,
+    // and never substitute a newly selected message while this request is pending.
+    const revision = { mailboxId: item.mailboxId, id: item.id, expectedRevision: item.revision };
+    const key = sendKey;
+    sending.current = key;
+    attempted.current.add(key);
+    setSendStates((states) => ({ ...states, [key]: "requesting" }));
+    setNotice("");
+    try {
+      const result = await sendMutation.mutateAsync(revision);
+      if (!mounted.current) return;
+      setSendStates((states) => ({ ...states, [key]: result.status }));
+      setNotice(
+        t(
+          result.status === "unknown"
+            ? "sendUnknown"
+            : result.status === "failed"
+              ? "sendFailed"
+              : result.status === "accepted"
+                ? "sendAccepted"
+                : result.status === "sending"
+                  ? "sendProcessing"
+                  : "sendQueued",
+        ),
+      );
+    } catch (cause) {
+      if (!mounted.current) return;
+      const code = (cause as { data?: { code?: string } })?.data?.code;
+      setSendStates((states) => ({ ...states, [key]: "unknown" }));
+      setNotice(t(code === "FORBIDDEN" ? "accessLost" : "sendUnknown"));
+      if (code === "FORBIDDEN")
+        void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
+    } finally {
+      sending.current = null;
+      if (mounted.current) void refresh();
+    }
   }
   const hasRows = !listing.isError && !listing.isPending && rows.length > 0;
   const shortDate = (value: Date) =>
@@ -642,15 +742,38 @@ export function MailboxContentView({
                   {selectedBox?.address ?? selected?.address ?? t("all")}
                 </span>
                 {item && selectedBox?.canDraft ? (
-                  <button
-                    type="button"
-                    className="ms-btn"
-                    disabled={pendingSentReply}
-                    aria-describedby={pendingSentReply ? "mailbox-sent-reply-pending" : undefined}
-                    onClick={() => openComposer(item.mailboxId, item)}
-                  >
-                    {t(item.kind === "draft" ? "editDraft" : "replyDraft")}
-                  </button>
+                  <div className={styles.contentActions}>
+                    <button
+                      type="button"
+                      className="ms-btn"
+                      disabled={
+                        pendingSentReply ||
+                        !!(item.kind === "draft" && sendState && sendState !== "failed")
+                      }
+                      aria-describedby={pendingSentReply ? "mailbox-sent-reply-pending" : undefined}
+                      onClick={() => openComposer(item.mailboxId, item)}
+                    >
+                      {t(item.kind === "draft" ? "editDraft" : "replyDraft")}
+                    </button>
+                    {item.kind !== "draft" ? (
+                      <button
+                        type="button"
+                        className="ms-btn ms-btn-ghost"
+                        onClick={() => openComposer(item.mailboxId, item, "forward")}
+                      >
+                        {t("forward")}
+                      </button>
+                    ) : selectedBox.canSend && deliveryReady ? (
+                      <button
+                        type="button"
+                        className="ms-btn ms-btn-primary"
+                        disabled={!canSubmitDraft || sendMutation.isPending}
+                        onClick={() => void submitDraft()}
+                      >
+                        {t(sendState === "requesting" ? "sending" : "send")}
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
               {detail.isError && visibleItem ? (
@@ -704,6 +827,23 @@ export function MailboxContentView({
                       {t("sentReplyPending")}
                     </p>
                   ) : null}
+                  {item.kind === "draft" && sendState ? (
+                    <p className={styles.contentNotice} role="status">
+                      {t(
+                        sendState === "requesting"
+                          ? "sending"
+                          : sendState === "unknown"
+                            ? "sendUnknown"
+                            : sendState === "failed"
+                              ? "sendFailed"
+                              : sendState === "accepted"
+                                ? "sendAccepted"
+                                : sendState === "sending"
+                                  ? "sendProcessing"
+                                  : "sendQueued",
+                      )}
+                    </p>
+                  ) : null}
                   <div className={styles.messageBody}>{item.text || t("noText")}</div>
                   {item.attachments.length ? (
                     <section aria-label={t("attachments")} className={styles.attachments}>
@@ -734,6 +874,8 @@ export function MailboxContentView({
           boxes={boxes}
           mailboxId={composer.mailboxId}
           source={composer.source}
+          mode={composer.mode}
+          deliveryReady={deliveryReady}
           current={() => composerSession.current === composer.session}
           close={() => closeComposer(composer.session)}
           selectBox={(id) =>

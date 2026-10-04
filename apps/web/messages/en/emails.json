@@ -314,7 +314,7 @@
     "send": "Send email",
     "batch": "Send batch emails",
     "retrieve": "Retrieve email",
-    "keyHint": "Replace ms_xxxxxxxxx with an API key from the API Keys page. Every SDK also honors the MILLIONSEND_API_KEY and MILLIONSEND_BASE_URL environment variables."
+    "keyHint": "Replace ms_xxxxxxxxx with an API key from the API Keys page. Configure the API key and base URL using your SDK's settings."
   },
   "unsubscribedDrawer": {
     "title": "Unsubscribed details",

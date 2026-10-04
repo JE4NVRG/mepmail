@@ -1,0 +1,219 @@
+.banner,
+.dialog {
+  box-sizing: border-box;
+  background: var(--ms-panel, #0c0c0d);
+  color: var(--ms-bone, #f4f1ea);
+  border: 1px solid var(--ms-line-strong, #2a2a2e);
+  border-radius: 18px;
+  padding: 24px;
+  font-family: var(--ms-font-sans, sans-serif);
+  font-size: 14px;
+  line-height: 1.6;
+  box-shadow: var(--ms-shadow-card, 0 12px 40px #0005);
+  overflow: auto;
+}
+
+.banner {
+  position: fixed;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  left: max(20px, env(safe-area-inset-left));
+  z-index: var(--ms-z-popover, 500);
+  max-width: 560px;
+  max-height: calc(100dvh - 40px);
+  margin-left: auto;
+}
+
+.dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+}
+
+.dialog::backdrop {
+  background: #0009;
+  backdrop-filter: blur(4px);
+}
+
+.heading,
+.dialogHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.heading {
+  min-width: 0;
+}
+
+.dialogHeader {
+  justify-content: space-between;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--ms-violet-border, #33264a);
+  background: var(--ms-violet-bg, #1c1527);
+  color: var(--ms-violet, #c0a8e1);
+}
+
+.icon svg {
+  width: 23px;
+  height: 23px;
+}
+
+.brand {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--ms-muted, #918f89);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+.heading h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+
+.description {
+  margin: 20px 0 10px;
+  color: var(--ms-muted, #918f89);
+}
+
+.policy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ms-bone, #f4f1ea);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--ms-line-strong, #2a2a2e);
+}
+
+.policy:hover {
+  text-decoration-color: currentColor;
+}
+
+.policy svg {
+  width: 14px;
+  height: 14px;
+}
+
+.status {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 10px 12px;
+  background: var(--ms-panel-raised, #131316);
+  border: 1px solid var(--ms-line, #1f1f22);
+  border-radius: 8px;
+  color: var(--ms-muted, #918f89);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.statusDot {
+  flex: 0 0 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status[data-state="error"] {
+  color: var(--ms-danger, #ff8b94);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.actions .choice {
+  height: auto;
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: normal;
+  text-wrap: balance;
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--ms-line-strong, #2a2a2e);
+  border-radius: 10px;
+  background: var(--ms-panel-raised, #131316);
+  color: var(--ms-muted, #918f89);
+  cursor: pointer;
+}
+
+.close:hover {
+  color: var(--ms-bone, #f4f1ea);
+}
+
+.close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.settings {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.settings:focus-visible,
+.policy:focus-visible,
+.close:focus-visible {
+  outline: 2px solid var(--ms-violet, #c0a8e1);
+  outline-offset: 4px;
+}
+
+@media (max-width: 480px) {
+  .banner,
+  .dialog {
+    padding: 20px;
+    border-radius: 14px;
+  }
+
+  .banner {
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(12px, env(safe-area-inset-left));
+    max-height: calc(100dvh - 24px);
+  }
+
+  .heading {
+    gap: 10px;
+  }
+
+  .heading h2 {
+    font-size: 17px;
+  }
+
+  .actions {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}

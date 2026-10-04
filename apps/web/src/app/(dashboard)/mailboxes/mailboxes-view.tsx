@@ -12,6 +12,7 @@ import type { AppRouter } from "@/server/routers";
 import { MailboxAgentKeysDialog } from "./mailbox-agent-keys";
 import { MailboxContentView } from "./mailbox-content-view";
 import { MailboxServicePanel } from "./mailbox-service-panel";
+import { MailboxSetupDialog } from "./mailbox-setup-dialog";
 import styles from "./mailboxes.module.css";
 
 type Outputs = inferRouterOutputs<AppRouter>["mailboxes"];
@@ -342,6 +343,7 @@ export function MailboxesView() {
   const [itemSelection, selectItem] = useState<{ mailboxId: string; id: string } | null>(null);
   const [folder, setFolder] = useState<"inbox" | "drafts" | "sent">("inbox");
   const [dialog, setDialog] = useState<"new" | "edit" | null>(null);
+  const [licenseOpenRequest, openLicense] = useState(0);
   const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
   // Team switches cause a full navigation. Every id is also resolved against this request's scoped DTO.
   const boxes = registry.data?.mailboxes ?? [];
@@ -354,7 +356,10 @@ export function MailboxesView() {
     select(id);
   }
   async function changed(id: string) {
-    await queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
+    await Promise.all([
+      queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() }),
+      queries.invalidateQueries({ queryKey: trpc.mailboxes.service.queryKey() }),
+    ]);
     selectMailbox(id);
   }
   if (capability.isPending || (capability.data?.enabled && registry.isPending))
@@ -437,7 +442,7 @@ export function MailboxesView() {
           {registry.data?.canManage ? (
             <button
               type="button"
-              className="ms-btn ms-btn-ghost"
+              className="ms-btn ms-btn-primary"
               disabled={!options.data?.domains.length}
               onClick={() => setDialog("new")}
             >
@@ -447,9 +452,10 @@ export function MailboxesView() {
         </div>
       </header>
       <p className={styles.previewNote}>
-        <span>{t("preview")}</span> {t("previewBody")}
+        <span>{t("preview")}</span>{" "}
+        {t(capability.data?.deliveryReady ? "contentPrivate" : "previewBody")}
       </p>
-      <MailboxServicePanel />
+      <MailboxServicePanel openRequest={licenseOpenRequest} />
       {registry.data?.canManage && options.data && !options.data.domains.length ? (
         <p className={styles.notice}>
           {t("noDomains")} <Link href="/domains">{t("domainsLink")} ↗</Link>
@@ -534,10 +540,21 @@ export function MailboxesView() {
           </div>
         )}
       </div>
-      {dialog && options.data && (dialog === "new" || selected) ? (
+      {dialog === "new" && options.data ? (
+        <MailboxSetupDialog
+          options={options.data}
+          close={() => setDialog(null)}
+          changed={changed}
+          reviewLicense={() => {
+            setDialog(null);
+            openLicense((request) => request + 1);
+          }}
+        />
+      ) : null}
+      {dialog === "edit" && options.data && selected ? (
         <RegistryDialog
-          key={dialog === "new" ? "new" : selected!.id}
-          mailbox={dialog === "edit" ? selected : null}
+          key={selected.id}
+          mailbox={selected}
           options={options.data}
           close={() => setDialog(null)}
           changed={changed}

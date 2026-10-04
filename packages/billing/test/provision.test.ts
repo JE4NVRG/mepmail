@@ -435,6 +435,69 @@ describe("provision", () => {
     expect(state.webhooks).toHaveLength(1);
   });
 
+  it("upgrades the canonical six-event webhook without replacing it", async () => {
+    const { stripe, state } = fakeStripe();
+    const first = await provision(stripe, opts({ portal: false }));
+    const webhook = state.webhooks[0];
+    if (!webhook) throw new Error("Missing webhook");
+    const identity = { id: webhook.id, url: webhook.url, api_version: webhook.api_version };
+    webhook.enabled_events = [
+      "checkout.session.completed",
+      "customer.subscription.created",
+      "customer.subscription.updated",
+      "customer.subscription.deleted",
+      "invoice.paid",
+      "invoice.payment_failed",
+    ];
+    state.calls.length = 0;
+
+    const upgraded = await provision(stripe, opts({ portal: false }));
+
+    expect(upgraded.webhook).toEqual({ id: first.webhook?.id });
+    expect(webhook).toMatchObject(identity);
+    expect([...webhook.enabled_events].sort()).toEqual([
+      "checkout.session.completed",
+      "customer.subscription.created",
+      "customer.subscription.deleted",
+      "customer.subscription.updated",
+      "invoice.paid",
+      "invoice.payment_failed",
+      "invoice.payment_succeeded",
+    ]);
+    expect(state.calls.filter((call) => call.startsWith("webhookEndpoints."))).toEqual([
+      "webhookEndpoints.list",
+      `webhookEndpoints.update ${webhook.id}`,
+    ]);
+    expect(state.webhooks).toHaveLength(1);
+  });
+
+  it("keeps an existing seven-event webhook idempotent regardless of event order", async () => {
+    const { stripe, state } = fakeStripe();
+    await provision(stripe, opts({ portal: false }));
+    const webhook = state.webhooks[0];
+    if (!webhook) throw new Error("Missing webhook");
+    webhook.enabled_events = [
+      "invoice.payment_succeeded",
+      "invoice.payment_failed",
+      "invoice.paid",
+      "customer.subscription.deleted",
+      "customer.subscription.updated",
+      "customer.subscription.created",
+      "checkout.session.completed",
+    ];
+    const before = { ...webhook, enabled_events: [...webhook.enabled_events] };
+    state.calls.length = 0;
+
+    const repeated = await provision(stripe, opts({ portal: false }));
+
+    expect(repeated.webhook).toEqual({ id: webhook.id });
+    expect(webhook).toEqual(before);
+    expect(state.calls.filter((call) => call.startsWith("webhookEndpoints."))).toEqual([
+      "webhookEndpoints.list",
+    ]);
+    expect(state.webhooks).toHaveLength(1);
+  });
+
   it("skips the webhook and portal when not requested", async () => {
     const { stripe, state } = fakeStripe();
     const result = await provision(stripe, opts({ webhookUrl: undefined, portal: false }));

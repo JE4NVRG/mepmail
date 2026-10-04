@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { DnsResolver } from "../src/dns-check.js";
 import type { SesIdentityClient } from "../src/domain-identity.js";
-import { computeDomainVerification, verificationDbPatch } from "../src/domain-verification.js";
+import {
+  computeDomainVerification,
+  dnsChecklist,
+  verificationDbPatch,
+} from "../src/domain-verification.js";
 
 const DOMAIN = {
   name: "d.com",
@@ -51,6 +55,25 @@ function fakeDns(
     resolveCname: async () => [],
   };
 }
+
+describe("dnsChecklist selector compatibility", () => {
+  it.each([
+    { selector: "mepmail", expectedName: "mepmail._domainkey.d.com" },
+    { selector: "millionsend", expectedName: "millionsend._domainkey.d.com" },
+    { selector: null, expectedName: "millionsend._domainkey.d.com" },
+  ])("keeps $expectedName for a stored selector of $selector", ({ selector, expectedName }) => {
+    const rows = dnsChecklist({
+      domain: { ...DOMAIN, dkimSelector: selector },
+      verification: null,
+    });
+    expect(rows[0]).toMatchObject({
+      group: "verification",
+      type: "TXT",
+      name: expectedName,
+      value: '"v=DKIM1; k=rsa; p=ABC"',
+    });
+  });
+});
 
 describe("computeDomainVerification", () => {
   it("DKIM+MX+SPF found and SES-verified promotes to verified (DMARC missing never gates)", async () => {

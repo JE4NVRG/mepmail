@@ -7,6 +7,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
+import { AdvertisingConsent } from "@/components/advertising-consent";
 import { Providers } from "@/components/providers";
 import { UmamiAnalytics } from "@/components/umami-analytics";
 import { THEME_INIT_SCRIPT, THEME_KEY } from "@/lib/theme";
@@ -51,7 +52,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <UmamiAnalytics />
         <NextIntlClientProvider>
-          <Providers>{children}</Providers>
+          <Providers>
+            {children}
+            <AdvertisingConsent />
+          </Providers>
         </NextIntlClientProvider>
       </body>
     </html>

@@ -65,7 +65,7 @@ function storageLabel(bytes: number, locale: string): string {
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(bytes / 1024 ** index)} ${units[index]}`;
 }
 
-export function MailboxServicePanel() {
+export function MailboxServicePanel({ openRequest = 0 }: { openRequest?: number } = {}) {
   const t = useTranslations("mailboxes-service");
   const locale = useLocale();
   const trpc = useTRPC();
@@ -81,6 +81,9 @@ export function MailboxServicePanel() {
   const seatsId = useId();
   const seatsHintId = useId();
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (openRequest > 0) setOpen(true);
+  }, [openRequest]);
   const [seats, setSeats] = useState("1");
   const [attemptedSeats, setAttemptedSeats] = useState<number | null>(null);
   const [failure, setFailure] = useState<"pending" | "existing" | "unavailable" | "error" | null>(

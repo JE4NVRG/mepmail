@@ -737,6 +737,11 @@ describe("attachments and custom headers", () => {
   });
 
   it("rejects every header outside the allowlist, case-insensitively", async () => {
+    const beforeEmails = await db
+      .select({ id: schema.emails.id })
+      .from(schema.emails)
+      .where(eq(schema.emails.teamId, teamId));
+    const beforeEnqueued = enqueuedSends.length;
     for (const name of [
       "From",
       "bCC",
@@ -744,6 +749,11 @@ describe("attachments and custom headers", () => {
       "Content-Type",
       "X-SES-SOURCE-ARN",
       "X-MillionSend-Email-Id",
+      "x-millionsend-email-id",
+      "x-MiLlIoNsEnD-Trace",
+      "X-MepMail-Email-ID",
+      "x-mepmail-email-id",
+      "x-MePmAiL-Trace",
       "Resent-From",
       "Authentication-Results",
       "ARC-Seal",
@@ -759,6 +769,13 @@ describe("attachments and custom headers", () => {
         message: expect.stringMatching(/not an allowed header/),
       });
     }
+    expect(enqueuedSends).toHaveLength(beforeEnqueued);
+    expect(
+      await db
+        .select({ id: schema.emails.id })
+        .from(schema.emails)
+        .where(eq(schema.emails.teamId, teamId)),
+    ).toHaveLength(beforeEmails.length);
     const ok = await post({
       ...validBody,
       to: ["allowed-headers@example.com"],
