@@ -40,12 +40,13 @@ import {
   saveMailboxContentDraft,
 } from "../mailbox-content";
 import { mailboxTransportMime } from "../mailbox-transport";
-import { mailboxRegistryEnabled } from "../mailboxes";
+import { mailboxAccessEnabled } from "../mailboxes";
 import { getQueue } from "../queue";
 import { router, teamProcedure } from "../trpc";
 
 const enabled = teamProcedure.use(({ ctx, next }) => {
-  if (!mailboxRegistryEnabled()) throw new TRPCError({ code: "NOT_FOUND" });
+  if (!mailboxAccessEnabled({ teamId: ctx.teamId, userId: ctx.session.user.id }))
+    throw new TRPCError({ code: "NOT_FOUND" });
   // Existing operator support grants cover outbound operations, not private mailbox content or registry.
   if (ctx.supportView) throw new TRPCError({ code: "FORBIDDEN" });
   return next();
@@ -105,10 +106,13 @@ const boxInput = z.object({
 });
 
 export const mailboxesRouter = router({
-  capabilities: teamProcedure.query(({ ctx }) => ({
-    enabled: mailboxRegistryEnabled() && !ctx.supportView,
-    deliveryReady: false as const,
-  })),
+  capabilities: teamProcedure.query(({ ctx }) => {
+    const enabled = mailboxAccessEnabled(actor(ctx)) && !ctx.supportView;
+    return {
+      enabled,
+      deliveryReady: enabled && process.env.MAILBOX_TRANSPORT_ENABLED === "1",
+    };
+  }),
   list: enabled.query(({ ctx }) => call(() => listMailboxRegistry(ctx.db, actor(ctx)))),
   service: enabled.query(async ({ ctx }) => {
     await call(() => listMailboxRegistry(ctx.db, actor(ctx)));
@@ -286,6 +290,7 @@ export const mailboxesRouter = router({
         id: z.uuid().optional(),
         expectedRevision: z.number().int().min(0).max(2147483646),
         sourceItemId: z.uuid().optional(),
+        mode: z.enum(["reply", "forward"]).optional(),
         to: z.array(z.email().max(254)).max(20),
         subject: z
           .string()

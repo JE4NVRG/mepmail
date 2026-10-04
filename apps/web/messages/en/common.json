@@ -110,5 +110,21 @@
     "readOnly": "Read-only support view: nothing can be changed here."
   },
   "sourceCode": "Source code · AGPL-3.0",
-  "sourceDownload": "Download the corresponding source of this version for free"
+  "sourceDownload": "Download the corresponding source of this version for free",
+  "advertising": {
+    "title": "Advertising preferences",
+    "body": "With your permission, we use Meta to measure public visits and paid-plan purchases. Essential cookies keep working if you decline. You can change your choice at any time.",
+    "accept": "Allow advertising measurement",
+    "deny": "Decline optional measurement",
+    "settings": "Advertising preferences",
+    "withdraw": "Withdraw permission",
+    "close": "Close",
+    "pending": "Saving your choice…",
+    "error": "We could not save your choice. Advertising measurement stays off.",
+    "currentAccepted": "Advertising measurement is allowed.",
+    "currentDenied": "Advertising measurement is off.",
+    "privacyLink": "Read our privacy policy",
+    "save": "Save preferences",
+    "unknown": "No advertising permission has been given."
+  }
 }

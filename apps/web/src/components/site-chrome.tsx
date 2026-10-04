@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AdvertisingSettingsButton } from "./advertising-consent";
 import { LandingLangSwitch } from "./landing-lang-switch";
 import { LandingNav } from "./landing-nav";
 import { PublicAccount } from "./public-account";
@@ -236,6 +237,7 @@ export function PublicFooter({
           <h3>{labels.footer.colLegal}</h3>
           <a href={legal.terms}>{labels.footer.terms}</a>
           <a href={legal.privacy}>{labels.footer.privacy}</a>
+          <AdvertisingSettingsButton />
           <a href={legal.refund}>{labels.footer.refund}</a>
           <a href="/security">{labels.nav.security}</a>
           <a href="/source" title={labels.footer.sourceDownload}>

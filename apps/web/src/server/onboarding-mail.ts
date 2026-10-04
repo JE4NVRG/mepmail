@@ -21,6 +21,9 @@ export function buildOnboardingEmail(input: {
   return {
     subject: m.subject,
     ...accountMailCard({
+      locale: input.locale,
+      homeUrl: "https://mepmail.dev",
+      assetBaseUrl: "https://mepmail.dev",
       heading: m.heading,
       paragraphs: [m.body],
       button: m.button,

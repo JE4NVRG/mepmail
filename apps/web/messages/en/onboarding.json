@@ -9,7 +9,12 @@
     "error": "Team creation failed. Try again."
   },
   "title": "Send your first email",
-  "subtitle": "Follow the steps to send an email using the MepMail API.",
+  "subtitle": "Test delivery and prepare your own API integration.",
+  "demo": {
+    "title": "Try a platform email",
+    "body": "This demonstration is sent from {from} only to {to}. No API key or domain setup is needed.",
+    "sendCta": "Send test to my inbox"
+  },
   "step1": {
     "title": "Add an API key",
     "body": "Keys authenticate every request. The full key is shown once, at creation.",
@@ -22,9 +27,9 @@
     "error": "Key creation failed. Try again."
   },
   "step2": {
-    "title": "Send an email",
+    "title": "Send through the API",
     "bodyLocked": "To your own inbox, from a domain you verify — the snippet unlocks once you have a key.",
-    "bodyReady": "Your key and your inbox are pre-filled. Run it from your terminal.",
+    "bodyReady": "Your key and your inbox are pre-filled. Verify your own domain, use a sender from it, then run the snippet from your terminal.",
     "subject": "It works.",
     "html": "<p>0000001 and counting.</p>",
     "fromPlaceholder": "you@yourdomain.com",
@@ -35,7 +40,7 @@
     "sending": "Sending…",
     "sentTo": "Send request accepted for {to}. Wait for the delivery event.",
     "sendError": "Could not send. Try again.",
-    "selfHostBase": "Self-hosted: point the SDKs at this instance with MILLIONSEND_BASE_URL={url}.",
+    "selfHostBase": "Self-hosted: set your SDK's base URL to {url}.",
     "captchaFailed": "Verification failed. Try again.",
     "sendLimited": "A few onboarding emails already went out from this team. Try again in an hour."
   },

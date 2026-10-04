@@ -63,7 +63,10 @@ export interface BillingStripe {
         params: Stripe.Checkout.SessionCreateParams,
         options?: Stripe.RequestOptions,
       ): Promise<Stripe.Checkout.Session>;
-      retrieve?: (id: string) => Promise<Stripe.Checkout.Session>;
+      retrieve?: (
+        id: string,
+        params?: Stripe.Checkout.SessionRetrieveParams,
+      ) => Promise<Stripe.Checkout.Session>;
       list?: (
         params: Stripe.Checkout.SessionListParams,
       ) => Promise<Stripe.ApiList<Stripe.Checkout.Session>>;

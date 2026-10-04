@@ -1,4 +1,4 @@
-import { hashRecipient } from "@millionsend/core";
+import { findSuppressed, hashRecipient } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import type { SerializedSesEvent } from "@millionsend/queue";
@@ -375,4 +375,104 @@ it("suppresses only addresses the email was sent to — never a payload-supplied
   expect(hashes).toContain(hashRecipient("real@example.com"));
   expect(hashes).toContain(hashRecipient("copy@example.com"));
   expect(hashes).not.toContain(hashRecipient("stranger@example.com"));
+});
+
+function suppressionEvent(
+  reason: "hard_bounce" | "complaint",
+  sesMessageId: string,
+  recipient: string,
+): SerializedSesEvent {
+  return makeEvent(
+    reason === "hard_bounce"
+      ? {
+          eventType: "Bounce",
+          sesMessageId,
+          bounce: {
+            bounceType: "Permanent",
+            bounceSubType: "General",
+            recipients: [recipient],
+          },
+        }
+      : { eventType: "Complaint", sesMessageId, complaint: { recipients: [recipient] } },
+  );
+}
+
+it.each(["hard_bounce", "complaint"] as const)(
+  "%s promotes an existing opt-out and blocks transactional sends without restoring an erased address",
+  async (reason) => {
+    const recipient = `opt-out-${reason}@example.com`;
+    const sesMessageId = `mid-opt-out-${reason}`;
+    const emailId = await insertSentEmail(sesMessageId, [recipient]);
+    const createdAt = new Date("2026-08-01T12:00:00.000Z");
+    const [original] = await db
+      .insert(schema.suppressions)
+      .values({
+        teamId,
+        email: null,
+        emailHash: hashRecipient(recipient),
+        reason: "one_click_unsubscribe",
+        createdAt,
+      })
+      .returning({ id: schema.suppressions.id });
+    if (!original) throw new Error("suppression insert failed");
+    expect(await findSuppressed(db, teamId, [recipient], { transactional: true })).toEqual(
+      new Set(),
+    );
+
+    const event = suppressionEvent(reason, sesMessageId, recipient);
+    const opts = { snsMessageId: `sns-opt-out-${reason}` };
+    await processSesEvent(db, event, opts);
+    await processSesEvent(db, event, opts);
+
+    const [suppression] = await db
+      .select()
+      .from(schema.suppressions)
+      .where(eq(schema.suppressions.id, original.id));
+    expect(suppression?.id).toBe(original.id);
+    expect(suppression?.reason).toBe(reason);
+    expect(suppression?.sourceEmailId).toBe(emailId);
+    expect(suppression?.email).toBeNull();
+    expect(suppression?.createdAt).toEqual(createdAt);
+    expect(await findSuppressed(db, teamId, [recipient], { transactional: true })).toEqual(
+      new Set([recipient]),
+    );
+    const events = await db
+      .select()
+      .from(schema.emailEvents)
+      .where(eq(schema.emailEvents.emailId, emailId));
+    expect(events).toHaveLength(1);
+  },
+);
+
+it.each([
+  ["manual", "hard_bounce"],
+  ["manual", "complaint"],
+  ["hard_bounce", "hard_bounce"],
+  ["hard_bounce", "complaint"],
+  ["complaint", "hard_bounce"],
+  ["complaint", "complaint"],
+] as const)("preserves an existing %s block after a %s event", async (existingReason, reason) => {
+  const recipient = `blocked-${existingReason}-${reason}@example.com`;
+  const sesMessageId = `mid-blocked-${existingReason}-${reason}`;
+  await insertSentEmail(sesMessageId, [recipient]);
+  const [original] = await db
+    .insert(schema.suppressions)
+    .values({
+      teamId,
+      email: null,
+      emailHash: hashRecipient(recipient),
+      reason: existingReason,
+    })
+    .returning();
+  if (!original) throw new Error("suppression insert failed");
+  await processSesEvent(db, suppressionEvent(reason, sesMessageId, recipient));
+
+  const [suppression] = await db
+    .select()
+    .from(schema.suppressions)
+    .where(eq(schema.suppressions.id, original.id));
+  expect(suppression).toEqual(original);
+  expect(await findSuppressed(db, teamId, [recipient], { transactional: true })).toEqual(
+    new Set([recipient]),
+  );
 });

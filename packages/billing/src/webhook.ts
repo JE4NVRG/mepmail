@@ -6,6 +6,8 @@ import { mailboxManagementRequests } from "../../db/src/schema/mailbox-managemen
 import type { BillingDeps } from "./checkout.js";
 import { isMailboxSubscription, type MailboxCatalog } from "./mailbox.js";
 import { applyMailboxSubscription } from "./mailbox-lifecycle.js";
+import { recordMetaPurchase } from "./meta-advertising.js";
+import type { MetaConversionConfig } from "./meta-conversions.js";
 import { SUBSCRIPTION_EXPAND } from "./prices.js";
 import { applySubscription, idOf, lockCustomer } from "./subscription.js";
 
@@ -13,6 +15,7 @@ export interface WebhookDeps extends BillingDeps {
   webhookSecret: string;
   /** Mode of the configured API key; events from the other mode are rejected. */
   livemode: boolean;
+  advertisingConfig?: MetaConversionConfig;
   /** Presence opts into the independent Mail ledger. Null closes paid Mail access. */
   mailboxCatalog?: MailboxCatalog | null;
   /**
@@ -53,6 +56,7 @@ function subscriptionRef(
       return { subscriptionId: sub.id, customerId: idOf(sub.customer) };
     }
     case "invoice.paid":
+    case "invoice.payment_succeeded":
     case "invoice.payment_failed": {
       const invoice = event.data.object;
       return {
@@ -148,6 +152,13 @@ export async function handleWebhook(
             .from(schema.teams)
             .where(eq(schema.teams.stripeCustomerId, customerId))
         : [];
+    await recordMetaPurchase(
+      tx as unknown as Db,
+      event,
+      sub,
+      mail || !!projected?.applied,
+      deps.advertisingConfig,
+    );
     return {
       id: event.id,
       type: event.type,

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { mailboxAgentRequest, MAILBOX_AGENT_HEADERS } from "@/server/mailbox-agent";
+import { MAILBOX_AGENT_HEADERS, mailboxAgentRequest } from "@/server/mailbox-agent";
 import { saveMailboxContentDraft } from "@/server/mailbox-content";
 
 const input = z
@@ -7,6 +7,7 @@ const input = z
     id: z.uuid().optional(),
     expectedRevision: z.number().int().min(0).max(2147483646),
     sourceItemId: z.uuid().optional(),
+    mode: z.enum(["reply", "forward"]).optional(),
     to: z.array(z.email().max(254)).min(1).max(20),
     subject: z
       .string()

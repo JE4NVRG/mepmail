@@ -53,10 +53,9 @@ export const account = pgTable(
   "account",
   {
     id: text("id").primaryKey(),
-    // Better Auth keys external identities on (issuer, accountId):
-    // `local:credential` for passwords, `local:oauth:<providerId>` for the
-    // built-in social providers (the migration backfills the same values).
-    issuer: text("issuer").notNull(),
+    // Better Auth >=1.7.3 keys external identities by (providerId, accountId).
+    // Preserve issuer for existing data and the legacy rollback writer.
+    issuer: text("issuer"),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
@@ -72,7 +71,10 @@ export const account = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("account_issuer_account_id_idx").on(t.issuer, t.accountId)],
+  (t) => [
+    uniqueIndex("account_issuer_account_id_idx").on(t.issuer, t.accountId),
+    uniqueIndex("account_provider_account_id_idx").on(t.providerId, t.accountId),
+  ],
 );
 
 export const verification = pgTable("verification", {

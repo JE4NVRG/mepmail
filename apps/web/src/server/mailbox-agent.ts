@@ -1,16 +1,16 @@
 import {
   MailboxAgentAccessError,
+  type MailboxAgentScope,
   MailboxContentError,
   MailboxServiceError,
   queueMailboxAgentDraft,
   withMailboxAgentAccess,
-  type MailboxAgentScope,
 } from "@millionsend/core";
 import { getDb } from "@millionsend/db";
-import { mailboxRegistryEnabled } from "./mailboxes";
 import { getKeyring } from "./keyring";
-import { getQueue } from "./queue";
 import { mailboxTransportMime } from "./mailbox-transport";
+import { mailboxAccessEnabled, mailboxRegistryEnabled } from "./mailboxes";
+import { getQueue } from "./queue";
 
 export const MAILBOX_AGENT_HEADERS = {
   "Cache-Control": "private, no-store",
@@ -25,7 +25,11 @@ export async function mailboxAgentRequest(
 ) {
   return mailboxAgentBearerRequest(
     request,
-    (token) => withMailboxAgentAccess(getDb(), token, scope, run),
+    (token) =>
+      withMailboxAgentAccess(getDb(), token, scope, (context) => {
+        if (!mailboxAccessEnabled(context.actor)) throw new MailboxAgentAccessError("forbidden");
+        return run(context);
+      }),
     (result) => Response.json(result, { headers: MAILBOX_AGENT_HEADERS }),
   );
 }
@@ -40,6 +44,16 @@ export async function mailboxAgentSendRequest(
   return mailboxAgentBearerRequest(
     request,
     async (token) => {
+      // Verify the credential's current owner/team before capturing any outbox data.
+      // Finish this transaction first; admission below revalidates all provenance.
+      if (
+        process.env.MAILBOX_PILOT_TEAM_IDS !== undefined ||
+        process.env.MAILBOX_PILOT_USER_IDS !== undefined
+      )
+        await withMailboxAgentAccess(getDb(), token, "send", (context) => {
+          if (!mailboxAccessEnabled(context.actor)) throw new MailboxAgentAccessError("forbidden");
+          return Promise.resolve();
+        });
       const result = await queueMailboxAgentDraft(
         getDb(),
         getKeyring(),

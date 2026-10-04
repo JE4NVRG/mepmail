@@ -63,7 +63,7 @@ describe("dnsRecordsForDomain", () => {
   it("derives the exact DKIM TXT, MAIL FROM, SPF, and DMARC records", () => {
     const records = dnsRecordsForDomain({
       domain: "updates.example.com",
-      dkimSelector: "millionsend",
+      dkimSelector: DKIM_SELECTOR,
       dkimPublicKey: "PUBKEYB64",
       mailFromSubdomain: "send",
       region: "sa-east-1",
@@ -72,7 +72,7 @@ describe("dnsRecordsForDomain", () => {
       {
         group: "verification",
         type: "TXT",
-        name: "millionsend._domainkey.updates.example.com",
+        name: "mepmail._domainkey.updates.example.com",
         value: '"v=DKIM1; k=rsa; p=PUBKEYB64"',
       },
       {
@@ -96,6 +96,25 @@ describe("dnsRecordsForDomain", () => {
       },
     ]);
   });
+
+  it.each(["millionsend", "custom-2025"])(
+    "preserves the persisted selector %s and public key of an existing identity",
+    (selector) => {
+      const records = dnsRecordsForDomain({
+        domain: "existing.example.com",
+        dkimSelector: selector,
+        dkimPublicKey: "EXISTINGPUBLICKEY",
+        mailFromSubdomain: "send",
+        region: "us-east-1",
+      });
+      expect(records[0]).toEqual({
+        group: "verification",
+        type: "TXT",
+        name: `${selector}._domainkey.existing.example.com`,
+        value: '"v=DKIM1; k=rsa; p=EXISTINGPUBLICKEY"',
+      });
+    },
+  );
 });
 
 describe("createDomainIdentity", () => {
@@ -113,7 +132,7 @@ describe("createDomainIdentity", () => {
     expect((create as CreateEmailIdentityCommand).input).toEqual({
       EmailIdentity: "example.com",
       DkimSigningAttributes: {
-        DomainSigningSelector: "millionsend",
+        DomainSigningSelector: "mepmail",
         DomainSigningPrivateKey: DKIM.privateKeyB64,
       },
     });
@@ -147,7 +166,7 @@ describe("createDomainIdentity", () => {
       EmailIdentity: "example.com",
       SigningAttributesOrigin: "EXTERNAL",
       SigningAttributes: {
-        DomainSigningSelector: "millionsend",
+        DomainSigningSelector: "mepmail",
         DomainSigningPrivateKey: DKIM.privateKeyB64,
       },
     });

@@ -32,6 +32,7 @@ import {
 import { and, asc, eq } from "drizzle-orm";
 import { createRemoteJWKSet, type JWTVerifyGetKey, jwtVerify } from "jose";
 import { type ApiDeps, type Env, errorBody } from "./app.js";
+import { normalizeMcpResponseConnection } from "./mcp-response.js";
 import { servedRegions } from "./routes/domains.js";
 import {
   batchAddSuppressionsRequestSchema,
@@ -1249,6 +1250,6 @@ export function registerMcp(app: OpenAPIHono<Env>, deps: ApiDeps, appBaseUrl: st
       }
       return bearerAuthChallengeResponse(err, bearer);
     }
-    return handler.fetch(c.req.raw, { authInfo });
+    return normalizeMcpResponseConnection(await handler.fetch(c.req.raw, { authInfo }));
   });
 }

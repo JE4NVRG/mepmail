@@ -97,20 +97,31 @@ const STYLE = [
   "u + .body .ms-gmail{display:inline-block !important}",
 ].join("\n");
 
-const WORDMARK = `<a href="https://je4ndev.com" style="display:block;margin:0 0 24px;line-height:0">
-      <img class="ms-ink" src="${EMAIL_WORDMARK_INK_URL}" width="174" height="24" alt="MepMail" style="display:block;height:24px;width:auto;border:0">
-      <!--[if !mso]><!--><img class="ms-bone" src="${EMAIL_WORDMARK_BONE_URL}" width="174" height="24" alt="MepMail" style="display:none;height:24px;width:auto;border:0;mix-blend-mode:difference"><!--<![endif]-->
+function wordmark(homeUrl: string, inkUrl: string, boneUrl: string): string {
+  return `<a href="${homeUrl}" style="display:block;margin:0 0 24px;line-height:0">
+      <img class="ms-ink" src="${inkUrl}" width="174" height="24" alt="MepMail" style="display:block;height:24px;width:auto;border:0">
+      <!--[if !mso]><!--><img class="ms-bone" src="${boneUrl}" width="174" height="24" alt="MepMail" style="display:none;height:24px;width:auto;border:0;mix-blend-mode:difference"><!--<![endif]-->
     </a>`;
+}
+
+/** Explicit branding overrides must point to public HTTPS URLs without credentials. */
+function publicMailUrl(value: string): URL {
+  const url = new URL(value);
+  if (url.protocol !== "https:" || url.username || url.password) {
+    throw new Error("Email branding requires an HTTPS URL without credentials");
+  }
+  return url;
+}
 
 /**
  * Word (classic Outlook for Windows) ignores display:none on images and
  * inline anchors, so the alternates it must never see sit behind a
  * conditional comment instead.
  */
-function buttons(url: string, label: string): string {
+function buttons(url: string, label: string, whiteTileUrl = EMAIL_WHITE_TILE_URL): string {
   const text = "font-size:14px;font-weight:600";
   return `<a class="ms-btn" href="${url}" style="display:inline-block;background:#18181b;color:#ffffff;${text};text-decoration:none;border-radius:8px;padding:12px 20px;margin-top:12px">${label}</a>
-    <!--[if !mso]><!--><a class="ms-gmail" href="${url}" style="display:none;${text};background:#ffffff url(${EMAIL_WHITE_TILE_URL});mix-blend-mode:difference;border-radius:8px;padding:12px 20px;margin-top:12px;text-decoration:none"><span style="mix-blend-mode:difference"><span style="background:#000000;mix-blend-mode:screen"><span style="background:#000000;mix-blend-mode:difference"><span style="color:#ffffff">${label}</span></span></span></span></a><!--<![endif]-->`;
+    <!--[if !mso]><!--><a class="ms-gmail" href="${url}" style="display:none;${text};background:#ffffff url(${whiteTileUrl});mix-blend-mode:difference;border-radius:8px;padding:12px 20px;margin-top:12px;text-decoration:none"><span style="mix-blend-mode:difference"><span style="background:#000000;mix-blend-mode:screen"><span style="background:#000000;mix-blend-mode:difference"><span style="color:#ffffff">${label}</span></span></span></span></a><!--<![endif]-->`;
 }
 
 /**
@@ -131,7 +142,30 @@ export function accountMailCard(input: {
   url?: string | undefined;
   linkFallback?: string;
   muted: string[];
+  /** Omitted options preserve the existing account-mail document and branding. */
+  locale?: string;
+  homeUrl?: string;
+  assetBaseUrl?: string;
 }): { html: string; text: string } {
+  const homeUrl =
+    input.homeUrl === undefined
+      ? "https://je4ndev.com"
+      : escapeHtml(publicMailUrl(input.homeUrl).href);
+  const assetBase = input.assetBaseUrl === undefined ? null : publicMailUrl(input.assetBaseUrl);
+  if (assetBase && (assetBase.search || assetBase.hash)) {
+    throw new Error("Email asset base cannot contain a query or fragment");
+  }
+  const asset = (name: string) =>
+    new URL(`email/${name}.png`, `${assetBase?.href.replace(/\/$/, "")}/`).href;
+  const mark = wordmark(
+    homeUrl,
+    assetBase ? escapeHtml(asset("wordmark-ink")) : EMAIL_WORDMARK_INK_URL,
+    assetBase ? escapeHtml(asset("wordmark-bone")) : EMAIL_WORDMARK_BONE_URL,
+  );
+  // Quote the CSS URL before escaping the HTML attribute; punctuation stays inside the URL.
+  const whiteTileUrl = assetBase
+    ? escapeHtml(JSON.stringify(asset("white")))
+    : EMAIL_WHITE_TILE_URL;
   const url = input.url === undefined ? undefined : escapeHtml(input.url);
   const heading = input.heading
     ? `<p class="ms-text" style="font-size:22px;line-height:1.3;font-weight:700;color:#18181b;margin:0 0 12px;font-variant-numeric:tabular-nums">${escapeHtml(input.heading)}</p>\n    `
@@ -143,14 +177,16 @@ export function accountMailCard(input: {
     )
     .join("\n    ");
   const button =
-    url !== undefined && input.button ? `\n    ${buttons(url, escapeHtml(input.button))}` : "";
+    url !== undefined && input.button
+      ? `\n    ${buttons(url, escapeHtml(input.button), whiteTileUrl)}`
+      : "";
   const fallback =
     url !== undefined && input.linkFallback
       ? `\n    <p ${MUTED}>${escapeHtml(input.linkFallback)}<br><a class="ms-link" href="${url}" style="color:#18181b;word-break:break-all">${url}</a></p>`
       : "";
   const muted = input.muted.map((m) => `<p ${MUTED}>${escapeHtml(m)}</p>`).join("\n    ");
   const html = `<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeHtml(input.locale ?? "en")}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
@@ -163,7 +199,7 @@ ${STYLE}
 <body class="body" style="margin:0;padding:0">
 <div class="ms-page" style="background:#f4f4f5;padding:32px 16px;font-family:-apple-system,'Segoe UI',Roboto,sans-serif">
   <div class="ms-card" style="max-width:440px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px">
-    ${WORDMARK}
+    ${mark}
     ${heading}${paragraphs}${button}${fallback}
     ${muted}
   </div>
