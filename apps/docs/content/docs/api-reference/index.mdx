@@ -88,8 +88,8 @@ remaining deltas are deliberate and loud:
   `starts_at`, `ends_at`. Self-hosted instances report `cloud: false` with
   null plan, limits and period.
 - `DELETE /emails/{id}` exists (Resend has no email deletion).
-- Custom `headers` are allowlisted: any `X-*` name (except `X-SES-*` and
-  `X-MillionSend-*`) plus `In-Reply-To`, `References`, `Importance`,
+- Custom `headers` are allowlisted: any `X-*` name (except `X-SES-*`,
+  `X-MepMail-*` and legacy `X-MillionSend-*`) plus `In-Reply-To`, `References`, `Importance`,
   `Priority`, `Comments`, `Keywords`, `Organization`, and the one-click
   unsubscribe pair — `List-Unsubscribe` (one or more `<https://…>` or
   `<mailto:…>` targets) with `List-Unsubscribe-Post`
