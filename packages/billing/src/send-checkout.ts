@@ -9,6 +9,11 @@ import {
   MAILBOX_SERVICE,
   MAILBOX_SERVICE_METADATA_KEY,
 } from "./mailbox.js";
+import {
+  type MetaCheckoutAdvertising,
+  prepareMetaCheckout,
+  recordMetaCheckout,
+} from "./meta-advertising.js";
 import { overageLookupKey, resolvePriceId, rungLookupKey } from "./prices.js";
 import type { BillingStripe } from "./stripe.js";
 import { idOf, lockCustomer } from "./subscription.js";
@@ -39,6 +44,7 @@ export interface SendCheckoutDeps {
   db: Db;
   stripe: BillingStripe;
   livemode: boolean;
+  advertising?: MetaCheckoutAdvertising;
 }
 export interface SendCheckoutInput {
   team: { id: string; name: string; stripeCustomerId: string | null };
@@ -343,6 +349,7 @@ export async function beginSendCheckout(
       })
       .returning();
     if (!attempt) throw new SendCheckoutError("unknown");
+    await prepareMetaCheckout(tx, attempt, deps.advertising, attempt.createdAt);
     return attempt;
   });
   const claim = await deps.db.transaction(async (transaction) => {
@@ -503,6 +510,7 @@ export async function beginSendCheckout(
           )
           .returning();
         if (!saved) throw new SendCheckoutError("pending");
+        await recordMetaCheckout(tx, saved, session, deps.advertising, time);
         return result(saved);
       },
     );
