@@ -10,6 +10,28 @@ export function mailboxRegistryEnabled(): boolean {
   );
 }
 
+/** A private pilot requires both an allowed team and its allowed human owner.
+ * Leaving both unset preserves the normal hosted/self-hosted capability.
+ * Partial or malformed configuration must never open the pilot to everyone.
+ */
+export function mailboxAccessEnabled(actor: { teamId: string; userId: string }): boolean {
+  if (!mailboxRegistryEnabled()) return false;
+  const teams = process.env.MAILBOX_PILOT_TEAM_IDS;
+  const users = process.env.MAILBOX_PILOT_USER_IDS;
+  if (teams === undefined && users === undefined) return true;
+  if (!teams || !users) return false;
+  const teamIds = teams.split(",").map((id) => id.trim());
+  const userIds = users.split(",").map((id) => id.trim());
+  if (
+    !teamIds.every((id) =>
+      /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id),
+    ) ||
+    !userIds.every((id) => /^[A-Za-z0-9_-]{1,128}$/.test(id))
+  )
+    return false;
+  return teamIds.includes(actor.teamId) && userIds.includes(actor.userId);
+}
+
 /** Protect reserved boxes before domain removal touches SES, even with registry UI off. */
 export async function withMailboxDomainDeletion<T>(
   db: Db,

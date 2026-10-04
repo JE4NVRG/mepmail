@@ -146,6 +146,7 @@ export async function getMailboxContent(
   // Recheck current access before returning the content and correlated metadata.
   let transportMessageId: string | null = null;
   let replyToSentItemId: string | null = null;
+  let sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null = null;
   if (content.kind === "sent") {
     const [sent] = await acceptedSent(
       db,
@@ -169,10 +170,26 @@ export async function getMailboxContent(
       }
     }
   }
+  if (content.kind === "draft") {
+    const [submitted] = await db
+      .select({ status: schema.mailboxOutbox.status })
+      .from(schema.mailboxOutbox)
+      .where(
+        and(
+          eq(schema.mailboxOutbox.teamId, actor.teamId),
+          eq(schema.mailboxOutbox.mailboxId, input.mailboxId),
+          eq(schema.mailboxOutbox.draftId, input.id),
+          eq(schema.mailboxOutbox.draftRevision, content.revision),
+        ),
+      )
+      .limit(1);
+    sendStatus = submitted?.status ?? null;
+  }
   return withMailboxContentAccess(db, actor, [input.mailboxId], async () => ({
     ...content,
     transportMessageId,
     replyToSentItemId,
+    sendStatus,
   }));
 }
 
@@ -247,6 +264,7 @@ export interface MailboxDraftInput {
   id?: string | undefined;
   expectedRevision: number;
   sourceItemId?: string | undefined;
+  mode?: "reply" | "forward" | undefined;
   to: string[];
   subject: string;
   text: string;
@@ -263,6 +281,12 @@ export async function saveMailboxContentDraft(
     (b) => b.id === input.mailboxId && b.canDraft && b.status === "planned",
   );
   if (!box) throw new MailboxContentError("forbidden");
+  const mode = input.mode ?? "reply";
+  if (mode !== "reply" && mode !== "forward") throw new MailboxContentError("invalid");
+  // Forward creates a new message from an authorized Inbox/Sent item. Editing
+  // a draft keeps that draft's own headers instead of reusing an earlier source.
+  if (mode === "forward" && (input.id || !input.sourceItemId))
+    throw new MailboxContentError("invalid");
   // Existing draft attachments/headers always come from the item being updated.
   if (input.id && input.sourceItemId !== input.id) throw new MailboxContentError("invalid");
   const source = input.sourceItemId
@@ -279,6 +303,7 @@ export async function saveMailboxContentDraft(
       )
     : null;
   if (input.id && source?.kind !== "draft") throw new MailboxContentError("conflict");
+  if (mode === "forward" && source?.kind === "draft") throw new MailboxContentError("invalid");
   if (
     (!source && input.retainedAttachments.length) ||
     new Set(input.retainedAttachments).size !== input.retainedAttachments.length
@@ -310,11 +335,11 @@ export async function saveMailboxContentDraft(
     });
   }
   if (attachments.length > MAX_ATTACHMENTS) throw new MailboxContentError("invalid");
-  const reply = source && source.kind !== "draft" ? source.mime : null;
-  const refs = source ? references(source.mime) : [];
+  const reply = mode === "reply" && source && source.kind !== "draft" ? source.mime : null;
+  const refs = mode === "reply" && source ? references(source.mime) : [];
   const originalId = mailboxMessageId(source?.mime.messageId) ?? undefined;
   let replyId = originalId;
-  if (source?.kind === "sent") {
+  if (mode === "reply" && source?.kind === "sent") {
     const [sent] = await acceptedSent(
       db,
       actor,
@@ -337,8 +362,18 @@ export async function saveMailboxContentDraft(
     subject: input.subject,
     text: input.text,
     messageId: input.id ? originalId : `<${randomUUID()}@${box.address.split("@")[1]}>`,
-    inReplyTo: reply ? replyId : (mailboxMessageId(source?.mime.inReplyTo) ?? undefined),
-    references: reply && replyId ? [...new Set([...refs, replyId])].slice(-50) : refs,
+    inReplyTo:
+      mode === "forward"
+        ? undefined
+        : reply
+          ? replyId
+          : (mailboxMessageId(source?.mime.inReplyTo) ?? undefined),
+    references:
+      mode === "forward"
+        ? undefined
+        : reply && replyId
+          ? [...new Set([...refs, replyId])].slice(-50)
+          : refs,
     attachments,
   });
   if (!Buffer.isBuffer(result.message) || result.message.length > MAX_MIME)

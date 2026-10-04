@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
@@ -344,6 +344,138 @@ describe("session-authenticated mailbox content", () => {
     expect(sender).toHaveBeenCalledTimes(1);
   });
 
+  it("forwards authorized Inbox content and selected attachments in a new encrypted message without inherited thread headers", async () => {
+    const sourceRaw = Buffer.from(
+      mime()
+        .toString()
+        .replace("References:", "In-Reply-To: <direct@example.invalid>\r\nReferences:"),
+    );
+    const source = await imported("forward:inbox", mailboxId, sourceRaw);
+    const saved = await as().saveDraft(
+      draft({
+        mode: "forward",
+        sourceItemId: source.id,
+        to: ["owner@example.invalid"],
+        subject: "Fw: Private subject",
+        text: "Private forwarded body",
+        retainedAttachments: [0],
+      }),
+    );
+    const raw = (await readMailboxItem(db, keys, actor(), { mailboxId, id: saved.id })).raw;
+    const parsed = await simpleParser(raw);
+    expect(parsed.from?.value[0]?.address).toBe("person@content.invalid");
+    expect(parsed.subject).toBe("Fw: Private subject");
+    expect(parsed.text).toContain("Private forwarded body");
+    expect(parsed.messageId).toMatch(/^<[^<>]+@content\.invalid>$/);
+    expect(parsed.messageId).not.toBe("<original@example.invalid>");
+    expect(parsed.headers.has("in-reply-to")).toBe(false);
+    expect(parsed.headers.has("references")).toBe(false);
+    expect(parsed.attachments[0]?.content).toEqual(Buffer.from(png, "base64"));
+    expect((await readMailboxItem(db, keys, actor(), { mailboxId, id: source.id })).raw).toEqual(
+      sourceRaw,
+    );
+    const [stored] = await db
+      .select()
+      .from(schema.mailboxItems)
+      .where(eq(schema.mailboxItems.id, saved.id));
+    expect(stored?.ciphertext).not.toEqual(raw);
+    expect(stored?.ciphertext.includes(Buffer.from("Private forwarded body"))).toBe(false);
+    const updated = await as().saveDraft(
+      draft({
+        id: saved.id,
+        sourceItemId: saved.id,
+        expectedRevision: saved.revision,
+        to: ["owner@example.invalid"],
+        subject: "Fw: Private subject",
+        text: "Edited forward",
+        retainedAttachments: [0],
+      }),
+    );
+    const edited = await simpleParser(
+      (await readMailboxItem(db, keys, actor(), { mailboxId, id: updated.id })).raw,
+    );
+    expect(edited.messageId).toBe(parsed.messageId);
+    expect(edited.headers.has("in-reply-to")).toBe(false);
+    expect(edited.headers.has("references")).toBe(false);
+    expect(edited.attachments[0]?.content).toEqual(Buffer.from(png, "base64"));
+  });
+
+  it("forwards Sent independently of its final SES alias and leaves the original send unchanged", async () => {
+    const { row, raw, sender } = await submittedSent({
+      uploads: [
+        { filename: "sent.txt", base64: Buffer.from("Sent attachment").toString("base64") },
+      ],
+    });
+    expect(row.providerRfcMessageId).toBeNull();
+    const saved = await as().saveDraft(
+      draft({
+        mode: "forward",
+        sourceItemId: row.id,
+        to: ["owner@example.invalid"],
+        retainedAttachments: [0],
+      }),
+    );
+    const parsed = await simpleParser(
+      (await readMailboxItem(db, keys, actor(), { mailboxId, id: saved.id })).raw,
+    );
+    expect(parsed.messageId).not.toBe((await simpleParser(raw)).messageId);
+    expect(parsed.headers.has("in-reply-to")).toBe(false);
+    expect(parsed.headers.has("references")).toBe(false);
+    expect(parsed.attachments[0]?.content.toString()).toBe("Sent attachment");
+    expect((await readMailboxItem(db, keys, actor(), { mailboxId, id: row.id })).raw).toEqual(raw);
+    expect(sender).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires current draft/read access to the exact source mailbox for forwarding", async () => {
+    const source = await imported("forward:access");
+    const input = draft({ mode: "forward", sourceItemId: source.id, retainedAttachments: [0] });
+    await expect(as("admin").saveDraft(input)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(as("owner", { teamId: otherTeam }).saveDraft(input)).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    const readGrant = await grantMailboxRegistry(db, actor(), {
+      mailboxId,
+      userId: "member",
+      permission: "read",
+    });
+    await expect(as("member").saveDraft(input)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await revokeMailboxRegistry(db, actor(), readGrant.id);
+    const draftGrant = await grantMailboxRegistry(db, actor(), {
+      mailboxId,
+      userId: "member",
+      permission: "draft",
+    });
+    expect(await as("member").saveDraft(input)).toMatchObject({ kind: "draft", mailboxId });
+    await revokeMailboxRegistry(db, actor(), draftGrant.id);
+    await expect(as("member").saveDraft(input)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      as().saveDraft(draft({ mode: "forward", mailboxId: agentId, sourceItemId: source.id })),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("rejects ambiguous forward sources and forward mode while editing an existing draft", async () => {
+    const saved = await as().saveDraft(draft());
+    await expect(as().saveDraft(draft({ mode: "forward" }))).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+    await expect(
+      as().saveDraft(draft({ mode: "forward", sourceItemId: saved.id })),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(
+      as().saveDraft(
+        draft({
+          mode: "forward",
+          id: saved.id,
+          sourceItemId: saved.id,
+          expectedRevision: saved.revision,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect((await readMailboxItem(db, keys, actor(), { mailboxId, id: saved.id })).revision).toBe(
+      saved.revision,
+    );
+  });
+
   it("correlates response headers only to accepted Sent in the authorized RCPT mailbox, preferring the direct target then nearest reference", async () => {
     const first = await submittedSent();
     const second = await submittedSent();
@@ -446,6 +578,73 @@ describe("session-authenticated mailbox content", () => {
     await expect(
       as().saveDraft(draft({ mailboxId: agentId, sourceItemId: saved.id })),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+  it("reports the accepted send only for its submitted draft and exposes no private outbox details", async () => {
+    const { row } = await submittedSent();
+    const submitted = await as().item({ mailboxId, id: row.draftId });
+    expect(submitted.sendStatus).toBe("accepted");
+    expect(submitted.revision).toBe(row.draftRevision);
+    expect(submitted).not.toHaveProperty("providerMessageId");
+    expect(submitted).not.toHaveProperty("attemptId");
+    expect((await as().item({ mailboxId, id: row.id })).sendStatus).toBeNull();
+    const inbox = await imported("status:inbox");
+    expect((await as().item({ mailboxId, id: inbox.id })).sendStatus).toBeNull();
+  });
+  it("correlates live send status to the exact draft revision and mailbox while requiring current read access", async () => {
+    await db
+      .update(schema.domains)
+      .set({ status: "verified" })
+      .where(eq(schema.domains.teamId, teamId));
+    const saved = await as().saveDraft(draft());
+    expect((await as().item({ mailboxId, id: saved.id })).sendStatus).toBeNull();
+    const queued = await queueMailboxDraft(
+      db,
+      keys,
+      actor(),
+      { mailboxId, id: saved.id, expectedRevision: saved.revision },
+      mailboxTransportMime,
+    );
+    expect((await as().item({ mailboxId, id: saved.id })).sendStatus).toBe("queued");
+    await db
+      .update(schema.mailboxOutbox)
+      .set({ status: "sending", attemptId: randomUUID(), attemptedAt: new Date() })
+      .where(eq(schema.mailboxOutbox.id, queued.id));
+    expect((await as().item({ mailboxId, id: saved.id })).sendStatus).toBe("sending");
+    for (const status of ["unknown", "failed"] as const) {
+      await db
+        .update(schema.mailboxOutbox)
+        .set({ status })
+        .where(eq(schema.mailboxOutbox.id, queued.id));
+      expect((await as().item({ mailboxId, id: saved.id })).sendStatus).toBe(status);
+    }
+    const grant = await grantMailboxRegistry(db, actor(), {
+      mailboxId,
+      userId: "member",
+      permission: "read",
+    });
+    expect((await as("member").item({ mailboxId, id: saved.id })).sendStatus).toBe("failed");
+    await revokeMailboxRegistry(db, actor(), grant.id);
+    await expect(as("member").item({ mailboxId, id: saved.id })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    await expect(
+      as("owner", { teamId: otherTeam }).item({ mailboxId, id: saved.id }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(as().item({ mailboxId: agentId, id: saved.id })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    const otherDraft = await as().saveDraft(draft({ mailboxId: agentId }));
+    expect((await as().item({ mailboxId: agentId, id: otherDraft.id })).sendStatus).toBeNull();
+    const updated = await as().saveDraft(
+      draft({
+        id: saved.id,
+        sourceItemId: saved.id,
+        expectedRevision: saved.revision,
+        text: "Next revision",
+      }),
+    );
+    expect(updated.revision).toBe(saved.revision + 1);
+    expect((await as().item({ mailboxId, id: saved.id })).sendStatus).toBeNull();
   });
   it("binds attachment downloads to the revision the reader saw", async () => {
     const saved = await as().saveDraft(

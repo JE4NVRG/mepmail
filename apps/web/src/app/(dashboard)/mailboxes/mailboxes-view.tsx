@@ -447,7 +447,8 @@ export function MailboxesView() {
         </div>
       </header>
       <p className={styles.previewNote}>
-        <span>{t("preview")}</span> {t("previewBody")}
+        <span>{t("preview")}</span>{" "}
+        {t(capability.data?.deliveryReady ? "contentPrivate" : "previewBody")}
       </p>
       <MailboxServicePanel />
       {registry.data?.canManage && options.data && !options.data.domains.length ? (
