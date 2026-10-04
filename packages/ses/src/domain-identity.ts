@@ -14,8 +14,10 @@ import type { TenantCommand } from "./tenants.js";
 export const SES_REGIONS = ["us-east-1", "eu-west-1", "sa-east-1", "ap-northeast-1"] as const;
 export type SesRegion = (typeof SES_REGIONS)[number];
 
-/** Single branded BYODKIM selector: every domain publishes `millionsend._domainkey`. */
-export const DKIM_SELECTOR = "millionsend";
+/** BYODKIM selector for newly created domain identities. */
+export const DKIM_SELECTOR = "mepmail";
+/** Fallback for existing rows created before the branded selector changed. */
+export const LEGACY_DKIM_SELECTOR = "millionsend";
 
 type IdentityCommand =
   | CreateEmailIdentityCommand

@@ -1,7 +1,7 @@
 import { type Db, schema } from "@millionsend/db";
 import { and, asc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
-import { mailboxServiceActive, reserveMailboxSeat } from "./mailbox-service.js";
 import { lockMailboxAgentKeysForOwnerChange } from "./mailbox-agent-access.js";
+import { mailboxServiceEntitlement, reserveMailboxSeat } from "./mailbox-service.js";
 
 export class MailboxRegistryError extends Error {
   constructor(public readonly code: "forbidden" | "not_found" | "invalid" | "conflict") {
@@ -70,22 +70,15 @@ export async function mailboxDomainLock(db: Db, domainId: string) {
 
 export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
   await member(db, actor);
-  const [team] = await db
-    .select({ suspendedAt: schema.teams.suspendedAt })
-    .from(schema.teams)
-    .where(eq(schema.teams.id, actor.teamId));
-  const [plan] = await db
-    .select()
-    .from(schema.mailboxSubscriptions)
-    .where(eq(schema.mailboxSubscriptions.teamId, actor.teamId));
+  const service = await mailboxServiceEntitlement(db, actor.teamId);
+  const allocation = db
+    .select({ id: schema.mailboxes.id })
+    .from(schema.mailboxes)
+    .where(eq(schema.mailboxes.teamId, actor.teamId))
+    .orderBy(asc(schema.mailboxes.createdAt), asc(schema.mailboxes.id));
   const licensed =
-    !!team && !team.suspendedAt && mailboxServiceActive(plan)
-      ? await db
-          .select({ id: schema.mailboxes.id })
-          .from(schema.mailboxes)
-          .where(eq(schema.mailboxes.teamId, actor.teamId))
-          .orderBy(asc(schema.mailboxes.createdAt), asc(schema.mailboxes.id))
-          .limit(plan!.seats)
+    service.resourcePolicyActive && service.plan
+      ? await (service.unlimitedSeats ? allocation : allocation.limit(service.plan.seats))
       : [];
   const licensedIds = new Set(licensed.map((b) => b.id));
   const rows = await db

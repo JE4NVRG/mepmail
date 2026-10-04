@@ -1,4 +1,4 @@
-import { handleWebhook, isLiveKey } from "@millionsend/billing";
+import { handleWebhook, isLiveKey, readMetaConversionConfig } from "@millionsend/billing";
 import { accountEmailFrom, env, notificationsEmailFrom } from "@millionsend/config";
 import {
   type AccountMailKind,
@@ -25,10 +25,10 @@ import { eq } from "drizzle-orm";
 import { appBaseUrl } from "@/lib/api-base-url";
 import { BILLING_PATH, getStripe, mailPlanMove } from "@/server/billing";
 import { emitFunnel } from "@/server/funnel";
+import { mailboxBillingCatalog } from "@/server/mailbox-billing";
+import { mailboxRegistryEnabled } from "@/server/mailboxes";
 import { getQueue } from "@/server/queue";
 import { buildAccountEmail, sendAccountMail } from "@/server/system-mail";
-import { mailboxRegistryEnabled } from "@/server/mailboxes";
-import { mailboxBillingCatalog } from "@/server/mailbox-billing";
 
 /**
  * Stripe webhook endpoint. Unauthenticated by design: the raw body is
@@ -49,6 +49,7 @@ export async function POST(request: Request) {
     stripe: getStripe(),
     webhookSecret: env.STRIPE_WEBHOOK_SECRET ?? "",
     livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
+    advertisingConfig: readMetaConversionConfig(process.env),
     ...(mailboxRegistryEnabled() ? { mailboxCatalog: mailboxBillingCatalog() } : {}),
     // Only for an event that was newly applied, so a redelivery stays silent;
     // keyed by the Stripe event id, so a recurring invoice is one payment each.

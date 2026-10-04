@@ -220,6 +220,9 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
     expect(getStripe).not.toHaveBeenCalled();
     expect(await as().mailboxes.service()).toEqual({
       active: false,
+      licenseKind: "none",
+      unlimitedSeats: false,
+      resourcePolicyActive: false,
       status: "inactive",
       seats: 0,
       reservedSeats: 0,

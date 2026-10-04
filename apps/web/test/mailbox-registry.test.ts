@@ -293,7 +293,7 @@ describe("authenticated persistent mailbox registry", () => {
     expect((await db.select().from(schema.mailboxes)).length).toBe(1);
     expect(
       (await client.query("select count(*) as count from drizzle.__mailbox_migrations")).rows[0],
-    ).toMatchObject({ count: 8 });
+    ).toMatchObject({ count: 10 });
     expect(
       (await client.query("select to_regclass('drizzle.__drizzle_migrations') as ledger")).rows[0],
     ).toMatchObject({ ledger: null });

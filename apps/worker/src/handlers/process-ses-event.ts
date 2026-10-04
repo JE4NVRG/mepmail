@@ -249,7 +249,14 @@ export async function processSesEvent(
           reason: s.reason,
           sourceEmailId: email.id,
         })
-        .onConflictDoNothing()
+        .onConflictDoUpdate({
+          target: [schema.suppressions.teamId, schema.suppressions.emailHash],
+          // A marketing opt-out still permits transactional mail. A permanent
+          // bounce or complaint must close that exception without weakening
+          // another existing block or restoring an erased address.
+          set: { reason: s.reason, sourceEmailId: email.id },
+          setWhere: eq(schema.suppressions.reason, "one_click_unsubscribe"),
+        })
         .returning({
           id: schema.suppressions.id,
           email: schema.suppressions.email,

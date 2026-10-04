@@ -14,7 +14,12 @@ import {
   planCapPhrase,
   planMove,
 } from "../src/account-mail.js";
-import { accountMailCard } from "../src/html.js";
+import {
+  accountMailCard,
+  EMAIL_WHITE_TILE_URL,
+  EMAIL_WORDMARK_BONE_URL,
+  EMAIL_WORDMARK_INK_URL,
+} from "../src/html.js";
 import { mailPreferenceOf } from "../src/mail-preferences.js";
 import { listTeamOwners } from "../src/notifications.js";
 import type { SystemMailKind } from "../src/system-mail.js";
@@ -133,6 +138,52 @@ describe("accountMailCard", () => {
     expect(card.html).toContain("wordmark-bone.png");
     expect(card.html).toContain("@media (prefers-color-scheme:dark)");
     expect(card.html).toContain("u + .body .ms-gmail");
+  });
+
+  it("keeps the original language, home and asset URLs when overrides are omitted", () => {
+    const card = accountMailCard({
+      paragraphs: ["Hello"],
+      button: "Open",
+      url: "https://x.y",
+      muted: [],
+    });
+    expect(card.html).toContain('<html lang="en">');
+    expect(card.html).toContain('<a href="https://je4ndev.com"');
+    expect(card.html).toContain(`src="${EMAIL_WORDMARK_INK_URL}"`);
+    expect(card.html).toContain(`src="${EMAIL_WORDMARK_BONE_URL}"`);
+    expect(card.html).toContain(`background:#ffffff url(${EMAIL_WHITE_TILE_URL});`);
+    expect(card.text).toBe("Hello\n\nOpen: https://x.y\n\n\n");
+  });
+
+  it("escapes explicit language and home attributes and quotes the Gmail asset URL", () => {
+    const card = accountMailCard({
+      paragraphs: ["Hello"],
+      button: "Open",
+      url: "https://x.y",
+      muted: [],
+      locale: 'pt-BR" data-injected="yes',
+      homeUrl: "https://mepmail.dev/?a=1&b=2",
+      assetBaseUrl: "https://assets.example/path');color:red;/*",
+    });
+    expect(card.html).toContain('<html lang="pt-BR&quot; data-injected=&quot;yes">');
+    expect(card.html).not.toContain('lang="pt-BR" data-injected="yes"');
+    expect(card.html).toContain('href="https://mepmail.dev/?a=1&amp;b=2"');
+    expect(card.html).toContain("background:#ffffff url(&quot;https://assets.example/");
+    expect(card.html).toContain("/email/white.png&quot;);");
+    expect(card.text).not.toContain("data-injected");
+  });
+
+  it("rejects executable or credential-bearing branding URLs", () => {
+    const input = { paragraphs: ["Hello"], muted: [] };
+    expect(() => accountMailCard({ ...input, homeUrl: "javascript:alert(1)" })).toThrow(
+      "HTTPS URL",
+    );
+    expect(() =>
+      accountMailCard({ ...input, assetBaseUrl: "https://user:password@example.com" }),
+    ).toThrow("HTTPS URL");
+    expect(() => accountMailCard({ ...input, assetBaseUrl: "https://example.com/?x=1" })).toThrow(
+      "query or fragment",
+    );
   });
 });
 

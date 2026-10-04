@@ -8,13 +8,24 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
-import { createMailboxRegistry } from "../../../packages/core/src/mailbox-registry.js";
+import {
+  createMailboxAgentKey,
+  withMailboxAgentAccess,
+} from "../../../packages/core/src/mailbox-agent-access.js";
 import {
   importMailboxMime,
   readMailboxItem,
   saveMailboxDraft,
 } from "../../../packages/core/src/mailbox-private-store.js";
-import { mailboxServiceState } from "../../../packages/core/src/mailbox-service.js";
+import {
+  createMailboxRegistry,
+  listMailboxRegistry,
+} from "../../../packages/core/src/mailbox-registry.js";
+import {
+  lockMailboxService,
+  mailboxServiceState,
+  requireMailboxSeat,
+} from "../../../packages/core/src/mailbox-service.js";
 import { seedMailboxTestService } from "./mailbox-service-fixture";
 
 let client: PGlite, db: Db, teamId: string, domainId: string, keys: EnvKeyring;
@@ -200,5 +211,271 @@ describe("separate paid mailbox entitlement and included quotas", () => {
       raw: Buffer.alloc(100, 69),
     });
     expect((await db.select().from(schema.mailboxItems)).length).toBe(4);
+  });
+});
+
+describe("operator-owned System mailbox licence and separate resource policy", () => {
+  const system = async () => {
+    await plan({ seats: 2 });
+    await db.update(schema.teams).set({ plan: "system" }).where(eq(schema.teams.id, teamId));
+  };
+  const rawPlan = async () => {
+    const [row] = await db
+      .select()
+      .from(schema.mailboxSubscriptions)
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+    return row;
+  };
+
+  it("licenses more than two person/agent boxes without changing the audited allowance row", async () => {
+    await system();
+    const before = await rawPlan();
+    await create("personal");
+    await create("agent-one", "agent");
+    const third = await create("agent-two", "agent");
+    const raw = Buffer.from("Third box private draft");
+    const draft = await saveMailboxDraft(db, keys, actor(), {
+      mailboxId: third.id,
+      expectedRevision: 0,
+      raw,
+    });
+    expect(
+      (await readMailboxItem(db, keys, actor(), { mailboxId: third.id, id: draft.id })).raw,
+    ).toEqual(raw);
+    expect(await mailboxServiceState(db, teamId)).toMatchObject({
+      active: true,
+      unlimitedSeats: true,
+      licenseKind: "system",
+      resourcePolicyActive: true,
+      reservedSeats: 3,
+    });
+    const listed = await listMailboxRegistry(db, actor());
+    expect(listed.mailboxes.find((box) => box.id === third.id)).toMatchObject({
+      canDraft: true,
+      canSend: true,
+    });
+    expect(await rawPlan()).toEqual(before);
+    expect((await rawPlan())?.seats).toBe(2);
+  });
+
+  it("admits the third agent box through the actual scoped bearer access path", async () => {
+    await system();
+    await create("first");
+    await create("second");
+    const box = await create("third-agent", "agent");
+    const key = await createMailboxAgentKey(db, actor(), {
+      mailboxId: box.id,
+      label: "Offline System agent",
+      scopes: ["read", "draft"],
+    });
+    const raw = Buffer.from("Private scoped agent draft");
+    const draft = await withMailboxAgentAccess(
+      db,
+      key.token,
+      "draft",
+      ({ db: tx, actor, mailboxId }) =>
+        saveMailboxDraft(tx, keys, actor, { mailboxId, expectedRevision: 0, raw }),
+    );
+    const item = await withMailboxAgentAccess(
+      db,
+      key.token,
+      "read",
+      ({ db: tx, actor, mailboxId }) =>
+        readMailboxItem(tx, keys, actor, { mailboxId, id: draft.id }),
+    );
+    expect(item.raw).toEqual(raw);
+    await plan({ periodEnd: new Date(Date.now() - 1000) });
+    let invoked = false;
+    await expect(
+      withMailboxAgentAccess(db, key.token, "draft", async () => {
+        invoked = true;
+      }),
+    ).rejects.toMatchObject({ code: "not_entitled" });
+    expect(invoked).toBe(false);
+  });
+
+  it("still counts actual stored bytes in a box above the old seat limit", async () => {
+    await system();
+    await create("first");
+    await create("second");
+    const third = await create("third");
+    await plan({ storageBytesPerMailbox: 50 });
+    await saveMailboxDraft(db, keys, actor(), {
+      mailboxId: third.id,
+      expectedRevision: 0,
+      raw: Buffer.alloc(50, 65),
+    });
+    await expect(
+      saveMailboxDraft(db, keys, actor(), {
+        mailboxId: third.id,
+        expectedRevision: 0,
+        raw: Buffer.from("x"),
+      }),
+    ).rejects.toMatchObject({ code: "quota" });
+    expect(await rawPlan()).toMatchObject({ seats: 2, includedOutboundPerMailbox: 100 });
+  });
+
+  it.each(["expired", "absent"] as const)(
+    "keeps System seat licensing permanent with an %s resource policy but denies content writes",
+    async (kind) => {
+      await system();
+      const box = await create("readable");
+      const raw = Buffer.from("Recoverable private content");
+      const item = await importMailboxMime(db, keys, actor(), {
+        mailboxId: box.id,
+        sourceId: "system:recovery",
+        raw,
+      });
+      if (kind === "expired") await plan({ periodEnd: new Date(Date.now() - 1000) });
+      else
+        await db
+          .delete(schema.mailboxSubscriptions)
+          .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+      await create("person-extra");
+      await create("agent-extra", "agent");
+      expect(await mailboxServiceState(db, teamId)).toMatchObject({
+        active: true,
+        unlimitedSeats: true,
+        licenseKind: "system",
+        resourcePolicyActive: false,
+        reservedSeats: 3,
+      });
+      await expect(
+        saveMailboxDraft(db, keys, actor(), { mailboxId: box.id, expectedRevision: 0, raw }),
+      ).rejects.toMatchObject({ code: "not_entitled" });
+      expect(
+        (await readMailboxItem(db, keys, actor(), { mailboxId: box.id, id: item.id })).raw,
+      ).toEqual(raw);
+      if (kind === "absent") expect(await rawPlan()).toBeUndefined();
+    },
+  );
+
+  it("removes the System exemption on suspension while retaining private recovery reads", async () => {
+    await system();
+    const box = await create("person");
+    const raw = Buffer.from("Suspended System recovery");
+    const item = await importMailboxMime(db, keys, actor(), {
+      mailboxId: box.id,
+      sourceId: "system:suspended",
+      raw,
+    });
+    await db
+      .update(schema.teams)
+      .set({ suspendedAt: new Date() })
+      .where(eq(schema.teams.id, teamId));
+    expect(await mailboxServiceState(db, teamId)).toMatchObject({
+      active: false,
+      unlimitedSeats: false,
+    });
+    await expect(create("blocked")).rejects.toMatchObject({ code: "not_entitled" });
+    await expect(
+      saveMailboxDraft(db, keys, actor(), { mailboxId: box.id, expectedRevision: 0, raw }),
+    ).rejects.toMatchObject({ code: "not_entitled" });
+    expect(
+      (await readMailboxItem(db, keys, actor(), { mailboxId: box.id, id: item.id })).raw,
+    ).toEqual(raw);
+  });
+
+  it.each(["operator_admin", "other_operator", "ordinary_admin"] as const)(
+    "does not derive unlimited access from %s",
+    async (reason) => {
+      await system();
+      if (reason === "other_operator")
+        await db.insert(schema.user).values({
+          id: "first-operator",
+          name: "First operator",
+          email: "first@example.invalid",
+          createdAt: new Date(0),
+        });
+      else {
+        await db
+          .update(schema.teamMembers)
+          .set({ role: "admin" })
+          .where(eq(schema.teamMembers.teamId, teamId));
+        if (reason === "ordinary_admin")
+          await db.update(schema.teams).set({ plan: "free" }).where(eq(schema.teams.id, teamId));
+      }
+      await create("first");
+      await create("second");
+      expect(await mailboxServiceState(db, teamId)).toMatchObject({ unlimitedSeats: false });
+      await expect(create("third")).rejects.toMatchObject({ code: "quota" });
+    },
+  );
+
+  it("rechecks owner membership and downgrade, restoring finite allocation without deleting boxes", async () => {
+    await system();
+    await create("first");
+    await create("second");
+    await create("third");
+    await db
+      .update(schema.teamMembers)
+      .set({ role: "admin" })
+      .where(eq(schema.teamMembers.teamId, teamId));
+    await expect(create("owner-lost")).rejects.toMatchObject({ code: "quota" });
+    await db
+      .update(schema.teamMembers)
+      .set({ role: "owner" })
+      .where(eq(schema.teamMembers.teamId, teamId));
+    await create("owner-restored");
+    await db.update(schema.teams).set({ plan: "free" }).where(eq(schema.teams.id, teamId));
+    const listed = await listMailboxRegistry(db, actor());
+    expect(listed.mailboxes).toHaveLength(4);
+    expect(listed.mailboxes.filter((box) => box.canDraft)).toHaveLength(2);
+    const unlicensed = listed.mailboxes.find((box) => !box.canDraft);
+    if (!unlicensed) throw new Error("Expected a finite-allocation box after System downgrade");
+    await expect(
+      saveMailboxDraft(db, keys, actor(), {
+        mailboxId: unlicensed.id,
+        expectedRevision: 0,
+        raw: Buffer.from("Unlicensed draft"),
+      }),
+    ).rejects.toMatchObject({ code: "not_entitled" });
+    await expect(create("downgraded")).rejects.toMatchObject({ code: "quota" });
+    expect(await mailboxServiceState(db, teamId)).toMatchObject({
+      unlimitedSeats: false,
+      reservedSeats: 4,
+    });
+  });
+
+  it("does not let an unlimited effective policy license a foreign team's box", async () => {
+    await system();
+    const [foreign] = await db
+      .insert(schema.teams)
+      .values({ name: "Foreign", slug: "foreign-system-test" })
+      .returning();
+    if (!foreign) throw new Error("Expected the offline foreign team fixture");
+    const foreignTeamId = foreign.id;
+    await seedMailboxTestService(db, [foreignTeamId]);
+    await db
+      .insert(schema.teamMembers)
+      .values({ teamId: foreignTeamId, userId: "owner", role: "owner" });
+    const [domain] = await db
+      .insert(schema.domains)
+      .values({
+        teamId: foreignTeamId,
+        name: "foreign.invalid",
+        region: "us-east-1",
+        status: "verified",
+      })
+      .returning();
+    if (!domain) throw new Error("Expected the offline foreign domain fixture");
+    const box = await createMailboxRegistry(
+      db,
+      { teamId: foreignTeamId, userId: "owner" },
+      {
+        domainId: domain.id,
+        localPart: "foreign",
+        kind: "person",
+        label: "Foreign",
+        ownerUserId: "owner",
+      },
+    );
+    const effective = await db.transaction((tx) => lockMailboxService(tx as unknown as Db, teamId));
+    await expect(requireMailboxSeat(db, teamId, box.id, effective)).rejects.toMatchObject({
+      code: "not_entitled",
+    });
+    await expect(requireMailboxSeat(db, foreignTeamId, box.id, effective)).rejects.toMatchObject({
+      code: "not_entitled",
+    });
   });
 });

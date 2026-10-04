@@ -26,6 +26,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { headers } from "next/headers";
 import { mcpResourceUrl, resolveBaseUrl } from "@/lib/api-base-url";
 import { httpOrigin } from "@/lib/http-url";
+import { legacyAccountIssuer } from "@/lib/legacy-account-issuer";
 import { attributionProps, emitFunnel, recordSignupAttribution } from "./funnel";
 import { localeFromHeaders } from "./locale";
 import { getActiveMembership, listMemberships } from "./membership";
@@ -357,6 +358,11 @@ export function createAuth(
         oauthClientAssertion: schema.oauthClientAssertion,
       },
     }),
+    account: {
+      additionalFields: {
+        issuer: { type: "string", required: false, input: false, returned: false },
+      },
+    },
     session: {
       // No step-up: a signed-in session may do everything its role allows,
       // however old it is (Better Auth would otherwise re-prompt for
@@ -560,6 +566,13 @@ export function createAuth(
     baseURL,
     ...(env.APP_BASE_URL ? { trustedOrigins: [env.APP_BASE_URL] } : {}),
     databaseHooks: {
+      account: {
+        create: {
+          before: async (account) => ({
+            data: { issuer: legacyAccountIssuer(account.providerId) },
+          }),
+        },
+      },
       user: {
         create: {
           before: async () => {

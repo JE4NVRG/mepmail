@@ -1,7 +1,7 @@
 import { MailboxContentError } from "@millionsend/core";
 import { z } from "zod";
 import { getMailboxAttachmentResponse, MAILBOX_PRIVATE_HEADERS } from "@/server/mailbox-content";
-import { mailboxRegistryEnabled } from "@/server/mailboxes";
+import { mailboxAccessEnabled, mailboxRegistryEnabled } from "@/server/mailboxes";
 import { createContext } from "@/server/trpc";
 
 export const runtime = "nodejs";
@@ -21,6 +21,8 @@ export async function GET(
     const ctx = await createContext({ headers: request.headers });
     if (!ctx.session) return empty(401);
     if (!ctx.teamId || !ctx.role || ctx.supportView) return empty(403);
+    if (!mailboxAccessEnabled({ teamId: ctx.teamId, userId: ctx.session.user.id }))
+      return empty(404);
     const params = paramsSchema.safeParse(await context.params);
     if (!params.success) return empty(404);
     const url = new URL(request.url);

@@ -11,8 +11,9 @@ import type { MailboxRegistryActor } from "./mailbox-registry.js";
 import {
   assertMailboxStorage,
   lockMailboxService,
-  mailboxServiceActive,
   MailboxServiceError,
+  mailboxServiceEntitlement,
+  requireMailboxOperationalPlan,
   requireMailboxSeat,
 } from "./mailbox-service.js";
 
@@ -94,13 +95,7 @@ async function scoped<T>(
       .for("share");
     if (!member) throw new MailboxContentError("forbidden");
     // Lock billing before mailbox, but report access failures before entitlements.
-    const [plan] = change
-      ? await tx
-          .select()
-          .from(schema.mailboxSubscriptions)
-          .where(eq(schema.mailboxSubscriptions.teamId, actor.teamId))
-          .for("update")
-      : [];
+    const entitlement = change ? await mailboxServiceEntitlement(tx, actor.teamId, true) : null;
     const query = tx
       .select()
       .from(schema.mailboxes)
@@ -131,8 +126,8 @@ async function scoped<T>(
     }
     if (change) {
       if (!team || team.suspendedAt) throw new MailboxServiceError("not_entitled");
-      if (!mailboxServiceActive(plan)) throw new MailboxServiceError("not_entitled");
-      await requireMailboxSeat(tx, actor.teamId, mailboxId, plan!);
+      const plan = requireMailboxOperationalPlan(entitlement);
+      await requireMailboxSeat(tx, actor.teamId, mailboxId, plan);
     }
     return operation(tx);
   });

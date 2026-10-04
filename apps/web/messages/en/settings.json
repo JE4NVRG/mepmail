@@ -377,7 +377,7 @@
     "revokeAllTeamsForbidden": "This grant also covers teams you do not administer. Only its holder can revoke it.",
     "revokeConfirm": {
       "title": "Revoke access",
-      "body": "{name} loses access to this team at its next token refresh, within 15 minutes.",
+      "body": "{name} will no longer be able to refresh access using this authorization. Access tokens already issued may remain valid for up to 1 hour and 30 seconds after revocation.",
       "confirm": "Revoke access"
     }
   },
