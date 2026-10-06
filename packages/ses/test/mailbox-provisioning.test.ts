@@ -138,3 +138,170 @@ describe("recipient activation on the explicitly pinned existing rule", () => {
     expect(c.destroyed).toBe(true);
   });
 });
+
+describe("recipient activation across several pinned exact-address rules", () => {
+  const rule = (name: string, recipients: string[]): ReceiptRule & { Name: string } => ({
+    ...structuredClone(seed),
+    Name: name,
+    Recipients: recipients,
+  });
+  const base = [rule("rule-a", ["support@example.com"]), rule("rule-b", ["hold@b.invalid"])];
+  const v2 = (rules = base): MailboxProvisioningConfiguration => ({
+    version: 2,
+    region: "us-east-1",
+    ruleSetName: "existing-set",
+    rules: rules.map((r) => ({
+      ruleName: r.Name,
+      protectedRuleSha256: mailboxProtectedRuleSha256(r),
+    })),
+  });
+  function multi(initial = base, failOn: string | null = null) {
+    let rules = structuredClone(initial) as ReceiptRule[];
+    const commands: unknown[] = [];
+    return {
+      commands,
+      get rules() {
+        return rules;
+      },
+      async send(command: DescribeActiveReceiptRuleSetCommand | UpdateReceiptRuleCommand) {
+        commands.push(command);
+        if (command instanceof DescribeActiveReceiptRuleSetCommand)
+          return { Metadata: { Name: "existing-set" }, Rules: structuredClone(rules) };
+        const next = command.input.Rule!;
+        if (next.Name === failOn) throw new Error("denied");
+        rules = rules.map((r) => (r.Name === next.Name ? structuredClone(next) : r));
+        return {};
+      },
+    };
+  }
+  const updates = (c: { commands: unknown[] }) =>
+    c.commands.filter((x) => x instanceof UpdateReceiptRuleCommand) as UpdateReceiptRuleCommand[];
+
+  it("parses version 2 and rejects ambiguous or oversized pins", () => {
+    const config = v2();
+    expect(parseMailboxProvisioningConfiguration(JSON.stringify(config))).toEqual(config);
+    const bad = [
+      { ...config, rules: [] },
+      {
+        ...config,
+        rules: [
+          config.version === 2 ? config.rules[0] : null,
+          config.version === 2 ? config.rules[0] : null,
+        ],
+      },
+      { ...config, rules: [{ ruleName: "rule-a", protectedRuleSha256: "x" }] },
+      { ...config, rules: [{ ruleName: "rule-a", protectedRuleSha256: "a".repeat(64), extra: 1 }] },
+      {
+        ...config,
+        rules: Array.from({ length: 201 }, (_, i) => ({
+          ruleName: `r${i}`,
+          protectedRuleSha256: "a".repeat(64),
+        })),
+      },
+      { ...config, ruleName: "rule-a" },
+      { ...config, version: 3 },
+    ];
+    for (const value of bad)
+      expect(() => parseMailboxProvisioningConfiguration(JSON.stringify(value))).toThrow(
+        "configuration",
+      );
+  });
+
+  it("fills the first rule, then spills over in pinned order, touching only changed rules", async () => {
+    const full = Array.from(
+      { length: 99 },
+      (_, i) => `box${String(i).padStart(2, "0")}@example.com`,
+    );
+    const start = [rule("rule-a", full), rule("rule-b", ["hold@b.invalid"])];
+    const c = multi(start);
+    expect(
+      await appendMailboxReceivingRecipients(c, v2(start), [
+        "new1@example.com",
+        "new2@example.com",
+      ]),
+    ).toEqual({ confirmed: true, added: 2 });
+    expect(updates(c).map((u) => [u.input.Rule?.Name, u.input.Rule?.Recipients?.length])).toEqual([
+      ["rule-a", 100],
+      ["rule-b", 2],
+    ]);
+    expect(updates(c)[1]?.input.Rule).toEqual({
+      ...start[1],
+      Recipients: ["hold@b.invalid", "new2@example.com"],
+    });
+    // Replays are reads only, wherever the address landed.
+    expect(
+      await appendMailboxReceivingRecipients(c, v2(start), [
+        "new1@example.com",
+        "new2@example.com",
+      ]),
+    ).toEqual({ confirmed: true, added: 0 });
+    expect(updates(c)).toHaveLength(2);
+  });
+
+  it("refuses capacity across all rules before any mutation", async () => {
+    const start = [
+      rule(
+        "rule-a",
+        Array.from({ length: 100 }, (_, i) => `a${i}@example.com`),
+      ),
+      rule(
+        "rule-b",
+        Array.from({ length: 100 }, (_, i) => `b${i}@example.com`),
+      ),
+    ];
+    const c = multi(start);
+    await expect(
+      appendMailboxReceivingRecipients(c, v2(start), ["luna@example.com"]),
+    ).rejects.toThrow("capacity");
+    expect(c.commands).toHaveLength(1);
+  });
+
+  it("rejects an unpinned extra rule, a missing rule or an address routed twice", async () => {
+    const extra = [...base, rule("rogue", ["x@example.com"])];
+    const missing = [base[0]!];
+    const twice = [rule("rule-a", ["dup@example.com"]), rule("rule-b", ["dup@example.com"])];
+    for (const [live, config] of [
+      [extra, v2()],
+      [missing, v2()],
+      [twice, v2(twice)],
+    ] as const) {
+      const c = multi(live as (ReceiptRule & { Name: string })[]);
+      await expect(
+        appendMailboxReceivingRecipients(c, config, ["luna@example.com"]),
+      ).rejects.toThrow("rule_changed");
+      expect(c.commands).toHaveLength(1);
+    }
+  });
+
+  it("rejects drift in any pinned rule before mutation", async () => {
+    const drifted = [base[0]!, { ...base[1]!, TlsPolicy: "Optional" as const }];
+    const c = multi(drifted);
+    await expect(appendMailboxReceivingRecipients(c, v2(), ["luna@example.com"])).rejects.toThrow(
+      "rule_changed",
+    );
+    expect(c.commands).toHaveLength(1);
+  });
+
+  it("does not certify a partial spill-over and completes it on the next activation", async () => {
+    const start = [
+      rule(
+        "rule-a",
+        Array.from({ length: 99 }, (_, i) => `a${i}@example.com`),
+      ),
+      rule("rule-b", ["hold@b.invalid"]),
+    ];
+    const failing = multi(start, "rule-b");
+    await expect(
+      appendMailboxReceivingRecipients(failing, v2(start), ["n1@example.com", "n2@example.com"]),
+    ).rejects.toThrow("unconfirmed");
+    expect(failing.rules[0]?.Recipients).toContain("n1@example.com");
+    const retry = multi(failing.rules as (ReceiptRule & { Name: string })[]);
+    expect(
+      await appendMailboxReceivingRecipients(retry, v2(start), [
+        "n1@example.com",
+        "n2@example.com",
+      ]),
+    ).toEqual({ confirmed: true, added: 1 });
+    expect(updates(retry).map((u) => u.input.Rule?.Name)).toEqual(["rule-b"]);
+  });
+});
