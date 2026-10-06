@@ -42,7 +42,7 @@ beforeAll(async () => {
 afterAll(() => close());
 
 describe("verifyOnboardingSender", () => {
-  const platform = "MillionSend <onboarding@ms.example>";
+  const platform = "MepMail <onboarding@ms.example>";
   it("only the shared sender qualifies, and only for the team's own members", async () => {
     await db
       .insert(schema.user)

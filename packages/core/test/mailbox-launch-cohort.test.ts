@@ -15,22 +15,23 @@ const fixture = {
 };
 const parse = (value: unknown) => parseMailboxLaunchCohort(JSON.stringify(value));
 
-describe("private Correio opening cohort", () => {
-  it("keeps only the captured team/customer pair enrolled", () => {
+describe("public Correio opening admission", () => {
+  it("admits every team with a Stripe customer once the opening has passed", () => {
     const cohort = parse(fixture);
     expect(cohort).toEqual(fixture);
     expect(
       mailboxLaunchCohortAllows(cohort, { teamId: team, customerId: "cus_previous" }, now),
     ).toBe(true);
     expect(mailboxLaunchCohortAllows(cohort, { teamId: other, customerId: "cus_new29" }, now)).toBe(
-      false,
+      true,
     );
     expect(
       mailboxLaunchCohortAllows(cohort, { teamId: team, customerId: "cus_transfer" }, now),
-    ).toBe(false);
-    expect(
-      mailboxLaunchCohortAllows(cohort, { teamId: other, customerId: "cus_previous" }, now),
-    ).toBe(false);
+    ).toBe(true);
+  });
+  it("still refuses a team that never became a Stripe customer", () => {
+    const cohort = parse(fixture);
+    expect(mailboxLaunchCohortAllows(cohort, { teamId: other, customerId: null }, now)).toBe(false);
   });
   it("retains enrollment after an Envio subscription replacement", () => {
     const cohort = parse(fixture);
@@ -72,12 +73,12 @@ describe("private Correio opening cohort", () => {
     expect(parseMailboxLaunchCohort("invalid")).toBeNull();
     expect(parseMailboxLaunchCohort(undefined)).toBeNull();
   });
-  it("accepts an empty captured cohort without opening to future buyers", () => {
+  it("admits paying teams even when the captured list of grants is empty", () => {
     const cohort = parse({ ...fixture, members: [] });
     expect(cohort).not.toBeNull();
     expect(
       mailboxLaunchCohortAllows(cohort, { teamId: team, customerId: "cus_previous" }, now),
-    ).toBe(false);
+    ).toBe(true);
   });
   it("requires an explicit true marker for the exceptional existing-US20 grant", () => {
     const member = fixture.members[0];

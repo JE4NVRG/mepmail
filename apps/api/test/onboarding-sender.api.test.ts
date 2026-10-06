@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
 
-const PLATFORM = "MillionSend <onboarding@ms.example>";
+const PLATFORM = "MepMail <onboarding@ms.example>";
 
 let db: Db;
 let close: () => Promise<void>;

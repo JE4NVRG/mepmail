@@ -31,7 +31,7 @@ const builds = argv.filter((a) => a in BUNDLE);
 if (builds.length === 0) builds.push("before", "after");
 
 const freshCwd = (tag) => {
-  const cwd = mkdtempSync(join(tmpdir(), `millionsend-preview-${tag}-`));
+  const cwd = mkdtempSync(join(tmpdir(), `mepmail-preview-${tag}-`));
   writeFileSync(join(cwd, ".gitignore"), "node_modules\n");
   return cwd;
 };
@@ -41,10 +41,10 @@ function makeEnv(fake, cloud, extra = {}) {
   const env = {
     ...process.env,
     RESEND_API_KEY: fake.token,
-    MILLIONSEND_CLI_RESEND_URL: fake.url,
+    MEPMAIL_CLI_RESEND_URL: fake.url,
     RESEND_BASE_URL: fake.url,
-    MILLIONSEND_API_KEY: cloud.apiKey,
-    MILLIONSEND_BASE_URL: cloud.baseUrl,
+    MEPMAIL_API_KEY: cloud.apiKey,
+    MEPMAIL_BASE_URL: cloud.baseUrl,
   };
   for (const k of ["NO_COLOR", "FORCE_COLOR", "COLUMNS", "LINES"]) delete env[k];
   for (const [k, v] of Object.entries(extra)) {
@@ -76,7 +76,7 @@ function runPty({ bundle, args, cwd, env, cols = 100, rows = 50 }) {
   );
 }
 
-const echo = (args) => Buffer.from(`$ millionsend ${args.join(" ")}\r\n`);
+const echo = (args) => Buffer.from(`$ mepmail ${args.join(" ")}\r\n`);
 
 /*
  * Order matters: the cloud instance is shared for a build. Read-only
@@ -195,9 +195,7 @@ for (const build of builds) {
     const env = makeEnv(
       fake,
       cloud,
-      s.self
-        ? { MILLIONSEND_API_KEY: self.apiKey, MILLIONSEND_BASE_URL: undefined, ...s.env }
-        : s.env,
+      s.self ? { MEPMAIL_API_KEY: self.apiKey, MEPMAIL_BASE_URL: undefined, ...s.env } : s.env,
     );
     const args = s.args.map((a) => (a === "SELF_URL" ? self.baseUrl : a));
     const parts = [];
@@ -236,9 +234,9 @@ for (const build of builds) {
 }
 
 const shown = (s) => {
-  const cmd = `millionsend ${s.args.map((a) => (a === "SELF_URL" ? "http://127.0.0.1:<port>" : a)).join(" ")}`;
+  const cmd = `mepmail ${s.args.map((a) => (a === "SELF_URL" ? "http://127.0.0.1:<port>" : a)).join(" ")}`;
   const envPrefix = s.self
-    ? "MILLIONSEND_API_KEY=<self-hosted key> "
+    ? "MEPMAIL_API_KEY=<self-hosted key> "
     : s.env?.RESEND_API_KEY
       ? `RESEND_API_KEY=${BAD_KEY} `
       : "";

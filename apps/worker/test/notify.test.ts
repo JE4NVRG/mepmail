@@ -751,7 +751,7 @@ it("a paid period that lapsed past its grace reads as the downgrade, keyed like 
 });
 
 it("an owner whose account contact is pt-BR reads the notice in pt-BR", async () => {
-  vi.stubEnv("AUTH_EMAIL_FROM", "MillionSend <account@mail.example.com>");
+  vi.stubEnv("AUTH_EMAIL_FROM", "MepMail <account@mail.example.com>");
   const home = await createTeam(db, "home");
   await db
     .insert(schema.domains)

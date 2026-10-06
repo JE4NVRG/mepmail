@@ -52,6 +52,13 @@ Pin the Git revision you deploy when you need a reproducible release or
 rollback. Schema migrations run forward only, so take a dump before a big jump
 ([Backups](#backups)); an older revision may not start on a newer schema.
 
+Installs created with the earlier compose names: the app service is now
+`mepmail` (it was `millionsend`), and the Postgres user and database default
+to `mepmail`. Postgres keeps the names it was initialized with, so add
+`POSTGRES_USER=millionsend` and `POSTGRES_DB=millionsend` to `.env` first, then
+run `docker compose up --build -d --remove-orphans` once so the old app
+container is replaced instead of left running.
+
 Once tables are large (millions of emails or contacts), a migration that
 rewrites or indexes them takes minutes. Migrations run in one transaction and
 their locks block reads and writes on the tables they touch until it commits,
@@ -61,7 +68,7 @@ migration that fails leaves the old container serving instead of a container
 that will not boot, and the boot-time pass then finds nothing pending:
 
 ```sh
-docker compose build && docker compose run --rm --no-deps millionsend migrate && docker compose up -d
+docker compose build && docker compose run --rm --no-deps mepmail migrate && docker compose up -d
 ```
 
 ## Development without Docker
@@ -83,7 +90,7 @@ deployments — see [Billing](/billing); a self-hosted instance has no plan limi
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | Postgres connection string. The default matches the compose `postgres` service. |
-| `POSTGRES_PASSWORD` | Password of the compose `postgres` service (default `millionsend`); the setup wizard generates one and puts it in `DATABASE_URL` too. Keep both in sync. |
+| `POSTGRES_PASSWORD` | Password of the compose `postgres` service (default `mepmail`); the setup wizard generates one and puts it in `DATABASE_URL` too. Keep both in sync. |
 | `MASTER_ENCRYPTION_KEY` | Encryption key for email bodies at rest. Generate with `openssl rand -base64 32`. Losing it makes stored bodies unrecoverable; changing it orphans old bodies. Back it up with the database. |
 | `BETTER_AUTH_SECRET` | Dashboard session signing secret. Generate with `openssl rand -base64 32`. |
 | `APP_BASE_URL` | Public base URL of the deployment — the origin browsers use to reach the dashboard (e.g. `https://mail.example.com`). Sign-in is only accepted from this origin; SNS subscriptions, unsubscribe links, and tracking links derive from it. It must match the exact scheme+host+port you open the dashboard on — including a custom `WEB_PORT` — or login and signup fail with an "invalid origin" error. Default `http://localhost:3000`. |
@@ -600,7 +607,7 @@ The root Compose file builds the backup service locally from `scripts/backup`.
 Stop the app first so nothing writes mid-restore:
 
 ```sh
-docker compose stop millionsend smtp
+docker compose stop mepmail smtp
 # list the bucket, pick a dump
 docker compose run --rm --entrypoint /usr/local/bin/backup.sh backup \
   sh -c 'rclone lsl ":s3:$S3_BACKUP_BUCKET/${S3_BACKUP_PREFIX:-backups}"'
@@ -608,7 +615,7 @@ docker compose run --rm --entrypoint /usr/local/bin/backup.sh backup \
 docker compose run --rm --entrypoint /usr/local/bin/backup.sh backup \
   sh -c 'rclone copyto ":s3:$S3_BACKUP_BUCKET/${S3_BACKUP_PREFIX:-backups}/mepmail-YYYYMMDD-HHMMSS.dump" /tmp/restore.dump \
     && pg_restore --clean --if-exists -d "$DATABASE_URL" /tmp/restore.dump'
-docker compose start millionsend smtp
+docker compose start mepmail smtp
 ```
 
 ## Signup policy

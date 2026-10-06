@@ -372,8 +372,8 @@ function portalFeatures(): Stripe.BillingPortal.ConfigurationCreateParams.Featur
 
 /** The legal links the portal shows; the marketing site hosts them. */
 const PORTAL_BUSINESS_PROFILE = {
-  terms_of_service_url: "https://millionsend.com/terms",
-  privacy_policy_url: "https://millionsend.com/privacy",
+  terms_of_service_url: "https://mepmail.dev/terms",
+  privacy_policy_url: "https://mepmail.dev/privacy",
 } as const;
 
 async function ensurePortal(

@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import {
   accountMailDeliverable,
   appHostname,
+  deploymentRevision,
   env,
   servedRegions,
   sesTenantsEnabled,
@@ -92,7 +93,7 @@ const app = createApi({
   onboardingEmailFrom: env.ONBOARDING_EMAIL_FROM,
   requireVerifiedMembers: accountMailDeliverable(),
   rateLimitPerMinute: env.API_RATE_LIMIT_PER_MINUTE,
-  revision: env.MILLIONSEND_REVISION,
+  revision: deploymentRevision(),
   appBaseUrl: env.APP_BASE_URL,
   oauthIssuerUrl: env.OAUTH_ISSUER_URL,
   unsubscribeBaseUrl: unsubscribeBaseUrl(),

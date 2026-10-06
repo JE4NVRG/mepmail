@@ -231,22 +231,23 @@ describe("private cohort at durable Checkout boundaries", () => {
         subscription: null,
       }) as Stripe.Checkout.Session;
   });
-  it.each(["outside", "invalid"] as const)(
-    "denies %s configuration before Checkout or Customer creation",
-    async (configuration) => {
-      await expect(
-        purchase(configuration === "invalid" ? null : { ...cohort, members: [] }),
-      ).rejects.toMatchObject({ code: "early_access_required" });
-      expect(state.checkouts).toHaveLength(0);
-      expect(state.customers).toHaveLength(0);
-      expect(
-        await db
-          .select()
-          .from(schema.mailboxCheckouts)
-          .where(eq(schema.mailboxCheckouts.teamId, teamId)),
-      ).toHaveLength(0);
-    },
-  );
+  it("denies an invalid configuration before Checkout or Customer creation", async () => {
+    await expect(purchase(null)).rejects.toMatchObject({ code: "early_access_required" });
+    expect(state.checkouts).toHaveLength(0);
+    expect(state.customers).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(schema.mailboxCheckouts)
+        .where(eq(schema.mailboxCheckouts.teamId, teamId)),
+    ).toHaveLength(0);
+  });
+  it("opens Checkout for a paying US29 team that is not on the captured list", async () => {
+    expect(await purchase({ ...cohort, members: [] })).toMatchObject({
+      url: expect.stringContaining("checkout.stripe.com"),
+    });
+    expect(state.checkouts).toHaveLength(1);
+  });
   it("honors only an explicit original-US20 exception while preserving its signed contract", async () => {
     sending = { ...sending, baseAmountCents: 2000, regularMonthlyCents: 2000 };
     await db

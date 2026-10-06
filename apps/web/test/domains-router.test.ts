@@ -252,7 +252,7 @@ describe("domains.create", () => {
 
   it("with SES_TENANTS on, creates the team's tenant, associates identity + configuration set, and detaches on delete", async () => {
     vi.stubEnv("SES_TENANTS", "true");
-    vi.stubEnv("SES_CONFIGURATION_SET", "millionsend");
+    vi.stubEnv("SES_CONFIGURATION_SET", "mepmail");
     const teamId = await createTeam(db, "tenant-team");
     const { deps, calls } = fakeSes();
     const { id } = await callerFor(teamId, deps).domains.create({
@@ -269,7 +269,7 @@ describe("domains.create", () => {
     expect(calls[2]?.input).toEqual({ TenantName: teamId });
     expect(calls.slice(3).map((c) => c.input.ResourceArn)).toEqual([
       "arn:aws:ses:us-east-1:123456789012:identity/tenant.example.com",
-      "arn:aws:ses:us-east-1:123456789012:configuration-set/millionsend",
+      "arn:aws:ses:us-east-1:123456789012:configuration-set/mepmail",
     ]);
     const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
     expect(row?.sesTenantAssociatedAt).toBeInstanceOf(Date);
@@ -287,7 +287,7 @@ describe("domains.create", () => {
 
   it("with SES_TENANTS on, delete detaches an identity whose association never completed", async () => {
     vi.stubEnv("SES_TENANTS", "true");
-    vi.stubEnv("SES_CONFIGURATION_SET", "millionsend");
+    vi.stubEnv("SES_CONFIGURATION_SET", "mepmail");
     const teamId = await createTeam(db, "tenant-partial");
     const { deps, calls } = fakeSes();
     // Identity association succeeds, configuration-set association fails: the
@@ -381,7 +381,7 @@ describe("domains.create", () => {
   it("refuses public mailbox providers, and in cloud the platform and system-mail domains", async () => {
     const teamId = await createTeam(db);
     const caller = callerFor(teamId, fakeSes().deps);
-    vi.stubEnv("AUTH_EMAIL_FROM", "MillionSend <no-reply@mail.ms-ops.dev>");
+    vi.stubEnv("AUTH_EMAIL_FROM", "MepMail <no-reply@mail.ms-ops.dev>");
     await expect(
       caller.domains.create({ name: "gmail.com", region: "us-east-1" }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
@@ -389,7 +389,7 @@ describe("domains.create", () => {
     await caller.domains.create({ name: "mail.ms-ops.dev", region: "us-east-1" });
 
     vi.stubEnv("IS_CLOUD", "true");
-    for (const name of ["millionsend.com", "app.millionsend.com", "mail.ms-ops.dev"]) {
+    for (const name of ["mepmail.dev", "app.mepmail.dev", "mail.ms-ops.dev"]) {
       await expect(caller.domains.create({ name, region: "us-east-1" })).rejects.toMatchObject({
         code: "BAD_REQUEST",
       });

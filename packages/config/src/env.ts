@@ -133,8 +133,11 @@ export const env = createEnv({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     PORT: z.coerce.number().int().min(1).max(65535).default(3001),
     // Git SHA baked into the image (Dockerfile ARG GIT_SHA); reported by the
-    // API's /health so a running deployment can be matched to a commit.
-    MILLIONSEND_REVISION: z.string().default("unknown"),
+    // API's /health so a running deployment can be matched to a commit. Read
+    // through deploymentRevision(): MILLIONSEND_REVISION is the historical
+    // name that older images and runtimes still set.
+    MEPMAIL_REVISION: z.string().optional(),
+    MILLIONSEND_REVISION: z.string().optional(),
     API_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(600),
     DATABASE_URL: z.url(),
 
@@ -484,6 +487,11 @@ function envFlag(value: unknown): boolean {
 /** The single seam between the hosted SaaS and self-host. */
 export function isCloudDeployment(e: Env = env): boolean {
   return envFlag(e.IS_CLOUD);
+}
+
+/** The running build's Git SHA, preferring MEPMAIL_REVISION over the historical name. */
+export function deploymentRevision(e: Env = env): string {
+  return e.MEPMAIL_REVISION || e.MILLIONSEND_REVISION || "unknown";
 }
 
 /** Where the hosted unsubscribe pages live: their own host when configured, else the dashboard's. */

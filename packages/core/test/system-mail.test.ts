@@ -46,7 +46,7 @@ beforeAll(async () => {
 afterAll(() => close());
 
 const message = (over: Partial<SystemMailMessage> = {}): SystemMailMessage => ({
-  from: "MillionSend <no-reply@mail.example.com>",
+  from: "MepMail <no-reply@mail.example.com>",
   to: "ada@example.com",
   subject: "Reset your password",
   html: "<p>hi</p>",
@@ -129,7 +129,7 @@ describe("sendSystemMail", () => {
       domainId,
       apiKeyId: null,
       topicId: null,
-      from: "MillionSend <no-reply@mail.example.com>",
+      from: "MepMail <no-reply@mail.example.com>",
       to: ["ada@example.com"],
       latestStatus: "queued",
       tags: { [SYSTEM_MAIL_TAG]: "password_reset" },

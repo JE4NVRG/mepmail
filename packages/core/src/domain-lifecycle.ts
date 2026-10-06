@@ -26,7 +26,7 @@ const PUBLIC_MAILBOX_DOMAINS = [
 ] as const;
 
 /** The hosted product's own domain; a cloud tenant must never hold its SES identity. */
-export const PLATFORM_DOMAIN = "millionsend.com";
+export const PLATFORM_DOMAIN = "mepmail.dev";
 
 /** Creates per team per hour before the dashboard/API answer 429. */
 export const DOMAIN_CREATE_LIMIT_PER_HOUR = 10;

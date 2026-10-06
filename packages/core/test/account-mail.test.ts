@@ -219,7 +219,7 @@ describe("listTeamOwners", () => {
       { teamId: home, email: "ana@example.com", properties: { locale: "pt-BR" } },
       { teamId: home, email: "bob@example.com", properties: { locale: "xx" } },
     ]);
-    const owners = await listTeamOwners(db, teamId, "MillionSend <account@mail.example.com>");
+    const owners = await listTeamOwners(db, teamId, "MepMail <account@mail.example.com>");
     expect(owners.map((o) => [o.email, o.locale]).sort()).toEqual([
       ["Ana@example.com", "pt-BR"],
       ["bob@example.com", "en"],

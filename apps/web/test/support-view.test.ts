@@ -99,7 +99,7 @@ afterAll(() => close());
 beforeEach(() => {
   vi.stubEnv("SUPPORT_VIEW", "on");
   vi.stubEnv("APP_BASE_URL", APP);
-  vi.stubEnv("AUTH_EMAIL_FROM", "MillionSend <hello@example.com>");
+  vi.stubEnv("AUTH_EMAIL_FROM", "MepMail <hello@example.com>");
   h.session = null;
   h.cookies.clear();
   h.cookieSets = [];

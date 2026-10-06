@@ -1,4 +1,4 @@
-/* MillionSend motion — everything is a 120–180ms fade; the odometer digit-roll is the only flourish. */
+/* MepMail motion — everything is a 120–180ms fade; the odometer digit-roll is the only flourish. */
 :root {
   --ms-dur-fast: 120ms; /* hovers, dropdowns in */
   --ms-dur-base: 160ms; /* fades, transforms */

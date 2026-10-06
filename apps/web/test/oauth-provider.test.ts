@@ -684,7 +684,7 @@ describe("OAuth authorization server", () => {
 
 describe("connected-app receipt", () => {
   it("mails the granting user once per fresh consent, naming the app, the team and the scopes", async () => {
-    vi.stubEnv("AUTH_EMAIL_FROM", "MillionSend <no-reply@mail.example.com>");
+    vi.stubEnv("AUTH_EMAIL_FROM", "MepMail <no-reply@mail.example.com>");
     const { userId, cookie } = await signUp("ada@example.com");
     const teamId = await createTeam(db, "acme");
     await addMember(userId, teamId);

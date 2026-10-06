@@ -267,7 +267,7 @@ describe("POST /domains", () => {
       return { id, key: await insertKey(id) };
     })();
     const { client, calls } = fakeSes();
-    const app = makeApp({ client, isCloud: true, tenants: { configurationSet: "millionsend" } });
+    const app = makeApp({ client, isCloud: true, tenants: { configurationSet: "mepmail" } });
     const created = await call(app, t.key, "POST", "/domains", { name: "tenant.example.com" });
     expect(created.status).toBe(200);
     const { id } = (await created.json()) as { id: string };
@@ -282,11 +282,11 @@ describe("POST /domains", () => {
     expect(calls[2]?.input).toEqual({ TenantName: t.id });
     expect(calls.slice(3).map((c) => c.input.ResourceArn)).toEqual([
       "arn:aws:ses:sa-east-1:123456789012:identity/tenant.example.com",
-      "arn:aws:ses:sa-east-1:123456789012:configuration-set/millionsend",
+      "arn:aws:ses:sa-east-1:123456789012:configuration-set/mepmail",
     ]);
     const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
     expect(row?.sesTenantAssociatedAt).toBeInstanceOf(Date);
-    expect(row?.sesTenantConfigSet).toBe("millionsend");
+    expect(row?.sesTenantConfigSet).toBe("mepmail");
     const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, t.id));
     expect(team?.sesTenantName).toBe(t.id);
 
@@ -324,7 +324,7 @@ describe("POST /domains", () => {
     const app = makeApp({
       client: partial,
       isCloud: true,
-      tenants: { configurationSet: "millionsend" },
+      tenants: { configurationSet: "mepmail" },
     });
     const created = await call(app, t.key, "POST", "/domains", { name: "partial.example.com" });
     expect(created.status).toBe(200);
@@ -493,9 +493,9 @@ describe("POST /domains in cloud (shared AWS account)", () => {
   });
 
   it("422s public mailbox providers everywhere and platform/system-mail domains in cloud", async () => {
-    const authEmailFrom = "MillionSend <no-reply@mail.ms-ops.dev>";
+    const authEmailFrom = "MepMail <no-reply@mail.ms-ops.dev>";
     const cloud = makeApp({ ...fakeSes(), isCloud: true, authEmailFrom });
-    for (const name of ["gmail.com", "millionsend.com", "mail.ms-ops.dev"]) {
+    for (const name of ["gmail.com", "mepmail.dev", "mail.ms-ops.dev"]) {
       const res = await call(cloud, fullKey, "POST", "/domains", { name });
       expect(res.status, name).toBe(422);
     }

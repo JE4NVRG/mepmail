@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 function stubRecoveryEnv() {
-  vi.stubEnv("AUTH_EMAIL_FROM", "MillionSend <no-reply@mail.example.com>");
+  vi.stubEnv("AUTH_EMAIL_FROM", "MepMail <no-reply@mail.example.com>");
   vi.stubEnv("AWS_ACCESS_KEY_ID", "test-key");
   vi.stubEnv("AWS_SECRET_ACCESS_KEY", "test-secret");
   vi.stubEnv("AWS_DEFAULT_CHAIN", "");
@@ -64,7 +64,7 @@ describe("buildResetEmail", () => {
       locale: "en",
     });
     expect(en.subject).toBe("Reset your MepMail password");
-    expect(en.from).toBe("MillionSend <no-reply@mail.example.com>");
+    expect(en.from).toBe("MepMail <no-reply@mail.example.com>");
     expect(en.text).toContain("Hi Ada,");
     expect(en.text).toContain("https://app.example.com/api/auth/reset-password/tok");
     expect(en.text).toContain("30");

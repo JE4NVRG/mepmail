@@ -81,6 +81,13 @@ default drops from 365 to 30 days, and the first hourly purge after boot
 deletes email rows older than that (counters and broadcast results stay). Set
 `EMAIL_METADATA_RETENTION_DAYS=365` first if that history must remain.
 
+Installs created with the earlier compose names: the app service is now
+`mepmail` (it was `millionsend`), and the Postgres user and database default
+to `mepmail`. Postgres keeps the names it was initialized with, so add
+`POSTGRES_USER=millionsend` and `POSTGRES_DB=millionsend` to `.env` first, then
+run `docker compose up --build -d --remove-orphans` once so the old app
+container is replaced instead of left running.
+
 Once tables are large (millions of emails or contacts), a migration that
 rewrites or indexes them takes minutes. Migrations run in one transaction and
 their locks block reads and writes on the tables they touch until it commits,
@@ -90,7 +97,7 @@ migration that fails leaves the old container serving instead of a container
 that will not boot, and the boot-time pass then finds nothing pending:
 
 ```sh
-docker compose build && docker compose run --rm --no-deps millionsend migrate && docker compose up -d
+docker compose build && docker compose run --rm --no-deps mepmail migrate && docker compose up -d
 ```
 
 </details>
@@ -472,7 +479,7 @@ The defaults are equivalent to:
 
 ```yaml
 services:
-  millionsend:
+  mepmail:
     ports: !override
       - "127.0.0.1:3000:3000"
       - "127.0.0.1:3001:3001"
@@ -587,7 +594,7 @@ restores use that locally built container too.
 Restore (stop the app first so nothing writes mid-restore):
 
 ```sh
-docker compose stop millionsend smtp
+docker compose stop mepmail smtp
 # list the bucket, pick a dump
 docker compose run --rm --entrypoint /usr/local/bin/backup.sh backup \
   sh -c 'rclone lsl ":s3:$S3_BACKUP_BUCKET/${S3_BACKUP_PREFIX:-backups}"'
@@ -595,7 +602,7 @@ docker compose run --rm --entrypoint /usr/local/bin/backup.sh backup \
 docker compose run --rm --entrypoint /usr/local/bin/backup.sh backup \
   sh -c 'rclone copyto ":s3:$S3_BACKUP_BUCKET/${S3_BACKUP_PREFIX:-backups}/mepmail-YYYYMMDD-HHMMSS.dump" /tmp/restore.dump \
     && pg_restore --clean --if-exists -d "$DATABASE_URL" /tmp/restore.dump'
-docker compose start millionsend smtp
+docker compose start mepmail smtp
 ```
 
 </details>

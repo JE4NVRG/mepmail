@@ -11,11 +11,15 @@ e verificados no painel.
 
 Adicionar um domínio o registra no SES e mostra os registros DNS a criar:
 
-- **DKIM** — um único registro TXT `millionsend._domainkey`. O MepMail
+- **DKIM** — um único registro TXT `mepmail._domainkey`. O MepMail
   gera um par de chaves RSA-2048 por domínio e entrega a chave privada ao SES
   (BYODKIM), então a verificação é um registro TXT em vez de três CNAMEs. A
   chave privada nunca é armazenada.
 - **MAIL FROM** — registros MX e SPF (TXT) para o subdomínio de bounce.
+
+Domínios adicionados antes da troca do seletor mantêm o que aparece na lista
+de DNS de cada um (`millionsend._domainkey`); use exatamente os registros que o
+painel mostra para cada domínio.
 
 Dois sinais de verificação aparecem lado a lado:
 
@@ -42,7 +46,7 @@ dizendo por quê.
 
 Uma instalação provisiona identidades nas regiões do SES que atende — a sua
 `AWS_REGIONS`, ou a única região em `AWS_REGION`; o MepMail Cloud atende
-`sa-east-1` (São Paulo) hoje. O formulário de novo domínio do dashboard lista
+`us-east-1` (Norte da Virgínia) hoje. O formulário de novo domínio do dashboard lista
 as regiões atendidas, segura uma que ainda está no sandbox do SES enquanto
 outra tem acesso de produção, e usa por padrão a primeira região em produção.
 O campo opcional `region` da API (inclusive na ferramenta MCP `create_domain`)

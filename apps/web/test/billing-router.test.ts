@@ -914,7 +914,7 @@ describe("billing router", () => {
   });
 
   it("changePlan tells the owners about a move once per period, keyed like the webhook's own report", async () => {
-    vi.stubEnv("NOTIFICATIONS_EMAIL_FROM", "MillionSend <notices@mail.example.com>");
+    vi.stubEnv("NOTIFICATIONS_EMAIL_FROM", "MepMail <notices@mail.example.com>");
     const teamId = await subscribedTeam("pro_100k");
     await db.insert(schema.user).values({ id: "ada", name: "Ada", email: "ada@example.com" });
     await db.insert(schema.teamMembers).values({ teamId, userId: "ada", role: "owner" });
@@ -923,7 +923,7 @@ describe("billing router", () => {
     expect(h.sent.map((m) => [m.kind, m.to, m.subject])).toEqual([
       ["billing.plan_changed", "ada@example.com", "acme moved from Pro 110K to Scale 550K"],
     ]);
-    expect(h.sent[0]?.from).toBe("MillionSend <notices@mail.example.com>");
+    expect(h.sent[0]?.from).toBe("MepMail <notices@mail.example.com>");
     expect(h.sent[0]?.text).toContain("https://app.example.com/settings/billing");
     expect(await notificationRows()).toEqual([
       { kind: "billing.plan_changed", key: `pro_100k>scale_500k:${PERIOD_END.toISOString()}` },

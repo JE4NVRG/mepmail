@@ -316,8 +316,8 @@ describe("provision", () => {
     expect(portal?.features.subscription_cancel.mode).toBe("at_period_end");
     expect(portal?.features.subscription_cancel.cancellation_reason.enabled).toBe(true);
     expect(portal?.business_profile).toEqual({
-      terms_of_service_url: "https://millionsend.com/terms",
-      privacy_policy_url: "https://millionsend.com/privacy",
+      terms_of_service_url: "https://mepmail.dev/terms",
+      privacy_policy_url: "https://mepmail.dev/privacy",
     });
     expect(portal?.default_return_url).toBeNull();
     expect(log.some((l) => l.startsWith("Dashboard-only steps"))).toBe(true);
@@ -531,7 +531,7 @@ describe("--move-legacy", () => {
   it("moves a subscription on a pre-ladder price to its rung, adds the metered item, keeps going idempotently", async () => {
     const { stripe, state, seedSubscription } = fakeStripe();
     const product = await stripe.products.create({
-      name: "MillionSend Scale",
+      name: "MepMail Scale",
       metadata: { [PRODUCT_METADATA_KEY]: "scale" },
     });
     const legacy =

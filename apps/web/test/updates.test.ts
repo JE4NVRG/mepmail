@@ -23,7 +23,7 @@ const mail = { send: async (m: SystemMailMessage) => void sent.push(m) };
 beforeEach(async () => {
   vi.stubEnv("MASTER_ENCRYPTION_KEY", randomBytes(32).toString("base64"));
   vi.stubEnv("APP_BASE_URL", "https://app.example.com");
-  vi.stubEnv("AUTH_EMAIL_FROM", "MillionSend <no-reply@mail.example.com>");
+  vi.stubEnv("AUTH_EMAIL_FROM", "MepMail <no-reply@mail.example.com>");
   ({ db, close } = await createTestDb());
   teamId = await createTeam(db, "owner");
   await db.insert(schema.domains).values({

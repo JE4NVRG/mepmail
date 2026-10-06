@@ -82,110 +82,122 @@ function links(html: string): Array<{ href: string; text: string }> {
 
 const expectations = {
   en: {
-    preview: /Launch preview · closed access/,
+    open: /Open to every paying Send subscriber/,
+    closed: /Launch preview · closed access/,
     fictional: /fictional content/,
     noMessageSent: /No message was sent/,
-    existingSubscriber: /exclusive to eligible earlier subscribers/i,
-    noNewSubscriberGuarantee: /a new subscription does not guarantee entry/i,
-    minimumPlan: /plan above US\$\s*20\/month/,
+    everyPayingPlan: /available on every paying Send plan/i,
+    subscribeInDashboard: /Subscribe from the dashboard once your Send plan is active/,
+    minimumPlan: /Send plan above US\$\s*20\/month/,
     recurringEligibility:
-      /US\$29 offer qualifies the plan even during its US\$20 introductory monthly bill/,
-    legacyPreserved: /Existing US\$20 contracts do not change automatically/,
+      /US\$29 Pro 110K offer qualifies even during its US\$20 first monthly bill/,
+    legacyPreserved: /Existing US\$20 contracts keep their price/,
     authorizedEarlierPlan:
-      /Authorized earlier accounts may keep their current Send plan when purchasing the add-on/,
+      /earlier accounts authorized for Mail may keep their current Send plan when adding mailboxes/,
     systemUnlimited:
       /System[\s\S]*50 GiB per mailbox[\s\S]*no commercial mailbox or delivery limits/i,
     paidSeparately: /Mail is paid separately/,
-    offerPrepared: /Offer prepared for launch/,
-    subscriptionsClosed: /Public Mail subscriptions are not open yet/,
     sendOnly: "Send only",
     combined: "Send + Mail",
     contractsPreserved: /existing subscriptions are preserved/i,
     annualUpfront: "Annual · paid upfront",
-    purchaseUnavailable: /Preview · purchase unavailable/,
+    previewStatus: /Price comparison · subscribe in the dashboard/,
     firstPayment: "First monthly bill for new customers:",
     renewal: "Renewal:",
     introRestricted:
-      /US\$20 only for eligible new customers’ first monthly Send bill; then US\$29\/month/,
+      /US\$20 only for the first monthly Send bill of customers who never paid MepMail; then US\$29\/month/,
     mailNoDiscount: /Mail does not receive this discount/,
     recipientAccounting: /To and Cc count; this is not a limit on distinct contacts/,
     noSubscriptionChange: /does not purchase a plan or change your subscription/,
     rest: "Mail · REST API",
     dedicatedKey: /a key dedicated to the mailbox/,
-    apiClosed: "In closed validation",
+    apiAvailable: "Available for activated mailboxes",
     mcp: "Send · MCP",
     noMailboxAccess: /does not grant access to Mail mailboxes/,
     mcpAvailable: "Available in Send",
-    publicMailboxMcpPending: /Public mailbox MCP availability will be announced when ready/,
+    publicMailboxMcpPending: /A public MCP for mailboxes is not available yet/,
     agentFragment: "connect-an-agent",
     docsPrefix: "https://docs-mepmail.je4ndev.com",
   },
   "pt-BR": {
-    preview: /Prévia de lançamento · acesso fechado/,
+    open: /Aberto a todos os assinantes pagantes de Envio/,
+    closed: /Prévia de lançamento · acesso fechado/,
     fictional: /conteúdo fictício/,
     noMessageSent: /Nenhuma mensagem foi enviada/,
-    existingSubscriber: /exclusiva aos assinantes anteriores elegíveis/i,
-    noNewSubscriberGuarantee: /uma assinatura nova não garante entrada/i,
-    minimumPlan: /plano acima de US\$ 20\/mês/,
+    everyPayingPlan: /disponível em todos os planos pagos de Envio/i,
+    subscribeInDashboard: /Contrate pelo painel quando o seu plano de Envio estiver ativo/,
+    minimumPlan: /plano de Envio acima de US\$ 20\/mês/,
     recurringEligibility:
-      /US\$ 29 qualifica o plano mesmo na primeira mensalidade promocional de US\$ 20/,
-    legacyPreserved: /Contratos antigos de US\$ 20 não mudam automaticamente/,
+      /oferta Pro 110K de US\$ 29 qualifica mesmo na primeira mensalidade promocional de US\$ 20/,
+    legacyPreserved: /Contratos antigos de US\$ 20 mantêm o preço/,
     authorizedEarlierPlan:
-      /Contas anteriores autorizadas podem manter seu plano atual de Envio ao contratar o adicional/,
+      /contas anteriores autorizadas para o Correio podem manter o plano atual de Envio ao adicionar caixas/,
     systemUnlimited: /System[\s\S]*50 GiB por caixa[\s\S]*sem limites comerciais/i,
     paidSeparately: /Correio é pago à parte/,
-    offerPrepared: /Oferta preparada para lançamento/,
-    subscriptionsClosed: /A contratação pública do Correio ainda não está aberta/,
     sendOnly: "Só Envio",
     combined: "Envio + Correio",
     contractsPreserved: /assinaturas atuais são preservadas/i,
     annualUpfront: "Anual · antecipado",
-    purchaseUnavailable: /Prévia · contratação indisponível/,
+    previewStatus: /Comparação de preços · contrate pelo painel/,
     firstPayment: "Primeira mensalidade para novos clientes:",
     renewal: "Renovação:",
     introRestricted:
-      /US\$ 20 só na primeira mensalidade de Envio de novos clientes elegíveis; depois US\$ 29\/mês/,
+      /US\$ 20 só na primeira mensalidade de Envio de quem nunca pagou o MepMail; depois US\$ 29\/mês/,
     mailNoDiscount: /Correio não recebe esse desconto/,
     recipientAccounting: /To e Cc contam; não é limite de contatos diferentes/,
     noSubscriptionChange: /não contrata um plano nem altera sua assinatura/,
     rest: "Correio · API REST",
     dedicatedKey: /uma chave dedicada à caixa/,
-    apiClosed: "Em validação fechada",
+    apiAvailable: "Disponível para caixas ativadas",
     mcp: "Envio · MCP",
     noMailboxAccess: /não concede acesso às caixas do Correio/,
     mcpAvailable: "Disponível no Envio",
-    publicMailboxMcpPending: /O MCP público de caixas será anunciado quando estiver disponível/,
+    publicMailboxMcpPending: /Um MCP público para caixas ainda não está disponível/,
     agentFragment: "conecte-um-agente",
     docsPrefix: "https://docs-mepmail.je4ndev.com/pt-BR",
   },
 };
+
+async function render(locale: Locale): Promise<string> {
+  current.locale = locale;
+  return renderToStaticMarkup(
+    createElement(NextIntlClientProvider, {
+      locale,
+      timeZone: "UTC",
+      messages:
+        locale === "pt-BR"
+          ? { correio: ptCorreio, landing: ptLanding }
+          : { correio: enCorreio, landing: enLanding },
+      // biome-ignore lint/correctness/noChildrenProp: This provider requires children in its createElement props type.
+      children: await CorreioPage(),
+    }),
+  );
+}
+
+describe.each(["en", "pt-BR"] as const)("Correio closed preview fallback in %s", (locale) => {
+  afterEach(() => vi.unstubAllEnvs());
+  it("still presents a closed, unindexed preview when the opening flag is off", async () => {
+    vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "false");
+    const html = await render(locale);
+    expect(textContent(section(html, "correio-title"))).toMatch(expectations[locale].closed);
+    expect((await generateMetadata()).robots).toEqual({ index: false, follow: true });
+  });
+});
 
 describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (locale) => {
   const expected = expectations[locale];
   let html: string;
 
   beforeEach(async () => {
-    vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "false");
-    current.locale = locale;
-    html = renderToStaticMarkup(
-      createElement(NextIntlClientProvider, {
-        locale,
-        timeZone: "UTC",
-        messages:
-          locale === "pt-BR"
-            ? { correio: ptCorreio, landing: ptLanding }
-            : { correio: enCorreio, landing: enLanding },
-        // biome-ignore lint/correctness/noChildrenProp: This provider requires children in its createElement props type.
-        children: await CorreioPage(),
-      }),
-    );
+    vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
+    html = await render(locale);
   });
   afterEach(() => vi.unstubAllEnvs());
 
-  it("presents a closed preview and labels the conversation example as fictional", () => {
+  it("presents the open offer and labels the conversation example as fictional", () => {
     const hero = section(html, "correio-title");
     const visible = textContent(hero);
-    expect(visible).toMatch(expected.preview);
+    expect(visible).toMatch(expected.open);
     expect(visible).toMatch(expected.fictional);
     expect(visible).toMatch(expected.noMessageSent);
     expect(hero.match(/<h1\b/g)).toHaveLength(1);
@@ -197,13 +209,11 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     expect(html).toContain('id="como-funciona"');
   });
 
-  it("explains the earlier-subscriber cohort and separately paid mailbox add-on", () => {
+  it("opens Mail to every paying Send plan as a separately paid add-on", () => {
     const plans = textContent(section(html, "correio-plans-title"));
-    expect(plans).toMatch(expected.existingSubscriber);
-    expect(plans).toMatch(expected.noNewSubscriberGuarantee);
+    expect(plans).toMatch(expected.everyPayingPlan);
+    expect(plans).toMatch(expected.subscribeInDashboard);
     expect(plans).toMatch(expected.paidSeparately);
-    expect(plans).toMatch(expected.offerPrepared);
-    expect(plans).toMatch(expected.subscriptionsClosed);
   });
 
   it("qualifies Mail by the recurring base while preserving old contracts and internal System access", () => {
@@ -213,11 +223,10 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     expect(plans).toMatch(expected.recurringEligibility);
     expect(plans).toMatch(expected.legacyPreserved);
     expect(plans).toMatch(expected.authorizedEarlierPlan);
-    expect(plans).toMatch(expected.noNewSubscriberGuarantee);
     expect(textContent(html)).toMatch(expected.systemUnlimited);
   });
 
-  it("keeps the closed mailbox REST API distinct from the available Send MCP", () => {
+  it("keeps the mailbox REST API distinct from the Send MCP", () => {
     const integrationHtml = section(html, "correio-integrations-title");
     const articles = [...integrationHtml.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/g)].map(
       (match) => textContent(capture(match, 1)),
@@ -226,14 +235,14 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     const mcp = articles.find((article) => article.includes(expected.mcp));
     expect(api).toBeDefined();
     expect(api).toMatch(expected.dedicatedKey);
-    expect(api).toContain(expected.apiClosed);
+    expect(api).toContain(expected.apiAvailable);
     expect(mcp).toBeDefined();
     expect(mcp).toMatch(expected.noMailboxAccess);
     expect(mcp).toContain(expected.mcpAvailable);
     expect(textContent(integrationHtml)).toMatch(expected.publicMailboxMcpPending);
   });
 
-  it("offers information and Send plans without a public Mail purchase", () => {
+  it("sends Mail purchases to the dashboard instead of a checkout on the public page", () => {
     const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)?.[1];
     expect(main).toBeDefined();
     const content = main ?? "";
@@ -244,12 +253,13 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     expect(inputs.length).toBeGreaterThan(0);
     expect(inputs.every((input) => /type="(?:radio|number|checkbox)"/.test(input))).toBe(true);
     for (const link of links(content)) {
-      expect(link.href).not.toMatch(/checkout|subscribe|signup|\/settings\/billing|^\/mailboxes/);
+      expect(link.href).not.toMatch(/checkout|subscribe|signup|\/settings\/billing/);
       expect(
-        ["#como-funciona", "/pricing", "/integrations"].includes(link.href) ||
+        ["#como-funciona", "/pricing", "/integrations", "/mailboxes"].includes(link.href) ||
           link.href.startsWith(`${expected.docsPrefix}/`),
       ).toBe(true);
     }
+    expect(links(content).some((link) => link.href === "/mailboxes")).toBe(true);
     const closeLinks = links(section(html, "correio-close-title"));
     expect(closeLinks.map((link) => link.href)).toEqual([
       "/pricing",
@@ -258,7 +268,7 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     expect(closeLinks.every((link) => link.text.length > 0)).toBe(true);
   });
 
-  it("labels an annual upfront option while keeping the offer closed and preserving contracts", () => {
+  it("labels an annual upfront option and points purchases to the dashboard while preserving contracts", () => {
     const plansHtml = section(html, "correio-plans-title");
     const plans = textContent(plansHtml);
     const table = plansHtml.match(/<table\b[^>]*>([\s\S]*?)<\/table>/)?.[1];
@@ -269,7 +279,7 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     expect(columnHeaders.slice(1)).toEqual([expected.sendOnly, expected.combined]);
     expect(plans).toMatch(expected.contractsPreserved);
     expect(plans).toContain(expected.annualUpfront);
-    expect(plans).toMatch(expected.purchaseUnavailable);
+    expect(plans).toMatch(expected.previewStatus);
     expect(plans).toMatch(expected.noSubscriptionChange);
     expect(plansHtml).toMatch(/<input\b[^>]*checked=""[^>]*value="month"/);
     expect(plansHtml).toMatch(/<input\b[^>]*value="year"/);
@@ -395,10 +405,10 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     );
   });
 
-  it("keeps the launch preview out of the index with localized metadata", async () => {
+  it("indexes the open offer with localized metadata", async () => {
     const metadata = await generateMetadata();
     const copy = locale === "pt-BR" ? ptCorreio : enCorreio;
-    expect(metadata.robots).toEqual({ index: false, follow: true });
+    expect(metadata.robots).toEqual({ index: true, follow: true });
     expect(metadata.alternates?.canonical).toBe("/correio");
     expect(metadata.title).toEqual({ absolute: copy.meta.title });
     expect(metadata.description).toBe(copy.meta.description);

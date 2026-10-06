@@ -42,7 +42,7 @@ function caller(teamId: string, enqueued: string[] = [], enqueue?: Context["enqu
 
 describe("onboarding.sendFirstEmail", () => {
   it("accepts the shared sender to the member's own inbox in the asked locale", async () => {
-    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MillionSend <onboarding@ms.example>");
+    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MepMail <onboarding@ms.example>");
     const teamId = await createTeam(db, "team-a");
     const enqueued: string[] = [];
 
@@ -53,7 +53,7 @@ describe("onboarding.sendFirstEmail", () => {
       teamId,
       domainId: null,
       apiKeyId: null,
-      from: "MillionSend <onboarding@ms.example>",
+      from: "MepMail <onboarding@ms.example>",
       to: ["Ada@Example.com"],
       subject: "Seu e-mail de teste do MepMail",
       latestStatus: "queued",
@@ -62,7 +62,7 @@ describe("onboarding.sendFirstEmail", () => {
   });
 
   it("caps onboarding sends per team and refuses a missing captcha token when Turnstile is on", async () => {
-    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MillionSend <onboarding@ms.example>");
+    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MepMail <onboarding@ms.example>");
     const teamId = await createTeam(db, "team-a");
     const c = caller(teamId);
     for (let i = 0; i < 5; i++) await c.onboarding.sendFirstEmail({ locale: "en" });
@@ -86,7 +86,7 @@ describe("onboarding.sendFirstEmail", () => {
   });
 
   it("accepts only the remaining hourly slot under concurrent same-team requests", async () => {
-    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MillionSend <onboarding@ms.example>");
+    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MepMail <onboarding@ms.example>");
     const teamId = await createTeam(db, "hour-race");
     const enqueued: string[] = [];
     const c = caller(teamId, enqueued);
@@ -106,7 +106,7 @@ describe("onboarding.sendFirstEmail", () => {
   });
 
   it("serializes the daily limit while different teams keep their own allowance", async () => {
-    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MillionSend <onboarding@ms.example>");
+    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MepMail <onboarding@ms.example>");
     const teamId = await createTeam(db, "day-race");
     const c = caller(teamId);
     for (let i = 0; i < 19; i++) {
@@ -136,7 +136,7 @@ describe("onboarding.sendFirstEmail", () => {
   });
 
   it("rolls back the quota and email when the insert fails, without enqueueing", async () => {
-    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MillionSend <onboarding@ms.example>");
+    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MepMail <onboarding@ms.example>");
     const teamId = await createTeam(db, "rollback");
     const enqueued: string[] = [];
     await db.execute(sql`
@@ -173,7 +173,7 @@ describe("onboarding.sendFirstEmail", () => {
   });
 
   it("hands the committed email to the queue only after the owning transaction resolves", async () => {
-    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MillionSend <onboarding@ms.example>");
+    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MepMail <onboarding@ms.example>");
     const teamId = await createTeam(db, "commit-before-enqueue");
     const originalTransaction = db.transaction.bind(db);
     let committed = false;
@@ -193,7 +193,7 @@ describe("onboarding.sendFirstEmail", () => {
   });
 
   it("preserves a committed accept when enqueue fails so reconcile can recover it", async () => {
-    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MillionSend <onboarding@ms.example>");
+    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MepMail <onboarding@ms.example>");
     const teamId = await createTeam(db, "queue-failure");
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
     const queue = vi.fn(async () => {
@@ -214,7 +214,7 @@ describe("onboarding.sendFirstEmail", () => {
   });
 
   it("keeps suppression and team suspension effective without spending quota or enqueueing", async () => {
-    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MillionSend <onboarding@ms.example>");
+    vi.stubEnv("ONBOARDING_EMAIL_FROM", "MepMail <onboarding@ms.example>");
     const teamId = await createTeam(db, "suppressed");
     const enqueued: string[] = [];
     await db.insert(schema.suppressions).values({

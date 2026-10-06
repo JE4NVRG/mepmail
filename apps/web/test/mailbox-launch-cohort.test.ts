@@ -176,19 +176,30 @@ describe("Correio hosted opening admission", () => {
     expect(await mailboxActorAccessEnabled(db, { teamId, userId: outsider })).toBe(false);
     expect(await mailboxCreateAccessEnabled(db, actor())).toBe(true);
   });
-  it("blocks a new US29 buyer outside the captured cohort, without dispatching checkout", async () => {
+  it("admits a new US29 buyer who is not on the captured list of grants", async () => {
     configure({ ...cohort, members: [] });
     await update({
       sendBillingContract: { ...contract, baseAmountCents: 2900, regularMonthlyCents: 2900 },
     });
-    expect(await as().capabilities()).toEqual({ enabled: false, deliveryReady: false });
+    expect(await as().capabilities()).toEqual({ enabled: true, deliveryReady: false });
     expect(await mailboxBillingPresentation(db, actor())).toMatchObject({
-      canPurchase: false,
+      canPurchase: true,
       sendingPlanRequired: false,
-      earlyAccessRequired: true,
-      availability: "early_access_required",
+      earlyAccessRequired: false,
+      availability: "available",
     });
-    await expect(as().checkout({ seats: 1 })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(await mailboxCreateAccessEnabled(db, actor())).toBe(true);
+  });
+  it("keeps a team that never paid for Envio out of the purchase", async () => {
+    configure({ ...cohort, members: [] });
+    await update({
+      plan: "free",
+      planStatus: "none",
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      sendBillingContract: null,
+    });
+    expect(await as().capabilities()).toEqual({ enabled: false, deliveryReady: false });
     expect(await mailboxCreateAccessEnabled(db, actor())).toBe(false);
   });
   it("does not grant an ordinary US20 contract a default exception", async () => {
@@ -218,7 +229,8 @@ describe("Correio hosted opening admission", () => {
     expect(await as().billing()).toMatchObject({ canPurchase: false, sendingPlanRequired: true });
     expect(await mailboxCreateAccessEnabled(db, actor())).toBe(false);
     await update({ planStatus: "active", stripeCustomerId: "cus_foreign" });
-    expect(await mailboxActorAccessEnabled(db, actor())).toBe(false);
+    // Admission only needs a customer; the signed contract must still match it to buy or create.
+    expect(await mailboxActorAccessEnabled(db, actor())).toBe(true);
     expect(await mailboxCreateAccessEnabled(db, actor())).toBe(false);
   });
   it("keeps existing content and contract management visible after Envio expiry/outside cohort", async () => {

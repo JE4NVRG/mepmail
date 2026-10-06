@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Mail for you and your agents | MepMail",
-    "description": "Discover MepMail Mail: mailboxes on your domain for people and agents, with messages, drafts and permissions under your control. Exclusive early access for existing subscribers."
+    "description": "Discover MepMail Mail: mailboxes on your domain for people and agents, with messages, drafts and permissions under your control. Available to every paying Send subscriber."
   },
   "hero": {
     "eyebrow": "MepMail Mail",
@@ -135,8 +135,8 @@
       {
         "kind": "Mail · agent integration",
         "title": "Read and prepare. You follow.",
-        "body": "The read-and-draft workflow has been exercised with Sage Windows through a local integration. Public mailbox MCP availability will be announced when ready.",
-        "status": "Tested in closed access",
+        "body": "The read-and-draft workflow has been tested with an agent integration through the mailbox API. A public MCP for mailboxes is not available yet.",
+        "status": "Public mailbox MCP not available yet",
         "link": "Understand agent access",
         "path": "/mailboxes#connect-an-agent"
       }
@@ -193,7 +193,7 @@
         "combined": "Initial closed access for eligible earlier subscribers"
       }
     ],
-    "earlyNote": "Mail requires a plan above US$20/month at its recurring price. The new US$29 offer qualifies the plan even during its US$20 introductory monthly bill. Existing US$20 contracts do not change automatically. The first opening remains exclusive to eligible earlier subscribers; a new subscription does not guarantee entry. Authorized earlier accounts may keep their current Send plan when purchasing the add-on."
+    "earlyNote": "Mail requires a Send plan above US$20/month at its regular price. The US$29 Pro 110K offer qualifies even during its US$20 first monthly bill. Existing US$20 contracts keep their price; earlier accounts authorized for Mail may keep their current Send plan when adding mailboxes."
   },
   "preview": {
     "eyebrow": "Compare the new offer",
@@ -227,8 +227,8 @@
     "annualFormula": "10 × the regular monthly price for 12 months of access. Annual billing does not stack with the first-month promotion.",
     "annualConsumption": "Allowances renew monthly in the proposed annual offer, not as an annual balance. Purchasing and separate usage cycles are still being prepared.",
     "monthlyConsumption": "The 110,000 Send delivery allowance is separate from each Mail mailbox's monthly allowance. Storage is per mailbox.",
-    "introTerms": "US$20 only for eligible new customers’ first monthly Send bill; then US$29/month. Mail does not receive this discount, and a new subscription does not guarantee early access.",
-    "eligibility": "The US$29 plan qualifies for Mail at its recurring price, even during the promotion. Access still requires release, eligibility and domain activation.",
+    "introTerms": "US$20 only for the first monthly Send bill of customers who never paid MepMail; then US$29/month. Mail does not receive this discount.",
+    "eligibility": "The US$29 plan qualifies for Mail at its regular price, even during the promotion. Each mailbox still needs a verified domain and receiving activation.",
     "monthlyNote": "This previews a new offer. Mail remains in closed access; checkout and purchasing are not available here yet.",
     "noChange": "This comparison does not purchase a plan or change your subscription. Values in US$, before taxes and any additional usage."
   },
@@ -251,11 +251,11 @@
     "items": [
       {
         "q": "Which subscribers can purchase Mail?",
-        "a": "Mail is paid separately per mailbox and requires a plan above US$20/month at its recurring price. The new US$29 offer qualifies the plan even during the US$20 introductory monthly bill. Initial access remains exclusive to eligible earlier subscribers. Existing subscriptions are preserved without automatic migration. The internal System license remains exempt, with 50 GiB per mailbox and no commercial mailbox or delivery limits. Authorized earlier accounts may keep their current Send plan when purchasing the add-on."
+        "a": "Mail is paid separately per mailbox and is available on every Send plan above US$20/month at its regular price, including the US$29 Pro 110K during its US$20 first monthly bill. Existing subscriptions are preserved without automatic migration. The internal System license remains exempt, with 50 GiB per mailbox and no commercial mailbox or delivery limits. Authorized earlier accounts may keep their current Send plan when purchasing the add-on."
       },
       {
         "q": "I bought a domain. Can I create any address now?",
-        "a": "You can choose an available address on a domain you control. Sending and receiving require an eligible plan and Mail access, an add-on subscription, domain verification, DNS/MX configuration and confirmed receiving activation. Registering an address alone does not complete these steps. The first opening will be exclusive to eligible earlier subscribers."
+        "a": "You can choose an available address on a domain you control. Sending and receiving require a paying Send plan, a Mail subscription, domain verification, DNS/MX configuration and confirmed receiving activation. Registering an address alone does not complete these steps."
       },
       {
         "q": "Do I need a website or hosting?",
@@ -275,7 +275,7 @@
       },
       {
         "q": "Does the public MCP already open these mailboxes?",
-        "a": "The current public MCP serves Send. Mail uses its own API with per-mailbox keys; read-and-draft integration has been tested in closed access. Public MCP availability for mailboxes will be announced separately."
+        "a": "The current public MCP serves Send. Mail uses its own REST API with per-mailbox keys, and read-and-draft has been tested with an agent integration. A public MCP for mailboxes is not available yet."
       },
       {
         "q": "How will I access it on my computer and phone?",
@@ -286,21 +286,21 @@
   "close": {
     "eyebrow": "The next address could be your agent's",
     "title": "Your company talks. You follow.",
-    "body": "We are preparing Mail for earlier subscribers to plans above US$ 20/month. Explore the proposal and documentation while we validate the initial opening, with a separate subscription.",
+    "body": "Mail is open to every paying Send subscriber. Add a mailbox for you, your team or your agent from the dashboard, paid separately per mailbox.",
     "primary": "Explore Send plans",
     "secondary": "Read the Mail documentation"
   },
   "release": {
-    "heroNote": "Mail is paid separately. Early access for eligible earlier subscribers; check your account’s availability in the dashboard.",
-    "heroStatus": "Early access · eligibility in the dashboard",
-    "setupFirst": "Check whether your account participates in early access and review its plan conditions in the dashboard. Mail is a paid per-mailbox add-on; existing Send contracts are preserved.",
-    "restStatus": "Available for activated mailboxes on eligible accounts",
-    "plansBody": "Send handles application emails and campaigns. Mail adds inboxes and outboxes for people and agents, paid separately. The first opening is for eligible earlier subscribers.",
-    "mailNote": "Purchase and activation depend on the eligibility shown in the dashboard. A new subscription does not guarantee early access; domain, DNS/MX and receiving must be confirmed.",
-    "previewStatus": "Price comparison · check your access in the dashboard",
+    "heroNote": "Mail is paid separately, per mailbox, and available on every paying Send plan. Add mailboxes from the dashboard.",
+    "heroStatus": "Open to every paying Send subscriber",
+    "setupFirst": "Mail runs on top of a paying Send plan (regular price above US$20/month, including the new US$29 Pro 110K). Add mailboxes from the dashboard; existing Send contracts are preserved.",
+    "restStatus": "Available for activated mailboxes",
+    "plansBody": "Send handles application emails and campaigns. Mail adds inboxes and outboxes for people and agents, paid separately and available on every paying Send plan.",
+    "mailNote": "Subscribe from the dashboard once your Send plan is active. Each mailbox still needs a verified domain, DNS/MX and receiving activation.",
+    "previewStatus": "Price comparison · subscribe in the dashboard",
     "annualConsumption": "Allowances renew monthly, without an accumulated annual balance. Storage is continuous; messages are not deleted when a period changes.",
-    "monthlyNote": "This comparison does not grant access or purchase a plan. The dashboard confirms eligibility, contract, billing and activation for each mailbox.",
-    "checkAccess": "Check my Mail access",
-    "availability": "Early access for eligible accounts; check the dashboard"
+    "monthlyNote": "This comparison does not purchase a plan. The dashboard confirms your contract, billing and activation for each mailbox.",
+    "checkAccess": "Open Mail in the dashboard",
+    "availability": "Available on every paying Send plan"
   }
 }

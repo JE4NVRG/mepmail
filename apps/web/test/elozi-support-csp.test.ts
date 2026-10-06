@@ -12,7 +12,7 @@ describe("Elozi support document policy", () => {
     async (env) => {
       vi.stubEnv("NODE_ENV", env);
       vi.stubEnv("NEXT_PUBLIC_META_PIXEL_ENABLED", "true");
-      vi.stubEnv("NEXT_PUBLIC_META_PIXEL_ID", "4530758537185348");
+      vi.stubEnv("NEXT_PUBLIC_META_PIXEL_ID", "1418150576403119");
       const config = (await import("../next.config")).default;
       const rules = (await config.headers?.()) ?? [];
       const base = rules.find((rule) => rule.source === "/:path*");

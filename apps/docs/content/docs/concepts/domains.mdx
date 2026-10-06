@@ -11,11 +11,15 @@ the dashboard.
 
 Adding a domain registers it with SES and shows the DNS records to add:
 
-- **DKIM** — a single `millionsend._domainkey` TXT record. MepMail
+- **DKIM** — a single `mepmail._domainkey` TXT record. MepMail
   generates an RSA-2048 keypair per domain and hands the private key to SES
   (BYODKIM), so verification is one TXT record instead of three CNAMEs. The
   private key is never stored.
 - **MAIL FROM** — MX and SPF (TXT) records for the bounce subdomain.
+
+Domains added before the selector was renamed keep the one shown in their own
+DNS checklist (`millionsend._domainkey`); use exactly the records the dashboard
+lists for each domain.
 
 Two verification signals are shown side by side:
 
@@ -41,7 +45,7 @@ what public DNS answers right now) and, when a row is not verified, a one-line
 
 A deployment provisions identities in the SES regions it serves — its
 `AWS_REGIONS`, or the one region in `AWS_REGION`; MepMail Cloud serves
-`sa-east-1` (São Paulo) today. The dashboard's add-domain form lists the
+`us-east-1` (N. Virginia) today. The dashboard's add-domain form lists the
 served regions, holds back one still in the SES sandbox while another has
 production access, and defaults to the first production region. The API's
 optional `region` field (the `create_domain` MCP tool included) accepts any

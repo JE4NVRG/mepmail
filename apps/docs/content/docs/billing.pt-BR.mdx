@@ -89,6 +89,9 @@ mensais. Um envio agendado conta no período em que foi aceito.
   `millionsend_<degrau>_overage`, nesse medidor, cobrado por 1.000 e-mails
   arredondando para cima (`transform_quantity: { divide_by: 1000, round: "up" }`).
 
+O prefixo `millionsend_` dessas chaves e metadados é histórico; ele continua
+para que preços e assinaturas criados antes da troca de nome sigam funcionando.
+
 Os preços são localizados por lookup key, nunca por id de preço, então o
 mesmo build roda em qualquer conta Stripe (teste ou produção) sem configurar
 preços por ambiente. Uma assinatura num degrau mensal carrega o preço do

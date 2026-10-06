@@ -227,7 +227,7 @@ export function freshDatabaseEntries(): Record<string, string> {
   const password = randomBytes(24).toString("base64url");
   return {
     POSTGRES_PASSWORD: password,
-    DATABASE_URL: `postgres://millionsend:${password}@postgres:5432/millionsend`,
+    DATABASE_URL: `postgres://mepmail:${password}@postgres:5432/mepmail`,
   };
 }
 

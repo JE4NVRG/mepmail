@@ -1,4 +1,4 @@
-/* MillionSend component classes — ported from design-system/components.html (reference implementations).
+/* MepMail component classes — ported from design-system/components.html (reference implementations).
    React components apply these classes; values come from token custom properties.
    Hover/press opacity steps are inferred from the source's `transition: opacity` spec (see design-system readme). */
 
@@ -1019,7 +1019,7 @@ table.ms-table {
 .ms-newborn {
   color: var(--ms-steel);
 }
-/* Wheel odometer (the LP hero's mechanics, mirrored in millionsend-lp
+/* Wheel odometer (the LP hero's mechanics, mirrored from the original landing
    site.css): masked cells, tabular 800 grotesque, the units cell lit steel
    once the count is live. */
 .od {
@@ -2676,7 +2676,7 @@ summary:focus-visible,
   background: color-mix(in srgb, var(--ms-warn) 52%, transparent);
 }
 
-/* Plan ladder — the landing page's pricing section (millionsend-lp site.css,
+/* Plan ladder — the landing page's pricing section (the original landing's site.css,
    "Pricing") without its recommendation: a native range slider over the
    volumes and four level cards; the card the volume lands on carries the
    primary button and, on phones, is the one that unfolds. */

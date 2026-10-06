@@ -4,7 +4,7 @@ const configuredPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 export const META_PIXEL_ID =
   configuredPixelId && /^[0-9]{5,30}$/.test(configuredPixelId)
     ? configuredPixelId
-    : "4530758537185348";
+    : "1418150576403119";
 export const META_ORIGIN = "https://mepmail.dev";
 const PUBLIC_PATHS = new Set(["/", "/pricing"]);
 const UTM_KEYS = new Set(["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"]);

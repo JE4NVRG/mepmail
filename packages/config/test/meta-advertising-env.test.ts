@@ -13,7 +13,7 @@ describe("optional Meta server transport", () => {
   it.each([true, "true", "1"])("requires explicit configuration for enabled=%s", (flag) => {
     const fields: Record<string, string | boolean> = { META_CONVERSIONS_ENABLED: flag };
     for (const [key, value] of [
-      ["META_DATASET_ID", "4530758537185348"],
+      ["META_DATASET_ID", "1418150576403119"],
       ["META_ACCESS_TOKEN", "fixture-not-a-credential"],
       ["META_GRAPH_API_VERSION", "v25.0"],
     ]) {

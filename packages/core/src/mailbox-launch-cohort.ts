@@ -63,9 +63,12 @@ export function parseMailboxLaunchCohort(raw: string | undefined): MailboxLaunch
   return value as MailboxLaunchCohort;
 }
 
-/** Undefined preserves self-hosted/legacy behavior. A present but invalid
- * configuration is null and must never grant access. Changing the subscription
- * does not erase an existing team's enrollment; transferring the customer does.
+/** Hosted admission to Correio. Undefined preserves self-hosted/legacy behavior,
+ * and a present but invalid configuration is null and never grants access.
+ * Since the public opening, any team with a Stripe customer is admitted once
+ * `capturedAt` has passed; whether it may buy or create is decided separately
+ * by hasPaidSendingPlanForMailbox. Members only carry explicit grants such as
+ * grandfatheredTwentyDollarPlan.
  */
 export function mailboxLaunchCohortAllows(
   cohort: MailboxLaunchCohort | null | undefined,
@@ -75,11 +78,5 @@ export function mailboxLaunchCohortAllows(
   if (cohort === undefined) return true;
   if (!cohort || !binding.customerId || !Number.isFinite(now.getTime())) return false;
   const captured = new Date(cohort.capturedAt).getTime();
-  return (
-    Number.isFinite(captured) &&
-    captured <= now.getTime() &&
-    cohort.members.some(
-      (member) => member.teamId === binding.teamId && member.customerId === binding.customerId,
-    )
-  );
+  return Number.isFinite(captured) && captured <= now.getTime();
 }

@@ -1,4 +1,4 @@
-import { env, isCloudDeployment } from "@millionsend/config";
+import { deploymentRevision, env, isCloudDeployment } from "@millionsend/config";
 import {
   committedDailyVolume,
   DAY_MS,
@@ -48,7 +48,7 @@ export const consoleOverviewRouter = router({
     ]);
     const probe = (key: (typeof PROBE_KEYS)[number]) => probes.get(key) ?? null;
     return {
-      version: env.MILLIONSEND_REVISION,
+      version: deploymentRevision(),
       host: env.APP_BASE_URL ? new URL(env.APP_BASE_URL).host : null,
       cloud: isCloudDeployment(),
       regions: {

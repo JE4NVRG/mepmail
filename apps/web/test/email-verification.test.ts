@@ -25,7 +25,7 @@ afterEach(async () => {
 });
 
 function stubSender() {
-  vi.stubEnv("AUTH_EMAIL_FROM", "MillionSend <no-reply@mail.example.com>");
+  vi.stubEnv("AUTH_EMAIL_FROM", "MepMail <no-reply@mail.example.com>");
   vi.stubEnv("AWS_ACCESS_KEY_ID", "test-key");
   vi.stubEnv("AWS_SECRET_ACCESS_KEY", "test-secret");
   vi.stubEnv("AWS_DEFAULT_CHAIN", "");
@@ -73,7 +73,7 @@ describe("email verification", () => {
     expect(sent[0]).toMatchObject({
       kind: "email_verification",
       to: "ada@example.com",
-      from: "MillionSend <no-reply@mail.example.com>",
+      from: "MepMail <no-reply@mail.example.com>",
       subject: "Verify your MepMail email",
     });
     const url = new URL(sent[0]?.text.match(/https?:\/\/\S+/)?.[0] ?? "");

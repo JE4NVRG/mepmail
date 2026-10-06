@@ -2,7 +2,7 @@
   "meta": {
     "title": "Preços: todos os planos MepMail em uma página",
     "description": "Preços do MepMail em USD: grátis com 100 e-mails/dia, Pro a partir de US$ 20 para 110.000 e-mails/mês e Scale até 2,75M. Excedente por 1.000 e sem fidelidade.",
-    "launchDescription": "Envio Pro 110K: US$ 29/mês; US$ 20 só na primeira mensalidade elegível de novos clientes, ou US$ 290/ano antecipados. Correio é um adicional por caixa, com acesso antecipado condicionado."
+    "launchDescription": "Envio Pro 110K: US$ 29/mês; US$ 20 só na primeira mensalidade de quem nunca pagou o MepMail, ou US$ 290/ano antecipados. Correio é um adicional por caixa, disponível em todos os planos pagos de Envio."
   },
   "eyebrow": "Preços",
   "title": "Escolha o volume. <highlight>Pague pelo que envia.</highlight>",
@@ -73,7 +73,7 @@
     "yearQuota": "A franquia de 110 mil renova mensalmente, sem saldo anual acumulado. O envio para na cota mensal; o anual não inclui cobrança de excedentes.",
     "preserved": "Contratos existentes mantêm seus valores e limites; não há migração automática. System continua isento.",
     "mailCta": "Conhecer o Correio",
-    "mailAccess": "Correio é pago à parte por caixa. A primeira abertura é para assinantes anteriores elegíveis; contratar Envio agora não garante acesso antecipado."
+    "mailAccess": "Correio é pago à parte por caixa e está disponível em todos os planos pagos de Envio, inclusive no Pro 110K durante a primeira mensalidade de US$ 20."
   },
   "launchFaq": [
     {

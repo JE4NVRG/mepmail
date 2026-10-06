@@ -95,12 +95,12 @@ export function envTemplate(): string {
 
 # Postgres connection string. The default matches the docker-compose postgres
 # service; for local dev without Docker, point it at your own instance
-# (e.g. postgres://postgres:postgres@localhost:5432/millionsend).
-DATABASE_URL=postgres://millionsend:millionsend@postgres:5432/millionsend
+# (e.g. postgres://postgres:postgres@localhost:5432/mepmail).
+DATABASE_URL=postgres://mepmail:mepmail@postgres:5432/mepmail
 
 # Password of the compose postgres service; the setup wizard generates one and
 # puts it in DATABASE_URL too. Keep both in sync.
-POSTGRES_PASSWORD=millionsend
+POSTGRES_PASSWORD=mepmail
 
 # Standalone deploy/docker-compose.yml only: private image references published
 # by the operator. The supported installation path for this fork uses the root
@@ -108,8 +108,8 @@ POSTGRES_PASSWORD=millionsend
 # Images referenced by deploy/docker-compose.yml are not a supported release
 # channel for this fork.
 # Prefer immutable @sha256 digests when operating your own image registry.
-# MILLIONSEND_IMAGE=
-# MILLIONSEND_BACKUP_IMAGE=
+# MEPMAIL_IMAGE=
+# MEPMAIL_BACKUP_IMAGE=
 
 # Optional compose services, comma-separated: smtp (the relay; mount a
 # STARTTLS keypair first), and in deploy/docker-compose.yml also docs (the

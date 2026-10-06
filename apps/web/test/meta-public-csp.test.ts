@@ -6,7 +6,7 @@ afterEach(() => {
   vi.resetModules();
 });
 
-async function headers(enabled: string, pixel = "4530758537185348") {
+async function headers(enabled: string, pixel = "1418150576403119") {
   vi.stubEnv("NEXT_PUBLIC_META_PIXEL_ENABLED", enabled);
   vi.stubEnv("NEXT_PUBLIC_META_PIXEL_ID", pixel);
   vi.stubEnv("NODE_ENV", "production");

@@ -182,7 +182,7 @@ describe("auth middleware", () => {
     expect(((await res.json()) as { error: string }).error).toBe("invalid_token");
   });
 
-  it("403s a token carrying no MillionSend scope", async () => {
+  it("403s a token carrying no MepMail scope", async () => {
     const token = await mintToken({ scope: "openid profile" });
     const res = await app.request("/mcp", {
       method: "POST",
@@ -732,7 +732,7 @@ it("create_webhook surfaces the signing secret verbatim and lists back without i
   const created = await client.callTool({
     name: "create_webhook",
     arguments: {
-      endpoint: "https://acme.dev/api/webhooks/millionsend",
+      endpoint: "https://acme.dev/api/webhooks/mepmail",
       events: ["email.bounced", "email.complained"],
     },
   });

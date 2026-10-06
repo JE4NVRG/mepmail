@@ -2,7 +2,7 @@
   "meta": {
     "title": "Pricing: every MepMail plan on one page",
     "description": "MepMail pricing in USD: free with 100 emails/day, Pro from US$ 20 for 110,000 emails/month and Scale up to 2.75M. Overage per 1,000 and no lock-in.",
-    "launchDescription": "Send Pro 110K: US$29/month; US$20 only for eligible new customers’ first monthly bill, or US$290/year upfront. Mail is a per-mailbox add-on with conditional early access."
+    "launchDescription": "Send Pro 110K: US$29/month; US$20 only on the first monthly bill for customers who never paid MepMail, or US$290/year upfront. Mail is a per-mailbox add-on available on every paying Send plan."
   },
   "eyebrow": "Pricing",
   "title": "Pick your volume. <highlight>Pay for what you send.</highlight>",
@@ -73,7 +73,7 @@
     "yearQuota": "The 110,000 allowance renews monthly, without an accumulated annual balance. Sending stops at the monthly quota; annual billing does not include metered overage.",
     "preserved": "Existing contracts keep their prices and limits; there is no automatic migration. System remains exempt.",
     "mailCta": "Explore Mail",
-    "mailAccess": "Mail is paid separately per mailbox. The first opening is for eligible earlier subscribers; subscribing to Send now does not guarantee early access."
+    "mailAccess": "Mail is paid separately per mailbox and available on every paying Send plan, including Pro 110K during its US$20 first month."
   },
   "launchFaq": [
     {

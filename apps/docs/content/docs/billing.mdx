@@ -86,6 +86,9 @@ counts against the period it is accepted in.
   `millionsend_<rung>_overage`, on that meter, priced per 1,000 emails rounded
   up (`transform_quantity: { divide_by: 1000, round: "up" }`).
 
+The `millionsend_` prefix in these keys and metadata is historical; it stays so
+that prices and subscriptions created before the rename keep resolving.
+
 Prices are found by lookup key, never by price id, so the same build runs
 against any Stripe account (test or live) with no per-environment price
 configuration. A subscription on a monthly rung carries the rung's price and

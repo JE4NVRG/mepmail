@@ -1,8 +1,8 @@
 # Legacy standalone compose definition, retained for operators that publish
 # their own private images. It is not a supported installation or release
 # channel for this fork. Use the root docker-compose.yml and build from source.
-# If you maintain this file privately, set MILLIONSEND_IMAGE and
-# MILLIONSEND_BACKUP_IMAGE explicitly, preferably to immutable @sha256 digests.
+# If you maintain this file privately, set MEPMAIL_IMAGE and
+# MEPMAIL_BACKUP_IMAGE explicitly, preferably to immutable @sha256 digests.
 #
 # Optional services sit behind compose profiles — COMPOSE_PROFILES in .env:
 #   docs    the documentation site on DOCS_PORT
@@ -16,19 +16,19 @@ services:
     # and a bad plan then costs one core instead of all of them.
     command: ["postgres", "-c", "max_connections=200", "-c", "max_parallel_workers_per_gather=0"]
     environment:
-      POSTGRES_USER: millionsend
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-millionsend}
-      POSTGRES_DB: millionsend
+      POSTGRES_USER: ${POSTGRES_USER:-mepmail}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mepmail}
+      POSTGRES_DB: ${POSTGRES_DB:-mepmail}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U millionsend -d millionsend"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mepmail} -d ${POSTGRES_DB:-mepmail}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  millionsend:
-    image: "${MILLIONSEND_IMAGE:?Set MILLIONSEND_IMAGE to an operator-published private image}"
+  mepmail:
+    image: "${MEPMAIL_IMAGE:?Set MEPMAIL_IMAGE to an operator-published private image}"
     env_file: .env
     environment:
       PROCESS: all
@@ -54,7 +54,7 @@ services:
       - /app/apps/docs/.source
 
   docs:
-    image: "${MILLIONSEND_IMAGE:?Set MILLIONSEND_IMAGE to an operator-published private image}"
+    image: "${MEPMAIL_IMAGE:?Set MEPMAIL_IMAGE to an operator-published private image}"
     env_file: .env
     environment:
       PROCESS: docs
@@ -76,7 +76,7 @@ services:
       - /app/apps/docs/.source
 
   smtp:
-    image: "${MILLIONSEND_IMAGE:?Set MILLIONSEND_IMAGE to an operator-published private image}"
+    image: "${MEPMAIL_IMAGE:?Set MEPMAIL_IMAGE to an operator-published private image}"
     env_file: .env
     environment:
       PROCESS: smtp
@@ -103,7 +103,7 @@ services:
 
   backup:
     # Must be built and published by the operator from scripts/backup.
-    image: "${MILLIONSEND_BACKUP_IMAGE:?Set MILLIONSEND_BACKUP_IMAGE to an operator-published private image}"
+    image: "${MEPMAIL_BACKUP_IMAGE:?Set MEPMAIL_BACKUP_IMAGE to an operator-published private image}"
     env_file: .env
     # Stays a no-op (prints a hint, exits 0, restart "no") until
     # S3_BACKUP_BUCKET and the S3_* credentials are set in .env.

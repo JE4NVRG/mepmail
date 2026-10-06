@@ -86,7 +86,7 @@ describe("freshDatabaseEntries", () => {
     const entries = freshDatabaseEntries();
     expect(entries.POSTGRES_PASSWORD).toMatch(/^[A-Za-z0-9_-]{32}$/);
     expect(entries.DATABASE_URL).toBe(
-      `postgres://millionsend:${entries.POSTGRES_PASSWORD}@postgres:5432/millionsend`,
+      `postgres://mepmail:${entries.POSTGRES_PASSWORD}@postgres:5432/mepmail`,
     );
     expect(freshDatabaseEntries().POSTGRES_PASSWORD).not.toBe(entries.POSTGRES_PASSWORD);
   });
@@ -179,7 +179,7 @@ describe("envTemplate", () => {
     const template = envTemplate();
     expect(template).toContain("delivery events\n# reach MepMail");
     expect(template).not.toContain("delivery events\n# reach MillionSend");
-    expect(template).toContain("# MILLIONSEND_IMAGE=");
+    expect(template).toContain("# MEPMAIL_IMAGE=");
   });
 });
 
