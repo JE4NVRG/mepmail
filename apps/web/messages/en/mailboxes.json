@@ -115,8 +115,7 @@
   "contentPrivate": "Private messages and attachments. Every request rechecks mailbox access.",
   "paidService": "Paid add-on service",
   "system": {
-    "closedProductionBadge": "Closed production · System",
-    "closedProduction": "Closed production"
+    "badge": "System account"
   },
   "preview": "Preview",
   "previewBody": "Prepare your inboxes and drafts. Receiving and sending are not active yet.",

@@ -585,7 +585,7 @@ export function MailboxesView() {
           <div className={styles.productMeta}>
             <h1>{t("title")}</h1>
             <span className={styles.serviceBadge}>
-              {t(systemLicense ? "system.closedProductionBadge" : "paidService")}
+              {t(systemLicense ? "system.badge" : "paidService")}
             </span>
           </div>
           <p>{t("subtitle")}</p>
@@ -683,10 +683,29 @@ export function MailboxesView() {
           ) : null}
         </div>
       </header>
-      <p className={styles.previewNote}>
-        <span>{t(systemLicense ? "system.closedProduction" : "preview")}</span>{" "}
-        {t(capability.data?.deliveryReady ? "contentPrivate" : "previewBody")}
-      </p>
+      {capability.data?.deliveryReady ? (
+        <p className={styles.previewNote}>
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          </svg>
+          {t("contentPrivate")}
+        </p>
+      ) : (
+        <p className={styles.previewNote}>
+          <span>{t("preview")}</span> {t("previewBody")}
+        </p>
+      )}
       <MailboxServicePanel openRequest={licenseOpenRequest} initialOfferId={licenseOfferId} />
       {registry.data?.canManage && options.data && !options.data.domains.length ? (
         <p className={styles.notice}>

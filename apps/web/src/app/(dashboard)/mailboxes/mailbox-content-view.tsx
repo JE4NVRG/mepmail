@@ -1050,29 +1050,32 @@ export function MailboxContentView({
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              {!listing.isPending && !listing.isError ? (
-                <span className={styles.messageCount}>
-                  {t("messageCount", { count: rows.length })}
-                </span>
-              ) : null}
               {listing.data?.limited ? (
                 <p className={styles.trashHelp}>{t("organization.limitedList")}</p>
               ) : null}
-              {movableRows.length ? (
+              {!listing.isPending && !listing.isError ? (
                 <div className={styles.selectionToolbar}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={checkedRows.length === movableRows.length}
-                      disabled={bulkBusy}
-                      onChange={(event) =>
-                        setCheckedIds(
-                          event.target.checked ? new Set(movableRows.map(rowKey)) : new Set(),
-                        )
-                      }
-                    />
-                    {t("organization.selectAll")}
-                  </label>
+                  {movableRows.length ? (
+                    <label>
+                      <input
+                        type="checkbox"
+                        className="ms-checkbox"
+                        ref={(input) => {
+                          if (input)
+                            input.indeterminate =
+                              checkedRows.length > 0 && checkedRows.length < movableRows.length;
+                        }}
+                        checked={checkedRows.length === movableRows.length}
+                        disabled={bulkBusy}
+                        onChange={(event) =>
+                          setCheckedIds(
+                            event.target.checked ? new Set(movableRows.map(rowKey)) : new Set(),
+                          )
+                        }
+                      />
+                      {t("organization.selectAll")}
+                    </label>
+                  ) : null}
                   {checkedRows.length ? (
                     <button
                       type="button"
@@ -1088,7 +1091,11 @@ export function MailboxContentView({
                         { count: checkedRows.length },
                       )}
                     </button>
-                  ) : null}
+                  ) : (
+                    <span className={styles.messageCount}>
+                      {t("messageCount", { count: rows.length })}
+                    </span>
+                  )}
                 </div>
               ) : null}
             </div>
@@ -1125,6 +1132,7 @@ export function MailboxContentView({
                             <label className={styles.rowSelectionTarget}>
                               <input
                                 type="checkbox"
+                                className="ms-checkbox"
                                 aria-label={t("organization.selectMessage", {
                                   subject: blocked
                                     ? t("safety.blockedMessage")

@@ -847,6 +847,10 @@
   line-height: 1.6;
   margin: 0 0 16px;
 }
+.previewNote > svg {
+  vertical-align: -2px;
+  margin-right: 6px;
+}
 .previewNote > span {
   color: var(--ms-bone);
   margin-right: 6px;
@@ -1056,7 +1060,7 @@
   color: var(--ms-muted);
   flex: none;
 }
-.listSearch input {
+.searchField input {
   width: 100%;
   min-width: 0;
   background: transparent;
@@ -1067,10 +1071,10 @@
   font-size: var(--ms-fs-ui);
 }
 .messageCount {
-  display: block;
   color: var(--ms-muted);
-  font-size: 10px;
-  padding: 8px 0 0;
+  font-size: 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .listBody {
   flex: 1;
@@ -1500,16 +1504,27 @@
   width: 100%;
   flex: none;
 }
+/* Segmented control: the three scopes share one inset track and never wrap mid-word. */
 .mailFolderRail .scopeFilters {
   flex-wrap: nowrap;
   gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  background: var(--ms-inset);
 }
 .mailFolderRail .scopeFilters button {
   padding: 8px 4px;
   flex: 1;
   min-width: 0;
   font-size: var(--ms-fs-badge);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mailFolderRail .scopeFilters button[aria-pressed="true"] {
+  background: var(--ms-panel-raised);
+  border-color: var(--ms-line-strong);
 }
 .mailFolderRail .compactFolders {
   display: grid;
@@ -1716,13 +1731,6 @@
   width: 44px;
   padding-top: 15px;
 }
-.rowQuickActions input {
-  width: 16px;
-  height: 16px;
-  margin: 8px 0;
-  accent-color: var(--ms-violet);
-  cursor: pointer;
-}
 .rowQuickActions .starButton {
   display: grid;
   place-items: center;
@@ -1774,29 +1782,36 @@
   border-color: var(--ms-violet-border);
   color: var(--ms-violet);
 }
+/* One quiet row under the search: select-all on the left, count or bulk action on the right. */
 .selectionToolbar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
-  margin: 10px 0 0;
+  gap: 8px;
+  min-height: 44px;
+  margin: 4px 0 0;
 }
 .selectionToolbar label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-height: 44px;
-  font-size: 11px;
+  min-width: 0;
+  font-size: 12px;
   color: var(--ms-muted);
+  cursor: pointer;
 }
-.selectionToolbar input {
-  accent-color: var(--ms-violet);
+.selectionToolbar label:hover {
+  color: var(--ms-bone);
 }
 .selectionToolbar button {
-  font-size: 11px;
-  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 8px 10px;
   min-height: 44px;
+  white-space: nowrap;
 }
 .trashHelp {
   font-size: 12px;

@@ -115,8 +115,7 @@
   "contentPrivate": "Mensagens e anexos privados. Cada consulta confere novamente o acesso à caixa.",
   "paidService": "Serviço adicional pago",
   "system": {
-    "closedProductionBadge": "Produção fechada · System",
-    "closedProduction": "Produção fechada"
+    "badge": "Conta System"
   },
   "preview": "Em prévia",
   "previewBody": "Prepare suas caixas e rascunhos. Recebimento e envio ainda não estão ativos.",
