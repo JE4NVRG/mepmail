@@ -12,8 +12,9 @@ import {
 } from "@/lib/launch-offer";
 
 /** Price comparison only. It does not open checkout or grant Mail access. */
-export function LaunchPlanPreview() {
+export function LaunchPlanPreview({ earlyAccessOpen = false }: { earlyAccessOpen?: boolean }) {
   const t = useTranslations("correio.preview");
+  const release = useTranslations("correio.release");
   const locale = useLocale();
   const groupId = useId();
   const titleId = `${groupId}-title`;
@@ -52,7 +53,9 @@ export function LaunchPlanPreview() {
           <h3 id={titleId}>{t("title")}</h3>
           <p>{t("body")}</p>
         </div>
-        <p className="correio-preview-status">{t("status")}</p>
+        <p className="correio-preview-status">
+          {earlyAccessOpen ? release("previewStatus") : t("status")}
+        </p>
       </div>
       <div className="correio-preview-controls">
         <fieldset>
@@ -198,14 +201,19 @@ export function LaunchPlanPreview() {
         {annual ? (
           <>
             <p>{t("annualFormula")}</p>
-            <p>{t("annualConsumption")}</p>
+            <p>{earlyAccessOpen ? release("annualConsumption") : t("annualConsumption")}</p>
           </>
         ) : (
           <p>{t("introTerms")}</p>
         )}
         <p>{t("eligibility")}</p>
-        <p>{t("monthlyNote")}</p>
+        <p>{earlyAccessOpen ? release("monthlyNote") : t("monthlyNote")}</p>
         <p>{t("noChange")}</p>
+        {earlyAccessOpen ? (
+          <a className="ms-btn ms-btn-secondary correio-action" href="/mailboxes">
+            {release("checkAccess")}
+          </a>
+        ) : null}
       </div>
     </section>
   );

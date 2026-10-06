@@ -7,15 +7,8 @@ import {
   type PublicSiteLabels,
   SignupLink,
 } from "@/components/site-chrome";
-import {
-  CLAIM_ANCHOR_ROW,
-  MAX_RESEND_SAVINGS_PCT,
-  MIN_RESEND_SAVINGS_PCT,
-  RESEND_PRICING_SOURCE,
-  RESEND_ROWS,
-  resendSavings,
-} from "@/lib/alternatives-resend";
-import { formatUsd, formatVolume } from "@/lib/landing-pricing";
+import { RESEND_PRICING_SOURCE, resendSavings } from "@/lib/alternatives-resend";
+import { formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricing";
 import { legalLinks } from "@/lib/legal-links";
 import "../../landing.css";
 
@@ -58,6 +51,7 @@ export default async function ResendAlternativePage() {
     nav: l.raw("nav"),
     footer: l.raw("footer"),
   } as PublicSiteLabels;
+  const rows = priceRowsForOffer(process.env.SEND_LAUNCH_OFFER_ENABLED === "true");
   const columns = t.raw("table.columns") as string[];
   const sameItems = t.raw("same.items") as string[];
   const differentItems = t.raw("different.items") as string[];
@@ -109,7 +103,7 @@ export default async function ResendAlternativePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {RESEND_ROWS.map((row) => {
+                  {rows.map((row) => {
                     const savings = resendSavings(row);
                     return (
                       <tr key={row.volume}>
@@ -140,15 +134,7 @@ export default async function ResendAlternativePage() {
             </p>
             <div className="gtm-claim">
               <h3>{t("claim.title")}</h3>
-              <p className="gtm-note">
-                {t("claim.body", {
-                  volume: formatVolume(CLAIM_ANCHOR_ROW.volume, locale),
-                  sendgrid: formatUsd(CLAIM_ANCHOR_ROW.sendgrid, locale),
-                  mepmail: formatUsd(CLAIM_ANCHOR_ROW.mepmail, locale),
-                  min: MIN_RESEND_SAVINGS_PCT,
-                  max: MAX_RESEND_SAVINGS_PCT,
-                })}
-              </p>
+              <p className="gtm-note">{t("claim.body")}</p>
             </div>
           </div>
         </section>

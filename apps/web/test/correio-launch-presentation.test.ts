@@ -1,7 +1,7 @@
 import { createTranslator, NextIntlClientProvider } from "next-intl";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import enCorreio from "../messages/en/correio.json";
 import enLanding from "../messages/en/landing.json";
@@ -91,6 +91,8 @@ const expectations = {
     recurringEligibility:
       /US\$29 offer qualifies the plan even during its US\$20 introductory monthly bill/,
     legacyPreserved: /Existing US\$20 contracts do not change automatically/,
+    authorizedEarlierPlan:
+      /Authorized earlier accounts may keep their current Send plan when purchasing the add-on/,
     systemUnlimited:
       /System[\s\S]*50 GiB per mailbox[\s\S]*no commercial mailbox or delivery limits/i,
     paidSeparately: /Mail is paid separately/,
@@ -104,9 +106,9 @@ const expectations = {
     firstPayment: "First monthly bill for new customers:",
     renewal: "Renewal:",
     introRestricted:
-      /US\$20 only for the first monthly Send bill for new customers; then US\$29\/month/,
-    mailNoDiscount: /Mail add-ons are charged at their regular price from the first bill/,
-    recipientAccounting: /To, Cc and Bcc count; this is not a limit on distinct contacts/,
+      /US\$20 only for eligible new customers’ first monthly Send bill; then US\$29\/month/,
+    mailNoDiscount: /Mail does not receive this discount/,
+    recipientAccounting: /To and Cc count; this is not a limit on distinct contacts/,
     noSubscriptionChange: /does not purchase a plan or change your subscription/,
     rest: "Mail · REST API",
     dedicatedKey: /a key dedicated to the mailbox/,
@@ -128,6 +130,8 @@ const expectations = {
     recurringEligibility:
       /US\$ 29 qualifica o plano mesmo na primeira mensalidade promocional de US\$ 20/,
     legacyPreserved: /Contratos antigos de US\$ 20 não mudam automaticamente/,
+    authorizedEarlierPlan:
+      /Contas anteriores autorizadas podem manter seu plano atual de Envio ao contratar o adicional/,
     systemUnlimited: /System[\s\S]*50 GiB por caixa[\s\S]*sem limites comerciais/i,
     paidSeparately: /Correio é pago à parte/,
     offerPrepared: /Oferta preparada para lançamento/,
@@ -140,9 +144,9 @@ const expectations = {
     firstPayment: "Primeira mensalidade para novos clientes:",
     renewal: "Renovação:",
     introRestricted:
-      /US\$ 20 somente na primeira mensalidade de Envio para novos clientes; depois, US\$ 29\/mês/,
-    mailNoDiscount: /O adicional Correio é cobrado pelo preço normal desde a primeira mensalidade/,
-    recipientAccounting: /To, Cc e Bcc contam; não é limite de contatos diferentes/,
+      /US\$ 20 só na primeira mensalidade de Envio de novos clientes elegíveis; depois US\$ 29\/mês/,
+    mailNoDiscount: /Correio não recebe esse desconto/,
+    recipientAccounting: /To e Cc contam; não é limite de contatos diferentes/,
     noSubscriptionChange: /não contrata um plano nem altera sua assinatura/,
     rest: "Correio · API REST",
     dedicatedKey: /uma chave dedicada à caixa/,
@@ -161,6 +165,7 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
   let html: string;
 
   beforeEach(async () => {
+    vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "false");
     current.locale = locale;
     html = renderToStaticMarkup(
       createElement(NextIntlClientProvider, {
@@ -175,6 +180,7 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
       }),
     );
   });
+  afterEach(() => vi.unstubAllEnvs());
 
   it("presents a closed preview and labels the conversation example as fictional", () => {
     const hero = section(html, "correio-title");
@@ -206,6 +212,7 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     expect(plans).toMatch(expected.minimumPlan);
     expect(plans).toMatch(expected.recurringEligibility);
     expect(plans).toMatch(expected.legacyPreserved);
+    expect(plans).toMatch(expected.authorizedEarlierPlan);
     expect(plans).toMatch(expected.noNewSubscriberGuarantee);
     expect(textContent(html)).toMatch(expected.systemUnlimited);
   });

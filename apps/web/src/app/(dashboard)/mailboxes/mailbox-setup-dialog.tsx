@@ -27,11 +27,13 @@ export function MailboxSetupDialog({
   close,
   changed,
   reviewLicense,
+  existingMailbox,
 }: {
   options: Options;
   close: () => void;
   changed: (id: string) => Promise<void>;
   reviewLicense: (offerId?: string) => void;
+  existingMailbox?: { id: string; address: string; domainId: string; kind: "person" | "agent" };
 }) {
   const t = useTranslations("mailboxes.setup");
   const mailboxT = useTranslations("mailboxes");
@@ -41,6 +43,8 @@ export function MailboxSetupDialog({
   const queries = useQueryClient();
   const service = useQuery(trpc.mailboxes.service.queryOptions(undefined, { retry: false }));
   const create = useMutation(trpc.mailboxes.create.mutationOptions());
+  const activate = useMutation(trpc.mailboxes.verifyReceiving.mutationOptions());
+  const activating = useRef(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
@@ -48,13 +52,14 @@ export function MailboxSetupDialog({
   const offerSelectId = useId();
   const [step, setStep] = useState(0);
   const [domainId, setDomainId] = useState(
-    options.domains.find((domain) => domain.status === "verified")?.id ??
+    existingMailbox?.domainId ??
+      options.domains.find((domain) => domain.status === "verified")?.id ??
       options.domains[0]?.id ??
       "",
   );
   const [local, setLocal] = useState("");
   const [label, setLabel] = useState("");
-  const [kind, setKind] = useState<"person" | "agent">("person");
+  const [kind, setKind] = useState<"person" | "agent">(existingMailbox?.kind ?? "person");
   const [ownerId, setOwnerId] = useState(options.currentUserId);
   const [error, setError] = useState<
     | ReturnType<typeof mailboxSetupFailure>
@@ -63,8 +68,13 @@ export function MailboxSetupDialog({
     | "ownerInvalid"
     | null
   >(null);
-  const [saved, setSaved] = useState<{ id: string; address: string } | null>(null);
+  const [saved, setSaved] = useState<{ id: string; address: string } | null>(
+    existingMailbox ?? null,
+  );
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
+  const [activationMessage, setActivationMessage] = useState<"ready" | "pending" | "error" | null>(
+    null,
+  );
   const domain = options.domains.find((entry) => entry.id === domainId);
   const receivingQuery = useQuery(
     trpc.mailboxes.receiving.queryOptions(
@@ -80,7 +90,8 @@ export function MailboxSetupDialog({
   const systemIdentified = service.data?.licenseKind === "system";
   const billing = useQuery(
     trpc.mailboxes.billing.queryOptions(undefined, {
-      enabled: step === 1 && !systemIdentified && !service.isPending && !service.isError,
+      enabled:
+        (step === 1 || !!saved) && !systemIdentified && !service.isPending && !service.isError,
       retry: false,
       refetchOnWindowFocus: false,
     }),
@@ -103,7 +114,49 @@ export function MailboxSetupDialog({
   const address = `${normalized ?? (local.trim() || t("exampleLocal"))}@${domain?.name ?? t("exampleDomain")}`;
   const seatState = mailboxSetupSeatState(service.data, service.isPending, service.isError);
   const systemUnlimited = seatState === "ready" && mailboxHasUnlimitedSeats(service.data);
-  const busy = create.isPending;
+  const busy = create.isPending || activate.isPending;
+  const savedReceiving = receivingQuery.data?.mailboxes.find((box) => box.id === saved?.id);
+  const canActivate =
+    !!saved &&
+    service.data?.active === true &&
+    service.data.resourcePolicyActive === true &&
+    !service.isPending &&
+    !service.isFetching &&
+    !service.isError &&
+    (systemIdentified ||
+      (!billing.isPending &&
+        !billing.isError &&
+        billing.data?.sendingPlanRequired === false &&
+        billing.data.earlyAccessRequired === false)) &&
+    domain?.status === "verified" &&
+    receivingQuery.data?.mx.status === "ready" &&
+    !receivingQuery.isPending &&
+    !receivingQuery.isFetching &&
+    !receivingQuery.isError &&
+    savedReceiving?.receiving_state === "reserved" &&
+    !savedReceiving.reasons.some((reason) =>
+      ["seat_not_licensed", "owner_inactive", "mailbox_suspended"].includes(reason),
+    );
+
+  async function activateReceiving() {
+    if (!canActivate || busy || activating.current || !saved) return;
+    activating.current = true;
+    setActivationMessage(null);
+    try {
+      const result = await activate.mutateAsync({ domainId });
+      queries.setQueryData(trpc.mailboxes.receiving.queryKey({ domainId }), result);
+      setActivationMessage(
+        result.mailboxes.find((box) => box.id === saved.id)?.receiving_state === "ready"
+          ? "ready"
+          : "pending",
+      );
+    } catch {
+      setActivationMessage("error");
+      void receivingQuery.refetch();
+    } finally {
+      activating.current = false;
+    }
+  }
 
   function openLicense() {
     reviewLicense(canChoosePlan ? (selection.offerId ?? undefined) : undefined);
@@ -163,6 +216,7 @@ export function MailboxSetupDialog({
       await Promise.allSettled([
         changed(result.id),
         queries.invalidateQueries({ queryKey: trpc.mailboxes.service.queryKey() }),
+        queries.invalidateQueries({ queryKey: trpc.mailboxes.receiving.queryKey({ domainId }) }),
       ]);
     } catch (cause) {
       setError(mailboxSetupFailure(cause));
@@ -284,15 +338,47 @@ export function MailboxSetupDialog({
           <h3>{t("nextTitle")}</h3>
           <p>{t("nextBody")}</p>
           {domainReadiness()}
+          <p>{t("activationHint")}</p>
+          {activationMessage ? (
+            <p role={activationMessage === "error" ? "alert" : "status"}>
+              {t(
+                activationMessage === "error"
+                  ? "activationError"
+                  : activationMessage === "ready"
+                    ? "activationReady"
+                    : "activationPending",
+              )}
+            </p>
+          ) : null}
           {kind === "agent" ? <p>{t("agentNext")}</p> : null}
           <div className={styles.successActions}>
+            <button
+              type="button"
+              className="ms-btn ms-btn-primary"
+              disabled={!canActivate || busy}
+              aria-busy={activate.isPending}
+              onClick={() => void activateReceiving()}
+            >
+              {t(activate.isPending ? "receivingActivating" : "activateReceiving")}
+            </button>
+            <button
+              type="button"
+              className="ms-btn"
+              disabled={busy || receivingQuery.isFetching}
+              onClick={() => {
+                setActivationMessage(null);
+                void receivingQuery.refetch();
+              }}
+            >
+              {t("checkReceiving")}
+            </button>
             <Link className="ms-btn" href={`/domains/${domainId}`}>
               {t("viewDomain")}
             </Link>
             <a className="ms-btn" href={`${DOCS_URL}/mailboxes`} target="_blank" rel="noreferrer">
               {t("guide")}
             </a>
-            <button type="button" className="ms-btn ms-btn-primary" onClick={close}>
+            <button type="button" className="ms-btn" disabled={busy} onClick={close}>
               {t("viewMailbox")}
             </button>
           </div>

@@ -350,7 +350,13 @@
     "resourcePolicyPending": "A política de recursos precisa estar ativa para enviar ou receber novas mensagens. Você pode reservar o endereço antes disso.",
     "receivingChecking": "Conferindo a configuração de recebimento…",
     "receivingError": "Não foi possível confirmar o recebimento. Confira novamente antes de usar este domínio.",
-    "checkReceiving": "Conferir recebimento"
+    "checkReceiving": "Conferir recebimento",
+    "activateReceiving": "Ativar recebimento",
+    "receivingActivating": "Ativando recebimento…",
+    "activationHint": "Após confirmar licença, domínio e MX, ative o recebimento das caixas licenciadas deste domínio. O DNS é gerenciado separadamente.",
+    "activationError": "Não foi possível confirmar a ativação do recebimento. Seu endereço continua reservado. Confira o recebimento antes de tentar novamente.",
+    "activationPending": "O recebimento continua pendente. Revise a configuração do domínio e a disponibilidade do serviço e confira novamente.",
+    "activationReady": "O recebimento foi confirmado para sua caixa."
   },
   "favorites": "Favoritos",
   "custom": "Pasta",

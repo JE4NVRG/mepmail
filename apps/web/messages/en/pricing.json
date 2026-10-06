@@ -1,7 +1,8 @@
 {
   "meta": {
     "title": "Pricing: every MepMail plan on one page",
-    "description": "MepMail pricing in USD: free with 100 emails/day, Pro from US$ 20 for 110,000 emails/month and Scale up to 2.75M. Overage per 1,000 and no lock-in."
+    "description": "MepMail pricing in USD: free with 100 emails/day, Pro from US$ 20 for 110,000 emails/month and Scale up to 2.75M. Overage per 1,000 and no lock-in.",
+    "launchDescription": "Send Pro 110K: US$29/month; US$20 only for eligible new customers’ first monthly bill, or US$290/year upfront. Mail is a per-mailbox add-on with conditional early access."
   },
   "eyebrow": "Pricing",
   "title": "Pick your volume. <highlight>Pay for what you send.</highlight>",
@@ -9,7 +10,7 @@
   "note": "Starting is free: 100 emails a day, no card. Choose a paid plan in the dashboard when you need more volume.",
   "plans": {
     "title": "The full ladder.",
-    "intro": "The same grid the landing shows, with the Scale rungs open. Overage is what each plan charges per 1,000 extra sends once its included volume ends."
+    "intro": "Regular Send monthly fees. The introductory promotion and Pro 110K annual offer appear below when available. Overage depends on your contract and dashboard enablement."
   },
   "included": {
     "eyebrow": "Included",
@@ -34,11 +35,11 @@
     "items": [
       {
         "q": "How does overage work?",
-        "a": "On Pro and Scale, extra sends are billed per 1,000 at the plan's own rate, and the safety ceiling is 5× the included volume. Without overage enabled at provisioning, sending stops at the monthly quota. Free and Starter stop at the daily cap."
+        "a": "Free and Starter stop at the UTC daily limit. Annual Pro 110K has a 110,000 monthly allowance with no paid overage. Monthly Pro and Scale contracts support overage only when contracted and enabled, at their plan’s rate; the safety ceiling remains."
       },
       {
         "q": "Is there a contract, and can I change plans later?",
-        "a": "No contract and no cancellation fee. Plans are month-to-month; tell us the volume you need and we move you to another rung."
+        "a": "Pro 110K offers monthly and a prepaid 12-month annual period. Annual costs US$290, without stacking the introductory monthly promotion. Available subscription actions appear in the dashboard; existing contracts are preserved."
       },
       {
         "q": "What is the attachment limit per message?",
@@ -46,7 +47,7 @@
       },
       {
         "q": "Do I need a card to start?",
-        "a": "No. The beta is free, 100 emails a day per account. Paid plans are billed monthly in USD and can be chosen in the dashboard."
+        "a": "No card is needed to start on Free. The new Pro 110K offer costs US$29/month, with US$20 only for eligible new customers’ first monthly bill, or US$290/year upfront."
       },
       {
         "q": "What happens above the top plan?",
@@ -58,5 +59,42 @@
     "title": "Pick your rung and send.",
     "body": "Create the account, verify your domain with our help, and go live through the API or the relay the same day.",
     "cta": "Create free account"
-  }
+  },
+  "launch": {
+    "eyebrow": "Pro 110K · Send",
+    "title": "One monthly allowance. Two ways to pay.",
+    "body": "110,000 Send deliveries each month for your application, campaigns and agents. Choose monthly or annual in the dashboard; introductory eligibility is confirmed before checkout.",
+    "monthTitle": "Monthly",
+    "monthIntro": "US$20 only for eligible new customers’ first monthly bill. Renewal: US$29/month.",
+    "monthQuota": "Overage only when supported by your contract and enabled in the dashboard.",
+    "yearTitle": "Annual",
+    "perYear": "/year",
+    "yearUpfront": "US$290 paid upfront for 12 months: the price of 10 regular monthly fees. The introduction does not stack.",
+    "yearQuota": "The 110,000 allowance renews monthly, without an accumulated annual balance. Sending stops at the monthly quota; annual billing does not include metered overage.",
+    "preserved": "Existing contracts keep their prices and limits; there is no automatic migration. System remains exempt.",
+    "mailCta": "Explore Mail",
+    "mailAccess": "Mail is paid separately per mailbox. The first opening is for eligible earlier subscribers; subscribing to Send now does not guarantee early access."
+  },
+  "launchFaq": [
+    {
+      "q": "How does overage work?",
+      "a": "Free and Starter stop at the UTC daily limit. Annual Pro 110K has a 110,000 monthly allowance with no paid overage. Monthly Pro and Scale contracts support overage only when contracted and enabled, at their plan’s rate; the safety ceiling remains."
+    },
+    {
+      "q": "Is there a contract, and can I change plans later?",
+      "a": "Pro 110K offers monthly and a prepaid 12-month annual period. Annual costs US$290, without stacking the introductory monthly promotion. Available subscription actions appear in the dashboard; existing contracts are preserved."
+    },
+    {
+      "q": "What is the attachment limit per message?",
+      "a": "1 MB on Free and Starter, 5 MB on Pro and 10 MB on Scale. This is the sum of the decoded attachments, not each file separately."
+    },
+    {
+      "q": "Do I need a card to start?",
+      "a": "No card is needed to start on Free. The new Pro 110K offer costs US$29/month, with US$20 only for eligible new customers’ first monthly bill, or US$290/year upfront."
+    },
+    {
+      "q": "What happens above the top plan?",
+      "a": "The published ladder stops at 2.75M a month. Above that, talk to us: we size the volume with you instead of quoting an enterprise tier we do not publish."
+    }
+  ]
 }

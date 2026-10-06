@@ -15,7 +15,8 @@ import {
 } from "@/components/site-chrome";
 import { StackLogoRow } from "@/components/stack-logos";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
-import { formatUsd, formatVolume, PRICE_ROWS } from "@/lib/landing-pricing";
+import { formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricing";
+import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
 import "./landing-calc.css";
@@ -69,7 +70,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootPage() {
   const locale = await getLocale();
   const t = await getTranslations("landing");
-  const comparison = PRICE_ROWS.map((row) => [
+  const launchOfferEnabled = process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
+  const priceRows = priceRowsForOffer(launchOfferEnabled);
+  const comparison = priceRows.map((row) => [
     formatVolume(row.volume, locale),
     formatUsd(row.mepmail, locale),
     formatUsd(row.resend, locale),
@@ -95,7 +98,11 @@ export default async function RootPage() {
     ctaNote: t("plans.ctaNote"),
     featuredBadge: t("plans.featuredBadge"),
   } satisfies PlanCardLabels;
-  const allPlans = plansWithCopy(t.raw("plans.items") as PlanCopy[]);
+  const allPlans = plansWithCopy(
+    t.raw("plans.items") as PlanCopy[],
+    launchOfferEnabled,
+    t("plans.launchPriceNote"),
+  );
   const points = t.raw("structure.points") as string[];
   const columns = t.raw("compare.columns") as string[];
   const steps = t.raw("how.items") as string[];
@@ -134,9 +141,14 @@ export default async function RootPage() {
               <p className="gtm-note">{t("hero.note")}</p>
               {proOffer && (
                 <p className="cro-offer">
-                  {t("hero.offer", {
+                  {t(launchOfferEnabled ? "hero.launchOffer" : "hero.offer", {
                     volume: new Intl.NumberFormat(locale).format(proOffer.included),
-                    price: formatUsd(proOffer.priceCents / 100, locale),
+                    price: formatUsd(
+                      (launchOfferEnabled
+                        ? LAUNCH_OFFER.sending.monthlyCents
+                        : proOffer.priceCents) / 100,
+                      locale,
+                    ),
                   })}{" "}
                   <a href="#planos" aria-label={t("nav.plans")}>
                     ↗
@@ -316,7 +328,7 @@ export default async function RootPage() {
             <p className="gtm-eyebrow">{t("compare.eyebrow")}</p>
             <h2>{t("compare.title")}</h2>
             <p>{t("compare.intro")}</p>
-            <LandingCalculator labels={{ ...calc, contact }} />
+            <LandingCalculator labels={{ ...calc, contact }} rows={priceRows} />
             <details className="cro-comparison">
               <summary>{t("integration.tableSummary")}</summary>
               <section

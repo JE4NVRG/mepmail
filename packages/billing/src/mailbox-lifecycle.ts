@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import type Stripe from "stripe";
+import {
+  type MailboxLaunchCohort,
+  mailboxLaunchCohortAllows,
+} from "../../core/src/mailbox-launch-cohort.js";
 import { mailboxManagementRequests } from "../../db/src/schema/mailbox-management-requests.js";
 import {
   createMailboxCheckoutSession,
@@ -15,7 +19,7 @@ import {
   mailboxIncreasePaymentConfirmed,
   projectMailboxSubscription,
 } from "./mailbox.js";
-import { hasPaidSendingPlan } from "./mailbox-addon.js";
+import { hasPaidSendingPlanForMailbox } from "./mailbox-addon.js";
 import type { BillingStripe } from "./stripe.js";
 import { idOf, lockCustomer } from "./subscription.js";
 
@@ -30,7 +34,8 @@ export class MailboxLifecycleError extends Error {
       | "pending"
       | "expired"
       | "subscription_exists"
-      | "sending_plan_required",
+      | "sending_plan_required"
+      | "early_access_required",
   ) {
     super(code);
   }
@@ -394,6 +399,8 @@ async function applyMailboxProjection(
 export interface MailboxPurchaseDeps {
   /** Hosted Envio contract prerequisite; library callers retain their own catalog rules. */
   requirePaidSendingPlan?: boolean;
+  /** Optional hosted opening snapshot; null represents an invalid present config. */
+  earlyAccessCohort?: MailboxLaunchCohort | null | undefined;
   db: Db;
   stripe: MailboxBillingStripe;
   /** Resolve an ambiguous attempt through provider readback. Null remains blocked, never expired by TTL. */
@@ -566,9 +573,19 @@ async function ensureMailboxCustomer(
     if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
     if (
       deps.requirePaidSendingPlan &&
-      !hasPaidSendingPlan({ ...team, stripeCustomerId: team.customerId })
+      !hasPaidSendingPlanForMailbox(
+        { ...team, stripeCustomerId: team.customerId },
+        deps.earlyAccessCohort,
+      )
     )
       throw new MailboxLifecycleError("sending_plan_required");
+    if (
+      !mailboxLaunchCohortAllows(deps.earlyAccessCohort, {
+        teamId: team.id,
+        customerId: team.customerId,
+      })
+    )
+      throw new MailboxLifecycleError("early_access_required");
     await assertNoOccupiedMailboxPlan(db, team.id);
     const [existing] = await tx
       .select()
@@ -629,9 +646,19 @@ async function ensureMailboxCustomer(
       if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
       if (
         deps.requirePaidSendingPlan &&
-        !hasPaidSendingPlan({ ...team, stripeCustomerId: team.customerId })
+        !hasPaidSendingPlanForMailbox(
+          { ...team, stripeCustomerId: team.customerId },
+          deps.earlyAccessCohort,
+        )
       )
         throw new MailboxLifecycleError("sending_plan_required");
+      if (
+        !mailboxLaunchCohortAllows(deps.earlyAccessCohort, {
+          teamId: team.id,
+          customerId: team.customerId,
+        })
+      )
+        throw new MailboxLifecycleError("early_access_required");
       // The first Customer intent committed before this transaction. A grant may
       // have arrived in that gap; preserve the intent and reject before the SDK call.
       await assertNoOccupiedMailboxPlan(db, input.teamId);
@@ -686,6 +713,7 @@ async function purchaseTeam(
   db: Db,
   input: BeginMailboxCheckoutInput,
   requirePaidSendingPlan = false,
+  earlyAccessCohort?: MailboxLaunchCohort | null,
 ) {
   // Discovery takes no row lock. Customer -> team -> membership -> service/lease
   // matches webhook writers and team deletion, avoiding an advisory/row lock cycle.
@@ -716,8 +744,15 @@ async function purchaseTeam(
   if (team.customerId !== discovered.customerId) throw new MailboxLifecycleError("conflict");
   await currentAdmin(db, input);
   if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
-  if (requirePaidSendingPlan && !hasPaidSendingPlan({ ...team, stripeCustomerId: team.customerId }))
+  if (
+    requirePaidSendingPlan &&
+    !hasPaidSendingPlanForMailbox({ ...team, stripeCustomerId: team.customerId }, earlyAccessCohort)
+  )
     throw new MailboxLifecycleError("sending_plan_required");
+  if (
+    !mailboxLaunchCohortAllows(earlyAccessCohort, { teamId: team.id, customerId: team.customerId })
+  )
+    throw new MailboxLifecycleError("early_access_required");
   // Customer linkage is created by the authorized durable Customer flow, never team metadata.
   if (!team.customerId) throw new MailboxLifecycleError("unavailable");
   return { ...team, customerId: team.customerId };
@@ -824,7 +859,7 @@ async function purchase(
 ): Promise<BeginMailboxCheckoutResult> {
   const prepared = await deps.db.transaction(async (tx) => {
     const db = tx as unknown as Db;
-    const team = await purchaseTeam(db, input, deps.requirePaidSendingPlan);
+    const team = await purchaseTeam(db, input, deps.requirePaidSendingPlan, deps.earlyAccessCohort);
     await assertNoSubscription(db, deps.stripe, catalog, team.id, team.customerId);
     const [existing] = await tx
       .select()
@@ -876,7 +911,12 @@ async function purchase(
   const outcome = await deps.db.transaction(
     async (tx): Promise<BeginMailboxCheckoutResult | { error: "expired" | "pending" }> => {
       const db = tx as unknown as Db;
-      const team = await purchaseTeam(db, input, deps.requirePaidSendingPlan);
+      const team = await purchaseTeam(
+        db,
+        input,
+        deps.requirePaidSendingPlan,
+        deps.earlyAccessCohort,
+      );
       await assertNoSubscription(db, deps.stripe, catalog, team.id, team.customerId);
       const [lease] = await tx
         .select()

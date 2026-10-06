@@ -1,22 +1,22 @@
 {
   "meta": {
-    "title": "Alternativa ao Resend: mesma API, preço menor",
-    "description": "Resend vs MepMail lado a lado: a mesma API de envio e o mesmo SDK oficial, preços em USD com fonte e data, MCP nativo e plataforma open-source que você pode hospedar."
+    "title": "Alternativa ao Resend: fluxos de envio e preços",
+    "description": "Compare fluxos compatíveis de envio no MepMail, com API, SMTP e MCP. Referência histórica de preços dos concorrentes, com data e diferenças de recursos."
   },
   "eyebrow": "Alternativas",
   "title": "Vindo do Resend? <highlight>Mantenha o SDK.</highlight>",
-  "lead": "O MepMail fala a API de envio do Resend. Nos fluxos compatíveis, troque a base URL e a chave sem reescrever código. Veja o que muda, o que permanece e a diferença de preço calculada pela lista pública do Resend.",
+  "lead": "Nos fluxos de envio compatíveis com o SDK Resend, troque a base URL e a chave. Veja o guia de migração, os recursos disponíveis e a referência histórica de preços abaixo.",
   "note": "Começar é grátis: 100 e-mails por dia, sem cartão. Ajudamos na migração e na configuração do seu domínio de envio.",
   "table": {
     "title": "Resend vs MepMail, volume por volume.",
-    "intro": "Em cada lado, o menor plano publicado que cobre o volume.",
-    "columns": ["Envios/mês", "Resend", "MepMail", "Vantagem MepMail"],
-    "rowAdvantage": "{percent}% menos · {usd}/mês de economia",
-    "source": "Coluna Resend: lista pública em <link>resend.com/pricing</link>, lida em {date}. Coluna MepMail: nossos preços publicados. Valores em USD por mês, sem impostos e sem excedentes."
+    "intro": "Mensalidades recorrentes MepMail comparadas com a referência histórica Resend de 27/09/2026, sem promoção de entrada ou desconto anual. Não é uma cotação atual do concorrente.",
+    "columns": ["Envios/mês", "Resend", "MepMail", "Diferença histórica"],
+    "rowAdvantage": "Diferença: {percent}% · {usd}/mês",
+    "source": "Referência histórica Resend: <link>resend.com/pricing</link>, lida em {date}. MepMail: mensalidade recorrente apresentada nesta página. Valores em USD, antes de impostos; recursos e condições não são equivalentes. Confirme os preços atuais do fornecedor."
   },
   "claim": {
-    "title": "Sobre o “até 60% mais barato”.",
-    "body": "A chamada compara com o degrau público mais caro do mercado: SendGrid em {volume}, {sendgrid}/mês contra os nossos {mepmail}. Contra o Resend especificamente, a diferença na tabela acima vai de {min}% a {max}%."
+    "title": "Como ler esta comparação",
+    "body": "As porcentagens são diferenças aritméticas em relação à referência datada, não uma promessa de economia atual. A oferta inicial de US$ 20 e o anual MepMail não entram no cálculo; compare também recursos, limites e suporte."
   },
   "same": {
     "title": "O que carrega junto",
@@ -38,7 +38,7 @@
   },
   "steps": {
     "eyebrow": "Migração",
-    "title": "Três passos, cerca de 15 minutos.",
+    "title": "Três passos para começar.",
     "items": [
       "Crie a conta e adicione seu domínio de envio: geramos os registros de DKIM e MAIL FROM e esperamos a verificação junto com você.",
       "Troque a base URL e a chave no seu client Resend. O SDK e as chamadas de envio ficam exatamente como estão.",

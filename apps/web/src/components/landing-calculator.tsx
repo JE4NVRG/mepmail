@@ -3,8 +3,8 @@
 import { useLocale } from "next-intl";
 import { useId, useMemo, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
-import { formatUsd, formatVolume, PRICE_ROWS } from "@/lib/landing-pricing";
-import { savingsForIndex } from "@/lib/landing-savings";
+import { formatUsd, formatVolume, PRICE_ROWS, type PriceRow } from "@/lib/landing-pricing";
+import { computeSavings } from "@/lib/landing-savings";
 
 export interface CalcLabels {
   title: string;
@@ -32,11 +32,21 @@ export interface CalcLabels {
  * from @/lib/landing-pricing — the same data the comparison table renders — and
  * render in the reader's locale (US separators in en, Brazilian ones in pt-BR).
  */
-export function LandingCalculator({ labels }: { labels: CalcLabels }) {
+export function LandingCalculator({
+  labels,
+  rows = PRICE_ROWS,
+}: {
+  labels: CalcLabels;
+  rows?: readonly PriceRow[];
+}) {
   const [index, setIndex] = useState(2); // default: 550K, the middle rung
   const locale = useLocale();
   const id = useId();
-  const savings = useMemo(() => savingsForIndex(index), [index]);
+  const savings = useMemo(() => {
+    const row = rows[index];
+    if (!row) throw new RangeError("Missing comparison row");
+    return computeSavings(row);
+  }, [index, rows]);
   const volume = formatVolume(savings.row.volume, locale);
   const savingsText = labels.savings
     .replace("{percent}", String(savings.savingsPct))
@@ -56,14 +66,14 @@ export function LandingCalculator({ labels }: { labels: CalcLabels }) {
         id={id}
         type="range"
         min={0}
-        max={PRICE_ROWS.length - 1}
+        max={rows.length - 1}
         step={1}
         value={index}
         aria-label={labels.a11y}
         onChange={(event) => {
           const next = Number(event.target.value);
           setIndex(next);
-          const row = PRICE_ROWS[next];
+          const row = rows[next];
           if (row)
             trackEvent("pricing_slider_change", { volume: formatVolume(row.volume, locale) });
         }}

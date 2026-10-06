@@ -1,7 +1,8 @@
 {
   "meta": {
     "title": "Preços: todos os planos MepMail em uma página",
-    "description": "Preços do MepMail em USD: grátis com 100 e-mails/dia, Pro a partir de US$ 20 para 110.000 e-mails/mês e Scale até 2,75M. Excedente por 1.000 e sem fidelidade."
+    "description": "Preços do MepMail em USD: grátis com 100 e-mails/dia, Pro a partir de US$ 20 para 110.000 e-mails/mês e Scale até 2,75M. Excedente por 1.000 e sem fidelidade.",
+    "launchDescription": "Envio Pro 110K: US$ 29/mês; US$ 20 só na primeira mensalidade elegível de novos clientes, ou US$ 290/ano antecipados. Correio é um adicional por caixa, com acesso antecipado condicionado."
   },
   "eyebrow": "Preços",
   "title": "Escolha o volume. <highlight>Pague pelo que envia.</highlight>",
@@ -9,7 +10,7 @@
   "note": "Começar é grátis: 100 e-mails por dia, sem cartão. Escolha um plano pago no painel quando precisar de mais volume.",
   "plans": {
     "title": "A escada completa.",
-    "intro": "A mesma grade mostrada na landing, com os degraus Scale abertos. Excedente é o que cada plano cobra por 1.000 envios extras quando o volume incluído acaba."
+    "intro": "Mensalidades normais de Envio. A promoção de entrada e o anual Pro 110K aparecem abaixo quando disponíveis. O excedente depende do contrato e da habilitação no painel."
   },
   "included": {
     "eyebrow": "Incluído",
@@ -34,11 +35,11 @@
     "items": [
       {
         "q": "Como funciona o excedente?",
-        "a": "Em Pro e Scale, os envios extras são cobrados por 1.000 pela tarifa do próprio plano, com teto de segurança de 5× o volume incluído. Sem excedente habilitado no provisionamento, os envios param na cota mensal. Free e Starter param no limite diário."
+        "a": "Free e Starter param no limite diário UTC. O Pro 110K anual tem franquia mensal de 110 mil, sem excedente pago. Nos contratos mensais Pro e Scale, excedente só quando contratado e habilitado, pela tarifa do próprio plano; o teto de segurança permanece."
       },
       {
         "q": "Existe fidelidade e posso trocar de plano depois?",
-        "a": "Não há fidelidade nem multa de cancelamento. Os planos são mês a mês; conte o volume que você precisa e nós movemos você para outro degrau."
+        "a": "O Pro 110K oferece mensal e anual antecipado de 12 meses. O anual custa US$ 290, sem acumular a promoção da primeira mensalidade. As ações disponíveis para sua assinatura aparecem no painel; contratos atuais são preservados."
       },
       {
         "q": "Qual o limite de anexos por mensagem?",
@@ -46,7 +47,7 @@
       },
       {
         "q": "Preciso de cartão para começar?",
-        "a": "Não. O beta é grátis, 100 e-mails por dia por conta. Os planos pagos são cobrados por mês em USD e podem ser escolhidos no painel."
+        "a": "Não precisa de cartão para começar no Free. A nova oferta Pro 110K custa US$ 29/mês, com US$ 20 apenas na primeira mensalidade de novos clientes elegíveis, ou US$ 290/ano antecipados."
       },
       {
         "q": "E acima do maior plano?",
@@ -58,5 +59,42 @@
     "title": "Escolha o degrau e envie.",
     "body": "Crie a conta, verifique seu domínio com a nossa ajuda e entre em produção pela API ou pelo relay no mesmo dia.",
     "cta": "Criar conta grátis"
-  }
+  },
+  "launch": {
+    "eyebrow": "Pro 110K · Envio",
+    "title": "Uma franquia mensal. Duas formas de pagar.",
+    "body": "110 mil entregas de Envio por mês para sua aplicação, campanhas e agentes. Escolha mensal ou anual no painel; a elegibilidade da promoção é confirmada antes do checkout.",
+    "monthTitle": "Mensal",
+    "monthIntro": "US$ 20 só na primeira mensalidade de novos clientes elegíveis. Renovação: US$ 29/mês.",
+    "monthQuota": "Excedente apenas quando previsto no contrato e habilitado no painel.",
+    "yearTitle": "Anual",
+    "perYear": "/ano",
+    "yearUpfront": "US$ 290 pagos antecipadamente para 12 meses: o valor de 10 mensalidades normais. Não acumula a promoção inicial.",
+    "yearQuota": "A franquia de 110 mil renova mensalmente, sem saldo anual acumulado. O envio para na cota mensal; o anual não inclui cobrança de excedentes.",
+    "preserved": "Contratos existentes mantêm seus valores e limites; não há migração automática. System continua isento.",
+    "mailCta": "Conhecer o Correio",
+    "mailAccess": "Correio é pago à parte por caixa. A primeira abertura é para assinantes anteriores elegíveis; contratar Envio agora não garante acesso antecipado."
+  },
+  "launchFaq": [
+    {
+      "q": "Como funciona o excedente?",
+      "a": "Free e Starter param no limite diário UTC. O Pro 110K anual tem franquia mensal de 110 mil, sem excedente pago. Nos contratos mensais Pro e Scale, excedente só quando contratado e habilitado, pela tarifa do próprio plano; o teto de segurança permanece."
+    },
+    {
+      "q": "Existe fidelidade e posso trocar de plano depois?",
+      "a": "O Pro 110K oferece mensal e anual antecipado de 12 meses. O anual custa US$ 290, sem acumular a promoção da primeira mensalidade. As ações disponíveis para sua assinatura aparecem no painel; contratos atuais são preservados."
+    },
+    {
+      "q": "Qual o limite de anexos por mensagem?",
+      "a": "1 MB no Free e Starter, 5 MB no Pro e 10 MB no Scale. É a soma dos anexos decodificados, não cada arquivo separadamente."
+    },
+    {
+      "q": "Preciso de cartão para começar?",
+      "a": "Não precisa de cartão para começar no Free. A nova oferta Pro 110K custa US$ 29/mês, com US$ 20 apenas na primeira mensalidade de novos clientes elegíveis, ou US$ 290/ano antecipados."
+    },
+    {
+      "q": "E acima do maior plano?",
+      "a": "A escada publicada termina em 2,75M por mês. Acima disso, fale com a gente: dimensionamos o volume com você em vez de cotar um plano enterprise que não publicamos."
+    }
+  ]
 }

@@ -50,7 +50,8 @@
       "subject": "Olá do MepMail",
       "responseLabel": "Resposta",
       "caption": "Uma base URL e o SDK que você já usa envia pelo MepMail."
-    }
+    },
+    "launchOffer": "{volume} entregas/mês por {price} recorrentes. US$ 20 só na primeira mensalidade elegível."
   },
   "stack": {
     "eyebrow": "Funciona com a sua stack",
@@ -61,23 +62,31 @@
   "compare": {
     "eyebrow": "Preço sem adivinhação",
     "title": "Compare pelo volume que você realmente envia.",
-    "intro": "Os valores abaixo comparam o caminho público mais barato para enviar cada volume mensal: o plano que cobre o volume, ou um plano menor mais o excedente publicado do fornecedor. A economia varia por faixa e fornecedor; confirme condições atuais antes de contratar.",
+    "intro": "Compare o preço mensal recorrente do MepMail com a referência histórica dos concorrentes de 27/09/2026. A promoção inicial e o desconto anual não entram nesta tabela; recursos e condições variam.",
     "tableAria": "Comparativo de preços por volume",
-    "columns": ["Envios/mês", "MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "Vantagem"],
+    "columns": [
+      "Envios/mês",
+      "MepMail",
+      "Resend",
+      "SendGrid",
+      "Postmark",
+      "Mailgun",
+      "Diferença histórica"
+    ],
     "slideNote": "Deslize a tabela para ver todos os fornecedores em telas menores.",
     "refNote": "Referência da análise comercial de 27/09/2026; preços públicos de terceiros podem mudar e condições/recursos não são equivalentes. Valores em USD por mês, sem impostos. Onde o fornecedor publica o excedente como intervalo, usamos o ponto médio."
   },
   "calc": {
-    "title": "Arraste o volume e veja a economia.",
-    "lead": "Escolha o volume mensal que você envia; comparamos o preço MepMail com os concorrentes de preço público e mostramos a diferença.",
+    "title": "Compare com a referência histórica.",
+    "lead": "Escolha seu volume: mensalidade recorrente do MepMail e preços de concorrentes registrados em 27/09/2026.",
     "volumeLabel": "Envios por mês",
     "ours": "MepMail",
-    "cheapest": "Concorrente mais barato ({name})",
-    "savings": "Economia de {percent}% (~{usd}/mês)",
-    "annual": "≈ {usd} por ano",
-    "cta": "Quero esse preço",
+    "cheapest": "Menor preço na referência ({name})",
+    "savings": "Diferença histórica: {percent}% (~{usd}/mês)",
+    "annual": "12 mensalidades dessa diferença: ≈ {usd}; não é uma cotação anual",
+    "cta": "Conversar sobre meu volume",
     "ctaSubject": "Calculadora MepMail: {volume} e-mails/mês",
-    "note": "Estimativa com preços públicos de 27/09/2026, em USD/mês; os concorrentes podem mudar valores e os recursos não são equivalentes.",
+    "note": "Referência histórica de 27/09/2026, em USD/mês. Confirme os preços atuais dos fornecedores; os recursos não são equivalentes. Não inclui promoção inicial, desconto anual, impostos ou consumo excedente.",
     "a11y": "Volume mensal de envios"
   },
   "structure": {
@@ -115,7 +124,7 @@
   "plans": {
     "eyebrow": "Planos",
     "title": "Comece grátis. Cresça por volume.",
-    "intro": "Todos os planos incluem onboarding assistido e suporte. Preços mensais em USD, sem fidelidade.",
+    "intro": "Planos de Envio em USD, com implantação assistida e suporte. Escolha seu volume; a oferta Pro 110K tem uma opção anual quando disponível no painel.",
     "perMonth": "/mês",
     "limitsLabel": "Workspaces e limites",
     "overageLabel": "Excedente",
@@ -193,7 +202,8 @@
       "note": "Depois do período de fundador, a gestão proativa segue opcional a +US$ 29/mês. Sem fidelidade: cancele quando quiser.",
       "cta": "Garantir minha vaga"
     },
-    "noteAttach": "Limite por e-mail: tamanho total dos anexos após decodificação, não por arquivo."
+    "noteAttach": "Limite por e-mail: tamanho total dos anexos após decodificação, não por arquivo.",
+    "launchPriceNote": "Novos clientes elegíveis: US$ 20 só na primeira mensalidade; depois US$ 29/mês. Anual: US$ 290 antecipados, sem acumular a promoção."
   },
   "how": {
     "eyebrow": "Seus próximos passos",

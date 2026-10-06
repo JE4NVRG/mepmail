@@ -30,11 +30,13 @@ function RegistryDialog({
   options,
   close,
   changed,
+  openReceiving,
 }: {
   mailbox: Box | null;
   options: Options;
   close: () => void;
   changed: (id: string) => Promise<void>;
+  openReceiving: () => void;
 }) {
   const t = useTranslations("mailboxes");
   const trpc = useTRPC();
@@ -255,6 +257,13 @@ function RegistryDialog({
         </footer>
       </form>
       {mailbox ? (
+        <div className={styles.dialogFooter}>
+          <button type="button" className="ms-btn" disabled={busy} onClick={openReceiving}>
+            {t("setup.checkReceiving")}
+          </button>
+        </div>
+      ) : null}
+      {mailbox ? (
         <section className={styles.access}>
           <h3>{t("access")}</h3>
           <p className={styles.hint}>{t("accessHint")}</p>
@@ -383,7 +392,7 @@ export function MailboxesView() {
   const [customFolderId, setCustomFolderId] = useState<string | null>(null);
   const [folderDialog, setFolderDialog] = useState<string | "new" | null>(null);
   const [mailboxKind, setMailboxKind] = useState<MailboxKindFilter>("all");
-  const [dialog, setDialog] = useState<"new" | "edit" | null>(null);
+  const [dialog, setDialog] = useState<"new" | "edit" | "receiving" | null>(null);
   const [licenseOpenRequest, openLicense] = useState(0);
   const [licenseOfferId, setLicenseOfferId] = useState<string | null>(null);
   const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
@@ -789,6 +798,21 @@ export function MailboxesView() {
           options={options.data}
           close={() => setDialog(null)}
           changed={changed}
+          openReceiving={() => setDialog("receiving")}
+        />
+      ) : null}
+      {registry.data?.canManage && dialog === "receiving" && options.data && selected ? (
+        <MailboxSetupDialog
+          key={`receiving-${selected.id}`}
+          existingMailbox={selected}
+          options={options.data}
+          close={() => setDialog(null)}
+          changed={changed}
+          reviewLicense={(offerId) => {
+            setDialog(null);
+            setLicenseOfferId(offerId ?? null);
+            openLicense((request) => request + 1);
+          }}
         />
       ) : null}
       {agentBox ? (

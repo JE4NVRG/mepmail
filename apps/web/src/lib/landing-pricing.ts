@@ -1,18 +1,8 @@
-/**
- * Single source for the landing price comparison: display strings for the public
- * table (via formatUsd / formatVolume) and numbers for the savings calculator.
- * Both locales share the numbers but NOT the separators: the audience is global
- * and English is the default, so "en" renders US formatting ("US$ 1,265",
- * "1.65M") and pt-BR the mirrored Brazilian one ("US$ 1.265", "1,65M"). The
- * rows are the MepMail rungs of release v.44 (+10% volume, same price), in the
- * same order packages/core/src/plans.ts lists them; every competitor figure is
- * the cheapest published way to send that volume (the rung that covers it, or a
- * smaller rung plus that plan's published overage), from
- * docs/gtm/bench-concorrentes-2026-09.md. test/landing-savings.test.ts pins the
- * table cell-for-cell in both locales and checks the Advantage column against
- * the calculator's own arithmetic, so a formatter change cannot silently alter
- * the copy or drift from computeSavings.
+/** Public MepMail prices compared with the dated 2026-09-27 benchmark.
+ * Competitor values are historical references, not current quotes or equivalent
+ * feature bundles. The new offer is selected by the server, never client env.
  */
+import { LAUNCH_OFFER } from "./launch-offer";
 
 export interface PriceRow {
   /** Emails per month this row refers to: a MepMail rung (plans.ts PLAN_RUNGS). */
@@ -83,6 +73,17 @@ export const PRICE_ROWS: readonly PriceRow[] = [
     savings: "55%",
   },
 ];
+
+/** Presentation only: existing subscriptions and the core catalog are unchanged. */
+export function priceRowsForOffer(launchOfferEnabled: boolean): readonly PriceRow[] {
+  if (!launchOfferEnabled) return PRICE_ROWS;
+  return PRICE_ROWS.map((row) => {
+    if (row.volume !== LAUNCH_OFFER.sending.monthlyRecipientDeliveries) return row;
+    const mepmail = LAUNCH_OFFER.sending.monthlyCents / 100;
+    const cheapest = Math.min(row.resend, row.sendgrid, row.postmark ?? Infinity, row.mailgun);
+    return { ...row, mepmail, savings: `${Math.round(((cheapest - mepmail) / cheapest) * 100)}%` };
+  });
+}
 
 export const COMPETITORS = [
   { key: "resend", name: "Resend" },

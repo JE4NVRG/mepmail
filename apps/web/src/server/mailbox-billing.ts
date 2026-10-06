@@ -11,9 +11,11 @@ import { env, isCloudDeployment } from "@millionsend/config";
 import { type Db, schema } from "@millionsend/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { hasPaidSendingPlan } from "../../../../packages/billing/src/mailbox-addon";
+import { hasPaidSendingPlanForMailbox } from "../../../../packages/billing/src/mailbox-addon";
+import { mailboxLaunchCohortAllows } from "../../../../packages/core/src/mailbox-launch-cohort";
 import { mailboxManagementRequests } from "../../../../packages/db/src/schema/mailbox-management-requests";
 import { getStripe } from "./billing";
+import { mailboxEarlyAccessCohort } from "./mailboxes";
 
 const terms = z
   .object({
@@ -173,7 +175,14 @@ export async function mailboxBillingPresentation(
     );
   if (!member) throw new MailboxLifecycleError("forbidden");
   const canManage = member.role === "owner" || member.role === "admin";
-  const sendingPlanRequired = member.plan !== "system" && !hasPaidSendingPlan(member);
+  const sendingPlanRequired =
+    member.plan !== "system" && !hasPaidSendingPlanForMailbox(member, mailboxEarlyAccessCohort());
+  const earlyAccessRequired =
+    member.plan !== "system" &&
+    !mailboxLaunchCohortAllows(mailboxEarlyAccessCohort(), {
+      teamId: member.id,
+      customerId: member.stripeCustomerId,
+    });
   const [subscription] = await db
     .select()
     .from(schema.mailboxSubscriptions)
@@ -291,15 +300,18 @@ export async function mailboxBillingPresentation(
         ? ("existing_subscription" as const)
         : sendingPlanRequired
           ? ("sending_plan_required" as const)
-          : offers.length === 0
-            ? ("unavailable" as const)
-            : !sameOffer
-              ? ("recovery_required" as const)
-              : ("available" as const);
+          : earlyAccessRequired
+            ? ("early_access_required" as const)
+            : offers.length === 0
+              ? ("unavailable" as const)
+              : !sameOffer
+                ? ("recovery_required" as const)
+                : ("available" as const);
   return {
     canManage,
     canPurchase: availability === "available",
     sendingPlanRequired,
+    earlyAccessRequired,
     availability,
     offer,
     offers,
@@ -319,6 +331,7 @@ export async function mailboxBillingPresentation(
       canResume:
         mutable &&
         !sendingPlanRequired &&
+        !earlyAccessRequired &&
         beforeEnd &&
         ["active", "trialing"].includes(subscription!.status) &&
         subscription!.cancelAtPeriodEnd &&
@@ -332,6 +345,7 @@ export async function mailboxBillingPresentation(
       canIncrease:
         mutable &&
         !sendingPlanRequired &&
+        !earlyAccessRequired &&
         beforeEnd &&
         subscription!.status === "active" &&
         !subscription!.cancelAtPeriodEnd &&
@@ -352,6 +366,7 @@ export function mailboxPurchaseDeps(db: Db): MailboxPurchaseDeps {
     db,
     stripe,
     requirePaidSendingPlan: true,
+    earlyAccessCohort: mailboxEarlyAccessCohort(),
     recoverCheckout: (lease) => recoverMailboxCheckoutSession(stripe, lease),
   };
 }

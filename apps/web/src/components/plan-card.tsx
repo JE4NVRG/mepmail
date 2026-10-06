@@ -59,6 +59,7 @@ export function PlanCard({ plan, labels }: { plan: LandingPlan; labels: PlanCard
         {plan.price}
         <span>{labels.perMonth}</span>
       </p>
+      {copy.priceNote ? <p className="gtm-cta-note">{copy.priceNote}</p> : null}
       <p className="gtm-volume">{copy.volume}</p>
       <dl>
         <div>

@@ -9,7 +9,7 @@ import {
 import { getDb } from "@millionsend/db";
 import { getKeyring } from "./keyring";
 import { mailboxTransportMime } from "./mailbox-transport";
-import { mailboxAccessEnabled, mailboxRegistryEnabled } from "./mailboxes";
+import { mailboxActorAccessEnabled, mailboxRegistryEnabled } from "./mailboxes";
 import { getQueue } from "./queue";
 
 export const MAILBOX_AGENT_HEADERS = {
@@ -26,8 +26,9 @@ export async function mailboxAgentRequest(
   return mailboxAgentBearerRequest(
     request,
     (token) =>
-      withMailboxAgentAccess(getDb(), token, scope, (context) => {
-        if (!mailboxAccessEnabled(context.actor)) throw new MailboxAgentAccessError("forbidden");
+      withMailboxAgentAccess(getDb(), token, scope, async (context) => {
+        if (!(await mailboxActorAccessEnabled(context.db, context.actor)))
+          throw new MailboxAgentAccessError("forbidden");
         return run(context);
       }),
     (result) => Response.json(result, { headers: MAILBOX_AGENT_HEADERS }),
@@ -48,11 +49,12 @@ export async function mailboxAgentSendRequest(
       // Finish this transaction first; admission below revalidates all provenance.
       if (
         process.env.MAILBOX_PILOT_TEAM_IDS !== undefined ||
-        process.env.MAILBOX_PILOT_USER_IDS !== undefined
+        process.env.MAILBOX_PILOT_USER_IDS !== undefined ||
+        process.env.MAILBOX_EARLY_ACCESS_COHORT !== undefined
       )
-        await withMailboxAgentAccess(getDb(), token, "send", (context) => {
-          if (!mailboxAccessEnabled(context.actor)) throw new MailboxAgentAccessError("forbidden");
-          return Promise.resolve();
+        await withMailboxAgentAccess(getDb(), token, "send", async (context) => {
+          if (!(await mailboxActorAccessEnabled(context.db, context.actor)))
+            throw new MailboxAgentAccessError("forbidden");
         });
       const result = await queueMailboxAgentDraft(
         getDb(),

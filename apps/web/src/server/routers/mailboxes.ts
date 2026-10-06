@@ -40,6 +40,7 @@ import { recordAudit } from "../audit";
 import { resolveBaseUrl } from "../auth";
 import { getKeyring } from "../keyring";
 import { cursorSchema } from "../keyset";
+import { activateMailboxReceiving } from "../mailbox-activation";
 import {
   mailboxBillingCatalog,
   mailboxBillingCatalogForOffer,
@@ -56,12 +57,14 @@ import {
 import { mailboxReceivingDeps } from "../mailbox-receiving";
 import { mailboxTransportMime } from "../mailbox-transport";
 import { getMailboxUsage } from "../mailbox-usage";
-import { mailboxAccessEnabled } from "../mailboxes";
+import { mailboxActorAccessEnabled, mailboxCreateAccessEnabled } from "../mailboxes";
 import { getQueue } from "../queue";
 import { router, teamProcedure } from "../trpc";
 
-const enabled = teamProcedure.use(({ ctx, next }) => {
-  if (!mailboxAccessEnabled({ teamId: ctx.teamId, userId: ctx.session.user.id }))
+const enabled = teamProcedure.use(async ({ ctx, next }) => {
+  if (
+    !(await mailboxActorAccessEnabled(ctx.db, { teamId: ctx.teamId, userId: ctx.session.user.id }))
+  )
     throw new TRPCError({ code: "NOT_FOUND" });
   // Existing operator support grants cover outbound operations, not private mailbox content or registry.
   if (ctx.supportView) throw new TRPCError({ code: "FORBIDDEN" });
@@ -123,8 +126,8 @@ const boxInput = z.object({
 });
 
 export const mailboxesRouter = router({
-  capabilities: teamProcedure.query(({ ctx }) => {
-    const enabled = mailboxAccessEnabled(actor(ctx)) && !ctx.supportView;
+  capabilities: teamProcedure.query(async ({ ctx }) => {
+    const enabled = !ctx.supportView && (await mailboxActorAccessEnabled(ctx.db, actor(ctx)));
     return {
       enabled,
       deliveryReady: enabled && process.env.MAILBOX_TRANSPORT_ENABLED === "1",
@@ -139,6 +142,31 @@ export const mailboxesRouter = router({
       );
       return { ...readiness, state: readiness.receiving_state, mxHost: readiness.mx.value };
     }),
+  verifyReceiving: enabled
+    .input(z.object({ domainId: z.uuid() }).strict())
+    .mutation(({ ctx, input }) =>
+      call(async () => {
+        await withMailboxRegistryAdmin(ctx.db, actor(ctx), async (transaction) => {
+          if (!(await mailboxCreateAccessEnabled(transaction, actor(ctx)))) {
+            const presentation = await mailboxBillingPresentation(transaction, actor(ctx));
+            throw new MailboxLifecycleError(
+              presentation.sendingPlanRequired ? "sending_plan_required" : "early_access_required",
+            );
+          }
+          await activateMailboxReceiving(transaction, actor(ctx), input.domainId);
+        });
+        const readiness = await getMailboxReceivingReadiness(
+          ctx.db,
+          actor(ctx),
+          input.domainId,
+          mailboxReceivingDeps(),
+        );
+        return { ...readiness, state: readiness.receiving_state, mxHost: readiness.mx.value };
+      }).catch((error: unknown) => {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "receiving_unavailable" });
+      }),
+    ),
   activity: enabled
     .input(
       z
@@ -234,7 +262,9 @@ export const mailboxesRouter = router({
                 ? "conflict"
                 : presentation.availability === "sending_plan_required"
                   ? "sending_plan_required"
-                  : "mailbox_billing_unavailable",
+                  : presentation.availability === "early_access_required"
+                    ? "early_access_required"
+                    : "mailbox_billing_unavailable",
         });
       if (
         presentation.pendingCheckoutSeats !== null &&
@@ -673,7 +703,17 @@ export const mailboxesRouter = router({
     ),
   ),
   create: enabled.input(boxInput).mutation(async ({ ctx, input }) => {
-    const row = await call(() => createMailboxRegistry(ctx.db, actor(ctx), input));
+    const row = await call(() =>
+      withMailboxRegistryAdmin(ctx.db, actor(ctx), async (transaction) => {
+        if (!(await mailboxCreateAccessEnabled(transaction, actor(ctx))))
+          throw new MailboxLifecycleError(
+            (await mailboxBillingPresentation(transaction, actor(ctx))).sendingPlanRequired
+              ? "sending_plan_required"
+              : "early_access_required",
+          );
+        return createMailboxRegistry(transaction, actor(ctx), input);
+      }),
+    );
     await recordAudit(ctx, {
       action: "mailbox.created",
       target: { type: "mailbox", id: row.id },

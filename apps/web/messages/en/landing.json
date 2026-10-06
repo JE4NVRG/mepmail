@@ -50,7 +50,8 @@
       "subject": "Hello from MepMail",
       "responseLabel": "Response",
       "caption": "One base URL and the SDK you already use sends through MepMail."
-    }
+    },
+    "launchOffer": "{volume} deliveries/month for a recurring {price}. US$20 only for the first eligible monthly bill."
   },
   "stack": {
     "eyebrow": "Works with your stack",
@@ -61,7 +62,7 @@
   "compare": {
     "eyebrow": "Pricing without guesswork",
     "title": "Compare by the volume you actually send.",
-    "intro": "The numbers below compare the cheapest published way to send each monthly volume: the plan that covers it, or a smaller plan plus that provider's published overage. Savings vary by tier and provider; confirm current terms before subscribing.",
+    "intro": "Compare MepMail’s regular monthly price with the historical competitor benchmark of 2026-09-27. The introductory promotion and annual discount are excluded; features and terms differ.",
     "tableAria": "Price comparison by volume",
     "columns": [
       "Emails/month",
@@ -70,22 +71,22 @@
       "SendGrid",
       "Postmark",
       "Mailgun",
-      "Advantage"
+      "Historical difference"
     ],
     "slideNote": "Swipe the table to see every provider on smaller screens.",
     "refNote": "Reference: commercial analysis of 2026-09-27; third-party public prices can change and features/terms are not equivalent. USD per month, excluding taxes. Where a provider publishes its overage as a range, the table uses the midpoint."
   },
   "calc": {
-    "title": "Slide the volume and see the savings.",
-    "lead": "Pick a monthly volume; we compare the MepMail price with publicly priced competitors and show the difference.",
+    "title": "Compare with the historical benchmark.",
+    "lead": "Choose your volume: MepMail’s regular monthly fee and competitor prices recorded on 2026-09-27.",
     "volumeLabel": "Emails per month",
     "ours": "MepMail",
-    "cheapest": "Cheapest competitor ({name})",
-    "savings": "{percent}% saved (~{usd}/month)",
-    "annual": "≈ {usd} per year",
-    "cta": "I want this price",
+    "cheapest": "Lowest benchmark price ({name})",
+    "savings": "Historical difference: {percent}% (~{usd}/month)",
+    "annual": "12 monthly differences: ≈ {usd}; this is not an annual quote",
+    "cta": "Discuss my volume",
     "ctaSubject": "MepMail calculator: {volume} emails/month",
-    "note": "Estimate over public prices of 2026-09-27, in USD/month; competitors may change theirs and features are not equivalent.",
+    "note": "Historical reference of 2026-09-27, in USD/month. Check providers’ current prices; features are not equivalent. Excludes introductory offers, annual discounts, taxes and additional usage.",
     "a11y": "Monthly sending volume"
   },
   "structure": {
@@ -123,7 +124,7 @@
   "plans": {
     "eyebrow": "Plans",
     "title": "Start free. Scale by volume.",
-    "intro": "Every plan includes assisted onboarding and support. Monthly prices in USD, billed monthly, no lock-in.",
+    "intro": "Send plans in USD, with assisted onboarding and support. Choose your volume; the Pro 110K offer has an annual option when available in the dashboard.",
     "perMonth": "/month",
     "limitsLabel": "Workspaces and limits",
     "overageLabel": "Overage",
@@ -201,7 +202,8 @@
       "note": "After the founder period, proactive management stays optional at +US$ 29/month. No lock-in: cancel anytime.",
       "cta": "Claim my spot"
     },
-    "noteAttach": "Per-email limit: total attachment size after decoding, not per file."
+    "noteAttach": "Per-email limit: total attachment size after decoding, not per file.",
+    "launchPriceNote": "Eligible new customers: US$20 only for the first monthly bill; then US$29/month. Annual: US$290 upfront, without stacking the promotion."
   },
   "how": {
     "eyebrow": "Your next steps",

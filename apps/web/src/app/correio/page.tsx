@@ -8,6 +8,7 @@ import "./correio.css";
 
 const canonical = "/correio";
 const docsOrigin = "https://docs-mepmail.je4ndev.com";
+const earlyAccessOpen = () => process.env.MAILBOX_EARLY_ACCESS_OPEN === "true";
 
 type TextStep = { label: string; text: string };
 type TextItem = { title: string; body: string };
@@ -22,8 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { absolute: t("meta.title") },
     description: t("meta.description"),
     alternates: { canonical },
-    // This launch preview is prepared in staging; opening access is a separate release.
-    robots: { index: false, follow: true },
+    robots: { index: earlyAccessOpen(), follow: true },
     openGraph: {
       title: t("meta.title"),
       description: t("meta.description"),
@@ -57,6 +57,7 @@ export default async function CorreioPage() {
   const integrations = t.raw("integrations.items") as Integration[];
   const faq = t.raw("faq.items") as FaqItem[];
   const comparison = t.raw("comparison.rows") as ComparisonRow[];
+  const mailOpen = earlyAccessOpen();
 
   return (
     <div className="gtm correio">
@@ -79,8 +80,10 @@ export default async function CorreioPage() {
                   {t("hero.secondary")}
                 </a>
               </div>
-              <p className="correio-note correio-hero-note">{t("hero.note")}</p>
-              <p className="correio-status">{t("hero.status")}</p>
+              <p className="correio-note correio-hero-note">
+                {t(mailOpen ? "release.heroNote" : "hero.note")}
+              </p>
+              <p className="correio-status">{t(mailOpen ? "release.heroStatus" : "hero.status")}</p>
             </div>
 
             <aside className="correio-example" aria-labelledby="correio-example-label">
@@ -192,7 +195,7 @@ export default async function CorreioPage() {
                     {String(index + 1).padStart(2, "0")}
                   </span>
                   <h3>{step.title}</h3>
-                  <p>{step.body}</p>
+                  <p>{mailOpen && index === 0 ? t("release.setupFirst") : step.body}</p>
                 </li>
               ))}
             </ol>
@@ -221,12 +224,14 @@ export default async function CorreioPage() {
               <p className="correio-section-lead">{t("integrations.body")}</p>
             </div>
             <div className="correio-integrations-grid">
-              {integrations.map((item) => (
+              {integrations.map((item, index) => (
                 <article className="correio-integration" key={item.kind}>
                   <p className="correio-eyebrow">{item.kind}</p>
                   <h3>{item.title}</h3>
                   <p>{item.body}</p>
-                  <p className="correio-integration-status">{item.status}</p>
+                  <p className="correio-integration-status">
+                    {mailOpen && index === 0 ? t("release.restStatus") : item.status}
+                  </p>
                   <a className="correio-text-link" href={`${docs}${item.path}`}>
                     {item.link} <span aria-hidden="true">↗</span>
                   </a>
@@ -246,7 +251,9 @@ export default async function CorreioPage() {
                 <p className="correio-eyebrow">{t("plans.eyebrow")}</p>
                 <h2 id="correio-plans-title">{t("plans.title")}</h2>
               </div>
-              <p className="correio-section-lead">{t("plans.body")}</p>
+              <p className="correio-section-lead">
+                {t(mailOpen ? "release.plansBody" : "plans.body")}
+              </p>
             </div>
             <div className="correio-plans-grid">
               <article className="correio-plan">
@@ -261,7 +268,14 @@ export default async function CorreioPage() {
                 <p className="correio-eyebrow">{t("plans.mail.label")}</p>
                 <h3>{t("plans.mail.title")}</h3>
                 <p>{t("plans.mail.body")}</p>
-                <p className="correio-note">{t("plans.mail.note")}</p>
+                <p className="correio-note">
+                  {t(mailOpen ? "release.mailNote" : "plans.mail.note")}
+                </p>
+                {mailOpen ? (
+                  <a className="ms-btn ms-btn-secondary correio-action" href="/mailboxes">
+                    {t("release.checkAccess")}
+                  </a>
+                ) : null}
               </article>
             </div>
             <div className="correio-comparison">
@@ -275,18 +289,22 @@ export default async function CorreioPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {comparison.map((row) => (
+                  {comparison.map((row, index) => (
                     <tr key={row.label}>
                       <th scope="row">{row.label}</th>
                       <td>{row.sending}</td>
-                      <td>{row.combined}</td>
+                      <td>
+                        {mailOpen && index === comparison.length - 1
+                          ? t("release.availability")
+                          : row.combined}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <p className="correio-note correio-under-grid">{t("comparison.earlyNote")}</p>
-            <LaunchPlanPreview />
+            <LaunchPlanPreview earlyAccessOpen={mailOpen} />
             <p className="correio-note correio-under-grid">{t("plans.terms")}</p>
           </div>
         </section>

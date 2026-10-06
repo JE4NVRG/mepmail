@@ -350,7 +350,13 @@
     "resourcePolicyPending": "The resource policy must be active to send or receive new messages. You can reserve the address before then.",
     "receivingChecking": "Checking receiving setup…",
     "receivingError": "Receiving could not be confirmed. Check again before using this domain.",
-    "checkReceiving": "Check receiving"
+    "checkReceiving": "Check receiving",
+    "activateReceiving": "Activate receiving",
+    "receivingActivating": "Activating receiving…",
+    "activationHint": "After your license, domain and MX are confirmed, activate receiving for this domain’s licensed mailboxes. DNS is managed separately.",
+    "activationError": "Receiving activation could not be confirmed. Your address remains reserved. Check receiving before trying again.",
+    "activationPending": "Receiving is still pending. Review the domain configuration and service availability, then check again.",
+    "activationReady": "Receiving has been confirmed for your mailbox."
   },
   "favorites": "Favorites",
   "custom": "Folder",

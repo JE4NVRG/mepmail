@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type Stripe from "stripe";
+import {
+  type MailboxLaunchCohort,
+  mailboxLaunchCohortAllows,
+} from "../../core/src/mailbox-launch-cohort.js";
 import { mailboxManagementRequests as requests } from "../../db/src/schema/mailbox-management-requests.js";
 import {
   type MailboxCatalog,
@@ -9,7 +13,7 @@ import {
   mailboxIncreasePaymentConfirmed,
   projectMailboxSubscription,
 } from "./mailbox.js";
-import { hasPaidSendingPlan } from "./mailbox-addon.js";
+import { hasPaidSendingPlanForMailbox } from "./mailbox-addon.js";
 import {
   MailboxLifecycleError,
   mailboxSubscriptionCatalog,
@@ -29,6 +33,7 @@ export interface MailboxManagementDeps {
   readOnly?: boolean;
   /** Hosted Envio contract prerequisite for increases/resume, never cancel/reduction. */
   requirePaidSendingPlan?: boolean;
+  earlyAccessCohort?: MailboxLaunchCohort | null | undefined;
 }
 export interface MailboxManagementInput {
   teamId: string;
@@ -180,8 +185,15 @@ async function context(
     !plan.stripePriceId
   )
     throw new MailboxLifecycleError("unavailable");
-  const sendingPlanEligible =
-    !deps.requirePaidSendingPlan || hasPaidSendingPlan(team, deps.now?.());
+  const paidSendingPlanEligible =
+    !deps.requirePaidSendingPlan ||
+    hasPaidSendingPlanForMailbox(team, deps.earlyAccessCohort, deps.now?.());
+  const earlyAccessEligible = mailboxLaunchCohortAllows(
+    deps.earlyAccessCohort,
+    { teamId: team.id, customerId: team.stripeCustomerId },
+    deps.now?.(),
+  );
+  const sendingPlanEligible = paidSendingPlanEligible && earlyAccessEligible;
   const sub = await deps.stripe.subscriptions.retrieve(plan.stripeSubscriptionId, {
     expand: ["items.data.price.product", "latest_invoice", "schedule"],
   });
@@ -202,7 +214,9 @@ async function context(
     !sendingPlanEligible &&
     (input.action === "resume" || (input.action === "quantity" && input.seats! > projection.seats))
   )
-    throw new MailboxLifecycleError("sending_plan_required");
+    throw new MailboxLifecycleError(
+      paidSendingPlanEligible ? "early_access_required" : "sending_plan_required",
+    );
   return { plan, sub, projection, approved, sendingPlanEligible };
 }
 function compatible(row: Request, c: Awaited<ReturnType<typeof context>>) {

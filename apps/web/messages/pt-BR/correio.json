@@ -193,12 +193,12 @@
         "combined": "Acesso inicial fechado aos assinantes anteriores elegíveis"
       }
     ],
-    "earlyNote": "Correio exige um plano acima de US$ 20/mês pelo preço recorrente. A nova oferta de US$ 29 qualifica o plano mesmo na primeira mensalidade promocional de US$ 20. Contratos antigos de US$ 20 não mudam automaticamente. A primeira abertura permanece exclusiva aos assinantes anteriores elegíveis; uma assinatura nova não garante entrada."
+    "earlyNote": "Correio exige um plano acima de US$ 20/mês pelo preço recorrente. A nova oferta de US$ 29 qualifica o plano mesmo na primeira mensalidade promocional de US$ 20. Contratos antigos de US$ 20 não mudam automaticamente. A primeira abertura permanece exclusiva aos assinantes anteriores elegíveis; uma assinatura nova não garante entrada. Contas anteriores autorizadas podem manter seu plano atual de Envio ao contratar o adicional."
   },
   "preview": {
     "eyebrow": "Compare a nova oferta",
     "title": "Seu plano. Suas caixas.",
-    "body": "Compare Só Envio com Envio + Correio. Os totais abaixo simulam uma nova contratação, sem alterar assinaturas existentes.",
+    "body": "Compare o preço da nova oferta de Envio com o adicional por caixa. São exemplos de orçamento; o painel confirma o seu contrato e acesso antecipado.",
     "status": "Prévia · contratação indisponível",
     "periodLegend": "Período da comparação",
     "month": "Mensal",
@@ -227,7 +227,7 @@
     "annualFormula": "10 × a mensalidade normal para 12 meses de acesso. O anual não acumula a promoção da primeira mensalidade.",
     "annualConsumption": "As franquias renovam mensalmente na oferta anual proposta, não formam um saldo anual. A contratação e a separação dos ciclos ainda estão em preparação.",
     "monthlyConsumption": "A franquia de 110 mil entregas de Envio é separada da franquia mensal de cada caixa de Correio. O espaço é por caixa.",
-    "introTerms": "US$ 20 somente na primeira mensalidade de Envio para novos clientes; depois, US$ 29/mês. O adicional Correio é cobrado pelo preço normal desde a primeira mensalidade.",
+    "introTerms": "US$ 20 só na primeira mensalidade de Envio de novos clientes elegíveis; depois US$ 29/mês. Correio não recebe esse desconto, e uma nova assinatura não garante entrada na abertura antecipada.",
     "eligibility": "O plano de US$ 29 qualifica Correio pelo preço recorrente, mesmo durante a promoção. Acesso ainda sujeito à abertura, elegibilidade e ativação do domínio.",
     "monthlyNote": "Esta é a prévia de uma nova oferta. Correio continua em acesso fechado; checkout e contratação ainda não estão disponíveis aqui.",
     "noChange": "Esta comparação não contrata um plano nem altera sua assinatura. Valores em US$, antes de impostos e eventual consumo excedente."
@@ -251,7 +251,7 @@
     "items": [
       {
         "q": "Quais assinantes poderão contratar Correio?",
-        "a": "Correio é pago à parte por caixa e exige um plano acima de US$ 20/mês pelo valor recorrente. A nova oferta de US$ 29 qualifica o plano mesmo durante a primeira mensalidade promocional de US$ 20. O acesso inicial permanece exclusivo aos assinantes anteriores elegíveis. As assinaturas atuais são preservadas, sem migração automática. A licença interna System continua isenta, com 50 GiB por caixa e sem limites comerciais de caixas ou entregas."
+        "a": "Correio é pago à parte por caixa e exige um plano acima de US$ 20/mês pelo valor recorrente. A nova oferta de US$ 29 qualifica o plano mesmo durante a primeira mensalidade promocional de US$ 20. O acesso inicial permanece exclusivo aos assinantes anteriores elegíveis. As assinaturas atuais são preservadas, sem migração automática. A licença interna System continua isenta, com 50 GiB por caixa e sem limites comerciais de caixas ou entregas. Contas anteriores autorizadas podem manter seu plano atual de Envio ao contratar o adicional."
       },
       {
         "q": "Comprei um domínio. Já posso criar qualquer endereço?",
@@ -289,5 +289,18 @@
     "body": "Estamos preparando o Correio para assinantes anteriores de planos acima de US$ 20/mês. Conheça a proposta e a documentação enquanto validamos a abertura inicial, com contratação à parte.",
     "primary": "Conhecer planos de Envio",
     "secondary": "Ler a documentação do Correio"
+  },
+  "release": {
+    "heroNote": "Correio pago à parte. Acesso antecipado para assinantes anteriores elegíveis; confira a disponibilidade da sua conta no painel.",
+    "heroStatus": "Acesso antecipado · elegibilidade no painel",
+    "setupFirst": "Confira no painel se sua conta participa da abertura antecipada e as condições do seu plano. O Correio é um adicional pago por caixa; contratos de Envio atuais são preservados.",
+    "restStatus": "Disponível nas caixas ativadas de contas elegíveis",
+    "plansBody": "Envio cuida dos e-mails da aplicação e das campanhas. Correio acrescenta caixas com entrada e saída para pessoas e agentes, pago à parte. A primeira abertura é para assinantes anteriores elegíveis.",
+    "mailNote": "A contratação e a ativação dependem da elegibilidade exibida no painel. Uma assinatura nova não garante acesso antecipado; domínio, DNS/MX e recebimento precisam ser confirmados.",
+    "previewStatus": "Comparação de valores · confira seu acesso no painel",
+    "annualConsumption": "As franquias renovam mensalmente, sem acumular saldo anual. Armazenamento é contínuo; as mensagens não são apagadas na virada do período.",
+    "monthlyNote": "Esta comparação não concede acesso nem contrata um plano. O painel confirma elegibilidade, contrato, cobrança e ativação de cada caixa.",
+    "checkAccess": "Conferir meu acesso ao Correio",
+    "availability": "Acesso antecipado para contas elegíveis; confira no painel"
   }
 }

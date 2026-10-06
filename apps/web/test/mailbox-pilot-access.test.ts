@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   list: vi.fn(),
   createAgentKey: vi.fn(),
   recordSupportRead: vi.fn(),
+  activity: vi.fn(),
   content: vi.fn(),
   contentList: vi.fn(),
   draft: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock("@millionsend/core", async (original) => ({
   createMailboxAgentKey: h.createAgentKey,
   queueMailboxAgentDraft: h.queueDraft,
   recordSupportViewRead: h.recordSupportRead,
+  appendMailboxActivity: h.activity,
 }));
 vi.mock("@millionsend/db", async (original) => ({
   ...(await original<typeof import("@millionsend/db")>()),
@@ -42,6 +44,9 @@ vi.mock("@/server/queue", () => ({
   enqueueWebhookDeliveries: vi.fn(),
 }));
 vi.mock("@/server/auth", () => ({ getAuth: vi.fn(), resolveBaseUrl: (url: string) => url }));
+// Direct caller fixtures supply their context instead of a framework request.
+vi.mock("next/headers", () => ({ cookies: vi.fn() }));
+vi.mock("@/server/locale", () => ({ activeLocale: async () => "en" }));
 vi.mock("@/server/audit", () => ({ recordAudit: vi.fn() }));
 vi.mock("@/server/mailbox-transport", () => ({ mailboxTransportMime: { synthetic: "mime" } }));
 vi.mock("@/server/mailbox-content", () => ({
@@ -122,6 +127,7 @@ beforeEach(() => {
   vi.stubEnv("MAILBOX_TRANSPORT_ENABLED", "1");
   vi.stubEnv("MAILBOX_PILOT_TEAM_IDS", undefined);
   vi.stubEnv("MAILBOX_PILOT_USER_IDS", undefined);
+  vi.stubEnv("MAILBOX_EARLY_ACCESS_COHORT", undefined);
   h.actor = { teamId: TEAM, userId: OWNER };
   h.credentialError = null;
   h.authCallbackActive = false;
@@ -130,6 +136,7 @@ beforeEach(() => {
   h.list.mockResolvedValue({ canManage: true, mailboxes: [] });
   h.createAgentKey.mockResolvedValue({ id: BOX });
   h.recordSupportRead.mockResolvedValue(undefined);
+  h.activity.mockResolvedValue(undefined);
   h.content.mockResolvedValue({ id: ITEM, text: "Synthetic content" });
   h.contentList.mockResolvedValue({ items: [], limited: false });
   h.draft.mockResolvedValue({ id: ITEM, revision: 1, mailboxId: BOX });
@@ -300,6 +307,18 @@ describe("operator mailbox pilot admission", () => {
         mailboxId: BOX,
       },
     );
+    expect(h.activity.mock.calls).toEqual([
+      [
+        h.db,
+        { teamId: TEAM, mailboxId: BOX, actor: { kind: "mailbox_agent", keyId: BOX } },
+        { action: "mailbox.items_listed", folder: "inbox", count: 0 },
+      ],
+      [
+        h.db,
+        { teamId: TEAM, mailboxId: BOX, actor: { kind: "mailbox_agent", keyId: BOX } },
+        { action: "mailbox.draft_saved", itemId: ITEM, revision: 1 },
+      ],
+    ]);
     expect(h.queueDraft).not.toHaveBeenCalled();
     expect(h.enqueue).not.toHaveBeenCalled();
   });
@@ -316,6 +335,11 @@ describe("operator mailbox pilot admission", () => {
       h.db,
       { teamId: TEAM, userId: OWNER },
       { ...forward, mailboxId: BOX },
+    );
+    expect(h.activity).toHaveBeenCalledExactlyOnceWith(
+      h.db,
+      { teamId: TEAM, mailboxId: BOX, actor: { kind: "mailbox_agent", keyId: BOX } },
+      { action: "mailbox.draft_saved", itemId: ITEM, revision: 1 },
     );
     expect(h.queueDraft).not.toHaveBeenCalled();
     expect(h.enqueue).not.toHaveBeenCalled();

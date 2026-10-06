@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { PlanCard, type PlanCardLabels } from "@/components/plan-card";
 import {
   PublicFooter,
@@ -8,6 +8,8 @@ import {
   SignupLink,
 } from "@/components/site-chrome";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
+import { formatUsd } from "@/lib/landing-pricing";
+import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import "../landing.css";
 
@@ -18,7 +20,11 @@ type FaqItem = { q: string; a: string };
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("pricing");
-  const description = t("meta.description");
+  const description = t(
+    process.env.SEND_LAUNCH_OFFER_ENABLED === "true"
+      ? "meta.launchDescription"
+      : "meta.description",
+  );
   return {
     title: t("meta.title"),
     description,
@@ -40,6 +46,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * all come from the shared sources the landing uses.
  */
 export default async function PricingPage() {
+  const locale = await getLocale();
   const t = await getTranslations("pricing");
   const l = await getTranslations("landing");
   const site = {
@@ -59,9 +66,14 @@ export default async function PricingPage() {
     ctaNote: l("plans.ctaNote"),
     featuredBadge: l("plans.featuredBadge"),
   } satisfies PlanCardLabels;
-  const allPlans = plansWithCopy(l.raw("plans.items") as PlanCopy[]);
+  const launchOfferEnabled = process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
+  const allPlans = plansWithCopy(
+    l.raw("plans.items") as PlanCopy[],
+    launchOfferEnabled,
+    l("plans.launchPriceNote"),
+  );
   const includedPoints = t.raw("included.points") as string[];
-  const faq = t.raw("faq.items") as FaqItem[];
+  const faq = t.raw(launchOfferEnabled ? "launchFaq" : "faq.items") as FaqItem[];
 
   return (
     <div className="gtm">
@@ -95,6 +107,44 @@ export default async function PricingPage() {
             <p className="gtm-note">{l("plans.noteAttach")}</p>
           </div>
         </section>
+
+        {launchOfferEnabled ? (
+          <section className="gtm-section gtm-alt" id="pro110k" aria-labelledby="launch-pro-title">
+            <div className="gtm-container">
+              <p className="gtm-eyebrow">{t("launch.eyebrow")}</p>
+              <h2 id="launch-pro-title">{t("launch.title")}</h2>
+              <p>{t("launch.body")}</p>
+              <div className="gtm-split">
+                <article className="ms-card gtm-plan">
+                  <h3>{t("launch.monthTitle")}</h3>
+                  <p className="gtm-price">
+                    {formatUsd(LAUNCH_OFFER.sending.monthlyCents / 100, locale)}
+                    <span>{l("plans.perMonth")}</span>
+                  </p>
+                  <p>{t("launch.monthIntro")}</p>
+                  <p className="gtm-note">{t("launch.monthQuota")}</p>
+                </article>
+                <article className="ms-card gtm-plan">
+                  <h3>{t("launch.yearTitle")}</h3>
+                  <p className="gtm-price">
+                    {formatUsd(
+                      (LAUNCH_OFFER.sending.monthlyCents * LAUNCH_OFFER.annualChargedMonths) / 100,
+                      locale,
+                    )}
+                    <span>{t("launch.perYear")}</span>
+                  </p>
+                  <p>{t("launch.yearUpfront")}</p>
+                  <p className="gtm-note">{t("launch.yearQuota")}</p>
+                </article>
+              </div>
+              <p className="gtm-note">{t("launch.preserved")}</p>
+              <a className="ms-btn ms-btn-secondary gtm-action" href="/correio">
+                {t("launch.mailCta")}
+              </a>
+              <p className="gtm-note">{t("launch.mailAccess")}</p>
+            </div>
+          </section>
+        ) : null}
 
         <section className="gtm-section gtm-alt">
           <div className="gtm-container">
