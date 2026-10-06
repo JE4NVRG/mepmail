@@ -1,7 +1,7 @@
-import { parseAuditActor } from "@millionsend/core";
+import { MAILBOX_ACTIVITY_ACTIONS, parseAuditActor } from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, notInArray } from "drizzle-orm";
 import { z } from "zod";
 import { beforeCursor, createdAtCursorField, cursorSchema, paginate } from "../keyset";
 import { router, teamProcedure } from "../trpc";
@@ -34,7 +34,11 @@ export const auditRouter = router({
         })
         .from(t)
         .where(
-          and(eq(t.teamId, ctx.teamId), input.cursor ? beforeCursor(t, input.cursor) : undefined),
+          and(
+            eq(t.teamId, ctx.teamId),
+            notInArray(t.action, [...MAILBOX_ACTIVITY_ACTIONS]),
+            input.cursor ? beforeCursor(t, input.cursor) : undefined,
+          ),
         )
         .orderBy(desc(t.createdAt), desc(t.id))
         .limit(input.limit + 1);

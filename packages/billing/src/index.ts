@@ -1,4 +1,14 @@
 export {
+  ADVERTISING_CONSENT_COOKIE,
+  ADVERTISING_CONSENT_MAX_AGE,
+  ADVERTISING_POLICY_VERSION,
+  advertisingCookie,
+  consentSameOrigin,
+  decodeConsentProof,
+  encodeConsentProof,
+  publicAdvertisingSource,
+} from "./advertising-consent.js";
+export {
   type BillingDeps,
   type BillingTeam,
   createCheckoutSession,
@@ -49,6 +59,17 @@ export {
   type MailboxManagementResult,
   manageMailboxSubscription,
 } from "./mailbox-management.js";
+export {
+  dispatchMetaConversions,
+  type MetaCheckoutAdvertising,
+  readAdvertisingConsent,
+  saveAdvertisingConsent,
+} from "./meta-advertising.js";
+export {
+  type MetaConversionConfig,
+  metaConversionConfigured,
+  readMetaConversionConfig,
+} from "./meta-conversions.js";
 export { type OverageReport, reportOverage } from "./overage.js";
 export {
   METER_EVENT_NAME,

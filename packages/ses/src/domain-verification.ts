@@ -11,11 +11,11 @@ import { registrableDomain } from "@millionsend/core/org-domain";
 import { type DmarcLookup, type DmarcPolicy, lookupDmarc } from "./dmarc.js";
 import { checkDnsRecordsDetailed, type DnsResolver } from "./dns-check.js";
 import {
-  DKIM_SELECTOR,
   type DnsRecordGroup,
   type DomainVerification,
   dnsRecordsForDomain,
   getDomainVerification,
+  LEGACY_DKIM_SELECTOR,
   type SesIdentityClient,
 } from "./domain-identity.js";
 
@@ -76,9 +76,9 @@ export function dnsChecklist(input: {
   const { domain, verification, live = [], dmarc, tracking } = input;
   const rows: DnsChecklistRow[] = dnsRecordsForDomain({
     domain: domain.name,
-    // Columns are nullable only for bare fixture inserts; the create flow
-    // always sets both. Falling back keeps a half-inserted row from throwing.
-    dkimSelector: domain.dkimSelector ?? DKIM_SELECTOR,
+    // New identities always persist their selector. Rows without one retain
+    // the legacy selector rather than being silently treated as a new identity.
+    dkimSelector: domain.dkimSelector ?? LEGACY_DKIM_SELECTOR,
     dkimPublicKey: domain.dkimPublicKey ?? "",
     mailFromSubdomain: domain.mailFromSubdomain,
     region: domain.region,

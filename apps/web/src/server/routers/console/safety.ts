@@ -12,6 +12,7 @@ import {
   fetchContentFactors,
   fetchDeliverabilityHealth,
   getMonitorSettingsRow,
+  MAILBOX_ACTIVITY_ACTIONS,
   parseAuditActor,
   recentMonitorSamples,
   redactRevealedText,
@@ -23,7 +24,19 @@ import {
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, ilike, inArray, isNotNull, or, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  notInArray,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { escapeLike } from "@/lib/sql";
@@ -271,7 +284,12 @@ export const consoleSafetyRouter = router({
           createdAt: schema.auditLog.createdAt,
         })
         .from(schema.auditLog)
-        .where(eq(schema.auditLog.teamId, team.id))
+        .where(
+          and(
+            eq(schema.auditLog.teamId, team.id),
+            notInArray(schema.auditLog.action, [...MAILBOX_ACTIVITY_ACTIONS]),
+          ),
+        )
         .orderBy(desc(schema.auditLog.createdAt))
         .limit(20),
       teamMonitorOverview(ctx.db, team.id, monitorSettings, now),

@@ -2,14 +2,17 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
-import type Stripe from "stripe";
+import Stripe from "stripe";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createMailboxCheckoutSession,
   isMailboxSubscription,
   type MailboxCatalog,
   type MailboxCheckoutInput,
+  type MailboxIncreaseEvidence,
   type MailboxPriceTerms,
+  mailboxIncreaseInvoiceMatches,
+  mailboxIncreasePaymentConfirmed,
   projectMailboxSubscription,
 } from "../src/mailbox.js";
 import type { BillingStripe } from "../src/stripe.js";
@@ -61,6 +64,158 @@ function mailSubscription(
   };
   return sub;
 }
+
+describe("Mailbox increase invoice evidence", () => {
+  function fixture(unitAmount: Stripe.Decimal | null | undefined = null) {
+    const sub = mailSubscription();
+    sub.pending_update = null;
+    const item = sub.items.data[0]!;
+    const owner: MailboxIncreaseEvidence = {
+      customerId: OWNER.customerId,
+      livemode: false,
+      seats: 3,
+      periodStart: new Date(PERIOD_START * 1000),
+      periodEnd: new Date(PERIOD_END * 1000),
+      prorationAt: new Date((PERIOD_START + 10) * 1000),
+      previousInvoiceId: "in_previous",
+      invoiceId: "in_proration",
+    };
+    const line = {
+      invoice: owner.invoiceId,
+      livemode: false,
+      currency: TERMS.currency,
+      quantity: 3,
+      quantity_decimal: "3",
+      amount: TERMS.unitAmount * 3,
+      pricing: {
+        type: "price_details",
+        price_details: { price: TERMS.priceId },
+        ...(unitAmount === undefined ? {} : { unit_amount_decimal: unitAmount }),
+      },
+      period: { start: PERIOD_START + 10, end: PERIOD_END },
+      parent: {
+        type: "subscription_item_details",
+        subscription_item_details: {
+          subscription: sub.id,
+          subscription_item: item.id,
+          proration: true,
+          proration_details: null,
+        },
+      },
+    };
+    const invoice = {
+      id: owner.invoiceId,
+      customer: OWNER.customerId,
+      livemode: false,
+      currency: TERMS.currency,
+      billing_reason: "subscription_update",
+      status: "paid",
+      amount_remaining: 0,
+      parent: { subscription_details: { subscription: sub.id } },
+      lines: {
+        has_more: false,
+        data: [
+          {
+            ...line,
+            amount: -TERMS.unitAmount * 2,
+            quantity: 2,
+            parent: {
+              ...line.parent,
+              subscription_item_details: {
+                ...line.parent.subscription_item_details,
+                proration_details: {
+                  credited_items: { invoice: "in_previous", invoice_line_items: ["il_previous"] },
+                },
+              },
+            },
+          },
+          line,
+        ],
+      },
+    } as unknown as Stripe.Invoice;
+    return { sub, owner, invoice, debit: invoice.lines.data[1]! };
+  }
+
+  it.each(["null", "absent"])(
+    "confirms a paid credit/debit proration with %s unit amount and its canonical price",
+    (kind) => {
+      const { sub, owner, invoice, debit } = fixture();
+      if (kind === "absent") Reflect.deleteProperty(debit.pricing!, "unit_amount_decimal");
+      expect(mailboxIncreaseInvoiceMatches(sub, owner, invoice)).toBe(true);
+      expect(mailboxIncreasePaymentConfirmed(sub, owner, invoice)).toBe(true);
+    },
+  );
+
+  it("retains exact unit amount validation when Stripe supplies it", () => {
+    const { sub, owner, invoice, debit } = fixture(Stripe.Decimal.from(TERMS.unitAmount));
+    expect(mailboxIncreasePaymentConfirmed(sub, owner, invoice)).toBe(true);
+    debit.pricing!.unit_amount_decimal = Stripe.Decimal.from(TERMS.unitAmount + 1);
+    expect(mailboxIncreaseInvoiceMatches(sub, owner, invoice)).toBe(false);
+    expect(mailboxIncreasePaymentConfirmed(sub, owner, invoice)).toBe(false);
+  });
+
+  it.each([
+    "other_price",
+    "other_quantity",
+    "other_item",
+    "other_subscription",
+    "other_customer",
+    "other_mode",
+    "other_currency",
+    "other_invoice",
+    "other_period",
+    "other_proration_date",
+    "not_proration",
+    "zero_debit",
+    "credited_debit",
+    "duplicate_debit",
+    "incomplete_lines",
+    "previous_invoice",
+    "unexpected_invoice",
+    "invalid_subscription_amount",
+  ])("keeps rejecting incompatible evidence with absent unit amount: %s", (field) => {
+    const { sub, owner, invoice, debit } = fixture();
+    Reflect.deleteProperty(debit.pricing!, "unit_amount_decimal");
+    if (field === "other_price") debit.pricing!.price_details!.price = "price_other";
+    if (field === "other_quantity") debit.quantity = 2;
+    if (field === "other_item")
+      debit.parent!.subscription_item_details!.subscription_item = "si_other";
+    if (field === "other_subscription")
+      debit.parent!.subscription_item_details!.subscription = "sub_other";
+    if (field === "other_customer") invoice.customer = "cus_other";
+    if (field === "other_mode") invoice.livemode = true;
+    if (field === "other_currency") debit.currency = "eur";
+    if (field === "other_invoice") debit.invoice = "in_other";
+    if (field === "other_period") debit.period.end--;
+    if (field === "other_proration_date") debit.period.start++;
+    if (field === "not_proration") debit.parent!.subscription_item_details!.proration = false;
+    if (field === "zero_debit") debit.amount = 0;
+    if (field === "credited_debit")
+      debit.parent!.subscription_item_details!.proration_details = {
+        credited_items: { invoice: "in_previous", invoice_line_items: ["il_previous"] },
+      };
+    if (field === "duplicate_debit") invoice.lines.data.push({ ...debit });
+    if (field === "incomplete_lines") invoice.lines.has_more = true;
+    if (field === "previous_invoice") owner.previousInvoiceId = invoice.id;
+    if (field === "unexpected_invoice") owner.invoiceId = "in_other";
+    if (field === "invalid_subscription_amount") sub.items.data[0]!.price.unit_amount = null;
+    expect(mailboxIncreaseInvoiceMatches(sub, owner, invoice)).toBe(false);
+    expect(mailboxIncreasePaymentConfirmed(sub, owner, invoice)).toBe(false);
+  });
+
+  it.each(["unpaid", "remaining_balance", "pending_update"])(
+    "does not confirm payment merely from a matching proration: %s",
+    (field) => {
+      const { sub, owner, invoice } = fixture();
+      if (field === "unpaid") invoice.status = "open";
+      if (field === "remaining_balance") invoice.amount_remaining = 1;
+      if (field === "pending_update")
+        sub.pending_update = { expires_at: PERIOD_END } as Stripe.Subscription.PendingUpdate;
+      expect(mailboxIncreaseInvoiceMatches(sub, owner, invoice)).toBe(true);
+      expect(mailboxIncreasePaymentConfirmed(sub, owner, invoice)).toBe(false);
+    },
+  );
+});
 
 describe("Mailbox subscription projection", () => {
   it("projects a trusted licensed quantity and its contract, using the linked owner", () => {

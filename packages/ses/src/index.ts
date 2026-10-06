@@ -56,6 +56,14 @@ export {
 } from "./domain-verification.js";
 export { createKeyringFromEnv, type KeyringEnv } from "./kms.js";
 export {
+  createMailboxReceivingRuleClient,
+  type MailboxReceivingRoute,
+  type MailboxReceivingRuleClient,
+  mailboxReceivingIdentityVerified,
+  mailboxReceivingRuleFacts,
+  readMailboxReceivingRules,
+} from "./mailbox-receiving.js";
+export {
   createQuotaRequestClient,
   type QuotaRequestClient,
   type QuotaRequestResult,

@@ -1,0 +1,293 @@
+{
+  "meta": {
+    "title": "Correio para você e seus agentes | MepMail",
+    "description": "Conheça o Correio MepMail: caixas no seu domínio para pessoas e agentes, com mensagens, rascunhos e permissões sob seu controle. Acesso antecipado exclusivo aos atuais assinantes."
+  },
+  "hero": {
+    "eyebrow": "MepMail Correio",
+    "status": "Prévia de lançamento · acesso fechado",
+    "title": "Um e-mail da sua empresa.",
+    "titleEnd": "Para você e seu agente.",
+    "lead": "Receba contatos, converse com clientes e dê ao seu agente um endereço próprio. Você acompanha as mensagens e decide o que ele pode fazer.",
+    "primary": "Ver como funciona",
+    "secondary": "Conhecer planos de Envio",
+    "note": "Correio pago à parte. Acesso inicial exclusivo aos assinantes anteriores elegíveis; a nova oferta está nesta prévia.",
+    "audiences": ["Para você", "Para sua equipe", "Para seus agentes"]
+  },
+  "example": {
+    "label": "Exemplo de uso · conteúdo fictício",
+    "identity": "Uma identidade da sua empresa",
+    "address": "luna@suaempresa.com",
+    "role": "Caixa dedicada ao seu agente",
+    "steps": [
+      {
+        "label": "Receber",
+        "text": "Um cliente pede informações sobre a proposta."
+      },
+      {
+        "label": "Preparar",
+        "text": "Seu agente lê a conversa e salva uma resposta como rascunho."
+      },
+      {
+        "label": "Acompanhar",
+        "text": "Você revisa no painel. O envio depende da permissão concedida."
+      }
+    ],
+    "foot": "Endereço e cenário ilustrativos. Nenhuma mensagem foi enviada."
+  },
+  "use": {
+    "eyebrow": "O seu endereço. A sua conversa.",
+    "title": "Uma caixa que também pode trabalhar com você.",
+    "body": "Seu e-mail pessoal de trabalho, o atendimento da empresa e o agente têm contextos diferentes. Crie caixas separadas e acompanhe cada conversa no mesmo painel.",
+    "items": [
+      {
+        "kind": "Pessoas",
+        "title": "Converse com um endereço seu.",
+        "address": "voce@suaempresa.com",
+        "body": "Leia, responda e encaminhe mensagens. Sua assinatura acompanha as novas mensagens e respostas.",
+        "points": [
+          "Entrada, rascunhos e enviados",
+          "Favoritos e pastas por caixa",
+          "Lixeira com restauração"
+        ]
+      },
+      {
+        "kind": "Agentes",
+        "title": "Dê um e-mail ao seu agente.",
+        "address": "agente@suaempresa.com",
+        "body": "Ele pode ler mensagens, preparar respostas e, com sua autorização, enviar. Você acompanha os rascunhos e as mensagens no painel.",
+        "points": [
+          "Permissões de leitura, rascunho e envio",
+          "Chave com acesso a uma caixa",
+          "Acesso revogável pelo responsável"
+        ]
+      }
+    ],
+    "exampleNote": "Os endereços acima são exemplos. Cada caixa precisa estar criada e ter o serviço ativado."
+  },
+  "control": {
+    "eyebrow": "Você define o acesso",
+    "title": "Comece com rascunhos. Amplie quando fizer sentido.",
+    "body": "Dê ao agente apenas as permissões necessárias. Uma chave de leitura e rascunho deixa ele preparar a resposta, enquanto você revisa e envia pelo painel.",
+    "permissions": [
+      {
+        "title": "Leitura",
+        "body": "Consulte as mensagens da caixa autorizada."
+      },
+      {
+        "title": "Rascunhos",
+        "body": "Prepare respostas para revisão no painel."
+      },
+      {
+        "title": "Envio",
+        "body": "Envie somente quando essa permissão estiver concedida."
+      }
+    ],
+    "note": "Autorizar uma caixa não libera toda a organização. A chave continua sujeita às permissões, à validade e à revogação."
+  },
+  "setup": {
+    "eyebrow": "Do domínio à conversa",
+    "title": "Seu domínio é o começo.",
+    "body": "Você não precisa contratar hospedagem de site para ter um e-mail no seu domínio. Precisa controlar o domínio e configurar o caminho das mensagens.",
+    "steps": [
+      {
+        "title": "Confira seu plano e a abertura antecipada",
+        "body": "A primeira abertura permanece para assinantes anteriores elegíveis de planos com preço recorrente acima de US$ 20/mês. A nova oferta de US$ 29 está em validação nesta prévia. Correio é pago à parte, por caixa."
+      },
+      {
+        "title": "Vincule um domínio seu",
+        "body": "Comprove que você controla o domínio e configure os registros de autenticação solicitados."
+      },
+      {
+        "title": "Configure o recebimento",
+        "body": "Ajuste DNS e MX conforme a orientação do serviço. O domínio e a infraestrutura de recebimento precisam estar confirmados antes de receber mensagens."
+      },
+      {
+        "title": "Crie a caixa e escolha quem usa",
+        "body": "Defina o endereço, o responsável e se a caixa será de uma pessoa ou de um agente. Depois configure as permissões de acesso."
+      }
+    ],
+    "warningTitle": "Já recebe e-mails nesse domínio?",
+    "warning": "Alterar o MX muda o destino do recebimento do domínio ou subdomínio inteiro. Planeje a troca antes de alterar o DNS. Vincular o domínio não importa as mensagens do provedor anterior.",
+    "docs": "Entender domínios e DNS"
+  },
+  "integrations": {
+    "eyebrow": "Uma plataforma, conexões diferentes",
+    "title": "Conecte com clareza sobre o que seu agente pode acessar.",
+    "body": "O Envio e o Correio têm funções e autorizações próprias. Escolha a conexão certa para a tarefa.",
+    "items": [
+      {
+        "kind": "Correio · API REST",
+        "title": "Uma caixa para seu agente",
+        "body": "A API do Correio permite consultar mensagens, criar rascunhos e enviar rascunhos autorizados, com uma chave dedicada à caixa.",
+        "status": "Em validação fechada",
+        "link": "Ver a API de caixas",
+        "path": "/mailboxes"
+      },
+      {
+        "kind": "Envio · MCP",
+        "title": "Seu agente no Envio",
+        "body": "O MCP público do MepMail conecta clientes compatíveis ao produto Envio, por OAuth hospedado ou pelo pacote local oficial. Essa conexão não concede acesso às caixas do Correio.",
+        "status": "Disponível no Envio",
+        "link": "Conhecer o MCP de Envio",
+        "path": "/mcp"
+      },
+      {
+        "kind": "Correio · integração de agente",
+        "title": "Leia e prepare. Você acompanha.",
+        "body": "O fluxo de leitura e rascunhos já foi exercitado com o Sage Windows por uma integração local. O MCP público de caixas será anunciado quando estiver disponível.",
+        "status": "Testado no acesso fechado",
+        "link": "Entender o acesso de agentes",
+        "path": "/mailboxes#conecte-um-agente"
+      }
+    ],
+    "all": "Ver as integrações de Envio"
+  },
+  "plans": {
+    "eyebrow": "Envio + Correio",
+    "title": "Um plano para sua aplicação. Caixas para suas conversas.",
+    "body": "Envio cuida dos e-mails da aplicação e das campanhas. Correio acrescenta caixas com entrada e saída para pessoas e agentes, pago à parte. O acesso inicial continua fechado aos assinantes anteriores elegíveis.",
+    "sending": {
+      "label": "Para sua aplicação",
+      "title": "Só Envio",
+      "body": "Nova oferta: 110 mil entregas por mês por US$ 29 recorrentes. Novos clientes pagam US$ 20 só na primeira mensalidade. Você pode usar Envio sem contratar caixas; as assinaturas atuais são preservadas.",
+      "link": "Comparar planos de Envio"
+    },
+    "mail": {
+      "label": "Para suas conversas e agentes",
+      "title": "Envio + Correio",
+      "body": "Seu plano de Envio pode receber o adicional Correio: US$ 5,90 por caixa de 1 GiB ou US$ 9,90 por caixa de 10 GiB, ao mês. Entrada, saída e permissões por caixa. Humano ou agente: o mesmo preço.",
+      "note": "Oferta preparada para lançamento. A contratação pública do Correio ainda não está aberta; esta prévia não libera acesso."
+    },
+    "terms": "Correio é pago à parte. Aumento de caixas após pagamento confirmado; redução na próxima renovação, preservando as mensagens. Você pode continuar usando só Envio."
+  },
+  "comparison": {
+    "caption": "O que muda entre as duas modalidades",
+    "feature": "Recurso",
+    "sending": "Só Envio",
+    "combined": "Envio + Correio",
+    "rows": [
+      {
+        "label": "Aplicação e campanhas",
+        "sending": "API, modelos e campanhas de Envio",
+        "combined": "As mesmas funções de Envio"
+      },
+      {
+        "label": "Caixas de e-mail",
+        "sending": "Sem caixa de entrada",
+        "combined": "Entrada, rascunhos e saída por caixa"
+      },
+      {
+        "label": "Conexão de agentes",
+        "sending": "API e MCP de Envio",
+        "combined": "Envio + API própria de caixas, com permissões"
+      },
+      {
+        "label": "Cobrança",
+        "sending": "Plano de Envio",
+        "combined": "Plano de Envio + adicional por caixa"
+      },
+      {
+        "label": "Disponibilidade",
+        "sending": "Envio já disponível; assinaturas atuais preservadas",
+        "combined": "Acesso inicial fechado aos assinantes anteriores elegíveis"
+      }
+    ],
+    "earlyNote": "Correio exige um plano acima de US$ 20/mês pelo preço recorrente. A nova oferta de US$ 29 qualifica o plano mesmo na primeira mensalidade promocional de US$ 20. Contratos antigos de US$ 20 não mudam automaticamente. A primeira abertura permanece exclusiva aos assinantes anteriores elegíveis; uma assinatura nova não garante entrada."
+  },
+  "preview": {
+    "eyebrow": "Compare a nova oferta",
+    "title": "Seu plano. Suas caixas.",
+    "body": "Compare Só Envio com Envio + Correio. Os totais abaixo simulam uma nova contratação, sem alterar assinaturas existentes.",
+    "status": "Prévia · contratação indisponível",
+    "periodLegend": "Período da comparação",
+    "month": "Mensal",
+    "year": "Anual · antecipado",
+    "savingBadge": "12 meses pelo valor de 10 mensalidades normais",
+    "mailboxLegend": "Armazenamento por caixa",
+    "storage": "{size} GiB por caixa",
+    "quantityLabel": "Quantidade de caixas",
+    "quantityHint": "De 1 a 50 nesta comparação. Pessoas e agentes têm o mesmo preço por caixa.",
+    "quantityError": "Use uma quantidade inteira de 1 a 50.",
+    "invalidQuote": "Informe uma quantidade válida para calcular o total.",
+    "mailboxSelection": "Correio de {size} GiB",
+    "recipients": "{count, number} entregas de saída por mês, por caixa. To, Cc e Bcc contam; não é limite de contatos diferentes.",
+    "sendingLabel": "Só Envio",
+    "combinedLabel": "Envio + Correio",
+    "sendingPlan": "{count, number} entregas de Envio por mês",
+    "combinedPlan": "{count, plural, one {Envio + # caixa} other {Envio + # caixas}}",
+    "perMonth": "/ mês",
+    "perYear": "/ ano",
+    "paidUpfront": "Total anual pago antecipadamente",
+    "equivalent": "Equivalente a {amount} por mês; não é uma cobrança mensal",
+    "firstPayment": "Primeira mensalidade para novos clientes: {amount}",
+    "renewal": "Renovação: {amount} {period}",
+    "sendingAmount": "Envio: {amount}",
+    "mailAmount": "{count, plural, one {# caixa} other {# caixas}} × {unit} = {amount}",
+    "annualFormula": "10 × a mensalidade normal para 12 meses de acesso. O anual não acumula a promoção da primeira mensalidade.",
+    "annualConsumption": "As franquias renovam mensalmente na oferta anual proposta, não formam um saldo anual. A contratação e a separação dos ciclos ainda estão em preparação.",
+    "monthlyConsumption": "A franquia de 110 mil entregas de Envio é separada da franquia mensal de cada caixa de Correio. O espaço é por caixa.",
+    "introTerms": "US$ 20 somente na primeira mensalidade de Envio para novos clientes; depois, US$ 29/mês. O adicional Correio é cobrado pelo preço normal desde a primeira mensalidade.",
+    "eligibility": "O plano de US$ 29 qualifica Correio pelo preço recorrente, mesmo durante a promoção. Acesso ainda sujeito à abertura, elegibilidade e ativação do domínio.",
+    "monthlyNote": "Esta é a prévia de uma nova oferta. Correio continua em acesso fechado; checkout e contratação ainda não estão disponíveis aqui.",
+    "noChange": "Esta comparação não contrata um plano nem altera sua assinatura. Valores em US$, antes de impostos e eventual consumo excedente."
+  },
+  "devices": {
+    "eyebrow": "Computador e celular",
+    "title": "A mesma operação, em uma tela que acompanha você.",
+    "body": "Acesse as mensagens pelo painel web do MepMail. A experiência responsiva está sendo preparada para ler, revisar e organizar no computador e no celular.",
+    "browser": {
+      "title": "Acesso pelo navegador",
+      "body": "Sua organização, suas caixas e suas permissões no painel web. Sem depender de hospedar um site para sua empresa."
+    },
+    "install": {
+      "title": "Instalação web em preparação",
+      "body": "Estamos preparando a base de instalação web para Windows e iOS. A instalação nesses dispositivos ainda precisa ser validada."
+    },
+    "note": "Aplicativos nativos de Windows e iOS ainda não estão publicados. Recursos como uso offline e notificações não fazem parte desta prévia."
+  },
+  "faq": {
+    "title": "Antes de trazer seu e-mail",
+    "items": [
+      {
+        "q": "Quais assinantes poderão contratar Correio?",
+        "a": "Correio é pago à parte por caixa e exige um plano acima de US$ 20/mês pelo valor recorrente. A nova oferta de US$ 29 qualifica o plano mesmo durante a primeira mensalidade promocional de US$ 20. O acesso inicial permanece exclusivo aos assinantes anteriores elegíveis. As assinaturas atuais são preservadas, sem migração automática. A licença interna System continua isenta, com 50 GiB por caixa e sem limites comerciais de caixas ou entregas."
+      },
+      {
+        "q": "Comprei um domínio. Já posso criar qualquer endereço?",
+        "a": "Você pode escolher um endereço disponível no domínio que controla. Para enviar e receber, é necessário ter um plano elegível e acesso ao Correio, contratar o adicional, verificar o domínio, configurar DNS/MX e confirmar a ativação do recebimento. Só cadastrar o endereço não conclui essas etapas. A primeira abertura será exclusiva aos assinantes anteriores elegíveis."
+      },
+      {
+        "q": "Preciso ter um site ou contratar hospedagem?",
+        "a": "Não é necessário hospedar um site. Você precisa ter o domínio e acesso aos registros DNS para comprovar sua propriedade e configurar o e-mail. O serviço de caixa é fornecido pelo Correio MepMail quando estiver ativado."
+      },
+      {
+        "q": "O agente tem acesso a toda a minha operação?",
+        "a": "Não automaticamente. No Correio, cada chave autoriza uma caixa e as permissões escolhidas pelo responsável. Acesso a outras ferramentas ou dados da empresa depende das respectivas conexões e autorizações."
+      },
+      {
+        "q": "O agente pode enviar sem eu revisar?",
+        "a": "Somente se você conceder a permissão de envio. Para começar, recomendamos leitura e rascunhos: o agente prepara a resposta e você revisa pelo painel antes de enviar."
+      },
+      {
+        "q": "Posso trazer as mensagens do Gmail ou de outro provedor?",
+        "a": "Vincular um domínio não transfere mensagens antigas nem migra automaticamente uma conta Gmail ou Outlook. A mudança de provedor e a importação precisam de uma jornada própria, ainda não disponível publicamente no Correio. Preserve o acesso ao provedor atual durante a transição."
+      },
+      {
+        "q": "O MCP público já abre essas caixas?",
+        "a": "O MCP público atual atende ao Envio. O Correio usa uma API própria com chaves por caixa; a integração de leitura e rascunhos foi testada no acesso fechado. A disponibilidade de um MCP público para caixas será informada separadamente."
+      },
+      {
+        "q": "Como vou acessar no computador e no celular?",
+        "a": "Pelo painel web do MepMail no navegador. Estamos preparando a experiência responsiva para computador e celular. Aplicativos nativos para Windows e iOS ainda não estão publicados."
+      }
+    ]
+  },
+  "close": {
+    "eyebrow": "O próximo endereço pode ser do seu agente",
+    "title": "Sua empresa conversa. Você acompanha.",
+    "body": "Estamos preparando o Correio para assinantes anteriores de planos acima de US$ 20/mês. Conheça a proposta e a documentação enquanto validamos a abertura inicial, com contratação à parte.",
+    "primary": "Conhecer planos de Envio",
+    "secondary": "Ler a documentação do Correio"
+  }
+}

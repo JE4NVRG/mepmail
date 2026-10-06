@@ -10,6 +10,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState } from "react";
+import { DeliverabilityRecovery } from "@/components/deliverability-banner";
 import { EmptyState } from "@/components/empty-state";
 import { ChartTip, LineChart } from "@/components/line-chart";
 import { Odometer } from "@/components/odometer";
@@ -475,7 +476,7 @@ export default function MetricsPage() {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const dayLabel = (day: string) => formatDayUtc(day, locale);
   // The headline of the two risk cards is the guardrail's own seven-day
-  // rate — the number that warns and pauses — never the chart window's.
+  // warning rate, independent from the short pause window and chart range.
   const health = useQuery(trpc.metrics.health.queryOptions());
   const guardrailRate = (rate: number | undefined, format: Intl.NumberFormat) =>
     health.data === undefined
@@ -534,6 +535,10 @@ export default function MetricsPage() {
             options={RANGES.map((r) => ({ value: String(r), label: t(`range.${r}`) }))}
           />
         }
+      />
+
+      <DeliverabilityRecovery
+        health={health.isError || health.isPending ? undefined : health.data}
       />
 
       {data === undefined ? (
@@ -671,6 +676,26 @@ export default function MetricsPage() {
                     {pct2.format(scoreQuery.data.hardBounceRate)}
                   </div>
                 </div>
+              </div>
+              <div style={{ marginTop: 16, color: "var(--ms-muted)", lineHeight: 1.6 }}>
+                <p>{t("score.authorizationNote")}</p>
+                <p>
+                  <strong style={{ color: "var(--ms-bone)" }}>{t("score.confidence.title")}</strong>
+                  {" · "}
+                  {t(`score.confidence.${scoreQuery.data.outcomeConfidence.level}`, {
+                    sent: fmt.format(scoreQuery.data.outcomeConfidence.sent),
+                    minimum: fmt.format(scoreQuery.data.outcomeConfidence.minOutcomeSends),
+                  })}
+                </p>
+                {!scoreQuery.data.outcomeConfidence.complaintPenaltyEligible ? (
+                  <p>
+                    {t("score.confidence.complaintSignalPending", {
+                      count: fmt.format(scoreQuery.data.outcomeConfidence.complaintEvents),
+                      events: fmt.format(scoreQuery.data.outcomeConfidence.minComplaintEvents),
+                      sent: fmt.format(scoreQuery.data.outcomeConfidence.minOutcomeSends),
+                    })}
+                  </p>
+                ) : null}
               </div>
               <button
                 type="button"

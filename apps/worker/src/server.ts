@@ -1,7 +1,9 @@
 import { SQSClient } from "@aws-sdk/client-sqs";
 import {
   createStripe,
+  dispatchMetaConversions,
   purgeStripeEvents,
+  readMetaConversionConfig,
   reconcileTeamPlan,
   reportOverage,
 } from "@millionsend/billing";
@@ -15,11 +17,13 @@ import {
   unsubscribeBaseUrl,
 } from "@millionsend/config";
 import {
+  checkMailboxRecipientBlocks,
   committedDailyVolume,
   deriveSamplingKey,
   deriveTrackingKey,
   deriveUnsubscribeKey,
   eraseRecipient,
+  failQueuedMailboxOutbox,
   getInstanceSettings,
   hashRecipient,
   type MonitorDeps,
@@ -31,13 +35,12 @@ import {
   pruneProbes,
   purgeExpiredIdempotencyKeys,
   type QueuedWebhookDelivery,
+  reconcileMailboxOutbox,
   recordProbes,
   recountStaleSegments,
   regionBulkCounts,
-  sesEventsHealth,
   sendMailboxOutbox,
-  reconcileMailboxOutbox,
-  failQueuedMailboxOutbox,
+  sesEventsHealth,
 } from "@millionsend/core";
 import { getDb, schema } from "@millionsend/db";
 import {
@@ -85,15 +88,15 @@ import { finalizeBroadcast, sendBroadcast } from "./handlers/send-broadcast.js";
 import { failQueuedEmail, sendEmail } from "./handlers/send-email.js";
 import { createRegionSendControls } from "./handlers/ses-regions.js";
 import { syncTenants } from "./handlers/tenants.js";
-import { createSesSender } from "./ses-sender.js";
-import { startSqsPoller } from "./sqs-poller.js";
-import { createSystemMailer } from "./system-mail.js";
+import { createMailboxIngress, parseMailboxInboundConfiguration } from "./mailbox-ingress.js";
 import {
   createMailboxSesSender,
   mailboxWorkerMime,
   parseMailboxSesConfigurationSets,
 } from "./mailbox-sender.js";
-import { createMailboxIngress, parseMailboxInboundConfiguration } from "./mailbox-ingress.js";
+import { createSesSender } from "./ses-sender.js";
+import { startSqsPoller } from "./sqs-poller.js";
+import { createSystemMailer } from "./system-mail.js";
 
 if (!env.MASTER_ENCRYPTION_KEY) {
   // Required even when cloud wraps DEKs with KMS: tracking/unsubscribe token
@@ -121,7 +124,8 @@ const mailboxSes = mailboxTransportEnabled
       configurationSets:
         parseMailboxSesConfigurationSets(process.env.MAILBOX_SES_CONFIGURATION_SETS) ?? undefined,
       exhausted: (region) => sendControls.exhausted(region),
-      throttle: (region) => sendControls.throttle(region),
+      throttle: (region, recipients) => sendControls.throttle(region, recipients),
+      checkRecipients: (input) => checkMailboxRecipientBlocks(db, input),
     })
   : null;
 // Days whole email rows (recipients, subject, events) are kept; bodies age
@@ -384,6 +388,13 @@ await queue.scheduleCrons({
   "webhooks.reconcile": async () => {
     const armed = await reconcileWebhookDeliveries(db, { enqueue: enqueueWebhook });
     if (armed > 0) console.log(`webhooks.reconcile: armed=${armed}`);
+    if (stripe) {
+      const result = await dispatchMetaConversions(db, readMetaConversionConfig(process.env), {
+        stripe,
+        fetch: (url, request) => fetch(url, request),
+      });
+      if (result.sent > 0) console.log(`meta conversions: sent=${result.sent}`);
+    }
   },
   "broadcasts.reconcile": async () => {
     const requeued = await reconcileStalledBroadcasts(db, {

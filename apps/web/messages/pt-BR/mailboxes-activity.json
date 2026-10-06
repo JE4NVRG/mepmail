@@ -1,0 +1,47 @@
+{
+  "eyebrow": "Correio · Atividade",
+  "title": "Atividade da caixa",
+  "open": "Histórico",
+  "description": "Acompanhe consultas, acesso a mensagens, rascunhos salvos e aprovações de envio desta caixa.",
+  "historyStart": "O histórico começa a partir da ativação.",
+  "privacy": "O histórico registra ações e horários. O conteúdo das mensagens não é copiado para esta tela.",
+  "close": "Fechar",
+  "refresh": "Atualizar",
+  "refreshing": "Atualizando…",
+  "loading": "Carregando atividades…",
+  "error": "Não foi possível carregar o histórico desta caixa. Atualize para tentar novamente.",
+  "empty": "Nenhuma atividade registrada ainda.",
+  "older": "Mais antigas",
+  "loadingOlder": "Carregando atividades anteriores…",
+  "loadedCount": "{count, plural, one {# atividade exibida} other {# atividades exibidas}}",
+  "messageCount": "{count, plural, one {# mensagem} other {# mensagens}}",
+  "revision": "Revisão {revision, number}",
+  "actors": {
+    "agent": "Agente",
+    "person": "Pessoa"
+  },
+  "actions": {
+    "itemsListed": "Consultou a lista de mensagens",
+    "itemRead": "Acessou o conteúdo de uma mensagem",
+    "draftSaved": "Salvou um rascunho",
+    "sendApproved": "Aprovou um envio",
+    "itemTrashed": "Moveu uma mensagem para a lixeira",
+    "itemRestored": "Restaurou uma mensagem da lixeira",
+    "itemStarred": "Adicionou uma mensagem aos favoritos",
+    "itemUnstarred": "Removeu uma mensagem dos favoritos",
+    "itemFolderChanged": "Moveu uma mensagem de pasta",
+    "folderCreated": "Criou uma pasta",
+    "folderRenamed": "Renomeou uma pasta",
+    "folderArchived": "Removeu uma pasta preservando as mensagens"
+  },
+  "folders": {
+    "inbox": "Entrada",
+    "drafts": "Rascunhos",
+    "sent": "Enviados",
+    "trash": "Lixeira",
+    "spam": "Spam",
+    "quarantine": "Quarentena",
+    "favorites": "Favoritos",
+    "custom": "Pasta"
+  }
+}

@@ -1,37 +1,34 @@
-.products {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3px;
-  margin: 14px 0 6px;
-  padding: 4px;
-  border: 1px solid var(--ms-line);
-  border-radius: var(--ms-r-input);
-  background: var(--ms-inset);
+.navSection {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
-.products a {
-  min-width: 0;
-  padding: 9px 8px;
+.navSection + .navSection {
+  margin-top: 12px;
+}
+.navHeading {
+  padding: 4px 12px 6px;
   color: var(--ms-muted);
-  border: 1px solid transparent;
-  border-radius: var(--ms-r-chip);
-  text-decoration: none;
   font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
 }
-.products small {
-  display: block;
-  margin-top: 4px;
-  font-size: 10px;
-  color: var(--ms-muted);
+.sidebarNav :global(a) {
+  min-height: 38px;
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
-.products a:hover,
-.products a.selectedProduct {
-  color: var(--ms-bone);
-  background: var(--ms-panel-raised);
-  border-color: var(--ms-line);
-}
-.products a:focus-visible {
+.sidebarNav :global(a:focus-visible) {
   outline: 2px solid var(--ms-steel);
-  outline-offset: 2px;
+  outline-offset: -2px;
+}
+.navResources {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 1px solid var(--ms-line);
+  margin-top: 12px;
+  padding-top: 8px;
 }
 .mail > :global(.ms-main) {
   padding: 24px !important;
@@ -45,6 +42,9 @@
   font-size: 12px;
 }
 @media (max-width: 900px) {
+  .sidebarNav :global(a) {
+    min-height: 44px;
+  }
   .mail > :global(.ms-main) {
     padding: 16px !important;
   }

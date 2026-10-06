@@ -4,7 +4,9 @@ import {
   BOUND_ENVELOPE_VERSION_OFFSET,
   decryptPayload,
   type Keyring,
+  type MailboxOutboundEvidence,
   type MailboxTransportMimeAdapter,
+  mailboxRecipientHash,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { and, eq } from "drizzle-orm";
@@ -59,8 +61,100 @@ function recipients(values: unknown) {
   return result;
 }
 
-/** Authenticated provider fact, never a user/API command. Proves submission
- * acceptance only; it does not claim recipient delivery and never resends.
+/** Deliberately allowlisted provider facts. No diagnostic text, raw event,
+ * address or subject leaves this boundary; hashes are scoped to the owning team.
+ */
+function outcomeEvidence(
+  event: Record<string, unknown>,
+  eventType: string,
+  teamId: string,
+  destination: string[],
+  input: TrustedMailboxNotification,
+): MailboxOutboundEvidence {
+  let outcome: MailboxOutboundEvidence["outcome"];
+  let section: Record<string, unknown> | null = null;
+  let selected = destination;
+  switch (eventType) {
+    case "Send":
+      outcome = "send";
+      section = providerRecord(event.send);
+      break;
+    case "Delivery":
+      outcome = "delivered";
+      section = providerRecord(event.delivery);
+      selected = recipients(section?.recipients);
+      break;
+    case "DeliveryDelay":
+      outcome = "delayed";
+      section = providerRecord(event.deliveryDelay);
+      selected = recipients(
+        Array.isArray(section?.delayedRecipients)
+          ? section.delayedRecipients.map((value) => providerRecord(value)?.emailAddress)
+          : null,
+      );
+      break;
+    case "Bounce":
+      section = providerRecord(event.bounce);
+      if (
+        section?.bounceType !== "Permanent" &&
+        section?.bounceType !== "Transient" &&
+        section?.bounceType !== "Undetermined"
+      )
+        throw new MailboxProviderEventError("evidence");
+      // Undetermined is not a confirmed hard bounce and must not silently block.
+      outcome =
+        section.bounceType === "Permanent"
+          ? "hard_bounce"
+          : section.bounceType === "Transient"
+            ? "soft_bounce"
+            : "undetermined_bounce";
+      selected = recipients(
+        Array.isArray(section.bouncedRecipients)
+          ? section.bouncedRecipients.map((value) => providerRecord(value)?.emailAddress)
+          : null,
+      );
+      break;
+    case "Complaint":
+      outcome = "complaint";
+      section = providerRecord(event.complaint);
+      selected = recipients(
+        Array.isArray(section?.complainedRecipients)
+          ? section.complainedRecipients.map((value) => providerRecord(value)?.emailAddress)
+          : null,
+      );
+      break;
+    case "Reject":
+      outcome = "rejected";
+      section = providerRecord(event.reject);
+      break;
+    case "Rendering Failure":
+      outcome = "rendering_failed";
+      section = providerRecord(event.failure);
+      break;
+    default:
+      throw new MailboxProviderEventError("evidence");
+  }
+  if (!section || selected.some((recipient) => !destination.includes(recipient)))
+    throw new MailboxProviderEventError("evidence");
+  const timestamp = section.timestamp ?? providerRecord(event.mail)?.timestamp;
+  if (typeof timestamp !== "string" || !/^\d{4}-\d{2}-\d{2}T/.test(timestamp))
+    throw new MailboxProviderEventError("evidence");
+  const occurredAt = new Date(timestamp);
+  if (!Number.isFinite(occurredAt.getTime())) throw new MailboxProviderEventError("evidence");
+  return {
+    topicArn: input.topicArn,
+    snsMessageId: input.snsMessageId,
+    outcome,
+    recipientHashes: selected.map((recipient) => mailboxRecipientHash(teamId, recipient)).sort(),
+    approvedRecipientHashes: destination
+      .map((recipient) => mailboxRecipientHash(teamId, recipient))
+      .sort(),
+    occurredAt,
+  };
+}
+
+/** Authenticated provider facts, never a user/API command. Acceptance and
+ * recipient outcomes commit atomically before ACK. No fact authorizes a resend.
  */
 export function createMailboxEvidenceHandler(options: {
   db: Db;
@@ -123,6 +217,13 @@ export function createMailboxEvidenceHandler(options: {
       (bound.outbox.status === "accepted" && bound.outbox.providerMessageId !== messageId)
     )
       throw new MailboxProviderEventError("evidence");
+    const outboundEvidence = outcomeEvidence(
+      event,
+      eventType,
+      bound.outbox.teamId,
+      destination,
+      input,
+    );
     let envelope = {
       ciphertext: bound.outbox.ciphertext,
       iv: bound.outbox.iv,
@@ -213,6 +314,7 @@ export function createMailboxEvidenceHandler(options: {
       attemptId,
       messageId,
       ...(rfcMessageId ? { rfcMessageId } : {}),
+      outboundEvidence,
     });
     return true;
   };

@@ -1,0 +1,293 @@
+{
+  "meta": {
+    "title": "Mail for you and your agents | MepMail",
+    "description": "Discover MepMail Mail: mailboxes on your domain for people and agents, with messages, drafts and permissions under your control. Exclusive early access for existing subscribers."
+  },
+  "hero": {
+    "eyebrow": "MepMail Mail",
+    "status": "Launch preview · closed access",
+    "title": "An email from your company.",
+    "titleEnd": "For you and your agent.",
+    "lead": "Receive inquiries, talk to customers and give your agent its own address. Follow the messages and decide what it can do.",
+    "primary": "See how it works",
+    "secondary": "Explore Send plans",
+    "note": "Mail is paid separately. Initial access is exclusive to eligible earlier subscribers; this preview presents the new offer.",
+    "audiences": ["For you", "For your team", "For your agents"]
+  },
+  "example": {
+    "label": "Usage example · fictional content",
+    "identity": "An identity from your company",
+    "address": "luna@yourcompany.com",
+    "role": "A dedicated mailbox for your agent",
+    "steps": [
+      {
+        "label": "Receive",
+        "text": "A customer asks for details about a proposal."
+      },
+      {
+        "label": "Prepare",
+        "text": "Your agent reads the conversation and saves a reply as a draft."
+      },
+      {
+        "label": "Follow",
+        "text": "You review it in the dashboard. Sending requires the permission you grant."
+      }
+    ],
+    "foot": "Illustrative address and scenario. No message was sent."
+  },
+  "use": {
+    "eyebrow": "Your address. Your conversation.",
+    "title": "A mailbox that can work with you.",
+    "body": "Your work email, company support and agent have different contexts. Create separate mailboxes and follow each conversation in the same dashboard.",
+    "items": [
+      {
+        "kind": "People",
+        "title": "Talk from your own address.",
+        "address": "you@yourcompany.com",
+        "body": "Read, reply to and forward messages. Your signature follows new messages and replies.",
+        "points": [
+          "Inbox, drafts and sent messages",
+          "Favorites and folders per mailbox",
+          "Trash with restore"
+        ]
+      },
+      {
+        "kind": "Agents",
+        "title": "Give your agent an email.",
+        "address": "agent@yourcompany.com",
+        "body": "It can read messages, prepare replies and, with your authorization, send. Follow drafts and messages in the dashboard.",
+        "points": [
+          "Read, draft and send permissions",
+          "A key scoped to one mailbox",
+          "Access the owner can revoke"
+        ]
+      }
+    ],
+    "exampleNote": "The addresses above are examples. Each mailbox must be created and its service activated."
+  },
+  "control": {
+    "eyebrow": "You define access",
+    "title": "Start with drafts. Expand when it makes sense.",
+    "body": "Give the agent only the permissions it needs. A read-and-draft key lets it prepare a reply while you review and send from the dashboard.",
+    "permissions": [
+      {
+        "title": "Read",
+        "body": "Access messages in the authorized mailbox."
+      },
+      {
+        "title": "Draft",
+        "body": "Prepare replies for review in the dashboard."
+      },
+      {
+        "title": "Send",
+        "body": "Send only when this permission has been granted."
+      }
+    ],
+    "note": "Authorizing one mailbox does not unlock the entire organization. The key remains subject to its permissions, expiration and revocation."
+  },
+  "setup": {
+    "eyebrow": "From domain to conversation",
+    "title": "Your domain is the beginning.",
+    "body": "You do not need website hosting to have email on your domain. You need to control the domain and configure where messages go.",
+    "steps": [
+      {
+        "title": "Check your plan and early access",
+        "body": "The first opening remains for eligible earlier subscribers to plans with a recurring price above US$20/month. The new US$29 offer is being validated in this preview. Mail is paid separately, per mailbox."
+      },
+      {
+        "title": "Connect a domain you own",
+        "body": "Verify that you control the domain and configure the required authentication records."
+      },
+      {
+        "title": "Configure receiving",
+        "body": "Update DNS and MX as directed by the service. The domain and receiving infrastructure must be confirmed before messages can arrive."
+      },
+      {
+        "title": "Create the mailbox and choose who uses it",
+        "body": "Set its address, owner and whether it is for a person or an agent. Then configure access permissions."
+      }
+    ],
+    "warningTitle": "Already receiving email on this domain?",
+    "warning": "Changing MX redirects receiving for the entire domain or subdomain. Plan the switch before editing DNS. Connecting the domain does not import messages from your previous provider.",
+    "docs": "Understand domains and DNS"
+  },
+  "integrations": {
+    "eyebrow": "One platform, different connections",
+    "title": "Connect with clarity about what your agent can access.",
+    "body": "Send and Mail have their own functions and authorizations. Choose the right connection for the task.",
+    "items": [
+      {
+        "kind": "Mail · REST API",
+        "title": "A mailbox for your agent",
+        "body": "The Mail API can retrieve messages, create drafts and send authorized drafts, using a key dedicated to the mailbox.",
+        "status": "In closed validation",
+        "link": "See the mailbox API",
+        "path": "/mailboxes"
+      },
+      {
+        "kind": "Send · MCP",
+        "title": "Your agent in Send",
+        "body": "MepMail's public MCP connects compatible clients to Send through hosted OAuth or the official local package. This connection does not grant access to Mail mailboxes.",
+        "status": "Available in Send",
+        "link": "Explore the Send MCP",
+        "path": "/mcp"
+      },
+      {
+        "kind": "Mail · agent integration",
+        "title": "Read and prepare. You follow.",
+        "body": "The read-and-draft workflow has been exercised with Sage Windows through a local integration. Public mailbox MCP availability will be announced when ready.",
+        "status": "Tested in closed access",
+        "link": "Understand agent access",
+        "path": "/mailboxes#connect-an-agent"
+      }
+    ],
+    "all": "See Send integrations"
+  },
+  "plans": {
+    "eyebrow": "Send + Mail",
+    "title": "A plan for your application. Mailboxes for your conversations.",
+    "body": "Send handles application emails and campaigns. Mail adds inboxes and outboxes for people and agents, paid separately. Initial access remains closed to eligible earlier subscribers.",
+    "sending": {
+      "label": "For your application",
+      "title": "Send only",
+      "body": "New offer: 110,000 deliveries each month for a recurring US$29. New customers pay US$20 only for the first monthly bill. Send can be used without mailboxes; existing subscriptions are preserved.",
+      "link": "Compare Send plans"
+    },
+    "mail": {
+      "label": "For your conversations and agents",
+      "title": "Send + Mail",
+      "body": "Your Send plan can add Mail: US$5.90 per 1 GiB mailbox or US$9.90 per 10 GiB mailbox each month. Inboxes, outboxes and per-mailbox permissions. People and agents have the same price.",
+      "note": "Offer prepared for launch. Public Mail subscriptions are not open yet; this preview does not grant access."
+    },
+    "terms": "Mail is paid separately. More mailboxes after confirmed payment; reductions at the next renewal, preserving stored messages. You can continue using Send on its own."
+  },
+  "comparison": {
+    "caption": "What changes between the two options",
+    "feature": "Feature",
+    "sending": "Send only",
+    "combined": "Send + Mail",
+    "rows": [
+      {
+        "label": "Application and campaigns",
+        "sending": "Send API, templates and campaigns",
+        "combined": "The same Send features"
+      },
+      {
+        "label": "Email mailboxes",
+        "sending": "No inbox",
+        "combined": "Inbox, drafts and outbox per mailbox"
+      },
+      {
+        "label": "Agent connection",
+        "sending": "Send API and MCP",
+        "combined": "Send + dedicated mailbox API with permissions"
+      },
+      {
+        "label": "Billing",
+        "sending": "Send plan",
+        "combined": "Send plan + per-mailbox add-on"
+      },
+      {
+        "label": "Availability",
+        "sending": "Send is already available; existing subscriptions are preserved",
+        "combined": "Initial closed access for eligible earlier subscribers"
+      }
+    ],
+    "earlyNote": "Mail requires a plan above US$20/month at its recurring price. The new US$29 offer qualifies the plan even during its US$20 introductory monthly bill. Existing US$20 contracts do not change automatically. The first opening remains exclusive to eligible earlier subscribers; a new subscription does not guarantee entry."
+  },
+  "preview": {
+    "eyebrow": "Compare the new offer",
+    "title": "Your plan. Your mailboxes.",
+    "body": "Compare Send only with Send + Mail. These totals model a new purchase without changing existing subscriptions.",
+    "status": "Preview · purchase unavailable",
+    "periodLegend": "Comparison period",
+    "month": "Monthly",
+    "year": "Annual · paid upfront",
+    "savingBadge": "12 months for the price of 10 regular monthly fees",
+    "mailboxLegend": "Storage per mailbox",
+    "storage": "{size} GiB per mailbox",
+    "quantityLabel": "Number of mailboxes",
+    "quantityHint": "From 1 to 50 in this comparison. People and agents have the same price per mailbox.",
+    "quantityError": "Use a whole number from 1 to 50.",
+    "invalidQuote": "Enter a valid quantity to calculate the total.",
+    "mailboxSelection": "{size} GiB Mail",
+    "recipients": "{count, number} outbound deliveries per month, per mailbox. To, Cc and Bcc count; this is not a limit on distinct contacts.",
+    "sendingLabel": "Send only",
+    "combinedLabel": "Send + Mail",
+    "sendingPlan": "{count, number} Send deliveries per month",
+    "combinedPlan": "{count, plural, one {Send + # mailbox} other {Send + # mailboxes}}",
+    "perMonth": "/ month",
+    "perYear": "/ year",
+    "paidUpfront": "Annual total paid upfront",
+    "equivalent": "Equivalent to {amount} per month; not a monthly bill",
+    "firstPayment": "First monthly bill for new customers: {amount}",
+    "renewal": "Renewal: {amount} {period}",
+    "sendingAmount": "Send: {amount}",
+    "mailAmount": "{count, plural, one {# mailbox} other {# mailboxes}} × {unit} = {amount}",
+    "annualFormula": "10 × the regular monthly price for 12 months of access. Annual billing does not stack with the first-month promotion.",
+    "annualConsumption": "Allowances renew monthly in the proposed annual offer, not as an annual balance. Purchasing and separate usage cycles are still being prepared.",
+    "monthlyConsumption": "The 110,000 Send delivery allowance is separate from each Mail mailbox's monthly allowance. Storage is per mailbox.",
+    "introTerms": "US$20 only for the first monthly Send bill for new customers; then US$29/month. Mail add-ons are charged at their regular price from the first bill.",
+    "eligibility": "The US$29 plan qualifies for Mail at its recurring price, even during the promotion. Access still requires release, eligibility and domain activation.",
+    "monthlyNote": "This previews a new offer. Mail remains in closed access; checkout and purchasing are not available here yet.",
+    "noChange": "This comparison does not purchase a plan or change your subscription. Values in US$, before taxes and any additional usage."
+  },
+  "devices": {
+    "eyebrow": "Computer and phone",
+    "title": "The same operation, on a screen that follows you.",
+    "body": "Access messages through the MepMail web dashboard. The responsive experience is being prepared for reading, reviewing and organizing on computers and phones.",
+    "browser": {
+      "title": "Browser access",
+      "body": "Your organization, mailboxes and permissions in the web dashboard. Without requiring website hosting for your company."
+    },
+    "install": {
+      "title": "Web installation in preparation",
+      "body": "We are preparing the web installation foundation for Windows and iOS. Installation on those devices still needs to be validated."
+    },
+    "note": "Native Windows and iOS applications are not published yet. Features such as offline use and notifications are not part of this preview."
+  },
+  "faq": {
+    "title": "Before bringing your email",
+    "items": [
+      {
+        "q": "Which subscribers can purchase Mail?",
+        "a": "Mail is paid separately per mailbox and requires a plan above US$20/month at its recurring price. The new US$29 offer qualifies the plan even during the US$20 introductory monthly bill. Initial access remains exclusive to eligible earlier subscribers. Existing subscriptions are preserved without automatic migration. The internal System license remains exempt, with 50 GiB per mailbox and no commercial mailbox or delivery limits."
+      },
+      {
+        "q": "I bought a domain. Can I create any address now?",
+        "a": "You can choose an available address on a domain you control. Sending and receiving require an eligible plan and Mail access, an add-on subscription, domain verification, DNS/MX configuration and confirmed receiving activation. Registering an address alone does not complete these steps. The first opening will be exclusive to eligible earlier subscribers."
+      },
+      {
+        "q": "Do I need a website or hosting?",
+        "a": "You do not need to host a website. You need a domain and access to its DNS records to verify ownership and configure email. The mailbox service is provided by MepMail Mail once activated."
+      },
+      {
+        "q": "Does the agent have access to my entire operation?",
+        "a": "Not automatically. In Mail, each key authorizes one mailbox and the permissions its owner selects. Access to other company tools or data depends on their respective connections and authorizations."
+      },
+      {
+        "q": "Can the agent send without my review?",
+        "a": "Only if you grant send permission. We recommend starting with read and draft: the agent prepares a reply and you review it in the dashboard before sending."
+      },
+      {
+        "q": "Can I bring messages from Gmail or another provider?",
+        "a": "Connecting a domain does not transfer old messages or automatically migrate a Gmail or Outlook account. Changing providers and importing messages need a separate workflow, which is not publicly available in Mail yet. Keep access to your current provider during the transition."
+      },
+      {
+        "q": "Does the public MCP already open these mailboxes?",
+        "a": "The current public MCP serves Send. Mail uses its own API with per-mailbox keys; read-and-draft integration has been tested in closed access. Public MCP availability for mailboxes will be announced separately."
+      },
+      {
+        "q": "How will I access it on my computer and phone?",
+        "a": "Through the MepMail web dashboard in a browser. We are preparing a responsive experience for computers and phones. Native Windows and iOS applications are not published yet."
+      }
+    ]
+  },
+  "close": {
+    "eyebrow": "The next address could be your agent's",
+    "title": "Your company talks. You follow.",
+    "body": "We are preparing Mail for earlier subscribers to plans above US$ 20/month. Explore the proposal and documentation while we validate the initial opening, with a separate subscription.",
+    "primary": "Explore Send plans",
+    "secondary": "Read the Mail documentation"
+  }
+}

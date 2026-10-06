@@ -1,5 +1,5 @@
 {
-  "mailboxes": "Caixas de e-mail",
+  "mailboxes": "Caixa de entrada",
   "emails": "E-mails",
   "broadcasts": "Transmissões",
   "audience": "Audiência",
@@ -18,8 +18,10 @@
     "choose": "Serviços MepMail",
     "send": "Envio",
     "mail": "Correio",
+    "backToSend": "Voltar ao Envio",
     "sendShort": "API e campanhas",
     "additional": "Adicional pago",
-    "organization": "Organização"
+    "organization": "Organização",
+    "resources": "Recursos"
   }
 }

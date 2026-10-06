@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
 import {
+  getMailboxOutboundSummary,
+  listMailboxFolders,
   listMailboxItems,
   listMailboxRegistry,
   type MailboxContentActor,
   MailboxContentError,
+  type MailboxOutboundSummary,
   saveMailboxDraft,
   withMailboxContentAccess,
   withMailboxItem,
@@ -18,6 +21,7 @@ import {
 } from "../../../../packages/core/src/mailbox-message-id";
 import { pilotImageMetadata } from "../../../../packages/core/src/mailbox-pilot-images";
 import { getKeyring } from "./keyring";
+import { projectMailboxHtml } from "./mailbox-html";
 
 const MAX_MIME = 1024 * 1024;
 const MAX_ATTACHMENT = 256 * 1024;
@@ -80,6 +84,8 @@ function dto(mime: Awaited<ReturnType<typeof parse>>) {
     to: addresses(mime.to),
     replyTo: mime.replyTo?.value[0]?.address ?? mime.from?.value[0]?.address ?? "",
     text: mime.text ?? "",
+    hasHtmlBody: typeof mime.html === "string" && mime.html.length > 0,
+    ...projectMailboxHtml(mime.html, mime.attachments),
     date: mime.date && !Number.isNaN(mime.date.getTime()) ? mime.date : null,
     attachments: mime.attachments.map((a, index) => {
       const image = pilotImageMetadata(a.content);
@@ -96,6 +102,8 @@ function acceptedSent(db: Db, actor: MailboxContentActor, mailboxId: string, mat
     .select({
       id: schema.mailboxOutbox.id,
       messageId: schema.mailboxOutbox.providerRfcMessageId,
+      approvalKind: schema.mailboxOutbox.approvalKind,
+      agentLabel: schema.mailboxAgentKeys.label,
     })
     .from(schema.mailboxOutbox)
     .innerJoin(
@@ -105,6 +113,14 @@ function acceptedSent(db: Db, actor: MailboxContentActor, mailboxId: string, mat
         eq(schema.mailboxItems.mailboxId, schema.mailboxOutbox.mailboxId),
         eq(schema.mailboxItems.teamId, schema.mailboxOutbox.teamId),
         eq(schema.mailboxItems.kind, "sent"),
+      ),
+    )
+    .leftJoin(
+      schema.mailboxAgentKeys,
+      and(
+        eq(schema.mailboxAgentKeys.id, schema.mailboxOutbox.agentKeyId),
+        eq(schema.mailboxAgentKeys.mailboxId, schema.mailboxOutbox.mailboxId),
+        eq(schema.mailboxAgentKeys.teamId, schema.mailboxOutbox.teamId),
       ),
     )
     .where(
@@ -146,6 +162,9 @@ export async function getMailboxContent(
   // Recheck current access before returning the content and correlated metadata.
   let transportMessageId: string | null = null;
   let replyToSentItemId: string | null = null;
+  let sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null = null;
+  let sentBy: { kind: "human" | "agent"; label: string | null } | null = null;
+  let outboxId: string | null = null;
   if (content.kind === "sent") {
     const [sent] = await acceptedSent(
       db,
@@ -154,6 +173,14 @@ export async function getMailboxContent(
       eq(schema.mailboxOutbox.id, input.id),
     );
     transportMessageId = mailboxMessageId(sent?.messageId);
+    if (sent) {
+      outboxId = sent.id;
+      sendStatus = "accepted";
+      sentBy = {
+        kind: sent.approvalKind,
+        label: sent.approvalKind === "agent" ? sent.agentLabel : null,
+      };
+    }
   } else if (replyIds.length) {
     const matches = await acceptedSent(
       db,
@@ -169,10 +196,53 @@ export async function getMailboxContent(
       }
     }
   }
+  if (content.kind === "draft") {
+    const [submitted] = await db
+      .select({ id: schema.mailboxOutbox.id, status: schema.mailboxOutbox.status })
+      .from(schema.mailboxOutbox)
+      .where(
+        and(
+          eq(schema.mailboxOutbox.teamId, actor.teamId),
+          eq(schema.mailboxOutbox.mailboxId, input.mailboxId),
+          eq(schema.mailboxOutbox.draftId, input.id),
+          eq(schema.mailboxOutbox.draftRevision, content.revision),
+        ),
+      )
+      .limit(1);
+    sendStatus = submitted?.status ?? null;
+    outboxId = submitted?.id ?? null;
+  }
+  const results = outboxId
+    ? await getMailboxOutboundSummary(db, {
+        teamId: actor.teamId,
+        mailboxId: input.mailboxId,
+        outboxId,
+      })
+    : null;
+  // Keep the private ledger behind the server boundary, including if its
+  // internal contract later acquires correlation or recipient metadata.
+  const outboundSummary: MailboxOutboundSummary | null = results
+    ? {
+        totalRecipients: results.totalRecipients,
+        delivered: results.delivered,
+        delayed: results.delayed,
+        hardBounce: results.hardBounce,
+        complaint: results.complaint,
+        softBounce: results.softBounce,
+        rejected: results.rejected,
+        renderingFailed: results.renderingFailed,
+        unconfirmed: results.unconfirmed,
+        lastObservedAt: results.lastObservedAt,
+      }
+    : null;
   return withMailboxContentAccess(db, actor, [input.mailboxId], async () => ({
     ...content,
+    contentTrust: "untrusted-message" as const,
     transportMessageId,
     replyToSentItemId,
+    sendStatus,
+    sentBy,
+    outboundSummary,
   }));
 }
 
@@ -180,22 +250,67 @@ export async function getMailboxContent(
 export async function getMailboxContentList(
   db: Db,
   actor: MailboxContentActor,
-  input: { mailboxId: string | null; folder: "inbox" | "drafts" | "sent" },
+  input: {
+    mailboxId: string | null;
+    folder: "inbox" | "drafts" | "sent" | "spam" | "quarantine" | "trash" | "favorites" | "custom";
+    customFolderId?: string | undefined;
+    mailboxKind?: "person" | "agent" | undefined;
+  },
 ) {
+  actor = { ...actor };
+  input = { ...input };
+  if (actor.agentAccess && ["spam", "quarantine", "trash"].includes(input.folder))
+    throw new MailboxContentError("forbidden");
+  if (
+    (input.folder === "custom" && (!input.mailboxId || !input.customFolderId)) ||
+    (input.folder !== "custom" && input.customFolderId !== undefined)
+  )
+    throw new MailboxContentError("invalid");
+  if (input.folder === "custom") {
+    const folders = await listMailboxFolders(db, actor, { mailboxId: input.mailboxId! });
+    if (!folders.some((folder) => folder.id === input.customFolderId))
+      throw new MailboxContentError("not_found");
+  }
   const registry = await listMailboxRegistry(db, actor);
   const readable = registry.mailboxes.filter(
-    (b) => b.canRead && b.status === "planned" && (!input.mailboxId || b.id === input.mailboxId),
+    (b) =>
+      b.canRead &&
+      b.status === "planned" &&
+      (!input.mailboxId || b.id === input.mailboxId) &&
+      (!input.mailboxKind || b.kind === input.mailboxKind),
   );
   if (input.mailboxId && !readable.length) throw new MailboxContentError("forbidden");
-  const kind = input.folder === "drafts" ? "draft" : input.folder === "sent" ? "sent" : "inbox";
+  const kind = ["trash", "favorites", "custom"].includes(input.folder)
+    ? undefined
+    : input.folder === "drafts"
+      ? "draft"
+      : input.folder === "sent"
+        ? "sent"
+        : "inbox";
   const metadata = [];
   let limited = readable.length > 20;
   for (const box of readable.slice(0, 20)) {
-    const rows = await listMailboxItems(db, actor, box.id);
+    const rows = await listMailboxItems(db, actor, box.id, {
+      ...(kind ? { kind } : {}),
+      trashed: input.folder === "trash",
+      ...(input.folder === "favorites" ? { starred: true, safeOnly: true } : {}),
+      ...(input.folder === "custom" ? { folderId: input.customFolderId!, safeOnly: true } : {}),
+      ...(!actor.agentAccess && ["inbox", "drafts", "sent"].includes(input.folder)
+        ? { folderId: null }
+        : {}),
+      ...(kind === "inbox"
+        ? { deliveryFolder: input.folder as "inbox" | "spam" | "quarantine" }
+        : {}),
+    });
     if (rows.length === 100) limited = true;
     for (const row of rows)
-      if (row.kind === kind)
-        metadata.push({ ...row, address: box.address, mailboxLabel: box.label });
+      if (!kind || row.kind === kind)
+        metadata.push({
+          ...row,
+          address: box.address,
+          mailboxLabel: box.label,
+          mailboxKind: box.kind,
+        });
   }
   metadata.sort(
     (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime() || b.id.localeCompare(a.id),
@@ -215,8 +330,35 @@ export async function getMailboxContentList(
     snippet: string;
     date: Date;
     attachmentCount: number;
+    mailboxKind: "person" | "agent";
+    deliveryFolder: "inbox" | "spam" | "quarantine";
+    trashedAt: Date | null;
+    starredAt: Date | null;
+    folderId: string | null;
+    inboundAssessment: (typeof schema.mailboxItems.$inferSelect)["inboundAssessment"];
+    sentBy: { kind: "human" | "agent"; label: string | null } | null;
+    sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null;
+    outboundSummary: MailboxOutboundSummary | null;
+    blocked: boolean;
   }[] = [];
   for (const row of metadata.slice(0, 50)) {
+    if (row.deliveryFolder === "quarantine" || row.inboundAssessment?.decision === "quarantine") {
+      items.push({
+        ...row,
+        subject: "",
+        from: "",
+        fromName: "",
+        to: [],
+        snippet: "",
+        date: row.createdAt,
+        attachmentCount: 0,
+        sentBy: null,
+        sendStatus: null,
+        outboundSummary: null,
+        blocked: true,
+      });
+      continue;
+    }
     const item = await getMailboxContent(db, actor, { mailboxId: row.mailboxId, id: row.id });
     items.push({
       id: row.id,
@@ -232,6 +374,16 @@ export async function getMailboxContentList(
       snippet: item.text.slice(0, 160),
       date: item.date ?? row.updatedAt,
       attachmentCount: item.attachments.length,
+      mailboxKind: row.mailboxKind,
+      deliveryFolder: row.deliveryFolder,
+      trashedAt: item.trashedAt,
+      starredAt: item.starredAt,
+      folderId: item.folderId,
+      inboundAssessment: item.inboundAssessment,
+      sentBy: item.sentBy,
+      sendStatus: item.sendStatus,
+      outboundSummary: item.outboundSummary,
+      blocked: false,
     });
   }
   return withMailboxContentAccess(
@@ -247,6 +399,7 @@ export interface MailboxDraftInput {
   id?: string | undefined;
   expectedRevision: number;
   sourceItemId?: string | undefined;
+  mode?: "reply" | "forward" | undefined;
   to: string[];
   subject: string;
   text: string;
@@ -258,11 +411,24 @@ export async function saveMailboxContentDraft(
   actor: MailboxContentActor,
   input: MailboxDraftInput,
 ) {
+  actor = { ...actor };
+  input = {
+    ...input,
+    to: [...input.to],
+    retainedAttachments: [...input.retainedAttachments],
+    uploads: input.uploads.map((upload) => ({ ...upload })),
+  };
   const registry = await listMailboxRegistry(db, actor);
   const box = registry.mailboxes.find(
     (b) => b.id === input.mailboxId && b.canDraft && b.status === "planned",
   );
   if (!box) throw new MailboxContentError("forbidden");
+  const mode = input.mode ?? "reply";
+  if (mode !== "reply" && mode !== "forward") throw new MailboxContentError("invalid");
+  // Forward creates a new message from an authorized Inbox/Sent item. Editing
+  // a draft keeps that draft's own headers instead of reusing an earlier source.
+  if (mode === "forward" && (input.id || !input.sourceItemId))
+    throw new MailboxContentError("invalid");
   // Existing draft attachments/headers always come from the item being updated.
   if (input.id && input.sourceItemId !== input.id) throw new MailboxContentError("invalid");
   const source = input.sourceItemId
@@ -272,6 +438,9 @@ export async function saveMailboxContentDraft(
         actor,
         { mailboxId: box.id, id: input.sourceItemId },
         async (item) => {
+          if (item.trashedAt !== null) throw new MailboxContentError("conflict");
+          if (item.kind === "inbox" && item.deliveryFolder !== "inbox")
+            throw new MailboxContentError("forbidden");
           if (input.id && item.revision !== input.expectedRevision)
             throw new MailboxContentError("conflict");
           return { kind: item.kind, mime: await parse(item.raw) };
@@ -279,6 +448,7 @@ export async function saveMailboxContentDraft(
       )
     : null;
   if (input.id && source?.kind !== "draft") throw new MailboxContentError("conflict");
+  if (mode === "forward" && source?.kind === "draft") throw new MailboxContentError("invalid");
   if (
     (!source && input.retainedAttachments.length) ||
     new Set(input.retainedAttachments).size !== input.retainedAttachments.length
@@ -310,11 +480,11 @@ export async function saveMailboxContentDraft(
     });
   }
   if (attachments.length > MAX_ATTACHMENTS) throw new MailboxContentError("invalid");
-  const reply = source && source.kind !== "draft" ? source.mime : null;
-  const refs = source ? references(source.mime) : [];
+  const reply = mode === "reply" && source && source.kind !== "draft" ? source.mime : null;
+  const refs = mode === "reply" && source ? references(source.mime) : [];
   const originalId = mailboxMessageId(source?.mime.messageId) ?? undefined;
   let replyId = originalId;
-  if (source?.kind === "sent") {
+  if (mode === "reply" && source?.kind === "sent") {
     const [sent] = await acceptedSent(
       db,
       actor,
@@ -337,8 +507,18 @@ export async function saveMailboxContentDraft(
     subject: input.subject,
     text: input.text,
     messageId: input.id ? originalId : `<${randomUUID()}@${box.address.split("@")[1]}>`,
-    inReplyTo: reply ? replyId : (mailboxMessageId(source?.mime.inReplyTo) ?? undefined),
-    references: reply && replyId ? [...new Set([...refs, replyId])].slice(-50) : refs,
+    inReplyTo:
+      mode === "forward"
+        ? undefined
+        : reply
+          ? replyId
+          : (mailboxMessageId(source?.mime.inReplyTo) ?? undefined),
+    references:
+      mode === "forward"
+        ? undefined
+        : reply && replyId
+          ? [...new Set([...refs, replyId])].slice(-50)
+          : refs,
     attachments,
   });
   if (!Buffer.isBuffer(result.message) || result.message.length > MAX_MIME)
@@ -356,6 +536,8 @@ export async function getMailboxAttachmentResponse(
   actor: MailboxContentActor,
   input: { mailboxId: string; id: string; index: number; revision: number; preview: boolean },
 ) {
+  actor = { ...actor };
+  input = { ...input };
   return withMailboxItem(db, getKeyring(), actor, input, async ({ raw, revision }) => {
     if (revision !== input.revision) throw new MailboxContentError("conflict");
     const mime = await parse(raw);

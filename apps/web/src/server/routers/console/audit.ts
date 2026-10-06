@@ -1,6 +1,6 @@
-import { AUDIT_ACTIONS, parseAuditActor } from "@millionsend/core";
+import { AUDIT_ACTIONS, MAILBOX_ACTIVITY_ACTIONS, parseAuditActor } from "@millionsend/core";
 import { schema } from "@millionsend/db";
-import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, like, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { beforeCursor, createdAtCursorField, cursorSchema, paginate } from "../../keyset";
 import { operatorProcedure, router } from "../../trpc";
@@ -31,6 +31,7 @@ export const consoleAuditRouter = router({
         eq(a.actorId, `user:${ctx.operator.id}`),
         ...CONSOLE_ACTION_PREFIXES.map((prefix) => like(a.action, `${prefix}%`)),
       );
+      const privateActivityExcluded = notInArray(a.action, [...MAILBOX_ACTIVITY_ACTIONS]);
       const rows = await ctx.db
         .select({
           id: a.id,
@@ -49,6 +50,7 @@ export const consoleAuditRouter = router({
         .where(
           and(
             scope,
+            privateActivityExcluded,
             input.action ? eq(a.action, input.action) : undefined,
             input.cursor ? beforeCursor(a, input.cursor) : undefined,
           ),
@@ -71,7 +73,13 @@ export const consoleAuditRouter = router({
         : await ctx.db
             .select({ n: sql<number>`count(*)::int` })
             .from(a)
-            .where(and(scope, input.action ? eq(a.action, input.action) : undefined));
+            .where(
+              and(
+                scope,
+                privateActivityExcluded,
+                input.action ? eq(a.action, input.action) : undefined,
+              ),
+            );
       return {
         nextCursor: page.nextCursor,
         total: total?.n ?? null,

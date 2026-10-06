@@ -4,6 +4,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { DOCS_URL } from "@/lib/docs-links";
+import {
+  formatMailboxPrice,
+  formatMailboxStorage,
+  mailboxHasUnlimitedSeats,
+  mailboxOfferSelection,
+} from "@/lib/mailbox-setup";
 import { useTRPC } from "@/lib/trpc";
 import styles from "./mailbox-service-panel.module.css";
 
@@ -37,15 +43,19 @@ export function safeMailboxPaymentUrl(value: string): string | null {
   }
 }
 
-export function formatMailboxPrice(amount: number, currency: string, locale: string): string {
-  const format = new Intl.NumberFormat(locale, { style: "currency", currency });
-  // Stripe represents ISK charges in hundredths despite the currency's zero-decimal display.
-  const decimals =
-    currency.toLowerCase() === "isk" ? 2 : format.resolvedOptions().maximumFractionDigits;
-  return format.format(amount / 10 ** (decimals ?? 2));
+export { formatMailboxPrice } from "@/lib/mailbox-setup";
+
+export function mailboxCheckoutFailure(cause: unknown) {
+  const error = cause as { message?: string; data?: { code?: string } } | null;
+  if (error?.message === "sending_plan_required") return "sending_plan_required";
+  if (error?.message === "expired") return "error";
+  if (error?.message === "subscription_exists") return "existing";
+  if (error?.message === "mailbox_billing_unavailable" || error?.data?.code === "FORBIDDEN")
+    return "unavailable";
+  return "pending";
 }
 
-/** A registered license may be internal or paid; its public DTO does not reveal its source. */
+/** Notice for subscription availability; internal System licenses have their own presentation. */
 export function mailboxServiceNotice(
   availability: string | undefined,
   periodEnd: Date | null | undefined,
@@ -53,24 +63,29 @@ export function mailboxServiceNotice(
 ) {
   if (availability === "existing_subscription" || existingFailure)
     return periodEnd ? "existingLicenseBody" : "existingBody";
+  if (availability === "sending_plan_required") return "sendingPlanRequiredBody";
   if (availability === "recovery_required") return "recoveryBody";
   if (availability === "forbidden") return "adminBody";
   return "unavailableBody";
 }
 
-function storageLabel(bytes: number, locale: string): string {
-  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
-  const index =
-    bytes > 0 ? Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1) : 0;
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(bytes / 1024 ** index)} ${units[index]}`;
-}
-
-export function MailboxServicePanel() {
+export function MailboxServicePanel({
+  openRequest = 0,
+  initialOfferId = null,
+}: {
+  openRequest?: number;
+  initialOfferId?: string | null;
+} = {}) {
   const t = useTranslations("mailboxes-service");
+  const systemT = useTranslations("mailboxes-service.system");
   const locale = useLocale();
   const trpc = useTRPC();
   const service = useQuery(trpc.mailboxes.service.queryOptions(undefined, { retry: false }));
-  const billing = useQuery(trpc.mailboxes.billing.queryOptions(undefined, { retry: false }));
+  const systemIdentified = service.data?.licenseKind === "system";
+  const systemLicense = systemIdentified && !service.isPending && !service.isError;
+  const billing = useQuery(
+    trpc.mailboxes.billing.queryOptions(undefined, { retry: false, enabled: !systemIdentified }),
+  );
   const checkout = useMutation(trpc.mailboxes.checkout.mutationOptions());
   const management = useMutation(trpc.mailboxes.manage.mutationOptions());
   const dialog = useRef<HTMLDialogElement>(null);
@@ -80,12 +95,12 @@ export function MailboxServicePanel() {
   const titleId = useId();
   const seatsId = useId();
   const seatsHintId = useId();
+  const offerId = useId();
+  const offerHintId = useId();
   const [open, setOpen] = useState(false);
   const [seats, setSeats] = useState("1");
   const [attemptedSeats, setAttemptedSeats] = useState<number | null>(null);
-  const [failure, setFailure] = useState<"pending" | "existing" | "unavailable" | "error" | null>(
-    null,
-  );
+  const [failure, setFailure] = useState<ReturnType<typeof mailboxCheckoutFailure> | null>(null);
   const [returned, setReturned] = useState(false);
   const [managedSeats, setManagedSeats] = useState("");
   const [managementNotice, setManagementNotice] = useState<
@@ -97,6 +112,14 @@ export function MailboxServicePanel() {
     billingUpdatedAt: number;
     requestedSeats: number | null;
   } | null>(null);
+  const [selectedOfferId, setSelectedOfferId] = useState<string | null>(initialOfferId);
+  const [attemptedOfferId, setAttemptedOfferId] = useState<string | null>(null);
+  useEffect(() => {
+    if (openRequest > 0) {
+      setSelectedOfferId(initialOfferId);
+      setOpen(true);
+    }
+  }, [openRequest, initialOfferId]);
   const publishManagementResult = useCallback(
     async (
       outcome: {
@@ -134,6 +157,10 @@ export function MailboxServicePanel() {
     setManagementNotice(null);
     setPaymentUrl(null);
     setManagementReadback(null);
+    if (systemIdentified) {
+      await service.refetch();
+      return;
+    }
     if (billing.data?.management.canReconcile) {
       try {
         const outcome = await management.mutateAsync({ action: "reconcile" });
@@ -144,8 +171,18 @@ export function MailboxServicePanel() {
         setManagementNotice("error");
       }
     }
-    await Promise.allSettled([service.refetch(), billing.refetch()]);
+    const [, billingRead] = await Promise.allSettled([service.refetch(), billing.refetch()]);
+    if (
+      alive.current &&
+      billingRead.status === "fulfilled" &&
+      billingRead.value?.isSuccess &&
+      !billingRead.value.data?.sendingPlanRequired &&
+      billingRead.value.data?.availability !== "sending_plan_required"
+    ) {
+      setFailure((current) => (current === "sending_plan_required" ? null : current));
+    }
   }, [
+    systemIdentified,
     service.refetch,
     billing.refetch,
     billing.data?.management.canReconcile,
@@ -178,16 +215,41 @@ export function MailboxServicePanel() {
     if (!open && dialog.current?.open) dialog.current.close();
   }, [open]);
 
-  const loaded = !!service.data && !!billing.data && !service.isError && !billing.isError;
+  const loaded =
+    !!service.data &&
+    !service.isPending &&
+    !service.isError &&
+    (systemLicense || (!!billing.data && !billing.isPending && !billing.isError));
   const plan = loaded ? service.data : undefined;
-  const offer = loaded ? billing.data?.offer : null;
-  const lockedSeats = attemptedSeats ?? billing.data?.pendingCheckoutSeats ?? null;
+  const systemUnlimited = systemLicense && mailboxHasUnlimitedSeats(plan);
+  const selection = mailboxOfferSelection(
+    loaded && !systemIdentified ? billing.data : undefined,
+    selectedOfferId,
+    attemptedOfferId,
+  );
+  const offer = selection.offer;
+  const lockedSeats = billing.data?.pendingOfferId
+    ? (billing.data.pendingCheckoutSeats ?? null)
+    : (billing.data?.pendingCheckoutSeats ?? attemptedSeats ?? null);
   const quantity = lockedSeats ?? Number(seats);
   const validSeats = Number.isSafeInteger(quantity) && quantity >= 1 && quantity <= 10000;
+  const availability = billing.data?.availability;
+  const sendingPlanRequired =
+    loaded &&
+    !systemIdentified &&
+    (billing.data?.sendingPlanRequired === true ||
+      availability === "sending_plan_required" ||
+      failure === "sending_plan_required");
   const canPurchase =
-    loaded && billing.data?.canPurchase === true && !!offer && failure !== "existing";
-  const pending = !!billing.data?.checkoutPending || failure === "pending";
-  const refreshing = service.isFetching || billing.isFetching;
+    loaded &&
+    !systemIdentified &&
+    !sendingPlanRequired &&
+    billing.data?.canPurchase === true &&
+    !!offer &&
+    (!selection.locked || lockedSeats !== null) &&
+    failure !== "existing";
+  const pending = !!billing.data?.checkoutPending || failure === "pending" || selection.locked;
+  const refreshing = service.isFetching || (!systemIdentified && billing.isFetching);
   const status =
     plan?.status === "active" || plan?.status === "trialing"
       ? plan.active
@@ -199,13 +261,16 @@ export function MailboxServicePanel() {
   const date = plan?.periodEnd
     ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(plan.periodEnd)
     : null;
-  const availability = billing.data?.availability;
+  const cycleStart = plan?.periodStart
+    ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(plan.periodStart)
+    : null;
   const notice = mailboxServiceNotice(availability, plan?.periodEnd, failure === "existing");
   const manage = billing.data?.management;
   // DTOs omit contract IDs. A later query publication invalidates local success/
   // payment feedback even when quantity and period happen to look identical.
   const currentManagementReadback =
     loaded &&
+    !systemIdentified &&
     managementReadback !== null &&
     managementReadback.serviceUpdatedAt === service.dataUpdatedAt &&
     managementReadback.billingUpdatedAt === billing.dataUpdatedAt;
@@ -223,11 +288,13 @@ export function MailboxServicePanel() {
     manage.requestedSeats === managementReadback?.requestedSeats
       ? paymentUrl
       : null;
-  const busy = checkout.isPending || management.isPending;
+  const busy = !systemIdentified && (checkout.isPending || management.isPending);
   const changeSeats = Number(managedSeats);
-  const validChange = Number.isSafeInteger(changeSeats) && changeSeats >= 1 && changeSeats <= 10000;
+  const maxChangeSeats = manage?.canIncrease ? 10000 : (plan?.seats ?? 0);
+  const validChange =
+    Number.isSafeInteger(changeSeats) && changeSeats >= 1 && changeSeats <= maxChangeSeats;
   async function runManagement(action: "cancel" | "resume" | "quantity", seats?: number) {
-    if (busy) return;
+    if (busy || systemIdentified) return;
     const sequence = ++managementSequence.current;
     setManagementNotice(null);
     setPaymentUrl(null);
@@ -251,6 +318,7 @@ export function MailboxServicePanel() {
 
   function closeDialog() {
     dialog.current?.close();
+    setSelectedOfferId(null);
     setOpen(false);
   }
   return (
@@ -260,21 +328,33 @@ export function MailboxServicePanel() {
           <strong>{t("title")}</strong>
           {plan ? (
             <span className={styles.badge} data-active={plan.active}>
-              {t(`status.${status}`)}
+              {systemLicense ? systemT("licenseLabel") : t(`status.${status}`)}
             </span>
           ) : null}
         </div>
         {plan ? (
           <p className={styles.usage}>
-            {t("seatsSummary", { used: plan.reservedSeats, included: plan.seats })}
+            {systemLicense
+              ? systemT(systemUnlimited ? "mailboxesSummary" : "registeredSummary", {
+                  count: plan.reservedSeats,
+                })
+              : t("seatsSummary", { used: plan.reservedSeats, included: plan.seats })}
             {plan.storageBytesPerMailbox > 0 ? (
               <span>
                 {" "}
                 ·{" "}
-                {t("includedSummary", {
-                  storage: storageLabel(plan.storageBytesPerMailbox, locale),
-                  messages: plan.includedOutboundPerMailbox,
-                })}
+                {systemLicense
+                  ? systemT(
+                      plan.unlimitedOutbound ? "includedUnlimitedSummary" : "includedSummary",
+                      {
+                        storage: formatMailboxStorage(plan.storageBytesPerMailbox, locale),
+                        messages: plan.includedOutboundPerMailbox,
+                      },
+                    )
+                  : t("includedSummary", {
+                      storage: formatMailboxStorage(plan.storageBytesPerMailbox, locale),
+                      messages: plan.includedOutboundPerMailbox,
+                    })}
               </span>
             ) : null}
           </p>
@@ -286,13 +366,16 @@ export function MailboxServicePanel() {
         <button
           type="button"
           className="ms-btn ms-btn-ghost"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setSelectedOfferId(null);
+            setOpen(true);
+          }}
           aria-haspopup="dialog"
         >
           {t("viewPlan")}
         </button>
       </div>
-      {returned ? (
+      {returned && !systemIdentified ? (
         <div className={styles.returnNotice} role="status">
           <span>{t(plan?.active ? "confirmed" : "awaitingConfirmation")}</span>
           <button
@@ -310,14 +393,19 @@ export function MailboxServicePanel() {
           ref={dialog}
           className={styles.dialog}
           aria-labelledby={titleId}
-          onClose={() => setOpen(false)}
+          onClose={() => {
+            setSelectedOfferId(null);
+            setOpen(false);
+          }}
           onCancel={(event) => {
             if (busy) event.preventDefault();
           }}
         >
           <header className={styles.dialogHeader}>
             <div>
-              <p className={styles.eyebrow}>{t("additionalService")}</p>
+              <p className={styles.eyebrow}>
+                {systemLicense ? systemT("licenseLabel") : t("additionalService")}
+              </p>
               <h2 id={titleId}>{t("title")}</h2>
             </div>
             <button
@@ -330,7 +418,11 @@ export function MailboxServicePanel() {
               ×
             </button>
           </header>
-          <p className={styles.hint}>{t("equalPrice")}</p>
+          {loaded ? (
+            <p className={styles.hint}>
+              {systemLicense ? systemT("licenseBody") : t("equalPrice")}
+            </p>
+          ) : null}
           {!loaded ? (
             <div role={service.isError || billing.isError ? "alert" : "status"}>
               <p>{t(service.isError || billing.isError ? "loadError" : "loading")}</p>
@@ -343,6 +435,60 @@ export function MailboxServicePanel() {
                 {t("retry")}
               </button>
             </div>
+          ) : systemLicense && plan ? (
+            <>
+              <dl className={styles.facts}>
+                <div>
+                  <dt>{t("currentStatus")}</dt>
+                  <dd>{systemT(plan.active ? "active" : "restricted")}</dd>
+                </div>
+                <div>
+                  <dt>{systemT("registeredMailboxes")}</dt>
+                  <dd>{systemT("registeredSummary", { count: plan.reservedSeats })}</dd>
+                </div>
+                <div>
+                  <dt>{systemT("mailboxLimit")}</dt>
+                  <dd>
+                    {systemT(systemUnlimited ? "unlimitedMailboxes" : "admissionUnavailable")}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{systemT("subscription")}</dt>
+                  <dd>{systemT("noSubscription")}</dd>
+                </div>
+              </dl>
+              <h3 className={styles.sectionTitle}>{t("resourcesTitle")}</h3>
+              <p className={styles.hint}>{systemT("resourceLimitsBody")}</p>
+              <dl className={styles.facts}>
+                <div>
+                  <dt>{t("storagePerMailbox")}</dt>
+                  <dd>{formatMailboxStorage(plan.storageBytesPerMailbox, locale)}</dd>
+                </div>
+                <div>
+                  <dt>{systemT("outboundPerMailbox")}</dt>
+                  <dd>
+                    {plan.unlimitedOutbound
+                      ? systemT("unlimitedOutbound")
+                      : t("messageCount", { count: plan.includedOutboundPerMailbox })}
+                  </dd>
+                </div>
+                {!plan.unlimitedOutbound && cycleStart && date ? (
+                  <div>
+                    <dt>{systemT("operationalCycle")}</dt>
+                    <dd>{systemT("cycleDates", { start: cycleStart, end: date })}</dd>
+                  </div>
+                ) : null}
+              </dl>
+              <p className={styles.notice} role="status">
+                {systemT(
+                  plan.unlimitedOutbound && plan.resourcePolicyActive
+                    ? "internalUsageActiveBody"
+                    : plan.resourcePolicyActive
+                      ? "cycleActiveBody"
+                      : "cycleInactiveBody",
+                )}
+              </p>
+            </>
           ) : (
             <>
               <dl className={styles.facts}>
@@ -358,7 +504,7 @@ export function MailboxServicePanel() {
                   <>
                     <div>
                       <dt>{t("storagePerMailbox")}</dt>
-                      <dd>{storageLabel(plan!.storageBytesPerMailbox, locale)}</dd>
+                      <dd>{formatMailboxStorage(plan!.storageBytesPerMailbox, locale)}</dd>
                     </div>
                     <div>
                       <dt>{t("outboundPerMailbox")}</dt>
@@ -391,7 +537,19 @@ export function MailboxServicePanel() {
               {manage?.requestedSeats !== null && manage?.requestedSeats !== undefined ? (
                 <p role="status">{t("increasePending", { count: manage.requestedSeats })}</p>
               ) : null}
-              {manage?.canReconcile ? (
+              {sendingPlanRequired ? (
+                <div
+                  className={styles.notice}
+                  role={failure === "sending_plan_required" ? "alert" : "status"}
+                >
+                  <p>{t("sendingPlanRequiredBody")}</p>
+                  <a className="ms-btn ms-btn-primary" href="/settings/billing">
+                    {t("viewSendingPlans")}
+                  </a>
+                </div>
+              ) : null}
+              {manage &&
+              (manage.canReconcile || manage.canAdjust || manage.canCancel || manage.canResume) ? (
                 <div className={styles.management}>
                   <p className={styles.hint}>{t("managementTerms")}</p>
                   {manage.canAdjust ? (
@@ -408,7 +566,7 @@ export function MailboxServicePanel() {
                         type="number"
                         inputMode="numeric"
                         min={1}
-                        max={10000}
+                        max={maxChangeSeats}
                         step={1}
                         required
                         value={managedSeats}
@@ -459,7 +617,19 @@ export function MailboxServicePanel() {
               ) : null}
               {!canPurchase ? (
                 <div className={styles.notice}>
-                  <p>{t(notice)}</p>
+                  {!sendingPlanRequired ||
+                  notice === "existingLicenseBody" ||
+                  notice === "existingBody" ||
+                  notice === "recoveryBody" ||
+                  notice === "adminBody" ? (
+                    <p>
+                      {t(
+                        selection.locked && (!offer || lockedSeats === null)
+                          ? "pendingOfferUnavailable"
+                          : notice,
+                      )}
+                    </p>
+                  ) : null}
                   <p>{t("recoveryReads")}</p>
                 </div>
               ) : offer ? (
@@ -468,9 +638,13 @@ export function MailboxServicePanel() {
                     event.preventDefault();
                     if (!canPurchase || !validSeats || checkout.isPending) return;
                     setAttemptedSeats(quantity);
+                    setAttemptedOfferId(selection.offerId);
                     setFailure(null);
                     try {
-                      const result = await checkout.mutateAsync({ seats: quantity });
+                      const result = await checkout.mutateAsync({
+                        seats: quantity,
+                        ...(selection.offerId ? { offerId: selection.offerId } : {}),
+                      });
                       if (!alive.current) return;
                       const url = safeMailboxCheckoutUrl(result.url);
                       if (!url) {
@@ -480,24 +654,56 @@ export function MailboxServicePanel() {
                       window.location.assign(url);
                     } catch (error) {
                       if (!alive.current) return;
-                      const message = (error as { message?: string })?.message;
-                      const code = (error as { data?: { code?: string } })?.data?.code;
-                      if (message === "expired") {
+                      const reason = mailboxCheckoutFailure(error);
+                      if (reason === "error" || reason === "sending_plan_required") {
                         setAttemptedSeats(null);
-                        setFailure("error");
-                      } else
-                        setFailure(
-                          message === "subscription_exists"
-                            ? "existing"
-                            : message === "mailbox_billing_unavailable" || code === "FORBIDDEN"
-                              ? "unavailable"
-                              : "pending",
-                        );
+                        setAttemptedOfferId(null);
+                      }
+                      setFailure(reason);
                       void refresh();
                     }
                   }}
                 >
                   <fieldset className={styles.purchase} disabled={checkout.isPending}>
+                    {selection.offers.length || selection.locked ? (
+                      <>
+                        <label htmlFor={offerId}>{t("planChoice")}</label>
+                        <select
+                          id={offerId}
+                          className="ms-input"
+                          value={selection.offerId ?? ""}
+                          disabled={selection.locked || lockedSeats !== null}
+                          aria-describedby={offerHintId}
+                          onChange={(event) => setSelectedOfferId(event.target.value)}
+                        >
+                          {(selection.locked && selection.offerId
+                            ? [{ ...offer, offerId: selection.offerId }]
+                            : selection.offers
+                          ).map((entry) => (
+                            <option key={entry.offerId} value={entry.offerId}>
+                              {t("planOption", {
+                                storage: formatMailboxStorage(entry.storageBytesPerMailbox, locale),
+                                price: t("priceInterval", {
+                                  amount: formatMailboxPrice(
+                                    entry.unitAmount,
+                                    entry.currency,
+                                    locale,
+                                  ),
+                                  interval: t(`interval.${entry.interval}`),
+                                }),
+                              })}
+                            </option>
+                          ))}
+                        </select>
+                        <p id={offerHintId} className={styles.hint}>
+                          {t(
+                            selection.locked || lockedSeats !== null
+                              ? "planLocked"
+                              : "planChoiceHint",
+                          )}
+                        </p>
+                      </>
+                    ) : null}
                     <label htmlFor={seatsId}>{t("quantity")}</label>
                     <input
                       id={seatsId}
@@ -531,7 +737,7 @@ export function MailboxServicePanel() {
                         <dt>{t("included")}</dt>
                         <dd>
                           {t("includedSummary", {
-                            storage: storageLabel(offer.storageBytesPerMailbox, locale),
+                            storage: formatMailboxStorage(offer.storageBytesPerMailbox, locale),
                             messages: offer.includedOutboundPerMailbox,
                           })}
                         </dd>

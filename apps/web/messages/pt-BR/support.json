@@ -7,10 +7,10 @@
     "eyebrow": "Suporte",
     "title": "Suporte no MepMail",
     "lead": "O MepMail é operado pelo fundador: quem constrói o produto responde o e-mail. Escolha o canal que serve — a maioria das dúvidas já está na documentação.",
-    "note": "O suporte é um time pequeno, então inclua o e-mail da conta em qualquer pergunta.",
+    "note": "Para questões da conta, procure o suporte por e-mail. Nunca compartilhe senha, chave de API ou código de acesso.",
     "badges": [
       "Operado pelo fundador",
-      "Resposta em até 1 dia útil",
+      "Orientação e documentação",
       "Relatos de abuso são tratados",
       "Docs · changelog · novidades"
     ],
@@ -20,17 +20,22 @@
   "channels": {
     "eyebrow": "Canais",
     "title": "Onde falar com a gente",
-    "body": "Quatro caminhos, ordenados pela velocidade da resposta habitual.",
+    "body": "Escolha o canal conforme sua dúvida.",
     "items": [
       {
         "name": "Suporte por e-mail",
         "kind": "support@je4ndev.com",
         "body": "Melhor para dúvidas de conta, cobrança e entregabilidade que a documentação não responde.",
         "bullets": [
-          "Resposta em até 1 dia útil.",
+          "O atendimento humano não tem prazo de resposta garantido.",
           "Inclua o e-mail da conta e, em problema de envio, o id da mensagem nos logs."
         ],
-        "links": [{ "label": "support@je4ndev.com", "href": "mailto:support@je4ndev.com" }]
+        "links": [
+          {
+            "label": "support@je4ndev.com",
+            "href": "mailto:support@je4ndev.com"
+          }
+        ]
       },
       {
         "name": "Documentação",
@@ -40,14 +45,24 @@
           "Domínios de envio e os registros DNS a publicar.",
           "Limites de taxa, códigos de erro e a superfície de API compatível."
         ],
-        "links": [{ "label": "Abrir a documentação", "href": "https://docs-mepmail.je4ndev.com" }]
+        "links": [
+          {
+            "label": "Abrir a documentação",
+            "href": "https://docs-mepmail.je4ndev.com"
+          }
+        ]
       },
       {
         "name": "Changelog",
         "kind": "/updates",
         "body": "As novidades do produto saem na página de atualizações, e você pode assinar por e-mail.",
         "bullets": ["Um clique para descadastrar, sem precisar de conta."],
-        "links": [{ "label": "Novidades do produto", "href": "/updates" }]
+        "links": [
+          {
+            "label": "Novidades do produto",
+            "href": "/updates"
+          }
+        ]
       },
       {
         "name": "Status page",
@@ -63,6 +78,62 @@
     "title": "Perguntas mais comuns",
     "items": [
       {
+        "q": "Para que serve o MepMail?",
+        "a": "O Envio atende mensagens de aplicações, cadastros e campanhas, com painel, API HTTP, modelos, contatos, transmissões, webhooks e métricas.",
+        "link": {
+          "label": "Documentação",
+          "href": "https://docs-mepmail.je4ndev.com/pt-BR"
+        }
+      },
+      {
+        "q": "Como começo a enviar?",
+        "a": "Acesse mepmail.dev, entre na organização correta, adicione um domínio que controla e conclua a verificação DNS. Depois, crie uma chave em Chaves de API com as permissões necessárias.",
+        "link": {
+          "label": "Primeiros passos",
+          "href": "https://docs-mepmail.je4ndev.com/pt-BR/quickstart"
+        }
+      },
+      {
+        "q": "Adicionar meu domínio já cria uma caixa de entrada?",
+        "a": "A verificação prepara o domínio para Envio. Correio é um serviço separado: cadastrar uma caixa não altera automaticamente o MX nem ativa o recebimento. Use os registros apresentados no painel para aquele domínio.",
+        "link": {
+          "label": "Domínios",
+          "href": "https://docs-mepmail.je4ndev.com/pt-BR/concepts/domains"
+        }
+      },
+      {
+        "q": "Meus agentes podem usar o MepMail?",
+        "a": "Sim, pela API de Envio ou pelo MCP publicado, respeitando as permissões da conexão. Copie o endpoint em Configurações → MCP. O MCP de Envio não concede acesso às caixas do Correio.",
+        "link": {
+          "label": "MCP",
+          "href": "https://docs-mepmail.je4ndev.com/pt-BR/mcp"
+        }
+      },
+      {
+        "q": "Posso receber e-mails ou importar Gmail/Hotmail?",
+        "a": "O Correio já está em produção fechada para a conta operadora, sem oferta pública. Ainda não oferecemos IMAP, importação Gmail/Hotmail/MBOX/PST ou MCP público de entrada. O login Google não sincroniza uma caixa Gmail.",
+        "link": {
+          "label": "Correio",
+          "href": "https://docs-mepmail.je4ndev.com/pt-BR/mailboxes"
+        }
+      },
+      {
+        "q": "Quais são os preços e limites?",
+        "a": "Confira os termos apresentados para sua organização no painel e no checkout. Envio e Correio têm licenciamento e cotas separados; condições internas da conta operadora não são uma oferta aos clientes. Não há preço público aprovado do Correio para informar.",
+        "link": {
+          "label": "Preços",
+          "href": "/pricing"
+        }
+      },
+      {
+        "q": "O envio falhou ou ainda não chegou. O que conferir?",
+        "a": "Confira domínio verificado, permissões da chave, cotas, supressões e o estado do envio nos logs. Aceitação ou entrada na fila não comprova entrega na caixa do destinatário. Para diagnóstico, informe horário, status HTTP e ID da requisição ou mensagem; não compartilhe senha nem chave.",
+        "link": {
+          "label": "Supressões",
+          "href": "https://docs-mepmail.je4ndev.com/pt-BR/concepts/suppressions"
+        }
+      },
+      {
         "q": "Como migrar do Resend?",
         "a": "Aponte os SDKs oficiais do Resend para a base URL do MepMail, troque a API key e traga os seus domínios e contatos. A conta grátis pode ser migrada com npx @mepmail/cli migrate --from resend. O guia mostra cada SDK, linguagem por linguagem.",
         "link": {
@@ -71,35 +142,12 @@
         }
       },
       {
-        "q": "Como conectar e verificar um domínio?",
-        "a": "Adicione o domínio no painel e publique os registros DNS que ele devolve: o registro DKIM e o registro MAIL FROM (SPF). Esses dois condicionam o envio, o DMARC é recomendado, e o painel mostra o estado ao vivo de cada registro até ele resolver.",
-        "link": {
-          "label": "Docs: domínios de envio",
-          "href": "https://docs-mepmail.je4ndev.com/concepts/domains"
-        }
-      },
-      {
-        "q": "Quais são os limites dos planos?",
-        "a": "Cada plano tem um volume mensal incluído e um teto diário de envio. O volume é contado por destinatário distinto, e envios acima do volume incluído são cobrados por 1.000 pela taxa de excedente do plano. Preços e volumes estão na página de preços.",
-        "link": { "label": "Preços", "href": "/pricing" }
-      },
-      {
-        "q": "Como funcionam cobrança e reembolso?",
-        "a": "Os planos pagos são cobrados em dólar pelo Stripe, mensalmente e antecipado. Se uma cobrança parecer errada, escreva com a referência da cobrança; o reembolso volta para o meio de pagamento original, normalmente em 5 a 10 dias úteis dependendo do banco.",
-        "link": { "label": "Política de reembolso", "href": "/refund" }
-      },
-      {
-        "q": "Por que meu e-mail caiu em spam?",
-        "a": "Normalmente é DNS ou reputação: um registro DKIM ou MAIL FROM que não resolve, uma política DMARC que falha, ou um domínio sem histórico de envio. Os insights de entregabilidade do MepMail pontuam cada domínio e apontam o registro que está falhando.",
-        "link": {
-          "label": "Docs: insights de entregabilidade",
-          "href": "https://docs-mepmail.je4ndev.com/concepts/deliverability-insights"
-        }
-      },
-      {
         "q": "Como reportar abuso ou spam?",
         "a": "Escreva para security@je4ndev.com com o id da mensagem ou os cabeçalhos. Agimos sobre relatos de abuso, e envios que geram reclamações podem ser pausados ou a conta suspensa.",
-        "link": { "label": "security@je4ndev.com", "href": "mailto:security@je4ndev.com" }
+        "link": {
+          "label": "security@je4ndev.com",
+          "href": "mailto:security@je4ndev.com"
+        }
       }
     ]
   },
@@ -107,5 +155,20 @@
     "title": "Nada aqui respondeu?",
     "body": "Mande o e-mail da conta e o que você esperava que acontecesse — isso normalmente basta para uma resposta concreta.",
     "cta": "Escrever para support@je4ndev.com"
+  },
+  "assistant": {
+    "eyebrow": "Ajuda no MepMail",
+    "title": "Vamos encontrar o caminho",
+    "body": "Primeiros passos, domínios e integrações: encontre orientação aqui e procure nossa equipe para questões da conta.",
+    "available": "Conversa de visitante por texto",
+    "pending": "Chat em preparação. E-mail e documentação disponíveis.",
+    "open": "Abrir atendimento",
+    "reopen": "Reabrir atendimento",
+    "loading": "Abrindo atendimento…",
+    "opened": "Use a janela de atendimento para iniciar sua conversa.",
+    "error": "Não foi possível abrir o chat. Tente novamente ou fale com a equipe por e-mail.",
+    "privacy": "Ao abrir o chat, você conversa como visitante pela Elozi. Sua conta MepMail não é vinculada automaticamente. Não envie senhas ou chaves.",
+    "email": "Falar por e-mail",
+    "docs": "Consultar documentação"
   }
 }

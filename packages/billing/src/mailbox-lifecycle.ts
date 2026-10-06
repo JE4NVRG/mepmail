@@ -15,6 +15,7 @@ import {
   mailboxIncreasePaymentConfirmed,
   projectMailboxSubscription,
 } from "./mailbox.js";
+import { hasPaidSendingPlan } from "./mailbox-addon.js";
 import type { BillingStripe } from "./stripe.js";
 import { idOf, lockCustomer } from "./subscription.js";
 
@@ -28,7 +29,8 @@ export class MailboxLifecycleError extends Error {
       | "conflict"
       | "pending"
       | "expired"
-      | "subscription_exists",
+      | "subscription_exists"
+      | "sending_plan_required",
   ) {
     super(code);
   }
@@ -390,6 +392,8 @@ async function applyMailboxProjection(
 }
 
 export interface MailboxPurchaseDeps {
+  /** Hosted application policy; self-hosted/library callers retain their own catalog rules. */
+  requirePaidSendingPlan?: boolean;
   db: Db;
   stripe: MailboxBillingStripe;
   /** Resolve an ambiguous attempt through provider readback. Null remains blocked, never expired by TTL. */
@@ -546,6 +550,11 @@ async function ensureMailboxCustomer(
         plan: schema.teams.plan,
         customerId: schema.teams.stripeCustomerId,
         suspendedAt: schema.teams.suspendedAt,
+        planStatus: schema.teams.planStatus,
+        stripeSubscriptionId: schema.teams.stripeSubscriptionId,
+        currentPeriodStart: schema.teams.currentPeriodStart,
+        currentPeriodEnd: schema.teams.currentPeriodEnd,
+        cancelAt: schema.teams.cancelAt,
       })
       .from(schema.teams)
       .where(eq(schema.teams.id, input.teamId))
@@ -554,6 +563,11 @@ async function ensureMailboxCustomer(
     if (team.customerId) return null;
     await currentAdmin(db, input);
     if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
+    if (
+      deps.requirePaidSendingPlan &&
+      !hasPaidSendingPlan({ ...team, stripeCustomerId: team.customerId })
+    )
+      throw new MailboxLifecycleError("sending_plan_required");
     await assertNoOccupiedMailboxPlan(db, team.id);
     const [existing] = await tx
       .select()
@@ -595,6 +609,11 @@ async function ensureMailboxCustomer(
           plan: schema.teams.plan,
           customerId: schema.teams.stripeCustomerId,
           suspendedAt: schema.teams.suspendedAt,
+          planStatus: schema.teams.planStatus,
+          stripeSubscriptionId: schema.teams.stripeSubscriptionId,
+          currentPeriodStart: schema.teams.currentPeriodStart,
+          currentPeriodEnd: schema.teams.currentPeriodEnd,
+          cancelAt: schema.teams.cancelAt,
         })
         .from(schema.teams)
         .where(eq(schema.teams.id, input.teamId))
@@ -605,6 +624,11 @@ async function ensureMailboxCustomer(
       if (team.customerId) return;
       await currentAdmin(db, input);
       if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
+      if (
+        deps.requirePaidSendingPlan &&
+        !hasPaidSendingPlan({ ...team, stripeCustomerId: team.customerId })
+      )
+        throw new MailboxLifecycleError("sending_plan_required");
       // The first Customer intent committed before this transaction. A grant may
       // have arrived in that gap; preserve the intent and reject before the SDK call.
       await assertNoOccupiedMailboxPlan(db, input.teamId);
@@ -655,7 +679,11 @@ async function ensureMailboxCustomer(
       throw new MailboxLifecycleError("pending");
     });
 }
-async function purchaseTeam(db: Db, input: BeginMailboxCheckoutInput) {
+async function purchaseTeam(
+  db: Db,
+  input: BeginMailboxCheckoutInput,
+  requirePaidSendingPlan = false,
+) {
   // Discovery takes no row lock. Customer -> team -> membership -> service/lease
   // matches webhook writers and team deletion, avoiding an advisory/row lock cycle.
   const [discovered] = await db
@@ -671,6 +699,11 @@ async function purchaseTeam(db: Db, input: BeginMailboxCheckoutInput) {
       plan: schema.teams.plan,
       customerId: schema.teams.stripeCustomerId,
       suspendedAt: schema.teams.suspendedAt,
+      planStatus: schema.teams.planStatus,
+      stripeSubscriptionId: schema.teams.stripeSubscriptionId,
+      currentPeriodStart: schema.teams.currentPeriodStart,
+      currentPeriodEnd: schema.teams.currentPeriodEnd,
+      cancelAt: schema.teams.cancelAt,
     })
     .from(schema.teams)
     .where(eq(schema.teams.id, input.teamId))
@@ -679,6 +712,8 @@ async function purchaseTeam(db: Db, input: BeginMailboxCheckoutInput) {
   if (team.customerId !== discovered.customerId) throw new MailboxLifecycleError("conflict");
   await currentAdmin(db, input);
   if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
+  if (requirePaidSendingPlan && !hasPaidSendingPlan({ ...team, stripeCustomerId: team.customerId }))
+    throw new MailboxLifecycleError("sending_plan_required");
   // Customer linkage is created by the authorized durable Customer flow, never team metadata.
   if (!team.customerId) throw new MailboxLifecycleError("unavailable");
   return { ...team, customerId: team.customerId };
@@ -785,7 +820,7 @@ async function purchase(
 ): Promise<BeginMailboxCheckoutResult> {
   const prepared = await deps.db.transaction(async (tx) => {
     const db = tx as unknown as Db;
-    const team = await purchaseTeam(db, input);
+    const team = await purchaseTeam(db, input, deps.requirePaidSendingPlan);
     await assertNoSubscription(db, deps.stripe, catalog, team.id, team.customerId);
     const [existing] = await tx
       .select()
@@ -837,7 +872,7 @@ async function purchase(
   const outcome = await deps.db.transaction(
     async (tx): Promise<BeginMailboxCheckoutResult | { error: "expired" | "pending" }> => {
       const db = tx as unknown as Db;
-      const team = await purchaseTeam(db, input);
+      const team = await purchaseTeam(db, input, deps.requirePaidSendingPlan);
       await assertNoSubscription(db, deps.stripe, catalog, team.id, team.customerId);
       const [lease] = await tx
         .select()

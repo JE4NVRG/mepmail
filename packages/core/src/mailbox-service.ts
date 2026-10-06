@@ -7,6 +7,12 @@ export class MailboxServiceError extends Error {
   }
 }
 export type MailboxSubscription = typeof schema.mailboxSubscriptions.$inferSelect;
+/** Internal capacity for the verified platform operator; never a paid-plan allowance. */
+export const SYSTEM_MAILBOX_STORAGE_BYTES = 50 * 1024 ** 3;
+export type MailboxOperationalPlan = MailboxSubscription & {
+  unlimitedSeats: boolean;
+  unlimitedOutbound: boolean;
+};
 
 export function mailboxServiceActive(plan: MailboxSubscription | undefined, now = new Date()) {
   return (
@@ -18,29 +24,99 @@ export function mailboxServiceActive(plan: MailboxSubscription | undefined, now 
   );
 }
 
-/** Public plan/usage DTO contains neither customer IDs nor provider credentials. */
-export async function mailboxServiceState(db: Db, teamId: string) {
-  const [team] = await db
-    .select({ suspendedAt: schema.teams.suspendedAt })
+/** System is the platform operator's own team, not an ordinary tenant administrator.
+ * Resolve current database authority; session roles and request fields cannot grant it.
+ * The team lock stabilizes plan changes, and the owner lock stabilizes this privilege.
+ */
+export async function mailboxServiceEntitlement(
+  db: Db,
+  teamId: string,
+  lock = false,
+  now = new Date(),
+) {
+  const teamQuery = db
+    .select({ plan: schema.teams.plan, suspendedAt: schema.teams.suspendedAt })
     .from(schema.teams)
     .where(eq(schema.teams.id, teamId));
-  const [plan] = await db
+  const [team] = await (lock ? teamQuery.for("share") : teamQuery);
+  let system = false;
+  if (team?.plan === "system" && !team.suspendedAt) {
+    const [operator] = await db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .orderBy(asc(schema.user.createdAt), asc(schema.user.id))
+      .limit(1);
+    if (operator) {
+      const ownerQuery = db
+        .select({ id: schema.teamMembers.id })
+        .from(schema.teamMembers)
+        .where(
+          and(
+            eq(schema.teamMembers.teamId, teamId),
+            eq(schema.teamMembers.userId, operator.id),
+            eq(schema.teamMembers.role, "owner"),
+          ),
+        );
+      const [owner] = await (lock ? ownerQuery.for("share") : ownerQuery);
+      system = !!owner;
+    }
+  }
+  const planQuery = db
     .select()
     .from(schema.mailboxSubscriptions)
     .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+  const [plan] = await (lock ? planQuery.for("update") : planQuery);
+  const allowed = !!team && !team.suspendedAt;
+  const resourcePolicyActive = allowed && !!plan && (system || mailboxServiceActive(plan, now));
+  return {
+    // Preserve the audited grant row; only the authority-derived operational view changes.
+    plan: system && plan ? { ...plan, storageBytesPerMailbox: SYSTEM_MAILBOX_STORAGE_BYTES } : plan,
+    licenseKind: system
+      ? ("system" as const)
+      : plan
+        ? ("subscription" as const)
+        : ("none" as const),
+    unlimitedSeats: system,
+    unlimitedOutbound: system,
+    active: allowed && (system || mailboxServiceActive(plan, now)),
+    resourcePolicyActive,
+  };
+}
+
+/** The effective policy preserves the audited row and System's internal capacity. */
+export function requireMailboxOperationalPlan(
+  entitlement: Awaited<ReturnType<typeof mailboxServiceEntitlement>> | null,
+): MailboxOperationalPlan {
+  if (!entitlement || !entitlement.active || !entitlement.resourcePolicyActive || !entitlement.plan)
+    throw new MailboxServiceError("not_entitled");
+  return {
+    ...entitlement.plan,
+    unlimitedSeats: entitlement.unlimitedSeats,
+    unlimitedOutbound: entitlement.unlimitedOutbound,
+  };
+}
+
+/** Public plan/usage DTO contains neither customer IDs nor provider credentials. */
+export async function mailboxServiceState(db: Db, teamId: string) {
+  const entitlement = await mailboxServiceEntitlement(db, teamId);
+  const { plan } = entitlement;
   const [usage] = await db
     .select({ boxes: sql<number>`count(*)::int` })
     .from(schema.mailboxes)
     .where(eq(schema.mailboxes.teamId, teamId));
   return {
-    active: !!team && !team.suspendedAt && mailboxServiceActive(plan),
+    active: entitlement.active,
+    licenseKind: entitlement.licenseKind,
+    unlimitedSeats: entitlement.unlimitedSeats,
+    unlimitedOutbound: entitlement.unlimitedOutbound,
+    resourcePolicyActive: entitlement.resourcePolicyActive,
     status: plan?.status ?? "inactive",
     seats: plan?.seats ?? 0,
     reservedSeats: usage?.boxes ?? 0,
     storageBytesPerMailbox: plan?.storageBytesPerMailbox ?? 0,
     includedOutboundPerMailbox: plan?.includedOutboundPerMailbox ?? 0,
-    periodStart: plan?.periodStart ?? null,
-    periodEnd: plan?.periodEnd ?? null,
+    periodStart: entitlement.unlimitedOutbound ? null : (plan?.periodStart ?? null),
+    periodEnd: entitlement.unlimitedOutbound ? null : (plan?.periodEnd ?? null),
     cancelAtPeriodEnd: plan?.cancelAtPeriodEnd ?? false,
     cancelAt: plan?.cancelAt ?? null,
   };
@@ -51,29 +127,21 @@ export async function mailboxServiceState(db: Db, teamId: string) {
  * Expiry never deletes data or denies already-authorized reads/export.
  */
 export async function lockMailboxService(db: Db, teamId: string, now = new Date()) {
-  const [team] = await db
-    .select({ suspendedAt: schema.teams.suspendedAt })
-    .from(schema.teams)
-    .where(eq(schema.teams.id, teamId))
-    .for("share");
-  if (!team || team.suspendedAt) throw new MailboxServiceError("not_entitled");
-  const [plan] = await db
-    .select()
-    .from(schema.mailboxSubscriptions)
-    .where(eq(schema.mailboxSubscriptions.teamId, teamId))
-    .for("update");
-  if (!mailboxServiceActive(plan, now)) throw new MailboxServiceError("not_entitled");
-  return plan!;
+  return requireMailboxOperationalPlan(await mailboxServiceEntitlement(db, teamId, true, now));
 }
 
 export async function reserveMailboxSeat(db: Db, teamId: string) {
-  const plan = await lockMailboxService(db, teamId);
+  const entitlement = await mailboxServiceEntitlement(db, teamId, true);
+  if (!entitlement.active) throw new MailboxServiceError("not_entitled");
+  if (entitlement.unlimitedSeats) return entitlement;
+  const plan = entitlement.plan;
+  if (!plan) throw new MailboxServiceError("not_entitled");
   const [usage] = await db
     .select({ boxes: sql<number>`count(*)::int` })
     .from(schema.mailboxes)
     .where(eq(schema.mailboxes.teamId, teamId));
   if ((usage?.boxes ?? 0) >= plan.seats) throw new MailboxServiceError("quota");
-  return plan;
+  return entitlement;
 }
 
 /** Quantity reductions keep content recoverable; only licensed boxes may write/send.
@@ -83,8 +151,17 @@ export async function requireMailboxSeat(
   db: Db,
   teamId: string,
   mailboxId: string,
-  plan: MailboxSubscription,
+  plan: MailboxSubscription & { unlimitedSeats?: boolean },
 ) {
+  if (plan.teamId !== teamId) throw new MailboxServiceError("not_entitled");
+  if (plan.unlimitedSeats) {
+    const [box] = await db
+      .select({ id: schema.mailboxes.id })
+      .from(schema.mailboxes)
+      .where(and(eq(schema.mailboxes.id, mailboxId), eq(schema.mailboxes.teamId, teamId)));
+    if (!box) throw new MailboxServiceError("not_entitled");
+    return;
+  }
   const licensed = await db
     .select({ id: schema.mailboxes.id })
     .from(schema.mailboxes)

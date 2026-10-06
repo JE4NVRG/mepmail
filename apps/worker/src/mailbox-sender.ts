@@ -1,10 +1,10 @@
-import { SESv2Client, SendEmailCommand, type SESv2ClientConfig } from "@aws-sdk/client-sesv2";
+import { SESv2Client, type SESv2ClientConfig, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import {
-  MailboxSendRejectedError,
-  MailboxSendDeferredError,
-  type MailboxOutboxSender,
-  type MailboxTransportMimeAdapter,
   MailboxContentError,
+  type MailboxOutboxSender,
+  MailboxSendDeferredError,
+  MailboxSendRejectedError,
+  type MailboxTransportMimeAdapter,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { and, eq } from "drizzle-orm";
@@ -84,7 +84,11 @@ export function createMailboxSesSender(
   opts: {
     configurationSets?: MailboxSesConfigurationSets | null | undefined;
     exhausted?: (region: string) => boolean;
-    throttle?: (region: string) => Promise<void>;
+    throttle?: (region: string, recipients: number) => Promise<void>;
+    checkRecipients?: (input: {
+      teamId: string;
+      recipients: readonly string[];
+    }) => Promise<boolean>;
     /** Captured client for offline qualification; production uses the AWS SDK. */
     clientFactory?: (options: SESv2ClientConfig) => MailboxSesClient;
   } = {},
@@ -93,6 +97,18 @@ export function createMailboxSesSender(
   const clients = new Map<string, MailboxSesClient>();
   return {
     async send(input) {
+      // Capture the same MIME/envelope whose recipient permits are reserved below.
+      input = {
+        ...input,
+        raw: Buffer.from(input.raw),
+        to: [...input.to],
+        cc: [...input.cc],
+        bcc: [...input.bcc],
+      };
+      const recipients = [...new Set([...input.to, ...input.cc, ...input.bcc])];
+      const recipientCount = recipients.length;
+      if (!input.to.length || recipientCount < 1 || recipientCount > 20)
+        throw new MailboxSendRejectedError();
       const [domain] = await db
         .select({
           region: schema.domains.region,
@@ -134,7 +150,23 @@ export function createMailboxSesSender(
       if (parsed.headerLines.some((line) => line.key.toLowerCase().startsWith("x-ses-")))
         throw new MailboxSendRejectedError();
       if (opts.exhausted?.(domain.region)) throw new MailboxSendDeferredError();
-      await opts.throttle?.(domain.region);
+      try {
+        await opts.throttle?.(domain.region, recipientCount);
+      } catch {
+        // Cancellation or a failed local permit cannot have accepted this message.
+        throw new MailboxSendDeferredError();
+      }
+      if (opts.exhausted?.(domain.region)) throw new MailboxSendDeferredError();
+      if (opts.checkRecipients) {
+        let allowed: boolean;
+        try {
+          allowed = await opts.checkRecipients({ teamId: input.teamId, recipients });
+        } catch {
+          // A failed lookup is a preflight failure, never evidence of provider acceptance.
+          throw new MailboxSendDeferredError();
+        }
+        if (allowed !== true) throw new MailboxSendRejectedError();
+      }
       let client = clients.get(domain.region);
       if (!client) {
         const options: SESv2ClientConfig = {
@@ -152,7 +184,7 @@ export function createMailboxSesSender(
         domain.tenantConfigSet === configurationSet
           ? domain.tenantName
           : undefined;
-      let response;
+      let response: Awaited<ReturnType<MailboxSesClient["send"]>>;
       try {
         response = await client.send(
           new SendEmailCommand({

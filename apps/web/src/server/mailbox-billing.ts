@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import {
   isLiveKey,
   type MailboxCatalog,
   MailboxLifecycleError,
+  type MailboxPriceTerms,
   type MailboxPurchaseDeps,
   recoverMailboxCheckoutSession,
 } from "@millionsend/billing";
@@ -9,6 +11,7 @@ import { env, isCloudDeployment } from "@millionsend/config";
 import { type Db, schema } from "@millionsend/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { hasPaidSendingPlan } from "../../../../packages/billing/src/mailbox-addon";
 import { mailboxManagementRequests } from "../../../../packages/db/src/schema/mailbox-management-requests";
 import { getStripe } from "./billing";
 
@@ -36,6 +39,10 @@ export function mailboxBillingCatalog(): MailboxCatalog | null {
     .object({
       livemode: z.boolean(),
       checkoutPriceId: z.string().nullable(),
+      checkoutPriceIds: z
+        .array(z.string().regex(/^price_[A-Za-z0-9_]+$/))
+        .max(10)
+        .optional(),
       prices: z.array(terms).max(100),
     })
     .strict()
@@ -43,23 +50,50 @@ export function mailboxBillingCatalog(): MailboxCatalog | null {
   if (
     !parsed.success ||
     parsed.data.livemode !== isLiveKey(env.STRIPE_SECRET_KEY ?? "") ||
-    new Set(parsed.data.prices.map((p) => p.priceId)).size !== parsed.data.prices.length
+    new Set(parsed.data.prices.map((p) => p.priceId)).size !== parsed.data.prices.length ||
+    (parsed.data.checkoutPriceIds !== undefined &&
+      (new Set(parsed.data.checkoutPriceIds).size !== parsed.data.checkoutPriceIds.length ||
+        parsed.data.checkoutPriceIds.some(
+          (id) => !parsed.data.prices.some((p) => p.priceId === id),
+        ) ||
+        (parsed.data.checkoutPriceId !== null &&
+          !parsed.data.checkoutPriceIds.includes(parsed.data.checkoutPriceId))))
   )
     return null;
   return parsed.data;
 }
 
-/** An offer describes approved terms, never a provider identifier or a grant. */
-export function mailboxBillingOffer() {
-  if (
-    !isCloudDeployment() ||
-    !/^(sk|rk)_(test|live)_\S+$/.test(env.STRIPE_SECRET_KEY ?? "") ||
-    ["1", "true"].includes(process.env.BILLING_MUTATIONS_PAUSED ?? "")
-  )
-    return null;
-  const catalog = mailboxBillingCatalog();
-  const price = catalog?.prices.find((entry) => entry.priceId === catalog.checkoutPriceId);
-  if (!price) return null;
+/** Pause new Mail purchases and financial changes without hiding persisted contracts.
+ * An explicitly configured Mail flag must be a known false value to permit writes.
+ * Keep the existing global billing pause semantics.
+ */
+export function mailboxBillingMutationsPaused() {
+  const mailboxPause = process.env.MAILBOX_BILLING_PAUSED;
+  return (
+    ["1", "true"].includes(process.env.BILLING_MUTATIONS_PAUSED ?? "") ||
+    (mailboxPause !== undefined && !["0", "false"].includes(mailboxPause))
+  );
+}
+
+function purchasesAvailable() {
+  return (
+    isCloudDeployment() &&
+    /^(sk|rk)_(test|live)_\S+$/.test(env.STRIPE_SECRET_KEY ?? "") &&
+    !mailboxBillingMutationsPaused()
+  );
+}
+
+function purchasableTerms(catalog: MailboxCatalog | null) {
+  if (!catalog) return [];
+  const ids =
+    catalog.checkoutPriceIds ?? (catalog.checkoutPriceId ? [catalog.checkoutPriceId] : []);
+  return ids.flatMap((id) => {
+    const price = catalog.prices.find((p) => p.priceId === id);
+    return price ? [price] : [];
+  });
+}
+
+function publicTerms(price: MailboxPriceTerms) {
   return {
     currency: price.currency,
     unitAmount: price.unitAmount,
@@ -67,6 +101,41 @@ export function mailboxBillingOffer() {
     storageBytesPerMailbox: price.storageBytesPerMailbox,
     includedOutboundPerMailbox: price.includedOutboundPerMailbox,
   };
+}
+
+function publicOffer(catalog: MailboxCatalog, price: MailboxPriceTerms) {
+  const offerId = `mbo_${createHash("sha256")
+    .update(JSON.stringify([catalog.livemode, price.priceId, publicTerms(price)]))
+    .digest("base64url")}`;
+  return { offerId, ...publicTerms(price) };
+}
+
+/** Provider IDs and historical-only terms never become client-selectable offers. */
+export function mailboxBillingOffers() {
+  if (!purchasesAvailable()) return [];
+  const catalog = mailboxBillingCatalog();
+  return catalog ? purchasableTerms(catalog).map((price) => publicOffer(catalog, price)) : [];
+}
+
+/** Resolve only a server-approved offer; client amounts, prices and limits are never inputs. */
+export function mailboxBillingCatalogForOffer(offerId?: string): MailboxCatalog | null {
+  if (!purchasesAvailable()) return null;
+  const catalog = mailboxBillingCatalog();
+  if (!catalog) return null;
+  if (offerId !== undefined && !/^mbo_[A-Za-z0-9_-]{43}$/.test(offerId)) return null;
+  const price = purchasableTerms(catalog).find((entry) =>
+    offerId === undefined
+      ? entry.priceId === catalog.checkoutPriceId
+      : publicOffer(catalog, entry).offerId === offerId,
+  );
+  return price ? { ...catalog, checkoutPriceId: price.priceId } : null;
+}
+
+/** Preserve the legacy default DTO without granting a purchase or exposing its provider ID. */
+export function mailboxBillingOffer() {
+  const catalog = mailboxBillingCatalogForOffer();
+  const price = catalog?.prices.find((entry) => entry.priceId === catalog.checkoutPriceId);
+  return price ? publicTerms(price) : null;
 }
 
 export function mailboxManagementEnabled() {
@@ -88,6 +157,12 @@ export async function mailboxBillingPresentation(
       role: schema.teamMembers.role,
       suspendedAt: schema.teams.suspendedAt,
       plan: schema.teams.plan,
+      planStatus: schema.teams.planStatus,
+      stripeCustomerId: schema.teams.stripeCustomerId,
+      stripeSubscriptionId: schema.teams.stripeSubscriptionId,
+      currentPeriodStart: schema.teams.currentPeriodStart,
+      currentPeriodEnd: schema.teams.currentPeriodEnd,
+      cancelAt: schema.teams.cancelAt,
     })
     .from(schema.teamMembers)
     .innerJoin(schema.teams, eq(schema.teams.id, schema.teamMembers.teamId))
@@ -96,6 +171,7 @@ export async function mailboxBillingPresentation(
     );
   if (!member) throw new MailboxLifecycleError("forbidden");
   const canManage = member.role === "owner" || member.role === "admin";
+  const sendingPlanRequired = member.plan !== "system" && !hasPaidSendingPlan(member);
   const [subscription] = await db
     .select()
     .from(schema.mailboxSubscriptions)
@@ -137,18 +213,27 @@ export async function mailboxBillingPresentation(
     .from(schema.mailboxCustomerRequests)
     .where(eq(schema.mailboxCustomerRequests.teamId, actor.teamId));
   const offer = mailboxBillingOffer();
+  const offers = mailboxBillingOffers();
   const catalog = mailboxBillingCatalog();
-  const sameOffer =
-    !checkout ||
-    (!!offer &&
-      !!catalog &&
-      checkout.priceId === catalog.checkoutPriceId &&
-      checkout.livemode === catalog.livemode &&
-      checkout.currency === offer.currency &&
-      checkout.unitAmount === offer.unitAmount &&
-      checkout.interval === offer.interval &&
-      checkout.storageBytesPerMailbox === offer.storageBytesPerMailbox &&
-      checkout.includedOutboundPerMailbox === offer.includedOutboundPerMailbox);
+  const pendingPrice =
+    checkout && catalog && checkout.livemode === catalog.livemode
+      ? purchasableTerms(catalog).find(
+          (price) =>
+            checkout.priceId === price.priceId &&
+            checkout.currency === price.currency &&
+            checkout.unitAmount === price.unitAmount &&
+            checkout.interval === price.interval &&
+            checkout.storageBytesPerMailbox === price.storageBytesPerMailbox &&
+            checkout.includedOutboundPerMailbox === price.includedOutboundPerMailbox,
+        )
+      : null;
+  const pendingOffer = catalog && pendingPrice ? publicOffer(catalog, pendingPrice) : null;
+  const defaultPrice = purchasableTerms(catalog).find(
+    (price) => price.priceId === catalog?.checkoutPriceId,
+  );
+  const defaultOfferId =
+    offer && catalog && defaultPrice ? publicOffer(catalog, defaultPrice).offerId : null;
+  const sameOffer = !checkout || pendingOffer !== null;
   const ended =
     subscription?.status === "canceled" &&
     !!subscription.stripeSubscriptionId &&
@@ -188,6 +273,9 @@ export async function mailboxBillingPresentation(
     !!subscription.stripeSubscriptionId &&
     !!subscription.stripeSubscriptionItemId &&
     subscription.livemode === catalog.livemode;
+  // Reconciliation may read an existing contract while new financial changes are paused.
+  // The caller must also enforce the mutation flag and use read-only provider reconciliation.
+  const mutable = manageable && !mailboxBillingMutationsPaused();
   const openManagement = !!managementRequest && managementRequest.status !== "scheduled";
   const scheduledReduction =
     managementRequest?.status === "scheduled" &&
@@ -199,34 +287,49 @@ export async function mailboxBillingPresentation(
       ? ("forbidden" as const)
       : (subscription && !ended) || completedPending
         ? ("existing_subscription" as const)
-        : !offer
-          ? ("unavailable" as const)
-          : !sameOffer
-            ? ("recovery_required" as const)
-            : ("available" as const);
+        : sendingPlanRequired
+          ? ("sending_plan_required" as const)
+          : offers.length === 0
+            ? ("unavailable" as const)
+            : !sameOffer
+              ? ("recovery_required" as const)
+              : ("available" as const);
   return {
     canManage,
     canPurchase: availability === "available",
+    sendingPlanRequired,
     availability,
     offer,
+    offers,
+    defaultOfferId,
+    pendingOfferId: pendingOffer?.offerId ?? null,
+    pendingOffer,
     checkoutPending: !!checkout || customerRequest?.status === "creating",
     pendingCheckoutSeats: checkout?.seats ?? null,
     management: {
       canReconcile: manageable,
       canCancel:
-        manageable &&
+        mutable &&
         beforeEnd &&
         ["active", "trialing", "past_due"].includes(subscription!.status) &&
         !subscription!.cancelAtPeriodEnd &&
         !openManagement,
       canResume:
-        manageable &&
+        mutable &&
+        !sendingPlanRequired &&
         beforeEnd &&
         ["active", "trialing"].includes(subscription!.status) &&
         subscription!.cancelAtPeriodEnd &&
         !openManagement,
       canAdjust:
-        manageable &&
+        mutable &&
+        beforeEnd &&
+        subscription!.status === "active" &&
+        !subscription!.cancelAtPeriodEnd &&
+        !openManagement,
+      canIncrease:
+        mutable &&
+        !sendingPlanRequired &&
         beforeEnd &&
         subscription!.status === "active" &&
         !subscription!.cancelAtPeriodEnd &&
@@ -246,6 +349,7 @@ export function mailboxPurchaseDeps(db: Db): MailboxPurchaseDeps {
   return {
     db,
     stripe,
+    requirePaidSendingPlan: true,
     recoverCheckout: (lease) => recoverMailboxCheckoutSession(stripe, lease),
   };
 }

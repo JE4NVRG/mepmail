@@ -1,0 +1,47 @@
+{
+  "eyebrow": "Mail · Activity",
+  "title": "Mailbox activity",
+  "open": "History",
+  "description": "Follow message queries, content access, saved drafts and send approvals for this mailbox.",
+  "historyStart": "History starts from activation.",
+  "privacy": "This history records actions and times. Message content is not copied to this view.",
+  "close": "Close",
+  "refresh": "Refresh",
+  "refreshing": "Refreshing…",
+  "loading": "Loading activity…",
+  "error": "Mailbox history could not be loaded. Refresh to try again.",
+  "empty": "No activity recorded yet.",
+  "older": "Older activity",
+  "loadingOlder": "Loading older activity…",
+  "loadedCount": "{count, plural, one {# activity shown} other {# activities shown}}",
+  "messageCount": "{count, plural, one {# message} other {# messages}}",
+  "revision": "Revision {revision, number}",
+  "actors": {
+    "agent": "Agent",
+    "person": "Person"
+  },
+  "actions": {
+    "itemsListed": "Queried the message list",
+    "itemRead": "Accessed a message's content",
+    "draftSaved": "Saved a draft",
+    "sendApproved": "Approved a send",
+    "itemTrashed": "Moved a message to trash",
+    "itemRestored": "Restored a message from trash",
+    "itemStarred": "Added a message to favorites",
+    "itemUnstarred": "Removed a message from favorites",
+    "itemFolderChanged": "Moved a message between folders",
+    "folderCreated": "Created a folder",
+    "folderRenamed": "Renamed a folder",
+    "folderArchived": "Removed a folder while preserving its messages"
+  },
+  "folders": {
+    "inbox": "Inbox",
+    "drafts": "Drafts",
+    "sent": "Sent",
+    "trash": "Trash",
+    "spam": "Spam",
+    "quarantine": "Quarantine",
+    "favorites": "Favorites",
+    "custom": "Folder"
+  }
+}

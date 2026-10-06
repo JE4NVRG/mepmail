@@ -1,14 +1,5 @@
 export type { ContactActivityType, SegmentCondition, SegmentFilter } from "@millionsend/db/schema";
 export {
-  MailboxServiceError,
-  mailboxServiceActive,
-  mailboxServiceState,
-  lockMailboxService,
-  reserveMailboxSeat,
-  requireMailboxSeat,
-  assertMailboxStorage,
-} from "./mailbox-service.js";
-export {
   buildJudgeBlock,
   decodeEntities,
   JUDGE_LINK_ROWS_MAX,
@@ -127,7 +118,9 @@ export {
   planMove,
 } from "./account-mail.js";
 export {
+  ACCOUNT_SCORE_VERSION,
   ACCOUNT_SCORE_WINDOW_DAYS,
+  type AccountOutcomeConfidence,
   type AccountScore,
   type AccountScoreInput,
   type ContentFactor,
@@ -136,6 +129,7 @@ export {
   fetchAccountScore,
   fetchAccountScoreInput,
   fetchContentFactors,
+  MIN_OUTCOME_COMPLAINTS,
   MIN_OUTCOME_SENDS,
 } from "./account-score.js";
 export { type ApiKeyAuth, authenticateApiKey } from "./api-key-auth.js";
@@ -269,6 +263,11 @@ export {
   type WindowCounts,
 } from "./deliverability.js";
 export {
+  type DailyDeliverabilityCounts,
+  type DeliverabilityRecovery,
+  evaluateDeliverabilityRecovery,
+} from "./deliverability-recovery.js";
+export {
   createFixedWindowLimiter,
   DOMAIN_CREATE_LIMIT_PER_HOUR,
   failQueuedEmailsForDomain,
@@ -378,6 +377,101 @@ export {
   type MailPreferenceKey,
   mailPreferenceOf,
 } from "./mail-preferences.js";
+export {
+  appendMailboxActivity,
+  listMailboxActivity,
+  MAILBOX_ACTIVITY_ACTIONS,
+  type MailboxActivityAction,
+  type MailboxActivityContext,
+  type MailboxActivityCursor,
+  type MailboxActivityEvent,
+  type MailboxActivityItem,
+} from "./mailbox-activity.js";
+export {
+  createMailboxAgentKey,
+  listMailboxAgentKeys,
+  type MailboxAgentAccessContext,
+  MailboxAgentAccessError,
+  type MailboxAgentScope,
+  revokeMailboxAgentKey,
+  withMailboxAgentAccess,
+} from "./mailbox-agent-access.js";
+export {
+  assessMailboxReceipt,
+  type MailboxInboundAssessment,
+  type MailboxSafetyReason,
+  type MailboxVerdict,
+  validateMailboxInboundAssessment,
+} from "./mailbox-inbound-safety.js";
+export {
+  archiveMailboxFolder,
+  createMailboxFolder,
+  listMailboxFolders,
+  setMailboxItemFolder,
+  setMailboxItemStar,
+  updateMailboxFolder,
+} from "./mailbox-organization.js";
+export {
+  importMailboxMime,
+  listMailboxItems,
+  type MailboxContentActor,
+  MailboxContentError,
+  readMailboxItem,
+  saveMailboxDraft,
+  setMailboxDeliveryFolder,
+  setMailboxItemTrash,
+  withMailboxContentAccess,
+  withMailboxItem,
+} from "./mailbox-private-store.js";
+export {
+  getMailboxReceivingReadiness,
+  type MailboxReceivingDeps,
+  type MailboxReceivingDomain,
+  type MailboxReceivingObservation,
+  type MailboxReceivingReadiness,
+  type MailboxReceivingReason,
+  type MailboxReceivingState,
+} from "./mailbox-receiving.js";
+export {
+  createMailboxRegistry,
+  grantMailboxRegistry,
+  listMailboxRegistry,
+  type MailboxRegistryActor,
+  MailboxRegistryError,
+  mailboxDomainLock,
+  revokeMailboxRegistry,
+  updateMailboxRegistry,
+  withMailboxRegistryAdmin,
+} from "./mailbox-registry.js";
+export {
+  assertMailboxStorage,
+  lockMailboxService,
+  MailboxServiceError,
+  mailboxServiceActive,
+  mailboxServiceEntitlement,
+  mailboxServiceState,
+  requireMailboxSeat,
+  reserveMailboxSeat,
+} from "./mailbox-service.js";
+export {
+  acceptMailboxOutbox,
+  checkMailboxRecipientBlocks,
+  failQueuedMailboxOutbox,
+  getMailboxOutboundSummary,
+  type MailboxOutboundEvidence,
+  type MailboxOutboundOutcome,
+  type MailboxOutboundSummary,
+  type MailboxOutboxSender,
+  MailboxSendDeferredError,
+  MailboxSendRejectedError,
+  type MailboxTransportMimeAdapter,
+  mailboxRecipientHash,
+  queueMailboxAgentDraft,
+  queueMailboxDraft,
+  receiveMailboxMime,
+  reconcileMailboxOutbox,
+  sendMailboxOutbox,
+} from "./mailbox-transport.js";
 export {
   getMonitorSettingsRow,
   isValidMonitorSetting,
@@ -645,27 +739,6 @@ export {
   type WebhookChannel,
 } from "./webhook-channels.js";
 export {
-  createMailboxRegistry,
-  grantMailboxRegistry,
-  listMailboxRegistry,
-  mailboxDomainLock,
-  MailboxRegistryError,
-  type MailboxRegistryActor,
-  revokeMailboxRegistry,
-  updateMailboxRegistry,
-  withMailboxRegistryAdmin,
-} from "./mailbox-registry.js";
-export {
-  importMailboxMime,
-  listMailboxItems,
-  MailboxContentError,
-  type MailboxContentActor,
-  readMailboxItem,
-  saveMailboxDraft,
-  withMailboxItem,
-  withMailboxContentAccess,
-} from "./mailbox-private-store.js";
-export {
   buildWebhookPayload,
   clearWebhookEndpointNotifications,
   decryptWebhookSecret,
@@ -700,25 +773,3 @@ export {
   type WebhookPayload,
   type WebhookSignatureHeaders,
 } from "./webhooks.js";
-export {
-  acceptMailboxOutbox,
-  queueMailboxDraft,
-  queueMailboxAgentDraft,
-  receiveMailboxMime,
-  reconcileMailboxOutbox,
-  sendMailboxOutbox,
-  failQueuedMailboxOutbox,
-  MailboxSendRejectedError,
-  MailboxSendDeferredError,
-  type MailboxOutboxSender,
-  type MailboxTransportMimeAdapter,
-} from "./mailbox-transport.js";
-export {
-  createMailboxAgentKey,
-  listMailboxAgentKeys,
-  revokeMailboxAgentKey,
-  withMailboxAgentAccess,
-  MailboxAgentAccessError,
-  type MailboxAgentScope,
-  type MailboxAgentAccessContext,
-} from "./mailbox-agent-access.js";

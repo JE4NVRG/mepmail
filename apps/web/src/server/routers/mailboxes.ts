@@ -5,10 +5,16 @@ import {
 } from "@millionsend/billing";
 import { env } from "@millionsend/config";
 import {
+  appendMailboxActivity,
+  archiveMailboxFolder,
   createMailboxAgentKey,
+  createMailboxFolder,
   createMailboxRegistry,
+  getMailboxReceivingReadiness,
   grantMailboxRegistry,
+  listMailboxActivity,
   listMailboxAgentKeys,
+  listMailboxFolders,
   listMailboxRegistry,
   MailboxAgentAccessError,
   MailboxContentError,
@@ -18,18 +24,26 @@ import {
   queueMailboxDraft,
   revokeMailboxAgentKey,
   revokeMailboxRegistry,
+  setMailboxDeliveryFolder,
+  setMailboxItemFolder,
+  setMailboxItemStar,
+  setMailboxItemTrash,
+  updateMailboxFolder,
   updateMailboxRegistry,
   withMailboxRegistryAdmin,
 } from "@millionsend/core";
-import { schema } from "@millionsend/db";
+import { type Db, schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { recordAudit } from "../audit";
 import { resolveBaseUrl } from "../auth";
 import { getKeyring } from "../keyring";
+import { cursorSchema } from "../keyset";
 import {
   mailboxBillingCatalog,
+  mailboxBillingCatalogForOffer,
+  mailboxBillingMutationsPaused,
   mailboxBillingPresentation,
   mailboxManagementEnabled,
   mailboxPurchaseDeps,
@@ -39,13 +53,16 @@ import {
   getMailboxContentList,
   saveMailboxContentDraft,
 } from "../mailbox-content";
+import { mailboxReceivingDeps } from "../mailbox-receiving";
 import { mailboxTransportMime } from "../mailbox-transport";
-import { mailboxRegistryEnabled } from "../mailboxes";
+import { getMailboxUsage } from "../mailbox-usage";
+import { mailboxAccessEnabled } from "../mailboxes";
 import { getQueue } from "../queue";
 import { router, teamProcedure } from "../trpc";
 
 const enabled = teamProcedure.use(({ ctx, next }) => {
-  if (!mailboxRegistryEnabled()) throw new TRPCError({ code: "NOT_FOUND" });
+  if (!mailboxAccessEnabled({ teamId: ctx.teamId, userId: ctx.session.user.id }))
+    throw new TRPCError({ code: "NOT_FOUND" });
   // Existing operator support grants cover outbound operations, not private mailbox content or registry.
   if (ctx.supportView) throw new TRPCError({ code: "FORBIDDEN" });
   return next();
@@ -102,14 +119,47 @@ const boxInput = z.object({
   label: z.string().min(1).max(80),
   kind: z.enum(["person", "agent"]),
   ownerUserId: z.string().min(1).max(128),
+  signatureText: z.string().max(4000).optional(),
 });
 
 export const mailboxesRouter = router({
-  capabilities: teamProcedure.query(({ ctx }) => ({
-    enabled: mailboxRegistryEnabled() && !ctx.supportView,
-    deliveryReady: false as const,
-  })),
+  capabilities: teamProcedure.query(({ ctx }) => {
+    const enabled = mailboxAccessEnabled(actor(ctx)) && !ctx.supportView;
+    return {
+      enabled,
+      deliveryReady: enabled && process.env.MAILBOX_TRANSPORT_ENABLED === "1",
+    };
+  }),
   list: enabled.query(({ ctx }) => call(() => listMailboxRegistry(ctx.db, actor(ctx)))),
+  receiving: enabled
+    .input(z.object({ domainId: z.uuid() }).strict())
+    .query(async ({ ctx, input }) => {
+      const readiness = await call(() =>
+        getMailboxReceivingReadiness(ctx.db, actor(ctx), input.domainId, mailboxReceivingDeps()),
+      );
+      return { ...readiness, state: readiness.receiving_state, mxHost: readiness.mx.value };
+    }),
+  activity: enabled
+    .input(
+      z
+        .object({
+          mailboxId: z.uuid(),
+          cursor: cursorSchema.optional(),
+          limit: z.number().int().min(1).max(50).default(25),
+          // tRPC infinite queries supply this transport field when loading older pages.
+          direction: z.literal("forward").optional(),
+        })
+        .strict(),
+    )
+    .query(({ ctx, input }) =>
+      call(() =>
+        listMailboxActivity(ctx.db, actor(ctx), {
+          mailboxId: input.mailboxId,
+          limit: input.limit,
+          ...(input.cursor ? { cursor: input.cursor } : {}),
+        }),
+      ),
+    ),
   service: enabled.query(async ({ ctx }) => {
     await call(() => listMailboxRegistry(ctx.db, actor(ctx)));
     return mailboxServiceState(ctx.db, ctx.teamId);
@@ -127,6 +177,11 @@ export const mailboxesRouter = router({
     .mutation(async ({ ctx, input }) => {
       const presentation = await call(() => mailboxBillingPresentation(ctx.db, actor(ctx)));
       if (!presentation.canManage) throw new TRPCError({ code: "FORBIDDEN" });
+      if (input.action !== "reconcile" && mailboxBillingMutationsPaused())
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "mailbox_billing_unavailable",
+        });
       if (!mailboxManagementEnabled() || !presentation.management.canReconcile)
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
@@ -141,17 +196,31 @@ export const mailboxesRouter = router({
           message: "mailbox_billing_unavailable",
         });
       return call(() =>
-        manageMailboxSubscription(mailboxPurchaseDeps(ctx.db), catalog, {
-          ...actor(ctx),
-          ...input,
-        }),
+        manageMailboxSubscription(
+          { ...mailboxPurchaseDeps(ctx.db), readOnly: mailboxBillingMutationsPaused() },
+          catalog,
+          {
+            ...actor(ctx),
+            ...input,
+          },
+        ),
       ).catch((error: unknown) => {
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
       });
     }),
   checkout: enabled
-    .input(z.object({ seats: z.number().int().min(1).max(10000) }))
+    .input(
+      z
+        .object({
+          seats: z.number().int().min(1).max(10000),
+          offerId: z
+            .string()
+            .regex(/^mbo_[A-Za-z0-9_-]{43}$/)
+            .optional(),
+        })
+        .strict(),
+    )
     .mutation(async ({ ctx, input }) => {
       const presentation = await call(() => mailboxBillingPresentation(ctx.db, actor(ctx)));
       if (presentation.availability === "forbidden") throw new TRPCError({ code: "FORBIDDEN" });
@@ -163,14 +232,24 @@ export const mailboxesRouter = router({
               ? "subscription_exists"
               : presentation.availability === "recovery_required"
                 ? "conflict"
-                : "mailbox_billing_unavailable",
+                : presentation.availability === "sending_plan_required"
+                  ? "sending_plan_required"
+                  : "mailbox_billing_unavailable",
         });
       if (
         presentation.pendingCheckoutSeats !== null &&
         presentation.pendingCheckoutSeats !== input.seats
       )
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "conflict" });
-      const catalog = mailboxBillingCatalog();
+      if (
+        presentation.pendingOfferId !== null &&
+        input.offerId !== undefined &&
+        presentation.pendingOfferId !== input.offerId
+      )
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "conflict" });
+      const catalog = mailboxBillingCatalogForOffer(
+        input.offerId ?? presentation.pendingOfferId ?? undefined,
+      );
       if (!catalog)
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
@@ -265,20 +344,233 @@ export const mailboxesRouter = router({
         { outboxId: result.id },
         { dedupeKey: result.id },
       );
-      await recordAudit(ctx, {
-        action: "mailbox.send_queued",
-        target: { type: "mailbox_outbox", id: result.id },
-      });
       return result;
     }),
+  usage: enabled
+    .input(z.object({ mailboxId: z.uuid().nullable() }).strict())
+    .query(({ ctx, input }) => call(() => getMailboxUsage(ctx.db, actor(ctx), input))),
+  folders: enabled
+    .input(z.object({ mailboxId: z.uuid() }).strict())
+    .query(({ ctx, input }) => call(() => listMailboxFolders(ctx.db, actor(ctx), input))),
+  createFolder: enabled
+    .input(z.object({ mailboxId: z.uuid(), name: z.string().min(1).max(80) }).strict())
+    .mutation(({ ctx, input }) =>
+      call(() =>
+        ctx.db.transaction(async (transaction) => {
+          const db = transaction as unknown as Db;
+          const result = await createMailboxFolder(db, actor(ctx), input);
+          await appendMailboxActivity(
+            db,
+            {
+              teamId: ctx.teamId,
+              mailboxId: input.mailboxId,
+              actor: { kind: "user", userId: ctx.session.user.id },
+            },
+            { action: "mailbox.folder_created", folderId: result.id, revision: result.revision },
+          );
+          return result;
+        }),
+      ),
+    ),
+  updateFolder: enabled
+    .input(
+      z
+        .object({
+          mailboxId: z.uuid(),
+          id: z.uuid(),
+          expectedRevision: z.number().int().min(1).max(2147483646),
+          name: z.string().min(1).max(80),
+        })
+        .strict(),
+    )
+    .mutation(({ ctx, input }) =>
+      call(() =>
+        ctx.db.transaction(async (transaction) => {
+          const db = transaction as unknown as Db;
+          const result = await updateMailboxFolder(db, actor(ctx), input);
+          if (result.changed)
+            await appendMailboxActivity(
+              db,
+              {
+                teamId: ctx.teamId,
+                mailboxId: input.mailboxId,
+                actor: { kind: "user", userId: ctx.session.user.id },
+              },
+              { action: "mailbox.folder_renamed", folderId: result.id, revision: result.revision },
+            );
+          return result;
+        }),
+      ),
+    ),
+  archiveFolder: enabled
+    .input(
+      z
+        .object({
+          mailboxId: z.uuid(),
+          id: z.uuid(),
+          expectedRevision: z.number().int().min(1).max(2147483646),
+        })
+        .strict(),
+    )
+    .mutation(({ ctx, input }) =>
+      call(() =>
+        ctx.db.transaction(async (transaction) => {
+          const db = transaction as unknown as Db;
+          const result = await archiveMailboxFolder(db, actor(ctx), input);
+          await appendMailboxActivity(
+            db,
+            {
+              teamId: ctx.teamId,
+              mailboxId: input.mailboxId,
+              actor: { kind: "user", userId: ctx.session.user.id },
+            },
+            { action: "mailbox.folder_archived", folderId: result.id, revision: result.revision },
+          );
+          return result;
+        }),
+      ),
+    ),
+  setStar: enabled
+    .input(
+      z
+        .object({
+          mailboxId: z.uuid(),
+          id: z.uuid(),
+          expectedRevision: z.number().int().min(1).max(2147483646),
+          starred: z.boolean(),
+        })
+        .strict(),
+    )
+    .mutation(({ ctx, input }) =>
+      call(() =>
+        ctx.db.transaction(async (transaction) => {
+          const db = transaction as unknown as Db;
+          const result = await setMailboxItemStar(db, actor(ctx), input);
+          if (result.changed)
+            await appendMailboxActivity(
+              db,
+              {
+                teamId: ctx.teamId,
+                mailboxId: input.mailboxId,
+                actor: { kind: "user", userId: ctx.session.user.id },
+              },
+              {
+                action: input.starred ? "mailbox.item_starred" : "mailbox.item_unstarred",
+                itemId: result.id,
+                revision: result.revision,
+              },
+            );
+          return result;
+        }),
+      ),
+    ),
+  setItemFolder: enabled
+    .input(
+      z
+        .object({
+          mailboxId: z.uuid(),
+          id: z.uuid(),
+          expectedRevision: z.number().int().min(1).max(2147483646),
+          folderId: z.uuid().nullable(),
+        })
+        .strict(),
+    )
+    .mutation(({ ctx, input }) =>
+      call(() =>
+        ctx.db.transaction(async (transaction) => {
+          const db = transaction as unknown as Db;
+          const result = await setMailboxItemFolder(db, actor(ctx), input);
+          if (result.changed)
+            await appendMailboxActivity(
+              db,
+              {
+                teamId: ctx.teamId,
+                mailboxId: input.mailboxId,
+                actor: { kind: "user", userId: ctx.session.user.id },
+              },
+              {
+                action: "mailbox.item_folder_changed",
+                itemId: result.id,
+                revision: result.revision,
+                folderId: result.folderId,
+              },
+            );
+          return result;
+        }),
+      ),
+    ),
   items: enabled
     .input(
-      z.object({ mailboxId: z.uuid().nullable(), folder: z.enum(["inbox", "drafts", "sent"]) }),
+      z.object({
+        mailboxId: z.uuid().nullable(),
+        folder: z.enum([
+          "inbox",
+          "drafts",
+          "sent",
+          "spam",
+          "quarantine",
+          "trash",
+          "favorites",
+          "custom",
+        ]),
+        customFolderId: z.uuid().optional(),
+        mailboxKind: z.enum(["person", "agent"]).optional(),
+      }),
     )
     .query(({ ctx, input }) => call(() => getMailboxContentList(ctx.db, actor(ctx), input))),
   item: enabled
     .input(z.object({ mailboxId: z.uuid(), id: z.uuid() }))
     .query(({ ctx, input }) => call(() => getMailboxContent(ctx.db, actor(ctx), input))),
+  setDeliveryFolder: enabled
+    .input(
+      z.object({
+        mailboxId: z.uuid(),
+        id: z.uuid(),
+        expectedRevision: z.number().int().min(1).max(2147483646),
+        folder: z.enum(["inbox", "spam"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const result = await call(() => setMailboxDeliveryFolder(ctx.db, actor(ctx), input));
+      await recordAudit(ctx, {
+        action: "mailbox.message_classified",
+        target: { type: "mailbox_item", id: result.id },
+        metadata: { folder: result.deliveryFolder },
+      });
+      return result;
+    }),
+  setTrash: enabled
+    .input(
+      z.object({
+        mailboxId: z.uuid(),
+        id: z.uuid(),
+        expectedRevision: z.number().int().min(1).max(2147483646),
+        trashed: z.boolean(),
+      }),
+    )
+    .mutation(({ ctx, input }) =>
+      call(() =>
+        ctx.db.transaction(async (transaction) => {
+          const db = transaction as unknown as Db;
+          const result = await setMailboxItemTrash(db, actor(ctx), input);
+          if (result.changed)
+            await appendMailboxActivity(
+              db,
+              {
+                teamId: ctx.teamId,
+                mailboxId: input.mailboxId,
+                actor: { kind: "user", userId: ctx.session.user.id },
+              },
+              {
+                action: input.trashed ? "mailbox.item_trashed" : "mailbox.item_restored",
+                itemId: result.id,
+                revision: result.revision,
+              },
+            );
+          return result;
+        }),
+      ),
+    ),
   saveDraft: enabled
     .input(
       z.object({
@@ -286,6 +578,7 @@ export const mailboxesRouter = router({
         id: z.uuid().optional(),
         expectedRevision: z.number().int().min(0).max(2147483646),
         sourceItemId: z.uuid().optional(),
+        mode: z.enum(["reply", "forward"]).optional(),
         to: z.array(z.email().max(254)).max(20),
         subject: z
           .string()
@@ -304,12 +597,22 @@ export const mailboxesRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const result = await call(() => saveMailboxContentDraft(ctx.db, actor(ctx), input));
-      await recordAudit(ctx, {
-        action: "mailbox.draft_saved",
-        target: { type: "mailbox_item", id: result.id },
-      });
-      return result;
+      return call(() =>
+        ctx.db.transaction(async (tx) => {
+          const transactionDb = tx as unknown as Db;
+          const result = await saveMailboxContentDraft(transactionDb, actor(ctx), input);
+          await appendMailboxActivity(
+            transactionDb,
+            {
+              teamId: ctx.teamId,
+              mailboxId: input.mailboxId,
+              actor: { kind: "user", userId: ctx.session.user.id },
+            },
+            { action: "mailbox.draft_saved", itemId: result.id, revision: result.revision },
+          );
+          return result;
+        }),
+      );
     }),
   options: enabled.query(({ ctx }) =>
     call(() =>
@@ -385,6 +688,7 @@ export const mailboxesRouter = router({
         label: z.string().min(1).max(80),
         ownerUserId: z.string().min(1).max(128),
         status: z.enum(["planned", "suspended"]),
+        signatureText: z.string().max(4000).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

@@ -1,4 +1,21 @@
 // Pure list, safe to import from client components (no db or node imports).
+/** Private mailbox activity must not be exposed by general team/platform audit feeds. */
+export const MAILBOX_ACTIVITY_ACTIONS = [
+  "mailbox.items_listed",
+  "mailbox.item_read",
+  "mailbox.draft_saved",
+  "mailbox.send_approved",
+  "mailbox.item_trashed",
+  "mailbox.item_restored",
+  "mailbox.item_starred",
+  "mailbox.item_unstarred",
+  "mailbox.item_folder_changed",
+  "mailbox.folder_created",
+  "mailbox.folder_renamed",
+  "mailbox.folder_archived",
+] as const;
+export type MailboxActivityAction = (typeof MAILBOX_ACTIVITY_ACTIONS)[number];
+
 export const AUDIT_ACTIONS = [
   "api_key.created",
   "api_key.revoked",
@@ -10,10 +27,22 @@ export const AUDIT_ACTIONS = [
   "mailbox.updated",
   "mailbox.granted",
   "mailbox.revoked",
+  "mailbox.items_listed",
+  "mailbox.item_read",
   "mailbox.draft_saved",
+  "mailbox.message_classified",
+  "mailbox.item_trashed",
+  "mailbox.item_restored",
+  "mailbox.item_starred",
+  "mailbox.item_unstarred",
+  "mailbox.item_folder_changed",
+  "mailbox.folder_created",
+  "mailbox.folder_renamed",
+  "mailbox.folder_archived",
   "mailbox.agent_key_created",
   "mailbox.agent_key_revoked",
   "mailbox.send_queued",
+  "mailbox.send_approved",
   "mailbox.license_granted",
   "mailbox.license_revoked",
   "webhook.created",

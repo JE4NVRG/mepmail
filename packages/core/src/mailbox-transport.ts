@@ -1,18 +1,29 @@
 import { createHash, randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
 import { and, asc, eq, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
-import { mailboxOutbox } from "../../db/src/schema/mailbox-transport.js";
+import {
+  type MailboxOutboundOutcome,
+  mailboxOutboundEvents,
+  mailboxOutboundOutcomes,
+  mailboxOutbox,
+  mailboxRecipientBlocks,
+} from "../../db/src/schema/mailbox-transport.js";
 import {
   BOUND_ENVELOPE_VERSION_OFFSET,
   decryptPayload,
   encryptPayload,
 } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
+import { appendMailboxActivity } from "./mailbox-activity.js";
 import {
   MailboxAgentAccessError,
   withMailboxAgentAccess,
   withMailboxAgentQueuedSendAccess,
 } from "./mailbox-agent-access.js";
+import {
+  type MailboxInboundAssessment,
+  validateMailboxInboundAssessment,
+} from "./mailbox-inbound-safety.js";
 import { mailboxMessageId } from "./mailbox-message-id.js";
 import {
   type MailboxContentActor,
@@ -26,6 +37,7 @@ import {
   requireMailboxSeat,
 } from "./mailbox-service.js";
 import { parseMailbox } from "./sender-address.js";
+import { hashRecipient } from "./suppressions.js";
 
 export interface MailboxTransportMimeAdapter {
   /** Trusted MIME parser; implementation belongs to the runtime with mailparser.
@@ -82,6 +94,45 @@ class MailboxReservationExpiredError extends MailboxServiceError {
 }
 
 type Outbox = typeof mailboxOutbox.$inferSelect;
+
+export type { MailboxOutboundOutcome };
+
+/** Internal trusted SNS boundary, never a client/API payload. The worker must
+ * authenticate the topic, tags, provider attempt and approved MIME recipients.
+ */
+export interface MailboxOutboundEvidence {
+  topicArn: string;
+  snsMessageId: string;
+  outcome: MailboxOutboundOutcome;
+  recipientHashes: readonly string[];
+  approvedRecipientHashes: readonly string[];
+  occurredAt: Date;
+}
+
+export interface MailboxOutboundSummary {
+  totalRecipients: number;
+  delivered: number;
+  delayed: number;
+  hardBounce: number;
+  complaint: number;
+  softBounce: number;
+  rejected: number;
+  renderingFailed: number;
+  unconfirmed: number;
+  lastObservedAt: Date | null;
+}
+
+const OUTCOMES = new Set<MailboxOutboundOutcome>([
+  "send",
+  "delivered",
+  "delayed",
+  "soft_bounce",
+  "undetermined_bounce",
+  "hard_bounce",
+  "complaint",
+  "rejected",
+  "rendering_failed",
+]);
 const MAX_MIME_BYTES = 1024 * 1024;
 const MAX_RECIPIENTS = 20;
 const MAX_ATTACHMENT_BYTES = 256 * 1024;
@@ -108,6 +159,261 @@ function addr(value: string) {
   if (!parsed || parsed.name || !/^[\x21-\x7e]+$/.test(parsed.address))
     throw new MailboxContentError("invalid");
   return parsed.address.toLowerCase();
+}
+
+/** Private domain separation avoids correlating a recipient across teams or
+ * with Envio's public suppression hash. Only canonical bare addresses enter.
+ */
+export function mailboxRecipientHash(teamId: string, address: string): string {
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(teamId))
+    throw new MailboxContentError("invalid");
+  return hash(
+    `mepmail-private-recipient-v1\0${teamId.toLowerCase()}\0${hashRecipient(addr(address))}`,
+  );
+}
+
+function checkedHashes(values: readonly string[]): string[] {
+  if (
+    !Array.isArray(values) ||
+    !values.length ||
+    values.length > MAX_RECIPIENTS ||
+    values.some((value) => typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value))
+  )
+    throw new MailboxContentError("invalid");
+  const sorted = [...new Set(values)].sort();
+  if (sorted.length !== values.length) throw new MailboxContentError("invalid");
+  return sorted;
+}
+
+function approvedHashes(teamId: string, recipients: readonly string[], count: number) {
+  const hashes = checkedHashes(
+    recipients.map((recipient) => mailboxRecipientHash(teamId, recipient)),
+  );
+  if (hashes.length !== count) throw new MailboxContentError("invalid");
+  return hashes;
+}
+
+/** Admission/pre-provider check only. A database failure throws so callers can
+ * defer before the provider call; it must never imply permission to send.
+ */
+export async function checkMailboxRecipientBlocks(
+  db: Db,
+  input: { teamId: string; recipients: readonly string[] },
+): Promise<boolean> {
+  const teamId = input.teamId;
+  const recipients = [...input.recipients];
+  if (!recipients.length || recipients.length > MAX_RECIPIENTS)
+    throw new MailboxContentError("invalid");
+  const hashes = [
+    ...new Set(recipients.map((recipient) => mailboxRecipientHash(teamId, recipient))),
+  ];
+  const [blocked] = await db
+    .select({ recipientHash: mailboxRecipientBlocks.recipientHash })
+    .from(mailboxRecipientBlocks)
+    .where(
+      and(
+        eq(mailboxRecipientBlocks.teamId, teamId),
+        inArray(mailboxRecipientBlocks.recipientHash, hashes),
+      ),
+    )
+    .limit(1);
+  return !blocked;
+}
+
+function copyOutboundEvidence(value: MailboxOutboundEvidence): MailboxOutboundEvidence {
+  if (
+    !/^arn:aws(?:-[a-z]+)?:sns:[a-z0-9-]+:\d{12}:[A-Za-z0-9_-]{1,256}$/.test(value.topicArn) ||
+    !/^[\x21-\x7e]{1,128}$/.test(value.snsMessageId) ||
+    !OUTCOMES.has(value.outcome) ||
+    !(value.occurredAt instanceof Date) ||
+    !Number.isFinite(value.occurredAt.getTime())
+  )
+    throw new MailboxContentError("invalid");
+  const approved = checkedHashes(value.approvedRecipientHashes);
+  const recipients = checkedHashes(value.recipientHashes);
+  if (recipients.some((recipient) => !approved.includes(recipient)))
+    throw new MailboxContentError("conflict");
+  return {
+    ...value,
+    recipientHashes: recipients,
+    approvedRecipientHashes: approved,
+    occurredAt: new Date(value.occurredAt),
+  };
+}
+
+/** Runs under acceptMailboxOutbox's outbox lock/transaction. No subscription or
+ * credential check: an already-established external fact remains recordable.
+ */
+async function recordOutboundEvidence(
+  tx: Db,
+  row: Outbox,
+  messageId: string,
+  evidence: MailboxOutboundEvidence,
+  now: Date,
+) {
+  if (
+    row.recipientCount !== evidence.approvedRecipientHashes.length ||
+    (row.recipientHashes !== null &&
+      JSON.stringify(checkedHashes(row.recipientHashes)) !==
+        JSON.stringify(evidence.approvedRecipientHashes))
+  )
+    throw new MailboxContentError("conflict");
+  if (row.recipientHashes === null) {
+    await tx
+      .update(mailboxOutbox)
+      .set({ recipientHashes: [...evidence.approvedRecipientHashes] })
+      .where(eq(mailboxOutbox.id, row.id));
+  }
+  const id = hash(`mepmail-private-sns-v1\0${evidence.topicArn}\0${evidence.snsMessageId}`);
+  const fingerprint = hash(
+    JSON.stringify([
+      row.id,
+      row.teamId,
+      row.mailboxId,
+      row.attemptId,
+      messageId,
+      evidence.outcome,
+      evidence.approvedRecipientHashes,
+      evidence.recipientHashes,
+      evidence.occurredAt.toISOString(),
+    ]),
+  );
+  const [inserted] = await tx
+    .insert(mailboxOutboundEvents)
+    .values({
+      id,
+      outboxId: row.id,
+      attemptId: row.attemptId!,
+      providerMessageId: messageId,
+      fingerprint,
+      outcome: evidence.outcome,
+      occurredAt: evidence.occurredAt,
+      receivedAt: now,
+    })
+    .onConflictDoNothing()
+    .returning({ id: mailboxOutboundEvents.id });
+  if (!inserted) {
+    const [previous] = await tx
+      .select()
+      .from(mailboxOutboundEvents)
+      .where(eq(mailboxOutboundEvents.id, id));
+    if (
+      !previous ||
+      previous.fingerprint !== fingerprint ||
+      previous.outboxId !== row.id ||
+      previous.attemptId !== row.attemptId ||
+      previous.providerMessageId !== messageId
+    )
+      throw new MailboxContentError("conflict");
+    return;
+  }
+  await tx
+    .insert(mailboxOutboundOutcomes)
+    .values(evidence.recipientHashes.map((recipientHash) => ({ eventId: id, recipientHash })));
+  if (evidence.outcome === "hard_bounce" || evidence.outcome === "complaint") {
+    for (const recipientHash of evidence.recipientHashes) {
+      await tx
+        .insert(mailboxRecipientBlocks)
+        .values({
+          teamId: row.teamId,
+          recipientHash,
+          reason: evidence.outcome,
+          sourceEventId: id,
+          blockedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [mailboxRecipientBlocks.teamId, mailboxRecipientBlocks.recipientHash],
+          // A later replay/Delivery never clears a block; Complaint takes precedence.
+          set: { reason: evidence.outcome, sourceEventId: id },
+          setWhere: eq(mailboxRecipientBlocks.reason, "hard_bounce"),
+        });
+    }
+  }
+}
+
+/** Scoped private DTO for an already-authorized caller. Eight disjoint counts
+ * sum to the captured recipient count. Missing/legacy evidence is unconfirmed.
+ * Delivery supersedes a delayed/soft-bounce fact independent of arrival order;
+ * complaints/hard bounces remain sticky and never turn into "all delivered".
+ */
+export async function getMailboxOutboundSummary(
+  db: Db,
+  input: { teamId: string; mailboxId: string; outboxId: string },
+): Promise<MailboxOutboundSummary | null> {
+  const scope = { ...input };
+  const [row] = await db
+    .select()
+    .from(mailboxOutbox)
+    .where(
+      and(
+        eq(mailboxOutbox.id, scope.outboxId),
+        eq(mailboxOutbox.teamId, scope.teamId),
+        eq(mailboxOutbox.mailboxId, scope.mailboxId),
+      ),
+    );
+  if (!row) return null;
+  const summary: MailboxOutboundSummary = {
+    totalRecipients: row.recipientCount,
+    delivered: 0,
+    delayed: 0,
+    hardBounce: 0,
+    complaint: 0,
+    softBounce: 0,
+    rejected: 0,
+    renderingFailed: 0,
+    unconfirmed: row.recipientCount,
+    lastObservedAt: null,
+  };
+  if (!row.recipientHashes || !row.attemptId) return summary;
+  const approved = checkedHashes(row.recipientHashes);
+  const facts = await db
+    .select({
+      recipientHash: mailboxOutboundOutcomes.recipientHash,
+      outcome: mailboxOutboundEvents.outcome,
+      receivedAt: mailboxOutboundEvents.receivedAt,
+    })
+    .from(mailboxOutboundEvents)
+    .innerJoin(
+      mailboxOutboundOutcomes,
+      eq(mailboxOutboundOutcomes.eventId, mailboxOutboundEvents.id),
+    )
+    .where(
+      and(
+        eq(mailboxOutboundEvents.outboxId, row.id),
+        eq(mailboxOutboundEvents.attemptId, row.attemptId),
+      ),
+    );
+  const states = new Map<string, Set<MailboxOutboundOutcome>>();
+  for (const fact of facts) {
+    if (!approved.includes(fact.recipientHash)) throw new MailboxContentError("conflict");
+    const state = states.get(fact.recipientHash) ?? new Set<MailboxOutboundOutcome>();
+    state.add(fact.outcome);
+    states.set(fact.recipientHash, state);
+    if (!summary.lastObservedAt || fact.receivedAt > summary.lastObservedAt)
+      summary.lastObservedAt = fact.receivedAt;
+  }
+  for (const state of states.values()) {
+    const category = state.has("complaint")
+      ? "complaint"
+      : state.has("hard_bounce")
+        ? "hardBounce"
+        : state.has("rejected")
+          ? "rejected"
+          : state.has("rendering_failed")
+            ? "renderingFailed"
+            : state.has("delivered")
+              ? "delivered"
+              : state.has("soft_bounce")
+                ? "softBounce"
+                : state.has("delayed")
+                  ? "delayed"
+                  : null;
+    if (category) {
+      summary[category]++;
+      summary.unconfirmed--;
+    }
+  }
+  return summary;
 }
 function binding(row: { teamId: string; mailboxId: string; id: string }) {
   return {
@@ -199,11 +505,18 @@ function outboxDto(row: Outbox, duplicate: boolean) {
 export async function receiveMailboxMime(
   db: Db,
   keys: Keyring,
-  input: { sourceId: string; recipients: string[]; raw: Buffer },
+  input: {
+    sourceId: string;
+    recipients: string[];
+    raw: Buffer;
+    assessment?: MailboxInboundAssessment;
+  },
   mime: MailboxTransportMimeAdapter,
   now = new Date(),
 ) {
   input = { ...input, recipients: [...input.recipients], raw: copyRaw(input.raw) };
+  const assessment =
+    input.assessment === undefined ? null : validateMailboxInboundAssessment(input.assessment);
   if (
     typeof input.sourceId !== "string" ||
     !input.sourceId ||
@@ -214,7 +527,8 @@ export async function receiveMailboxMime(
   const recipients = [...new Set(input.recipients.map(addr))].sort();
   if (!recipients.length || recipients.length > MAX_RECIPIENTS)
     throw new MailboxContentError("invalid");
-  await envelope(mime, input.raw, false);
+  // Unsafe bytes are durably sealed without parsing or exposing their content.
+  if (assessment?.decision !== "quarantine") await envelope(mime, input.raw, false);
   const sourceId = `ingress:${hash(input.sourceId)}`;
   return db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
@@ -265,6 +579,14 @@ export async function receiveMailboxMime(
       if (previous) {
         if (!(await open(previous, keys)).equals(input.raw))
           throw new MailboxContentError("conflict");
+        if (
+          JSON.stringify(
+            previous.inboundAssessment === null
+              ? null
+              : validateMailboxInboundAssessment(previous.inboundAssessment),
+          ) !== JSON.stringify(assessment)
+        )
+          throw new MailboxContentError("conflict");
         items.push({ id: previous.id, mailboxId: box.id, duplicate: true });
         continue;
       }
@@ -280,6 +602,8 @@ export async function receiveMailboxMime(
         teamId: box.teamId,
         mailboxId: box.id,
         kind: "inbox",
+        deliveryFolder: assessment?.decision ?? "inbox",
+        inboundAssessment: assessment,
         sourceId,
         rawBytes: input.raw.length,
         ...sealed,
@@ -405,7 +729,11 @@ async function queueAuthorizedMailboxDraft(
     )
     .for("update");
   if (!draft) throw new MailboxContentError("not_found");
-  if (draft.kind !== "draft" || draft.revision !== input.expectedRevision)
+  if (
+    draft.kind !== "draft" ||
+    draft.revision !== input.expectedRevision ||
+    draft.trashedAt !== null
+  )
     throw new MailboxContentError("conflict");
   const [domain] = await tx
     .select({ status: schema.domains.status })
@@ -416,23 +744,29 @@ async function queueAuthorizedMailboxDraft(
   const raw = await open(draft, keys);
   const parsed = await envelope(mime, raw, true);
   if (parsed.from !== box!.address) throw new MailboxContentError("invalid");
+  const recipients = [...parsed.to, ...parsed.cc, ...parsed.bcc];
+  const recipientHashes = approvedHashes(actor.teamId, recipients, parsed.count);
+  if (!(await checkMailboxRecipientBlocks(tx, { teamId: actor.teamId, recipients })))
+    throw new MailboxContentError("forbidden");
   const plan = await lockMailboxService(tx, actor.teamId, now);
-  const [usage] = await tx
-    .select({ recipients: sql<string>`coalesce(sum(${mailboxOutbox.recipientCount}),0)::text` })
-    .from(mailboxOutbox)
-    .where(
-      and(
-        eq(mailboxOutbox.mailboxId, input.mailboxId),
-        eq(mailboxOutbox.teamId, actor.teamId),
-        eq(mailboxOutbox.periodStart, plan.periodStart),
-        ne(mailboxOutbox.status, "failed"),
-      ),
-    );
-  if (
-    BigInt(usage?.recipients ?? "0") + BigInt(parsed.count) >
-    BigInt(plan.includedOutboundPerMailbox)
-  )
-    throw new MailboxServiceError("quota");
+  if (!plan.unlimitedOutbound) {
+    const [usage] = await tx
+      .select({ recipients: sql<string>`coalesce(sum(${mailboxOutbox.recipientCount}),0)::text` })
+      .from(mailboxOutbox)
+      .where(
+        and(
+          eq(mailboxOutbox.mailboxId, input.mailboxId),
+          eq(mailboxOutbox.teamId, actor.teamId),
+          eq(mailboxOutbox.periodStart, plan.periodStart),
+          ne(mailboxOutbox.status, "failed"),
+        ),
+      );
+    if (
+      BigInt(usage?.recipients ?? "0") + BigInt(parsed.count) >
+      BigInt(plan.includedOutboundPerMailbox)
+    )
+      throw new MailboxServiceError("quota");
+  }
   await assertMailboxStorage(tx, actor.teamId, input.mailboxId, raw.length, plan);
   const id = randomUUID();
   const sealed = await encryptPayload(
@@ -455,6 +789,7 @@ async function queueAuthorizedMailboxDraft(
       approvalKind: approval.kind,
       agentKeyId: approval.agentKeyId,
       recipientCount: parsed.count,
+      recipientHashes,
       periodStart: plan.periodStart,
       periodEnd: plan.periodEnd,
       rawBytes: raw.length,
@@ -462,6 +797,23 @@ async function queueAuthorizedMailboxDraft(
       ...sealed,
     })
     .returning();
+  await appendMailboxActivity(
+    tx,
+    {
+      teamId: actor.teamId,
+      mailboxId: input.mailboxId,
+      actor:
+        approval.kind === "agent"
+          ? { kind: "mailbox_agent", keyId: approval.agentKeyId }
+          : { kind: "user", userId: actor.userId },
+    },
+    {
+      action: "mailbox.send_approved",
+      itemId: draft.id,
+      revision: draft.revision,
+      outboxId: row!.id,
+    },
+  );
   return outboxDto(row!, false);
 }
 
@@ -471,8 +823,21 @@ async function queueAuthorizedMailboxDraft(
 export async function acceptMailboxOutbox(
   db: Db,
   outboxId: string,
-  evidence: { attemptId: string; messageId: string; rfcMessageId?: string; now?: Date },
+  evidence: {
+    attemptId: string;
+    messageId: string;
+    rfcMessageId?: string;
+    outboundEvidence?: MailboxOutboundEvidence;
+    now?: Date;
+  },
 ) {
+  evidence = {
+    ...evidence,
+    ...(evidence.outboundEvidence
+      ? { outboundEvidence: copyOutboundEvidence(evidence.outboundEvidence) }
+      : {}),
+    ...(evidence.now ? { now: new Date(evidence.now) } : {}),
+  };
   if (
     !evidence.messageId ||
     evidence.messageId.length > 512 ||
@@ -484,6 +849,7 @@ export async function acceptMailboxOutbox(
   if (evidence.rfcMessageId !== undefined && !rfcMessageId)
     throw new MailboxContentError("invalid");
   const now = evidence.now ?? new Date();
+  if (!Number.isFinite(now.getTime())) throw new MailboxContentError("invalid");
   return db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
     const [known] = await tx.select().from(mailboxOutbox).where(eq(mailboxOutbox.id, outboxId));
@@ -529,6 +895,8 @@ export async function acceptMailboxOutbox(
           .set({ providerRfcMessageId: rfcMessageId, updatedAt: now })
           .where(eq(mailboxOutbox.id, row!.id));
       }
+      if (evidence.outboundEvidence)
+        await recordOutboundEvidence(tx, row!, evidence.messageId, evidence.outboundEvidence, now);
       return outboxDto(row!, true);
     }
     if (
@@ -569,6 +937,14 @@ export async function acceptMailboxOutbox(
       })
       .where(eq(mailboxOutbox.id, row!.id))
       .returning();
+    if (evidence.outboundEvidence)
+      await recordOutboundEvidence(
+        tx,
+        accepted!,
+        evidence.messageId,
+        evidence.outboundEvidence,
+        now,
+      );
     return outboxDto(accepted!, false);
   });
 }
@@ -625,8 +1001,9 @@ export async function sendMailboxOutbox(
         };
       const plan = await lockMailboxService(tx, row!.teamId, now);
       if (
-        row!.periodStart.getTime() !== plan.periodStart.getTime() ||
-        row!.periodEnd.getTime() !== plan.periodEnd.getTime()
+        !plan.unlimitedOutbound &&
+        (row!.periodStart.getTime() !== plan.periodStart.getTime() ||
+          row!.periodEnd.getTime() !== plan.periodEnd.getTime())
       )
         throw new MailboxReservationExpiredError();
       const [box] = await tx
@@ -644,12 +1021,27 @@ export async function sendMailboxOutbox(
       const parsed = await envelope(mime, raw, true);
       if (parsed.from !== box!.address || parsed.count !== row!.recipientCount)
         throw new MailboxContentError("invalid");
+      const recipients = [...parsed.to, ...parsed.cc, ...parsed.bcc];
+      const recipientHashes = approvedHashes(row!.teamId, recipients, parsed.count);
+      if (
+        row!.recipientHashes !== null &&
+        JSON.stringify(checkedHashes(row!.recipientHashes)) !== JSON.stringify(recipientHashes)
+      )
+        throw new MailboxContentError("conflict");
+      if (!(await checkMailboxRecipientBlocks(tx, { teamId: row!.teamId, recipients })))
+        throw new MailboxContentError("forbidden");
       // Time can advance during decryption/parsing even while credential rows are locked.
       if (credentialExpiresAt && credentialExpiresAt.getTime() <= Date.now())
         throw new MailboxAgentAccessError("forbidden");
       const [claimed] = await tx
         .update(mailboxOutbox)
-        .set({ status: "sending", attemptId: randomUUID(), attemptedAt: now, updatedAt: now })
+        .set({
+          status: "sending",
+          recipientHashes,
+          attemptId: randomUUID(),
+          attemptedAt: now,
+          updatedAt: now,
+        })
         .where(and(eq(mailboxOutbox.id, outboxId), eq(mailboxOutbox.status, "queued")))
         .returning();
       return { row: claimed!, raw, parsed };

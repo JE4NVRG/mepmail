@@ -5,14 +5,41 @@
       "complaint": "Your complaint rate ({rate}) over the last {days} days is approaching the limit. New broadcasts are being sent at a reduced rate until it recovers."
     },
     "paused": {
-      "bounce": "Broadcasts are paused: your hard-bounce rate ({rate}) over the last {days} days is above the {limit} limit.",
-      "complaint": "Broadcasts are paused: your complaint rate ({rate}) over the last {days} days is above the {limit} limit."
+      "bounce": "New API, batch and broadcast sends are paused due to hard bounces: {count} events across {sent} sends ({rate}) today and yesterday in UTC. Review the list and suppressions. See the criteria and recovery steps in metrics.",
+      "complaint": "New API, batch and broadcast sends are paused due to complaints: {count} events across {sent} sends ({rate}) today and yesterday in UTC. Review contact sources and consent. See the criteria and recovery steps in metrics."
     },
-    "action": "Open metrics"
+    "action": "See reason and next steps"
+  },
+  "recovery": {
+    "title": "Sending protection and recovery",
+    "status": {
+      "paused": "New sends paused",
+      "warning": "Broadcasts at a reduced rate"
+    },
+    "pauseWindow": "The pause uses today and yesterday in the UTC calendar. This window is separate from the range selected in the charts.",
+    "warningWindow": "The warning uses the last {days} days in UTC and reduces broadcast speed. The pause criteria below use a shorter window.",
+    "pauseEvidence": "{metric}: {count} events across {sent} sends ({rate}), today and yesterday in UTC.",
+    "warningEvidence": "{metric}: a rate of {rate} over the last {days} days in UTC, at warning level.",
+    "criteriaTitle": "When new sends are paused",
+    "criteriaVolume": "Today's and yesterday's UTC window must contain at least {sent} sends and meet one of these conditions:",
+    "bounceCriteria": "At least {count} hard bounces and a rate at or above {rate}.",
+    "complaintCriteria": "At least {count} complaints and a rate at or above {rate}.",
+    "stepsTitle": "What to review now",
+    "steps": {
+      "list": "Fix the list at its source: remove invalid addresses and stop retrying recipients with permanent rejections.",
+      "suppressions": "Review the actual suppression list. Hard bounces and complaints received from the provider automatically suppress the address. Preserve these entries; removing them to retry keeps the problem in place.",
+      "consent": "Review contact sources, consent and segmentation. Remove people who did not authorize messages or unsubscribed from campaigns."
+    },
+    "reevaluationTitle": "Next evaluation",
+    "reevaluationAt": "Earliest possible calendar review: {date} UTC, if no new sends or events occur. Release depends on a fresh evaluation of the criteria; this time does not guarantee sending will resume.",
+    "reevaluationPending": "The next evaluation uses current counters. The window advances at 00:00 UTC. Without enough daily detail, there is no estimated improvement date yet.",
+    "automatic": "Sending resumes automatically when the pause criteria are no longer met. New events can change the result; a warning may continue reducing broadcast speed after the pause ends.",
+    "openSuppressions": "Review suppressions",
+    "help": "Suppression help"
   },
   "sendGuard": {
-    "bounce": "Broadcasts are paused: your hard-bounce rate is {rate} over the last {days} days, above the {limit} limit. Clear it before sending.",
-    "complaint": "Broadcasts are paused: your complaint rate is {rate} over the last {days} days, above the {limit} limit. Clear it before sending.",
+    "bounce": "New API, batch and broadcast sends are paused due to hard bounces. Displayed rate: {rate} over {days} days; protection threshold: {limit}. Review the rejected addresses. The evaluation uses today and yesterday in UTC; sending resumes automatically when the pause criteria are no longer met.",
+    "complaint": "New API, batch and broadcast sends are paused due to complaints. Displayed rate: {rate} over {days} days; protection threshold: {limit}. Review contact sources and consent. The evaluation uses today and yesterday in UTC; sending resumes automatically when the pause criteria are no longer met.",
     "regionPaused": "Broadcasts are paused in {region} while the platform's {metric} rate recovers. Transactional email is unaffected. Try again later.",
     "suspended": "This team is suspended by the instance operator. Sending is disabled until it is reinstated.",
     "operatorPaused": "Broadcasts are paused for this team by the instance operator. Transactional email is unaffected.",

@@ -284,9 +284,21 @@
 }
 .dialog {
   box-sizing: border-box;
-  width: min(560px, calc(100% - 32px));
-  max-height: 90dvh;
+  width: min(
+    560px,
+    calc(100% - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))
+  );
+  max-width: calc(100% - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  max-height: calc(
+    100dvh -
+    32px -
+    env(safe-area-inset-top, 0px) -
+    env(safe-area-inset-bottom, 0px)
+  );
+  margin: auto;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 24px;
   background: var(--ms-panel);
   border: 1px solid var(--ms-line-strong);
   border-radius: var(--ms-r-card);
@@ -306,7 +318,14 @@
 }
 .dialogHeader h2 {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: var(--ms-fs-section);
+}
+.dialogHeader > button {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
 }
 .fields {
   border: 0;
@@ -319,14 +338,21 @@
 .fields label {
   display: grid;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--ms-fs-label);
   color: var(--ms-muted);
   min-width: 0;
 }
 .fields input,
-.fields select {
+.fields select,
+.fields textarea {
+  box-sizing: border-box;
   width: 100%;
   min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: var(--ms-fs-body);
+  line-height: 1.5;
 }
 .addressFields {
   display: grid;
@@ -344,6 +370,8 @@
 }
 .kind button {
   flex: 1;
+  min-width: 0;
+  min-height: 44px;
   border: 1px solid var(--ms-line);
   border-radius: var(--ms-r-input);
   background: var(--ms-panel);
@@ -358,9 +386,14 @@
 }
 .dialogFooter {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 24px;
+}
+.dialogFooter button,
+.dialogFooter a {
+  min-height: 44px;
 }
 .error {
   color: var(--ms-danger);
@@ -380,6 +413,7 @@
 }
 .access li {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
@@ -403,7 +437,11 @@
 .view button:focus-visible,
 .view input:focus-visible,
 .view select:focus-visible,
-.dialog button:focus-visible {
+.view textarea:focus-visible,
+.dialog button:focus-visible,
+.dialog input:focus-visible,
+.dialog select:focus-visible,
+.dialog textarea:focus-visible {
   outline: 2px solid var(--ms-steel);
   outline-offset: 3px;
 }
@@ -418,7 +456,7 @@
   color: var(--ms-muted);
   font-size: 12px;
 }
-.messageRows button {
+.messageRows .messageRowOpen {
   display: block;
   width: 100%;
   text-align: left;
@@ -431,8 +469,8 @@
   cursor: pointer;
   min-width: 0;
 }
-.messageRows button:hover,
-.messageRows button[aria-pressed="true"] {
+.messageRows .messageRowOpen:hover,
+.messageRows .messageRowOpen[aria-pressed="true"] {
   background: var(--ms-panel-raised);
 }
 .messageRows strong,
@@ -521,6 +559,49 @@
   gap: 12px;
   margin: 20px 0 28px;
 }
+.richBody {
+  min-width: 0;
+  margin-top: 20px;
+}
+.bodyControls {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.bodyControls > fieldset {
+  display: flex;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.bodyControls button[aria-pressed="true"] {
+  background: var(--ms-panel);
+  color: var(--ms-bone);
+  box-shadow: inset 0 0 0 1px var(--ms-line);
+}
+.externalImages {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: var(--ms-muted);
+  font-size: 12px;
+}
+.externalImages p {
+  margin: 0;
+  flex: 1 1 220px;
+}
+.htmlMessage {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: min(60vh, 540px);
+  min-height: 280px;
+  background: #fff;
+  border: 1px solid var(--ms-line);
+  border-radius: 8px;
+}
 .attachment {
   margin: 0;
   min-width: 0;
@@ -563,19 +644,133 @@
   display: none;
 }
 .composer {
-  width: min(680px, calc(100% - 32px));
+  width: min(
+    720px,
+    calc(100% - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))
+  );
+  max-height: calc(
+    100dvh -
+    32px -
+    env(safe-area-inset-top, 0px) -
+    env(safe-area-inset-bottom, 0px)
+  );
+  padding: 0;
+  overflow: hidden;
+}
+.composer[open] {
+  display: flex;
+  flex-direction: column;
+}
+.composerHeader {
+  flex: none;
+  align-items: flex-start;
+  margin: 0;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--ms-line);
+}
+.composerHeading {
+  min-width: 0;
+}
+.composerSender {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ms-muted);
+  overflow-wrap: anywhere;
+}
+.composerSender strong {
+  margin-left: 6px;
+  color: var(--ms-bone);
+  font-weight: 500;
+}
+.composerForm {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.composerBody {
+  flex: 1;
+  padding: 20px 24px;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scroll-padding-block: 20px;
+}
+.composerFields {
+  gap: 16px;
+}
+.composerAddressFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+.composerAddressFields > label {
+  min-width: 0;
+}
+.composer input:not([type="file"]),
+.composer select {
+  min-height: 44px;
 }
 .composer textarea {
+  box-sizing: border-box;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   resize: vertical;
   min-height: 180px;
-  line-height: 1.7;
+  height: clamp(180px, 26dvh, 260px);
   font: inherit;
   font-size: 14px;
+  line-height: 1.65;
+  padding: 12px 14px;
+}
+.composer button {
+  min-height: 44px;
+}
+.composerHeader > button {
+  flex: none;
+  min-width: 44px;
+}
+.composer textarea:focus-visible {
+  outline: 2px solid var(--ms-steel);
+  outline-offset: 3px;
+}
+.composerUpload {
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ms-line);
+}
+.composerAttachButton {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.composerAttachButton svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.composerUpload .hint {
+  margin: 0;
 }
 .draftAttachments {
   display: grid;
-  gap: 6px;
+  gap: 8px;
+  min-width: 0;
+}
+.composerAttachmentSummary {
+  margin: 0;
+  color: var(--ms-muted);
+  font-size: 12px;
+  font-weight: 500;
 }
 .draftAttachments > div {
   display: flex;
@@ -584,11 +779,38 @@
   gap: 12px;
   border: 1px solid var(--ms-line);
   border-radius: var(--ms-r-input);
-  padding: 4px 12px;
+  background: var(--ms-panel-raised);
+  padding: 4px 10px 4px 14px;
+  min-width: 0;
   font-size: 12px;
 }
 .draftAttachments span {
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+.draftAttachments button {
+  flex: none;
+  min-width: 44px;
+}
+.composerFooter {
+  flex: none;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0;
+  padding: 16px 24px max(16px, env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--ms-line);
+  background: var(--ms-panel);
+  gap: 16px;
+}
+.composerFooter .hint {
+  margin: 0;
+  max-width: 320px;
+}
+.composerActions {
+  display: flex;
+  flex-wrap: wrap;
+  flex: none;
+  gap: 8px;
 }
 
 /* A single mail toolbar above the message list and reader. */
@@ -663,9 +885,13 @@
   flex: 0 1 250px;
 }
 .workspaceNavigation select {
+  box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  font-size: 12px;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: var(--ms-fs-ui);
+  line-height: 1.5;
 }
 .visuallyHidden {
   position: absolute;
@@ -680,6 +906,7 @@
 }
 .compactFolders {
   display: flex;
+  flex-wrap: wrap;
   gap: 18px;
   align-items: center;
 }
@@ -693,6 +920,88 @@
   color: var(--ms-muted);
   cursor: pointer;
   white-space: nowrap;
+  min-height: 44px;
+}
+.scopeFilters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.scopeFilters button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--ms-r-input);
+  background: transparent;
+  color: var(--ms-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.scopeFilters button:hover,
+.scopeFilters button[aria-pressed="true"] {
+  color: var(--ms-bone);
+  background: var(--ms-inset);
+}
+.scopeFilters button[aria-pressed="true"] {
+  border-color: var(--ms-line);
+}
+.rowBadges,
+.messageBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.rowBadges > span,
+.messageBadges > span {
+  padding: 3px 7px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-badge);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--ms-muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.rowBadges .warningBadge {
+  color: var(--ms-warn);
+  border-color: var(--ms-warn-border);
+}
+.safetyNotice {
+  padding: 14px 16px;
+  margin: 0 0 20px;
+  border: 1px solid var(--ms-warn-border);
+  border-radius: var(--ms-r-input);
+  background: var(--ms-warn-bg);
+  color: var(--ms-bone);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.safetyNotice strong {
+  color: var(--ms-warn);
+}
+.safetyNotice p {
+  margin: 6px 0 0;
+}
+.safetyNotice ul {
+  padding-left: 18px;
+  margin: 8px 0 0;
+}
+.quarantineDetail {
+  max-width: 650px;
+  padding: 26px 30px;
+}
+.quarantineDetail h2 {
+  font-size: var(--ms-fs-section);
+  margin: 12px 0 8px;
+}
+.quarantineDetail time {
+  display: block;
+  margin-bottom: 20px;
+  font-size: 12px;
+  color: var(--ms-muted);
 }
 .compactFolders button:hover {
   color: var(--ms-bone);
@@ -711,6 +1020,7 @@
 .contentActions .ms-btn,
 .contentActions button {
   font-size: 12px;
+  min-height: 44px;
 }
 .contentNotice {
   flex-basis: 100%;
@@ -753,6 +1063,8 @@
   border: 0;
   padding-left: 0;
   box-shadow: none;
+  min-height: 44px;
+  font-size: var(--ms-fs-ui);
 }
 .messageCount {
   display: block;
@@ -769,12 +1081,12 @@
 .messageRows {
   min-height: 0;
 }
-.messageRows button {
+.messageRows .messageRowOpen {
   padding: 16px;
   border-bottom: 1px solid var(--ms-line);
   position: relative;
 }
-.messageRows button[aria-pressed="true"] {
+.messageRows .messageRowOpen[aria-pressed="true"] {
   box-shadow: inset 2px 0 var(--ms-bone);
 }
 .messageRows strong {
@@ -852,6 +1164,7 @@
 .detailTop button {
   font-size: 12px;
   flex: none;
+  min-height: 44px;
 }
 .message {
   padding: 26px 30px 30px;
@@ -893,6 +1206,43 @@
   margin: 26px 0;
   font-size: 14px;
   line-height: 1.75;
+}
+.sendResults {
+  padding: 14px 16px;
+  margin: 20px 0;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  background: var(--ms-panel);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.sendResults h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.sendResults p {
+  margin: 8px 0 0;
+  color: var(--ms-muted);
+}
+.sendResults .resultCounts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin: 12px 0;
+}
+.resultCounts > div {
+  justify-content: space-between;
+  min-width: 0;
+}
+.resultCounts dt {
+  width: auto;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.resultCounts dd {
+  flex: none;
+  font-variant-numeric: tabular-nums;
 }
 .attachments {
   display: grid;
@@ -1089,5 +1439,462 @@
   }
   .dialog {
     padding: 20px;
+  }
+  .composer {
+    width: calc(100% - 16px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+    max-height: calc(
+      100dvh -
+      16px -
+      env(safe-area-inset-top, 0px) -
+      env(safe-area-inset-bottom, 0px)
+    );
+    padding: 0;
+  }
+  .composerHeader,
+  .composerBody {
+    padding: 16px;
+  }
+  .composerAddressFields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .composerFooter {
+    padding: 14px 16px max(14px, env(safe-area-inset-bottom, 0px));
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .composerFooter .hint {
+    max-width: none;
+  }
+  .composerActions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+}
+
+/* A stable folder rail, message list and reader share one workspace. */
+.contentWorkspace {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.mailFolderRail {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--ms-line);
+  background: var(--ms-panel);
+  padding: 16px 10px;
+}
+.mailFolderRail .workspaceNavigation {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  min-height: 100%;
+}
+.mailFolderRail .workspaceNavigation label {
+  width: 100%;
+  flex: none;
+}
+.mailFolderRail .scopeFilters {
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+.mailFolderRail .scopeFilters button {
+  padding: 8px 4px;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--ms-fs-badge);
+  overflow-wrap: anywhere;
+}
+.mailFolderRail .compactFolders {
+  display: grid;
+  gap: 3px;
+  align-items: stretch;
+}
+.mailFolderRail .compactFolders button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--ms-r-input);
+  text-align: left;
+  font-size: 13px;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+.mailFolderRail .compactFolders button:hover {
+  background: var(--ms-panel-raised);
+}
+.mailFolderRail .compactFolders button[aria-current] {
+  color: var(--ms-violet);
+  border-color: var(--ms-violet-border);
+  background: var(--ms-violet-bg);
+}
+.contentWorkspace > .contentToolbar,
+.contentWorkspace > .contentPanels {
+  grid-column: 2;
+}
+.contentWorkspace > .contentToolbar {
+  grid-row: 1;
+}
+.contentWorkspace > .contentPanels {
+  grid-row: 2;
+}
+.folderHeading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ms-bone);
+}
+.folderHeading h2 {
+  font-size: 15px;
+  margin: 0;
+  font-weight: 600;
+}
+.folderHeading > svg {
+  color: var(--ms-muted);
+  flex: none;
+}
+.mobileFolderMenu {
+  display: none;
+}
+.customFolders {
+  border-top: 1px solid var(--ms-line);
+  padding-top: 14px;
+}
+.customFolders header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.customFolders h3,
+.usagePanel h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ms-muted);
+}
+.customFolders header button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--ms-muted);
+  cursor: pointer;
+  font-size: 20px;
+}
+.customFolders p,
+.folderHelp {
+  color: var(--ms-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.customFolderRow {
+  display: flex;
+  min-width: 0;
+}
+.customFolderRow button {
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: var(--ms-r-input);
+  background: transparent;
+  color: var(--ms-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.customFolderRow button:first-child {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.customFolderRow button:first-child > svg {
+  flex: none;
+}
+.customFolderRow button:first-child > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.customFolderRow button:last-child:not(:first-child) {
+  width: 44px;
+  flex: none;
+}
+.customFolderRow button:hover,
+.customFolderRow button[aria-current] {
+  background: var(--ms-panel-raised);
+  color: var(--ms-bone);
+}
+.customFolderRow button[aria-current] {
+  border-color: var(--ms-line-strong);
+}
+.folderName {
+  display: grid;
+  gap: 8px;
+  margin: 22px 0;
+  font-size: 13px;
+}
+.usagePanel {
+  border-top: 1px solid var(--ms-line);
+  padding: 16px 4px 0;
+  margin-top: auto;
+}
+.usagePanel p,
+.usagePanel small {
+  font-size: 11px;
+  color: var(--ms-muted);
+  line-height: 1.6;
+}
+.usageMetric {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0 8px;
+  font-size: 11px;
+  color: var(--ms-muted);
+}
+.usageMetric strong {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--ms-bone);
+  font-variant-numeric: tabular-nums;
+}
+.usagePanel progress {
+  width: 100%;
+  height: 5px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--ms-inset);
+  color: var(--ms-violet);
+  overflow: hidden;
+}
+.usagePanel progress::-webkit-progress-bar {
+  background: var(--ms-inset);
+  border-radius: 10px;
+}
+.usagePanel progress::-webkit-progress-value {
+  background: var(--ms-violet);
+  border-radius: 10px;
+}
+.usagePanel progress::-moz-progress-bar {
+  background: var(--ms-violet);
+  border-radius: 10px;
+}
+.unlimitedUsage {
+  font-size: 11px;
+  color: var(--ms-violet);
+}
+.messageRow {
+  display: flex;
+  border-bottom: 1px solid var(--ms-line);
+  min-width: 0;
+}
+.messageRows .messageRowOpen {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+  padding-left: 8px;
+}
+.rowQuickActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+  width: 44px;
+  padding-top: 15px;
+}
+.rowQuickActions input {
+  width: 16px;
+  height: 16px;
+  margin: 8px 0;
+  accent-color: var(--ms-violet);
+  cursor: pointer;
+}
+.rowQuickActions .starButton {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--ms-muted);
+  cursor: pointer;
+}
+.starButton[aria-pressed="true"] {
+  color: var(--ms-violet);
+}
+.organizationActions {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+.organizationActions select {
+  box-sizing: border-box;
+  max-width: 160px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: var(--ms-fs-ui);
+}
+.organizationActions label {
+  min-width: 0;
+  max-width: 100%;
+}
+.organizationActions .starButton {
+  min-width: 44px;
+}
+.contentDetail .detailTop {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.contentDetail .detailTop > span {
+  flex-basis: 100%;
+  font-size: 11px;
+}
+.contentDetail .dangerAction {
+  color: var(--ms-danger);
+}
+.contentDetail .restoreAction {
+  border-color: var(--ms-violet-border);
+  color: var(--ms-violet);
+}
+.selectionToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin: 10px 0 0;
+}
+.selectionToolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 11px;
+  color: var(--ms-muted);
+}
+.selectionToolbar input {
+  accent-color: var(--ms-violet);
+}
+.selectionToolbar button {
+  font-size: 11px;
+  padding: 8px;
+  min-height: 44px;
+}
+.trashHelp {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ms-muted);
+  margin: 0 0 10px;
+}
+@container (max-width: 1050px) {
+  .contentPanels {
+    grid-template-columns: minmax(250px, 285px) minmax(0, 1fr);
+  }
+  .contentWorkspace {
+    grid-template-columns: 192px minmax(0, 1fr);
+  }
+}
+@container (max-width: 850px) {
+  .contentPanels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .contentList[data-reading="true"],
+  .contentDetail[data-reading="false"] {
+    display: none;
+  }
+  .mobileBack {
+    display: inline-flex;
+  }
+}
+@container (max-width: 620px) {
+  .contentWorkspace {
+    display: flex;
+    flex-direction: column;
+  }
+  .mobileFolderMenu {
+    display: inline-flex;
+  }
+  .mailFolderRail {
+    flex: none;
+    max-height: 240px;
+    border-right: 0;
+    border-bottom: 1px solid var(--ms-line);
+  }
+  .mailFolderRail[data-expanded="false"] {
+    display: none;
+  }
+  .mailFolderRail .workspaceNavigation {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mailFolderRail .compactFolders {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .mailFolderRail .compactFolders button {
+    padding: 8px 10px;
+    font-size: 12px;
+    flex: 1 1 auto;
+    justify-content: flex-start;
+  }
+  .contentDetail .detailTop > span {
+    display: none;
+  }
+}
+
+.rowSelectionTarget {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+}
+
+/* Keep input values readable and avoid focus zoom in mobile mail clients. */
+@media (max-width: 900px) {
+  .view input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  .view select,
+  .view textarea,
+  .dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  .dialog select,
+  .dialog textarea {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 600px) {
+  .dialogFooter > button,
+  .dialogFooter > a {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .organizationActions {
+    flex: 1 1 100%;
+  }
+  .organizationActions label {
+    flex: 1;
+  }
+  .organizationActions select {
+    width: 100%;
+    max-width: none;
   }
 }

@@ -18,8 +18,10 @@ export interface MailboxPriceTerms {
 
 export interface MailboxCatalog {
   livemode: boolean;
-  /** Null disables new purchases while archived terms can still be reconciled. */
+  /** Null disables the legacy/default purchase; explicit offers may remain selectable. */
   checkoutPriceId: string | null;
+  /** Explicit purchasable offers. When absent, only the legacy default is purchasable. */
+  checkoutPriceIds?: readonly string[] | undefined;
   prices: readonly MailboxPriceTerms[];
 }
 
@@ -123,6 +125,8 @@ export function mailboxIncreaseInvoiceMatches(
   if (
     !item ||
     sub.items.data.length !== 1 ||
+    !Number.isSafeInteger(item.price.unit_amount) ||
+    (item.price.unit_amount ?? 0) <= 0 ||
     !Number.isSafeInteger(owner.seats) ||
     owner.seats < 1 ||
     !Number.isSafeInteger(start) ||
@@ -156,7 +160,10 @@ export function mailboxIncreaseInvoiceMatches(
       line.amount > 0 &&
       line.pricing?.type === "price_details" &&
       idOf(line.pricing.price_details?.price) === item.price.id &&
-      Number(line.pricing.unit_amount_decimal) === item.price.unit_amount &&
+      // Stripe may omit the unit amount on a proration; its canonical price remains bound.
+      (line.pricing.unit_amount_decimal == null
+        ? details.proration === true
+        : Number(line.pricing.unit_amount_decimal) === item.price.unit_amount) &&
       line.quantity === owner.seats &&
       (line.quantity_decimal == null || Number(line.quantity_decimal) === owner.seats) &&
       Number.isSafeInteger(line.period?.start) &&

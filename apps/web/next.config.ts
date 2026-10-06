@@ -8,6 +8,8 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 // (o beacon de pageview/evento). Manter em sincronia com UMAMI_SCRIPT_URL em
 // src/lib/analytics.ts — as duas pontas mudam juntas.
 const UMAMI_ORIGIN = "https://umami.je4ndev.com";
+// Public visitor support; keep in sync with src/lib/elozi-support.ts.
+const ELOZI_ORIGIN = "https://elozi.je4ndev.com";
 
 const config: NextConfig = {
   poweredByHeader: false,
@@ -54,6 +56,23 @@ const config: NextConfig = {
       "frame-ancestors 'none'",
       "form-action 'self'",
     ].join("; ");
+    // The optional Pixel is confined to public offer documents. A new document
+    // is required when leaving those routes after its SDK has loaded.
+    const publicMetaEnabled =
+      process.env.NEXT_PUBLIC_META_PIXEL_ENABLED === "true" &&
+      /^[0-9]{5,30}$/.test(process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "");
+    const publicContentSecurityPolicy = contentSecurityPolicy
+      .replace(scriptPolicy, `${scriptPolicy} https://connect.facebook.net`)
+      .replace(
+        `connect-src 'self' ${UMAMI_ORIGIN}`,
+        `connect-src 'self' ${UMAMI_ORIGIN} https://www.facebook.com`,
+      );
+    const supportContentSecurityPolicy = contentSecurityPolicy
+      .replace(scriptPolicy, `${scriptPolicy} ${ELOZI_ORIGIN}`)
+      .replace(
+        `connect-src 'self' ${UMAMI_ORIGIN}`,
+        `connect-src 'self' ${UMAMI_ORIGIN} ${ELOZI_ORIGIN}`,
+      );
     return [
       {
         source: "/:path*",
@@ -76,6 +95,21 @@ const config: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
         ],
       },
+      // Support links use document navigation so this policy takes effect.
+      // The page destroys its visitor widget before leaving; microphone stays off.
+      {
+        source: "/support",
+        headers: [{ key: "Content-Security-Policy", value: supportContentSecurityPolicy }],
+      },
+      ...(publicMetaEnabled
+        ? ["/", "/pricing"].map((source) => ({
+            source,
+            headers: [
+              { key: "Content-Security-Policy", value: publicContentSecurityPolicy },
+              { key: "Referrer-Policy", value: "no-referrer" },
+            ],
+          }))
+        : []),
     ];
   },
   // Workspace packages ship TS source with NodeNext-style "./file.js"

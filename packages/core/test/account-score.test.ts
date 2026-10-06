@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { AccountScoreInput } from "../src/account-score.js";
 import {
+  ACCOUNT_SCORE_VERSION,
   computeAccountScore,
   contentFactorImpact,
+  MIN_OUTCOME_COMPLAINTS,
   MIN_OUTCOME_SENDS,
 } from "../src/account-score.js";
 
@@ -26,6 +28,15 @@ describe("computeAccountScore", () => {
     expect(s.contentScoreTenths).toBeNull();
     expect(s.outcomeScoreTenths).toBeNull();
     expect(s.insufficientOutcomeData).toBe(true);
+    expect(s.outcomeConfidence).toEqual({
+      level: "insufficient",
+      sent: 0,
+      minOutcomeSends: MIN_OUTCOME_SENDS,
+      complaintEvents: 0,
+      minComplaintEvents: MIN_OUTCOME_COMPLAINTS,
+      complaintPenaltyEligible: false,
+    });
+    expect(s.scoreVersion).toBe(ACCOUNT_SCORE_VERSION);
   });
 
   it("falls back to the content sub-score below the outcome volume floor", () => {
@@ -63,6 +74,57 @@ describe("computeAccountScore", () => {
     const s = computeAccountScore(input({ sent: 10_000, complained: 20 }));
     expect(s.complaintRate).toBeCloseTo(0.002);
     expect(s.outcomeScoreTenths).toBe(70);
+  });
+
+  it("keeps one complaint in a small eligible sample visible without collapsing the score", () => {
+    const s = computeAccountScore(
+      input({ sent: 100, complained: 1, contentRecipients: 100, contentWeightedTenths: 10_000 }),
+    );
+    expect(s.complaintRate).toBe(0.01);
+    expect(s.outcomeScoreTenths).toBe(100);
+    expect(s.scoreTenths).toBe(100);
+    expect(s.guardrailStatus).toBe("ok");
+    expect(s.outcomeConfidence).toEqual({
+      level: "provisional",
+      sent: 100,
+      minOutcomeSends: 100,
+      complaintEvents: 1,
+      minComplaintEvents: 2,
+      complaintPenaltyEligible: false,
+    });
+  });
+
+  it("prices two complaints but keeps the outcome volume floor and guardrail independent", () => {
+    const belowFloor = computeAccountScore(input({ sent: 99, complained: 2 }));
+    expect(belowFloor.outcomeScoreTenths).toBeNull();
+    expect(belowFloor.outcomeConfidence.complaintPenaltyEligible).toBe(false);
+
+    const supported = computeAccountScore(
+      input({ sent: 100, complained: 2, contentRecipients: 100, contentWeightedTenths: 10_000 }),
+    );
+    expect(supported.complaintRate).toBe(0.02);
+    expect(supported.outcomeScoreTenths).toBe(0);
+    expect(supported.scoreTenths).toBe(15);
+    expect(supported.outcomeConfidence.complaintPenaltyEligible).toBe(true);
+    expect(supported.guardrailStatus).toBe("ok");
+  });
+
+  it("does not penalize one hard bounce while still including new content in the account score", () => {
+    const s = computeAccountScore(
+      input({ sent: 100, hardBounced: 1, contentRecipients: 1, contentWeightedTenths: 65 }),
+    );
+    expect(s.hardBounceRate).toBe(0.01);
+    expect(s.outcomeScoreTenths).toBe(100);
+    expect(s.contentScoreTenths).toBe(65);
+    expect(s.scoreTenths).toBe(86);
+  });
+
+  it("preserves a paused guardrail cap when an isolated complaint has no scoring penalty", () => {
+    const s = computeAccountScore(input({ sent: 130, complained: 1, guardrailStatus: "paused" }));
+    expect(s.outcomeScoreTenths).toBe(100);
+    expect(s.guardrailCapTenths).toBe(49);
+    expect(s.scoreTenths).toBe(49);
+    expect(s.guardrailStatus).toBe("paused");
   });
 
   it("ramps the hard-bounce penalty from 2%", () => {

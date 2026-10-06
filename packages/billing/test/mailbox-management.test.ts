@@ -264,6 +264,141 @@ beforeEach(async () => {
 });
 
 describe("Mail self-service with provider fake and real optional SQL", () => {
+  it.each(["resume", "quantity"] as const)(
+    "requires active paid Envio for hosted %s",
+    async (action) => {
+      await expect(
+        manageMailboxSubscription({ db, stripe, now, requirePaidSendingPlan: true }, catalog, {
+          teamId,
+          userId: user,
+          action,
+          ...(action === "quantity" ? { seats: 5 } : {}),
+        }),
+      ).rejects.toMatchObject({ code: "sending_plan_required" });
+      expect(update).not.toHaveBeenCalled();
+      expect(createSchedule).not.toHaveBeenCalled();
+      expect((await plan()).seats).toBe(3);
+    },
+  );
+
+  it("preserves hosted cancellation and reduction after Envio ends", async () => {
+    const deps = { db, stripe, now, requirePaidSendingPlan: true };
+    expect(
+      await manageMailboxSubscription(deps, catalog, {
+        teamId,
+        userId: user,
+        action: "quantity",
+        seats: 2,
+      }),
+    ).toMatchObject({ status: "scheduled", scheduledSeats: 2 });
+    expect((await plan()).seats).toBe(3);
+    expect(
+      await manageMailboxSubscription(deps, catalog, { teamId, userId: user, action: "cancel" }),
+    ).toMatchObject({ status: "confirmed" });
+    expect((await plan()).seats).toBe(3);
+  });
+  it("classifies a reduction from provider evidence when local seats are stale", async () => {
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({ seats: 1 })
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+    const outcome = await manageMailboxSubscription(
+      { db, stripe, now, requirePaidSendingPlan: true },
+      catalog,
+      {
+        teamId,
+        userId: user,
+        action: "quantity",
+        seats: 2,
+      },
+    );
+    expect(outcome).toMatchObject({ status: "scheduled", scheduledSeats: 2 });
+    expect(update).not.toHaveBeenCalled();
+  });
+  it("rejects new financial actions while read-only reconciliation remains available", async () => {
+    for (const input of [
+      { action: "cancel" as const },
+      { action: "resume" as const },
+      { action: "quantity" as const, seats: 5 },
+    ]) {
+      await expect(
+        manageMailboxSubscription({ db, stripe, now, readOnly: true }, catalog, {
+          teamId,
+          userId: user,
+          ...input,
+        }),
+      ).rejects.toMatchObject({ code: "unavailable" });
+    }
+    expect(update).not.toHaveBeenCalled();
+    expect(createSchedule).not.toHaveBeenCalled();
+    expect(scheduleUpdate).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+    const rows = await db
+      .select()
+      .from(schema.mailboxManagementRequests)
+      .where(eq(schema.mailboxManagementRequests.teamId, teamId));
+    expect(rows).toHaveLength(0);
+  });
+  it.each([{ readOnly: true }, { requirePaidSendingPlan: true }])(
+    "never dispatches a prepared increase during protected reconciliation %j",
+    async (policy) => {
+      await db.insert(schema.mailboxManagementRequests).values({
+        teamId,
+        createdBy: user,
+        action: "increase",
+        status: "prepared",
+        step: "update",
+        seatsBefore: 3,
+        seats: 5,
+        periodStart: new Date(PERIOD_START * 1000),
+        periodEnd: new Date(PERIOD_END * 1000),
+        stripeCustomerId: customer,
+        stripeSubscriptionId: sub.id,
+        stripeSubscriptionItemId: sub.items.data[0]!.id,
+        stripePriceId: terms.priceId,
+        livemode: false,
+        idempotencyKey: `prepared_paused:${teamId}`,
+        previousInvoiceId: "in_previous_fixture",
+        createdAt: now(),
+      });
+      expect(
+        await manageMailboxSubscription({ db, stripe, now, ...policy }, catalog, {
+          teamId,
+          userId: user,
+          action: "reconcile",
+        }),
+      ).toMatchObject({ status: policy.readOnly ? "pending" : "expired", paymentUrl: null });
+      expect((await plan()).seats).toBe(3);
+      expect(update).not.toHaveBeenCalled();
+      expect(createSchedule).not.toHaveBeenCalled();
+      expect(scheduleUpdate).not.toHaveBeenCalled();
+      expect(release).not.toHaveBeenCalled();
+      const [intent] = await db
+        .select()
+        .from(schema.mailboxManagementRequests)
+        .where(eq(schema.mailboxManagementRequests.teamId, teamId));
+      expect(intent?.status).toBe(policy.readOnly ? "prepared" : "expired");
+      if (!policy.readOnly) expect(await run("cancel")).toMatchObject({ status: "confirmed" });
+    },
+  );
+  it("reconciles a confirmed paid increase during pause without another provider write", async () => {
+    paid = false;
+    await run("quantity", 5);
+    expect(update).toHaveBeenCalledTimes(1);
+    sub.pending_update = null;
+    sub.items.data[0]!.quantity = 5;
+    sub.latest_invoice = invoice("paid");
+    expect(
+      await manageMailboxSubscription({ db, stripe, now, readOnly: true }, catalog, {
+        teamId,
+        userId: user,
+        action: "reconcile",
+      }),
+    ).toMatchObject({ status: "confirmed" });
+    expect((await plan()).seats).toBe(5);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(createSchedule).not.toHaveBeenCalled();
+  });
   it("cancels at period end, resumes, keeps quantity and the verified event watermark", async () => {
     expect(await run("cancel")).toMatchObject({ status: "confirmed" });
     expect(await plan()).toMatchObject({

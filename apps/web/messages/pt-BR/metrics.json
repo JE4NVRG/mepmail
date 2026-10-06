@@ -40,6 +40,13 @@
     "capped": "Limitada pela proteção de envio.",
     "complaintRate": "Taxa de reclamação",
     "hardBounceRate": "Taxa de bounce permanente",
+    "authorizationNote": "A nota avalia conteúdo e resultados. A permissão para novos envios depende do plano, dos limites e das proteções atuais; a pausa é reavaliada por seus próprios critérios.",
+    "confidence": {
+      "title": "Confiança da amostra",
+      "insufficient": "Amostra insuficiente: {sent} envios em 30 dias. O resultado precisa de pelo menos {minimum} envios para entrar na nota.",
+      "provisional": "Leitura provisória de {sent} envios em 30 dias. São dados descritivos, sensíveis a eventos novos; a nota não prevê a chegada à caixa de entrada.",
+      "complaintSignalPending": "Reclamações registradas nesta janela: {count}. A penalidade por reclamação exige pelo menos {events} eventos e {sent} envios. A taxa real continua visível."
+    },
     "details": {
       "open": "Ver o que compõe a nota",
       "title": "Detalhes da nota",

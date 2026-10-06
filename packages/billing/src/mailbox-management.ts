@@ -9,6 +9,7 @@ import {
   mailboxIncreasePaymentConfirmed,
   projectMailboxSubscription,
 } from "./mailbox.js";
+import { hasPaidSendingPlan } from "./mailbox-addon.js";
 import {
   MailboxLifecycleError,
   mailboxSubscriptionCatalog,
@@ -24,6 +25,10 @@ export interface MailboxManagementDeps {
   db: Db;
   stripe: BillingStripe;
   now?: () => Date;
+  /** Paused billing may reconcile provider evidence, but must not dispatch writes. */
+  readOnly?: boolean;
+  /** Hosted purchase policy; never inferred from caller inputs. */
+  requirePaidSendingPlan?: boolean;
 }
 export interface MailboxManagementInput {
   teamId: string;
@@ -175,6 +180,8 @@ async function context(
     !plan.stripePriceId
   )
     throw new MailboxLifecycleError("unavailable");
+  const sendingPlanEligible =
+    !deps.requirePaidSendingPlan || hasPaidSendingPlan(team, deps.now?.());
   const sub = await deps.stripe.subscriptions.retrieve(plan.stripeSubscriptionId, {
     expand: ["items.data.price.product", "latest_invoice", "schedule"],
   });
@@ -191,7 +198,12 @@ async function context(
     projection.stripeSubscriptionCreated !== plan.stripeSubscriptionCreated
   )
     throw new MailboxLifecycleError("unavailable");
-  return { plan, sub, projection, approved };
+  if (
+    !sendingPlanEligible &&
+    (input.action === "resume" || (input.action === "quantity" && input.seats! > projection.seats))
+  )
+    throw new MailboxLifecycleError("sending_plan_required");
+  return { plan, sub, projection, approved, sendingPlanEligible };
 }
 function compatible(row: Request, c: Awaited<ReturnType<typeof context>>) {
   return (
@@ -326,7 +338,7 @@ async function prepare(
       throw new MailboxLifecycleError("expired");
     if (c.sub.pending_update) throw new MailboxLifecycleError("pending");
     const reduction = await ownedReduction(db, c);
-    let action: Request["action"] =
+    const action: Request["action"] =
       input.action === "quantity"
         ? input.seats! > c.projection.seats
           ? "increase"
@@ -409,7 +421,13 @@ async function stage(
       .where(and(eq(requests.id, id), eq(requests.teamId, input.teamId)))
       .for("update");
     if (!row || !compatible(row, c)) throw new MailboxLifecycleError("conflict");
-    if (row.status !== "prepared") return false;
+    if (row.status !== "prepared" || deps.readOnly) return false;
+    if (!c.sendingPlanEligible && ["increase", "resume"].includes(row.action)) {
+      // Only prepared proves no provider write was armed. Preserve its journal,
+      // close the abandoned intent and allow cancellation/reduction to proceed.
+      await save(db, row, { status: "expired" });
+      return false;
+    }
     await save(db, row, { status: "creating" }); // Commit before the provider call.
     return true;
   });
@@ -424,6 +442,8 @@ async function stage(
     if (!row || !compatible(row, c)) throw new MailboxLifecycleError("conflict");
     if (![...OPEN].includes(row.status as (typeof OPEN)[number]))
       return { again: false, value: result(row, c.sub) };
+    if (row.status === "prepared" && deps.readOnly)
+      return { again: false, value: result(row, c.sub) };
     let sub = c.sub;
     if (["canceled", "incomplete_expired"].includes(sub.status)) {
       await reconcileExistingMailboxSubscription(db, sub, c.approved);
@@ -436,6 +456,8 @@ async function stage(
       });
     try {
       if (armed) {
+        if (!c.sendingPlanEligible && ["increase", "resume"].includes(row.action))
+          throw new MailboxLifecycleError("sending_plan_required");
         if (
           c.projection.periodEnd.getTime() !== row.periodEnd.getTime() ||
           c.projection.seats !== row.seatsBefore ||
@@ -623,7 +645,13 @@ async function stage(
       // A committed creating marker remains pending even when the response/readback is lost.
       row = await save(db, row, { status: "pending" });
     }
-    return { again: row.status === "prepared", value: result(row, sub) };
+    return {
+      again:
+        !deps.readOnly &&
+        row.status === "prepared" &&
+        (c.sendingPlanEligible || !["increase", "resume"].includes(row.action)),
+      value: result(row, sub),
+    };
   });
 }
 
@@ -633,6 +661,7 @@ export async function manageMailboxSubscription(
   input: MailboxManagementInput,
 ): Promise<MailboxManagementResult> {
   if (!catalog) throw new MailboxLifecycleError("unavailable");
+  if (deps.readOnly && input.action !== "reconcile") throw new MailboxLifecycleError("unavailable");
   if (
     input.action === "quantity" &&
     (!Number.isSafeInteger(input.seats) || input.seats! < 1 || input.seats! > 10000)

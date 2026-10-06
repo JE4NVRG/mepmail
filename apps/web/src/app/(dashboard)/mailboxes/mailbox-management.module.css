@@ -1,0 +1,131 @@
+.header {
+  flex-wrap: wrap;
+}
+.actions {
+  align-items: center;
+  position: relative;
+  max-width: 100%;
+  min-width: 0;
+}
+.actions > button,
+.actions > a,
+.menuTrigger {
+  min-height: 44px;
+  min-width: 0;
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.menu {
+  position: relative;
+}
+.menuTrigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+.menuTrigger::-webkit-details-marker {
+  display: none;
+}
+.menuTrigger svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.menuBody {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(360px, calc(100vw - 32px));
+  box-sizing: border-box;
+  max-height: min(420px, calc(100dvh - 96px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: var(--ms-r-card);
+  background: var(--ms-panel);
+  color: var(--ms-bone);
+  box-shadow: var(--ms-shadow-card);
+}
+.menuBody p {
+  margin: 0;
+  color: var(--ms-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.chooser {
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ms-muted);
+  min-width: 0;
+}
+.chooser select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: var(--ms-fs-body);
+  line-height: 1.5;
+}
+.signatureInput {
+  width: 100%;
+  min-height: 108px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+  padding: 12px 14px;
+  font-size: var(--ms-fs-body);
+  line-height: 1.6;
+}
+.signatureHelp {
+  color: var(--ms-muted);
+  line-height: 1.6;
+}
+.actions > a:focus-visible,
+.menuTrigger:focus-visible,
+.chooser select:focus-visible,
+.signatureInput:focus-visible {
+  outline: 2px solid var(--ms-steel);
+  outline-offset: 3px;
+}
+@media (max-width: 900px) {
+  .chooser select,
+  .signatureInput {
+    font-size: 16px;
+  }
+}
+@media (max-width: 600px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .actions {
+    align-self: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+  .menu {
+    position: static;
+  }
+  .menuBody {
+    right: auto;
+    left: 0;
+    width: min(360px, 100%);
+  }
+  .actions > button,
+  .actions > a,
+  .menu {
+    flex: 1 1 auto;
+  }
+  .menuTrigger {
+    justify-content: center;
+  }
+}

@@ -7,11 +7,18 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { authClient } from "@/lib/auth-client";
+import type { MailboxFolder, MailboxKindFilter } from "@/lib/mailbox-inbox-presentation";
 import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
+import { MailboxActivityDialog } from "./mailbox-activity";
 import { MailboxAgentKeysDialog } from "./mailbox-agent-keys";
 import { MailboxContentView } from "./mailbox-content-view";
+import { MailboxFolderDialog } from "./mailbox-folder-dialog";
+import { MailboxFolderIcon } from "./mailbox-folder-icon";
+import managementStyles from "./mailbox-management.module.css";
 import { MailboxServicePanel } from "./mailbox-service-panel";
+import { MailboxSetupDialog } from "./mailbox-setup-dialog";
+import { MailboxUsagePanel } from "./mailbox-usage-panel";
 import styles from "./mailboxes.module.css";
 
 type Outputs = inferRouterOutputs<AppRouter>["mailboxes"];
@@ -36,6 +43,7 @@ function RegistryDialog({
   const [domainId, setDomain] = useState(options.domains[0]?.id ?? "");
   const [owner, setOwner] = useState(mailbox?.ownerUserId ?? options.currentUserId);
   const [label, setLabel] = useState(mailbox?.label ?? "");
+  const [signatureText, setSignatureText] = useState(mailbox?.signatureText ?? "");
   const [local, setLocal] = useState("");
   const [kind, setKind] = useState<"person" | "agent">(mailbox?.kind ?? "person");
   const [status, setStatus] = useState<"planned" | "suspended">(mailbox?.status ?? "planned");
@@ -92,7 +100,13 @@ function RegistryDialog({
           setError("");
           try {
             const result = mailbox
-              ? await update.mutateAsync({ id: mailbox.id, label, ownerUserId: owner, status })
+              ? await update.mutateAsync({
+                  id: mailbox.id,
+                  label,
+                  ownerUserId: owner,
+                  status,
+                  signatureText,
+                })
               : await create.mutateAsync({
                   domainId,
                   localPart: local,
@@ -190,17 +204,34 @@ function RegistryDialog({
             </select>
           </label>
           {mailbox ? (
-            <label>
-              {t("status")}
-              <select
-                className="ms-input"
-                value={status}
-                onChange={(e) => setStatus(e.target.value as "planned" | "suspended")}
-              >
-                <option value="planned">{t("planned")}</option>
-                <option value="suspended">{t("suspended")}</option>
-              </select>
-            </label>
+            <>
+              <label>
+                {t("status")}
+                <select
+                  className="ms-input"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as "planned" | "suspended")}
+                >
+                  <option value="planned">{t("planned")}</option>
+                  <option value="suspended">{t("suspended")}</option>
+                </select>
+              </label>
+              <label>
+                {t("signatureLabel")}
+                <textarea
+                  className={`ms-input ${managementStyles.signatureInput}`}
+                  value={signatureText}
+                  onChange={(event) => setSignatureText(event.target.value)}
+                  maxLength={4000}
+                  rows={4}
+                  placeholder={t("signaturePlaceholder")}
+                  aria-describedby="mailbox-signature-help"
+                />
+                <small id="mailbox-signature-help" className={managementStyles.signatureHelp}>
+                  {t("signatureHelp")}
+                </small>
+              </label>
+            </>
           ) : (
             <p className={styles.hint}>{t("createHint")}</p>
           )}
@@ -324,11 +355,19 @@ function RegistryDialog({
 
 export function MailboxesView() {
   const t = useTranslations("mailboxes");
-  const agentT = useTranslations("mailboxes-agent");
+  const tActivity = useTranslations("mailboxes-activity");
   const { data: session } = authClient.useSession();
   const trpc = useTRPC();
   const queries = useQueryClient();
   const capability = useQuery(trpc.mailboxes.capabilities.queryOptions());
+  const service = useQuery(
+    trpc.mailboxes.service.queryOptions(undefined, {
+      enabled: capability.data?.enabled === true,
+      retry: false,
+    }),
+  );
+  const systemLicense =
+    !service.isPending && !service.isError && service.data?.licenseKind === "system";
   const registry = useQuery(
     trpc.mailboxes.list.queryOptions(undefined, {
       enabled: capability.data?.enabled === true,
@@ -340,21 +379,60 @@ export function MailboxesView() {
   );
   const [selectedId, select] = useState<string | null>(null);
   const [itemSelection, selectItem] = useState<{ mailboxId: string; id: string } | null>(null);
-  const [folder, setFolder] = useState<"inbox" | "drafts" | "sent">("inbox");
+  const [folder, setFolder] = useState<MailboxFolder>("inbox");
+  const [customFolderId, setCustomFolderId] = useState<string | null>(null);
+  const [folderDialog, setFolderDialog] = useState<string | "new" | null>(null);
+  const [mailboxKind, setMailboxKind] = useState<MailboxKindFilter>("all");
   const [dialog, setDialog] = useState<"new" | "edit" | null>(null);
+  const [licenseOpenRequest, openLicense] = useState(0);
+  const [licenseOfferId, setLicenseOfferId] = useState<string | null>(null);
   const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
+  const [activityDialogId, setActivityDialogId] = useState<string | null>(null);
+  const managementMenu = useRef<HTMLDetailsElement>(null);
   // Team switches cause a full navigation. Every id is also resolved against this request's scoped DTO.
   const boxes = registry.data?.mailboxes ?? [];
+  const scopedBoxes = boxes.filter((box) => mailboxKind === "all" || box.kind === mailboxKind);
   const selected = boxes.find((b) => b.id === selectedId) ?? null;
+  const folderList = useQuery(
+    trpc.mailboxes.folders.queryOptions(
+      { mailboxId: selected?.id ?? "00000000-0000-0000-0000-000000000000" },
+      { enabled: !!selected?.canRead && selected.status === "planned", retry: false },
+    ),
+  );
+  const canOrganize = !!selected?.ownerActive && selected.ownerUserId === session?.user.id;
   const agentBox = boxes.find(
     (box) => box.id === agentDialogId && box.ownerActive && box.ownerUserId === session?.user.id,
+  );
+  const activityBox = boxes.find(
+    (box) =>
+      box.id === activityDialogId &&
+      box.canRead &&
+      box.status === "planned" &&
+      box.ownerActive &&
+      box.ownerUserId === session?.user.id,
   );
   function selectMailbox(id: string | null) {
     selectItem(null);
     select(id);
+    setCustomFolderId(null);
+    setFolderDialog(null);
+    if (folder === "custom") setFolder("inbox");
+  }
+  function chooseFolder(next: MailboxFolder, id: string | null = null) {
+    selectItem(null);
+    setFolder(next);
+    setCustomFolderId(id);
+  }
+  function changeScope(kind: MailboxKindFilter) {
+    setMailboxKind(kind);
+    selectMailbox(null);
   }
   async function changed(id: string) {
-    await queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
+    await Promise.all([
+      queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() }),
+      queries.invalidateQueries({ queryKey: trpc.mailboxes.service.queryKey() }),
+    ]);
+    setMailboxKind("all");
     selectMailbox(id);
   }
   if (capability.isPending || (capability.data?.enabled && registry.isPending))
@@ -384,6 +462,18 @@ export function MailboxesView() {
     );
   const navigation = (
     <div className={styles.workspaceNavigation}>
+      <nav className={styles.scopeFilters} aria-label={t("scope.label")}>
+        {(["all", "person", "agent"] as const).map((kind) => (
+          <button
+            type="button"
+            key={kind}
+            aria-pressed={mailboxKind === kind}
+            onClick={() => changeScope(kind)}
+          >
+            {t(`scope.${kind}`)}
+          </button>
+        ))}
+      </nav>
       <label>
         <span className={styles.visuallyHidden}>{t("chooseBox")}</span>
         <select
@@ -392,64 +482,203 @@ export function MailboxesView() {
           value={selected?.id ?? ""}
           onChange={(e) => selectMailbox(e.target.value || null)}
         >
-          <option value="">{t("all")}</option>
-          {boxes.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.label} · {b.address}
-            </option>
-          ))}
+          <option value="">{t(`scope.boxes.${mailboxKind}`)}</option>
+          {(["person", "agent"] as const).map((kind) => {
+            const group = scopedBoxes.filter((box) => box.kind === kind);
+            return group.length ? (
+              <optgroup key={kind} label={t(`scope.${kind}`)}>
+                {group.map((box) => (
+                  <option key={box.id} value={box.id}>
+                    {box.label} · {box.address}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null;
+          })}
         </select>
       </label>
       <nav className={styles.compactFolders} aria-label={t("folders")}>
-        {(["inbox", "drafts", "sent"] as const).map((f) => (
+        {(["inbox", "favorites", "drafts", "sent", "spam", "quarantine", "trash"] as const).map(
+          (f) => (
+            <button
+              type="button"
+              key={f}
+              aria-current={f === folder ? "page" : undefined}
+              onClick={() => chooseFolder(f)}
+            >
+              <MailboxFolderIcon name={f} />
+              {t(f)}
+            </button>
+          ),
+        )}
+      </nav>
+      <section className={styles.customFolders} aria-label={t("organization.folders")}>
+        <header>
+          <h3>{t("organization.folders")}</h3>
+          {canOrganize && selected?.canRead ? (
+            <button
+              type="button"
+              aria-label={t("organization.createFolder")}
+              onClick={() => setFolderDialog("new")}
+            >
+              +
+            </button>
+          ) : null}
+        </header>
+        {!selected ? (
+          <p>{t("organization.chooseBox")}</p>
+        ) : folderList.isError ? (
           <button
             type="button"
-            key={f}
-            aria-current={f === folder ? "page" : undefined}
-            onClick={() => setFolder(f)}
+            className="ms-btn ms-btn-ghost"
+            onClick={() => void folderList.refetch()}
           >
-            {t(f)}
+            {t("retry")}
           </button>
-        ))}
-      </nav>
+        ) : folderList.isPending ? (
+          <p>{t("loading")}</p>
+        ) : folderList.data?.length ? (
+          folderList.data.map((entry) => (
+            <div className={styles.customFolderRow} key={entry.id}>
+              <button
+                type="button"
+                title={entry.name}
+                aria-current={
+                  folder === "custom" && customFolderId === entry.id ? "page" : undefined
+                }
+                onClick={() => chooseFolder("custom", entry.id)}
+              >
+                <MailboxFolderIcon name="custom" />
+                <span>{entry.name}</span>
+              </button>
+              {canOrganize ? (
+                <button
+                  type="button"
+                  aria-label={t("organization.manageFolder", { name: entry.name })}
+                  onClick={() => setFolderDialog(entry.id)}
+                >
+                  ···
+                </button>
+              ) : null}
+            </div>
+          ))
+        ) : (
+          <p>{t("organization.emptyFolders")}</p>
+        )}
+      </section>
+      <MailboxUsagePanel mailboxId={selected?.id ?? null} />
     </div>
   );
   return (
     <section className={styles.view}>
-      <header className={styles.header}>
+      <header className={`${styles.header} ${managementStyles.header}`}>
         <div>
           <div className={styles.productMeta}>
             <h1>{t("title")}</h1>
-            <span className={styles.serviceBadge}>{t("paidService")}</span>
+            <span className={styles.serviceBadge}>
+              {t(systemLicense ? "system.closedProductionBadge" : "paidService")}
+            </span>
           </div>
           <p>{t("subtitle")}</p>
         </div>
-        <div className={styles.headerActions}>
+        <div className={`${styles.headerActions} ${managementStyles.actions}`}>
+          {selected?.canRead &&
+          selected.status === "planned" &&
+          selected.ownerActive &&
+          selected.ownerUserId === session?.user.id ? (
+            <button
+              type="button"
+              className="ms-btn ms-btn-ghost"
+              onClick={() => setActivityDialogId(selected.id)}
+            >
+              {tActivity("open")}
+            </button>
+          ) : null}
           {selected?.ownerActive && selected.ownerUserId === session?.user.id ? (
             <button
               type="button"
               className="ms-btn ms-btn-ghost"
               onClick={() => setAgentDialogId(selected.id)}
             >
-              {agentT("title")}
+              {t("connectAgent")}
             </button>
           ) : null}
           {registry.data?.canManage ? (
-            <button
-              type="button"
-              className="ms-btn ms-btn-ghost"
-              disabled={!options.data?.domains.length}
-              onClick={() => setDialog("new")}
-            >
-              + {t("new")}
-            </button>
+            <>
+              <Link className="ms-btn ms-btn-ghost" href="/domains">
+                {t("domainsLink")}
+              </Link>
+              {selected ? (
+                <button
+                  type="button"
+                  className="ms-btn"
+                  disabled={!options.data}
+                  onClick={() => setDialog("edit")}
+                >
+                  {t("manage")}
+                </button>
+              ) : (
+                <details ref={managementMenu} className={managementStyles.menu}>
+                  <summary className={`ms-btn ${managementStyles.menuTrigger}`}>
+                    {t("manage")}
+                    <svg
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      aria-hidden="true"
+                    >
+                      <path d="m4 6 4 4 4-4" />
+                    </svg>
+                  </summary>
+                  <div className={managementStyles.menuBody}>
+                    {boxes.length ? (
+                      <label className={managementStyles.chooser}>
+                        {t("chooseBox")}
+                        <select
+                          className="ms-input"
+                          value=""
+                          disabled={!options.data}
+                          onChange={(event) => {
+                            const id = event.target.value;
+                            if (!options.data || !boxes.some((box) => box.id === id)) return;
+                            if (managementMenu.current) managementMenu.current.open = false;
+                            setMailboxKind("all");
+                            selectMailbox(id);
+                            setDialog("edit");
+                          }}
+                        >
+                          <option value="">{t("chooseBox")}</option>
+                          {boxes.map((box) => (
+                            <option key={box.id} value={box.id}>
+                              {box.label} · {box.address}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <p>{t("emptyTitle")}</p>
+                    )}
+                  </div>
+                </details>
+              )}
+              <button
+                type="button"
+                className="ms-btn ms-btn-primary"
+                disabled={!options.data}
+                onClick={() => setDialog("new")}
+              >
+                + {t("new")}
+              </button>
+            </>
           ) : null}
         </div>
       </header>
       <p className={styles.previewNote}>
-        <span>{t("preview")}</span> {t("previewBody")}
+        <span>{t(systemLicense ? "system.closedProduction" : "preview")}</span>{" "}
+        {t(capability.data?.deliveryReady ? "contentPrivate" : "previewBody")}
       </p>
-      <MailboxServicePanel />
+      <MailboxServicePanel openRequest={licenseOpenRequest} initialOfferId={licenseOfferId} />
       {registry.data?.canManage && options.data && !options.data.domains.length ? (
         <p className={styles.notice}>
           {t("noDomains")} <Link href="/domains">{t("domainsLink")} ↗</Link>
@@ -465,26 +694,28 @@ export function MailboxesView() {
       ) : null}
       <div className={styles.workspace}>
         {(!selected || (selected.canRead && selected.status === "planned")) &&
-        boxes.some((b) => b.canRead && b.status === "planned") ? (
+        scopedBoxes.some((b) => b.canRead && b.status === "planned") ? (
           <MailboxContentView
-            key={selected?.id ?? "all"}
+            key={`${mailboxKind}:${selected?.id ?? "all"}`}
             navigation={navigation}
             boxes={boxes}
             selected={selected}
+            mailboxKind={mailboxKind === "all" ? undefined : mailboxKind}
+            currentUserId={session?.user.id}
             folder={folder}
-            changeFolder={setFolder}
+            customFolderId={customFolderId}
+            customFolderName={
+              folderList.data?.find((entry) => entry.id === customFolderId)?.name ?? null
+            }
+            changeFolder={chooseFolder}
             selection={itemSelection}
             select={selectItem}
             draftSaved={(saved) => {
+              setMailboxKind("all");
               select(saved.mailboxId);
               setFolder("drafts");
               selectItem({ mailboxId: saved.mailboxId, id: saved.id });
             }}
-            manage={
-              selected && registry.data?.canManage && options.data
-                ? () => setDialog("edit")
-                : undefined
-            }
           />
         ) : (
           <div className={styles.registryWorkspace}>
@@ -492,7 +723,10 @@ export function MailboxesView() {
             <div className={styles.registryState}>
               <div className={styles.hero}>
                 <NavGlyph name="emails" hovered={false} />
-                <h2>{selected?.label ?? t("emptyTitle")}</h2>
+                <h2>
+                  {selected?.label ??
+                    t(mailboxKind === "all" ? "emptyTitle" : `scope.empty.${mailboxKind}.title`)}
+                </h2>
                 {selected ? (
                   <>
                     <p className={styles.address}>{selected.address}</p>
@@ -517,8 +751,10 @@ export function MailboxesView() {
                   </>
                 ) : (
                   <>
-                    <p>{t("emptyBody")}</p>
-                    {registry.data?.canManage && options.data?.domains.length ? (
+                    <p>
+                      {t(mailboxKind === "all" ? "emptyBody" : `scope.empty.${mailboxKind}.body`)}
+                    </p>
+                    {registry.data?.canManage && options.data ? (
                       <button
                         type="button"
                         className="ms-btn ms-btn-primary"
@@ -534,10 +770,22 @@ export function MailboxesView() {
           </div>
         )}
       </div>
-      {dialog && options.data && (dialog === "new" || selected) ? (
+      {registry.data?.canManage && dialog === "new" && options.data ? (
+        <MailboxSetupDialog
+          options={options.data}
+          close={() => setDialog(null)}
+          changed={changed}
+          reviewLicense={(offerId) => {
+            setDialog(null);
+            setLicenseOfferId(offerId ?? null);
+            openLicense((request) => request + 1);
+          }}
+        />
+      ) : null}
+      {registry.data?.canManage && dialog === "edit" && options.data && selected ? (
         <RegistryDialog
-          key={dialog === "new" ? "new" : selected!.id}
-          mailbox={dialog === "edit" ? selected : null}
+          key={selected.id}
+          mailbox={selected}
           options={options.data}
           close={() => setDialog(null)}
           changed={changed}
@@ -548,6 +796,29 @@ export function MailboxesView() {
           key={agentBox.id}
           mailbox={{ id: agentBox.id, address: agentBox.address }}
           onClose={() => setAgentDialogId(null)}
+        />
+      ) : null}
+      {activityBox ? (
+        <MailboxActivityDialog
+          key={activityBox.id}
+          mailbox={{ id: activityBox.id, address: activityBox.address }}
+          close={() => setActivityDialogId(null)}
+        />
+      ) : null}
+      {folderDialog &&
+      selected &&
+      canOrganize &&
+      (folderDialog === "new" || folderList.data?.some((entry) => entry.id === folderDialog)) ? (
+        <MailboxFolderDialog
+          key={`${selected.id}:${folderDialog}`}
+          mailboxId={selected.id}
+          folder={
+            folderDialog === "new"
+              ? null
+              : (folderList.data?.find((entry) => entry.id === folderDialog) ?? null)
+          }
+          close={() => setFolderDialog(null)}
+          changed={(id) => chooseFolder(id ? "custom" : "inbox", id)}
         />
       ) : null}
     </section>

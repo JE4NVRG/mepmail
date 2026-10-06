@@ -18,6 +18,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
   font-size: 12px;
 }
 .badge {
@@ -26,6 +28,9 @@
   padding: 3px 8px;
   font-size: 11px;
   color: var(--ms-muted);
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .badge[data-active="true"] {
   color: var(--ms-bone);
@@ -33,6 +38,7 @@
 }
 .usage {
   flex: 1;
+  min-width: 0;
   margin: 0;
   font-size: 12px;
   line-height: 1.6;
@@ -49,10 +55,20 @@
   line-height: 1.6;
 }
 .dialog {
-  width: min(560px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
+  width: min(
+    560px,
+    calc(100vw - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))
+  );
+  max-height: calc(
+    100dvh -
+    32px -
+    env(safe-area-inset-top, 0px) -
+    env(safe-area-inset-bottom, 0px)
+  );
   box-sizing: border-box;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 24px;
   border: 1px solid var(--ms-line-strong);
   border-radius: var(--ms-r-card);
   padding: 24px;
@@ -72,6 +88,15 @@
   margin: 0;
   font-size: var(--ms-fs-section);
   letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.dialogHeader > div {
+  min-width: 0;
+}
+.dialogHeader > button {
+  min-width: 44px;
+  min-height: 44px;
+  flex: none;
 }
 .eyebrow {
   margin: 0 0 8px;
@@ -82,6 +107,11 @@
   color: var(--ms-muted);
   font-size: 12px;
   line-height: 1.7;
+}
+.sectionTitle {
+  margin: 24px 0 8px;
+  font-size: 14px;
+  font-weight: 600;
 }
 .facts,
 .offer {
@@ -95,6 +125,7 @@
   align-items: baseline;
   gap: 16px;
   padding: 9px 0;
+  min-width: 0;
 }
 .facts > div + div {
   border-top: 1px solid var(--ms-line);
@@ -102,12 +133,15 @@
 .facts dt,
 .offer dt {
   color: var(--ms-muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .facts dd,
 .offer dd {
   margin: 0;
   text-align: right;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 .notice {
   padding: 12px 14px;
@@ -132,12 +166,28 @@
 }
 .purchase > label {
   display: block;
-  font-size: 12px;
+  font-size: var(--ms-fs-label);
   margin-bottom: 8px;
 }
 .purchase > input {
   width: 100%;
+  min-width: 0;
+  min-height: 44px;
   box-sizing: border-box;
+}
+.purchase > select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.purchase > input,
+.purchase > select,
+.management input {
+  box-sizing: border-box;
+  padding: 10px 12px;
+  font-size: var(--ms-fs-body);
+  line-height: 1.5;
 }
 .purchase > button {
   width: 100%;
@@ -171,8 +221,12 @@
 .management form {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 .management input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
   max-width: 180px;
 }
 .management button,
@@ -181,6 +235,25 @@
 }
 .docsLink {
   margin-right: auto;
+}
+.dialog button,
+.dialog a,
+.summary > button {
+  min-height: 44px;
+}
+.dialog button:focus-visible,
+.dialog a:focus-visible,
+.dialog input:focus-visible,
+.dialog select:focus-visible {
+  outline: 2px solid var(--ms-steel);
+  outline-offset: 3px;
+}
+@media (max-width: 900px) {
+  .purchase > input,
+  .purchase > select,
+  .management input {
+    font-size: 16px;
+  }
 }
 @media (max-width: 540px) {
   .summary {
@@ -203,7 +276,17 @@
   }
   .facts dd,
   .offer dd {
+    flex-basis: 100%;
     text-align: left;
+  }
+  .management input {
+    max-width: none;
+  }
+  .dialogFooter > button,
+  .dialogFooter > a {
+    flex: 1 1 auto;
+    justify-content: center;
+    margin-right: 0;
   }
   .returnNotice {
     flex-wrap: wrap;

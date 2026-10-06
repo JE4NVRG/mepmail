@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, ne } from "drizzle-orm";
 import {
   BOUND_ENVELOPE_VERSION_OFFSET,
   decryptPayload,
@@ -11,14 +11,17 @@ import type { MailboxRegistryActor } from "./mailbox-registry.js";
 import {
   assertMailboxStorage,
   lockMailboxService,
-  mailboxServiceActive,
   MailboxServiceError,
+  mailboxServiceEntitlement,
+  requireMailboxOperationalPlan,
   requireMailboxSeat,
 } from "./mailbox-service.js";
 
 /** Actor comes from a trusted session adapter, never from an HTTP body or API key. */
 export interface MailboxContentActor extends MailboxRegistryActor {
   supportView?: boolean;
+  /** Set only by the trusted bearer adapter. Agent reads exclude unsafe folders. */
+  agentAccess?: boolean;
 }
 export class MailboxContentError extends Error {
   constructor(public readonly code: "forbidden" | "not_found" | "invalid" | "conflict") {
@@ -48,6 +51,11 @@ function summary(item: Item) {
     id: item.id,
     mailboxId: item.mailboxId,
     kind: item.kind,
+    deliveryFolder: item.deliveryFolder,
+    inboundAssessment: item.inboundAssessment,
+    trashedAt: item.trashedAt,
+    starredAt: item.starredAt,
+    folderId: item.folderId,
     revision: item.revision,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
@@ -73,6 +81,7 @@ async function scoped<T>(
   permission: Permission,
   change: boolean,
   operation: (tx: Db) => Promise<T>,
+  exclusive = false,
 ): Promise<T> {
   if (actor.supportView) throw new MailboxContentError("forbidden");
   return db.transaction(async (transaction) => {
@@ -94,18 +103,12 @@ async function scoped<T>(
       .for("share");
     if (!member) throw new MailboxContentError("forbidden");
     // Lock billing before mailbox, but report access failures before entitlements.
-    const [plan] = change
-      ? await tx
-          .select()
-          .from(schema.mailboxSubscriptions)
-          .where(eq(schema.mailboxSubscriptions.teamId, actor.teamId))
-          .for("update")
-      : [];
+    const entitlement = change ? await mailboxServiceEntitlement(tx, actor.teamId, true) : null;
     const query = tx
       .select()
       .from(schema.mailboxes)
       .where(and(eq(schema.mailboxes.id, mailboxId), eq(schema.mailboxes.teamId, actor.teamId)));
-    const [mailbox] = await (change ? query.for("update") : query.for("share"));
+    const [mailbox] = await (change || exclusive ? query.for("update") : query.for("share"));
     if (!mailbox || mailbox.status !== "planned") throw new MailboxContentError("forbidden");
     const owner = mailbox.ownerUserId === actor.userId && mailbox.ownerMembershipId === member.id;
     if (!owner) {
@@ -131,8 +134,8 @@ async function scoped<T>(
     }
     if (change) {
       if (!team || team.suspendedAt) throw new MailboxServiceError("not_entitled");
-      if (!mailboxServiceActive(plan)) throw new MailboxServiceError("not_entitled");
-      await requireMailboxSeat(tx, actor.teamId, mailboxId, plan!);
+      const plan = requireMailboxOperationalPlan(entitlement);
+      await requireMailboxSeat(tx, actor.teamId, mailboxId, plan);
     }
     return operation(tx);
   });
@@ -148,6 +151,17 @@ export function withMailboxWriteAccess<T>(
   operation: (tx: Db) => Promise<T>,
 ): Promise<T> {
   return scoped(db, { ...actor }, mailboxId, "owner", true, operation);
+}
+
+/** Human owner metadata access; permits organization of retained data without renewing billing. */
+export function withMailboxOrganizationAccess<T>(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxId: string,
+  operation: (tx: Db) => Promise<T>,
+): Promise<T> {
+  if (actor.agentAccess) throw new MailboxContentError("forbidden");
+  return scoped(db, { ...actor }, mailboxId, "owner", false, operation, true);
 }
 
 /** Owner-only import for local qualification/export restore. No inbound transport is activated. */
@@ -217,7 +231,7 @@ export async function withMailboxContentAccess<T>(
   db: Db,
   actor: MailboxContentActor,
   mailboxIds: string[],
-  operation: () => Promise<T>,
+  operation: (tx: Db) => Promise<T>,
 ): Promise<T> {
   actor = { ...actor };
   const ids = [...new Set(mailboxIds)].sort();
@@ -225,7 +239,7 @@ export async function withMailboxContentAccess<T>(
   if (ids.length > 20) throw new MailboxContentError("invalid");
   const visit = (tx: Db, index: number): Promise<T> =>
     index === ids.length
-      ? operation()
+      ? operation(tx)
       : scoped(tx, actor, ids[index]!, "read", false, (locked) => visit(locked, index + 1));
   return visit(db, 0);
 }
@@ -252,19 +266,45 @@ export async function withMailboxItem<T>(
         ),
       );
     if (!item) throw new MailboxContentError("not_found");
+    if (
+      item.deliveryFolder === "quarantine" ||
+      item.inboundAssessment?.decision === "quarantine" ||
+      (actor.agentAccess && item.trashedAt !== null) ||
+      (actor.agentAccess && item.kind === "inbox" && item.deliveryFolder !== "inbox")
+    )
+      throw new MailboxContentError("forbidden");
     return operation({ ...summary(item), raw: await open(item, keyring) });
   });
 }
 
 /** Bounded metadata listing. Content is decrypted only by a separate authorized read. */
-export async function listMailboxItems(db: Db, actor: MailboxContentActor, mailboxId: string) {
+export async function listMailboxItems(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxId: string,
+  filter?: {
+    kind?: "inbox" | "draft" | "sent";
+    deliveryFolder?: "inbox" | "spam" | "quarantine";
+    trashed?: boolean;
+    starred?: boolean;
+    folderId?: string | null;
+    safeOnly?: boolean;
+  },
+) {
   actor = { ...actor };
+  filter = filter ? { ...filter } : undefined;
+  if (actor.agentAccess && filter?.trashed) throw new MailboxContentError("forbidden");
   return scoped(db, actor, mailboxId, "read", false, async (tx) => {
     const items = await tx
       .select({
         id: schema.mailboxItems.id,
         mailboxId: schema.mailboxItems.mailboxId,
         kind: schema.mailboxItems.kind,
+        deliveryFolder: schema.mailboxItems.deliveryFolder,
+        inboundAssessment: schema.mailboxItems.inboundAssessment,
+        trashedAt: schema.mailboxItems.trashedAt,
+        starredAt: schema.mailboxItems.starredAt,
+        folderId: schema.mailboxItems.folderId,
         revision: schema.mailboxItems.revision,
         createdAt: schema.mailboxItems.createdAt,
         updatedAt: schema.mailboxItems.updatedAt,
@@ -274,11 +314,152 @@ export async function listMailboxItems(db: Db, actor: MailboxContentActor, mailb
         and(
           eq(schema.mailboxItems.mailboxId, mailboxId),
           eq(schema.mailboxItems.teamId, actor.teamId),
+          ...(filter?.kind ? [eq(schema.mailboxItems.kind, filter.kind)] : []),
+          filter?.trashed === true && !actor.agentAccess
+            ? isNotNull(schema.mailboxItems.trashedAt)
+            : isNull(schema.mailboxItems.trashedAt),
+          ...(filter?.deliveryFolder
+            ? [eq(schema.mailboxItems.deliveryFolder, filter.deliveryFolder)]
+            : []),
+          ...(filter?.starred ? [isNotNull(schema.mailboxItems.starredAt)] : []),
+          ...(filter?.folderId === null
+            ? [isNull(schema.mailboxItems.folderId)]
+            : filter?.folderId
+              ? [eq(schema.mailboxItems.folderId, filter.folderId)]
+              : []),
+          ...(filter?.safeOnly ? [eq(schema.mailboxItems.deliveryFolder, "inbox")] : []),
+          ...(actor.agentAccess ? [eq(schema.mailboxItems.deliveryFolder, "inbox")] : []),
         ),
       )
       .orderBy(desc(schema.mailboxItems.createdAt), desc(schema.mailboxItems.id))
       .limit(100);
     return items;
+  });
+}
+
+/** Human owner review only. Classification never releases quarantined bytes or trusts a sender. */
+export async function setMailboxDeliveryFolder(
+  db: Db,
+  actor: MailboxContentActor,
+  input: { mailboxId: string; id: string; expectedRevision: number; folder: "inbox" | "spam" },
+) {
+  actor = { ...actor };
+  input = { ...input };
+  if (actor.agentAccess) throw new MailboxContentError("forbidden");
+  if (
+    !["inbox", "spam"].includes(input.folder) ||
+    !Number.isSafeInteger(input.expectedRevision) ||
+    input.expectedRevision < 1 ||
+    input.expectedRevision >= 2147483647
+  )
+    throw new MailboxContentError("invalid");
+  return scoped(db, actor, input.mailboxId, "owner", false, async (tx) => {
+    const [item] = await tx
+      .select()
+      .from(schema.mailboxItems)
+      .where(
+        and(
+          eq(schema.mailboxItems.id, input.id),
+          eq(schema.mailboxItems.mailboxId, input.mailboxId),
+          eq(schema.mailboxItems.teamId, actor.teamId),
+        ),
+      )
+      .for("update");
+    if (!item) throw new MailboxContentError("not_found");
+    if (
+      item.kind !== "inbox" ||
+      item.deliveryFolder === "quarantine" ||
+      item.inboundAssessment?.decision === "quarantine" ||
+      item.trashedAt !== null
+    )
+      throw new MailboxContentError("forbidden");
+    if (item.revision !== input.expectedRevision) throw new MailboxContentError("conflict");
+    if (item.deliveryFolder === input.folder) return summary(item);
+    const [updated] = await tx
+      .update(schema.mailboxItems)
+      .set({
+        deliveryFolder: input.folder,
+        revision: item.revision + 1,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.mailboxItems.id, item.id),
+          eq(schema.mailboxItems.mailboxId, input.mailboxId),
+          eq(schema.mailboxItems.teamId, actor.teamId),
+          eq(schema.mailboxItems.revision, input.expectedRevision),
+        ),
+      )
+      .returning();
+    if (!updated) throw new MailboxContentError("conflict");
+    return summary(updated);
+  });
+}
+
+/** Reversible owner-only metadata operation. Original MIME, classification,
+ * transport facts and storage accounting remain intact, including quarantine.
+ */
+export async function setMailboxItemTrash(
+  db: Db,
+  actor: MailboxContentActor,
+  input: { mailboxId: string; id: string; expectedRevision: number; trashed: boolean },
+  now = new Date(),
+) {
+  actor = { ...actor };
+  input = { ...input };
+  if (actor.agentAccess) throw new MailboxContentError("forbidden");
+  if (
+    typeof input.trashed !== "boolean" ||
+    !Number.isSafeInteger(input.expectedRevision) ||
+    input.expectedRevision < 1 ||
+    input.expectedRevision >= 2147483647 ||
+    !Number.isFinite(now.getTime())
+  )
+    throw new MailboxContentError("invalid");
+  return scoped(db, actor, input.mailboxId, "owner", false, async (tx) => {
+    const [item] = await tx
+      .select()
+      .from(schema.mailboxItems)
+      .where(
+        and(
+          eq(schema.mailboxItems.id, input.id),
+          eq(schema.mailboxItems.mailboxId, input.mailboxId),
+          eq(schema.mailboxItems.teamId, actor.teamId),
+        ),
+      )
+      .for("update");
+    if (!item) throw new MailboxContentError("not_found");
+    if (item.revision !== input.expectedRevision) throw new MailboxContentError("conflict");
+    if ((item.trashedAt !== null) === input.trashed) return { ...summary(item), changed: false };
+    if (item.kind === "draft") {
+      const [pending] = await tx
+        .select({ id: schema.mailboxOutbox.id })
+        .from(schema.mailboxOutbox)
+        .where(
+          and(
+            eq(schema.mailboxOutbox.teamId, actor.teamId),
+            eq(schema.mailboxOutbox.mailboxId, input.mailboxId),
+            eq(schema.mailboxOutbox.draftId, item.id),
+            ne(schema.mailboxOutbox.status, "failed"),
+          ),
+        )
+        .limit(1);
+      if (pending) throw new MailboxContentError("conflict");
+    }
+    const [updated] = await tx
+      .update(schema.mailboxItems)
+      .set({ trashedAt: input.trashed ? now : null, revision: item.revision + 1, updatedAt: now })
+      .where(
+        and(
+          eq(schema.mailboxItems.id, item.id),
+          eq(schema.mailboxItems.mailboxId, input.mailboxId),
+          eq(schema.mailboxItems.teamId, actor.teamId),
+          eq(schema.mailboxItems.revision, input.expectedRevision),
+        ),
+      )
+      .returning();
+    if (!updated) throw new MailboxContentError("conflict");
+    return { ...summary(updated), changed: true };
   });
 }
 
@@ -312,7 +493,12 @@ export async function saveMailboxDraft(
         ),
       );
     if (input.id && !previous) throw new MailboxContentError("not_found");
-    if (previous && (previous.kind !== "draft" || previous.revision !== input.expectedRevision))
+    if (
+      previous &&
+      (previous.kind !== "draft" ||
+        previous.revision !== input.expectedRevision ||
+        previous.trashedAt !== null)
+    )
       throw new MailboxContentError("conflict");
     const plan = await lockMailboxService(tx, actor.teamId);
     await assertMailboxStorage(

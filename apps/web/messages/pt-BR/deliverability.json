@@ -5,14 +5,41 @@
       "complaint": "Sua taxa de reclamação ({rate}) nos últimos {days} dias está se aproximando do limite. Novas transmissões estão sendo enviadas em ritmo reduzido até que ela se recupere."
     },
     "paused": {
-      "bounce": "As transmissões estão pausadas: sua taxa de bounce permanente ({rate}) nos últimos {days} dias está acima do limite de {limit}.",
-      "complaint": "As transmissões estão pausadas: sua taxa de reclamação ({rate}) nos últimos {days} dias está acima do limite de {limit}."
+      "bounce": "Novos envios por API, lote e transmissões estão pausados por rejeições permanentes: {count} eventos em {sent} envios ({rate}) no dia atual e anterior em UTC. Revise a lista e as supressões. Veja os critérios e a recuperação nas métricas.",
+      "complaint": "Novos envios por API, lote e transmissões estão pausados por reclamações: {count} eventos em {sent} envios ({rate}) no dia atual e anterior em UTC. Revise a origem e o consentimento dos contatos. Veja os critérios e a recuperação nas métricas."
     },
-    "action": "Abrir métricas"
+    "action": "Ver motivo e próximos passos"
+  },
+  "recovery": {
+    "title": "Proteção e recuperação do envio",
+    "status": {
+      "paused": "Novos envios pausados",
+      "warning": "Transmissões em ritmo reduzido"
+    },
+    "pauseWindow": "A pausa considera o dia atual e o anterior no calendário UTC. Essa janela é diferente do período escolhido nos gráficos.",
+    "warningWindow": "O aviso considera os últimos {days} dias em UTC e reduz o ritmo das transmissões. Os critérios de pausa abaixo usam uma janela menor.",
+    "pauseEvidence": "{metric}: {count} eventos em {sent} envios ({rate}), no dia atual e anterior em UTC.",
+    "warningEvidence": "{metric}: taxa de {rate} nos últimos {days} dias em UTC, em nível de aviso.",
+    "criteriaTitle": "Quando novos envios são pausados",
+    "criteriaVolume": "A janela de hoje e ontem em UTC precisa ter pelo menos {sent} envios e atingir uma destas condições:",
+    "bounceCriteria": "Pelo menos {count} rejeições permanentes e taxa igual ou superior a {rate}.",
+    "complaintCriteria": "Pelo menos {count} reclamações e taxa igual ou superior a {rate}.",
+    "stepsTitle": "O que revisar agora",
+    "steps": {
+      "list": "Corrija a lista na origem: retire endereços inválidos e interrompa novas tentativas para destinatários com rejeição permanente.",
+      "suppressions": "Confira as supressões reais. Rejeições permanentes e reclamações recebidas do provedor suprimem o endereço automaticamente. Preserve essas entradas; removê-las para tentar de novo mantém o problema.",
+      "consent": "Revise a origem, o consentimento e a segmentação dos contatos. Retire das campanhas quem não autorizou o recebimento ou pediu descadastro."
+    },
+    "reevaluationTitle": "Próxima avaliação",
+    "reevaluationAt": "Primeira revisão por calendário possível: {date} UTC, se não houver novos envios ou eventos. A liberação depende de uma nova avaliação dos critérios; esse horário não garante retomada.",
+    "reevaluationPending": "A próxima avaliação considera os contadores atuais. A janela avança às 00:00 UTC. Sem detalhe diário suficiente, ainda não há uma data estimada de melhora.",
+    "automatic": "A retomada é automática quando os critérios de pausa deixam de ser atingidos. Eventos novos podem mudar o resultado; um aviso pode continuar reduzindo o ritmo das transmissões depois da pausa.",
+    "openSuppressions": "Revisar supressões",
+    "help": "Ajuda sobre supressões"
   },
   "sendGuard": {
-    "bounce": "As transmissões estão pausadas: sua taxa de bounce permanente é {rate} nos últimos {days} dias, acima do limite de {limit}. Resolva antes de enviar.",
-    "complaint": "As transmissões estão pausadas: sua taxa de reclamação é {rate} nos últimos {days} dias, acima do limite de {limit}. Resolva antes de enviar.",
+    "bounce": "Novos envios por API, lote e transmissões estão pausados por rejeições permanentes. Taxa exibida: {rate} em {days} dias; limite da proteção: {limit}. Revise os endereços rejeitados. A avaliação usa o dia atual e anterior em UTC; a retomada é automática quando os critérios de pausa deixam de ser atingidos.",
+    "complaint": "Novos envios por API, lote e transmissões estão pausados por reclamações. Taxa exibida: {rate} em {days} dias; limite da proteção: {limit}. Revise a origem e o consentimento dos contatos. A avaliação usa o dia atual e anterior em UTC; a retomada é automática quando os critérios de pausa deixam de ser atingidos.",
     "regionPaused": "As transmissões estão pausadas em {region} enquanto a taxa de {metric} da plataforma se recupera. E-mails transacionais não são afetados. Tente de novo mais tarde.",
     "suspended": "Esta equipe está suspensa pelo operador da instância. O envio fica desativado até a reativação.",
     "operatorPaused": "Os broadcasts desta equipe estão pausados pelo operador da instância. E-mails transacionais não são afetados.",

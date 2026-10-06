@@ -420,6 +420,23 @@ export const env = createEnv({
     STRIPE_SECRET_KEY: z.string().optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),
     STRIPE_PORTAL_CONFIG: z.string().optional(),
+    // Advertising is optional and off until the server transport is configured.
+    // Never prefix the access token with NEXT_PUBLIC_. Graph version is explicit
+    // so a deployment cannot silently switch APIs or backfill historical events.
+    META_CONVERSIONS_ENABLED: boolFromString,
+    META_DATASET_ID: z
+      .string()
+      .regex(/^\d{5,30}$/)
+      .optional(),
+    META_ACCESS_TOKEN: z.string().min(1).optional(),
+    META_GRAPH_API_VERSION: z
+      .string()
+      .regex(/^v\d{1,3}\.\d{1,2}$/)
+      .optional(),
+    META_TEST_EVENT_CODE: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,100}$/)
+      .optional(),
     // Stripe Tax needs an account country from Stripe's supported list; BR is
     // not one, so the hosted instance turns automatic tax off at Checkout.
     STRIPE_AUTOMATIC_TAX: z
@@ -685,6 +702,11 @@ const BACKUP_TUNING_KEYS = ["S3_BACKUP_PREFIX", "BACKUP_CRON", "BACKUP_RETENTION
 
 /** Cross-field rules that per-field schemas cannot express. */
 export function assertEnvConsistency(e: Env): void {
+  if (envFlag(e.META_CONVERSIONS_ENABLED)) {
+    for (const key of ["META_DATASET_ID", "META_ACCESS_TOKEN", "META_GRAPH_API_VERSION"] as const) {
+      if (!e[key]) throw new Error(`META_CONVERSIONS_ENABLED=true requires ${key}`);
+    }
+  }
   if (e.OAUTH_ISSUER_URL) {
     if (!e.APP_BASE_URL) throw new Error("OAUTH_ISSUER_URL requires APP_BASE_URL");
     resolveOAuthIssuerUrl(e.APP_BASE_URL, e.OAUTH_ISSUER_URL, e.PUBLIC_API_URL);

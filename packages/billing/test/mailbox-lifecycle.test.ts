@@ -234,6 +234,73 @@ describe("Mailbox lifecycle with real optional migrations", () => {
   });
   afterEach(() => close());
 
+  it.each([true, false])(
+    "requires paid Envio before hosted checkout, linked customer=%s",
+    async (linked) => {
+      if (!linked) await unlinkCustomer();
+      await expect(
+        beginMailboxCheckout({ db, stripe, requirePaidSendingPlan: true }, CATALOG, request()),
+      ).rejects.toMatchObject({ code: "sending_plan_required" });
+      expect(state.customers).toHaveLength(0);
+      expect(state.checkouts).toHaveLength(0);
+      expect(await leases()).toHaveLength(0);
+      expect(await customerRequests()).toHaveLength(0);
+    },
+  );
+
+  it("rechecks the verified Envio period under checkout locks", async () => {
+    await db
+      .update(schema.teams)
+      .set({
+        plan: "starter",
+        planStatus: "active",
+        stripeSubscriptionId: "sub_sending_addon_fixture",
+        currentPeriodStart: new Date(Date.now() - 60000),
+        currentPeriodEnd: new Date(Date.now() + 86400000),
+      })
+      .where(eq(schema.teams.id, teamId));
+    const original = db.transaction.bind(db);
+    let transactions = 0;
+    const interveningDb = Object.create(db) as Db;
+    interveningDb.transaction = (async (...args: Parameters<typeof db.transaction>) => {
+      const result = await original(...args);
+      if (++transactions === 2)
+        await db
+          .update(schema.teams)
+          .set({ planStatus: "past_due" })
+          .where(eq(schema.teams.id, teamId));
+      return result;
+    }) as typeof db.transaction;
+    await expect(
+      beginMailboxCheckout(
+        { db: interveningDb, stripe, requirePaidSendingPlan: true },
+        CATALOG,
+        request(),
+      ),
+    ).rejects.toMatchObject({ code: "sending_plan_required" });
+    expect(state.checkouts).toHaveLength(0);
+    expect(await leases()).toMatchObject([{ status: "creating" }]);
+  });
+
+  it("allows hosted Correio checkout for an active paid Envio subscriber", async () => {
+    await db
+      .update(schema.teams)
+      .set({
+        plan: "pro",
+        planStatus: "active",
+        stripeSubscriptionId: "sub_sending_addon_fixture",
+        currentPeriodStart: new Date(Date.now() - 60000),
+        currentPeriodEnd: new Date(Date.now() + 86400000),
+      })
+      .where(eq(schema.teams.id, teamId));
+    expect(
+      await beginMailboxCheckout({ db, stripe, requirePaidSendingPlan: true }, CATALOG, request()),
+    ).toMatchObject({ url: expect.stringContaining("checkout.stripe.com") });
+    expect(state.checkouts).toHaveLength(1);
+    expect(state.customers).toHaveLength(0);
+    expect(await plan()).toBeUndefined();
+  });
+
   it("creates one durable Customer for Mail only and preserves every Send field", async () => {
     await unlinkCustomer();
     const [before] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));

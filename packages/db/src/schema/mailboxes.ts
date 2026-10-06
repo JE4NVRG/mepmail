@@ -27,6 +27,7 @@ export const mailboxes = pgTable(
       .references(() => domains.id, { onDelete: "restrict" }),
     address: text("address").notNull(),
     label: text("label").notNull(),
+    signatureText: text("signature_text").notNull().default(""),
     kind: text("kind").$type<"person" | "agent">().notNull(),
     // Keep the registry if its responsible account is deleted. A team admin must reassign it.
     ownerUserId: text("owner_user_id").references(() => user.id, { onDelete: "set null" }),
@@ -48,6 +49,7 @@ export const mailboxes = pgTable(
     index("mailboxes_team_created_idx").on(t.teamId, t.createdAt),
     check("mailboxes_kind_check", sql`${t.kind} in ('person', 'agent')`),
     check("mailboxes_status_check", sql`${t.status} in ('planned', 'suspended')`),
+    check("mailboxes_signature_text_check", sql`char_length(${t.signatureText}) <= 4000`),
     check(
       "mailboxes_address_check",
       sql`${t.address} = lower(${t.address}) and length(${t.address}) <= 254`,

@@ -29,6 +29,15 @@ vi.mock("@/server/billing", async (original) => ({
   ...(await original<typeof import("@/server/billing")>()),
   getStripe: vi.fn(),
 }));
+// This contract exercises real billing, router authority and optional migrations.
+// Private MIME operations are unrelated and never called by these billing routes.
+vi.mock("@/server/mailbox-content", () => ({
+  getMailboxContent: vi.fn(),
+  getMailboxContentList: vi.fn(),
+  saveMailboxContentDraft: vi.fn(),
+}));
+vi.mock("@/server/mailbox-transport", () => ({ mailboxTransportMime: {} }));
+vi.mock("@/server/mailbox-receiving", () => ({ mailboxReceivingDeps: vi.fn() }));
 
 // Synthetic offline prices and credentials. No approved launch price is supplied by this test.
 const price = {
@@ -101,12 +110,16 @@ async function lease(status: "creating" | "ready" | "completed" = "creating") {
 beforeAll(async () => {
   client = new PGlite();
   for (const name of readdirSync(base)
-    .filter((n) => n.endsWith(".sql") && n.slice(0, 4) <= "0042")
-    .sort())
-    for (const statement of readFileSync(base + name, "utf8")
-      .split("--> statement-breakpoint")
-      .filter((s) => s.trim()))
-      await client.exec(statement);
+    .filter((n) => n.endsWith(".sql"))
+    .sort()) {
+    // The current main chain includes locks which require a transaction.
+    await client.transaction(async (transaction) => {
+      for (const statement of readFileSync(base + name, "utf8")
+        .split("--> statement-breakpoint")
+        .filter((s) => s.trim()))
+        await transaction.exec(statement);
+    });
+  }
   const database = drizzle(client, { schema });
   db = database as unknown as Db;
   await migrate(database, { migrationsFolder: extension, migrationsTable: "__mailbox_migrations" });
@@ -140,6 +153,11 @@ beforeEach(async () => {
       name: "Offline Mail billing",
       slug: `mail-billing-${sequence}`,
       stripeCustomerId: customerId,
+      plan: "starter",
+      planStatus: "active",
+      stripeSubscriptionId: `sub_sending_presentation_fixture_${sequence}`,
+      currentPeriodStart: new Date("2020-01-01"),
+      currentPeriodEnd: new Date("2030-01-01"),
     })
     .returning({ id: schema.teams.id });
   teamId = team!.id;
@@ -202,8 +220,13 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
     expect(await as().mailboxes.billing()).toEqual({
       canManage: true,
       canPurchase: true,
+      sendingPlanRequired: false,
       availability: "available",
       offer,
+      offers: [{ ...offer, offerId: expect.stringMatching(/^mbo_[A-Za-z0-9_-]{43}$/) }],
+      defaultOfferId: expect.stringMatching(/^mbo_[A-Za-z0-9_-]{43}$/),
+      pendingOfferId: null,
+      pendingOffer: null,
       checkoutPending: false,
       pendingCheckoutSeats: null,
       management: {
@@ -211,6 +234,7 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
         canCancel: false,
         canResume: false,
         canAdjust: false,
+        canIncrease: false,
         pending: false,
         requestedSeats: null,
         scheduledSeats: null,
@@ -220,6 +244,9 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
     expect(getStripe).not.toHaveBeenCalled();
     expect(await as().mailboxes.service()).toEqual({
       active: false,
+      licenseKind: "none",
+      unlimitedSeats: false,
+      resourcePolicyActive: false,
       status: "inactive",
       seats: 0,
       reservedSeats: 0,
@@ -456,17 +483,23 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
       .where(eq(schema.teams.id, teamId));
     const result = await as().mailboxes.billing();
     expect(result).toMatchObject({
-      canPurchase: true,
+      canPurchase: false,
+      sendingPlanRequired: true,
       checkoutPending: true,
       pendingCheckoutSeats: null,
     });
     expect(JSON.stringify(result)).not.toContain("Private snapshot");
     expect(JSON.stringify(result)).not.toContain("snapshot@example.invalid");
     await expect(as().mailboxes.checkout({ seats: 3 })).rejects.toMatchObject({
-      message: "pending",
+      message: "sending_plan_required",
     });
     expect(createCustomer).not.toHaveBeenCalled();
     expect(createSession).not.toHaveBeenCalled();
+    const [request] = await db
+      .select()
+      .from(schema.mailboxCustomerRequests)
+      .where(eq(schema.mailboxCustomerRequests.teamId, teamId));
+    expect(request).toMatchObject({ status: "creating", name: "Private snapshot" });
   });
   it("returns only the hosted URL, reuses Customer, preserves Send and grants no entitlement on success", async () => {
     const before = await client.query("select * from teams where id = $1", [teamId]);

@@ -248,7 +248,7 @@ describe("GET /deliverability", () => {
       window_days: 30,
       insufficient_outcome_data: false,
       guardrail_status: "ok",
-      score_version: 1,
+      score_version: 2,
     });
   });
 

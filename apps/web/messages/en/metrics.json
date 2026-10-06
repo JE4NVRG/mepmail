@@ -40,6 +40,13 @@
     "capped": "Capped by sending guardrail.",
     "complaintRate": "Complaint rate",
     "hardBounceRate": "Hard-bounce rate",
+    "authorizationNote": "The score assesses content and outcomes. Permission for new sends depends on the current plan, limits and protections; the pause is evaluated by its own criteria.",
+    "confidence": {
+      "title": "Sample confidence",
+      "insufficient": "Insufficient sample: {sent} sends in 30 days. Outcome needs at least {minimum} sends to count toward the score.",
+      "provisional": "Provisional view of {sent} sends in 30 days. These are descriptive data, sensitive to new events; the score does not predict inbox placement.",
+      "complaintSignalPending": "Complaints recorded in this window: {count}. A complaint penalty requires at least {events} events and {sent} sends. The actual rate stays visible."
+    },
     "details": {
       "open": "See what makes up the score",
       "title": "Score details",

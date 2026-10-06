@@ -8,6 +8,7 @@ export async function PublicStarterGallery({ compact = false }: { compact?: bool
   const templates = listStartersWithContent(locale);
   const featured = new Set(["welcome", "verify-email", "order-confirmation", "shipping-update"]);
   const shown = compact ? templates.filter((template) => featured.has(template.key)) : templates;
+  const Heading = compact ? "h2" : "h3";
   return (
     <div className={compact ? "cro-starter-grid compact" : "cro-starter-grid"}>
       {shown.map((template) => (
@@ -22,7 +23,7 @@ export async function PublicStarterGallery({ compact = false }: { compact?: bool
             />
           </div>
           <div className="cro-starter-copy">
-            <h3>{template.name}</h3>
+            <Heading>{template.name}</Heading>
             {!compact && <p>{template.description}</p>}
             <a
               href={`/templates/new?starter=${encodeURIComponent(template.key)}`}

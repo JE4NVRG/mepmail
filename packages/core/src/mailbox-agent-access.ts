@@ -4,8 +4,8 @@ import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { hashApiKey, verifyApiKey } from "./api-keys.js";
 import type { MailboxRegistryActor } from "./mailbox-registry.js";
 import {
-  MailboxServiceError,
-  mailboxServiceActive,
+  mailboxServiceEntitlement,
+  requireMailboxOperationalPlan,
   requireMailboxSeat,
 } from "./mailbox-service.js";
 
@@ -16,7 +16,7 @@ export interface MailboxAgentOwnerActor extends MailboxRegistryActor {
 }
 export interface MailboxAgentAccessContext {
   db: Db;
-  actor: MailboxRegistryActor;
+  actor: MailboxRegistryActor & { agentAccess: true };
   mailboxId: string;
   /** Derived authorization provenance, never selected by an HTTP caller. */
   keyId: string;
@@ -364,6 +364,8 @@ async function withLockedMailboxAgentKey<T>(
       )
       .for("share");
     if (!member) throw new MailboxAgentAccessError("forbidden");
+    const change = scope !== "read";
+    const entitlement = change ? await mailboxServiceEntitlement(tx, hint.teamId, true) : null;
     await credentialNamespace(tx, hint.mailboxId, true);
     const [key] = await tx
       .select()
@@ -386,15 +388,7 @@ async function withLockedMailboxAgentKey<T>(
       !verify(key)
     )
       throw new MailboxAgentAccessError("forbidden");
-    const change = scope !== "read";
-    // Preserve the private-store lock order, including the subscription before mailbox writes.
-    const [plan] = change
-      ? await tx
-          .select()
-          .from(schema.mailboxSubscriptions)
-          .where(eq(schema.mailboxSubscriptions.teamId, key.teamId))
-          .for("update")
-      : [];
+    // Entitlement is locked before credentials and mailbox writes; reads remain recoverable.
     const query = tx
       .select()
       .from(schema.mailboxes)
@@ -410,12 +404,12 @@ async function withLockedMailboxAgentKey<T>(
       throw new MailboxAgentAccessError("forbidden");
     if (change) {
       if (team.suspendedAt) throw new MailboxAgentAccessError("forbidden");
-      if (!mailboxServiceActive(plan)) throw new MailboxServiceError("not_entitled");
-      await requireMailboxSeat(tx, key.teamId, box.id, plan!);
+      const plan = requireMailboxOperationalPlan(entitlement);
+      await requireMailboxSeat(tx, key.teamId, box.id, plan);
     }
     return operation({
       db: tx,
-      actor: { teamId: key.teamId, userId: key.ownerUserId },
+      actor: { teamId: key.teamId, userId: key.ownerUserId, agentAccess: true },
       mailboxId: box.id,
       keyId: key.id,
       ownerMembershipId: member.id,

@@ -3,10 +3,12 @@ import {
   computeAccountScore,
   contentFactorImpact,
   DAY_MS,
+  evaluateDeliverabilityRecovery,
   fetchAccountScore,
   fetchAccountScoreInput,
   fetchContentFactors,
   fetchDeliverabilityHealth,
+  GUARDRAIL_WINDOW_DAYS,
   PAUSE_BOUNCE_RATE,
   PAUSE_COMPLAINT_RATE,
   utcDay,
@@ -153,9 +155,22 @@ export const metricsRouter = router({
    * chart reads.
    */
   health: teamProcedure.query(async ({ ctx }) => {
-    const health = await fetchDeliverabilityHealth(ctx.db, ctx.teamId);
+    const now = new Date();
+    const c = schema.usageCounters;
+    const since = utcDay(now.getTime() - (GUARDRAIL_WINDOW_DAYS - 1) * DAY_MS);
+    const [health, dailyCounts] = await Promise.all([
+      fetchDeliverabilityHealth(ctx.db, ctx.teamId, { now }),
+      ctx.db
+        .select({ day: c.day, sent: c.sent, hardBounced: c.hardBounced, complained: c.complained })
+        .from(c)
+        .where(and(eq(c.teamId, ctx.teamId), gte(c.day, since)))
+        .orderBy(c.day),
+    ]);
     return {
       ...health,
+      // Reconciled daily counters project an opportunity to review, not an
+      // override of send permissions. Concurrent/late events invalidate it.
+      recovery: evaluateDeliverabilityRecovery({ health, now, dailyCounts }),
       thresholds: {
         warnBounce: WARN_BOUNCE_RATE,
         warnComplaint: WARN_COMPLAINT_RATE,

@@ -11,8 +11,10 @@ import { EnvKeyring, type Keyring } from "../../../packages/core/src/crypto/keyr
 import {
   importMailboxMime,
   listMailboxItems,
+  type MailboxContentActor,
   readMailboxItem,
   saveMailboxDraft,
+  setMailboxDeliveryFolder,
 } from "../../../packages/core/src/mailbox-private-store.js";
 import {
   createMailboxRegistry,
@@ -37,20 +39,22 @@ const mime = Buffer.from(
 );
 const owner = () => ({ teamId, userId: "owner" });
 const member = () => ({ teamId, userId: "member" });
-const read = (id: string, actor = owner(), box = mailboxId, keys = keyring) =>
+const read = (id: string, actor: MailboxContentActor = owner(), box = mailboxId, keys = keyring) =>
   readMailboxItem(db, keys, actor, { mailboxId: box, id });
 const imported = (sourceId = "fixture:1", box = mailboxId, raw = mime, keys = keyring) =>
   importMailboxMime(db, keys, owner(), { mailboxId: box, sourceId, raw });
 
 beforeEach(async () => {
   client = new PGlite();
-  for (const name of readdirSync(folder)
-    .filter((n) => n.endsWith(".sql") && n.slice(0, 4) <= "0042")
-    .sort())
-    for (const statement of readFileSync(folder + name, "utf8")
-      .split("--> statement-breakpoint")
-      .filter((s) => s.trim()))
-      await client.exec(statement);
+  await client.transaction(async (tx) => {
+    for (const name of readdirSync(folder)
+      .filter((n) => n.endsWith(".sql"))
+      .sort())
+      for (const statement of readFileSync(folder + name, "utf8")
+        .split("--> statement-breakpoint")
+        .filter((s) => s.trim()))
+        await tx.exec(statement);
+  });
   const database = drizzle(client, { schema });
   db = database as unknown as Db;
   await migrate(database, { migrationsFolder: extension, migrationsTable: "__mailbox_migrations" });
@@ -119,6 +123,53 @@ afterEach(async () => {
 });
 
 describe("private mailbox persistence", () => {
+  it("lets only the human owner classify inbound messages with a current revision, preserving encrypted bytes", async () => {
+    const item = await imported();
+    await grantMailboxRegistry(db, owner(), { mailboxId, userId: "member", permission: "draft" });
+    for (const actor of [
+      member(),
+      { teamId, userId: "admin" },
+      { ...owner(), supportView: true },
+      { ...owner(), agentAccess: true },
+    ])
+      await expect(
+        setMailboxDeliveryFolder(db, actor, {
+          mailboxId,
+          id: item.id,
+          expectedRevision: 1,
+          folder: "spam",
+        }),
+      ).rejects.toMatchObject({ code: "forbidden" });
+    const moved = await setMailboxDeliveryFolder(db, owner(), {
+      mailboxId,
+      id: item.id,
+      expectedRevision: 1,
+      folder: "spam",
+    });
+    expect(moved).toMatchObject({ deliveryFolder: "spam", revision: 2 });
+    expect((await read(item.id)).raw.equals(mime)).toBe(true);
+    await expect(read(item.id, { ...owner(), agentAccess: true })).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    expect(await listMailboxItems(db, { ...owner(), agentAccess: true }, mailboxId)).toHaveLength(
+      0,
+    );
+    await expect(
+      setMailboxDeliveryFolder(db, owner(), {
+        mailboxId,
+        id: item.id,
+        expectedRevision: 1,
+        folder: "inbox",
+      }),
+    ).rejects.toMatchObject({ code: "conflict" });
+    await setMailboxDeliveryFolder(db, owner(), {
+      mailboxId,
+      id: item.id,
+      expectedRevision: 2,
+      folder: "inbox",
+    });
+    expect((await read(item.id, { ...owner(), agentAccess: true })).raw.equals(mime)).toBe(true);
+  });
   it("round-trips personal and agent MIME including private attachments without plaintext content columns", async () => {
     const person = await imported();
     const agent = await imported("fixture:1", agentId);

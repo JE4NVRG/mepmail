@@ -1,5 +1,6 @@
+import { appendMailboxActivity } from "@millionsend/core";
 import { z } from "zod";
-import { mailboxAgentRequest, MAILBOX_AGENT_HEADERS } from "@/server/mailbox-agent";
+import { MAILBOX_AGENT_HEADERS, mailboxAgentRequest } from "@/server/mailbox-agent";
 import { saveMailboxContentDraft } from "@/server/mailbox-content";
 
 const input = z
@@ -7,6 +8,7 @@ const input = z
     id: z.uuid().optional(),
     expectedRevision: z.number().int().min(0).max(2147483646),
     sourceItemId: z.uuid().optional(),
+    mode: z.enum(["reply", "forward"]).optional(),
     to: z.array(z.email().max(254)).min(1).max(20),
     subject: z
       .string()
@@ -49,7 +51,17 @@ export async function POST(request: Request) {
   const parsed = input.safeParse(body);
   if (!parsed.success)
     return Response.json({ error: "invalid" }, { status: 400, headers: MAILBOX_AGENT_HEADERS });
-  return mailboxAgentRequest(request, "draft", ({ db, actor, mailboxId }) =>
-    saveMailboxContentDraft(db, actor, { ...parsed.data, mailboxId }),
-  );
+  return mailboxAgentRequest(request, "draft", async ({ db, actor, mailboxId, keyId }) => {
+    const result = await saveMailboxContentDraft(db, actor, { ...parsed.data, mailboxId });
+    await appendMailboxActivity(
+      db,
+      {
+        teamId: actor.teamId,
+        mailboxId,
+        actor: { kind: "mailbox_agent", keyId },
+      },
+      { action: "mailbox.draft_saved", itemId: result.id, revision: result.revision },
+    );
+    return result;
+  });
 }

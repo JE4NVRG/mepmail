@@ -47,15 +47,17 @@ async function box(overrides = {}) {
 beforeEach(async () => {
   vi.stubEnv("MAILBOX_REGISTRY_ENABLED", "1");
   client = new PGlite();
-  // Prove the production baseline through0042; billing0043 is intentionally independent.
-  for (const name of readdirSync(folder)
-    .filter((n) => n.endsWith(".sql") && n.slice(0, 4) <= "0042")
-    .sort()) {
-    for (const statement of readFileSync(folder + name, "utf8")
-      .split("--> statement-breakpoint")
-      .filter((s) => s.trim()))
-      await client.exec(statement);
-  }
+  // Exercise the current Main schema with an independent optional mailbox ledger.
+  await client.transaction(async (tx) => {
+    for (const name of readdirSync(folder)
+      .filter((n) => n.endsWith(".sql"))
+      .sort()) {
+      for (const statement of readFileSync(folder + name, "utf8")
+        .split("--> statement-breakpoint")
+        .filter((s) => s.trim()))
+        await tx.exec(statement);
+    }
+  });
   const database = drizzle(client, { schema });
   db = database as unknown as Db;
   await migrate(database, { migrationsFolder: extension, migrationsTable: "__mailbox_migrations" });
@@ -280,20 +282,45 @@ describe("authenticated persistent mailbox registry", () => {
     await expect(db.delete(schema.domains).where(eq(schema.domains.id, domain))).rejects.toThrow();
     expect(await withMailboxDomainDeletion(db, otherTeam, otherDomain, external)).toBe("deleted");
   });
-  it("uses an idempotent independent migration ledger without billing0043", async () => {
+  it("stores a bounded per-box plaintext signature and preserves it when old clients omit the field", async () => {
+    const id = await box({ signatureText: "Jean\r\nSuporte\rMepMail" });
+    const entry = (await as().mailboxes.list()).mailboxes.find((row) => row.id === id)!;
+    expect(entry.signatureText).toBe("Jean\nSuporte\nMepMail");
+    const update = { id, label: "Updated", ownerUserId: "owner", status: "planned" as const };
+    await as().mailboxes.update(update);
+    expect((await as().mailboxes.list()).mailboxes[0]!.signatureText).toBe(entry.signatureText);
+    await as().mailboxes.update({ ...update, signatureText: "" });
+    expect((await as().mailboxes.list()).mailboxes[0]!.signatureText).toBe("");
+    await expect(
+      as("member", team, "member").mailboxes.update({ ...update, signatureText: "forged" }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    const audit = await db.select().from(schema.auditLog);
+    expect(JSON.stringify(audit.map((row) => row.data))).not.toContain("Jean\\nSuporte");
+    await expect(
+      box({ localPart: "large", signatureText: "x".repeat(4001) }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(
+      box({ localPart: "control", signatureText: "bad\u0000text" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+  it("uses an idempotent independent mailbox migration ledger alongside the current Main schema", async () => {
     await box();
     await migrate(drizzle(client), {
       migrationsFolder: extension,
       migrationsTable: "__mailbox_migrations",
     });
     const columns = await client.query(
-      "select column_name from information_schema.columns where table_name='teams' and column_name in ('billing_terms','stripe_subscription_created')",
+      "select column_name,is_nullable from information_schema.columns where table_schema='public' and table_name='account' and column_name='issuer'",
     );
-    expect(columns.rows).toEqual([]);
+    expect(columns.rows).toEqual([{ column_name: "issuer", is_nullable: "YES" }]);
+    const identityIndex = await client.query(
+      "select i.indisunique,i.indisvalid,i.indisready from pg_index i join pg_class c on c.oid=i.indrelid join pg_namespace n on n.oid=c.relnamespace join pg_class ix on ix.oid=i.indexrelid where n.nspname='public' and c.relname='account' and ix.relname='account_provider_account_id_idx'",
+    );
+    expect(identityIndex.rows).toEqual([{ indisunique: true, indisvalid: true, indisready: true }]);
     expect((await db.select().from(schema.mailboxes)).length).toBe(1);
     expect(
       (await client.query("select count(*) as count from drizzle.__mailbox_migrations")).rows[0],
-    ).toMatchObject({ count: 8 });
+    ).toMatchObject({ count: 13 });
     expect(
       (await client.query("select to_regclass('drizzle.__drizzle_migrations') as ledger")).rows[0],
     ).toMatchObject({ ledger: null });

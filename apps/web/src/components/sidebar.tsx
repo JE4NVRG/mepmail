@@ -17,7 +17,7 @@ import { applyTheme, currentTheme, type Theme } from "@/lib/theme";
 import { useTRPC } from "@/lib/trpc";
 import styles from "./app-shell.module.css";
 
-// Canvas nav order (Row 1 chrome): Settings lives in the main list.
+// Shared route definitions also power the command palette.
 export const NAV_ITEMS: ReadonlyArray<{ key: string; href: string; icon: NavIconName }> = [
   { key: "emails", href: "/emails", icon: "emails" },
   { key: "broadcasts", href: "/broadcasts", icon: "broadcasts" },
@@ -67,6 +67,7 @@ function NavItem({
     <Link
       href={item.href}
       className={active ? "active" : undefined}
+      aria-current={active ? "page" : undefined}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
@@ -187,7 +188,6 @@ export function Sidebar({
   const t = useTranslations("nav");
   const tCommon = useTranslations("common");
   const pathname = usePathname();
-  const router = useRouter();
   const trpc = useTRPC();
   const [menuOpen, setMenuOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -196,11 +196,11 @@ export function Sidebar({
   // the gate is the server's (a 404 for anyone else), never this query.
   const operator = useQuery(trpc.system.operator.queryOptions());
   const mailboxCapability = useQuery(trpc.mailboxes.capabilities.queryOptions());
-  const mailProduct = isActive(pathname, "/mailboxes") && mailboxCapability.data?.enabled === true;
-  // The console's row rides on the same query the account menu uses: an
-  // operator sees /console in the nav, everyone else keeps the plain list.
-  const navItems = navItemsWithConsole(
-    mailProduct ? [MAIL_NAV_ITEM, ...ORGANIZATION_NAV_ITEMS] : NAV_ITEMS,
+  const mailEnabled = mailboxCapability.data?.enabled === true;
+  // Shared organization tools stay in the same place on every product route.
+  // The console's server gate remains the access control.
+  const organizationItems = navItemsWithConsole(
+    ORGANIZATION_NAV_ITEMS,
     CONSOLE_NAV_ITEM,
     operator.data?.isOperator === true,
   );
@@ -224,7 +224,7 @@ export function Sidebar({
     <aside
       className={className}
       style={{
-        width: mailProduct ? 200 : 240,
+        width: 240,
         flexShrink: 0,
         background: "var(--ms-panel)",
         borderRight: "1px solid var(--ms-line)",
@@ -248,35 +248,14 @@ export function Sidebar({
         />
       </div>
       <TeamSwitcher teamName={teamName} teamLogoUrl={teamLogoUrl} />
-      {mailboxCapability.data?.enabled ? (
-        <div className={styles.products} aria-label={t("products.choose")}>
-          <Link
-            href="/emails"
-            aria-current={!mailProduct ? "page" : undefined}
-            onClick={() => onNavigate?.()}
-            className={!mailProduct ? styles.selectedProduct : undefined}
-          >
-            <span>{t("products.send")}</span>
-            <small>{t("products.sendShort")}</small>
-          </Link>
-          <Link
-            href="/mailboxes"
-            aria-current={mailProduct ? "page" : undefined}
-            onClick={() => onNavigate?.()}
-            className={mailProduct ? styles.selectedProduct : undefined}
-          >
-            <span>{t("products.mail")}</span>
-            <small>{t("products.additional")}</small>
-          </Link>
-        </div>
-      ) : null}
       {/* The list scrolls, and a scroll container clips its children's
           focus ring at its own edges. Side padding pulled back by the same
           margin keeps the ring inside the scrollable box without moving the
           items. */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: delegated close-drawer hook; links stay the interactive elements and keyboard activation bubbles the same click */}
       <nav
-        className="ms-nav"
+        className={`ms-nav ${styles.sidebarNav}`}
+        aria-label={t("products.choose")}
         style={{ minHeight: 0, overflowY: "auto", padding: 3, margin: "7px -3px -3px" }}
         onClick={
           onNavigate
@@ -286,48 +265,80 @@ export function Sidebar({
             : undefined
         }
       >
-        {navItems.map((item) => (
-          <NavItem
-            key={item.key}
-            item={item}
-            active={isActive(pathname, item.href)}
-            label={t(item.key)}
-          />
-        ))}
-        <a href={DOCS_URL} target="_blank" rel="noreferrer">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            style={{ flex: "none", display: "block" }}
-          >
-            <path d="M12 7v14M3 3h6a3 3 0 0 1 3 3 3 3 0 0 1 3-3h6v16h-6a3 3 0 0 0-3 2 3 3 0 0 0-3-2H3Z" />
-          </svg>
-          {t("docs")}
-        </a>
-        <a href="/source" title={t("sourceDownload")}>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            style={{ flex: "none", display: "block" }}
-          >
-            <path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 16" />
-          </svg>
-          {t("sourceCode")}
-        </a>
+        {mailEnabled ? (
+          <section className={styles.navSection} aria-label={t("products.mail")}>
+            <div className={styles.navHeading} aria-hidden="true">
+              {t("products.mail")}
+            </div>
+            <NavItem
+              item={MAIL_NAV_ITEM}
+              active={isActive(pathname, MAIL_NAV_ITEM.href)}
+              label={t(MAIL_NAV_ITEM.key)}
+            />
+          </section>
+        ) : null}
+        <section className={styles.navSection} aria-label={t("products.send")}>
+          <div className={styles.navHeading} aria-hidden="true">
+            {t("products.send")}
+          </div>
+          {SEND_NAV_ITEMS.map((item) => (
+            <NavItem
+              key={item.key}
+              item={item}
+              active={isActive(pathname, item.href)}
+              label={t(item.key)}
+            />
+          ))}
+        </section>
+        <section className={styles.navSection} aria-label={t("products.organization")}>
+          <div className={styles.navHeading} aria-hidden="true">
+            {t("products.organization")}
+          </div>
+          {organizationItems.map((item) => (
+            <NavItem
+              key={item.key}
+              item={item}
+              active={isActive(pathname, item.href)}
+              label={t(item.key)}
+            />
+          ))}
+        </section>
+        <section className={styles.navResources} aria-label={t("products.resources")}>
+          <a href={DOCS_URL} target="_blank" rel="noreferrer">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              style={{ flex: "none", display: "block" }}
+            >
+              <path d="M12 7v14M3 3h6a3 3 0 0 1 3 3 3 3 0 0 1 3-3h6v16h-6a3 3 0 0 0-3 2 3 3 0 0 0-3-2H3Z" />
+            </svg>
+            {t("docs")}
+          </a>
+          <a href="/source" title={t("sourceDownload")}>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              style={{ flex: "none", display: "block" }}
+            >
+              <path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 16" />
+            </svg>
+            {t("sourceCode")}
+          </a>
+        </section>
       </nav>
       <div style={{ flex: 1 }} />
       <div ref={accountRef} style={{ position: "relative", borderTop: "1px solid var(--ms-line)" }}>

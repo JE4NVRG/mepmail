@@ -1,5 +1,5 @@
 {
-  "mailboxes": "Email inboxes",
+  "mailboxes": "Inbox",
   "emails": "Emails",
   "broadcasts": "Broadcasts",
   "audience": "Audience",
@@ -18,8 +18,10 @@
     "choose": "MepMail services",
     "send": "Send",
     "mail": "Mail",
+    "backToSend": "Back to Send",
     "sendShort": "API & campaigns",
     "additional": "Paid add-on",
-    "organization": "Organization"
+    "organization": "Organization",
+    "resources": "Resources"
   }
 }

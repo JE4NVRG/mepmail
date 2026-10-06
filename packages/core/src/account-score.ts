@@ -6,13 +6,7 @@ import * as schema from "@millionsend/db/schema";
 import { and, eq, gte, type SQL, sql } from "drizzle-orm";
 import { type DeliverabilityStatus, fetchDeliverabilityHealth } from "./deliverability.js";
 import { firstRow, resultRows } from "./driver-result.js";
-import {
-  type CheckId,
-  type CheckSeverity,
-  SCORE_VERSION,
-  type ScoreBand,
-  scoreBand,
-} from "./email-insights.js";
+import { type CheckId, type CheckSeverity, type ScoreBand, scoreBand } from "./email-insights.js";
 import { DAY_MS, utcDay } from "./utc-day.js";
 
 /** Trailing window, in UTC calendar days, the account score is computed over. */
@@ -24,6 +18,21 @@ export const ACCOUNT_SCORE_WINDOW_DAYS = 30;
  * headline then falls back to the content sub-score alone.
  */
 export const MIN_OUTCOME_SENDS = 100;
+
+/** An isolated complaint is still displayed, but is not enough to price an outcome penalty. */
+export const MIN_OUTCOME_COMPLAINTS = 2;
+/** Account scoring can evolve without changing the stored per-email insights version. */
+export const ACCOUNT_SCORE_VERSION = 2;
+
+export interface AccountOutcomeConfidence {
+  /** Describes the evidence floor, never a statistical certainty or inbox-placement probability. */
+  level: "insufficient" | "provisional";
+  sent: number;
+  minOutcomeSends: number;
+  complaintEvents: number;
+  minComplaintEvents: number;
+  complaintPenaltyEligible: boolean;
+}
 
 export interface AccountScoreInput {
   /** Σ scoreTenths × recipients over scored emails in the window. */
@@ -53,6 +62,7 @@ export interface AccountScore {
   complaintRate: number;
   hardBounceRate: number;
   insufficientOutcomeData: boolean;
+  outcomeConfidence: AccountOutcomeConfidence;
   guardrailStatus: DeliverabilityStatus;
   sent: number;
   contentRecipients: number;
@@ -70,7 +80,8 @@ function ramp(rate: number, lo: number, hi: number, max: number): number {
 /**
  * Outcome penalty gradients (in score tenths), anchored to Google's published
  * spam-rate lines (keep below 0.10%, never reach 0.30%) with a severe tail:
- * complaints ramp 0→6pts across 0.1%–0.3% and 6→10pts across 0.3%–1%;
+ * complaints ramp 0→6pts across 0.1%–0.3% and 6→10pts across 0.3%–1%,
+ * once MIN_OUTCOME_COMPLAINTS events support that penalty;
  * hard bounces ramp 0→4pts across 2%–5% and 4→6pts across 5%–10%.
  * Denominator is `sent`, matching evaluateDeliverability — the guardrail and
  * the score must read the same rates or they become two arguing authorities.
@@ -84,7 +95,7 @@ function outcomePenaltyTenths(complaintRate: number, hardBounceRate: number): nu
 /**
  * Pure account-score math. Two sub-scores, outcome-dominant headline:
  * headline = min(0.4·C + 0.6·O, O + 1.5) — the governor means immaculate
- * content lint can never mask a real complaint problem. The 7-day guardrail
+ * content lint can never mask a real complaint problem. The live guardrail
  * additionally caps the headline (paused ≤ 4.9, warning ≤ 6.9) so "score 8.1
  * but your sends are paused" is impossible by construction.
  */
@@ -99,9 +110,15 @@ export function computeAccountScore(input: AccountScoreInput): AccountScore {
       : null;
 
   const insufficientOutcomeData = sent < MIN_OUTCOME_SENDS;
+  const complaintPenaltyEligible = !insufficientOutcomeData && complained >= MIN_OUTCOME_COMPLAINTS;
   const outcomeScoreTenths = insufficientOutcomeData
     ? null
-    : Math.round(Math.max(0, 100 - outcomePenaltyTenths(complaintRate, hardBounceRate)));
+    : Math.round(
+        Math.max(
+          0,
+          100 - outcomePenaltyTenths(complaintPenaltyEligible ? complaintRate : 0, hardBounceRate),
+        ),
+      );
 
   const blendTenths =
     outcomeScoreTenths !== null && contentScoreTenths !== null
@@ -132,11 +149,19 @@ export function computeAccountScore(input: AccountScoreInput): AccountScore {
     complaintRate,
     hardBounceRate,
     insufficientOutcomeData,
+    outcomeConfidence: {
+      level: insufficientOutcomeData ? "insufficient" : "provisional",
+      sent,
+      minOutcomeSends: MIN_OUTCOME_SENDS,
+      complaintEvents: complained,
+      minComplaintEvents: MIN_OUTCOME_COMPLAINTS,
+      complaintPenaltyEligible,
+    },
     guardrailStatus,
     sent,
     contentRecipients: input.contentRecipients,
     windowDays: ACCOUNT_SCORE_WINDOW_DAYS,
-    scoreVersion: SCORE_VERSION,
+    scoreVersion: ACCOUNT_SCORE_VERSION,
   };
 }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRegionSendControls } from "../src/handlers/ses-regions.js";
 
 type Quota = { max24h: number; sentLast24h: number; maxSendRate: number };
@@ -46,7 +46,86 @@ function harness(
 const production: Quota = { max24h: 50_000, sentLast24h: 10, maxSendRate: 14 };
 const sandboxFull: Quota = { max24h: 200, sentLast24h: 199, maxSendRate: 1 };
 
+afterEach(() => vi.useRealTimers());
+
 describe("per-region send controls", () => {
+  it("finishes a 20-recipient envelope above bucket capacity at the shared recipient rate", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const h = harness({ slow: { ...production, maxSendRate: 1 } });
+    await h.controls.refreshAll();
+    let finished = false;
+    const pending = h.controls.throttle("slow", 20).then(() => {
+      finished = true;
+    });
+    await vi.advanceTimersByTimeAsync(18_999);
+    expect(finished).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await pending;
+    expect(finished).toBe(true);
+    expect(Date.now()).toBe(19_000);
+    let next = false;
+    const defaultCost = h.controls.throttle("slow").then(() => {
+      next = true;
+    });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(next).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await defaultCost;
+    expect(next).toBe(true);
+  });
+  it("shares recipient permits between concurrent envelopes without blocking another region", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const h = harness({ shared: { ...production, maxSendRate: 2 }, other: production });
+    await h.controls.refreshAll();
+    await h.controls.throttle("shared", 2);
+    const completed: number[] = [];
+    const heavy = h.controls.throttle("shared", 3).then(() => completed.push(Date.now()));
+    const light = h.controls.throttle("shared").then(() => completed.push(Date.now()));
+    await h.controls.throttle("other");
+    expect(Date.now()).toBe(0);
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(completed).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await Promise.all([heavy, light]);
+    expect(completed).toHaveLength(2);
+    expect(Math.max(...completed)).toBe(2_000);
+  });
+  it("applies a lower regional rate while a recipient reservation is waiting", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const h = harness({ changing: { ...production, maxSendRate: 4 } }, 4);
+    await h.controls.refreshAll();
+    await h.controls.throttle("changing", 4);
+    let finished = false;
+    const pending = h.controls.throttle("changing", 4).then(() => {
+      finished = true;
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    h.quotas.changing = { ...production, maxSendRate: 1 };
+    await h.controls.refresh("changing");
+    await vi.advanceTimersByTimeAsync(3_899);
+    expect(finished).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await pending;
+    expect(Date.now()).toBe(4_000);
+  });
+  it.each([0, -1, 0.5, Number.NaN, Number.POSITIVE_INFINITY, 21])(
+    "rejects invalid recipient cost %s without consuming a permit",
+    async (cost) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(0);
+      const h = harness({ slow: { ...production, maxSendRate: 1 } });
+      await h.controls.refreshAll();
+      await expect(h.controls.throttle("slow", cost)).rejects.toThrow(
+        "invalid_recipient_rate_cost",
+      );
+      await h.controls.throttle("slow");
+      expect(Date.now()).toBe(0);
+    },
+  );
+
   it("gates each region on its own 24-hour quota, one probe per region", async () => {
     const h = harness({ "sa-east-1": production, "us-east-1": sandboxFull });
     await h.controls.refreshAll();

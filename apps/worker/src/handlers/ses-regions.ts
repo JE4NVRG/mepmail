@@ -19,8 +19,8 @@ import { createSesQuotaGate, type SendQuotaControls } from "./ses-quota.js";
 export interface RegionSendControls extends SendQuotaControls {
   /** Served regions, the default first. */
   readonly regions: readonly string[];
-  /** Waits for a send token of the region's bucket. */
-  throttle(region?: string): Promise<void>;
+  /** Waits for each recipient permit. Existing callers reserve one by default. */
+  throttle(region?: string, recipients?: number): Promise<void>;
   /** Probes every region and re-reads the settings; a failure keeps that region's last answer. */
   refreshAll(): Promise<void>;
   /** The transactional reserve, percent of the quota. */
@@ -217,7 +217,14 @@ export function createRegionSendControls(opts: {
     regions: opts.regions,
     exhausted: (region) => pick(region).gate.exhausted(),
     refresh: (region) => pick(region).probe(),
-    throttle: (region) => pick(region).bucket.take(),
+    async throttle(region, recipients = 1) {
+      if (!Number.isSafeInteger(recipients) || recipients < 1 || recipients > 20)
+        throw new RangeError("invalid_recipient_rate_cost");
+      const { bucket } = pick(region);
+      // Each permit uses the existing shared bucket. Waiting for N tokens at once
+      // would never finish when N exceeds that bucket's capacity (e.g. 20 at 1/s).
+      for (let i = 0; i < recipients; i++) await bucket.take();
+    },
     async refreshAll() {
       try {
         ceiling = await opts.ceiling();

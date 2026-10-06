@@ -486,12 +486,6 @@ export async function sweepNotifications(db: Db, deps: NotifyDeps): Promise<{ se
     }
     const reason = health.reasons.find((r) => r.tier === health.status) ?? health.reasons[0];
     if (!reason) continue;
-    const claimed = await claimNotification(db, {
-      teamId: team.teamId,
-      kind: "deliverability",
-      periodKey: health.status,
-    });
-    if (!claimed) continue;
     const limit = lineFor(reason);
     const url = `${base}/metrics`;
     const input = {
@@ -502,9 +496,30 @@ export async function sweepNotifications(db: Db, deps: NotifyDeps): Promise<{ se
       windowDays: reason.windowDays,
       url,
     };
+    const type = health.status === "paused" ? "deliverability.paused" : "deliverability.warning";
+    // Preparation is certainly before either dispatch. A failed preparation
+    // leaves no claim, so a later sweep may safely try again. Once claimed,
+    // retain it even on send failure: partial delivery and the raw fallback
+    // cannot be reconciled safely with this dedupe-only ledger.
+    let mail: MailContent;
+    try {
+      mail =
+        health.status === "paused"
+          ? deliverabilityPausedMail(input)
+          : deliverabilityWarningMail(input);
+    } catch {
+      console.error(`notifications.sweep: ${type} preparation failed`);
+      continue;
+    }
+    const claimed = await claimNotification(db, {
+      teamId: team.teamId,
+      kind: "deliverability",
+      periodKey: health.status,
+    });
+    if (!claimed) continue;
     await notify(
       team.teamId,
-      health.status === "paused" ? "deliverability.paused" : "deliverability.warning",
+      type,
       {
         metric: reason.metric,
         rate: reason.rate,
@@ -512,9 +527,7 @@ export async function sweepNotifications(db: Db, deps: NotifyDeps): Promise<{ se
         window_days: reason.windowDays,
         dashboard_url: url,
       },
-      health.status === "paused"
-        ? deliverabilityPausedMail(input)
-        : deliverabilityWarningMail(input),
+      mail,
     );
   }
 

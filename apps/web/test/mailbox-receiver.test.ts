@@ -4,17 +4,18 @@ import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { type Db, schema } from "@millionsend/db";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EnvKeyring, type Keyring } from "../../../packages/core/src/crypto/keyring.js";
 import { readMailboxItem } from "../../../packages/core/src/mailbox-private-store.js";
 import { createMailboxRegistry } from "../../../packages/core/src/mailbox-registry.js";
 import { createMailboxPrivateObjectReader } from "../../../packages/ses/src/mailbox-storage.js";
-import { mailboxWorkerMime } from "../../worker/src/mailbox-sender.js";
 import {
   createMailboxReceiver,
   type TrustedMailboxNotification,
 } from "../../worker/src/mailbox-receiver.js";
+import { mailboxWorkerMime } from "../../worker/src/mailbox-sender.js";
 
 const topicArn = "arn:aws:sns:us-east-1:123456789012:private-receipts";
 const location = {
@@ -39,6 +40,11 @@ const event = (recipients = ["person@receiver.invalid", "other@foreign.invalid"]
   receipt: {
     recipients,
     virusVerdict: { status: "PASS" },
+    spamVerdict: { status: "PASS" },
+    spfVerdict: { status: "PASS" },
+    dkimVerdict: { status: "PASS" },
+    dmarcVerdict: { status: "PASS" },
+    dmarcPolicy: "none",
     action: {
       type: "S3",
       bucketName: location.bucket,
@@ -139,10 +145,10 @@ describe("trusted private SES receipt adapter with real encrypted persistence", 
   afterEach(async () => {
     await client.close();
   });
-  const reader = () => {
+  const reader = (bytes = raw) => {
     const send = vi.fn(async (_command: StorageCommand) => ({
-      Body: Readable.from([raw.subarray(0, 40), raw.subarray(40)]),
-      ContentLength: raw.length,
+      Body: Readable.from([bytes.subarray(0, 40), bytes.subarray(40)]),
+      ContentLength: bytes.length,
     }));
     return {
       send,
@@ -171,6 +177,8 @@ describe("trusted private SES receipt adapter with real encrypted persistence", 
     ).toBe(true);
     const items = await db.select().from(schema.mailboxItems);
     expect(items).toHaveLength(2);
+    expect(items.every((item) => item.deliveryFolder === "inbox")).toBe(true);
+    expect(items.every((item) => item.inboundAssessment?.decision === "inbox")).toBe(true);
     const item = items.find((i) => i.mailboxId === mailboxId)!;
     expect(item.ciphertext.includes(Buffer.from("private received body"))).toBe(false);
     expect(
@@ -217,14 +225,165 @@ describe("trusted private SES receipt adapter with real encrypted persistence", 
       await expect(
         handle(notification({ ...event(), receipt: { ...event().receipt, action } })),
       ).rejects.toThrow();
-    for (const status of ["FAIL", "GRAY", "PROCESSING_FAILED", undefined])
-      await expect(
-        handle(
-          notification({ ...event(), receipt: { ...event().receipt, virusVerdict: { status } } }),
-        ),
-      ).rejects.toThrow("receipt");
     expect(captured.send).not.toHaveBeenCalled();
     expect(await db.select().from(schema.mailboxItems)).toHaveLength(0);
+  });
+
+  it("stores unsafe virus results in private quarantine without parsing the MIME", async () => {
+    const forgedRaw = Buffer.concat([Buffer.from("X-SES-Virus-Verdict: PASS\r\n"), raw]);
+    const captured = reader(forgedRaw);
+    const parse = vi.fn(mailboxWorkerMime.parse);
+    const handle = createMailboxReceiver({
+      db,
+      keys,
+      mime: { ...mailboxWorkerMime, parse },
+      reader: captured.objectReader,
+      enabled: true,
+      topics: [topicArn],
+      locations: [location],
+    });
+    for (const [index, status] of ["FAIL", "GRAY", "PROCESSING_FAILED", undefined].entries()) {
+      const received = event(["person@receiver.invalid"]);
+      const messageId = `virus-fixture-${index}`;
+      const value = {
+        ...received,
+        mail: { ...received.mail, messageId },
+        receipt: {
+          ...received.receipt,
+          virusVerdict: { status },
+          action: { ...received.receipt.action, objectKey: `${location.prefix}${messageId}` },
+        },
+      };
+      expect(await handle(notification(value))).toBe(true);
+      expect(await handle(notification(value))).toBe(true);
+    }
+    expect(parse).not.toHaveBeenCalled();
+    const items = await db.select().from(schema.mailboxItems);
+    expect(items).toHaveLength(4);
+    for (const item of items) {
+      expect(item).toMatchObject({ mailboxId, deliveryFolder: "quarantine" });
+      expect(item.inboundAssessment?.decision).toBe("quarantine");
+      expect(item.ciphertext.includes(Buffer.from("private received body"))).toBe(false);
+      await expect(
+        readMailboxItem(db, keys, { teamId, userId: "owner" }, { mailboxId, id: item.id }),
+      ).rejects.toThrow();
+    }
+  });
+
+  it("classifies trusted spam findings per RCPT mailbox despite forged clean MIME headers", async () => {
+    const forgedRaw = Buffer.concat([Buffer.from("X-SES-Spam-Verdict: PASS\r\n"), raw]);
+    const captured = reader(forgedRaw);
+    const handle = createMailboxReceiver({
+      db,
+      keys,
+      mime: mailboxWorkerMime,
+      reader: captured.objectReader,
+      enabled: true,
+      topics: [topicArn],
+      locations: [location],
+    });
+    const statuses = ["FAIL", "GRAY", "PROCESSING_FAILED", undefined];
+    for (const [index, status] of statuses.entries()) {
+      const received = event();
+      const messageId = `spam-fixture-${index}`;
+      const value = {
+        ...received,
+        mail: { ...received.mail, messageId },
+        receipt: {
+          ...received.receipt,
+          spamVerdict: { status },
+          action: { ...received.receipt.action, objectKey: `${location.prefix}${messageId}` },
+        },
+      };
+      expect(await handle(notification(value))).toBe(true);
+      expect(await handle(notification(value))).toBe(true);
+    }
+    const items = await db.select().from(schema.mailboxItems);
+    expect(items).toHaveLength(8);
+    expect(items.filter((item) => item.teamId === teamId)).toHaveLength(4);
+    expect(items.filter((item) => item.teamId === foreignTeamId)).toHaveLength(4);
+    for (const item of items) {
+      expect(item.deliveryFolder).toBe("spam");
+      expect(item.inboundAssessment?.decision).toBe("spam");
+    }
+    const ownItems = items.filter((item) => item.mailboxId === mailboxId);
+    expect(ownItems.map((item) => item.inboundAssessment?.verdicts.spam).sort()).toEqual(
+      ["FAIL", "GRAY", "PROCESSING_FAILED", "UNKNOWN"].sort(),
+    );
+    const item = ownItems[0];
+    if (!item) throw new Error("missing own spam fixture");
+    expect(
+      (await readMailboxItem(db, keys, { teamId, userId: "owner" }, { mailboxId, id: item.id }))
+        .raw,
+    ).toEqual(forgedRaw);
+  });
+
+  it("does not acknowledge S3 read or encryption failure, including a quarantined receipt", async () => {
+    const received = event(["person@receiver.invalid"]);
+    const unsafe = {
+      ...received,
+      receipt: { ...received.receipt, virusVerdict: { status: "FAIL" } },
+    };
+    const captured = reader();
+    const config = {
+      db,
+      keys,
+      mime: mailboxWorkerMime,
+      reader: captured.objectReader,
+      enabled: true,
+      topics: [topicArn],
+      locations: [location],
+    };
+    await expect(
+      createMailboxReceiver({
+        ...config,
+        reader: {
+          read: vi.fn(async () => {
+            throw new Error("fixture_s3_failure");
+          }),
+        },
+      })(notification(unsafe)),
+    ).rejects.toThrow("fixture_s3_failure");
+    const unavailableKeys: Keyring = {
+      async wrapDek() {
+        throw new Error("fixture_key_failure");
+      },
+      async unwrapDek() {
+        throw new Error("fixture_key_failure");
+      },
+    };
+    await expect(
+      createMailboxReceiver({ ...config, keys: unavailableKeys })(notification(unsafe)),
+    ).rejects.toThrow("fixture_key_failure");
+    expect(await db.select().from(schema.mailboxItems)).toHaveLength(0);
+  });
+
+  it("captures receipt identity and assessment before asynchronous storage access", async () => {
+    const received = event(["person@receiver.invalid"]);
+    const handle = createMailboxReceiver({
+      db,
+      keys,
+      mime: mailboxWorkerMime,
+      reader: {
+        async read() {
+          received.mail.messageId = "changed-after-read";
+          received.receipt.action.objectKey = "receipts/changed-after-read";
+          received.receipt.virusVerdict.status = "FAIL";
+          return raw;
+        },
+      },
+      enabled: true,
+      topics: [topicArn],
+      locations: [location],
+    });
+    expect(await handle(notification(received))).toBe(true);
+    expect(await handle(notification(event(["person@receiver.invalid"])))).toBe(true);
+    const items = await db.select().from(schema.mailboxItems);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      deliveryFolder: "inbox",
+      inboundAssessment: { decision: "inbox" },
+    });
   });
 
   it("does not acknowledge quota/routing failures or partial cross-team fanout", async () => {
@@ -241,6 +400,12 @@ describe("trusted private SES receipt adapter with real encrypted persistence", 
     await expect(
       handle(notification(event(["person@receiver.invalid", "missing@foreign.invalid"]))),
     ).rejects.toThrow();
+    expect(await db.select().from(schema.mailboxItems)).toHaveLength(0);
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({ storageBytesPerMailbox: raw.length - 1 })
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+    await expect(handle(notification())).rejects.toThrow();
     expect(await db.select().from(schema.mailboxItems)).toHaveLength(0);
   });
 });

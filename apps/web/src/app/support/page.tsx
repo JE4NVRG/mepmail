@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { EloziSupport, type EloziSupportLabels } from "@/components/elozi-support";
 import { PublicFooter, PublicHeader, type PublicSiteLabels } from "@/components/site-chrome";
 import { DOCS_URL } from "@/lib/docs-links";
+import { resolveEloziSupportChannel } from "@/lib/elozi-support";
 import { legalLinks } from "@/lib/legal-links";
 import "../landing.css";
+import "./support.css";
 
 const contact = "mailto:jean@je4ndev.com";
 const canonical = "/support";
@@ -61,26 +64,32 @@ export default async function SupportPage() {
       <PublicHeader labels={site} page="support" />
       <main id="conteudo">
         <section className="gtm-section gtm-hero">
-          <div className="gtm-container">
-            <p className="gtm-eyebrow">{t("hero.eyebrow")}</p>
-            <h1>{t("hero.title")}</h1>
-            <p className="gtm-lead">{t("hero.lead")}</p>
-            <ul className="gtm-chips">
-              {badges.map((badge) => (
-                <li className="gtm-chip" key={badge}>
-                  {badge}
-                </li>
-              ))}
-            </ul>
-            <div className="gtm-actions">
-              <a className="ms-btn ms-btn-primary gtm-action" href="mailto:support@je4ndev.com">
-                {t("hero.ctaEmail")}
-              </a>
-              <a className="ms-btn ms-btn-secondary gtm-action" href={DOCS_URL}>
-                {t("hero.ctaDocs")}
-              </a>
+          <div className="gtm-container gtm-support-hero">
+            <div>
+              <p className="gtm-eyebrow">{t("hero.eyebrow")}</p>
+              <h1>{t("hero.title")}</h1>
+              <p className="gtm-lead">{t("hero.lead")}</p>
+              <ul className="gtm-chips">
+                {badges.map((badge) => (
+                  <li className="gtm-chip" key={badge}>
+                    {badge}
+                  </li>
+                ))}
+              </ul>
+              <div className="gtm-actions">
+                <a className="ms-btn ms-btn-primary gtm-action" href="mailto:support@je4ndev.com">
+                  {t("hero.ctaEmail")}
+                </a>
+                <a className="ms-btn ms-btn-secondary gtm-action" href={DOCS_URL}>
+                  {t("hero.ctaDocs")}
+                </a>
+              </div>
+              <p className="gtm-note">{t("hero.note")}</p>
             </div>
-            <p className="gtm-note">{t("hero.note")}</p>
+            <EloziSupport
+              config={resolveEloziSupportChannel()}
+              labels={t.raw("assistant") as EloziSupportLabels}
+            />
           </div>
         </section>
 

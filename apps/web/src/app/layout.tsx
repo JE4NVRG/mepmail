@@ -3,13 +3,21 @@ import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/700.css";
 import "@/styles/globals.css";
 import { env } from "@millionsend/config";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
+import { AdvertisingConsent } from "@/components/advertising-consent";
 import { Providers } from "@/components/providers";
 import { UmamiAnalytics } from "@/components/umami-analytics";
 import { THEME_INIT_SCRIPT, THEME_KEY } from "@/lib/theme";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#000000",
+};
 
 // metadataBase comes from the runtime APP_BASE_URL, so a self-hosted instance
 // emits its own absolute Open Graph URLs rather than ours. Copy mirrors the
@@ -23,7 +31,12 @@ export async function generateMetadata(): Promise<Metadata> {
     description: t("meta.description"),
     // Everything behind the sign-in is private; the auth pages opt back in.
     robots: { index: false, follow: false },
-    icons: { icon: "/logo/mepmail-favicon.svg" },
+    icons: {
+      icon: "/logo/mepmail-favicon.svg",
+      apple: [{ url: "/logo/mepmail-app-180.png", sizes: "180x180", type: "image/png" }],
+    },
+    applicationName: t("appName"),
+    appleWebApp: { capable: true, title: t("appName"), statusBarStyle: "default" },
     openGraph: {
       siteName: t("appName"),
       type: "website",
@@ -51,7 +64,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <UmamiAnalytics />
         <NextIntlClientProvider>
-          <Providers>{children}</Providers>
+          <Providers>
+            {children}
+            <AdvertisingConsent />
+          </Providers>
         </NextIntlClientProvider>
       </body>
     </html>

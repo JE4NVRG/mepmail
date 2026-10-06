@@ -1,5 +1,5 @@
-import type { Db } from "@millionsend/db";
 import { MailboxSendDeferredError, MailboxSendRejectedError } from "@millionsend/core";
+import type { Db } from "@millionsend/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mailboxTransportMime } from "@/server/mailbox-transport";
 import {
@@ -72,7 +72,7 @@ describe("private Mail runtime adapters", () => {
       clientFactory,
     }).send(input);
     expect(result).toEqual({ messageId: "accepted_fixture" });
-    expect(throttle).toHaveBeenCalledWith("us-east-1");
+    expect(throttle).toHaveBeenCalledWith("us-east-1", 1);
     expect(provider.options).toEqual([
       {
         region: "us-east-1",
@@ -93,6 +93,135 @@ describe("private Mail runtime adapters", () => {
       ],
     });
     expect(provider.send).toHaveBeenCalledTimes(1);
+  });
+  it("reserves distinct To/Cc/Bcc recipients before one immutable provider request", async () => {
+    const original = Buffer.from(input.raw);
+    const mutable = {
+      ...input,
+      raw: Buffer.from(original),
+      to: ["recipient@example.invalid", "second@example.invalid"],
+      cc: ["recipient@example.invalid", "third@example.invalid"],
+      bcc: ["third@example.invalid"],
+    };
+    let release = () => {};
+    let entered = () => {};
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const throttle = vi.fn(async () => {
+      entered();
+      await blocked;
+    });
+    const checkRecipients = vi.fn().mockResolvedValue(true);
+    const pending = createMailboxSesSender(database(), {
+      configurationSets,
+      throttle,
+      checkRecipients,
+      clientFactory,
+    }).send(mutable);
+    await started;
+    expect(throttle).toHaveBeenCalledWith("us-east-1", 3);
+    expect(provider.send).not.toHaveBeenCalled();
+    mutable.raw.fill(0);
+    mutable.to.push("late@example.invalid");
+    mutable.cc.length = 0;
+    mutable.bcc.length = 0;
+    mutable.from = "changed@example.invalid";
+    release();
+    await expect(pending).resolves.toEqual({ messageId: "accepted_fixture" });
+    expect(checkRecipients).toHaveBeenCalledWith({
+      teamId: input.teamId,
+      recipients: ["recipient@example.invalid", "second@example.invalid", "third@example.invalid"],
+    });
+    expect(provider.inputs[0]).toMatchObject({
+      FromEmailAddress: input.from,
+      Content: { Raw: { Data: original } },
+      Destination: {
+        ToAddresses: ["recipient@example.invalid", "second@example.invalid"],
+        CcAddresses: ["recipient@example.invalid", "third@example.invalid"],
+        BccAddresses: ["third@example.invalid"],
+      },
+      EmailTags: [
+        { Name: "mepmail_outbox_id", Value: input.outboxId },
+        { Name: "mepmail_attempt_id", Value: input.attemptId },
+      ],
+    });
+    expect(provider.send).toHaveBeenCalledTimes(1);
+  });
+  it("defers an aborted permit or quota exhaustion during the wait without calling the provider", async () => {
+    const aborted = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error("cancelled"), { name: "AbortError" }));
+    await expect(
+      createMailboxSesSender(database(), {
+        configurationSets,
+        throttle: aborted,
+        clientFactory,
+      }).send(input),
+    ).rejects.toBeInstanceOf(MailboxSendDeferredError);
+    let exhausted = false;
+    await expect(
+      createMailboxSesSender(database(), {
+        configurationSets,
+        exhausted: () => exhausted,
+        throttle: async () => {
+          exhausted = true;
+        },
+        clientFactory,
+      }).send(input),
+    ).rejects.toBeInstanceOf(MailboxSendDeferredError);
+    expect(provider.options).toHaveLength(0);
+    expect(provider.send).not.toHaveBeenCalled();
+  });
+  it("rejects an empty or oversized recipient cost before throttle and provider", async () => {
+    const throttle = vi.fn();
+    for (const to of [[], Array.from({ length: 21 }, (_, i) => `recipient${i}@example.invalid`)])
+      await expect(
+        createMailboxSesSender(database(), { configurationSets, throttle, clientFactory }).send({
+          ...input,
+          to,
+        }),
+      ).rejects.toBeInstanceOf(MailboxSendRejectedError);
+    expect(throttle).not.toHaveBeenCalled();
+    expect(provider.send).not.toHaveBeenCalled();
+  });
+  it("checks recipient blocks after the permit and never invokes SES after a block or lookup failure", async () => {
+    const order: string[] = [];
+    const checkRecipients = vi.fn(async () => {
+      order.push("check");
+      return false;
+    });
+    const throttle = vi.fn(async () => {
+      order.push("permit");
+    });
+    await expect(
+      createMailboxSesSender(database(), {
+        configurationSets,
+        throttle,
+        checkRecipients,
+        clientFactory,
+      }).send(input),
+    ).rejects.toBeInstanceOf(MailboxSendRejectedError);
+    expect(order).toEqual(["permit", "check"]);
+    expect(checkRecipients).toHaveBeenCalledWith({
+      teamId: input.teamId,
+      recipients: input.to,
+    });
+    await expect(
+      createMailboxSesSender(database(), {
+        configurationSets,
+        throttle,
+        checkRecipients: async () => {
+          throw new Error("fixture lookup unavailable");
+        },
+        clientFactory,
+      }).send(input),
+    ).rejects.toBeInstanceOf(MailboxSendDeferredError);
+    expect(provider.options).toHaveLength(0);
+    expect(provider.send).not.toHaveBeenCalled();
   });
   it("defers regional quota before provider invocation and refuses globally suspended teams", async () => {
     await expect(

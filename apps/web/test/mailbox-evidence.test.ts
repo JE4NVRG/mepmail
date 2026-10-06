@@ -133,7 +133,9 @@ describe("authenticated private SES acceptance evidence", () => {
     snsMessageId: randomUUID(),
     event: {
       eventType: "Send",
+      send: {},
       mail: {
+        timestamp: "2026-10-04T12:00:00.000Z",
         messageId,
         source: "person@evidence.invalid",
         destination: ["recipient@example.invalid", "copy@example.invalid"],
@@ -337,7 +339,11 @@ describe("authenticated private SES acceptance evidence", () => {
       .set({ suspendedAt: new Date() })
       .where(eq(schema.teams.id, teamId));
     const input = notification(row.id, row.attemptId!);
-    input.event = { ...(input.event as Record<string, unknown>), eventType: "Reject" };
+    input.event = {
+      ...(input.event as Record<string, unknown>),
+      eventType: "Reject",
+      reject: { reason: "synthetic rejection" },
+    };
     expect(await handler()(input)).toBe(true);
     expect((await outbox(row.id)).status).toBe("accepted");
     expect(send).toHaveBeenCalledTimes(1);

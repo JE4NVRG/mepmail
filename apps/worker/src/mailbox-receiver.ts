@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import {
-  receiveMailboxMime,
-  parseMailbox,
   type Keyring,
   type MailboxTransportMimeAdapter,
+  parseMailbox,
+  receiveMailboxMime,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
+import { assessMailboxReceipt } from "../../../packages/core/src/mailbox-inbound-safety.js";
 import type {
   MailboxObjectReader,
   MailboxPrivateObjectLocation,
@@ -95,34 +96,32 @@ export function createMailboxReceiver(options: {
       (action.topicArn !== undefined && action.topicArn !== input.topicArn) ||
       !Array.isArray(receipt.recipients) ||
       !receipt.recipients.length ||
-      receipt.recipients.length > 20 ||
-      // Pilot has no quarantine workflow: only an explicit completed virus scan
-      // permits ingestion. Other verdicts retain the source for operator review.
-      providerRecord(receipt.virusVerdict)?.status !== "PASS"
+      receipt.recipients.length > 20
     )
       throw new MailboxProviderEventError("receipt");
+    const objectKey = action.objectKey;
     const location = locations.find(
       (entry) =>
         entry.bucket === action.bucketName &&
         entry.ownerAccountId === topic.accountId &&
-        action.objectKey === `${entry.prefix}${messageId}`,
+        objectKey === `${entry.prefix}${messageId}`,
     );
     if (!location) throw new MailboxProviderEventError("location");
     // Only trusted SMTP RCPT TO recipients from the SES receipt determine fanout.
     const recipients = [...new Set(receipt.recipients.map(mailboxProviderAddress))];
-    const raw = await options.reader.read({ bucket: location.bucket, key: action.objectKey });
+    const assessment = assessMailboxReceipt(receipt);
+    const raw = await options.reader.read({ bucket: location.bucket, key: objectKey });
     const sourceId = `ses-s3:${createHash("sha256")
       .update(
-        JSON.stringify([
-          topic.region,
-          topic.accountId,
-          location.bucket,
-          action.objectKey,
-          messageId,
-        ]),
+        JSON.stringify([topic.region, topic.accountId, location.bucket, objectKey, messageId]),
       )
       .digest("hex")}`;
-    await receiveMailboxMime(options.db, options.keys, { sourceId, recipients, raw }, options.mime);
+    await receiveMailboxMime(
+      options.db,
+      options.keys,
+      { sourceId, recipients, raw, assessment },
+      options.mime,
+    );
     return true;
   };
 }

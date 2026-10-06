@@ -12,9 +12,11 @@ import {
   createMailboxAgentKey,
   revokeMailboxAgentKey,
 } from "../../../packages/core/src/mailbox-agent-access.js";
+import { assessMailboxReceipt } from "../../../packages/core/src/mailbox-inbound-safety.js";
 import {
   readMailboxItem,
   saveMailboxDraft,
+  setMailboxDeliveryFolder,
 } from "../../../packages/core/src/mailbox-private-store.js";
 import {
   createMailboxRegistry,
@@ -189,6 +191,100 @@ afterEach(async () => {
 });
 
 describe("durable private Correio transport contracts with captured provider", () => {
+  it("rejects changed receipt assessments without overwriting the sealed MIME or a human folder review", async () => {
+    const raw = fixture("external@example.invalid", "visible-wrong@example.invalid");
+    const input = {
+      sourceId: "assessment:stable-receipt",
+      recipients: ["person@transport.invalid"],
+      raw,
+      assessment: assessMailboxReceipt({
+        virusVerdict: { status: "PASS" },
+        spamVerdict: { status: "FAIL" },
+      }),
+    };
+    const first = await receiveMailboxMime(db, keys, input, mimeAdapter);
+    const id = first.items[0]!.id;
+    await setMailboxDeliveryFolder(db, owner(), {
+      mailboxId,
+      id,
+      expectedRevision: 1,
+      folder: "inbox",
+    });
+    const [before] = await db
+      .select()
+      .from(schema.mailboxItems)
+      .where(eq(schema.mailboxItems.id, id));
+    expect(before).toMatchObject({
+      deliveryFolder: "inbox",
+      revision: 2,
+      inboundAssessment: input.assessment,
+    });
+    expect((await receiveMailboxMime(db, keys, input, mimeAdapter)).items).toEqual([
+      { id, mailboxId, duplicate: true },
+    ]);
+    for (const assessment of [
+      assessMailboxReceipt({
+        virusVerdict: { status: "PASS" },
+        spamVerdict: { status: "PASS" },
+      }),
+      assessMailboxReceipt({
+        virusVerdict: { status: "PASS" },
+        spamVerdict: { status: "FAIL" },
+        dmarcVerdict: { status: "FAIL" },
+        dmarcPolicy: "reject",
+      }),
+      assessMailboxReceipt({
+        virusVerdict: { status: "FAIL" },
+        spamVerdict: { status: "FAIL" },
+      }),
+    ])
+      await expect(
+        receiveMailboxMime(db, keys, { ...input, assessment }, mimeAdapter),
+      ).rejects.toMatchObject({ code: "conflict" });
+    expect(await db.select().from(schema.mailboxItems)).toEqual([before]);
+    expect((await readMailboxItem(db, keys, owner(), { mailboxId, id })).raw.equals(raw)).toBe(
+      true,
+    );
+  });
+
+  it("persists quarantine without MIME parsing, counts storage and keeps every content read blocked", async () => {
+    const raw = Buffer.from("unparsed unsafe fixture bytes");
+    const parse = vi.fn(async () => {
+      throw new Error("must not parse quarantine");
+    });
+    const assessment = assessMailboxReceipt({
+      virusVerdict: { status: "FAIL" },
+      spamVerdict: { status: "PASS" },
+    });
+    const input = {
+      sourceId: "unsafe:1",
+      recipients: ["person@transport.invalid"],
+      raw,
+      assessment,
+    };
+    const first = await receiveMailboxMime(db, keys, input, { parse });
+    const repeat = await receiveMailboxMime(db, keys, input, { parse });
+    expect(repeat.items[0]).toMatchObject({ id: first.items[0]!.id, duplicate: true });
+    expect(parse).not.toHaveBeenCalled();
+    const [stored] = await db.select().from(schema.mailboxItems);
+    expect(stored).toMatchObject({
+      rawBytes: raw.length,
+      deliveryFolder: "quarantine",
+      inboundAssessment: assessment,
+    });
+    expect(stored!.ciphertext.includes(raw)).toBe(false);
+    await expect(
+      readMailboxItem(db, keys, owner(), { mailboxId, id: first.items[0]!.id }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({ storageBytesPerMailbox: raw.length })
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+    await expect(
+      receiveMailboxMime(db, keys, { ...input, sourceId: "unsafe:2" }, { parse }),
+    ).rejects.toMatchObject({ code: "quota" });
+    expect(await db.select().from(schema.mailboxItems)).toHaveLength(1);
+  });
   it("routes trusted RCPT across teams, encrypts fanout and deduplicates provider receipts rather than MIME Message-ID", async () => {
     const raw = fixture("external@example.invalid", "visible-wrong@example.invalid");
     const recipients = ["person@transport.invalid", "other@foreign.invalid"];

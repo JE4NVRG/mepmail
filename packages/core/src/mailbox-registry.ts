@@ -1,7 +1,7 @@
 import { type Db, schema } from "@millionsend/db";
 import { and, asc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
-import { mailboxServiceActive, reserveMailboxSeat } from "./mailbox-service.js";
 import { lockMailboxAgentKeysForOwnerChange } from "./mailbox-agent-access.js";
+import { mailboxServiceEntitlement, reserveMailboxSeat } from "./mailbox-service.js";
 
 export class MailboxRegistryError extends Error {
   constructor(public readonly code: "forbidden" | "not_found" | "invalid" | "conflict") {
@@ -11,6 +11,20 @@ export class MailboxRegistryError extends Error {
 export interface MailboxRegistryActor {
   teamId: string;
   userId: string;
+}
+
+function invalidControl(value: string, multiline = false) {
+  return [...value].some((character) => {
+    const code = character.charCodeAt(0);
+    return (code < 32 && !(multiline && [9, 10, 13].includes(code))) || code === 127;
+  });
+}
+
+function signatureText(value: string | undefined) {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || value.length > 4000 || invalidControl(value, true))
+    throw new MailboxRegistryError("invalid");
+  return value.replace(/\r\n?/g, "\n");
 }
 
 async function member(db: Db, actor: MailboxRegistryActor, lock = false) {
@@ -70,22 +84,15 @@ export async function mailboxDomainLock(db: Db, domainId: string) {
 
 export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
   await member(db, actor);
-  const [team] = await db
-    .select({ suspendedAt: schema.teams.suspendedAt })
-    .from(schema.teams)
-    .where(eq(schema.teams.id, actor.teamId));
-  const [plan] = await db
-    .select()
-    .from(schema.mailboxSubscriptions)
-    .where(eq(schema.mailboxSubscriptions.teamId, actor.teamId));
+  const service = await mailboxServiceEntitlement(db, actor.teamId);
+  const allocation = db
+    .select({ id: schema.mailboxes.id })
+    .from(schema.mailboxes)
+    .where(eq(schema.mailboxes.teamId, actor.teamId))
+    .orderBy(asc(schema.mailboxes.createdAt), asc(schema.mailboxes.id));
   const licensed =
-    !!team && !team.suspendedAt && mailboxServiceActive(plan)
-      ? await db
-          .select({ id: schema.mailboxes.id })
-          .from(schema.mailboxes)
-          .where(eq(schema.mailboxes.teamId, actor.teamId))
-          .orderBy(asc(schema.mailboxes.createdAt), asc(schema.mailboxes.id))
-          .limit(plan!.seats)
+    service.resourcePolicyActive && service.plan
+      ? await (service.unlimitedSeats ? allocation : allocation.limit(service.plan.seats))
       : [];
   const licensedIds = new Set(licensed.map((b) => b.id));
   const rows = await db
@@ -94,6 +101,7 @@ export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
       domainId: schema.mailboxes.domainId,
       address: schema.mailboxes.address,
       label: schema.mailboxes.label,
+      signatureText: schema.mailboxes.signatureText,
       kind: schema.mailboxes.kind,
       ownerUserId: schema.mailboxes.ownerUserId,
       ownerMembershipId: schema.mailboxes.ownerMembershipId,
@@ -163,17 +171,19 @@ export async function createMailboxRegistry(
     label: string;
     kind: "person" | "agent";
     ownerUserId: string;
+    signatureText?: string | undefined;
   },
 ) {
   const local = input.localPart.trim().toLowerCase();
   const label = input.label.trim();
+  const signature = signatureText(input.signatureText) ?? "";
   // Deliberately excludes SMTPUTF8, quoted local parts, aliases and catch-all until their contracts exist.
   if (
     !/^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/.test(local) ||
     local.includes("..") ||
     !label ||
     label.length > 80 ||
-    /[\r\n\x00-\x1f]/.test(label) ||
+    invalidControl(label) ||
     !["person", "agent"].includes(input.kind)
   ) {
     throw new MailboxRegistryError("invalid");
@@ -201,6 +211,7 @@ export async function createMailboxRegistry(
         domainId: input.domainId,
         address,
         label,
+        signatureText: signature,
         kind: input.kind,
         ownerUserId: input.ownerUserId,
         ownerMembershipId,
@@ -221,13 +232,15 @@ export async function updateMailboxRegistry(
     label: string;
     ownerUserId: string;
     status: "planned" | "suspended";
+    signatureText?: string | undefined;
   },
 ) {
   const label = input.label.trim();
+  const signature = signatureText(input.signatureText);
   if (
     !label ||
     label.length > 80 ||
-    /[\r\n\x00-\x1f]/.test(label) ||
+    invalidControl(label) ||
     !["planned", "suspended"].includes(input.status)
   )
     throw new MailboxRegistryError("invalid");
@@ -249,6 +262,7 @@ export async function updateMailboxRegistry(
       .update(schema.mailboxes)
       .set({
         label,
+        ...(signature !== undefined ? { signatureText: signature } : {}),
         ownerUserId: input.ownerUserId,
         ownerMembershipId,
         status: input.status,

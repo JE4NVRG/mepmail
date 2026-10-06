@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AdvertisingSettingsButton } from "./advertising-consent";
 import { LandingLangSwitch } from "./landing-lang-switch";
 import { LandingNav } from "./landing-nav";
 import { PublicAccount } from "./public-account";
@@ -18,6 +19,7 @@ export type PublicPage =
   | "pricing"
   | "alternatives"
   | "integrations"
+  | "correio"
   | "security"
   | "support"
   | "changelog";
@@ -30,6 +32,7 @@ export interface PublicSiteLabels {
   nav: {
     /** Nav v2 (flat, 6 itens): Product · Integrations · Pricing · Docs · Security · Support. */
     product: string;
+    correio?: string;
     integrations: string;
     pricing: string;
     docs: string;
@@ -137,6 +140,11 @@ export function PublicHeader({
           <LandingNav label={labels.navAria} menuLabel={labels.nav.menu}>
             <div className="gtm-nav-links">
               <a href={anchorHref(page, "#product")}>{labels.nav.product}</a>
+              {labels.nav.correio ? (
+                <a href="/correio" aria-current={page === "correio" ? "page" : undefined}>
+                  {labels.nav.correio}
+                </a>
+              ) : null}
               <a href="/integrations" aria-current={page === "integrations" ? "page" : undefined}>
                 {labels.nav.integrations}
               </a>
@@ -207,6 +215,7 @@ export function PublicFooter({
           <h3>{labels.footer.colProduct}</h3>
           <a href={anchorHref(page, "#como-funciona")}>{labels.nav.how}</a>
           <a href={anchorHref(page, "#planos")}>{labels.nav.plans}</a>
+          {labels.nav.correio ? <a href="/correio">{labels.nav.correio}</a> : null}
           <a href="/integrations">{labels.nav.integrations}</a>
           <a href={anchorHref(page, "#mcp")}>{labels.nav.mcp}</a>
           <a href="/changelog" aria-current={page === "changelog" ? "page" : undefined}>
@@ -236,6 +245,7 @@ export function PublicFooter({
           <h3>{labels.footer.colLegal}</h3>
           <a href={legal.terms}>{labels.footer.terms}</a>
           <a href={legal.privacy}>{labels.footer.privacy}</a>
+          <AdvertisingSettingsButton />
           <a href={legal.refund}>{labels.footer.refund}</a>
           <a href="/security">{labels.nav.security}</a>
           <a href="/source" title={labels.footer.sourceDownload}>

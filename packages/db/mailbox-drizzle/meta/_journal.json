@@ -71,6 +71,34 @@
       "when": 1790866800009,
       "tag": "0009_mailbox_management_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790866800010,
+      "tag": "0010_mailbox_inbound_safety",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790866800011,
+      "tag": "0011_mailbox_outbound_outcomes",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790866800012,
+      "tag": "0012_mailbox_signature_trash",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790866800013,
+      "tag": "0013_mailbox_organization",
+      "breakpoints": true
     }
   ]
 }

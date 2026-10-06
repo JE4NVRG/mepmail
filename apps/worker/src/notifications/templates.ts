@@ -2,6 +2,9 @@ import {
   accountMailCard,
   formatMailDate,
   type MailContent,
+  MIN_GUARDRAIL_VOLUME,
+  MIN_PAUSE_COMPLAINTS,
+  MIN_PAUSE_HARD_BOUNCES,
   OVERAGE_HARD_CAP,
   QUOTA_TOLERANCE,
 } from "@millionsend/core";
@@ -147,13 +150,13 @@ export function deliverabilityWarningMail(input: {
   return layout({
     subject: `${input.team}: ${metricName(input.metric)} at risk`,
     paragraphs: [
-      `${input.team}'s ${metricName(input.metric)} over the last ${input.windowDays} days is ${percent(input.rate)}, above the ${percent(input.limit)} risk line. Sending continues, but broadcasts are slowed while it stays there.`,
+      `${input.team}'s ${metricName(input.metric)} over the last ${input.windowDays} UTC calendar days, including today, is ${percent(input.rate)}, at or above the ${percent(input.limit)} risk line. Sending continues, but broadcasts are slowed while it stays there.`,
       input.metric === "bounce"
-        ? "Hard bounces come from addresses that do not exist. Remove old or unverified addresses from your lists; every bounced address is already on your suppression list."
+        ? "Hard bounces are permanent delivery failures. Remove invalid or unverified addresses from your lists. Hard-bounced addresses are automatically added to your suppression list; transient bounces alone do not add an address."
         : "Complaints come from recipients who did not expect the email. Send only to people who opted in, keep the unsubscribe link visible, and pause lists that have not heard from you in months.",
     ],
     button: { label: "Open metrics", url: input.url },
-    footnote: "You get this once per episode; it clears when the rate drops back under the line.",
+    footnote: "You get this once per risk episode.",
   });
 }
 
@@ -165,11 +168,18 @@ export function deliverabilityPausedMail(input: {
   windowDays: number;
   url: string;
 }): MailContent {
+  const window =
+    input.windowDays === 2
+      ? "today and yesterday (UTC)"
+      : `the last ${input.windowDays} UTC calendar days, including today`;
+  const minimumEvents = input.metric === "bounce" ? MIN_PAUSE_HARD_BOUNCES : MIN_PAUSE_COMPLAINTS;
+  const events = input.metric === "bounce" ? "hard bounces" : "complaints";
   return layout({
     subject: `${input.team}: sending paused (${metricName(input.metric)})`,
     paragraphs: [
-      `${input.team}'s ${metricName(input.metric)} over the last ${input.windowDays} days reached ${percent(input.rate)}, at or above the ${percent(input.limit)} pause line. New sends are refused until it recovers.`,
-      "The pause lifts on its own once the rate over the window drops back under the line. Clean the recipient list first, or the next sends will trip it again.",
+      `${input.team}'s ${metricName(input.metric)} over ${window} reached ${percent(input.rate)}, at or above the ${percent(input.limit)} pause line.`,
+      `This automatic pause requires all three conditions in that same window: at least ${MIN_GUARDRAIL_VOLUME} successfully sent messages, at least ${minimumEvents} ${events}, and a rate at or above ${percent(input.limit)}. New API and batch sends and new broadcast starts are refused while these conditions apply.`,
+      "This automatic pause lifts when neither hard bounces nor complaints still meet all of their pause conditions. Clean your recipient list first. The deliverability score and the seven-day display do not unlock sending; warning throttles and operator or regional restrictions can still apply.",
     ],
     button: { label: "Open metrics", url: input.url },
     footnote: "You get this once per episode.",

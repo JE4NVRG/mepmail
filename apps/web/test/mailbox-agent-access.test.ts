@@ -6,23 +6,26 @@ import { type Db, schema } from "@millionsend/db";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
 import {
   createMailboxAgentKey,
   listMailboxAgentKeys,
   revokeMailboxAgentKey,
   withMailboxAgentAccess,
 } from "../../../packages/core/src/mailbox-agent-access.js";
-import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
+import { assessMailboxReceipt } from "../../../packages/core/src/mailbox-inbound-safety.js";
 import {
   listMailboxItems,
   readMailboxItem,
   saveMailboxDraft,
+  setMailboxDeliveryFolder,
 } from "../../../packages/core/src/mailbox-private-store.js";
 import {
   createMailboxRegistry,
   grantMailboxRegistry,
   updateMailboxRegistry,
 } from "../../../packages/core/src/mailbox-registry.js";
+import { receiveMailboxMime } from "../../../packages/core/src/mailbox-transport.js";
 import { seedMailboxTestService } from "./mailbox-service-fixture";
 
 const base = fileURLToPath(new URL("../../../packages/db/drizzle/", import.meta.url));
@@ -130,6 +133,87 @@ afterEach(async () => {
 });
 
 describe("mailbox agent credentials", () => {
+  it("keeps unsafe receipts inaccessible to a real bearer until the human owner reviews Spam", async () => {
+    await db
+      .update(schema.domains)
+      .set({ status: "verified" })
+      .where(eq(schema.domains.teamId, teamId));
+    const key = await mint();
+    const adapter = {
+      parse: vi.fn(async () => ({
+        from: "agent@local.invalid",
+        to: ["recipient@example.invalid"],
+        cc: [],
+        bcc: [],
+        attachmentBytes: [],
+      })),
+    };
+    const receive = (sourceId: string, virus: "PASS" | "FAIL") =>
+      receiveMailboxMime(
+        db,
+        keyring,
+        {
+          sourceId,
+          recipients: ["agent@local.invalid"],
+          raw: mime,
+          assessment: assessMailboxReceipt({
+            virusVerdict: { status: virus },
+            spamVerdict: { status: "FAIL" },
+          }),
+        },
+        adapter,
+      );
+    const spam = (await receive("bearer:spam", "PASS")).items[0]!;
+    const quarantine = (await receive("bearer:quarantine", "FAIL")).items[0]!;
+    const read = (id: string) =>
+      withMailboxAgentAccess(db, key.token, "read", ({ db: tx, actor, mailboxId: box }) =>
+        readMailboxItem(tx, keyring, actor, { mailboxId: box, id }),
+      );
+    const list = () =>
+      withMailboxAgentAccess(db, key.token, "read", ({ db: tx, actor, mailboxId: box }) =>
+        listMailboxItems(tx, actor, box),
+      );
+    expect(adapter.parse).toHaveBeenCalledTimes(1);
+    expect(await list()).toHaveLength(0);
+    for (const item of [spam, quarantine]) {
+      await expect(read(item.id)).rejects.toMatchObject({ code: "forbidden" });
+      await expect(
+        withMailboxAgentAccess(db, key.token, "read", ({ db: tx, actor, mailboxId: box }) =>
+          setMailboxDeliveryFolder(tx, actor, {
+            mailboxId: box,
+            id: item.id,
+            expectedRevision: 1,
+            folder: "inbox",
+          }),
+        ),
+      ).rejects.toMatchObject({ code: "forbidden" });
+    }
+    await expect(
+      setMailboxDeliveryFolder(db, owner(), {
+        mailboxId,
+        id: quarantine.id,
+        expectedRevision: 1,
+        folder: "inbox",
+      }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await setMailboxDeliveryFolder(db, owner(), {
+      mailboxId,
+      id: spam.id,
+      expectedRevision: 1,
+      folder: "inbox",
+    });
+    expect((await read(spam.id)).raw.equals(mime)).toBe(true);
+    expect(await list()).toEqual([
+      expect.objectContaining({
+        id: spam.id,
+        deliveryFolder: "inbox",
+        revision: 2,
+        inboundAssessment: expect.objectContaining({ decision: "spam" }),
+      }),
+    ]);
+    await expect(read(quarantine.id)).rejects.toMatchObject({ code: "forbidden" });
+  });
+
   it("reveals a strong one-time token, persists only its hash and returns bounded metadata", async () => {
     const first = await mint();
     const second = await mint({ mailboxId: personId });
@@ -154,7 +238,10 @@ describe("mailbox agent credentials", () => {
       "revokedAt",
     ]);
     expect(first).not.toHaveProperty("keyHash");
-    expect(await bridge(first.token)).toEqual({ actor: owner(), mailboxId });
+    expect(await bridge(first.token)).toEqual({
+      actor: { ...owner(), agentAccess: true },
+      mailboxId,
+    });
     expect(
       await withMailboxAgentAccess(db, first.token, "read", async (context) => ({
         keyId: context.keyId,
@@ -162,7 +249,10 @@ describe("mailbox agent credentials", () => {
         expiresAt: context.expiresAt,
       })),
     ).toEqual({ keyId: first.id, ownerMembershipId: stored!.ownerMembershipId, expiresAt: null });
-    expect(await bridge(second.token)).toEqual({ actor: owner(), mailboxId: personId });
+    expect(await bridge(second.token)).toEqual({
+      actor: { ...owner(), agentAccess: true },
+      mailboxId: personId,
+    });
     await expect(
       db
         .update(schema.mailboxAgentKeys)
@@ -227,7 +317,11 @@ describe("mailbox agent credentials", () => {
       { teamId, userId: "delegate" },
       { mailboxId, label: "Authorized" },
     );
-    expect((await bridge(current.token)).actor).toEqual({ teamId, userId: "delegate" });
+    expect((await bridge(current.token)).actor).toEqual({
+      teamId,
+      userId: "delegate",
+      agentAccess: true,
+    });
     await revokeMailboxAgentKey(db, { teamId, userId: "delegate" }, { mailboxId, id: key.id });
   });
 
