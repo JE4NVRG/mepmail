@@ -347,7 +347,8 @@
     },
     "checkoutSuccess": "Obrigado! Seu plano é atualizado assim que o Stripe confirmar o pagamento — normalmente em poucos segundos.",
     "checkoutCancel": "Checkout cancelado. Seu plano não mudou.",
-    "error": "Algo deu errado com o Stripe. Tente novamente."
+    "error": "Algo deu errado com o Stripe. Tente novamente.",
+    "billingPaused": "Alterações de cobrança estão temporariamente pausadas. Tente novamente mais tarde."
   },
   "mcp": {
     "title": "Servidor MCP",

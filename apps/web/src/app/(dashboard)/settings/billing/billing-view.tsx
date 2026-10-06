@@ -176,6 +176,9 @@ export function BillingView({
   const mutations = [startCheckout, openPortal, changePlan, setOverage];
   const busy = mutations.some((m) => m.isPending);
   const failed = mutations.some((m) => m.isError);
+  const billingPaused = mutations.some(
+    (m) => m.isError && m.error?.data?.code === "SERVICE_UNAVAILABLE",
+  );
 
   const fmt = new Intl.NumberFormat(locale);
   const usd = (cents: number) => formatUsd(cents, locale);
@@ -428,13 +431,18 @@ export function BillingView({
         ) : null}
 
         <p
+          role={failed ? "alert" : undefined}
           style={{
             margin: "14px 0 0",
             fontSize: 13,
             color: failed ? "var(--ms-danger)" : "var(--ms-muted)",
           }}
         >
-          {failed ? t("error") : canManage ? t("manageHint") : t("readOnly")}
+          {failed
+            ? t(billingPaused ? "billingPaused" : "error")
+            : canManage
+              ? t("manageHint")
+              : t("readOnly")}
         </p>
       </Card>
 

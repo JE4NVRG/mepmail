@@ -211,7 +211,7 @@
     "quantityError": "Use uma quantidade inteira de 1 a 50.",
     "invalidQuote": "Informe uma quantidade válida para calcular o total.",
     "mailboxSelection": "Correio de {size} GiB",
-    "recipients": "{count, number} entregas de saída por mês, por caixa. To, Cc e Bcc contam; não é limite de contatos diferentes.",
+    "recipients": "{count, number} entregas de saída por mês, por caixa. To e Cc contam; não é limite de contatos diferentes.",
     "sendingLabel": "Só Envio",
     "combinedLabel": "Envio + Correio",
     "sendingPlan": "{count, number} entregas de Envio por mês",

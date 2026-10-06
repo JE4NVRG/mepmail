@@ -211,7 +211,7 @@
     "quantityError": "Use a whole number from 1 to 50.",
     "invalidQuote": "Enter a valid quantity to calculate the total.",
     "mailboxSelection": "{size} GiB Mail",
-    "recipients": "{count, number} outbound deliveries per month, per mailbox. To, Cc and Bcc count; this is not a limit on distinct contacts.",
+    "recipients": "{count, number} outbound deliveries per month, per mailbox. To and Cc count; this is not a limit on distinct contacts.",
     "sendingLabel": "Send only",
     "combinedLabel": "Send + Mail",
     "sendingPlan": "{count, number} Send deliveries per month",
