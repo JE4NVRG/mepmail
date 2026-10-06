@@ -248,6 +248,7 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
       canManage: true,
       canPurchase: true,
       sendingPlanRequired: false,
+      earlyAccessRequired: false,
       availability: "available",
       offer,
       offers: [{ ...offer, offerId: expect.stringMatching(/^mbo_[A-Za-z0-9_-]{43}$/) }],

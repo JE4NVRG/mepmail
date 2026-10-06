@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { DOCS_URL } from "@/lib/docs-links";
+import { mailboxCheckoutFailure, safeMailboxCheckoutUrl } from "@/lib/mailbox-checkout";
 import {
   formatMailboxPrice,
   formatMailboxStorage,
@@ -13,21 +14,6 @@ import {
 import { useTRPC } from "@/lib/trpc";
 import styles from "./mailbox-service-panel.module.css";
 
-/** Hosted Checkout only; a provider response is never allowed to redirect to an arbitrary origin. */
-export function safeMailboxCheckoutUrl(value: string): string | null {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" &&
-      url.hostname === "checkout.stripe.com" &&
-      !url.username &&
-      !url.password &&
-      !url.port
-      ? url.href
-      : null;
-  } catch {
-    return null;
-  }
-}
 export function safeMailboxPaymentUrl(value: string): string | null {
   try {
     const url = new URL(value);
@@ -44,16 +30,7 @@ export function safeMailboxPaymentUrl(value: string): string | null {
 }
 
 export { formatMailboxPrice } from "@/lib/mailbox-setup";
-
-export function mailboxCheckoutFailure(cause: unknown) {
-  const error = cause as { message?: string; data?: { code?: string } } | null;
-  if (error?.message === "sending_plan_required") return "sending_plan_required";
-  if (error?.message === "expired") return "error";
-  if (error?.message === "subscription_exists") return "existing";
-  if (error?.message === "mailbox_billing_unavailable" || error?.data?.code === "FORBIDDEN")
-    return "unavailable";
-  return "pending";
-}
+export { mailboxCheckoutFailure, safeMailboxCheckoutUrl };
 
 /** Notice for subscription availability; internal System licenses have their own presentation. */
 export function mailboxServiceNotice(

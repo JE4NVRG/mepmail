@@ -80,18 +80,20 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/lib/trpc", () => ({
   useTRPC: () => ({
     mailboxes: Object.fromEntries(
-      ["service", "receiving", "billing", "create", "checkout", "manage"].map((kind) => [
-        kind,
-        {
-          queryOptions: (input: unknown, options: Record<string, unknown>) => ({
-            kind,
-            input,
-            ...options,
-          }),
-          queryKey: () => ["mailboxes", kind],
-          mutationOptions: () => ({ kind }),
-        },
-      ]),
+      ["service", "receiving", "billing", "create", "checkout", "manage", "verifyReceiving"].map(
+        (kind) => [
+          kind,
+          {
+            queryOptions: (input: unknown, options: Record<string, unknown>) => ({
+              kind,
+              input,
+              ...options,
+            }),
+            queryKey: () => ["mailboxes", kind],
+            mutationOptions: () => ({ kind }),
+          },
+        ],
+      ),
     ),
   }),
 }));

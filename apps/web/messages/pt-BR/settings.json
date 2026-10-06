@@ -302,7 +302,17 @@
       "annualTerms": "Pague {total} antecipadamente por 12 meses; equivalente a {equivalent} / mês, não uma fatura mensal. A promoção do primeiro mês não se aplica ao pagamento anual.",
       "annualHardCap": "A franquia de 110 mil entregas renova todo mês. No anual, novos envios pausam ao atingir esse limite, sem cobrança automática de excedente.",
       "existingPreserved": "Assinaturas existentes mantêm os preços e limites contratados. Esta oferta não altera uma assinatura ativa.",
-      "continue": "Continuar para o checkout"
+      "continue": "Continuar para o checkout",
+      "comboToggle": "Adicionar caixas do Correio para seus agentes",
+      "comboHint": "Caixas reais no seu domínio para seus agentes receberem e responderem e-mails. O Correio é uma assinatura separada, paga em um segundo passo logo após o Envio.",
+      "comboSize": "Tamanho da caixa",
+      "comboTier": "{size} · {price} por caixa {per}",
+      "comboQuantity": "Quantidade de caixas",
+      "comboQuantityHint": "De 1 a 50. Você pode adicionar mais depois.",
+      "comboSendStep": "Passo 1 · Pagamento do Envio: {amount}",
+      "comboMailStep": "Passo 2 · Pagamento do Correio: {amount} {per}",
+      "comboRenewal": "Depois, {amount} {per} por Envio + Correio.",
+      "comboContinue": "Continuar: pagar o Envio (1 de 2)"
     },
     "capPerDay": "{n} e-mails / dia",
     "capPerMonth": "{n} e-mails / mês",
@@ -348,7 +358,24 @@
     "checkoutSuccess": "Obrigado! Seu plano é atualizado assim que o Stripe confirmar o pagamento — normalmente em poucos segundos.",
     "checkoutCancel": "Checkout cancelado. Seu plano não mudou.",
     "error": "Algo deu errado com o Stripe. Tente novamente.",
-    "billingPaused": "Alterações de cobrança estão temporariamente pausadas. Tente novamente mais tarde."
+    "billingPaused": "Alterações de cobrança estão temporariamente pausadas. Tente novamente mais tarde.",
+    "combo": {
+      "step": "Passo 2 de 2 · Correio",
+      "title": "Conclua suas caixas do Correio",
+      "summary": "{seats, plural, one {# caixa} other {# caixas}} de {size} · {unit} cada · {total} {per}",
+      "confirming": "Confirmando o pagamento do Envio… isso costuma levar alguns segundos.",
+      "ready": "Seu plano de Envio está ativo. O Correio é uma assinatura separada: revise na Stripe e pague para ativar suas caixas.",
+      "pay": "Pagar o Correio · {total} {per}",
+      "retry": "Verificar de novo",
+      "timedOut": "Ainda não confirmamos o pagamento do Envio. Verifique de novo em instantes; sua escolha de caixas fica salva neste navegador por 24 horas.",
+      "existing": "Sua assinatura do Correio já está ativa.",
+      "manual": "Escolha suas caixas na página do Correio para concluir.",
+      "pending": "O pagamento do Correio está em preparação. Abra a página do Correio para continuar.",
+      "unavailable": "A contratação do Correio está indisponível agora. Tente novamente mais tarde.",
+      "openMailboxes": "Abrir o Correio",
+      "skip": "Agora não",
+      "close": "Fechar"
+    }
   },
   "mcp": {
     "title": "Servidor MCP",

@@ -302,7 +302,17 @@
       "annualTerms": "Pay {total} upfront for 12 months; equivalent to {equivalent} / month, not a monthly bill. The first-month promotion does not apply to annual payment.",
       "annualHardCap": "Your 110,000-delivery allowance renews each month. Annual subscriptions pause new sending at that limit and have no automatic overage charge.",
       "existingPreserved": "Existing subscriptions keep their contracted prices and limits. This offer does not change an active subscription.",
-      "continue": "Continue to checkout"
+      "continue": "Continue to checkout",
+      "comboToggle": "Add Correio mailboxes for your agents",
+      "comboHint": "Real inboxes on your domain where agents receive and reply to email. Correio is a separate subscription, paid in a second step right after Send.",
+      "comboSize": "Mailbox size",
+      "comboTier": "{size} · {price} per mailbox {per}",
+      "comboQuantity": "Mailboxes",
+      "comboQuantityHint": "From 1 to 50. You can add more later.",
+      "comboSendStep": "Step 1 · Send checkout: {amount}",
+      "comboMailStep": "Step 2 · Correio checkout: {amount} {per}",
+      "comboRenewal": "Then {amount} {per} for Send + Correio.",
+      "comboContinue": "Continue: pay for Send (1 of 2)"
     },
     "capPerDay": "{n} emails / day",
     "capPerMonth": "{n} emails / month",
@@ -348,7 +358,24 @@
     "checkoutSuccess": "Thanks! Your plan updates as soon as Stripe confirms the payment — usually within a few seconds.",
     "checkoutCancel": "Checkout canceled. Your plan is unchanged.",
     "error": "Something went wrong with Stripe. Try again.",
-    "billingPaused": "Billing changes are temporarily paused. Please try again later."
+    "billingPaused": "Billing changes are temporarily paused. Please try again later.",
+    "combo": {
+      "step": "Step 2 of 2 · Correio",
+      "title": "Finish your Correio mailboxes",
+      "summary": "{seats, plural, one {# mailbox} other {# mailboxes}} of {size} · {unit} each · {total} {per}",
+      "confirming": "Confirming your Send payment… this usually takes a few seconds.",
+      "ready": "Your Send plan is active. Correio is a separate subscription: review it at Stripe and pay to activate your mailboxes.",
+      "pay": "Pay for Correio · {total} {per}",
+      "retry": "Check again",
+      "timedOut": "We haven't confirmed your Send payment yet. Check again in a moment; your mailbox choice stays saved in this browser for 24 hours.",
+      "existing": "Your Correio subscription is already active.",
+      "manual": "Choose your mailboxes on the Correio page to finish.",
+      "pending": "The Correio checkout is being prepared. Open the Correio page to continue it.",
+      "unavailable": "Correio purchases are unavailable right now. Please try again later.",
+      "openMailboxes": "Open Correio",
+      "skip": "Not now",
+      "close": "Close"
+    }
   },
   "mcp": {
     "title": "MCP server",

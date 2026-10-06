@@ -13,7 +13,7 @@ import {
 } from "@millionsend/core/plans";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { type CSSProperties, type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { Modal } from "@/components/modal";
 import { Odometer } from "@/components/odometer";
 import { Skeleton } from "@/components/skeleton";
@@ -21,10 +21,23 @@ import { BtnSpinner } from "@/components/spinner";
 import { Switch } from "@/components/switch";
 import { WarnCard } from "@/components/warn-card";
 import { formatDay, formatDayTime, formatUsd } from "@/lib/format";
-import type { LaunchBillingPeriod } from "@/lib/launch-offer";
+import {
+  clearLaunchComboIntent,
+  type LaunchComboIntent,
+  launchComboQuote,
+  readLaunchComboIntent,
+  saveLaunchComboIntent,
+} from "@/lib/launch-combo";
+import {
+  LAUNCH_OFFER,
+  type LaunchBillingPeriod,
+  type LaunchMailboxTierId,
+  parseLaunchMailboxQuantity,
+} from "@/lib/launch-offer";
 import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { QuotaRow } from "../usage/usage-view";
+import { LaunchComboMailStep } from "./launch-combo-step";
 
 const PLANS = ["free", "starter", "pro", "scale"] as const satisfies readonly Plan[];
 /* The slider's stops are the rungs themselves; a daily cap sits on the monthly axis as thirty days of it. */
@@ -140,6 +153,7 @@ export function BillingView({
   const teams = useQuery(trpc.team.list.queryOptions());
   const role = teams.data?.teams.find((m) => m.teamId === teams.data.activeTeamId)?.role;
   const canManage = role === "owner" || role === "admin";
+  const teamId = teams.data?.activeTeamId ?? null;
 
   const redirect = { onSuccess: ({ url }: { url: string }) => window.location.assign(url) };
   // The cap banner reads usage.recent; team.list carries the plan.
@@ -156,6 +170,22 @@ export function BillingView({
     PLAN_RUNGS.find((rung) => rung.key === requestedRung && rung.priceCents > 0)?.key ?? null;
   const [step, setStep] = useState<number | null>(null);
   const [launchInterval, setLaunchInterval] = useState<LaunchBillingPeriod>("month");
+  // Send + Mail combo: Mail is a second, separate Checkout opened after Send.
+  const [comboOn, setComboOn] = useState(false);
+  const [comboTier, setComboTier] = useState<LaunchMailboxTierId>("gib1");
+  const [comboSeats, setComboSeats] = useState("1");
+  const [comboIntent, setComboIntent] = useState<LaunchComboIntent | null>(null);
+  useEffect(() => {
+    if (!teamId) return;
+    const saved = readLaunchComboIntent(teamId);
+    setComboIntent(saved);
+    if (saved) {
+      setComboOn(true);
+      setComboTier(saved.tier);
+      setComboSeats(String(saved.seats));
+      setLaunchInterval(saved.interval);
+    }
+  }, [teamId]);
   const [plansOpen, setPlansOpen] = useState(intent !== null);
   const [changed, setChanged] = useState<{ rung: PlanRungKey; result: RungChange } | null>(null);
   const startCheckout = useMutation(trpc.billing.checkout.mutationOptions(redirect));
@@ -285,7 +315,16 @@ export function BillingView({
     );
   const selected = PLAN_RUNGS[at] ?? current;
   const over = quota.kind === "month" ? Math.max(0, usage.accepted - quota.included) : 0;
-  const newOffer = !hasLiveSubscription ? launchOffer : null;
+  // After a successful return the webhook may still be on its way; offering a
+  // second purchase in that window would only invite a duplicate Checkout.
+  const newOffer = !hasLiveSubscription && checkout !== "success" ? launchOffer : null;
+  const comboSeatCount = parseLaunchMailboxQuantity(comboSeats);
+  const comboQuote =
+    comboOn && comboSeatCount !== null
+      ? launchComboQuote({ interval: launchInterval, tier: comboTier, seats: comboSeatCount })
+      : null;
+  const comboPer = t(launchInterval === "year" ? "launch.perYear" : "perMonth");
+  const showComboStep = !!comboIntent && (hasLiveSubscription || checkout === "success");
   const subscriptionChangesUnavailable =
     hasLiveSubscription && (billingInterval === "year" || subscriptionState !== "confirmed");
   const salePrice = (r: PlanRung) =>
@@ -322,6 +361,14 @@ export function BillingView({
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
       {notice}
+
+      {showComboStep && comboIntent ? (
+        <LaunchComboMailStep
+          intent={comboIntent}
+          canManage={canManage}
+          onDone={() => setComboIntent(null)}
+        />
+      ) : null}
 
       <Card
         title={t("plan")}
@@ -577,6 +624,149 @@ export function BillingView({
               </p>
             ) : null}
           </div>
+          {canManage ? (
+            <fieldset
+              disabled={busy}
+              style={{
+                border: 0,
+                padding: "18px 0 0",
+                margin: "18px 0 0",
+                borderTop: "1px solid var(--ms-line)",
+              }}
+            >
+              <label
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  alignItems: "flex-start",
+                  cursor: busy ? "wait" : "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  className="ms-checkbox"
+                  style={{ marginTop: 3 }}
+                  checked={comboOn}
+                  onChange={(event) => setComboOn(event.target.checked)}
+                />
+                <span>
+                  <span style={{ display: "block", color: "var(--ms-bone)", fontSize: 15 }}>
+                    {t("launch.comboToggle")}
+                  </span>
+                  <span
+                    style={{
+                      display: "block",
+                      color: "var(--ms-muted)",
+                      fontSize: 13,
+                      lineHeight: 1.6,
+                      marginTop: 2,
+                    }}
+                  >
+                    {t("launch.comboHint")}
+                  </span>
+                </span>
+              </label>
+              {comboOn ? (
+                <div style={{ display: "grid", gap: 16, marginTop: 16 }}>
+                  <div role="radiogroup" aria-labelledby="send-launch-mailbox-size">
+                    <div
+                      id="send-launch-mailbox-size"
+                      className="ms-microlabel"
+                      style={{ marginBottom: 10 }}
+                    >
+                      {t("launch.comboSize")}
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                      {LAUNCH_OFFER.mailboxes.map((tier) => (
+                        <label
+                          key={tier.id}
+                          className="ms-btn ms-btn-secondary"
+                          style={{
+                            minHeight: 44,
+                            fontSize: 15,
+                            display: "inline-flex",
+                            gap: 10,
+                            alignItems: "center",
+                            cursor: busy ? "wait" : "pointer",
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="send-launch-mailbox-tier"
+                            value={tier.id}
+                            checked={comboTier === tier.id}
+                            onChange={() => setComboTier(tier.id)}
+                          />
+                          {t("launch.comboTier", {
+                            size: `${tier.storageGiB} GiB`,
+                            price: usd(
+                              tier.monthlyCents *
+                                (launchInterval === "year" ? LAUNCH_OFFER.annualChargedMonths : 1),
+                            ),
+                            per: comboPer,
+                          })}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="ms-field" style={{ maxWidth: 220 }}>
+                    <label htmlFor="send-launch-mailbox-seats">{t("launch.comboQuantity")}</label>
+                    <input
+                      id="send-launch-mailbox-seats"
+                      className="ms-input"
+                      type="number"
+                      inputMode="numeric"
+                      min={LAUNCH_OFFER.previewMailboxQuantity.min}
+                      max={LAUNCH_OFFER.previewMailboxQuantity.max}
+                      step={1}
+                      value={comboSeats}
+                      aria-invalid={comboSeatCount === null || undefined}
+                      aria-describedby="send-launch-mailbox-seats-hint"
+                      onChange={(event) => setComboSeats(event.target.value)}
+                    />
+                    <span
+                      id="send-launch-mailbox-seats-hint"
+                      style={{
+                        fontSize: 12.5,
+                        color: comboSeatCount === null ? "var(--ms-danger)" : "var(--ms-muted)",
+                      }}
+                    >
+                      {t("launch.comboQuantityHint")}
+                    </span>
+                  </div>
+                  {comboQuote ? (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      style={{ display: "grid", gap: 6, fontSize: 14, lineHeight: 1.6 }}
+                    >
+                      <div style={{ color: "var(--ms-bone)" }}>
+                        {t("launch.comboSendStep", {
+                          amount: usd(
+                            launchInterval === "year"
+                              ? newOffer.annualCents
+                              : newOffer.firstMonthlyCents,
+                          ),
+                        })}
+                      </div>
+                      <div style={{ color: "var(--ms-bone)" }}>
+                        {t("launch.comboMailStep", {
+                          amount: usd(comboQuote.mailPeriodCents),
+                          per: comboPer,
+                        })}
+                      </div>
+                      <div style={{ color: "var(--ms-muted)" }}>
+                        {t("launch.comboRenewal", {
+                          amount: usd(comboQuote.recurringPeriodCents),
+                          per: comboPer,
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </fieldset>
+          ) : null}
           <p
             style={{
               fontSize: 13,
@@ -591,13 +781,23 @@ export function BillingView({
             <button
               type="button"
               className="ms-btn ms-btn-primary"
-              disabled={busy}
-              onClick={() =>
-                startCheckout.mutate({ rung: newOffer.rung, interval: launchInterval })
-              }
+              disabled={busy || (comboOn && comboSeatCount === null)}
+              onClick={() => {
+                if (comboOn && comboSeatCount !== null && teamId) {
+                  saveLaunchComboIntent({
+                    teamId,
+                    tier: comboTier,
+                    seats: comboSeatCount,
+                    interval: launchInterval,
+                  });
+                } else {
+                  clearLaunchComboIntent();
+                }
+                startCheckout.mutate({ rung: newOffer.rung, interval: launchInterval });
+              }}
             >
               <BtnSpinner on={startCheckout.isPending} />
-              {t("launch.continue")}
+              {t(comboOn ? "launch.comboContinue" : "launch.continue")}
             </button>
           ) : (
             <p style={{ color: "var(--ms-muted)", fontSize: 14 }}>{t("readOnly")}</p>
