@@ -217,3 +217,192 @@ describe("quotaRoom", () => {
     expect(quotaRoom({ reserved: true, accepted: 5_000, ceiling: null })).toBeNull();
   });
 });
+
+describe("period financial snapshots", () => {
+  const terms = (id: string): NonNullable<typeof schema.teams.$inferSelect.billingTerms> => ({
+    version: 1,
+    teamId: id,
+    customerId: "cus_snapshot",
+    subscriptionId: "sub_snapshot",
+    baseItemId: "si_base",
+    basePriceId: "price_base_old",
+    overageItemId: "si_meter",
+    overagePriceId: "price_meter_old",
+    currency: "usd",
+    centsPerBlock: 130,
+    blockSize: 1000,
+    rounding: "up",
+    included: 100,
+    periodStart: PERIOD.toISOString(),
+    periodEnd: NEXT_PERIOD.toISOString(),
+    verifiedAt: PERIOD.toISOString(),
+  });
+
+  it("freezes original financial terms while a re-verification timestamp cannot change their price", async () => {
+    const id = await createTeam(db, "snapshot-same");
+    const original = terms(id);
+    expect(
+      await reservePeriodQuota(db, {
+        teamId: id,
+        count: 100,
+        included: 100,
+        periodStart: PERIOD,
+        overage: true,
+        billingTerms: original,
+        day: DAY,
+      }),
+    ).toEqual({ reserved: true, accepted: 100, ceiling: 500 });
+    expect(
+      await reservePeriodQuota(db, {
+        teamId: id,
+        count: 50,
+        included: 100,
+        periodStart: PERIOD,
+        overage: true,
+        billingTerms: { ...original, verifiedAt: "2026-08-15T12:00:00.000Z" },
+        day: DAY,
+      }),
+    ).toEqual({ reserved: true, accepted: 150, ceiling: 500 });
+    const [row] = await db
+      .select()
+      .from(schema.usagePeriods)
+      .where(and(eq(schema.usagePeriods.teamId, id), eq(schema.usagePeriods.periodStart, PERIOD)));
+    expect(row?.billingTerms).toEqual(original);
+  });
+
+  it("refuses excess when current price IDs conflict with the original period and preserves counters and pins", async () => {
+    const id = await createTeam(db, "snapshot-conflict");
+    const original = terms(id);
+    await reservePeriodQuota(db, {
+      teamId: id,
+      count: 100,
+      included: 100,
+      periodStart: PERIOD,
+      overage: true,
+      billingTerms: original,
+      day: DAY,
+    });
+    await db
+      .update(schema.usagePeriods)
+      .set({ reportedOverage: 7, pendingOverage: 11 })
+      .where(eq(schema.usagePeriods.teamId, id));
+    const changed = {
+      ...original,
+      basePriceId: "price_base_new",
+      overagePriceId: "price_meter_new",
+      centsPerBlock: 35,
+    };
+    expect(
+      await reservePeriodQuota(db, {
+        teamId: id,
+        count: 1,
+        included: 100,
+        periodStart: PERIOD,
+        overage: true,
+        billingTerms: changed,
+        day: DAY,
+      }),
+    ).toEqual({ reserved: false, accepted: 100, ceiling: 100 });
+    expect(
+      await reservePeriodQuota(db, {
+        teamId: id,
+        count: 1,
+        included: 100,
+        periodStart: PERIOD,
+        overage: true,
+        day: DAY,
+      }),
+    ).toEqual({ reserved: false, accepted: 100, ceiling: 100 });
+    const [row] = await db
+      .select()
+      .from(schema.usagePeriods)
+      .where(eq(schema.usagePeriods.teamId, id));
+    expect(row).toMatchObject({
+      accepted: 100,
+      reportedOverage: 7,
+      pendingOverage: 11,
+      billingTerms: original,
+    });
+    expect(await acceptedOn(id, DAY)).toBe(100);
+  });
+
+  it("can accept within the paid cap after a terms conflict without rewriting the original snapshot", async () => {
+    const id = await createTeam(db, "snapshot-under-cap");
+    const original = terms(id);
+    await reservePeriodQuota(db, {
+      teamId: id,
+      count: 40,
+      included: 100,
+      periodStart: PERIOD,
+      overage: true,
+      billingTerms: original,
+      day: DAY,
+    });
+    expect(
+      await reservePeriodQuota(db, {
+        teamId: id,
+        count: 60,
+        included: 100,
+        periodStart: PERIOD,
+        overage: true,
+        billingTerms: { ...original, basePriceId: "price_new" },
+        day: DAY,
+      }),
+    ).toEqual({ reserved: true, accepted: 100, ceiling: 100 });
+    const [row] = await db
+      .select()
+      .from(schema.usagePeriods)
+      .where(eq(schema.usagePeriods.teamId, id));
+    expect(row?.billingTerms).toEqual(original);
+  });
+
+  it("routes verified snapshots centrally and keeps annual monthly windows as separate hard-capped rows", async () => {
+    const id = await createTeam(db, "snapshot-central");
+    const original = terms(id);
+    await reserveQuota(db, {
+      teamId: id,
+      count: 10,
+      day: DAY,
+      quota: {
+        kind: "month",
+        plan: "pro",
+        included: 100,
+        periodStart: PERIOD,
+        periodEnd: NEXT_PERIOD,
+        overage: true,
+        overageCentsPer1k: 130,
+        billingTerms: original,
+      },
+    });
+    const [row] = await db
+      .select()
+      .from(schema.usagePeriods)
+      .where(eq(schema.usagePeriods.teamId, id));
+    expect(row?.billingTerms).toEqual(original);
+    const annual = await createTeam(db, "annual-monthly-counts");
+    const first = {
+      kind: "month" as const,
+      plan: "pro" as const,
+      included: 110_000,
+      periodStart: PERIOD,
+      periodEnd: NEXT_PERIOD,
+      overage: false,
+      overageCentsPer1k: null,
+    };
+    expect(
+      await reserveQuota(db, { teamId: annual, count: 110_000, quota: first, day: DAY }),
+    ).toMatchObject({ reserved: true, accepted: 110_000 });
+    expect(
+      await reserveQuota(db, { teamId: annual, count: 1, quota: first, day: DAY }),
+    ).toMatchObject({ reserved: false });
+    expect(
+      await reserveQuota(db, {
+        teamId: annual,
+        count: 1,
+        quota: { ...first, periodStart: NEXT_PERIOD, periodEnd: new Date("2026-10-01T00:00:00Z") },
+        day: "2026-09-01",
+      }),
+    ).toMatchObject({ reserved: true, accepted: 1 });
+    expect(await readPeriodUsage(db, annual, PERIOD)).toMatchObject({ accepted: 110_000 });
+  });
+});

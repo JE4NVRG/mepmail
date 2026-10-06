@@ -11,7 +11,7 @@ import { type Db, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getMailboxUsage } from "@/server/mailbox-usage";
 import { seedMailboxTestService } from "./mailbox-service-fixture";
 
@@ -204,6 +204,76 @@ async function outbox(
 }
 
 describe("private mailbox usage", () => {
+  it.each([500, 2000])(
+    "shows only the current annual recipient window (%i) and all retained storage",
+    async (limit) => {
+      const annualStart = new Date("2026-01-31T10:20:30.456Z");
+      const monthlyStart = new Date("2026-02-28T10:20:30.456Z");
+      const monthlyEnd = new Date("2026-03-31T10:20:30.456Z");
+      const annualEnd = new Date("2027-01-31T10:20:30.456Z");
+      await db
+        .update(schema.mailboxSubscriptions)
+        .set({
+          interval: "year",
+          periodStart: annualStart,
+          periodEnd: annualEnd,
+          includedOutboundPerMailbox: limit,
+        })
+        .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+      await storedItem(personId, 100, { createdAt: annualStart });
+      await storedItem(personId, 200, { trashedAt: annualStart });
+      await outbox(personId, "accepted", 20, {
+        periodStart: annualStart,
+        periodEnd: monthlyStart,
+      });
+      await outbox(personId, "queued", 2, { periodStart: monthlyStart, periodEnd: monthlyEnd });
+      await outbox(personId, "unknown", 3, { periodStart: monthlyStart, periodEnd: monthlyEnd });
+      await outbox(personId, "failed", 4, { periodStart: monthlyStart, periodEnd: monthlyEnd });
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(monthlyStart);
+        expect((await usage(personId)).mailboxes[0]).toMatchObject({
+          outboundUsedRecipients: 5,
+          outboundLimitRecipients: limit,
+          periodStart: monthlyStart,
+          periodEnd: monthlyEnd,
+          // Old sent MIME, Trash, drafts and pending/failed payloads all remain stored.
+          storageUsedBytes: 1700,
+        });
+        vi.setSystemTime(annualEnd);
+        expect((await usage(personId)).mailboxes[0]).toMatchObject({
+          outboundUsedRecipients: 0,
+          periodStart: null,
+          periodEnd: null,
+          storageUsedBytes: 1700,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("does not split a legacy monthly provider period on March 28", async () => {
+    const begin = new Date("2026-02-28T10:00:00Z");
+    const end = new Date("2026-03-31T10:00:00Z");
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({ interval: "month", periodStart: begin, periodEnd: end })
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+    await outbox(personId, "queued", 2, { periodStart: begin, periodEnd: end });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-03-28T12:00:00Z"));
+      expect((await usage(personId)).mailboxes[0]).toMatchObject({
+        outboundUsedRecipients: 2,
+        periodStart: begin,
+        periodEnd: end,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reports empty per-box usage with its actual subscription limits and period", async () => {
     const result = await usage();
     expect(result.mailboxes).toHaveLength(2);

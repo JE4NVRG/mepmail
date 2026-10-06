@@ -1,8 +1,9 @@
-import { DAY_MS, teamRung } from "@millionsend/core";
-import { schema } from "@millionsend/db";
+import { DAY_MS, type SendOverageTerms, verifiedSendOverageTerms } from "@millionsend/core";
+import { type Db, schema } from "@millionsend/db";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import type { BillingDeps } from "./checkout.js";
 import { METER_EVENT_NAME } from "./prices.js";
+import { lockCustomer } from "./subscription.js";
 
 /** Stripe refuses meter events older than this; a row that stale is logged and left. */
 const METER_MAX_AGE_MS = 35 * DAY_MS;
@@ -12,18 +13,87 @@ export interface OverageReport {
   failed: number;
 }
 
+type PeriodKey = { teamId: string; periodStart: Date };
+type Step = PeriodKey & { customerId: string; from: number; to: number; terms: SendOverageTerms };
+
+/** Customer -> team -> period is also the subscription-change lock order. */
+async function readLocked(db: Db, key: PeriodKey) {
+  const [team] = await db
+    .select()
+    .from(schema.teams)
+    .where(eq(schema.teams.id, key.teamId))
+    .for("update");
+  if (!team) return null;
+  const [period] = await db
+    .select()
+    .from(schema.usagePeriods)
+    .where(
+      and(
+        eq(schema.usagePeriods.teamId, key.teamId),
+        eq(schema.usagePeriods.periodStart, key.periodStart),
+      ),
+    )
+    .for("update");
+  return period ? { team, period } : null;
+}
+
+function samePrices(a: SendOverageTerms, b: SendOverageTerms): boolean {
+  return (
+    a.baseItemId === b.baseItemId &&
+    a.basePriceId === b.basePriceId &&
+    a.overagePriceId === b.overagePriceId &&
+    a.centsPerBlock === b.centsPerBlock &&
+    a.included === b.included
+  );
+}
+
+/** A historical row keeps its own terms, but must still name the actual current prices. */
+function termsOf(
+  row: NonNullable<Awaited<ReturnType<typeof readLocked>>>,
+): SendOverageTerms | null {
+  const { team, period } = row;
+  if (!team.currentPeriodStart || !team.currentPeriodEnd) return null;
+  const binding = {
+    teamId: team.id,
+    customerId: team.stripeCustomerId,
+    subscriptionId: team.stripeSubscriptionId,
+    overageItemId: team.stripeOverageItemId,
+  };
+  const current = verifiedSendOverageTerms(team.billingTerms, {
+    ...binding,
+    periodStart: team.currentPeriodStart,
+    periodEnd: team.currentPeriodEnd,
+  });
+  // Accepted usage without a snapshot cannot be priced retroactively from today's terms.
+  const historical = verifiedSendOverageTerms(period.billingTerms, {
+    ...binding,
+    periodStart: period.periodStart,
+  });
+  return current &&
+    historical &&
+    samePrices(current, historical) &&
+    historical.periodEnd <= current.periodEnd
+    ? historical
+    : null;
+}
+
+function eventTime(terms: SendOverageTerms, now: Date): Date | null {
+  const end = new Date(terms.periodEnd);
+  const at = now >= end ? new Date(end.getTime() - 1000) : now;
+  return Number.isFinite(at.getTime()) && now.getTime() - at.getTime() <= METER_MAX_AGE_MS
+    ? at
+    : null;
+}
+
 /**
- * Sends past the included volume, for every period row that has more of
- * them than the meter already knows about, one event per team and period
- * per run. Three steps per row, each its own statement: the row first pins
- * the counter the event will advance to (`pendingOverage`), the event goes
- * out with an identifier naming both ends of the step, then the row catches
- * up. A crash between the last two leaves the pin, so the next run re-sends
- * the same value under the same identifier and Stripe drops it as a
- * duplicate; a Stripe failure leaves the pin for the next run too. Usage of
- * a period that already ended is stamped inside that period, which is where
- * Stripe invoices it (the invoice stays a draft for about an hour after the
- * period closes).
+ * The first transaction validates and commits a durable pendingOverage pin.
+ * A second transaction takes the same Customer lock, rereads both price bindings,
+ * and holds that lock through the provider call. Its local HTTP-error catch commits
+ * without clearing the pin. A crash or failed commit after POST therefore retries
+ * the same Stripe identifier rather than creating a new financial step.
+ *
+ * If invoked with an existing transaction (subscription removal), these are
+ * savepoints: durability still depends on that caller's eventual outer commit.
  */
 export async function reportOverage(
   deps: BillingDeps,
@@ -33,19 +103,9 @@ export async function reportOverage(
   const log = deps.log ?? console.warn;
   const t = schema.teams;
   const p = schema.usagePeriods;
-  const rows = await deps.db
-    .select({
-      teamId: t.id,
-      customerId: t.stripeCustomerId,
-      plan: t.plan,
-      planQuota: t.planQuota,
-      currentPeriodStart: t.currentPeriodStart,
-      currentPeriodEnd: t.currentPeriodEnd,
-      periodStart: p.periodStart,
-      accepted: p.accepted,
-      reportedOverage: p.reportedOverage,
-      pendingOverage: p.pendingOverage,
-    })
+  // This is only discovery. Every financial field is read again under the Customer lock.
+  const candidates = await deps.db
+    .select({ teamId: t.id, customerId: t.stripeCustomerId, periodStart: p.periodStart })
     .from(p)
     .innerJoin(t, eq(t.id, p.teamId))
     .where(
@@ -57,59 +117,117 @@ export async function reportOverage(
     );
   let reported = 0;
   let failed = 0;
-  for (const row of rows) {
-    // The system plan has no rung and is never metered, whatever Stripe ids
-    // its row still carries; one throw here would stop the run for every team.
-    if (row.plan === "system") continue;
-    const rung = teamRung(row.plan, row.planQuota);
-    if (rung.period !== "month" || !row.customerId) continue;
-    const from = row.reportedOverage;
-    // A pinned step is finished before a new one starts.
-    const to = row.pendingOverage ?? row.accepted - rung.included;
-    if (to <= from) continue;
-    // A period before the current one ended where the current one starts;
-    // the current one ends at the recorded period end. A row keyed at or past
-    // that end (the renewal webhook not landed yet) is still running.
-    const ps = row.periodStart.getTime();
-    const end =
-      row.currentPeriodStart && ps < row.currentPeriodStart.getTime()
-        ? row.currentPeriodStart
-        : row.currentPeriodEnd && ps < row.currentPeriodEnd.getTime()
-          ? row.currentPeriodEnd
-          : null;
-    const at = end && now.getTime() >= end.getTime() ? new Date(end.getTime() - 1000) : now;
-    if (now.getTime() - at.getTime() > METER_MAX_AGE_MS) {
-      log(
-        `overage: team ${row.teamId} period ${row.periodStart.toISOString()} is too old to meter`,
-      );
-      failed += 1;
-      continue;
-    }
-    const key = and(eq(p.teamId, row.teamId), eq(p.periodStart, row.periodStart));
+  for (const candidate of candidates) {
+    if (!candidate.customerId) continue;
     try {
-      if (row.pendingOverage === null) {
-        const pinned = await deps.db
-          .update(p)
-          .set({ pendingOverage: to })
-          .where(and(key, eq(p.reportedOverage, from), isNull(p.pendingOverage)))
-          .returning({ pendingOverage: p.pendingOverage });
-        // Another run pinned this row first; its event carries the usage.
-        if (pinned.length === 0) continue;
+      const prepared = await deps.db.transaction(
+        async (transaction): Promise<Step | "failed" | null> => {
+          const tx = transaction as unknown as Db;
+          await lockCustomer(tx, candidate.customerId as string);
+          const row = await readLocked(tx, candidate);
+          if (!row || row.team.plan === "system") return null;
+          const terms = termsOf(row);
+          if (!terms || row.team.stripeCustomerId !== candidate.customerId) {
+            if (
+              row.period.pendingOverage !== null ||
+              row.period.accepted > (row.team.planQuota ?? 0)
+            ) {
+              log(
+                `overage: team ${candidate.teamId} period ${candidate.periodStart.toISOString()} has no verified terms; preserved`,
+              );
+              return "failed";
+            }
+            return null;
+          }
+          const from = row.period.reportedOverage;
+          const to = row.period.pendingOverage ?? row.period.accepted - terms.included;
+          if (to <= from) return null;
+          if (!eventTime(terms, now)) {
+            log(
+              `overage: team ${candidate.teamId} period ${candidate.periodStart.toISOString()} is outside the meter window`,
+            );
+            return "failed";
+          }
+          if (row.period.pendingOverage === null) {
+            const pinned = await tx
+              .update(p)
+              .set({ pendingOverage: to })
+              .where(
+                and(
+                  eq(p.teamId, candidate.teamId),
+                  eq(p.periodStart, candidate.periodStart),
+                  eq(p.reportedOverage, from),
+                  isNull(p.pendingOverage),
+                ),
+              )
+              .returning({ pendingOverage: p.pendingOverage });
+            if (!pinned.length) return null;
+          }
+          return { ...candidate, customerId: candidate.customerId as string, from, to, terms };
+        },
+      );
+      if (!prepared) continue;
+      if (prepared === "failed") {
+        failed += 1;
+        continue;
       }
-      await deps.stripe.billing.meterEvents.create({
-        event_name: METER_EVENT_NAME,
-        identifier: `${row.teamId}:${row.periodStart.getTime()}:${from}:${to}`,
-        timestamp: Math.floor(at.getTime() / 1000),
-        payload: { stripe_customer_id: row.customerId, value: String(to - from) },
-      });
-      await deps.db
-        .update(p)
-        .set({ reportedOverage: to, pendingOverage: null })
-        .where(and(key, eq(p.reportedOverage, from)));
-      reported += 1;
+      const outcome = await deps.db.transaction(
+        async (transaction): Promise<"reported" | "failed" | null> => {
+          const tx = transaction as unknown as Db;
+          await lockCustomer(tx, prepared.customerId);
+          const row = await readLocked(tx, prepared);
+          // Another reporter may already have finished this exact pinned step.
+          if (row && row.period.reportedOverage !== prepared.from) return null;
+          const terms = row ? termsOf(row) : null;
+          const at = terms ? eventTime(terms, now) : null;
+          if (
+            !row ||
+            row.team.plan === "system" ||
+            row.team.stripeCustomerId !== prepared.customerId ||
+            !terms ||
+            !samePrices(terms, prepared.terms) ||
+            terms.periodEnd !== prepared.terms.periodEnd ||
+            row.period.pendingOverage !== prepared.to ||
+            !at
+          ) {
+            log(
+              `overage: team ${prepared.teamId} price binding changed before reporting; pin preserved`,
+            );
+            return "failed";
+          }
+          try {
+            await deps.stripe.billing.meterEvents.create({
+              event_name: METER_EVENT_NAME,
+              identifier: `${prepared.teamId}:${prepared.periodStart.getTime()}:${prepared.from}:${prepared.to}`,
+              timestamp: Math.floor(at.getTime() / 1000),
+              payload: {
+                stripe_customer_id: prepared.customerId,
+                value: String(prepared.to - prepared.from),
+              },
+            });
+          } catch (err) {
+            log(`overage: team ${prepared.teamId} report failed: ${String(err)}`);
+            return "failed";
+          }
+          await tx
+            .update(p)
+            .set({ reportedOverage: prepared.to, pendingOverage: null })
+            .where(
+              and(
+                eq(p.teamId, prepared.teamId),
+                eq(p.periodStart, prepared.periodStart),
+                eq(p.reportedOverage, prepared.from),
+                eq(p.pendingOverage, prepared.to),
+              ),
+            );
+          return "reported";
+        },
+      );
+      if (outcome === "reported") reported += 1;
+      else if (outcome === "failed") failed += 1;
     } catch (err) {
       failed += 1;
-      log(`overage: team ${row.teamId} report failed: ${String(err)}`);
+      log(`overage: team ${candidate.teamId} report failed: ${String(err)}`);
     }
   }
   return { reported, failed };

@@ -1,4 +1,7 @@
 import type { schema } from "@millionsend/db";
+import { monthlyBillingUsagePeriod } from "./billing-usage-period.js";
+import { type SendBillingContract, verifiedSendBillingContract } from "./send-billing-contract.js";
+import { type SendOverageTerms, verifiedSendOverageTerms } from "./send-overage-terms.js";
 import { DAY_MS } from "./utc-day.js";
 
 export type Plan = (typeof schema.planEnum.enumValues)[number];
@@ -184,11 +187,19 @@ export const QUOTA_TOLERANCE = 0.5;
 
 /** The billing columns a quota is derived from. */
 export interface QuotaTeamRow {
+  id?: string;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  stripeOverageItemId?: string | null;
+  sendBillingContract?: SendBillingContract | null;
+  billingTerms?: SendOverageTerms | null;
   plan: Plan;
   planQuota: number | null;
   currentPeriodStart: Date | null;
   currentPeriodEnd: Date | null;
   overageEnabled: boolean;
+  /** Effective subscription rate, never inferred from the current catalog. */
+  overageCentsPer1k?: number | null;
   /** Operator ceiling on the team's UTC day (instance console); null or absent = the plan decides. */
   dailySendCeiling?: number | null | undefined;
 }
@@ -212,7 +223,9 @@ export type TeamQuota =
       periodEnd: Date;
       /** Sends past `included` bill instead of stopping. */
       overage: boolean;
-      overageCentsPer1k: number;
+      overageCentsPer1k: number | null;
+      /** Verified financial terms frozen into the usage row at reservation. */
+      billingTerms?: SendOverageTerms | null;
       /** An operator ceiling on each UTC day inside the period; absent or null = the period alone caps. */
       dailyCeiling?: number | null | undefined;
     };
@@ -245,16 +258,79 @@ function planQuota(team: QuotaTeamRow, isCloud: boolean, now: Date): TeamQuota {
   const plan = effectivePlan(team.plan, team.currentPeriodEnd, now);
   if (plan === "system") return { kind: "none" };
   const rung = teamRung(plan, plan === team.plan ? team.planQuota : null);
-  if (rung.period === "day") return { kind: "day", plan, limit: rung.included };
+  const contract = verifiedSendBillingContract(team.sendBillingContract, {
+    teamId: team.id ?? "",
+    customerId: team.stripeCustomerId ?? null,
+    subscriptionId: team.stripeSubscriptionId ?? null,
+    financialPeriodStart: team.currentPeriodStart,
+    financialPeriodEnd: team.currentPeriodEnd,
+  });
+  if (team.sendBillingContract?.billingInterval === "year") {
+    if (!contract || plan === "free")
+      return { kind: "day", plan: "free", limit: PLAN_RUNGS[0].included };
+    const usage = monthlyBillingUsagePeriod(
+      {
+        currentPeriodStart: new Date(contract.financialPeriodStart),
+        currentPeriodEnd: new Date(contract.financialPeriodEnd),
+      },
+      now,
+    );
+    if (!usage) return { kind: "day", plan: "free", limit: PLAN_RUNGS[0].included };
+    return {
+      kind: "month",
+      plan,
+      included: contract.included,
+      periodStart: usage.start,
+      periodEnd: usage.end,
+      overage: false,
+      overageCentsPer1k: null,
+    };
+  }
+  if (rung.period === "day") {
+    return {
+      kind: "day",
+      plan,
+      limit:
+        plan === team.plan && contract?.usageInterval === "day" ? contract.included : rung.included,
+    };
+  }
   const period = quotaPeriod(team, now);
+  // Stored pre-migration quotas remain caps; unknown tariffs never create a bill.
+  const storedQuota =
+    plan === team.plan &&
+    team.planQuota !== null &&
+    Number.isSafeInteger(team.planQuota) &&
+    team.planQuota > 0
+      ? team.planQuota
+      : rung.included;
+  const included = contract?.usageInterval === "month" ? contract.included : storedQuota;
+  const candidateTerms =
+    contract?.billingInterval === "month"
+      ? verifiedSendOverageTerms(team.billingTerms, {
+          teamId: team.id ?? "",
+          customerId: team.stripeCustomerId ?? null,
+          subscriptionId: team.stripeSubscriptionId ?? null,
+          overageItemId: team.stripeOverageItemId ?? null,
+          periodStart: period.start,
+          periodEnd: period.end,
+        })
+      : null;
+  const terms =
+    candidateTerms &&
+    candidateTerms.baseItemId === contract?.baseItemId &&
+    candidateTerms.basePriceId === contract?.basePriceId &&
+    candidateTerms.included === included
+      ? candidateTerms
+      : null;
   return {
     kind: "month",
     plan,
-    included: rung.included,
+    included,
     periodStart: period.start,
     periodEnd: period.end,
-    overage: team.overageEnabled,
-    overageCentsPer1k: rung.overageCentsPer1k ?? 0,
+    overage: team.overageEnabled && terms !== null,
+    overageCentsPer1k: terms?.centsPerBlock ?? null,
+    ...(terms ? { billingTerms: terms } : {}),
   };
 }
 

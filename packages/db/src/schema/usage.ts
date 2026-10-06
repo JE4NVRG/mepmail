@@ -1,5 +1,14 @@
-import { date, index, integer, pgTable, primaryKey, timestamp, uuid } from "drizzle-orm/pg-core";
-import { teams } from "./teams.js";
+import {
+  date,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
+import { type BillingTerms, teams } from "./teams.js";
 
 /**
  * Daily send counters (UTC day). Quota is reserved with an atomic
@@ -87,6 +96,8 @@ export const usagePeriods = pgTable(
       .notNull()
       .references(() => teams.id, { onDelete: "cascade" }),
     periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+    // Stripe-derived terms captured for this window; later catalog changes cannot reprice usage.
+    billingTerms: jsonb("billing_terms").$type<BillingTerms>(),
     accepted: integer("accepted").notNull().default(0),
     reportedOverage: integer("reported_overage").notNull().default(0),
     // The counter a meter event in flight advances to: set before the event

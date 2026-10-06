@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mailboxBillingOffers } from "@/server/mailbox-billing";
 import { mailboxesRouter } from "@/server/routers/mailboxes";
 import { type Context, createCallerFactory, router } from "@/server/trpc";
+import type { SendBillingContract } from "../../../packages/core/src/send-billing-contract";
 
 const runtime = vi.hoisted(() => ({
   env: {
@@ -28,9 +29,13 @@ vi.mock("@millionsend/billing", () => ({
 vi.mock("@/server/billing", () => ({ getStripe: runtime.getStripe }));
 // Checkout does not touch private content, keys, queues or registry mutations.
 // Keep its actual router, middleware, catalog resolver and membership presentation.
-vi.mock("@millionsend/core", () => {
+vi.mock("@millionsend/core", async () => {
+  const { verifiedSendBillingContract } = await import(
+    "../../../packages/core/src/send-billing-contract"
+  );
   class UnusedMailboxError extends Error {}
   return {
+    verifiedSendBillingContract,
     ...Object.fromEntries(
       [
         "appendMailboxActivity",
@@ -100,20 +105,46 @@ const catalog = {
 const teamId = "11111111-1111-4111-8111-111111111111";
 const userId = "customer_checkout_fixture_owner";
 const checkoutUrl = "https://checkout.stripe.com/c/pay/customer_fixture";
+const sendingPeriodStart = new Date("2020-01-01");
+const sendingPeriodEnd = new Date("2030-01-01");
+const sendingContract = {
+  version: 1,
+  teamId,
+  customerId: "cus_sending_checkout_fixture",
+  subscriptionId: "sub_sending_checkout_fixture",
+  baseItemId: "si_sending_checkout_fixture",
+  basePriceId: "price_sending_checkout_fixture",
+  currency: "usd",
+  baseAmountCents: 2900,
+  billingInterval: "month",
+  intervalCount: 1,
+  included: 110_000,
+  usageInterval: "month",
+  regularMonthlyCents: 2900,
+  financialPeriodStart: sendingPeriodStart.toISOString(),
+  financialPeriodEnd: sendingPeriodEnd.toISOString(),
+  usageAnchor: sendingPeriodStart.toISOString(),
+  verifiedAt: new Date("2026-10-06").toISOString(),
+} satisfies SendBillingContract;
 const paidSendingMember = {
+  id: teamId,
   role: "owner",
-  plan: "starter",
+  plan: "pro",
   suspendedAt: null as Date | null,
   planStatus: "active",
   stripeCustomerId: "cus_sending_checkout_fixture",
   stripeSubscriptionId: "sub_sending_checkout_fixture",
-  currentPeriodStart: new Date("2020-01-01"),
-  currentPeriodEnd: new Date("2030-01-01"),
+  currentPeriodStart: sendingPeriodStart,
+  currentPeriodEnd: sendingPeriodEnd,
   cancelAt: null as Date | null,
+  sendBillingContract: sendingContract,
 };
-type Member = { role: string; plan: string; suspendedAt: Date | null } & Partial<
-  typeof paidSendingMember
->;
+type Member = {
+  role: string;
+  plan: string;
+  suspendedAt: Date | null;
+  sendBillingContract?: SendBillingContract | null;
+} & Partial<Omit<typeof paidSendingMember, "sendBillingContract">>;
 type Pending = typeof small & { seats: number; livemode: boolean };
 
 /** Only read rows are synthetic. The real presentation rechecks them; this
@@ -183,6 +214,15 @@ describe("customer checkout resolves only server-approved mailbox offers", () =>
     { planStatus: "past_due" },
     { stripeSubscriptionId: "" },
     { currentPeriodEnd: new Date(0) },
+    { sendBillingContract: null },
+    { sendBillingContract: { ...sendingContract, teamId: "another_team" } },
+    {
+      sendBillingContract: {
+        ...sendingContract,
+        baseAmountCents: 2000,
+        regularMonthlyCents: 2000,
+      },
+    },
   ])("requires confirmed Envio before standalone Correio purchase %j", async (changes) => {
     const options = { member: { ...paidSendingMember, ...changes } };
     expect(await customer(options).caller.mailboxes.billing()).toMatchObject({

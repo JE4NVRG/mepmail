@@ -24,6 +24,7 @@ import { getStripe } from "@/server/billing";
 import { mailboxBillingOffer } from "@/server/mailbox-billing";
 import { mailboxesRouter } from "@/server/routers/mailboxes";
 import { type Context, createCallerFactory, router } from "@/server/trpc";
+import type { SendBillingContract } from "../../../packages/core/src/send-billing-contract";
 
 vi.mock("@/server/billing", async (original) => ({
   ...(await original<typeof import("@/server/billing")>()),
@@ -60,6 +61,8 @@ const offer = {
   storageBytesPerMailbox: price.storageBytesPerMailbox,
   includedOutboundPerMailbox: price.includedOutboundPerMailbox,
 };
+const sendingPeriodStart = new Date("2020-01-01");
+const sendingPeriodEnd = new Date("2030-01-01");
 const caller = createCallerFactory(router({ mailboxes: mailboxesRouter }));
 const base = fileURLToPath(new URL("../../../packages/db/drizzle/", import.meta.url));
 const extension = fileURLToPath(new URL("../../../packages/db/mailbox-drizzle/", import.meta.url));
@@ -153,14 +156,38 @@ beforeEach(async () => {
       name: "Offline Mail billing",
       slug: `mail-billing-${sequence}`,
       stripeCustomerId: customerId,
-      plan: "starter",
+      plan: "pro",
       planStatus: "active",
       stripeSubscriptionId: `sub_sending_presentation_fixture_${sequence}`,
-      currentPeriodStart: new Date("2020-01-01"),
-      currentPeriodEnd: new Date("2030-01-01"),
+      currentPeriodStart: sendingPeriodStart,
+      currentPeriodEnd: sendingPeriodEnd,
     })
     .returning({ id: schema.teams.id });
   teamId = team!.id;
+  await db
+    .update(schema.teams)
+    .set({
+      sendBillingContract: {
+        version: 1,
+        teamId,
+        customerId,
+        subscriptionId: `sub_sending_presentation_fixture_${sequence}`,
+        baseItemId: `si_sending_presentation_fixture_${sequence}`,
+        basePriceId: "price_sending_presentation_fixture",
+        currency: "usd",
+        baseAmountCents: 2900,
+        billingInterval: "month",
+        intervalCount: 1,
+        included: 110_000,
+        usageInterval: "month",
+        regularMonthlyCents: 2900,
+        financialPeriodStart: sendingPeriodStart.toISOString(),
+        financialPeriodEnd: sendingPeriodEnd.toISOString(),
+        usageAnchor: sendingPeriodStart.toISOString(),
+        verifiedAt: new Date("2026-10-06").toISOString(),
+      } satisfies SendBillingContract,
+    })
+    .where(eq(schema.teams.id, teamId));
   await db.insert(schema.user).values(
     [owner, member].map((id) => ({
       id,
@@ -246,6 +273,7 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
       active: false,
       licenseKind: "none",
       unlimitedSeats: false,
+      unlimitedOutbound: false,
       resourcePolicyActive: false,
       status: "inactive",
       seats: 0,
@@ -254,6 +282,8 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
       includedOutboundPerMailbox: 0,
       periodStart: null,
       periodEnd: null,
+      usagePeriodStart: null,
+      usagePeriodEnd: null,
       cancelAtPeriodEnd: false,
       cancelAt: null,
     });

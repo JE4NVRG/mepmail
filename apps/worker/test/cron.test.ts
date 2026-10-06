@@ -757,8 +757,53 @@ it("drain on a monthly plan releases while the period has room and holds at the 
   // At the volume with overage off nothing else moves, however many runs.
   expect(await drainQuotaParked(db, deps)).toEqual({ drained: 0, stillParked: 2 });
 
-  // Overage on: the rest go out and the period counter keeps growing.
-  await db.update(schema.teams).set({ overageEnabled: true }).where(eq(schema.teams.id, teamId));
+  // Overage requires the actual provider terms; the flag alone cannot authorize a charge.
+  await db
+    .update(schema.teams)
+    .set({
+      overageEnabled: true,
+      stripeCustomerId: "cus_drain",
+      stripeSubscriptionId: "sub_drain",
+      stripeOverageItemId: "si_drain_overage",
+      sendBillingContract: {
+        version: 1,
+        teamId,
+        customerId: "cus_drain",
+        subscriptionId: "sub_drain",
+        baseItemId: "si_drain_base",
+        basePriceId: "price_drain_base",
+        currency: "usd",
+        baseAmountCents: 2_000,
+        billingInterval: "month",
+        intervalCount: 1,
+        included,
+        usageInterval: "month",
+        regularMonthlyCents: 2_000,
+        financialPeriodStart: periodStart.toISOString(),
+        financialPeriodEnd: periodEnd.toISOString(),
+        usageAnchor: periodStart.toISOString(),
+        verifiedAt: periodStart.toISOString(),
+      },
+      billingTerms: {
+        version: 1,
+        teamId,
+        customerId: "cus_drain",
+        subscriptionId: "sub_drain",
+        baseItemId: "si_drain_base",
+        basePriceId: "price_drain_base",
+        overageItemId: "si_drain_overage",
+        overagePriceId: "price_drain_overage",
+        currency: "usd",
+        centsPerBlock: 90,
+        blockSize: 1000,
+        rounding: "up",
+        included,
+        periodStart: periodStart.toISOString(),
+        periodEnd: periodEnd.toISOString(),
+        verifiedAt: periodStart.toISOString(),
+      },
+    })
+    .where(eq(schema.teams.id, teamId));
   expect(await drainQuotaParked(db, deps)).toEqual({ drained: 2, stillParked: 0 });
   expect(enqueued).toEqual([oldest, middle, newest]);
   const [after] = await db

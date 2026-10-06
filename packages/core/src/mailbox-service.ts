@@ -1,5 +1,6 @@
 import { type Db, schema } from "@millionsend/db";
 import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { monthlyBillingUsagePeriod } from "./billing-usage-period.js";
 
 export class MailboxServiceError extends Error {
   constructor(public readonly code: "not_entitled" | "quota" | "invalid") {
@@ -12,7 +13,20 @@ export const SYSTEM_MAILBOX_STORAGE_BYTES = 50 * 1024 ** 3;
 export type MailboxOperationalPlan = MailboxSubscription & {
   unlimitedSeats: boolean;
   unlimitedOutbound: boolean;
+  usagePeriod: { start: Date; end: Date };
 };
+
+/** Annual financial terms remain intact; only the recipient allowance renews monthly.
+ * Legacy/monthly terms preserve the exact provider boundaries, including Feb 28 -> Mar 31.
+ */
+export function mailboxSubscriptionUsagePeriod(plan: MailboxSubscription, at: Date) {
+  return plan.interval === "year"
+    ? monthlyBillingUsagePeriod(
+        { currentPeriodStart: plan.periodStart, currentPeriodEnd: plan.periodEnd },
+        at,
+      )
+    : { start: new Date(plan.periodStart), end: new Date(plan.periodEnd) };
+}
 
 export function mailboxServiceActive(plan: MailboxSubscription | undefined, now = new Date()) {
   return (
@@ -80,6 +94,7 @@ export async function mailboxServiceEntitlement(
     unlimitedOutbound: system,
     active: allowed && (system || mailboxServiceActive(plan, now)),
     resourcePolicyActive,
+    usagePeriod: system || !plan ? null : mailboxSubscriptionUsagePeriod(plan, now),
   };
 }
 
@@ -87,12 +102,19 @@ export async function mailboxServiceEntitlement(
 export function requireMailboxOperationalPlan(
   entitlement: Awaited<ReturnType<typeof mailboxServiceEntitlement>> | null,
 ): MailboxOperationalPlan {
-  if (!entitlement || !entitlement.active || !entitlement.resourcePolicyActive || !entitlement.plan)
+  if (!entitlement?.active || !entitlement.resourcePolicyActive || !entitlement.plan)
+    throw new MailboxServiceError("not_entitled");
+  if (!entitlement.unlimitedOutbound && !entitlement.usagePeriod)
     throw new MailboxServiceError("not_entitled");
   return {
     ...entitlement.plan,
     unlimitedSeats: entitlement.unlimitedSeats,
     unlimitedOutbound: entitlement.unlimitedOutbound,
+    // System keeps a stable audit snapshot but no commercial usage window or cap.
+    usagePeriod: entitlement.usagePeriod ?? {
+      start: entitlement.plan.periodStart,
+      end: entitlement.plan.periodEnd,
+    },
   };
 }
 
@@ -117,6 +139,8 @@ export async function mailboxServiceState(db: Db, teamId: string) {
     includedOutboundPerMailbox: plan?.includedOutboundPerMailbox ?? 0,
     periodStart: entitlement.unlimitedOutbound ? null : (plan?.periodStart ?? null),
     periodEnd: entitlement.unlimitedOutbound ? null : (plan?.periodEnd ?? null),
+    usagePeriodStart: entitlement.usagePeriod?.start ?? null,
+    usagePeriodEnd: entitlement.usagePeriod?.end ?? null,
     cancelAtPeriodEnd: plan?.cancelAtPeriodEnd ?? false,
     cancelAt: plan?.cancelAt ?? null,
   };

@@ -286,6 +286,24 @@
       "incomplete": "Incomplete"
     },
     "cap": "Sending quota",
+    "effectiveBasePrice": "Your subscription's base price: {price} / month.",
+    "subscriptionConfirmationPending": "We are confirming your subscription terms. Prices and plan changes will be available after confirmation. Your existing contract remains unchanged; you can still open the billing portal.",
+    "annualChangesUnavailable": "Plan changes for annual subscriptions are not available yet. Your current contract is preserved. Use the billing portal to manage payment details or cancellation.",
+    "effectiveAnnualBasePrice": "Your subscription's base price: {price} / year, paid upfront.",
+    "effectiveRateUnavailable": "The contracted overage rate is unavailable. We cannot estimate an extra charge.",
+    "launch": {
+      "title": "Send · 110,000 deliveries a month",
+      "included": "{n} recipient deliveries each month for your API, transactional emails and campaigns.",
+      "interval": "Payment interval",
+      "month": "Monthly",
+      "year": "Annual · pay for 10 months",
+      "perYear": "/ year",
+      "monthlyTerms": "Eligible new customers pay {first} for the first monthly bill, then {renewal} / month. The introductory discount is confirmed at checkout.",
+      "annualTerms": "Pay {total} upfront for 12 months; equivalent to {equivalent} / month, not a monthly bill. The first-month promotion does not apply to annual payment.",
+      "annualHardCap": "Your 110,000-delivery allowance renews each month. Annual subscriptions pause new sending at that limit and have no automatic overage charge.",
+      "existingPreserved": "Existing subscriptions keep their contracted prices and limits. This offer does not change an active subscription.",
+      "continue": "Continue to checkout"
+    },
     "capPerDay": "{n} emails / day",
     "capPerMonth": "{n} emails / month",
     "renewsOn": "Renews on",
@@ -329,12 +347,7 @@
     },
     "checkoutSuccess": "Thanks! Your plan updates as soon as Stripe confirms the payment — usually within a few seconds.",
     "checkoutCancel": "Checkout canceled. Your plan is unchanged.",
-    "error": "Something went wrong with Stripe. Try again.",
-    "checkoutPending": "Your earlier checkout is still being verified. Wait before trying another purchase; contact support if it remains pending.",
-    "checkoutUnknown": "The result of your earlier checkout is not confirmed. Open the same plan again to verify that attempt, or contact support. Do not start another purchase.",
-    "checkoutConflict": "An earlier checkout already holds a different plan. Choose that same plan to reopen it, or wait until Stripe confirms it has expired.",
-    "checkoutExpired": "Stripe confirmed that this checkout has expired. Choose your plan again to start a new checkout.",
-    "checkoutSubscriptionExists": "Your subscription is already active or awaiting payment. Manage the existing subscription instead of starting another purchase."
+    "error": "Something went wrong with Stripe. Try again."
   },
   "mcp": {
     "title": "MCP server",

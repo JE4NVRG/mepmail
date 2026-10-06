@@ -616,10 +616,12 @@ describe("Mailbox isolation from Send billing, real handler and database", () =>
     const after = await row();
     const normalizeVerification = (value: object) => {
       const snapshot = { ...value } as Record<string, unknown>;
-      const terms = snapshot.billingTerms;
-      if (terms && typeof terms === "object") {
-        const { verifiedAt: _, ...financialTerms } = terms as Record<string, unknown>;
-        snapshot.billingTerms = financialTerms;
+      for (const field of ["billingTerms", "sendBillingContract"]) {
+        const terms = snapshot[field];
+        if (terms && typeof terms === "object") {
+          const { verifiedAt: _, ...financialTerms } = terms as Record<string, unknown>;
+          snapshot[field] = financialTerms;
+        }
       }
       return snapshot;
     };

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { BillingStripe } from "@millionsend/billing";
+import { type BillingStripe, priceMetadata } from "@millionsend/billing";
 import {
   DAY_MS,
   PLAN_RUNGS,
@@ -16,12 +16,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TeamRole } from "@/server/membership";
 import { createBillingRouter } from "@/server/routers/billing";
 import { createCallerFactory, router } from "@/server/trpc";
+import { applySubscription } from "../../../packages/billing/src/subscription";
 
 const h = vi.hoisted(() => ({
   runCronNow: vi.fn(async (_name: string) => {}),
   sent: [] as SystemMailMessage[],
 }));
 vi.mock("@/server/queue", () => ({ getQueue: async () => ({ runCronNow: h.runCronNow }) }));
+// Request-boundary adapters are synthetic; DB, durable checkout and price resolution stay real.
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers(),
+  cookies: async () => ({ get: () => undefined }),
+}));
+vi.mock("next-intl/server", () => ({ getRequestConfig: (factory: unknown) => factory }));
+vi.mock("@/server/auth", () => ({
+  resolveBaseUrl: (url: string) => url,
+  getAuth: () => {
+    throw new Error("Router caller fixture must not initialize authentication");
+  },
+}));
 vi.mock("@/server/system-mail", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/server/system-mail")>();
   return { ...actual, sendAccountMail: (m: SystemMailMessage) => void h.sent.push(m) };
@@ -56,18 +69,44 @@ const seconds = (d: Date) => d.getTime() / 1000;
 
 /** A ladder price as Stripe returns it; the rung is read back off the metadata. */
 function price(key: PlanRungKey, metered = false): Stripe.Price {
+  const rung = rungByKey(key);
   return {
+    active: true,
+    livemode: false,
+    currency: "usd",
+    unit_amount: metered ? rung.overageCentsPer1k : key === "pro_100k" ? 2000 : rung.priceCents,
+    transform_quantity: metered ? { divide_by: 1000, round: "up" } : null,
     id: `price_${key}${metered ? "_overage" : ""}`,
     lookup_key: `millionsend_${key}_${metered ? "overage" : "monthly"}`,
-    metadata: { millionsend_rung: key },
-    recurring: { usage_type: metered ? "metered" : "licensed" },
+    metadata: priceMetadata(rung),
+    recurring: {
+      interval: "month",
+      interval_count: 1,
+      usage_type: metered ? "metered" : "licensed",
+    },
     product: "prod_x",
   } as unknown as Stripe.Price;
 }
-const PRICES = PLAN_RUNGS.filter((r) => r.priceCents > 0).flatMap((r) => [
-  price(r.key),
-  ...(r.period === "month" ? [price(r.key, true)] : []),
-]);
+function launchPrice(interval: "month" | "year"): Stripe.Price {
+  return {
+    ...price("pro_100k"),
+    product: "prod_launch",
+    id: `price_launch_${interval}`,
+    active: true,
+    livemode: false,
+    lookup_key: `mepmail_send_110k_launch_20261006_${interval}`,
+    unit_amount: interval === "year" ? 29_000 : 2_900,
+    metadata: {
+      ...priceMetadata(rungByKey("pro_100k")),
+      mepmail_send_offer: "launch_20261006",
+      regular_monthly_cents: "2900",
+    },
+    recurring: { interval, interval_count: 1, usage_type: "licensed" },
+  } as unknown as Stripe.Price;
+}
+const PRICES = PLAN_RUNGS.filter((r) => r.priceCents > 0)
+  .flatMap((r) => [price(r.key), ...(r.period === "month" ? [price(r.key, true)] : [])])
+  .concat([launchPrice("month"), launchPrice("year")]);
 function priceById(id: string): Stripe.Price {
   const found = PRICES.find((p) => p.id === id);
   if (!found) throw new Error(`no price ${id}`);
@@ -90,6 +129,8 @@ function subscription(items: Stripe.SubscriptionItem[]): Stripe.Subscription {
   return {
     id: "sub_1",
     customer: "cus_1",
+    created: seconds(PERIOD_START),
+    livemode: false,
     status: "active",
     cancel_at: null,
     items: { data: items },
@@ -98,6 +139,20 @@ function subscription(items: Stripe.SubscriptionItem[]): Stripe.Subscription {
 }
 
 const stripe = {
+  invoices: { list: async () => ({ data: [], has_more: false }) },
+  coupons: {
+    retrieve: async () => ({
+      id: "mepmail_send_launch_20261006_first_month",
+      valid: true,
+      livemode: false,
+      currency: "usd",
+      amount_off: 900,
+      percent_off: null,
+      duration: "once",
+      applies_to: { products: ["prod_launch"] },
+      metadata: { mepmail_send_offer: "launch_20261006" },
+    }),
+  },
   prices: {
     list: async ({ lookup_keys }: Stripe.PriceListParams) => ({
       data: PRICES.filter((p) => lookup_keys?.includes(p.lookup_key ?? "")),
@@ -218,6 +273,27 @@ const stripe = {
   },
 } as unknown as BillingStripe;
 
+describe("billing maintenance window", () => {
+  it("blocks financial mutations before loading team or calling Stripe", async () => {
+    vi.stubEnv("BILLING_MUTATIONS_PAUSED", "true");
+    const teamId = await createTeam(db, "Testes QA");
+    const caller = callerFor(teamId, "owner");
+    for (const action of [
+      () => caller.billing.checkout({ rung: "pro_100k" }),
+      () => caller.billing.changePlan({ rung: "pro_200k" }),
+      () => caller.billing.portal(),
+      () => caller.billing.setOverage({ enabled: true }),
+    ]) {
+      await expect(action()).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+    }
+    for (const writes of Object.values(calls)) expect(writes).toEqual([]);
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    expect(team?.plan).toBe("free");
+    expect(team?.stripeCustomerId).toBeNull();
+    expect((await caller.billing.status()).plan).toBe("free");
+  });
+});
+
 const createCaller = createCallerFactory(
   router({ billing: createBillingRouter({ stripe: () => stripe }) }),
 );
@@ -262,7 +338,16 @@ async function subscribedTeam(
       currentPeriodEnd: PERIOD_END,
     })
     .where(eq(schema.teams.id, teamId));
+  await persistSubscriptionTerms();
   return teamId;
+}
+
+async function persistSubscriptionTerms() {
+  await db.transaction(async (tx) => {
+    await applySubscription(tx as unknown as Db, sub, (message) => {
+      throw new Error(message);
+    });
+  });
 }
 
 async function teamRow(teamId: string) {
@@ -308,6 +393,7 @@ beforeEach(async () => {
   onCustomerCreate = undefined;
   vi.stubEnv("IS_CLOUD", "true");
   vi.stubEnv("APP_BASE_URL", "https://app.example.com");
+  vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", "false");
 });
 
 afterEach(async () => {
@@ -319,6 +405,184 @@ afterEach(async () => {
 });
 
 describe("billing router", () => {
+  it("keeps the real legacy USD20 price and checkout when the new offer is disabled", async () => {
+    vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", "false");
+    const existing = await subscribedTeam("pro_100k");
+    await db
+      .update(schema.teams)
+      .set({ sendBillingContract: null })
+      .where(eq(schema.teams.id, existing));
+    const before = await teamRow(existing);
+    const status = await callerFor(existing, "owner").billing.status();
+    expect(status).toMatchObject({
+      effectiveRung: { priceCents: 2000 },
+      billingInterval: "month",
+      subscriptionState: "confirmed",
+      launchOffer: null,
+    });
+    expect(await teamRow(existing)).toEqual(before);
+    const fresh = await createTeam(db, "legacy-checkout");
+    await seedBuyer(fresh);
+    await callerFor(fresh, "owner").billing.checkout({ rung: "pro_100k" });
+    const baseId = calls.checkouts[0]?.line_items?.[0]?.price;
+    expect(baseId).toBe("price_pro_100k");
+    expect(priceById(baseId as string).unit_amount).toBe(2000);
+    expect(calls.checkouts[0]?.metadata?.mepmail_send_offer).toBeUndefined();
+  });
+
+  it.each(["interval", "amount", "binding"] as const)(
+    "hides inconsistent %s readback without changing the customer's contract",
+    async (mismatch) => {
+      const teamId = await subscribedTeam("pro_100k", { overage: true });
+      const before = await teamRow(teamId);
+      const base = sub.items.data[0];
+      if (!base) throw new Error("Missing licensed item");
+      if (mismatch === "interval") sub = subscription([item("si_base", launchPrice("year"))]);
+      else if (mismatch === "amount") base.price = { ...base.price, unit_amount: 2900 };
+      else sub = { ...sub, customer: "cus_other" };
+      const status = await callerFor(teamId, "owner").billing.status();
+      expect(status).toMatchObject({
+        subscriptionState: "pending_confirmation",
+        effectiveRung: null,
+        quota: { overage: false, overageCentsPer1k: null },
+      });
+      expect(status.quota).not.toHaveProperty("billingTerms");
+      expect(await teamRow(teamId)).toEqual(before);
+      expect(calls.updates).toEqual([]);
+      expect(calls.itemCreates).toEqual([]);
+      expect(JSON.stringify(status)).not.toMatch(/cus_|price_|sub_|si_/);
+    },
+  );
+
+  it("reports a validated annual interval and amount without changing an existing customer's terms", async () => {
+    const teamId = await subscribedTeam("pro_100k", { metered: false });
+    sub = subscription([item("si_base", launchPrice("year"))]);
+    await persistSubscriptionTerms();
+    const before = await teamRow(teamId);
+    const state = await callerFor(teamId, "member").billing.status();
+    expect(state.billingInterval).toBe("year");
+    expect(state.effectiveRung?.priceCents).toBe(29000);
+    expect(state.launchOffer).toBeNull();
+    expect(await teamRow(teamId)).toEqual(before);
+    expect(JSON.stringify(state)).not.toMatch(/price_|cus_|sub_/);
+  });
+  it("returns the enabled offer without provider IDs only to a team without an active subscription", async () => {
+    vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", "true");
+    const teamId = await createTeam(db, "offer-free");
+    const state = await callerFor(teamId, "member").billing.status();
+    expect(state.launchOffer).toEqual({
+      rung: "pro_100k",
+      monthlyCents: 2900,
+      firstMonthlyCents: 2000,
+      annualCents: 29000,
+      monthlyRecipientDeliveries: 110000,
+    });
+    expect(state).not.toHaveProperty("sendBillingContract");
+    expect(JSON.stringify(state)).not.toMatch(/price_|cus_|sub_/);
+    const existing = await subscribedTeam("pro_100k");
+    expect((await callerFor(existing, "member").billing.status()).launchOffer).toBeNull();
+    expect((await callerFor(existing, "member").billing.status()).billingInterval).toBe("month");
+    const system = await createTeam(db, "offer-system");
+    await db.update(schema.teams).set({ plan: "system" }).where(eq(schema.teams.id, system));
+    expect((await callerFor(system, "member").billing.status()).launchOffer).toBeNull();
+  });
+
+  it.each([
+    { flag: "false", rung: "pro_100k" as const },
+    { flag: "1", rung: "pro_100k" as const },
+    { flag: "true", rung: "starter" as const },
+    { flag: "true", rung: "pro_200k" as const },
+  ])(
+    "refuses unapproved annual checkout before any provider write ($flag, $rung)",
+    async ({ flag, rung }) => {
+      vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", flag);
+      const teamId = await createTeam(db);
+      await expect(
+        callerFor(teamId, "owner").billing.checkout({ rung, interval: "year" }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST", message: "SEND_CHECKOUT_INVALID" });
+      expect(calls.customers).toEqual([]);
+      expect(calls.checkouts).toEqual([]);
+    },
+  );
+
+  it.each(["month", "year"] as const)(
+    "captures the enabled %s offer in one durable checkout with no annual promo stacking",
+    async (interval) => {
+      vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", "true");
+      const teamId = await createTeam(db);
+      await seedBuyer(teamId);
+      const caller = callerFor(teamId, "owner");
+      await caller.billing.checkout({ rung: "pro_100k", interval });
+      await caller.billing.checkout({ rung: "pro_100k", interval });
+      expect(calls.checkouts).toHaveLength(1);
+      expect(calls.checkouts[0]?.line_items?.[0]).toEqual({
+        price: `price_launch_${interval}`,
+        quantity: 1,
+      });
+      expect(calls.checkouts[0]?.metadata?.mepmail_send_interval).toBe(interval);
+      if (interval === "year") {
+        expect(calls.checkouts[0]?.line_items).toHaveLength(1);
+        expect(calls.checkouts[0]?.discounts).toBeUndefined();
+        expect(calls.checkouts[0]?.allow_promotion_codes).not.toBe(true);
+      } else {
+        expect(calls.checkouts[0]?.discounts).toEqual([
+          { coupon: "mepmail_send_launch_20261006_first_month" },
+        ]);
+      }
+      expect(await db.select().from(schema.sendCheckoutAttempts)).toHaveLength(1);
+      expect((await auditRows())[0]?.data).toMatchObject({
+        interval,
+        checkoutAttemptId: expect.any(String),
+      });
+    },
+  );
+  it("status preserves archived subscription prices through the real resolver and quota path", async () => {
+    const teamId = await subscribedTeam("pro_100k", { overage: true });
+    const base = sub.items.data[0];
+    const metered = sub.items.data[1];
+    if (!base || !metered) throw new Error("Missing subscribed items");
+    base.price = {
+      ...base.price,
+      id: "price_old_base",
+      active: false,
+      lookup_key: null,
+      unit_amount: 2000,
+      metadata: { ...base.price.metadata, overage_cents_per_1k: "90" },
+    };
+    metered.price = {
+      ...metered.price,
+      id: "price_old_metered",
+      active: false,
+      lookup_key: null,
+      unit_amount: 90,
+    };
+    await persistSubscriptionTerms();
+    await db
+      .insert(schema.usagePeriods)
+      .values({ teamId, periodStart: PERIOD_START, accepted: 111001 });
+    const result = await callerFor(teamId, "member").billing.status();
+    expect(result.effectiveRung).toMatchObject({ priceCents: 2000, overageCentsPer1k: 90 });
+    expect(result.quota).toMatchObject({ kind: "month", overageCentsPer1k: 90 });
+    expect(result.quota).not.toHaveProperty("billingTerms");
+    expect(JSON.stringify(result)).not.toMatch(/price_old_|cus_1|sub_1|si_/);
+    expect(calls.updates).toEqual([]);
+    expect(calls.itemCreates).toEqual([]);
+    metered.price.transform_quantity = { divide_by: 1000, round: "down" };
+    expect((await callerFor(teamId, "member").billing.status()).quota).toMatchObject({
+      overageCentsPer1k: null,
+    });
+  });
+
+  it("status keeps unknown rates unavailable rather than falling back to catalog", async () => {
+    const teamId = await subscribedTeam("pro_100k", { overage: true });
+    await db
+      .update(schema.teams)
+      .set({ stripeSubscriptionId: null })
+      .where(eq(schema.teams.id, teamId));
+    expect((await callerFor(teamId, "member").billing.status()).quota).toMatchObject({
+      overageCentsPer1k: null,
+    });
+  });
   it("does not exist on self-host", async () => {
     vi.stubEnv("IS_CLOUD", "");
     const teamId = await createTeam(db);
@@ -341,6 +605,8 @@ describe("billing router", () => {
     const teamId = await createTeam(db);
     expect(await callerFor(teamId, "member").billing.status()).toEqual({
       plan: "free",
+      effectiveRung: null,
+      subscriptionState: "none",
       planQuota: null,
       rung: "free",
       pendingRung: null,
@@ -350,6 +616,8 @@ describe("billing router", () => {
       usage: { accepted: 0, reportedOverage: 0 },
       hasCustomer: false,
       hasLiveSubscription: false,
+      billingInterval: null,
+      launchOffer: null,
     });
   });
 
@@ -430,7 +698,7 @@ describe("billing router", () => {
     expect(await auditRows()).toEqual([
       {
         action: "billing.checkout_started",
-        data: { rung: "scale_1m", checkoutAttemptId: expect.any(String) },
+        data: { rung: "scale_1m", interval: "month", checkoutAttemptId: expect.any(String) },
       },
     ]);
 
@@ -696,9 +964,18 @@ describe("billing router", () => {
     expect(h.runCronNow).toHaveBeenCalledWith("quota.drain");
 
     h.runCronNow.mockClear();
-    await db
-      .insert(schema.usagePeriods)
-      .values({ teamId, periodStart: PERIOD_START, accepted: 110_500 });
+    const subscribed = await teamRow(teamId);
+    if (!subscribed?.billingTerms) {
+      throw new Error(
+        "Subscribed fixture must retain verified billing terms before recording usage",
+      );
+    }
+    await db.insert(schema.usagePeriods).values({
+      teamId,
+      periodStart: PERIOD_START,
+      accepted: 110_500,
+      billingTerms: subscribed.billingTerms,
+    });
     await owner.billing.setOverage({ enabled: false });
     expect(calls.meterEvents).toEqual([
       expect.objectContaining({

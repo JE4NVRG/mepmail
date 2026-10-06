@@ -60,9 +60,11 @@ export async function getMailboxUsage(
         eq(schema.mailboxOutbox.teamId, actor.teamId),
         inArray(schema.mailboxOutbox.mailboxId, ids),
         ne(schema.mailboxOutbox.status, "failed"),
-        entitlement.unlimitedOutbound || !plan
+        entitlement.unlimitedOutbound
           ? undefined
-          : eq(schema.mailboxOutbox.periodStart, plan.periodStart),
+          : entitlement.usagePeriod
+            ? eq(schema.mailboxOutbox.periodStart, entitlement.usagePeriod.start)
+            : sql`false`,
       ),
     )
     .groupBy(schema.mailboxOutbox.mailboxId);
@@ -81,8 +83,8 @@ export async function getMailboxUsage(
       outboundLimitRecipients: entitlement.unlimitedOutbound
         ? null
         : (plan?.includedOutboundPerMailbox ?? 0),
-      periodStart: entitlement.unlimitedOutbound ? null : (plan?.periodStart ?? null),
-      periodEnd: entitlement.unlimitedOutbound ? null : (plan?.periodEnd ?? null),
+      periodStart: entitlement.usagePeriod?.start ?? null,
+      periodEnd: entitlement.usagePeriod?.end ?? null,
     })),
   };
 }

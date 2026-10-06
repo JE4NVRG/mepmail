@@ -17,16 +17,20 @@ export async function createTestDb(): Promise<{ db: Db; close: () => Promise<voi
   const files = readdirSync(migrationsDir)
     .filter((f) => f.endsWith(".sql"))
     .sort();
-  for (const file of files) {
-    const statements = readFileSync(join(migrationsDir, file), "utf8")
-      .split("--> statement-breakpoint")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    await client.transaction(async (tx) => {
-      for (const statement of statements) {
-        await tx.exec(statement);
-      }
-    });
+  try {
+    for (const file of files) {
+      const statements = readFileSync(join(migrationsDir, file), "utf8")
+        .split("--> statement-breakpoint")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      // Match the production migrator: locks and DDL belong to one transaction.
+      await client.transaction(async (migration) => {
+        for (const statement of statements) await migration.exec(statement);
+      });
+    }
+  } catch (error) {
+    await client.close();
+    throw error;
   }
   const db = drizzle(client, { schema }) as unknown as Db;
   return { db, close: () => client.close() };

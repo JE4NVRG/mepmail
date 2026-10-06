@@ -27,7 +27,7 @@ export interface MailboxManagementDeps {
   now?: () => Date;
   /** Paused billing may reconcile provider evidence, but must not dispatch writes. */
   readOnly?: boolean;
-  /** Hosted purchase policy; never inferred from caller inputs. */
+  /** Hosted Envio contract prerequisite for increases/resume, never cancel/reduction. */
   requirePaidSendingPlan?: boolean;
 }
 export interface MailboxManagementInput {

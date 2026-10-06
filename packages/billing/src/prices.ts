@@ -60,7 +60,7 @@ export const isMeteredPrice = (price: Stripe.Price): boolean =>
  * with neither (a rotated one, or the two sold before the ladder), landing
  * on the plan's first rung.
  */
-export function rungFromPrice(price: Stripe.Price): PlanRung | null {
+export function rungIdentityFromPrice(price: Stripe.Price): PlanRung | null {
   const tagged = price.metadata?.[RUNG_METADATA_KEY];
   if (isPlanRungKey(tagged)) return rungByKey(tagged);
   const key = price.lookup_key;
@@ -76,6 +76,84 @@ export function rungFromPrice(price: Stripe.Price): PlanRung | null {
   return PAID_RUNGS.find((r) => r.plan === plan) ?? null;
 }
 
+/** Resolve identity from the catalog, financial terms only from the subscribed price. */
+export function rungFromPrice(price: Stripe.Price): PlanRung | null {
+  const rung = rungIdentityFromPrice(price);
+  if (!rung) return null;
+  const included = positiveMetadataInteger(price.metadata?.included_emails);
+  const period = price.metadata?.period;
+  if (included === null || (period !== "day" && period !== "month") || period !== rung.period)
+    return null;
+  if (!isMeteredPrice(price)) {
+    const interval = price.recurring?.interval;
+    if (
+      price.currency !== "usd" ||
+      !Number.isSafeInteger(price.unit_amount) ||
+      (price.unit_amount ?? 0) <= 0 ||
+      price.recurring?.usage_type !== "licensed" ||
+      (price.recurring.interval_count ?? 1) !== 1 ||
+      (interval !== "month" && interval !== "year")
+    )
+      return null;
+    const offer = price.metadata?.mepmail_send_offer;
+    if (offer) {
+      if (
+        offer !== "launch_20261006" ||
+        rung.key !== "pro_100k" ||
+        included !== 110_000 ||
+        period !== "month" ||
+        price.metadata.regular_monthly_cents !== "2900" ||
+        price.unit_amount !== (interval === "year" ? 29_000 : 2_900)
+      )
+        return null;
+    } else if (interval === "year") {
+      // No historic annual offer is approved; never infer a monthly price from an annual total.
+      return null;
+    } else if (
+      price.metadata?.regular_monthly_cents !== undefined &&
+      positiveMetadataInteger(price.metadata.regular_monthly_cents) !== price.unit_amount
+    ) {
+      return null;
+    }
+  } else if (effectiveOverageRate(price) === null) {
+    return null;
+  }
+  const rawRate = price.metadata?.overage_cents_per_1k;
+  const rate = rawRate && /^\d+$/.test(rawRate) ? Number(rawRate) : null;
+  return {
+    ...rung,
+    priceCents:
+      !isMeteredPrice(price) && Number.isSafeInteger(price.unit_amount)
+        ? (price.unit_amount as number)
+        : rung.priceCents,
+    included,
+    overageCentsPer1k: isMeteredPrice(price)
+      ? effectiveOverageRate(price)
+      : rate !== null && Number.isSafeInteger(rate)
+        ? rate
+        : null,
+  };
+}
+
+function positiveMetadataInteger(value: string | undefined): number | null {
+  if (!value || !/^[1-9]\d*$/.test(value)) return null;
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number <= 2_147_483_647 ? number : null;
+}
+
+/** Unknown/custom transforms must not be presented as the catalog's roundup rate. */
+export function effectiveOverageRate(price: Stripe.Price): number | null {
+  return price.currency === "usd" &&
+    price.recurring?.interval === "month" &&
+    price.recurring.usage_type === "metered" &&
+    price.transform_quantity?.divide_by === 1000 &&
+    price.transform_quantity.round === "up" &&
+    Number.isSafeInteger(price.unit_amount) &&
+    (price.unit_amount ?? -1) >= 0
+    ? price.unit_amount
+    : null;
+}
+
 /** A subscription's plan item and, when overage is on, its metered item. */
 export function subscriptionItems(sub: Stripe.Subscription): {
   base: Stripe.SubscriptionItem | null;
@@ -89,8 +167,20 @@ export function subscriptionItems(sub: Stripe.Subscription): {
 }
 
 export function rungFromSubscription(sub: Stripe.Subscription): PlanRung | null {
-  const { base } = subscriptionItems(sub);
-  return base ? rungFromPrice(base.price) : null;
+  const { base, overage } = subscriptionItems(sub);
+  const baseCount = sub.items.data.filter((item) => !isMeteredPrice(item.price)).length;
+  const overageCount = sub.items.data.filter((item) => isMeteredPrice(item.price)).length;
+  if (baseCount !== 1 || overageCount > 1 || base?.quantity !== 1) return null;
+  const rung = base ? rungFromPrice(base.price) : null;
+  if (!rung) return null;
+  if (base?.price.recurring?.interval === "year" && overage !== null) return null;
+  return {
+    ...rung,
+    overageCentsPer1k:
+      overage && rungIdentityFromPrice(overage.price)?.key === rung.key
+        ? effectiveOverageRate(overage.price)
+        : null,
+  };
 }
 
 /**

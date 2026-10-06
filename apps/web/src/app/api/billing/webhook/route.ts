@@ -206,7 +206,6 @@ async function teamOfCustomer(db: Db, customerId: string) {
 async function planOf(db: Db, customerId: string) {
   const [team] = await db
     .select({
-      id: schema.teams.id,
       name: schema.teams.name,
       ...QUOTA_COLUMNS,
       planStatus: schema.teams.planStatus,

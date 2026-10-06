@@ -14,7 +14,18 @@ import {
   prepareMetaCheckout,
   recordMetaCheckout,
 } from "./meta-advertising.js";
-import { overageLookupKey, resolvePriceId, rungLookupKey } from "./prices.js";
+import {
+  effectiveOverageRate,
+  overageLookupKey,
+  resolvePriceId,
+  rungFromPrice,
+  rungLookupKey,
+} from "./prices.js";
+import {
+  resolveSendLaunchPrice,
+  SEND_LAUNCH_OFFER,
+  verifySendIntroCoupon,
+} from "./send-launch-offer.js";
 import type { BillingStripe } from "./stripe.js";
 import { idOf, lockCustomer } from "./subscription.js";
 
@@ -45,11 +56,14 @@ export interface SendCheckoutDeps {
   stripe: BillingStripe;
   livemode: boolean;
   advertising?: MetaCheckoutAdvertising;
+  /** Enable only after the account's immutable launch prices and coupon are verified. */
+  launchOfferEnabled?: boolean;
 }
 export interface SendCheckoutInput {
   team: { id: string; name: string; stripeCustomerId: string | null };
   userId: string;
   rung: PlanRungKey;
+  interval?: "month" | "year";
   email: string;
   successUrl: string;
   cancelUrl: string;
@@ -191,6 +205,7 @@ function compatible(attempt: Attempt, input: SendCheckoutInput, deps: SendChecko
   return (
     attempt.rung === input.rung &&
     attempt.livemode === deps.livemode &&
+    (p.metadata?.mepmail_send_interval ?? "month") === (input.interval ?? "month") &&
     p.success_url === input.successUrl &&
     p.cancel_url === input.cancelUrl &&
     p.automatic_tax?.enabled === (input.automaticTax ?? true)
@@ -220,6 +235,30 @@ async function noOtherSubscription(deps: SendCheckoutDeps, customer: string) {
         throw new SendCheckoutError("subscription_exists");
     }
     if (!page.has_more) return;
+    const last = page.data.at(-1)?.id;
+    if (!last || last === after) throw new SendCheckoutError("unknown");
+    after = last;
+  }
+}
+
+async function qualifiesForIntro(deps: SendCheckoutDeps, customer: string): Promise<boolean> {
+  if (!deps.stripe.invoices?.list) throw new SendCheckoutError("unknown");
+  const invoices = await deps.stripe.invoices.list({ customer, status: "paid", limit: 1 });
+  if (invoices.data.length || invoices.has_more) return false;
+  let after: string | undefined;
+  for (;;) {
+    const page = await deps.stripe.subscriptions.list({
+      customer,
+      status: "all",
+      limit: 100,
+      ...(after ? { starting_after: after } : {}),
+    });
+    for (const sub of page.data) {
+      if (idOf(sub.customer) !== customer || sub.livemode !== deps.livemode)
+        throw new SendCheckoutError("unknown");
+      if (!isMailboxSubscription(sub) && sub.status !== "incomplete_expired") return false;
+    }
+    if (!page.has_more) return true;
     const last = page.data.at(-1)?.id;
     if (!last || last === after) throw new SendCheckoutError("unknown");
     after = last;
@@ -279,6 +318,10 @@ export async function beginSendCheckout(
   input = { ...input, team: { ...input.team } };
   if (typeof deps.livemode !== "boolean" || !input.userId) throw new SendCheckoutError("invalid");
   const rung = rungByKey(input.rung);
+  const interval = input.interval ?? "month";
+  if (interval !== "month" && interval !== "year") throw new SendCheckoutError("invalid");
+  const launch = deps.launchOfferEnabled === true && input.rung === "pro_100k";
+  if (interval === "year" && !launch) throw new SendCheckoutError("invalid");
   if (rung.priceCents <= 0) throw new Error(`rung ${input.rung} is not for sale`);
   // Price lookups are read-only. Once an attempt exists, its frozen IDs always win.
   const customer = await ensureCustomer(deps, input);
@@ -291,12 +334,38 @@ export async function beginSendCheckout(
         ne(schema.sendCheckoutAttempts.status, "resolved"),
       ),
     );
+  const launchPrice =
+    !existing.length && launch
+      ? await resolveSendLaunchPrice(deps.stripe, interval, deps.livemode)
+      : null;
   const [price, overage] = existing.length
     ? [null, null]
     : await Promise.all([
-        resolvePriceId(deps.stripe, rungLookupKey(rung)),
-        rung.period === "month" ? resolvePriceId(deps.stripe, overageLookupKey(rung)) : null,
+        launchPrice ? launchPrice.id : resolvePriceId(deps.stripe, rungLookupKey(rung)),
+        rung.period === "month" && interval === "month"
+          ? resolvePriceId(deps.stripe, overageLookupKey(rung))
+          : null,
       ]);
+  if (launchPrice && overage) {
+    const page = await deps.stripe.prices.list({
+      lookup_keys: [overageLookupKey(rung)],
+      active: true,
+    });
+    const metered = page.data.find((entry) => entry.id === overage);
+    const meteredRung = metered ? rungFromPrice(metered) : null;
+    if (
+      !metered ||
+      page.has_more ||
+      !metered.active ||
+      metered.livemode !== deps.livemode ||
+      (metered.recurring?.interval_count ?? 1) !== 1 ||
+      meteredRung?.key !== rung.key ||
+      meteredRung.included !== rung.included ||
+      effectiveOverageRate(metered) !== rung.overageCentsPer1k ||
+      idOf(metered.product) === idOf(launchPrice.product)
+    )
+      throw new SendCheckoutError("invalid");
+  }
   const prepared = await deps.db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
     const team = await currentTeam(tx, input);
@@ -318,7 +387,23 @@ export async function beginSendCheckout(
     }
     if (!price) throw new SendCheckoutError("pending");
     const id = randomUUID();
-    const metadata = { team_id: team.id, [SEND_CHECKOUT_METADATA_KEY]: id };
+    const productId = launchPrice ? idOf(launchPrice.product) : null;
+    const intro = launchPrice && interval === "month" && (await qualifiesForIntro(deps, customer));
+    const coupon =
+      intro && productId
+        ? await verifySendIntroCoupon(deps.stripe, productId, deps.livemode)
+        : null;
+    const metadata = {
+      team_id: team.id,
+      [SEND_CHECKOUT_METADATA_KEY]: id,
+      mepmail_send_interval: interval,
+      ...(launchPrice
+        ? {
+            mepmail_send_offer: SEND_LAUNCH_OFFER,
+            mepmail_send_intro: coupon ? "first_invoice_900" : "none",
+          }
+        : {}),
+    };
     const parameters = {
       mode: "subscription",
       customer,
@@ -330,7 +415,11 @@ export async function beginSendCheckout(
       cancel_url: input.cancelUrl,
       automatic_tax: { enabled: input.automaticTax ?? true },
       tax_id_collection: { enabled: input.automaticTax ?? true },
-      allow_promotion_codes: true,
+      ...(coupon
+        ? { discounts: [{ coupon }] }
+        : launchPrice
+          ? {}
+          : { allow_promotion_codes: true }),
       billing_address_collection: "auto",
       customer_update: { address: "auto", name: "auto" },
     };

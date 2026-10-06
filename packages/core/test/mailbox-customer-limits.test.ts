@@ -16,11 +16,14 @@ import { createMailboxRegistry } from "../src/mailbox-registry.js";
 import {
   assertMailboxStorage,
   lockMailboxService,
+  mailboxServiceEntitlement,
   mailboxServiceState,
   SYSTEM_MAILBOX_STORAGE_BYTES,
 } from "../src/mailbox-service.js";
 import {
   type MailboxOutboxSender,
+  MailboxSendDeferredError,
+  MailboxSendRejectedError,
   type MailboxTransportMimeAdapter,
   queueMailboxDraft,
   sendMailboxOutbox,
@@ -182,6 +185,283 @@ async function usage(f: Fixture, box: Box) {
 }
 
 describe("finite Correio customer outbound allowances", () => {
+  const annualStart = new Date("2026-01-31T10:20:30.456Z");
+  const annualEnd = new Date("2027-01-31T10:20:30.456Z");
+  const secondMonth = new Date("2026-02-28T10:20:30.456Z");
+
+  async function annualFixture(plan: Plan = PLANS[0]) {
+    const f = await fixture(plan);
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({
+        interval: "year",
+        periodStart: annualStart,
+        periodEnd: annualEnd,
+        cancelAtPeriodEnd: true,
+      })
+      .where(eq(schema.mailboxSubscriptions.teamId, f.teamId));
+    return f;
+  }
+
+  it.each(PLANS)(
+    "renews $name monthly within annual financial terms without resetting storage",
+    async (plan) => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(annualStart);
+        const f = await annualFixture(plan);
+        const [financialBefore] = await db
+          .select()
+          .from(schema.mailboxSubscriptions)
+          .where(eq(schema.mailboxSubscriptions.teamId, f.teamId));
+        await fill(f, f.person, plan.outbound);
+        await expect(reserve(f, f.person, 1)).rejects.toMatchObject({ code: "quota" });
+        expect(
+          (await usage(f, f.person)).rows.every(
+            (row) =>
+              row.periodStart.getTime() === annualStart.getTime() &&
+              row.periodEnd.getTime() === secondMonth.getTime(),
+          ),
+        ).toBe(true);
+        vi.setSystemTime(new Date(secondMonth.getTime() - 1));
+        await expect(reserve(f, f.person, 1)).rejects.toMatchObject({ code: "quota" });
+        vi.setSystemTime(secondMonth);
+        const second = await reserve(f, f.person, 1);
+        expect(second).toMatchObject({
+          periodStart: secondMonth,
+          periodEnd: new Date("2026-03-31T10:20:30.456Z"),
+        });
+        await fill(f, f.person, plan.outbound - 1);
+        await expect(reserve(f, f.person, 1)).rejects.toMatchObject({ code: "quota" });
+        const { rows, charged } = await usage(f, f.person);
+        expect(charged).toBe(plan.outbound * 2);
+        expect(
+          rows
+            .filter((row) => row.periodStart.getTime() === secondMonth.getTime())
+            .reduce((sum, row) => sum + row.recipientCount, 0),
+        ).toBe(plan.outbound);
+        expect((await reserve(f, f.agent, 1)).periodStart).toEqual(secondMonth);
+        const entitlement = await mailboxServiceEntitlement(db, f.teamId);
+        expect(entitlement.plan).toEqual(financialBefore);
+        expect(await mailboxServiceState(db, f.teamId)).toMatchObject({
+          active: true,
+          seats: 2,
+          storageBytesPerMailbox: plan.storageBytes,
+          periodStart: annualStart,
+          periodEnd: annualEnd,
+          cancelAtPeriodEnd: true,
+          usagePeriodStart: secondMonth,
+          usagePeriodEnd: new Date("2026-03-31T10:20:30.456Z"),
+        });
+        const items = await db
+          .select({ bytes: schema.mailboxItems.rawBytes })
+          .from(schema.mailboxItems)
+          .where(eq(schema.mailboxItems.mailboxId, f.person.id));
+        const stored =
+          items.reduce((sum, row) => sum + row.bytes, 0) +
+          rows.reduce((sum, row) => sum + row.rawBytes, 0);
+        const operational = await lockMailboxService(db, f.teamId);
+        await expect(
+          assertMailboxStorage(db, f.teamId, f.person.id, plan.storageBytes - stored, operational),
+        ).resolves.toBeUndefined();
+        await expect(
+          assertMailboxStorage(
+            db,
+            f.teamId,
+            f.person.id,
+            plan.storageBytes - stored + 1,
+            operational,
+          ),
+        ).rejects.toMatchObject({ code: "quota" });
+        vi.setSystemTime(annualEnd);
+        await expect(reserve(f, f.person, 1)).rejects.toMatchObject({ code: "not_entitled" });
+        expect((await usage(f, f.person)).rows).toHaveLength(rows.length);
+        const [financialAfter] = await db
+          .select()
+          .from(schema.mailboxSubscriptions)
+          .where(eq(schema.mailboxSubscriptions.teamId, f.teamId));
+        expect(financialAfter).toEqual(financialBefore);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each(["month", null] as const)(
+    "preserves exact legacy %s boundaries from February 28 to March 31",
+    async (interval) => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(new Date("2026-03-28T12:00:00Z"));
+        const f = await fixture();
+        const begin = new Date("2026-02-28T10:00:00Z");
+        const end = new Date("2026-03-31T10:00:00Z");
+        await db
+          .update(schema.mailboxSubscriptions)
+          .set({ interval, periodStart: begin, periodEnd: end })
+          .where(eq(schema.mailboxSubscriptions.teamId, f.teamId));
+        expect(await reserve(f, f.person, 1)).toMatchObject({ periodStart: begin, periodEnd: end });
+        expect((await lockMailboxService(db, f.teamId)).usagePeriod).toEqual({ start: begin, end });
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("keeps an annual reservation's captured window through deferred send and approval replay after rollover", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(annualStart);
+      const f = await annualFixture();
+      const raw = Buffer.from(
+        `From: ${f.person.address}\r\nTo: First@Example.invalid, first@example.invalid\r\nCc: FIRST@example.invalid, second@example.invalid, SECOND@example.invalid\r\n\r\nFixture`,
+      );
+      const item = await draft(f, f.person, 1, raw);
+      const queued = await queueMailboxDraft(
+        db,
+        keys,
+        f.actor,
+        {
+          mailboxId: f.person.id,
+          id: item.id,
+          expectedRevision: item.revision,
+        },
+        mime,
+      );
+      expect(queued.recipientCount).toBe(2);
+      const deferred = vi.fn(async () => {
+        throw new MailboxSendDeferredError();
+      });
+      expect(await sendMailboxOutbox(db, keys, queued.id, { send: deferred }, mime)).toMatchObject({
+        status: "queued",
+      });
+      vi.setSystemTime(secondMonth);
+      const replay = await queueMailboxDraft(
+        db,
+        keys,
+        f.actor,
+        {
+          mailboxId: f.person.id,
+          id: queued.draftId,
+          expectedRevision: queued.draftRevision,
+        },
+        mime,
+      );
+      expect(replay).toMatchObject({
+        id: queued.id,
+        duplicate: true,
+        periodStart: annualStart,
+        periodEnd: secondMonth,
+      });
+      const current = await reserve(f, f.person, 1);
+      const send = vi.fn(async (_input: Parameters<MailboxOutboxSender["send"]>[0]) => ({
+        messageId: "synthetic-annual-delayed-send",
+      }));
+      expect(await sendMailboxOutbox(db, keys, queued.id, { send }, mime)).toMatchObject({
+        status: "accepted",
+        recipientCount: 2,
+        periodStart: annualStart,
+        periodEnd: secondMonth,
+      });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0]?.[0]).toMatchObject({
+        to: ["first@example.invalid"],
+        cc: ["second@example.invalid"],
+        bcc: [],
+      });
+      expect(
+        (await usage(f, f.person)).rows.find((row) => row.id === current.id)?.periodStart,
+      ).toEqual(secondMonth);
+      await sendMailboxOutbox(db, keys, queued.id, { send }, mime);
+      expect(send).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("releases only a refused old annual reservation and never relieves the new month's allowance", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(annualStart);
+      const f = await annualFixture();
+      const old = await reserve(f, f.person, 2);
+      vi.setSystemTime(secondMonth);
+      await fill(f, f.person, f.plan.outbound);
+      const send = vi.fn(async () => {
+        throw new MailboxSendRejectedError();
+      });
+      expect(await sendMailboxOutbox(db, keys, old.id, { send }, mime)).toMatchObject({
+        status: "failed",
+        errorCode: "provider_rejected",
+        periodStart: annualStart,
+      });
+      expect(send).toHaveBeenCalledTimes(1);
+      await expect(reserve(f, f.person, 1)).rejects.toMatchObject({ code: "quota" });
+      const { rows } = await usage(f, f.person);
+      expect(
+        rows
+          .filter(
+            (row) => row.status !== "failed" && row.periodStart.getTime() === secondMonth.getTime(),
+          )
+          .reduce((sum, row) => sum + row.recipientCount, 0),
+      ).toBe(f.plan.outbound);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("refuses unsupported Bcc before reserving any annual recipient allowance", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(annualStart);
+      const f = await annualFixture();
+      const raw = Buffer.from(
+        `From: ${f.person.address}\r\nTo: first@example.invalid\r\nCc: second@example.invalid\r\nBcc: hidden@example.invalid\r\n\r\nFixture`,
+      );
+      const item = await draft(f, f.person, 1, raw);
+      await expect(
+        queueMailboxDraft(
+          db,
+          keys,
+          f.actor,
+          {
+            mailboxId: f.person.id,
+            id: item.id,
+            expectedRevision: item.revision,
+          },
+          mime,
+        ),
+      ).rejects.toMatchObject({ code: "invalid" });
+      expect((await usage(f, f.person)).charged).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not impose annual commercial windows on the verified System operator", async () => {
+    const f = await fixture(PLANS[0], true);
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({
+        interval: "year",
+        status: "canceled",
+        seats: 0,
+        includedOutboundPerMailbox: 0,
+        periodStart: new Date("2024-01-31T10:00:00Z"),
+        periodEnd: new Date("2025-01-31T10:00:00Z"),
+      })
+      .where(eq(schema.mailboxSubscriptions.teamId, f.teamId));
+    const entitlement = await mailboxServiceEntitlement(db, f.teamId);
+    expect(entitlement).toMatchObject({
+      active: true,
+      unlimitedSeats: true,
+      unlimitedOutbound: true,
+      usagePeriod: null,
+    });
+    expect((await reserve(f, f.person, 20)).recipientCount).toBe(20);
+    expect((await lockMailboxService(db, f.teamId)).storageBytesPerMailbox).toBe(50 * GIB);
+  });
+
   it.each(PLANS)(
     "admits exactly $name, refuses +1 and keeps the other box independent",
     async (plan) => {

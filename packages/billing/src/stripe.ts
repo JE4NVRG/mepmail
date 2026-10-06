@@ -23,7 +23,11 @@ export interface BillingStripe {
     ): Promise<Stripe.Subscription>;
     cancel(id: string, params?: Stripe.SubscriptionCancelParams): Promise<Stripe.Subscription>;
   };
-  invoices?: { retrieve(id: string): Promise<Stripe.Invoice> };
+  invoices?: {
+    retrieve(id: string): Promise<Stripe.Invoice>;
+    list?: (params: Stripe.InvoiceListParams) => Promise<Stripe.ApiList<Stripe.Invoice>>;
+  };
+  coupons?: { retrieve(id: string, params?: Stripe.CouponRetrieveParams): Promise<Stripe.Coupon> };
   subscriptionItems: {
     create(params: Stripe.SubscriptionItemCreateParams): Promise<Stripe.SubscriptionItem>;
     update(

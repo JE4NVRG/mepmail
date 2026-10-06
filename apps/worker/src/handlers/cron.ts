@@ -334,10 +334,10 @@ async function releaseParkedRows(
   while (total < opts.budget) {
     const page = await db
       .select({
+        ...QUOTA_COLUMNS,
         id: schema.emails.id,
         teamId: schema.emails.teamId,
         broadcastId: schema.emails.broadcastId,
-        ...QUOTA_COLUMNS,
         scheduledAt: schema.emails.scheduledAt,
         to: schema.emails.to,
         cc: schema.emails.cc,
@@ -484,7 +484,7 @@ async function releaseParked(
   throttleAt: Date | null,
 ): Promise<MovedEmail | null> {
   if (run.exhaustedTeams.has(email.teamId)) return null;
-  const quota = teamQuota(email, deps.isCloud);
+  const quota = teamQuota({ ...email, id: email.teamId }, deps.isCloud);
   // Charged the way accept charged it: one unit per distinct mailbox.
   const units = countDistinctRecipients(email.to, email.cc, email.bcc);
   try {

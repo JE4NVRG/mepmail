@@ -1,7 +1,9 @@
+import { PLAN_RUNGS } from "@millionsend/core/plans";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import Stripe from "stripe";
+import { priceMetadata } from "../src/prices.js";
 import type { BillingStripe } from "../src/stripe.js";
 
 /** Signature verification is pure crypto; a key-less real client signs and verifies offline. */
@@ -10,6 +12,7 @@ export const webhooks: Stripe["webhooks"] = new Stripe("sk_test_x").webhooks;
 /** Billing period every fixture subscription item carries, in Stripe seconds. */
 export const PERIOD_START = 1_897_300_000;
 export const PERIOD_END = 1_900_000_000;
+const subscriptionCreated = new Map<string, number>();
 
 /** Fake price ids are derived from the lookup key so a call can be matched back to its rung. */
 export const priceId = (lookupKey: string | null) => `price_${lookupKey ?? "rotated"}`;
@@ -27,12 +30,16 @@ export function price(
   lookupKey: string | null,
   extra: { product?: unknown; metadata?: Record<string, string>; metered?: boolean } = {},
 ): Stripe.Price {
+  const rung = PLAN_RUNGS.find((r) => lookupKey?.includes(r.key)) ?? PLAN_RUNGS[2];
   return {
+    currency: "usd",
+    unit_amount: extra.metered ? rung.overageCentsPer1k : rung.priceCents,
+    transform_quantity: extra.metered ? { divide_by: 1000, round: "up" } : null,
     id: priceId(lookupKey),
     object: "price",
     active: true,
     lookup_key: lookupKey,
-    metadata: extra.metadata ?? {},
+    metadata: extra.metadata ?? (lookupKey?.includes(rung.key) ? priceMetadata(rung) : {}),
     recurring: { interval: "month", usage_type: extra.metered ? "metered" : "licensed" },
     product: extra.product ?? "prod_1",
   } as unknown as Stripe.Price;
@@ -78,9 +85,15 @@ export function subscription(
     overageMetadata?: Record<string, string>;
     cancelAt?: number;
     schedule?: Stripe.SubscriptionSchedule;
+    created?: number;
   } = {},
 ): Stripe.Subscription {
   const data = [item(`si_${id}`, price(lookupKey, opts))];
+  let created = opts.created ?? subscriptionCreated.get(id);
+  if (created === undefined) {
+    created = PERIOD_START - 10_000 + subscriptionCreated.size;
+    subscriptionCreated.set(id, created);
+  }
   if (opts.overageKey !== undefined) {
     data.push(
       item(
@@ -97,6 +110,7 @@ export function subscription(
     object: "subscription",
     customer,
     status,
+    created,
     cancel_at: opts.cancelAt ?? null,
     schedule: opts.schedule ?? null,
     items: { object: "list", data },

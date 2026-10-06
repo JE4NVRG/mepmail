@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -45,6 +46,46 @@ export const suspensionReasonEnum = pgEnum("suspension_reason", [
   "non_payment",
 ]);
 
+export interface BillingTerms {
+  version: 1;
+  teamId: string;
+  customerId: string;
+  subscriptionId: string;
+  baseItemId: string;
+  basePriceId: string;
+  overageItemId: string;
+  overagePriceId: string;
+  currency: "usd";
+  centsPerBlock: number;
+  blockSize: 1000;
+  rounding: "up";
+  included: number;
+  periodStart: string;
+  periodEnd: string;
+  verifiedAt: string;
+}
+
+/** Provider-verified base terms, independent of first-invoice discounts and usage windows. */
+export interface SendBillingContract {
+  version: 1;
+  teamId: string;
+  customerId: string;
+  subscriptionId: string;
+  baseItemId: string;
+  basePriceId: string;
+  currency: "usd";
+  baseAmountCents: number;
+  billingInterval: "month" | "year";
+  intervalCount: 1;
+  included: number;
+  usageInterval: "day" | "month";
+  regularMonthlyCents: number;
+  financialPeriodStart: string;
+  financialPeriodEnd: string;
+  usageAnchor: string;
+  verifiedAt: string;
+}
+
 export const teams = pgTable(
   "teams",
   {
@@ -58,6 +99,9 @@ export const teams = pgTable(
     // Cloud-only Stripe linkage; all null/"none" on self-host.
     stripeCustomerId: text("stripe_customer_id").unique(),
     stripeSubscriptionId: text("stripe_subscription_id"),
+    billingTerms: jsonb("billing_terms").$type<BillingTerms>(),
+    sendBillingContract: jsonb("send_billing_contract").$type<SendBillingContract>(),
+    stripeSubscriptionCreated: integer("stripe_subscription_created"),
     // The metered overage item on the subscription (every monthly plan
     // carries one); what it bills is what the worker reports, so the switch
     // below is the customer's choice, not the item's presence.

@@ -69,7 +69,7 @@ describe("PLAN_RUNGS", () => {
     ]);
   });
 
-  it("keeps every monthly rung key and price intact, only the included volume moved", () => {
+  it("preserves keys and quotas with approved prices", () => {
     // The keys are the stem of the Stripe lookup keys and the pence of the
     // ladder; the +10% bump touched `included` alone.
     expect(
@@ -240,7 +240,7 @@ describe("teamQuota", () => {
     });
   });
 
-  it("caps monthly plans by the bought volume over the billing period, overage as the row flag says", () => {
+  it("keeps monthly bought volume while a row flag alone cannot authorize unverified overage", () => {
     expect(teamQuota(row(), true, now)).toEqual({
       kind: "month",
       plan: "pro",
@@ -248,25 +248,25 @@ describe("teamQuota", () => {
       periodStart: START,
       periodEnd: END,
       overage: false,
-      overageCentsPer1k: 90,
+      overageCentsPer1k: null,
     });
     expect(teamQuota(row({ overageEnabled: true }), true, now)).toMatchObject({
-      overage: true,
+      overage: false,
     });
     expect(
       teamQuota(row({ plan: "scale", planQuota: 1_650_000, overageEnabled: true }), true, now),
-    ).toMatchObject({ included: 1_650_000, overageCentsPer1k: 18, overage: true });
+    ).toMatchObject({ included: 1_650_000, overageCentsPer1k: null, overage: false });
     expect(teamQuota(row({ planQuota: 220_000 }), true, now)).toMatchObject({
       included: 220_000,
-      overageCentsPer1k: 35,
+      overageCentsPer1k: null,
     });
     expect(teamQuota(row({ plan: "scale", planQuota: 1_100_000 }), true, now)).toMatchObject({
       included: 1_100_000,
-      overageCentsPer1k: 23,
+      overageCentsPer1k: null,
     });
     expect(teamQuota(row({ plan: "scale", planQuota: 2_750_000 }), true, now)).toMatchObject({
       included: 2_750_000,
-      overageCentsPer1k: 16,
+      overageCentsPer1k: null,
     });
     // A monthly row written before rungs existed sits on the plan's first rung.
     expect(teamQuota(row({ plan: "scale", planQuota: null }), true, now)).toMatchObject({
@@ -287,6 +287,164 @@ describe("teamQuota", () => {
     expect(teamQuota(row(), true, lapsed)).toEqual({ kind: "day", plan: "free", limit: 100 });
     const inGrace = new Date(END.getTime() + PLAN_GRACE_DAYS * DAY_MS);
     expect(teamQuota(row(), true, inGrace)).toMatchObject({ kind: "month", plan: "pro" });
+  });
+});
+
+describe("signed monthly and annual Send quotas", () => {
+  const annualStart = new Date("2026-01-31T10:00:00Z");
+  const annualEnd = new Date("2027-01-31T10:00:00Z");
+  const annual: NonNullable<QuotaTeamRow["sendBillingContract"]> = {
+    version: 1,
+    teamId: "team_signed",
+    customerId: "cus_signed",
+    subscriptionId: "sub_signed",
+    baseItemId: "si_base",
+    basePriceId: "price_annual",
+    currency: "usd",
+    baseAmountCents: 29_000,
+    billingInterval: "year",
+    intervalCount: 1,
+    included: 110_000,
+    usageInterval: "month",
+    regularMonthlyCents: 2_900,
+    financialPeriodStart: annualStart.toISOString(),
+    financialPeriodEnd: annualEnd.toISOString(),
+    usageAnchor: annualStart.toISOString(),
+    verifiedAt: annualStart.toISOString(),
+  };
+  const annualTeam = (over: Partial<QuotaTeamRow> = {}): QuotaTeamRow =>
+    row({
+      id: "team_signed",
+      stripeCustomerId: "cus_signed",
+      stripeSubscriptionId: "sub_signed",
+      currentPeriodStart: annualStart,
+      currentPeriodEnd: annualEnd,
+      overageEnabled: true,
+      sendBillingContract: annual,
+      ...over,
+    });
+
+  it("gives 110K each anchored UTC month, clamping February without drifting March", () => {
+    expect(teamQuota(annualTeam(), true, annualStart)).toMatchObject({
+      kind: "month",
+      included: 110_000,
+      periodStart: annualStart,
+      periodEnd: new Date("2026-02-28T10:00:00Z"),
+      overage: false,
+      overageCentsPer1k: null,
+    });
+    expect(teamQuota(annualTeam(), true, new Date("2026-02-28T10:00:00Z"))).toMatchObject({
+      periodStart: new Date("2026-02-28T10:00:00Z"),
+      periodEnd: new Date("2026-03-31T10:00:00Z"),
+    });
+    expect(teamQuota(annualTeam(), true, new Date("2026-03-31T10:00:00Z"))).toMatchObject({
+      periodStart: new Date("2026-03-31T10:00:00Z"),
+      periodEnd: new Date("2026-04-30T10:00:00Z"),
+    });
+  });
+
+  it("does not mint an annual renewal allowance during grace or before the paid window", () => {
+    expect(teamQuota(annualTeam(), true, annualEnd)).toEqual({
+      kind: "day",
+      plan: "free",
+      limit: 100,
+    });
+    expect(teamQuota(annualTeam(), true, new Date(annualEnd.getTime() + DAY_MS))).toEqual({
+      kind: "day",
+      plan: "free",
+      limit: 100,
+    });
+    expect(teamQuota(annualTeam(), true, new Date(annualStart.getTime() - 1))).toEqual({
+      kind: "day",
+      plan: "free",
+      limit: 100,
+    });
+  });
+
+  it("fails closed on foreign annual bindings while System remains unlimited", () => {
+    expect(teamQuota(annualTeam({ stripeCustomerId: "cus_other" }), true, annualStart)).toEqual({
+      kind: "day",
+      plan: "free",
+      limit: 100,
+    });
+    expect(
+      teamQuota(
+        annualTeam({ sendBillingContract: { ...annual, included: 1_320_000 } }),
+        true,
+        annualStart,
+      ),
+    ).toEqual({ kind: "day", plan: "free", limit: 100 });
+    expect(teamQuota(annualTeam({ plan: "system", dailySendCeiling: 1 }), true, annualEnd)).toEqual(
+      { kind: "none" },
+    );
+  });
+
+  it("preserves signed monthly quota and rate, only while both financial snapshots agree", () => {
+    const contract = {
+      ...annual,
+      billingInterval: "month" as const,
+      baseAmountCents: 2_000,
+      regularMonthlyCents: 2_000,
+      included: 100_001,
+      financialPeriodStart: START.toISOString(),
+      financialPeriodEnd: END.toISOString(),
+      usageAnchor: START.toISOString(),
+    };
+    const terms: NonNullable<QuotaTeamRow["billingTerms"]> = {
+      version: 1,
+      teamId: contract.teamId,
+      customerId: contract.customerId,
+      subscriptionId: contract.subscriptionId,
+      baseItemId: contract.baseItemId,
+      basePriceId: contract.basePriceId,
+      overageItemId: "si_meter",
+      overagePriceId: "price_meter_archived",
+      currency: "usd",
+      blockSize: 1000,
+      rounding: "up",
+      centsPerBlock: 130,
+      included: 100_001,
+      periodStart: START.toISOString(),
+      periodEnd: END.toISOString(),
+      verifiedAt: START.toISOString(),
+    };
+    const monthlyTeam = annualTeam({
+      planQuota: 110_000,
+      currentPeriodStart: START,
+      currentPeriodEnd: END,
+      sendBillingContract: contract,
+      stripeOverageItemId: terms.overageItemId,
+      billingTerms: terms,
+    });
+    const now = new Date("2026-09-20T00:00:00Z");
+    expect(teamQuota(monthlyTeam, true, now)).toMatchObject({
+      included: 100_001,
+      overage: true,
+      overageCentsPer1k: 130,
+      billingTerms: terms,
+    });
+    expect(
+      teamQuota(
+        { ...monthlyTeam, billingTerms: { ...terms, basePriceId: "price_other" } },
+        true,
+        now,
+      ),
+    ).toMatchObject({ included: 100_001, overage: false, overageCentsPer1k: null });
+    expect(teamQuota(monthlyTeam, true, END)).toMatchObject({
+      included: 100_001,
+      periodStart: END,
+      overage: false,
+    });
+  });
+
+  it("keeps a legacy stored volume that is absent from the current ladder without guessing its rate", () => {
+    expect(
+      teamQuota(
+        row({ planQuota: 123_456, overageEnabled: true, overageCentsPer1k: 999 }),
+        true,
+        START,
+      ),
+    ).toMatchObject({ included: 123_456, overage: false, overageCentsPer1k: null });
   });
 });
 

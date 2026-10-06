@@ -34,6 +34,7 @@ import {
   assertMailboxStorage,
   lockMailboxService,
   MailboxServiceError,
+  mailboxSubscriptionUsagePeriod,
   requireMailboxSeat,
 } from "./mailbox-service.js";
 import { parseMailbox } from "./sender-address.js";
@@ -757,7 +758,7 @@ async function queueAuthorizedMailboxDraft(
         and(
           eq(mailboxOutbox.mailboxId, input.mailboxId),
           eq(mailboxOutbox.teamId, actor.teamId),
-          eq(mailboxOutbox.periodStart, plan.periodStart),
+          eq(mailboxOutbox.periodStart, plan.usagePeriod.start),
           ne(mailboxOutbox.status, "failed"),
         ),
       );
@@ -790,8 +791,8 @@ async function queueAuthorizedMailboxDraft(
       agentKeyId: approval.agentKeyId,
       recipientCount: parsed.count,
       recipientHashes,
-      periodStart: plan.periodStart,
-      periodEnd: plan.periodEnd,
+      periodStart: plan.usagePeriod.start,
+      periodEnd: plan.usagePeriod.end,
       rawBytes: raw.length,
       rawSha256: hash(raw),
       ...sealed,
@@ -1000,10 +1001,16 @@ export async function sendMailboxOutbox(
           parsed: { from: "", to: [], cc: [], bcc: [], count: 0 },
         };
       const plan = await lockMailboxService(tx, row!.teamId, now);
+      // The captured counter key survives a monthly boundary and a deferred retry.
+      // Revalidate it against the still-current financial term, never move it to now.
+      const reservedPeriod = plan.unlimitedOutbound
+        ? null
+        : mailboxSubscriptionUsagePeriod(plan, row.periodStart);
       if (
         !plan.unlimitedOutbound &&
-        (row!.periodStart.getTime() !== plan.periodStart.getTime() ||
-          row!.periodEnd.getTime() !== plan.periodEnd.getTime())
+        (!reservedPeriod ||
+          row.periodStart.getTime() !== reservedPeriod.start.getTime() ||
+          row.periodEnd.getTime() !== reservedPeriod.end.getTime())
       )
         throw new MailboxReservationExpiredError();
       const [box] = await tx

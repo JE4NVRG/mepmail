@@ -10,7 +10,9 @@ import {
   isLiveKey,
   metaConversionConfigured,
   readMetaConversionConfig,
+  rungFromSubscription,
   SendCheckoutError,
+  SUBSCRIPTION_EXPAND,
   setOverage as setSubscriptionOverage,
 } from "@millionsend/billing";
 import { env } from "@millionsend/config";
@@ -26,6 +28,7 @@ import {
   teamQuota,
   teamRung,
   utcDay,
+  verifiedSendBillingContract,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
@@ -33,6 +36,7 @@ import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { z } from "zod";
+import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { recordAudit } from "../audit";
 import { resolveBaseUrl } from "../auth";
 import { getStripe, mailPlanMove } from "../billing";
@@ -53,13 +57,15 @@ function requireCloud(): void {
 async function loadTeam(db: Db, teamId: string) {
   const [team] = await db
     .select({
+      ...QUOTA_COLUMNS,
       id: schema.teams.id,
       name: schema.teams.name,
-      ...QUOTA_COLUMNS,
       planStatus: schema.teams.planStatus,
       stripeCustomerId: schema.teams.stripeCustomerId,
+      stripeSubscriptionId: schema.teams.stripeSubscriptionId,
       cancelAt: schema.teams.cancelAt,
       pendingRung: schema.teams.pendingRung,
+      sendBillingContract: schema.teams.sendBillingContract,
     })
     .from(schema.teams)
     .where(eq(schema.teams.id, teamId));
@@ -126,14 +132,102 @@ async function checkoutAdvertising() {
   };
 }
 
+const launchOfferEnabled = () => process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
+
+const billingMutationProcedure = adminProcedure.use(({ next }) => {
+  const paused = process.env.BILLING_MUTATIONS_PAUSED;
+  if (paused === "true" || paused === "1") {
+    throw new TRPCError({
+      code: "SERVICE_UNAVAILABLE",
+      message: "Billing changes are temporarily paused. Please try again later.",
+    });
+  }
+  return next();
+});
+
 export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
   return router({
     status: teamProcedure.query(async ({ ctx }) => {
       requireCloud();
       const team = await loadTeam(ctx.db, ctx.teamId);
-      const quota = teamQuota(team, true);
       const live = hasLiveSubscription(team.planStatus);
+      const contract = verifiedSendBillingContract(team.sendBillingContract, {
+        teamId: team.id,
+        customerId: team.stripeCustomerId,
+        subscriptionId: team.stripeSubscriptionId,
+        financialPeriodStart: team.currentPeriodStart,
+        financialPeriodEnd: team.currentPeriodEnd,
+      });
+      let subscriptionState: "none" | "confirmed" | "pending_confirmation" =
+        live && team.plan !== "system" ? "pending_confirmation" : "none";
+      let effectiveRung = null;
+      let effectiveInterval: "month" | "year" | null = null;
+      if (team.plan !== "free" && team.plan !== "system" && team.stripeSubscriptionId) {
+        try {
+          const subscription = await deps
+            .stripe()
+            .subscriptions.retrieve(team.stripeSubscriptionId, { expand: SUBSCRIPTION_EXPAND });
+          const resolved = rungFromSubscription(subscription);
+          const base = subscription.items.data.find(
+            (item) => item.price.recurring?.usage_type === "licensed",
+          );
+          const interval = base?.price.recurring?.interval;
+          const customerId =
+            typeof subscription.customer === "string"
+              ? subscription.customer
+              : subscription.customer.id;
+          const bound =
+            subscription.id === team.stripeSubscriptionId &&
+            customerId === team.stripeCustomerId &&
+            subscription.status === team.planStatus;
+          const consistent =
+            !contract ||
+            (base?.id === contract.baseItemId &&
+              base.price.id === contract.basePriceId &&
+              base.price.unit_amount === contract.baseAmountCents &&
+              interval === contract.billingInterval &&
+              resolved?.included === contract.included &&
+              base.current_period_start * 1000 ===
+                new Date(contract.financialPeriodStart).getTime() &&
+              base.current_period_end * 1000 === new Date(contract.financialPeriodEnd).getTime());
+          if (resolved && bound && consistent && (interval === "month" || interval === "year")) {
+            effectiveRung = resolved;
+            effectiveInterval = interval === "year" ? "year" : "month";
+            subscriptionState = "confirmed";
+          }
+        } catch {
+          // Falha de leitura não autoriza usar preço do catálogo como contrato vigente.
+          effectiveRung = null;
+        }
+      }
+      const operationalQuota = teamQuota(
+        { ...team, overageCentsPer1k: effectiveRung?.overageCentsPer1k ?? null },
+        true,
+      );
+      // Contract identifiers stay server-side. An inconsistent provider read cannot
+      // advertise a confirmed metered tariff from the persisted snapshot.
+      const confirmedRate =
+        operationalQuota.kind === "month" &&
+        effectiveRung?.overageCentsPer1k !== null &&
+        effectiveRung?.overageCentsPer1k === operationalQuota.overageCentsPer1k;
+      const quota =
+        operationalQuota.kind === "month"
+          ? {
+              kind: operationalQuota.kind,
+              plan: operationalQuota.plan,
+              included: operationalQuota.included,
+              periodStart: operationalQuota.periodStart,
+              periodEnd: operationalQuota.periodEnd,
+              overage: operationalQuota.overage && confirmedRate,
+              overageCentsPer1k: confirmedRate ? operationalQuota.overageCentsPer1k : null,
+              ...(operationalQuota.dailyCeiling === undefined
+                ? {}
+                : { dailyCeiling: operationalQuota.dailyCeiling }),
+            }
+          : operationalQuota;
       return {
+        effectiveRung,
+        subscriptionState,
         plan: team.plan,
         planQuota: team.planQuota,
         rung: team.plan === "system" ? null : teamRung(team.plan, team.planQuota).key,
@@ -144,11 +238,22 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         usage: await readUsage(ctx.db, ctx.teamId, quota),
         hasCustomer: team.stripeCustomerId !== null,
         hasLiveSubscription: live,
+        billingInterval: contract?.billingInterval ?? effectiveInterval,
+        launchOffer:
+          launchOfferEnabled() && !live && team.plan !== "system"
+            ? {
+                rung: "pro_100k" as const,
+                monthlyCents: LAUNCH_OFFER.sending.monthlyCents,
+                firstMonthlyCents: LAUNCH_OFFER.sending.firstMonthlyCents,
+                annualCents: LAUNCH_OFFER.sending.monthlyCents * LAUNCH_OFFER.annualChargedMonths,
+                monthlyRecipientDeliveries: LAUNCH_OFFER.sending.monthlyRecipientDeliveries,
+              }
+            : null,
       };
     }),
 
-    checkout: adminProcedure
-      .input(z.object({ rung: paidRung }))
+    checkout: billingMutationProcedure
+      .input(z.object({ rung: paidRung, interval: z.enum(["month", "year"]).default("month") }))
       .mutation(async ({ ctx, input }) => {
         requireCloud();
         const team = await loadTeam(ctx.db, ctx.teamId);
@@ -161,6 +266,10 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
             message: "SEND_CHECKOUT_SUBSCRIPTION_EXISTS",
           });
         }
+        const offerEnabled = launchOfferEnabled();
+        if (input.interval === "year" && (!offerEnabled || input.rung !== "pro_100k")) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "SEND_CHECKOUT_INVALID" });
+        }
         let checkout: Awaited<ReturnType<typeof beginSendCheckout>>;
         try {
           checkout = await beginSendCheckout(
@@ -168,12 +277,14 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
               db: ctx.db,
               stripe: deps.stripe(),
               livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
+              launchOfferEnabled: offerEnabled,
               ...(await checkoutAdvertising()),
             },
             {
               team,
               userId: ctx.session.user.id,
               rung: input.rung,
+              interval: input.interval,
               email: ctx.session.user.email,
               successUrl: `${billingPageUrl()}?checkout=success`,
               cancelUrl: billingPageUrl(),
@@ -197,10 +308,13 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         await recordAudit(ctx, {
           action: "billing.checkout_started",
           target: { type: "team", id: ctx.teamId },
-          metadata: { rung: input.rung, checkoutAttemptId: checkout.attemptId },
+          metadata: {
+            rung: input.rung,
+            interval: input.interval,
+            checkoutAttemptId: checkout.attemptId,
+          },
         });
-        // A durable, persisted Session defines this intent. Retrying its URL
-        // cannot count as another checkout or claim a successful payment.
+        // A persisted Session defines intent; reopening it is never a new purchase.
         await emitFunnel(ctx.db, {
           name: "checkout_started",
           dedupeKey: `checkout_started:${ctx.teamId}:${checkout.attemptId}`,
@@ -216,7 +330,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
      * portal cannot switch plans on a subscription carrying a metered item,
      * so every plan change happens here.
      */
-    changePlan: adminProcedure
+    changePlan: billingMutationProcedure
       .input(z.object({ rung: paidRung }))
       .mutation(async ({ ctx, input }) => {
         requireCloud();
@@ -246,7 +360,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         return change;
       }),
 
-    setOverage: adminProcedure
+    setOverage: billingMutationProcedure
       .input(z.object({ enabled: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
         requireCloud();
@@ -271,7 +385,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         return { enabled: input.enabled };
       }),
 
-    portal: adminProcedure.mutation(async ({ ctx }) => {
+    portal: billingMutationProcedure.mutation(async ({ ctx }) => {
       requireCloud();
       const team = await loadTeam(ctx.db, ctx.teamId);
       assertBillable(team);

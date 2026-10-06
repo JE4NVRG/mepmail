@@ -3,6 +3,7 @@ import { schema } from "@millionsend/db";
 import { sql } from "drizzle-orm";
 import { firstRow } from "./driver-result.js";
 import { OVERAGE_HARD_CAP, QUOTA_TOLERANCE, type TeamQuota } from "./plans.js";
+import type { SendOverageTerms } from "./send-overage-terms.js";
 import { bumpHourlyUsage } from "./usage-hourly.js";
 import { utcDay } from "./utc-day.js";
 
@@ -127,6 +128,7 @@ export async function reservePeriodQuota(
     included: number;
     periodStart: Date;
     overage: boolean;
+    billingTerms?: SendOverageTerms | null;
     /** Operator ceiling on the UTC day; the daily counter then caps as on a daily plan. */
     dailyCeiling?: number | null | undefined;
     day?: string;
@@ -137,27 +139,45 @@ export async function reservePeriodQuota(
   if (count <= 0) throw new Error("count must be positive");
   const ceiling = params.overage ? params.included * OVERAGE_HARD_CAP : params.included;
   const t = schema.usagePeriods;
+  const incomingTerms = params.billingTerms ?? null;
+  const termsJson = incomingTerms ? JSON.stringify(incomingTerms) : null;
+  const financialSignature = (value: unknown) => {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+    const financial = value as Record<string, unknown>;
+    return JSON.stringify(
+      Object.keys(financial)
+        .filter((key) => key !== "verifiedAt")
+        .sort()
+        .map((key) => [key, financial[key]]),
+    );
+  };
+  const effectiveCeiling = (storedTerms: unknown) =>
+    storedTerms === null || financialSignature(storedTerms) === financialSignature(incomingTerms)
+      ? ceiling
+      : params.included;
   const current = async () => {
     const [row] = await db
-      .select({ accepted: t.accepted })
+      .select({ accepted: t.accepted, billingTerms: t.billingTerms })
       .from(t)
       .where(sql`${t.teamId} = ${teamId} and ${t.periodStart} = ${periodStart}`);
-    return row?.accepted ?? 0;
+    return { accepted: row?.accepted ?? 0, ceiling: effectiveCeiling(row?.billingTerms ?? null) };
   };
   if (count > ceiling) {
-    return { reserved: false, accepted: await current(), ceiling };
+    return { reserved: false, ...(await current()) };
   }
-  const guard = sql`${t.accepted} + ${count} <= ${ceiling}`;
-  const rows = await db.execute<{ accepted: number }>(sql`
-    insert into ${t} (team_id, period_start, accepted)
-    values (${teamId}, ${periodStart}, ${count})
+  const financialMatches = sql`(${t.billingTerms} is null or (${t.billingTerms} - 'verifiedAt') = (${termsJson}::jsonb - 'verifiedAt'))`;
+  const guard = sql`${t.accepted} + ${count} <= case when ${financialMatches} then ${ceiling}::bigint else ${params.included}::bigint end`;
+  const rows = await db.execute<{ accepted: number; billing_terms: unknown }>(sql`
+    insert into ${t} (team_id, period_start, accepted, billing_terms)
+    values (${teamId}, ${periodStart}, ${count}, ${termsJson}::jsonb)
     on conflict (team_id, period_start) do update
-      set accepted = ${t.accepted} + ${count}
+      set accepted = ${t.accepted} + ${count},
+          billing_terms = coalesce(${t.billingTerms}, excluded.billing_terms)
       where ${guard}
-    returning accepted
+    returning accepted, billing_terms
   `);
-  const row = firstRow<{ accepted: number }>(rows);
-  if (!row) return { reserved: false, accepted: await current(), ceiling };
+  const row = firstRow<{ accepted: number; billing_terms: unknown }>(rows);
+  if (!row) return { reserved: false, ...(await current()) };
   const daily = await reserveDailyQuota(db, {
     teamId,
     count,
@@ -176,7 +196,11 @@ export async function reservePeriodQuota(
     `);
     return { reserved: false, accepted: daily.accepted, ceiling: daily.ceiling, cap: "day" };
   }
-  return { reserved: true, accepted: Number(row.accepted), ceiling };
+  return {
+    reserved: true,
+    accepted: Number(row.accepted),
+    ceiling: effectiveCeiling(row.billing_terms),
+  };
 }
 
 /** Compensating release for a period reservation; floors at zero and mirrors the daily release. */
@@ -220,6 +244,7 @@ export async function reserveQuota(
       included: quota.included,
       periodStart: quota.periodStart,
       overage: quota.overage,
+      billingTerms: quota.billingTerms ?? null,
       dailyCeiling: quota.dailyCeiling,
       ...when,
     });

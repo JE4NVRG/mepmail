@@ -1,10 +1,10 @@
-import { isMailboxSubscription } from "./mailbox.js";
 import { type PlanRung, type PlanRungKey, rungByKey } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, eq, sql } from "drizzle-orm";
 import type Stripe from "stripe";
 import type { BillingDeps } from "./checkout.js";
+import { isMailboxSubscription } from "./mailbox.js";
 import { reportOverage } from "./overage.js";
 import {
   overageLookupKey,
@@ -12,10 +12,12 @@ import {
   resolvePriceId,
   rungFromPrice,
   rungFromSubscription,
+  rungIdentityFromPrice,
   rungLookupKey,
   SUBSCRIPTION_EXPAND,
   subscriptionItems,
 } from "./prices.js";
+import { resolveSendBillingContract, verifiedSendBillingContract } from "./send-contract.js";
 import type { BillingStripe } from "./stripe.js";
 
 type Plan = (typeof schema.planEnum.enumValues)[number];
@@ -31,8 +33,11 @@ function planStatusOf(status: Stripe.Subscription.Status): PlanStatus {
   return status === "incomplete_expired" ? "incomplete" : "canceled";
 }
 
-const stamp = (seconds: number | null | undefined): Date | null =>
-  seconds ? new Date(seconds * 1000) : null;
+const stamp = (seconds: number | null | undefined): Date | null => {
+  if (!Number.isSafeInteger(seconds) || (seconds ?? 0) <= 0) return null;
+  const date = new Date((seconds as number) * 1000);
+  return Number.isFinite(date.getTime()) ? date : null;
+};
 
 /**
  * Every writer of a team's billing columns takes this lock BEFORE fetching
@@ -57,6 +62,7 @@ export async function applySubscription(
   log: (message: string) => void,
   stripe?: BillingStripe,
 ): Promise<void> {
+  // Mail has its own entitlement. Exclude it before touching Send's billing schema.
   if (isMailboxSubscription(sub)) return;
   const customerId = idOf(sub.customer);
   const [team] = customerId
@@ -66,7 +72,11 @@ export async function applySubscription(
           plan: schema.teams.plan,
           planQuota: schema.teams.planQuota,
           stripeSubscriptionId: schema.teams.stripeSubscriptionId,
+          stripeSubscriptionCreated: schema.teams.stripeSubscriptionCreated,
           stripeOverageItemId: schema.teams.stripeOverageItemId,
+          sendBillingContract: schema.teams.sendBillingContract,
+          currentPeriodStart: schema.teams.currentPeriodStart,
+          currentPeriodEnd: schema.teams.currentPeriodEnd,
         })
         .from(schema.teams)
         .where(eq(schema.teams.stripeCustomerId, customerId))
@@ -82,7 +92,64 @@ export async function applySubscription(
     return;
   }
 
-  if (team.stripeSubscriptionId !== sub.id && !rungFromSubscription(sub)) return;
+  // A customer's other products cannot replace Send's subscription or clear its terms.
+  // Keep processing the already-linked subscription so legacy/unknown prices fail closed.
+  if (team.stripeSubscriptionId !== sub.id && !rungFromSubscription(sub)) {
+    log(`subscription ${sub.id} has no known plan price`);
+    return;
+  }
+
+  if (!Number.isSafeInteger(sub.created) || sub.created <= 0) {
+    log(`subscription ${sub.id} has no valid creation timestamp`);
+    return;
+  }
+  let previousCreated = team.stripeSubscriptionCreated;
+  if (
+    team.stripeSubscriptionId &&
+    team.stripeSubscriptionId !== sub.id &&
+    previousCreated === null
+  ) {
+    // Pre-migration rows already have an authoritative subscription ID. Read its
+    // immutable timestamp under the caller's customer lock before comparing events.
+    if (!stripe) {
+      log(`subscription ${sub.id} cannot replace an uninitialized linked subscription`);
+      return;
+    }
+    const previous = await stripe.subscriptions.retrieve(team.stripeSubscriptionId, {
+      expand: SUBSCRIPTION_EXPAND,
+    });
+    if (
+      previous.id !== team.stripeSubscriptionId ||
+      idOf(previous.customer) !== customerId ||
+      previous.livemode !== sub.livemode ||
+      isMailboxSubscription(previous) ||
+      !Number.isSafeInteger(previous.created) ||
+      previous.created <= 0
+    ) {
+      log(`linked subscription ${team.stripeSubscriptionId} has no verified creation timestamp`);
+      return;
+    }
+    previousCreated = previous.created;
+    await tx
+      .update(schema.teams)
+      .set({ stripeSubscriptionCreated: previousCreated })
+      .where(eq(schema.teams.id, team.id));
+  }
+  if (
+    team.stripeSubscriptionId === sub.id &&
+    previousCreated !== null &&
+    sub.created !== previousCreated
+  ) {
+    log(`subscription ${sub.id} creation timestamp changed`);
+    return;
+  }
+  if (
+    team.stripeSubscriptionId !== sub.id &&
+    previousCreated !== null &&
+    sub.created <= previousCreated
+  )
+    return;
+
   const entitled = sub.status === "active" || sub.status === "trialing";
   // A superseded subscription ending must not revoke what the team's
   // current subscription grants: events about different subscriptions
@@ -90,21 +157,81 @@ export async function applySubscription(
   if (!entitled && team.stripeSubscriptionId && team.stripeSubscriptionId !== sub.id) return;
 
   const { base, overage: existingOverage } = subscriptionItems(sub);
+  const previousContract = verifiedSendBillingContract(team.sendBillingContract, {
+    teamId: team.id,
+    customerId: customerId as string,
+    subscriptionId: team.stripeSubscriptionId,
+    financialPeriodStart: team.currentPeriodStart,
+    financialPeriodEnd: team.currentPeriodEnd,
+  });
+  if (
+    sub.status === "past_due" &&
+    (base?.price.recurring?.interval === "year" || previousContract?.billingInterval === "year")
+  ) {
+    // Failed annual renewal must not mint another paid year from Stripe's
+    // advanced invoice period. The previously paid window remains authoritative.
+    await tx
+      .update(schema.teams)
+      .set({
+        planStatus: "past_due",
+        stripeSubscriptionCreated: sub.created,
+        cancelAt: stamp(sub.cancel_at),
+      })
+      .where(eq(schema.teams.id, team.id));
+    return;
+  }
   let overage = existingOverage;
   let plan: Plan;
   let planQuota: number | null;
   let rung: PlanRung | null = null;
+  let sendBillingContract = resolveSendBillingContract(sub, {
+    teamId: team.id,
+    customerId: customerId as string,
+  });
   if (entitled) {
     rung = rungFromSubscription(sub);
-    if (!rung) {
+    if (!rung || !sendBillingContract) {
       log(`subscription ${sub.id} has no known plan price`);
+      // No quota metadata means no new entitlement. A pre-migration linked
+      // contract keeps its stored quota; it does not acquire today's catalog terms.
+      if (team.stripeSubscriptionId !== sub.id) return;
+      if (previousContract?.billingInterval === "year") {
+        // Keep the already verified paid annual window and its monthly usage
+        // cycles. An unrecognized update cannot grant a renewal or new tariff.
+        await tx
+          .update(schema.teams)
+          .set({
+            planStatus: planStatusOf(sub.status),
+            stripeSubscriptionCreated: sub.created,
+            cancelAt: stamp(sub.cancel_at),
+          })
+          .where(eq(schema.teams.id, team.id));
+        return;
+      }
+      await tx
+        .update(schema.teams)
+        .set({
+          billingTerms: null,
+          sendBillingContract: null,
+          stripeSubscriptionId: sub.id,
+          stripeSubscriptionCreated: sub.created,
+        })
+        .where(eq(schema.teams.id, team.id));
       return;
     }
     plan = rung.plan;
     planQuota = rung.period === "month" ? rung.included : null;
     // A monthly subscription from before the ladder has no metered item, so
     // its overage (on by default) would go unbilled; the first sync adds it.
-    if (stripe && !overage && rung.period === "month") {
+    const catalog = rungByKey(rung.key as PlanRungKey);
+    const baseTerms = base ? rungFromPrice(base.price) : null;
+    const matchesCatalog =
+      sendBillingContract.billingInterval === "month" &&
+      base?.price.active === true &&
+      baseTerms?.priceCents === catalog.priceCents &&
+      baseTerms.included === catalog.included &&
+      baseTerms.overageCentsPer1k === catalog.overageCentsPer1k;
+    if (stripe && !overage && rung.period === "month" && matchesCatalog) {
       try {
         const price = await resolvePriceId(stripe, overageLookupKey(rung));
         overage = await stripe.subscriptionItems.create({ subscription: sub.id, price });
@@ -112,12 +239,15 @@ export async function applySubscription(
         log(`overage item not added to ${sub.id}: ${String(err)}`);
       }
     }
-    if (stripe && overage && rung.period === "month") {
+    if (stripe && overage && rung.period === "month" && matchesCatalog) {
       const expected = overageLookupKey(rung);
-      if (rungFromPrice(overage.price)?.key !== rung.key) {
+      if (rungIdentityFromPrice(overage.price)?.key !== rung.key) {
         try {
           const price = await resolvePriceId(stripe, expected);
-          await stripe.subscriptionItems.update(overage.id, { price, proration_behavior: "none" });
+          overage = await stripe.subscriptionItems.update(overage.id, {
+            price,
+            proration_behavior: "none",
+          });
         } catch (err) {
           log(`overage item ${overage.id} not re-pointed to ${expected}: ${String(err)}`);
         }
@@ -137,14 +267,75 @@ export async function applySubscription(
   if (stripe && team.stripeOverageItemId && overageItemId === null) {
     await reportOverage({ db: tx, stripe, log }, { teamId: team.id });
   }
+  const effectiveItems = sub.items.data.map((item) =>
+    overage && item.id === overage.id ? overage : item,
+  );
+  if (overage && !effectiveItems.some((item) => item.id === overage.id))
+    effectiveItems.push(overage);
+  const effectiveSubscription = { ...sub, items: { ...sub.items, data: effectiveItems } };
+  const resolved = rungFromSubscription(effectiveSubscription);
+  sendBillingContract = resolveSendBillingContract(effectiveSubscription, {
+    teamId: team.id,
+    customerId: customerId as string,
+  });
+  const included = Number(base?.price.metadata?.included_emails);
+  const start = stamp(base?.current_period_start);
+  const end = stamp(base?.current_period_end);
+  const valid =
+    (entitled || sub.status === "past_due") &&
+    base &&
+    overage &&
+    effectiveItems.length === 2 &&
+    sendBillingContract?.billingInterval === "month" &&
+    base.quantity === 1 &&
+    base.price.recurring?.interval === "month" &&
+    (base.price.recurring.interval_count ?? 1) === 1 &&
+    (overage.price.recurring?.interval_count ?? 1) === 1 &&
+    Number.isSafeInteger(included) &&
+    included > 0 &&
+    included === planQuota &&
+    resolved?.overageCentsPer1k !== null &&
+    resolved?.overageCentsPer1k !== undefined &&
+    start &&
+    end &&
+    start < end &&
+    overage.current_period_start === base.current_period_start &&
+    overage.current_period_end === base.current_period_end;
+  const billingTerms: typeof schema.teams.$inferInsert.billingTerms =
+    valid && overage
+      ? {
+          version: 1,
+          teamId: team.id,
+          customerId: customerId as string,
+          subscriptionId: sub.id,
+          baseItemId: base.id,
+          basePriceId: base.price.id,
+          overageItemId: overage.id,
+          overagePriceId: overage.price.id,
+          currency: "usd",
+          centsPerBlock: resolved.overageCentsPer1k as number,
+          blockSize: 1000,
+          rounding: "up",
+          included,
+          periodStart: start.toISOString(),
+          periodEnd: end.toISOString(),
+          verifiedAt: new Date().toISOString(),
+        }
+      : null;
   await tx
     .update(schema.teams)
     .set({
+      billingTerms,
+      sendBillingContract,
+      stripeSubscriptionCreated: Number.isSafeInteger(sub.created)
+        ? sub.created
+        : team.stripeSubscriptionCreated,
       plan,
       planQuota,
       planStatus: planStatusOf(sub.status),
       stripeSubscriptionId: sub.id,
       stripeOverageItemId: overageItemId,
+      ...(sendBillingContract?.billingInterval === "year" ? { overageEnabled: false } : {}),
       pendingRung: entitled ? pendingRungOf(sub, rung) : null,
       currentPeriodStart: stamp(base?.current_period_start),
       currentPeriodEnd: stamp(base?.current_period_end),
@@ -166,8 +357,9 @@ async function loadBillingColumns(db: Db, teamId: string) {
 
 /**
  * Re-derives the team's plan from Stripe's current state, for missed or
- * dropped webhooks. The customer's newest subscription is authoritative:
- * new ones are only created once the previous has ended.
+ * dropped webhooks. The newest recognized Send subscription is authoritative;
+ * the already-linked one remains eligible even if its legacy price is unknown.
+ * Other products on the same customer must never replace Send.
  */
 export async function reconcileTeamPlan(deps: BillingDeps, teamId: string): Promise<void> {
   const team = await loadBillingColumns(deps.db, teamId);
@@ -200,7 +392,8 @@ export async function reconcileTeamPlan(deps: BillingDeps, teamId: string): Prom
       }
       if (!page.has_more) return;
       const lastId = page.data.at(-1)?.id;
-      if (!lastId || lastId === startingAfter) throw new Error("Stripe subscription pagination stalled");
+      if (!lastId || lastId === startingAfter)
+        throw new Error("Stripe subscription pagination stalled");
       startingAfter = lastId;
     }
   });
@@ -274,6 +467,9 @@ export async function changeRung(
   if (!base) throw new Error(`subscription ${sub.id} has no plan item`);
   const current = rungFromPrice(base.price);
   if (!current) throw new Error(`subscription ${sub.id} has no known plan price`);
+  if (base.price.recurring?.interval === "year") {
+    throw new Error("Annual subscription changes require an explicit annual offer");
+  }
 
   let result: RungChange;
   if (rung.key === current.key) {
@@ -317,27 +513,67 @@ export async function changeRung(
     } else if (overage) {
       items.push({ id: overage.id, deleted: true });
     }
-    await deps.stripe.subscriptions.update(sub.id, {
-      items,
-      proration_behavior: "create_prorations",
-    });
-    // What was accepted inside the old volume is never re-judged as overage
-    // under the new one: the period row counts it as already settled.
-    if (rung.period === "month" && base.current_period_start) {
-      const p = schema.usagePeriods;
-      await deps.db
-        .update(p)
-        .set({
-          reportedOverage: sql`greatest(${p.reportedOverage}, ${p.accepted} - ${rung.included})`,
+    // Settle the old usage above before opening this transaction: its meter pin
+    // must remain durable even if the subsequent price-change POST fails.
+    await deps.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Db;
+      await lockCustomer(tx, customerId);
+      const [binding] = await tx
+        .select({
+          customerId: schema.teams.stripeCustomerId,
+          subscriptionId: schema.teams.stripeSubscriptionId,
         })
-        .where(
-          and(
-            eq(p.teamId, input.teamId),
-            eq(p.periodStart, new Date(base.current_period_start * 1000)),
-          ),
-        );
-    }
-    result = { applied: "now" };
+        .from(schema.teams)
+        .where(eq(schema.teams.id, input.teamId))
+        .for("update");
+      if (binding?.customerId !== customerId || binding.subscriptionId !== sub.id)
+        throw new Error("Subscription binding changed before the plan update");
+      const fresh = await deps.stripe.subscriptions.retrieve(sub.id, {
+        expand: SUBSCRIPTION_EXPAND,
+      });
+      const { base: freshBase, overage: freshOverage } = subscriptionItems(fresh);
+      if (
+        fresh.id !== sub.id ||
+        idOf(fresh.customer) !== customerId ||
+        fresh.livemode !== sub.livemode ||
+        fresh.status !== sub.status ||
+        isMailboxSubscription(fresh) ||
+        freshBase?.id !== base.id ||
+        freshBase.price.id !== base.price.id ||
+        freshBase.current_period_start !== base.current_period_start ||
+        freshBase.current_period_end !== base.current_period_end ||
+        freshOverage?.id !== overage?.id ||
+        freshOverage?.price.id !== overage?.price.id
+      )
+        throw new Error("Subscription changed before the plan update");
+      // Internal subscription mutations and meter emission now share this lock.
+      // A manual change made directly in Stripe remains outside the app's lock.
+      await deps.stripe.subscriptions.update(sub.id, {
+        items,
+        proration_behavior: "create_prorations",
+      });
+      // What was accepted inside the old volume is never re-judged as overage
+      // under the new one: the period row counts it as already settled.
+      if (rung.period === "month" && base.current_period_start) {
+        const p = schema.usagePeriods;
+        await tx
+          .update(p)
+          .set({
+            reportedOverage: sql`greatest(${p.reportedOverage}, ${p.accepted} - ${rung.included})`,
+          })
+          .where(
+            and(
+              eq(p.teamId, input.teamId),
+              eq(p.periodStart, new Date(base.current_period_start * 1000)),
+            ),
+          );
+      }
+      const confirmed = await deps.stripe.subscriptions.retrieve(sub.id, {
+        expand: SUBSCRIPTION_EXPAND,
+      });
+      await applySubscription(tx, confirmed, deps.log ?? console.warn, deps.stripe);
+    });
+    return { applied: "now" };
   }
   await applyLocked(deps, customerId, sub.id);
   return result;
@@ -357,8 +593,18 @@ export async function setOverage(
   const { customerId, sub } = await liveSubscription(deps, input.teamId);
   const { base, overage } = subscriptionItems(sub);
   const rung = base ? rungFromPrice(base.price) : null;
-  if (rung?.period !== "month") throw new Error("overage applies to monthly plans only");
+  if (rung?.period !== "month" || base?.price.recurring?.interval !== "month")
+    throw new Error("overage applies to monthly plans only");
   if (input.enabled && !overage) {
+    const catalog = rungByKey(rung.key as PlanRungKey);
+    if (
+      base?.price.active !== true ||
+      rung.priceCents !== catalog.priceCents ||
+      rung.included !== catalog.included ||
+      rung.overageCentsPer1k !== catalog.overageCentsPer1k
+    ) {
+      throw new Error("Existing subscription requires explicit overage price review");
+    }
     await deps.stripe.subscriptionItems.create({
       subscription: sub.id,
       price: await resolvePriceId(deps.stripe, overageLookupKey(rung)),
@@ -391,6 +637,8 @@ export async function cancelTeamSubscription(deps: BillingDeps, teamId: string):
       planQuota: null,
       planStatus: "canceled",
       stripeSubscriptionId: null,
+      billingTerms: null,
+      sendBillingContract: null,
       stripeOverageItemId: null,
       overageEnabled: false,
       pendingRung: null,

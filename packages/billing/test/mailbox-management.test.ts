@@ -52,6 +52,41 @@ const plan = async () =>
       .from(schema.mailboxSubscriptions)
       .where(eq(schema.mailboxSubscriptions.teamId, teamId))
   )[0]!;
+const sendingContract = async (amount = 2900) => {
+  const start = new Date(PERIOD_START * 1000);
+  const end = new Date(PERIOD_END * 1000);
+  const contract = {
+    version: 1 as const,
+    teamId,
+    customerId: customer,
+    subscriptionId: "sub_sending_management_fixture",
+    baseItemId: "si_sending_management_fixture",
+    basePriceId: `price_sending_management_${amount}`,
+    currency: "usd" as const,
+    baseAmountCents: amount,
+    billingInterval: "month" as const,
+    intervalCount: 1 as const,
+    included: 110000,
+    usageInterval: "month" as const,
+    regularMonthlyCents: amount,
+    financialPeriodStart: start.toISOString(),
+    financialPeriodEnd: end.toISOString(),
+    usageAnchor: start.toISOString(),
+    verifiedAt: now().toISOString(),
+  };
+  await db
+    .update(schema.teams)
+    .set({
+      plan: "pro",
+      planStatus: "active",
+      stripeSubscriptionId: contract.subscriptionId,
+      currentPeriodStart: start,
+      currentPeriodEnd: end,
+      sendBillingContract: contract,
+    })
+    .where(eq(schema.teams.id, teamId));
+  return contract;
+};
 function invoice(
   status: "paid" | "open" | "void" = "paid",
   id = "in_management_fixture",
@@ -280,6 +315,85 @@ describe("Mail self-service with provider fake and real optional SQL", () => {
       expect((await plan()).seats).toBe(3);
     },
   );
+
+  it.each(["resume", "quantity"] as const)(
+    "refuses hosted %s for a still-active legacy20 Envio contract",
+    async (action) => {
+      await sendingContract(2000);
+      const before = await plan();
+      await expect(
+        manageMailboxSubscription({ db, stripe, now, requirePaidSendingPlan: true }, catalog, {
+          teamId,
+          userId: user,
+          action,
+          ...(action === "quantity" ? { seats: 5 } : {}),
+        }),
+      ).rejects.toMatchObject({ code: "sending_plan_required" });
+      expect(update).not.toHaveBeenCalled();
+      expect(createSchedule).not.toHaveBeenCalled();
+      expect(await plan()).toEqual(before);
+    },
+  );
+
+  it.each(["resume", "quantity"] as const)(
+    "allows hosted %s for the regular29 Envio contract",
+    async (action) => {
+      await sendingContract();
+      if (action === "resume") {
+        sub.cancel_at_period_end = true;
+        sub.cancel_at = PERIOD_END;
+        await applyMailboxSubscription(db, sub, catalog, PERIOD_START + 200);
+      }
+      expect(
+        await manageMailboxSubscription(
+          { db, stripe, now, requirePaidSendingPlan: true },
+          catalog,
+          {
+            teamId,
+            userId: user,
+            action,
+            ...(action === "quantity" ? { seats: 5 } : {}),
+          },
+        ),
+      ).toMatchObject({ status: "confirmed" });
+      expect(update).toHaveBeenCalledTimes(1);
+      expect((await plan()).seats).toBe(action === "quantity" ? 5 : 3);
+    },
+  );
+
+  it("keeps the historical Mail terms through reduction, cancellation and reconciliation on legacy20", async () => {
+    await sendingContract(2000);
+    const before = await plan();
+    const deps = { db, stripe, now, requirePaidSendingPlan: true };
+    const rotated: MailboxCatalog = {
+      ...catalog,
+      checkoutPriceId: "price_mail_new590",
+      prices: [{ ...terms, priceId: "price_mail_new590", unitAmount: 590 }],
+    };
+    expect(
+      await manageMailboxSubscription(deps, rotated, {
+        teamId,
+        userId: user,
+        action: "quantity",
+        seats: 2,
+      }),
+    ).toMatchObject({ status: "scheduled", scheduledSeats: 2 });
+    await manageMailboxSubscription(deps, rotated, { teamId, userId: user, action: "cancel" });
+    await manageMailboxSubscription(deps, rotated, { teamId, userId: user, action: "reconcile" });
+    expect(await plan()).toMatchObject({
+      stripePriceId: before.stripePriceId,
+      unitAmount: before.unitAmount,
+      currency: before.currency,
+      interval: before.interval,
+      storageBytesPerMailbox: before.storageBytesPerMailbox,
+      includedOutboundPerMailbox: before.includedOutboundPerMailbox,
+      seats: before.seats,
+    });
+    expect(scheduleUpdate.mock.calls[0]?.[1].phases?.[1]?.items).toMatchObject([
+      { price: before.stripePriceId, quantity: 2 },
+    ]);
+    expect(update).toHaveBeenCalledTimes(1);
+  });
 
   it("preserves hosted cancellation and reduction after Envio ends", async () => {
     const deps = { db, stripe, now, requirePaidSendingPlan: true };

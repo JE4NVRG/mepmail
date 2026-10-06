@@ -21,6 +21,7 @@ import { BtnSpinner } from "@/components/spinner";
 import { Switch } from "@/components/switch";
 import { WarnCard } from "@/components/warn-card";
 import { formatDay, formatDayTime, formatUsd } from "@/lib/format";
+import type { LaunchBillingPeriod } from "@/lib/launch-offer";
 import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { QuotaRow } from "../usage/usage-view";
@@ -115,7 +116,13 @@ function Check() {
   );
 }
 
-export function BillingView({ checkout }: { checkout: "success" | "cancel" | null }) {
+export function BillingView({
+  checkout,
+  requestedRung = null,
+}: {
+  checkout: "success" | "cancel" | null;
+  requestedRung?: PlanRungKey | null;
+}) {
   const t = useTranslations("settings.billing");
   const planName = useTranslations("settings.plans");
   const usageT = useTranslations("settings.usage");
@@ -144,25 +151,17 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
         queryClient.invalidateQueries(trpc.team.list.queryFilter()),
       ]),
   };
-  // The slider follows the team's own rung until the viewer moves it.
+  // A intenção só abre a comparação; todas as mutações exigem clique e role.
+  const intent =
+    PLAN_RUNGS.find((rung) => rung.key === requestedRung && rung.priceCents > 0)?.key ?? null;
   const [step, setStep] = useState<number | null>(null);
-  const [plansOpen, setPlansOpen] = useState(false);
+  const [launchInterval, setLaunchInterval] = useState<LaunchBillingPeriod>("month");
+  const [plansOpen, setPlansOpen] = useState(intent !== null);
   const [changed, setChanged] = useState<{ rung: PlanRungKey; result: RungChange } | null>(null);
-  const startCheckout = useMutation(
-    trpc.billing.checkout.mutationOptions({
-      ...redirect,
-      onMutate: () => resetOtherErrors("checkout"),
-    }),
-  );
-  const openPortal = useMutation(
-    trpc.billing.portal.mutationOptions({
-      ...redirect,
-      onMutate: () => resetOtherErrors("portal"),
-    }),
-  );
+  const startCheckout = useMutation(trpc.billing.checkout.mutationOptions(redirect));
+  const openPortal = useMutation(trpc.billing.portal.mutationOptions(redirect));
   const changePlan = useMutation(
     trpc.billing.changePlan.mutationOptions({
-      onMutate: () => resetOtherErrors("changePlan"),
       onSuccess: async (result, variables) => {
         await refresh.onSuccess();
         // The outcome shows on the plan card at the top of the page, so the
@@ -173,35 +172,10 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
       },
     }),
   );
-  const setOverage = useMutation(
-    trpc.billing.setOverage.mutationOptions({
-      ...refresh,
-      onMutate: () => resetOtherErrors("setOverage"),
-    }),
-  );
-  // Callbacks run after all hooks have initialized. Clear only failures of
-  // other actions, preserving the mutation that the user just started.
-  function resetOtherErrors(action: "checkout" | "portal" | "changePlan" | "setOverage"): void {
-    if (action !== "checkout" && startCheckout.isError) startCheckout.reset();
-    if (action !== "portal" && openPortal.isError) openPortal.reset();
-    if (action !== "changePlan" && changePlan.isError) changePlan.reset();
-    if (action !== "setOverage" && setOverage.isError) setOverage.reset();
-  }
+  const setOverage = useMutation(trpc.billing.setOverage.mutationOptions(refresh));
   const mutations = [startCheckout, openPortal, changePlan, setOverage];
   const busy = mutations.some((m) => m.isPending);
   const failed = mutations.some((m) => m.isError);
-  const checkoutErrors = {
-    SEND_CHECKOUT_PENDING: "checkoutPending",
-    SEND_CHECKOUT_UNKNOWN: "checkoutUnknown",
-    SEND_CHECKOUT_CONFLICT: "checkoutConflict",
-    SEND_CHECKOUT_EXPIRED: "checkoutExpired",
-    SEND_CHECKOUT_SUBSCRIPTION_EXISTS: "checkoutSubscriptionExists",
-  } as const;
-  const checkoutError = startCheckout.error?.message;
-  const failureText =
-    startCheckout.isError && checkoutError && Object.hasOwn(checkoutErrors, checkoutError)
-      ? t(checkoutErrors[checkoutError as keyof typeof checkoutErrors])
-      : t("error");
 
   const fmt = new Intl.NumberFormat(locale);
   const usd = (cents: number) => formatUsd(cents, locale);
@@ -279,6 +253,9 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
     usage,
     hasCustomer,
     hasLiveSubscription,
+    billingInterval,
+    launchOffer,
+    subscriptionState,
   } = status.data;
   if (plan === "system") {
     return (
@@ -301,10 +278,19 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
     step ??
     Math.max(
       0,
-      PLAN_RUNGS.findIndex((r) => r.key === current.key),
+      PLAN_RUNGS.findIndex((r) => r.key === (intent ?? current.key)),
     );
   const selected = PLAN_RUNGS[at] ?? current;
   const over = quota.kind === "month" ? Math.max(0, usage.accepted - quota.included) : 0;
+  const newOffer = !hasLiveSubscription ? launchOffer : null;
+  const subscriptionChangesUnavailable =
+    hasLiveSubscription && (billingInterval === "year" || subscriptionState !== "confirmed");
+  const salePrice = (r: PlanRung) =>
+    newOffer && r.key === newOffer.rung
+      ? launchInterval === "year"
+        ? newOffer.annualCents
+        : newOffer.monthlyCents
+      : r.priceCents;
 
   const portalButton = (label: string, className: string) => (
     <button
@@ -355,6 +341,23 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
           </span>
         </div>
 
+        {status.data.effectiveRung ? (
+          <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+            {t(billingInterval === "year" ? "effectiveAnnualBasePrice" : "effectiveBasePrice", {
+              price: usd(status.data.effectiveRung.priceCents),
+            })}
+          </p>
+        ) : null}
+        {hasLiveSubscription && subscriptionState !== "confirmed" ? (
+          <p role="status" style={{ margin: "12px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+            {t("subscriptionConfirmationPending")}
+          </p>
+        ) : billingInterval === "year" ? (
+          <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+            {t("annualChangesUnavailable")}
+          </p>
+        ) : null}
+
         <div className="ms-kpi-row" style={{ display: "flex", gap: 48, marginTop: 22 }}>
           <div>
             <div className="ms-microlabel" style={{ fontSize: 10.5 }}>
@@ -402,8 +405,12 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
               <button
                 type="button"
                 className="ms-btn ms-btn-secondary"
-                disabled={busy}
-                onClick={() => changePlan.mutate({ rung: current.key })}
+                disabled={busy || subscriptionChangesUnavailable}
+                onClick={
+                  subscriptionChangesUnavailable
+                    ? undefined
+                    : () => changePlan.mutate({ rung: current.key })
+                }
               >
                 <BtnSpinner
                   on={changePlan.isPending && changePlan.variables?.rung === current.key}
@@ -427,7 +434,7 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
             color: failed ? "var(--ms-danger)" : "var(--ms-muted)",
           }}
         >
-          {failed ? failureText : canManage ? t("manageHint") : t("readOnly")}
+          {failed ? t("error") : canManage ? t("manageHint") : t("readOnly")}
         </p>
       </Card>
 
@@ -452,20 +459,28 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
             >
               <Switch
                 checked={quota.overage}
-                disabled={!canManage || !hasLiveSubscription || busy}
-                onChange={(enabled) => setOverage.mutate({ enabled })}
+                disabled={
+                  !canManage || !hasLiveSubscription || busy || subscriptionChangesUnavailable
+                }
+                onChange={(enabled) => {
+                  if (!subscriptionChangesUnavailable) setOverage.mutate({ enabled });
+                }}
                 ariaLabel={t("overage")}
               />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 14, color: "var(--ms-bone)" }}>{t("overage")}</div>
                 <div style={{ fontSize: 12.5, color: "var(--ms-muted)", marginTop: 2 }}>
-                  {t("overageCopy", { price: usd(quota.overageCentsPer1k) })}
+                  {billingInterval === "year"
+                    ? t("launch.annualHardCap")
+                    : quota.overageCentsPer1k === null
+                      ? t("effectiveRateUnavailable")
+                      : t("overageCopy", { price: usd(quota.overageCentsPer1k) })}
                 </div>
-                {over > 0 ? (
+                {over > 0 && quota.overageCentsPer1k !== null ? (
                   <div style={{ fontSize: 12.5, color: "var(--ms-bone)", marginTop: 6 }}>
                     {t("overSoFar", {
                       n: over,
-                      amount: usd(Math.round((over * quota.overageCentsPer1k) / 1000)),
+                      amount: usd(Math.ceil(over / 1000) * quota.overageCentsPer1k),
                     })}
                   </div>
                 ) : null}
@@ -482,6 +497,106 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
         )}
       </Card>
 
+      {newOffer ? (
+        <Card title={t("launch.title")}>
+          <p
+            style={{ margin: "0 0 20px", color: "var(--ms-muted)", fontSize: 14, lineHeight: 1.6 }}
+          >
+            {t("launch.included", { n: fmt.format(newOffer.monthlyRecipientDeliveries) })}
+          </p>
+          <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+            <legend className="ms-microlabel" style={{ marginBottom: 10 }}>
+              {t("launch.interval")}
+            </legend>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+              {(["month", "year"] as const).map((interval) => (
+                <label
+                  key={interval}
+                  className="ms-btn ms-btn-secondary"
+                  style={{
+                    minHeight: 44,
+                    fontSize: 16,
+                    display: "inline-flex",
+                    gap: 10,
+                    alignItems: "center",
+                    cursor: busy ? "wait" : "pointer",
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="send-launch-interval"
+                    value={interval}
+                    checked={launchInterval === interval}
+                    disabled={busy}
+                    onChange={() => setLaunchInterval(interval)}
+                  />
+                  {t(`launch.${interval}`)}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div role="status" aria-live="polite" aria-atomic="true" style={{ marginTop: 20 }}>
+            <p
+              className="ms-display"
+              style={{
+                margin: 0,
+                fontSize: "var(--ms-fs-h1)",
+                color: "var(--ms-bone)",
+                overflowWrap: "anywhere",
+              }}
+            >
+              {usd(launchInterval === "year" ? newOffer.annualCents : newOffer.monthlyCents)}
+              <span style={{ fontSize: 16, color: "var(--ms-muted)", marginLeft: 8 }}>
+                {t(launchInterval === "year" ? "launch.perYear" : "perMonth")}
+              </span>
+            </p>
+            <p
+              style={{ fontSize: 14, lineHeight: 1.6, margin: "10px 0", color: "var(--ms-muted)" }}
+            >
+              {launchInterval === "year"
+                ? t("launch.annualTerms", {
+                    total: usd(newOffer.annualCents),
+                    equivalent: usd(Math.round(newOffer.annualCents / 12)),
+                  })
+                : t("launch.monthlyTerms", {
+                    first: usd(newOffer.firstMonthlyCents),
+                    renewal: usd(newOffer.monthlyCents),
+                  })}
+            </p>
+            {launchInterval === "year" ? (
+              <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ms-muted)" }}>
+                {t("launch.annualHardCap")}
+              </p>
+            ) : null}
+          </div>
+          <p
+            style={{
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: "var(--ms-muted)",
+              margin: "14px 0 20px",
+            }}
+          >
+            {t("launch.existingPreserved")}
+          </p>
+          {canManage ? (
+            <button
+              type="button"
+              className="ms-btn ms-btn-primary"
+              disabled={busy}
+              onClick={() =>
+                startCheckout.mutate({ rung: newOffer.rung, interval: launchInterval })
+              }
+            >
+              <BtnSpinner on={startCheckout.isPending} />
+              {t("launch.continue")}
+            </button>
+          ) : (
+            <p style={{ color: "var(--ms-muted)", fontSize: 14 }}>{t("readOnly")}</p>
+          )}
+        </Card>
+      ) : null}
+
       <Card
         title={t("plansTitle")}
         action={
@@ -497,7 +612,12 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
         <div className="ms-plan-strip">
           {PLANS.map((p) => {
             const rungs = PLAN_RUNGS.filter((x) => x.plan === p);
-            const price = usd(rungs[0]?.priceCents ?? 0);
+            const firstRung = rungs[0];
+            const price = usd(
+              firstRung && newOffer && firstRung.key === newOffer.rung
+                ? newOffer.monthlyCents
+                : (firstRung?.priceCents ?? 0),
+            );
             return (
               <div
                 key={p}
@@ -554,14 +674,6 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
             </div>
             <p className="ms-slider-hint">{t("sliderHint")}</p>
           </div>
-          {failed ? (
-            <p
-              role="alert"
-              style={{ color: "var(--ms-error, var(--ms-bone))", margin: "0 0 16px" }}
-            >
-              {failureText}
-            </p>
-          ) : null}
           <div className="ms-plans">
             {PLANS.map((p) => {
               const active = selected.plan === p;
@@ -575,9 +687,15 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
                   <div className="ms-plan-name">{planName(p)}</div>
                   <div className="ms-plan-price">
                     <span className="ms-digits">
-                      <Odometer formatted={usd(r.priceCents)} lit={false} />
+                      <Odometer formatted={usd(salePrice(r))} lit={false} />
                     </span>
-                    <span className="ms-plan-per">{t("perMonth")}</span>
+                    <span className="ms-plan-per">
+                      {t(
+                        newOffer && r.key === newOffer.rung && launchInterval === "year"
+                          ? "launch.perYear"
+                          : "perMonth",
+                      )}
+                    </span>
                   </div>
                   <div className="ms-plan-cap">
                     <span className="ms-digits">{fmt.format(r.included)}</span>
@@ -590,9 +708,11 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
                     className="ms-plan-over"
                     data-empty={r.overageCentsPer1k === null || undefined}
                   >
-                    {r.overageCentsPer1k === null
-                      ? "\u00a0"
-                      : t("overagePer1k", { price: usd(r.overageCentsPer1k) })}
+                    {newOffer && r.key === newOffer.rung && launchInterval === "year"
+                      ? t("launch.annualHardCap")
+                      : r.overageCentsPer1k === null
+                        ? "\u00a0"
+                        : t("overagePer1k", { price: usd(r.overageCentsPer1k) })}
                   </span>
                   <div className="ms-plan-more">
                     <div>
@@ -612,11 +732,19 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
                         <button
                           type="button"
                           className={`ms-btn ${active ? "ms-btn-primary" : "ms-btn-secondary"}`}
-                          disabled={busy}
+                          disabled={busy || subscriptionChangesUnavailable}
                           onClick={() =>
-                            hasLiveSubscription
-                              ? changePlan.mutate({ rung: r.key })
-                              : startCheckout.mutate({ rung: r.key })
+                            subscriptionChangesUnavailable
+                              ? undefined
+                              : hasLiveSubscription
+                                ? changePlan.mutate({ rung: r.key })
+                                : startCheckout.mutate({
+                                    rung: r.key,
+                                    interval:
+                                      newOffer && r.key === newOffer.rung
+                                        ? launchInterval
+                                        : "month",
+                                  })
                           }
                         >
                           <BtnSpinner
@@ -627,7 +755,8 @@ export function BillingView({ checkout }: { checkout: "success" | "cancel" | nul
                             }
                           />
                           {hasLiveSubscription
-                            ? r.priceCents < current.priceCents
+                            ? status.data.effectiveRung &&
+                              r.priceCents < status.data.effectiveRung.priceCents
                               ? t("switchAtPeriodEnd")
                               : t("switch")
                             : t("choose")}

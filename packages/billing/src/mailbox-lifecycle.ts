@@ -392,7 +392,7 @@ async function applyMailboxProjection(
 }
 
 export interface MailboxPurchaseDeps {
-  /** Hosted application policy; self-hosted/library callers retain their own catalog rules. */
+  /** Hosted Envio contract prerequisite; library callers retain their own catalog rules. */
   requirePaidSendingPlan?: boolean;
   db: Db;
   stripe: MailboxBillingStripe;
@@ -551,6 +551,7 @@ async function ensureMailboxCustomer(
         customerId: schema.teams.stripeCustomerId,
         suspendedAt: schema.teams.suspendedAt,
         planStatus: schema.teams.planStatus,
+        sendBillingContract: schema.teams.sendBillingContract,
         stripeSubscriptionId: schema.teams.stripeSubscriptionId,
         currentPeriodStart: schema.teams.currentPeriodStart,
         currentPeriodEnd: schema.teams.currentPeriodEnd,
@@ -606,10 +607,12 @@ async function ensureMailboxCustomer(
       const db = tx as unknown as Db;
       const [team] = await tx
         .select({
+          id: schema.teams.id,
           plan: schema.teams.plan,
           customerId: schema.teams.stripeCustomerId,
           suspendedAt: schema.teams.suspendedAt,
           planStatus: schema.teams.planStatus,
+          sendBillingContract: schema.teams.sendBillingContract,
           stripeSubscriptionId: schema.teams.stripeSubscriptionId,
           currentPeriodStart: schema.teams.currentPeriodStart,
           currentPeriodEnd: schema.teams.currentPeriodEnd,
@@ -700,6 +703,7 @@ async function purchaseTeam(
       customerId: schema.teams.stripeCustomerId,
       suspendedAt: schema.teams.suspendedAt,
       planStatus: schema.teams.planStatus,
+      sendBillingContract: schema.teams.sendBillingContract,
       stripeSubscriptionId: schema.teams.stripeSubscriptionId,
       currentPeriodStart: schema.teams.currentPeriodStart,
       currentPeriodEnd: schema.teams.currentPeriodEnd,

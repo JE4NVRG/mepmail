@@ -20,6 +20,12 @@ export async function fetchEffectivePlan(db: Db, teamId: string): Promise<Plan |
 
 /** The billing columns teamQuota reads, selected off a team row. */
 export const QUOTA_COLUMNS = {
+  id: schema.teams.id,
+  stripeCustomerId: schema.teams.stripeCustomerId,
+  stripeSubscriptionId: schema.teams.stripeSubscriptionId,
+  stripeOverageItemId: schema.teams.stripeOverageItemId,
+  sendBillingContract: schema.teams.sendBillingContract,
+  billingTerms: schema.teams.billingTerms,
   plan: schema.teams.plan,
   planQuota: schema.teams.planQuota,
   currentPeriodStart: schema.teams.currentPeriodStart,

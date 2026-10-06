@@ -155,6 +155,8 @@ export async function mailboxBillingPresentation(
   const [member] = await db
     .select({
       role: schema.teamMembers.role,
+      id: schema.teams.id,
+      sendBillingContract: schema.teams.sendBillingContract,
       suspendedAt: schema.teams.suspendedAt,
       plan: schema.teams.plan,
       planStatus: schema.teams.planStatus,

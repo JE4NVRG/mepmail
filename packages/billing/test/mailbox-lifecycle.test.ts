@@ -144,6 +144,43 @@ describe("Mailbox lifecycle with real optional migrations", () => {
       CATALOG,
       request(),
     );
+  const sendingContract = async (amount = 2900, annual = false) => {
+    const start = new Date(Date.now() - 60000);
+    const end = new Date(start);
+    if (annual) end.setUTCFullYear(end.getUTCFullYear() + 1);
+    else end.setUTCMonth(end.getUTCMonth() + 1);
+    const contract = {
+      version: 1 as const,
+      teamId,
+      customerId: CUSTOMER,
+      subscriptionId: "sub_sending_addon_fixture",
+      baseItemId: "si_sending_addon_fixture",
+      basePriceId: `price_sending_${amount}_${annual ? "year" : "month"}`,
+      currency: "usd" as const,
+      baseAmountCents: annual ? amount * 10 : amount,
+      billingInterval: annual ? ("year" as const) : ("month" as const),
+      intervalCount: 1 as const,
+      included: 110000,
+      usageInterval: "month" as const,
+      regularMonthlyCents: amount,
+      financialPeriodStart: start.toISOString(),
+      financialPeriodEnd: end.toISOString(),
+      usageAnchor: start.toISOString(),
+      verifiedAt: new Date().toISOString(),
+    };
+    await db
+      .update(schema.teams)
+      .set({
+        plan: "pro",
+        planStatus: "active",
+        stripeSubscriptionId: contract.subscriptionId,
+        currentPeriodStart: start,
+        currentPeriodEnd: end,
+        sendBillingContract: contract,
+      })
+      .where(eq(schema.teams.id, teamId));
+    return contract;
+  };
   const customerRequests = () => db.select().from(schema.mailboxCustomerRequests);
   // Qualification rows only: an operational internal grant has its own mandatory audit.
   const internalPlan = (
@@ -248,56 +285,115 @@ describe("Mailbox lifecycle with real optional migrations", () => {
     },
   );
 
-  it("rechecks the verified Envio period under checkout locks", async () => {
-    await db
-      .update(schema.teams)
-      .set({
-        plan: "starter",
-        planStatus: "active",
-        stripeSubscriptionId: "sub_sending_addon_fixture",
-        currentPeriodStart: new Date(Date.now() - 60000),
-        currentPeriodEnd: new Date(Date.now() + 86400000),
-      })
-      .where(eq(schema.teams.id, teamId));
-    const original = db.transaction.bind(db);
-    let transactions = 0;
-    const interveningDb = Object.create(db) as Db;
-    interveningDb.transaction = (async (...args: Parameters<typeof db.transaction>) => {
-      const result = await original(...args);
-      if (++transactions === 2)
-        await db
-          .update(schema.teams)
-          .set({ planStatus: "past_due" })
-          .where(eq(schema.teams.id, teamId));
-      return result;
-    }) as typeof db.transaction;
-    await expect(
-      beginMailboxCheckout(
-        { db: interveningDb, stripe, requirePaidSendingPlan: true },
-        CATALOG,
-        request(),
-      ),
-    ).rejects.toMatchObject({ code: "sending_plan_required" });
-    expect(state.checkouts).toHaveLength(0);
-    expect(await leases()).toMatchObject([{ status: "creating" }]);
-  });
+  it.each(["status", "amount"] as const)(
+    "rechecks the verified Envio %s under checkout locks",
+    async (change) => {
+      const contracted = await sendingContract();
+      const original = db.transaction.bind(db);
+      let transactions = 0;
+      const interveningDb = Object.create(db) as Db;
+      interveningDb.transaction = (async (...args: Parameters<typeof db.transaction>) => {
+        const result = await original(...args);
+        if (++transactions === 2)
+          await db
+            .update(schema.teams)
+            .set(
+              change === "status"
+                ? { planStatus: "past_due" }
+                : {
+                    sendBillingContract: {
+                      ...contracted,
+                      basePriceId: "price_sending_legacy20_fixture",
+                      baseAmountCents: 2000,
+                      regularMonthlyCents: 2000,
+                    },
+                  },
+            )
+            .where(eq(schema.teams.id, teamId));
+        return result;
+      }) as typeof db.transaction;
+      await expect(
+        beginMailboxCheckout(
+          { db: interveningDb, stripe, requirePaidSendingPlan: true },
+          CATALOG,
+          request(),
+        ),
+      ).rejects.toMatchObject({ code: "sending_plan_required" });
+      expect(state.checkouts).toHaveLength(0);
+      expect(await leases()).toMatchObject([{ status: "creating" }]);
+    },
+  );
 
   it("allows hosted Correio checkout for an active paid Envio subscriber", async () => {
-    await db
-      .update(schema.teams)
-      .set({
-        plan: "pro",
-        planStatus: "active",
-        stripeSubscriptionId: "sub_sending_addon_fixture",
-        currentPeriodStart: new Date(Date.now() - 60000),
-        currentPeriodEnd: new Date(Date.now() + 86400000),
-      })
-      .where(eq(schema.teams.id, teamId));
+    await sendingContract();
     expect(
       await beginMailboxCheckout({ db, stripe, requirePaidSendingPlan: true }, CATALOG, request()),
     ).toMatchObject({ url: expect.stringContaining("checkout.stripe.com") });
     expect(state.checkouts).toHaveLength(1);
     expect(state.customers).toHaveLength(0);
+    expect(await plan()).toBeUndefined();
+  });
+
+  it("refuses the active legacy20 contract without changing it or creating an intent", async () => {
+    await sendingContract(2000);
+    const [before] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    await expect(
+      beginMailboxCheckout({ db, stripe, requirePaidSendingPlan: true }, CATALOG, request()),
+    ).rejects.toMatchObject({ code: "sending_plan_required" });
+    expect(await db.select().from(schema.teams).where(eq(schema.teams.id, teamId))).toEqual([
+      before,
+    ]);
+    expect(state.checkouts).toHaveLength(0);
+    expect(state.customers).toHaveLength(0);
+    expect(await leases()).toHaveLength(0);
+  });
+
+  it("accepts verified annual29 terms without changing Send or granting Mail on redirect", async () => {
+    await sendingContract(2900, true);
+    const [before] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    expect(
+      await beginMailboxCheckout({ db, stripe, requirePaidSendingPlan: true }, CATALOG, request()),
+    ).toMatchObject({ url: expect.stringContaining("checkout.stripe.com") });
+    expect(await db.select().from(schema.teams).where(eq(schema.teams.id, teamId))).toEqual([
+      before,
+    ]);
+    expect(await plan()).toBeUndefined();
+  });
+
+  it.each([
+    { unitAmount: 590, interval: "month", storageGiB: 1, included: 500 },
+    { unitAmount: 5900, interval: "year", storageGiB: 1, included: 500 },
+    { unitAmount: 990, interval: "month", storageGiB: 10, included: 2000 },
+    { unitAmount: 9900, interval: "year", storageGiB: 10, included: 2000 },
+  ] as const)("freezes the approved Correio SKU %j in the checkout intent", async (sku) => {
+    await sendingContract();
+    const offered = {
+      ...TERMS,
+      priceId: `price_mail_${sku.storageGiB}_${sku.interval}`,
+      unitAmount: sku.unitAmount,
+      interval: sku.interval,
+      storageBytesPerMailbox: sku.storageGiB * 1024 ** 3,
+      includedOutboundPerMailbox: sku.included,
+    };
+    const selected: MailboxCatalog = {
+      ...CATALOG,
+      checkoutPriceId: offered.priceId,
+      checkoutPriceIds: [offered.priceId],
+      prices: [TERMS, offered],
+    };
+    await beginMailboxCheckout({ db, stripe, requirePaidSendingPlan: true }, selected, request());
+    expect(await leases()).toMatchObject([
+      {
+        stripePriceId: offered.priceId,
+        currency: "usd",
+        unitAmount: sku.unitAmount,
+        interval: sku.interval,
+        storageBytesPerMailbox: offered.storageBytesPerMailbox,
+        includedOutboundPerMailbox: sku.included,
+        seats: 3,
+      },
+    ]);
+    expect(state.checkouts[0]?.line_items).toEqual([{ price: offered.priceId, quantity: 3 }]);
     expect(await plan()).toBeUndefined();
   });
 
@@ -927,6 +1023,50 @@ describe("Mailbox lifecycle with real optional migrations", () => {
     );
     expect(await plan()).toEqual(before);
   });
+
+  it.each([390, 690])(
+    "preserves the archived Correio amount %i when the purchase catalog moves to590/990",
+    async (unitAmount) => {
+      const archived = { ...TERMS, priceId: `price_mail_legacy_${unitAmount}`, unitAmount };
+      const oldCatalog: MailboxCatalog = {
+        ...CATALOG,
+        checkoutPriceId: null,
+        prices: [archived],
+      };
+      const sub = mailSub();
+      sub.items.data[0]!.price = {
+        ...sub.items.data[0]!.price,
+        id: archived.priceId,
+        unit_amount: unitAmount,
+      };
+      await applyMailboxSubscription(db, sub, oldCatalog, EVENT);
+      const before = await plan();
+      if (!before) throw new Error("Expected the archived Mail contract");
+      const newTerms = [590, 990].map((amount) => ({
+        ...TERMS,
+        priceId: `price_mail_new_${amount}`,
+        unitAmount: amount,
+        storageBytesPerMailbox: (amount === 590 ? 1 : 10) * 1024 ** 3,
+        includedOutboundPerMailbox: amount === 590 ? 500 : 2000,
+      }));
+      const rotated: MailboxCatalog = {
+        ...CATALOG,
+        checkoutPriceId: "price_mail_new_590",
+        checkoutPriceIds: newTerms.map((price) => price.priceId),
+        prices: newTerms,
+      };
+      expect((await applyMailboxSubscription(db, sub, rotated, EVENT + 1)).applied).toBe(true);
+      expect(await plan()).toMatchObject({
+        stripePriceId: archived.priceId,
+        unitAmount,
+        currency: before.currency,
+        interval: before.interval,
+        storageBytesPerMailbox: before.storageBytesPerMailbox,
+        includedOutboundPerMailbox: before.includedOutboundPerMailbox,
+        seats: before.seats,
+      });
+    },
+  );
 
   it("preserves initial purchase authority while refusing an old paid invoice for a later increase", async () => {
     const sub = mailSub();

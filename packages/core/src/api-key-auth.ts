@@ -3,6 +3,7 @@ import { schema } from "@millionsend/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { extractTokenPrefix, verifyApiKey } from "./api-keys.js";
 import { effectivePlan, type Plan, type QuotaTeamRow } from "./plans.js";
+import { QUOTA_COLUMNS } from "./team-plan.js";
 
 /** SECURITY: the only source of teamId for API-key-authenticated requests. */
 export interface ApiKeyAuth {
@@ -45,12 +46,7 @@ export async function authenticateApiKey(db: Db, token: string): Promise<ApiKeyA
       lastUsedAt: schema.apiKeys.lastUsedAt,
       permission: schema.apiKeys.permission,
       domainId: schema.apiKeys.domainId,
-      plan: schema.teams.plan,
-      planQuota: schema.teams.planQuota,
-      currentPeriodStart: schema.teams.currentPeriodStart,
-      currentPeriodEnd: schema.teams.currentPeriodEnd,
-      overageEnabled: schema.teams.overageEnabled,
-      dailySendCeiling: schema.teams.dailySendCeiling,
+      billing: QUOTA_COLUMNS,
     })
     .from(schema.apiKeys)
     .innerJoin(schema.teams, eq(schema.apiKeys.teamId, schema.teams.id))
@@ -69,15 +65,8 @@ export async function authenticateApiKey(db: Db, token: string): Promise<ApiKeyA
   }
   return {
     teamId: match.teamId,
-    plan: effectivePlan(match.plan, match.currentPeriodEnd),
-    billing: {
-      plan: match.plan,
-      planQuota: match.planQuota,
-      currentPeriodStart: match.currentPeriodStart,
-      currentPeriodEnd: match.currentPeriodEnd,
-      overageEnabled: match.overageEnabled,
-      dailySendCeiling: match.dailySendCeiling,
-    },
+    plan: effectivePlan(match.billing.plan, match.billing.currentPeriodEnd),
+    billing: match.billing,
     apiKeyId: match.id,
     permission: match.permission,
     domainId: match.domainId,

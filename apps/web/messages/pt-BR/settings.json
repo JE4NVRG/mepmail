@@ -286,6 +286,24 @@
       "incomplete": "Incompleto"
     },
     "cap": "Cota de envio",
+    "effectiveBasePrice": "Preço-base da sua assinatura: {price} / mês.",
+    "subscriptionConfirmationPending": "Estamos confirmando as condições da sua assinatura. Preços e trocas de plano ficarão disponíveis após a confirmação. Seu contrato atual permanece preservado; você pode abrir o portal de cobrança.",
+    "annualChangesUnavailable": "As trocas de plano para assinaturas anuais ainda não estão disponíveis. Seu contrato atual permanece preservado. Use o portal de cobrança para gerenciar o pagamento ou cancelamento.",
+    "effectiveAnnualBasePrice": "Preço-base da sua assinatura: {price} / ano, pago antecipadamente.",
+    "effectiveRateUnavailable": "A tarifa de excedente contratada está indisponível. Não podemos estimar uma cobrança extra.",
+    "launch": {
+      "title": "Envio · 110 mil entregas por mês",
+      "included": "{n} entregas a destinatários por mês para sua API, e-mails transacionais e campanhas.",
+      "interval": "Período de pagamento",
+      "month": "Mensal",
+      "year": "Anual · pague por 10 meses",
+      "perYear": "/ ano",
+      "monthlyTerms": "Novos clientes elegíveis pagam {first} na primeira mensalidade, depois {renewal} / mês. O desconto inicial é confirmado no checkout.",
+      "annualTerms": "Pague {total} antecipadamente por 12 meses; equivalente a {equivalent} / mês, não uma fatura mensal. A promoção do primeiro mês não se aplica ao pagamento anual.",
+      "annualHardCap": "A franquia de 110 mil entregas renova todo mês. No anual, novos envios pausam ao atingir esse limite, sem cobrança automática de excedente.",
+      "existingPreserved": "Assinaturas existentes mantêm os preços e limites contratados. Esta oferta não altera uma assinatura ativa.",
+      "continue": "Continuar para o checkout"
+    },
     "capPerDay": "{n} e-mails / dia",
     "capPerMonth": "{n} e-mails / mês",
     "renewsOn": "Renova em",
@@ -329,12 +347,7 @@
     },
     "checkoutSuccess": "Obrigado! Seu plano é atualizado assim que o Stripe confirmar o pagamento — normalmente em poucos segundos.",
     "checkoutCancel": "Checkout cancelado. Seu plano não mudou.",
-    "error": "Algo deu errado com o Stripe. Tente novamente.",
-    "checkoutPending": "Sua tentativa anterior ainda está em verificação. Aguarde antes de iniciar outra compra; fale com o suporte se continuar pendente.",
-    "checkoutUnknown": "O resultado da tentativa anterior ainda não foi confirmado. Abra novamente o mesmo plano para verificar essa tentativa, ou fale com o suporte. Não inicie outra compra.",
-    "checkoutConflict": "Já existe uma tentativa com outro plano. Selecione o mesmo plano para reabri-la, ou aguarde a confirmação de expiração pela Stripe.",
-    "checkoutExpired": "A Stripe confirmou que esta tentativa expirou. Selecione seu plano novamente para abrir uma nova compra.",
-    "checkoutSubscriptionExists": "Sua assinatura já está ativa ou aguardando pagamento. Gerencie a assinatura existente para evitar outra compra."
+    "error": "Algo deu errado com o Stripe. Tente novamente."
   },
   "mcp": {
     "title": "Servidor MCP",
