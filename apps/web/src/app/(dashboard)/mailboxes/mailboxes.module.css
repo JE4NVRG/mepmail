@@ -1514,7 +1514,7 @@
   background: var(--ms-inset);
 }
 .mailFolderRail .scopeFilters button {
-  padding: 8px 4px;
+  padding: 8px 2px;
   flex: 1;
   min-width: 0;
   font-size: var(--ms-fs-badge);
