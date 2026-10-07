@@ -1063,6 +1063,7 @@
   padding: 12px;
 }
 .correio .correio-demo-draft {
+  position: relative;
   min-height: 44px;
   padding: 10px 12px;
   border: 1px solid var(--ms-line);
@@ -1073,6 +1074,20 @@
 .correio .correio-demo-type {
   display: inline-block;
   max-width: 100%;
+}
+/* "Typing…": three dots while the agent writes, then the whole reply. */
+.correio .correio-demo-dots {
+  position: absolute;
+  top: 16px;
+  left: 12px;
+  display: none;
+  gap: 4px;
+}
+.correio .correio-demo-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ms-muted);
 }
 .correio .correio-demo-wait {
   display: flex;
@@ -1125,12 +1140,39 @@
 }
 @keyframes correio-demo-type {
   0%,
-  24% {
-    clip-path: inset(0 100% 0 0);
+  40% {
+    opacity: 0;
+    transform: translateY(3px);
   }
-  52%,
+  46%,
   100% {
-    clip-path: inset(0 0 0 0);
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes correio-demo-dots {
+  0%,
+  22% {
+    opacity: 0;
+  }
+  25%,
+  39% {
+    opacity: 1;
+  }
+  41%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes correio-demo-dot {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: none;
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
   }
 }
 @keyframes correio-demo-wait {
@@ -1180,7 +1222,20 @@
     animation: correio-demo-read 11s infinite;
   }
   .correio .correio-demo-type {
-    animation: correio-demo-type 11s steps(40) infinite;
+    animation: correio-demo-type 11s infinite;
+  }
+  .correio .correio-demo-dots {
+    display: inline-flex;
+    animation: correio-demo-dots 11s infinite;
+  }
+  .correio .correio-demo-dots span {
+    animation: correio-demo-dot 0.9s ease-in-out infinite;
+  }
+  .correio .correio-demo-dots span:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .correio .correio-demo-dots span:nth-child(3) {
+    animation-delay: 0.3s;
   }
   .correio .correio-demo-wait {
     animation: correio-demo-wait 11s infinite;

@@ -57,6 +57,11 @@ export function AgentDemo({ labels }: { labels: AgentDemoLabels }) {
           <div className="correio-demo-work">
             <p className="correio-demo-muted correio-demo-read">{labels.read}</p>
             <div className="correio-demo-draft">
+              <span className="correio-demo-dots">
+                <span />
+                <span />
+                <span />
+              </span>
               <span className="correio-demo-type">{labels.reply}</span>
             </div>
             <div className="correio-demo-wait">
