@@ -242,4 +242,23 @@ describe("transaction-bound agent activity at REST boundaries", () => {
     expect(h.list).not.toHaveBeenCalled();
     expect(h.save).not.toHaveBeenCalled();
   });
+  it("throttles one credential per minute before any access or audit work", async () => {
+    vi.stubEnv("MAILBOX_AGENT_RATE_LIMIT_PER_MINUTE", "2");
+    const other = `Bearer mmb_${"r".repeat(40)}`;
+    const throttled = `Bearer mmb_${"t".repeat(40)}`;
+    expect((await get("", throttled)).status).toBe(200);
+    expect((await get("", throttled)).status).toBe(200);
+    h.access.mockClear();
+    h.audit.mockClear();
+    const limited = await get("", throttled);
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toEqual({ error: "rate_limited" });
+    expect(Number(limited.headers.get("retry-after"))).toBeGreaterThanOrEqual(1);
+    expect(limited.headers.get("cache-control")).toBe("private, no-store");
+    expect((await post(draft, throttled)).status).toBe(429);
+    expect(h.access).not.toHaveBeenCalled();
+    expect(h.audit).not.toHaveBeenCalled();
+    // Another credential keeps its own window.
+    expect((await get("", other)).status).toBe(200);
+  });
 });

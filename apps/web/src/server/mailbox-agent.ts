@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   MailboxAgentAccessError,
   type MailboxAgentScope,
@@ -80,6 +81,24 @@ export async function mailboxAgentSendRequest(
   );
 }
 
+// Per-credential fixed window, before any database work. One Web process serves the
+// API, so process memory is the shared counter; restarts only reset the window.
+const RATE_WINDOW_MS = 60_000;
+const agentWindows = new Map<string, { start: number; count: number }>();
+function agentRateLimit(token: string, now = Date.now()): number | null {
+  const parsed = Number(process.env.MAILBOX_AGENT_RATE_LIMIT_PER_MINUTE);
+  const limit = Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 120;
+  const start = now - (now % RATE_WINDOW_MS);
+  if (agentWindows.size > 10_000)
+    for (const [key, value] of agentWindows) if (value.start !== start) agentWindows.delete(key);
+  // Only a digest of the credential is kept in memory.
+  const key = createHash("sha256").update(token).digest("base64url");
+  const current = agentWindows.get(key);
+  const count = current?.start === start ? current.count + 1 : 1;
+  agentWindows.set(key, { start, count });
+  return count > limit ? Math.max(1, Math.ceil((start + RATE_WINDOW_MS - now) / 1000)) : null;
+}
+
 async function mailboxAgentBearerRequest<T>(
   request: Request,
   run: (token: string) => Promise<T>,
@@ -92,6 +111,15 @@ async function mailboxAgentBearerRequest<T>(
     return Response.json(
       { error: "unauthorized" },
       { status: 401, headers: MAILBOX_AGENT_HEADERS },
+    );
+  const retryAfter = agentRateLimit(match[1]!);
+  if (retryAfter !== null)
+    return Response.json(
+      { error: "rate_limited" },
+      {
+        status: 429,
+        headers: { ...MAILBOX_AGENT_HEADERS, "Retry-After": String(retryAfter) },
+      },
     );
   try {
     return respond(await run(match[1]!));
