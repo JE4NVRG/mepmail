@@ -2050,6 +2050,20 @@
   justify-content: flex-end;
   gap: 8px;
 }
+.appCentered {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: clamp(24px, 6vh, 64px) 16px;
+  animation: mailAppIn 0.22s ease-out both;
+}
+.appLicense {
+  flex: none;
+  padding: 12px 18px 0;
+}
 @keyframes mailAppIn {
   from {
     opacity: 0;
@@ -2062,7 +2076,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .appView > .workspace,
-  .settings {
+  .settings,
+  .appCentered {
     animation: none;
   }
   .appTabs a,

@@ -463,19 +463,43 @@ export function MailboxesView({
     setMailboxKind("all");
     selectMailbox(id);
   }
-  if (capability.isPending) return <p aria-live="polite">{t("loading")}</p>;
-  if (!capability.isError && !capability.data?.enabled)
-    return capability.data?.offered ? (
-      <MailboxOffer />
+  // In the standalone app every state keeps the Correio bar and the way back,
+  // so a team without access sees the offer framed like the app it would get.
+  const frame = (body: React.ReactNode) =>
+    layout === "dashboard" ? (
+      body
     ) : (
-      <section>
-        <h1>{t("title")}</h1>
-        <p>{t("disabled")}</p>
+      <section className={`${styles.view} ${styles.appView}`}>
+        <header className={styles.appBar}>
+          <Link href="/mail" className={styles.appBrand}>
+            <NavGlyph name="emails" hovered={false} />
+            <span>{t("title")}</span>
+          </Link>
+          <div className={styles.appActions}>
+            <Link className="ms-btn ms-btn-ghost" href="/emails">
+              {t("app.back")}
+            </Link>
+          </div>
+        </header>
+        <div className={styles.appCentered}>{body}</div>
       </section>
     );
-  if (!capability.isError && registry.isPending) return <p aria-live="polite">{t("loading")}</p>;
+  if (capability.isPending) return frame(<p aria-live="polite">{t("loading")}</p>);
+  if (!capability.isError && !capability.data?.enabled)
+    return frame(
+      capability.data?.offered ? (
+        <MailboxOffer />
+      ) : (
+        <section>
+          <h1>{t("title")}</h1>
+          <p>{t("disabled")}</p>
+        </section>
+      ),
+    );
+  if (!capability.isError && registry.isPending)
+    return frame(<p aria-live="polite">{t("loading")}</p>);
   if (capability.isError || registry.isError)
-    return (
+    return frame(
       <div role="alert">
         <p>{t("loadError")}</p>
         <button
@@ -488,7 +512,7 @@ export function MailboxesView({
         >
           {t("retry")}
         </button>
-      </div>
+      </div>,
     );
   const navigation = (
     <div className={styles.workspaceNavigation}>
@@ -808,11 +832,13 @@ export function MailboxesView({
         </header>
         {layout === "app" ? (
           <>
-            {licenseOpenRequest > 0 ? (
-              <MailboxServicePanel
-                openRequest={licenseOpenRequest}
-                initialOfferId={licenseOfferId}
-              />
+            {licenseOpenRequest > 0 || (service.data && !service.data.active) ? (
+              <div className={styles.appLicense}>
+                <MailboxServicePanel
+                  openRequest={licenseOpenRequest}
+                  initialOfferId={licenseOfferId}
+                />
+              </div>
             ) : null}
             {workspace}
           </>
