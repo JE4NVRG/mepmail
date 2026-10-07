@@ -124,7 +124,7 @@ it("sends a queued email: MIME, join key, status, event row", async () => {
   expect(sends).toHaveLength(1);
   const mime = sends[0]?.raw.toString("utf8") ?? "";
   // Header casing is normalized by nodemailer; compare case-insensitively.
-  expect(mime.toLowerCase()).toContain(`x-millionsend-email-id: ${emailId}`);
+  expect(mime.toLowerCase()).toContain(`x-mepmail-email-id: ${emailId}`);
   expect(mime).toContain("Subject: greetings");
   expect(mime).toContain("r@example.com");
   expect(sends[0]?.configurationSetName).toBe("ms-config-set");
@@ -607,7 +607,7 @@ it("attachments and custom headers ride the raw MIME; tracking still rewrites th
   expect(raw).toContain(content);
   // Custom header shipped; the transport-owned join header is still ours.
   expect(lower).toContain("x-entity-ref-id: ref-1");
-  expect(lower).toContain(`x-millionsend-email-id: ${emailId}`);
+  expect(lower).toContain(`x-mepmail-email-id: ${emailId}`);
   // Tracking rewrote the html part even on the attachment path.
   const mime = unwrapQp(raw);
   expect(mime).toContain("https://track.example.com/t/c/");

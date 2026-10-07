@@ -126,6 +126,7 @@ const mailboxSes = mailboxTransportEnabled
       exhausted: (region) => sendControls.exhausted(region),
       throttle: (region, recipients) => sendControls.throttle(region, recipients),
       checkRecipients: (input) => checkMailboxRecipientBlocks(db, input),
+      tenants: sesTenantsEnabled(),
     })
   : null;
 // Days whole email rows (recipients, subject, events) are kept; bodies age

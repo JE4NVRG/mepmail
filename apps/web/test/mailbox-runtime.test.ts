@@ -25,6 +25,7 @@ const clientFactory = (options: unknown) => {
 function database(extra = {}) {
   const row = {
     region: "us-east-1",
+    domainName: "example.invalid",
     status: "verified",
     address: "person@example.invalid",
     suspendedAt: null,
@@ -238,6 +239,64 @@ describe("private Mail runtime adapters", () => {
       }).send(input),
     ).rejects.toBeInstanceOf(MailboxSendRejectedError);
     expect(provider.send).not.toHaveBeenCalled();
+  });
+  it("with SES_TENANTS, associates the Mail set with the team tenant once, then tags sends", async () => {
+    provider.send.mockImplementation(async (command: { constructor: { name: string } }) => {
+      if (command.constructor.name === "CreateTenantCommand")
+        return { TenantArn: "arn:aws:ses:us-east-1:123456789012:tenant/tenant_fixture/tn-1" };
+      if (command.constructor.name === "CreateTenantResourceAssociationCommand") return {};
+      return { MessageId: "accepted_fixture" };
+    });
+    const sender = createMailboxSesSender(database({ tenantConfigSet: "campaign_set" }), {
+      configurationSets,
+      clientFactory,
+      tenants: true,
+    });
+    await sender.send(input);
+    await sender.send(input);
+    expect(provider.inputs).toEqual([
+      { TenantName: "tenant_fixture" },
+      {
+        TenantName: "tenant_fixture",
+        ResourceArn: "arn:aws:ses:us-east-1:123456789012:identity/example.invalid",
+      },
+      {
+        TenantName: "tenant_fixture",
+        ResourceArn: "arn:aws:ses:us-east-1:123456789012:configuration-set/private_mail_fixture",
+      },
+      expect.objectContaining({
+        ConfigurationSetName: "private_mail_fixture",
+        TenantName: "tenant_fixture",
+      }),
+      expect.objectContaining({
+        ConfigurationSetName: "private_mail_fixture",
+        TenantName: "tenant_fixture",
+      }),
+    ]);
+  });
+  it("with SES_TENANTS, a failed association sends untagged and never fails the send", async () => {
+    provider.send.mockImplementation(async (command: { constructor: { name: string } }) => {
+      if (command.constructor.name === "CreateTenantCommand")
+        throw Object.assign(new Error("denied"), { name: "AccessDeniedException" });
+      return { MessageId: "accepted_fixture" };
+    });
+    expect(
+      await createMailboxSesSender(database({ tenantConfigSet: "campaign_set" }), {
+        configurationSets,
+        clientFactory,
+        tenants: true,
+      }).send(input),
+    ).toEqual({ messageId: "accepted_fixture" });
+    expect(provider.inputs.at(-1)).not.toHaveProperty("TenantName");
+    // A team whose domain is not in a tenant yet never triggers tenant calls.
+    provider.inputs.length = 0;
+    await createMailboxSesSender(database({ tenantAssociatedAt: null }), {
+      configurationSets,
+      clientFactory,
+      tenants: true,
+    }).send(input);
+    expect(provider.inputs).toHaveLength(1);
+    expect(provider.inputs[0]).not.toHaveProperty("TenantName");
   });
   it("does not attach an unassociated tenant and distinguishes definitive refusal from ambiguity", async () => {
     await createMailboxSesSender(database({ tenantConfigSet: "different" }), {

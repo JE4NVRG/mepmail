@@ -7,6 +7,7 @@ import {
   type MailboxTransportMimeAdapter,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
+import { associateTenantResources, ensureTenant, type SesTenantClient } from "@millionsend/ses";
 import { and, eq } from "drizzle-orm";
 import { simpleParser } from "mailparser";
 
@@ -91,10 +92,50 @@ export function createMailboxSesSender(
     }) => Promise<boolean>;
     /** Captured client for offline qualification; production uses the AWS SDK. */
     clientFactory?: (options: SESv2ClientConfig) => MailboxSesClient;
+    /** SES_TENANTS: also associate the Mail configuration set with the team's tenant. */
+    tenants?: boolean;
   } = {},
 ): MailboxOutboxSender {
   const configurationSets = copyConfigurationSets(opts.configurationSets ?? {});
   const clients = new Map<string, MailboxSesClient>();
+  // Region + tenant + Mail configuration set already associated by this process.
+  const tenantSets = new Set<string>();
+  /** The team's tenant for this send, or none; never fails the send itself. */
+  async function sendingTenant(
+    client: MailboxSesClient,
+    domain: {
+      region: string;
+      domainName: string;
+      tenantName: string | null;
+      tenantAssociatedAt: Date | null;
+      tenantConfigSet: string | null;
+    },
+    configurationSet: string,
+  ): Promise<string | undefined> {
+    if (!domain.tenantAssociatedAt || !domain.tenantName) return undefined;
+    if (domain.tenantConfigSet === configurationSet) return domain.tenantName;
+    if (!opts.tenants) return undefined;
+    const key = `${domain.region}|${domain.tenantName}|${configurationSet}`;
+    if (tenantSets.has(key)) return domain.tenantName;
+    try {
+      // The identity is already in the tenant (domain sync); add the Mail set too.
+      // The SDK client sends any SESv2 command; the Mail interface only names SendEmail.
+      const tenants = client as unknown as SesTenantClient;
+      const { accountId } = await ensureTenant(tenants, { tenantName: domain.tenantName });
+      await associateTenantResources(tenants, {
+        tenantName: domain.tenantName,
+        accountId,
+        region: domain.region,
+        identity: domain.domainName,
+        configurationSet,
+      });
+      tenantSets.add(key);
+      return domain.tenantName;
+    } catch {
+      // A TenantName needs every referenced resource associated; send untagged instead.
+      return undefined;
+    }
+  }
   return {
     async send(input) {
       // Capture the same MIME/envelope whose recipient permits are reserved below.
@@ -112,6 +153,7 @@ export function createMailboxSesSender(
       const [domain] = await db
         .select({
           region: schema.domains.region,
+          domainName: schema.domains.name,
           status: schema.domains.status,
           configurationSet: schema.domains.sesConfigurationSet,
           address: schema.mailboxes.address,
@@ -178,12 +220,7 @@ export function createMailboxSesSender(
         client = opts.clientFactory ? opts.clientFactory(options) : new SESv2Client(options);
         clients.set(domain.region, client);
       }
-      const tenantName =
-        domain.tenantAssociatedAt &&
-        domain.tenantName &&
-        domain.tenantConfigSet === configurationSet
-          ? domain.tenantName
-          : undefined;
+      const tenantName = await sendingTenant(client, domain, configurationSet);
       let response: Awaited<ReturnType<MailboxSesClient["send"]>>;
       try {
         response = await client.send(
