@@ -21,12 +21,17 @@ describe("frontend polish contracts", () => {
     expect(shell.match(/href="\/"/g)).toHaveLength(2);
     expect(shell).toContain("<AuthArt />");
     expect(shell).not.toContain("/product/templates-hero.webp");
-    expect(read("../src/app/page.tsx")).toContain("/product/templates-hero.webp");
+    // The landing's proof is the live starter gallery (it replaced the static
+    // templates-hero.webp); the auth shell keeps its own illustration.
+    expect(read("../src/app/page.tsx")).toContain("<PublicStarterGallery");
+    expect(shell).not.toContain("PublicStarterGallery");
     expect(shell).toContain("LandingLangSwitch");
     expect(shell + form).not.toMatch(/SilkCanvas|waves-dark|waves-light/);
-    expect(form).toContain("safeNextPath(nextParam");
+    // The redirect goes through postAuthNext, which validates with safeNextPath.
+    expect(form).toContain("postAuthNext(nextParam");
+    expect(read("../src/lib/nav.ts")).toContain("const next = safeNextPath(");
     expect(form).toContain("callbackURL: verifyCallback");
-    expect(form).toContain("errorCallbackURL: mode");
+    expect(form).toContain("errorCallbackURL: withNext(mode");
     expect(form).toContain('params.get("email")');
   });
   it("motion is an enhancement, never a hidden CSS prerequisite", () => {

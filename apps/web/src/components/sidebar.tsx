@@ -58,10 +58,13 @@ function NavItem({
   item,
   active,
   label,
+  badge,
 }: {
   item: (typeof NAV_ITEMS)[number];
   active: boolean;
   label: string;
+  /** Decorative pill after the label ("New"); the link's name stays the label. */
+  badge?: string;
 }) {
   const [hovered, setHovered] = useState(false);
   return (
@@ -77,6 +80,11 @@ function NavItem({
     >
       <NavGlyph name={item.icon} hovered={hovered} />
       {label}
+      {badge ? (
+        <span className={styles.navNew} aria-hidden="true">
+          {badge}
+        </span>
+      ) : null}
     </Link>
   );
 }
@@ -277,6 +285,7 @@ export function Sidebar({
               item={MAIL_NAV_ITEM}
               active={isActive(pathname, MAIL_NAV_ITEM.href)}
               label={t(MAIL_NAV_ITEM.key)}
+              badge={t("newBadge")}
             />
           </section>
         ) : null}

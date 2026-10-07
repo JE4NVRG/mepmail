@@ -4,15 +4,21 @@ import type { MetadataRoute } from "next";
 export const dynamic = "force-dynamic";
 
 // Public, indexable pages: the landing, the standalone pricing page, the
-// "Resend alternative" comparison, the integrations, security and support
-// pages and the auth entry points (mirrors robots.ts). The dashboard has no
-// public URLs of its own.
+// Correio page (once it is open and indexable), the "Resend alternative"
+// comparison, the integrations, security and support pages and the auth entry
+// points (mirrors robots.ts). The dashboard has no public URLs of its own.
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = (process.env.APP_BASE_URL ?? "https://mepmail.dev").replace(/\/+$/, "");
+  // /correio carries noindex while Mail is closed; advertise it only when open.
+  const correio: MetadataRoute.Sitemap =
+    process.env.MAILBOX_EARLY_ACCESS_OPEN === "true"
+      ? [{ url: `${base}/correio`, changeFrequency: "weekly", priority: 0.9 }]
+      : [];
   // Omit lastModified until each page has a reliable editorial update date.
   return [
     { url: `${base}/`, changeFrequency: "weekly", priority: 1 },
     { url: `${base}/pricing`, changeFrequency: "monthly", priority: 0.9 },
+    ...correio,
     { url: `${base}/alternatives/resend`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${base}/integrations`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/security`, changeFrequency: "yearly", priority: 0.7 },

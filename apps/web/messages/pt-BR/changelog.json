@@ -28,6 +28,30 @@
   },
   "releases": [
     {
+      "version": "0.45",
+      "date": "2026-10-07",
+      "title": "Correio: caixas de e-mail para seus agentes de IA",
+      "summary": "Seus agentes ganham uma caixa de e-mail no seu domínio: leem, rascunham e respondem por MCP, e você pode aprovar antes de cada envio.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Correio aberto a todos os assinantes pagantes de Envio: caixas no seu domínio para pessoas e agentes, a partir de US$ 5,90 por caixa ao mês.",
+            "MCP do Correio em api-mepmail.je4ndev.com/mcp/correio: o agente lista, lê, rascunha e envia com a chave da caixa.",
+            "Aprovação do dono: um agente sem permissão de envio pede, e o rascunho fica \"Aguardando sua aprovação\" até você decidir.",
+            "O MCP principal ganhou list_mailboxes, create_mailbox e create_mailbox_agent_key.",
+            "O Correio abre em uma janela própria, com caixa de entrada e configurações, e o botão Enviar no editor."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Proteção antes do envio: remetentes e assuntos disfarçados são recusados, e contas novas que imitam bancos ou transportadoras passam por revisão."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.44",
       "date": "2026-09-29",
       "title": "10% mais e-mail em todos os planos",
@@ -42,7 +66,9 @@
         },
         {
           "kind": "changed",
-          "items": ["Quotas +10% em tudo: o Pro começa em 110.000 e-mails/mês e o Scale chega a 2,75M. Preços inalterados."]
+          "items": [
+            "Quotas +10% em tudo: o Pro começa em 110.000 e-mails/mês e o Scale chega a 2,75M. Preços inalterados."
+          ]
         }
       ]
     },
@@ -100,7 +126,9 @@
         },
         {
           "kind": "changed",
-          "items": ["Documentação onda 1 — pacotes npm, rate limits com Retry-After, catálogo completo de erros e o caminho de instalação do MCP."]
+          "items": [
+            "Documentação onda 1 — pacotes npm, rate limits com Retry-After, catálogo completo de erros e o caminho de instalação do MCP."
+          ]
         }
       ]
     },
@@ -119,26 +147,13 @@
         },
         {
           "kind": "changed",
-          "items": ["Docs e páginas legais agora são amigáveis a buscadores — mais fáceis de achar quando você pesquisa um erro."]
+          "items": [
+            "Docs e páginas legais agora são amigáveis a buscadores — mais fáceis de achar quando você pesquisa um erro."
+          ]
         },
         {
           "kind": "fixed",
           "items": ["Header do mobile fica no lugar, com o botão de criar conta sempre visível."]
-        }
-      ]
-    },
-    {
-      "version": "0.39",
-      "date": "2026-09-27",
-      "title": "Termos, Privacidade e Reembolso — em linguagem clara",
-      "summary": "As páginas legais que você espera, e uma landing que mostra o produto em vez de descrevê-lo.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "Políticas de Termos, Privacidade e Reembolso, em inglês e português.",
-            "Landing construída em volta do produto: demo ao vivo, programa de fundadores e respostas diretas no FAQ."
-          ]
         }
       ]
     }

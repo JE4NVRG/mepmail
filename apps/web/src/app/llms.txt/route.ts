@@ -9,6 +9,12 @@ const BODY = `# MepMail
 - Agent skills index: https://mepmail.je4ndev.com/.well-known/agent-skills/index.json
 - AI catalog (everything published for agents): https://mepmail.je4ndev.com/.well-known/ai-catalog.json
 - MCP server (hosted, OAuth): https://api-mepmail.je4ndev.com/mcp
+
+## Correio: email inboxes for AI agents
+
+- What it is: https://mepmail.je4ndev.com/correio
+- Correio MCP server (one mailbox, mmb_ key): https://api-mepmail.je4ndev.com/mcp/correio
+- Mailboxes guide (MCP, agent API, owner approval): https://docs-mepmail.je4ndev.com/mailboxes
 `;
 
 export function GET(): Response {

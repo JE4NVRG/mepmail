@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Integrações: n8n, Slack, Discord, Telegram, MCP e SMTP",
-    "description": "O MepMail se encaixa na sua stack: node comunitário do n8n, canais de notificação Slack/Discord/Telegram, servidor MCP para agentes de IA, relay SMTP, CLI e API compatível com a do Resend."
+    "description": "O MepMail se encaixa na sua stack: node comunitário do n8n, canais de notificação Slack/Discord/Telegram, servidor MCP e caixas de e-mail para agentes de IA, relay SMTP, CLI e API compatível com a do Resend."
   },
   "hero": {
     "eyebrow": "Integrações",
@@ -24,8 +24,14 @@
           "Funciona com o MepMail Cloud ou qualquer instância auto-hospedada. Exige API key de acesso total."
         ],
         "links": [
-          { "label": "Pacote no npm", "href": "https://www.npmjs.com/package/n8n-nodes-mepmail" },
-          { "label": "GitHub", "href": "https://github.com/JE4NVRG/n8n-nodes-mepmail" }
+          {
+            "label": "Pacote no npm",
+            "href": "https://www.npmjs.com/package/n8n-nodes-mepmail"
+          },
+          {
+            "label": "GitHub",
+            "href": "https://github.com/JE4NVRG/n8n-nodes-mepmail"
+          }
         ]
       },
       {
@@ -49,12 +55,38 @@
         "name": "Agentes de IA",
         "kind": "Servidor MCP",
         "logos": ["mcp"],
-        "body": "Claude Code, Cursor, VS Code e qualquer cliente de Model Context Protocol enviam e-mail e gerenciam a plataforma por 22 ferramentas, no mesmo pipeline da REST API.",
+        "body": "Claude Code, Cursor, VS Code e qualquer cliente de Model Context Protocol enviam e-mail e gerenciam a plataforma pelas ferramentas do MCP, no mesmo pipeline da REST API.",
         "bullets": [
           "Endpoint Streamable HTTP em /mcp na origem da sua API, ou o servidor stdio no npm.",
           "Domínios verificados, supressões, opt-outs de tópicos, cotas e escopo de time valem igual."
         ],
-        "links": [{ "label": "Docs: MCP", "href": "https://docs-mepmail.je4ndev.com/mcp" }]
+        "links": [
+          {
+            "label": "Docs: MCP",
+            "href": "https://docs-mepmail.je4ndev.com/mcp"
+          }
+        ]
+      },
+      {
+        "name": "Correio para agentes",
+        "kind": "Caixa de e-mail por MCP",
+        "logos": ["mcp"],
+        "body": "Dê ao agente uma caixa própria no seu domínio. Pelo MCP do Correio ele lista e lê mensagens, salva rascunhos e responde, sem código.",
+        "bullets": [
+          "Endpoint em https://api-mepmail.je4ndev.com/mcp/correio com a chave da caixa (mmb_).",
+          "Permissões por chave: ler, rascunhar e enviar. Sem envio, o pedido espera a sua aprovação.",
+          "O MCP principal também cria caixas e chaves de agente, sem ler o conteúdo."
+        ],
+        "links": [
+          {
+            "label": "Conhecer o Correio",
+            "href": "/correio"
+          },
+          {
+            "label": "Docs: conecte um agente por MCP",
+            "href": "https://docs-mepmail.je4ndev.com/pt-BR/mailboxes#conecte-um-agente-por-mcp"
+          }
+        ]
       },
       {
         "name": "Relay SMTP",
@@ -83,8 +115,14 @@
           "A conta gratuita se move com um comando: npx @mepmail/cli migrate --from resend."
         ],
         "links": [
-          { "label": "Docs: SDKs", "href": "https://docs-mepmail.je4ndev.com/sdks" },
-          { "label": "MepMail vs Resend", "href": "/alternatives/resend" }
+          {
+            "label": "Docs: SDKs",
+            "href": "https://docs-mepmail.je4ndev.com/sdks"
+          },
+          {
+            "label": "MepMail vs Resend",
+            "href": "/alternatives/resend"
+          }
         ]
       },
       {
@@ -97,8 +135,14 @@
           "OpenAPI em docs-mepmail.je4ndev.com, wire-compatible com a superfície da API do Resend."
         ],
         "links": [
-          { "label": "Docs: CLI", "href": "https://docs-mepmail.je4ndev.com/cli" },
-          { "label": "Docs: API", "href": "https://docs-mepmail.je4ndev.com/api-reference" }
+          {
+            "label": "Docs: CLI",
+            "href": "https://docs-mepmail.je4ndev.com/cli"
+          },
+          {
+            "label": "Docs: API",
+            "href": "https://docs-mepmail.je4ndev.com/api-reference"
+          }
         ]
       }
     ]

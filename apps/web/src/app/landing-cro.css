@@ -356,6 +356,43 @@
 .cro .gtm-demo-code {
   overflow-x: auto;
 }
+/* Correio: the launch gets its own framed card, so it reads as news. */
+.cro-correio-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: center;
+  padding: clamp(24px, 4vw, 48px);
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 20px;
+  background: var(--ms-ground);
+}
+.cro .cro-correio .gtm-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cro-correio-new {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--ms-violet);
+  color: var(--ms-void);
+  letter-spacing: 0.04em;
+}
+.cro .cro-correio-price {
+  margin: 20px 0 0;
+  color: var(--ms-bone);
+  font-weight: 600;
+}
+.cro .cro-correio .gtm-actions {
+  margin-top: 24px;
+}
+@media (max-width: 1023px) {
+  .cro-correio-card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+  }
+}
 @media (max-width: 1023px) {
   .cro .gtm-hero-grid {
     gap: 28px;

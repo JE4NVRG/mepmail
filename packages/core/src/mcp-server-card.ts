@@ -39,7 +39,7 @@ export const MCP_SERVER_CARD = {
   name: "com.je4ndev/mepmail",
   version: "0.6.69",
   description:
-    "Official MepMail MCP server (hosted): transactional email with a Resend-compatible API. Send and manage emails, broadcasts, domains, contacts, templates, webhooks and API keys from AI assistants.",
+    "Official MepMail MCP server (hosted): transactional email with a Resend-compatible API. Send and manage emails, broadcasts, domains, contacts, templates, webhooks, API keys and Correio mailboxes for AI agents from AI assistants.",
   title: "MepMail",
   websiteUrl: "https://docs-mepmail.je4ndev.com",
   repository: {
@@ -57,7 +57,7 @@ export const MCP_SERVER_CARD = {
     title: "MepMail",
     version: "0.6.69",
     description:
-      "Hosted MCP server for transactional email, broadcasts, domains, contacts, templates and webhooks.",
+      "Hosted MCP server for transactional email, broadcasts, domains, contacts, templates, webhooks and Correio mailboxes.",
   },
   capabilities: {
     // The tool set follows the token's scopes and never changes mid-connection.
@@ -90,6 +90,8 @@ export const MCP_SERVER_CARD = {
       "templates:write",
       "webhooks:write",
       "api-keys:write",
+      "mailboxes:read",
+      "mailboxes:write",
     ],
     instructionsUrl: "https://mepmail.je4ndev.com/auth.md",
     description:

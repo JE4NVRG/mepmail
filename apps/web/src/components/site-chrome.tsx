@@ -33,6 +33,8 @@ export interface PublicSiteLabels {
     /** Nav v2 (flat, 6 itens): Product · Integrations · Pricing · Docs · Security · Support. */
     product: string;
     correio?: string;
+    /** Short "New" pill next to Correio while the launch is fresh. */
+    correioBadge?: string;
     integrations: string;
     pricing: string;
     docs: string;
@@ -143,6 +145,9 @@ export function PublicHeader({
               {labels.nav.correio ? (
                 <a href="/correio" aria-current={page === "correio" ? "page" : undefined}>
                   {labels.nav.correio}
+                  {labels.nav.correioBadge ? (
+                    <span className="gtm-nav-new">{labels.nav.correioBadge}</span>
+                  ) : null}
                 </a>
               ) : null}
               <a href="/integrations" aria-current={page === "integrations" ? "page" : undefined}>

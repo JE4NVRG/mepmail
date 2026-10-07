@@ -13,6 +13,16 @@
   font-weight: 500;
   line-height: 1.4;
 }
+.navNew {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ms-violet) 16%, transparent);
+  color: var(--ms-violet);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}
 .sidebarNav :global(a) {
   min-height: 38px;
   padding-top: 8px;

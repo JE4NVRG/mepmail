@@ -30,6 +30,14 @@ describe("landing CRO contract", () => {
     expect(UmamiAnalytics()?.type).toBe("script");
   });
 
+  it("the proof gallery follows the visitor's language", () => {
+    const gallery = readFileSync(
+      fileURLToPath(new URL("../src/components/public-starter-gallery.tsx", import.meta.url)),
+      "utf8",
+    );
+    expect(gallery).toContain("listStartersWithContent(locale)");
+  });
+
   for (const locale of ["en", "pt-BR"]) {
     it(`${locale}: no isolated reputation, time promise or popularity claim`, () => {
       const copy = JSON.parse(
@@ -45,7 +53,9 @@ describe("landing CRO contract", () => {
         /reputation.{0,10}isolated|reputação isolada|one minute|1 minuto|15 minutes|15 minutos/i,
       );
       expect(copy.plans.featuredBadge).not.toMatch(/popular/i);
-      expect(copy.productProof.caption).toMatch(/English|inglês/);
+      // The proof gallery renders the starters in the visitor's language, so the
+      // caption names them as real templates instead of warning they are English.
+      expect(copy.productProof.caption).toMatch(/real MepMail templates|Modelos reais do MepMail/i);
       expect(copy.integration.example).toMatch(/no email|não envia/);
     });
   }

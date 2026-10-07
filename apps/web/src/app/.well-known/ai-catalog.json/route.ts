@@ -1,7 +1,8 @@
 /**
  * AI catalog (ai-catalog.json): the single document an agent reads to find
- * everything MepMail publishes for machines — the MCP server card, the API
- * catalog, the OpenAPI definition, auth instructions and llms.txt.
+ * everything MepMail publishes for machines — the MCP server card, the Correio
+ * MCP for agent inboxes, the API catalog, the OpenAPI definition, auth
+ * instructions and llms.txt.
  *
  * Served at /.well-known/ai-catalog.json; modelled on the shape the Postmark
  * catalog made the de-facto standard (specVersion 1.0, urn:air identifiers).
@@ -20,7 +21,7 @@ const BODY = JSON.stringify(
         identifier: "urn:air:je4ndev.com:mepmail:mcp",
         displayName: "MepMail MCP server",
         description:
-          "Server card for the hosted MepMail MCP server: send and manage transactional email, broadcasts, domains, contacts, templates, webhooks and API keys from an AI assistant.",
+          "Server card for the hosted MepMail MCP server: send and manage transactional email, broadcasts, domains, contacts, templates, webhooks, API keys and Correio mailboxes from an AI assistant.",
         type: "application/mcp-server-card+json",
         url: "https://mepmail.je4ndev.com/.well-known/mcp/server-card.json",
         representativeQueries: [
@@ -30,6 +31,28 @@ const BODY = JSON.stringify(
           "set up the MepMail MCP server",
         ],
         version: "0.6.69",
+      },
+      {
+        identifier: "urn:air:je4ndev.com:mepmail:correio:mcp",
+        displayName: "MepMail Correio MCP server (email inboxes for AI agents)",
+        description:
+          "Give an AI agent its own mailbox on your domain. Streamable HTTP at https://api-mepmail.je4ndev.com/mcp/correio with a per-mailbox mmb_ key: list and read messages, save drafts and send, with optional owner approval before each send. This entry links to its guide.",
+        type: "text/html",
+        url: "https://docs-mepmail.je4ndev.com/mailboxes",
+        representativeQueries: [
+          "give my AI agent an email inbox",
+          "email inbox for an AI agent over MCP",
+          "let an agent read and answer email with approval",
+          "set up the MepMail Correio MCP server",
+        ],
+      },
+      {
+        identifier: "urn:air:je4ndev.com:mepmail:correio",
+        displayName: "MepMail Correio",
+        description:
+          "Email inboxes for people and AI agents on your own domain, paid per mailbox on top of a MepMail Send plan.",
+        type: "text/html",
+        url: "https://mepmail.je4ndev.com/correio",
       },
       {
         identifier: "urn:air:je4ndev.com:mepmail:api:catalog",

@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description: t("meta.description"),
       url: canonical,
       type: "website",
-      images: [{ url: "/og.png", width: 1280, height: 640, alt: "MepMail" }],
+      // The share image is ./opengraph-image.tsx, in the visitor's language.
     },
   };
 }

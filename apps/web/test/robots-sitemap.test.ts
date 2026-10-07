@@ -79,6 +79,19 @@ describe("robots.txt + sitemap.xml agreement", () => {
     }
   });
 
+  it("advertises /correio only while Mail is open, and robots lets crawlers in", () => {
+    const has = () =>
+      sitemap().some((entry) => new URL(entry.url as string).pathname === "/correio");
+    expect(has()).toBe(false);
+    vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
+    const urls = sitemap();
+    expect(urls).toHaveLength(13);
+    expect(has()).toBe(true);
+    expect(urls.find((entry) => entry.url.endsWith("/correio"))?.priority).toBe(0.9);
+    expect(isAllowed("/correio", allowedPaths())).toBe(true);
+    expect(isAllowed("/correio/opengraph-image", allowedPaths())).toBe(true);
+  });
+
   it("advertises the institutional pages with their own priority and allows them", () => {
     const urls = sitemap();
     const priorityOf = (pathname: string): number | undefined =>

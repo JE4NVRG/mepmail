@@ -232,6 +232,19 @@
   color: var(--ms-bone);
   background: color-mix(in srgb, var(--ms-bone) 8%, transparent);
 }
+/* "Novo" ao lado do Correio enquanto o lançamento é recente. */
+.gtm-nav-new {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1px solid color-mix(in srgb, var(--ms-violet) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ms-violet) 14%, transparent);
+  color: var(--ms-violet);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
 .gtm-nav-actions {
   display: flex;
   align-items: center;

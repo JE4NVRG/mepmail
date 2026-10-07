@@ -4,7 +4,7 @@ import type { MetadataRoute } from "next";
 export const dynamic = "force-dynamic";
 
 // The dashboard is private: crawlers get the public pages (the landing, the
-// standalone pricing page, the comparison page, the integrations, security and
+// standalone pricing page, the Correio page, the comparison page, the integrations, security and
 // support pages, the auth entry points and the legal pages) plus the static
 // assets those pages need to render, and nothing else. `/sitemap.xml` stays
 // crawlable on purpose — it is the file that advertises those same public URLs
@@ -19,6 +19,7 @@ export default function robots(): MetadataRoute.Robots {
         "/$",
         "/?",
         "/pricing",
+        "/correio",
         "/alternatives",
         "/integrations",
         "/security",

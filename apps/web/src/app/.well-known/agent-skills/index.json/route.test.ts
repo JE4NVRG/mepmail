@@ -39,9 +39,13 @@ describe("agent-skills index", () => {
       "https://docs-mepmail.je4ndev.com/packages",
       "https://api-mepmail.je4ndev.com/openapi.json",
       "https://mepmail.je4ndev.com/auth.md",
+      "https://api-mepmail.je4ndev.com/mcp/correio",
+      "https://docs-mepmail.je4ndev.com/mailboxes",
     ]) {
       expect(markdown).toContain(url);
     }
+    // Agents learn the approval path instead of retrying around it.
+    expect(markdown).toContain("awaiting_approval");
     // The old brand must never appear in a machine-readable surface.
     expect(markdown.toLowerCase()).not.toContain("millionsend");
   });

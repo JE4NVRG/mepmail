@@ -19,7 +19,7 @@ const BODY = JSON.stringify(
         name: "mepmail",
         type: "skill-md",
         description:
-          "Use when sending or managing transactional email with MepMail: the Resend-compatible API, the hosted and local MCP servers, the migration CLI, quotas, rate limits and delivery failures.",
+          "Use when sending or managing transactional email with MepMail, or giving an AI agent its own inbox with Correio: the Resend-compatible API, the hosted, local and Correio MCP servers, the migration CLI, quotas, rate limits and delivery failures.",
         url: "https://mepmail.je4ndev.com/.well-known/agent-skills/mepmail/SKILL.md",
         digest: skillDigest(),
       },

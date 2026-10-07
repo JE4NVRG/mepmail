@@ -96,5 +96,20 @@
       "q": "E acima do maior plano?",
       "a": "A escada publicada termina em 2,75M por mês. Acima disso, fale com a gente: dimensionamos o volume com você em vez de cotar um plano enterprise que não publicamos."
     }
-  ]
+  ],
+  "correio": {
+    "eyebrow": "Correio",
+    "title": "Caixas de e-mail para pessoas e agentes de IA",
+    "body": "Um adicional do seu plano pago de Envio: cada caixa tem endereço no seu domínio, entrada, saída e permissões próprias. Humano ou agente, o mesmo preço.",
+    "perMonth": "/mês por caixa",
+    "storage": "{size} GiB de armazenamento",
+    "sends": "{count, number} entregas de saída por mês",
+    "agents": "Agentes conectam pelo MCP do Correio, com aprovação opcional antes de cada envio",
+    "note": "Exige um plano pago de Envio ativo. Cada caixa precisa de domínio verificado e do recebimento ativado.",
+    "cta": "Conhecer o Correio",
+    "names": {
+      "gib1": "Caixa 1 GiB",
+      "gib10": "Caixa 10 GiB"
+    }
+  }
 }

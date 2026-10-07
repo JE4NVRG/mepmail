@@ -23,6 +23,30 @@
   },
   "releases": [
     {
+      "version": "0.45",
+      "date": "2026-10-07",
+      "title": "Mail: email inboxes for your AI agents",
+      "summary": "Your agents get an email inbox on your domain: they read, draft and reply over MCP, and you can approve every send.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Mail opens to every paying Send subscriber: mailboxes on your domain for people and agents, from US$5.90 per mailbox a month.",
+            "The Mail MCP at api-mepmail.je4ndev.com/mcp/correio: the agent lists, reads, drafts and sends with the mailbox key.",
+            "Owner approval: an agent without send permission asks, and the draft shows \"Awaiting your approval\" until you decide.",
+            "The main MCP gained list_mailboxes, create_mailbox and create_mailbox_agent_key.",
+            "Mail opens in its own window, with inbox and settings, plus a Send button in the composer."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Pre-send protection: disguised senders and subjects are refused, and new accounts imitating banks or carriers go through review."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.44",
       "date": "2026-09-29",
       "title": "10% more email on every plan",
@@ -37,7 +61,9 @@
         },
         {
           "kind": "changed",
-          "items": ["Quotas up 10% everywhere: Pro now starts at 110,000 emails/month and Scale reaches 2.75M. Prices unchanged."]
+          "items": [
+            "Quotas up 10% everywhere: Pro now starts at 110,000 emails/month and Scale reaches 2.75M. Prices unchanged."
+          ]
         }
       ]
     },
@@ -95,7 +121,9 @@
         },
         {
           "kind": "changed",
-          "items": ["Docs wave 1 — npm packages, rate limits with Retry-After, a full error catalogue, and the MCP install path."]
+          "items": [
+            "Docs wave 1 — npm packages, rate limits with Retry-After, a full error catalogue, and the MCP install path."
+          ]
         }
       ]
     },
@@ -114,26 +142,13 @@
         },
         {
           "kind": "changed",
-          "items": ["Docs and legal pages are now search-engine friendly — easier to find when you're googling an error."]
+          "items": [
+            "Docs and legal pages are now search-engine friendly — easier to find when you're googling an error."
+          ]
         },
         {
           "kind": "fixed",
           "items": ["The mobile header stays put, with the sign-up button always visible."]
-        }
-      ]
-    },
-    {
-      "version": "0.39",
-      "date": "2026-09-27",
-      "title": "Terms, Privacy and Refunds — in plain language",
-      "summary": "The legal pages you expect, plus a landing that shows the product instead of describing it.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "Terms, Privacy and Refund policies, in English and Portuguese.",
-            "A landing built around the product: a live demo, the founders program and straight answers in the FAQ."
-          ]
         }
       ]
     }

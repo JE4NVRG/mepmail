@@ -10,6 +10,10 @@ describe("crawler entry points", () => {
     expect(body).toContain("https://docs-mepmail.je4ndev.com");
     expect(body).toContain("https://mepmail.je4ndev.com/auth.md");
     expect(body).toContain("https://api-mepmail.je4ndev.com/mcp");
+    // Correio is announced to agents with its own MCP endpoint and guide.
+    expect(body).toContain("https://mepmail.je4ndev.com/correio");
+    expect(body).toContain("https://api-mepmail.je4ndev.com/mcp/correio");
+    expect(body).toContain("https://docs-mepmail.je4ndev.com/mailboxes");
     expect(body).not.toContain("millionsend.com");
   });
 
@@ -23,6 +27,7 @@ describe("crawler entry points", () => {
     for (const path of [
       "/$",
       "/pricing",
+      "/correio",
       "/alternatives",
       "/changelog",
       "/login",

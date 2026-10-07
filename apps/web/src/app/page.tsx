@@ -19,6 +19,7 @@ import { formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricin
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
+import { AgentDemo, type AgentDemoLabels } from "./correio/agent-demo";
 import "./landing-calc.css";
 import "./landing.css";
 import "./landing-cro.css";
@@ -70,7 +71,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootPage() {
   const locale = await getLocale();
   const t = await getTranslations("landing");
+  const mail = await getTranslations("correio");
   const launchOfferEnabled = process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
+  // The Correio section and announcement follow the same switch as /correio.
+  const mailOpen = process.env.MAILBOX_EARLY_ACCESS_OPEN === "true";
+  const mailFrom = formatUsd(
+    Math.min(...LAUNCH_OFFER.mailboxes.map((box) => box.monthlyCents)) / 100,
+    locale,
+  );
   const priceRows = priceRowsForOffer(launchOfferEnabled);
   const comparison = priceRows.map((row) => [
     formatVolume(row.volume, locale),
@@ -109,6 +117,7 @@ export default async function RootPage() {
   const faq = t.raw("faq.items") as FaqItem[];
   const calc = t.raw("calc") as CalcLabels;
   const mcpPoints = t.raw("mcp.points") as string[];
+  const correioPoints = t.raw("correio.points") as string[];
 
   return (
     <div className="gtm cro">
@@ -118,9 +127,9 @@ export default async function RootPage() {
         labels={site}
         page="landing"
         banner={
-          <a className="gtm-announce" href="#mcp">
+          <a className="gtm-announce" href={mailOpen ? "/correio" : "#mcp"}>
             <span className="gtm-announce-dot" aria-hidden="true" />
-            <span>{t("announce.text")}</span>
+            <span>{t(mailOpen ? "announce.correio" : "announce.text")}</span>
             <span aria-hidden="true">→</span>
           </a>
         }
@@ -282,6 +291,42 @@ export default async function RootPage() {
             </figure>
           </div>
         </section>
+
+        {mailOpen ? (
+          <section
+            className="gtm-section cro-correio"
+            id="correio"
+            aria-labelledby="home-correio-title"
+          >
+            <div className="gtm-container">
+              <div className="cro-correio-card">
+                <div>
+                  <p className="gtm-eyebrow">
+                    <span className="cro-correio-new">{t("correio.badge")}</span>
+                    {t("correio.eyebrow")}
+                  </p>
+                  <h2 id="home-correio-title">{t("correio.title")}</h2>
+                  <p>{t("correio.body")}</p>
+                  <ul className="gtm-points">
+                    {correioPoints.map((point) => (
+                      <li key={point}>{point}</li>
+                    ))}
+                  </ul>
+                  <p className="cro-correio-price">{t("correio.price", { price: mailFrom })}</p>
+                  <div className="gtm-actions">
+                    <a className="ms-btn ms-btn-primary gtm-action" href="/correio">
+                      {t("correio.cta")} <span aria-hidden="true">→</span>
+                    </a>
+                    <a className="ms-btn ms-btn-secondary gtm-action" href="/pricing#correio">
+                      {t("correio.pricing")}
+                    </a>
+                  </div>
+                </div>
+                <AgentDemo labels={mail.raw("demo") as AgentDemoLabels} compact />
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className="gtm-section cro-value">
           <div className="gtm-container">

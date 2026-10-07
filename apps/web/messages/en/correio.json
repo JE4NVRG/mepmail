@@ -1,10 +1,10 @@
 {
   "meta": {
-    "title": "Mail for you and your agents | MepMail",
-    "description": "Discover MepMail Mail: mailboxes on your domain for people and agents, with messages, drafts and permissions under your control. Available to every paying Send subscriber."
+    "title": "Mail: email inboxes for AI agents | MepMail",
+    "description": "Give your AI agent an email inbox on your domain. It reads, drafts and replies over MCP, and you approve before it sends. From US$5.90 per mailbox a month, with a Send plan."
   },
   "hero": {
-    "eyebrow": "MepMail Mail",
+    "eyebrow": "MepMail Mail · email inboxes for AI agents",
     "status": "Launch preview · closed access",
     "title": "An email from your company.",
     "titleEnd": "For you and your agent.",
@@ -286,5 +286,11 @@
     "approve": "Approve and send",
     "sent": "Sent to Ana Souza",
     "foot": "Illustrative address and scenario. No message was sent."
+  },
+  "og": {
+    "badge": "New · Mail",
+    "title": "Email inboxes for your AI agents",
+    "body": "They read, draft and reply over MCP. You approve before anything is sent.",
+    "price": "From {price} per mailbox a month"
   }
 }

@@ -1,3 +1,5 @@
+import "./agent-demo.css";
+
 export interface AgentDemoLabels {
   label: string;
   description: string;
@@ -23,11 +25,22 @@ export interface AgentDemoLabels {
  * the draft waits for the owner's approval and goes out. Pure CSS on a fixed
  * loop; with reduced motion the scene rests on its final, readable state. The
  * moving part is decorative (aria-hidden); the description says the same.
+ * `compact` is the home's smaller version: one message in the inbox, tighter.
  */
-export function AgentDemo({ labels }: { labels: AgentDemoLabels }) {
+export function AgentDemo({
+  labels,
+  compact = false,
+}: {
+  labels: AgentDemoLabels;
+  compact?: boolean;
+}) {
+  const labelId = compact ? "correio-demo-label-home" : "correio-demo-label";
   return (
-    <aside className="correio-demo" aria-labelledby="correio-demo-label">
-      <p className="correio-example-label" id="correio-demo-label">
+    <aside
+      className={compact ? "correio-demo correio-demo-compact" : "correio-demo"}
+      aria-labelledby={labelId}
+    >
+      <p className="correio-example-label" id={labelId}>
         {labels.label}
       </p>
       <p className="correio-demo-description">{labels.description}</p>
@@ -44,13 +57,15 @@ export function AgentDemo({ labels }: { labels: AgentDemoLabels }) {
               <p className="correio-demo-muted">{labels.preview}</p>
             </div>
           </div>
-          <div className="correio-demo-row correio-demo-quiet">
-            <span className="correio-demo-avatar">··</span>
-            <div>
-              <p>{labels.otherSender}</p>
-              <p className="correio-demo-muted">{labels.otherSubject}</p>
+          {compact ? null : (
+            <div className="correio-demo-row correio-demo-quiet">
+              <span className="correio-demo-avatar">··</span>
+              <div>
+                <p>{labels.otherSender}</p>
+                <p className="correio-demo-muted">{labels.otherSubject}</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
         <div className="correio-demo-pane">
           <div className="correio-demo-head">{labels.agent}</div>

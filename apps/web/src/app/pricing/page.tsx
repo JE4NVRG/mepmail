@@ -67,6 +67,7 @@ export default async function PricingPage() {
     featuredBadge: l("plans.featuredBadge"),
   } satisfies PlanCardLabels;
   const launchOfferEnabled = process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
+  const mailOpen = process.env.MAILBOX_EARLY_ACCESS_OPEN === "true";
   const allPlans = plansWithCopy(
     l.raw("plans.items") as PlanCopy[],
     launchOfferEnabled,
@@ -142,6 +143,36 @@ export default async function PricingPage() {
                 {t("launch.mailCta")}
               </a>
               <p className="gtm-note">{t("launch.mailAccess")}</p>
+            </div>
+          </section>
+        ) : null}
+
+        {mailOpen ? (
+          <section className="gtm-section" id="correio" aria-labelledby="pricing-correio-title">
+            <div className="gtm-container">
+              <p className="gtm-eyebrow">{t("correio.eyebrow")}</p>
+              <h2 id="pricing-correio-title">{t("correio.title")}</h2>
+              <p>{t("correio.body")}</p>
+              <div className="gtm-split">
+                {LAUNCH_OFFER.mailboxes.map((box) => (
+                  <article className="ms-card gtm-plan" key={box.id}>
+                    <h3>{t(`correio.names.${box.id}`)}</h3>
+                    <p className="gtm-price">
+                      {formatUsd(box.monthlyCents / 100, locale)}
+                      <span>{t("correio.perMonth")}</span>
+                    </p>
+                    <ul className="gtm-points">
+                      <li>{t("correio.storage", { size: box.storageGiB })}</li>
+                      <li>{t("correio.sends", { count: box.monthlyRecipientDeliveries })}</li>
+                      <li>{t("correio.agents")}</li>
+                    </ul>
+                  </article>
+                ))}
+              </div>
+              <p className="gtm-note">{t("correio.note")}</p>
+              <a className="ms-btn ms-btn-secondary gtm-action" href="/correio">
+                {t("correio.cta")}
+              </a>
             </div>
           </section>
         ) : null}

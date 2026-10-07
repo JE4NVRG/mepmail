@@ -15,6 +15,12 @@ describe("ai-catalog.json", () => {
     expect(urls).toContain("https://mepmail.je4ndev.com/.well-known/agent-skills/index.json");
     expect(urls).toContain("https://api-mepmail.je4ndev.com/openapi.json");
     expect(urls).toContain("https://mepmail.je4ndev.com/auth.md");
+    expect(urls).toContain("https://mepmail.je4ndev.com/correio");
+    expect(urls).toContain("https://docs-mepmail.je4ndev.com/mailboxes");
+    const correio = body.entries.find(
+      (e: { identifier: string }) => e.identifier === "urn:air:je4ndev.com:mepmail:correio:mcp",
+    );
+    expect(correio.description).toContain("https://api-mepmail.je4ndev.com/mcp/correio");
     expect(JSON.stringify(body)).not.toContain("millionsend.com");
   });
 });

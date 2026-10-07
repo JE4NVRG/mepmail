@@ -111,6 +111,31 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(alternative).not.toContain("78%");
     });
 
+    it("presents Correio on the home and on /pricing only while Mail is open", async () => {
+      current.locale = locale;
+      const landing = messages(locale).landing.correio;
+      const pricing = messages(locale).pricing.correio;
+      const [small, large] = locale === "en" ? ["US$ 5.90", "US$ 9.90"] : ["US$ 5,90", "US$ 9,90"];
+
+      vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "false");
+      expect(await render(Home)).not.toContain('id="correio"');
+      expect(await render(Pricing)).not.toContain('id="correio"');
+
+      vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
+      const home = await render(Home);
+      expect(home).toContain('id="correio"');
+      expect(home).toContain(landing.title);
+      expect(home).toContain(small);
+      expect(home).toContain('href="/correio"');
+      expect(home).toContain('href="/pricing#correio"');
+      expect(home).toContain(messages(locale).correio.demo.awaiting);
+      const page = await render(Pricing);
+      expect(page).toContain('id="correio"');
+      expect(page).toContain(pricing.title);
+      expect(page).toContain(small);
+      expect(page).toContain(large);
+    });
+
     it("holds Mail presentation closed by default, independent of registry availability", async () => {
       current.locale = locale;
       vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "false");
@@ -130,7 +155,8 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(html).toContain(copy.mailNote);
       expect(html).toContain(copy.restStatus);
       expect(html).toContain(copy.checkAccess);
-      expect(html).toContain('href="/mailboxes"');
+      // Correio is its own app at /mail (the old /mailboxes path redirects there).
+      expect(html).toContain('href="/mail"');
       expect(html).not.toContain(messages(locale).correio.hero.status);
       expect(html).not.toContain(messages(locale).correio.preview.status);
       expect(html).not.toMatch(/MAILBOX_EARLY_ACCESS_OPEN|teamId|customerId|subscriptionId/);

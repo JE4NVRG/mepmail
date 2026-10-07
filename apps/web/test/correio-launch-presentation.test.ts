@@ -412,6 +412,9 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     expect(metadata.alternates?.canonical).toBe("/correio");
     expect(metadata.title).toEqual({ absolute: copy.meta.title });
     expect(metadata.description).toBe(copy.meta.description);
+    // Search phrasing: the title says what it is for.
+    expect(copy.meta.title).toMatch(locale === "pt-BR" ? /agentes de IA/ : /AI agents/);
+    expect(copy.meta.description).toMatch(locale === "pt-BR" ? /agente de IA/ : /AI agent/);
     expect(metadata.openGraph).toMatchObject({
       title: copy.meta.title,
       description: copy.meta.description,

@@ -7,6 +7,31 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.45] - 2026-10-07
+
+Correio: email inboxes for your AI agents.
+
+### Added
+
+- Correio opens to every paying Send subscriber: mailboxes on the team's own
+  domain for people and agents, from US$5.90 per mailbox a month.
+- The Correio MCP server at `https://api-mepmail.je4ndev.com/mcp/correio`: an
+  agent lists, reads, drafts and sends with its mailbox key (`mmb_`).
+- Owner approval: an agent key without the send permission asks to send, the
+  owner is emailed and the draft shows "Awaiting your approval" until they
+  decide.
+- `list_mailboxes`, `create_mailbox` and `create_mailbox_agent_key` on the main
+  MCP server, behind the new `mailboxes:read` and `mailboxes:write` scopes.
+- Correio runs as its own full-window app (`/mail`, `/mail/settings`) with a
+  Send button in the composer, and `/correio` shows an animated agent demo.
+- The home, `/pricing`, `/integrations`, the sitemap and the agent discovery
+  files (llms.txt, the agent skill, the AI catalog) now present Correio.
+
+### Changed
+
+- Pre-send protection: disguised senders and subjects are refused, and young
+  teams imitating banks, carriers or account-security mail are held for review.
+
 ## [0.44] - 2026-09-29
 
 Value-first landing, official logos and +10% quotas.
