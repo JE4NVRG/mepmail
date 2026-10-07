@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { AuthForm } from "@/components/auth/auth-form";
 import { enabledSocialProviders, hasSession } from "@/server/auth";
+import { accountMailDelayed } from "@/server/ses-pause";
 
 // Server component so the env-derived social-provider flags reach the client
 // form as props; the form itself keeps the better-auth client mechanism.
@@ -18,6 +19,7 @@ export default async function SignupPage() {
       legal={{ termsUrl: env.TERMS_URL ?? "/terms", privacyUrl: env.PRIVACY_URL ?? "/privacy" }}
       turnstileSiteKey={env.TURNSTILE_SITE_KEY ?? null}
       productUpdates={signupOpen()}
+      mailDelayed={await accountMailDelayed()}
     />
   );
 }

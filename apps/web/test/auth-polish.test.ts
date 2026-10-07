@@ -70,6 +70,7 @@ function find(tree: ReactNode, predicate: (node: Node) => boolean) {
 function render(
   mode: "login" | "signup" = "login",
   providers = { google: false, github: false, microsoft: false },
+  mailDelayed = false,
 ) {
   h.cursor = 0;
   return AuthForm({
@@ -77,6 +78,7 @@ function render(
     providers,
     legal: { termsUrl: null, privacyUrl: null },
     forgotPassword: true,
+    mailDelayed,
   });
 }
 function input(tree: ReactNode, id: string, value: string) {
@@ -183,6 +185,31 @@ describe("auth UX: synthetic component state harness", () => {
       expect(button(render("login", providers)).props.disabled).toBe(false);
     });
   }
+  it("while account mail runs late, signup points at Google before the email form", async () => {
+    const google = { google: true, github: false, microsoft: false };
+    const texts = (tree: ReactNode) => nodes(tree).map((n) => n.props.children);
+    expect(texts(render("signup", google))).not.toContain("auth.shell.mailDelayed");
+    const tree = render("signup", google, true);
+    const order = texts(tree);
+    const notice = order.indexOf("auth.shell.mailDelayed");
+    expect(notice).toBeGreaterThan(-1);
+    expect(notice).toBeLessThan(
+      order.findIndex((c) => Array.isArray(c) && c.includes("auth.social.google")),
+    );
+    expect(texts(render("signup", undefined, true))).toContain("auth.shell.mailDelayedPlain");
+    // A password signup that is already waiting for its link is offered Google too.
+    h.signup.mockResolvedValue({ data: { token: null }, error: null });
+    input(render("signup", google, true), "name", "Preview");
+    input(render("signup", google, true), "email", "preview@example.invalid");
+    input(render("signup", google, true), "password", "synthetic-test-only");
+    await submit(render("signup", google, true));
+    const waiting = render("signup", google, true);
+    expect(texts(waiting)).toContain("auth.shell.mailDelayedVerify");
+    const social = find(waiting, (n) => n.type === "button" && Array.isArray(n.props.children));
+    h.social.mockResolvedValue({ error: null });
+    await (social.props.onClick as () => Promise<void>)();
+    expect(h.social).toHaveBeenCalledWith(expect.objectContaining({ provider: "google" }));
+  });
   it("login never displays provider/server account details", async () => {
     await submit(render());
     h.email.mockResolvedValue({

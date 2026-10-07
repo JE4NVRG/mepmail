@@ -71,6 +71,7 @@ export function AuthForm({
   forgotPassword = false,
   turnstileSiteKey = null,
   productUpdates = false,
+  mailDelayed = false,
 }: {
   mode: "login" | "signup";
   providers: SocialProviderFlags;
@@ -81,6 +82,8 @@ export function AuthForm({
   turnstileSiteKey?: string | null;
   /** Cadastro: oferece o double opt-in separado de novidades. */
   productUpdates?: boolean;
+  /** SES is paused with no fallback: the verification link runs late, so point at social sign-in. */
+  mailDelayed?: boolean;
 }) {
   const t = useTranslations(`auth.${mode}`);
   const tSocial = useTranslations("auth.social");
@@ -271,6 +274,50 @@ export function AuthForm({
         ? `/login?next=${encodeURIComponent(next)}`
         : "/login";
   const anySocial = providers.google || providers.github || providers.microsoft;
+  // A social sign-in arrives verified, so it is the way in while links run late.
+  const delayedNotice = (key: "mailDelayed" | "mailDelayedVerify") =>
+    mailDelayed ? (
+      <p className={styles.delayed} role="status">
+        {tAuth(`shell.${anySocial ? key : "mailDelayedPlain"}`)}
+      </p>
+    ) : null;
+  const socialButtons = anySocial ? (
+    <div className={styles.social}>
+      {providers.google ? (
+        <button
+          type="button"
+          className={`ms-btn ms-btn-secondary ${styles.button}`}
+          disabled={pending !== null}
+          onClick={() => onSocial("google")}
+        >
+          <GoogleIcon />
+          {tSocial("google")}
+        </button>
+      ) : null}
+      {providers.github ? (
+        <button
+          type="button"
+          className={`ms-btn ms-btn-secondary ${styles.button}`}
+          disabled={pending !== null}
+          onClick={() => onSocial("github")}
+        >
+          <GitHubIcon />
+          {tSocial("github")}
+        </button>
+      ) : null}
+      {providers.microsoft ? (
+        <button
+          type="button"
+          className={`ms-btn ms-btn-secondary ${styles.button}`}
+          disabled={pending !== null}
+          onClick={() => onSocial("microsoft")}
+        >
+          <MicrosoftIcon />
+          {tSocial("microsoft")}
+        </button>
+      ) : null}
+    </div>
+  ) : null;
 
   if (awaitingVerification) {
     return (
@@ -302,6 +349,8 @@ export function AuthForm({
             {notice}
           </p>
         ) : null}
+        {delayedNotice("mailDelayedVerify")}
+        {mailDelayed ? socialButtons : null}
         {turnstile.slot}
         <p className={styles.subline}>
           <Link href={`/login?next=${encodeURIComponent(next)}`}>{t("backToLogin")}</Link>
@@ -316,43 +365,8 @@ export function AuthForm({
         {t("subline")} <Link href={otherPage}>{t("sublineLink")}</Link>
       </p>
       {mode === "signup" ? <p className={styles.freeNote}>{t("freeNote")}</p> : null}
-      {anySocial ? (
-        <div className={styles.social}>
-          {providers.google ? (
-            <button
-              type="button"
-              className={`ms-btn ms-btn-secondary ${styles.button}`}
-              disabled={pending !== null}
-              onClick={() => onSocial("google")}
-            >
-              <GoogleIcon />
-              {tSocial("google")}
-            </button>
-          ) : null}
-          {providers.github ? (
-            <button
-              type="button"
-              className={`ms-btn ms-btn-secondary ${styles.button}`}
-              disabled={pending !== null}
-              onClick={() => onSocial("github")}
-            >
-              <GitHubIcon />
-              {tSocial("github")}
-            </button>
-          ) : null}
-          {providers.microsoft ? (
-            <button
-              type="button"
-              className={`ms-btn ms-btn-secondary ${styles.button}`}
-              disabled={pending !== null}
-              onClick={() => onSocial("microsoft")}
-            >
-              <MicrosoftIcon />
-              {tSocial("microsoft")}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+      {delayedNotice("mailDelayed")}
+      {socialButtons}
       {anySocial ? <div className={styles.divider}>{tSocial("or")}</div> : null}
       <p className={styles.hint} id="auth-step" aria-live="polite">
         {tAuth(

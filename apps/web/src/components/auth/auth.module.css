@@ -72,8 +72,12 @@
 /* The illustration: a template card, two curves, two personal messages. */
 .artFrame {
   background:
-    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ms-bone) 7%, transparent) 1px, transparent 0)
-      0 0 / 22px 22px,
+    radial-gradient(
+      circle at 1px 1px,
+      color-mix(in srgb, var(--ms-bone) 7%, transparent) 1px,
+      transparent 0
+    )
+    0 0 / 22px 22px,
     #080808;
 }
 .artStage {
@@ -525,4 +529,16 @@
   margin: 1px 0 0;
   accent-color: var(--ms-violet);
   cursor: pointer;
+}
+/* SES paused with no fallback: the verification link runs late. */
+.delayed {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--ms-warn) 45%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ms-warn) 10%, transparent);
+  color: inherit;
+  font-size: var(--ms-fs-label);
+  line-height: 1.5;
+  text-align: left;
 }

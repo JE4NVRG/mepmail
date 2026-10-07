@@ -26,6 +26,7 @@ import { isAwsCredentialError } from "@/lib/aws-errors";
 import { recordAudit } from "../audit";
 import { isInstanceOperator } from "../instance-operator";
 import type { SessionRole } from "../membership";
+import { cloudSendingPaused, createSesPauseProbe } from "../ses-pause";
 import { awsCredentialsConfigured, passwordRecoveryEnabled } from "../system-mail";
 import { router, teamProcedure } from "../trpc";
 
@@ -117,22 +118,9 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
     productionProbes.set(region, { at: Date.now(), value });
     return cached ? cached.value : value;
   };
-  // SES's own pause per served region (EnforcementStatus SHUTDOWN or sending
-  // off), on the same once-a-minute cadence: the dashboard's strip reads it on
-  // every page.
-  const pauseProbes = new Map<string, { at: number; value: Promise<boolean> }>();
-  const sesPaused = (region: string): Promise<boolean> => {
-    const cached = pauseProbes.get(region);
-    if (cached && Date.now() - cached.at < PRODUCTION_PROBE_TTL_MS) return cached.value;
-    const value = awsCredentialsConfigured()
-      ? getAccountOverview(deps.accountClient(region)).then(
-          (overview) => overview.enforcementStatus === "SHUTDOWN" || !overview.sendingEnabled,
-          () => cached?.value ?? false,
-        )
-      : Promise.resolve(false);
-    pauseProbes.set(region, { at: Date.now(), value });
-    return cached ? cached.value : value;
-  };
+  // SES's own pause per served region, on the same once-a-minute cadence:
+  // the dashboard's strip reads it on every page.
+  const sesPaused = createSesPauseProbe(deps.accountClient);
   return router({
     /**
      * Whether SES has paused sending in any region this deployment serves:
@@ -140,11 +128,7 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
      * every team hears it is queued, not lost. Cloud only (a self-host
      * operator reads it on the SES settings page).
      */
-    sendingPaused: teamProcedure.query(async () => {
-      if (!isCloudDeployment()) return false;
-      const answers = await Promise.all(servedRegions().map((region) => sesPaused(region)));
-      return answers.some(Boolean);
-    }),
+    sendingPaused: teamProcedure.query(() => cloudSendingPaused(sesPaused)),
 
     /**
      * Env-level deployment readiness, behind team auth like everything else.
