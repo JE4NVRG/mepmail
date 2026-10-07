@@ -2,6 +2,7 @@ import { SQSClient } from "@aws-sdk/client-sqs";
 import {
   createStripe,
   dispatchMetaConversions,
+  isLiveKey,
   purgeStripeEvents,
   readMetaConversionConfig,
   reconcileTeamPlan,
@@ -370,6 +371,7 @@ await queue.scheduleCrons({
     if (!stripe) return;
     const result = await reconcileBillingPlans(db, {
       reconcileTeam: (teamId) => reconcileTeamPlan({ db, stripe, log: console.warn }, teamId),
+      livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
       onPlanMoved: async (team, before, after) => {
         await reportPlanMove(db, mailer, env.APP_BASE_URL ?? "", team, before, after);
       },
@@ -385,7 +387,7 @@ await queue.scheduleCrons({
       ),
     );
     console.log(
-      `billing.reconcile: reconciled=${result.reconciled} failed=${result.failed} committedPerDay=${committed} sesDailyQuota=${sesDaily.join(",")}`,
+      `billing.reconcile: reconciled=${result.reconciled} failed=${result.failed} skipped=${result.skipped} committedPerDay=${committed} sesDailyQuota=${sesDaily.join(",")}`,
     );
   },
   "billing.overage": async () => {

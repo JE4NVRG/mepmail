@@ -96,3 +96,13 @@ export function createStripe(secretKey: string): BillingStripe {
 export function isLiveKey(secretKey: string): boolean {
   return /^[sr]k_live_/.test(secretKey);
 }
+
+/**
+ * Stripe's answer that the request's `customer` does not exist under this
+ * key: deleted, from another account, or a test-mode id met by a live key.
+ */
+export function isMissingStripeCustomer(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const { code, param } = err as { code?: unknown; param?: unknown };
+  return code === "resource_missing" && param === "customer";
+}

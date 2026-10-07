@@ -95,7 +95,12 @@ export {
   type SendCheckoutResult,
 } from "./send-checkout.js";
 export { resolveSendBillingContract, verifiedSendBillingContract } from "./send-contract.js";
-export { type BillingStripe, createStripe, isLiveKey } from "./stripe.js";
+export {
+  type BillingStripe,
+  createStripe,
+  isLiveKey,
+  isMissingStripeCustomer,
+} from "./stripe.js";
 export {
   cancelTeamSubscription,
   changeRung,

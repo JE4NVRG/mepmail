@@ -3,7 +3,7 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq, sql } from "drizzle-orm";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   drainQuotaParked,
   purgeExpiredApiRequests,
@@ -13,6 +13,7 @@ import {
   purgeStaleHourlyUsage,
   reconcileBillingPlans,
   reconcileStalledSends,
+  STRIPE_CUSTOMER_MISSING,
   stripExpiredEventPayloads,
 } from "../src/handlers/cron.js";
 
@@ -677,9 +678,147 @@ it("billing reconcile visits only teams with a Stripe customer and isolates fail
       visited.push(id);
       if (id === failing) throw new Error("stripe down");
     },
+    livemode: true,
   });
-  expect(result).toEqual({ reconciled: 1, failed: 1 });
+  expect(result).toEqual({ reconciled: 1, failed: 1, skipped: 0 });
   expect(visited.sort()).toEqual([withStripe, failing].sort());
+});
+
+/** What Stripe throws for a customer it does not know, e.g. a test-mode id under a live key. */
+function noSuchCustomer(customerId: string) {
+  return Object.assign(
+    new Error(
+      `No such customer: '${customerId}'; a similar object exists in test mode, but a live mode key was used to make this request.`,
+    ),
+    { type: "StripeInvalidRequestError", code: "resource_missing", param: "customer" },
+  );
+}
+
+it("billing reconcile skips a customer Stripe does not know and flags it once", async () => {
+  const live = await createTeam(db, "live-team");
+  await db
+    .update(schema.teams)
+    .set({ stripeCustomerId: "cus_live" })
+    .where(eq(schema.teams.id, live));
+  const stale = await createTeam(db, "test-mode-team");
+  await db
+    .update(schema.teams)
+    .set({ stripeCustomerId: "cus_testmode" })
+    .where(eq(schema.teams.id, stale));
+  const visited: string[] = [];
+  const deps = {
+    reconcileTeam: async (id: string) => {
+      visited.push(id);
+      if (id === stale) throw noSuchCustomer("cus_testmode");
+    },
+    livemode: true,
+  };
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    expect(await reconcileBillingPlans(db, deps)).toEqual({ reconciled: 1, failed: 0, skipped: 1 });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain(`team ${stale} customer cus_testmode`);
+    // The next runs skip it without asking Stripe and without logging again.
+    visited.length = 0;
+    expect(await reconcileBillingPlans(db, deps)).toEqual({ reconciled: 1, failed: 0, skipped: 1 });
+    expect(await reconcileBillingPlans(db, deps)).toEqual({ reconciled: 1, failed: 0, skipped: 1 });
+    expect(visited).toEqual([live, live]);
+    expect(warn).toHaveBeenCalledTimes(1);
+  } finally {
+    warn.mockRestore();
+  }
+  const flags = await db
+    .select({ kind: schema.teamNotifications.kind, periodKey: schema.teamNotifications.periodKey })
+    .from(schema.teamNotifications)
+    .where(eq(schema.teamNotifications.teamId, stale));
+  expect(flags).toEqual([{ kind: STRIPE_CUSTOMER_MISSING, periodKey: "live:cus_testmode" }]);
+});
+
+it("billing reconcile visits a flagged team again once its customer id changes", async () => {
+  const teamId = await createTeam(db, "relinked-team");
+  await db
+    .update(schema.teams)
+    .set({ stripeCustomerId: "cus_old" })
+    .where(eq(schema.teams.id, teamId));
+  const visited: string[] = [];
+  const deps = {
+    reconcileTeam: async (id: string) => {
+      const [row] = await db
+        .select({ customer: schema.teams.stripeCustomerId })
+        .from(schema.teams)
+        .where(eq(schema.teams.id, id));
+      visited.push(row?.customer ?? "");
+      if (row?.customer === "cus_old") throw noSuchCustomer("cus_old");
+    },
+    livemode: true,
+  };
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    await reconcileBillingPlans(db, deps);
+    await db
+      .update(schema.teams)
+      .set({ stripeCustomerId: "cus_new" })
+      .where(eq(schema.teams.id, teamId));
+    expect(await reconcileBillingPlans(db, deps)).toEqual({ reconciled: 1, failed: 0, skipped: 0 });
+  } finally {
+    warn.mockRestore();
+  }
+  expect(visited).toEqual(["cus_old", "cus_new"]);
+});
+
+it("billing reconcile keeps a customer flagged under one key mode visible to the other", async () => {
+  const teamId = await createTeam(db, "shared-db-team");
+  await db
+    .update(schema.teams)
+    .set({ stripeCustomerId: "cus_shared" })
+    .where(eq(schema.teams.id, teamId));
+  let visits = 0;
+  const reconcileTeam = async () => {
+    visits += 1;
+    throw noSuchCustomer("cus_shared");
+  };
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    // A staging worker on a test key flags it; the live worker still asks Stripe.
+    await reconcileBillingPlans(db, { reconcileTeam, livemode: false });
+    await reconcileBillingPlans(db, { reconcileTeam, livemode: true });
+    await reconcileBillingPlans(db, { reconcileTeam, livemode: true });
+    expect(visits).toBe(2);
+    expect(warn).toHaveBeenCalledTimes(2);
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+it("billing reconcile still counts any other Stripe error as a failure on every run", async () => {
+  const teamId = await createTeam(db, "missing-sub-team");
+  await db
+    .update(schema.teams)
+    .set({ stripeCustomerId: "cus_sub" })
+    .where(eq(schema.teams.id, teamId));
+  const deps = {
+    // A missing subscription (param "id") is not a missing customer.
+    reconcileTeam: async () => {
+      throw Object.assign(new Error("No such subscription: 'sub_x'"), {
+        type: "StripeInvalidRequestError",
+        code: "resource_missing",
+        param: "id",
+      });
+    },
+    livemode: true,
+  };
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    expect(await reconcileBillingPlans(db, deps)).toEqual({ reconciled: 0, failed: 1, skipped: 0 });
+    expect(await reconcileBillingPlans(db, deps)).toEqual({ reconciled: 0, failed: 1, skipped: 0 });
+  } finally {
+    warn.mockRestore();
+  }
+  const flags = await db
+    .select()
+    .from(schema.teamNotifications)
+    .where(eq(schema.teamNotifications.teamId, teamId));
+  expect(flags).toEqual([]);
 });
 
 it("billing reconcile reports a plan it moved, with the row before and after", async () => {
@@ -698,6 +837,7 @@ it("billing reconcile reports a plan it moved, with the row before and after", a
         .set({ plan: "free", currentPeriodEnd: null })
         .where(eq(schema.teams.id, id));
     },
+    livemode: true,
     onPlanMoved: async (
       team: { id: string; name: string },
       before: { plan: string; currentPeriodEnd: Date | null },
@@ -824,6 +964,7 @@ it("billing reconcile reports a rung change within one plan", async () => {
     reconcileTeam: async (id: string) => {
       await db.update(schema.teams).set({ planQuota: 200_000 }).where(eq(schema.teams.id, id));
     },
+    livemode: true,
     onPlanMoved: async (
       _team: { id: string; name: string },
       before: { planQuota: number | null },

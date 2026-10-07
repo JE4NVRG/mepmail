@@ -1,5 +1,7 @@
+import { isMissingStripeCustomer } from "@millionsend/billing";
 import {
   broadcastSendSpacingMs,
+  claimNotification,
   countDistinctRecipients,
   DAY_MS,
   DRAIN_MAX_PER_RUN,
@@ -1187,23 +1189,34 @@ export async function purgeExpiredSessions(db: Db, now = new Date()): Promise<nu
 }
 
 /**
+ * team_notifications kind marking a customer Stripe does not know under the
+ * worker's key; the period is `<live|test>:<customer id>`, so a staging key
+ * of the other mode (same database) never hides a customer from this one.
+ */
+export const STRIPE_CUSTOMER_MISSING = "billing.customer_missing";
+
+/**
  * Daily plan reconcile against Stripe for every team with a customer: covers
  * webhooks that were dropped or arrived out of order. One team's failure is
- * logged and never blocks the rest. A plan the reconcile moved is reported
- * through `onPlanMoved`, since the webhook that would have said so never
- * came (or will find nothing left to say when it does).
+ * logged and never blocks the rest. A customer Stripe answers is missing is
+ * logged once and skipped, without a Stripe call, until the team's customer
+ * id changes. A plan the reconcile moved is reported through `onPlanMoved`,
+ * since the webhook that would have said so never came (or will find nothing
+ * left to say when it does).
  */
 export async function reconcileBillingPlans(
   db: Db,
   deps: {
     reconcileTeam: (teamId: string) => Promise<void>;
+    /** The mode of the key `reconcileTeam` calls Stripe with. */
+    livemode: boolean;
     onPlanMoved?: (
       team: { id: string; name: string },
       before: PlanSnapshot,
       after: PlanSnapshot,
     ) => Promise<void>;
   },
-): Promise<{ reconciled: number; failed: number }> {
+): Promise<{ reconciled: number; failed: number; skipped: number }> {
   const columns = {
     id: schema.teams.id,
     name: schema.teams.name,
@@ -1212,13 +1225,24 @@ export async function reconcileBillingPlans(
     currentPeriodEnd: schema.teams.currentPeriodEnd,
     cancelAt: schema.teams.cancelAt,
   };
+  const mode = deps.livemode ? "live:" : "test:";
+  const n = schema.teamNotifications;
   const teams = await db
-    .select(columns)
+    .select({
+      ...columns,
+      customerId: schema.teams.stripeCustomerId,
+      customerMissing: sql<boolean>`exists (select 1 from ${n} where ${n.teamId} = ${schema.teams.id} and ${n.kind} = ${STRIPE_CUSTOMER_MISSING} and ${n.periodKey} = (${mode} || ${schema.teams.stripeCustomerId}))`,
+    })
     .from(schema.teams)
     .where(isNotNull(schema.teams.stripeCustomerId))
     .orderBy(asc(schema.teams.id));
   let failed = 0;
-  for (const team of teams) {
+  let skipped = 0;
+  for (const { customerId, customerMissing, ...team } of teams) {
+    if (customerMissing) {
+      skipped += 1;
+      continue;
+    }
     try {
       await deps.reconcileTeam(team.id);
       if (deps.onPlanMoved) {
@@ -1231,9 +1255,21 @@ export async function reconcileBillingPlans(
         }
       }
     } catch (err) {
+      if (isMissingStripeCustomer(err)) {
+        skipped += 1;
+        const periodKey = `${mode}${customerId}`;
+        if (
+          await claimNotification(db, { teamId: team.id, kind: STRIPE_CUSTOMER_MISSING, periodKey })
+        ) {
+          console.warn(
+            `billing.reconcile: team ${team.id} customer ${customerId} does not exist in Stripe ${deps.livemode ? "live" : "test"} mode; skipped until its customer id changes`,
+          );
+        }
+        continue;
+      }
       failed += 1;
       console.warn(`billing.reconcile: team ${team.id} failed`, err);
     }
   }
-  return { reconciled: teams.length - failed, failed };
+  return { reconciled: teams.length - failed - skipped, failed, skipped };
 }
