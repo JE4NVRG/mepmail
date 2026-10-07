@@ -358,6 +358,9 @@ export const consoleSafetyRouter = router({
         suspendedAt: team.suspendedAt,
         suspensionReason: team.suspensionReason,
         broadcastsPausedByOperatorAt: team.broadcastsPausedByOperatorAt,
+        sendReview: team.sendReviewAt
+          ? { at: team.sendReviewAt, reason: team.sendReviewReason, note: team.sendReviewNote }
+          : null,
         region: region.region,
         domains: region.domains,
         contacts,

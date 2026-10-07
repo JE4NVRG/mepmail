@@ -141,6 +141,8 @@ export function fakeStripe() {
     meterError: null as Error | null,
     /** The next pending_if_incomplete update's charge fails: Stripe keeps a pending update. */
     declinePayment: false,
+    /** Charges charges.list answers from, filtered by customer and created.gt. */
+    charges: [] as Stripe.Charge[],
     customers: [] as Stripe.CustomerCreateParams[],
     checkouts: [] as Stripe.Checkout.SessionCreateParams[],
   };
@@ -169,6 +171,15 @@ export function fakeStripe() {
     price(lookupKeyOf(id), { metered: current.recurring?.usage_type === "metered" });
   const stripe = {
     webhooks,
+    charges: {
+      async list(p: Stripe.ChargeListParams) {
+        state.calls.push("charges.list");
+        const after = typeof p.created === "object" ? (p.created.gt ?? 0) : 0;
+        return {
+          data: state.charges.filter((c) => c.customer === p.customer && c.created > after),
+        };
+      },
+    },
     prices: {
       async list(p: Stripe.PriceListParams) {
         state.calls.push("prices.list");

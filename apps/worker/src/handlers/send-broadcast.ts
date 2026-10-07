@@ -13,9 +13,11 @@ import {
   fetchDeliverabilityHealth,
   fetchTeamQuota,
   fetchTeamStanding,
+  findDisguise,
   findSuppressed,
   formatMailDate,
   formatMailDateTime,
+  holdTeamForReview,
   injectPreheader,
   isSubscribedToTopic,
   type Keyring,
@@ -35,6 +37,7 @@ import {
   regionPause,
   reserveQuota,
   roundUpToSlot,
+  screenImpersonation,
   segmentContactsWhere,
   substituteUnsubscribeUrl,
 } from "@millionsend/core";
@@ -225,10 +228,30 @@ export async function sendBroadcast(
     await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
     return "deferred";
   }
-  // An operator's pause or suspension parks the fan-out the way a region
-  // hold does; the owners heard about it when the operator acted.
+  // Pre-send protection (send-review), before a single row fans out: a
+  // disguised sender that slipped past the send endpoints, or a young team
+  // imitating a bank, a carrier or a security notice, holds the team for
+  // review, and the fan-out waits below like any other hold.
+  if (deps.isCloud) {
+    const disguise = findDisguise(broadcast);
+    if (disguise) {
+      await holdTeamForReview(db, {
+        teamId: broadcast.teamId,
+        reason: "impersonation",
+        note: `Disguised ${disguise.field === "from" ? "sender name" : "subject"}: "${disguise.sample}"`,
+      });
+    } else {
+      await screenImpersonation(db, {
+        teamId: broadcast.teamId,
+        from: broadcast.from,
+        subject: broadcast.subject,
+      });
+    }
+  }
+  // An operator's pause or suspension, or a review hold, parks the fan-out the
+  // way a region hold does; the owners heard about it when the operator acted.
   const standing = await fetchTeamStanding(db, broadcast.teamId);
-  if (standing?.suspended || standing?.broadcastsPausedByOperatorAt) {
+  if (standing?.suspended || standing?.sendReview || standing?.broadcastsPausedByOperatorAt) {
     await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
     return "deferred";
   }
@@ -410,7 +433,11 @@ export async function sendBroadcast(
       // A suspension or pause landing mid-walk stops the fan-out at the page
       // edge; the resumed walk skips the contacts already inserted.
       const standingNow = await fetchTeamStanding(db, broadcast.teamId);
-      if (standingNow?.suspended || standingNow?.broadcastsPausedByOperatorAt) {
+      if (
+        standingNow?.suspended ||
+        standingNow?.sendReview ||
+        standingNow?.broadcastsPausedByOperatorAt
+      ) {
         await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
         return "deferred";
       }

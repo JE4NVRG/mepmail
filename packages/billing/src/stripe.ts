@@ -28,6 +28,8 @@ export interface BillingStripe {
     list?: (params: Stripe.InvoiceListParams) => Promise<Stripe.ApiList<Stripe.Invoice>>;
   };
   coupons?: { retrieve(id: string, params?: Stripe.CouponRetrieveParams): Promise<Stripe.Coupon> };
+  /** Read only: the fraud screen looks for payments Stripe's Radar blocked. */
+  charges?: { list(params: Stripe.ChargeListParams): Promise<Stripe.ApiList<Stripe.Charge>> };
   subscriptionItems: {
     create(params: Stripe.SubscriptionItemCreateParams): Promise<Stripe.SubscriptionItem>;
     update(

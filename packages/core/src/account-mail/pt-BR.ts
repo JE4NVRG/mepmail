@@ -246,6 +246,14 @@ export const ptBR = {
       "Enviado ao operador da instância no máximo a cada seis horas enquanto a parcela ficar acima de 20%.",
     ],
   },
+  "review.held": {
+    subject: "Envio retido para revisão: {team}",
+    body: [
+      "O envio de {team} ficou retido antes de chegar ao SES: {note}. Os e-mails aceitos ficam guardados e nada saiu.",
+      "Abra a página de revisão para liberar o envio (os e-mails retidos saem em até 15 minutos) ou suspender a equipe (nada sai).",
+    ],
+    button: "Abrir revisão",
+  },
   "content.access_notice": {
     subject: "Um operador leu conteúdo em {team}",
     body: [

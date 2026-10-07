@@ -9,8 +9,9 @@ import { useTRPC } from "@/lib/trpc";
 
 /**
  * What the instance operator did to this team: a suspension shows on every
- * page (sends are refused), an operator pause of broadcasts only on the
- * Broadcasts pages, where it explains why nothing goes out.
+ * page (sends are refused), as does a send-review hold (mail is kept until
+ * the review ends), an operator pause of broadcasts only on the Broadcasts
+ * pages, where it explains why nothing goes out.
  */
 export function TeamStandingBanner() {
   const t = useTranslations("console.banner");
@@ -29,6 +30,14 @@ export function TeamStandingBanner() {
             ? t("suspendedNote", { note })
             : t("suspended", { reason: t(`reasons.${reason}`) })
         }
+      />
+    );
+  }
+  if (data.sendReview) {
+    return (
+      <NoticeStrip
+        tone="warn"
+        text={t("sendReview", { since: formatDayTime(data.sendReview.at, locale) })}
       />
     );
   }

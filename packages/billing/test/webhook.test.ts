@@ -319,6 +319,49 @@ describe("handleWebhook", () => {
     expect(period?.reportedOverage).toBe(500);
   });
 
+  it("holds a team's sending for review when Radar blocked one of its payments", async () => {
+    const teamId = await customerTeam();
+    const charge = (id: string, created: number, outcome: Partial<Stripe.Charge.Outcome>) =>
+      ({ id, object: "charge", customer: "cus_1", created, outcome }) as unknown as Stripe.Charge;
+    state.charges = [
+      charge("ch_ok", 1_000, { type: "authorized", risk_level: "normal" }),
+      charge("ch_blocked", 900, { type: "blocked", risk_level: "highest" }),
+    ];
+    state.subscriptions.sub_1 = subscription(
+      "sub_1",
+      "cus_1",
+      "active",
+      "millionsend_pro_100k_monthly",
+      { overageKey: "millionsend_pro_100k_overage" },
+    );
+    await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
+    const held = async () =>
+      (
+        await db
+          .select({
+            at: schema.teams.sendReviewAt,
+            reason: schema.teams.sendReviewReason,
+            note: schema.teams.sendReviewNote,
+          })
+          .from(schema.teams)
+          .where(eq(schema.teams.id, teamId))
+      )[0];
+    expect(await held()).toMatchObject({ reason: "payment_risk" });
+    expect((await held())?.note).toContain("ch_blocked");
+    expect((await team(teamId))?.plan).toBe("pro");
+
+    // An operator's release forgives the charges it saw; only a new block holds again.
+    await db
+      .update(schema.teams)
+      .set({ sendReviewAt: null, sendReviewReason: null, sendReviewClearedAt: new Date(1_000_000) })
+      .where(eq(schema.teams.id, teamId));
+    await deliver(subEvent("customer.subscription.updated", state.subscriptions.sub_1));
+    expect((await held())?.at).toBeNull();
+    state.charges.push(charge("ch_blocked_2", 2_000, { type: "blocked" }));
+    await deliver(subEvent("customer.subscription.updated", state.subscriptions.sub_1));
+    expect((await held())?.note).toContain("ch_blocked_2");
+  });
+
   it("past_due keeps the plan as a grace period; unpaid and canceled drop to free", async () => {
     const teamId = await customerTeam();
     state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "active", undefined, {

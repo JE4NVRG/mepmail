@@ -8,6 +8,7 @@ import { isMailboxSubscription, type MailboxCatalog } from "./mailbox.js";
 import { applyMailboxSubscription } from "./mailbox-lifecycle.js";
 import { recordMetaPurchase } from "./meta-advertising.js";
 import type { MetaConversionConfig } from "./meta-conversions.js";
+import { screenPaymentRisk } from "./payment-risk.js";
 import { SUBSCRIPTION_EXPAND } from "./prices.js";
 import { applySubscription, idOf, lockCustomer } from "./subscription.js";
 
@@ -145,6 +146,13 @@ export async function handleWebhook(
         deps.stripe,
       );
     const customerId = idOf(sub.customer);
+    // Send subscriptions only: the fraud screen holds the team's sending for
+    // review when Radar blocked one of its payments (payment-risk).
+    if (!mail && customerId) {
+      await screenPaymentRisk(tx as unknown as Db, deps.stripe, customerId, (m) =>
+        log(`stripe webhook ${event.id}: ${m}`),
+      );
+    }
     const [sendTeam] =
       customerId && !mail && !projected?.applied
         ? await tx

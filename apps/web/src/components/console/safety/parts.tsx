@@ -9,7 +9,14 @@ import { formatRisk, riskColor } from "@/lib/monitor-settings";
 import { formatScoreTenths } from "@/lib/score-band";
 
 export type Guardrail = "ok" | "warning" | "paused";
-export type FlagReason = "monitor" | "complaints" | "guardrail" | "score" | "report" | "manual";
+export type FlagReason =
+  | "monitor"
+  | "complaints"
+  | "guardrail"
+  | "score"
+  | "report"
+  | "manual"
+  | "review";
 
 const PAID = ["starter", "pro", "scale"];
 const PLAN_KEYS = ["free", "starter", "pro", "scale", "system"];

@@ -478,6 +478,8 @@
       "team_broadcasts_resumed": "Retomou transmissões",
       "team_suspended": "Suspendeu a equipe",
       "team_reinstated": "Reativou a equipe",
+      "team_send_review_held": "Envio retido para revisão",
+      "team_send_review_released": "Liberou o envio após revisão",
       "console_flag_opened": "Sinalizou a equipe",
       "console_flag_cleared": "Limpou a sinalização",
       "console_flag_reopened": "Reabriu a sinalização",

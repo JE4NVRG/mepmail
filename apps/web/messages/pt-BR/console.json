@@ -602,7 +602,8 @@
       "guardrail": "Guardrail",
       "score": "Score",
       "report": "Denúncia",
-      "manual": "Manual"
+      "manual": "Manual",
+      "review": "Revisão de envio"
     },
     "reasonTip": {
       "monitor": "O monitor de conteúdo: conteúdo amostrado julgado pelo modelo levou o risco interno acima da linha de sinalização.",
@@ -610,7 +611,8 @@
       "guardrail": "O guardrail de entregabilidade virou alerta ou pausou a equipe pelas taxas de bounce ou reclamação.",
       "score": "O score da conta caiu abaixo de 5 em 10.",
       "report": "Um provedor de e-mail ou um destinatário denunciou abuso.",
-      "manual": "Um operador sinalizou a equipe à mão."
+      "manual": "Um operador sinalizou a equipe à mão.",
+      "review": "Envio retido antes do SES: conta nova imitando banco, operadora ou segurança da conta, ou pagamento bloqueado pelo antifraude da Stripe."
     },
     "reasonLabel": {
       "complaint": "Reclamações {rate} · 7d",
@@ -620,6 +622,7 @@
       "score": "Score {score} / 10",
       "manual": "Sinalizada pelo operador",
       "report": "Denúncia de abuso",
+      "review": "Envio retido para revisão",
       "monitor": "Risco {risk} · {samples, plural, one {# amostra} other {# amostras}}"
     },
     "columns": {
@@ -664,7 +667,16 @@
         "guardrailOk": "Guardrail ok",
         "operatorPaused": "Transmissões pausadas pelo operador",
         "flagOpen": "Sinalização aberta",
-        "flagCleared": "Sinalização limpa"
+        "flagCleared": "Sinalização limpa",
+        "sendReview": "Envio retido para revisão"
+      },
+      "sendReview": {
+        "title": "Envio retido para revisão",
+        "impersonation": "Conta nova com remetente ou assunto imitando banco, operadora ou segurança da conta.",
+        "payment_risk": "O antifraude da Stripe bloqueou um pagamento desta conta.",
+        "body": "Os e-mails aceitos ficam guardados e nada sai para o SES. Liberar o envio solta os retidos em até 15 minutos; suspender a equipe mantém tudo retido.",
+        "release": "Liberar envio",
+        "released": "{team} · envio liberado"
       },
       "tiles": {
         "score": "Score",
@@ -979,6 +991,7 @@
       "phishing": "abuso",
       "non_payment": "inadimplência"
     },
-    "broadcastsPendingReview": "As transmissões desta equipe estão pausadas aguardando revisão desde {since}. E-mails transacionais não são afetados."
+    "broadcastsPendingReview": "As transmissões desta equipe estão pausadas aguardando revisão desde {since}. E-mails transacionais não são afetados.",
+    "sendReview": "Os envios desta equipe estão em revisão de segurança desde {since}. Os e-mails aceitos ficam guardados e saem assim que a revisão terminar; nada é perdido. Dúvidas: responda ao e-mail de boas-vindas ou fale com o suporte."
   }
 }

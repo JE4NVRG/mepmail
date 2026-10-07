@@ -7,6 +7,7 @@ import type { Keyring } from "./crypto/keyring.js";
 import { emitFunnelEvent, type FunnelEventTarget, teamFunnelProps } from "./funnel-events.js";
 import { attachmentLimit, type QuotaTeamRow, type TeamQuota, teamQuota } from "./plans.js";
 import { reserveQuota } from "./quota.js";
+import { findDisguise, screenImpersonation } from "./send-review.js";
 import { parseSingleSender } from "./sender-address.js";
 import { extractAddrSpec, findSuppressed, normalizeAddress } from "./suppressions.js";
 import { findTopicOptOuts } from "./topics.js";
@@ -225,6 +226,8 @@ export type AcceptEmailResult =
       quota: TeamQuota;
     }
   | { ok: false; reason: "all_suppressed" }
+  /** Look-alike letters or hidden characters in the sender name or subject (send-review). */
+  | { ok: false; reason: "disguised_sender"; field: "from" | "subject"; sample: string }
   | { ok: false; reason: "attachments_too_large"; maxBytes: number }
   | { ok: false; reason: "quota_backlog_full" }
   /**
@@ -274,6 +277,21 @@ export async function acceptEmail(
   const attachmentCeiling = teamAttachmentLimit(auth.billing, deps.isCloud);
   if (estimateAttachmentBytes(payload.attachments ?? []) > attachmentCeiling) {
     return { ok: false, reason: "attachments_too_large", maxBytes: attachmentCeiling };
+  }
+
+  // Pre-send protection (send-review), on the cloud: a disguised sender name
+  // or subject is refused, and a young team imitating a bank, a carrier or an
+  // account-security notice is held for review, its mail parked at send time
+  // until an operator releases it. The instance's own mail and the shared
+  // onboarding sender carry the platform's words and are not screened.
+  if (deps.isCloud && auth.billing !== "uncapped" && payload.domainId !== null) {
+    const disguise = findDisguise({ from: payload.from, subject: payload.subject });
+    if (disguise) return { ok: false, reason: "disguised_sender", ...disguise };
+    await screenImpersonation(opts.tx ?? deps.db, {
+      teamId: auth.teamId,
+      from: payload.from,
+      subject: payload.subject,
+    });
   }
 
   // Suppression: dedupe, check every recipient field, and strip suppressed

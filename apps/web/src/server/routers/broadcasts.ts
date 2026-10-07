@@ -4,10 +4,12 @@ import {
   applyMergeFields,
   cancelBroadcastRows,
   DAY_MS,
+  disguiseMessage,
   emailInsightsView,
   fetchBroadcastInsights,
   fetchDeliverabilityHealth,
   fetchTeamStanding,
+  findDisguise,
   injectPreheader,
   type MergeContact,
   PAUSE_BOUNCE_RATE,
@@ -542,6 +544,11 @@ export const broadcastsRouter = router({
               ? "From must be a single address."
               : `The ${sender.fromDomain} domain is not verified for this team.`,
         });
+      }
+      // Same pre-send protection as the API: a disguised sender never fans out.
+      const disguise = isCloudDeployment() ? findDisguise(row) : null;
+      if (disguise) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: disguiseMessage(disguise) });
       }
       // Deliverability pause is enforced here, before anything is committed or
       // enqueued: a paused account must not schedule a new fan-out. "warning"

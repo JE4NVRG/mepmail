@@ -64,11 +64,19 @@ export const teamBootstrapRouter = router({
       .from(schema.teamMonitor)
       .where(eq(schema.teamMonitor.teamId, ctx.teamId));
     const pendingReview = Boolean(standing.broadcastsPausedByOperatorAt && monitor?.pausedAt);
+    // A send-review hold reads as "under review" too; what tripped it stays
+    // on the operator's side.
+    const sendReview = standing.sendReview ? { at: standing.sendReview.at } : null;
     // The note is written for the owner only on a manual suspension; on the
     // other reasons it is the operator's own record.
     return standing.suspended && standing.suspended.reason !== "manual"
-      ? { ...standing, pendingReview, suspended: { ...standing.suspended, note: null } }
-      : { ...standing, pendingReview };
+      ? {
+          ...standing,
+          sendReview,
+          pendingReview,
+          suspended: { ...standing.suspended, note: null },
+        }
+      : { ...standing, sendReview, pendingReview };
   }),
 
   /** The operator's read-only look at the active team, for the owner's Support access card. */

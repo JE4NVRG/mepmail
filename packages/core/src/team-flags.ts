@@ -204,8 +204,9 @@ export function flagTrigger(s: TeamStandingRow, opts: FlagTriggerOptions = {}): 
  * trigger that lapsed and came back is a new finding, judged against the
  * previous run's standings, so `previous` must be the rows saved before this
  * run's); an open automatic flag whose trigger is gone is cleared; an
- * operator's manual flag is never touched. `opened_at` of an open flag is
- * left alone so the list's "since" holds still.
+ * operator's manual flag is never touched, nor a send-review flag (its hold
+ * lives on the team and only an operator's release ends it). `opened_at` of
+ * an open flag is left alone so the list's "since" holds still.
  */
 export async function syncTeamFlags(
   db: Db,
@@ -235,7 +236,11 @@ export async function syncTeamFlags(
   for (const [teamId, trigger] of triggered) {
     const current = openByTeam.get(teamId);
     if (current) {
-      if (current.openedBy === null && current.reason !== trigger.reason) {
+      if (
+        current.openedBy === null &&
+        current.reason !== "review" &&
+        current.reason !== trigger.reason
+      ) {
         await db
           .update(f)
           .set({ reason: trigger.reason, detail: trigger.detail })
@@ -260,7 +265,9 @@ export async function syncTeamFlags(
     });
     opened += 1;
   }
-  const stale = open.filter((row) => row.openedBy === null && !triggered.has(row.teamId));
+  const stale = open.filter(
+    (row) => row.openedBy === null && row.reason !== "review" && !triggered.has(row.teamId),
+  );
   if (stale.length > 0) {
     await db
       .update(f)

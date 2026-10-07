@@ -68,6 +68,7 @@ export function ReviewView({ teamId }: { teamId: string }) {
   const setOverride = useMutation(trpc.console.monitor.setOverride.mutationOptions());
   const clearOverride = useMutation(trpc.console.monitor.clearOverride.mutationOptions());
   const resumeMonitor = useMutation(trpc.console.monitor.resumeBroadcasts.mutationOptions());
+  const releaseReview = useMutation(trpc.console.teams.releaseSendReview.mutationOptions());
   const monitorT = useTranslations("console.safety.review.monitor");
   const tiers = useTranslations("console.safety.tiers");
 
@@ -191,6 +192,9 @@ export function ReviewView({ teamId }: { teamId: string }) {
         actions={
           <>
             <span className={`ms-badge ms-badge-${standingBadge[0]}`}>{standingBadge[1]}</span>
+            {team.sendReview ? (
+              <span className="ms-badge ms-badge-warn">{t("badges.sendReview")}</span>
+            ) : null}
             {team.broadcastsPausedByOperatorAt ? (
               <span className="ms-badge ms-badge-warn">{t("badges.operatorPaused")}</span>
             ) : null}
@@ -254,6 +258,53 @@ export function ReviewView({ teamId }: { teamId: string }) {
           </>
         }
       />
+
+      {team.sendReview ? (
+        <div
+          className="ms-card"
+          style={{
+            padding: 20,
+            marginBottom: 16,
+            display: "flex",
+            gap: 16,
+            alignItems: "flex-start",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <CardHead
+              flush
+              title={t("sendReview.title")}
+              subtitle={`${team.sendReview.reason ? t(`sendReview.${team.sendReview.reason}`) : ""} ${formatRelative(team.sendReview.at, locale)}`}
+            />
+            {team.sendReview.note ? (
+              <p style={{ margin: "8px 0 0", fontSize: 13 }}>{team.sendReview.note}</p>
+            ) : null}
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+              {t("sendReview.body")}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="ms-btn ms-btn-primary"
+            disabled={releaseReview.isPending || !!team.suspendedAt}
+            onClick={() =>
+              releaseReview.mutate(
+                { id: team.id },
+                {
+                  onSuccess: () => {
+                    toast(t("sendReview.released", { team: team.name }));
+                    refetch();
+                  },
+                },
+              )
+            }
+          >
+            <BtnSpinner on={releaseReview.isPending} />
+            {t("sendReview.release")}
+          </button>
+        </div>
+      ) : null}
 
       <div className="ms-grid ms-grid-6" style={{ marginBottom: 16 }}>
         <Tile

@@ -330,6 +330,13 @@
       "when": 1791264272527,
       "tag": "0046_send_billing_terms",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1791345600000,
+      "tag": "0047_send_review",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@ import {
   type ApiKeyAuth,
   acceptEmail,
   authenticateApiKey,
+  disguiseMessage,
   formatMailbox,
   isTeamSuspended,
   OVERAGE_HARD_CAP,
@@ -159,6 +160,7 @@ async function handleMessage(
       );
     }
     if (result.reason === "attachments_too_large") throw smtpError(552, "Attachments too large");
+    if (result.reason === "disguised_sender") throw smtpError(554, disguiseMessage(result));
     throw smtpError(550, "All recipients are suppressed");
   }
   return `Queued as ${result.id}`;

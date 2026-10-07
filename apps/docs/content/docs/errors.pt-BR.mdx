@@ -37,7 +37,7 @@ API.
 | `invalid_idempotent_request` | 409 | A `Idempotency-Key` já foi usada com um payload diferente | Terminal — envie o novo payload com uma chave nova, ou reenvie o corpo original com a chave original |
 | `concurrent_idempotent_requests` | 409 | Já existe uma requisição em andamento com a mesma chave de idempotência | Aguarde e repita com a mesma chave |
 | `payload_too_large` | 413 | O corpo da requisição passa do teto de 25 MiB da implantação — anexos viajam no corpo (base64), então contam aqui | Reduza a mensagem, ou envie o arquivo como link |
-| `validation_error` | 422 | O payload falhou na validação de esquema — ou um envio foi recusado por uma regra que nenhum campo indica: domínio `from` não verificado, `from` que não é um único endereço, o remetente de onboarding alcançando fora do time, um item de lote suprimido, anexos acima do teto do plano (1 MB no Free e Starter, 5 MB no Pro, 10 MB no Scale) | Leia o `message`; corrija o que ele indicar |
+| `validation_error` | 422 | O payload falhou na validação de esquema — ou um envio foi recusado por uma regra que nenhum campo indica: domínio `from` não verificado, `from` que não é um único endereço, o remetente de onboarding alcançando fora do time, um item de lote suprimido, anexos acima do teto do plano (1 MB no Free e Starter, 5 MB no Pro, 10 MB no Scale), nome do remetente ou assunto [disfarçado com letras parecidas](#pausas-e-bloqueios-de-envio) | Leia o `message`; corrija o que ele indicar |
 | `all_recipients_suppressed` | 422 | Todos os destinatários estão na lista de supressão | Confira as supressões antes de reenviar |
 | `broadcast_too_large` | 422 | A audiência precisa de mais capacidade de envio do que o horizonte da implantação permite (mais de 24 dias) | Divida em segmentos menores ou peça mais capacidade ao operador |
 | `rate_limit_exceeded` | 429 | Requisições demais em pouco tempo | Faça backoff exponencial — veja [limites de taxa](/pt-BR/rate-limits) |
@@ -63,6 +63,21 @@ são `403` e determinísticas — nenhum laço de retentativa as resolve:
   **E-mail transacional não é afetado**, e a pausa se resolve sozinha.
 - **`team_suspended`** — o operador da instância suspendeu o time. Nada é
   enviado até a reinstalação; só o operador pode liberar.
+
+Duas proteções rodam antes de o e-mail chegar ao SES, no MepMail Cloud:
+
+- **Remetente disfarçado é recusado** com `422 validation_error`: nome do
+  remetente ou assunto que mistura letras parecidas de alfabetos diferentes na
+  mesma palavra (um `а` cirílico dentro de uma palavra latina), escreve uma
+  palavra inteira com letras parecidas ao lado de palavras latinas, ou esconde
+  caracteres invisíveis ou de inversão de direção. Escreva num alfabeto só e
+  envie de novo.
+- **A revisão guarda o e-mail em vez de enviá-lo.** Um time nos primeiros 30
+  dias cujo nome do remetente ou assunto imita banco, operadora, fisco ou aviso
+  de segurança da conta, ou cujo pagamento foi bloqueado pelo antifraude da
+  Stripe, fica retido para uma revisão rápida. A API continua respondendo
+  `200` com o id do e-mail; o e-mail espera como `queued` e sai quando a
+  revisão termina, e o painel mostra a retenção. Nada se perde.
 
 ## Repetir requisições
 

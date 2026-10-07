@@ -435,10 +435,12 @@ await queue.scheduleCrons({
     // With the judge off a stored risk opens nothing: the line is unreachable.
     const result = await runSafetyFlags(db, {
       monitorFlagRisk: judge ? (await monitorSettings()).flagRisk : Number.POSITIVE_INFINITY,
+      mailer,
+      appBaseUrl: env.APP_BASE_URL,
     });
-    if (result.opened > 0 || result.cleared > 0) {
+    if (result.opened > 0 || result.cleared > 0 || result.reviews > 0) {
       console.log(
-        `safety.flags: teams=${result.teams} opened=${result.opened} cleared=${result.cleared}`,
+        `safety.flags: teams=${result.teams} opened=${result.opened} cleared=${result.cleared} reviews=${result.reviews}`,
       );
     }
   },

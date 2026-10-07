@@ -589,6 +589,23 @@ export {
   verifiedSendBillingContract,
 } from "./send-billing-contract.js";
 export { type SendOverageTerms, verifiedSendOverageTerms } from "./send-overage-terms.js";
+export {
+  type DisguiseFinding,
+  disguisedWord,
+  disguiseMessage,
+  findDisguise,
+  findImpersonation,
+  foldText,
+  holdTeamForReview,
+  type ImpersonationFinding,
+  impersonationNote,
+  markSendReviewNotified,
+  SEND_REVIEW_NEW_TEAM_DAYS,
+  type SendReviewReason,
+  screenImpersonation,
+  senderName,
+  unnotifiedSendReviews,
+} from "./send-review.js";
 export { formatMailbox, type Mailbox, parseMailbox, parseSingleSender } from "./sender-address.js";
 export {
   type BroadcastEstimate,

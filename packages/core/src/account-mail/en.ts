@@ -246,6 +246,14 @@ export const en = {
       "Sent to the instance operator at most once every six hours while the share stays over 20%.",
     ],
   },
+  "review.held": {
+    subject: "Sending held for review: {team}",
+    body: [
+      "Mail from {team} is held before it reaches SES: {note}. Accepted mail is kept and nothing has gone out.",
+      "Open the review page to release sending (the held mail drains within 15 minutes) or suspend the team (it never leaves).",
+    ],
+    button: "Open review",
+  },
   "content.access_notice": {
     subject: "An operator read content in {team}",
     body: [

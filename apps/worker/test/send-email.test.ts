@@ -1458,6 +1458,20 @@ it("parks a suspended team's mail before SES, and a paused team's broadcast rows
   await hold({ broadcastsPausedByOperatorAt: null });
 });
 
+it("parks a team's mail before SES while it is held for review", async () => {
+  const { ses, sends } = fakeSes("review-hold");
+  const hold = (patch: Partial<typeof schema.teams.$inferInsert>) =>
+    db.update(schema.teams).set(patch).where(eq(schema.teams.id, teamId));
+  await hold({ sendReviewAt: new Date(), sendReviewReason: "impersonation" });
+  const emailId = await insertEmail();
+  expect(await sendEmail(db, { keyring, ses }, { emailId })).toBe("parked");
+  const [row] = await db.select().from(schema.emails).where(eq(schema.emails.id, emailId));
+  expect(row?.latestStatus).toBe("queued_quota");
+  expect(sends).toHaveLength(0);
+  await hold({ sendReviewAt: null, sendReviewReason: null });
+  expect(await sendEmail(db, { keyring, ses }, { emailId: await insertEmail() })).toBe("sent");
+});
+
 it("a broadcast row parks on the bulk share or a held region; a transactional row only at the total, which the probe hears", async () => {
   const { ses, sends } = fakeSes("mid-share");
   const [bc] = await db

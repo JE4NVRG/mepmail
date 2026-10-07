@@ -417,9 +417,23 @@ export async function sendEmail(
   // already carries: parked like an over-quota send, and the drain skips the
   // team until the operator lifts the hold. Read per send, so it bites on the
   // next row, not the next fan-out.
+  // A send-review hold (send-review) parks the same way: the mail waits for
+  // the operator's release, and a suspension keeps it.
   const standing = await fetchTeamStanding(db, email.teamId);
-  if (standing?.suspended || (email.broadcastId && standing?.broadcastsPausedByOperatorAt)) {
-    await parkQueued(db, email, standing.suspended ? "team suspended" : "broadcasts paused");
+  if (
+    standing?.suspended ||
+    standing?.sendReview ||
+    (email.broadcastId && standing?.broadcastsPausedByOperatorAt)
+  ) {
+    await parkQueued(
+      db,
+      email,
+      standing.suspended
+        ? "team suspended"
+        : standing.sendReview
+          ? "team held for review"
+          : "broadcasts paused",
+    );
     return "parked";
   }
 

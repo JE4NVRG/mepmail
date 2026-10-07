@@ -71,6 +71,7 @@ export {
   readMetaConversionConfig,
 } from "./meta-conversions.js";
 export { type OverageReport, reportOverage } from "./overage.js";
+export { screenPaymentRisk } from "./payment-risk.js";
 export {
   METER_EVENT_NAME,
   overageLookupKey,

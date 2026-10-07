@@ -46,6 +46,9 @@ export const suspensionReasonEnum = pgEnum("suspension_reason", [
   "non_payment",
 ]);
 
+/** Why sending is held until an operator reviews the team. */
+export const sendReviewReasonEnum = pgEnum("send_review_reason", ["impersonation", "payment_risk"]);
+
 export interface BillingTerms {
   version: 1;
   teamId: string;
@@ -156,6 +159,20 @@ export const teams = pgTable(
     suspendedAt: timestamp("suspended_at", { withTimezone: true }),
     suspensionReason: suspensionReasonEnum("suspension_reason"),
     suspensionNote: text("suspension_note"),
+    // While set, accepted mail parks instead of sending until an operator
+    // releases it: a young team whose sender or subject imitates a bank, a
+    // carrier or an account-security notice, or whose card Stripe's fraud
+    // screening blocked. Nothing is lost; a release drains it, a suspension
+    // keeps it.
+    sendReviewAt: timestamp("send_review_at", { withTimezone: true }),
+    sendReviewReason: sendReviewReasonEnum("send_review_reason"),
+    sendReviewNote: text("send_review_note"),
+    // The operator heard about the current hold (once per hold).
+    sendReviewNotifiedAt: timestamp("send_review_notified_at", { withTimezone: true }),
+    // An operator released a hold: the impersonation screen stops holding
+    // this team (a payment block still does).
+    sendReviewClearedAt: timestamp("send_review_cleared_at", { withTimezone: true }),
+    sendReviewClearedBy: text("send_review_cleared_by"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

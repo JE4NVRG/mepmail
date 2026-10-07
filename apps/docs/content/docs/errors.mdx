@@ -36,7 +36,7 @@ its own protocol status — the names are the API's.
 | `invalid_idempotent_request` | 409 | The `Idempotency-Key` was already used with a different payload | Terminal — send the new payload under a new key, or resend the original body with the original key |
 | `concurrent_idempotent_requests` | 409 | A request with the same idempotency key is still in flight | Wait, then retry with the same key |
 | `payload_too_large` | 413 | The request body exceeds the deployment's 25 MiB ceiling — attachments travel inline (base64), so they are part of the body | Shrink the message, or send the file as a link instead |
-| `validation_error` | 422 | The payload failed schema validation — or a send was refused by a rule no field names: an unverified `from` domain, a `from` that is not a single address, the onboarding sender reaching outside the team, a suppressed batch item, attachments over the plan's ceiling (1 MB on Free and Starter, 5 MB on Pro, 10 MB on Scale) | Read `message`; fix what it names |
+| `validation_error` | 422 | The payload failed schema validation — or a send was refused by a rule no field names: an unverified `from` domain, a `from` that is not a single address, the onboarding sender reaching outside the team, a suppressed batch item, attachments over the plan's ceiling (1 MB on Free and Starter, 5 MB on Pro, 10 MB on Scale), a sender name or subject [disguised with look-alike letters](#sending-pauses-and-holds) | Read `message`; fix what it names |
 | `all_recipients_suppressed` | 422 | Every recipient is on the suppression list | Check suppressions before resending |
 | `broadcast_too_large` | 422 | The audience needs more sending capacity than the deployment's horizon allows (over 24 days) | Split it into smaller segments, or ask the operator for more capacity |
 | `rate_limit_exceeded` | 429 | Too many requests in a short window | Back off with exponential delay — see [rate limits](/rate-limits) |
@@ -62,6 +62,20 @@ Three refusals mean "not now, and not because of your request". All three are
   **Transactional email is unaffected**, and it clears on its own.
 - **`team_suspended`** — the instance operator suspended the team. Nothing
   sends until it is reinstated; only the operator can lift it.
+
+Two protections run before mail reaches SES, on MepMail Cloud:
+
+- **A disguised sender is refused** with `422 validation_error`: a sender
+  name or subject that mixes look-alike letters from different alphabets in
+  one word (a Cyrillic `а` inside a Latin word), spells a word wholly in
+  look-alike letters beside Latin ones, or hides invisible or
+  direction-override characters. Write it in one alphabet and send again.
+- **A review hold keeps mail instead of sending it.** A team in its first 30
+  days whose sender name or subject reads as a bank, a carrier, a tax office
+  or an account-security notice, or whose payment was blocked by Stripe's
+  fraud screening, is held for a short review. The API still answers `200`
+  with the email id; the mail waits as `queued` and goes out when the review
+  ends, and the dashboard shows the hold. Nothing is lost.
 
 ## Retrying
 

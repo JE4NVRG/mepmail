@@ -21,6 +21,8 @@ export const teamFlagReasonEnum = pgEnum("team_flag_reason", [
   "score",
   "report",
   "manual",
+  // Sending held for review (teams.send_review_at); never opened or cleared by the cron.
+  "review",
 ]);
 
 export const teamFlagStatusEnum = pgEnum("team_flag_status", ["open", "cleared"]);

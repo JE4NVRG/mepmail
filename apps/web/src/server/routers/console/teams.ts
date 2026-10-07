@@ -576,4 +576,45 @@ export const consoleTeamsRouter = router({
       }
       await kickQuotaDrain();
     }),
+
+  /**
+   * Ends a send-review hold: the parked mail drains, and the impersonation
+   * screen leaves the team alone from now on (a new payment block still
+   * holds it). Suspending instead keeps the mail parked.
+   */
+  releaseSendReview: operatorProcedure
+    .input(z.object({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const team = await loadTeam(ctx.db, input.id);
+      if (!team.sendReviewAt) return;
+      const now = new Date();
+      await ctx.db
+        .update(t)
+        .set({
+          sendReviewAt: null,
+          sendReviewReason: null,
+          sendReviewNote: null,
+          sendReviewNotifiedAt: null,
+          sendReviewClearedAt: now,
+          sendReviewClearedBy: ctx.operator.id,
+        })
+        .where(eq(t.id, team.id));
+      await ctx.db
+        .update(schema.teamFlags)
+        .set({ status: "cleared", clearedAt: now, clearedBy: ctx.operator.id })
+        .where(
+          and(
+            eq(schema.teamFlags.teamId, team.id),
+            eq(schema.teamFlags.status, "open"),
+            eq(schema.teamFlags.reason, "review"),
+          ),
+        );
+      await auditOperator(ctx, {
+        teamId: team.id,
+        action: "team.send_review_released",
+        target: { type: "team", id: team.id },
+        metadata: { name: team.name, reason: team.sendReviewReason },
+      });
+      await kickQuotaDrain();
+    }),
 });

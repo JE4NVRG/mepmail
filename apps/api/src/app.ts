@@ -23,6 +23,7 @@ import {
   contactSnapshotColumns,
   DAY_MS,
   decryptEmailBody,
+  disguiseMessage,
   emitContactEvents,
   emitSuppressionEvents,
   eraseRecipient,
@@ -34,6 +35,7 @@ import {
   fetchEmailInsights,
   fetchTeamQuota,
   fetchTeamStanding,
+  findDisguise,
   findSuppressed,
   findTopicOptOuts,
   isTeamSuspended,
@@ -362,6 +364,11 @@ function acceptRejection(result: Exclude<AcceptEmailResult, { ok: true }>) {
       return {
         status: 422 as const,
         body: errorBody(422, "all_recipients_suppressed", "All recipients are suppressed"),
+      };
+    case "disguised_sender":
+      return {
+        status: 422 as const,
+        body: errorBody(422, "validation_error", disguiseMessage(result)),
       };
   }
 }
@@ -2658,7 +2665,13 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
   type SendBody = z.infer<typeof sendBroadcastResponseSchema>;
   const initiateSend = async (
     auth: ApiKeyAuth,
-    broadcast: { id: string; from: string; segmentId: string | null; topicId: string | null },
+    broadcast: {
+      id: string;
+      from: string;
+      subject: string;
+      segmentId: string | null;
+      topicId: string | null;
+    },
     scheduledAtInput: string | undefined,
   ): Promise<
     | { ok: true; id: string; body: SendBody }
@@ -2697,6 +2710,9 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
     if (keyForbidsSendingDomain(auth, domain.domainId)) {
       return fail(403, "restricted_api_key", RESTRICTED_DOMAIN_MESSAGE);
     }
+    // Same pre-send protection as /emails: a disguised sender never fans out.
+    const disguise = deps.isCloud ? findDisguise(broadcast) : null;
+    if (disguise) return fail(422, "validation_error", disguiseMessage(disguise));
     // Platform breaker: the account-wide rate in this SES region is near
     // SES's review line, so broadcasts wait; /emails is deliberately not
     // gated by it.
@@ -2931,6 +2947,7 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
           {
             id: row.id,
             from: body.from,
+            subject: body.subject,
             segmentId: body.segment_id ?? null,
             topicId: body.topic_id ?? null,
           },
@@ -3733,6 +3750,12 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
     }
     if (keyForbidsSendingDomain(auth, domain.domainId)) {
       return { status: 403, name: "restricted_api_key", message: RESTRICTED_DOMAIN_MESSAGE };
+    }
+    // The accept pipeline refuses a disguised sender too; checked here so the
+    // item fails at validation instead of aborting the batch transaction.
+    const disguise = deps.isCloud ? findDisguise({ from: body.from, subject: body.subject }) : null;
+    if (disguise) {
+      return { status: 422, name: "validation_error", message: disguiseMessage(disguise) };
     }
     if (estimateAttachmentBytes(body.attachments ?? []) > MAX_ATTACHMENT_BYTES) {
       const { body: rejected } = acceptRejection({

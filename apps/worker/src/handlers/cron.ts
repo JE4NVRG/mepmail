@@ -351,9 +351,10 @@ async function releaseParkedRows(
         and(
           eq(schema.emails.latestStatus, "queued_quota"),
           opts.where,
-          // The operator's holds: a suspended team releases nothing, a paused
-          // team releases only its transactional rows.
+          // The operator's holds: a suspended team, or one held for review,
+          // releases nothing; a paused team releases only its transactional rows.
           isNull(schema.teams.suspendedAt),
+          isNull(schema.teams.sendReviewAt),
           or(isNull(schema.emails.broadcastId), isNull(schema.teams.broadcastsPausedByOperatorAt)),
           run.exhaustedTeams.size > 0
             ? notInArray(schema.emails.teamId, [...run.exhaustedTeams])

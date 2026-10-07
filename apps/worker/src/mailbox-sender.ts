@@ -158,6 +158,7 @@ export function createMailboxSesSender(
           configurationSet: schema.domains.sesConfigurationSet,
           address: schema.mailboxes.address,
           suspendedAt: schema.teams.suspendedAt,
+          sendReviewAt: schema.teams.sendReviewAt,
           tenantName: schema.teams.sesTenantName,
           tenantAssociatedAt: schema.domains.sesTenantAssociatedAt,
           tenantConfigSet: schema.domains.sesTenantConfigSet,
@@ -181,6 +182,9 @@ export function createMailboxSesSender(
         domain.address !== input.from
       )
         throw new MailboxSendRejectedError();
+      // A send-review hold keeps the message for the operator's release, as
+      // it keeps the team's API mail.
+      if (domain.sendReviewAt) throw new MailboxSendDeferredError();
       const configurationSet = configurationSets[domain.region];
       if (!configurationSet) throw new MailboxSendDeferredError();
       // Campaign configuration can enable SES Open/Click body rewriting. Mail

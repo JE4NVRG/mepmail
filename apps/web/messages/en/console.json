@@ -602,7 +602,8 @@
       "guardrail": "Guardrail",
       "score": "Score",
       "report": "Report",
-      "manual": "Manual"
+      "manual": "Manual",
+      "review": "Send review"
     },
     "reasonTip": {
       "monitor": "The content monitor: sampled content judged by the model pushed the internal risk over the flag line.",
@@ -610,7 +611,8 @@
       "guardrail": "The deliverability guardrail turned warning or paused the team on its bounce or complaint rates.",
       "score": "The account score dropped under 5 out of 10.",
       "report": "A mailbox provider or a recipient reported abuse.",
-      "manual": "An operator flagged the team by hand."
+      "manual": "An operator flagged the team by hand.",
+      "review": "Sending held before SES: a young team imitating a bank, a carrier or an account-security notice, or a payment Stripe's fraud screening blocked."
     },
     "reasonLabel": {
       "complaint": "Complaints {rate} · 7d",
@@ -620,6 +622,7 @@
       "score": "Score {score} / 10",
       "manual": "Flagged by operator",
       "report": "Abuse report",
+      "review": "Sending held for review",
       "monitor": "Risk {risk} · {samples, plural, one {# sample} other {# samples}}"
     },
     "columns": {
@@ -664,7 +667,16 @@
         "guardrailOk": "Guardrail ok",
         "operatorPaused": "Broadcasts paused by operator",
         "flagOpen": "Flag open",
-        "flagCleared": "Flag cleared"
+        "flagCleared": "Flag cleared",
+        "sendReview": "Sending held for review"
+      },
+      "sendReview": {
+        "title": "Sending held for review",
+        "impersonation": "A young team whose sender or subject imitates a bank, a carrier or an account-security notice.",
+        "payment_risk": "Stripe's fraud screening blocked a payment from this team.",
+        "body": "Accepted mail is kept and nothing reaches SES. Releasing sending lets the held mail out within 15 minutes; suspending the team keeps it all held.",
+        "release": "Release sending",
+        "released": "{team} · sending released"
       },
       "tiles": {
         "score": "Score",
@@ -979,6 +991,7 @@
       "phishing": "abuse",
       "non_payment": "non-payment"
     },
-    "broadcastsPendingReview": "Broadcasts are paused for this team pending review since {since}. Transactional email is unaffected."
+    "broadcastsPendingReview": "Broadcasts are paused for this team pending review since {since}. Transactional email is unaffected.",
+    "sendReview": "Sending for this team is under a security review since {since}. Accepted mail is kept and goes out as soon as the review ends; nothing is lost. Questions: reply to the welcome email or contact support."
   }
 }

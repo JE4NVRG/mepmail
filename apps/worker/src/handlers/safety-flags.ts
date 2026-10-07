@@ -1,13 +1,17 @@
 import {
   computeTeamStandings,
+  markSendReviewNotified,
   pruneTeamStandings,
+  recordAudit,
   recordProbes,
   saveTeamStandings,
   syncTeamFlags,
+  unnotifiedSendReviews,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { eq, sql } from "drizzle-orm";
+import { mailOperator, type SystemMailer } from "../system-mail.js";
 
 /**
  * Refresh every active team's standing (score, guardrail, 7-day rates) and
@@ -17,8 +21,13 @@ import { eq, sql } from "drizzle-orm";
  */
 export async function runSafetyFlags(
   db: Db,
-  opts: { now?: Date; monitorFlagRisk?: number | undefined } = {},
-): Promise<{ teams: number; opened: number; cleared: number }> {
+  opts: {
+    now?: Date;
+    monitorFlagRisk?: number | undefined;
+    mailer?: SystemMailer | undefined;
+    appBaseUrl?: string | undefined;
+  } = {},
+): Promise<{ teams: number; opened: number; cleared: number; reviews: number }> {
   const now = opts.now ?? new Date();
   const previous = await db.select().from(schema.teamStandings);
   const standings = await computeTeamStandings(db, now);
@@ -36,5 +45,43 @@ export async function runSafetyFlags(
   } catch (err) {
     console.warn("safety.flags: contacts_unsubscribed probe failed", err);
   }
-  return { teams: standings.length, ...flags };
+  const reviews = await notifySendReviews(db, { ...opts, now });
+  return { teams: standings.length, ...flags, reviews };
+}
+
+/**
+ * Tell the operator about every new send-review hold, once per hold: the
+ * audit row and the notice are written here, after the hold committed,
+ * whichever surface (accept, fan-out, Stripe webhook) opened it.
+ */
+export async function notifySendReviews(
+  db: Db,
+  opts: { now: Date; mailer?: SystemMailer | undefined; appBaseUrl?: string | undefined },
+): Promise<number> {
+  let told = 0;
+  for (const hold of await unnotifiedSendReviews(db)) {
+    if (!(await markSendReviewNotified(db, hold.id, opts.now))) continue;
+    told += 1;
+    await recordAudit(db, {
+      teamId: hold.id,
+      actor: hold.reason === "payment_risk" ? "stripe" : "system",
+      action: "team.send_review_held",
+      target: { type: "team", id: hold.id },
+      metadata: { reason: hold.reason },
+    });
+    if (!opts.mailer) continue;
+    try {
+      await mailOperator(
+        db,
+        opts.mailer,
+        "review.held",
+        `/console/safety/${hold.id}`,
+        { team: hold.name, note: hold.note ?? hold.reason ?? "" },
+        opts.appBaseUrl,
+      );
+    } catch (err) {
+      console.error(`safety.flags: review notice for ${hold.id} failed`, err);
+    }
+  }
+  return told;
 }
