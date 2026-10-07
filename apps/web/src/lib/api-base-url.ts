@@ -47,8 +47,9 @@ export function appOrigin(): string {
 
 /**
  * The API base the dashboard prints in snippets: ADVERTISED_API_URL when set
- * (a brand hostname in front of the same API), else the canonical one. MCP
- * OAuth stays on {@link mcpResourceUrl}, which never follows this override.
+ * (a brand hostname in front of the same API), else the canonical one. The
+ * canonical MCP resource ({@link mcpResourceUrl}) stays registered next to the
+ * advertised one, so tokens issued before the alias keep working.
  */
 export function apiBaseUrl(): string {
   if (env.ADVERTISED_API_URL) return env.ADVERTISED_API_URL.replace(/\/+$/, "");
@@ -58,4 +59,18 @@ export function apiBaseUrl(): string {
 /** Canonical RFC 8707 resource identifier OAuth access tokens are bound to. */
 export function mcpResourceUrl(): string {
   return mcpResourceUrlFor(env.APP_BASE_URL, env.PUBLIC_API_URL);
+}
+
+/**
+ * The MCP URL to show: on the advertised API host when there is one, else the
+ * canonical resource. The API answers on both and accepts either binding.
+ */
+export function mcpServerUrl(): string {
+  if (env.ADVERTISED_API_URL) return `${env.ADVERTISED_API_URL.replace(/\/+$/, "")}/mcp`;
+  return mcpResourceUrl();
+}
+
+/** Every RFC 8707 identifier of the MCP server: the shown one first, then the canonical one. */
+export function mcpResourceUrls(): string[] {
+  return [...new Set([mcpServerUrl(), mcpResourceUrl()])];
 }

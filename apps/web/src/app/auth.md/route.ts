@@ -112,11 +112,11 @@ worked, assume it was rotated or revoked and re-read it once.
 
 ## OAuth 2.1 for the MCP server
 
-The hosted MCP endpoint lives at \`https://api-mepmail.je4ndev.com/mcp\` and
+The hosted MCP endpoint lives at \`https://api.mepmail.dev/mcp\` and
 answers \`401\` with a \`WWW-Authenticate\` challenge that points MCP clients at:
 
 - Resource metadata:
-  <https://api-mepmail.je4ndev.com/.well-known/oauth-protected-resource>
+  <https://api.mepmail.dev/.well-known/oauth-protected-resource>
 - Authorization server metadata:
   <https://mepmail.je4ndev.com/.well-known/oauth-authorization-server>
 

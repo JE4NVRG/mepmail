@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.48",
+      "date": "2026-10-07",
+      "title": "MCP em api.mepmail.dev",
+      "summary": "O MCP oficial agora mora em https://api.mepmail.dev/mcp. Agentes já conectados no endereço antigo continuam funcionando.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Conecte Claude, Cursor ou qualquer cliente MCP em https://api.mepmail.dev/mcp, com o mesmo login OAuth em mepmail.dev.",
+            "O endereço antigo api-mepmail.je4ndev.com/mcp segue no ar, e os tokens de um valem no outro: ninguém precisa reconectar."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.47",
       "date": "2026-10-07",
       "title": "MepMail agora mora em mepmail.dev",
@@ -131,21 +146,6 @@
         {
           "kind": "fixed",
           "items": ["Preços exibidos corretamente em cada idioma."]
-        }
-      ]
-    },
-    {
-      "version": "0.42",
-      "date": "2026-09-29",
-      "title": "Alertas no Slack, Discord e Telegram — e modelos prontos",
-      "summary": "Receba notificação onde seu time já conversa, e comece a partir de 10 modelos de e-mail prontos.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "Canais de notificação Slack, Discord e Telegram — cole a URL do webhook e o MepMail formata os alertas.",
-            "Galeria com 10 modelos de e-mail prontos (EN e PT) com preview ao vivo e cópia em 1 clique."
-          ]
         }
       ]
     }

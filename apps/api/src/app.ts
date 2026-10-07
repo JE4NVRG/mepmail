@@ -251,6 +251,12 @@ export interface ApiDeps {
    */
   publicApiUrl?: string | undefined;
   /**
+   * A second public origin of this API (a brand domain in front of it). The
+   * MCP server answers there with that host's resource identifier and accepts
+   * tokens bound to either; omitted → only publicApiUrl.
+   */
+  advertisedApiUrl?: string | undefined;
+  /**
    * Where this process reaches the dashboard's mailbox agent API for the
    * Correio MCP (/mcp/correio). Default: the web process on loopback port 3000.
    */

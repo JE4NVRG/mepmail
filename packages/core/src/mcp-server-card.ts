@@ -19,7 +19,7 @@ import { MCP_TOOLS } from "./mcp-tools.js";
  * card", fetched "on your server" — i.e. on the origin of the MCP URL the
  * directory was pointed at, NOT on the marketing host). Measured on
  * 2026-09-28 with SmitheryBot/1.0: the scan of
- * https://api-mepmail.je4ndev.com/mcp fetched
+ * https://api.mepmail.dev/mcp fetched
  * https://api.mepmail.dev/.well-known/mcp/server-card.json and got the
  * API's 404, then fell through to the interactive OAuth prompt — which is why
  * the API must serve this document too, not only the dashboard.
@@ -66,14 +66,14 @@ export const MCP_SERVER_CARD = {
   tools: TOOLS,
   transport: {
     type: "streamable-http",
-    url: "https://api-mepmail.je4ndev.com/mcp",
+    url: "https://api.mepmail.dev/mcp",
   },
   authentication: {
     required: true,
     type: "oauth2",
     schemes: ["oauth2"],
     authorizationServer: "https://mepmail.je4ndev.com",
-    resourceMetadata: "https://api-mepmail.je4ndev.com/.well-known/oauth-protected-resource",
+    resourceMetadata: "https://api.mepmail.dev/.well-known/oauth-protected-resource",
     authorizationServerMetadata:
       "https://mepmail.je4ndev.com/.well-known/oauth-authorization-server",
     scopes: [

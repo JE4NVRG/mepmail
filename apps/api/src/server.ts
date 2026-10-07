@@ -99,6 +99,7 @@ const app = createApi({
   oauthIssuerUrl: env.OAUTH_ISSUER_URL,
   unsubscribeBaseUrl: unsubscribeBaseUrl(),
   publicApiUrl: env.PUBLIC_API_URL,
+  advertisedApiUrl: env.ADVERTISED_API_URL,
   mailboxAgentOrigin: process.env.MAILBOX_AGENT_ORIGIN || undefined,
   internalActorKey: deriveInternalActorKey(Buffer.from(env.MASTER_ENCRYPTION_KEY, "base64")),
   unsubscribeSecretKey: deriveUnsubscribeKey(Buffer.from(env.MASTER_ENCRYPTION_KEY, "base64")),

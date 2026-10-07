@@ -7,6 +7,21 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.48] - 2026-10-07
+
+The OAuth MCP endpoint on api.mepmail.dev.
+
+### Changed
+
+- The MCP server answers at `https://api.mepmail.dev/mcp` with that host's
+  RFC 9728 resource metadata; `api-mepmail.je4ndev.com/mcp` keeps its own.
+  Tokens bound to either identifier are accepted on both hosts.
+- The authorization server registers both MCP resource identifiers; newly
+  registered clients are linked to both, and `linkClientsToResource` links
+  clients registered before. The issuer identifier is unchanged.
+- Docs, snippets, the MCP settings page, the server card and the discovery
+  files show `https://api.mepmail.dev/mcp`.
+
 ## [0.47] - 2026-10-07
 
 Public hosts on mepmail.dev.

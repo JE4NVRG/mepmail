@@ -24,7 +24,7 @@ import { captcha, jwt } from "better-auth/plugins";
 import { and, desc, eq, ne, notExists } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { headers } from "next/headers";
-import { mcpResourceUrl, resolveBaseUrl } from "@/lib/api-base-url";
+import { mcpResourceUrls, resolveBaseUrl } from "@/lib/api-base-url";
 import { httpOrigin } from "@/lib/http-url";
 import { legacyAccountIssuer } from "@/lib/legacy-account-issuer";
 import { attributionProps, emitFunnel, recordSignupAttribution } from "./funnel";
@@ -419,13 +419,18 @@ export function createAuth(
         loginPage: "/login",
         consentPage: "/oauth/consent",
         scopes: OAUTH_SCOPES,
-        resources: [{ identifier: mcpResourceUrl(), allowedScopes: [...MCP_SCOPES] }],
+        // Both hosts of the MCP server (the advertised brand host and the
+        // canonical one): clients bind tokens to whichever URL they dialed.
+        resources: mcpResourceUrls().map((identifier) => ({
+          identifier,
+          allowedScopes: [...MCP_SCOPES],
+        })),
         // The seeded oauthResource row must track this config: token issuance
         // intersects requested scopes with the row's allowedScopes, so the
         // default insertOnly mode would freeze the scope list at first-boot —
         // every scope shipped later would be silently dropped from tokens.
         resourceSeedMode: "merge",
-        clientRegistrationDefaultResources: [mcpResourceUrl()],
+        clientRegistrationDefaultResources: mcpResourceUrls(),
         // MCP clients (Claude Code, Cursor) still self-register via RFC 7591.
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,

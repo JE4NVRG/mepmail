@@ -13,12 +13,12 @@ describe("mcp server-card.json", () => {
     expect(body.name).toBe("com.je4ndev/mepmail");
     expect(body.transport).toEqual({
       type: "streamable-http",
-      url: "https://api-mepmail.je4ndev.com/mcp",
+      url: "https://api.mepmail.dev/mcp",
     });
     expect(body.authentication.type).toBe("oauth2");
     expect(body.authentication.scopes).toContain("emails:send");
     expect(body.authentication.resourceMetadata).toBe(
-      "https://api-mepmail.je4ndev.com/.well-known/oauth-protected-resource",
+      "https://api.mepmail.dev/.well-known/oauth-protected-resource",
     );
     expect(body.authentication.instructionsUrl).toBe("https://mepmail.dev/auth.md");
     expect(JSON.stringify(body)).not.toContain("millionsend.com");

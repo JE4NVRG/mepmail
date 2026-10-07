@@ -262,7 +262,7 @@
     "title": "Let your AI agents send email.",
     "body": "Connect Claude, Cursor, Codex or any MCP client to your sending domain with the official <b>MCP server</b>. Use hosted OAuth with nothing to install, or run it locally with npx @mepmail/mcp.",
     "points": [
-      "Hosted: connect with OAuth at api-mepmail.je4ndev.com/mcp.",
+      "Hosted: connect with OAuth at api.mepmail.dev/mcp.",
       "Local: npx @mepmail/mcp with a dedicated API key.",
       "Both modes expose the same tools."
     ],

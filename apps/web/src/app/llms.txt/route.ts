@@ -8,7 +8,7 @@ const BODY = `# MepMail
 - For agents (auth, MCP, discovery): https://mepmail.dev/auth.md
 - Agent skills index: https://mepmail.dev/.well-known/agent-skills/index.json
 - AI catalog (everything published for agents): https://mepmail.dev/.well-known/ai-catalog.json
-- MCP server (hosted, OAuth): https://api-mepmail.je4ndev.com/mcp
+- MCP server (hosted, OAuth): https://api.mepmail.dev/mcp
 
 ## Correio: email inboxes for AI agents
 

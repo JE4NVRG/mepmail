@@ -169,7 +169,7 @@ function mcpRateLimited(userId: string, limit: number): boolean {
 function createTokenVerifier(
   db: Db,
   issuer: string,
-  resource: string,
+  resources: readonly string[],
   getKey: JWTVerifyGetKey,
   rateLimitPerMinute: number,
 ): OAuthTokenVerifier {
@@ -179,9 +179,11 @@ function createTokenVerifier(
       // Pinned to what the authorization server issues (better-auth jwt
       // plugin: Ed25519, RFC 9068 `at+jwt`) so a JWKS that ever grows another
       // key type, or a session/logout JWT signed by the same key, is refused.
+      // Any of the resource identifiers this server answers on (the canonical
+      // API host and its advertised alias): a token bound to either works.
       const verified = await jwtVerify(token, getKey, {
         issuer,
-        audience: resource,
+        audience: [...resources],
         algorithms: ["EdDSA"],
         typ: "at+jwt",
         clockTolerance: 30,
@@ -246,12 +248,14 @@ function createTokenVerifier(
           role,
         };
       }
+      const audience = verified?.payload.aud;
+      const bound = Array.isArray(audience) ? audience : [audience];
       return {
         token,
         clientId: claims.data.client_id,
         scopes,
         expiresAt: claims.data.exp,
-        resource: new URL(resource),
+        resource: new URL(resources.find((r) => bound.includes(r)) ?? (resources[0] as string)),
         extra: { ...extra },
       };
     },
@@ -1310,21 +1314,37 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
  * MCP resource server (Streamable HTTP at /mcp) plus its RFC 9728 discovery
  * document. APP_BASE_URL locates the dashboard's JWKS; a single explicit
  * OAuth issuer may remain stable when that dashboard origin changes.
+ *
+ * The same server may answer on two public hosts: the canonical one
+ * (PUBLIC_API_URL) and an advertised alias (ADVERTISED_API_URL, a brand
+ * domain). Each host advertises its own resource identifier, as RFC 9728
+ * clients check it against the URL they dialed, and a token bound to either
+ * identifier is accepted on both, so agents connected before the alias keep
+ * working.
  */
 export function registerMcp(app: OpenAPIHono<Env>, deps: ApiDeps, appBaseUrl: string): void {
   const issuer = resolveOAuthIssuerUrl(appBaseUrl, deps.oauthIssuerUrl, deps.publicApiUrl);
-  const resource = mcpResourceUrl(appBaseUrl, deps.publicApiUrl);
-  const resourceMetadataUrl = getOAuthProtectedResourceMetadataUrl(new URL(resource));
-  const bearer = {
-    verifier: createTokenVerifier(
-      deps.db,
-      issuer,
-      resource,
-      createRemoteJWKSet(new URL(`${appBaseUrl}/api/auth/jwks`)),
-      deps.rateLimitPerMinute ?? 600,
-    ),
-    resourceMetadataUrl,
+  const canonical = mcpResourceUrl(appBaseUrl, deps.publicApiUrl);
+  const advertised = deps.advertisedApiUrl
+    ? `${deps.advertisedApiUrl.replace(/\/+$/, "")}${MCP_RESOURCE_PATH}`
+    : null;
+  const resources = [...new Set([canonical, ...(advertised ? [advertised] : [])])];
+  const verifier = createTokenVerifier(
+    deps.db,
+    issuer,
+    resources,
+    createRemoteJWKSet(new URL(`${appBaseUrl}/api/auth/jwks`)),
+    deps.rateLimitPerMinute ?? 600,
+  );
+  /** The resource identifier of the host a request came in on; unknown hosts get the canonical one. */
+  const resourceFor = (requestUrl: string): string => {
+    const host = new URL(requestUrl).host;
+    return resources.find((r) => new URL(r).host === host) ?? canonical;
   };
+  const bearerFor = (requestUrl: string) => ({
+    verifier,
+    resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(new URL(resourceFor(requestUrl))),
+  });
   // One McpServer per request: nothing is kept between calls, so the
   // endpoint scales horizontally with no session affinity.
   const handler = createMcpHandler(
@@ -1337,14 +1357,16 @@ export function registerMcp(app: OpenAPIHono<Env>, deps: ApiDeps, appBaseUrl: st
   // Clients request the scopes the resource advertises. offline_access is what
   // makes the authorization server issue a refresh token; without it here, a
   // client's session ends when the first access token expires.
-  const metadata = {
-    resource,
+  const metadataFor = (requestUrl: string) => ({
+    resource: resourceFor(requestUrl),
     authorization_servers: [issuer],
     scopes_supported: ["offline_access", ...MCP_SCOPES],
     bearer_methods_supported: ["header"],
-  };
-  app.get("/.well-known/oauth-protected-resource", (c) => c.json(metadata));
-  app.get(`/.well-known/oauth-protected-resource${MCP_RESOURCE_PATH}`, (c) => c.json(metadata));
+  });
+  app.get("/.well-known/oauth-protected-resource", (c) => c.json(metadataFor(c.req.url)));
+  app.get(`/.well-known/oauth-protected-resource${MCP_RESOURCE_PATH}`, (c) =>
+    c.json(metadataFor(c.req.url)),
+  );
   // Static server card, on this origin. A directory cannot scan an OAuth 2.1
   // endpoint without a human granting consent, so Smithery's scanner falls back
   // to /.well-known/mcp/server-card.json *on the MCP URL's origin* (its docs,
@@ -1358,6 +1380,7 @@ export function registerMcp(app: OpenAPIHono<Env>, deps: ApiDeps, appBaseUrl: st
   // DNS-rebound page holds no credential — the same reasoning behind the REST
   // API's wildcard CORS.
   app.all(MCP_RESOURCE_PATH, async (c) => {
+    const bearer = bearerFor(c.req.url);
     let authInfo: AuthInfo;
     try {
       authInfo = await verifyBearerToken(c.req.header("authorization"), bearer);

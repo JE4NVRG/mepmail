@@ -171,6 +171,58 @@ describe("auth middleware", () => {
     }
   });
 
+  describe("with an advertised alias host", () => {
+    const ALIAS = "https://api.alias.example";
+    const aliasApp = () =>
+      createApi({
+        db,
+        keyring: EnvKeyring.fromBase64(randomBytes(32).toString("base64")),
+        isCloud: false,
+        appBaseUrl,
+        advertisedApiUrl: `${ALIAS}/`,
+        enqueueEmailSend: async () => {},
+      });
+
+    it("advertises each host's own resource identifier", async () => {
+      const api = aliasApp();
+      const onAlias = await api.request(`${ALIAS}/.well-known/oauth-protected-resource/mcp`);
+      expect(((await onAlias.json()) as { resource: string }).resource).toBe(`${ALIAS}/mcp`);
+      const onCanonical = await api.request("/.well-known/oauth-protected-resource/mcp");
+      expect(((await onCanonical.json()) as { resource: string }).resource).toBe(resource);
+      const challenge = await api.request(`${ALIAS}/mcp`, {
+        method: "POST",
+        headers: JSONRPC_HEADERS,
+        body: ping,
+      });
+      expect(challenge.status).toBe(401);
+      expect(challenge.headers.get("www-authenticate") ?? "").toContain(
+        `resource_metadata="${ALIAS}/.well-known/oauth-protected-resource/mcp"`,
+      );
+    });
+
+    it("accepts a token bound to either identifier on either host", async () => {
+      const api = aliasApp();
+      for (const aud of [resource, `${ALIAS}/mcp`]) {
+        const token = await mintToken({ aud });
+        for (const url of [`${ALIAS}/mcp`, "/mcp"]) {
+          const res = await api.request(url, {
+            method: "POST",
+            headers: { ...JSONRPC_HEADERS, authorization: `Bearer ${token}` },
+            body: ping,
+          });
+          expect(res.status, `${aud} via ${url}`).toBe(200);
+        }
+      }
+      const elsewhere = await mintToken({ aud: "https://elsewhere.example/mcp" });
+      const refused = await api.request(`${ALIAS}/mcp`, {
+        method: "POST",
+        headers: { ...JSONRPC_HEADERS, authorization: `Bearer ${elsewhere}` },
+        body: ping,
+      });
+      expect(refused.status).toBe(401);
+    });
+  });
+
   it("401s a token minted for another resource (aud mismatch)", async () => {
     const token = await mintToken({ aud: "https://elsewhere.example/mcp" });
     const res = await app.request("/mcp", {

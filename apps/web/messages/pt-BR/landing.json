@@ -262,7 +262,7 @@
     "title": "Deixe seus agentes de IA enviarem e-mail.",
     "body": "Conecte Claude, Cursor, Codex ou qualquer cliente MCP ao seu domínio de envio com o <b>MCP server</b> oficial. Use OAuth hospedado, sem instalar, ou execute localmente com npx @mepmail/mcp.",
     "points": [
-      "Hospedado: conecte com OAuth em api-mepmail.je4ndev.com/mcp.",
+      "Hospedado: conecte com OAuth em api.mepmail.dev/mcp.",
       "Local: npx @mepmail/mcp com uma API key dedicada.",
       "Os dois modos expõem as mesmas tools."
     ],

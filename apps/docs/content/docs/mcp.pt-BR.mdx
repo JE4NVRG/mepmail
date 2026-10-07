@@ -17,7 +17,7 @@ O endpoint MCP (Streamable HTTP) fica em `/mcp` na origem da API:
 <DeploymentTabs>
 <DeploymentTab deployment="cloud">
 
-`https://api-mepmail.je4ndev.com/mcp`
+`https://api.mepmail.dev/mcp`
 
 </DeploymentTab>
 <DeploymentTab deployment="self-hosted">
@@ -116,7 +116,7 @@ funciona no outro sem mudança.
 <Tab value="Claude Code">
 
 ```sh
-claude mcp add --transport http mepmail https://api-mepmail.je4ndev.com/mcp
+claude mcp add --transport http mepmail https://api.mepmail.dev/mcp
 ```
 
 Isso registra o servidor só no projeto atual; adicione `--scope user` para
@@ -139,7 +139,7 @@ a ponte, rode o [servidor local](#servidor-local-stdio) acima: uma linha de
   "mcpServers": {
     "mepmail": {
       "command": "npx",
-      "args": ["-y", "mcp-remote@0.8.2", "https://api-mepmail.je4ndev.com/mcp"]
+      "args": ["-y", "mcp-remote@0.8.2", "https://api.mepmail.dev/mcp"]
     }
   }
 }
@@ -152,7 +152,7 @@ a ponte, rode o [servidor local](#servidor-local-stdio) acima: uma linha de
 {
   "mcpServers": {
     "mepmail": {
-      "url": "https://api-mepmail.je4ndev.com/mcp"
+      "url": "https://api.mepmail.dev/mcp"
     }
   }
 }
@@ -168,7 +168,7 @@ Salve no projeto, ou em `~/.cursor/mcp.json` para todos os projetos.
   "servers": {
     "mepmail": {
       "type": "http",
-      "url": "https://api-mepmail.je4ndev.com/mcp"
+      "url": "https://api.mepmail.dev/mcp"
     }
   }
 }
@@ -177,7 +177,7 @@ Salve no projeto, ou em `~/.cursor/mcp.json` para todos os projetos.
 </Tab>
 </Tabs>
 
-Auto-hospedado: troque `https://api-mepmail.je4ndev.com/mcp` pela URL do servidor
+Auto-hospedado: troque `https://api.mepmail.dev/mcp` pela URL do servidor
 da sua instância, mostrada acima.
 
 ## Autenticação

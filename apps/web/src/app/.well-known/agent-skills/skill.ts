@@ -31,7 +31,7 @@ URL — and moving off Resend costs one line per call site.
 | Surface | Where |
 | --- | --- |
 | REST API (Resend-compatible) | ${B}https://api.mepmail.dev${B} |
-| Hosted MCP server (OAuth 2.1, no install) | ${B}https://api-mepmail.je4ndev.com/mcp${B} |
+| Hosted MCP server (OAuth 2.1, no install) | ${B}https://api.mepmail.dev/mcp${B} |
 | Correio MCP server (one mailbox, ${B}mmb_${B} key) | ${B}https://api.mepmail.dev/mcp/correio${B} |
 | Local MCP server (stdio) | ${B}npx -y @mepmail/mcp${B} with a team API key |
 | Migration CLI | ${B}npx @mepmail/cli migrate --from resend${B} |
