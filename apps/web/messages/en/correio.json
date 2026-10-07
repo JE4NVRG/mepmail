@@ -14,27 +14,6 @@
     "note": "Mail is paid separately. Initial access is exclusive to eligible earlier subscribers; this preview presents the new offer.",
     "audiences": ["For you", "For your team", "For your agents"]
   },
-  "example": {
-    "label": "Usage example · fictional content",
-    "identity": "An identity from your company",
-    "address": "luna@yourcompany.com",
-    "role": "A dedicated mailbox for your agent",
-    "steps": [
-      {
-        "label": "Receive",
-        "text": "A customer asks for details about a proposal."
-      },
-      {
-        "label": "Prepare",
-        "text": "Your agent reads the conversation and saves a reply as a draft."
-      },
-      {
-        "label": "Follow",
-        "text": "You review it in the dashboard. Sending requires the permission you grant."
-      }
-    ],
-    "foot": "Illustrative address and scenario. No message was sent."
-  },
   "use": {
     "eyebrow": "Your address. Your conversation.",
     "title": "A mailbox that can work with you.",
@@ -127,18 +106,18 @@
       {
         "kind": "Send · MCP",
         "title": "Your agent in Send",
-        "body": "MepMail's public MCP connects compatible clients to Send through hosted OAuth or the official local package. This connection does not grant access to Mail mailboxes.",
-        "status": "Available in Send",
+        "body": "The MepMail MCP connects compatible clients to Send, through hosted OAuth or the official local package. With the mailbox permissions it also lists and creates mailboxes and agent keys, without reading their content.",
+        "status": "Available",
         "link": "Explore the Send MCP",
         "path": "/mcp"
       },
       {
-        "kind": "Mail · agent integration",
-        "title": "Read and prepare. You follow.",
-        "body": "The read-and-draft workflow has been tested with an agent integration through the mailbox API. A public MCP for mailboxes is not available yet.",
-        "status": "Public mailbox MCP not available yet",
-        "link": "Understand agent access",
-        "path": "/mailboxes#connect-an-agent"
+        "kind": "Mail · MCP",
+        "title": "Your agent inside the mailbox",
+        "body": "The Correio MCP gives the agent its own mailbox as tools: list, read, draft and send. Without the send permission it asks for your approval before each send.",
+        "status": "Available for activated mailboxes",
+        "link": "Connect over MCP",
+        "path": "/mailboxes#connect-an-agent-over-mcp"
       }
     ],
     "all": "See Send integrations"
@@ -232,20 +211,6 @@
     "monthlyNote": "This previews a new offer. Mail remains in closed access; checkout and purchasing are not available here yet.",
     "noChange": "This comparison does not purchase a plan or change your subscription. Values in US$, before taxes and any additional usage."
   },
-  "devices": {
-    "eyebrow": "Computer and phone",
-    "title": "The same operation, on a screen that follows you.",
-    "body": "Access messages through the MepMail web dashboard. The responsive experience is being prepared for reading, reviewing and organizing on computers and phones.",
-    "browser": {
-      "title": "Browser access",
-      "body": "Your organization, mailboxes and permissions in the web dashboard. Without requiring website hosting for your company."
-    },
-    "install": {
-      "title": "Web installation in preparation",
-      "body": "We are preparing the web installation foundation for Windows and iOS. Installation on those devices still needs to be validated."
-    },
-    "note": "Native Windows and iOS applications are not published yet. Features such as offline use and notifications are not part of this preview."
-  },
   "faq": {
     "title": "Before bringing your email",
     "items": [
@@ -302,5 +267,24 @@
     "monthlyNote": "This comparison does not purchase a plan. The dashboard confirms your contract, billing and activation for each mailbox.",
     "checkAccess": "Open Mail in the dashboard",
     "availability": "Available on every paying Send plan"
+  },
+  "demo": {
+    "label": "Usage example · fictional content",
+    "description": "Animated example: a customer's email arrives, the agent reads it and writes the answer, the answer waits for your approval and goes out once you approve.",
+    "inbox": "Inbox · support@yourcompany.com",
+    "sender": "Ana Souza",
+    "initials": "AS",
+    "isNew": "New",
+    "subject": "Order 4812",
+    "preview": "Hi! When will it arrive?",
+    "otherSender": "Supplier",
+    "otherSubject": "October invoice",
+    "agent": "Your agent · via MCP",
+    "read": "Read “Order 4812” and wrote the answer",
+    "reply": "Hi Ana! Your order ships tomorrow and arrives in 2 days.",
+    "awaiting": "Awaiting your approval",
+    "approve": "Approve and send",
+    "sent": "Sent to Ana Souza",
+    "foot": "Illustrative address and scenario. No message was sent."
   }
 }

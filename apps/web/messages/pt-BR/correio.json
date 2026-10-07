@@ -14,27 +14,6 @@
     "note": "Correio pago à parte. Acesso inicial exclusivo aos assinantes anteriores elegíveis; a nova oferta está nesta prévia.",
     "audiences": ["Para você", "Para sua equipe", "Para seus agentes"]
   },
-  "example": {
-    "label": "Exemplo de uso · conteúdo fictício",
-    "identity": "Uma identidade da sua empresa",
-    "address": "luna@suaempresa.com",
-    "role": "Caixa dedicada ao seu agente",
-    "steps": [
-      {
-        "label": "Receber",
-        "text": "Um cliente pede informações sobre a proposta."
-      },
-      {
-        "label": "Preparar",
-        "text": "Seu agente lê a conversa e salva uma resposta como rascunho."
-      },
-      {
-        "label": "Acompanhar",
-        "text": "Você revisa no painel. O envio depende da permissão concedida."
-      }
-    ],
-    "foot": "Endereço e cenário ilustrativos. Nenhuma mensagem foi enviada."
-  },
   "use": {
     "eyebrow": "O seu endereço. A sua conversa.",
     "title": "Uma caixa que também pode trabalhar com você.",
@@ -127,18 +106,18 @@
       {
         "kind": "Envio · MCP",
         "title": "Seu agente no Envio",
-        "body": "O MCP público do MepMail conecta clientes compatíveis ao produto Envio, por OAuth hospedado ou pelo pacote local oficial. Essa conexão não concede acesso às caixas do Correio.",
-        "status": "Disponível no Envio",
+        "body": "O MCP do MepMail conecta clientes compatíveis ao Envio, por OAuth hospedado ou pelo pacote local oficial. Com as permissões de caixas, ele também lista e cria caixas e chaves de agente, sem ler o conteúdo delas.",
+        "status": "Disponível",
         "link": "Conhecer o MCP de Envio",
         "path": "/mcp"
       },
       {
-        "kind": "Correio · integração de agente",
-        "title": "Leia e prepare. Você acompanha.",
-        "body": "O fluxo de leitura e rascunhos foi testado com uma integração de agente pela API de caixas. Um MCP público para caixas ainda não está disponível.",
-        "status": "MCP público de caixas ainda indisponível",
-        "link": "Entender o acesso de agentes",
-        "path": "/mailboxes#conecte-um-agente"
+        "kind": "Correio · MCP",
+        "title": "Seu agente dentro da caixa",
+        "body": "O MCP do Correio dá ao agente as ferramentas da própria caixa: listar, ler, rascunhar e enviar. Sem a permissão de envio, ele pede a sua aprovação antes de cada envio.",
+        "status": "Disponível para caixas ativadas",
+        "link": "Conectar por MCP",
+        "path": "/mailboxes#conecte-um-agente-por-mcp"
       }
     ],
     "all": "Ver as integrações de Envio"
@@ -232,20 +211,6 @@
     "monthlyNote": "Esta é a prévia de uma nova oferta. Correio continua em acesso fechado; checkout e contratação ainda não estão disponíveis aqui.",
     "noChange": "Esta comparação não contrata um plano nem altera sua assinatura. Valores em US$, antes de impostos e eventual consumo excedente."
   },
-  "devices": {
-    "eyebrow": "Computador e celular",
-    "title": "A mesma operação, em uma tela que acompanha você.",
-    "body": "Acesse as mensagens pelo painel web do MepMail. A experiência responsiva está sendo preparada para ler, revisar e organizar no computador e no celular.",
-    "browser": {
-      "title": "Acesso pelo navegador",
-      "body": "Sua organização, suas caixas e suas permissões no painel web. Sem depender de hospedar um site para sua empresa."
-    },
-    "install": {
-      "title": "Instalação web em preparação",
-      "body": "Estamos preparando a base de instalação web para Windows e iOS. A instalação nesses dispositivos ainda precisa ser validada."
-    },
-    "note": "Aplicativos nativos de Windows e iOS ainda não estão publicados. Recursos como uso offline e notificações não fazem parte desta prévia."
-  },
   "faq": {
     "title": "Antes de trazer seu e-mail",
     "items": [
@@ -302,5 +267,24 @@
     "monthlyNote": "Esta comparação não contrata nenhum plano. O painel confirma contrato, cobrança e ativação de cada caixa.",
     "checkAccess": "Abrir o Correio no painel",
     "availability": "Disponível em todos os planos pagos de Envio"
+  },
+  "demo": {
+    "label": "Exemplo de uso · conteúdo fictício",
+    "description": "Exemplo animado: chega um e-mail de uma cliente, o agente lê e escreve a resposta, a resposta fica aguardando a sua aprovação e sai depois que você aprova.",
+    "inbox": "Entrada · suporte@suaempresa.com",
+    "sender": "Ana Souza",
+    "initials": "AS",
+    "isNew": "Novo",
+    "subject": "Pedido 4812",
+    "preview": "Oi! Qual o prazo de entrega?",
+    "otherSender": "Fornecedor",
+    "otherSubject": "Nota fiscal de outubro",
+    "agent": "Seu agente · via MCP",
+    "read": "Leu “Pedido 4812” e escreveu a resposta",
+    "reply": "Olá, Ana! Seu pedido sai amanhã e chega em 2 dias.",
+    "awaiting": "Aguardando sua aprovação",
+    "approve": "Aprovar e enviar",
+    "sent": "Enviado para Ana Souza",
+    "foot": "Endereço e cenário ilustrativos. Nenhuma mensagem foi enviada."
   }
 }

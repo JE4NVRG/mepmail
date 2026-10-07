@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { PublicFooter, PublicHeader, type PublicSiteLabels } from "@/components/site-chrome";
 import { legalLinks } from "@/lib/legal-links";
+import { AgentDemo, type AgentDemoLabels } from "./agent-demo";
 import { LaunchPlanPreview } from "./launch-plan-preview";
 import "../landing.css";
 import "./correio.css";
@@ -10,7 +11,6 @@ const canonical = "/correio";
 const docsOrigin = "https://docs-mepmail.je4ndev.com";
 const earlyAccessOpen = () => process.env.MAILBOX_EARLY_ACCESS_OPEN === "true";
 
-type TextStep = { label: string; text: string };
 type TextItem = { title: string; body: string };
 type UseCase = TextItem & { kind: string; address: string; points: string[] };
 type Integration = TextItem & { kind: string; status: string; link: string; path: string };
@@ -50,7 +50,6 @@ export default async function CorreioPage() {
   } as PublicSiteLabels;
   const docs = `${docsOrigin}${locale === "pt-BR" ? "/pt-BR" : ""}`;
   const audiences = t.raw("hero.audiences") as string[];
-  const exampleSteps = t.raw("example.steps") as TextStep[];
   const useCases = t.raw("use.items") as UseCase[];
   const permissions = t.raw("control.permissions") as TextItem[];
   const setup = t.raw("setup.steps") as TextItem[];
@@ -86,30 +85,7 @@ export default async function CorreioPage() {
               <p className="correio-status">{t(mailOpen ? "release.heroStatus" : "hero.status")}</p>
             </div>
 
-            <aside className="correio-example" aria-labelledby="correio-example-label">
-              <p className="correio-example-label" id="correio-example-label">
-                {t("example.label")}
-              </p>
-              <div className="correio-identity">
-                <p className="correio-eyebrow">{t("example.identity")}</p>
-                <p className="correio-address">{t("example.address")}</p>
-                <p className="correio-example-role">{t("example.role")}</p>
-              </div>
-              <ol className="correio-example-steps">
-                {exampleSteps.map((step, index) => (
-                  <li key={step.label}>
-                    <span className="correio-step-marker" aria-hidden="true">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <div>
-                      <h2>{step.label}</h2>
-                      <p>{step.text}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-              <p className="correio-note correio-example-foot">{t("example.foot")}</p>
-            </aside>
+            <AgentDemo labels={t.raw("demo") as AgentDemoLabels} />
           </div>
           <div className="gtm-container">
             <ul className="correio-audiences">
@@ -308,33 +284,6 @@ export default async function CorreioPage() {
             <p className="correio-note correio-under-grid">{t("plans.terms")}</p>
           </div>
         </section>
-
-        <section
-          className="correio-section correio-alternate"
-          aria-labelledby="correio-devices-title"
-        >
-          <div className="gtm-container">
-            <div className="correio-section-heading">
-              <div>
-                <p className="correio-eyebrow">{t("devices.eyebrow")}</p>
-                <h2 id="correio-devices-title">{t("devices.title")}</h2>
-              </div>
-              <p className="correio-section-lead">{t("devices.body")}</p>
-            </div>
-            <div className="correio-device-grid">
-              <article>
-                <h3>{t("devices.browser.title")}</h3>
-                <p>{t("devices.browser.body")}</p>
-              </article>
-              <article>
-                <h3>{t("devices.install.title")}</h3>
-                <p>{t("devices.install.body")}</p>
-              </article>
-            </div>
-            <p className="correio-note correio-under-grid">{t("devices.note")}</p>
-          </div>
-        </section>
-
         <section className="correio-section correio-alternate" aria-labelledby="correio-faq-title">
           <div className="gtm-container correio-faq-grid">
             <h2 id="correio-faq-title">{t("faq.title")}</h2>
