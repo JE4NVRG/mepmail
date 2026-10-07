@@ -196,7 +196,8 @@ export function Sidebar({
   // the gate is the server's (a 404 for anyone else), never this query.
   const operator = useQuery(trpc.system.operator.queryOptions());
   const mailboxCapability = useQuery(trpc.mailboxes.capabilities.queryOptions());
-  const mailEnabled = mailboxCapability.data?.enabled === true;
+  const mailEnabled =
+    mailboxCapability.data?.enabled === true || mailboxCapability.data?.offered === true;
   // Shared organization tools stay in the same place on every product route.
   // The console's server gate remains the access control.
   const organizationItems = navItemsWithConsole(

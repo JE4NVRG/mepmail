@@ -405,5 +405,19 @@
     "empty": "Escolha uma caixa disponível para consultar o uso.",
     "noPolicy": "Sem capacidade configurada",
     "allBoxes": "Total das caixas acessíveis"
+  },
+  "offer": {
+    "eyebrow": "Correio",
+    "title": "Caixas de e-mail para você e seus agentes",
+    "body": "Endereços reais no seu próprio domínio para pessoas e agentes de IA receberem, lerem e responderem e-mails — pelo painel ou pela API.",
+    "points": {
+      "addresses": "Caixas de pessoas e de agentes no seu domínio verificado, com pastas, busca e anexos.",
+      "agents": "Chaves de API por caixa para agentes, com uma franquia de envio em cada caixa.",
+      "price": "{small} por {smallPrice} ou {large} por {largePrice} por caixa ao mês."
+    },
+    "requirement": "O Correio é um complemento dos planos pagos de Envio, a partir de {price} por mês. Novos clientes elegíveis pagam {first} no primeiro mês do Envio.",
+    "cta": "Assinar Envio + Correio",
+    "learn": "Conhecer o Correio",
+    "adminOnly": "Peça a um proprietário ou administrador da equipe para assinar."
   }
 }

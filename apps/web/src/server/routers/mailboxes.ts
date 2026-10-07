@@ -57,7 +57,11 @@ import {
 import { mailboxReceivingDeps } from "../mailbox-receiving";
 import { mailboxTransportMime } from "../mailbox-transport";
 import { getMailboxUsage } from "../mailbox-usage";
-import { mailboxActorAccessEnabled, mailboxCreateAccessEnabled } from "../mailboxes";
+import {
+  mailboxActorAccessEnabled,
+  mailboxCreateAccessEnabled,
+  mailboxOfferOpen,
+} from "../mailboxes";
 import { getQueue } from "../queue";
 import { router, teamProcedure } from "../trpc";
 
@@ -131,6 +135,8 @@ export const mailboxesRouter = router({
     return {
       enabled,
       deliveryReady: enabled && process.env.MAILBOX_TRANSPORT_ENABLED === "1",
+      // Shows the Correio offer to teams that cannot use it yet; access stays with `enabled`.
+      offered: !enabled && !ctx.supportView && mailboxOfferOpen(),
     };
   }),
   list: enabled.query(({ ctx }) => call(() => listMailboxRegistry(ctx.db, actor(ctx)))),

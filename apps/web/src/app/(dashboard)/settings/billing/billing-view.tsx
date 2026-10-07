@@ -132,9 +132,12 @@ function Check() {
 export function BillingView({
   checkout,
   requestedRung = null,
+  requestedMail = false,
 }: {
   checkout: "success" | "cancel" | null;
   requestedRung?: PlanRungKey | null;
+  /** From the Correio offer: preselect the Mail step of the launch combo. */
+  requestedMail?: boolean;
 }) {
   const t = useTranslations("settings.billing");
   const planName = useTranslations("settings.plans");
@@ -171,7 +174,7 @@ export function BillingView({
   const [step, setStep] = useState<number | null>(null);
   const [launchInterval, setLaunchInterval] = useState<LaunchBillingPeriod>("month");
   // Send + Mail combo: Mail is a second, separate Checkout opened after Send.
-  const [comboOn, setComboOn] = useState(false);
+  const [comboOn, setComboOn] = useState(requestedMail);
   const [comboTier, setComboTier] = useState<LaunchMailboxTierId>("gib1");
   const [comboSeats, setComboSeats] = useState("1");
   const [comboIntent, setComboIntent] = useState<LaunchComboIntent | null>(null);

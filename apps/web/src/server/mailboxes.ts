@@ -1,4 +1,5 @@
 /** Optional registry; production hosting/transport is a separate capability. */
+import { isCloudDeployment } from "@millionsend/config";
 import { mailboxDomainLock, mailboxServiceEntitlement } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
@@ -12,6 +13,15 @@ import {
 export function mailboxEarlyAccessCohort() {
   const raw = process.env.MAILBOX_EARLY_ACCESS_COHORT;
   return raw === undefined ? undefined : parseMailboxLaunchCohort(raw);
+}
+
+/** Public Correio offer on the hosted service: presentation only, never an access grant. */
+export function mailboxOfferOpen(): boolean {
+  return (
+    isCloudDeployment() &&
+    mailboxRegistryEnabled() &&
+    process.env.MAILBOX_EARLY_ACCESS_OPEN === "true"
+  );
 }
 
 export function mailboxRegistryEnabled(): boolean {

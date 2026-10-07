@@ -405,5 +405,19 @@
     "empty": "Choose an available mailbox to check usage.",
     "noPolicy": "No capacity configured",
     "allBoxes": "Total across accessible mailboxes"
+  },
+  "offer": {
+    "eyebrow": "Correio · Mail",
+    "title": "Mailboxes for you and your agents",
+    "body": "Real addresses on your own domain for people and AI agents to receive, read and reply to email — from the dashboard or through the API.",
+    "points": {
+      "addresses": "Person and agent mailboxes on your verified domain, with folders, search and attachments.",
+      "agents": "Per-mailbox API keys for agents, with a sending allowance on each mailbox.",
+      "price": "{small} for {smallPrice} or {large} for {largePrice} per mailbox a month."
+    },
+    "requirement": "Correio is an add-on to the paid Send plans, from {price} a month. Eligible new customers pay {first} for the first month of Send.",
+    "cta": "Get Send + Correio",
+    "learn": "Learn about Correio",
+    "adminOnly": "Ask a team owner or admin to subscribe."
   }
 }

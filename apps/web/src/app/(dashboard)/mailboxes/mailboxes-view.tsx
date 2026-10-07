@@ -16,6 +16,7 @@ import { MailboxContentView } from "./mailbox-content-view";
 import { MailboxFolderDialog } from "./mailbox-folder-dialog";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import managementStyles from "./mailbox-management.module.css";
+import { MailboxOffer } from "./mailbox-offer";
 import { MailboxServicePanel } from "./mailbox-service-panel";
 import { MailboxSetupDialog } from "./mailbox-setup-dialog";
 import { MailboxUsagePanel } from "./mailbox-usage-panel";
@@ -463,7 +464,9 @@ export function MailboxesView() {
       </div>
     );
   if (!capability.data?.enabled)
-    return (
+    return capability.data?.offered ? (
+      <MailboxOffer />
+    ) : (
       <section>
         <h1>{t("title")}</h1>
         <p>{t("disabled")}</p>

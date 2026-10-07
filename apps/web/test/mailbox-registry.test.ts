@@ -108,7 +108,11 @@ describe("authenticated persistent mailbox registry", () => {
       deliveryReady: false,
       canRead: true,
     });
-    expect(await as().mailboxes.capabilities()).toEqual({ enabled: true, deliveryReady: false });
+    expect(await as().mailboxes.capabilities()).toEqual({
+      enabled: true,
+      deliveryReady: false,
+      offered: false,
+    });
     expect((await as().mailboxes.options()).domains[0]?.status).toBe("verified");
   });
   it("rejects duplicate addresses across domain rows/teams without revealing ownership", async () => {
@@ -265,7 +269,11 @@ describe("authenticated persistent mailbox registry", () => {
       as("owner", team, "owner", { session: null }).mailboxes.list(),
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     vi.stubEnv("MAILBOX_REGISTRY_ENABLED", "false");
-    expect(await as().mailboxes.capabilities()).toEqual({ enabled: false, deliveryReady: false });
+    expect(await as().mailboxes.capabilities()).toEqual({
+      enabled: false,
+      deliveryReady: false,
+      offered: false,
+    });
     await expect(as().mailboxes.create(input())).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
   it("blocks domain deletion before external side effects, including with feature switched off", async () => {
@@ -320,7 +328,7 @@ describe("authenticated persistent mailbox registry", () => {
     expect((await db.select().from(schema.mailboxes)).length).toBe(1);
     expect(
       (await client.query("select count(*) as count from drizzle.__mailbox_migrations")).rows[0],
-    ).toMatchObject({ count: 13 });
+    ).toMatchObject({ count: 14 });
     expect(
       (await client.query("select to_regclass('drizzle.__drizzle_migrations') as ledger")).rows[0],
     ).toMatchObject({ ledger: null });

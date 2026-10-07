@@ -171,7 +171,11 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("Correio hosted opening admission", () => {
   it("exposes only the enrolled member and a verified paid add-on purchase", async () => {
-    expect(await as().capabilities()).toEqual({ enabled: true, deliveryReady: false });
+    expect(await as().capabilities()).toEqual({
+      enabled: true,
+      deliveryReady: false,
+      offered: false,
+    });
     expect(await as().billing()).toMatchObject({ canPurchase: true, earlyAccessRequired: false });
     expect(await mailboxActorAccessEnabled(db, { teamId, userId: outsider })).toBe(false);
     expect(await mailboxCreateAccessEnabled(db, actor())).toBe(true);
@@ -181,7 +185,11 @@ describe("Correio hosted opening admission", () => {
     await update({
       sendBillingContract: { ...contract, baseAmountCents: 2900, regularMonthlyCents: 2900 },
     });
-    expect(await as().capabilities()).toEqual({ enabled: true, deliveryReady: false });
+    expect(await as().capabilities()).toEqual({
+      enabled: true,
+      deliveryReady: false,
+      offered: false,
+    });
     expect(await mailboxBillingPresentation(db, actor())).toMatchObject({
       canPurchase: true,
       sendingPlanRequired: false,
@@ -199,8 +207,21 @@ describe("Correio hosted opening admission", () => {
       stripeSubscriptionId: null,
       sendBillingContract: null,
     });
-    expect(await as().capabilities()).toEqual({ enabled: false, deliveryReady: false });
+    expect(await as().capabilities()).toEqual({
+      enabled: false,
+      deliveryReady: false,
+      offered: false,
+    });
     expect(await mailboxCreateAccessEnabled(db, actor())).toBe(false);
+    // With the public offer open the team sees the Correio offer, still without access.
+    vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
+    expect(await as().capabilities()).toEqual({
+      enabled: false,
+      deliveryReady: false,
+      offered: true,
+    });
+    expect(await mailboxCreateAccessEnabled(db, actor())).toBe(false);
+    await expect(as().list()).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
   it("does not grant an ordinary US20 contract a default exception", async () => {
     await update({
@@ -237,7 +258,11 @@ describe("Correio hosted opening admission", () => {
     await seedMailboxTestService(db, [teamId]);
     configure({ ...cohort, members: [] });
     await update({ planStatus: "canceled" });
-    expect(await as().capabilities()).toEqual({ enabled: true, deliveryReady: false });
+    expect(await as().capabilities()).toEqual({
+      enabled: true,
+      deliveryReady: false,
+      offered: false,
+    });
     expect(await as().list()).toMatchObject({ mailboxes: [] });
     expect(await as().billing()).toMatchObject({
       availability: "existing_subscription",
@@ -265,7 +290,11 @@ describe("Correio hosted opening admission", () => {
     await update({ plan: "system", sendBillingContract: null, planStatus: "canceled" });
     await seedMailboxTestService(db, [teamId]);
     vi.stubEnv("MAILBOX_EARLY_ACCESS_COHORT", "invalid");
-    expect(await as().capabilities()).toEqual({ enabled: true, deliveryReady: false });
+    expect(await as().capabilities()).toEqual({
+      enabled: true,
+      deliveryReady: false,
+      offered: false,
+    });
     expect(await as().service()).toMatchObject({
       licenseKind: "system",
       unlimitedSeats: true,
@@ -301,8 +330,16 @@ describe("Correio hosted opening admission", () => {
   });
   it("fails closed for invalid present configuration and preserves absent legacy behavior", async () => {
     vi.stubEnv("MAILBOX_EARLY_ACCESS_COHORT", "{}");
-    expect(await as().capabilities()).toEqual({ enabled: false, deliveryReady: false });
+    expect(await as().capabilities()).toEqual({
+      enabled: false,
+      deliveryReady: false,
+      offered: false,
+    });
     vi.stubEnv("MAILBOX_EARLY_ACCESS_COHORT", undefined);
-    expect(await as().capabilities()).toEqual({ enabled: true, deliveryReady: false });
+    expect(await as().capabilities()).toEqual({
+      enabled: true,
+      deliveryReady: false,
+      offered: false,
+    });
   });
 });

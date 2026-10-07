@@ -216,7 +216,11 @@ describe("operator mailbox pilot admission", () => {
     async (team, user) => {
       restrict();
       const caller = as(context(team, user)).mailboxes;
-      expect(await caller.capabilities()).toEqual({ enabled: false, deliveryReady: false });
+      expect(await caller.capabilities()).toEqual({
+        enabled: false,
+        deliveryReady: false,
+        offered: false,
+      });
       await expect(caller.list()).rejects.toMatchObject({ code: "NOT_FOUND" });
       await expect(
         caller.createAgentKey({ mailboxId: BOX, label: "Synthetic key" }),
@@ -230,7 +234,11 @@ describe("operator mailbox pilot admission", () => {
   it("admits the paired owner through the real router while preserving support-view denial", async () => {
     restrict();
     const caller = as(context()).mailboxes;
-    expect(await caller.capabilities()).toEqual({ enabled: true, deliveryReady: true });
+    expect(await caller.capabilities()).toEqual({
+      enabled: true,
+      deliveryReady: true,
+      offered: false,
+    });
     expect(await caller.list()).toEqual({ canManage: true, mailboxes: [] });
     expect(h.list).toHaveBeenCalledExactlyOnceWith(h.db, { teamId: TEAM, userId: OWNER });
     const view = as(
@@ -238,7 +246,11 @@ describe("operator mailbox pilot admission", () => {
         supportView: { grantId: BOX, expiresAt: new Date(Date.now() + 60000) },
       }),
     ).mailboxes;
-    expect(await view.capabilities()).toEqual({ enabled: false, deliveryReady: false });
+    expect(await view.capabilities()).toEqual({
+      enabled: false,
+      deliveryReady: false,
+      offered: false,
+    });
     await expect(view.list()).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(h.list).toHaveBeenCalledTimes(1);
   });
@@ -385,6 +397,7 @@ describe("operator mailbox pilot admission", () => {
     expect(await as(context()).mailboxes.capabilities()).toEqual({
       enabled: true,
       deliveryReady: false,
+      offered: false,
     });
     expect((await sendPost(agentRequest("send", { id: ITEM, expectedRevision: 1 }))).status).toBe(
       404,
