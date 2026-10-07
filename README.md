@@ -5,7 +5,7 @@
 <p align="center"><b>Transactional email with a Resend-compatible API.</b></p>
 
 Self-host on your own AWS SES, or use the hosted cloud at
-[mepmail.je4ndev.com](https://mepmail.je4ndev.com). Migrating from Resend means
+[mepmail.dev](https://mepmail.dev). Migrating from Resend means
 changing two environment variables — not rewriting your integration.
 
 <p align="center">
@@ -34,7 +34,7 @@ changing two environment variables — not rewriting your integration.
 | Migrate from Resend | ✅ | `npx @mepmail/cli migrate --from resend` moves contacts, segments, topics, templates, webhooks, domains and suppressions; read-only against Resend, safe to re-run before cutover. |
 | MCP for AI agents | ✅ | Hosted MCP server (`https://api-mepmail.je4ndev.com/mcp`, OAuth) and a local stdio server: `npx @mepmail/mcp`. |
 | Agent discovery | ✅ | `/.well-known/ai-catalog.json`, `/llms.txt` and `/auth.md` served by the web app. |
-| Docs (en/pt-BR) | ✅ | Full documentation at [docs-mepmail.je4ndev.com](https://docs-mepmail.je4ndev.com). |
+| Docs (en/pt-BR) | ✅ | Full documentation at [docs.mepmail.dev](https://docs.mepmail.dev). |
 
 ## Run it locally
 
@@ -74,9 +74,9 @@ npx -y @mepmail/mcp   # stdio server for Claude Code, Cursor and any MCP client
 
 ## Links
 
-- Cloud: [mepmail.je4ndev.com](https://mepmail.je4ndev.com)
-- Docs: [docs-mepmail.je4ndev.com](https://docs-mepmail.je4ndev.com)
-- API: [api-mepmail.je4ndev.com](https://api-mepmail.je4ndev.com)
+- Cloud: [mepmail.dev](https://mepmail.dev)
+- Docs: [docs.mepmail.dev](https://docs.mepmail.dev)
+- API: [api.mepmail.dev](https://api.mepmail.dev)
 
 ## License
 

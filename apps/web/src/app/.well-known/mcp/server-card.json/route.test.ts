@@ -20,7 +20,7 @@ describe("mcp server-card.json", () => {
     expect(body.authentication.resourceMetadata).toBe(
       "https://api-mepmail.je4ndev.com/.well-known/oauth-protected-resource",
     );
-    expect(body.authentication.instructionsUrl).toBe("https://mepmail.je4ndev.com/auth.md");
+    expect(body.authentication.instructionsUrl).toBe("https://mepmail.dev/auth.md");
     expect(JSON.stringify(body)).not.toContain("millionsend.com");
   });
 

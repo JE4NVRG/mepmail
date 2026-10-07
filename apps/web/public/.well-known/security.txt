@@ -1,6 +1,6 @@
 # MepMail security contact (RFC 9116).
-# Policy and disclosure terms: https://mepmail.je4ndev.com/security
+# Policy and disclosure terms: https://mepmail.dev/security
 Contact: mailto:security@je4ndev.com
 Expires: 2027-09-29T00:00:00.000Z
-Policy: https://mepmail.je4ndev.com/security
+Policy: https://mepmail.dev/security
 Preferred-Languages: en, pt-BR

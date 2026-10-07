@@ -47,7 +47,7 @@
         "links": [
           {
             "label": "Docs: notification channels",
-            "href": "https://docs-mepmail.je4ndev.com/integrations"
+            "href": "https://docs.mepmail.dev/integrations"
           }
         ]
       },
@@ -63,7 +63,7 @@
         "links": [
           {
             "label": "Docs: MCP",
-            "href": "https://docs-mepmail.je4ndev.com/mcp"
+            "href": "https://docs.mepmail.dev/mcp"
           }
         ]
       },
@@ -73,7 +73,7 @@
         "logos": ["mcp"],
         "body": "Give the agent its own mailbox on your domain. Through the Mail MCP it lists and reads messages, saves drafts and replies, no code.",
         "bullets": [
-          "Endpoint at https://api-mepmail.je4ndev.com/mcp/correio with the mailbox key (mmb_).",
+          "Endpoint at https://api.mepmail.dev/mcp/correio with the mailbox key (mmb_).",
           "Per-key permissions: read, draft and send. Without send, the request waits for your approval.",
           "The main MCP also creates mailboxes and agent keys, without reading their content."
         ],
@@ -84,7 +84,7 @@
           },
           {
             "label": "Docs: connect an agent over MCP",
-            "href": "https://docs-mepmail.je4ndev.com/mailboxes#connect-an-agent-over-mcp"
+            "href": "https://docs.mepmail.dev/mailboxes#connect-an-agent-over-mcp"
           }
         ]
       },
@@ -101,7 +101,7 @@
         "links": [
           {
             "label": "Docs: SMTP relay",
-            "href": "https://docs-mepmail.je4ndev.com/self-hosting#smtp-relay"
+            "href": "https://docs.mepmail.dev/self-hosting#smtp-relay"
           }
         ]
       },
@@ -117,7 +117,7 @@
         "links": [
           {
             "label": "Docs: SDKs",
-            "href": "https://docs-mepmail.je4ndev.com/sdks"
+            "href": "https://docs.mepmail.dev/sdks"
           },
           {
             "label": "MepMail vs Resend",
@@ -132,16 +132,16 @@
         "body": "Scripts, pipelines and back-office tools call the same public API the panel uses: 44 documented endpoints with an interactive reference.",
         "bullets": [
           "@mepmail/cli runs the migration and day-to-day operations from the terminal.",
-          "OpenAPI at docs-mepmail.je4ndev.com, wire-compatible with the Resend API surface."
+          "OpenAPI at docs.mepmail.dev, wire-compatible with the Resend API surface."
         ],
         "links": [
           {
             "label": "Docs: CLI",
-            "href": "https://docs-mepmail.je4ndev.com/cli"
+            "href": "https://docs.mepmail.dev/cli"
           },
           {
             "label": "Docs: API reference",
-            "href": "https://docs-mepmail.je4ndev.com/api-reference"
+            "href": "https://docs.mepmail.dev/api-reference"
           }
         ]
       }

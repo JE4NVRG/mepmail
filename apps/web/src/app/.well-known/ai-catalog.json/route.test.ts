@@ -8,19 +8,19 @@ describe("ai-catalog.json", () => {
     expect(res.headers.get("Content-Type")).toContain("application/json");
     const body = await res.json();
     expect(body.specVersion).toBe("1.0");
-    expect(body.host.identifier).toBe("mepmail.je4ndev.com");
+    expect(body.host.identifier).toBe("mepmail.dev");
     const urls = body.entries.map((e: { url: string }) => e.url);
-    expect(urls).toContain("https://mepmail.je4ndev.com/.well-known/mcp/server-card.json");
-    expect(urls).toContain("https://mepmail.je4ndev.com/.well-known/api-catalog");
-    expect(urls).toContain("https://mepmail.je4ndev.com/.well-known/agent-skills/index.json");
-    expect(urls).toContain("https://api-mepmail.je4ndev.com/openapi.json");
-    expect(urls).toContain("https://mepmail.je4ndev.com/auth.md");
-    expect(urls).toContain("https://mepmail.je4ndev.com/correio");
-    expect(urls).toContain("https://docs-mepmail.je4ndev.com/mailboxes");
+    expect(urls).toContain("https://mepmail.dev/.well-known/mcp/server-card.json");
+    expect(urls).toContain("https://mepmail.dev/.well-known/api-catalog");
+    expect(urls).toContain("https://mepmail.dev/.well-known/agent-skills/index.json");
+    expect(urls).toContain("https://api.mepmail.dev/openapi.json");
+    expect(urls).toContain("https://mepmail.dev/auth.md");
+    expect(urls).toContain("https://mepmail.dev/correio");
+    expect(urls).toContain("https://docs.mepmail.dev/mailboxes");
     const correio = body.entries.find(
       (e: { identifier: string }) => e.identifier === "urn:air:je4ndev.com:mepmail:correio:mcp",
     );
-    expect(correio.description).toContain("https://api-mepmail.je4ndev.com/mcp/correio");
+    expect(correio.description).toContain("https://api.mepmail.dev/mcp/correio");
     expect(JSON.stringify(body)).not.toContain("millionsend.com");
   });
 });

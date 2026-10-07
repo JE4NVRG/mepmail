@@ -30,27 +30,27 @@ URL — and moving off Resend costs one line per call site.
 
 | Surface | Where |
 | --- | --- |
-| REST API (Resend-compatible) | ${B}https://api-mepmail.je4ndev.com${B} |
+| REST API (Resend-compatible) | ${B}https://api.mepmail.dev${B} |
 | Hosted MCP server (OAuth 2.1, no install) | ${B}https://api-mepmail.je4ndev.com/mcp${B} |
-| Correio MCP server (one mailbox, ${B}mmb_${B} key) | ${B}https://api-mepmail.je4ndev.com/mcp/correio${B} |
+| Correio MCP server (one mailbox, ${B}mmb_${B} key) | ${B}https://api.mepmail.dev/mcp/correio${B} |
 | Local MCP server (stdio) | ${B}npx -y @mepmail/mcp${B} with a team API key |
 | Migration CLI | ${B}npx @mepmail/cli migrate --from resend${B} |
-| OpenAPI 3.1 | ${B}https://api-mepmail.je4ndev.com/openapi.json${B} |
-| Documentation | ${B}https://docs-mepmail.je4ndev.com${B} |
+| OpenAPI 3.1 | ${B}https://api.mepmail.dev/openapi.json${B} |
+| Documentation | ${B}https://docs.mepmail.dev${B} |
 
 ## You cannot mint a credential yourself
 
 An API key (${B}ms_${B}…) is created by a human in the MepMail dashboard under
 **API keys**. No unauthenticated endpoint issues one, and the dashboard is not
 an automation surface — ask the user for a key, or tell them where to create
-one. ${B}https://mepmail.je4ndev.com/auth.md${B} has the full authentication
+one. ${B}https://mepmail.dev/auth.md${B} has the full authentication
 picture: full-access and sending-only keys, keys confined to one sender domain,
 OAuth for the MCP server, and the SMTP relay.
 
 ## Send one email
 
 ${FENCE}sh
-curl -X POST https://api-mepmail.je4ndev.com/emails \\
+curl -X POST https://api.mepmail.dev/emails \\
   -H "Authorization: Bearer ms_..." \\
   -H "Content-Type: application/json" \\
   -d '{"from":"Acme <onboarding@acme.dev>","to":["delivered@example.com"],"subject":"Hello","html":"<strong>It works</strong>"}'
@@ -62,7 +62,7 @@ ${FENCE}ts
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.MEPMAIL_API_KEY, {
-  baseUrl: "https://api-mepmail.je4ndev.com",
+  baseUrl: "https://api.mepmail.dev",
 });
 
 await resend.emails.send({
@@ -113,7 +113,7 @@ key opens exactly one mailbox and carries the permissions the owner chose:
 **read**, **draft** and **send**.
 
 - **Over MCP**, add a Streamable HTTP server at
-  ${B}https://api-mepmail.je4ndev.com/mcp/correio${B} with the header
+  ${B}https://api.mepmail.dev/mcp/correio${B} with the header
   ${B}Authorization: Bearer mmb_...${B}. Tools: ${B}mailbox_list_messages${B},
   ${B}mailbox_read_message${B}, ${B}mailbox_save_draft${B} and
   ${B}mailbox_send_draft${B}.
@@ -129,19 +129,19 @@ key opens exactly one mailbox and carries the permissions the owner chose:
   read mailbox content.
 - Correio is paid per mailbox on top of a paying Send plan; each mailbox needs a
   verified domain and receiving turned on. Guide:
-  <https://docs-mepmail.je4ndev.com/mailboxes>
+  <https://docs.mepmail.dev/mailboxes>
 
 ## Where the truth lives
 
 - Every error name, status and remedy:
-  <https://docs-mepmail.je4ndev.com/errors>
+  <https://docs.mepmail.dev/errors>
 - Rate limits, and what to do on a 429:
-  <https://docs-mepmail.je4ndev.com/rate-limits>
+  <https://docs.mepmail.dev/rate-limits>
 - MCP tools and client config:
-  <https://docs-mepmail.je4ndev.com/mcp>
-- npm packages (MCP server, CLI): <https://docs-mepmail.je4ndev.com/packages>
+  <https://docs.mepmail.dev/mcp>
+- npm packages (MCP server, CLI): <https://docs.mepmail.dev/packages>
 - Everything published for machines:
-  <https://mepmail.je4ndev.com/.well-known/ai-catalog.json>
+  <https://mepmail.dev/.well-known/ai-catalog.json>
 `;
 
 /** The `sha256:<hex>` digest of the exact markdown the SKILL.md route serves. */

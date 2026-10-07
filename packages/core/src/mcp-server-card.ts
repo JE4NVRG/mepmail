@@ -20,7 +20,7 @@ import { MCP_TOOLS } from "./mcp-tools.js";
  * directory was pointed at, NOT on the marketing host). Measured on
  * 2026-09-28 with SmitheryBot/1.0: the scan of
  * https://api-mepmail.je4ndev.com/mcp fetched
- * https://api-mepmail.je4ndev.com/.well-known/mcp/server-card.json and got the
+ * https://api.mepmail.dev/.well-known/mcp/server-card.json and got the
  * API's 404, then fell through to the interactive OAuth prompt — which is why
  * the API must serve this document too, not only the dashboard.
  *
@@ -41,14 +41,14 @@ export const MCP_SERVER_CARD = {
   description:
     "Official MepMail MCP server (hosted): transactional email with a Resend-compatible API. Send and manage emails, broadcasts, domains, contacts, templates, webhooks, API keys and Correio mailboxes for AI agents from AI assistants.",
   title: "MepMail",
-  websiteUrl: "https://docs-mepmail.je4ndev.com",
+  websiteUrl: "https://docs.mepmail.dev",
   repository: {
     url: "https://github.com/JE4NVRG/mepmail",
     source: "github",
   },
   icons: [
     {
-      src: "https://mepmail.je4ndev.com/logo/mepmail-avatar.svg",
+      src: "https://mepmail.dev/logo/mepmail-avatar.svg",
       mimeType: "image/svg+xml",
     },
   ],
@@ -93,16 +93,16 @@ export const MCP_SERVER_CARD = {
       "mailboxes:read",
       "mailboxes:write",
     ],
-    instructionsUrl: "https://mepmail.je4ndev.com/auth.md",
+    instructionsUrl: "https://mepmail.dev/auth.md",
     description:
       "The MCP endpoint answers 401 with a WWW-Authenticate challenge; MCP clients then follow the OAuth 2.1 discovery documents above. API keys do not authenticate this endpoint. The tools a token exposes depend on the scopes it carries.",
   },
   relatedResources: {
-    aiCatalog: "https://mepmail.je4ndev.com/.well-known/ai-catalog.json",
-    apiCatalog: "https://mepmail.je4ndev.com/.well-known/api-catalog",
-    authInstructions: "https://mepmail.je4ndev.com/auth.md",
-    llmsTxt: "https://mepmail.je4ndev.com/llms.txt",
-    docs: "https://docs-mepmail.je4ndev.com",
+    aiCatalog: "https://mepmail.dev/.well-known/ai-catalog.json",
+    apiCatalog: "https://mepmail.dev/.well-known/api-catalog",
+    authInstructions: "https://mepmail.dev/auth.md",
+    llmsTxt: "https://mepmail.dev/llms.txt",
+    docs: "https://docs.mepmail.dev",
   },
 } as const;
 

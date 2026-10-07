@@ -21,7 +21,7 @@ import {
 
 const OUT = "/home/jean/.hermes/cache/scratch/mail-gallery";
 const LOCALES = ["pt-BR", "en"] as const;
-const SAMPLE_URL = "https://mepmail.je4ndev.com/sample?token=EXEMPLO";
+const SAMPLE_URL = "https://mepmail.dev/sample?token=EXEMPLO";
 
 /** Realistic stand-ins for every {slot} in the account catalogs. */
 const VALUES: Record<string, string> = {
@@ -40,7 +40,7 @@ const VALUES: Record<string, string> = {
   days: "7",
   minutes: "30",
   hours: "24",
-  docsUrl: "https://docs-mepmail.je4ndev.com",
+  docsUrl: "https://docs.mepmail.dev",
   domain: "mail.vultrix3d.com.br",
   reason: "bounce rate acima de 5%",
   metric: "7,4%",
@@ -58,7 +58,7 @@ const VALUES: Record<string, string> = {
   parked: "37",
   rate: "12%",
   actor: "Jean Carlos",
-  billingUrl: "https://mepmail.je4ndev.com/settings/billing",
+  billingUrl: "https://mepmail.dev/settings/billing",
   emails: "3 e-mails",
   failed: " 37 falharam.",
   first: "640",

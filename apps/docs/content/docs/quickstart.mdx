@@ -13,11 +13,11 @@ your choice across the docs.
 <DeploymentTab deployment="cloud">
 
 Signup is open — the beta has no seat limit, so create your account at
-[mepmail.je4ndev.com/signup](https://mepmail.je4ndev.com/signup) — no invite, no
+[mepmail.dev/signup](https://mepmail.dev/signup) — no invite, no
 card required — then sign in at
-[mepmail.je4ndev.com](https://mepmail.je4ndev.com). Each account sends up to 100
+[mepmail.dev](https://mepmail.dev). Each account sends up to 100
 emails per UTC day on the Free plan; write to us if you would rather have us set
-the account up for you. The API is at `api-mepmail.je4ndev.com`.
+the account up for you. The API is at `api.mepmail.dev`.
 
 </DeploymentTab>
 <DeploymentTab deployment="self-hosted">
@@ -89,7 +89,7 @@ Your API base URL:
 <DeploymentTabs>
 <DeploymentTab deployment="cloud">
 
-`https://api-mepmail.je4ndev.com`
+`https://api.mepmail.dev`
 
 </DeploymentTab>
 <DeploymentTab deployment="self-hosted">
@@ -105,7 +105,7 @@ yours.
 With curl:
 
 ```sh
-curl -X POST https://api-mepmail.je4ndev.com/emails \
+curl -X POST https://api.mepmail.dev/emails \
   -H "Authorization: Bearer ms_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -123,7 +123,7 @@ base URL:
 import { Resend } from "resend";
 
 const resend = new Resend("ms_...", {
-  baseUrl: "https://api-mepmail.je4ndev.com",
+  baseUrl: "https://api.mepmail.dev",
 });
 
 const { data, error } = await resend.emails.send({

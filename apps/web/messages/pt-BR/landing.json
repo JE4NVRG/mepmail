@@ -220,7 +220,7 @@
   "deliverability": {
     "eyebrow": "Entregabilidade e integração",
     "title": "Domínio próprio. Visibilidade de cada envio. Apoio de quem constrói.",
-    "body": "Use seu domínio, verificado com DKIM e MAIL FROM, e acompanhe cada envio no painel. Envie por <api>api-mepmail.je4ndev.com</api> ou pelo relay SMTP com STARTTLS em <smtp>smtp-mepmail.je4ndev.com:2587</smtp>. Conte com onboarding direto do time que constrói o MepMail.",
+    "body": "Use seu domínio, verificado com DKIM e MAIL FROM, e acompanhe cada envio no painel. Envie por <api>api.mepmail.dev</api> ou pelo relay SMTP com STARTTLS em <smtp>smtp.mepmail.dev:2587</smtp>. Conte com onboarding direto do time que constrói o MepMail.",
     "note": "Compatibilidade de API não significa paridade de recursos: inbound, IP dedicado e SSO não fazem parte desta promessa. A entrega na caixa de entrada depende também do domínio, do conteúdo e da reputação de envio."
   },
   "faq": {

@@ -7,13 +7,13 @@ describe("crawler entry points", () => {
     const res = GET();
     expect(res.status).toBe(200);
     const body = await res.text();
-    expect(body).toContain("https://docs-mepmail.je4ndev.com");
-    expect(body).toContain("https://mepmail.je4ndev.com/auth.md");
+    expect(body).toContain("https://docs.mepmail.dev");
+    expect(body).toContain("https://mepmail.dev/auth.md");
     expect(body).toContain("https://api-mepmail.je4ndev.com/mcp");
     // Correio is announced to agents with its own MCP endpoint and guide.
-    expect(body).toContain("https://mepmail.je4ndev.com/correio");
-    expect(body).toContain("https://api-mepmail.je4ndev.com/mcp/correio");
-    expect(body).toContain("https://docs-mepmail.je4ndev.com/mailboxes");
+    expect(body).toContain("https://mepmail.dev/correio");
+    expect(body).toContain("https://api.mepmail.dev/mcp/correio");
+    expect(body).toContain("https://docs.mepmail.dev/mailboxes");
     expect(body).not.toContain("millionsend.com");
   });
 

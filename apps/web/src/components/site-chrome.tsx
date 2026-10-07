@@ -82,7 +82,7 @@ function anchorHref(page: PublicPage, hash: string): string {
 }
 
 /** Documentação oficial do produto (host separado do painel). */
-const DOCS_URL = "https://docs-mepmail.je4ndev.com";
+const DOCS_URL = "https://docs.mepmail.dev";
 
 export function Wordmark() {
   return (

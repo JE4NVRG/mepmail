@@ -81,7 +81,7 @@ describe("enrollment and the sign-up flag", () => {
     });
     expect(sends[0]?.text).toContain("Olá, Ada Lovelace");
     expect(sends[0]?.text).toContain("http://localhost:3000/domains");
-    expect(sends[0]?.text).toContain("https://docs-mepmail.je4ndev.com");
+    expect(sends[0]?.text).toContain("https://docs.mepmail.dev");
   });
 
   it("the cloud enrolls whatever the flag says", async () => {

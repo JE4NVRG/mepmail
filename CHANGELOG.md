@@ -7,6 +7,25 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.47] - 2026-10-07
+
+Public hosts on mepmail.dev.
+
+### Added
+
+- `https://api.mepmail.dev` (REST API and the Correio MCP at `/mcp/correio`),
+  `https://docs.mepmail.dev` and `smtp.mepmail.dev` (port 2587, STARTTLS), in
+  front of the same services.
+- `ADVERTISED_API_URL`: an optional second public API hostname the dashboard
+  prints, while MCP tokens stay bound to `PUBLIC_API_URL`.
+
+### Changed
+
+- The site, dashboard snippets, docs, agent discovery files and the OpenAPI
+  server point at the mepmail.dev hosts. The je4ndev.com hosts keep serving;
+  the old docs host redirects. The OAuth MCP endpoint and its issuer stay on
+  je4ndev.com until connected agents can move.
+
 ## [0.46] - 2026-10-07
 
 A Send price ladder where moving up always costs less per email.

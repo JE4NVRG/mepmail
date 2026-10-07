@@ -966,7 +966,7 @@ describe("static server card", () => {
    * A directory's scanner reads the card from the origin of the MCP URL it was
    * given, so this route — not the dashboard's copy — is what unblocks a scan
    * behind the OAuth wall. Measured with SmitheryBot/1.0 on 2026-09-28: it
-   * fetched https://api-mepmail.je4ndev.com/.well-known/mcp/server-card.json.
+   * fetched https://api.mepmail.dev/.well-known/mcp/server-card.json.
    */
   it("serves the shared card on the endpoint's own origin", async () => {
     const res = await app.request("/.well-known/mcp/server-card.json");

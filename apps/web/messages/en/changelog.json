@@ -23,6 +23,28 @@
   },
   "releases": [
     {
+      "version": "0.47",
+      "date": "2026-10-07",
+      "title": "MepMail now lives on mepmail.dev",
+      "summary": "The API, the docs and SMTP have mepmail.dev addresses. The old ones keep working, nothing to change in your code.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "API at https://api.mepmail.dev, docs at https://docs.mepmail.dev and SMTP at smtp.mepmail.dev (port 2587, STARTTLS).",
+            "The Mail MCP also answers at https://api.mepmail.dev/mcp/correio."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "The dashboard, the site, the docs and the code samples now show the new addresses.",
+            "The je4ndev.com addresses stay up for existing integrations; the old docs redirect to the new ones. The main OAuth MCP stays at api-mepmail.je4ndev.com/mcp for now."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.46",
       "date": "2026-10-07",
       "title": "Prices that add up at every rung",
@@ -118,27 +140,6 @@
           "items": [
             "Notification channels for Slack, Discord and Telegram — paste a webhook URL and MepMail formats the alerts.",
             "A gallery of 10 ready-to-use email templates (EN and PT) with live preview and one-click copy."
-          ]
-        }
-      ]
-    },
-    {
-      "version": "0.41",
-      "date": "2026-09-28",
-      "title": "Your AI agents can discover MepMail",
-      "summary": "The MCP server now advertises itself where agent tools look, and the docs got a big first pass.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "MCP auto-discovery: Claude and other MCP clients can now find MepMail's tools without manual setup.",
-            "For self-hosters: an operator console to manage instance users, audit and regions."
-          ]
-        },
-        {
-          "kind": "changed",
-          "items": [
-            "Docs wave 1 — npm packages, rate limits with Retry-After, a full error catalogue, and the MCP install path."
           ]
         }
       ]

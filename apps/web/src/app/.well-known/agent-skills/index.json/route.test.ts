@@ -15,7 +15,7 @@ describe("agent-skills index", () => {
     expect(skill.name).toBe("mepmail");
     expect(skill.type).toBe("skill-md");
     expect(skill.description).toMatch(/^Use when /);
-    expect(skill.url).toBe("https://mepmail.je4ndev.com/.well-known/agent-skills/mepmail/SKILL.md");
+    expect(skill.url).toBe("https://mepmail.dev/.well-known/agent-skills/mepmail/SKILL.md");
   });
 
   it("publishes the digest of the bytes the SKILL.md route actually serves", async () => {
@@ -33,14 +33,14 @@ describe("agent-skills index", () => {
     // Frontmatter the convention expects, and the loop back to the docs.
     expect(markdown.startsWith("---\nname: mepmail\n")).toBe(true);
     for (const url of [
-      "https://docs-mepmail.je4ndev.com/errors",
-      "https://docs-mepmail.je4ndev.com/rate-limits",
-      "https://docs-mepmail.je4ndev.com/mcp",
-      "https://docs-mepmail.je4ndev.com/packages",
-      "https://api-mepmail.je4ndev.com/openapi.json",
-      "https://mepmail.je4ndev.com/auth.md",
-      "https://api-mepmail.je4ndev.com/mcp/correio",
-      "https://docs-mepmail.je4ndev.com/mailboxes",
+      "https://docs.mepmail.dev/errors",
+      "https://docs.mepmail.dev/rate-limits",
+      "https://docs.mepmail.dev/mcp",
+      "https://docs.mepmail.dev/packages",
+      "https://api.mepmail.dev/openapi.json",
+      "https://mepmail.dev/auth.md",
+      "https://api.mepmail.dev/mcp/correio",
+      "https://docs.mepmail.dev/mailboxes",
     ]) {
       expect(markdown).toContain(url);
     }

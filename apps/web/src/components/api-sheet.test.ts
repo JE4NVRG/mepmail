@@ -27,7 +27,7 @@ describe("RESOURCE_SHEETS", () => {
       for (const section of sheet.sections) {
         const code = sheet.curl[section];
         expect(code, `${resource}.${section}`).toBeTruthy();
-        expect(code, `${resource}.${section}`).toContain("https://api-mepmail.je4ndev.com/");
+        expect(code, `${resource}.${section}`).toContain("https://api.mepmail.dev/");
         expect(code, `${resource}.${section}`).toContain("Authorization: Bearer ms_xxxxxxxxx");
       }
     });

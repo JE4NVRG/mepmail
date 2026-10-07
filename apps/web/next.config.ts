@@ -25,7 +25,7 @@ const config: NextConfig = {
     return [
       {
         source: "/llms-full.txt",
-        destination: "https://docs-mepmail.je4ndev.com/llms-full.txt",
+        destination: "https://docs.mepmail.dev/llms-full.txt",
         permanent: true,
       },
     ];

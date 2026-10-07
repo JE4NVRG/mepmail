@@ -17,8 +17,8 @@
     "title": "O que todo plano carrega, Free incluído.",
     "body": "Incluído em todos os planos. Sem adicionais.",
     "points": [
-      "API HTTPS compatível com Resend em api-mepmail.je4ndev.com. Mantenha o SDK oficial e troque a base URL.",
-      "Relay SMTP com STARTTLS em smtp-mepmail.je4ndev.com:2587.",
+      "API HTTPS compatível com Resend em api.mepmail.dev. Mantenha o SDK oficial e troque a base URL.",
+      "Relay SMTP com STARTTLS em smtp.mepmail.dev:2587.",
       "Seu domínio de envio próprio, verificado com DKIM e MAIL FROM no Amazon SES.",
       "Chave de API dedicada, logs de entrega, lista de supressão e métricas no painel.",
       "MCP server oficial, para agentes enviarem pela mesma conta."

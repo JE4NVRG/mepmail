@@ -39,7 +39,7 @@
       },
       {
         "name": "Documentation",
-        "kind": "docs-mepmail.je4ndev.com",
+        "kind": "docs.mepmail.dev",
         "body": "Quickstart, concepts, integrations and the API reference — the same docs the dashboard links to.",
         "bullets": [
           "Sending domains and the DNS records to publish.",
@@ -48,7 +48,7 @@
         "links": [
           {
             "label": "Open the docs",
-            "href": "https://docs-mepmail.je4ndev.com"
+            "href": "https://docs.mepmail.dev"
           }
         ]
       },
@@ -82,7 +82,7 @@
         "a": "Sending serves application messages, sign-ups and campaigns, with a dashboard, HTTP API, templates, contacts, broadcasts, webhooks and metrics.",
         "link": {
           "label": "Documentation",
-          "href": "https://docs-mepmail.je4ndev.com"
+          "href": "https://docs.mepmail.dev"
         }
       },
       {
@@ -90,7 +90,7 @@
         "a": "Visit mepmail.dev, select the correct organization, add a domain you control and complete DNS verification. Then create a key in API Keys with the permissions you need.",
         "link": {
           "label": "Getting started",
-          "href": "https://docs-mepmail.je4ndev.com/quickstart"
+          "href": "https://docs.mepmail.dev/quickstart"
         }
       },
       {
@@ -98,7 +98,7 @@
         "a": "Verification prepares your domain for Sending. Mailboxes are a separate service: registering a mailbox does not automatically change MX or enable receiving. Use the records shown in the dashboard for that domain.",
         "link": {
           "label": "Domains",
-          "href": "https://docs-mepmail.je4ndev.com/concepts/domains"
+          "href": "https://docs.mepmail.dev/concepts/domains"
         }
       },
       {
@@ -106,7 +106,7 @@
         "a": "Yes, through the Sending API or the published MCP, within the connection permissions. Copy the endpoint from Settings → MCP. The Sending MCP does not grant access to Mailboxes.",
         "link": {
           "label": "MCP",
-          "href": "https://docs-mepmail.je4ndev.com/mcp"
+          "href": "https://docs.mepmail.dev/mcp"
         }
       },
       {
@@ -114,7 +114,7 @@
         "a": "Mailboxes are in closed production for the operator account, without a public offer. IMAP, Gmail/Hotmail/MBOX/PST import and public inbox MCP are not available yet. Google sign-in does not sync a Gmail inbox.",
         "link": {
           "label": "Mailboxes",
-          "href": "https://docs-mepmail.je4ndev.com/mailboxes"
+          "href": "https://docs.mepmail.dev/mailboxes"
         }
       },
       {
@@ -130,7 +130,7 @@
         "a": "Check domain verification, key permissions, quotas, suppressions and sending status in the logs. Acceptance or queuing does not prove delivery to the recipient inbox. For diagnosis, provide the time, HTTP status and request or message ID; do not share passwords or keys.",
         "link": {
           "label": "Suppressions",
-          "href": "https://docs-mepmail.je4ndev.com/concepts/suppressions"
+          "href": "https://docs.mepmail.dev/concepts/suppressions"
         }
       },
       {
@@ -138,7 +138,7 @@
         "a": "Point the official Resend SDKs at MepMail's base URL, swap the API key, and move your domains and contacts. The free account can be migrated with npx @mepmail/cli migrate --from resend. The per-language guide walks through each SDK.",
         "link": {
           "label": "Docs: migrate from Resend",
-          "href": "https://docs-mepmail.je4ndev.com/migrate-from-resend"
+          "href": "https://docs.mepmail.dev/migrate-from-resend"
         }
       },
       {

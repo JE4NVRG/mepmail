@@ -8,7 +8,7 @@ import "../landing.css";
 import "./correio.css";
 
 const canonical = "/correio";
-const docsOrigin = "https://docs-mepmail.je4ndev.com";
+const docsOrigin = "https://docs.mepmail.dev";
 const earlyAccessOpen = () => process.env.MAILBOX_EARLY_ACCESS_OPEN === "true";
 
 type TextItem = { title: string; body: string };

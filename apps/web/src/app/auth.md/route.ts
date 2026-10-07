@@ -5,7 +5,7 @@
  */
 const BODY = `# auth.md
 
-Not an agent? You're looking for <https://docs-mepmail.je4ndev.com>.
+Not an agent? You're looking for <https://docs.mepmail.dev>.
 
 You are an agent. This document tells you how to authenticate to **MepMail**,
 a transactional email service with a Resend-compatible API. Read it fully
@@ -27,7 +27,7 @@ MepMail authenticates two different kinds of caller:
 | --- | --- | --- |
 | **API key** | \`Authorization: Bearer ms_...\` | Every endpoint the team can use |
 | **Sending-access key** | \`Authorization: Bearer ms_...\` | Sending endpoints only; everything else answers \`403 restricted_api_key\` |
-| **SMTP relay credentials** | SMTP AUTH at \`smtp-mepmail.je4ndev.com\` port \`2587\` (STARTTLS), username \`mepmail\`, password = a sending-access key | The same sending surface, over SMTP |
+| **SMTP relay credentials** | SMTP AUTH at \`smtp.mepmail.dev\` port \`2587\` (STARTTLS), username \`mepmail\`, password = a sending-access key | The same sending surface, over SMTP |
 
 Keys are opaque strings that start with \`ms_\`. A key can also be restricted
 to one sender domain at creation time; sending from any other domain answers
@@ -44,11 +44,11 @@ transcripts, commits, tickets or prompts that will be logged.
 
 ## Using a key
 
-Base URL: \`https://api-mepmail.je4ndev.com\`
+Base URL: \`https://api.mepmail.dev\`
 
 \`\`\`
 POST /emails HTTP/1.1
-Host: api-mepmail.je4ndev.com
+Host: api.mepmail.dev
 Authorization: Bearer ms_...
 Content-Type: application/json
 
@@ -61,7 +61,7 @@ Content-Type: application/json
 \`\`\`
 
 Every endpoint is defined in the OpenAPI document linked from
-<https://mepmail.je4ndev.com/.well-known/api-catalog>.
+<https://mepmail.dev/.well-known/api-catalog>.
 
 ## Before your first real send
 
@@ -92,7 +92,7 @@ allowed for that resource (wrong permission level, or a sender domain the key
 is not scoped to). Fix what you ask for, or ask the operator for a key with
 the right scope. \`422 validation_error\` means the credential was accepted and
 the *request* was wrong; fix the request. The full error catalog is at
-<https://docs-mepmail.je4ndev.com/errors>.
+<https://docs.mepmail.dev/errors>.
 
 ## Rotation and revocation
 
@@ -134,11 +134,11 @@ are audience-bound to the MCP resource and are not accepted on the REST API.
 
 | Document | What it is |
 | --- | --- |
-| <https://mepmail.je4ndev.com/.well-known/ai-catalog.json> | Everything MepMail publishes for agents |
-| <https://mepmail.je4ndev.com/.well-known/api-catalog> | The API, its OpenAPI definition and docs (RFC 9727) |
-| <https://mepmail.je4ndev.com/.well-known/mcp/server-card.json> | The MCP server card |
-| <https://mepmail.je4ndev.com/llms.txt> | What MepMail is, in brief |
-| <https://docs-mepmail.je4ndev.com> | Human-facing documentation |
+| <https://mepmail.dev/.well-known/ai-catalog.json> | Everything MepMail publishes for agents |
+| <https://mepmail.dev/.well-known/api-catalog> | The API, its OpenAPI definition and docs (RFC 9727) |
+| <https://mepmail.dev/.well-known/mcp/server-card.json> | The MCP server card |
+| <https://mepmail.dev/llms.txt> | What MepMail is, in brief |
+| <https://docs.mepmail.dev> | Human-facing documentation |
 
 Human support, if you need to escalate to your operator:
 <mailto:jean@je4ndev.com>.

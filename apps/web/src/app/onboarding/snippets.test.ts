@@ -3,7 +3,7 @@ import { LANGS } from "../../components/api-sheet";
 import { onboardingSnippet, SNIPPET_HLJS, SNIPPET_LABELS, SNIPPET_LANGS } from "./snippets";
 
 const P = {
-  apiUrl: "https://api-mepmail.je4ndev.com",
+  apiUrl: "https://api.mepmail.dev",
   apiKey: "ms_test_key",
   from: "Acme <onboarding@yourdomain.com>",
   to: "delivered@example.com",

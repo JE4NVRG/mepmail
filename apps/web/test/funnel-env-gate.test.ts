@@ -82,12 +82,12 @@ it("sends to exactly the collector this environment set", async () => {
   vi.stubEnv("IS_CLOUD", "true");
   vi.stubEnv("UMAMI_ENDPOINT", ENDPOINT);
   vi.stubEnv("UMAMI_WEBSITE_ID", WEBSITE);
-  vi.stubEnv("APP_BASE_URL", "https://mepmail.je4ndev.com");
+  vi.stubEnv("APP_BASE_URL", "https://mepmail.dev");
 
   expect(funnelTarget()).toEqual({
     endpoint: ENDPOINT,
     websiteId: WEBSITE,
-    hostname: "mepmail.je4ndev.com",
+    hostname: "mepmail.dev",
   });
 
   const teamId = await createTeam(db);
@@ -106,7 +106,7 @@ it("sends to exactly the collector this environment set", async () => {
     type: "event",
     payload: {
       website: WEBSITE,
-      hostname: "mepmail.je4ndev.com",
+      hostname: "mepmail.dev",
       url: "/settings/billing",
       name: "checkout_started",
     },

@@ -281,7 +281,7 @@
       {
         "q": "Como apago os dados de um contato?",
         "a": "Apague o contato com erase=true pela API: o endereço é então apagado do histórico de e-mails, dos payloads de evento e dos logs de API — o caminho GDPR/LGPD. Sem isso, o log de envio envelhece na janela de retenção. As supressões guardam apenas um hash do endereço, como registro de não contatar.",
-        "link": { "label": "Referência da API", "href": "https://docs-mepmail.je4ndev.com" }
+        "link": { "label": "Referência da API", "href": "https://docs.mepmail.dev" }
       },
       {
         "q": "Subprocessadores de IA recebem o conteúdo dos meus e-mails?",

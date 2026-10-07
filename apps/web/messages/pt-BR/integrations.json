@@ -47,7 +47,7 @@
         "links": [
           {
             "label": "Docs: canais de notificação",
-            "href": "https://docs-mepmail.je4ndev.com/integrations"
+            "href": "https://docs.mepmail.dev/integrations"
           }
         ]
       },
@@ -63,7 +63,7 @@
         "links": [
           {
             "label": "Docs: MCP",
-            "href": "https://docs-mepmail.je4ndev.com/mcp"
+            "href": "https://docs.mepmail.dev/mcp"
           }
         ]
       },
@@ -73,7 +73,7 @@
         "logos": ["mcp"],
         "body": "Dê ao agente uma caixa própria no seu domínio. Pelo MCP do Correio ele lista e lê mensagens, salva rascunhos e responde, sem código.",
         "bullets": [
-          "Endpoint em https://api-mepmail.je4ndev.com/mcp/correio com a chave da caixa (mmb_).",
+          "Endpoint em https://api.mepmail.dev/mcp/correio com a chave da caixa (mmb_).",
           "Permissões por chave: ler, rascunhar e enviar. Sem envio, o pedido espera a sua aprovação.",
           "O MCP principal também cria caixas e chaves de agente, sem ler o conteúdo."
         ],
@@ -84,7 +84,7 @@
           },
           {
             "label": "Docs: conecte um agente por MCP",
-            "href": "https://docs-mepmail.je4ndev.com/pt-BR/mailboxes#conecte-um-agente-por-mcp"
+            "href": "https://docs.mepmail.dev/pt-BR/mailboxes#conecte-um-agente-por-mcp"
           }
         ]
       },
@@ -101,7 +101,7 @@
         "links": [
           {
             "label": "Docs: relay SMTP",
-            "href": "https://docs-mepmail.je4ndev.com/self-hosting#smtp-relay"
+            "href": "https://docs.mepmail.dev/self-hosting#smtp-relay"
           }
         ]
       },
@@ -117,7 +117,7 @@
         "links": [
           {
             "label": "Docs: SDKs",
-            "href": "https://docs-mepmail.je4ndev.com/sdks"
+            "href": "https://docs.mepmail.dev/sdks"
           },
           {
             "label": "MepMail vs Resend",
@@ -132,16 +132,16 @@
         "body": "Scripts, pipelines e ferramentas internas chamam a mesma API pública que o painel usa: 44 endpoints documentados com referência interativa.",
         "bullets": [
           "O @mepmail/cli roda a migração e as operações do dia a dia pelo terminal.",
-          "OpenAPI em docs-mepmail.je4ndev.com, wire-compatible com a superfície da API do Resend."
+          "OpenAPI em docs.mepmail.dev, wire-compatible com a superfície da API do Resend."
         ],
         "links": [
           {
             "label": "Docs: CLI",
-            "href": "https://docs-mepmail.je4ndev.com/cli"
+            "href": "https://docs.mepmail.dev/cli"
           },
           {
             "label": "Docs: API",
-            "href": "https://docs-mepmail.je4ndev.com/api-reference"
+            "href": "https://docs.mepmail.dev/api-reference"
           }
         ]
       }

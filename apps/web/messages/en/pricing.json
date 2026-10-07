@@ -17,8 +17,8 @@
     "title": "What every plan carries, Free included.",
     "body": "Included in every plan. No add-ons needed.",
     "points": [
-      "Resend-compatible HTTPS API at api-mepmail.je4ndev.com. Keep the official SDK and change the base URL.",
-      "SMTP relay with STARTTLS at smtp-mepmail.je4ndev.com:2587.",
+      "Resend-compatible HTTPS API at api.mepmail.dev. Keep the official SDK and change the base URL.",
+      "SMTP relay with STARTTLS at smtp.mepmail.dev:2587.",
       "Your own sending domain, verified with DKIM and MAIL FROM on Amazon SES.",
       "Dedicated API key, delivery logs, suppression list and metrics in the panel.",
       "The official MCP server, so agents send through the same account."

@@ -12,9 +12,9 @@ const BODY = JSON.stringify(
     specVersion: "1.0",
     host: {
       displayName: "MepMail",
-      identifier: "mepmail.je4ndev.com",
-      documentationUrl: "https://docs-mepmail.je4ndev.com",
-      logoUrl: "https://mepmail.je4ndev.com/logo/mepmail-avatar.svg",
+      identifier: "mepmail.dev",
+      documentationUrl: "https://docs.mepmail.dev",
+      logoUrl: "https://mepmail.dev/logo/mepmail-avatar.svg",
     },
     entries: [
       {
@@ -23,7 +23,7 @@ const BODY = JSON.stringify(
         description:
           "Server card for the hosted MepMail MCP server: send and manage transactional email, broadcasts, domains, contacts, templates, webhooks, API keys and Correio mailboxes from an AI assistant.",
         type: "application/mcp-server-card+json",
-        url: "https://mepmail.je4ndev.com/.well-known/mcp/server-card.json",
+        url: "https://mepmail.dev/.well-known/mcp/server-card.json",
         representativeQueries: [
           "send a transactional email with MepMail",
           "connect MepMail to Claude or ChatGPT",
@@ -36,9 +36,9 @@ const BODY = JSON.stringify(
         identifier: "urn:air:je4ndev.com:mepmail:correio:mcp",
         displayName: "MepMail Correio MCP server (email inboxes for AI agents)",
         description:
-          "Give an AI agent its own mailbox on your domain. Streamable HTTP at https://api-mepmail.je4ndev.com/mcp/correio with a per-mailbox mmb_ key: list and read messages, save drafts and send, with optional owner approval before each send. This entry links to its guide.",
+          "Give an AI agent its own mailbox on your domain. Streamable HTTP at https://api.mepmail.dev/mcp/correio with a per-mailbox mmb_ key: list and read messages, save drafts and send, with optional owner approval before each send. This entry links to its guide.",
         type: "text/html",
-        url: "https://docs-mepmail.je4ndev.com/mailboxes",
+        url: "https://docs.mepmail.dev/mailboxes",
         representativeQueries: [
           "give my AI agent an email inbox",
           "email inbox for an AI agent over MCP",
@@ -52,7 +52,7 @@ const BODY = JSON.stringify(
         description:
           "Email inboxes for people and AI agents on your own domain, paid per mailbox on top of a MepMail Send plan.",
         type: "text/html",
-        url: "https://mepmail.je4ndev.com/correio",
+        url: "https://mepmail.dev/correio",
       },
       {
         identifier: "urn:air:je4ndev.com:mepmail:api:catalog",
@@ -60,7 +60,7 @@ const BODY = JSON.stringify(
         description:
           "RFC 9727 linkset: where the MepMail API lives, its machine-readable definition and its documentation.",
         type: "application/linkset+json",
-        url: "https://mepmail.je4ndev.com/.well-known/api-catalog",
+        url: "https://mepmail.dev/.well-known/api-catalog",
       },
       {
         identifier: "urn:air:je4ndev.com:mepmail:api:openapi",
@@ -68,7 +68,7 @@ const BODY = JSON.stringify(
         description:
           "Machine-readable definition of every MepMail REST endpoint. The API is compatible with the Resend wire protocol.",
         type: "application/json",
-        url: "https://api-mepmail.je4ndev.com/openapi.json",
+        url: "https://api.mepmail.dev/openapi.json",
       },
       {
         identifier: "urn:air:je4ndev.com:mepmail:auth:instructions",
@@ -76,7 +76,7 @@ const BODY = JSON.stringify(
         description:
           "How an agent authenticates to MepMail: API keys for the REST API and SMTP relay, OAuth 2.1 for the MCP server, failure modes and rotation.",
         type: "text/markdown",
-        url: "https://mepmail.je4ndev.com/auth.md",
+        url: "https://mepmail.dev/auth.md",
       },
       {
         identifier: "urn:air:je4ndev.com:mepmail:agent:skills",
@@ -84,21 +84,21 @@ const BODY = JSON.stringify(
         description:
           "Skills index (agentskills.io discovery): the MepMail SKILL.md an agent loads to send, migrate and troubleshoot correctly — auth, quotas, rate limits and error names included.",
         type: "application/json",
-        url: "https://mepmail.je4ndev.com/.well-known/agent-skills/index.json",
+        url: "https://mepmail.dev/.well-known/agent-skills/index.json",
       },
       {
         identifier: "urn:air:je4ndev.com:mepmail:docs:llms-txt",
         displayName: "MepMail llms.txt",
         description: "A brief map of MepMail for LLMs.",
         type: "text/plain",
-        url: "https://mepmail.je4ndev.com/llms.txt",
+        url: "https://mepmail.dev/llms.txt",
       },
       {
         identifier: "urn:air:je4ndev.com:mepmail:docs:site",
         displayName: "MepMail documentation",
         description: "Human-facing guides: quickstart, SDKs, MCP, error reference and rate limits.",
         type: "text/html",
-        url: "https://docs-mepmail.je4ndev.com",
+        url: "https://docs.mepmail.dev",
       },
     ],
   },

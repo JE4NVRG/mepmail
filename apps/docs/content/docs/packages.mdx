@@ -35,7 +35,7 @@ install:
       "args": ["-y", "@mepmail/mcp"],
       "env": {
         "MEPMAIL_API_KEY": "ms_...",
-        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
+        "MEPMAIL_BASE_URL": "https://api.mepmail.dev"
       }
     }
   }
@@ -45,7 +45,7 @@ install:
 | Variable | Required | Default | Meaning |
 | --- | --- | --- | --- |
 | `MEPMAIL_API_KEY` | yes | — | Team API key (`ms_...`) from **API keys** in the dashboard. The tools act with exactly this key's reach. |
-| `MEPMAIL_BASE_URL` | no | `https://api-mepmail.je4ndev.com` | Your instance's API origin. Set it for a self-hosted deployment. |
+| `MEPMAIL_BASE_URL` | no | `https://api.mepmail.dev` | Your instance's API origin. Set it for a self-hosted deployment. |
 
 It reaches your instance's REST API directly with that key — no OAuth, no
 browser step — and exposes the reading, sending and contact tools: 22 of the

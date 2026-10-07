@@ -46,7 +46,7 @@ npx -y @mepmail/mcp
 | Variável | Obrigatória | Padrão | Significado |
 | --- | --- | --- | --- |
 | `MEPMAIL_API_KEY` | sim | — | Chave de API do time (`ms_...`), criada em **Chaves de API** no painel. O agente age exatamente com o alcance dessa chave. |
-| `MEPMAIL_BASE_URL` | não | `https://api-mepmail.je4ndev.com` | Origem da API da sua instância. Defina em uma implantação auto-hospedada. |
+| `MEPMAIL_BASE_URL` | não | `https://api.mepmail.dev` | Origem da API da sua instância. Defina em uma implantação auto-hospedada. |
 
 **Claude Desktop** (`claude_desktop_config.json`), e qualquer cliente com o
 mesmo formato de configuração:
@@ -59,7 +59,7 @@ mesmo formato de configuração:
       "args": ["-y", "@mepmail/mcp"],
       "env": {
         "MEPMAIL_API_KEY": "ms_...",
-        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
+        "MEPMAIL_BASE_URL": "https://api.mepmail.dev"
       }
     }
   }

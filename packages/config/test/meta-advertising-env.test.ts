@@ -16,7 +16,7 @@ describe("optional Meta server transport", () => {
       ["META_DATASET_ID", "1418150576403119"],
       ["META_ACCESS_TOKEN", "fixture-not-a-credential"],
       ["META_GRAPH_API_VERSION", "v25.0"],
-    ]) {
+    ] as const) {
       expect(() => assertEnvConsistency(fakeEnv(fields))).toThrow(
         `META_CONVERSIONS_ENABLED=true requires ${key}`,
       );

@@ -74,11 +74,13 @@ for (const locale of ["en", "pt-BR"] as const) {
       const initialLinks = hrefs(first.nav);
       expect(initialLinks).toContain("/mail");
       // Correio is its own full-window app: the menu opens it in a new tab.
-      expect(first.nav).toMatch(/href="\/mail"[^>]*target="_blank"|target="_blank"[^>]*href="\/mail"/);
+      expect(first.nav).toMatch(
+        /href="\/mail"[^>]*target="_blank"|target="_blank"[^>]*href="\/mail"/,
+      );
       expect(initialLinks).toContain("/emails");
       expect(initialLinks.filter((href) => href === "/domains")).toHaveLength(1);
       expect(initialLinks.filter((href) => href === "/settings")).toHaveLength(1);
-      expect(initialLinks).toContain("https://docs-mepmail.je4ndev.com");
+      expect(initialLinks).toContain("https://docs.mepmail.dev");
       expect(initialLinks).toContain("/source");
       for (const pathname of ["/domains/new", "/settings/connected-apps", "/emails/123"]) {
         state.pathname = pathname;

@@ -35,12 +35,12 @@ const MCP_CONFIG = `{
       "args": ["-y", "@mepmail/mcp"],
       "env": {
         "MEPMAIL_API_KEY": "ms_...",
-        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
+        "MEPMAIL_BASE_URL": "https://api.mepmail.dev"
       }
     }
   }
 }`;
-const API_EXAMPLE = `curl https://api-mepmail.je4ndev.com/emails \\
+const API_EXAMPLE = `curl https://api.mepmail.dev/emails \\
   -H "Authorization: Bearer $MEPMAIL_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -244,7 +244,7 @@ export default async function RootPage() {
                     <>
                       <p>{t("integration.smtpBody")}</p>
                       <pre>
-                        <code>{"smtp-mepmail.je4ndev.com\nPort: 2587\nSecurity: STARTTLS"}</code>
+                        <code>{"smtp.mepmail.dev\nPort: 2587\nSecurity: STARTTLS"}</code>
                       </pre>
                     </>
                   ),

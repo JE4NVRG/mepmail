@@ -21,7 +21,7 @@
   "same": {
     "title": "O que carrega junto",
     "items": [
-      "O SDK oficial do Resend: new Resend(\"ms_…\", { baseUrl: \"https://api-mepmail.je4ndev.com\" }).",
+      "O SDK oficial do Resend: new Resend(\"ms_…\", { baseUrl: \"https://api.mepmail.dev\" }).",
       "Os endpoints de envio que você já chama: /emails, /emails/batch e /emails/{id}/cancel.",
       "Gestão de domínios, chaves, webhooks, templates e supressões, com os mesmos formatos de requisição onde os dois se sobrepõem.",
       "O relay SMTP, para stacks que já enviam por SMTP em vez de HTTPS."

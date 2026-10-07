@@ -37,7 +37,7 @@ describe("page-scoped visitor support", () => {
     );
     expect(html).toContain(copy.assistant.pending);
     expect(html).toContain("mailto:support@je4ndev.com");
-    expect(html).toContain("https://docs-mepmail.je4ndev.com");
+    expect(html).toContain("https://docs.mepmail.dev");
     expect(html).not.toContain("<script");
     expect(html).not.toContain("<button");
     expect(JSON.stringify(copy)).not.toMatch(/one business day|1 dia útil/i);

@@ -19,8 +19,8 @@ export function CodeDemo({ subject, caption }: { subject: string; caption: strin
             <span className="gtm-s">&quot;resend&quot;</span>;{"\n\n"}
             <span className="gtm-k">const</span> resend = <span className="gtm-k">new</span> Resend(
             <span className="gtm-s">&quot;ms_…&quot;</span>, {"{"}
-            {"\n  "}baseUrl:{" "}
-            <span className="gtm-s">&quot;https://api-mepmail.je4ndev.com&quot;</span>,{"\n"}
+            {"\n  "}baseUrl: <span className="gtm-s">&quot;https://api.mepmail.dev&quot;</span>,
+            {"\n"}
             {"}"});{"\n\n"}
             <span className="gtm-k">await</span> resend.emails.send({"{"}
             {"\n  "}from: &quot;Acme &lt;onboarding@acme.dev&gt;&quot;,{"\n"}

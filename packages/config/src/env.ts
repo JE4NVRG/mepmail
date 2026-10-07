@@ -330,6 +330,12 @@ export const env = createEnv({
     // tokens are bound to; the listen port stays PORT.
     PUBLIC_API_URL: z.url().optional(),
 
+    // A second public API hostname to print instead (a brand domain added in
+    // front of the same API), while MCP tokens stay bound to PUBLIC_API_URL
+    // until clients move. Only the printed base changes; unset, it is
+    // PUBLIC_API_URL.
+    ADVERTISED_API_URL: z.url().optional(),
+
     // Legal pages linked from the auth screen's consent line. Both optional;
     // the line renders only the links that are set, and disappears entirely
     // when neither is.

@@ -7,7 +7,7 @@ O MepMail auto-hospedado envia pela sua própria conta AWS SES. Uma
 implantação são dois contêineres: Postgres e um contêiner de app rodando a
 API (porta 3001), o worker e o painel web (porta 3000). Um terceiro contêiner
 opcional roda o relay SMTP (porta 2587). (Prefere não operar infraestrutura?
-O [MepMail Cloud](https://mepmail.je4ndev.com) é a mesma plataforma,
+O [MepMail Cloud](https://mepmail.dev) é a mesma plataforma,
 hospedada.)
 
 **Pré-requisitos:** Docker com Compose; uma conta AWS com acesso ao SES na
@@ -99,6 +99,7 @@ auto-hospedada não tem limites de plano.
 | `BETTER_AUTH_SECRET` | Segredo de assinatura das sessões do painel. Gere com `openssl rand -base64 32`. |
 | `APP_BASE_URL` | URL base pública da implantação — a origem que os navegadores usam para acessar o painel (ex.: `https://mail.example.com`). O login só é aceito a partir dessa origem; assinaturas SNS, links de descadastro e links de rastreamento derivam dela. Precisa corresponder exatamente ao esquema+host+porta em que você abre o painel — inclusive um `WEB_PORT` customizado — ou login e cadastro falham com erro de "invalid origin". Padrão `http://localhost:3000`. |
 | `PUBLIC_API_URL` | Origem pública da API quando um reverse proxy a serve no próprio hostname (ex.: `https://api.example.com`). É o que o painel mostra como base da API e ao que os tokens MCP ficam vinculados; sem definir, a API é assumida na porta 3001 do host do painel. |
+| `ADVERTISED_API_URL` | Segundo hostname público opcional para a mesma API (ex.: um domínio novo da marca). O painel mostra este como base da API; os tokens MCP continuam vinculados ao `PUBLIC_API_URL`, então agentes já conectados seguem funcionando. |
 
 ### AWS SES
 
@@ -703,12 +704,12 @@ cadastro por senha não recebe sessão até o link enviado ser aberto; contas
 anteriores confirmam no próximo login. Onde a instância confirma e-mails, o
 remetente do onboarding só alcança membros que confirmaram.
 
-Nada em uma instância auto-hospedada contata mepmail.je4ndev.com por conta
+Nada em uma instância auto-hospedada contata mepmail.dev por conta
 própria. O assistente de configuração oferece, uma vez e só de forma
 interativa, inscrever o e-mail do operador nas notas de lançamento do
 MepMail; é o assistente na sua máquina enviando a sua resposta, e um link
 de confirmação chega antes de qualquer coisa ser armazenada. Quando não
-consegue alcançar mepmail.je4ndev.com, ele imprime a página,
+consegue alcançar mepmail.dev, ele imprime a página,
 [app.mepmail.je4ndev.com/updates?source=self-host](https://app.mepmail.je4ndev.com/updates?source=self-host), e **Configurações →
 Instância** leva à mesma página; o `source` marca você como auto-hospedado
 nos dois casos.

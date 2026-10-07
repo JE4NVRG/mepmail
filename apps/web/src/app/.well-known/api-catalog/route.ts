@@ -7,27 +7,27 @@ const BODY = JSON.stringify(
   {
     linkset: [
       {
-        anchor: "https://api-mepmail.je4ndev.com/",
+        anchor: "https://api.mepmail.dev/",
         "service-desc": [
           {
-            href: "https://api-mepmail.je4ndev.com/openapi.json",
+            href: "https://api.mepmail.dev/openapi.json",
             type: "application/json",
             title: "MepMail API (OpenAPI 3.1)",
           },
         ],
         "service-doc": [
           {
-            href: "https://docs-mepmail.je4ndev.com",
+            href: "https://docs.mepmail.dev",
             type: "text/html",
             title: "MepMail documentation",
           },
           {
-            href: "https://docs-mepmail.je4ndev.com/llms-full.txt",
+            href: "https://docs.mepmail.dev/llms-full.txt",
             type: "text/plain",
             title: "MepMail documentation in one file",
           },
           {
-            href: "https://mepmail.je4ndev.com/auth.md",
+            href: "https://mepmail.dev/auth.md",
             type: "text/markdown",
             title: "Authentication for agents",
           },

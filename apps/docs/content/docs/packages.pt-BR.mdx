@@ -35,7 +35,7 @@ a instalação inteira:
       "args": ["-y", "@mepmail/mcp"],
       "env": {
         "MEPMAIL_API_KEY": "ms_...",
-        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
+        "MEPMAIL_BASE_URL": "https://api.mepmail.dev"
       }
     }
   }
@@ -45,7 +45,7 @@ a instalação inteira:
 | Variável | Obrigatória | Padrão | Significado |
 | --- | --- | --- | --- |
 | `MEPMAIL_API_KEY` | sim | — | Chave de API do time (`ms_...`) de **Chaves de API** no painel. As ferramentas agem exatamente com o alcance dessa chave. |
-| `MEPMAIL_BASE_URL` | não | `https://api-mepmail.je4ndev.com` | Origem da API da sua instância. Defina em uma implantação auto-hospedada. |
+| `MEPMAIL_BASE_URL` | não | `https://api.mepmail.dev` | Origem da API da sua instância. Defina em uma implantação auto-hospedada. |
 
 Ele chega à API REST da sua instância direto com essa chave — sem OAuth, sem
 passo no navegador — e expõe as ferramentas de leitura, envio e contatos: 22

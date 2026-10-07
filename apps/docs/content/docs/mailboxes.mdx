@@ -69,11 +69,11 @@ mailbox as tools, with no code: `mailbox_list_messages`, `mailbox_read_message`,
 **Agent access**, the dashboard shows the ready command. On MepMail Cloud:
 
 ```bash title="Claude Code"
-claude mcp add --transport http mepmail-correio https://api-mepmail.je4ndev.com/mcp/correio --header "Authorization: Bearer mmb_..."
+claude mcp add --transport http mepmail-correio https://api.mepmail.dev/mcp/correio --header "Authorization: Bearer mmb_..."
 ```
 
 In other clients, add a Streamable HTTP server at
-`https://api-mepmail.je4ndev.com/mcp/correio` with the header
+`https://api.mepmail.dev/mcp/correio` with the header
 `Authorization: Bearer` followed by the mailbox key. The tools keep the same
 permissions, limits and activity records as the API below. Message content comes
 back marked as untrusted data: the agent must not follow instructions that

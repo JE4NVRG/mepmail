@@ -220,7 +220,7 @@
   "deliverability": {
     "eyebrow": "Deliverability and integration",
     "title": "Your domain. Sending visibility. Support from the builders.",
-    "body": "Use your own domain, verified with DKIM and MAIL FROM, and follow each send in the dashboard. Send through <api>api-mepmail.je4ndev.com</api> or the SMTP relay with STARTTLS at <smtp>smtp-mepmail.je4ndev.com:2587</smtp>. Get onboarding help directly from the team building MepMail.",
+    "body": "Use your own domain, verified with DKIM and MAIL FROM, and follow each send in the dashboard. Send through <api>api.mepmail.dev</api> or the SMTP relay with STARTTLS at <smtp>smtp.mepmail.dev:2587</smtp>. Get onboarding help directly from the team building MepMail.",
     "note": "API compatibility is not feature parity: inbound, dedicated IPs and SSO are not part of this promise. Inbox placement also depends on your domain, your content and sending reputation."
   },
   "faq": {

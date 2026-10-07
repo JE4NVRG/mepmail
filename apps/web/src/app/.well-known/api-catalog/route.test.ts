@@ -8,8 +8,8 @@ describe("api-catalog (RFC 9727 linkset)", () => {
     expect(res.headers.get("Content-Type")).toContain("application/linkset+json");
     const body = await res.json();
     const [linkset] = body.linkset;
-    expect(linkset.anchor).toBe("https://api-mepmail.je4ndev.com/");
-    expect(linkset["service-desc"][0].href).toBe("https://api-mepmail.je4ndev.com/openapi.json");
+    expect(linkset.anchor).toBe("https://api.mepmail.dev/");
+    expect(linkset["service-desc"][0].href).toBe("https://api.mepmail.dev/openapi.json");
     expect(JSON.stringify(body)).not.toContain("millionsend.com");
   });
 });

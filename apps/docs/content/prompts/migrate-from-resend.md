@@ -4,7 +4,7 @@ You are migrating an application from Resend to MepMail. MepMail's REST API is w
 
 ## Facts you can rely on
 
-- Cloud API base URL: `https://api-mepmail.je4ndev.com`. Self-hosted: the instance's own API origin (ask if it is not in the repo).
+- Cloud API base URL: `https://api.mepmail.dev`. Self-hosted: the instance's own API origin (ask if it is not in the repo).
 - API keys start with `ms_` and are created in the dashboard under **API keys**. Use a full-access key for the migration and sending-access keys for production senders.
 - Documentation: the docs live in the repository under `apps/docs/content/` — raw markdown is the same path on `raw.githubusercontent.com/JE4NVRG/mepmail/main/`, and the API itself serves its OpenAPI 3.1 spec at `/openapi.json`. The migration guide is https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/prompts/migrate-from-resend.md and the CLI reference is https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/docs/cli.mdx.
 - The migration CLI (`@mepmail/cli`) only ever reads from Resend (`GET` requests), keeps keys in memory, writes them to no file, and sends no telemetry.
@@ -29,7 +29,7 @@ Plan first (read-only; exit code 2 means there are changes, 0 nothing to do, 1 a
 ```sh
 export RESEND_API_KEY=re_...
 export MEPMAIL_API_KEY=ms_...
-export MEPMAIL_BASE_URL=https://api-mepmail.je4ndev.com   # or the instance's URL
+export MEPMAIL_BASE_URL=https://api.mepmail.dev   # or the instance's URL
 
 npx @mepmail/cli migrate plan --from resend --out plan.json
 ```
@@ -51,7 +51,7 @@ Choose one of the two, with the user:
 1. **Keep the Resend SDK.** Official Resend SDKs honor a base URL. Set, in every environment that sends:
    ```sh
    RESEND_API_KEY=ms_...
-   RESEND_BASE_URL=https://api-mepmail.je4ndev.com
+   RESEND_BASE_URL=https://api.mepmail.dev
    ```
    Confirm the installed SDK version reads `RESEND_BASE_URL` (or its base URL constructor option) and replace any hardcoded `https://api.resend.com`.
 2. **Keep the Resend SDK you already have — there is no first-party client of ours to switch to.** Point it at the instance through its base URL option (`baseUrl` in Node, `base_url` in Python, `RESEND_BASE_URL` in the others, `BaseURL` in Go; whether the value wants a trailing slash differs per language) and leave the import and class names alone. Details per language: https://github.com/JE4NVRG/mepmail/blob/main/apps/docs/content/docs/sdks.mdx.

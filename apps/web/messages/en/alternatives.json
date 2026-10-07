@@ -21,7 +21,7 @@
   "same": {
     "title": "What carries over",
     "items": [
-      "The official Resend SDK: new Resend(\"ms_…\", { baseUrl: \"https://api-mepmail.je4ndev.com\" }).",
+      "The official Resend SDK: new Resend(\"ms_…\", { baseUrl: \"https://api.mepmail.dev\" }).",
       "The sending endpoints you already call: /emails, /emails/batch and /emails/{id}/cancel.",
       "Domain, key, webhook, template and suppression management, with the same request shapes where the two overlap.",
       "The SMTP relay, for stacks that send over SMTP instead of HTTPS."

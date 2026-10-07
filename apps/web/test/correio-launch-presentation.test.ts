@@ -117,7 +117,7 @@ const expectations = {
     mcpAvailable: "Available",
     publicMailboxMcpPending: /The Correio MCP gives the agent its own mailbox as tools/,
     agentFragment: "connect-an-agent-over-mcp",
-    docsPrefix: "https://docs-mepmail.je4ndev.com",
+    docsPrefix: "https://docs.mepmail.dev",
   },
   "pt-BR": {
     open: /Aberto a todos os assinantes pagantes de Envio/,
@@ -154,7 +154,7 @@ const expectations = {
     mcpAvailable: "Disponível",
     publicMailboxMcpPending: /O MCP do Correio dá ao agente as ferramentas da própria caixa/,
     agentFragment: "conecte-um-agente-por-mcp",
-    docsPrefix: "https://docs-mepmail.je4ndev.com/pt-BR",
+    docsPrefix: "https://docs.mepmail.dev/pt-BR",
   },
 };
 
@@ -394,7 +394,7 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
   it("links to the matching language for domain, Mail and MCP documentation", () => {
     const docLinks = links(html)
       .map((link) => link.href)
-      .filter((href) => href.startsWith("https://docs-mepmail.je4ndev.com"));
+      .filter((href) => href.startsWith("https://docs.mepmail.dev"));
     expect(new Set(docLinks)).toEqual(
       new Set([
         `${expected.docsPrefix}/concepts/domains`,

@@ -28,6 +28,28 @@
   },
   "releases": [
     {
+      "version": "0.47",
+      "date": "2026-10-07",
+      "title": "MepMail agora mora em mepmail.dev",
+      "summary": "API, documentação e SMTP ganharam endereços em mepmail.dev. Os antigos continuam funcionando, sem nada para mudar no seu código.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "API em https://api.mepmail.dev, documentação em https://docs.mepmail.dev e SMTP em smtp.mepmail.dev (porta 2587, STARTTLS).",
+            "O MCP do Correio também responde em https://api.mepmail.dev/mcp/correio."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "O painel, o site, a documentação e os exemplos de código passam a mostrar os endereços novos.",
+            "Os endereços em je4ndev.com seguem no ar para quem já usa. A documentação antiga redireciona para a nova. O MCP principal com OAuth continua em api-mepmail.je4ndev.com/mcp por enquanto."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.46",
       "date": "2026-10-07",
       "title": "Preços que fazem sentido em cada degrau",
@@ -123,27 +145,6 @@
           "items": [
             "Canais de notificação Slack, Discord e Telegram — cole a URL do webhook e o MepMail formata os alertas.",
             "Galeria com 10 modelos de e-mail prontos (EN e PT) com preview ao vivo e cópia em 1 clique."
-          ]
-        }
-      ]
-    },
-    {
-      "version": "0.41",
-      "date": "2026-09-28",
-      "title": "Seus agentes de IA agora encontram o MepMail",
-      "summary": "O servidor MCP passa a se anunciar onde as ferramentas de agentes procuram, e a documentação ganhou a primeira grande rodada.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "Auto-descoberta MCP: Claude e outros clientes MCP agora encontram as ferramentas do MepMail sem setup manual.",
-            "Pra quem self-hospeda: console do operador com usuários da instância, auditoria e regiões."
-          ]
-        },
-        {
-          "kind": "changed",
-          "items": [
-            "Documentação onda 1 — pacotes npm, rate limits com Retry-After, catálogo completo de erros e o caminho de instalação do MCP."
           ]
         }
       ]

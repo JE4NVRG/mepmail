@@ -70,11 +70,11 @@ como ferramentas, sem escrever código: `mailbox_list_messages`,
 chave em **Acesso de agentes**, o painel mostra o comando pronto. No MepMail Cloud:
 
 ```bash title="Claude Code"
-claude mcp add --transport http mepmail-correio https://api-mepmail.je4ndev.com/mcp/correio --header "Authorization: Bearer mmb_..."
+claude mcp add --transport http mepmail-correio https://api.mepmail.dev/mcp/correio --header "Authorization: Bearer mmb_..."
 ```
 
 Em outros clientes, adicione um servidor Streamable HTTP em
-`https://api-mepmail.je4ndev.com/mcp/correio` com o cabeçalho
+`https://api.mepmail.dev/mcp/correio` com o cabeçalho
 `Authorization: Bearer` seguido da chave da caixa. As ferramentas respeitam as
 mesmas permissões, limites e registros de atividade da API abaixo. O conteúdo
 das mensagens volta marcado como dado não confiável: o agente não deve seguir

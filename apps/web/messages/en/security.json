@@ -281,7 +281,7 @@
       {
         "q": "How do I delete a contact's data?",
         "a": "Delete the contact with erase=true on the API: the address is then erased from email history, event payloads and API logs — the GDPR/LGPD path. Without it, the send log ages out with the retention window. Suppressions keep only a hash of the address, as the do-not-contact record.",
-        "link": { "label": "API reference", "href": "https://docs-mepmail.je4ndev.com" }
+        "link": { "label": "API reference", "href": "https://docs.mepmail.dev" }
       },
       {
         "q": "Do AI or model subprocessors receive my email content?",

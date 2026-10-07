@@ -3,7 +3,7 @@
  * generated from `apps/docs/content`. Every path here was checked against the
  * deployed site.
  */
-export const DOCS_URL = "https://docs-mepmail.je4ndev.com";
+export const DOCS_URL = "https://docs.mepmail.dev";
 export const MCP_DOCS_URL = `${DOCS_URL}/mcp`;
 export const MIGRATE_DOCS_URL = `${DOCS_URL}/migrate-from-resend`;
 /** The relay has no page of its own; it is a section of the self-hosting page. */

@@ -45,7 +45,13 @@ export function appOrigin(): string {
   return new URL(appBaseUrl()).origin;
 }
 
+/**
+ * The API base the dashboard prints in snippets: ADVERTISED_API_URL when set
+ * (a brand hostname in front of the same API), else the canonical one. MCP
+ * OAuth stays on {@link mcpResourceUrl}, which never follows this override.
+ */
 export function apiBaseUrl(): string {
+  if (env.ADVERTISED_API_URL) return env.ADVERTISED_API_URL.replace(/\/+$/, "");
   return apiBaseUrlFor(env.APP_BASE_URL, env.PUBLIC_API_URL);
 }
 

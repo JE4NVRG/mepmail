@@ -29,7 +29,7 @@ than a redesign.
 <DeploymentTabs>
 <DeploymentTab deployment="cloud">
 
-`https://api-mepmail.je4ndev.com` — what every example on this page uses.
+`https://api.mepmail.dev` — what every example on this page uses.
 
 Signup is open — no invite and no card required: create your account at
 [mepmail.dev/signup](https://mepmail.dev/signup). The Free plan sends up to
@@ -78,7 +78,7 @@ npm install resend
 import { Resend } from "resend";
 
 const resend = new Resend("ms_123", {
-  baseUrl: "https://api-mepmail.je4ndev.com",
+  baseUrl: "https://api.mepmail.dev",
 });
 
 const { data, error } = await resend.emails.send({
@@ -101,7 +101,7 @@ pip install resend
 import resend
 
 resend.api_key = "ms_123"
-resend.api_url = "https://api-mepmail.je4ndev.com"  # no trailing slash
+resend.api_url = "https://api.mepmail.dev"  # no trailing slash
 
 email = resend.Emails.send({
     "from": "Acme <onboarding@acme.dev>",
@@ -123,7 +123,7 @@ composer require resend/resend-php
 ```
 
 ```php
-putenv("RESEND_BASE_URL=https://api-mepmail.je4ndev.com");
+putenv("RESEND_BASE_URL=https://api.mepmail.dev");
 
 $resend = Resend::client('ms_123');
 
@@ -148,7 +148,7 @@ gem install resend
 ```
 
 ```ruby
-ENV["RESEND_BASE_URL"] = "https://api-mepmail.je4ndev.com/"
+ENV["RESEND_BASE_URL"] = "https://api.mepmail.dev/"
 
 require "resend"
 Resend.api_key = "ms_123"
@@ -180,7 +180,7 @@ import (
 )
 
 client := resend.NewClient("ms_123")
-client.BaseURL, _ = url.Parse("https://api-mepmail.je4ndev.com/")
+client.BaseURL, _ = url.Parse("https://api.mepmail.dev/")
 
 sent, err := client.Emails.Send(&resend.SendEmailRequest{
     From:    "Acme <onboarding@acme.dev>",
@@ -207,7 +207,7 @@ use resend_rs::{Config, Resend};
 
 let resend = Resend::with_config(
     Config::builder("ms_123")
-        .base_url("https://api-mepmail.je4ndev.com".parse()?)
+        .base_url("https://api.mepmail.dev".parse()?)
         .build(),
 );
 
@@ -241,7 +241,7 @@ var body = """
     """;
 
 var request = HttpRequest.newBuilder()
-    .uri(URI.create("https://api-mepmail.je4ndev.com/emails"))
+    .uri(URI.create("https://api.mepmail.dev/emails"))
     .header("Authorization", "Bearer ms_123")
     .header("Content-Type", "application/json")
     .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -265,7 +265,7 @@ using Resend;
 var options = new ResendClientOptions
 {
     ApiToken = "ms_123",
-    ApiUrl = "https://api-mepmail.je4ndev.com",
+    ApiUrl = "https://api.mepmail.dev",
 };
 
 var resend = ResendClient.Create(options);
@@ -295,7 +295,7 @@ end
 ```elixir
 client = Resend.client(
   api_key: "ms_123",
-  base_url: "https://api-mepmail.je4ndev.com"
+  base_url: "https://api.mepmail.dev"
 )
 
 {:ok, email} =

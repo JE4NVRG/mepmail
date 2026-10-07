@@ -45,7 +45,7 @@ npx -y @mepmail/mcp
 | Variable | Required | Default | Meaning |
 | --- | --- | --- | --- |
 | `MEPMAIL_API_KEY` | yes | — | Team API key (`ms_...`), created under **API keys** in the dashboard. The agent acts with exactly this key's reach. |
-| `MEPMAIL_BASE_URL` | no | `https://api-mepmail.je4ndev.com` | Your instance's API origin. Set it for a self-hosted deployment. |
+| `MEPMAIL_BASE_URL` | no | `https://api.mepmail.dev` | Your instance's API origin. Set it for a self-hosted deployment. |
 
 **Claude Desktop** (`claude_desktop_config.json`), and any client with the same
 config shape:
@@ -58,7 +58,7 @@ config shape:
       "args": ["-y", "@mepmail/mcp"],
       "env": {
         "MEPMAIL_API_KEY": "ms_...",
-        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
+        "MEPMAIL_BASE_URL": "https://api.mepmail.dev"
       }
     }
   }
