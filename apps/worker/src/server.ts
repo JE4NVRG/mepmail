@@ -78,6 +78,7 @@ import {
 } from "./handlers/cron.js";
 import { drainWebhookEndpoint } from "./handlers/deliver-webhook.js";
 import { runInstanceProbes } from "./handlers/instance-probes.js";
+import { runMailboxCapacity } from "./handlers/mailbox-capacity.js";
 import { runMonitorHealth } from "./handlers/monitor-health.js";
 import { reportPlanMove, sweepNotifications } from "./handlers/notify.js";
 import { runPlatformBreaker } from "./handlers/platform-breaker.js";
@@ -254,6 +255,7 @@ const monitor: MonitorDeps | undefined = judge
     }
   : undefined;
 const monitorHealthState = { degradedMailedAt: null as Date | null };
+const mailboxCapacityState = { mailedAt: null as Date | null, mailedShare: 0 };
 if (judge) console.log(`content monitor: ${judge.provider} · ${judge.model}`);
 
 /**
@@ -442,6 +444,22 @@ await queue.scheduleCrons({
       console.log(
         `safety.flags: teams=${result.teams} opened=${result.opened} cleared=${result.cleared} reviews=${result.reviews}`,
       );
+    }
+    // Same quarter-hour: how full the Correio receiving rules are. An SES
+    // read failure is logged and leaves the flags run alone.
+    try {
+      await runMailboxCapacity(db, {
+        configuration: process.env.MAILBOX_RECEIVING_PROVISIONING_CONFIG,
+        credentials:
+          env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
+            ? { accessKeyId: env.AWS_ACCESS_KEY_ID, secretAccessKey: env.AWS_SECRET_ACCESS_KEY }
+            : {},
+        mailer,
+        appBaseUrl: env.APP_BASE_URL,
+        state: mailboxCapacityState,
+      });
+    } catch (err) {
+      console.warn("mailbox.capacity: reading skipped", err instanceof Error ? err.message : err);
     }
   },
   "safety.reveal_notices": async () => {

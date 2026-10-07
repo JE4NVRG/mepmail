@@ -184,7 +184,8 @@
       "region_sent": "Enviados por hora · {region}",
       "noPoints": "Nada registrado neste período ainda.",
       "monitor_samples_1h": "Amostras do monitor por hora",
-      "monitor_unjudged_rate": "Parcela sem julgamento do monitor"
+      "monitor_unjudged_rate": "Parcela sem julgamento do monitor",
+      "mailbox_receiving_used_rate": "Vagas de recebimento do Correio em uso"
     },
     "monitoring": {
       "title": "Monitoramento",

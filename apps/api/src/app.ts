@@ -101,6 +101,7 @@ import { cors } from "hono/cors";
 import { createMiddleware } from "hono/factory";
 import { secureHeaders } from "hono/secure-headers";
 import { INTERNAL_AUTH, registerMcp } from "./mcp.js";
+import { registerCorreioMcp } from "./mcp-correio.js";
 import { loggedBody, maskEmailPathSegments } from "./request-log.js";
 import { registerApiKeyRoutes } from "./routes/api-keys.js";
 import { registerContactPropertyRoutes } from "./routes/contact-properties.js";
@@ -249,6 +250,11 @@ export interface ApiDeps {
    * MCP tokens are bound to it, so it must match what clients actually dial.
    */
   publicApiUrl?: string | undefined;
+  /**
+   * Where this process reaches the dashboard's mailbox agent API for the
+   * Correio MCP (/mcp/correio). Default: the web process on loopback port 3000.
+   */
+  mailboxAgentOrigin?: string | undefined;
   /**
    * Whether a domain may adopt a branded tracking subdomain (a customer CNAME
    * pointing at this app). Omitted means yes; false drops the CNAME from the
@@ -4469,6 +4475,9 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
   // MCP needs APP_BASE_URL twice over: it is the OAuth issuer and the base
   // the canonical resource URL derives from. Without it there is no /mcp.
   if (deps.appBaseUrl) registerMcp(app, deps, deps.appBaseUrl);
+  // Correio's own MCP authenticates with a mailbox agent key and calls the
+  // dashboard's agent API, which answers from the web process beside this one.
+  registerCorreioMcp(app, deps.mailboxAgentOrigin ?? "http://127.0.0.1:3000");
 
   const sns = deps.sns;
   if (sns) {

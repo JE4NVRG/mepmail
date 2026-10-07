@@ -162,6 +162,31 @@ function verifiedRules(
   if (new Set(all).size !== all.length) throw new MailboxProvisioningError("rule_changed");
   return rules;
 }
+/**
+ * Read-only: how many recipients the pinned rules hold now, against the room
+ * they have (100 each). Reserved placeholder recipients count as used, since
+ * they take a slot. Throws like provisioning when the set drifted.
+ */
+export async function mailboxReceivingCapacity(
+  client: MailboxProvisioningClient,
+  config: MailboxProvisioningConfiguration,
+): Promise<{ used: number; total: number; rules: number; maxRules: number }> {
+  try {
+    const rules = verifiedRules(
+      await client.send(new DescribeActiveReceiptRuleSetCommand({})),
+      config,
+    );
+    return {
+      used: rules.reduce((sum, rule) => sum + rule.Recipients.length, 0),
+      total: rules.length * RECIPIENTS_PER_RULE,
+      rules: rules.length,
+      maxRules: RULES_PER_SET,
+    };
+  } finally {
+    client.destroy?.();
+  }
+}
+
 /** Caller must hold the shared PostgreSQL provisioning lock. Never removes recipients. */
 export async function appendMailboxReceivingRecipients(
   client: MailboxProvisioningClient,

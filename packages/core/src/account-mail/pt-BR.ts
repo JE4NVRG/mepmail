@@ -254,6 +254,14 @@ export const ptBR = {
     ],
     button: "Abrir revisão",
   },
+  "mailbox.capacity": {
+    subject: "Recebimento do Correio em {share} das vagas",
+    body: [
+      "As regras de recebimento do SES ocupam {used} de {total} vagas de destinatário ({rules} regras de 100). Novas caixas deixam de ativar quando elas enchem.",
+      "Adicione regras ao conjunto ativo (o SES aceita até 200, cerca de 20 mil caixas) e liste-as em MAILBOX_RECEIVING_PROVISIONING_CONFIG, ou passe clientes para o recebimento por domínio. Este aviso se repete no máximo uma vez por dia enquanto o uso ficar acima de 80%.",
+    ],
+    button: "Abrir console",
+  },
   "content.access_notice": {
     subject: "Um operador leu conteúdo em {team}",
     body: [

@@ -44,5 +44,10 @@
   "revoke": "Revogar",
   "revoking": "Revogando…",
   "revokeLabel": "Revogar chave {label}",
-  "revokeSuccess": "Revogação da chave confirmada. Esta credencial não concede mais acesso."
+  "revokeSuccess": "Revogação da chave confirmada. Esta credencial não concede mais acesso.",
+  "mcpTitle": "Conectar por MCP",
+  "mcpHint": "Agentes que falam MCP (Claude Code, Claude Desktop, Cursor e outros) usam esta caixa como ferramentas: listar, ler, criar rascunho e, com a permissão de envio, enviar. O comando abaixo já leva esta chave; guarde-o com o mesmo cuidado.",
+  "mcpCommand": "Comando para o Claude Code",
+  "mcpOther": "Outros clientes MCP: adicione um servidor Streamable HTTP em {url} com o cabeçalho Authorization: Bearer seguido desta chave.",
+  "mcpCopy": "Copiar comando MCP"
 }

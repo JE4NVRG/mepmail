@@ -7,7 +7,12 @@ import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import styles from "./mailbox-agent-keys.module.css";
 import registryStyles from "./mailboxes.module.css";
 
-type Props = { mailbox: { id: string; address: string }; onClose: () => void };
+type Props = {
+  mailbox: { id: string; address: string };
+  onClose: () => void;
+  /** The Correio MCP endpoint, shown with a new key so an agent can connect at once. */
+  mcpUrl?: string | undefined;
+};
 type Scope = "read" | "draft" | "send";
 type Secret = { id: string; token: string };
 
@@ -20,7 +25,12 @@ export function MailboxAgentKeysDialog(props: Props) {
   return <AgentKeysSession key={props.mailbox.id} {...props} />;
 }
 
-function AgentKeysSession({ mailbox, onClose }: Props) {
+/** One line an MCP client takes: Claude Code's add command with the key as a header. */
+export function correioMcpCommand(url: string, token: string): string {
+  return `claude mcp add --transport http mepmail-correio ${url} --header "Authorization: Bearer ${token}"`;
+}
+
+function AgentKeysSession({ mailbox, onClose, mcpUrl }: Props) {
   const t = useTranslations("mailboxes-agent");
   const format = useFormatter();
   const trpc = useTRPC();
@@ -167,13 +177,13 @@ function AgentKeysSession({ mailbox, onClose }: Props) {
     }
   }
 
-  async function copyToken() {
-    if (!secret || copying || busy) return;
+  async function copyToken(text = secret?.token) {
+    if (!secret || !text || copying || busy) return;
     setCopying(true);
     setError("");
     try {
       // Clipboard writes happen only in this explicit user click handler.
-      await navigator.clipboard.writeText(secret.token);
+      await navigator.clipboard.writeText(text);
       if (active.current) setCopied(true);
     } catch {
       if (active.current) setError(t("copyError"));
@@ -277,6 +287,34 @@ function AgentKeysSession({ mailbox, onClose }: Props) {
               {t("copySuccess")}
             </p>
           )}
+          {mcpUrl ? (
+            <>
+              <h3>{t("mcpTitle")}</h3>
+              <p id={`${id}-mcp-hint`}>{t("mcpHint")}</p>
+              <label htmlFor={`${id}-mcp`}>{t("mcpCommand")}</label>
+              <textarea
+                id={`${id}-mcp`}
+                className={`ms-input ${styles.token}`}
+                value={correioMcpCommand(mcpUrl, secret.token)}
+                readOnly
+                rows={3}
+                autoComplete="off"
+                spellCheck={false}
+                aria-describedby={`${id}-mcp-hint`}
+              />
+              <p>{t("mcpOther", { url: mcpUrl })}</p>
+              <div className={styles.actions}>
+                <button
+                  type="button"
+                  className="ms-btn"
+                  disabled={busy || copying}
+                  onClick={() => void copyToken(correioMcpCommand(mcpUrl, secret.token))}
+                >
+                  {t("mcpCopy")}
+                </button>
+              </div>
+            </>
+          ) : null}
         </section>
       ) : (
         <form className={styles.form} onSubmit={(event) => void createKey(event)}>

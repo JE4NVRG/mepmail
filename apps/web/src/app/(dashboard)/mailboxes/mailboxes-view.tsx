@@ -363,7 +363,7 @@ function RegistryDialog({
   );
 }
 
-export function MailboxesView() {
+export function MailboxesView({ correioMcpUrl }: { correioMcpUrl?: string } = {}) {
   const t = useTranslations("mailboxes");
   const tActivity = useTranslations("mailboxes-activity");
   const { data: session } = authClient.useSession();
@@ -847,6 +847,7 @@ export function MailboxesView() {
           key={agentBox.id}
           mailbox={{ id: agentBox.id, address: agentBox.address }}
           onClose={() => setAgentDialogId(null)}
+          mcpUrl={correioMcpUrl}
         />
       ) : null}
       {activityBox ? (

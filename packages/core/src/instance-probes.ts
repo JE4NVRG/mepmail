@@ -33,6 +33,9 @@ export const PROBES = {
   queue_oldest_s: "warn",
   monitor_samples_1h: "warn",
   monitor_unjudged_rate: "warn",
+  // Share of the Correio receiving rules' recipient slots in use (SES caps a
+  // rule at 100 recipients and a rule set at 200 rules).
+  mailbox_receiving_used_rate: "warn",
 } as const;
 
 export type ProbeKey = keyof typeof PROBES;

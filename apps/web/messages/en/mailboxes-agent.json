@@ -44,5 +44,10 @@
   "revoke": "Revoke",
   "revoking": "Revoking…",
   "revokeLabel": "Revoke key {label}",
-  "revokeSuccess": "Key revocation confirmed. This credential no longer grants access."
+  "revokeSuccess": "Key revocation confirmed. This credential no longer grants access.",
+  "mcpTitle": "Connect over MCP",
+  "mcpHint": "Agents that speak MCP (Claude Code, Claude Desktop, Cursor and others) can use this mailbox as tools: list, read, draft and, with the send permission, send. The command below already carries this key, so keep it as private as the key.",
+  "mcpCommand": "Claude Code command",
+  "mcpOther": "Other MCP clients: add a Streamable HTTP server at {url} with the header Authorization: Bearer followed by this key.",
+  "mcpCopy": "Copy MCP command"
 }

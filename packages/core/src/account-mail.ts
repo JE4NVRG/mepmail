@@ -39,6 +39,7 @@ export const ACCOUNT_MAIL_KINDS = [
   "monitor.broadcasts_paused",
   "monitor.degraded",
   "review.held",
+  "mailbox.capacity",
   "content.access_notice",
   "support.view_started",
 ] as const;

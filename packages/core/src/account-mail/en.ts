@@ -254,6 +254,14 @@ export const en = {
     ],
     button: "Open review",
   },
+  "mailbox.capacity": {
+    subject: "Correio receiving at {share} of its slots",
+    body: [
+      "The SES receiving rules hold {used} of {total} recipient slots ({rules} rules of 100). New mailboxes stop activating when they are full.",
+      "Add receipt rules to the active rule set (SES allows up to 200, about 20,000 mailboxes) and list them in MAILBOX_RECEIVING_PROVISIONING_CONFIG, or move customers to receiving by domain. This notice repeats at most once a day while usage stays over 80%.",
+    ],
+    button: "Open console",
+  },
   "content.access_notice": {
     subject: "An operator read content in {team}",
     body: [
