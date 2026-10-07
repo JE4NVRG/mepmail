@@ -60,18 +60,18 @@ describe("PLAN_RUNGS", () => {
     ).toEqual([
       ["free", "free", 100, "day", 0, null],
       ["starter", "starter", 1_500, "day", 900, null],
-      ["pro_100k", "pro", 110_000, "month", 2_000, 90],
-      ["pro_200k", "pro", 220_000, "month", 10_000, 35],
-      ["scale_500k", "scale", 550_000, "month", 19_900, 25],
-      ["scale_1m", "scale", 1_100_000, "month", 31_900, 23],
-      ["scale_1_5m", "scale", 1_650_000, "month", 42_900, 18],
-      ["scale_2_5m", "scale", 2_750_000, "month", 54_900, 16],
+      ["pro_100k", "pro", 110_000, "month", 2_000, 35],
+      ["pro_200k", "pro", 220_000, "month", 5_500, 32],
+      ["scale_500k", "scale", 550_000, "month", 12_900, 29],
+      ["scale_1m", "scale", 1_100_000, "month", 23_900, 26],
+      ["scale_1_5m", "scale", 1_650_000, "month", 34_900, 24],
+      ["scale_2_5m", "scale", 2_750_000, "month", 54_900, 22],
     ]);
   });
 
   it("preserves keys and quotas with approved prices", () => {
-    // The keys are the stem of the Stripe lookup keys and the pence of the
-    // ladder; the +10% bump touched `included` alone.
+    // The keys are the stem of the Stripe lookup keys; the +10% bump touched
+    // `included` alone and the 2026-10-07 ladder (Jean) set these prices.
     expect(
       PLAN_RUNGS.filter((r) => r.period === "month").map((r) => [
         r.key,
@@ -80,13 +80,31 @@ describe("PLAN_RUNGS", () => {
         r.overageCentsPer1k,
       ]),
     ).toEqual([
-      ["pro_100k", 110_000, 2_000, 90],
-      ["pro_200k", 220_000, 10_000, 35],
-      ["scale_500k", 550_000, 19_900, 25],
-      ["scale_1m", 1_100_000, 31_900, 23],
-      ["scale_1_5m", 1_650_000, 42_900, 18],
-      ["scale_2_5m", 2_750_000, 54_900, 16],
+      ["pro_100k", 110_000, 2_000, 35],
+      ["pro_200k", 220_000, 5_500, 32],
+      ["scale_500k", 550_000, 12_900, 29],
+      ["scale_1m", 1_100_000, 23_900, 26],
+      ["scale_1_5m", 1_650_000, 34_900, 24],
+      ["scale_2_5m", 2_750_000, 54_900, 22],
     ]);
+  });
+
+  it("makes every step up cheaper per email, with overage above the rung's own price", () => {
+    // Pro 110K sells at the US$29 launch price (send-launch-offer); its rung
+    // keeps the grandfathered US$20. The ladder must beat buying two smaller
+    // plans at every step, and overage must never undercut moving up.
+    const monthly = PLAN_RUNGS.filter((r) => r.period === "month").map((r) => ({
+      key: r.key,
+      perThousand: (r.key === "pro_100k" ? 2_900 : r.priceCents) / (r.included / 1000),
+      overage: r.overageCentsPer1k ?? 0,
+    }));
+    for (const [index, rung] of monthly.entries()) {
+      expect(rung.overage, rung.key).toBeGreaterThan(rung.perThousand);
+      const next = monthly[index + 1];
+      if (!next) continue;
+      expect(next.perThousand, next.key).toBeLessThan(rung.perThousand);
+      expect(next.overage, next.key).toBeLessThan(rung.overage);
+    }
   });
 });
 

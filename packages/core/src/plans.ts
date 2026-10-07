@@ -59,7 +59,10 @@ export interface PlanRung {
 
 /**
  * The ladder, cheapest first. Free and Starter cap per day; Pro and Scale
- * include a monthly volume and can bill overage past it. Self-host ignores
+ * include a monthly volume and can bill overage past it. Going up a rung
+ * always lowers the price per email, and each rung's overage sits above its
+ * own per-email price (Jean, 2026-10-07). Pro 110K sells at the US$29 launch
+ * price (send-launch-offer); its rung price is the grandfathered US$20. Self-host ignores
  * plans entirely. The system plan (the instance's own team) has no rung:
  * callers that can see it branch before asking for one.
  */
@@ -86,39 +89,39 @@ export const PLAN_RUNGS = [
     included: 110_000,
     period: "month",
     priceCents: 2_000,
-    overageCentsPer1k: 90,
+    overageCentsPer1k: 35,
   },
   {
     key: "pro_200k",
     plan: "pro",
     included: 220_000,
     period: "month",
-    priceCents: 10_000,
-    overageCentsPer1k: 35,
+    priceCents: 5_500,
+    overageCentsPer1k: 32,
   },
   {
     key: "scale_500k",
     plan: "scale",
     included: 550_000,
     period: "month",
-    priceCents: 19_900,
-    overageCentsPer1k: 25,
+    priceCents: 12_900,
+    overageCentsPer1k: 29,
   },
   {
     key: "scale_1m",
     plan: "scale",
     included: 1_100_000,
     period: "month",
-    priceCents: 31_900,
-    overageCentsPer1k: 23,
+    priceCents: 23_900,
+    overageCentsPer1k: 26,
   },
   {
     key: "scale_1_5m",
     plan: "scale",
     included: 1_650_000,
     period: "month",
-    priceCents: 42_900,
-    overageCentsPer1k: 18,
+    priceCents: 34_900,
+    overageCentsPer1k: 24,
   },
   {
     key: "scale_2_5m",
@@ -126,7 +129,7 @@ export const PLAN_RUNGS = [
     included: 2_750_000,
     period: "month",
     priceCents: 54_900,
-    overageCentsPer1k: 16,
+    overageCentsPer1k: 22,
   },
 ] as const satisfies readonly PlanRung[];
 

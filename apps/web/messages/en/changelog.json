@@ -23,6 +23,22 @@
   },
   "releases": [
     {
+      "version": "0.46",
+      "date": "2026-10-07",
+      "title": "Prices that add up at every rung",
+      "summary": "Moving up a plan now always costs less per email, and overage is much lower.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Pro 220K for US$55 (was US$100), Scale 550K for US$129 (was US$199), Scale 1.1M for US$239 (was US$319) and Scale 1.65M for US$349 (was US$429). Pro 110K stays at US$29 and Scale 2.75M at US$549.",
+            "Overage per 1,000 emails: US$0.35 on Pro 110K (was US$0.90), US$0.32 on Pro 220K and US$0.29 down to US$0.22 on Scale, always above the plan's own price so moving up pays off.",
+            "Existing subscriptions keep the price they already have."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.45",
       "date": "2026-10-07",
       "title": "Mail: email inboxes for your AI agents",
@@ -124,31 +140,6 @@
           "items": [
             "Docs wave 1 — npm packages, rate limits with Retry-After, a full error catalogue, and the MCP install path."
           ]
-        }
-      ]
-    },
-    {
-      "version": "0.40",
-      "date": "2026-09-28",
-      "title": "Open beta: sign up and send today",
-      "summary": "No invite needed — create an account and start sending. Docs and search visibility improved along the way.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "Open sign-up: no invite, no waiting list. The Free plan sends 100 emails/day, no card required.",
-            "A doctor command in the migration CLI to check your setup, plus emails list/get."
-          ]
-        },
-        {
-          "kind": "changed",
-          "items": [
-            "Docs and legal pages are now search-engine friendly — easier to find when you're googling an error."
-          ]
-        },
-        {
-          "kind": "fixed",
-          "items": ["The mobile header stays put, with the sign-up button always visible."]
         }
       ]
     }

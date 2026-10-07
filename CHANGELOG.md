@@ -7,6 +7,21 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.46] - 2026-10-07
+
+A Send price ladder where moving up always costs less per email.
+
+### Changed
+
+- Pro 220K is US$55 (was US$100), Scale 550K US$129 (was US$199), Scale 1.1M
+  US$239 (was US$319) and Scale 1.65M US$349 (was US$429). Pro 110K stays at
+  the US$29 launch price and Scale 2.75M at US$549.
+- Overage per 1,000: US$0.35 on Pro 110K (was US$0.90), US$0.32 on Pro 220K,
+  then US$0.29, 0.26, 0.24 and 0.22 up the Scale rungs: always above the
+  rung's own per-email price, never the US$0.90 jump.
+- New Stripe prices rotate in behind the same lookup keys; existing
+  subscriptions keep the price they are on.
+
 ## [0.45] - 2026-10-07
 
 Correio: email inboxes for your AI agents.

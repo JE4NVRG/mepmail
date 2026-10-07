@@ -36,10 +36,10 @@ export const PLANS: readonly PlanBase[] = [
   { rung: "free", name: "Free", price: "US$ 0", tier: "core" },
   { rung: "starter", name: "Starter", price: "US$ 9", tier: "core" },
   { rung: "pro_100k", name: "Pro 110K", price: "US$ 20", tier: "core", featured: true },
-  { rung: "pro_200k", name: "Pro 220K", price: "US$ 100", tier: "core" },
-  { rung: "scale_500k", name: "Scale 550K", price: "US$ 199", tier: "scale" },
-  { rung: "scale_1m", name: "Scale 1.1M", price: "US$ 319", tier: "scale" },
-  { rung: "scale_1_5m", name: "Scale 1.65M", price: "US$ 429", tier: "scale" },
+  { rung: "pro_200k", name: "Pro 220K", price: "US$ 55", tier: "core" },
+  { rung: "scale_500k", name: "Scale 550K", price: "US$ 129", tier: "scale" },
+  { rung: "scale_1m", name: "Scale 1.1M", price: "US$ 239", tier: "scale" },
+  { rung: "scale_1_5m", name: "Scale 1.65M", price: "US$ 349", tier: "scale" },
   { rung: "scale_2_5m", name: "Scale 2.75M", price: "US$ 549", tier: "scale" },
 ];
 

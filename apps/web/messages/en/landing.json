@@ -153,42 +153,42 @@
       {
         "volume": "110,000/month",
         "limits": "25 domains · 10 workspaces · unlimited contacts",
-        "overage": "US$ 0.90/1k",
+        "overage": "US$ 0.35/1k",
         "attachment": "5 MB",
         "cta": "Start with Pro 110K"
       },
       {
         "volume": "220,000/month",
         "limits": "25 domains · 10 workspaces · unlimited contacts",
-        "overage": "US$ 0.35/1k",
+        "overage": "US$ 0.32/1k",
         "attachment": "5 MB",
         "cta": "Start with Pro 220K"
       },
       {
         "volume": "550,000/month",
         "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
-        "overage": "US$ 0.25/1k",
+        "overage": "US$ 0.29/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 550K"
       },
       {
         "volume": "1,100,000/month",
         "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
-        "overage": "US$ 0.23/1k",
+        "overage": "US$ 0.26/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 1.1M"
       },
       {
         "volume": "1,650,000/month",
         "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
-        "overage": "US$ 0.18/1k",
+        "overage": "US$ 0.24/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 1.65M"
       },
       {
         "volume": "2,750,000/month",
         "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
-        "overage": "US$ 0.16/1k",
+        "overage": "US$ 0.22/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 2.75M"
       }

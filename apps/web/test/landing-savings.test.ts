@@ -2,26 +2,27 @@ import { describe, expect, it } from "vitest";
 import { COMPETITORS, formatUsd, formatVolume, PRICE_ROWS } from "../src/lib/landing-pricing";
 import { computeSavings, savingsForIndex } from "../src/lib/landing-savings";
 
-// The exact cells the public table publishes, cell for cell, on the release
-// v.44 rungs (110K…2.75M, +10% volume at the same prices). The numbers are
+// The exact cells the public table publishes, cell for cell, on the 2026-10-07
+// ladder (110K…2.75M; the 110K cell is the rung price, the launch offer
+// replaces it when selected). The numbers are
 // shared across locales; the separators and the quote cell are not. English is
 // the default audience (US separators) and pt-BR mirrors it ("1,65M",
 // "US$ 1.265").
 const EN_TABLE = [
   ["110k", "US$ 20", "US$ 44", "US$ 43.95", "US$ 115", "US$ 86", "54%"],
-  ["220k", "US$ 100", "US$ 143", "US$ 142.95", "US$ 245", "US$ 207", "30%"],
-  ["550k", "US$ 199", "US$ 385", "US$ 439.95", "US$ 455", "US$ 437.50", "48%"],
-  ["1.1M", "US$ 319", "US$ 715", "US$ 799", "US$ 775", "US$ 750", "55%"],
-  ["1.65M", "US$ 429", "US$ 903", "US$ 889", "US$ 1,037.50", "US$ 1,025", "52%"],
+  ["220k", "US$ 55", "US$ 143", "US$ 142.95", "US$ 245", "US$ 207", "62%"],
+  ["550k", "US$ 129", "US$ 385", "US$ 439.95", "US$ 455", "US$ 437.50", "66%"],
+  ["1.1M", "US$ 239", "US$ 715", "US$ 799", "US$ 775", "US$ 750", "67%"],
+  ["1.65M", "US$ 349", "US$ 903", "US$ 889", "US$ 1,037.50", "US$ 1,025", "61%"],
   ["2.75M", "US$ 549", "US$ 1,265", "US$ 1,224", "US$ 2,962.50", "US$ 1,350", "55%"],
 ] as const;
 
 const PT_TABLE = [
   ["110k", "US$ 20", "US$ 44", "US$ 43,95", "US$ 115", "US$ 86", "54%"],
-  ["220k", "US$ 100", "US$ 143", "US$ 142,95", "US$ 245", "US$ 207", "30%"],
-  ["550k", "US$ 199", "US$ 385", "US$ 439,95", "US$ 455", "US$ 437,50", "48%"],
-  ["1,1M", "US$ 319", "US$ 715", "US$ 799", "US$ 775", "US$ 750", "55%"],
-  ["1,65M", "US$ 429", "US$ 903", "US$ 889", "US$ 1.037,50", "US$ 1.025", "52%"],
+  ["220k", "US$ 55", "US$ 143", "US$ 142,95", "US$ 245", "US$ 207", "62%"],
+  ["550k", "US$ 129", "US$ 385", "US$ 439,95", "US$ 455", "US$ 437,50", "66%"],
+  ["1,1M", "US$ 239", "US$ 715", "US$ 799", "US$ 775", "US$ 750", "67%"],
+  ["1,65M", "US$ 349", "US$ 903", "US$ 889", "US$ 1.037,50", "US$ 1.025", "61%"],
   ["2,75M", "US$ 549", "US$ 1.265", "US$ 1.224", "US$ 2.962,50", "US$ 1.350", "55%"],
 ] as const;
 

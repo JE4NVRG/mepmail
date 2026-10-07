@@ -153,42 +153,42 @@
       {
         "volume": "110.000/mês",
         "limits": "25 domínios · 10 workspaces · contatos ilimitados",
-        "overage": "US$ 0,90/1k",
+        "overage": "US$ 0,35/1k",
         "attachment": "5 MB",
         "cta": "Começar no Pro 110K"
       },
       {
         "volume": "220.000/mês",
         "limits": "25 domínios · 10 workspaces · contatos ilimitados",
-        "overage": "US$ 0,35/1k",
+        "overage": "US$ 0,32/1k",
         "attachment": "5 MB",
         "cta": "Começar no Pro 220K"
       },
       {
         "volume": "550.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "US$ 0,25/1k",
+        "overage": "US$ 0,29/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 550K"
       },
       {
         "volume": "1.100.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "US$ 0,23/1k",
+        "overage": "US$ 0,26/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 1.1M"
       },
       {
         "volume": "1.650.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "US$ 0,18/1k",
+        "overage": "US$ 0,24/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 1.65M"
       },
       {
         "volume": "2.750.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "US$ 0,16/1k",
+        "overage": "US$ 0,22/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 2.75M"
       }

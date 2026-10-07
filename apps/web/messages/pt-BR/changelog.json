@@ -28,6 +28,22 @@
   },
   "releases": [
     {
+      "version": "0.46",
+      "date": "2026-10-07",
+      "title": "Preços que fazem sentido em cada degrau",
+      "summary": "Subir de plano agora sempre sai mais barato por e-mail, e o excedente ficou bem menor.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Pro 220K por US$ 55 (era US$ 100), Scale 550K por US$ 129 (era US$ 199), Scale 1,1M por US$ 239 (era US$ 319) e Scale 1,65M por US$ 349 (era US$ 429). Pro 110K continua US$ 29 e Scale 2,75M, US$ 549.",
+            "Excedente por mil e-mails: US$ 0,35 no Pro 110K (era US$ 0,90), US$ 0,32 no Pro 220K e de US$ 0,29 a US$ 0,22 no Scale, sempre acima do preço do próprio plano para valer a pena subir.",
+            "Assinaturas existentes mantêm o preço que já têm."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.45",
       "date": "2026-10-07",
       "title": "Correio: caixas de e-mail para seus agentes de IA",
@@ -129,31 +145,6 @@
           "items": [
             "Documentação onda 1 — pacotes npm, rate limits com Retry-After, catálogo completo de erros e o caminho de instalação do MCP."
           ]
-        }
-      ]
-    },
-    {
-      "version": "0.40",
-      "date": "2026-09-28",
-      "title": "Beta aberta: cadastre-se e envie hoje",
-      "summary": "Sem convite — crie a conta e comece a enviar. Docs e visibilidade em buscadores melhoraram no caminho.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "Cadastro aberto: sem convite, sem fila. O plano Free envia 100 e-mails/dia, sem cartão.",
-            "Comando doctor na CLI de migração pra checar seu setup, mais emails list/get."
-          ]
-        },
-        {
-          "kind": "changed",
-          "items": [
-            "Docs e páginas legais agora são amigáveis a buscadores — mais fáceis de achar quando você pesquisa um erro."
-          ]
-        },
-        {
-          "kind": "fixed",
-          "items": ["Header do mobile fica no lugar, com o botão de criar conta sempre visível."]
         }
       ]
     }

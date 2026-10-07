@@ -15,10 +15,10 @@ describe("public offer selection preserves the legacy contract", () => {
       "US$ 0",
       "US$ 9",
       "US$ 20",
-      "US$ 100",
-      "US$ 199",
-      "US$ 319",
-      "US$ 429",
+      "US$ 55",
+      "US$ 129",
+      "US$ 239",
+      "US$ 349",
       "US$ 549",
     ]);
     expect(launch.find((plan) => plan.rung === "pro_100k")?.price).toBe(

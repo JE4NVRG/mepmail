@@ -76,4 +76,6 @@ it("drains annual quota against the team binding while preserving the message ID
   } finally {
     await close();
   }
-});
+  // The fresh database (every migration) is built inside the test, not in a
+  // hook, so it gets the hook budget instead of the 5 s default.
+}, 60_000);

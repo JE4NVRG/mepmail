@@ -640,7 +640,7 @@ describe("billing router", () => {
         periodStart: PERIOD_START,
         periodEnd: PERIOD_END,
         overage: true,
-        overageCentsPer1k: 35,
+        overageCentsPer1k: 32,
       },
       usage: { accepted: 1234, reportedOverage: 0 },
       hasCustomer: true,
