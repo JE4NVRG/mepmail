@@ -1,11 +1,11 @@
 import { abuseJudgeConfig } from "@millionsend/config";
 
-/** What the console says about the judge: off, or the TypeSafe model the env names. */
+/** What the console says about the judge: off, or the provider and model the env names. */
 export type JudgeStatus =
   | { on: false }
   | {
       on: true;
-      provider: "typesafe";
+      provider: "typesafe" | "openai";
       model: string;
       region: string | null;
       baseUrl: string | null;

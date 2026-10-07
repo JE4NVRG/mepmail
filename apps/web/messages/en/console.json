@@ -677,6 +677,7 @@
         "payment_risk": "Stripe's fraud screening blocked a payment from this team.",
         "new_sender": "A young team's sending pattern: past its probation day, rotating sender addresses, or a sending domain under an abuse-prone TLD.",
         "reputation": "Hard bounces or complaints past SES's review lines: all of this team's mail is held, transactional included.",
+        "content": "The content monitor judged a young team's message as near-certain abuse (phishing, impersonation or scam).",
         "body": "Accepted mail is kept and nothing reaches SES. Releasing sending lets the held mail out within 15 minutes; suspending the team keeps it all held.",
         "release": "Release sending",
         "released": "{team} · sending released"

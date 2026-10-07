@@ -13,6 +13,8 @@ import {
   findDisguise,
   findImpersonation,
   foldText,
+  CONTENT_HOLD_SCORE,
+  holdOnContentVerdict,
   holdReputationRuns,
   holdTeamForReview,
   markSendReviewNotified,
@@ -410,5 +412,52 @@ describe("acceptEmail screens a new sender", () => {
     );
     expect(result.ok).toBe(true);
     expect((await fetchTeamStanding(db, teamId))?.sendReview?.reason).toBe("new_sender");
+  });
+});
+
+describe("content verdict hold", () => {
+  async function aged(slug: string, ageDays: number) {
+    const teamId = await createTeam(db, slug);
+    await db
+      .update(schema.teams)
+      .set({ createdAt: new Date(Date.now() - ageDays * 86_400_000) })
+      .where(eq(schema.teams.id, teamId));
+    return teamId;
+  }
+
+  it("holds a young team on a near-certain verdict, even one an operator released", async () => {
+    const teamId = await aged("content-young", 2);
+    expect(
+      await holdOnContentVerdict(db, { teamId, score: CONTENT_HOLD_SCORE - 1, categories: ["scam"] }),
+    ).toBe(false);
+    await db
+      .update(schema.teams)
+      .set({ sendReviewClearedAt: new Date(), sendReviewClearedBy: "op" })
+      .where(eq(schema.teams.id, teamId));
+    expect(
+      await holdOnContentVerdict(db, { teamId, score: 100, categories: ["phishing_credentials"] }),
+    ).toBe(true);
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    expect(team).toMatchObject({ sendReviewReason: "content" });
+    expect(team?.sendReviewNote).toBe("Content monitor verdict 100/100 (phishing_credentials)");
+    expect((await fetchTeamStanding(db, teamId))?.sendReview?.reason).toBe("content");
+  });
+
+  it("leaves established, suspended and system teams to the monitor's own alert", async () => {
+    const old = await aged("content-old", SEND_REVIEW_NEW_TEAM_DAYS + 1);
+    expect(await holdOnContentVerdict(db, { teamId: old, score: 100, categories: [] })).toBe(false);
+    const suspended = await aged("content-suspended", 1);
+    await db
+      .update(schema.teams)
+      .set({ suspendedAt: new Date(), suspensionReason: "phishing" })
+      .where(eq(schema.teams.id, suspended));
+    expect(await holdOnContentVerdict(db, { teamId: suspended, score: 100, categories: [] })).toBe(
+      false,
+    );
+    const system = await aged("content-system", 1);
+    await db.update(schema.teams).set({ plan: "system" }).where(eq(schema.teams.id, system));
+    expect(await holdOnContentVerdict(db, { teamId: system, score: 100, categories: [] })).toBe(
+      false,
+    );
   });
 });

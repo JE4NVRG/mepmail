@@ -3,6 +3,7 @@ import {
   applyJudgedSample,
   buildJudgeBlock,
   decryptEmailBody,
+  holdOnContentVerdict,
   type JudgeBlockInput,
   judgeErrorClass,
   type Keyring,
@@ -116,6 +117,14 @@ export async function judgeSample(
     return applyJudgedSample(t, settings, { teamId: sample.teamId, score: verdict.score, now });
   });
   if (!outcome) return "skipped";
+  // A near-certain verdict on a young team holds its transactional mail too;
+  // the safety sweep tells the operator about the hold.
+  await holdOnContentVerdict(db, {
+    teamId: sample.teamId,
+    score: verdict.score,
+    categories: verdict.categories,
+    now,
+  });
   if ((outcome.alert || outcome.paused) && deps.mailer) {
     await notifyOperator(db, deps, sample.teamId, verdict.score, outcome, settings, now);
   }

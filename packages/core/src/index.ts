@@ -603,6 +603,7 @@ export {
   findDisguise,
   findImpersonation,
   foldText,
+  holdOnContentVerdict,
   holdReputationRuns,
   holdTeamForReview,
   type ImpersonationFinding,

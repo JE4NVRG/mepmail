@@ -683,6 +683,41 @@ export async function holdReputationRuns(
   return held;
 }
 
+/**
+ * A near-certain abuse verdict of the content monitor (CONTENT_HOLD_SCORE and
+ * up) on a team inside its first SEND_REVIEW_NEW_TEAM_DAYS holds all of its
+ * sending, transactional included: the monitor reads the body, which the
+ * sender-name and subject screens never see. Unlike those screens it holds a
+ * team an operator released before — the verdict is about this message.
+ * Established teams keep the monitor's alert and broadcast pause only.
+ */
+export const CONTENT_HOLD_SCORE = 95;
+
+export async function holdOnContentVerdict(
+  db: Db,
+  input: { teamId: string; score: number; categories: readonly string[]; now?: Date },
+): Promise<boolean> {
+  if (input.score < CONTENT_HOLD_SCORE) return false;
+  const now = input.now ?? new Date();
+  const [team] = await db
+    .select({
+      plan: schema.teams.plan,
+      createdAt: schema.teams.createdAt,
+      suspendedAt: schema.teams.suspendedAt,
+    })
+    .from(schema.teams)
+    .where(eq(schema.teams.id, input.teamId));
+  if (!team || team.plan === "system" || team.suspendedAt) return false;
+  if (now.getTime() - team.createdAt.getTime() > SEND_REVIEW_NEW_TEAM_DAYS * DAY_MS) return false;
+  const kind = input.categories[0] ?? "abuse";
+  return holdTeamForReview(db, {
+    teamId: input.teamId,
+    reason: "content",
+    note: `Content monitor verdict ${input.score}/100 (${kind})`,
+    now,
+  });
+}
+
 /** Holds the operator has not heard about yet, oldest first. */
 export async function unnotifiedSendReviews(db: Db) {
   return db

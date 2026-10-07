@@ -4,7 +4,7 @@
  * records as "unjudged". Nothing here touches sending.
  */
 
-export const JUDGE_PROVIDERS = ["typesafe"] as const;
+export const JUDGE_PROVIDERS = ["typesafe", "openai"] as const;
 export type JudgeProvider = (typeof JUDGE_PROVIDERS)[number];
 
 export interface JudgeVerdict {

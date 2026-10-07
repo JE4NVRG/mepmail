@@ -50,14 +50,16 @@ export const suspensionReasonEnum = pgEnum("suspension_reason", [
  * Why sending is held until an operator reviews the team: impersonation in
  * the sender or subject, a payment Stripe's fraud screening blocked, a young
  * team's sending pattern (volume past its probation day, rotating sender
- * identities, an abuse-prone sending domain), or a bounce/complaint run that
- * crossed the guardrail's pause line.
+ * identities, an abuse-prone sending domain), a bounce/complaint run that
+ * crossed the guardrail's pause line, or a near-certain abuse verdict of the
+ * content monitor on a young team.
  */
 export const sendReviewReasonEnum = pgEnum("send_review_reason", [
   "impersonation",
   "payment_risk",
   "new_sender",
   "reputation",
+  "content",
 ]);
 
 export interface BillingTerms {

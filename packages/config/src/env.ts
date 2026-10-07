@@ -43,7 +43,8 @@ export const CONTENT_REVEAL_MODES = ["off", "on"] as const;
 export type ContentRevealMode = (typeof CONTENT_REVEAL_MODES)[number];
 
 /** Where the optional content-monitor judge runs; "off" is the default everywhere. */
-export const ABUSE_JUDGE_PROVIDERS = ["off", "typesafe"] as const;
+/** "openai" is any OpenAI-compatible Chat Completions endpoint (OpenAI, DeepSeek, a gateway). */
+export const ABUSE_JUDGE_PROVIDERS = ["off", "typesafe", "openai"] as const;
 export type AbuseJudgeProvider = (typeof ABUSE_JUDGE_PROVIDERS)[number];
 export const ABUSE_JUDGE_BASE_URL_DEFAULT = "https://api.typesafe.ai";
 export const ABUSE_JUDGE_MODEL_DEFAULT = "jev-latest";
@@ -640,8 +641,12 @@ export function abuseJudgeConfig(e: Env = env): AbuseJudgeConfig | null {
   const timeout = Number(e.ABUSE_JUDGE_TIMEOUT_MS);
   return {
     provider: provider as AbuseJudgeConfig["provider"],
-    model: e.ABUSE_JUDGE_MODEL || ABUSE_JUDGE_MODEL_DEFAULT,
-    baseUrl: e.ABUSE_JUDGE_BASE_URL || ABUSE_JUDGE_BASE_URL_DEFAULT,
+    // TypeSafe's defaults mean nothing to an OpenAI-compatible endpoint.
+    model:
+      e.ABUSE_JUDGE_MODEL || (provider === "openai" ? "gpt-4o-mini" : ABUSE_JUDGE_MODEL_DEFAULT),
+    baseUrl:
+      e.ABUSE_JUDGE_BASE_URL ||
+      (provider === "openai" ? "https://api.openai.com/v1" : ABUSE_JUDGE_BASE_URL_DEFAULT),
     apiKey: e.ABUSE_JUDGE_API_KEY,
     timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : ABUSE_JUDGE_TIMEOUT_MS_DEFAULT,
   };

@@ -52,3 +52,24 @@ it("reads the judge's settings with their defaults, validated or raw", () => {
     timeoutMs: 20_000,
   });
 });
+
+it("gives an OpenAI-compatible judge its own defaults, and takes a gateway's URL and model", () => {
+  expect(abuseJudgeConfig(fakeEnv({ ABUSE_JUDGE: "openai", ABUSE_JUDGE_API_KEY: "k" }))).toMatchObject({
+    provider: "openai",
+    model: "gpt-4o-mini",
+    baseUrl: "https://api.openai.com/v1",
+  });
+  expect(
+    abuseJudgeConfig(
+      fakeEnv({
+        ABUSE_JUDGE: "openai",
+        ABUSE_JUDGE_API_KEY: "k",
+        ABUSE_JUDGE_BASE_URL: "https://api.commandcode.ai/provider/v1",
+        ABUSE_JUDGE_MODEL: "deepseek/deepseek-v4.1-flash",
+      }),
+    ),
+  ).toMatchObject({ baseUrl: "https://api.commandcode.ai/provider/v1", model: "deepseek/deepseek-v4.1-flash" });
+  expect(() => assertEnvConsistency(fakeEnv({ ABUSE_JUDGE: "openai" }))).toThrow(
+    "ABUSE_JUDGE=openai requires ABUSE_JUDGE_API_KEY",
+  );
+});
