@@ -54,6 +54,12 @@ export interface FakeResend {
   requests: FakeRequest[];
   /** Non-GET requests seen; the fake answers them with 500. */
   writes: number;
+  /**
+   * The team limit the fake announces in `ratelimit-limit` (Resend's default
+   * is 10). A raised limit lets a long run use a higher --rps: the pacing is
+   * real time, and the fake has no limit of its own to protect.
+   */
+  limit: number;
   /** Next request whose path starts with `pathPrefix` gets this reply instead. */
   injectOnce(pathPrefix: string, reply: InjectedReply): void;
   close(): Promise<void>;
@@ -146,6 +152,7 @@ export async function startFakeResend(
     data,
     requests,
     writes: 0,
+    limit: 10,
     injectOnce: (prefix, reply) => injections.push({ prefix, reply }),
     close: () => new Promise((resolve, reject) => server.close((e) => (e ? reject(e) : resolve()))),
   };
@@ -154,8 +161,8 @@ export async function startFakeResend(
     // Resend answers every request with its team limit headers.
     res.writeHead(status, {
       "content-type": "application/json",
-      "ratelimit-limit": "10",
-      "ratelimit-remaining": "9",
+      "ratelimit-limit": String(fake.limit),
+      "ratelimit-remaining": String(fake.limit - 1),
       "ratelimit-reset": "1",
       ...headers,
     });

@@ -14,6 +14,7 @@ import { schema } from "@millionsend/db";
 import { count, eq } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { RPS_CEILING } from "../src/config.js";
 import type { MigrateState, Plan } from "../src/model.js";
 import { migratePaths } from "../src/paths.js";
 import type { Report } from "../src/report.js";
@@ -51,6 +52,12 @@ const QUICK = 60_000;
 const READ = 120_000;
 const ENRICH = 600_000;
 const ROLLBACK = 400_000;
+/**
+ * The CLI's --rps ceiling. The enrichment runs pace two GETs per contact in
+ * real time; at Resend's default 10 req/s they took minutes. The fake announces
+ * this as its limit for them, the way a raised Resend limit would.
+ */
+const FAST_RPS = RPS_CEILING;
 
 let fake: FakeResend;
 let cloud: LiveApi;
@@ -356,13 +363,14 @@ describe("mepmail (built bundle)", () => {
   it(
     "the resumed run completes: every row on the target, the summary, no key anywhere",
     async () => {
+      fake.limit = FAST_RPS;
       const { code, stdout, stderr } = await run([
         "migrate",
         "--from",
         "resend",
         "--yes",
         "--rps",
-        "10",
+        String(FAST_RPS),
       ]);
       expect(stderr).toBe("");
       // Both domains fit under the Starter plan: exit 0, not 3.
@@ -610,6 +618,7 @@ describe("mepmail (built bundle)", () => {
   it(
     "a re-run changes nothing and creates no row",
     async () => {
+      fake.limit = FAST_RPS;
       const before = readState();
       const rows = async () => ({
         contacts: await rowCount(cloud, schema.contacts),
@@ -625,7 +634,7 @@ describe("mepmail (built bundle)", () => {
         "resend",
         "--yes",
         "--rps",
-        "10",
+        String(FAST_RPS),
       ]);
       expect(stderr).toBe("");
       expect(code).toBe(0);

@@ -1,4 +1,7 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
@@ -7,30 +10,104 @@ import { schema } from "@millionsend/db";
 import { drizzle } from "drizzle-orm/pglite";
 
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "../../db/drizzle");
+const SNAPSHOT_PREFIX = "mepmail-test-db-";
+
+function migrationFiles(): string[] {
+  return readdirSync(migrationsDir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+}
+
+async function migrate(client: PGlite, files: string[]): Promise<void> {
+  for (const file of files) {
+    const statements = readFileSync(join(migrationsDir, file), "utf8")
+      .split("--> statement-breakpoint")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    // Match the production migrator: locks and DDL belong to one transaction.
+    await client.transaction(async (migration) => {
+      for (const statement of statements) await migration.exec(statement);
+    });
+  }
+}
+
+/** The installed PGlite version (a data-dir dump is only valid for the version that wrote it). */
+function pgliteVersion(): string {
+  // The package exports no ./package.json, so walk up from its entry point.
+  let dir = dirname(createRequire(import.meta.url).resolve("@electric-sql/pglite"));
+  for (let depth = 0; depth < 5; depth++) {
+    try {
+      const manifest = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
+      if (manifest.name === "@electric-sql/pglite") return String(manifest.version);
+    } catch {
+      // Not the package root yet.
+    }
+    dir = dirname(dir);
+  }
+  throw new Error("Cannot read the installed @electric-sql/pglite version");
+}
+
+/**
+ * The migrated, still-empty database as a PGlite data-dir dump, shared by every
+ * test process through the OS temp dir. Its name hashes every migration and the
+ * PGlite version, so a changed or added migration builds a new one; restoring
+ * it (~0.35 s) replaces replaying all migrations (~1-2 s) for each database.
+ */
+async function migratedTemplate(): Promise<Blob> {
+  const files = migrationFiles();
+  const hash = createHash("sha256");
+  hash.update(pgliteVersion());
+  for (const file of files) hash.update(file).update(readFileSync(join(migrationsDir, file)));
+  const name = `${SNAPSHOT_PREFIX}${hash.digest("hex").slice(0, 24)}.tar`;
+  const path = join(tmpdir(), name);
+  try {
+    return new Blob([readFileSync(path)]);
+  } catch {
+    // Not built yet for this migration set.
+  }
+  const client = new PGlite();
+  try {
+    await migrate(client, files);
+    const dump = await client.dumpDataDir("none");
+    // Write-then-rename: concurrent test workers never read a half-written file.
+    const partial = `${path}.${randomUUID()}`;
+    writeFileSync(partial, Buffer.from(await dump.arrayBuffer()));
+    renameSync(partial, path);
+    for (const old of readdirSync(tmpdir())) {
+      if (old.startsWith(SNAPSHOT_PREFIX) && old !== name && old.endsWith(".tar")) {
+        rmSync(join(tmpdir(), old), { force: true });
+      }
+    }
+    return dump;
+  } finally {
+    await client.close();
+  }
+}
+
+let template: Promise<Blob> | undefined;
 
 /**
  * Fresh in-memory Postgres with the real generated migrations applied —
  * tests exercise the same DDL production runs, append-only trigger included.
+ * Each call is its own database, restored from the migrated template;
+ * MEPMAIL_TEST_DB_FRESH=1 replays the migrations every time instead.
  */
 export async function createTestDb(): Promise<{ db: Db; close: () => Promise<void> }> {
-  const client = new PGlite();
-  const files = readdirSync(migrationsDir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort();
-  try {
-    for (const file of files) {
-      const statements = readFileSync(join(migrationsDir, file), "utf8")
-        .split("--> statement-breakpoint")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-      // Match the production migrator: locks and DDL belong to one transaction.
-      await client.transaction(async (migration) => {
-        for (const statement of statements) await migration.exec(statement);
-      });
+  let client: PGlite;
+  if (process.env.MEPMAIL_TEST_DB_FRESH === "1") {
+    client = new PGlite();
+    try {
+      await migrate(client, migrationFiles());
+    } catch (error) {
+      await client.close();
+      throw error;
     }
-  } catch (error) {
-    await client.close();
-    throw error;
+  } else {
+    template ??= migratedTemplate().catch((error) => {
+      template = undefined;
+      throw error;
+    });
+    client = new PGlite({ loadDataDir: await template });
   }
   const db = drizzle(client, { schema }) as unknown as Db;
   return { db, close: () => client.close() };
