@@ -389,3 +389,25 @@
     transform: none;
   }
 }
+
+/* Product-updates opt-in on sign-up: the whole line toggles the box, and the
+   box itself is finger-sized instead of the browser's 13px default. */
+.updatesChoice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-block: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ms-muted);
+  cursor: pointer;
+}
+
+.updatesChoice input {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--ms-violet);
+  cursor: pointer;
+}

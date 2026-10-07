@@ -15,7 +15,7 @@
         "title": "2. Your account",
         "body": [
           "You must provide accurate account information, keep your credentials and API keys secret, and be at least 18 years old (or the age of majority where you live). You are responsible for all activity under your account and for the content you send.",
-          "You must have a lawful basis to email the recipients you upload or send to â€” typically their consent or an existing customer relationship."
+          "You must have a lawful basis to email the recipients you upload or send to — typically their consent or an existing customer relationship."
         ]
       },
       {
@@ -66,7 +66,7 @@
       {
         "title": "9. Intellectual property",
         "body": [
-          "The MepMail software is open source under the AGPL and can be self-hosted; the hosted service, brand and documentation are ours. Your data â€” contacts, messages and domains â€” remains yours. We claim no ownership over it."
+          "The MepMail software is open source under the AGPL and can be self-hosted; the hosted service, brand and documentation are ours. Your data — contacts, messages and domains — remains yours. We claim no ownership over it."
         ]
       },
       {
@@ -84,7 +84,7 @@
       {
         "title": "12. Governing law",
         "body": [
-          "These terms are governed by the laws of Brazil, where the service is operated. Disputes are settled in the courts of ParanavaÃ­, ParanÃ¡, Brazil, unless mandatory consumer law in your country provides otherwise."
+          "These terms are governed by the laws of Brazil, where the service is operated. Disputes are settled in the courts of Paranavaí, Paraná, Brazil, unless mandatory consumer law in your country provides otherwise."
         ]
       }
     ],
@@ -141,9 +141,9 @@
           "If you allow advertising measurement, Meta receives the optional events described in this policy. Pixel connections also provide Meta with your IP address and browser information. Meta processes this data under its own privacy policy; measurement is not required to use MepMail."
         ],
         "list": [
-          "Amazon Web Services (Amazon SES) â€” email delivery and event notifications. Message content and metadata pass through it for delivery.",
-          "Stripe â€” payment processing, invoices and receipts.",
-          "Cloudflare â€” DNS, CDN and network protection in front of our servers."
+          "Amazon Web Services (Amazon SES) — email delivery and event notifications. Message content and metadata pass through it for delivery.",
+          "Stripe — payment processing, invoices and receipts.",
+          "Cloudflare — DNS, CDN and network protection in front of our servers."
         ]
       },
       {
@@ -200,7 +200,7 @@
       {
         "title": "2. 7-day guarantee on your first payment",
         "body": [
-          "If you upgrade and are not satisfied, ask us within 7 days of your first payment and we refund it in full â€” no interrogation. One guarantee per account, on the first paid period."
+          "If you upgrade and are not satisfied, ask us within 7 days of your first payment and we refund it in full — no interrogation. One guarantee per account, on the first paid period."
         ]
       },
       {
@@ -212,7 +212,7 @@
       {
         "title": "4. Duplicate or accidental charges",
         "body": [
-          "If you were charged twice, charged after a cancellation, or charged by mistake, contact us and we refund the charge in full â€” this is not subject to the 7-day window."
+          "If you were charged twice, charged after a cancellation, or charged by mistake, contact us and we refund the charge in full — this is not subject to the 7-day window."
         ]
       },
       {
@@ -224,19 +224,19 @@
       {
         "title": "6. Abuse and spam",
         "body": [
-          "Accounts suspended or terminated for violating the Terms of Service â€” spam, purchased lists, phishing, prohibited content â€” are not eligible for refunds."
+          "Accounts suspended or terminated for violating the Terms of Service — spam, purchased lists, phishing, prohibited content — are not eligible for refunds."
         ]
       },
       {
         "title": "7. How to request a refund",
         "body": [
-          "Email jean@je4ndev.com from your account address (or tell us the account email) with the charge reference. Refunds are processed through Stripe back to the original payment method, typically within 5â€“10 business days depending on your bank."
+          "Email jean@je4ndev.com from your account address (or tell us the account email) with the charge reference. Refunds are processed through Stripe back to the original payment method, typically within 5–10 business days depending on your bank."
         ]
       },
       {
         "title": "8. Cancelling vs refunding",
         "body": [
-          "Cancelling stops future charges; it does not refund past ones. You can cancel from the dashboard at any time â€” no phone call, no retention maze."
+          "Cancelling stops future charges; it does not refund past ones. You can cancel from the dashboard at any time — no phone call, no retention maze."
         ]
       },
       {

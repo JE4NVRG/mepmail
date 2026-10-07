@@ -120,7 +120,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--ms-violet) 12%, transparent);
   color: var(--ms-violet);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -240,7 +240,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--ms-violet) 14%, transparent);
   color: var(--ms-violet);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.5;
   letter-spacing: 0.02em;
@@ -565,6 +565,15 @@
 }
 .gtm-footer-col a:hover {
   opacity: 1;
+}
+/* On a phone each footer link is a finger-sized row, not a 22px line. */
+@media (max-width: 640px) {
+  .gtm-footer-col {
+    gap: 2px;
+  }
+  .gtm-footer-col a {
+    padding-block: 7px;
+  }
 }
 .gtm-footer-base {
   border-top: 1px solid var(--ms-line-strong);

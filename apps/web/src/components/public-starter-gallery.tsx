@@ -1,4 +1,5 @@
 import { getLocale, getTranslations } from "next-intl/server";
+import { previewMergeTokens } from "@/lib/merge-fields";
 import { listStartersWithContent } from "@/server/starter-templates";
 
 /** These cards use the same library as the editor, rather than a screenshot. */
@@ -16,7 +17,7 @@ export async function PublicStarterGallery({ compact = false }: { compact?: bool
           <div className="cro-starter-preview" aria-hidden="true">
             <iframe
               title={template.name}
-              srcDoc={template.html}
+              srcDoc={previewMergeTokens(template.html)}
               sandbox=""
               tabIndex={-1}
               loading={compact ? "eager" : "lazy"}

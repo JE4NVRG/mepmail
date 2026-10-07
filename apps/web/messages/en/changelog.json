@@ -23,6 +23,28 @@
   },
   "releases": [
     {
+      "version": "0.51",
+      "date": "2026-10-07",
+      "title": "Phone polish and legal pages fixed",
+      "summary": "The Terms, Privacy and Refund pages read correctly again, and the site is easier to use on a phone.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "Accents in the Terms, Privacy and Refund pages display correctly again.",
+            "Template previews on the home page show sample text instead of raw merge fields."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "The ad-measurement notice takes about a third of a phone screen instead of half, with both choices side by side.",
+            "Larger tap targets for footer links and the sign-up updates box, and more readable badges."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.50",
       "date": "2026-10-07",
       "title": "Queued-sending notice",
@@ -108,30 +130,6 @@
             "Pro 220K for US$55 (was US$100), Scale 550K for US$129 (was US$199), Scale 1.1M for US$239 (was US$319) and Scale 1.65M for US$349 (was US$429). Pro 110K stays at US$29 and Scale 2.75M at US$549.",
             "Overage per 1,000 emails: US$0.35 on Pro 110K (was US$0.90), US$0.32 on Pro 220K and US$0.29 down to US$0.22 on Scale, always above the plan's own price so moving up pays off.",
             "Existing subscriptions keep the price they already have."
-          ]
-        }
-      ]
-    },
-    {
-      "version": "0.45",
-      "date": "2026-10-07",
-      "title": "Mail: email inboxes for your AI agents",
-      "summary": "Your agents get an email inbox on your domain: they read, draft and reply over MCP, and you can approve every send.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "Mail opens to every paying Send subscriber: mailboxes on your domain for people and agents, from US$5.90 per mailbox a month.",
-            "The Mail MCP at api-mepmail.je4ndev.com/mcp/correio: the agent lists, reads, drafts and sends with the mailbox key.",
-            "Owner approval: an agent without send permission asks, and the draft shows \"Awaiting your approval\" until you decide.",
-            "The main MCP gained list_mailboxes, create_mailbox and create_mailbox_agent_key.",
-            "Mail opens in its own window, with inbox and settings, plus a Send button in the composer."
-          ]
-        },
-        {
-          "kind": "changed",
-          "items": [
-            "Pre-send protection: disguised senders and subjects are refused, and new accounts imitating banks or carriers go through review."
           ]
         }
       ]

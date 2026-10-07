@@ -89,3 +89,25 @@ export function hasWellFormedMergeTokens(html: string): boolean {
   }
   return true;
 }
+
+/** Sample values the public template gallery shows in place of a token with no fallback. */
+const PREVIEW_SAMPLES: Record<string, string> = {
+  FIRST_NAME: "Ana",
+  LAST_NAME: "Souza",
+  EMAIL: "ana@example.com",
+  ORDER_ID: "4242",
+};
+
+const escapePreview = (text: string): string =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * A template as a reader would receive it, for the public gallery: each merge
+ * token becomes its own fallback, else a sample value, else its name in lower
+ * case. The editor keeps the raw tokens; only marketing previews call this.
+ */
+export function previewMergeTokens(html: string): string {
+  return html.replace(MERGE_TOKEN_RE, (_token, name: string, fallback?: string) =>
+    escapePreview(fallback || PREVIEW_SAMPLES[name.toUpperCase()] || name.toLowerCase()),
+  );
+}

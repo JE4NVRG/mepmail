@@ -28,6 +28,28 @@
   },
   "releases": [
     {
+      "version": "0.51",
+      "date": "2026-10-07",
+      "title": "Ajustes no celular e páginas legais corrigidas",
+      "summary": "Termos, Privacidade e Reembolso voltam a ser lidos corretamente, e o site fica mais fácil de usar no celular.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "Os acentos das páginas de Termos, Privacidade e Reembolso voltam a aparecer corretamente.",
+            "As prévias de modelos na página inicial mostram um texto de exemplo em vez das variáveis cruas."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "O aviso de mensuração de anúncios ocupa cerca de um terço da tela do celular em vez da metade, com as duas opções lado a lado.",
+            "Áreas de toque maiores nos links do rodapé e na opção de novidades do cadastro, e selos mais legíveis."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.50",
       "date": "2026-10-07",
       "title": "Aviso de envios em fila",
@@ -113,30 +135,6 @@
             "Pro 220K por US$ 55 (era US$ 100), Scale 550K por US$ 129 (era US$ 199), Scale 1,1M por US$ 239 (era US$ 319) e Scale 1,65M por US$ 349 (era US$ 429). Pro 110K continua US$ 29 e Scale 2,75M, US$ 549.",
             "Excedente por mil e-mails: US$ 0,35 no Pro 110K (era US$ 0,90), US$ 0,32 no Pro 220K e de US$ 0,29 a US$ 0,22 no Scale, sempre acima do preço do próprio plano para valer a pena subir.",
             "Assinaturas existentes mantêm o preço que já têm."
-          ]
-        }
-      ]
-    },
-    {
-      "version": "0.45",
-      "date": "2026-10-07",
-      "title": "Correio: caixas de e-mail para seus agentes de IA",
-      "summary": "Seus agentes ganham uma caixa de e-mail no seu domínio: leem, rascunham e respondem por MCP, e você pode aprovar antes de cada envio.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "Correio aberto a todos os assinantes pagantes de Envio: caixas no seu domínio para pessoas e agentes, a partir de US$ 5,90 por caixa ao mês.",
-            "MCP do Correio em api-mepmail.je4ndev.com/mcp/correio: o agente lista, lê, rascunha e envia com a chave da caixa.",
-            "Aprovação do dono: um agente sem permissão de envio pede, e o rascunho fica \"Aguardando sua aprovação\" até você decidir.",
-            "O MCP principal ganhou list_mailboxes, create_mailbox e create_mailbox_agent_key.",
-            "O Correio abre em uma janela própria, com caixa de entrada e configurações, e o botão Enviar no editor."
-          ]
-        },
-        {
-          "kind": "changed",
-          "items": [
-            "Proteção antes do envio: remetentes e assuntos disfarçados são recusados, e contas novas que imitam bancos ou transportadoras passam por revisão."
           ]
         }
       ]

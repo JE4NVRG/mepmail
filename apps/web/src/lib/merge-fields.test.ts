@@ -78,3 +78,13 @@ describe("hasWellFormedMergeTokens", () => {
     expect(performance.now() - started).toBeLessThan(1000);
   });
 });
+
+describe("previewMergeTokens", () => {
+  it("shows a reader's view: fallback, else a sample, else the name", async () => {
+    const { previewMergeTokens } = await import("./merge-fields");
+    expect(previewMergeTokens("<p>Olá, {{{FIRST_NAME|tudo bem}}}!</p>")).toBe("<p>Olá, tudo bem!</p>");
+    expect(previewMergeTokens("Pedido #{{{ORDER_ID}}} para {{{first_name}}}")).toBe("Pedido #4242 para Ana");
+    expect(previewMergeTokens("Plano {{{plan}}}")).toBe("Plano plan");
+    expect(previewMergeTokens("{{{FIRST_NAME|<b>x</b>}}}")).toBe("&lt;b&gt;x&lt;/b&gt;");
+  });
+});

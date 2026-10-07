@@ -7,6 +7,25 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.51] - 2026-10-07
+
+Front-end QA pass: phones and the legal pages.
+
+### Fixed
+
+- `messages/*/legal.json` had been saved as double-encoded UTF-8 (pt-BR 74
+  strings, en 11): Terms, Privacy and Refund showed "PolÃ­tica", "Ãšltima".
+- The public template gallery renders merge tokens as a reader sees them
+  (`previewMergeTokens`: fallback, sample value, or the name).
+- The hero offer's arrow no longer wraps onto its own line.
+
+### Changed
+
+- Ad-measurement banner on phones: about a third of the screen (was 52%),
+  choices side by side, the no-choice-yet status line hidden.
+- Footer links get finger-sized rows on phones; the sign-up updates
+  checkbox is 18px and styled; 9–10.5px badges raised to 11px.
+
 ## [0.50] - 2026-10-07
 
 Keeping the platform's own mail flowing while SES is paused.

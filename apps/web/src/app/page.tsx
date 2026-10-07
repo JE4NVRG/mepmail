@@ -158,7 +158,9 @@ export default async function RootPage() {
                         : proOffer.priceCents) / 100,
                       locale,
                     ),
-                  })}{" "}
+                  })}
+                  {/* A no-break space keeps the arrow on the sentence's last line. */}
+                  {"\u00a0"}
                   <a href="#planos" aria-label={t("nav.plans")}>
                     ↗
                   </a>

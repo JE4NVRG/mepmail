@@ -69,7 +69,7 @@
   display: block;
   margin-bottom: 2px;
   color: var(--ms-muted, #918f89);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.03em;
 }
@@ -215,5 +215,47 @@
   .actions {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  /* The first-visit banner sits over the hero: keep it to about a third of a
+     phone screen. Its status line only says "no choice yet" (an error still
+     shows), the brand label repeats the logo, and the two choices fit side
+     by side. */
+  .banner {
+    padding: 16px;
+  }
+
+  .banner .icon {
+    flex-basis: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .banner .icon svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .banner .brand {
+    display: none;
+  }
+
+  .banner .heading h2 {
+    font-size: 16px;
+  }
+
+  .banner .description {
+    margin: 12px 0 6px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .banner .status[data-state="unknown"] {
+    display: none;
+  }
+
+  .banner .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 14px;
   }
 }
