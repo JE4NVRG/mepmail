@@ -221,14 +221,16 @@ export function BillingView({
     return r ? planLabel(r.plan, r.period === "month" ? r.included : null) : key;
   };
   const changedText = changed
-    ? changed.result.applied === "now"
-      ? t("switchedNow", { plan: rungLabel(changed.rung) })
-      : changed.result.applied === "period_end"
-        ? t("pendingChange", {
-            plan: rungLabel(changed.rung),
-            date: formatDay(changed.result.at, locale),
-          })
-        : t("stayOn", { plan: rungLabel(changed.rung) })
+    ? changed.result.applied === "payment_pending"
+      ? null
+      : changed.result.applied === "now"
+        ? t("switchedNow", { plan: rungLabel(changed.rung) })
+        : changed.result.applied === "period_end"
+          ? t("pendingChange", {
+              plan: rungLabel(changed.rung),
+              date: formatDay(changed.result.at, locale),
+            })
+          : t("stayOn", { plan: rungLabel(changed.rung) })
     : null;
   const success = (text: string) => (
     <div
@@ -265,6 +267,10 @@ export function BillingView({
         </span>
         {t("checkoutCancel")}
       </div>
+    ) : changed?.result.applied === "payment_pending" ? (
+      <WarnCard action={null}>
+        {t("upgradePaymentPending", { plan: rungLabel(changed.rung) })}
+      </WarnCard>
     ) : changedText ? (
       success(changedText)
     ) : null;

@@ -444,11 +444,15 @@ async function rungItems(
 export type RungChange =
   | { applied: "now" }
   | { applied: "period_end"; at: Date }
-  | { applied: "unscheduled" };
+  | { applied: "unscheduled" }
+  /** The upgrade charge was not paid yet (declined or needs confirmation): plan unchanged. */
+  | { applied: "payment_pending" };
 
 /**
- * Moves a live subscription to another rung. Up (or across): at once, with
- * prorations on the next invoice, and any pending downgrade dropped. Down: a
+ * Moves a live subscription to another rung. Up (or across): the prorated
+ * difference is charged at once and the new rung applies only when that charge
+ * succeeds (otherwise Stripe keeps it as a pending update and the plan stays),
+ * and any pending downgrade is dropped. Down: a
  * subscription schedule swaps the items when the current period ends, with
  * no proration, so the paid volume is kept to the day it was paid for; a
  * later move up releases the schedule. Choosing the current rung while a
@@ -515,6 +519,7 @@ export async function changeRung(
     }
     // Settle the old usage above before opening this transaction: its meter pin
     // must remain durable even if the subsequent price-change POST fails.
+    let paymentPending = false;
     await deps.db.transaction(async (transaction) => {
       const tx = transaction as unknown as Db;
       await lockCustomer(tx, customerId);
@@ -548,13 +553,17 @@ export async function changeRung(
         throw new Error("Subscription changed before the plan update");
       // Internal subscription mutations and meter emission now share this lock.
       // A manual change made directly in Stripe remains outside the app's lock.
-      await deps.stripe.subscriptions.update(sub.id, {
+      // Charge the difference now; with pending_if_incomplete a declined or
+      // 3DS-pending payment leaves the items unchanged until it is paid.
+      const updated = await deps.stripe.subscriptions.update(sub.id, {
         items,
-        proration_behavior: "create_prorations",
+        proration_behavior: "always_invoice",
+        payment_behavior: "pending_if_incomplete",
       });
+      paymentPending = !!updated?.pending_update;
       // What was accepted inside the old volume is never re-judged as overage
       // under the new one: the period row counts it as already settled.
-      if (rung.period === "month" && base.current_period_start) {
+      if (!paymentPending && rung.period === "month" && base.current_period_start) {
         const p = schema.usagePeriods;
         await tx
           .update(p)
@@ -573,7 +582,7 @@ export async function changeRung(
       });
       await applySubscription(tx, confirmed, deps.log ?? console.warn, deps.stripe);
     });
-    return { applied: "now" };
+    return paymentPending ? { applied: "payment_pending" } : { applied: "now" };
   }
   await applyLocked(deps, customerId, sub.id);
   return result;

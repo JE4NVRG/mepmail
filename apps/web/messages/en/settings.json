@@ -345,7 +345,7 @@
     "stayOn": "You stay on {plan}.",
     "keepPlan": "Keep {plan}",
     "switchAtPeriodEnd": "Switch at period end",
-    "changeHint": "Moving up applies now, with the difference prorated on your next invoice. Moving down applies when the period renews.",
+    "changeHint": "Moving up charges the prorated difference now and applies as soon as it is paid. Moving down applies when the period renews.",
     "features": {
       "domains": "{n, plural, one {# sending domain} other {# sending domains}}",
       "domainsUnlimited": "Unlimited sending domains",
@@ -375,7 +375,8 @@
       "openMailboxes": "Open Correio",
       "skip": "Not now",
       "close": "Close"
-    }
+    },
+    "upgradePaymentPending": "We could not charge the difference for {plan} yet, so your plan has not changed. Check or update your card under Manage and try again; the upgrade applies as soon as the payment goes through."
   },
   "mcp": {
     "title": "MCP server",

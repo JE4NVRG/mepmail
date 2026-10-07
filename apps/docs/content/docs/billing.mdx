@@ -117,8 +117,9 @@ worker reports, so the customer's **overage** switch is a plain row flag,
    - **Up** applies now: the subscription's items are updated — the plan
      item to the new rung's price, the metered item re-priced for a monthly
      rung or dropped for a daily one after its usage is reported — with the
-     difference prorated on the next invoice, and the webhook that follows
-     re-applies the same state. Sends already accepted inside the old volume
+     prorated difference charged at once (the switch applies only when that
+     payment succeeds; a declined card keeps the current plan), and the
+     webhook that follows re-applies the same state. Sends already accepted inside the old volume
      are marked settled on the period row, so the new rung never bills them
      as overage.
    - **Down** applies at the period end, with no proration and no refund: a

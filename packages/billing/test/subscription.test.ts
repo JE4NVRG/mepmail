@@ -133,7 +133,8 @@ describe("changeRung up", () => {
             { id: "si_sub_1", price: priceId("millionsend_pro_200k_monthly") },
             { id: "si_sub_1_overage", price: priceId("millionsend_pro_200k_overage") },
           ],
-          proration_behavior: "create_prorations",
+          proration_behavior: "always_invoice",
+          payment_behavior: "pending_if_incomplete",
         },
       ],
     ]);
@@ -151,6 +152,21 @@ describe("changeRung up", () => {
       stripeOverageItemId: "si_sub_1_overage",
       pendingRung: null,
     });
+  });
+
+  it("keeps the current rung when the upgrade charge is not paid (pending update)", async () => {
+    const teamId = await subscribedTeam(withOverage(), 110_500);
+    state.declinePayment = true;
+    expect(await changeRung(deps(), { teamId, rung: "pro_200k" })).toEqual({
+      applied: "payment_pending",
+    });
+    expect(state.updates[0]?.[1]).toMatchObject({
+      proration_behavior: "always_invoice",
+      payment_behavior: "pending_if_incomplete",
+    });
+    // Nothing moved: the plan, its quota and the period settlement stay as before.
+    expect(await team(teamId)).toMatchObject({ plan: "pro", planQuota: 110_000 });
+    expect(await reportedOverage(teamId)).toBe(500);
   });
 
   it("serializes a reporter started during the price POST until readback persists the new binding", async () => {

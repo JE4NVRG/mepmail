@@ -821,7 +821,8 @@ describe("billing router", () => {
           { id: "si_base", price: "price_scale_500k" },
           { id: "si_overage", price: "price_scale_500k_overage" },
         ],
-        proration_behavior: "create_prorations",
+        proration_behavior: "always_invoice",
+        payment_behavior: "pending_if_incomplete",
       },
     ]);
     expect(calls.scheduleCreates).toEqual([]);

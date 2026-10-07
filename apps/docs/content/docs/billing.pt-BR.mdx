@@ -121,8 +121,9 @@ linha, `teams.overage_enabled`, que é o que toda superfície de envio lê.
    - **Subir** vale na hora: os itens da assinatura são atualizados — o item
      do plano para o preço do novo degrau, o item medido reprecificado para
      um degrau mensal ou removido para um diário depois de reportar o uso —
-     com a diferença rateada na próxima fatura, e o webhook que vem em
-     seguida reaplica o mesmo estado. Os envios já aceitos dentro do volume
+     com a diferença proporcional cobrada na hora (a troca só vale quando
+     esse pagamento é aprovado; um cartão recusado mantém o plano atual), e o
+     webhook que vem em seguida reaplica o mesmo estado. Os envios já aceitos dentro do volume
      antigo são marcados como acertados na linha do período, então o novo
      degrau nunca os cobra como excedente.
    - **Descer** vale ao fim do período, sem rateio e sem reembolso: um

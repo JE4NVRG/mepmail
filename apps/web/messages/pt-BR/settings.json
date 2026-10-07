@@ -345,7 +345,7 @@
     "stayOn": "Você continua no {plan}.",
     "keepPlan": "Manter {plan}",
     "switchAtPeriodEnd": "Trocar no fim do período",
-    "changeHint": "Subir de plano vale na hora, com a diferença rateada na próxima fatura. Descer vale quando o período renovar.",
+    "changeHint": "Subir de plano cobra a diferença proporcional na hora e vale assim que o pagamento é aprovado. Descer vale quando o período renovar.",
     "features": {
       "domains": "{n, plural, one {# domínio de envio} other {# domínios de envio}}",
       "domainsUnlimited": "Domínios de envio ilimitados",
@@ -375,7 +375,8 @@
       "openMailboxes": "Abrir o Correio",
       "skip": "Agora não",
       "close": "Fechar"
-    }
+    },
+    "upgradePaymentPending": "Ainda não conseguimos cobrar a diferença do {plan}, então seu plano não mudou. Confira ou atualize o cartão em Gerenciar e tente de novo; o upgrade vale assim que o pagamento for aprovado."
   },
   "mcp": {
     "title": "Servidor MCP",
