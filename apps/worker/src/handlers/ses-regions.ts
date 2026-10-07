@@ -66,8 +66,11 @@ interface Grant {
 
 export function createRegionSendControls(opts: {
   regions: readonly string[];
-  /** One GetAccount in the region: the quota and MaxSendRate come from the same read. */
-  read: (region: string) => Promise<SesAccountOverview["quota"]>;
+  /**
+   * One GetAccount in the region: the quota and MaxSendRate come from the
+   * same read, and so does whether SES has paused the account there.
+   */
+  read: (region: string) => Promise<SesAccountOverview["quota"] & { accountPaused?: boolean }>;
   /**
    * Messages/second ceiling across regions (the instance setting, else
    * SES_MAX_SEND_RATE): a region's bucket runs at the lower of its own

@@ -23,6 +23,28 @@
   },
   "releases": [
     {
+      "version": "0.49",
+      "date": "2026-10-07",
+      "title": "Sending protection for new accounts",
+      "summary": "New accounts start with a review step before they can send at volume, so one abusive sender cannot put everyone's deliverability at risk.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A new account sends a limited volume per day during its first days; our team reviews it once and the limit lifts. Mail past it is kept and sent after the review, never dropped.",
+            "Sending is held for review when a new account looks like phishing: imitated banks, insurers, carriers or security notices (now in French and Spanish too), sender addresses that keep changing, or a sending domain on a TLD known for abuse.",
+            "An account whose bounces or complaints cross the provider's review lines has all of its mail held, transactional included, until we review it."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "When the email provider pauses sending, accepted mail waits in the queue and goes out once sending resumes, instead of failing."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.48",
       "date": "2026-10-07",
       "title": "MCP on api.mepmail.dev",
@@ -117,30 +139,6 @@
           "items": [
             "Quotas up 10% everywhere: Pro now starts at 110,000 emails/month and Scale reaches 2.75M. Prices unchanged."
           ]
-        }
-      ]
-    },
-    {
-      "version": "0.43",
-      "date": "2026-09-29",
-      "title": "Roomier plans and pages you can trust",
-      "summary": "More domains and workspaces per plan, unlimited contacts on Starter, and two new pages that explain security and support up front.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "/security — the controls that protect your sending, the services we rely on, and exactly where compliance (SOC 2 / ISO 27001) stands.",
-            "/support — how to reach us and what to expect, with an FAQ for larger teams.",
-            "/integrations — every service that connects to MepMail, with a setup guide per tool."
-          ]
-        },
-        {
-          "kind": "changed",
-          "items": ["More domains and workspaces per plan; unlimited contacts on Starter."]
-        },
-        {
-          "kind": "fixed",
-          "items": ["Prices display correctly in each language."]
         }
       ]
     }

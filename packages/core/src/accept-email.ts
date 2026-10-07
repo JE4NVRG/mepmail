@@ -7,7 +7,7 @@ import type { Keyring } from "./crypto/keyring.js";
 import { emitFunnelEvent, type FunnelEventTarget, teamFunnelProps } from "./funnel-events.js";
 import { attachmentLimit, type QuotaTeamRow, type TeamQuota, teamQuota } from "./plans.js";
 import { reserveQuota } from "./quota.js";
-import { findDisguise, screenImpersonation } from "./send-review.js";
+import { findDisguise, screenImpersonation, screenNewSender } from "./send-review.js";
 import { parseSingleSender } from "./sender-address.js";
 import { extractAddrSpec, findSuppressed, normalizeAddress } from "./suppressions.js";
 import { findTopicOptOuts } from "./topics.js";
@@ -287,11 +287,18 @@ export async function acceptEmail(
   if (deps.isCloud && auth.billing !== "uncapped" && payload.domainId !== null) {
     const disguise = findDisguise({ from: payload.from, subject: payload.subject });
     if (disguise) return { ok: false, reason: "disguised_sender", ...disguise };
-    await screenImpersonation(opts.tx ?? deps.db, {
+    const held = await screenImpersonation(opts.tx ?? deps.db, {
       teamId: auth.teamId,
       from: payload.from,
       subject: payload.subject,
     });
+    if (!held) {
+      await screenNewSender(opts.tx ?? deps.db, {
+        teamId: auth.teamId,
+        from: payload.from,
+        recipients: countDistinctRecipients(payload.to, payload.cc, payload.bcc),
+      });
+    }
   }
 
   // Suppression: dedupe, check every recipient field, and strip suppressed

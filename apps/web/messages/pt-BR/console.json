@@ -675,6 +675,8 @@
         "title": "Envio retido para revisão",
         "impersonation": "Conta nova com remetente ou assunto imitando banco, operadora ou segurança da conta.",
         "payment_risk": "O antifraude da Stripe bloqueou um pagamento desta conta.",
+        "new_sender": "Padrão de envio de conta nova: passou do limite do período de teste, troca de endereço de remetente ou domínio em extensão muito usada em golpes.",
+        "reputation": "Devoluções ou reclamações acima das linhas de revisão do SES: todo o e-mail desta conta fica retido, inclusive o transacional.",
         "body": "Os e-mails aceitos ficam guardados e nada sai para o SES. Liberar o envio solta os retidos em até 15 minutos; suspender a equipe mantém tudo retido.",
         "release": "Liberar envio",
         "released": "{team} · envio liberado"

@@ -39,6 +39,14 @@ describe("SES quota gate", () => {
     expect(await gate.refresh()).toBe(false);
   });
 
+  it("holds while SES has paused the account, and reopens when it lifts", async () => {
+    let quota = { max24h: 50_000, sentLast24h: 10, accountPaused: true };
+    const gate = createSesQuotaGate(async () => quota);
+    expect(await gate.refresh()).toBe(true);
+    quota = { max24h: 50_000, sentLast24h: 10, accountPaused: false };
+    expect(await gate.refresh()).toBe(false);
+  });
+
   it("tells the daily-quota refusal from a rate refusal by SES's own wording", () => {
     const quota = Object.assign(new Error("Daily message quota exceeded"), {
       name: "TooManyRequestsException",

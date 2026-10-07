@@ -28,6 +28,28 @@
   },
   "releases": [
     {
+      "version": "0.49",
+      "date": "2026-10-07",
+      "title": "Proteção de envio para contas novas",
+      "summary": "Contas novas passam por uma revisão antes de enviar em volume, para que um remetente abusivo não coloque em risco a entrega de todo mundo.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Uma conta nova envia um volume limitado por dia nos primeiros dias; nosso time revisa a conta uma vez e o limite sai. O que passar do limite fica guardado e sai depois da revisão, nunca é descartado.",
+            "O envio fica retido para revisão quando uma conta nova parece phishing: imitação de banco, seguradora, transportadora ou aviso de segurança (agora também em francês e espanhol), endereços de remetente que mudam o tempo todo ou domínio em extensão conhecida por abuso.",
+            "Uma conta cujas devoluções ou reclamações passam das linhas de revisão do provedor tem todo o e-mail retido, inclusive o transacional, até a nossa revisão."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Quando o provedor de e-mail pausa os envios, o e-mail aceito espera na fila e sai assim que os envios voltam, em vez de falhar."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.48",
       "date": "2026-10-07",
       "title": "MCP em api.mepmail.dev",
@@ -122,30 +144,6 @@
           "items": [
             "Quotas +10% em tudo: o Pro começa em 110.000 e-mails/mês e o Scale chega a 2,75M. Preços inalterados."
           ]
-        }
-      ]
-    },
-    {
-      "version": "0.43",
-      "date": "2026-09-29",
-      "title": "Planos mais espaçosos e páginas de confiança",
-      "summary": "Mais domínios e workspaces por plano, contatos ilimitados no Starter, e duas páginas novas explicando segurança e suporte.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "/security — os controles que protegem seus envios, os serviços em que confiamos e onde o compliance (SOC 2 / ISO 27001) está, sem enrolação.",
-            "/support — como falar com a gente e o que esperar, com FAQ pra times maiores.",
-            "/integrations — todos os serviços que conectam no MepMail, com guia de setup por ferramenta."
-          ]
-        },
-        {
-          "kind": "changed",
-          "items": ["Mais domínios e workspaces por plano; contatos ilimitados no Starter."]
-        },
-        {
-          "kind": "fixed",
-          "items": ["Preços exibidos corretamente em cada idioma."]
         }
       ]
     }

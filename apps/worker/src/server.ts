@@ -201,7 +201,14 @@ const accountClientFor = (region: string) => {
 // parks, and the parked-transactional probe reads one replica's memory.
 const sendControls = createRegionSendControls({
   regions,
-  read: async (region) => (await getAccountOverview(accountClientFor(region))).quota,
+  read: async (region) => {
+    const account = await getAccountOverview(accountClientFor(region));
+    // SES's enforcement pause (or sending switched off): no room until it lifts.
+    return {
+      ...account.quota,
+      accountPaused: account.enforcementStatus === "SHUTDOWN" || !account.sendingEnabled,
+    };
+  },
   ceiling: async () => (await getInstanceSettings(db)).sesMaxSendRate ?? env.SES_MAX_SEND_RATE,
   reserve: async () =>
     (await getInstanceSettings(db)).sesTransactionalReserve ?? env.SES_TRANSACTIONAL_RESERVE,

@@ -1,5 +1,6 @@
 import {
   computeTeamStandings,
+  holdReputationRuns,
   markSendReviewNotified,
   pruneTeamStandings,
   recordAudit,
@@ -36,6 +37,9 @@ export async function runSafetyFlags(
   });
   await saveTeamStandings(db, standings, now);
   await pruneTeamStandings(db, now);
+  // A paused guardrail holds the team's transactional mail too; the notice
+  // below tells the operator about each new hold.
+  await holdReputationRuns(db, standings, now);
   try {
     const [row] = await db
       .select({ n: sql<number>`count(*)::int` })

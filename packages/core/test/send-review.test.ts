@@ -8,14 +8,20 @@ import { acceptEmail } from "../src/accept-email.js";
 import { EnvKeyring } from "../src/crypto/keyring.js";
 import type { QuotaTeamRow } from "../src/plans.js";
 import {
+  abuseProneTld,
   disguisedWord,
   findDisguise,
   findImpersonation,
   foldText,
+  holdReputationRuns,
   holdTeamForReview,
   markSendReviewNotified,
+  PROBATION_DAILY_RECIPIENTS,
+  PROBATION_DAYS,
   SEND_REVIEW_NEW_TEAM_DAYS,
+  SENDER_ROTATION_LIMIT,
   screenImpersonation,
+  screenNewSender,
   unnotifiedSendReviews,
 } from "../src/send-review.js";
 import { syncTeamFlags } from "../src/team-flags.js";
@@ -97,6 +103,30 @@ describe("findImpersonation", () => {
     expect(
       findImpersonation({ from: "Segurança da Conta <a@x.dev>", subject: "Aviso" }),
     ).toMatchObject({ field: "from" });
+  });
+
+  it("reads the 2026-10-07 runs: an insurer refund in French and an ISP security notice", () => {
+    expect(
+      findImpersonation({
+        from: "Assurances <sales@millionsmiledental.com.au>",
+        subject: "Remboursement de prestations I2PORKMM",
+      }),
+    ).toEqual({ field: "from", term: "assurances" });
+    expect(
+      findImpersonation({
+        from: "Notifications <support@millionsmiledental.com.au>",
+        subject: "Message important pour vous – Otmane",
+      }),
+    ).toEqual({ field: "subject", term: "message important pour vous" });
+    expect(
+      findImpersonation({
+        from: "Tech Team <info@fbx-centre.site>",
+        subject: "New App Linked To Your Account",
+      }),
+    ).toEqual({ field: "subject", term: "new app linked" });
+    expect(
+      findImpersonation({ from: "Account Security <info@fbx-centre.site>", subject: "Hi" }),
+    ).toEqual({ field: "from", term: "security" });
   });
 
   it("matches whole words only, and brand names only in the sender", () => {
@@ -232,5 +262,153 @@ describe("acceptEmail on the cloud", () => {
     );
     expect(result.ok).toBe(true);
     expect((await fetchTeamStanding(db, teamId))?.sendReview).not.toBeNull();
+  });
+});
+
+describe("new sender patterns", () => {
+  async function youngTeam(slug: string, ageDays = 1) {
+    const teamId = await createTeam(db, slug);
+    await db
+      .update(schema.teams)
+      .set({ createdAt: new Date(Date.now() - ageDays * 86_400_000) })
+      .where(eq(schema.teams.id, teamId));
+    return teamId;
+  }
+  const sent = (teamId: string, from: string, to: string[] = ["a@b.dev"]) =>
+    db.insert(schema.emails).values({ teamId, from, to, subject: "Hello" });
+  const teamRow = async (teamId: string) =>
+    (await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)))[0];
+
+  it("names abuse-prone TLDs only", () => {
+    expect(abuseProneTld("info@fbx-centre.site")).toBe("site");
+    expect(abuseProneTld("rich@coursaee.fit")).toBe("fit");
+    expect(abuseProneTld("a@mail.mepmail.dev")).toBeNull();
+    expect(abuseProneTld("a@millionsmiledental.com.au")).toBeNull();
+  });
+
+  it("holds a young team sending from an abuse-prone TLD before its first message", async () => {
+    const teamId = await youngTeam("tld-site");
+    expect(
+      await screenNewSender(db, { teamId, from: "Tech <info@fbx-centre.site>", recipients: 1 }),
+    ).toBe(true);
+    const team = await teamRow(teamId);
+    expect(team?.sendReviewReason).toBe("new_sender");
+    expect(team?.sendReviewNote).toContain(".site");
+  });
+
+  it("holds a young team rotating sender addresses, not one using a few", async () => {
+    const teamId = await youngTeam("rotator");
+    for (let i = 1; i < SENDER_ROTATION_LIMIT; i++) {
+      await sent(teamId, `Desk ${i} <s${i}@rotator.dev>`);
+    }
+    expect(
+      await screenNewSender(db, { teamId, from: "Desk <s1@rotator.dev>", recipients: 1 }),
+    ).toBe(false);
+    const last = `Desk <s${SENDER_ROTATION_LIMIT}@rotator.dev>`;
+    expect(await screenNewSender(db, { teamId, from: last, recipients: 1 })).toBe(false);
+    await sent(teamId, last);
+    expect(
+      await screenNewSender(db, { teamId, from: "Accueil <contrat@rotator.dev>", recipients: 1 }),
+    ).toBe(true);
+    expect((await teamRow(teamId))?.sendReviewNote).toContain("sender addresses in 24 hours");
+  });
+
+  it("holds a team inside its probation days past the daily recipients", async () => {
+    const teamId = await youngTeam("probation");
+    const batch = Array.from({ length: PROBATION_DAILY_RECIPIENTS - 10 }, (_, i) => `r${i}@b.dev`);
+    await sent(teamId, "news@probation.dev", batch);
+    expect(await screenNewSender(db, { teamId, from: "news@probation.dev", recipients: 10 })).toBe(
+      false,
+    );
+    expect(await screenNewSender(db, { teamId, from: "news@probation.dev", recipients: 11 })).toBe(
+      true,
+    );
+    expect((await teamRow(teamId))?.sendReviewNote).toContain("probation day");
+    // Past the probation days the volume is the plan's business.
+    const older = await youngTeam("past-probation", PROBATION_DAYS + 1);
+    await sent(older, "news@past.dev", batch);
+    expect(
+      await screenNewSender(db, { teamId: older, from: "news@past.dev", recipients: 50 }),
+    ).toBe(false);
+  });
+
+  it("leaves established, released and system teams alone", async () => {
+    const old = await youngTeam("old-site", SEND_REVIEW_NEW_TEAM_DAYS + 1);
+    expect(await screenNewSender(db, { teamId: old, from: "a@old.site", recipients: 1 })).toBe(
+      false,
+    );
+    const released = await youngTeam("released-site");
+    await db
+      .update(schema.teams)
+      .set({ sendReviewClearedAt: new Date(), sendReviewClearedBy: "op" })
+      .where(eq(schema.teams.id, released));
+    expect(
+      await screenNewSender(db, { teamId: released, from: "a@released.site", recipients: 500 }),
+    ).toBe(false);
+    const system = await youngTeam("system-site");
+    await db.update(schema.teams).set({ plan: "system" }).where(eq(schema.teams.id, system));
+    expect(
+      await screenNewSender(db, { teamId: system, from: "a@sys.site", recipients: 500 }),
+    ).toBe(false);
+  });
+
+  it("holds every send of a team whose guardrail paused, unless released this week", async () => {
+    const bad = await youngTeam("bounce-run", 60);
+    const releasedLately = await youngTeam("released-lately", 60);
+    await db
+      .update(schema.teams)
+      .set({ sendReviewClearedAt: new Date(Date.now() - 86_400_000), sendReviewClearedBy: "op" })
+      .where(eq(schema.teams.id, releasedLately));
+    const fine = await youngTeam("fine", 60);
+    const paused = (teamId: string) => ({
+      teamId,
+      guardrail: "paused",
+      guardrailMetric: "hard_bounce" as const,
+      complaintRate7d: 0,
+      hardBounceRate7d: 0.08,
+    });
+    const held = await holdReputationRuns(db, [
+      paused(bad),
+      paused(releasedLately),
+      { ...paused(fine), guardrail: "ok" },
+    ]);
+    expect(held).toEqual([bad]);
+    expect((await teamRow(bad))?.sendReviewReason).toBe("reputation");
+    expect((await teamRow(bad))?.sendReviewNote).toContain("8.00%");
+    expect((await fetchTeamStanding(db, bad))?.sendReview?.reason).toBe("reputation");
+    expect((await teamRow(releasedLately))?.sendReviewAt).toBeNull();
+    // A held team is not held again.
+    expect(await holdReputationRuns(db, [paused(bad)])).toEqual([]);
+  });
+});
+
+describe("acceptEmail screens a new sender", () => {
+  const keyring = EnvKeyring.fromBase64(randomBytes(32).toString("base64"));
+  it("accepts mail from an abuse-prone domain and holds the young team", async () => {
+    const teamId = await createTeam(db, "accept-site");
+    const [domain] = await db
+      .insert(schema.domains)
+      .values({ teamId, name: "accept-centre.site", region: "us-east-1", status: "verified" })
+      .returning({ id: schema.domains.id });
+    const billing: QuotaTeamRow = {
+      plan: "free",
+      planQuota: null,
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      overageEnabled: false,
+    };
+    const result = await acceptEmail(
+      { db, keyring, isCloud: true, enqueueEmailSend: async () => {} },
+      { teamId, billing, apiKeyId: null },
+      {
+        from: "Team <hi@accept-centre.site>",
+        to: ["a@b.dev"],
+        subject: "Welcome",
+        text: "x",
+        domainId: domain?.id ?? null,
+      },
+    );
+    expect(result.ok).toBe(true);
+    expect((await fetchTeamStanding(db, teamId))?.sendReview?.reason).toBe("new_sender");
   });
 });

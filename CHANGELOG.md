@@ -7,6 +7,32 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.49] - 2026-10-07
+
+Sending protection after the 2026-10-07 SES pause (three week-old accounts
+sent phishing from fresh domains).
+
+### Added
+
+- `screenNewSender` (send-review): until an operator has reviewed a team once,
+  a team in its probation days holds when a send would take it past the
+  probation day's recipients; a young team holds on more than four sender
+  addresses in 24 hours or on a sending domain under an abuse-prone TLD.
+  Held mail is accepted and parked; reason `new_sender`.
+- `holdReputationRuns`: a paused guardrail holds all of the team's mail,
+  transactional included (reason `reputation`); its automatic flag becomes
+  the review flag so the team stays listed while held.
+- Impersonation lists cover French, Spanish and English-market banks,
+  insurers, carriers and offices, and the lures of the 2026-10-07 runs.
+- Migration 0048: `send_review_reason` gains `new_sender` and `reputation`.
+
+### Changed
+
+- The worker reads SES's enforcement status with the quota: while SES has
+  paused the account (SHUTDOWN or sending disabled) mail parks as
+  `queued_quota` instead of failing `ses_MessageRejected`, and the drain lets
+  it out once sending resumes.
+
 ## [0.48] - 2026-10-07
 
 The OAuth MCP endpoint on api.mepmail.dev.

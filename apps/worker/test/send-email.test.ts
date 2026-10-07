@@ -1030,6 +1030,30 @@ it("an unresolved tracking subdomain falls back to the shared host where one is 
   expect(mime).not.toContain("track.pendingsub.dev");
 });
 
+it("parks instead of failing while SES has paused the account", async () => {
+  const ses: SesSender = {
+    async sendRaw() {
+      throw Object.assign(new Error("Sending suspended for this account."), {
+        name: "MessageRejected",
+      });
+    },
+  };
+  let refreshed = 0;
+  const sesQuota = {
+    exhausted: () => false,
+    refresh: async () => {
+      refreshed += 1;
+      return true;
+    },
+  };
+  const emailId = await insertEmail();
+  expect(await sendEmail(db, { keyring, ses, sesQuota }, { emailId })).toBe("parked");
+  expect(refreshed).toBe(1);
+  const [row] = await db.select().from(schema.emails).where(eq(schema.emails.id, emailId));
+  expect(row?.latestStatus).toBe("queued_quota");
+  expect(row?.sentAt).toBeNull();
+});
+
 it("a permanent SES refusal fails the email with an event instead of retrying", async () => {
   const ses: SesSender = {
     async sendRaw() {

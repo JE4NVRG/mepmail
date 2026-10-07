@@ -38,6 +38,7 @@ import {
   reserveQuota,
   roundUpToSlot,
   screenImpersonation,
+  screenNewSender,
   segmentContactsWhere,
   substituteUnsubscribeUrl,
 } from "@millionsend/core";
@@ -240,11 +241,28 @@ export async function sendBroadcast(
         reason: "impersonation",
         note: `Disguised ${disguise.field === "from" ? "sender name" : "subject"}: "${disguise.sample}"`,
       });
-    } else {
-      await screenImpersonation(db, {
+    } else if (
+      !(await screenImpersonation(db, {
         teamId: broadcast.teamId,
         from: broadcast.from,
         subject: broadcast.subject,
+      }))
+    ) {
+      // The team's reachable contacts bound the audience from above: the
+      // segment and topic narrow it only after the claim below.
+      const [reachable] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(schema.contacts)
+        .where(
+          and(
+            eq(schema.contacts.teamId, broadcast.teamId),
+            eq(schema.contacts.unsubscribed, false),
+          ),
+        );
+      await screenNewSender(db, {
+        teamId: broadcast.teamId,
+        from: broadcast.from,
+        recipients: reachable?.n ?? 0,
       });
     }
   }

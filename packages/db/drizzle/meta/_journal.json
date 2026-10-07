@@ -337,6 +337,13 @@
       "when": 1791345600000,
       "tag": "0047_send_review",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1791396000000,
+      "tag": "0048_send_review_new_sender",
+      "breakpoints": true
     }
   ]
 }

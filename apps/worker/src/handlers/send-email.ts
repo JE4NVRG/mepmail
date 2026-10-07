@@ -489,7 +489,7 @@ export async function sendEmail(
       return "parked";
     }
   } else if (deps.sesQuota?.exhausted(region)) {
-    await parkQueued(db, email, "SES 24h quota reached");
+    await parkQueued(db, email, "SES 24h quota reached or account paused");
     deps.sesQuota.noteTransactionalParked?.(region);
     return "parked";
   }
@@ -765,6 +765,22 @@ export async function sendEmail(
     // is never released — a bookkeeping failure then leaves the row claimed
     // rather than risking a duplicate delivery.)
     const name = (err as { name?: string }).name ?? "";
+    // SES answers MessageRejected for every message while it has paused the
+    // account; a fresh account read tells that apart from a refused message,
+    // and the mail parks for the drain instead of failing for good.
+    if (
+      name === "MessageRejected" &&
+      deps.sesQuota !== undefined &&
+      (await deps.sesQuota.refresh(region))
+    ) {
+      await db
+        .update(schema.emails)
+        .set({ sentAt: null })
+        .where(and(eq(schema.emails.id, email.id), eq(schema.emails.latestStatus, "queued")));
+      await parkQueued(db, email, "SES account paused");
+      if (!bulk) deps.sesQuota.noteTransactionalParked?.(region);
+      return "parked";
+    }
     if (TERMINAL_SES_ERRORS.has(name)) {
       await failQueuedEmail(db, email.id, `ses_${name}`);
       return "failed";

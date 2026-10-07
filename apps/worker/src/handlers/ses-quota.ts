@@ -32,8 +32,14 @@ export interface SendQuotaControls extends SesQuotaGate {
   noteTransactionalParked?(region?: string): void;
 }
 
+/**
+ * `accountPaused` is SES's own stop (EnforcementStatus SHUTDOWN, or sending
+ * disabled): every send would come back MessageRejected, so the gate reads it
+ * as no room at all. Mail parks as queued_quota instead of failing, and the
+ * drain lets it out once a probe sees the account sending again.
+ */
 export function createSesQuotaGate(
-  read: () => Promise<{ max24h: number; sentLast24h: number }>,
+  read: () => Promise<{ max24h: number; sentLast24h: number; accountPaused?: boolean }>,
   onError: (err: unknown) => void = (err) => console.warn("SES quota read failed", err),
 ): SesQuotaGate {
   let exhausted = false;
@@ -42,7 +48,9 @@ export function createSesQuotaGate(
     async refresh() {
       try {
         const quota = await read();
-        exhausted = quota.max24h > 0 && quota.sentLast24h >= quota.max24h * SES_QUOTA_MARGIN;
+        exhausted =
+          quota.accountPaused === true ||
+          (quota.max24h > 0 && quota.sentLast24h >= quota.max24h * SES_QUOTA_MARGIN);
       } catch (err) {
         onError(err);
       }

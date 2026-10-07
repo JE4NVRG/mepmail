@@ -603,6 +603,7 @@ export {
   findDisguise,
   findImpersonation,
   foldText,
+  holdReputationRuns,
   holdTeamForReview,
   type ImpersonationFinding,
   impersonationNote,
@@ -610,6 +611,7 @@ export {
   SEND_REVIEW_NEW_TEAM_DAYS,
   type SendReviewReason,
   screenImpersonation,
+  screenNewSender,
   senderName,
   unnotifiedSendReviews,
 } from "./send-review.js";

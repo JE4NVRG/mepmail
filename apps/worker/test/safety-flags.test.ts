@@ -32,17 +32,22 @@ afterAll(() => close());
 const flagsOf = (teamId: string) =>
   db.select().from(schema.teamFlags).where(eq(schema.teamFlags.teamId, teamId));
 
-it("flags the noisy team only, stands both, and records the unsubscribed count", async () => {
+it("flags and holds the noisy team only, stands both, and records the unsubscribed count", async () => {
   expect(await runSafetyFlags(db, { now: NOW })).toEqual({
     teams: 2,
     opened: 1,
     cleared: 0,
-    reviews: 0,
+    reviews: 1,
   });
 
+  // The paused guardrail holds all of the team's mail; its flag becomes the
+  // review flag the hold keeps open.
   expect(await flagsOf(noisy)).toMatchObject([
-    { status: "open", openedBy: null, openedAt: NOW, reason: "guardrail" },
+    { status: "open", openedBy: null, openedAt: NOW, reason: "review" },
   ]);
+  const [held] = await db.select().from(schema.teams).where(eq(schema.teams.id, noisy));
+  expect(held).toMatchObject({ sendReviewReason: "reputation" });
+  expect(held?.sendReviewNote).toContain("complaint rate 2.00%");
   expect(await flagsOf(clean)).toEqual([]);
 
   const standings = await db.select().from(schema.teamStandings);
@@ -71,7 +76,7 @@ it("flags the noisy team only, stands both, and records the unsubscribed count",
   expect(probes).toMatchObject([{ value: 1, ok: true }]);
 });
 
-it("clears the flag once the counters are fixed", async () => {
+it("keeps the hold and its flag once the counters are fixed, until an operator releases", async () => {
   const later = new Date(NOW.getTime() + 15 * 60_000);
   await db
     .update(schema.usageCounters)
@@ -80,11 +85,11 @@ it("clears the flag once the counters are fixed", async () => {
   expect(await runSafetyFlags(db, { now: later })).toEqual({
     teams: 2,
     opened: 0,
-    cleared: 1,
+    cleared: 0,
     reviews: 0,
   });
   expect(await flagsOf(noisy)).toMatchObject([
-    { status: "cleared", clearedBy: null, clearedAt: later, openedAt: NOW },
+    { status: "open", reason: "review", openedAt: NOW },
   ]);
   expect(
     (await db.select().from(schema.teamStandings)).find((s) => s.teamId === noisy),
