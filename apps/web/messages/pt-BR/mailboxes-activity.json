@@ -25,6 +25,7 @@
     "itemRead": "Acessou o conteúdo de uma mensagem",
     "draftSaved": "Salvou um rascunho",
     "sendApproved": "Aprovou um envio",
+    "sendRequested": "Pediu ao dono para aprovar um envio",
     "itemTrashed": "Moveu uma mensagem para a lixeira",
     "itemRestored": "Restaurou uma mensagem da lixeira",
     "itemStarred": "Adicionou uma mensagem aos favoritos",

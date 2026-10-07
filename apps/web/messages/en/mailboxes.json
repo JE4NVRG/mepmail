@@ -185,7 +185,10 @@
   "approval": {
     "human": "Approved by a person",
     "agent": "Approved by agent {label}",
-    "agentUnnamed": "Approved by an agent"
+    "agentUnnamed": "Approved by an agent",
+    "requested": "Awaiting your approval",
+    "requestedNotice": "The agent {label} asked you to approve sending this draft. Check the recipients and the text and click Send; to decline, edit or delete the draft.",
+    "requestedNoticeUnnamed": "An agent asked you to approve sending this draft. Check the recipients and the text and click Send; to decline, edit or delete the draft."
   },
   "deliveryStatus": {
     "queued": "Queued for sending",

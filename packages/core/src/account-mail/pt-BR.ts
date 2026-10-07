@@ -262,6 +262,15 @@ export const ptBR = {
     ],
     button: "Abrir console",
   },
+  "mailbox.send_requested": {
+    subject: "{agent} quer enviar um e-mail de {mailbox}",
+    body: [
+      "O agente {agent} salvou um rascunho em {mailbox} e pediu sua aprovação para enviar. A chave dele não tem permissão de envio, então nada saiu.",
+      "Abra o rascunho, confira destinatários e texto, e envie se estiver certo. Para recusar, edite ou apague o rascunho.",
+    ],
+    button: "Abrir o Correio",
+    muted: ["Você recebe no máximo um destes a cada 10 minutos por caixa."],
+  },
   "content.access_notice": {
     subject: "Um operador leu conteúdo em {team}",
     body: [

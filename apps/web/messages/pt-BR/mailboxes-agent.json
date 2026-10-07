@@ -11,7 +11,7 @@
   "scopeDraft": "Rascunhos",
   "draftHint": "Criar e editar rascunhos nesta caixa.",
   "scopeSend": "Permitir envio",
-  "sendHint": "Selecione apenas para um agente autorizado a enviar e-mails desta caixa.",
+  "sendHint": "Selecione apenas para um agente autorizado a enviar e-mails desta caixa. Sem esta permissão, o agente pede sua aprovação: você recebe um e-mail e envia o rascunho pelo painel.",
   "scopeUnknown": "Outra permissão",
   "chooseScope": "Selecione ao menos uma permissão.",
   "expiresAt": "Expiração (opcional)",

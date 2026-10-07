@@ -13,6 +13,7 @@ const ACTION_KEYS = {
   "mailbox.item_read": "actions.itemRead",
   "mailbox.draft_saved": "actions.draftSaved",
   "mailbox.send_approved": "actions.sendApproved",
+  "mailbox.send_requested": "actions.sendRequested",
   "mailbox.item_trashed": "actions.itemTrashed",
   "mailbox.item_restored": "actions.itemRestored",
   "mailbox.item_starred": "actions.itemStarred",

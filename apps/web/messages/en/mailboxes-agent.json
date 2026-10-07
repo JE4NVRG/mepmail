@@ -11,7 +11,7 @@
   "scopeDraft": "Drafts",
   "draftHint": "Create and edit drafts in this mailbox.",
   "scopeSend": "Allow sending",
-  "sendHint": "Select only for an agent you authorize to send email from this mailbox.",
+  "sendHint": "Select only for an agent you authorize to send email from this mailbox. Without it, the agent asks for your approval: you get an email and send the draft from the dashboard.",
   "scopeUnknown": "Other permission",
   "chooseScope": "Select at least one permission.",
   "expiresAt": "Expiration (optional)",

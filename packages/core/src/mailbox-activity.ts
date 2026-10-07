@@ -44,6 +44,8 @@ const eventSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("mailbox.folder_created"), folderId: z.uuid(), revision }).strict(),
   z.object({ action: z.literal("mailbox.folder_renamed"), folderId: z.uuid(), revision }).strict(),
   z.object({ action: z.literal("mailbox.folder_archived"), folderId: z.uuid(), revision }).strict(),
+  // A key without the send permission asked the mailbox owner to send this revision.
+  z.object({ action: z.literal("mailbox.send_requested"), itemId: z.uuid(), revision }).strict(),
   z
     .object({
       action: z.literal("mailbox.send_approved"),

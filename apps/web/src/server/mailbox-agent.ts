@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
+import { accountEmailFrom } from "@millionsend/config";
 import {
+  accountLocale,
+  appendMailboxActivity,
+  claimNotification,
   MailboxAgentAccessError,
   type MailboxAgentScope,
   MailboxContentError,
@@ -7,11 +11,13 @@ import {
   queueMailboxAgentDraft,
   withMailboxAgentAccess,
 } from "@millionsend/core";
-import { getDb } from "@millionsend/db";
+import { getDb, schema } from "@millionsend/db";
+import { and, eq, sql } from "drizzle-orm";
 import { getKeyring } from "./keyring";
 import { mailboxTransportMime } from "./mailbox-transport";
 import { mailboxActorAccessEnabled, mailboxRegistryEnabled } from "./mailboxes";
 import { getQueue } from "./queue";
+import { buildAccountEmail, sendAccountMail } from "./system-mail";
 
 export const MAILBOX_AGENT_HEADERS = {
   "Cache-Control": "private, no-store",
@@ -46,24 +52,34 @@ export async function mailboxAgentSendRequest(
   return mailboxAgentBearerRequest(
     request,
     async (token) => {
-      // Verify the credential's current owner/team before capturing any outbox data.
-      // Finish this transaction first; admission below revalidates all provenance.
-      if (
-        process.env.MAILBOX_PILOT_TEAM_IDS !== undefined ||
-        process.env.MAILBOX_PILOT_USER_IDS !== undefined ||
-        process.env.MAILBOX_EARLY_ACCESS_COHORT !== undefined
-      )
-        await withMailboxAgentAccess(getDb(), token, "send", async (context) => {
-          if (!(await mailboxActorAccessEnabled(context.db, context.actor)))
-            throw new MailboxAgentAccessError("forbidden");
-        });
-      const result = await queueMailboxAgentDraft(
-        getDb(),
-        getKeyring(),
-        token,
-        input,
-        mailboxTransportMime,
-      );
+      let result: Awaited<ReturnType<typeof queueMailboxAgentDraft>>;
+      try {
+        // Verify the credential's current owner/team before capturing any outbox data.
+        // Finish this transaction first; admission below revalidates all provenance.
+        if (
+          process.env.MAILBOX_PILOT_TEAM_IDS !== undefined ||
+          process.env.MAILBOX_PILOT_USER_IDS !== undefined ||
+          process.env.MAILBOX_EARLY_ACCESS_COHORT !== undefined
+        )
+          await withMailboxAgentAccess(getDb(), token, "send", async (context) => {
+            if (!(await mailboxActorAccessEnabled(context.db, context.actor)))
+              throw new MailboxAgentAccessError("forbidden");
+          });
+        result = await queueMailboxAgentDraft(
+          getDb(),
+          getKeyring(),
+          token,
+          input,
+          mailboxTransportMime,
+        );
+      } catch (error) {
+        // A key without the send permission asks the mailbox owner instead.
+        if (error instanceof MailboxAgentAccessError && error.code === "forbidden") {
+          const requested = await requestMailboxSendApproval(token, input);
+          if (requested) return requested;
+        }
+        throw error;
+      }
       // Capture commits before enqueue. Reconcile repairs enqueue failures using only this ID.
       if (result.status === "queued")
         await (await getQueue()).send(
@@ -79,6 +95,117 @@ export async function mailboxAgentSendRequest(
         headers: MAILBOX_AGENT_HEADERS,
       }),
   );
+}
+
+/** Owner notices about approval requests: at most one per mailbox in this window. */
+const APPROVAL_NOTICE_WINDOW_MS = 10 * 60_000;
+
+/**
+ * The human-approval path: a key that may draft but not send records that the
+ * agent asks the owner to send this exact revision (the mailbox activity, once
+ * per revision) and the owner is mailed. The draft then waits in the dashboard,
+ * where the owner sends it, edits it or deletes it. Null when the key does
+ * carry the send permission, so the original refusal stands.
+ */
+async function requestMailboxSendApproval(
+  token: string,
+  input: { id: string; expectedRevision: number },
+) {
+  const facts = await withMailboxAgentAccess(getDb(), token, "draft", async (context) => {
+    if (!(await mailboxActorAccessEnabled(context.db, context.actor)))
+      throw new MailboxAgentAccessError("forbidden");
+    const [key] = await context.db
+      .select({ label: schema.mailboxAgentKeys.label, scopes: schema.mailboxAgentKeys.scopes })
+      .from(schema.mailboxAgentKeys)
+      .where(eq(schema.mailboxAgentKeys.id, context.keyId));
+    if (!key || key.scopes.includes("send")) return null;
+    const [item] = await context.db
+      .select({
+        kind: schema.mailboxItems.kind,
+        revision: schema.mailboxItems.revision,
+        trashedAt: schema.mailboxItems.trashedAt,
+      })
+      .from(schema.mailboxItems)
+      .where(
+        and(
+          eq(schema.mailboxItems.id, input.id),
+          eq(schema.mailboxItems.mailboxId, context.mailboxId),
+          eq(schema.mailboxItems.teamId, context.actor.teamId),
+        ),
+      );
+    if (!item || item.kind !== "draft" || item.trashedAt)
+      throw new MailboxContentError("not_found");
+    if (item.revision !== input.expectedRevision) throw new MailboxContentError("conflict");
+    const [prior] = await context.db
+      .select({ id: schema.auditLog.id })
+      .from(schema.auditLog)
+      .where(
+        and(
+          eq(schema.auditLog.teamId, context.actor.teamId),
+          eq(schema.auditLog.target, `mailbox:${context.mailboxId}`),
+          eq(schema.auditLog.action, "mailbox.send_requested"),
+          sql`${schema.auditLog.data}->>'itemId' = ${input.id}`,
+          sql`${schema.auditLog.data}->>'revision' = ${String(input.expectedRevision)}`,
+        ),
+      )
+      .limit(1);
+    if (!prior)
+      await appendMailboxActivity(
+        context.db,
+        {
+          teamId: context.actor.teamId,
+          mailboxId: context.mailboxId,
+          actor: { kind: "mailbox_agent", keyId: context.keyId },
+        },
+        { action: "mailbox.send_requested", itemId: input.id, revision: input.expectedRevision },
+      );
+    const [box] = await context.db
+      .select({ address: schema.mailboxes.address, ownerEmail: schema.user.email })
+      .from(schema.mailboxes)
+      .innerJoin(schema.user, eq(schema.user.id, schema.mailboxes.ownerUserId))
+      .where(eq(schema.mailboxes.id, context.mailboxId));
+    return {
+      teamId: context.actor.teamId,
+      mailboxId: context.mailboxId,
+      agent: key.label,
+      duplicate: !!prior,
+      address: box?.address ?? null,
+      ownerEmail: box?.ownerEmail ?? null,
+    };
+  });
+  if (!facts) return null;
+  if (!facts.duplicate && facts.ownerEmail && facts.address) {
+    // Best-effort notice, outside the authorization transaction.
+    try {
+      const db = getDb();
+      const window = Math.floor(Date.now() / APPROVAL_NOTICE_WINDOW_MS);
+      if (
+        await claimNotification(db, {
+          teamId: facts.teamId,
+          kind: `mailbox.send_requested:${facts.mailboxId}`,
+          periodKey: String(window),
+        })
+      ) {
+        sendAccountMail(
+          buildAccountEmail({
+            to: facts.ownerEmail,
+            kind: "mailbox.send_requested",
+            locale: await accountLocale(db, accountEmailFrom(), facts.ownerEmail),
+            path: "/mailboxes",
+            values: { agent: facts.agent, mailbox: facts.address },
+          }),
+        );
+      }
+    } catch (error) {
+      console.error("mailbox approval notice skipped", error);
+    }
+  }
+  return {
+    status: "awaiting_approval" as const,
+    id: input.id,
+    revision: input.expectedRevision,
+    duplicate: facts.duplicate,
+  };
 }
 
 // Per-credential fixed window, before any database work. One Web process serves the

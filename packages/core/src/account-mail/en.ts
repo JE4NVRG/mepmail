@@ -262,6 +262,15 @@ export const en = {
     ],
     button: "Open console",
   },
+  "mailbox.send_requested": {
+    subject: "{agent} wants to send an email from {mailbox}",
+    body: [
+      "The agent {agent} saved a draft in {mailbox} and asked you to approve sending it. Its key does not carry the send permission, so nothing has gone out.",
+      "Open the draft, check the recipients and the text, and send it if it is right. To decline, edit or delete the draft.",
+    ],
+    button: "Open Correio",
+    muted: ["You get at most one of these every 10 minutes per mailbox."],
+  },
   "content.access_notice": {
     subject: "An operator read content in {team}",
     body: [

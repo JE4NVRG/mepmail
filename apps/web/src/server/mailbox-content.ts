@@ -12,7 +12,7 @@ import {
   withMailboxItem,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
-import { and, eq, inArray, type SQL } from "drizzle-orm";
+import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
 import { simpleParser } from "mailparser";
 import nodemailer from "nodemailer";
 import {
@@ -386,12 +386,52 @@ export async function getMailboxContentList(
       blocked: false,
     });
   }
+  const requests = await draftApprovalRequests(db, actor.teamId, items);
+  const withRequests = items.map((item) => ({
+    ...item,
+    // An agent without the send permission asked the owner to send this revision.
+    approvalRequested: requests.get(`${item.id}:${item.revision}`) ?? null,
+  }));
   return withMailboxContentAccess(
     db,
     actor,
     items.map((item) => item.mailboxId),
-    async () => ({ items, limited }),
+    async () => ({ items: withRequests, limited }),
   );
+}
+
+/** Approval requests recorded for these drafts, keyed by id and revision, with the agent's label. */
+async function draftApprovalRequests(
+  db: Db,
+  teamId: string,
+  items: readonly { id: string; kind: string; revision: number; blocked: boolean }[],
+): Promise<Map<string, { agentLabel: string | null }>> {
+  const drafts = items.filter((item) => item.kind === "draft" && !item.blocked);
+  const found = new Map<string, { agentLabel: string | null }>();
+  if (!drafts.length) return found;
+  const rows = await db
+    .select({ data: schema.auditLog.data, label: schema.mailboxAgentKeys.label })
+    .from(schema.auditLog)
+    .leftJoin(
+      schema.mailboxAgentKeys,
+      sql`${schema.mailboxAgentKeys.id}::text = ${schema.auditLog.data}->>'keyId'`,
+    )
+    .where(
+      and(
+        eq(schema.auditLog.teamId, teamId),
+        eq(schema.auditLog.action, "mailbox.send_requested"),
+        inArray(
+          sql<string>`${schema.auditLog.data}->>'itemId'`,
+          drafts.map((item) => item.id),
+        ),
+      ),
+    );
+  for (const row of rows) {
+    const data = row.data as { itemId?: string; revision?: number } | null;
+    if (data?.itemId && typeof data.revision === "number")
+      found.set(`${data.itemId}:${data.revision}`, { agentLabel: row.label ?? null });
+  }
+  return found;
 }
 
 export interface MailboxDraftInput {

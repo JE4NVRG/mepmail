@@ -185,7 +185,10 @@
   "approval": {
     "human": "Aprovado por pessoa",
     "agent": "Aprovado pelo agente {label}",
-    "agentUnnamed": "Aprovado por agente"
+    "agentUnnamed": "Aprovado por agente",
+    "requested": "Aguardando sua aprovação",
+    "requestedNotice": "O agente {label} pediu sua aprovação para enviar este rascunho. Confira destinatários e texto e clique em Enviar; para recusar, edite ou apague o rascunho.",
+    "requestedNoticeUnnamed": "Um agente pediu sua aprovação para enviar este rascunho. Confira destinatários e texto e clique em Enviar; para recusar, edite ou apague o rascunho."
   },
   "deliveryStatus": {
     "queued": "Na fila de envio",

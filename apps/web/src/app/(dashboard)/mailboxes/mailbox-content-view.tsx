@@ -1207,6 +1207,9 @@ export function MailboxContentView({
                                 })}
                               </span>
                             ) : null}
+                            {!blocked && row.approvalRequested && !row.sendStatus ? (
+                              <span className={styles.warningBadge}>{t("approval.requested")}</span>
+                            ) : null}
                             {!blocked && row.sendStatus ? (
                               <span>{t(`deliveryStatus.${row.sendStatus}`)}</span>
                             ) : null}
@@ -1482,6 +1485,17 @@ export function MailboxContentView({
                       <span>{t(`deliveryStatus.${selectedRow.sendStatus}`)}</span>
                     ) : null}
                   </div>
+                  {item.kind === "draft" &&
+                  selectedRow?.approvalRequested &&
+                  !selectedRow.sendStatus ? (
+                    <p className={styles.contentNotice} role="status">
+                      {selectedRow.approvalRequested.agentLabel
+                        ? t("approval.requestedNotice", {
+                            label: selectedRow.approvalRequested.agentLabel,
+                          })
+                        : t("approval.requestedNoticeUnnamed")}
+                    </p>
+                  ) : null}
                   {pendingSentReply ? (
                     <p
                       id="mailbox-sent-reply-pending"
