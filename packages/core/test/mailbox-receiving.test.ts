@@ -350,7 +350,7 @@ describe("fresh domain receiving readiness", () => {
     expect(dto.mailboxes[0]?.receiving_state).toBe("reserved");
   });
 
-  it("keeps System unlimited in quantity and preserves its finite resource policy", async () => {
+  it("keeps System unlimited in quantity and its grant row untouched", async () => {
     const f = await fixture({ system: true, count: 3 });
     const dto = await f.read();
     expect(dto.mailboxes.map((box) => box.receiving_state)).toEqual(["ready", "ready", "ready"]);
@@ -358,10 +358,15 @@ describe("fresh domain receiving readiness", () => {
       .update(schema.mailboxSubscriptions)
       .set({ periodEnd: new Date(Date.now() - 1000) })
       .where(eq(schema.mailboxSubscriptions.teamId, f.actor.teamId));
-    const expired = await f.read();
-    expect(expired.receiving_state).toBe("needs_activation");
-    expect(expired.reasons).toContain("resource_policy_inactive");
-    expect(expired.mailboxes.every((box) => box.receiving_state === "reserved")).toBe(true);
+    // The operator's own System grant does not lapse with its period end
+    // (mailbox-service: system || mailboxServiceActive); receiving stays ready.
+    const elapsed = await f.read();
+    expect(elapsed.reasons).not.toContain("resource_policy_inactive");
+    expect(elapsed.mailboxes.map((box) => box.receiving_state)).toEqual([
+      "ready",
+      "ready",
+      "ready",
+    ]);
     const [policy] = await db
       .select()
       .from(schema.mailboxSubscriptions)

@@ -46,6 +46,70 @@ export async function createTeam(db: Db, slug = "acme"): Promise<string> {
 }
 
 /**
+ * Team columns for a verified monthly Send contract with verified Stripe
+ * overage terms over one period: what a monthly plan needs before
+ * overageEnabled can bill past the included volume (core teamQuota).
+ */
+export function verifiedMonthlyBilling(options: {
+  teamId: string;
+  periodStart: Date;
+  periodEnd: Date;
+  included: number;
+  regularMonthlyCents?: number;
+}): {
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  stripeOverageItemId: string;
+  sendBillingContract: schema.SendBillingContract;
+  billingTerms: schema.BillingTerms;
+} {
+  const ids = {
+    teamId: options.teamId,
+    customerId: "cus_verified_fixture",
+    subscriptionId: "sub_verified_fixture",
+    baseItemId: "si_verified_base",
+    basePriceId: "price_verified_base",
+  };
+  const start = options.periodStart.toISOString();
+  const end = options.periodEnd.toISOString();
+  const cents = options.regularMonthlyCents ?? 2_900;
+  return {
+    stripeCustomerId: ids.customerId,
+    stripeSubscriptionId: ids.subscriptionId,
+    stripeOverageItemId: "si_verified_meter",
+    sendBillingContract: {
+      version: 1,
+      ...ids,
+      currency: "usd",
+      baseAmountCents: cents,
+      billingInterval: "month",
+      intervalCount: 1,
+      included: options.included,
+      usageInterval: "month",
+      regularMonthlyCents: cents,
+      financialPeriodStart: start,
+      financialPeriodEnd: end,
+      usageAnchor: start,
+      verifiedAt: start,
+    },
+    billingTerms: {
+      version: 1,
+      ...ids,
+      overageItemId: "si_verified_meter",
+      overagePriceId: "price_verified_meter",
+      currency: "usd",
+      centsPerBlock: 130,
+      blockSize: 1000,
+      rounding: "up",
+      included: options.included,
+      periodStart: start,
+      periodEnd: end,
+      verifiedAt: start,
+    },
+  };
+}
+
+/**
  * An enabled webhook endpoint for fan-out tests. The secret columns hold a
  * placeholder byte: enqueueing reads only id, events, teamId and status.
  */

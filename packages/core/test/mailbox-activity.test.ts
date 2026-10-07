@@ -496,6 +496,7 @@ describe("private mailbox activity", () => {
       "mailbox.item_read",
       "mailbox.draft_saved",
       "mailbox.send_approved",
+      "mailbox.send_requested",
       "mailbox.item_trashed",
       "mailbox.item_restored",
       "mailbox.item_starred",

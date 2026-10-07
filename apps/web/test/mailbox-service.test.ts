@@ -47,13 +47,16 @@ const plan = (values: Partial<typeof schema.mailboxSubscriptions.$inferInsert>) 
     .where(eq(schema.mailboxSubscriptions.teamId, teamId));
 beforeEach(async () => {
   client = new PGlite();
+  // Match the production migrator: each main migration's locks and DDL share one transaction.
   for (const file of readdirSync(base)
-    .filter((n) => n.endsWith(".sql") && n.slice(0, 4) <= "0042")
+    .filter((n) => n.endsWith(".sql"))
     .sort())
-    for (const statement of readFileSync(base + file, "utf8")
-      .split("--> statement-breakpoint")
-      .filter((s) => s.trim()))
-      await client.exec(statement);
+    await client.transaction(async (tx) => {
+      for (const statement of readFileSync(base + file, "utf8")
+        .split("--> statement-breakpoint")
+        .filter((s) => s.trim()))
+        await tx.exec(statement);
+    });
   const database = drizzle(client, { schema });
   db = database as unknown as Db;
   await migrate(database, { migrationsFolder: extension, migrationsTable: "__mailbox_migrations" });

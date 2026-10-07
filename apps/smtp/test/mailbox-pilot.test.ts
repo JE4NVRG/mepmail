@@ -9,12 +9,18 @@ import { mailboxPilotMime } from "../src/mailbox-pilot-mime.js";
 import {
   agent,
   attachmentBytes,
-  fixtureMime,
   fixtureImageMime,
+  fixtureMime,
   human,
   keyring,
   mailboxes,
 } from "./mailbox-pilot-fixture.js";
+
+/** Narrows an indexed read the test expects to exist. */
+function required<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error("expected value missing");
+  return value;
+}
 
 describe("mailbox product qualification with real MIME and private storage", () => {
   let directory: string;
@@ -40,7 +46,9 @@ describe("mailbox product qualification with real MIME and private storage", () 
       recipients: [mailbox === "personal" ? "jean@piloto.test" : "luna@piloto.test"],
       raw: raw ?? (await fixtureMime()),
     });
-    return (await service.list(human, mailbox))[0];
+    const [row] = await service.list(human, mailbox);
+    if (!row) throw new Error("the received message was not listed");
+    return row;
   }
   it("routes by RCPT TO despite a different visible To header", async () => {
     await received("agent");
@@ -98,7 +106,9 @@ describe("mailbox product qualification with real MIME and private storage", () 
         raw: await fixtureMime("Outra mensagem"),
       }),
     ).rejects.toMatchObject({ code: "invalid" });
-    expect((await service.list(human, "personal"))[0].subject).toBe("Contrato do seu novo domínio");
+    expect((await service.list(human, "personal"))[0]?.subject).toBe(
+      "Contrato do seu novo domínio",
+    );
   });
   it("fan-outs one ingress to two mailboxes with separate access and retry identity", async () => {
     const raw = await fixtureMime();
@@ -144,10 +154,12 @@ describe("mailbox product qualification with real MIME and private storage", () 
     ])
       expect(pilotImageMetadata(content)).toBeNull();
     const mime = await mailboxPilotMime.parse(await fixtureImageMime());
-    const oversized = Buffer.from(mime.attachments[0].content);
+    const [image] = mime.attachments;
+    if (!image) throw new Error("the fixture image did not parse");
+    const oversized = Buffer.from(image.content);
     oversized.writeUInt32BE(9000, 16);
     expect(pilotImageMetadata(oversized)).toBeNull();
-    const corrupt = Buffer.from(mime.attachments[1].content);
+    const corrupt = Buffer.from(required(mime.attachments[1]).content);
     corrupt.writeUInt32LE(0, 4);
     expect(pilotImageMetadata(corrupt)).toBeNull();
   });
@@ -181,7 +193,7 @@ describe("mailbox product qualification with real MIME and private storage", () 
     expect(disk).not.toContain("Contrato");
     expect(disk).not.toContain("jean@piloto.test");
     expect(disk).not.toContain(attachmentBytes.toString("base64"));
-    const row = (await service.list(human, "personal"))[0];
+    const row = required((await service.list(human, "personal"))[0]);
     expect(hash((await service.attachment(human, "personal", row.id, 0)).content)).toBe(
       hash(attachmentBytes),
     );
@@ -203,7 +215,7 @@ describe("mailbox product qualification with real MIME and private storage", () 
     await received();
     const envelope = JSON.parse(await readFile(file, "utf8"));
     const bytes = Buffer.from(envelope.ciphertext, "base64");
-    bytes[0] ^= 1;
+    bytes.writeUInt8(bytes.readUInt8(0) ^ 1, 0);
     envelope.ciphertext = bytes.toString("base64");
     await writeFile(file, JSON.stringify(envelope));
     await expect(MailboxPilot.open(file, human.teamId, key, mailboxPilotMime)).rejects.toThrow();
@@ -213,7 +225,9 @@ describe("mailbox product qualification with real MIME and private storage", () 
     const draft = await service.reply(agent, "agent", row.id, "Recebi o resumo, obrigado.", [0]);
     expect(draft).toMatchObject({ status: "draft", canSend: false, threadId: row.threadId });
     expect(await service.list(agent, "agent")).toHaveLength(1);
-    expect((await service.drafts(human, "agent"))[0].text).toBe("Recebi o resumo, obrigado.");
+    expect(required((await service.drafts(human, "agent"))[0]).text).toBe(
+      "Recebi o resumo, obrigado.",
+    );
     expect((await service.drafts(human, "agent"))[0]).toMatchObject({
       from: "luna@piloto.test",
       to: ["cliente@exemplo.test"],
@@ -236,7 +250,7 @@ describe("mailbox product qualification with real MIME and private storage", () 
     expect(parsed.from).toBe("luna@piloto.test");
     expect(parsed.replyTo).toBe("luna@piloto.test");
     expect(parsed.references).toContain("<personal@exemplo.test>");
-    expect(hash(parsed.attachments[0].content)).toBe(hash(attachmentBytes));
+    expect(hash(required(parsed.attachments[0]).content)).toBe(hash(attachmentBytes));
     expect(
       (await service.list(human, "agent")).find((item) => item.folder === "sent")?.threadId,
     ).toBe(row.threadId);
@@ -270,7 +284,7 @@ describe("mailbox product qualification with real MIME and private storage", () 
       ],
     });
     for (let index = 0; index < 9; index++) await received("personal", `capacity-${index}`, raw);
-    const row = (await service.list(human, "personal"))[0];
+    const row = required((await service.list(human, "personal"))[0]);
     const draft = await service.reply(human, "personal", row.id, "Confirmado.", [0]);
     let calls = 0;
     await expect(
@@ -279,7 +293,7 @@ describe("mailbox product qualification with real MIME and private storage", () 
       }),
     ).rejects.toMatchObject({ code: "too_large" });
     expect(calls).toBe(0);
-    expect((await service.drafts(human, "personal"))[0].status).toBe("draft");
+    expect(required((await service.drafts(human, "personal"))[0]).status).toBe("draft");
   });
   it("revokes cached agent access immediately and requires manage rather than send", async () => {
     const row = await received("agent");
@@ -289,7 +303,7 @@ describe("mailbox product qualification with real MIME and private storage", () 
       code: "forbidden",
     });
     const boxes = structuredClone(mailboxes);
-    boxes[1].grants.sender = ["read", "send"];
+    required(boxes[1]).grants.sender = ["read", "send"];
     const another = await MailboxPilot.open(
       join(directory, "sender.enc.json"),
       human.teamId,

@@ -10,7 +10,7 @@ import {
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { createTeam, createTestDb } from "@millionsend/test-utils";
+import { createTeam, createTestDb, verifiedMonthlyBilling } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
@@ -137,6 +137,8 @@ describe("monthly plan", () => {
         currentPeriodStart: start,
         currentPeriodEnd: end,
         overageEnabled: false,
+        // Overage bills only on verified contract and overage terms.
+        ...verifiedMonthlyBilling({ teamId, periodStart: start, periodEnd: end, included }),
       })
       .where(eq(schema.teams.id, teamId));
     await db.insert(schema.usagePeriods).values({ teamId, periodStart: start, accepted: included });

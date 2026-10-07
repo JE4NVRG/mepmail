@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { PLAN_RUNGS, rungByKey } from "@millionsend/core/plans";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
@@ -7,6 +8,7 @@ import type Stripe from "stripe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prepareMetaCheckout, saveAdvertisingConsent } from "../src/meta-advertising.js";
 import type { MetaConversionConfig } from "../src/meta-conversions.js";
+import { priceMetadata } from "../src/prices.js";
 import type { BillingStripe } from "../src/stripe.js";
 import { cancelTeamSubscription, reconcileTeamPlan } from "../src/subscription.js";
 import { handleWebhook, purgeStripeEvents } from "../src/webhook.js";
@@ -77,6 +79,13 @@ const subEvent = (type: string, sub: Stripe.Subscription, id?: string) =>
   event(type, { id: sub.id, object: "subscription", customer: sub.customer }, id);
 
 const deps = () => ({ db, stripe, log: (m: string) => logs.push(m) });
+
+/** A pre-ladder price's own terms: the first rung of its plan, without a rung tag. */
+function termsOf(plan: "pro" | "scale"): Record<string, string> {
+  const rung = PLAN_RUNGS.find((candidate) => candidate.plan === plan);
+  if (!rung) throw new Error(`no ${plan} rung`);
+  return { included_emails: String(rung.included), period: rung.period };
+}
 
 describe("handleWebhook", () => {
   it("rejects a bad signature without recording the event", async () => {
@@ -165,14 +174,14 @@ describe("handleWebhook", () => {
     expect(await team(teamId)).toMatchObject({ plan: "starter", planQuota: null });
   });
 
-  it("pre-ladder prices land on the first rung of their product's plan", async () => {
+  it("pre-ladder prices land on the first rung of their product's plan when they carry their terms", async () => {
     const teamId = await customerTeam();
     state.subscriptions.sub_1 = subscription(
       "sub_1",
       "cus_1",
       "active",
       "millionsend_scale_monthly",
-      { product: legacyProduct("scale") },
+      { product: legacyProduct("scale"), metadata: termsOf("scale") },
     );
     await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
     expect(await team(teamId)).toMatchObject({ plan: "scale", planQuota: 550_000 });
@@ -182,12 +191,23 @@ describe("handleWebhook", () => {
       "cus_1",
       "active",
       "millionsend_pro_monthly",
-      {
-        product: legacyProduct("pro"),
-      },
+      { product: legacyProduct("pro"), metadata: termsOf("pro") },
     );
     await deliver(subEvent("customer.subscription.updated", state.subscriptions.sub_1));
     expect(await team(teamId)).toMatchObject({ plan: "pro", planQuota: 110_000 });
+  });
+
+  it("a pre-ladder price without its own terms fails closed instead of guessing them", async () => {
+    const teamId = await customerTeam();
+    state.subscriptions.sub_1 = subscription(
+      "sub_1",
+      "cus_1",
+      "active",
+      "millionsend_scale_monthly",
+      { product: legacyProduct("scale") },
+    );
+    await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
+    expect(await team(teamId)).toMatchObject({ plan: "free", planQuota: null });
   });
 
   it("mirrors a scheduled downgrade in pending_rung and clears it once the schedule is gone", async () => {
@@ -224,7 +244,7 @@ describe("handleWebhook", () => {
       "cus_1",
       "active",
       "millionsend_pro_100k_monthly",
-      { metadata: { millionsend_rung: "scale_1m" } },
+      { metadata: priceMetadata(rungByKey("scale_1m")) },
     );
     await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
     expect(await team(teamId)).toMatchObject({ plan: "scale", planQuota: 1_100_000 });
@@ -234,6 +254,8 @@ describe("handleWebhook", () => {
     const teamId = await customerTeam();
     state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "active", null, {
       product: { id: "prod_scale", object: "product", metadata: { millionsend_plan: "scale" } },
+      // Identity from the product; the terms still come from the price itself.
+      metadata: termsOf("scale"),
     });
     await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
     expect(await team(teamId)).toMatchObject({
@@ -294,9 +316,19 @@ describe("handleWebhook", () => {
       overageKey: "millionsend_pro_100k_overage",
     });
     await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
-    await db
-      .insert(schema.usagePeriods)
-      .values({ teamId, periodStart: new Date(PERIOD_START * 1000), accepted: 110_500 });
+    // Accepted usage carries the terms it was accepted under (acceptEmail
+    // snapshots them); overage is never priced retroactively from today's.
+    const [applied] = await db
+      .select({ billingTerms: schema.teams.billingTerms })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, teamId));
+    expect(applied?.billingTerms).toBeTruthy();
+    await db.insert(schema.usagePeriods).values({
+      teamId,
+      periodStart: new Date(PERIOD_START * 1000),
+      accepted: 110_500,
+      billingTerms: applied?.billingTerms ?? null,
+    });
 
     state.subscriptions.sub_1.status = "canceled";
     await deliver(subEvent("customer.subscription.deleted", state.subscriptions.sub_1));
@@ -807,7 +839,8 @@ describe("reconcileTeamPlan", () => {
     const noCustomer = await createTeam(db, "other");
     await reconcileTeamPlan(deps(), noCustomer);
     await reconcileTeamPlan(deps(), teamId);
-    expect(state.listParams).toMatchObject({ customer: "cus_1", status: "all", limit: 1 });
+    // Every page is scanned (newest wins), not just the first subscription.
+    expect(state.listParams).toMatchObject({ customer: "cus_1", status: "all", limit: 100 });
     expect(await team(teamId)).toMatchObject({ plan: "free", planStatus: "none" });
 
     state.subscriptions.sub_old = subscription("sub_old", "cus_1", "canceled");

@@ -54,13 +54,16 @@ const box = (localPart: string, kind: "person" | "agent" = "person") =>
   });
 beforeEach(async () => {
   client = new PGlite();
+  // Match the production migrator: each main migration's locks and DDL share one transaction.
   for (const file of readdirSync(base)
-    .filter((n) => n.endsWith(".sql") && n.slice(0, 4) <= "0042")
+    .filter((n) => n.endsWith(".sql"))
     .sort())
-    for (const statement of readFileSync(base + file, "utf8")
-      .split("--> statement-breakpoint")
-      .filter((s) => s.trim()))
-      await client.exec(statement);
+    await client.transaction(async (tx) => {
+      for (const statement of readFileSync(base + file, "utf8")
+        .split("--> statement-breakpoint")
+        .filter((s) => s.trim()))
+        await tx.exec(statement);
+    });
   const database = drizzle(client, { schema });
   db = database as unknown as Db;
   await migrate(database, { migrationsFolder: extension, migrationsTable: "__mailbox_migrations" });
@@ -336,7 +339,12 @@ describe("audited operator-only two-mailbox internal licence", () => {
       ).status,
     ).toBe("unknown");
     expect(senderCalls).toBe(0);
-    expect(await audits()).toHaveLength(2);
+    // Queueing records its own mailbox activity; revoke retries and the refused replay add nothing.
+    expect((await audits()).map((a) => a.action).sort()).toEqual([
+      "mailbox.license_granted",
+      "mailbox.license_revoked",
+      "mailbox.send_approved",
+    ]);
     await expect(box("after-revoke")).rejects.toMatchObject({ code: "not_entitled" });
   });
   it("rejects revocation of a plan whose audited fingerprint was changed", async () => {

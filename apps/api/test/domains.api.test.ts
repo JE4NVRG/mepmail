@@ -8,7 +8,12 @@ import {
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import type { DkimVerificationStatus, DnsResolver, SesIdentityClient } from "@millionsend/ses";
+import {
+  DKIM_SELECTOR,
+  type DkimVerificationStatus,
+  type DnsResolver,
+  type SesIdentityClient,
+} from "@millionsend/ses";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -174,7 +179,7 @@ describe("POST /domains", () => {
       name: "updates.example.com",
       region: "sa-east-1",
       status: "pending",
-      dkimSelector: "millionsend",
+      dkimSelector: DKIM_SELECTOR,
     });
 
     expect(body).toMatchObject({
@@ -189,7 +194,7 @@ describe("POST /domains", () => {
     });
     expect(body.records).toContainEqual({
       record: "DKIM",
-      name: "millionsend._domainkey.updates.example.com",
+      name: `${DKIM_SELECTOR}._domainkey.updates.example.com`,
       type: "TXT",
       ttl: "Auto",
       status: "not_started",
@@ -571,7 +576,7 @@ function dnsFor(domain: string, dkimPublicKey: string, txt: Record<string, strin
   return fakeDns({
     resolveTxt: async (name: string) => {
       if (name in txt) return [txt[name] ?? []];
-      if (name === `millionsend._domainkey.${domain}`)
+      if (name === `${DKIM_SELECTOR}._domainkey.${domain}`)
         return [[`v=DKIM1; k=rsa; p=${dkimPublicKey}`]];
       if (name === `send.${domain}`) return [["v=spf1 include:amazonses.com ~all"]];
       return [];
@@ -681,7 +686,7 @@ describe("GET /domains/{id}", () => {
     const app = makeApp({
       client: fakeSes({ dkimStatus: "SUCCESS", verifiedForSending: true }).client,
       dns: dnsFor("wrong.example.com", await dkimKeyOf(id), {
-        "millionsend._domainkey.wrong.example.com": ["v=DKIM1; k=rsa; p=STALEKEY"],
+        [`${DKIM_SELECTOR}._domainkey.wrong.example.com`]: ["v=DKIM1; k=rsa; p=STALEKEY"],
       }),
     });
     const { records } = await getRecords(app, id);
@@ -719,7 +724,7 @@ describe("POST /domains/{id}/verify", () => {
       client: fakeSes({ dkimStatus: "SUCCESS", verifiedForSending: true }).client,
       dns: fakeDns({
         resolveTxt: async (name: string) => {
-          if (name === "millionsend._domainkey.verify.example.com") {
+          if (name === `${DKIM_SELECTOR}._domainkey.verify.example.com`) {
             return [[`v=DKIM1; k=rsa; p=${dkimPublicKey}`]];
           }
           if (name === "send.verify.example.com") return [["v=spf1 include:amazonses.com ~all"]];

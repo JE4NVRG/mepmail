@@ -10,7 +10,7 @@ import {
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { createTeam, createTestDb } from "@millionsend/test-utils";
+import { createTeam, createTestDb, verifiedMonthlyBilling } from "@millionsend/test-utils";
 import { eq, like, sql } from "drizzle-orm";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { sweepNotifications } from "../src/handlers/notify.js";
@@ -157,6 +157,8 @@ async function monthlyPlan(overage = false) {
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
       overageEnabled: overage,
+      // Overage bills only on verified contract and overage terms.
+      ...verifiedMonthlyBilling({ teamId, periodStart, periodEnd, included: 110_000 }),
     })
     .where(eq(schema.teams.id, teamId));
   const used = async (accepted: number) => {

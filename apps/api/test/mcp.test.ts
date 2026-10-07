@@ -4,7 +4,7 @@ import { DAY_MS, EnvKeyring, MCP_SCOPES, mcpResourceUrl } from "@millionsend/cor
 import { mcpServerCardBody } from "@millionsend/core/mcp-server-card";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { createTeam, createTestDb } from "@millionsend/test-utils";
+import { createTeam, createTestDb, verifiedMonthlyBilling } from "@millionsend/test-utils";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
@@ -874,7 +874,21 @@ describe("REST parity tools", () => {
     const end = new Date(start.getTime() + 30 * DAY_MS);
     await db
       .update(schema.teams)
-      .set({ plan: "pro", planQuota: 110_000, currentPeriodStart: start, currentPeriodEnd: end })
+      .set({
+        plan: "pro",
+        planStatus: "active",
+        planQuota: 110_000,
+        currentPeriodStart: start,
+        currentPeriodEnd: end,
+        // The usage tool reports a monthly plan only with verified contract and
+        // overage terms (otherwise billing_terms_unavailable).
+        ...verifiedMonthlyBilling({
+          teamId,
+          periodStart: start,
+          periodEnd: end,
+          included: 110_000,
+        }),
+      })
       .where(eq(schema.teams.id, teamId));
     await db.insert(schema.usagePeriods).values({ teamId, periodStart: start, accepted: 4321 });
     const cloud = createApi({

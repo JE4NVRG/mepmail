@@ -32,8 +32,9 @@ export const mailboxPilotMime: PilotMimeAdapter = {
         filename: item.filename ?? "anexo",
         contentType: item.contentType,
         content: item.content,
-        cid: item.cid,
-        disposition: item.contentDisposition,
+        // Optional fields stay absent rather than undefined (exactOptionalPropertyTypes).
+        ...(item.cid ? { cid: item.cid } : {}),
+        ...(item.contentDisposition ? { disposition: item.contentDisposition } : {}),
       })),
     };
   },

@@ -320,7 +320,12 @@ beforeEach(() => {
   fixture.initialOfferId = null;
   fixture.service = { ...querySnapshot(service()), refetch: fixture.serviceRefetch };
   fixture.receiving = {
-    ...querySnapshot({ state: "unknown", mxHost: null }),
+    ...querySnapshot({
+      state: "unknown",
+      mxHost: null,
+      mx: { status: "unknown", value: null },
+      mailboxes: [],
+    }),
     refetch: fixture.receivingRefetch,
   };
   fixture.billing = querySnapshot(billing());
@@ -354,7 +359,12 @@ describe.each(["en", "pt-BR"] as const)("mailbox setup in %s", (locale) => {
   it.each(["needs_mx", "needs_activation", "ready"] as const)(
     "shows the actual receiving state %s separately from sending",
     (state) => {
-      fixture.receiving.data = { state, mxHost: "inbound.synthetic.invalid" };
+      fixture.receiving.data = {
+        state,
+        mxHost: "inbound.synthetic.invalid",
+        mx: { status: state, value: "inbound.synthetic.invalid" },
+        mailboxes: [],
+      };
       const text = plain(render(locale));
       const t = translate(locale);
       expect(text).toContain(t(`receiving.${state}`));
@@ -365,7 +375,12 @@ describe.each(["en", "pt-BR"] as const)("mailbox setup in %s", (locale) => {
   it.each(["pending", "fetching", "error", "no_data"] as const)(
     "does not show a cached ready result while %s",
     (state) => {
-      fixture.receiving.data = { state: "ready", mxHost: "inbound.synthetic.invalid" };
+      fixture.receiving.data = {
+        state: "ready",
+        mxHost: "inbound.synthetic.invalid",
+        mx: { status: "ready", value: "inbound.synthetic.invalid" },
+        mailboxes: [],
+      };
       fixture.receiving.isPending = state === "pending";
       fixture.receiving.isFetching = state === "fetching";
       fixture.receiving.isError = state === "error";

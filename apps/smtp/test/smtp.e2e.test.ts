@@ -10,7 +10,7 @@ import {
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { createTeam, createTestDb } from "@millionsend/test-utils";
+import { createTeam, createTestDb, verifiedMonthlyBilling } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import nodemailer from "nodemailer";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -393,6 +393,8 @@ describe("smtp relay", () => {
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd,
         overageEnabled: false,
+        // Overage bills only on verified contract and overage terms.
+        ...verifiedMonthlyBilling({ teamId, periodStart, periodEnd, included: 110_000 }),
       })
       .where(eq(schema.teams.id, teamId));
     await db.insert(schema.usagePeriods).values({ teamId, periodStart, accepted: 110_000 });

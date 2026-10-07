@@ -34,6 +34,17 @@ vi.mock("@millionsend/billing", async (importOriginal) => {
         .update(schema.teams)
         .set(h.afterEvent)
         .where(eq(schema.teams.stripeCustomerId, "cus_1"));
+      // Like the real handler, report the newly applied event as a Send one:
+      // the route only audits, drains and mails owners for Send events.
+      const [rawBody, , deps] = args;
+      const event = JSON.parse(rawBody) as { id: string; type: string };
+      await deps.afterApply?.({
+        id: event.id,
+        type: event.type,
+        customerId: "cus_1",
+        subscriptionId: "sub_1",
+        service: "send",
+      });
       return 200;
     },
   };
@@ -148,7 +159,8 @@ describe("POST /api/billing/webhook", () => {
     // scheduled drain releases the mail anyway.
     h.runCronNow.mockClear();
     h.runCronNow.mockRejectedValueOnce(new Error("pg-boss unavailable"));
-    h.afterEvent = { plan: "scale" };
+    // On the ladder the quota is the rung's: Scale starts at 550K.
+    h.afterEvent = { plan: "scale", planQuota: 550_000 };
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     expect((await send("evt_up2", "customer.subscription.updated")).status).toBe(200);
     expect(h.runCronNow).toHaveBeenCalledTimes(1);
@@ -172,7 +184,9 @@ describe("POST /api/billing/webhook", () => {
 });
 
 describe("owner mail", () => {
-  const PERIOD_END = new Date("2026-09-30T12:00:00Z");
+  // Far enough ahead to stay a future period end (it was 2026-09-30, which
+  // turned this into a past date once October came).
+  const PERIOD_END = new Date("2036-09-30T12:00:00Z");
   let teamId: string;
 
   beforeEach(async () => {
@@ -274,7 +288,7 @@ describe("owner mail", () => {
     await send("evt_1", "customer.subscription.updated");
     await send("evt_2", "customer.subscription.updated");
     expect(kinds()).toEqual(["billing.cancel_scheduled"]);
-    expect(h.sent[0]?.subject).toBe("Your Pro 110K plan ends on September 30, 2026");
+    expect(h.sent[0]?.subject).toBe("Your Pro 110K plan ends on September 30, 2036");
     expect(h.sent[0]?.text).toContain("Free (100 emails a day)");
 
     // Resuming is the customer's own doing: nothing to tell them, and the

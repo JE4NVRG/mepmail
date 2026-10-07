@@ -69,7 +69,7 @@ describe("pollSqsOnce", () => {
     expect(deleted).toEqual(["sqs-1"]);
   });
 
-  it("drops (and deletes) foreign-topic and malformed messages without enqueueing", async () => {
+  it("retains foreign-topic and malformed messages for the DLQ redrive without enqueueing", async () => {
     const { deps, enqueued, deleted } = fakeDeps([
       {
         MessageId: "sqs-foreign",
@@ -81,7 +81,9 @@ describe("pollSqsOnce", () => {
     ]);
     expect(await pollSqsOnce(deps, 0)).toBe(3);
     expect(enqueued).toHaveLength(0);
-    expect(deleted).toEqual(["sqs-foreign", "sqs-garbage", "sqs-inner"]);
+    // Not ACKed: SQS moves them to mepmail-events-dlq after maxReceiveCount
+    // (see sqs-invalid-offline.test.ts).
+    expect(deleted).toEqual([]);
   });
 
   it("keeps the message on the queue when enqueueing fails", async () => {
@@ -161,6 +163,6 @@ describe("pollSqsOnce", () => {
     };
     await pollSqsOnce(deps, 0);
     expect(calls).toBe(0);
-    expect(deleted).toEqual(["foreign"]);
+    expect(deleted).toEqual([]);
   });
 });

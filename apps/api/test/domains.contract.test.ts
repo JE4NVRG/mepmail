@@ -3,7 +3,11 @@ import { type ServerType, serve } from "@hono/node-server";
 import { EnvKeyring, generateApiKey } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import type { DkimVerificationStatus, SesIdentityClient } from "@millionsend/ses";
+import {
+  DKIM_SELECTOR,
+  type DkimVerificationStatus,
+  type SesIdentityClient,
+} from "@millionsend/ses";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { Resend } from "resend";
@@ -68,7 +72,7 @@ beforeAll(async () => {
         // captured per-domain DKIM key — so verify passes when `state` says so.
         resolveTxt: async (name: string) => {
           for (const [domain, pub] of dkimKeys) {
-            if (name === `millionsend._domainkey.${domain}`) {
+            if (name === `${DKIM_SELECTOR}._domainkey.${domain}`) {
               return [[`v=DKIM1; k=rsa; p=${pub}`]];
             }
             if (name === `send.${domain}`) return [["v=spf1 include:amazonses.com ~all"]];

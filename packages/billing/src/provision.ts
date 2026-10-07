@@ -6,7 +6,7 @@ import {
   overageLookupKey,
   PRODUCT_METADATA_KEY,
   priceMetadata,
-  rungFromPrice,
+  rungIdentityFromPrice,
   rungLookupKey,
   subscriptionItems,
 } from "./prices.js";
@@ -268,7 +268,10 @@ async function moveLegacySubscriptions(
   });
   const moved: string[] = [];
   for (const price of legacy) {
-    const rung = rungFromPrice(price);
+    // Only the rung's identity: a pre-ladder price has no terms of its own to
+    // verify (rungFromPrice would refuse it), and the move puts the
+    // subscription on the rung's own provisioned prices anyway.
+    const rung = rungIdentityFromPrice(price);
     if (!rung) {
       log(`legacy price ${price.id}: no rung resolves from it; skipped`);
       continue;

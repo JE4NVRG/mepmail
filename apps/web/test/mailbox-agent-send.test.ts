@@ -11,10 +11,19 @@ const h = vi.hoisted(() => ({
   })),
   enqueue: vi.fn(async () => {}),
 }));
-vi.mock("@millionsend/core", async (original) => ({
-  ...(await original<typeof import("@millionsend/core")>()),
-  queueMailboxAgentDraft: h.queueDraft,
-}));
+vi.mock("@millionsend/core", async (original) => {
+  const core = await original<typeof import("@millionsend/core")>();
+  return {
+    ...core,
+    queueMailboxAgentDraft: h.queueDraft,
+    // A refused send asks the owner for approval, which needs draft access; the
+    // synthetic key here has none, so the refusal stands. The approval path
+    // itself is covered by mailbox-agent-send-approval.test.ts.
+    withMailboxAgentAccess: async () => {
+      throw new core.MailboxAgentAccessError("forbidden");
+    },
+  };
+});
 vi.mock("@millionsend/db", async (original) => ({
   ...(await original<typeof import("@millionsend/db")>()),
   getDb: () => h.db,

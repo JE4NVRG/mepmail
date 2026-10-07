@@ -50,7 +50,9 @@ describe("teamQuota with an operator ceiling", () => {
       kind: "month",
       plan: "pro",
       included: 110_000,
-      overage: true,
+      // A bare overageEnabled flag needs verified Stripe overage terms to bill
+      // (plans.test.ts); the ceiling is what this case is about.
+      overage: false,
       dailyCeiling: 1_000,
     });
     expect(teamQuota(PRO, true)).not.toHaveProperty("dailyCeiling");
@@ -192,6 +194,7 @@ describe("team standing", () => {
       suspended: null,
       broadcastsPausedByOperatorAt: null,
       dailySendCeiling: null,
+      sendReview: null,
     });
 
     const at = new Date("2026-09-14T10:00:00Z");
@@ -203,6 +206,8 @@ describe("team standing", () => {
         suspensionNote: "spiky",
         broadcastsPausedByOperatorAt: at,
         dailySendCeiling: 300,
+        sendReviewAt: at,
+        sendReviewReason: "impersonation",
       })
       .where(eq(schema.teams.id, teamId));
     expect(await isTeamSuspended(db, teamId)).toBe(true);
@@ -210,6 +215,7 @@ describe("team standing", () => {
       suspended: { at, reason: "reputation", note: "spiky" },
       broadcastsPausedByOperatorAt: at,
       dailySendCeiling: 300,
+      sendReview: { at, reason: "impersonation" },
     });
     expect(await fetchTeamStanding(db, "00000000-0000-0000-0000-000000000000")).toBeNull();
   });

@@ -40,9 +40,10 @@ export interface SqsPollerDeps {
 
 /**
  * One receive/process/delete round; returns how many messages arrived.
- * Unusable messages (non-JSON, foreign topic, unparseable event) are deleted —
- * redelivery can never fix them. Private mail is acknowledged only after its
- * dispatcher succeeds; disabled transport or persistence failure retains it.
+ * Invalid messages remain on SQS for the configured dead-letter redrive.
+ * Only a valid event successfully enqueued (or private mail its dispatcher
+ * persisted) enters the delete batch; enqueue failures, disabled transport and
+ * persistence failures remain available for redelivery too.
  */
 export async function pollSqsOnce(deps: SqsPollerDeps, waitSeconds = 20): Promise<number> {
   const log = deps.log ?? (() => {});
@@ -59,8 +60,7 @@ export async function pollSqsOnce(deps: SqsPollerDeps, waitSeconds = 20): Promis
   const done: Message[] = [];
   for (const message of messages) {
     try {
-      await processMessage(message, deps);
-      done.push(message);
+      if (await processMessage(message, deps)) done.push(message);
     } catch {
       // Private MIME, object keys and provider request details stay out of logs.
       log("sqs poller: processing failed, leaving message for redelivery");
@@ -80,26 +80,32 @@ export async function pollSqsOnce(deps: SqsPollerDeps, waitSeconds = 20): Promis
   return messages.length;
 }
 
-async function processMessage(message: Message, deps: SqsPollerDeps): Promise<void> {
+/** True when the message may be deleted; false retains it for the DLQ redrive. */
+async function processMessage(message: Message, deps: SqsPollerDeps): Promise<boolean> {
   const log = deps.log ?? (() => {});
   let raw: unknown;
   try {
     raw = JSON.parse(message.Body ?? "");
   } catch {
-    log("sqs poller: dropped non-JSON message");
-    return;
+    log("sqs poller: non-JSON message retained for redrive");
+    return false;
   }
   const parsed = snsMessageSchema.safeParse(raw);
-  if (!parsed.success || parsed.data.Type !== "Notification") return;
+  if (!parsed.success || parsed.data.Type !== "Notification") {
+    log("sqs poller: invalid SNS envelope retained for redrive");
+    return false;
+  }
+  // The topic ARN carries the AWS account id; it stays out of the log.
   if (!deps.allowedTopicArns.includes(parsed.data.TopicArn)) {
-    log(`sqs poller: dropped message from unallowed topic ${parsed.data.TopicArn}`);
-    return;
+    log("sqs poller: unallowed topic message retained for redrive");
+    return false;
   }
   let inner: unknown;
   try {
     inner = JSON.parse(parsed.data.Message);
   } catch {
-    return;
+    log("sqs poller: non-JSON event retained for redrive");
+    return false;
   }
   if (
     deps.dispatchPrivateMail &&
@@ -109,7 +115,7 @@ async function processMessage(message: Message, deps: SqsPollerDeps): Promise<vo
       event: inner,
     }))
   )
-    return;
+    return true;
   const candidate = inner as {
     notificationType?: unknown;
     mail?: { tags?: Record<string, unknown> };
@@ -121,13 +127,17 @@ async function processMessage(message: Message, deps: SqsPollerDeps): Promise<vo
   )
     throw new Error("Private mail requires an enabled trusted dispatcher");
   const event = parseSesEvent(inner);
-  if (!event) return;
+  if (!event) {
+    log("sqs poller: invalid SES event retained for redrive");
+    return false;
+  }
   // The SNS MessageId dedupes with the https path: same key, same singleton
   // queue job, same durable email_events.sns_message_id uniqueness.
   await deps.enqueueSesEvent(
     { ...event, occurredAt: event.occurredAt.toISOString() },
     parsed.data.MessageId,
   );
+  return true;
 }
 
 /** Endless long-poll loop; receive errors back off instead of crashing the worker. */

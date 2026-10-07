@@ -240,12 +240,57 @@ describe("acceptEmail", () => {
     const monthly = await createTeam(db, "monthly");
     const periodStart = new Date(Date.now() - DAY_MS);
     const periodEnd = new Date(Date.now() + 20 * DAY_MS);
+    // Overage bills only on a verified monthly Send contract with verified
+    // Stripe overage terms for the same period (see plans.test.ts).
+    const contract: NonNullable<QuotaTeamRow["sendBillingContract"]> = {
+      version: 1,
+      teamId: monthly,
+      customerId: "cus_accept_fixture",
+      subscriptionId: "sub_accept_fixture",
+      baseItemId: "si_accept_base",
+      basePriceId: "price_accept_base",
+      currency: "usd",
+      baseAmountCents: 2_900,
+      billingInterval: "month",
+      intervalCount: 1,
+      included: 110_000,
+      usageInterval: "month",
+      regularMonthlyCents: 2_900,
+      financialPeriodStart: periodStart.toISOString(),
+      financialPeriodEnd: periodEnd.toISOString(),
+      usageAnchor: periodStart.toISOString(),
+      verifiedAt: periodStart.toISOString(),
+    };
+    const terms: NonNullable<QuotaTeamRow["billingTerms"]> = {
+      version: 1,
+      teamId: monthly,
+      customerId: contract.customerId,
+      subscriptionId: contract.subscriptionId,
+      baseItemId: contract.baseItemId,
+      basePriceId: contract.basePriceId,
+      overageItemId: "si_accept_meter",
+      overagePriceId: "price_accept_meter",
+      currency: "usd",
+      blockSize: 1000,
+      rounding: "up",
+      centsPerBlock: 130,
+      included: 110_000,
+      periodStart: periodStart.toISOString(),
+      periodEnd: periodEnd.toISOString(),
+      verifiedAt: periodStart.toISOString(),
+    };
     const billing: QuotaTeamRow = {
+      id: monthly,
       plan: "pro",
       planQuota: 110_000,
+      stripeCustomerId: contract.customerId,
+      stripeSubscriptionId: contract.subscriptionId,
+      stripeOverageItemId: terms.overageItemId,
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
       overageEnabled: false,
+      sendBillingContract: contract,
+      billingTerms: terms,
     };
     await db
       .insert(schema.usagePeriods)

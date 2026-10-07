@@ -33,7 +33,12 @@ const flagsOf = (teamId: string) =>
   db.select().from(schema.teamFlags).where(eq(schema.teamFlags.teamId, teamId));
 
 it("flags the noisy team only, stands both, and records the unsubscribed count", async () => {
-  expect(await runSafetyFlags(db, { now: NOW })).toEqual({ teams: 2, opened: 1, cleared: 0 });
+  expect(await runSafetyFlags(db, { now: NOW })).toEqual({
+    teams: 2,
+    opened: 1,
+    cleared: 0,
+    reviews: 0,
+  });
 
   expect(await flagsOf(noisy)).toMatchObject([
     { status: "open", openedBy: null, openedAt: NOW, reason: "guardrail" },
@@ -72,7 +77,12 @@ it("clears the flag once the counters are fixed", async () => {
     .update(schema.usageCounters)
     .set({ complained: 0 })
     .where(and(eq(schema.usageCounters.teamId, noisy), eq(schema.usageCounters.day, DAY)));
-  expect(await runSafetyFlags(db, { now: later })).toEqual({ teams: 2, opened: 0, cleared: 1 });
+  expect(await runSafetyFlags(db, { now: later })).toEqual({
+    teams: 2,
+    opened: 0,
+    cleared: 1,
+    reviews: 0,
+  });
   expect(await flagsOf(noisy)).toMatchObject([
     { status: "cleared", clearedBy: null, clearedAt: later, openedAt: NOW },
   ]);

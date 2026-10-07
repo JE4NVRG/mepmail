@@ -140,19 +140,23 @@ describe("auth UX: synthetic component state harness", () => {
     expect(find(tree, (n) => n.props.id === "email").props.value).toBe("preview@example.invalid");
     expect(find(tree, (n) => n.props.id === "password").props.value).toBe("synthetic-test-only");
   });
-  it("signup retains five fields, invite email, eyes and mismatch validation", async () => {
+  it("signup asks only name, email and password and keeps the invite email", async () => {
+    // The signup was trimmed to three fields (no confirm-email or
+    // confirm-password); one eye toggles the password.
     h.params = new URLSearchParams("email=preview%40example.invalid&next=%2Finvite%2Ftest");
-    let tree = render("signup");
-    expect(nodes(tree).filter((n) => n.type === "input")).toHaveLength(5);
+    const tree = render("signup");
     expect(
-      nodes(tree).filter((n) => n.props["aria-label"] === "auth.signup.showPassword"),
-    ).toHaveLength(2);
+      nodes(tree)
+        .filter((n) => n.type === "input")
+        .map((n) => n.props.id),
+    ).toEqual(["name", "email", "password"]);
     expect(find(tree, (n) => n.props.id === "email").props.value).toBe("preview@example.invalid");
-    input(tree, "confirm-email", "different@example.invalid");
-    await submit(render("signup"));
-    tree = render("signup");
-    expect(alert(tree).props.children).toBe("auth.signup.emailMismatch");
-    expect(h.signup).not.toHaveBeenCalled();
+    expect(find(tree, (n) => n.props.id === "password").props.minLength).toBe(8);
+    expect(
+      nodes(tree).filter((n) =>
+        /^auth\.signup\.(show|hide)Password$/.test(String(n.props["aria-label"] ?? "")),
+      ),
+    ).toHaveLength(1);
   });
   for (const provider of ["google", "github", "microsoft"] as const) {
     it(`${provider}: respects flags, announces pending and recovers rejection`, async () => {

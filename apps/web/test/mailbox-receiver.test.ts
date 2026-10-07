@@ -6,6 +6,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { type Db, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EnvKeyring, type Keyring } from "../../../packages/core/src/crypto/keyring.js";
 import { readMailboxItem } from "../../../packages/core/src/mailbox-private-store.js";
@@ -72,15 +73,22 @@ describe("trusted private SES receipt adapter with real encrypted persistence", 
     const extension = fileURLToPath(
       new URL("../../../packages/db/mailbox-drizzle/", import.meta.url),
     );
-    for (const path of [base, extension])
-      for (const name of readdirSync(path)
-        .filter((n) => n.endsWith(".sql") && (path !== base || n.slice(0, 4) <= "0042"))
-        .sort())
-        for (const statement of readFileSync(path + name, "utf8")
+    // Match the production migrator: each main migration's locks and DDL share one transaction.
+    for (const name of readdirSync(base)
+      .filter((n) => n.endsWith(".sql"))
+      .sort())
+      await client.transaction(async (tx) => {
+        for (const statement of readFileSync(base + name, "utf8")
           .split("--> statement-breakpoint")
           .filter((s) => s.trim()))
-          await client.exec(statement);
-    db = drizzle(client, { schema }) as unknown as Db;
+          await tx.exec(statement);
+      });
+    const database = drizzle(client, { schema });
+    db = database as unknown as Db;
+    await migrate(database, {
+      migrationsFolder: extension,
+      migrationsTable: "__mailbox_migrations",
+    });
     keys = new EnvKeyring(new Map([[1, randomBytes(32)]]), 1);
     const teams = await db
       .insert(schema.teams)

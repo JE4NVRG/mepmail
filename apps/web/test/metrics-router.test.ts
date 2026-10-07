@@ -1,4 +1,4 @@
-import { utcDay as coreUtcDay, DAY_MS } from "@millionsend/core";
+import { ACCOUNT_SCORE_VERSION, utcDay as coreUtcDay, DAY_MS } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
@@ -292,7 +292,7 @@ describe("metrics.accountScore", () => {
 
     expect(result).toMatchObject({
       windowDays: 30,
-      scoreVersion: 1,
+      scoreVersion: ACCOUNT_SCORE_VERSION,
       sent: 40,
       contentRecipients: 0,
       insufficientOutcomeData: true,

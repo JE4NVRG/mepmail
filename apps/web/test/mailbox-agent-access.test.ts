@@ -5,6 +5,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { type Db, schema } from "@millionsend/db";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
 import {
@@ -52,18 +53,20 @@ const bridge = (token: string, scope: "read" | "draft" | "send" = "read") =>
 
 beforeEach(async () => {
   client = new PGlite();
-  // Mailbox migrations remain independent from the production Send migration journal.
-  for (const folder of [base, mail]) {
-    const files = readdirSync(folder)
-      .filter((name) => name.endsWith(".sql") && (folder === mail || name.slice(0, 4) <= "0042"))
-      .sort();
-    for (const name of files)
-      for (const statement of readFileSync(folder + name, "utf8")
+  // Match the production migrator: each main migration's locks and DDL share one transaction.
+  for (const name of readdirSync(base)
+    .filter((name) => name.endsWith(".sql"))
+    .sort())
+    await client.transaction(async (tx) => {
+      for (const statement of readFileSync(base + name, "utf8")
         .split("--> statement-breakpoint")
         .filter((part) => part.trim()))
-        await client.exec(statement);
-  }
-  db = drizzle(client, { schema }) as unknown as Db;
+        await tx.exec(statement);
+    });
+  const database = drizzle(client, { schema });
+  db = database as unknown as Db;
+  // Mailbox migrations remain independent from the production Send migration journal.
+  await migrate(database, { migrationsFolder: mail, migrationsTable: "__mailbox_migrations" });
   const teams = await db
     .insert(schema.teams)
     .values([

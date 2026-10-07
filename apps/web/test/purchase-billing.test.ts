@@ -20,6 +20,9 @@ const h = vi.hoisted(() => ({
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useState: (initial: unknown) => [initial === "month" ? h.period : initial, vi.fn()],
+  // The view is called as a plain function here; effects (the saved combo
+  // intent) belong to the browser and are not under test.
+  useEffect: () => undefined,
 }));
 vi.mock("next-intl", () => ({
   useLocale: () => h.locale,

@@ -656,7 +656,9 @@ describe("settings.usage", () => {
     await addMember(teamId, "u1", "owner");
     const usage = await callerFor("u1", teamId, "owner").settings.usage.recent();
     expect(usage.today.limit).toBeNull();
-    expect(usage.period).toEqual({ accepted: 777, included: 550_000, start, end, overage: true });
+    // overageEnabled alone no longer turns overage on: it needs verified
+    // Stripe overage terms (covered in packages/core/test/plans.test.ts).
+    expect(usage.period).toEqual({ accepted: 777, included: 550_000, start, end, overage: false });
   });
 
   it("reports no limit and no period on self-host, where plans are not enforced", async () => {

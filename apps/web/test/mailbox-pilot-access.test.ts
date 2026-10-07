@@ -298,7 +298,14 @@ describe("operator mailbox pilot admission", () => {
       expect((await sendPost(agentRequest("send", { id: ITEM, expectedRevision: 1 }))).status).toBe(
         403,
       );
-      expect(h.withAccess.mock.calls.map((call) => call[2])).toEqual(["read", "draft", "send"]);
+      // A refused send then tries to file an owner-approval request, which
+      // needs draft access and is refused the same way.
+      expect(h.withAccess.mock.calls.map((call) => call[2])).toEqual([
+        "read",
+        "draft",
+        "send",
+        "draft",
+      ]);
       contentNotTouched();
     },
   );

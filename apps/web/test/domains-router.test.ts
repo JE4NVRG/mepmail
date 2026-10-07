@@ -2,7 +2,12 @@ import { createPublicKey } from "node:crypto";
 import { PLAN_DOMAIN_LIMIT } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import type { DkimVerificationStatus, DnsResolver, SesIdentityClient } from "@millionsend/ses";
+import {
+  DKIM_SELECTOR,
+  type DkimVerificationStatus,
+  type DnsResolver,
+  type SesIdentityClient,
+} from "@millionsend/ses";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -161,7 +166,7 @@ describe("domains.create", () => {
     ]);
     expect(calls[0]?.input).toMatchObject({
       EmailIdentity: "updates.example.com",
-      DkimSigningAttributes: { DomainSigningSelector: "millionsend" },
+      DkimSigningAttributes: { DomainSigningSelector: DKIM_SELECTOR },
     });
     expect(calls[1]?.input).toMatchObject({
       EmailIdentity: "updates.example.com",
@@ -176,7 +181,7 @@ describe("domains.create", () => {
       region: "us-east-1",
       status: "pending",
       mailFromSubdomain: "send",
-      dkimSelector: "millionsend",
+      dkimSelector: DKIM_SELECTOR,
     });
 
     // The stored public key is the public half of the uploaded private key.
@@ -438,7 +443,7 @@ describe("domains.create", () => {
     ]);
 
     const [row] = await db.select().from(schema.domains).where(eq(schema.domains.id, id));
-    expect(row?.dkimSelector).toBe("millionsend");
+    expect(row?.dkimSelector).toBe(DKIM_SELECTOR);
     expect(row?.dkimPublicKey).toBeTruthy();
   });
 
@@ -476,7 +481,7 @@ describe("domains.create", () => {
 function publishedDns(dkimPublicKey: string, { spf = true }: { spf?: boolean } = {}) {
   return {
     resolveTxt: async (name: string) => {
-      if (name === "millionsend._domainkey.example.com") {
+      if (name === `${DKIM_SELECTOR}._domainkey.example.com`) {
         return [[`v=DKIM1; k=rsa; p=${dkimPublicKey}`]];
       }
       if (name === "send.example.com" && spf) return [["v=spf1 include:amazonses.com ~all"]];
@@ -681,10 +686,10 @@ describe("domains.verify live DNS", () => {
   it("marks a present-but-wrong value Mismatch", async () => {
     const { caller, id } = await verifiedCaller({
       resolveTxt: async (name) =>
-        name === "millionsend._domainkey.example.com" ? [["v=DKIM1; k=rsa; p=WRONGKEY"]] : [],
+        name === `${DKIM_SELECTOR}._domainkey.example.com` ? [["v=DKIM1; k=rsa; p=WRONGKEY"]] : [],
     });
     const { liveDns } = await caller.domains.verify({ id });
-    expect(liveDns.find((r) => r.name === "millionsend._domainkey.example.com")?.status).toBe(
+    expect(liveDns.find((r) => r.name === `${DKIM_SELECTOR}._domainkey.example.com`)?.status).toBe(
       "mismatch",
     );
   });
@@ -749,7 +754,7 @@ describe("domains.records", () => {
       {
         group: "verification",
         type: "TXT",
-        name: "millionsend._domainkey.example.com",
+        name: `${DKIM_SELECTOR}._domainkey.example.com`,
         value: `"v=DKIM1; k=rsa; p=${row?.dkimPublicKey}"`,
         status: "pending",
       },

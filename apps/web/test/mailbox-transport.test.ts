@@ -5,6 +5,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { type Db, schema } from "@millionsend/db";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import { simpleParser } from "mailparser";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EnvKeyring, type Keyring } from "../../../packages/core/src/crypto/keyring.js";
@@ -106,15 +107,19 @@ const queueAgent = (token: string, id: string, revision = 1) =>
 
 beforeEach(async () => {
   client = new PGlite();
-  for (const path of [base, extension])
-    for (const name of readdirSync(path)
-      .filter((n) => n.endsWith(".sql") && (path !== base || n.slice(0, 4) <= "0042"))
-      .sort())
-      for (const statement of readFileSync(path + name, "utf8")
+  // Match the production migrator: each main migration's locks and DDL share one transaction.
+  for (const name of readdirSync(base)
+    .filter((n) => n.endsWith(".sql"))
+    .sort())
+    await client.transaction(async (tx) => {
+      for (const statement of readFileSync(base + name, "utf8")
         .split("--> statement-breakpoint")
         .filter((s) => s.trim()))
-        await client.exec(statement);
-  db = drizzle(client, { schema: { ...schema, mailboxOutbox } }) as unknown as Db;
+        await tx.exec(statement);
+    });
+  const database = drizzle(client, { schema: { ...schema, mailboxOutbox } });
+  db = database as unknown as Db;
+  await migrate(database, { migrationsFolder: extension, migrationsTable: "__mailbox_migrations" });
   const teams = await db
     .insert(schema.teams)
     .values([

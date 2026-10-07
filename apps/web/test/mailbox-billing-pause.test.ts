@@ -52,6 +52,41 @@ const subscription = {
   lastEventCreated: 1,
 };
 
+// Correio sits on a paying Send contract (above US$20 a month), so the Mail
+// pause rules below are exercised on a team that already qualifies for it.
+const sendingPeriodStart = new Date("2020-01-01T00:00:00Z");
+const sendingPeriodEnd = new Date("2030-01-01T00:00:00Z");
+const paidSendingMember = {
+  id: actor.teamId,
+  role: "owner",
+  suspendedAt: null,
+  plan: "pro",
+  planStatus: "active",
+  stripeCustomerId: "cus_sending_pause_fixture",
+  stripeSubscriptionId: "sub_sending_pause_fixture",
+  currentPeriodStart: sendingPeriodStart,
+  currentPeriodEnd: sendingPeriodEnd,
+  cancelAt: null,
+  sendBillingContract: {
+    version: 1,
+    teamId: actor.teamId,
+    customerId: "cus_sending_pause_fixture",
+    subscriptionId: "sub_sending_pause_fixture",
+    baseItemId: "si_sending_pause_fixture",
+    basePriceId: "price_sending_pause_fixture",
+    currency: "usd",
+    baseAmountCents: 2900,
+    billingInterval: "month",
+    intervalCount: 1,
+    included: 110_000,
+    usageInterval: "month",
+    regularMonthlyCents: 2900,
+    financialPeriodStart: sendingPeriodStart.toISOString(),
+    financialPeriodEnd: sendingPeriodEnd.toISOString(),
+    usageAnchor: sendingPeriodStart.toISOString(),
+    verifiedAt: new Date("2026-10-06").toISOString(),
+  },
+};
 /** Only the selected read rows are stubbed; production presentation and flag logic run.
  * Writes/transactions/provider methods are deliberately absent from this handle.
  */
@@ -78,21 +113,7 @@ function presentationDb(
   } = {},
 ) {
   const rows = [
-    options.member === null
-      ? []
-      : [
-          options.member ?? {
-            role: "owner",
-            suspendedAt: null,
-            plan: "starter",
-            planStatus: "active",
-            stripeCustomerId: "cus_sending_pause_fixture",
-            stripeSubscriptionId: "sub_sending_pause_fixture",
-            currentPeriodStart: new Date("2020-01-01"),
-            currentPeriodEnd: new Date("2030-01-01"),
-            cancelAt: null,
-          },
-        ],
+    options.member === null ? [] : [options.member ?? paidSendingMember],
     options.subscription === null ? [] : [options.subscription ?? subscription],
     [],
     options.checkout ? [options.checkout] : [],
