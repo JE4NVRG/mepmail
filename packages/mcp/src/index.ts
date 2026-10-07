@@ -8,7 +8,7 @@ const VERSION = typeof __MCP_VERSION__ === "string" ? __MCP_VERSION__ : "0.0.0";
 
 const API_KEY_ENVS = ["MEPMAIL_API_KEY", "MILLIONSEND_API_KEY"] as const;
 const BASE_URL_ENVS = ["MEPMAIL_BASE_URL", "MILLIONSEND_BASE_URL"] as const;
-const DEFAULT_BASE_URL = "https://api-mepmail.je4ndev.com";
+const DEFAULT_BASE_URL = "https://api.mepmail.dev";
 
 const firstEnv = (names: readonly string[]): string | undefined => {
   for (const name of names) {

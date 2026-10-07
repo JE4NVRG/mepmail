@@ -7,8 +7,8 @@ suppressions. Reads from the source provider, writes to your MepMail
 instance (Cloud or self-hosted), and is safe to run again — a second run right
 before cutover syncs what changed since the first.
 
-Guide: <https://docs-mepmail.je4ndev.com/cli> ·
-Packages: <https://docs-mepmail.je4ndev.com/packages> · Published as
+Guide: <https://docs.mepmail.dev/cli> ·
+Packages: <https://docs.mepmail.dev/packages> · Published as
 `@mepmail/cli` on npm.
 
 ```sh
@@ -42,7 +42,7 @@ Audiences (deprecated in Resend) are skipped — segments cover them.
 | --- | --- |
 | `RESEND_API_KEY` | Source key (full access; the tool only ever reads). Alternatives: `--from-key-stdin`, or a masked prompt in a terminal. |
 | `MEPMAIL_API_KEY` | MepMail key (full access). Alternatives: `--to-key-stdin`, or a masked prompt. |
-| `MEPMAIL_BASE_URL` | API URL of a self-hosted MepMail instance. Same as `--to-url`. Unset, the target is MepMail Cloud (`https://api-mepmail.je4ndev.com`); a terminal asks. |
+| `MEPMAIL_BASE_URL` | API URL of a self-hosted MepMail instance. Same as `--to-url`. Unset, the target is MepMail Cloud (`https://api.mepmail.dev`); a terminal asks. |
 | `NO_COLOR` | Disables ANSI colors. |
 | `DO_NOT_TRACK` | Honored as a no-op: the tool sends no telemetry, never phones home and never checks for updates. |
 

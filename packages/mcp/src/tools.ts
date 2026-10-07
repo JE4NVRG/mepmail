@@ -4,7 +4,7 @@ import { MepMailApiError, type MepMailClient } from "./client.js";
 
 /**
  * The exact tool surface shared with the hosted MCP server
- * (api-mepmail.je4ndev.com/mcp), scoped to what a local client needs for the
+ * (api.mepmail.dev/mcp), scoped to what a local client needs for the
  * common loop: send email, inspect outcomes, manage the audience. REST paths
  * and parameter names mirror the public API; tool names are identical to the
  * hosted server's, so prompts move between installs unchanged.

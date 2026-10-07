@@ -8,8 +8,8 @@ export const REPO_URL = "https://github.com/JE4NVRG/mepmail";
 /** Sent on every request: Resend rejects requests without a User-Agent. */
 export const USER_AGENT = `mepmail-cli/${VERSION} (+${REPO_URL})`;
 
-export const CLOUD_API_URL = "https://api-mepmail.je4ndev.com";
-export const CLOUD_BILLING_URL = "https://mepmail.je4ndev.com/settings/billing";
+export const CLOUD_API_URL = "https://api.mepmail.dev";
+export const CLOUD_BILLING_URL = "https://mepmail.dev/settings/billing";
 
 export const TRADEMARK_NOTICE =
   "Resend is a trademark of Plus Five Five, Inc. MepMail is not affiliated with or endorsed by Resend.";

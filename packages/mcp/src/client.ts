@@ -24,7 +24,7 @@ export class MepMailApiError extends Error {
 export interface ClientOptions {
   /** The team API key: `ms_...`. Never logged, never sent anywhere else. */
   apiKey: string;
-  /** Instance base URL, e.g. `https://api-mepmail.je4ndev.com` (a trailing slash is fine). */
+  /** Instance base URL, e.g. `https://api.mepmail.dev` (a trailing slash is fine). */
   baseUrl: string;
   /** Injectable for tests. */
   fetchImpl?: typeof fetch;

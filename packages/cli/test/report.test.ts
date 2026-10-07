@@ -92,7 +92,7 @@ const report: Report = {
   finishedAt: "2026-09-01T00:00:00.000Z",
   source: "resend",
   sourceLabel: "Resend",
-  target: { baseUrl: "https://api-mepmail.je4ndev.com", cloud: true, plan: "free" },
+  target: { baseUrl: "https://api.mepmail.dev", cloud: true, plan: "free" },
   counts: {},
   sourceReadOnly: true,
   freshWebhookSecrets: [],

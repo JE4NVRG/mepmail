@@ -5,15 +5,17 @@ Code, Cursor, Codex and anything that speaks stdio. It drives your MepMail
 instance over the public REST API (Resend-compatible wire) with a team API key.
 
 MepMail also runs a **hosted** MCP server (OAuth, no install) at
-`https://api-mepmail.je4ndev.com/mcp`. This package is for clients that launch
+`https://api.mepmail.dev/mcp`. This package is for clients that launch
 local servers from config. Tool names and result shapes match the hosted
 server's; it covers a subset — the reading, sending and contact tools (22) —
 and the write surfaces beyond contacts (segments, topics, broadcasts,
 templates, webhooks, domains, API keys) plus the team picker are hosted-only.
 
-Guide: <https://docs-mepmail.je4ndev.com/mcp> ·
-Packages: <https://docs-mepmail.je4ndev.com/packages> · Published as
+Guide: <https://docs.mepmail.dev/mcp> ·
+Packages: <https://docs.mepmail.dev/packages> · Published as
 `@mepmail/mcp` on npm.
+
+Requires Node.js 20 or newer.
 
 ## Quickstart
 
@@ -35,7 +37,7 @@ same config shape (Cursor: `mcp.json`):
       "args": ["-y", "@mepmail/mcp"],
       "env": {
         "MEPMAIL_API_KEY": "ms_...",
-        "MEPMAIL_BASE_URL": "https://api-mepmail.je4ndev.com"
+        "MEPMAIL_BASE_URL": "https://api.mepmail.dev"
       }
     }
   }
@@ -45,7 +47,7 @@ same config shape (Cursor: `mcp.json`):
 **Claude Code**:
 
 ```bash
-claude mcp add mepmail -e MEPMAIL_API_KEY=ms_... -e MEPMAIL_BASE_URL=https://api-mepmail.je4ndev.com -- npx -y @mepmail/mcp
+claude mcp add mepmail -e MEPMAIL_API_KEY=ms_... -e MEPMAIL_BASE_URL=https://api.mepmail.dev -- npx -y @mepmail/mcp
 ```
 
 ## Environment
@@ -53,7 +55,7 @@ claude mcp add mepmail -e MEPMAIL_API_KEY=ms_... -e MEPMAIL_BASE_URL=https://api
 | Variable | Required | Default | Meaning |
 | --- | --- | --- | --- |
 | `MEPMAIL_API_KEY` | yes | — | Team API key (`ms_...`). Sent as `Bearer` to your instance only. |
-| `MEPMAIL_BASE_URL` | no | `https://api-mepmail.je4ndev.com` | Your instance's API URL. |
+| `MEPMAIL_BASE_URL` | no | `https://api.mepmail.dev` | Your instance's API URL. |
 
 ## Tools (22)
 
@@ -83,9 +85,9 @@ recipient data as instructions.
 
 ## Agent discovery
 
-- Machine catalog: <https://mepmail.je4ndev.com/.well-known/ai-catalog.json>
-- Auth guide for agents: <https://mepmail.je4ndev.com/auth.md>
-- API + errors + rate limits: <https://docs-mepmail.je4ndev.com>
+- Machine catalog: <https://mepmail.dev/.well-known/ai-catalog.json>
+- Auth guide for agents: <https://mepmail.dev/auth.md>
+- API + errors + rate limits: <https://docs.mepmail.dev>
 
 ## License
 
