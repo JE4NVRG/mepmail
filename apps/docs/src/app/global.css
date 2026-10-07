@@ -1,7 +1,15 @@
-@import "tailwindcss";
+/*
+ * Scan only our own sources for classes. Automatic detection walks the whole
+ * app folder, build outputs and caches included (.next-*, ~800 MB each), and
+ * made one CSS compile take ~43 minutes. Fumadocs ships its class lists as
+ * @source inline() in the presets below, so nothing else needs scanning.
+ */
+@import "tailwindcss" source(none);
 @import "fumadocs-ui/css/black.css";
 @import "fumadocs-ui/css/preset.css";
 @import "fumadocs-openapi/css/preset.css";
+@source "../";
+@source "../../content";
 
 /* Erode Medium (Fontshare): display type for the status pages only. */
 @font-face {

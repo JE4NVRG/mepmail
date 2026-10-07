@@ -7,3 +7,6 @@ next-env.d.ts
 # Generated from apps/api at build time (scripts/generate-openapi.ts)
 /public/openapi.json
 /content/docs/api-reference/endpoints/
+
+# Release builds use per-revision dist dirs
+.next-*/
