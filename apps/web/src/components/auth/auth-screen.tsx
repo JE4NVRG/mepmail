@@ -6,8 +6,23 @@ import { LandingLangSwitch } from "@/components/landing-lang-switch";
 import styles from "./auth.module.css";
 import { AuthArt } from "./auth-art";
 
-/** Estrutura única de acesso, recuperação e consentimento. */
-export function AuthScreen({ title, children }: { title: string; children: React.ReactNode }) {
+/** Each access screen's own pitch beside the form; recovery and consent screens share the shell's. */
+export type AuthPanel = "login" | "signup";
+
+/**
+ * Estrutura única de acesso, recuperação e consentimento. The AGPL source
+ * offer lives in the site footer and the dashboard sidebar, so the form
+ * itself stays free of it.
+ */
+export function AuthScreen({
+  title,
+  panel,
+  children,
+}: {
+  title: string;
+  panel?: AuthPanel | undefined;
+  children: React.ReactNode;
+}) {
   const tCommon = useTranslations("common");
   const tAuth = useTranslations("auth");
   const tLanding = useTranslations("landing");
@@ -22,8 +37,22 @@ export function AuthScreen({ title, children }: { title: string; children: React
       <div className={styles.layout}>
         <aside className={styles.product} aria-label={tAuth("shell.productLabel")}>
           <p className={styles.eyebrow}>MepMail / API · SMTP · MCP</p>
-          <h2>{tAuth("shell.title")}</h2>
-          <p className={styles.productLead}>{tAuth("shell.body")}</p>
+          <h2>{panel ? tAuth(`${panel}.panelTitle`) : tAuth("shell.title")}</h2>
+          <p className={styles.productLead}>
+            {panel ? tAuth(`${panel}.panelBody`) : tAuth("shell.body")}
+          </p>
+          {panel === "signup" ? (
+            <ul className={styles.perks}>
+              {(["perkFree", "perkApis", "perkCorreio"] as const).map((key) => (
+                <li key={key}>
+                  <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor">
+                    <path d="m3.5 8.5 3 3 6-7" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  {tAuth(`signup.${key}`)}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <AuthArt />
         </aside>
         <div className={styles.column}>
@@ -38,13 +67,6 @@ export function AuthScreen({ title, children }: { title: string; children: React
           </Link>
           <h1 className={`ms-display ${styles.headline}`}>{title}</h1>
           {children}
-          <a
-            href="/source"
-            title={tCommon("sourceDownload")}
-            style={{ marginTop: 16, fontSize: 12, color: "var(--ms-muted)" }}
-          >
-            {tCommon("sourceCode")}
-          </a>
         </div>
       </div>
     </main>

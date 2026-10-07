@@ -17,7 +17,9 @@ describe("frontend polish contracts", () => {
   it("auth uses one shell, personalization illustration and both home links", () => {
     const shell = read("../src/components/auth/auth-screen.tsx");
     const form = read("../src/components/auth/auth-form.tsx");
-    expect(form).toContain('<AuthScreen title={t("title")}>');
+    expect(form).toContain('<AuthScreen title={t("title")} panel={mode}>');
+    // The source offer lives in the site footer and the dashboard sidebar.
+    expect(shell).not.toContain('href="/source"');
     expect(shell.match(/href="\/"/g)).toHaveLength(2);
     expect(shell).toContain("<AuthArt />");
     expect(shell).not.toContain("/product/templates-hero.webp");

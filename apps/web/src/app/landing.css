@@ -843,6 +843,12 @@
     display: inline-flex;
   }
 }
+/* Signed in, the account side (photo, dashboard, sign out) is wider than
+   "sign in" + "sign up": the brand group shrank and the badge slid over the
+   nav links. The badge pitches to visitors, so a signed-in header drops it. */
+.gtm-header:has(.gtm-account-signout) .gtm-brand-badge {
+  display: none;
+}
 .gtm-beta-badge {
   display: inline-block;
   margin-inline-start: 8px;

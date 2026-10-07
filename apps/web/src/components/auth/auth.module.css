@@ -69,12 +69,127 @@
   border-radius: 12px;
   background: #080808;
 }
-.artFrame img {
-  display: block;
+/* The illustration: a template card, two curves, two personal messages. */
+.artFrame {
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ms-bone) 7%, transparent) 1px, transparent 0)
+      0 0 / 22px 22px,
+    #080808;
+}
+.artStage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 13% minmax(0, 0.92fr);
+  align-items: center;
+  padding: 8%;
+}
+.mailCard {
+  display: grid;
+  gap: 6px;
+  padding: 7% 8%;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 10px;
+  background: #121214;
+  color: #f4f1ea;
+  font-size: clamp(9px, 0.75vw, 11px);
+  line-height: 1.4;
+}
+.mailTemplate {
+  box-shadow: 0 18px 50px #0008;
+}
+.mailFrom {
+  color: #c9c6bf;
+}
+.mailMeta {
+  color: #8f8c86;
+}
+.mailHello {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid #262629;
+  font-size: clamp(16px, 1.55vw, 24px);
+  letter-spacing: -0.02em;
+}
+.mailSent .mailHello {
+  font-size: clamp(13px, 1.15vw, 17px);
+}
+.mailChip {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ms-violet) 85%, transparent);
+  color: #160f22;
+  font-family: var(--ms-font-mono, monospace);
+  font-size: clamp(9px, 0.7vw, 11px);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.mailLine {
+  color: #a7a49d;
+}
+.mailCta {
+  justify-self: start;
+  margin-top: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: #f4f1ea;
+  color: #0b0b0c;
+  font-weight: 500;
+}
+.mailLinks {
   width: 100%;
-  height: auto;
-  aspect-ratio: 1;
-  object-fit: contain;
+  height: 72%;
+  overflow: visible;
+  fill: none;
+  stroke: color-mix(in srgb, var(--ms-violet) 70%, transparent);
+  stroke-width: 1.5;
+}
+.mailOutputs {
+  display: grid;
+  gap: 12%;
+}
+/* Sign-up's three reasons, above the illustration. */
+.perks {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  max-width: 460px;
+}
+.perks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.perks svg {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  padding: 2px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ms-violet) 18%, transparent);
+  color: var(--ms-violet);
+  stroke-width: 2;
+}
+/* "Free to start" under the sign-up headline, on every screen size. */
+.freeNote {
+  justify-self: start;
+  margin: -4px 0 2px;
+  padding: 5px 12px;
+  border: 1px solid color-mix(in srgb, var(--ms-violet) 40%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ms-violet) 10%, transparent);
+  color: var(--ms-violet);
+  font-size: 13px;
+  line-height: 1.4;
 }
 .artFooter {
   display: flex;

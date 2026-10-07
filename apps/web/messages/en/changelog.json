@@ -23,6 +23,22 @@
   },
   "releases": [
     {
+      "version": "0.52",
+      "date": "2026-10-07",
+      "title": "New sign-in and sign-up screens",
+      "summary": "Each access screen now says what it is for, in your language.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Sign-in welcomes you back; sign-up lists what you get: 100 emails a day free with no credit card, a Resend-compatible API, SMTP and MCP, and Correio inboxes for you and your agents.",
+            "The personalization illustration is drawn in the page's language instead of an English picture.",
+            "Signed in, the site header no longer overlaps its menu."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.51",
       "date": "2026-10-07",
       "title": "Phone polish and legal pages fixed",
@@ -114,22 +130,6 @@
           "items": [
             "The dashboard, the site, the docs and the code samples now show the new addresses.",
             "The je4ndev.com addresses stay up for existing integrations; the old docs redirect to the new ones. The main OAuth MCP stays at api-mepmail.je4ndev.com/mcp for now."
-          ]
-        }
-      ]
-    },
-    {
-      "version": "0.46",
-      "date": "2026-10-07",
-      "title": "Prices that add up at every rung",
-      "summary": "Moving up a plan now always costs less per email, and overage is much lower.",
-      "changes": [
-        {
-          "kind": "changed",
-          "items": [
-            "Pro 220K for US$55 (was US$100), Scale 550K for US$129 (was US$199), Scale 1.1M for US$239 (was US$319) and Scale 1.65M for US$349 (was US$429). Pro 110K stays at US$29 and Scale 2.75M at US$549.",
-            "Overage per 1,000 emails: US$0.35 on Pro 110K (was US$0.90), US$0.32 on Pro 220K and US$0.29 down to US$0.22 on Scale, always above the plan's own price so moving up pays off.",
-            "Existing subscriptions keep the price they already have."
           ]
         }
       ]

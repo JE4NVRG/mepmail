@@ -311,10 +311,11 @@ export function AuthForm({
   }
 
   return (
-    <AuthScreen title={t("title")}>
+    <AuthScreen title={t("title")} panel={mode}>
       <p className={styles.subline}>
         {t("subline")} <Link href={otherPage}>{t("sublineLink")}</Link>
       </p>
+      {mode === "signup" ? <p className={styles.freeNote}>{t("freeNote")}</p> : null}
       {anySocial ? (
         <div className={styles.social}>
           {providers.google ? (

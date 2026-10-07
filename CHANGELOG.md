@@ -7,6 +7,22 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.52] - 2026-10-07
+
+Sign-in and sign-up screens.
+
+### Changed
+
+- `AuthScreen` takes `panel` (login | signup): each screen has its own pitch
+  beside the form; sign-up lists three reasons and shows a "free to start"
+  note under the headline on every screen size.
+- `AuthArt` draws the personalization illustration in HTML from the page's
+  messages instead of an English-only picture (no 960px webp download).
+- The AGPL source link left the auth form; the offer stays in the site
+  footer, the dashboard sidebar and `/source`.
+- The site header hides the agent-ready badge when signed in: the wider
+  account side shrank the brand group and the badge slid over the nav.
+
 ## [0.51] - 2026-10-07
 
 Front-end QA pass: phones and the legal pages.

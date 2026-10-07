@@ -28,6 +28,22 @@
   },
   "releases": [
     {
+      "version": "0.52",
+      "date": "2026-10-07",
+      "title": "Novas telas de entrar e criar conta",
+      "summary": "Cada tela de acesso agora diz para que serve, no seu idioma.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Entrar dá as boas-vindas de volta; criar conta mostra o que você ganha: 100 e-mails por dia grátis sem cartão, API compatível com o Resend, SMTP e MCP, e caixas do Correio para você e seus agentes.",
+            "A ilustração de personalização é desenhada no idioma da página em vez de uma imagem em inglês.",
+            "Com a conta conectada, o topo do site não sobrepõe mais o menu."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.51",
       "date": "2026-10-07",
       "title": "Ajustes no celular e páginas legais corrigidas",
@@ -119,22 +135,6 @@
           "items": [
             "O painel, o site, a documentação e os exemplos de código passam a mostrar os endereços novos.",
             "Os endereços em je4ndev.com seguem no ar para quem já usa. A documentação antiga redireciona para a nova. O MCP principal com OAuth continua em api-mepmail.je4ndev.com/mcp por enquanto."
-          ]
-        }
-      ]
-    },
-    {
-      "version": "0.46",
-      "date": "2026-10-07",
-      "title": "Preços que fazem sentido em cada degrau",
-      "summary": "Subir de plano agora sempre sai mais barato por e-mail, e o excedente ficou bem menor.",
-      "changes": [
-        {
-          "kind": "changed",
-          "items": [
-            "Pro 220K por US$ 55 (era US$ 100), Scale 550K por US$ 129 (era US$ 199), Scale 1,1M por US$ 239 (era US$ 319) e Scale 1,65M por US$ 349 (era US$ 429). Pro 110K continua US$ 29 e Scale 2,75M, US$ 549.",
-            "Excedente por mil e-mails: US$ 0,35 no Pro 110K (era US$ 0,90), US$ 0,32 no Pro 220K e de US$ 0,29 a US$ 0,22 no Scale, sempre acima do preço do próprio plano para valer a pena subir.",
-            "Assinaturas existentes mantêm o preço que já têm."
           ]
         }
       ]
