@@ -61,7 +61,25 @@ Stored messages are preserved; reading and export still require current mailbox
 access. Mail license changes do not change your Send plan or enable receiving
 and transport. Keep the pilot readiness checks above.
 
-## Connect an agent
+## Connect an agent over MCP
+
+Agents that speak MCP (Claude Code, Claude Desktop, Cursor and others) use the
+mailbox as tools, with no code: `mailbox_list_messages`, `mailbox_read_message`,
+`mailbox_save_draft` and `mailbox_send_draft`. When you create the key under
+**Agent access**, the dashboard shows the ready command. On MepMail Cloud:
+
+```bash title="Claude Code"
+claude mcp add --transport http mepmail-correio https://api-mepmail.je4ndev.com/mcp/correio --header "Authorization: Bearer mmb_..."
+```
+
+In other clients, add a Streamable HTTP server at
+`https://api-mepmail.je4ndev.com/mcp/correio` with the header
+`Authorization: Bearer` followed by the mailbox key. The tools keep the same
+permissions, limits and activity records as the API below. Message content comes
+back marked as untrusted data: the agent must not follow instructions that
+arrive by email.
+
+## Connect an agent over the API
 
 Use the **dashboard origin** of your enabled deployment for these endpoints.
 They run under `/api/mailbox-agent` on the Web application, rather than the Send
@@ -120,9 +138,9 @@ from the source message. Empty arrays are still required when there are none.
 ## Submit the saved revision
 
 Sending requires the owner's explicit **send** key permission, an active license,
-a verified domain, remaining allowances and enabled transport. A read/draft key
-cannot send. `POST /api/mailbox-agent/send` accepts only the saved draft's UUID
-and exact revision:
+a verified domain, remaining allowances and enabled transport.
+`POST /api/mailbox-agent/send` accepts only the saved draft's UUID and exact
+revision:
 
 ```json title="Send request body — replace with the saved draft values"
 {
@@ -136,6 +154,17 @@ draft revision can return the existing outbox with `duplicate: true` and `200`;
 it does not create a new message. Admission and provider acceptance do not prove
 delivery. An `unknown` result requires operator investigation; do not create
 another draft or automate a resend to work around it.
+
+### Owner approval
+
+A read/draft key, without the **send** permission, does not send on its own: the
+same request records that the agent wants to send that revision and answers
+`202` with `"status": "awaiting_approval"`. The mailbox owner gets an email (at
+most one every 10 minutes per mailbox) and sees the draft marked **Awaiting your
+approval** in Correio; they check it and send, edit or delete it. Repeating the
+request for the same revision answers `200` with `duplicate: true`. Editing the
+draft makes a new revision, which needs a new request. This is how you keep a
+person in the loop: create the agent key without the send permission.
 
 ## Handle access and service errors
 

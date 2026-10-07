@@ -62,7 +62,25 @@ dependendo do acesso atual à caixa. Alterar a licença de Correio não muda o
 plano de Envio nem habilita recebimento e transporte. Mantenha as verificações
 de prontidão do piloto descritas acima.
 
-## Conecte um agente
+## Conecte um agente por MCP
+
+Agentes que falam MCP (Claude Code, Claude Desktop, Cursor e outros) usam a caixa
+como ferramentas, sem escrever código: `mailbox_list_messages`,
+`mailbox_read_message`, `mailbox_save_draft` e `mailbox_send_draft`. Ao criar a
+chave em **Acesso de agentes**, o painel mostra o comando pronto. No MepMail Cloud:
+
+```bash title="Claude Code"
+claude mcp add --transport http mepmail-correio https://api-mepmail.je4ndev.com/mcp/correio --header "Authorization: Bearer mmb_..."
+```
+
+Em outros clientes, adicione um servidor Streamable HTTP em
+`https://api-mepmail.je4ndev.com/mcp/correio` com o cabeçalho
+`Authorization: Bearer` seguido da chave da caixa. As ferramentas respeitam as
+mesmas permissões, limites e registros de atividade da API abaixo. O conteúdo
+das mensagens volta marcado como dado não confiável: o agente não deve seguir
+instruções que cheguem por e-mail.
+
+## Conecte um agente pela API
 
 Use a **origem do painel** da sua instalação habilitada. Estes endpoints ficam
 em `/api/mailbox-agent` na aplicação Web, separados da origem da API de Envio.
@@ -121,9 +139,9 @@ da mensagem de origem. As duas listas vazias continuam obrigatórias sem anexos.
 ## Solicite o envio da revisão salva
 
 O envio exige permissão **enviar** concedida pelo dono à chave, licença vigente,
-domínio verificado, franquia disponível e transporte habilitado. Uma chave de
-leitura/rascunho não pode enviar. `POST /api/mailbox-agent/send` aceita somente
-o UUID do rascunho salvo e sua revisão exata:
+domínio verificado, franquia disponível e transporte habilitado.
+`POST /api/mailbox-agent/send` aceita somente o UUID do rascunho salvo e sua
+revisão exata:
 
 ```json title="Corpo do pedido de envio — substitua pelos valores do rascunho salvo"
 {
@@ -137,6 +155,17 @@ revisão pode retornar a outbox existente com `duplicate: true` e `200`; isso n�
 cria outra mensagem. Admissão e aceite do provedor não comprovam entrega. Um
 resultado `unknown` exige investigação pelo operador; não crie outro rascunho
 nem automatize um reenvio para contornar esse estado.
+
+### Aprovação do dono
+
+Uma chave de leitura/rascunho, sem a permissão **enviar**, não envia sozinha:
+o mesmo pedido registra que o agente quer enviar aquela revisão e responde
+`202` com `"status": "awaiting_approval"`. O dono da caixa recebe um e-mail (no
+máximo um a cada 10 minutos por caixa) e vê o rascunho marcado como
+**Aguardando sua aprovação** no Correio; ele confere e envia, edita ou apaga.
+Repetir o pedido da mesma revisão responde `200` com `duplicate: true`. Editar o
+rascunho cria outra revisão, que precisa de um novo pedido. É assim que se
+mantém uma pessoa no circuito: crie a chave do agente sem a permissão de envio.
 
 ## Trate erros de acesso e serviço
 
