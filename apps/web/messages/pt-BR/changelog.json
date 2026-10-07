@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.50",
+      "date": "2026-10-07",
+      "title": "Aviso de envios em fila",
+      "summary": "Quando o provedor de e-mail pausa a entrega, o painel avisa e o seu e-mail espera na fila.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Um aviso em todas as páginas do painel enquanto a entrega está pausada no provedor: o e-mail continua sendo aceito e sai sozinho quando a entrega voltar.",
+            "Os e-mails do próprio MepMail (conta, senha e avisos) continuam saindo por um relay de reserva enquanto a entrega estiver pausada."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.49",
       "date": "2026-10-07",
       "title": "Proteção de envio para contas novas",
@@ -122,27 +137,6 @@
           "kind": "changed",
           "items": [
             "Proteção antes do envio: remetentes e assuntos disfarçados são recusados, e contas novas que imitam bancos ou transportadoras passam por revisão."
-          ]
-        }
-      ]
-    },
-    {
-      "version": "0.44",
-      "date": "2026-09-29",
-      "title": "10% mais e-mail em todos os planos",
-      "summary": "Todo plano envia 10% mais e-mail pelo mesmo preço — e login/cadastro agora têm caminho de volta ao site.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "Login e cadastro agora linkam de volta ao site — ninguém fica preso no meio do fluxo.",
-            "Logos oficiais e coloridos de todos os serviços que o MepMail conecta, no site e no produto."
-          ]
-        },
-        {
-          "kind": "changed",
-          "items": [
-            "Quotas +10% em tudo: o Pro começa em 110.000 e-mails/mês e o Scale chega a 2,75M. Preços inalterados."
           ]
         }
       ]

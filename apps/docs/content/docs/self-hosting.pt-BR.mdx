@@ -100,6 +100,7 @@ auto-hospedada não tem limites de plano.
 | `APP_BASE_URL` | URL base pública da implantação — a origem que os navegadores usam para acessar o painel (ex.: `https://mail.example.com`). O login só é aceito a partir dessa origem; assinaturas SNS, links de descadastro e links de rastreamento derivam dela. Precisa corresponder exatamente ao esquema+host+porta em que você abre o painel — inclusive um `WEB_PORT` customizado — ou login e cadastro falham com erro de "invalid origin". Padrão `http://localhost:3000`. |
 | `PUBLIC_API_URL` | Origem pública da API quando um reverse proxy a serve no próprio hostname (ex.: `https://api.example.com`). É o que o painel mostra como base da API e ao que os tokens MCP ficam vinculados; sem definir, a API é assumida na porta 3001 do host do painel. |
 | `ADVERTISED_API_URL` | Segundo hostname público opcional para a mesma API (ex.: um domínio novo da marca). O painel mostra este como base da API; os tokens MCP continuam vinculados ao `PUBLIC_API_URL`, então agentes já conectados seguem funcionando. |
+| `SMTP_FALLBACK_URL` | Relay SMTP opcional (`smtps://usuario%40dominio:senha@host:465`) para o e-mail da própria instância (conta, senha, avisos e o remetente compartilhado de onboarding) enquanto o SES estiver com a conta pausada. Domínios de clientes nunca usam este relay; o e-mail deles espera na fila. |
 
 ### AWS SES
 

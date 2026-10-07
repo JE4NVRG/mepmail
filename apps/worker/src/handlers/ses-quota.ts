@@ -17,6 +17,8 @@ export interface SesQuotaGate {
   exhausted(region?: string): boolean;
   /** Re-read the account now; resolves to the new `exhausted`. A failed read keeps the last answer. */
   refresh(region?: string): Promise<boolean>;
+  /** True while SES itself has paused the account in the region (enforcement, not the quota). */
+  accountPaused?(region?: string): boolean;
 }
 
 /**
@@ -43,14 +45,16 @@ export function createSesQuotaGate(
   onError: (err: unknown) => void = (err) => console.warn("SES quota read failed", err),
 ): SesQuotaGate {
   let exhausted = false;
+  let paused = false;
   return {
     exhausted: () => exhausted,
+    accountPaused: () => paused,
     async refresh() {
       try {
         const quota = await read();
+        paused = quota.accountPaused === true;
         exhausted =
-          quota.accountPaused === true ||
-          (quota.max24h > 0 && quota.sentLast24h >= quota.max24h * SES_QUOTA_MARGIN);
+          paused || (quota.max24h > 0 && quota.sentLast24h >= quota.max24h * SES_QUOTA_MARGIN);
       } catch (err) {
         onError(err);
       }

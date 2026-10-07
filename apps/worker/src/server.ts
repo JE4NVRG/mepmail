@@ -88,6 +88,7 @@ import { runSafetyFlags } from "./handlers/safety-flags.js";
 import { finalizeBroadcast, sendBroadcast } from "./handlers/send-broadcast.js";
 import { failQueuedEmail, sendEmail } from "./handlers/send-email.js";
 import { createRegionSendControls } from "./handlers/ses-regions.js";
+import { createSmtpFallback } from "./handlers/smtp-fallback.js";
 import { syncTenants } from "./handlers/tenants.js";
 import { createMailboxIngress, parseMailboxInboundConfiguration } from "./mailbox-ingress.js";
 import {
@@ -154,6 +155,8 @@ const unsubscribe = unsubscribeHost
 // Platform mail (no domain row) goes out in the default region, the first served.
 const regions = servedRegions();
 const ses = createSesSender(regions[0] ?? env.AWS_REGION);
+// The platform's own mail leaves through it while SES has paused the account.
+const fallback = env.SMTP_FALLBACK_URL ? createSmtpFallback(env.SMTP_FALLBACK_URL) : undefined;
 // SESv2 identity clients (GetEmailIdentity) for domain re-verification, cached
 // per region since identities live in the domain's region. Distinct from the
 // send client above (SendEmail); credentials fall back to the provider chain.
@@ -613,6 +616,7 @@ await queue.work(
         throttle: (region) => sendControls.throttle(region),
         reschedule: (emailId, at, priority) => enqueueSend(emailId, at, priority),
         sesQuota: sendControls,
+        ...(fallback ? { fallback } : {}),
         enqueueWebhookDelivery: enqueueWebhook,
         tracking,
         monitor,

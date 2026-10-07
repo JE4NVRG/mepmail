@@ -96,6 +96,7 @@ deployments — see [Billing](/billing); a self-hosted instance has no plan limi
 | `APP_BASE_URL` | Public base URL of the deployment — the origin browsers use to reach the dashboard (e.g. `https://mail.example.com`). Sign-in is only accepted from this origin; SNS subscriptions, unsubscribe links, and tracking links derive from it. It must match the exact scheme+host+port you open the dashboard on — including a custom `WEB_PORT` — or login and signup fail with an "invalid origin" error. Default `http://localhost:3000`. |
 | `PUBLIC_API_URL` | Public origin of the API when a reverse proxy serves it on its own hostname (e.g. `https://api.example.com`). It is what the dashboard prints as the API base and what MCP tokens are bound to; unset, the API is assumed at port 3001 of the dashboard host. |
 | `ADVERTISED_API_URL` | Optional second public hostname for the same API (e.g. a new brand domain). The dashboard prints it as the API base; MCP tokens stay bound to `PUBLIC_API_URL`, so connected agents keep working. |
+| `SMTP_FALLBACK_URL` | Optional SMTP relay (`smtps://user%40domain:password@host:465`) for the instance's own mail (account, password and notice emails, and the shared onboarding sender) while SES has paused the account. Customer domains never use it; their mail waits in the queue. |
 
 ### AWS SES
 

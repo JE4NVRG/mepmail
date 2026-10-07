@@ -102,6 +102,9 @@
     "retry": "Try again",
     "back": "Back to {to}"
   },
+  "sendingPaused": {
+    "text": "Sending is queued: our email provider has temporarily paused delivery. Nothing is lost — your emails are accepted and go out on their own as soon as it resumes."
+  },
   "supportView": {
     "banner": "Support view of {team} · read-only",
     "endsIn": "ends in {left}",

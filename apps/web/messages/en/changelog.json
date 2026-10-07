@@ -23,6 +23,21 @@
   },
   "releases": [
     {
+      "version": "0.50",
+      "date": "2026-10-07",
+      "title": "Queued-sending notice",
+      "summary": "When the email provider pauses delivery, the dashboard says so and your mail waits in the queue.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A notice on every dashboard page while delivery is paused upstream: mail is still accepted and goes out on its own once delivery resumes.",
+            "Account, password and notice emails from MepMail itself keep flowing through a backup relay while delivery is paused."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.49",
       "date": "2026-10-07",
       "title": "Sending protection for new accounts",
@@ -117,27 +132,6 @@
           "kind": "changed",
           "items": [
             "Pre-send protection: disguised senders and subjects are refused, and new accounts imitating banks or carriers go through review."
-          ]
-        }
-      ]
-    },
-    {
-      "version": "0.44",
-      "date": "2026-09-29",
-      "title": "10% more email on every plan",
-      "summary": "Every plan sends 10% more email for the same price — plus a way back from sign-in and a website that leads with what you get.",
-      "changes": [
-        {
-          "kind": "added",
-          "items": [
-            "Sign-in and sign-up now link back to the site, so you're never stranded mid-flow.",
-            "Official, full-colour logos for every service MepMail connects to, across the site and the product."
-          ]
-        },
-        {
-          "kind": "changed",
-          "items": [
-            "Quotas up 10% everywhere: Pro now starts at 110,000 emails/month and Scale reaches 2.75M. Prices unchanged."
           ]
         }
       ]

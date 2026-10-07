@@ -217,6 +217,10 @@ export const env = createEnv({
     // standard production default. Bootstrap value only — the
     // instance_settings row overrides it.
     SES_MAX_SEND_RATE: z.coerce.number().positive().default(SES_MAX_SEND_RATE_DEFAULT),
+    // SMTP relay (smtps://mailbox%40domain:password@host:465) for the
+    // platform's own mail while SES has paused the account: the system team's
+    // domains and the shared onboarding sender. Unset = that mail parks too.
+    SMTP_FALLBACK_URL: z.url().optional(),
     // Share of every served region's rolling 24-hour SES quota that
     // broadcasts never touch, as a percent. Transactional mail may use all
     // of it and borrow beyond it; broadcasts get the rest and are paced over

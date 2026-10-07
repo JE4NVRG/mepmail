@@ -7,6 +7,18 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.50] - 2026-10-07
+
+Keeping the platform's own mail flowing while SES is paused.
+
+### Added
+
+- `SMTP_FALLBACK_URL`: while SES has paused the account, the worker sends
+  the platform's own mail (system-team domains and the shared onboarding
+  sender) through this SMTP relay; customer domains keep parking.
+- `system.sendingPaused` and a dashboard strip on every page while SES has
+  paused sending in a served region.
+
 ## [0.49] - 2026-10-07
 
 Sending protection after the 2026-10-07 SES pause (three week-old accounts

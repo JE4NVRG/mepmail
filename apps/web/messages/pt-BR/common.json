@@ -102,6 +102,9 @@
     "retry": "Tentar novamente",
     "back": "Voltar para {to}"
   },
+  "sendingPaused": {
+    "text": "Envios em fila: nosso provedor de e-mail pausou a entrega temporariamente. Nada se perde — seus e-mails são aceitos e saem sozinhos assim que a entrega voltar."
+  },
   "supportView": {
     "banner": "Modo de suporte de {team} · somente leitura",
     "endsIn": "termina em {left}",

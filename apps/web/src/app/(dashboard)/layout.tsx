@@ -6,6 +6,7 @@ import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { DeliverabilityBanner } from "@/components/deliverability-banner";
 import { EventsHealthBanner } from "@/components/events-health-banner";
 import { RegionBreakerBanner } from "@/components/region-breaker-banner";
+import { SendingPausedBanner } from "@/components/sending-paused-banner";
 import { SupportViewBanner } from "@/components/support-view-banner";
 import { TeamStandingBanner } from "@/components/team-standing-banner";
 import { ToastHost } from "@/components/toast";
@@ -53,6 +54,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       {/* Canvas main-block padding: 32px 40px (DESIGN.md Layout); 16px below 900px. */}
       <main className="ms-main" style={{ flex: 1, minWidth: 0, padding: "32px 40px" }}>
         <div style={{ maxWidth: 1120, margin: "0 auto" }}>
+          <SendingPausedBanner />
           <TeamStandingBanner />
           <RegionBreakerBanner />
           <EventsHealthBanner />

@@ -177,6 +177,32 @@ describe("system.sesAccount", () => {
     });
   });
 
+  it("sendingPaused reads SES's own pause per served region once a minute, on the cloud only", async () => {
+    vi.stubEnv("AWS_REGIONS", "sa-east-1,us-east-1");
+    vi.stubEnv("IS_CLOUD", "true");
+    const asked: string[] = [];
+    const caller = sesCaller((region) => ({
+      async send() {
+        asked.push(region);
+        return {
+          SendingEnabled: true,
+          EnforcementStatus: region === "us-east-1" ? "SHUTDOWN" : "HEALTHY",
+        };
+      },
+    }));
+    expect(await caller.system.sendingPaused()).toBe(true);
+    expect(await caller.system.sendingPaused()).toBe(true);
+    expect(asked).toEqual(["sa-east-1", "us-east-1"]);
+    const healthy = sesCaller(() => ({
+      async send() {
+        return { SendingEnabled: true, EnforcementStatus: "HEALTHY" };
+      },
+    }));
+    expect(await healthy.system.sendingPaused()).toBe(false);
+    vi.stubEnv("IS_CLOUD", "false");
+    expect(await caller.system.sendingPaused()).toBe(false);
+  });
+
   it("features lists the served regions with production access from one cached probe each", async () => {
     vi.stubEnv("AWS_REGIONS", "sa-east-1,us-east-1");
     const asked: string[] = [];

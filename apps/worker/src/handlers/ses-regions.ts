@@ -219,6 +219,7 @@ export function createRegionSendControls(opts: {
   return {
     regions: opts.regions,
     exhausted: (region) => pick(region).gate.exhausted(),
+    accountPaused: (region) => pick(region).gate.accountPaused?.() ?? false,
     refresh: (region) => pick(region).probe(),
     async throttle(region, recipients = 1) {
       if (!Number.isSafeInteger(recipients) || recipients < 1 || recipients > 20)

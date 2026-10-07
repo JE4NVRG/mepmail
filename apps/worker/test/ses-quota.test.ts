@@ -43,8 +43,10 @@ describe("SES quota gate", () => {
     let quota = { max24h: 50_000, sentLast24h: 10, accountPaused: true };
     const gate = createSesQuotaGate(async () => quota);
     expect(await gate.refresh()).toBe(true);
+    expect(gate.accountPaused?.()).toBe(true);
     quota = { max24h: 50_000, sentLast24h: 10, accountPaused: false };
     expect(await gate.refresh()).toBe(false);
+    expect(gate.accountPaused?.()).toBe(false);
   });
 
   it("tells the daily-quota refusal from a rate refusal by SES's own wording", () => {

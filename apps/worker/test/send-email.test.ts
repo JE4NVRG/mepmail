@@ -1030,6 +1030,63 @@ it("an unresolved tracking subdomain falls back to the shared host where one is 
   expect(mime).not.toContain("track.pendingsub.dev");
 });
 
+it("while SES has paused the account, the platform's own mail leaves through the fallback and a customer's parks", async () => {
+  const systemTeam = await createTeam(db, "platform-team");
+  await db.update(schema.teams).set({ plan: "system" }).where(eq(schema.teams.id, systemTeam));
+  const [systemDomain] = await db
+    .insert(schema.domains)
+    .values({
+      teamId: systemTeam,
+      name: "platform.dev",
+      region: "us-east-1",
+      status: "verified",
+      verifiedAt: new Date(),
+    })
+    .returning({ id: schema.domains.id });
+  const { ses, sends } = fakeSes("must-not-be-used");
+  const relayed: string[] = [];
+  const fallback: SesSender = {
+    async sendRaw(params) {
+      relayed.push(params.emailId);
+      return { messageId: `smtp-fallback:${params.emailId}` };
+    },
+  };
+  const sesQuota = { exhausted: () => true, accountPaused: () => true, refresh: async () => true };
+  const onboardingEmailFrom = "MepMail <welcome@platform.dev>";
+  const deps: SendDeps = { keyring, ses, sesQuota, fallback, onboardingEmailFrom };
+
+  const account = await insertEmail({
+    teamId: systemTeam,
+    domainId: systemDomain?.id ?? null,
+    from: "MepMail <account@platform.dev>",
+  });
+  const onboarding = await insertEmail({ domainId: null, from: onboardingEmailFrom });
+  const customer = await insertEmail();
+  expect(await sendEmail(db, deps, { emailId: account })).toBe("sent");
+  expect(await sendEmail(db, deps, { emailId: onboarding })).toBe("sent");
+  expect(await sendEmail(db, deps, { emailId: customer })).toBe("parked");
+  expect(relayed).toEqual([account, onboarding]);
+  expect(sends).toHaveLength(0);
+  const [row] = await db.select().from(schema.emails).where(eq(schema.emails.id, account));
+  expect(row?.sesMessageId).toBe(`smtp-fallback:${account}`);
+  const [parked] = await db.select().from(schema.emails).where(eq(schema.emails.id, customer));
+  expect(parked?.latestStatus).toBe("queued_quota");
+
+  // Once SES sends again, the platform's mail is back on SES.
+  const healthy = { exhausted: () => false, accountPaused: () => false, refresh: async () => false };
+  const later = await insertEmail({
+    teamId: systemTeam,
+    domainId: systemDomain?.id ?? null,
+    from: "MepMail <account@platform.dev>",
+  });
+  const { ses: back, sends: viaSes } = fakeSes("ses-again");
+  expect(
+    await sendEmail(db, { ...deps, ses: back, sesQuota: healthy }, { emailId: later }),
+  ).toBe("sent");
+  expect(viaSes).toHaveLength(1);
+  expect(relayed).toHaveLength(2);
+});
+
 it("parks instead of failing while SES has paused the account", async () => {
   const ses: SesSender = {
     async sendRaw() {

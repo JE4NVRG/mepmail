@@ -86,6 +86,13 @@ export interface SendDeps {
     | undefined;
   /** SES's 24-hour quota and the broadcast share; absent in tests that never reach it. */
   sesQuota?: SendQuotaControls | undefined;
+  /**
+   * SMTP relay for the platform's own mail (the system team's domains and the
+   * shared onboarding sender) while SES has paused the account: sign-up,
+   * password and notice mail, and a new team's first test, keep flowing.
+   * Customer domains never use it (their DKIM lives with SES); they park.
+   */
+  fallback?: SesSender | undefined;
   /** Arms the webhook drain for the endpoints written; email.sent webhooks are skipped when absent. */
   enqueueWebhookDelivery?: WebhookEnqueue | undefined;
   /**
@@ -460,6 +467,7 @@ export async function sendEmail(
             sesTenantAssociatedAt: schema.domains.sesTenantAssociatedAt,
             sesTenantConfigSet: schema.domains.sesTenantConfigSet,
             sesTenantName: schema.teams.sesTenantName,
+            ownerPlan: schema.teams.plan,
           })
           .from(schema.domains)
           .innerJoin(schema.teams, eq(schema.teams.id, schema.domains.teamId))
@@ -474,6 +482,11 @@ export async function sendEmail(
   // the region's broadcasts are held), so transactional mail keeps the rest.
   const bulk = email.broadcastId !== null;
   const region = domain?.region;
+  // The platform's own mail: a domain of the instance's system team, or the
+  // shared onboarding sender (no domain row).
+  const platformMail = !bulk && (email.domainId === null || domain?.ownerPlan === "system");
+  const viaFallback =
+    deps.fallback !== undefined && platformMail && deps.sesQuota?.accountPaused?.(region) === true;
   if (bulk) {
     // Before any park: a row of a stopped broadcast must end canceled, never
     // parked where no sweep looks again.
@@ -488,7 +501,7 @@ export async function sendEmail(
       );
       return "parked";
     }
-  } else if (deps.sesQuota?.exhausted(region)) {
+  } else if (!viaFallback && deps.sesQuota?.exhausted(region)) {
     await parkQueued(db, email, "SES 24h quota reached or account paused");
     deps.sesQuota.noteTransactionalParked?.(region);
     return "parked";
@@ -748,7 +761,7 @@ export async function sendEmail(
 
   let messageId: string;
   try {
-    ({ messageId } = await deps.ses.sendRaw({
+    ({ messageId } = await (viaFallback && deps.fallback ? deps.fallback : deps.ses).sendRaw({
       raw: mime,
       emailId: email.id,
       to: email.to,
