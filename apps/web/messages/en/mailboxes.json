@@ -76,6 +76,8 @@
   "forwardDraft": "Forward message",
   "forwardedBody": "\n\n---------- Forwarded message ----------\nFrom: {sender}\nDate: {date}\nTo: {recipients}\nSubject: {subject}\n\n{text}",
   "draftSaveFirst": "Save the draft. Then review the message and choose Send.",
+  "composeSendHint": "Send sends it now. Save draft keeps it for later.",
+  "sendingNow": "Sending…",
   "send": "Send",
   "sending": "Requesting send…",
   "sendQueued": "Message queued for sending.",

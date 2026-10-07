@@ -6,11 +6,13 @@ import {
   ALL_TEAMS_GRANT,
   type ApiKeyAuth,
   effectivePlan,
+  INTERNAL_ACTOR_HEADER,
   MCP_RESOURCE_PATH,
   MCP_SCOPES,
   type McpScope,
   mcpResourceUrl,
   QUOTA_COLUMNS,
+  signInternalActor,
 } from "@millionsend/core";
 import { MCP_SERVER_CARD_CONTENT_TYPE, mcpServerCardBody } from "@millionsend/core/mcp-server-card";
 import type { Db } from "@millionsend/db";
@@ -694,6 +696,61 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
     );
   }
 
+  // Correio: the dashboard owns mailboxes, so these call its internal admin
+  // endpoint on loopback as this OAuth user (signed internal actor); every
+  // dashboard check runs there, and seats are never bought from here.
+  const correio = async (input: Record<string, unknown>): Promise<CallToolResult> => {
+    if (!deps.internalActorKey)
+      return toolResult(
+        errorBody(503, "unavailable", "Correio tools are not configured here"),
+        false,
+      );
+    const team = callTeam?.getStore() ?? auth;
+    let res: Response;
+    try {
+      res = await fetch(
+        `${deps.mailboxAgentOrigin ?? "http://127.0.0.1:3000"}/api/internal/mailbox-admin`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            [INTERNAL_ACTOR_HEADER]: signInternalActor(deps.internalActorKey, {
+              teamId: team.teamId,
+              userId,
+            }),
+          },
+          body: JSON.stringify(input),
+          redirect: "manual",
+          signal: AbortSignal.timeout(30_000),
+        },
+      );
+    } catch {
+      return toolResult(
+        {
+          error: "unavailable",
+          outcome_unknown: input.action !== "list",
+          hint: "Correio did not answer. Call list_mailboxes before trying a create again.",
+        },
+        false,
+      );
+    }
+    const json: unknown = await res
+      .json()
+      .catch(() => errorBody(res.status, "error", res.statusText));
+    return toolResult(json, res.ok);
+  };
+  tool(
+    "list_mailboxes",
+    "mailboxes:read",
+    {
+      description:
+        "List the team's Correio mailboxes (email inboxes for people and agents): id, address, label, kind (person or agent), status and whether you own it and may draft or send from it.",
+      inputSchema: z.object({}),
+      readOnly: true,
+    },
+    () => correio({ action: "list" }),
+  );
+
   tool(
     "send_email",
     "emails:send",
@@ -1184,6 +1241,67 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
       ({ id }) => api("DELETE", `/domains/${enc(id)}`),
     );
   }
+
+  tool(
+    "create_mailbox",
+    "mailboxes:write",
+    {
+      description:
+        "Create a Correio mailbox on one of the team's verified domains (domain_id from list_domains), e.g. local_part \"support\" for support@domain. It uses a seat the team's Correio license already has; with no free seat it is refused (seats are bought in the dashboard, never here). receiving says whether the domain's MX already points at Correio (confirmed) or still needs DNS (needs_dns).",
+      inputSchema: z.object({
+        domain_id: z.uuid().describe("Verified domain id from list_domains"),
+        local_part: z
+          .string()
+          .min(1)
+          .max(64)
+          .describe("The part before @: lowercase letters, digits, dot, dash, underscore"),
+        label: z.string().min(1).max(80).describe("Display name for the mailbox"),
+        kind: z.enum(["agent", "person"]).default("agent").describe("agent (default) or person"),
+        owner_user_id: z
+          .string()
+          .min(1)
+          .max(128)
+          .optional()
+          .describe("Team member who owns it; defaults to you"),
+      }),
+    },
+    (a) =>
+      correio({
+        action: "create",
+        domainId: a.domain_id,
+        localPart: a.local_part,
+        label: a.label,
+        kind: a.kind,
+        ...(a.owner_user_id ? { ownerUserId: a.owner_user_id } : {}),
+      }),
+  );
+  tool(
+    "create_mailbox_agent_key",
+    "mailboxes:write",
+    {
+      description:
+        "Create an agent key for a mailbox you own (mailbox_id from list_mailboxes), with the read and draft permissions (or one of them). The token is returned only in this response, with the Correio MCP URL and a ready Claude Code command: treat it as a secret. A key made here can never send on its own: the agent's sends wait for the owner's approval, and only a person can grant the send permission, in the dashboard.",
+      inputSchema: z.object({
+        mailbox_id: z.uuid().describe("Mailbox id from list_mailboxes"),
+        label: z.string().min(1).max(80).describe("Which agent or device holds this key"),
+        scopes: z
+          .array(z.enum(["read", "draft"]))
+          .min(1)
+          .max(2)
+          .default(["read", "draft"])
+          .describe("read and/or draft; send is granted only in the dashboard"),
+        expires_at: z.iso.datetime().optional().describe("Optional expiry (ISO 8601)"),
+      }),
+    },
+    (a) =>
+      correio({
+        action: "create_agent_key",
+        mailboxId: a.mailbox_id,
+        label: a.label,
+        scopes: a.scopes,
+        ...(a.expires_at ? { expiresAt: a.expires_at } : {}),
+      }),
+  );
 
   return server;
 }

@@ -294,6 +294,7 @@ describe("tool listing", () => {
       "list_api_keys",
       "list_domains",
       "get_domain",
+      "list_mailboxes",
       "send_email",
       "send_email_batch",
       "update_email",
@@ -337,6 +338,8 @@ describe("tool listing", () => {
       "update_domain",
       "verify_domain",
       "delete_domain",
+      "create_mailbox",
+      "create_mailbox_agent_key",
     ]);
     await full.close();
 

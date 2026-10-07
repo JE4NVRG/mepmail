@@ -284,6 +284,9 @@ and admins.
 | `update_domain` | `domains:write` | **admin** Change a domain's tracking settings; `tracking_subdomain` is what yields the Tracking CNAME (required on Cloud). |
 | `verify_domain` | `domains:write` | **admin** Re-check a domain's DNS and SES verification. |
 | `delete_domain` | `domains:write` | **admin** Remove a domain and its SES identity. |
+| `list_mailboxes` | `mailboxes:read` | List the team's Correio mailboxes and what you may do with each. |
+| `create_mailbox` | `mailboxes:write` | **admin** Create a Correio mailbox on a verified domain, using a seat the license already has (never a purchase). |
+| `create_mailbox_agent_key` | `mailboxes:write` | **admin** Create a read/draft agent key for a mailbox you own, with the Correio MCP URL; send is granted only in the dashboard. |
 
 ## Tool results
 

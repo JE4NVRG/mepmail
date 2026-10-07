@@ -160,6 +160,7 @@ function DraftDialog({
   lost,
   selectBox,
   current,
+  send,
 }: {
   boxes: Box[];
   mailboxId: string;
@@ -168,6 +169,8 @@ function DraftDialog({
   deliveryReady: boolean;
   close: () => void;
   saved: (item: Outputs["saveDraft"]) => Promise<void>;
+  /** Submits the revision just saved: the composer's Send is save, then send. */
+  send?: ((item: Outputs["saveDraft"]) => Promise<void>) | undefined;
   lost: () => void;
   selectBox: (id: string) => void;
   current: () => boolean;
@@ -181,6 +184,7 @@ function DraftDialog({
   const messageInput = useRef<HTMLTextAreaElement>(null);
   const boxId = mailboxId;
   const sender = boxes.find((box) => box.id === boxId);
+  const canSend = !!send && deliveryReady && sender?.canSend === true;
   const previousSignature = useRef(sender?.signatureText ?? "");
   const [to, setTo] = useState(
     source
@@ -341,6 +345,8 @@ function DraftDialog({
         onSubmit={async (e) => {
           e.preventDefault();
           if (submitting.current || loadingFiles || !allowed || !current()) return;
+          const sendNow =
+            canSend && (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "send";
           submitting.current = true;
           setSaving(true);
           setError("");
@@ -362,6 +368,7 @@ function DraftDialog({
             });
             if (!active.current || !current()) return;
             await saved(result);
+            if (sendNow && active.current && current()) await send?.(result);
             if (active.current && current()) close();
           } catch (cause) {
             if (!active.current || !current()) return;
@@ -520,14 +527,26 @@ function DraftDialog({
           ) : null}
         </div>
         <footer className={`${styles.dialogFooter} ${styles.composerFooter}`}>
-          <p className={styles.hint}>{t(deliveryReady ? "draftSaveFirst" : "draftOnly")}</p>
+          <p className={styles.hint}>
+            {t(canSend ? "composeSendHint" : deliveryReady ? "draftSaveFirst" : "draftOnly")}
+          </p>
           <div className={styles.composerActions}>
             <button type="button" className="ms-btn" disabled={busy} onClick={dismiss}>
               {t("cancel")}
             </button>
-            <button type="submit" className="ms-btn ms-btn-primary" disabled={busy}>
-              {t(busy ? "saving" : "saveDraft")}
+            <button
+              type="submit"
+              value="draft"
+              className={canSend ? "ms-btn" : "ms-btn ms-btn-primary"}
+              disabled={busy}
+            >
+              {t(busy && !canSend ? "saving" : "saveDraft")}
             </button>
+            {canSend ? (
+              <button type="submit" value="send" className="ms-btn ms-btn-primary" disabled={busy}>
+                {t(busy ? "sendingNow" : "send")}
+              </button>
+            ) : null}
           </div>
         </footer>
       </form>
@@ -921,12 +940,23 @@ export function MailboxContentView({
     }
   }
   async function submitDraft() {
-    if (!item || !sendKey || !canSubmitDraft || sending.current || attempted.current.has(sendKey))
-      return;
+    if (!item || !sendKey || !canSubmitDraft) return;
     // Capture the displayed revision once. Never retry an uncertain submission,
     // and never substitute a newly selected message while this request is pending.
-    const revision = { mailboxId: item.mailboxId, id: item.id, expectedRevision: item.revision };
-    const key = sendKey;
+    await submitRevision({
+      mailboxId: item.mailboxId,
+      id: item.id,
+      expectedRevision: item.revision,
+    });
+  }
+  /** One send of one exact saved revision: from the open draft or the composer's Send. */
+  async function submitRevision(revision: {
+    mailboxId: string;
+    id: string;
+    expectedRevision: number;
+  }) {
+    const key = `${revision.mailboxId}:${revision.id}:${revision.expectedRevision}`;
+    if (sending.current || attempted.current.has(key)) return;
     sending.current = key;
     attempted.current.add(key);
     setSendStates((states) => ({ ...states, [key]: "requesting" }));
@@ -1586,6 +1616,13 @@ export function MailboxContentView({
             setSearch("");
             draftSaved(saved);
           }}
+          send={(saved) =>
+            submitRevision({
+              mailboxId: saved.mailboxId,
+              id: saved.id,
+              expectedRevision: saved.revision,
+            })
+          }
         />
       ) : null}
     </>

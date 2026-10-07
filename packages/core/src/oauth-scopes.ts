@@ -21,6 +21,10 @@ export const MCP_SCOPES = [
   // One scope for API keys as well: listing never returns a token, but the
   // surface exists to mint credentials, so it is granted as a whole.
   "api-keys:write",
+  // Correio mailboxes: list them, and create mailboxes and agent keys within
+  // the seats the team already pays for (never a purchase).
+  "mailboxes:read",
+  "mailboxes:write",
 ] as const;
 
 export type McpScope = (typeof MCP_SCOPES)[number];
@@ -34,6 +38,7 @@ export const ADMIN_MCP_SCOPES = [
   "domains:write",
   "webhooks:write",
   "api-keys:write",
+  "mailboxes:write",
 ] as const satisfies McpScope[];
 
 /**

@@ -183,6 +183,14 @@ export const MCP_TOOLS: {
       "Get one sending domain with its DNS records (DKIM, MAIL FROM, DMARC, and the Tracking CNAME once a tracking subdomain is set) and per-record status. Only the DKIM and MAIL FROM (SPF) rows gate sending. The DMARC row is recommended, and reads verified when a parent-domain policy covers the subdomain (see inherited_from and policy). Each record's live field says what public DNS answers now; detail explains a pending or failed row.",
   },
   {
+    name: "list_mailboxes",
+    scope: "mailboxes:read",
+    readOnly: true,
+    description:
+      "List the team's Correio mailboxes (email inboxes for people and agents): id, address, label, kind (person or agent), status and whether you own it and may draft or send from it.",
+  },
+
+  {
     name: "send_email",
     scope: "emails:send",
     description:
@@ -425,5 +433,17 @@ export const MCP_TOOLS: {
     scope: "domains:write",
     description:
       "Remove a sending domain and its SES identity. Sends from it stop immediately; this cannot be undone.",
+  },
+  {
+    name: "create_mailbox",
+    scope: "mailboxes:write",
+    description:
+      "Create a Correio mailbox on one of the team's verified domains (domain_id from list_domains), e.g. local_part \"support\" for support@domain. It uses a seat the team's Correio license already has; with no free seat it is refused (seats are bought in the dashboard, never here). receiving says whether the domain's MX already points at Correio (confirmed) or still needs DNS (needs_dns).",
+  },
+  {
+    name: "create_mailbox_agent_key",
+    scope: "mailboxes:write",
+    description:
+      "Create an agent key for a mailbox you own (mailbox_id from list_mailboxes), with the read and draft permissions (or one of them). The token is returned only in this response, with the Correio MCP URL and a ready Claude Code command: treat it as a secret. A key made here can never send on its own: the agent's sends wait for the owner's approval, and only a person can grant the send permission, in the dashboard.",
   },
 ];

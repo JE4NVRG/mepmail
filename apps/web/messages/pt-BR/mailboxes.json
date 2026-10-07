@@ -76,6 +76,8 @@
   "forwardDraft": "Encaminhar mensagem",
   "forwardedBody": "\n\n---------- Mensagem encaminhada ----------\nDe: {sender}\nData: {date}\nPara: {recipients}\nAssunto: {subject}\n\n{text}",
   "draftSaveFirst": "Salve o rascunho. Depois confira a mensagem e escolha Enviar.",
+  "composeSendHint": "Enviar manda agora. Salvar rascunho guarda para depois.",
+  "sendingNow": "Enviando…",
   "send": "Enviar",
   "sending": "Solicitando envio…",
   "sendQueued": "Mensagem na fila de envio.",

@@ -126,7 +126,8 @@ PKCE. Scopes mirror the API surfaces:
 \`emails:send\`, \`emails:read\`, \`audience:read\`, \`audience:write\`,
 \`broadcasts:read\`, \`broadcasts:write\`, \`domains:read\`, \`domains:write\`,
 \`templates:read\`, \`templates:write\`, \`webhooks:write\`,
-\`api-keys:write\`, plus \`offline_access\` for refresh tokens. Access tokens
+\`api-keys:write\`, \`mailboxes:read\`, \`mailboxes:write\`, plus \`offline_access\`
+for refresh tokens. Access tokens
 are audience-bound to the MCP resource and are not accepted on the REST API.
 
 ## Related discovery documents

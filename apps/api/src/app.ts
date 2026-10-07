@@ -256,6 +256,11 @@ export interface ApiDeps {
    */
   mailboxAgentOrigin?: string | undefined;
   /**
+   * Signs the internal actor the MCP's Correio tools present to the dashboard
+   * (core/internal-actor). Absent: those tools answer unavailable.
+   */
+  internalActorKey?: Buffer | undefined;
+  /**
    * Whether a domain may adopt a branded tracking subdomain (a customer CNAME
    * pointing at this app). Omitted means yes; false drops the CNAME from the
    * DNS checklist and refuses to store one, for a deployment that holds no

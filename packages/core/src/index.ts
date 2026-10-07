@@ -366,6 +366,13 @@ export {
 } from "./instance-probes.js";
 export { getInstanceSettings, type InstanceSettings } from "./instance-settings.js";
 export {
+  deriveInternalActorKey,
+  INTERNAL_ACTOR_HEADER,
+  type InternalActor,
+  signInternalActor,
+  verifyInternalActor,
+} from "./internal-actor.js";
+export {
   ANCHOR_HREF,
   anchorHrefParts,
   type RewriteOptions,
