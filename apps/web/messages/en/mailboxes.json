@@ -326,7 +326,7 @@
     "domainStep": "Domain",
     "licenseStep": "License",
     "domainBody": "The domain defines the address after @. Sending verification and receiving setup are separate steps.",
-    "existingProviderBody": "Already receiving email with another provider? Changing MX records redirects receiving for this entire domain or subdomain. Plan the switch before changing DNS; registration does not migrate old messages.",
+    "existingProviderBody": "Already receiving email with another provider (Google, Microsoft…)? Use a subdomain just for Correio, such as agents.yourdomain.com. Changing the MX records of your main domain redirects all of its incoming email to MepMail, and registration does not migrate old messages.",
     "mxDestination": "Required MX destination:",
     "receiving": {
       "unknown": "Receiving setup has not been confirmed. Check DNS (MX) and service activation before using this domain.",

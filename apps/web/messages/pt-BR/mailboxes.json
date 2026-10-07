@@ -326,7 +326,7 @@
     "domainStep": "Domínio",
     "licenseStep": "Licença",
     "domainBody": "O domínio define o endereço depois do @. Verificação de envio e configuração de recebimento são etapas separadas.",
-    "existingProviderBody": "Já recebe e-mails em outro provedor? Trocar os registros MX redireciona o recebimento de todo este domínio ou subdomínio. Planeje a mudança antes de alterar o DNS; o cadastro não migra mensagens antigas.",
+    "existingProviderBody": "Já recebe e-mails em outro provedor (Google, Microsoft…)? Use um subdomínio só para o Correio, como agentes.seudominio.com. Trocar os registros MX do domínio principal redireciona todo o e-mail que ele recebe para o MepMail, e o cadastro não migra mensagens antigas.",
     "mxDestination": "Destino MX necessário:",
     "receiving": {
       "unknown": "A configuração de recebimento não foi confirmada. Confira o DNS (MX) e a ativação do serviço antes de usar este domínio.",

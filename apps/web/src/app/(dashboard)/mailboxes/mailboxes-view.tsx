@@ -370,9 +370,12 @@ export function MailboxesView() {
   const trpc = useTRPC();
   const queries = useQueryClient();
   const capability = useQuery(trpc.mailboxes.capabilities.queryOptions());
+  // Start with the capability check instead of after it: one round trip less on
+  // open. A team without access gets NOT_FOUND once and the queries stop.
+  const mayUseMail = capability.data?.enabled !== false;
   const service = useQuery(
     trpc.mailboxes.service.queryOptions(undefined, {
-      enabled: capability.data?.enabled === true,
+      enabled: mayUseMail,
       retry: false,
     }),
   );
@@ -380,8 +383,10 @@ export function MailboxesView() {
     !service.isPending && !service.isError && service.data?.licenseKind === "system";
   const registry = useQuery(
     trpc.mailboxes.list.queryOptions(undefined, {
-      enabled: capability.data?.enabled === true,
+      enabled: mayUseMail,
       refetchInterval: 15000,
+      retry: (count, error) =>
+        (error as { data?: { code?: string } }).data?.code !== "NOT_FOUND" && count < 3,
     }),
   );
   const options = useQuery(
@@ -445,8 +450,17 @@ export function MailboxesView() {
     setMailboxKind("all");
     selectMailbox(id);
   }
-  if (capability.isPending || (capability.data?.enabled && registry.isPending))
-    return <p aria-live="polite">{t("loading")}</p>;
+  if (capability.isPending) return <p aria-live="polite">{t("loading")}</p>;
+  if (!capability.isError && !capability.data?.enabled)
+    return capability.data?.offered ? (
+      <MailboxOffer />
+    ) : (
+      <section>
+        <h1>{t("title")}</h1>
+        <p>{t("disabled")}</p>
+      </section>
+    );
+  if (!capability.isError && registry.isPending) return <p aria-live="polite">{t("loading")}</p>;
   if (capability.isError || registry.isError)
     return (
       <div role="alert">
@@ -462,15 +476,6 @@ export function MailboxesView() {
           {t("retry")}
         </button>
       </div>
-    );
-  if (!capability.data?.enabled)
-    return capability.data?.offered ? (
-      <MailboxOffer />
-    ) : (
-      <section>
-        <h1>{t("title")}</h1>
-        <p>{t("disabled")}</p>
-      </section>
     );
   const navigation = (
     <div className={styles.workspaceNavigation}>
