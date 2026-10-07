@@ -6,7 +6,14 @@ export const META_PIXEL_ID =
     ? configuredPixelId
     : "1418150576403119";
 export const META_ORIGIN = "https://mepmail.dev";
-const PUBLIC_PATHS = new Set(["/", "/pricing"]);
+/** Public offer documents that may load the Pixel after consent (CSP mirrors this in next.config.ts). */
+export const META_PUBLIC_PATHS: ReadonlySet<string> = new Set(["/", "/pricing", "/correio"]);
+const PUBLIC_PATHS = META_PUBLIC_PATHS;
+/** Product pages: ViewContent on arrival instead of when the plans section shows. */
+const VIEW_CONTENT = new Map([
+  ["/pricing", { content_ids: ["send-pro"], content_name: "MepMail Send Pro" }],
+  ["/correio", { content_ids: ["mail-correio"], content_name: "MepMail Correio" }],
+]);
 const UTM_KEYS = new Set(["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"]);
 const AD_ID_KEYS = new Set(["campaign_id", "adset_id", "ad_id"]);
 const META_REFERRER_ORIGINS = new Set([
@@ -128,11 +135,9 @@ export function createMetaPublicController(port: MetaPublicPort) {
     const key = currentKey();
     if (!command || !eligible() || !key || viewKey === key) return;
     viewKey = key;
-    command("trackSingle", META_PIXEL_ID, "ViewContent", {
-      content_ids: ["send-pro"],
-      content_name: "MepMail Send Pro",
-      content_type: "product",
-    });
+    const product =
+      VIEW_CONTENT.get(safeMetaUrl(port.href())?.pathname ?? "") ?? VIEW_CONTENT.get("/pricing")!;
+    command("trackSingle", META_PIXEL_ID, "ViewContent", { ...product, content_type: "product" });
   };
   const reconcile = () => {
     if (!eligible()) {
@@ -163,7 +168,7 @@ export function createMetaPublicController(port: MetaPublicPort) {
       stopPlans?.();
       stopPlans = undefined;
     }
-    if (safeMetaUrl(port.href())?.pathname === "/pricing") viewContent();
+    if (VIEW_CONTENT.has(safeMetaUrl(port.href())?.pathname ?? "")) viewContent();
     else if (!stopPlans && viewKey !== key) stopPlans = port.watchPlans(viewContent);
   };
   return {

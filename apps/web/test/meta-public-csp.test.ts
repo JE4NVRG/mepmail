@@ -27,13 +27,21 @@ describe("public Meta Content Security Policy", () => {
 
   it("overrides only public offer documents, retaining the other protections", async () => {
     const rules = await headers("true");
-    expect(rules.map((rule) => rule.source)).toEqual(["/:path*", "/support", "/", "/pricing"]);
+    expect(rules.map((rule) => rule.source)).toEqual([
+      "/:path*",
+      "/support",
+      "/",
+      "/pricing",
+      "/correio",
+    ]);
     const original = rules[0]?.headers ?? [];
     expect(original.find((item) => item.key === "Content-Security-Policy")?.value).not.toContain(
       "facebook",
     );
     expect(original.find((item) => item.key === "X-Frame-Options")?.value).toBe("DENY");
-    for (const rule of rules.filter((rule) => ["/", "/pricing"].includes(rule.source))) {
+    for (const rule of rules.filter((rule) =>
+      ["/", "/pricing", "/correio"].includes(rule.source),
+    )) {
       const csp = rule.headers.find((item) => item.key === "Content-Security-Policy")?.value ?? "";
       expect(csp).toContain("https://connect.facebook.net");
       expect(csp).toContain("https://www.facebook.com");

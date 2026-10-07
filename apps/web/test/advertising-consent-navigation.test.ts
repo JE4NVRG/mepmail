@@ -184,25 +184,28 @@ afterEach(() => {
 });
 
 describe("persisted consent after a private document reload and internal return", () => {
-  it.each(["/", "/pricing"])("rereads accepted server consent on return to %s", async (path) => {
-    paint();
-    expect(request).not.toHaveBeenCalled();
-    expect(fixture.sdk).not.toHaveBeenCalled();
-    navigate(
-      `${path}?campaign_id=120250209898050789&adset_id=120250209898060789&ad_id=120250210010930789`,
-    );
-    await vi.waitFor(() => expect(fixture.store.getSnapshot().state).toBe("accepted"));
-    expect(paint()).toContain('data-state="accepted"');
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(request).toHaveBeenCalledWith("/api/advertising-consent", {
-      credentials: "same-origin",
-      cache: "no-store",
-    });
-    await vi.waitFor(() => expect(fixture.sdk).toHaveBeenCalledTimes(1));
-    expect(events().map((call) => call[2])).toEqual(
-      path === "/" ? ["PageView"] : ["PageView", "ViewContent"],
-    );
-  });
+  it.each(["/", "/pricing", "/correio"])(
+    "rereads accepted server consent on return to %s",
+    async (path) => {
+      paint();
+      expect(request).not.toHaveBeenCalled();
+      expect(fixture.sdk).not.toHaveBeenCalled();
+      navigate(
+        `${path}?campaign_id=120250209898050789&adset_id=120250209898060789&ad_id=120250210010930789`,
+      );
+      await vi.waitFor(() => expect(fixture.store.getSnapshot().state).toBe("accepted"));
+      expect(paint()).toContain('data-state="accepted"');
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(request).toHaveBeenCalledWith("/api/advertising-consent", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      await vi.waitFor(() => expect(fixture.sdk).toHaveBeenCalledTimes(1));
+      expect(events().map((call) => call[2])).toEqual(
+        path === "/" ? ["PageView"] : ["PageView", "ViewContent"],
+      );
+    },
+  );
   it("restores the preference without loading the SDK when the original referrer is private", async () => {
     documentFixture.referrer = "https://mepmail.dev/signup";
     paint();

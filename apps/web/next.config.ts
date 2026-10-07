@@ -102,7 +102,8 @@ const config: NextConfig = {
         headers: [{ key: "Content-Security-Policy", value: supportContentSecurityPolicy }],
       },
       ...(publicMetaEnabled
-        ? ["/", "/pricing"].map((source) => ({
+        ? // Mirrors META_PUBLIC_PATHS in src/lib/meta-public-events.ts.
+          ["/", "/pricing", "/correio"].map((source) => ({
             source,
             headers: [
               { key: "Content-Security-Policy", value: publicContentSecurityPolicy },

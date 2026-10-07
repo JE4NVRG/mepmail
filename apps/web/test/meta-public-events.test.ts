@@ -355,6 +355,26 @@ describe("manual public Pixel controller", () => {
       ],
     ]);
   });
+  it("tracks the Correio ad landing with its own product ViewContent", async () => {
+    const correioUrl =
+      "https://mepmail.dev/correio?utm_source=fb&utm_content=correio_rollout&campaign_id=120250209898050789&adset_id=120250209898060789&ad_id=120250210010930789";
+    const page = setup(correioUrl);
+    page.controller.reconcile();
+    page.consent("accepted");
+    expect(page.load).toHaveBeenCalledTimes(1);
+    page.loader.resolve(page.command);
+    await flush();
+    page.controller.reconcile();
+    expect(page.command.mock.calls.filter((call) => call[0] === "trackSingle")).toEqual([
+      ["trackSingle", META_PIXEL_ID, "PageView"],
+      [
+        "trackSingle",
+        META_PIXEL_ID,
+        "ViewContent",
+        { content_ids: ["mail-correio"], content_name: "MepMail Correio", content_type: "product" },
+      ],
+    ]);
+  });
   it.each([
     "https://l.facebook.com/l.php?u=https%3A%2F%2Fmepmail.dev%2Flogin%3Ftoken%3Dprivate",
     "https://l.facebook.com/l.php?u=https%3A%2F%2Fmepmail.dev%2F&email=person%40example.com",

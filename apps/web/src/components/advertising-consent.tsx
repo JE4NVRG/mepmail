@@ -10,6 +10,7 @@ import {
   loadManualMetaSdk,
   META_ORIGIN,
   META_PIXEL_ID,
+  META_PUBLIC_PATHS,
 } from "@/lib/meta-public-events";
 import styles from "./advertising-consent.module.css";
 
@@ -21,7 +22,7 @@ let controller: ReturnType<typeof createMetaPublicController> | undefined;
 const SETTINGS_EVENT = "mepmail:advertising-settings";
 
 function publicDocument(pathname = window.location.pathname) {
-  return window.location.origin === META_ORIGIN && ["/", "/pricing"].includes(pathname);
+  return window.location.origin === META_ORIGIN && META_PUBLIC_PATHS.has(pathname);
 }
 
 /** The settings leaf can be reused in public chrome without making it a client tree. */
