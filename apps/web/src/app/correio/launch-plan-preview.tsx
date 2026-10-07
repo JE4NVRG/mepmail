@@ -210,7 +210,7 @@ export function LaunchPlanPreview({ earlyAccessOpen = false }: { earlyAccessOpen
         <p>{earlyAccessOpen ? release("monthlyNote") : t("monthlyNote")}</p>
         <p>{t("noChange")}</p>
         {earlyAccessOpen ? (
-          <a className="ms-btn ms-btn-secondary correio-action" href="/mailboxes">
+          <a className="ms-btn ms-btn-secondary correio-action" href="/mail">
             {release("checkAccess")}
           </a>
         ) : null}

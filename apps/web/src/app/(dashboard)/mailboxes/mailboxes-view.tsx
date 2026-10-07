@@ -363,7 +363,19 @@ function RegistryDialog({
   );
 }
 
-export function MailboxesView({ correioMcpUrl }: { correioMcpUrl?: string } = {}) {
+/**
+ * Correio's whole UI. `dashboard` is the legacy embedded page; `app` is the
+ * standalone full-screen inbox at /mail (opened from the menu in its own tab);
+ * `settings` is its companion page at /mail/settings: mailboxes, agents and
+ * the license, with the same dialogs.
+ */
+export function MailboxesView({
+  correioMcpUrl,
+  layout = "dashboard",
+}: {
+  correioMcpUrl?: string;
+  layout?: "dashboard" | "app" | "settings";
+} = {}) {
   const t = useTranslations("mailboxes");
   const tActivity = useTranslations("mailboxes-activity");
   const { data: session } = authClient.useSession();
@@ -403,6 +415,7 @@ export function MailboxesView({ correioMcpUrl }: { correioMcpUrl?: string } = {}
   const [licenseOfferId, setLicenseOfferId] = useState<string | null>(null);
   const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
   const [activityDialogId, setActivityDialogId] = useState<string | null>(null);
+  const [settingsTab, setSettingsTab] = useState<"boxes" | "agents" | "license">("boxes");
   const managementMenu = useRef<HTMLDetailsElement>(null);
   // Team switches cause a full navigation. Every id is also resolved against this request's scoped DTO.
   const boxes = registry.data?.mailboxes ?? [];
@@ -586,6 +599,346 @@ export function MailboxesView({ correioMcpUrl }: { correioMcpUrl?: string } = {}
       <MailboxUsagePanel mailboxId={selected?.id ?? null} />
     </div>
   );
+  const workspace = (
+    <div className={styles.workspace}>
+      {(!selected || (selected.canRead && selected.status === "planned")) &&
+      scopedBoxes.some((b) => b.canRead && b.status === "planned") ? (
+        <MailboxContentView
+          key={`${mailboxKind}:${selected?.id ?? "all"}`}
+          navigation={navigation}
+          boxes={boxes}
+          selected={selected}
+          mailboxKind={mailboxKind === "all" ? undefined : mailboxKind}
+          currentUserId={session?.user.id}
+          folder={folder}
+          customFolderId={customFolderId}
+          customFolderName={
+            folderList.data?.find((entry) => entry.id === customFolderId)?.name ?? null
+          }
+          changeFolder={chooseFolder}
+          selection={itemSelection}
+          select={selectItem}
+          draftSaved={(saved) => {
+            setMailboxKind("all");
+            select(saved.mailboxId);
+            setFolder("drafts");
+            selectItem({ mailboxId: saved.mailboxId, id: saved.id });
+          }}
+        />
+      ) : (
+        <div className={styles.registryWorkspace}>
+          <header className={styles.contentToolbar}>{navigation}</header>
+          <div className={styles.registryState}>
+            <div className={styles.hero}>
+              <NavGlyph name="emails" hovered={false} />
+              <h2>
+                {selected?.label ??
+                  t(mailboxKind === "all" ? "emptyTitle" : `scope.empty.${mailboxKind}.title`)}
+              </h2>
+              {selected ? (
+                <>
+                  <p className={styles.address}>{selected.address}</p>
+                  <span className={styles.tag}>{t(selected.status)}</span>
+                  <p>{t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}</p>
+                  {!selected.ownerActive ? (
+                    <p className={styles.hint}>{t("ownerMissing")}</p>
+                  ) : null}
+                  {!selected.canRead ? <p className={styles.hint}>{t("managementOnly")}</p> : null}
+                  {registry.data?.canManage ? (
+                    <button
+                      type="button"
+                      className="ms-btn"
+                      disabled={!options.data}
+                      onClick={() => setDialog("edit")}
+                    >
+                      {t("manage")}
+                    </button>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <p>
+                    {t(mailboxKind === "all" ? "emptyBody" : `scope.empty.${mailboxKind}.body`)}
+                  </p>
+                  {registry.data?.canManage && options.data ? (
+                    <button
+                      type="button"
+                      className="ms-btn ms-btn-primary"
+                      onClick={() => setDialog("new")}
+                    >
+                      {t("createFirst")}
+                    </button>
+                  ) : null}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+  const dialogs = (
+    <>
+      {registry.data?.canManage && dialog === "new" && options.data ? (
+        <MailboxSetupDialog
+          options={options.data}
+          close={() => setDialog(null)}
+          changed={changed}
+          reviewLicense={(offerId) => {
+            setDialog(null);
+            setLicenseOfferId(offerId ?? null);
+            openLicense((request) => request + 1);
+          }}
+        />
+      ) : null}
+      {registry.data?.canManage && dialog === "edit" && options.data && selected ? (
+        <RegistryDialog
+          key={selected.id}
+          mailbox={selected}
+          options={options.data}
+          close={() => setDialog(null)}
+          changed={changed}
+          openReceiving={() => setDialog("receiving")}
+        />
+      ) : null}
+      {registry.data?.canManage && dialog === "receiving" && options.data && selected ? (
+        <MailboxSetupDialog
+          key={`receiving-${selected.id}`}
+          existingMailbox={selected}
+          options={options.data}
+          close={() => setDialog(null)}
+          changed={changed}
+          reviewLicense={(offerId) => {
+            setDialog(null);
+            setLicenseOfferId(offerId ?? null);
+            openLicense((request) => request + 1);
+          }}
+        />
+      ) : null}
+      {agentBox ? (
+        <MailboxAgentKeysDialog
+          key={agentBox.id}
+          mailbox={{ id: agentBox.id, address: agentBox.address }}
+          onClose={() => setAgentDialogId(null)}
+          mcpUrl={correioMcpUrl}
+        />
+      ) : null}
+      {activityBox ? (
+        <MailboxActivityDialog
+          key={activityBox.id}
+          mailbox={{ id: activityBox.id, address: activityBox.address }}
+          close={() => setActivityDialogId(null)}
+        />
+      ) : null}
+      {folderDialog &&
+      selected &&
+      canOrganize &&
+      (folderDialog === "new" || folderList.data?.some((entry) => entry.id === folderDialog)) ? (
+        <MailboxFolderDialog
+          key={`${selected.id}:${folderDialog}`}
+          mailboxId={selected.id}
+          folder={
+            folderDialog === "new"
+              ? null
+              : (folderList.data?.find((entry) => entry.id === folderDialog) ?? null)
+          }
+          close={() => setFolderDialog(null)}
+          changed={(id) => chooseFolder(id ? "custom" : "inbox", id)}
+        />
+      ) : null}
+    </>
+  );
+  const ownsSelected = !!selected?.ownerActive && selected.ownerUserId === session?.user.id;
+  const ownedBoxes = boxes.filter((box) => box.ownerActive && box.ownerUserId === session?.user.id);
+  if (layout !== "dashboard")
+    return (
+      <section className={`${styles.view} ${styles.appView}`}>
+        <header className={styles.appBar}>
+          <Link href="/mail" className={styles.appBrand}>
+            <NavGlyph name="emails" hovered={false} />
+            <span>{t("title")}</span>
+          </Link>
+          <span className={styles.serviceBadge}>
+            {t(systemLicense ? "system.badge" : "paidService")}
+          </span>
+          <nav className={styles.appTabs} aria-label={t("app.sections")}>
+            <Link href="/mail" aria-current={layout === "app" ? "page" : undefined}>
+              {t("app.inbox")}
+            </Link>
+            <Link href="/mail/settings" aria-current={layout === "settings" ? "page" : undefined}>
+              {t("app.settings")}
+            </Link>
+          </nav>
+          <div className={styles.appActions}>
+            {layout === "app" &&
+            selected?.canRead &&
+            selected.status === "planned" &&
+            ownsSelected ? (
+              <button
+                type="button"
+                className="ms-btn ms-btn-ghost"
+                onClick={() => setActivityDialogId(selected.id)}
+              >
+                {tActivity("open")}
+              </button>
+            ) : null}
+            {layout === "app" && selected && ownsSelected ? (
+              <button
+                type="button"
+                className="ms-btn ms-btn-ghost"
+                onClick={() => setAgentDialogId(selected.id)}
+              >
+                {t("connectAgent")}
+              </button>
+            ) : null}
+            {registry.data?.canManage ? (
+              <button
+                type="button"
+                className="ms-btn ms-btn-primary"
+                disabled={!options.data}
+                onClick={() => setDialog("new")}
+              >
+                + {t("new")}
+              </button>
+            ) : null}
+            <Link className="ms-btn ms-btn-ghost" href="/emails">
+              {t("app.back")}
+            </Link>
+          </div>
+        </header>
+        {layout === "app" ? (
+          <>
+            {licenseOpenRequest > 0 ? (
+              <MailboxServicePanel
+                openRequest={licenseOpenRequest}
+                initialOfferId={licenseOfferId}
+              />
+            ) : null}
+            {workspace}
+          </>
+        ) : (
+          <div className={styles.settings}>
+            <div className={styles.settingsTabs} role="tablist" aria-label={t("app.settings")}>
+              {(["boxes", "agents", "license"] as const).map((tab) => (
+                <button
+                  type="button"
+                  role="tab"
+                  key={tab}
+                  aria-selected={settingsTab === tab}
+                  onClick={() => setSettingsTab(tab)}
+                >
+                  {t(`app.tabs.${tab}`)}
+                </button>
+              ))}
+            </div>
+            {settingsTab === "boxes" ? (
+              <section className={styles.settingsSection} aria-label={t("app.tabs.boxes")}>
+                <p className={styles.hint}>{t("app.boxesHint")}</p>
+                {registry.data?.canManage && options.data && !options.data.domains.length ? (
+                  <p className={styles.notice}>
+                    {t("noDomains")} <Link href="/domains">{t("domainsLink")} ↗</Link>
+                  </p>
+                ) : null}
+                {boxes.length ? (
+                  <ul className={styles.settingsList}>
+                    {boxes.map((box) => (
+                      <li key={box.id}>
+                        <div>
+                          <strong>{box.label}</strong>
+                          <span>{box.address}</span>
+                          <small>
+                            {t(`scope.${box.kind}`)} · {t(box.status)}
+                          </small>
+                        </div>
+                        {registry.data?.canManage ? (
+                          <div className={styles.settingsRowActions}>
+                            <button
+                              type="button"
+                              className="ms-btn ms-btn-ghost"
+                              disabled={!options.data}
+                              onClick={() => {
+                                selectMailbox(box.id);
+                                setDialog("receiving");
+                              }}
+                            >
+                              {t("app.receiving")}
+                            </button>
+                            <button
+                              type="button"
+                              className="ms-btn"
+                              disabled={!options.data}
+                              onClick={() => {
+                                selectMailbox(box.id);
+                                setDialog("edit");
+                              }}
+                            >
+                              {t("manage")}
+                            </button>
+                          </div>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>{t("emptyBody")}</p>
+                )}
+                {registry.data?.canManage ? (
+                  <Link className="ms-btn ms-btn-ghost" href="/domains">
+                    {t("domainsLink")}
+                  </Link>
+                ) : null}
+              </section>
+            ) : settingsTab === "agents" ? (
+              <section className={styles.settingsSection} aria-label={t("app.tabs.agents")}>
+                <p className={styles.hint}>{t("app.agentsHint")}</p>
+                {ownedBoxes.length ? (
+                  <ul className={styles.settingsList}>
+                    {ownedBoxes.map((box) => (
+                      <li key={box.id}>
+                        <div>
+                          <strong>{box.label}</strong>
+                          <span>{box.address}</span>
+                          <small>{t(`scope.${box.kind}`)}</small>
+                        </div>
+                        <div className={styles.settingsRowActions}>
+                          {box.canRead && box.status === "planned" ? (
+                            <button
+                              type="button"
+                              className="ms-btn ms-btn-ghost"
+                              onClick={() => setActivityDialogId(box.id)}
+                            >
+                              {tActivity("open")}
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="ms-btn"
+                            onClick={() => setAgentDialogId(box.id)}
+                          >
+                            {t("connectAgent")}
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>{t("app.agentsEmpty")}</p>
+                )}
+              </section>
+            ) : (
+              <section className={styles.settingsSection} aria-label={t("app.tabs.license")}>
+                <MailboxServicePanel
+                  openRequest={licenseOpenRequest}
+                  initialOfferId={licenseOfferId}
+                />
+                <MailboxUsagePanel mailboxId={null} />
+              </section>
+            )}
+          </div>
+        )}
+        {dialogs}
+      </section>
+    );
   return (
     <section className={styles.view}>
       <header className={`${styles.header} ${managementStyles.header}`}>
@@ -728,151 +1081,8 @@ export function MailboxesView({ correioMcpUrl }: { correioMcpUrl?: string } = {}
           </button>
         </div>
       ) : null}
-      <div className={styles.workspace}>
-        {(!selected || (selected.canRead && selected.status === "planned")) &&
-        scopedBoxes.some((b) => b.canRead && b.status === "planned") ? (
-          <MailboxContentView
-            key={`${mailboxKind}:${selected?.id ?? "all"}`}
-            navigation={navigation}
-            boxes={boxes}
-            selected={selected}
-            mailboxKind={mailboxKind === "all" ? undefined : mailboxKind}
-            currentUserId={session?.user.id}
-            folder={folder}
-            customFolderId={customFolderId}
-            customFolderName={
-              folderList.data?.find((entry) => entry.id === customFolderId)?.name ?? null
-            }
-            changeFolder={chooseFolder}
-            selection={itemSelection}
-            select={selectItem}
-            draftSaved={(saved) => {
-              setMailboxKind("all");
-              select(saved.mailboxId);
-              setFolder("drafts");
-              selectItem({ mailboxId: saved.mailboxId, id: saved.id });
-            }}
-          />
-        ) : (
-          <div className={styles.registryWorkspace}>
-            <header className={styles.contentToolbar}>{navigation}</header>
-            <div className={styles.registryState}>
-              <div className={styles.hero}>
-                <NavGlyph name="emails" hovered={false} />
-                <h2>
-                  {selected?.label ??
-                    t(mailboxKind === "all" ? "emptyTitle" : `scope.empty.${mailboxKind}.title`)}
-                </h2>
-                {selected ? (
-                  <>
-                    <p className={styles.address}>{selected.address}</p>
-                    <span className={styles.tag}>{t(selected.status)}</span>
-                    <p>{t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}</p>
-                    {!selected.ownerActive ? (
-                      <p className={styles.hint}>{t("ownerMissing")}</p>
-                    ) : null}
-                    {!selected.canRead ? (
-                      <p className={styles.hint}>{t("managementOnly")}</p>
-                    ) : null}
-                    {registry.data?.canManage ? (
-                      <button
-                        type="button"
-                        className="ms-btn"
-                        disabled={!options.data}
-                        onClick={() => setDialog("edit")}
-                      >
-                        {t("manage")}
-                      </button>
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    <p>
-                      {t(mailboxKind === "all" ? "emptyBody" : `scope.empty.${mailboxKind}.body`)}
-                    </p>
-                    {registry.data?.canManage && options.data ? (
-                      <button
-                        type="button"
-                        className="ms-btn ms-btn-primary"
-                        onClick={() => setDialog("new")}
-                      >
-                        {t("createFirst")}
-                      </button>
-                    ) : null}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-      {registry.data?.canManage && dialog === "new" && options.data ? (
-        <MailboxSetupDialog
-          options={options.data}
-          close={() => setDialog(null)}
-          changed={changed}
-          reviewLicense={(offerId) => {
-            setDialog(null);
-            setLicenseOfferId(offerId ?? null);
-            openLicense((request) => request + 1);
-          }}
-        />
-      ) : null}
-      {registry.data?.canManage && dialog === "edit" && options.data && selected ? (
-        <RegistryDialog
-          key={selected.id}
-          mailbox={selected}
-          options={options.data}
-          close={() => setDialog(null)}
-          changed={changed}
-          openReceiving={() => setDialog("receiving")}
-        />
-      ) : null}
-      {registry.data?.canManage && dialog === "receiving" && options.data && selected ? (
-        <MailboxSetupDialog
-          key={`receiving-${selected.id}`}
-          existingMailbox={selected}
-          options={options.data}
-          close={() => setDialog(null)}
-          changed={changed}
-          reviewLicense={(offerId) => {
-            setDialog(null);
-            setLicenseOfferId(offerId ?? null);
-            openLicense((request) => request + 1);
-          }}
-        />
-      ) : null}
-      {agentBox ? (
-        <MailboxAgentKeysDialog
-          key={agentBox.id}
-          mailbox={{ id: agentBox.id, address: agentBox.address }}
-          onClose={() => setAgentDialogId(null)}
-          mcpUrl={correioMcpUrl}
-        />
-      ) : null}
-      {activityBox ? (
-        <MailboxActivityDialog
-          key={activityBox.id}
-          mailbox={{ id: activityBox.id, address: activityBox.address }}
-          close={() => setActivityDialogId(null)}
-        />
-      ) : null}
-      {folderDialog &&
-      selected &&
-      canOrganize &&
-      (folderDialog === "new" || folderList.data?.some((entry) => entry.id === folderDialog)) ? (
-        <MailboxFolderDialog
-          key={`${selected.id}:${folderDialog}`}
-          mailboxId={selected.id}
-          folder={
-            folderDialog === "new"
-              ? null
-              : (folderList.data?.find((entry) => entry.id === folderDialog) ?? null)
-          }
-          close={() => setFolderDialog(null)}
-          changed={(id) => chooseFolder(id ? "custom" : "inbox", id)}
-        />
-      ) : null}
+      {workspace}
+      {dialogs}
     </section>
   );
 }

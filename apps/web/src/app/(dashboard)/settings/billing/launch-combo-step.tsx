@@ -105,7 +105,7 @@ export function LaunchComboMailStep({
   }
 
   const openCorreio = (
-    <Link href="/mailboxes" className="ms-btn ms-btn-secondary">
+    <Link href="/mail" className="ms-btn ms-btn-secondary">
       {t("combo.openMailboxes")}
     </Link>
   );

@@ -191,7 +191,7 @@ async function requestMailboxSendApproval(
             to: facts.ownerEmail,
             kind: "mailbox.send_requested",
             locale: await accountLocale(db, accountEmailFrom(), facts.ownerEmail),
-            path: "/mailboxes",
+            path: "/mail",
             values: { agent: facts.agent, mailbox: facts.address },
           }),
         );

@@ -424,5 +424,20 @@
     "cta": "Get Send + Correio",
     "learn": "Learn about Correio",
     "adminOnly": "Ask a team owner or admin to subscribe."
+  },
+  "app": {
+    "sections": "Correio sections",
+    "inbox": "Inbox",
+    "settings": "Settings",
+    "back": "Back to MepMail",
+    "receiving": "Receiving",
+    "boxesHint": "Your team's mailboxes on your domains. Manage name, owner and signature, or check each one's receiving (MX).",
+    "agentsHint": "Keys for agents to work in your mailboxes, over MCP or the API. Without the send permission, the agent asks for your approval before sending.",
+    "agentsEmpty": "You don't own a mailbox yet.",
+    "tabs": {
+      "boxes": "Mailboxes",
+      "agents": "Agents",
+      "license": "License and usage"
+    }
   }
 }

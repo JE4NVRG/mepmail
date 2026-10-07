@@ -1913,3 +1913,173 @@
     max-width: none;
   }
 }
+
+/* Standalone Correio (/mail, /mail/settings): the full window, its own bar. */
+.view.appView {
+  height: 100dvh;
+  min-height: 480px;
+}
+.appBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--ms-line);
+  background: var(--ms-panel);
+}
+.appBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ms-bone);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.appTabs {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+.appTabs a {
+  padding: 6px 10px;
+  border-radius: var(--ms-r-input);
+  color: var(--ms-muted);
+  font-size: 13px;
+  text-decoration: none;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+.appTabs a:hover,
+.appTabs a[aria-current="page"] {
+  color: var(--ms-bone);
+  background: var(--ms-void);
+}
+.appActions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.appView > .workspace {
+  border: 0;
+  border-radius: 0;
+  animation: mailAppIn 0.22s ease-out both;
+}
+.settings {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px clamp(16px, 4vw, 48px);
+  animation: mailAppIn 0.22s ease-out both;
+}
+.settingsTabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--ms-line);
+}
+.settingsTabs button {
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ms-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.settingsTabs button[aria-selected="true"] {
+  color: var(--ms-bone);
+  border-bottom-color: var(--ms-bone);
+}
+.settingsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.settingsList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-card);
+  overflow: hidden;
+}
+.settingsList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--ms-line);
+  transition: background-color 0.15s ease;
+}
+.settingsList li:first-child {
+  border-top: 0;
+}
+.settingsList li:hover {
+  background: var(--ms-panel);
+}
+.settingsList li > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.settingsList span {
+  color: var(--ms-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.settingsList small {
+  color: var(--ms-muted);
+  font-size: 12px;
+}
+.settingsRowActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@keyframes mailAppIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .appView > .workspace,
+  .settings {
+    animation: none;
+  }
+  .appTabs a,
+  .settingsList li {
+    transition: none;
+  }
+}
+@media (max-width: 700px) {
+  .appBar {
+    padding: 10px 12px;
+  }
+  .appActions {
+    width: 100%;
+    margin-left: 0;
+  }
+  .settingsList li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

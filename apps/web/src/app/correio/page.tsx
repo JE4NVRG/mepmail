@@ -272,7 +272,7 @@ export default async function CorreioPage() {
                   {t(mailOpen ? "release.mailNote" : "plans.mail.note")}
                 </p>
                 {mailOpen ? (
-                  <a className="ms-btn ms-btn-secondary correio-action" href="/mailboxes">
+                  <a className="ms-btn ms-btn-secondary correio-action" href="/mail">
                     {t("release.checkAccess")}
                   </a>
                 ) : null}

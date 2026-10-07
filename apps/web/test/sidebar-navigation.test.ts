@@ -72,7 +72,9 @@ for (const locale of ["en", "pt-BR"] as const) {
     it("preserves the full navigation and width when leaving Mail for a shared domain or settings page", () => {
       const first = navMarkup(locale);
       const initialLinks = hrefs(first.nav);
-      expect(initialLinks).toContain("/mailboxes");
+      expect(initialLinks).toContain("/mail");
+      // Correio is its own full-window app: the menu opens it in a new tab.
+      expect(first.nav).toMatch(/href="\/mail"[^>]*target="_blank"|target="_blank"[^>]*href="\/mail"/);
       expect(initialLinks).toContain("/emails");
       expect(initialLinks.filter((href) => href === "/domains")).toHaveLength(1);
       expect(initialLinks.filter((href) => href === "/settings")).toHaveLength(1);
@@ -90,8 +92,8 @@ for (const locale of ["en", "pt-BR"] as const) {
     });
 
     it.each([
-      ["/mailboxes", "/mailboxes"],
-      ["/mailboxes/box-123", "/mailboxes"],
+      ["/mail", "/mail"],
+      ["/mail/settings", "/mail"],
       ["/domains/new", "/domains"],
       ["/settings/connected-apps", "/settings"],
       ["/emails/123", "/emails"],
@@ -110,7 +112,7 @@ for (const locale of ["en", "pt-BR"] as const) {
       (enabled) => {
         state.mailEnabled = enabled;
         const { nav } = navMarkup(locale);
-        expect(hrefs(nav)).not.toContain("/mailboxes");
+        expect(hrefs(nav)).not.toContain("/mail");
         expect(hrefs(nav)).toContain("/emails");
         expect(hrefs(nav)).toContain("/domains");
         expect(nav).not.toContain(`aria-label="${locale === "en" ? "Mail" : "Correio"}"`);

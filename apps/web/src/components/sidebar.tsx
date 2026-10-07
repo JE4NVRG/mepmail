@@ -31,9 +31,10 @@ export const NAV_ITEMS: ReadonlyArray<{ key: string; href: string; icon: NavIcon
   { key: "settings", href: "/settings", icon: "settings" },
 ];
 
+/** Correio is its own full-window app (/mail): the menu opens it in a new tab. */
 export const MAIL_NAV_ITEM: (typeof NAV_ITEMS)[number] = {
   key: "mailboxes",
-  href: "/mailboxes",
+  href: "/mail",
   icon: "emails",
 };
 export const ORGANIZATION_NAV_ITEMS = NAV_ITEMS.filter((item) =>
@@ -66,6 +67,7 @@ function NavItem({
   return (
     <Link
       href={item.href}
+      {...(item.href === MAIL_NAV_ITEM.href ? { target: "_blank", rel: "noopener" } : {})}
       className={active ? "active" : undefined}
       aria-current={active ? "page" : undefined}
       onMouseEnter={() => setHovered(true)}

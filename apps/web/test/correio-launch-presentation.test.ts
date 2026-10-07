@@ -255,11 +255,11 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     for (const link of links(content)) {
       expect(link.href).not.toMatch(/checkout|subscribe|signup|\/settings\/billing/);
       expect(
-        ["#como-funciona", "/pricing", "/integrations", "/mailboxes"].includes(link.href) ||
+        ["#como-funciona", "/pricing", "/integrations", "/mail"].includes(link.href) ||
           link.href.startsWith(`${expected.docsPrefix}/`),
       ).toBe(true);
     }
-    expect(links(content).some((link) => link.href === "/mailboxes")).toBe(true);
+    expect(links(content).some((link) => link.href === "/mail")).toBe(true);
     const closeLinks = links(section(html, "correio-close-title"));
     expect(closeLinks.map((link) => link.href)).toEqual([
       "/pricing",
