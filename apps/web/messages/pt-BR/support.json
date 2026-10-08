@@ -103,7 +103,7 @@
       },
       {
         "q": "Meus agentes podem usar o MepMail?",
-        "a": "Sim, pela API de Envio ou pelo MCP publicado, respeitando as permissões da conexão. Copie o endpoint em Configurações → MCP. O MCP de Envio não concede acesso às caixas do Correio.",
+        "a": "Sim, pela API de Envio ou pelo MCP publicado, respeitando as permissões da conexão. Copie o endpoint em Configurações → MCP. O MCP de Envio não abre as caixas do Correio: para elas, o agente usa o MCP do Correio, com aprovação opcional antes de cada envio.",
         "link": {
           "label": "MCP",
           "href": "https://docs.mepmail.dev/pt-BR/mcp"
@@ -111,7 +111,7 @@
       },
       {
         "q": "Posso receber e-mails ou importar Gmail/Hotmail?",
-        "a": "O Correio já está em produção fechada para a conta operadora, sem oferta pública. Ainda não oferecemos IMAP, importação Gmail/Hotmail/MBOX/PST ou MCP público de entrada. O login Google não sincroniza uma caixa Gmail.",
+        "a": "Sim, com o Correio: caixas de e-mail no seu domínio para pessoas e agentes de IA. É um adicional de US$ 9,90/mês por caixa (10 GiB e 2.000 entregas de saída por mês), disponível em qualquer plano pago de Envio; cada caixa precisa de domínio verificado e do recebimento ativado. Ainda não oferecemos IMAP nem importação de Gmail/Hotmail/MBOX/PST, e o login Google não sincroniza uma caixa Gmail.",
         "link": {
           "label": "Correio",
           "href": "https://docs.mepmail.dev/pt-BR/mailboxes"
@@ -119,7 +119,7 @@
       },
       {
         "q": "Quais são os preços e limites?",
-        "a": "Confira os termos apresentados para sua organização no painel e no checkout. Envio e Correio têm licenciamento e cotas separados; condições internas da conta operadora não são uma oferta aos clientes. Não há preço público aprovado do Correio para informar.",
+        "a": "Os preços do Envio e do Correio estão na página de preços. Envio e Correio têm licenças e cotas separadas, e o checkout mostra o valor final para a sua organização.",
         "link": {
           "label": "Preços",
           "href": "/pricing"

@@ -7,6 +7,18 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.61] - 2026-10-08
+
+Support FAQ in line with the product.
+
+### Fixed
+
+- /support FAQ (PT/EN): Correio is open as a US$ 9.90/month per mailbox
+  add-on on any paid Send plan (10 GiB, 2,000 outbound deliveries a month),
+  prices live on /pricing, and agents use the Correio MCP for mailboxes.
+  The answers said Correio was closed to the operator account and unpriced.
+  This FAQ is also the published source for the Elozi support assistant.
+
 ## [0.60] - 2026-10-08
 
 Received HTML closer to the sender's design in the Correio reader.

@@ -23,6 +23,21 @@
   },
   "releases": [
     {
+      "version": "0.61",
+      "date": "2026-10-08",
+      "title": "Support FAQ updated",
+      "summary": "Support page answers now reflect open Correio and the published prices.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "The FAQ said Correio was closed and unpriced; it now explains the US$ 9.90/month per mailbox add-on on any paid Send plan.",
+            "Agents: the FAQ points to the Correio MCP for mailboxes."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.60",
       "date": "2026-10-08",
       "title": "Received email closer to the original",

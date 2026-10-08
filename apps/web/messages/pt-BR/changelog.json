@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.61",
+      "date": "2026-10-08",
+      "title": "FAQ do suporte atualizado",
+      "summary": "As respostas da página de suporte agora refletem o Correio aberto e os preços publicados.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "O FAQ dizia que o Correio era fechado e sem preço; agora explica o adicional de US$ 9,90/mês por caixa em qualquer plano pago de Envio.",
+            "Agentes: o FAQ indica o MCP do Correio para as caixas de e-mail."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.60",
       "date": "2026-10-08",
       "title": "E-mails recebidos mais fiéis ao original",
