@@ -5,6 +5,7 @@ import { LandingNav } from "./landing-nav";
 import { PublicAccount } from "./public-account";
 import { DocsLink, GithubLink } from "./public-events";
 import { SignupCta } from "./signup-cta";
+import { SubscriptionsPausedNotice } from "./subscriptions-paused-notice";
 
 /**
  * Public marketing chrome (header + footer) shared by the landing, /pricing and
@@ -127,6 +128,7 @@ export function PublicHeader({
       <a className="gtm-skip" href="#conteudo">
         {labels.skip}
       </a>
+      <SubscriptionsPausedNotice />
       {banner}
       <header className="gtm-header">
         <div className="gtm-container gtm-header-inner">

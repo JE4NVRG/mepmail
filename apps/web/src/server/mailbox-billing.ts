@@ -16,6 +16,7 @@ import { mailboxLaunchCohortAllows } from "../../../../packages/core/src/mailbox
 import { mailboxManagementRequests } from "../../../../packages/db/src/schema/mailbox-management-requests";
 import { getStripe } from "./billing";
 import { mailboxEarlyAccessCohort } from "./mailboxes";
+import { newSubscriptionsPaused } from "./new-subscriptions";
 
 const terms = z
   .object({
@@ -302,11 +303,13 @@ export async function mailboxBillingPresentation(
           ? ("sending_plan_required" as const)
           : earlyAccessRequired
             ? ("early_access_required" as const)
-            : offers.length === 0
-              ? ("unavailable" as const)
-              : !sameOffer
-                ? ("recovery_required" as const)
-                : ("available" as const);
+            : newSubscriptionsPaused()
+              ? ("subscriptions_paused" as const)
+              : offers.length === 0
+                ? ("unavailable" as const)
+                : !sameOffer
+                  ? ("recovery_required" as const)
+                  : ("available" as const);
   return {
     canManage,
     canPurchase: availability === "available",

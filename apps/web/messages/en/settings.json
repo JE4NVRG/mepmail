@@ -359,6 +359,7 @@
     "checkoutCancel": "Checkout canceled. Your plan is unchanged.",
     "error": "Something went wrong with Stripe. Try again.",
     "billingPaused": "Billing changes are temporarily paused. Please try again later.",
+    "subscriptionsPaused": "New subscriptions are paused while we switch our email delivery provider. Your account stays active, and you can subscribe as soon as we reopen.",
     "combo": {
       "step": "Step 2 of 2 · Correio",
       "title": "Finish your Correio mailboxes",

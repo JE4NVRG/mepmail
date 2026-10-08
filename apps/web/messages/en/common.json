@@ -105,6 +105,9 @@
   "sendingPaused": {
     "text": "Sending is queued: our email provider has temporarily paused delivery. Nothing is lost — your emails are accepted and go out on their own as soon as it resumes."
   },
+  "subscriptionsPaused": {
+    "public": "We're switching our email delivery provider, so new subscriptions are paused for now. Existing customers lose nothing: queued email goes out as soon as sending is back."
+  },
   "supportView": {
     "banner": "Support view of {team} · read-only",
     "endsIn": "ends in {left}",

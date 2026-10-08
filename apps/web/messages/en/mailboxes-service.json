@@ -56,6 +56,7 @@
   "sendingPlanRequiredBody": "This team needs an active paid Send plan to purchase Mail, increase mailboxes or resume renewal. You can still review your Mail contract, reduce mailboxes, cancel renewal, and read or export stored messages according to your access.",
   "viewSendingPlans": "View Send plans",
   "unavailableBody": "Purchasing through the dashboard is not available in this installation yet. Ask the installation operator for the terms to enable a Mail license. Prices and allowances must be approved before purchasing.",
+  "subscriptionsPausedBody": "New Mail subscriptions are paused while we switch our email delivery provider. You can subscribe as soon as we reopen.",
   "recoveryReads": "Stored messages remain available for reading and export by people with access to the mailbox.",
   "quantity": "How many mailboxes?",
   "quantityHint": "From 1 to 10,000 mailboxes. A person or agent uses one mailbox each.",

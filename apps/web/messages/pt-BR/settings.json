@@ -359,6 +359,7 @@
     "checkoutCancel": "Checkout cancelado. Seu plano não mudou.",
     "error": "Algo deu errado com o Stripe. Tente novamente.",
     "billingPaused": "Alterações de cobrança estão temporariamente pausadas. Tente novamente mais tarde.",
+    "subscriptionsPaused": "Novas assinaturas estão pausadas enquanto trocamos nosso provedor de envio de e-mail. Sua conta continua ativa, e você poderá assinar assim que reabrirmos.",
     "combo": {
       "step": "Passo 2 de 2 · Correio",
       "title": "Conclua suas caixas do Correio",

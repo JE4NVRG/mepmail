@@ -41,6 +41,7 @@ export function mailboxServiceNotice(
   if (availability === "existing_subscription" || existingFailure)
     return periodEnd ? "existingLicenseBody" : "existingBody";
   if (availability === "sending_plan_required") return "sendingPlanRequiredBody";
+  if (availability === "subscriptions_paused") return "subscriptionsPausedBody";
   if (availability === "recovery_required") return "recoveryBody";
   if (availability === "forbidden") return "adminBody";
   return "unavailableBody";

@@ -105,6 +105,9 @@
   "sendingPaused": {
     "text": "Envios em fila: nosso provedor de e-mail pausou a entrega temporariamente. Nada se perde — seus e-mails são aceitos e saem sozinhos assim que a entrega voltar."
   },
+  "subscriptionsPaused": {
+    "public": "Estamos trocando nosso provedor de envio de e-mail. Por isso, novas assinaturas estão pausadas por enquanto. Quem já é cliente não perde nada: os e-mails ficam na fila e saem assim que o envio voltar."
+  },
   "supportView": {
     "banner": "Modo de suporte de {team} · somente leitura",
     "endsIn": "termina em {left}",

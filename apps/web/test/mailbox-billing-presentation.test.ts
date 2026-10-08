@@ -334,6 +334,24 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
     expect(createSession).not.toHaveBeenCalled();
     expect(createCustomer).not.toHaveBeenCalled();
   });
+  it("closes a new purchase while new subscriptions are paused, with its own notice", async () => {
+    vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "true");
+    const presentation = await as().mailboxes.billing();
+    expect(presentation).toMatchObject({
+      canPurchase: false,
+      availability: "subscriptions_paused",
+    });
+    expect(mailboxServiceNotice(presentation.availability, null)).toBe("subscriptionsPausedBody");
+    await expect(as().mailboxes.checkout({ seats: 2 })).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: "subscriptions_paused",
+    });
+    expect(getStripe).not.toHaveBeenCalled();
+    expect(createSession).not.toHaveBeenCalled();
+    expect(createCustomer).not.toHaveBeenCalled();
+    vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false");
+    expect((await as().mailboxes.billing()).canPurchase).toBe(true);
+  });
   it("interprets string false as an unpaused flag and requires the current administrative role", async () => {
     vi.stubEnv("BILLING_MUTATIONS_PAUSED", "false");
     expect((await as().mailboxes.billing()).canPurchase).toBe(true);

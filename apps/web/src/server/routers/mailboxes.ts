@@ -270,7 +270,9 @@ export const mailboxesRouter = router({
                   ? "sending_plan_required"
                   : presentation.availability === "early_access_required"
                     ? "early_access_required"
-                    : "mailbox_billing_unavailable",
+                    : presentation.availability === "subscriptions_paused"
+                      ? "subscriptions_paused"
+                      : "mailbox_billing_unavailable",
         });
       if (
         presentation.pendingCheckoutSeats !== null &&

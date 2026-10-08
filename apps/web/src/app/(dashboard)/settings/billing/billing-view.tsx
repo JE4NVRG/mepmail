@@ -326,7 +326,10 @@ export function BillingView({
   const over = quota.kind === "month" ? Math.max(0, usage.accepted - quota.included) : 0;
   // After a successful return the webhook may still be on its way; offering a
   // second purchase in that window would only invite a duplicate Checkout.
-  const newOffer = !hasLiveSubscription && checkout !== "success" ? launchOffer : null;
+  // New subscriptions paused: a team without one sees why, and nothing to buy.
+  const salesPaused = status.data.newSubscriptionsPaused && !hasLiveSubscription;
+  const newOffer =
+    !hasLiveSubscription && checkout !== "success" && !salesPaused ? launchOffer : null;
   const comboSeatCount = parseLaunchMailboxQuantity(comboSeats);
   const comboQuote =
     comboOn && comboSeatCount !== null
@@ -485,6 +488,7 @@ export function BillingView({
             {t("pastDue")}
           </WarnCard>
         ) : null}
+        {salesPaused ? <WarnCard action={null}>{t("subscriptionsPaused")}</WarnCard> : null}
 
         <p
           role={failed ? "alert" : undefined}
@@ -949,9 +953,9 @@ export function BillingView({
                         <button
                           type="button"
                           className={`ms-btn ${active ? "ms-btn-primary" : "ms-btn-secondary"}`}
-                          disabled={busy || subscriptionChangesUnavailable}
+                          disabled={busy || subscriptionChangesUnavailable || salesPaused}
                           onClick={() =>
-                            subscriptionChangesUnavailable
+                            subscriptionChangesUnavailable || salesPaused
                               ? undefined
                               : hasLiveSubscription
                                 ? changePlan.mutate({ rung: r.key })

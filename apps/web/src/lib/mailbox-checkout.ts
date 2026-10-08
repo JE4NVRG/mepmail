@@ -21,6 +21,7 @@ export function mailboxCheckoutFailure(cause: unknown) {
   if (error?.message === "sending_plan_required") return "sending_plan_required";
   if (error?.message === "expired") return "error";
   if (error?.message === "subscription_exists") return "existing";
+  if (error?.message === "subscriptions_paused") return "unavailable";
   if (error?.message === "mailbox_billing_unavailable" || error?.data?.code === "FORBIDDEN")
     return "unavailable";
   return "pending";

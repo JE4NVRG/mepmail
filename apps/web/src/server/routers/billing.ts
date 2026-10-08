@@ -41,6 +41,7 @@ import { recordAudit } from "../audit";
 import { resolveBaseUrl } from "../auth";
 import { getStripe, mailPlanMove } from "../billing";
 import { emitFunnel } from "../funnel";
+import { newSubscriptionsPaused } from "../new-subscriptions";
 import { getQueue } from "../queue";
 import { adminProcedure, router, teamProcedure } from "../trpc";
 
@@ -238,6 +239,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         usage: await readUsage(ctx.db, ctx.teamId, quota),
         hasCustomer: team.stripeCustomerId !== null,
         hasLiveSubscription: live,
+        newSubscriptionsPaused: newSubscriptionsPaused(),
         billingInterval: contract?.billingInterval ?? effectiveInterval,
         launchOffer:
           launchOfferEnabled() && !live && team.plan !== "system"
@@ -256,6 +258,10 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
       .input(z.object({ rung: paidRung, interval: z.enum(["month", "year"]).default("month") }))
       .mutation(async ({ ctx, input }) => {
         requireCloud();
+        // Checkout only ever starts a new subscription.
+        if (newSubscriptionsPaused()) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "SEND_CHECKOUT_PAUSED" });
+        }
         const team = await loadTeam(ctx.db, ctx.teamId);
         assertBillable(team);
         // Plan changes on a live subscription go through changePlan; a second

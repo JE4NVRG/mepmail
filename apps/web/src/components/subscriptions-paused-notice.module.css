@@ -1,0 +1,22 @@
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--ms-warn, #f5a524) 14%, var(--ms-ground));
+  border-bottom: 1px solid color-mix(in srgb, var(--ms-warn, #f5a524) 45%, transparent);
+  color: var(--ms-bone);
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--ms-warn, #f5a524);
+}

@@ -56,6 +56,7 @@
   "sendingPlanRequiredBody": "Para contratar Correio, aumentar caixas ou retomar a renovação, este time precisa de um plano pago de Envio ativo. Você pode consultar o contrato de Correio, reduzir caixas, cancelar a renovação e ler ou exportar mensagens já armazenadas conforme seu acesso.",
   "viewSendingPlans": "Ver planos de Envio",
   "unavailableBody": "A contratação pelo painel ainda não está disponível nesta instalação. Peça ao responsável pela instalação as condições para habilitar uma licença de Correio. Preço e franquias precisam estar aprovados antes da compra.",
+  "subscriptionsPausedBody": "Novas assinaturas do Correio estão pausadas enquanto trocamos nosso provedor de envio de e-mail. Você poderá contratar assim que reabrirmos.",
   "recoveryReads": "Mensagens já armazenadas continuam disponíveis para leitura e exportação por quem tem acesso à caixa.",
   "quantity": "Quantas caixas incluir?",
   "quantityHint": "De 1 a 10.000 caixas. Pessoas e agentes usam uma caixa cada.",

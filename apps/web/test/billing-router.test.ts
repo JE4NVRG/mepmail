@@ -616,6 +616,7 @@ describe("billing router", () => {
       usage: { accepted: 0, reportedOverage: 0 },
       hasCustomer: false,
       hasLiveSubscription: false,
+      newSubscriptionsPaused: false,
       billingInterval: null,
       launchOffer: null,
     });
@@ -762,6 +763,25 @@ describe("billing router", () => {
       .where(eq(schema.teams.id, teamId));
     expect((await owner.billing.status()).hasLiveSubscription).toBe(false);
     expect(await owner.billing.checkout({ rung: "scale_500k" })).toEqual({
+      url: "https://checkout.stripe.com/c/cs_1",
+    });
+  });
+
+  it("checkout is refused while new subscriptions are paused; status says so", async () => {
+    vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "true");
+    const teamId = await createTeam(db);
+    await seedBuyer(teamId);
+    const owner = callerFor(teamId, "owner");
+    expect((await owner.billing.status()).newSubscriptionsPaused).toBe(true);
+    await expect(owner.billing.checkout({ rung: "pro_100k" })).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: "SEND_CHECKOUT_PAUSED",
+    });
+    expect(calls.customers).toEqual([]);
+    expect(calls.checkouts).toEqual([]);
+    vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false");
+    expect((await owner.billing.status()).newSubscriptionsPaused).toBe(false);
+    expect(await owner.billing.checkout({ rung: "pro_100k" })).toEqual({
       url: "https://checkout.stripe.com/c/cs_1",
     });
   });
