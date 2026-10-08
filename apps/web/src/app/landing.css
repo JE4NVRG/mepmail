@@ -837,9 +837,11 @@
   }
 }
 /* A badge "agent-ready" só entra quando sobra espaço para ela: em 1024–1099px
-   ela empurrava os rótulos da nav até a quebra de palavra. */
+   ela empurrava os rótulos da nav até a quebra de palavra. Com o "Novo" do
+   Correio a nav não cabe com ela em nenhuma largura (o header para em 1200px)
+   e a badge cobria "Produto"; enquanto o "Novo" estiver no ar, ela fica de fora. */
 @media (min-width: 1100px) {
-  .gtm-brand-badge {
+  .gtm-header:not(:has(.gtm-nav-new)) .gtm-brand-badge {
     display: inline-flex;
   }
 }

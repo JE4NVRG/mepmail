@@ -1,5 +1,5 @@
 // Artifact-only adapter: frozen next.config/start sources remain byte-identical.
-const path=require('path'),dist=".next-terms-2ff86e72",seen=new Set();
+const path=require('path'),dist=".next-inbox-36ed0367",seen=new Set();
 for(const app of ['web','docs']){
  const appRoot='/app/apps/'+app;
  let resolved;try{resolved=require.resolve('next/dist/server/config',{paths:[appRoot]});}catch{continue;}

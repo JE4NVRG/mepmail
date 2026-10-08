@@ -28,6 +28,24 @@
   },
   "releases": [
     {
+      "version": "0.54",
+      "date": "2026-10-08",
+      "title": "Caixa de entrada mais limpa",
+      "summary": "O Correio mostra mais e-mails por tela, com prévias legíveis e uma barra de leitura organizada.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "A lista mostra quase o dobro de e-mails por tela: remetente e data, assunto e uma linha de prévia.",
+            "A prévia mostra o texto que você leria, sem os endereços de links e imagens. A data segue os apps de e-mail: hora para hoje, “Ontem”, dia da semana e depois a data.",
+            "Na leitura, Responder e Encaminhar ficam à esquerda; mover para pasta, favorito, spam e lixeira, à direita. No celular, tudo cabe em duas linhas.",
+            "O e-mail aberto ocupa a altura da tela e rola uma vez só.",
+            "Enquanto as assinaturas estão pausadas, o aviso de pausa ocupa o lugar do anúncio no topo do site, e o selo do cabeçalho não cobre mais o menu."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.53",
       "date": "2026-10-08",
       "title": "Regras claras contra golpes",

@@ -7,6 +7,35 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.54] - 2026-10-08
+
+A cleaner Correio inbox.
+
+### Changed
+
+- List rows: sender and date, subject, one preview line. The "Personal
+  mailbox" chip is gone; the mailbox address shows only when rows of several
+  mailboxes are mixed; attachments show as a paperclip; the star sits on the
+  row's right edge, outside the open button.
+- `mailboxPreview` builds the list snippet: it drops the `[https://…]` and
+  `<https://…>` targets HTML-only mail carries as text, bare URLs and invisible
+  preheader padding, and collapses whitespace.
+- `mailboxListDate`: the time today, "yesterday", the weekday within the
+  week, day and month this year, a short date before.
+- Reader toolbar: Reply and Forward first; move to folder ("Move to folder…" /
+  "Remove from folder"), star, spam and trash as icons with labels on the
+  right; two rows on a phone. "Reply as draft" reads "Reply"; "Create email"
+  reads "New mailbox" and leaves the phone app bar.
+- The open message's frame fills the reader, so a long email scrolls once.
+- Public site: while new subscriptions are paused, the launch announcement
+  strip is not shown; the header's agent-ready badge stays hidden while the
+  Correio "New" pill is in the nav (together they overflowed the 1200px
+  header and the badge covered the first link).
+
+### Fixed
+
+- pt-BR: the system license badge read "Conta System".
+
 ## [0.53] - 2026-10-08
 
 Clear rules against scams.

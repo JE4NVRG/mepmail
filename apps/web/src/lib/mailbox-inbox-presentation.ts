@@ -109,3 +109,50 @@ export function mailboxOutboundPresentation(summary: OutboundSummary | null | un
     })),
   };
 }
+
+// Preheader padding and other characters that take no space on screen. The
+// combining grapheme joiner (U+034F) stays outside the class: in one, it would
+// read as combining with its neighbour.
+const INVISIBLE =
+  /\u034f|[\u00ad\u061c\u115f\u1160\u17b4\u17b5\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\u3164\ufeff\uffa0]/g;
+
+/**
+ * The list preview of a message body. HTML-only mail reaches us converted to
+ * text, with every link and image target written out as "[https://…]"; those
+ * targets, bare URLs and invisible preheader padding are dropped and runs of
+ * whitespace collapse, so the preview shows the words a reader would see.
+ */
+export function mailboxPreview(text: string, max = 160): string {
+  const clean = text
+    .replace(INVISIBLE, "")
+    .replace(/\[\s*(?:https?:\/\/|mailto:|cid:)[^\]]*\]/gi, " ")
+    .replace(/<\s*(?:https?:\/\/|mailto:)[^>]*>/gi, " ")
+    .replace(/\bhttps?:\/\/\S+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const chars = Array.from(clean);
+  return chars.length > max ? chars.slice(0, max).join("").trimEnd() : clean;
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * The date a message list shows, the way mail apps do: the time for today,
+ * "yesterday", the weekday within the last week, day and month this year,
+ * and a short full date before that. Both dates are read in local time.
+ */
+export function mailboxListDate(value: Date, now: Date, locale: string): string {
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((day(now) - day(value)) / DAY_MS);
+  if (days === 0)
+    return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(value);
+  if (days === 1) {
+    const word = new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(-1, "day");
+    return word.charAt(0).toLocaleUpperCase(locale) + word.slice(1);
+  }
+  if (days > 1 && days < 7)
+    return new Intl.DateTimeFormat(locale, { weekday: "short" }).format(value);
+  if (value.getFullYear() === now.getFullYear())
+    return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(value);
+  return new Intl.DateTimeFormat(locale, { dateStyle: "short" }).format(value);
+}

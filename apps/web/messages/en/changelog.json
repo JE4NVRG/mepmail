@@ -23,6 +23,24 @@
   },
   "releases": [
     {
+      "version": "0.54",
+      "date": "2026-10-08",
+      "title": "A cleaner inbox",
+      "summary": "Correio shows more mail per screen, with readable previews and a tidy reading toolbar.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "The list fits about twice as many emails per screen: sender and date, subject and one preview line.",
+            "Previews show the words you would read, without link and image addresses. Dates read like mail apps: the time today, “Yesterday”, the weekday, then the date.",
+            "When reading, Reply and Forward sit on the left; move to folder, favorite, spam and trash on the right. On a phone it all fits in two rows.",
+            "An open email takes the full height of the screen and scrolls once.",
+            "While subscriptions are paused, the pause notice takes the announcement's place at the top of the site, and the header badge no longer covers the menu."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.53",
       "date": "2026-10-08",
       "title": "Clear rules against scams",

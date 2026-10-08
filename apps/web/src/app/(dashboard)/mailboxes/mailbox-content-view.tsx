@@ -9,6 +9,7 @@ import { initialMailboxText, replaceMailboxSignature } from "@/lib/mailbox-compo
 import {
   type MailboxFolder,
   mailboxContentBlocked,
+  mailboxListDate,
   mailboxMessageActions,
   mailboxOutboundPresentation,
   mailboxPrimaryParticipant,
@@ -991,8 +992,10 @@ export function MailboxContentView({
     }
   }
   const hasRows = !listing.isError && !listing.isPending && rows.length > 0;
-  const shortDate = (value: Date) =>
-    new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(value);
+  const now = new Date();
+  const listDate = (value: Date) => mailboxListDate(value, now, locale);
+  // Which mailbox a row belongs to matters only when rows of several are mixed.
+  const showRowAddress = !selected && readable.length > 1;
   const canCompose = writable.length > 0 && (!selected || selected.canDraft);
   const newDraft = () => openComposer(selected?.id ?? writable[0]!.id, null);
   const folderTitle =
@@ -1155,6 +1158,11 @@ export function MailboxContentView({
                       !row.trashedAt &&
                       row.deliveryFolder !== "spam" &&
                       !(row.kind === "draft" && row.sendStatus && row.sendStatus !== "failed");
+                    const rowStatus =
+                      blocked ||
+                      !!rowApproval ||
+                      (!!row.approvalRequested && !row.sendStatus) ||
+                      !!row.sendStatus;
                     return (
                       <div className={styles.messageRow} key={rowKey(row)}>
                         <div className={styles.rowQuickActions}>
@@ -1181,22 +1189,6 @@ export function MailboxContentView({
                               />
                             </label>
                           ) : null}
-                          {rowOrganizable ? (
-                            <button
-                              type="button"
-                              className={styles.starButton}
-                              aria-label={t(
-                                row.starredAt
-                                  ? "organization.removeFavorite"
-                                  : "organization.addFavorite",
-                              )}
-                              aria-pressed={!!row.starredAt}
-                              disabled={starMutation.isPending || bulkBusy}
-                              onClick={() => void changeStar(row)}
-                            >
-                              <MailboxFolderIcon name="favorites" filled={!!row.starredAt} />
-                            </button>
-                          ) : null}
                         </div>
                         <button
                           type="button"
@@ -1217,44 +1209,68 @@ export function MailboxContentView({
                                 ? t("safety.quarantineTitle")
                                 : participant || t("noRecipient")}
                             </span>
+                            {!blocked && row.attachmentCount ? (
+                              <span
+                                className={styles.rowAttachment}
+                                role="img"
+                                aria-label={t("attachmentsCount", { count: row.attachmentCount })}
+                                title={t("attachmentsCount", { count: row.attachmentCount })}
+                              >
+                                <MailboxFolderIcon name="attachment" />
+                              </span>
+                            ) : null}
                             <time title={date(row.date)} dateTime={row.date.toISOString()}>
-                              {shortDate(row.date)}
+                              {listDate(row.date)}
                             </time>
                           </div>
                           <strong>
                             {blocked ? t("safety.blockedMessage") : row.subject || t("noSubject")}
                           </strong>
                           <p>{blocked ? t("safety.blockedPreview") : row.snippet}</p>
-                          <div className={styles.rowBadges}>
-                            <span>{t(`mailboxType.${row.mailboxKind}`)}</span>
-                            {blocked ? (
-                              <span className={styles.warningBadge}>{t("quarantine")}</span>
-                            ) : null}
-                            {!blocked && rowApproval ? (
-                              <span>
-                                {t(rowApproval.key, {
-                                  label: "label" in rowApproval ? rowApproval.label : "",
-                                })}
-                              </span>
-                            ) : null}
-                            {!blocked && row.approvalRequested && !row.sendStatus ? (
-                              <span className={styles.warningBadge}>{t("approval.requested")}</span>
-                            ) : null}
-                            {!blocked && row.sendStatus ? (
-                              <span>{t(`deliveryStatus.${row.sendStatus}`)}</span>
-                            ) : null}
-                          </div>
-                          <div className={styles.rowBottom}>
-                            {!selected ? (
-                              <small title={row.address}>{row.address}</small>
-                            ) : (
-                              <span />
-                            )}
-                            {!blocked && row.attachmentCount ? (
-                              <small>{t("attachmentsCount", { count: row.attachmentCount })}</small>
-                            ) : null}
-                          </div>
+                          {rowStatus ? (
+                            <div className={styles.rowBadges}>
+                              {blocked ? (
+                                <span className={styles.warningBadge}>{t("quarantine")}</span>
+                              ) : null}
+                              {!blocked && rowApproval ? (
+                                <span>
+                                  {t(rowApproval.key, {
+                                    label: "label" in rowApproval ? rowApproval.label : "",
+                                  })}
+                                </span>
+                              ) : null}
+                              {!blocked && row.approvalRequested && !row.sendStatus ? (
+                                <span className={styles.warningBadge}>
+                                  {t("approval.requested")}
+                                </span>
+                              ) : null}
+                              {!blocked && row.sendStatus ? (
+                                <span>{t(`deliveryStatus.${row.sendStatus}`)}</span>
+                              ) : null}
+                            </div>
+                          ) : null}
+                          {showRowAddress ? (
+                            <small className={styles.rowAddress} title={row.address}>
+                              {row.address}
+                            </small>
+                          ) : null}
                         </button>
+                        {rowOrganizable ? (
+                          <button
+                            type="button"
+                            className={`${styles.starButton} ${styles.rowStar}`}
+                            aria-label={t(
+                              row.starredAt
+                                ? "organization.removeFavorite"
+                                : "organization.addFavorite",
+                            )}
+                            aria-pressed={!!row.starredAt}
+                            disabled={starMutation.isPending || bulkBusy}
+                            onClick={() => void changeStar(row)}
+                          >
+                            <MailboxFolderIcon name="favorites" filled={!!row.starredAt} />
+                          </button>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -1332,23 +1348,50 @@ export function MailboxContentView({
                 >
                   ← {t("back")}
                 </button>
-                <span title={selectedBox?.address ?? selected?.address}>
-                  {selectedBox?.address ?? selected?.address ?? t("all")}
-                </span>
-                {canOrganizeItem && item ? (
-                  <div className={styles.organizationActions}>
+                {item || blockedRow ? null : (
+                  <span title={selectedBox?.address ?? selected?.address}>
+                    {selectedBox?.address ?? selected?.address ?? t("all")}
+                  </span>
+                )}
+                {item && actions?.canRespond ? (
+                  <div className={`${styles.contentActions} ${styles.replyActions}`}>
                     <button
                       type="button"
-                      className={`ms-btn ms-btn-ghost ${styles.starButton}`}
-                      aria-label={t(
-                        item.starredAt ? "organization.removeFavorite" : "organization.addFavorite",
-                      )}
-                      aria-pressed={!!item.starredAt}
-                      disabled={starMutation.isPending || bulkBusy}
-                      onClick={() => void changeStar(item)}
+                      className="ms-btn"
+                      disabled={
+                        pendingSentReply ||
+                        !!(item.kind === "draft" && sendState && sendState !== "failed")
+                      }
+                      aria-describedby={pendingSentReply ? "mailbox-sent-reply-pending" : undefined}
+                      onClick={() => openComposer(item.mailboxId, item)}
                     >
-                      <MailboxFolderIcon name="favorites" filled={!!item.starredAt} />
+                      <MailboxFolderIcon name={item.kind === "draft" ? "drafts" : "reply"} />
+                      {t(item.kind === "draft" ? "editDraft" : "replyDraft")}
                     </button>
+                    {item.kind !== "draft" ? (
+                      <button
+                        type="button"
+                        className="ms-btn ms-btn-ghost"
+                        aria-label={t("forward")}
+                        onClick={() => openComposer(item.mailboxId, item, "forward")}
+                      >
+                        <MailboxFolderIcon name="forward" />
+                        <span className={styles.narrowHidden}>{t("forward")}</span>
+                      </button>
+                    ) : selectedBox?.canSend && deliveryReady ? (
+                      <button
+                        type="button"
+                        className="ms-btn ms-btn-primary"
+                        disabled={!canSubmitDraft || sendMutation.isPending}
+                        onClick={() => void submitDraft()}
+                      >
+                        {t(sendState === "requesting" ? "sending" : "send")}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+                {canOrganizeItem && item ? (
+                  <div className={styles.organizationActions}>
                     {!availableFolders.isError ? (
                       <label>
                         <span className={styles.visuallyHidden}>
@@ -1363,7 +1406,13 @@ export function MailboxContentView({
                           }
                           onChange={(event) => void moveToFolder(event.target.value || null)}
                         >
-                          <option value="">{t("organization.defaultFolder")}</option>
+                          <option value="">
+                            {t(
+                              item.folderId
+                                ? "organization.removeFromFolder"
+                                : "organization.moveToFolderPlaceholder",
+                            )}
+                          </option>
                           {availableFolders.data?.map((entry) => (
                             <option key={entry.id} value={entry.id}>
                               {entry.name}
@@ -1372,80 +1421,55 @@ export function MailboxContentView({
                         </select>
                       </label>
                     ) : null}
-                  </div>
-                ) : null}
-                {item && actions?.canRespond ? (
-                  <div className={styles.contentActions}>
                     <button
                       type="button"
-                      className="ms-btn"
-                      disabled={
-                        pendingSentReply ||
-                        !!(item.kind === "draft" && sendState && sendState !== "failed")
-                      }
-                      aria-describedby={pendingSentReply ? "mailbox-sent-reply-pending" : undefined}
-                      onClick={() => openComposer(item.mailboxId, item)}
+                      className={`ms-btn ms-btn-ghost ${styles.starButton}`}
+                      aria-label={t(
+                        item.starredAt ? "organization.removeFavorite" : "organization.addFavorite",
+                      )}
+                      aria-pressed={!!item.starredAt}
+                      disabled={starMutation.isPending || bulkBusy}
+                      onClick={() => void changeStar(item)}
                     >
-                      {t(item.kind === "draft" ? "editDraft" : "replyDraft")}
+                      <MailboxFolderIcon name="favorites" filled={!!item.starredAt} />
                     </button>
-                    {item.kind !== "draft" ? (
-                      <button
-                        type="button"
-                        className="ms-btn ms-btn-ghost"
-                        onClick={() => openComposer(item.mailboxId, item, "forward")}
-                      >
-                        {t("forward")}
-                      </button>
-                    ) : selectedBox?.canSend && deliveryReady ? (
-                      <button
-                        type="button"
-                        className="ms-btn ms-btn-primary"
-                        disabled={!canSubmitDraft || sendMutation.isPending}
-                        onClick={() => void submitDraft()}
-                      >
-                        {t(sendState === "requesting" ? "sending" : "send")}
-                      </button>
-                    ) : null}
                   </div>
                 ) : null}
                 {actions?.canMoveToInbox || actions?.canMoveToSpam ? (
                   <button
                     type="button"
-                    className="ms-btn ms-btn-ghost"
+                    className={`ms-btn ms-btn-ghost ${styles.iconAction}`}
                     disabled={moveMutation.isPending}
+                    aria-label={t(actions.canMoveToInbox ? "safety.notSpam" : "safety.markSpam")}
+                    title={t(actions.canMoveToInbox ? "safety.notSpam" : "safety.markSpam")}
                     onClick={() =>
                       void moveDeliveryFolder(actions.canMoveToInbox ? "inbox" : "spam")
                     }
                   >
-                    {t(
-                      moveMutation.isPending
-                        ? "safety.moving"
-                        : actions.canMoveToInbox
-                          ? "safety.notSpam"
-                          : "safety.markSpam",
-                    )}
+                    <MailboxFolderIcon name={actions.canMoveToInbox ? "inbox" : "spam"} />
+                    {moveMutation.isPending ? <span>{t("safety.moving")}</span> : null}
                   </button>
                 ) : null}
                 {actions?.canMoveToTrash || actions?.canRestore ? (
                   <button
                     type="button"
-                    className={`ms-btn ms-btn-ghost ${actions.canRestore ? styles.restoreAction : styles.dangerAction}`}
+                    className={`ms-btn ms-btn-ghost ${actions.canRestore ? styles.restoreAction : `${styles.dangerAction} ${styles.iconAction}`}`}
                     disabled={
                       trashMutation.isPending ||
                       bulkBusy ||
                       moveMutation.isPending ||
                       !!(actionItem?.kind === "draft" && sendState && sendState !== "failed")
                     }
+                    aria-label={actions.canRestore ? undefined : t("moveToTrash")}
+                    title={actions.canRestore ? undefined : t("moveToTrash")}
                     onClick={() => void changeTrash(!actions.canRestore)}
                   >
                     <MailboxFolderIcon name={actions.canRestore ? "restore" : "trash"} />
-                    {t(
-                      trashMutation.isPending
-                        ? "movingTrash"
-                        : actions.canRestore
-                          ? "restoreMessage"
-                          : "moveToTrash",
-                    )}
+                    {trashMutation.isPending ? (
+                      <span>{t("movingTrash")}</span>
+                    ) : actions.canRestore ? (
+                      t("restoreMessage")
+                    ) : null}
                   </button>
                 ) : null}
               </div>
@@ -1505,7 +1529,6 @@ export function MailboxContentView({
                     <small>{date(item.date ?? item.updatedAt)}</small>
                   </header>
                   <div className={styles.messageBadges}>
-                    {selectedBox ? <span>{t(`mailboxType.${selectedBox.kind}`)}</span> : null}
                     {approval ? (
                       <span>
                         {t(approval.key, { label: "label" in approval ? approval.label : "" })}

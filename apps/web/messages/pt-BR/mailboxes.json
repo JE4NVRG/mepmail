@@ -3,7 +3,7 @@
   "subtitle": "Caixas para você, sua equipe e seus agentes.",
   "all": "Todas as caixas",
   "boxes": "Suas caixas",
-  "new": "Criar e-mail",
+  "new": "Nova caixa",
   "createFirst": "Criar seu primeiro e-mail",
   "manage": "Gerenciar caixa",
   "inbox": "Entrada",
@@ -71,7 +71,7 @@
   "openImage": "Abrir imagem {name}",
   "download": "Baixar",
   "editDraft": "Editar rascunho",
-  "replyDraft": "Responder em rascunho",
+  "replyDraft": "Responder",
   "forward": "Encaminhar",
   "forwardDraft": "Encaminhar mensagem",
   "forwardedBody": "\n\n---------- Mensagem encaminhada ----------\nDe: {sender}\nData: {date}\nPara: {recipients}\nAssunto: {subject}\n\n{text}",
@@ -117,7 +117,7 @@
   "contentPrivate": "Mensagens e anexos privados. Cada consulta confere novamente o acesso à caixa.",
   "paidService": "Serviço adicional pago",
   "system": {
-    "badge": "Conta System"
+    "badge": "Conta do sistema"
   },
   "preview": "Em prévia",
   "previewBody": "Prepare suas caixas e rascunhos. Recebimento e envio ainda não estão ativos.",
@@ -383,7 +383,8 @@
     "starred": "Mensagem adicionada aos favoritos.",
     "unstarred": "Mensagem removida dos favoritos.",
     "moveToFolder": "Mover para pasta",
-    "defaultFolder": "Pasta padrão",
+    "moveToFolderPlaceholder": "Mover para pasta…",
+    "removeFromFolder": "Tirar da pasta",
     "moved": "Mensagem movida para a pasta.",
     "boxesAndFolders": "Caixas e pastas",
     "selectAll": "Selecionar todas",

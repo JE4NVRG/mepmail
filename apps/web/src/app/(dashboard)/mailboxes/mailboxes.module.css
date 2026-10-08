@@ -1033,7 +1033,7 @@
 }
 .contentPanels {
   display: grid;
-  grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -1094,17 +1094,21 @@
   box-shadow: inset 2px 0 var(--ms-bone);
 }
 .messageRows strong {
-  margin: 7px 0 5px;
-  font-size: 14px;
+  margin: 3px 0 2px;
+  font-size: 13.5px;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .messageRows p {
-  margin: 5px 0 10px;
-  line-height: 1.55;
+  display: block;
+  margin: 0;
+  line-height: 1.45;
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rowMeta,
 .rowBottom {
@@ -1112,7 +1116,7 @@
   align-items: center;
   gap: 12px;
 }
-.rowMeta > span,
+.rowMeta > span:first-child,
 .rowBottom > small:first-child {
   min-width: 0;
   flex: 1;
@@ -1120,9 +1124,30 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.rowMeta > span {
+.rowMeta > span:first-child {
   font-size: 13px;
   font-weight: 500;
+}
+.rowAttachment {
+  flex: none;
+  display: inline-flex;
+  color: var(--ms-muted);
+}
+.rowAttachment svg {
+  width: 14px;
+  height: 14px;
+}
+.rowAddress {
+  margin-top: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.messageRows .rowBadges {
+  margin: 6px 0 0;
+}
+.messageBadges:empty {
+  display: none;
 }
 .rowMeta time,
 .rowBottom > small:last-child {
@@ -1713,6 +1738,7 @@
   color: var(--ms-violet);
 }
 .messageRow {
+  position: relative;
   display: flex;
   border-bottom: 1px solid var(--ms-line);
   min-width: 0;
@@ -1721,15 +1747,36 @@
   flex: 1;
   min-width: 0;
   border-bottom: 0;
-  padding-left: 8px;
+  padding: 11px 44px 11px 4px;
 }
 .rowQuickActions {
   display: flex;
   flex-direction: column;
   align-items: center;
   flex: none;
-  width: 44px;
-  padding-top: 15px;
+  width: 40px;
+  padding-top: 4px;
+}
+/* The star sits over the row's preview line, outside the row's open button. */
+.messageRow .rowStar {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--ms-muted);
+  cursor: pointer;
+  opacity: 0.55;
+}
+.messageRow:hover .rowStar,
+.messageRow .rowStar:focus-visible,
+.messageRow .rowStar[aria-pressed="true"] {
+  opacity: 1;
 }
 .rowQuickActions .starButton {
   display: grid;
@@ -1774,6 +1821,64 @@
 .contentDetail .detailTop > span {
   flex-basis: 100%;
   font-size: 11px;
+}
+.contentDetail .replyActions {
+  margin-right: auto;
+}
+/* Spam and trash read as icons, named by their tooltip and accessible label. */
+.contentDetail .iconAction {
+  min-width: 44px;
+  justify-content: center;
+}
+/* On a phone the reader keeps two rows: back, replies, spam and trash on the
+   first; moving to a folder and the star on the second. */
+@container (max-width: 760px) {
+  .contentDetail .detailTop {
+    gap: 4px;
+  }
+  .contentDetail .detailTop > button:not(.mobileBack) {
+    margin-left: 0;
+  }
+  .contentDetail .organizationActions {
+    order: 10;
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+  }
+  .contentDetail .organizationActions label {
+    flex: 1;
+  }
+  .contentDetail .organizationActions select {
+    width: 100%;
+    max-width: none;
+  }
+}
+@container (max-width: 480px) {
+  .contentDetail .replyActions {
+    width: auto;
+  }
+  .contentDetail .replyActions > button:last-child {
+    margin-left: 0;
+  }
+  .narrowHidden {
+    display: none;
+  }
+}
+/* The open message fills the reader: its frame takes the height left under
+   the header, so on most screens a long email scrolls once, inside the frame. */
+.contentDetail .message {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.contentDetail .richBody {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.contentDetail .htmlMessage {
+  flex: 1 0 320px;
+  height: auto;
+  min-height: 320px;
 }
 .contentDetail .dangerAction {
   color: var(--ms-danger);
@@ -2090,8 +2195,11 @@
     padding: 10px 12px;
   }
   .appActions {
-    width: 100%;
-    margin-left: 0;
+    margin-left: auto;
+  }
+  /* A new mailbox is a settings task; on a phone the inbox bar keeps to reading. */
+  .newMailboxAction {
+    display: none;
   }
   .settingsList li {
     flex-direction: column;

@@ -818,7 +818,7 @@ export function MailboxesView({
             {registry.data?.canManage ? (
               <button
                 type="button"
-                className="ms-btn ms-btn-primary"
+                className={`ms-btn ms-btn-primary ${styles.newMailboxAction}`}
                 disabled={!options.data}
                 onClick={() => setDialog("new")}
               >

@@ -1,11 +1,60 @@
 import { describe, expect, it } from "vitest";
 import {
   mailboxContentBlocked,
+  mailboxListDate,
   mailboxMessageActions,
   mailboxOutboundPresentation,
+  mailboxPreview,
   mailboxPrimaryParticipant,
   mailboxSendApproval,
 } from "../src/lib/mailbox-inbox-presentation";
+
+describe("mailbox list preview", () => {
+  it("drops the link and image targets HTML-only mail carries as text", () => {
+    expect(
+      mailboxPreview(
+        "Amazon [https://m.media-amazon.com/images/G/01/hero.png]\n\nYour AWS Activate application\n<https://aws.amazon.com/activate> was updated",
+      ),
+    ).toBe("Amazon Your AWS Activate application was updated");
+    expect(
+      mailboxPreview("Claude [https://claude.ai/images/email/logo.png] Seu link seguro está aqui"),
+    ).toBe("Claude Seu link seguro está aqui");
+  });
+
+  it("drops bare URLs, mailto and cid targets, and invisible preheader padding", () => {
+    expect(
+      mailboxPreview(
+        "Oi\u200c \u034f\u200b Jean, veja https://example.invalid/a?b=1 [mailto:a@b.invalid] [cid:logo]",
+      ),
+    ).toBe("Oi Jean, veja");
+  });
+
+  it("keeps bracketed words that are not targets and cuts on characters, not code units", () => {
+    expect(mailboxPreview("[Ação] pedido #12 confirmado")).toBe("[Ação] pedido #12 confirmado");
+    expect(mailboxPreview(`${"🙂".repeat(5)}abc`, 3)).toBe("🙂🙂🙂");
+    expect(mailboxPreview("   \n\t  ")).toBe("");
+  });
+});
+
+describe("mailbox list date", () => {
+  const now = new Date(2026, 9, 8, 15, 30);
+  it("shows the time today and 'yesterday' the day before", () => {
+    expect(mailboxListDate(new Date(2026, 9, 8, 9, 5), now, "pt-BR")).toBe("09:05");
+    expect(mailboxListDate(new Date(2026, 9, 7, 23, 59), now, "pt-BR")).toBe("Ontem");
+    expect(mailboxListDate(new Date(2026, 9, 7, 8, 0), now, "en")).toBe("Yesterday");
+  });
+
+  it("shows the weekday within the week, day and month this year, a full date before", () => {
+    expect(mailboxListDate(new Date(2026, 9, 5, 10, 0), now, "en")).toBe("Mon");
+    expect(mailboxListDate(new Date(2026, 8, 20, 10, 0), now, "pt-BR")).toBe("20 de set.");
+    expect(mailboxListDate(new Date(2026, 8, 20, 10, 0), now, "en")).toBe("Sep 20");
+    expect(mailboxListDate(new Date(2025, 11, 31, 10, 0), now, "pt-BR")).toBe("31/12/2025");
+  });
+
+  it("shows day and month for a date ahead of the clock", () => {
+    expect(mailboxListDate(new Date(2026, 9, 9, 10, 0), now, "en")).toBe("Oct 9");
+  });
+});
 
 const received = {
   kind: "inbox" as const,

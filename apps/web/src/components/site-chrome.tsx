@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { newSubscriptionsPaused } from "@/server/new-subscriptions";
 import { AdvertisingSettingsButton } from "./advertising-consent";
 import { LandingLangSwitch } from "./landing-lang-switch";
 import { LandingNav } from "./landing-nav";
@@ -129,7 +130,9 @@ export function PublicHeader({
         {labels.skip}
       </a>
       <SubscriptionsPausedNotice />
-      {banner}
+      {/* While sales are paused the pause notice takes the announcement's place:
+          what the announcement promotes cannot be bought until then. */}
+      {newSubscriptionsPaused() ? null : banner}
       <header className="gtm-header">
         <div className="gtm-container gtm-header-inner">
           <div className="gtm-brand-group">

@@ -20,6 +20,7 @@ import {
   mailboxReplyIds,
 } from "../../../../packages/core/src/mailbox-message-id";
 import { pilotImageMetadata } from "../../../../packages/core/src/mailbox-pilot-images";
+import { mailboxPreview } from "../lib/mailbox-inbox-presentation";
 import { getKeyring } from "./keyring";
 import { projectMailboxHtml } from "./mailbox-html";
 
@@ -371,7 +372,7 @@ export async function getMailboxContentList(
       from: item.from,
       fromName: item.fromName,
       to: item.to,
-      snippet: item.text.slice(0, 160),
+      snippet: mailboxPreview(item.text),
       date: item.date ?? row.updatedAt,
       attachmentCount: item.attachments.length,
       mailboxKind: row.mailboxKind,
