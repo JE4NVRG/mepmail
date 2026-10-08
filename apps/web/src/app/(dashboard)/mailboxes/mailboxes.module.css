@@ -713,6 +713,15 @@
 .composerAddressFields > label {
   min-width: 0;
 }
+/* Cc, or the button that reveals it, spans the row under From and To. */
+.composerAddressFields > :nth-child(3) {
+  grid-column: 1 / -1;
+}
+.addCc {
+  justify-self: start;
+  margin-top: -6px;
+  font-size: 12px;
+}
 .composer input:not([type="file"]),
 .composer select {
   min-height: 44px;
@@ -1906,6 +1915,10 @@
   }
 }
 @container (max-width: 480px) {
+  .contentToolbar .contentActions {
+    width: auto;
+    margin-left: auto;
+  }
   .contentDetail .replyActions {
     width: auto;
   }
@@ -1939,6 +1952,9 @@
 .contentDetail .restoreAction {
   border-color: var(--ms-violet-border);
   color: var(--ms-violet);
+}
+.backShort {
+  display: none;
 }
 /* One quiet row under the search: select-all on the left, count or bulk action on the right. */
 .selectionToolbar {
@@ -2254,6 +2270,31 @@
   /* A new mailbox is a settings task; on a phone the inbox bar keeps to reading. */
   .newMailboxAction {
     display: none;
+  }
+  /* One compact row on a phone: brand, Inbox/Settings tabs, the way back. */
+  .appBar {
+    gap: 6px 10px;
+    padding: 8px 10px;
+  }
+  .appBar .serviceBadge {
+    display: none;
+  }
+  .appTabs {
+    margin-left: 0;
+  }
+  .appTabs a {
+    padding: 6px 8px;
+    font-size: 12.5px;
+  }
+  .appActions :global(.ms-btn) {
+    padding: 6px 8px;
+    font-size: 12.5px;
+  }
+  .backLong {
+    display: none;
+  }
+  .backShort {
+    display: inline;
   }
   .settingsList li {
     flex-direction: column;

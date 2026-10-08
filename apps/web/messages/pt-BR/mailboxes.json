@@ -454,7 +454,8 @@
       "boxes": "Caixas",
       "agents": "Agentes",
       "license": "Licença e uso"
-    }
+    },
+    "backShort": "Voltar"
   },
   "archive": "Arquivo",
   "archiveEmptyTitle": "Nada arquivado",
@@ -489,5 +490,9 @@
     "saving": "Salvando…",
     "invalid": "Confira o telefone (só números, +, -, parênteses) e o site.",
     "error": "Não foi possível salvar a assinatura. Tente de novo."
-  }
+  },
+  "replyAll": "Responder a todos",
+  "cc": "Cc",
+  "addCc": "Adicionar Cc",
+  "replyQuote": "Em {date}, {sender} escreveu:\n{text}"
 }

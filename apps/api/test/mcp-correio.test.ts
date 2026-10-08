@@ -98,6 +98,7 @@ it("lists the mailbox tools and forwards each call with the agent key", async ()
     name: "mailbox_save_draft",
     arguments: {
       to: ["ana@example.com"],
+      cc: ["copia@example.com"],
       subject: "Oi",
       text: "Olá",
       mode: "reply",
@@ -124,6 +125,7 @@ it("lists the mailbox tools and forwards each call with the agent key", async ()
     sourceItemId: "00000000-0000-4000-8000-000000000002",
     mode: "reply",
     to: ["ana@example.com"],
+    cc: ["copia@example.com"],
     subject: "Oi",
     text: "Olá",
     retainedAttachments: [],

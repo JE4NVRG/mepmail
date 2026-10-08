@@ -454,7 +454,8 @@
       "boxes": "Mailboxes",
       "agents": "Agents",
       "license": "License and usage"
-    }
+    },
+    "backShort": "Back"
   },
   "archive": "Archive",
   "archiveEmptyTitle": "Nothing archived",
@@ -489,5 +490,9 @@
     "saving": "Saving…",
     "invalid": "Check the phone (digits, +, -, parentheses only) and the website.",
     "error": "The signature could not be saved. Try again."
-  }
+  },
+  "replyAll": "Reply all",
+  "cc": "Cc",
+  "addCc": "Add Cc",
+  "replyQuote": "On {date}, {sender} wrote:\n{text}"
 }

@@ -167,6 +167,26 @@ describe("private mailbox HTML projection", () => {
     expect(result.htmlBodyWithExternalImages).not.toMatch(/127\.0\.0\.1|hidden\.example/);
   });
 
+  it("shows images from our own storage at once, keeping only their pixel size", () => {
+    const html =
+      '<img src="https://assets.example.com/logos/a.png" alt="Logo" width="96" height="48" onerror="x()">' +
+      '<img src="https://assets.example.com.evil.example/b.png" alt="Lookalike">' +
+      '<img src="https://other.example/c.png" alt="Other" width="100%">';
+    const result = projectMailboxHtml(html, [], {
+      trustedImagePrefix: "https://assets.example.com/",
+    });
+    expect(result.htmlBody).toContain(
+      '<img src="https://assets.example.com/logos/a.png" alt="Logo" width="96" height="48" />',
+    );
+    expect(result.htmlBody).not.toMatch(/onerror|evil\.example|other\.example/);
+    expect(result.externalImages).toBe(2);
+    expect(result.htmlBodyWithExternalImages).toContain(
+      'src="https://other.example/c.png" alt="Other" />',
+    );
+    // Without a configured store nothing is trusted.
+    expect(projectMailboxHtml(html, []).externalImages).toBe(3);
+  });
+
   it("projects external URLs locally without fetching or rewriting them through a private proxy", () => {
     const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       throw new Error("Network is disabled in this projection test");

@@ -14,6 +14,13 @@ const BORDER =
 function contentId(value: string) {
   return value.trim().replace(/^<|>$/g, "");
 }
+/** A plain pixel width/height (a signature logo's display size); nothing else. */
+function imageSize(attrs: sanitizeHtml.Attributes) {
+  const size: Record<string, string> = {};
+  for (const name of ["width", "height"])
+    if (/^\d{1,4}$/.test(attrs[name] ?? "")) size[name] = attrs[name] as string;
+  return size;
+}
 function externalImage(value: string) {
   try {
     const url = new URL(value);
@@ -54,6 +61,9 @@ function tableCell(tagName: string) {
 export function projectMailboxHtml(
   html: string | false | undefined,
   attachments: InlineAttachment[],
+  /** https URLs under this prefix (our own public storage, e.g. signature
+   * logos) show at once: they reveal nothing to a third party. */
+  options: { trustedImagePrefix?: string | null } = {},
 ) {
   if (!html || html.length > MAX_HTML)
     return { htmlBody: null, htmlBodyWithExternalImages: null, externalImages: 0 };
@@ -172,13 +182,18 @@ export function projectMailboxHtml(
           const embedded = /^cid:/i.test(source) ? inline.get(contentId(source.slice(4))) : null;
           if (embedded && embedded.length <= inlineBudget) {
             inlineBudget -= embedded.length;
-            return { tagName: "img", attribs: { src: embedded, alt: attrs.alt ?? "" } };
+            return {
+              tagName: "img",
+              attribs: { src: embedded, alt: attrs.alt ?? "", ...imageSize(attrs) },
+            };
           }
           const remote = externalImage(source);
           if (remote) {
+            const shown = { src: remote, alt: attrs.alt ?? "", ...imageSize(attrs) };
+            if (options.trustedImagePrefix && remote.startsWith(options.trustedImagePrefix))
+              return { tagName: "img", attribs: shown };
             if (!allowExternal) externalImages++;
-            if (allowExternal)
-              return { tagName: "img", attribs: { src: remote, alt: attrs.alt ?? "" } };
+            else return { tagName: "img", attribs: shown };
           }
           return { tagName: "span", attribs: {}, text: attrs.alt ?? "" };
         },

@@ -21,10 +21,12 @@ import {
   mailboxReplyIds,
 } from "../../../../packages/core/src/mailbox-message-id";
 import { pilotImageMetadata } from "../../../../packages/core/src/mailbox-pilot-images";
+import { mailboxSignature } from "../lib/mailbox-compose-signature";
 import { mailboxPreview } from "../lib/mailbox-inbox-presentation";
-import { mailboxDraftHtml } from "../lib/mailbox-signature";
+import { mailboxDraftHtml, mailboxSignatureText } from "../lib/mailbox-signature";
 import { getKeyring } from "./keyring";
 import { projectMailboxHtml } from "./mailbox-html";
+import { publicStorageOrigin, publicStoragePrefix } from "./storage";
 
 const MAX_MIME = 1024 * 1024;
 const MAX_ATTACHMENT = 256 * 1024;
@@ -85,10 +87,14 @@ function dto(mime: Awaited<ReturnType<typeof parse>>) {
     from: mime.from?.value[0]?.address ?? "",
     fromName: mime.from?.value[0]?.name ?? "",
     to: addresses(mime.to),
+    cc: addresses(mime.cc),
     replyTo: mime.replyTo?.value[0]?.address ?? mime.from?.value[0]?.address ?? "",
     text: mime.text ?? "",
     hasHtmlBody: typeof mime.html === "string" && mime.html.length > 0,
-    ...projectMailboxHtml(mime.html, mime.attachments),
+    ...projectMailboxHtml(mime.html, mime.attachments, {
+      trustedImagePrefix: publicStoragePrefix(),
+    }),
+    trustedImageOrigin: publicStorageOrigin(),
     date: mime.date && !Number.isNaN(mime.date.getTime()) ? mime.date : null,
     attachments: mime.attachments.map((a, index) => {
       const image = pilotImageMetadata(a.content);
@@ -461,6 +467,7 @@ export interface MailboxDraftInput {
   sourceItemId?: string | undefined;
   mode?: "reply" | "forward" | undefined;
   to: string[];
+  cc?: string[] | undefined;
   subject: string;
   text: string;
   retainedAttachments: number[];
@@ -491,6 +498,7 @@ export async function saveMailboxContentDraft(
   input = {
     ...input,
     to: [...input.to],
+    ...(input.cc ? { cc: [...input.cc] } : {}),
     retainedAttachments: [...input.retainedAttachments],
     uploads: input.uploads.map((upload) => ({ ...upload })),
   };
@@ -499,6 +507,17 @@ export async function saveMailboxContentDraft(
     (b) => b.id === input.mailboxId && b.canDraft && b.status === "planned",
   );
   if (!box) throw new MailboxContentError("forbidden");
+  const cc = input.cc ?? [];
+  // Sending counts To and Cc together against the same 20-recipient cap.
+  if (input.to.length + cc.length > 20) throw new MailboxContentError("invalid");
+  const signature = { profile: box.signatureProfile, text: box.signatureText };
+  const footer = mailboxSignature(mailboxSignatureText(signature));
+  // Agents write plain text through the API; their mailbox's signature is
+  // added the way the composer adds it for people, once.
+  const text =
+    actor.agentAccess && footer && !input.text.includes(footer)
+      ? `${input.text.replace(/\s+$/, "")}${footer}`
+      : input.text;
   const mode = input.mode ?? "reply";
   if (mode !== "reply" && mode !== "forward") throw new MailboxContentError("invalid");
   // Forward creates a new message from an authorized Inbox/Sent item. Editing
@@ -580,14 +599,12 @@ export async function saveMailboxContentDraft(
   const result = await transport.sendMail({
     from: box.address,
     to: input.to,
+    ...(cc.length ? { cc } : {}),
     subject: input.subject,
-    text: input.text,
+    text,
     // The same words as HTML, with the mailbox's signature formatted where the
     // composer placed it. Rebuilt from the text on every save.
-    html: mailboxDraftHtml(input.text, {
-      profile: box.signatureProfile,
-      text: box.signatureText,
-    }),
+    html: mailboxDraftHtml(text, signature),
     messageId: input.id ? originalId : `<${randomUUID()}@${box.address.split("@")[1]}>`,
     inReplyTo:
       mode === "forward"

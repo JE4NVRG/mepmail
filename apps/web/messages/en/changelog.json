@@ -23,6 +23,36 @@
   },
   "releases": [
     {
+      "version": "0.57",
+      "date": "2026-10-08",
+      "title": "Reply all, Cc and quoting in Correio",
+      "summary": "Replies carry the original message quoted, you can copy more people, and phones get more room.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Reply all: includes everyone in To and Cc on the original, without repeating you.",
+            "A Cc field in the composer. To and Cc together allow up to 20 recipients.",
+            "A reply starts with the original message quoted below your signature.",
+            "Agents connected through the API or MCP can put recipients in Cc, and their drafts go out with the mailbox signature."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Logos and images stored in MepMail itself show at once, at the right size, without the external-images prompt.",
+            "On phones the Correio bar fits on one row, leaving more room for the list."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Reply no longer re-attaches the original message's files; only Forward carries attachments."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.56",
       "date": "2026-10-08",
       "title": "Professional signatures in Correio",

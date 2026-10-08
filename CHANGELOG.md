@@ -7,6 +7,40 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.57] - 2026-10-08
+
+Reply all, Cc and reply quoting in Correio.
+
+### Added
+
+- Cc on Correio drafts: `mailboxes.saveDraft` and `/api/mailbox-agent/drafts`
+  take an optional `cc` list (the agent route stays strict), written to the
+  MIME `Cc` header; To and Cc together are capped at the transport's 20
+  recipients. The reader DTO exposes `cc`.
+- Reply all in the reader (when the original had more than one recipient):
+  To is the reply address and Cc everyone else on the original's To and Cc,
+  without this mailbox or duplicates.
+- Replies start with the original quoted as `> ` lines under an
+  "On <date>, <sender> wrote:" line, below the managed signature footer, so
+  the HTML part renders it as a quote block.
+- The MCP `mailbox_save_draft` tool takes `cc` (at most 19).
+- Agent drafts get the mailbox's managed signature footer appended once
+  (not when the text already carries it), and so its formatted HTML.
+
+### Changed
+
+- `projectMailboxHtml` accepts a trusted image prefix: https images under our
+  own public storage (`publicStoragePrefix()`, e.g. signature logos) show
+  without the external-images prompt, and the reader's CSP `img-src` allows
+  that origin. Shown images keep a plain pixel `width`/`height`.
+- On phones the Correio app bar is one compact row: icon-only folder menu,
+  no service badge, a short "Back" link.
+
+### Fixed
+
+- Replying no longer retains the original's attachments; only forwarding
+  and editing a draft keep them.
+
 ## [0.56] - 2026-10-08
 
 Professional email signatures in Correio.

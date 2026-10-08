@@ -525,8 +525,11 @@ export function MailboxesView({
             <span>{t("title")}</span>
           </Link>
           <div className={styles.appActions}>
-            <Link className="ms-btn ms-btn-ghost" href="/emails">
-              {t("app.back")}
+            <Link className="ms-btn ms-btn-ghost" href="/emails" aria-label={t("app.back")}>
+              <span className={styles.backLong}>{t("app.back")}</span>
+              <span className={styles.backShort} aria-hidden="true">
+                {t("app.backShort")}
+              </span>
             </Link>
           </div>
         </header>
@@ -908,8 +911,11 @@ export function MailboxesView({
                 + {t("new")}
               </button>
             ) : null}
-            <Link className="ms-btn ms-btn-ghost" href="/emails">
-              {t("app.back")}
+            <Link className="ms-btn ms-btn-ghost" href="/emails" aria-label={t("app.back")}>
+              <span className={styles.backLong}>{t("app.back")}</span>
+              <span className={styles.backShort} aria-hidden="true">
+                {t("app.backShort")}
+              </span>
             </Link>
           </div>
         </header>

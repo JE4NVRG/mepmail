@@ -28,6 +28,36 @@
   },
   "releases": [
     {
+      "version": "0.57",
+      "date": "2026-10-08",
+      "title": "Responder a todos, Cc e citação no Correio",
+      "summary": "As respostas trazem a mensagem original citada, dá para copiar mais gente e o celular ganhou espaço.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Responder a todos: inclui quem estava em Para e Cc na mensagem original, sem repetir você.",
+            "Campo Cc no editor. Para e Cc somam até 20 destinatários.",
+            "A resposta já vem com a mensagem original citada abaixo da sua assinatura.",
+            "Agentes conectados pela API ou MCP podem colocar destinatários em Cc, e os rascunhos deles saem com a assinatura da caixa."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Logos e imagens guardados no próprio MepMail aparecem na hora, no tamanho certo, sem o aviso de imagens externas.",
+            "No celular, a barra do Correio ocupa uma linha só e sobra mais espaço para a lista."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Responder não anexa de novo os arquivos da mensagem original; só Encaminhar leva os anexos."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.56",
       "date": "2026-10-08",
       "title": "Assinatura profissional no Correio",

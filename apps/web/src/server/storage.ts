@@ -75,6 +75,23 @@ export async function deletePublicObject(key: string): Promise<void> {
   }
 }
 
+/** "https://assets.example/" when public storage is configured, else null. */
+export function publicStoragePrefix(): string | null {
+  const cfg = storageConfig();
+  return cfg ? `${cfg.publicUrl}/` : null;
+}
+
+/** The origin of our public storage, for a Content-Security-Policy img-src. */
+export function publicStorageOrigin(): string | null {
+  const cfg = storageConfig();
+  if (!cfg) return null;
+  try {
+    return new URL(cfg.publicUrl).origin;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Object key encoded in a stored public URL (path under S3_STORAGE_PUBLIC_URL,
  * cache-buster query stripped), or null for a URL outside the current bucket.

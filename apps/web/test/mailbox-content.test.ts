@@ -27,7 +27,11 @@ import { simpleParser } from "mailparser";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/mailboxes/[mailboxId]/items/[id]/attachments/[index]/route";
 import { getKeyring } from "@/server/keyring";
-import { getMailboxContent, getMailboxContentList } from "@/server/mailbox-content";
+import {
+  getMailboxContent,
+  getMailboxContentList,
+  saveMailboxContentDraft,
+} from "@/server/mailbox-content";
 import { mailboxTransportMime } from "@/server/mailbox-transport";
 import { mailboxesRouter } from "@/server/routers/mailboxes";
 import { type Context, createCallerFactory, createContext, router } from "@/server/trpc";
@@ -1155,12 +1159,72 @@ describe("session-authenticated mailbox content", () => {
     expect(mime.html).toContain('href="https://mepmail.dev/"');
     expect(mime.html).not.toContain("<Vargas>");
     // A footer the author edited stays text in the HTML part.
-    const edited = await as().saveDraft(draft({ text: ["Olá!", "", "--", "Jean, editado"].join("\n") }));
+    const edited = await as().saveDraft(
+      draft({ text: ["Olá!", "", "--", "Jean, editado"].join("\n") }),
+    );
     const plain = await simpleParser(
       (await readMailboxItem(db, keys, actor(), { mailboxId, id: edited.id })).raw,
     );
     expect(plain.html).not.toContain("<table");
     expect(plain.html).toContain("Jean, editado");
+  });
+  it("copies Cc into the draft and the reader, counting To and Cc against one cap", async () => {
+    const saved = await as().saveDraft(
+      draft({ cc: ["copy@example.invalid", "finance@example.invalid"] }),
+    );
+    const mime = await simpleParser(
+      (await readMailboxItem(db, keys, actor(), { mailboxId, id: saved.id })).raw,
+    );
+    const cc = Array.isArray(mime.cc) ? mime.cc : mime.cc ? [mime.cc] : [];
+    expect(cc.flatMap((v) => v.value).map((v) => v.address)).toEqual([
+      "copy@example.invalid",
+      "finance@example.invalid",
+    ]);
+    const detail = await as().item({ mailboxId, id: saved.id });
+    expect(detail.to).toEqual(["reply@example.invalid"]);
+    expect(detail.cc).toEqual(["copy@example.invalid", "finance@example.invalid"]);
+    const many = (n: number, at: string) =>
+      Array.from({ length: n }, (_, i) => `r${i}@${at}.invalid`);
+    await expect(
+      as().saveDraft(draft({ to: many(15, "to"), cc: many(6, "cc") })),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(
+      (await as().saveDraft(draft({ to: many(14, "to"), cc: many(6, "cc") }))).id,
+    ).toBeTruthy();
+  });
+  it("adds the mailbox signature to agent drafts once, formatted in the HTML part", async () => {
+    await updateMailboxSignature(db, actor(), {
+      mailboxId,
+      name: "Jean",
+      title: "",
+      company: "MepMail",
+      phone: "",
+      website: "",
+      text: "",
+    });
+    const footer = ["", "", "--", "Jean", "MepMail"].join("\n");
+    const agent = { ...actor(), agentAccess: true };
+    const first = await saveMailboxContentDraft(db, agent, draft({ text: "Olá!\n\n" }));
+    const read = async (id: string) =>
+      simpleParser((await readMailboxItem(db, keys, actor(), { mailboxId, id })).raw);
+    const signed = await read(first.id);
+    expect(signed.text?.trim()).toBe(`Olá!${footer}`.trim());
+    expect(signed.html).toContain('<table role="presentation"');
+    // Saving the same text again (an edit) does not stack a second signature.
+    const again = await saveMailboxContentDraft(
+      db,
+      agent,
+      draft({
+        id: first.id,
+        sourceItemId: first.id,
+        expectedRevision: first.revision,
+        text: `Olá!${footer}`,
+      }),
+    );
+    expect((await read(again.id)).text?.split("--").length).toBe(2);
+    // People write in the composer, which places the signature itself.
+    const human = await as().saveDraft(draft({ text: "Sem assinatura" }));
+    expect((await read(human.id)).text?.trim()).toBe("Sem assinatura");
   });
   it("reads, archives and counts unread mail through the router, in arrival order", async () => {
     const older = await imported("fixture:older");

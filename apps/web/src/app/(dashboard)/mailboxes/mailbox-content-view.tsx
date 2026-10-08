@@ -5,8 +5,11 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { useLocale, useTranslations } from "next-intl";
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
-import { initialMailboxText, replaceMailboxSignature } from "@/lib/mailbox-compose-signature";
-import { mailboxSignatureText } from "@/lib/mailbox-signature";
+import {
+  initialMailboxText,
+  mailboxSignature,
+  replaceMailboxSignature,
+} from "@/lib/mailbox-compose-signature";
 import {
   type MailboxFolder,
   mailboxContentBlocked,
@@ -16,6 +19,7 @@ import {
   mailboxPrimaryParticipant,
   mailboxSendApproval,
 } from "@/lib/mailbox-inbox-presentation";
+import { mailboxSignatureText } from "@/lib/mailbox-signature";
 import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
@@ -26,7 +30,24 @@ type Outputs = inferRouterOutputs<AppRouter>["mailboxes"];
 type Box = Outputs["list"]["mailboxes"][number];
 type Item = Outputs["item"];
 type Folder = MailboxFolder;
-type ComposeMode = "reply" | "forward";
+type ComposeMode = "reply" | "replyAll" | "forward";
+const addressList = (value: string) =>
+  value
+    .split(/[,;]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+/** Everyone on the original except this mailbox and whoever is already in To. */
+function replyAllCopies(source: Item, own: string, to: string[]) {
+  const skip = new Set([own, ...to].map((address) => address.toLowerCase()));
+  const copies: string[] = [];
+  for (const address of [...source.to, ...source.cc]) {
+    const key = address.toLowerCase();
+    if (skip.has(key)) continue;
+    skip.add(key);
+    copies.push(address);
+  }
+  return copies;
+}
 type SendState = "requesting" | Outputs["queueDraft"]["status"];
 const NIL = "00000000-0000-0000-0000-000000000000";
 function SendResults({
@@ -200,6 +221,16 @@ function DraftDialog({
           : source.replyTo
       : "",
   );
+  const [cc, setCc] = useState(
+    source
+      ? source.kind === "draft"
+        ? source.cc.join(", ")
+        : mode === "replyAll"
+          ? replyAllCopies(source, sender?.address ?? "", addressList(source.replyTo)).join(", ")
+          : ""
+      : "",
+  );
+  const [showCc, setShowCc] = useState(cc !== "");
   const [subject, setSubject] = useState(
     source
       ? source.kind === "draft"
@@ -213,8 +244,24 @@ function DraftDialog({
             : `Re: ${source.subject}`
       : "",
   );
-  const [text, setText] = useState(() =>
-    initialMailboxText(
+  const [text, setText] = useState(() => {
+    if (source && source.kind !== "draft" && mode !== "forward") {
+      // A reply quotes the original under the signature, the way mail apps do.
+      const quote = t("replyQuote", {
+        date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
+          source.date ?? source.updatedAt,
+        ),
+        sender: source.fromName ? `${source.fromName} <${source.from}>` : source.from,
+        text: source.text
+          .slice(0, 100_000)
+          .split("\n")
+          .map((line) => `> ${line}`)
+          .join("\n"),
+      });
+      const footer = mailboxSignature(senderSignature);
+      return footer ? `${footer}\n\n${quote}` : `\n\n${quote}`;
+    }
+    return initialMailboxText(
       source?.kind === "draft"
         ? source.text
         : source && mode === "forward"
@@ -234,9 +281,14 @@ function DraftDialog({
           : "",
       source?.kind === "draft" ? "" : senderSignature,
       source?.kind !== "draft" && mode === "forward",
-    ),
+    );
+  });
+  // A forward (or an edited draft) carries the attachments; a reply, like mail apps, does not.
+  const [retained, setRetained] = useState(
+    source && (source.kind === "draft" || mode === "forward")
+      ? source.attachments.map((a) => a.index)
+      : [],
   );
-  const [retained, setRetained] = useState(source?.attachments.map((a) => a.index) ?? []);
   const [uploads, setUploads] = useState<{ id: number; filename: string; base64: string }[]>([]);
   const uploadSequence = useRef(0);
   const [loadingFiles, loadFiles] = useState(false);
@@ -361,11 +413,9 @@ function DraftDialog({
               id: source?.kind === "draft" ? source.id : undefined,
               expectedRevision: source?.kind === "draft" ? source.revision : 0,
               sourceItemId: source?.id,
-              mode: source?.kind === "draft" ? undefined : mode,
-              to: to
-                .split(/[,;]/)
-                .map((v) => v.trim())
-                .filter(Boolean),
+              mode: source?.kind === "draft" ? undefined : mode === "forward" ? "forward" : "reply",
+              to: addressList(to),
+              ...(showCc && addressList(cc).length ? { cc: addressList(cc) } : {}),
               subject,
               text,
               retainedAttachments: retained,
@@ -432,6 +482,26 @@ function DraftDialog({
                   autoFocus={!source || mode === "forward"}
                 />
               </label>
+              {showCc ? (
+                <label>
+                  {t("cc")}
+                  <input
+                    className="ms-input"
+                    value={cc}
+                    onChange={(e) => setCc(e.target.value)}
+                    placeholder={t("composeRecipientPlaceholder")}
+                    maxLength={5100}
+                  />
+                </label>
+              ) : (
+                <button
+                  type="button"
+                  className={`ms-btn ms-btn-ghost ${styles.addCc}`}
+                  onClick={() => setShowCc(true)}
+                >
+                  {t("addCc")}
+                </button>
+              )}
             </div>
             <label>
               {t("subject")}
@@ -1221,10 +1291,11 @@ export function MailboxContentView({
             className={`ms-btn ms-btn-ghost ${styles.mobileFolderMenu}`}
             aria-controls="mailbox-folders-navigation"
             aria-expanded={navigationExpanded}
+            aria-label={t("organization.boxesAndFolders")}
             onClick={() => setNavigationExpanded((value) => !value)}
           >
             <MailboxFolderIcon name="custom" />
-            {t("organization.boxesAndFolders")}
+            <span className={styles.narrowHidden}>{t("organization.boxesAndFolders")}</span>
           </button>
           {notice ? (
             <p role="alert" className={styles.contentNotice}>
@@ -1652,6 +1723,18 @@ export function MailboxContentView({
                       <MailboxFolderIcon name={item.kind === "draft" ? "drafts" : "reply"} />
                       {t(item.kind === "draft" ? "editDraft" : "replyDraft")}
                     </button>
+                    {item.kind !== "draft" && item.to.length + item.cc.length > 1 ? (
+                      <button
+                        type="button"
+                        className="ms-btn ms-btn-ghost"
+                        aria-label={t("replyAll")}
+                        disabled={pendingSentReply}
+                        onClick={() => openComposer(item.mailboxId, item, "replyAll")}
+                      >
+                        <MailboxFolderIcon name="replyAll" />
+                        <span className={styles.narrowHidden}>{t("replyAll")}</span>
+                      </button>
+                    ) : null}
                     {item.kind !== "draft" ? (
                       <button
                         type="button"
@@ -1901,6 +1984,7 @@ export function MailboxContentView({
                     html={item.htmlBody}
                     externalHtml={item.htmlBodyWithExternalImages}
                     externalImages={item.externalImages}
+                    trustedImageOrigin={item.trustedImageOrigin}
                   />
                   {item.attachments.length ? (
                     <section aria-label={t("attachments")} className={styles.attachments}>

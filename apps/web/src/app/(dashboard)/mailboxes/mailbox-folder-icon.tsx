@@ -6,6 +6,7 @@ type MailboxIconName =
   | "restore"
   | "attachment"
   | "reply"
+  | "replyAll"
   | "forward"
   | "read"
   | "unread";
@@ -32,6 +33,7 @@ export function MailboxFolderIcon({
     attachment:
       "m20.5 11.5-8.4 8.4a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8",
     reply: "M9 14 4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11",
+    replyAll: "M7 14 2 9l5-5 M12 14 7 9l5-5 M7 9h9.5a5.5 5.5 0 0 1 0 11H14",
     forward: "m15 14 5-5-5-5 M20 9H9.5a5.5 5.5 0 0 0 0 11H13",
     read: "M3 10 12 4l9 6v10H3z M3 10l9 6 9-6",
     unread: "M3 6h18v13H3z M3 7l9 6 9-6",

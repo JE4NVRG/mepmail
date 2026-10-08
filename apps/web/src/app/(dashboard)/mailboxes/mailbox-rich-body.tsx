@@ -9,18 +9,21 @@ export function MailboxRichBody({
   html,
   externalHtml,
   externalImages,
+  trustedImageOrigin = null,
 }: {
   text: string;
   html: string | null;
   externalHtml: string | null;
   externalImages: number;
+  /** Our own public storage (signature logos): its images load without asking. */
+  trustedImageOrigin?: string | null;
 }) {
   const t = useTranslations("mailboxes");
   const [formatted, setFormatted] = useState(!!html);
   const [showImages, setShowImages] = useState(false);
   const body = showImages && externalHtml ? externalHtml : html;
   // The HTML is sanitized on the server. This frame also isolates styles and navigation.
-  const document = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:${showImages ? " https:" : ""}; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'"><meta name="referrer" content="no-referrer"><style>html{color-scheme:light}body{margin:0;padding:20px;color:#202124;background:#fff;font:14px/1.6 Arial,sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}a{color:#6741c5}</style></head><body>${body ?? ""}</body></html>`;
+  const document = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:${trustedImageOrigin ? ` ${trustedImageOrigin}` : ""}${showImages ? " https:" : ""}; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'"><meta name="referrer" content="no-referrer"><style>html{color-scheme:light}body{margin:0;padding:20px;color:#202124;background:#fff;font:14px/1.6 Arial,sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}a{color:#6741c5}</style></head><body>${body ?? ""}</body></html>`;
   return (
     <section className={styles.richBody} aria-label={t("message")}>
       {html ? (
