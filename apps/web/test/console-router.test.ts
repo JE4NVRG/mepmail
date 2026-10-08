@@ -253,6 +253,100 @@ describe("pause, resume, suspend, reinstate", () => {
   });
 });
 
+describe("console.teams.setDomainRelay", () => {
+  async function addDomain(name: string, status: "verified" | "pending", owner = teamId) {
+    const [row] = await db
+      .insert(schema.domains)
+      .values({ teamId: owner, name, region: REGION, status })
+      .returning({ id: schema.domains.id });
+    if (!row) throw new Error("domain insert failed");
+    return row.id;
+  }
+  async function relayStamp(id: string) {
+    const [row] = await db
+      .select({ at: schema.domains.relayEnabledAt })
+      .from(schema.domains)
+      .where(eq(schema.domains.id, id));
+    return row?.at;
+  }
+
+  it("is absent, and refused, while CUSTOMER_SMTP_RELAY_URL is unset", async () => {
+    const domainId = await addDomain("relay-off.acme.dev", "verified");
+    expect((await operator().console.teams.detail({ id: teamId })).relay).toBeNull();
+    await expect(
+      operator().console.teams.setDomainRelay({ id: teamId, domainId, enabled: true }),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: "relay_off" });
+    expect(await relayStamp(domainId)).toBeNull();
+  });
+
+  it("lists the team's domains under the relay's name, sets and clears the mark, recording both", async () => {
+    vi.stubEnv("CUSTOMER_SMTP_RELAY_URL", "smtps://resource.app.tenant:hunter2@smtp.example:465");
+    vi.stubEnv("CUSTOMER_SMTP_RELAY_NAME", "azure");
+    const domainId = await addDomain("relay-on.acme.dev", "verified");
+
+    const detail = await operator().console.teams.detail({ id: teamId });
+    expect(detail.relay?.name).toBe("azure");
+    expect(detail.relay?.domains).toContainEqual(
+      expect.objectContaining({ id: domainId, name: "relay-on.acme.dev", relayEnabledAt: null }),
+    );
+    // The relay's URL, and the password in it, never leave the server.
+    expect(JSON.stringify(detail)).not.toContain("hunter2");
+    expect(JSON.stringify(detail)).not.toContain("smtp.example");
+
+    await operator().console.teams.setDomainRelay({ id: teamId, domainId, enabled: true });
+    expect(await relayStamp(domainId)).toBeInstanceOf(Date);
+    expect(await auditRows("team.domain_relay_enabled")).toEqual([
+      expect.objectContaining({
+        teamId,
+        actorId: `user:${OPERATOR}`,
+        target: `domain:${domainId}`,
+        data: { name: "relay-on.acme.dev", domain: "relay-on.acme.dev", relay: "azure" },
+      }),
+    ]);
+    // Asking again changes nothing and records nothing.
+    await operator().console.teams.setDomainRelay({ id: teamId, domainId, enabled: true });
+    expect(await auditRows("team.domain_relay_enabled")).toHaveLength(1);
+
+    await operator().console.teams.setDomainRelay({ id: teamId, domainId, enabled: false });
+    expect(await relayStamp(domainId)).toBeNull();
+    expect((await auditRows("team.domain_relay_disabled"))[0]).toMatchObject({
+      teamId,
+      actorId: `user:${OPERATOR}`,
+      target: `domain:${domainId}`,
+    });
+  });
+
+  it("refuses a domain MepMail has not verified, and one of another team", async () => {
+    vi.stubEnv("CUSTOMER_SMTP_RELAY_URL", "smtp://relay.example:587");
+    const pending = await addDomain("relay-pending.acme.dev", "pending");
+    await expect(
+      operator().console.teams.setDomainRelay({ id: teamId, domainId: pending, enabled: true }),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: "domain_not_verified" });
+    expect(await relayStamp(pending)).toBeNull();
+
+    const other = await createTeam(db, "relay-other");
+    const foreign = await addDomain("relay.other.dev", "verified", other);
+    await expect(
+      operator().console.teams.setDomainRelay({ id: teamId, domainId: foreign, enabled: true }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(await relayStamp(foreign)).toBeNull();
+  });
+
+  it("is operator-only", async () => {
+    vi.stubEnv("CUSTOMER_SMTP_RELAY_URL", "smtp://relay.example:587");
+    const domainId = await addDomain("relay-member.acme.dev", "verified");
+    await expect(
+      member().console.teams.setDomainRelay({ id: teamId, domainId, enabled: true }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(
+      callerFor(null).console.teams.setDomainRelay({ id: teamId, domainId, enabled: true }),
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(await relayStamp(domainId)).toBeNull();
+    const rows = await auditRows("team.domain_relay_enabled");
+    expect(rows.filter((row) => row.target === `domain:${domainId}`)).toHaveLength(0);
+  });
+});
+
 describe("console.safety flags", () => {
   it("opens, refuses a second, clears and reopens with audit rows", async () => {
     await operator().console.safety.openFlag({ teamId, note: "looks off" });

@@ -480,6 +480,8 @@
       "team_reinstated": "Reinstated team",
       "team_send_review_held": "Sending held for review",
       "team_send_review_released": "Released sending after review",
+      "team_domain_relay_enabled": "Turned on the SMTP relay for a domain",
+      "team_domain_relay_disabled": "Turned off the SMTP relay for a domain",
       "console_flag_opened": "Flagged team",
       "console_flag_cleared": "Cleared flag",
       "console_flag_reopened": "Reopened flag",

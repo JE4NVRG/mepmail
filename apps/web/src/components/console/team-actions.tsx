@@ -25,7 +25,7 @@ export interface TeamActionTarget {
 }
 
 export interface TeamActions {
-  /** The team dialog (counters, type, owner, members, region, guardrail, created, Stripe). */
+  /** The team dialog (counters, type, owner, members, region, guardrail, created, Stripe, relay). */
   openTeam(team: TeamActionTarget): void;
   adjustLimits(team: TeamActionTarget): void;
   changePlan(team: TeamActionTarget): void;
@@ -92,6 +92,7 @@ export function useTeamActions(onChanged: () => void): TeamActions {
   );
   const suspend = useMutation(trpc.console.teams.suspend.mutationOptions({ onError: failed }));
   const reinstate = useMutation(trpc.console.teams.reinstate.mutationOptions({ onError: failed }));
+  const relay = useMutation(trpc.console.teams.setDomainRelay.mutationOptions({ onError: failed }));
   // A refusal stays in the dialog (the code is one it can explain); success
   // leaves for the dashboard in this tab, so the layout reads the new cookie.
   const view = useMutation(
@@ -109,12 +110,32 @@ export function useTeamActions(onChanged: () => void): TeamActions {
         <TeamDialog
           name={team.name}
           detail={loaded}
+          relayPending={relay.isPending ? (relay.variables?.domainId ?? null) : null}
           onClose={close}
           onAdjustLimits={() => setDialog({ kind: "limits", team })}
           onViewAsOwner={() => {
             view.reset();
             setDialog({ kind: "view", team });
           }}
+          onSetRelay={(domain, enabled) =>
+            relay.mutate(
+              { id: team.id, domainId: domain.id, enabled },
+              {
+                // The dialog stays open on the refreshed detail.
+                onSuccess: () => {
+                  toast(
+                    t(enabled ? "toast.relayOn" : "toast.relayOff", {
+                      domain: domain.name,
+                      relay: loaded?.relay?.name ?? "",
+                    }),
+                  );
+                  void queryClient.invalidateQueries({
+                    queryKey: trpc.console.teams.detail.queryKey({ id: team.id }),
+                  });
+                },
+              },
+            )
+          }
         />
       ) : null}
       {dialog?.kind === "view" ? (

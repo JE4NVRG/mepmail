@@ -1,5 +1,5 @@
 import { isLiveKey } from "@millionsend/billing";
-import { env, isCloudDeployment, supportViewEnabled } from "@millionsend/config";
+import { customerSmtpRelay, env, isCloudDeployment, supportViewEnabled } from "@millionsend/config";
 import {
   accountMailPhrase,
   fetchAccountScore,
@@ -216,7 +216,8 @@ export const consoleTeamsRouter = router({
       .where(eq(t.id, input.id));
     if (!row) throw new TRPCError({ code: "NOT_FOUND" });
     const viewEnabled = supportViewEnabled();
-    const [owners, health, score, view] = await Promise.all([
+    const relay = customerSmtpRelay();
+    const [owners, health, score, view, relayDomains] = await Promise.all([
       ctx.db
         .select({ email: schema.user.email, name: schema.user.name, role: schema.teamMembers.role })
         .from(schema.teamMembers)
@@ -226,6 +227,19 @@ export const consoleTeamsRouter = router({
       fetchDeliverabilityHealth(ctx.db, input.id),
       fetchAccountScore(ctx.db, input.id),
       viewEnabled ? liveSupportViewForTeam(ctx.db, input.id) : null,
+      relay
+        ? ctx.db
+            .select({
+              id: schema.domains.id,
+              name: schema.domains.name,
+              region: schema.domains.region,
+              status: schema.domains.status,
+              relayEnabledAt: schema.domains.relayEnabledAt,
+            })
+            .from(schema.domains)
+            .where(eq(schema.domains.teamId, input.id))
+            .orderBy(asc(schema.domains.name))
+        : [],
     ]);
     return {
       ...row,
@@ -242,8 +256,53 @@ export const consoleTeamsRouter = router({
       rungs: operatorRungs(),
       supportViewEnabled: viewEnabled,
       supportView: view ? { operatorEmail: view.operator.email, expiresAt: view.expiresAt } : null,
+      // Only the relay's label reaches the browser, never its URL.
+      relay: relay ? { name: relay.name, domains: relayDomains } : null,
     };
   }),
+
+  /**
+   * The operator's word that a domain is verified at the customer SMTP
+   * relay's provider: while SES has paused the account, the domain's
+   * transactional mail leaves through that relay instead of parking.
+   * Offered only while CUSTOMER_SMTP_RELAY_URL is configured.
+   */
+  setDomainRelay: operatorProcedure
+    .input(z.object({ id: z.uuid(), domainId: z.uuid(), enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const relay = customerSmtpRelay();
+      if (!relay) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "relay_off" });
+      const team = await loadTeam(ctx.db, input.id);
+      const [domain] = await ctx.db
+        .select({
+          id: schema.domains.id,
+          name: schema.domains.name,
+          status: schema.domains.status,
+          relayEnabledAt: schema.domains.relayEnabledAt,
+        })
+        .from(schema.domains)
+        .where(and(eq(schema.domains.id, input.domainId), eq(schema.domains.teamId, team.id)));
+      if (!domain) throw new TRPCError({ code: "NOT_FOUND" });
+      if (input.enabled === (domain.relayEnabledAt !== null)) return;
+      // A domain MepMail itself does not send from has nothing to relay.
+      if (input.enabled && domain.status !== "verified") {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "domain_not_verified" });
+      }
+      await ctx.db
+        .update(schema.domains)
+        .set({ relayEnabledAt: input.enabled ? new Date() : null })
+        .where(eq(schema.domains.id, domain.id));
+      await auditOperator(ctx, {
+        teamId: team.id,
+        action: input.enabled ? "team.domain_relay_enabled" : "team.domain_relay_disabled",
+        target: { type: "domain", id: domain.id },
+        // `name` labels the row in the team's own log, as every domain row
+        // does; the console's detail skips it, so the domain rides again.
+        metadata: { name: domain.name, domain: domain.name, relay: relay.name },
+      });
+      // The domain's mail parked since the pause began leaves now, not at the next drain.
+      if (input.enabled) await kickQuotaDrain();
+    }),
 
   /**
    * Opens the team's dashboard as its owner sees it, read-only, for 30

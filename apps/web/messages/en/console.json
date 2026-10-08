@@ -477,7 +477,19 @@
       "reinstated": "{team} reinstated",
       "limits": "Limits saved for {team}",
       "plan": "{team} · {from} → {to}",
+      "relayOn": "{domain} relays through {relay} while SES is paused",
+      "relayOff": "{domain} no longer relays",
       "error": "The action failed: {message}"
+    },
+    "relay": {
+      "title": "SMTP relay · {relay}",
+      "lead": "While SES has paused sending, transactional mail from a domain switched on here leaves through {relay} instead of waiting. Verify the domain and its sender addresses at {relay} first. Holds, suppressions and quotas still apply; broadcasts keep waiting.",
+      "none": "No domains.",
+      "on": "on since {since}",
+      "off": "off",
+      "unverified": "not verified",
+      "enable": "Turn on",
+      "disable": "Turn off"
     },
     "detail": {
       "lead": "Everything the console knows about the team. Bodies are not here.",

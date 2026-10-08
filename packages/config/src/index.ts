@@ -16,6 +16,7 @@ export {
   CONTENT_REVEAL_MODES,
   type ContentRevealMode,
   contentRevealOn,
+  customerSmtpRelay,
   deploymentRevision,
   EMAIL_RETENTION_DAYS_DEFAULT,
   type Env,

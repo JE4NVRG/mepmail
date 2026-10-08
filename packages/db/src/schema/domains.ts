@@ -64,6 +64,11 @@ export const domains = pgTable(
     // A send names TenantName only while this matches the set it will use;
     // tenants.sync re-associates rows whose value drifted from the env.
     sesTenantConfigSet: text("ses_tenant_config_set"),
+    // Stamped by an operator who verified the domain at the customer SMTP
+    // relay's provider (CUSTOMER_SMTP_RELAY_URL): while SES has paused the
+    // account, its transactional mail leaves through that relay instead of
+    // parking. NULL = never relayed.
+    relayEnabledAt: timestamp("relay_enabled_at", { withTimezone: true }),
     // Per-record snapshot persisted by every verification pass so send-time
     // insights never do live DNS.
     dnsRecords: jsonb("dns_records").$type<DomainDnsRecord[]>(),

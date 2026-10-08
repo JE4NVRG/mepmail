@@ -127,6 +127,70 @@ it("holds only the rows of a region whose SES quota is full; domain-less rows co
   expect(await statusOf(back)).toBe("queued_quota");
 });
 
+it("in a region SES paused, a relay domain's transactional rows drain, and only with the relay configured", async () => {
+  const [marked, plain] = await db
+    .insert(schema.domains)
+    .values([
+      { teamId, name: "relay.acme.dev", region: "us-east-1", relayEnabledAt: new Date() },
+      { teamId, name: "plain.acme.dev", region: "us-east-1" },
+    ])
+    .returning({ id: schema.domains.id });
+  if (!marked || !plain) throw new Error("domain insert failed");
+  const [bc] = await db
+    .insert(schema.broadcasts)
+    .values({ teamId, from: "a@relay.acme.dev", subject: "news", status: "sending" })
+    .returning({ id: schema.broadcasts.id });
+  const relayed = await insertParked(new Date("2026-08-13T01:00:00Z"), "r", {
+    domainId: marked.id,
+  });
+  const plainRow = await insertParked(new Date("2026-08-13T02:00:00Z"), "p", {
+    domainId: plain.id,
+  });
+  await insertParked(new Date("2026-08-13T03:00:00Z"), "platform");
+  await insertParked(new Date("2026-08-13T04:00:00Z"), "bulk", {
+    domainId: marked.id,
+    broadcastId: bc?.id ?? null,
+  });
+
+  const enqueued: string[] = [];
+  const deps = {
+    isCloud: false,
+    enqueueSends: async (batch: readonly { emailId: string }[]) => {
+      enqueued.push(...batch.map((j) => j.emailId));
+    },
+  };
+  const paused = { regions: ["us-east-1"], exhausted: () => true, accountPaused: () => true };
+  expect(await drainQuotaParked(db, { ...deps, sesQuota: paused })).toEqual({
+    drained: 0,
+    stillParked: 4,
+  });
+  expect(await drainQuotaParked(db, { ...deps, sesQuota: paused, customerRelay: true })).toEqual({
+    drained: 1,
+    stillParked: 3,
+  });
+  expect(enqueued).toEqual([relayed]);
+  expect(await statusOf(plainRow)).toBe("queued_quota");
+
+  // A full window SES still sends in is no pause: the relay domain waits too.
+  const full = { ...paused, accountPaused: () => false };
+  const later = await insertParked(new Date("2026-08-13T05:00:00Z"), "r2", { domainId: marked.id });
+  expect(await drainQuotaParked(db, { ...deps, sesQuota: full, customerRelay: true })).toEqual({
+    drained: 0,
+    stillParked: 4,
+  });
+  // Nor does a suspended team's row move.
+  await db
+    .update(schema.teams)
+    .set({ suspendedAt: new Date(), suspensionReason: "manual" })
+    .where(eq(schema.teams.id, teamId));
+  expect(await drainQuotaParked(db, { ...deps, sesQuota: paused, customerRelay: true })).toEqual({
+    drained: 0,
+    stillParked: 4,
+  });
+  expect(await statusOf(later)).toBe("queued_quota");
+  expect(enqueued).toEqual([relayed]);
+});
+
 it("self-host drain (no caps) releases everything", async () => {
   const a = await insertParked(new Date("2026-08-13T01:00:00Z"));
   const b = await insertParked(new Date("2026-08-13T02:00:00Z"));

@@ -351,6 +351,13 @@
       "when": 1791403200000,
       "tag": "0049_send_review_content",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791410400000,
+      "tag": "0050_domain_relay",
+      "breakpoints": true
     }
   ]
 }

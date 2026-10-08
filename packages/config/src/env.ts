@@ -52,6 +52,9 @@ export const ABUSE_JUDGE_TIMEOUT_MS_DEFAULT = 20_000;
 
 const emailAddress = z.email();
 
+/** CUSTOMER_SMTP_RELAY_NAME: a short label, safe inside a message id. */
+const CUSTOMER_SMTP_RELAY_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/;
+
 const oauthIssuerSchema = z.string().refine(
   (value) => {
     try {
@@ -222,6 +225,17 @@ export const env = createEnv({
     // platform's own mail while SES has paused the account: the system team's
     // domains and the shared onboarding sender. Unset = that mail parks too.
     SMTP_FALLBACK_URL: z.url().optional(),
+    // A second provider's SMTP relay (smtps://user:password@host:465, or
+    // smtp://user:password@host:587?requireTLS=true for STARTTLS; e.g.
+    // Azure Communication Services or OCI Email Delivery) for CUSTOMER mail
+    // while SES has paused the account: only the domains an operator verified
+    // at that provider and switched on in the console, and only their
+    // transactional mail. Unset = the feature is off and that mail parks.
+    // CUSTOMER_SMTP_RELAY_NAME labels it in logs, message ids and the console
+    // ("azure", "oci"); unset, the relay's host name. Read through
+    // customerSmtpRelay().
+    CUSTOMER_SMTP_RELAY_URL: z.url({ protocol: /^smtps?$/ }).optional(),
+    CUSTOMER_SMTP_RELAY_NAME: z.string().regex(CUSTOMER_SMTP_RELAY_NAME_RE).optional(),
     // Share of every served region's rolling 24-hour SES quota that
     // broadcasts never touch, as a percent. Transactional mail may use all
     // of it and borrow beyond it; broadcasts get the rest and are paced over
@@ -652,6 +666,25 @@ export function abuseJudgeConfig(e: Env = env): AbuseJudgeConfig | null {
   };
 }
 
+/**
+ * The customer SMTP relay the worker builds and the console offers, or null
+ * when CUSTOMER_SMTP_RELAY_URL is unset (or, under SKIP_ENV_VALIDATION, is no
+ * smtp:// or smtps:// URL; a validated boot refuses one). The name is
+ * CUSTOMER_SMTP_RELAY_NAME, else the relay's host name.
+ */
+export function customerSmtpRelay(e: Env = env): { url: string; name: string } | null {
+  const url = e.CUSTOMER_SMTP_RELAY_URL;
+  if (!url) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "smtp:" && parsed.protocol !== "smtps:") return null;
+  return { url, name: e.CUSTOMER_SMTP_RELAY_NAME || parsed.hostname };
+}
+
 /** Whether the operator may open a team's dashboard read-only; raw-string safe under SKIP_ENV_VALIDATION. */
 export function supportViewEnabled(e: Env = env): boolean {
   return (e.SUPPORT_VIEW as unknown) === "on";
@@ -742,6 +775,19 @@ export function assertEnvConsistency(e: Env): void {
   }
   if (e.ONBOARDING_EMAIL_FROM && parseEmailFrom(e.ONBOARDING_EMAIL_FROM) === null) {
     throw new Error('ONBOARDING_EMAIL_FROM must be "Name <user@domain>" or a bare email address');
+  }
+  if (e.CUSTOMER_SMTP_RELAY_URL && customerSmtpRelay(e) === null) {
+    throw new Error("CUSTOMER_SMTP_RELAY_URL must be an smtp:// or smtps:// URL");
+  }
+  if (e.CUSTOMER_SMTP_RELAY_NAME) {
+    if (!e.CUSTOMER_SMTP_RELAY_URL) {
+      throw new Error("CUSTOMER_SMTP_RELAY_NAME requires CUSTOMER_SMTP_RELAY_URL");
+    }
+    if (!CUSTOMER_SMTP_RELAY_NAME_RE.test(e.CUSTOMER_SMTP_RELAY_NAME)) {
+      throw new Error(
+        "CUSTOMER_SMTP_RELAY_NAME must be letters, digits, dots, dashes or underscores",
+      );
+    }
   }
   if (Boolean(e.TURNSTILE_SITE_KEY) !== Boolean(e.TURNSTILE_SECRET_KEY)) {
     throw new Error("TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY must be set together");

@@ -10,6 +10,7 @@ import {
 } from "@millionsend/billing";
 import {
   abuseJudgeConfig,
+  customerSmtpRelay,
   env,
   servedRegions,
   sesTenantsEnabled,
@@ -89,7 +90,7 @@ import { runSafetyFlags } from "./handlers/safety-flags.js";
 import { finalizeBroadcast, sendBroadcast } from "./handlers/send-broadcast.js";
 import { failQueuedEmail, sendEmail } from "./handlers/send-email.js";
 import { createRegionSendControls } from "./handlers/ses-regions.js";
-import { createSmtpFallback } from "./handlers/smtp-fallback.js";
+import { createCustomerSmtpRelay, createSmtpFallback } from "./handlers/smtp-fallback.js";
 import { syncTenants } from "./handlers/tenants.js";
 import { createMailboxIngress, parseMailboxInboundConfiguration } from "./mailbox-ingress.js";
 import {
@@ -158,6 +159,13 @@ const regions = servedRegions();
 const ses = createSesSender(regions[0] ?? env.AWS_REGION);
 // The platform's own mail leaves through it while SES has paused the account.
 const fallback = env.SMTP_FALLBACK_URL ? createSmtpFallback(env.SMTP_FALLBACK_URL) : undefined;
+// Customer mail of the domains an operator verified at a second provider
+// leaves through its relay while SES has paused the account.
+const relayConfig = customerSmtpRelay();
+const relay = relayConfig
+  ? { name: relayConfig.name, sender: createCustomerSmtpRelay(relayConfig.url, relayConfig.name) }
+  : undefined;
+if (relay) console.log(`customer SMTP relay: ${relay.name}`);
 // SESv2 identity clients (GetEmailIdentity) for domain re-verification, cached
 // per region since identities live in the domain's region. Distinct from the
 // send client above (SendEmail); credentials fall back to the provider chain.
@@ -310,6 +318,7 @@ await queue.scheduleCrons({
       isCloud: env.IS_CLOUD,
       enqueueSends,
       sesQuota: sendControls,
+      customerRelay: relay !== undefined,
       finalize: (id) => finalizeBroadcast(db, { mailer, appBaseUrl: env.APP_BASE_URL }, id),
     });
     console.log(`quota.drain: drained=${result.drained} stillParked=${result.stillParked}`);
@@ -619,6 +628,7 @@ await queue.work(
         reschedule: (emailId, at, priority) => enqueueSend(emailId, at, priority),
         sesQuota: sendControls,
         ...(fallback ? { fallback } : {}),
+        ...(relay ? { relay } : {}),
         enqueueWebhookDelivery: enqueueWebhook,
         tracking,
         monitor,

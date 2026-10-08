@@ -477,7 +477,19 @@
       "reinstated": "{team} reativada",
       "limits": "Limites salvos para {team}",
       "plan": "{team} · {from} → {to}",
+      "relayOn": "{domain} sai por {relay} enquanto o SES estiver pausado",
+      "relayOff": "{domain} não sai mais pelo relay",
       "error": "A ação falhou: {message}"
+    },
+    "relay": {
+      "title": "Relay SMTP · {relay}",
+      "lead": "Enquanto o SES estiver com o envio pausado, o e-mail transacional de um domínio ligado aqui sai por {relay} em vez de esperar. Verifique antes o domínio e os endereços de remetente em {relay}. Retenções, supressões e cotas continuam valendo; transmissões continuam esperando.",
+      "none": "Nenhum domínio.",
+      "on": "ligado desde {since}",
+      "off": "desligado",
+      "unverified": "não verificado",
+      "enable": "Ligar",
+      "disable": "Desligar"
     },
     "detail": {
       "lead": "Tudo o que o console sabe sobre a equipe. Corpos de e-mail não estão aqui.",

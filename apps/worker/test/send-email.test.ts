@@ -1087,6 +1087,213 @@ it("while SES has paused the account, the platform's own mail leaves through the
   expect(relayed).toHaveLength(2);
 });
 
+/** A customer team with one verified domain; `relay` stamps relay_enabled_at. */
+async function relayTeam(slug: string, relay: boolean) {
+  const team = await createTeam(db, slug);
+  const [domain] = await db
+    .insert(schema.domains)
+    .values({
+      teamId: team,
+      name: `${slug}.dev`,
+      region: "us-east-1",
+      status: "verified",
+      verifiedAt: new Date(),
+      relayEnabledAt: relay ? new Date() : null,
+    })
+    .returning({ id: schema.domains.id });
+  if (!domain) throw new Error("domain insert failed");
+  const send = (over: Partial<typeof schema.emails.$inferInsert> = {}) =>
+    insertEmail({ teamId: team, domainId: domain.id, from: `Shop <billing@${slug}.dev>`, ...over });
+  return { team, domain: domain.id, send };
+}
+
+function fakeRelay(name = "azure") {
+  const sends: (Parameters<SesSender["sendRaw"]>[0] & { envelopeFrom?: string })[] = [];
+  return {
+    sends,
+    relay: {
+      name,
+      sender: {
+        async sendRaw(params) {
+          sends.push(params);
+          return { messageId: `smtp-relay:${name}:${params.emailId}` };
+        },
+      } satisfies SesSender,
+    },
+  };
+}
+
+const pausedSes = (parked: (string | undefined)[] = []) => ({
+  exhausted: () => true,
+  accountPaused: () => true,
+  refresh: async () => true,
+  noteTransactionalParked: (region?: string) => {
+    parked.push(region);
+  },
+});
+
+async function rowOf(emailId: string) {
+  const [row] = await db.select().from(schema.emails).where(eq(schema.emails.id, emailId));
+  return row;
+}
+
+it("while SES has paused the account, a domain marked for the relay leaves through it, and only that one", async () => {
+  const marked = await relayTeam("relayed-shop", true);
+  const unmarked = await relayTeam("plain-shop", false);
+  const { ses, sends } = fakeSes("must-not-be-used");
+  const { relay, sends: relayed } = fakeRelay();
+  const deps: SendDeps = { keyring, ses, sesQuota: pausedSes(), relay };
+
+  const out = await marked.send({ cc: ["c@example.com"] });
+  expect(await sendEmail(db, deps, { emailId: out })).toBe("sent");
+  expect(relayed.map((p) => p.emailId)).toEqual([out]);
+  expect(relayed[0]?.envelopeFrom).toBe("billing@relayed-shop.dev");
+  expect(relayed[0]?.cc).toEqual(["c@example.com"]);
+  expect(relayed[0]?.raw.toString("utf8")).toContain("billing@relayed-shop.dev");
+  expect(await rowOf(out)).toMatchObject({
+    latestStatus: "sent",
+    sesMessageId: `smtp-relay:azure:${out}`,
+  });
+
+  // An unmarked domain parks as before.
+  const waits = await unmarked.send();
+  expect(await sendEmail(db, deps, { emailId: waits })).toBe("parked");
+  expect((await rowOf(waits))?.latestStatus).toBe("queued_quota");
+
+  // No relay configured: the marked domain parks too.
+  const noRelay = await marked.send();
+  expect(await sendEmail(db, { keyring, ses, sesQuota: pausedSes() }, { emailId: noRelay })).toBe(
+    "parked",
+  );
+  expect((await rowOf(noRelay))?.latestStatus).toBe("queued_quota");
+
+  // A broadcast row never takes the relay: it parks on the held share.
+  const [bc] = await db
+    .insert(schema.broadcasts)
+    .values({ teamId: marked.team, from: "Shop <billing@relayed-shop.dev>", subject: "news" })
+    .returning({ id: schema.broadcasts.id });
+  const bulk = await marked.send({ broadcastId: bc?.id });
+  expect(
+    await sendEmail(
+      db,
+      { ...deps, sesQuota: { ...pausedSes(), bulkExhausted: () => true } },
+      { emailId: bulk },
+    ),
+  ).toBe("parked");
+
+  // A quota full while SES still sends is not the pause: the relay waits too.
+  const full = await marked.send();
+  expect(
+    await sendEmail(
+      db,
+      { ...deps, sesQuota: { ...pausedSes(), accountPaused: () => false } },
+      { emailId: full },
+    ),
+  ).toBe("parked");
+  expect(relayed).toHaveLength(1);
+  expect(sends).toHaveLength(0);
+});
+
+it("while SES sends, a domain marked for the relay sends through SES as before", async () => {
+  const marked = await relayTeam("healthy-shop", true);
+  const { ses, sends } = fakeSes("ses-mid");
+  const { relay, sends: relayed } = fakeRelay();
+  const healthy = {
+    exhausted: () => false,
+    accountPaused: () => false,
+    refresh: async () => false,
+  };
+  const emailId = await marked.send();
+  expect(await sendEmail(db, { keyring, ses, sesQuota: healthy, relay }, { emailId })).toBe("sent");
+  expect(sends).toHaveLength(1);
+  expect(sends[0]?.region).toBe("us-east-1");
+  expect(relayed).toHaveLength(0);
+  expect((await rowOf(emailId))?.sesMessageId).toBe("ses-mid");
+});
+
+it("a suspended or held team is never relayed, nor a suppressed recipient", async () => {
+  const marked = await relayTeam("held-shop", true);
+  const { ses, sends } = fakeSes("must-not-be-used");
+  const { relay, sends: relayed } = fakeRelay();
+  const deps: SendDeps = { keyring, ses, sesQuota: pausedSes(), relay };
+  const hold = (patch: Partial<typeof schema.teams.$inferInsert>) =>
+    db.update(schema.teams).set(patch).where(eq(schema.teams.id, marked.team));
+
+  await hold({ suspendedAt: new Date(), suspensionReason: "phishing" });
+  const suspended = await marked.send();
+  expect(await sendEmail(db, deps, { emailId: suspended })).toBe("parked");
+  expect((await rowOf(suspended))?.latestStatus).toBe("queued_quota");
+  await hold({ suspendedAt: null, suspensionReason: null });
+
+  for (const reason of schema.sendReviewReasonEnum.enumValues) {
+    await hold({ sendReviewAt: new Date(), sendReviewReason: reason });
+    const held = await marked.send();
+    expect(await sendEmail(db, deps, { emailId: held })).toBe("parked");
+    expect((await rowOf(held))?.latestStatus).toBe("queued_quota");
+  }
+  await hold({ sendReviewAt: null, sendReviewReason: null });
+
+  // A hold placed while the row waits on the bucket still keeps it.
+  const late = await marked.send();
+  const racing: SendDeps = {
+    ...deps,
+    throttle: async () => {
+      await hold({ suspendedAt: new Date(), suspensionReason: "manual" });
+    },
+  };
+  expect(await sendEmail(db, racing, { emailId: late })).toBe("parked");
+  expect(await rowOf(late)).toMatchObject({ latestStatus: "queued_quota", sentAt: null });
+  await hold({ suspendedAt: null, suspensionReason: null });
+
+  await db.insert(schema.suppressions).values({
+    teamId: marked.team,
+    email: "gone@example.com",
+    emailHash: hashRecipient("gone@example.com"),
+    reason: "hard_bounce",
+  });
+  const suppressed = await marked.send({ to: ["gone@example.com"] });
+  expect(await sendEmail(db, deps, { emailId: suppressed })).toBe("suppressed");
+
+  expect(relayed).toHaveLength(0);
+  expect(sends).toHaveLength(0);
+  // Once the holds are gone, the same team's mail is relayed.
+  expect(await sendEmail(db, deps, { emailId: await marked.send() })).toBe("sent");
+  expect(relayed).toHaveLength(1);
+});
+
+it("a failed relay send parks the row, never fails it, and the probe hears it", async () => {
+  const marked = await relayTeam("flaky-shop", true);
+  const { ses, sends } = fakeSes("must-not-be-used");
+  const relay = {
+    name: "azure",
+    sender: {
+      async sendRaw() {
+        throw Object.assign(new Error("Message failed: 451 4.7.500 Server busy"), {
+          code: "EMESSAGE",
+          responseCode: 451,
+        });
+      },
+    } satisfies SesSender,
+  };
+  const parked: (string | undefined)[] = [];
+  const emailId = await marked.send();
+  expect(
+    await sendEmail(db, { keyring, ses, sesQuota: pausedSes(parked), relay }, { emailId }),
+  ).toBe("parked");
+  expect(await rowOf(emailId)).toMatchObject({
+    latestStatus: "queued_quota",
+    sentAt: null,
+    sesMessageId: null,
+  });
+  expect(parked).toEqual(["us-east-1"]);
+  expect(sends).toHaveLength(0);
+  const events = await db
+    .select()
+    .from(schema.emailEvents)
+    .where(eq(schema.emailEvents.emailId, emailId));
+  expect(events).toHaveLength(0);
+});
+
 it("parks instead of failing while SES has paused the account", async () => {
   const ses: SesSender = {
     async sendRaw() {

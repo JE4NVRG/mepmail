@@ -63,6 +63,8 @@ export interface SesSender {
     region?: string;
     /** The team's SES tenant; only set once the domain's resources are associated with it. */
     tenantName?: string;
+    /** The From addr-spec, for the customer relay's envelope; SES and the fallback ignore it. */
+    envelopeFrom?: string;
   }): Promise<{ messageId: string }>;
 }
 
@@ -90,9 +92,18 @@ export interface SendDeps {
    * SMTP relay for the platform's own mail (the system team's domains and the
    * shared onboarding sender) while SES has paused the account: sign-up,
    * password and notice mail, and a new team's first test, keep flowing.
-   * Customer domains never use it (their DKIM lives with SES); they park.
+   * Customer domains never use it (their DKIM lives with SES); they park,
+   * or take the customer relay below.
    */
   fallback?: SesSender | undefined;
+  /**
+   * A second provider's SMTP relay (CUSTOMER_SMTP_RELAY_URL) for customer
+   * mail while SES has paused the account: only a domain an operator marked
+   * verified there (domains.relay_enabled_at), only its transactional mail,
+   * and only past every hold, suppression and quota check a send through SES
+   * passes. A failed relay send parks the row as the pause itself would.
+   */
+  relay?: { name: string; sender: SesSender } | undefined;
   /** Arms the webhook drain for the endpoints written; email.sent webhooks are skipped when absent. */
   enqueueWebhookDelivery?: WebhookEnqueue | undefined;
   /**
@@ -466,6 +477,7 @@ export async function sendEmail(
             dmarcCheckedAt: schema.domains.dmarcCheckedAt,
             sesTenantAssociatedAt: schema.domains.sesTenantAssociatedAt,
             sesTenantConfigSet: schema.domains.sesTenantConfigSet,
+            relayEnabledAt: schema.domains.relayEnabledAt,
             sesTenantName: schema.teams.sesTenantName,
             ownerPlan: schema.teams.plan,
           })
@@ -485,8 +497,13 @@ export async function sendEmail(
   // The platform's own mail: a domain of the instance's system team, or the
   // shared onboarding sender (no domain row).
   const platformMail = !bulk && (email.domainId === null || domain?.ownerPlan === "system");
-  const viaFallback =
-    deps.fallback !== undefined && platformMail && deps.sesQuota?.accountPaused?.(region) === true;
+  const sesPaused = deps.sesQuota?.accountPaused?.(region) === true;
+  const viaFallback = deps.fallback !== undefined && platformMail && sesPaused;
+  // A domain the operator verified at the customer relay's provider: its
+  // transactional mail leaves there while SES's own pause lasts, and only
+  // then. The holds above have already parked a suspended or held team.
+  const viaRelay =
+    deps.relay !== undefined && !bulk && !viaFallback && sesPaused && !!domain?.relayEnabledAt;
   if (bulk) {
     // Before any park: a row of a stopped broadcast must end canceled, never
     // parked where no sweep looks again.
@@ -501,7 +518,7 @@ export async function sendEmail(
       );
       return "parked";
     }
-  } else if (!viaFallback && deps.sesQuota?.exhausted(region)) {
+  } else if (!viaFallback && !viaRelay && deps.sesQuota?.exhausted(region)) {
     await parkQueued(db, email, "SES 24h quota reached or account paused");
     deps.sesQuota.noteTransactionalParked?.(region);
     return "parked";
@@ -741,6 +758,16 @@ export async function sendEmail(
     await deps.reschedule?.(email.id, new Date(), emailSendPriority(email));
     return "deferred";
   }
+  // The relay is the exception made while SES is paused, so the operator's
+  // holds are read once more right before the claim: one placed while this
+  // row waited on the decrypt or the bucket keeps it off the relay.
+  if (viaRelay) {
+    const latest = await fetchTeamStanding(db, email.teamId);
+    if (latest?.suspended || latest?.sendReview) {
+      await parkQueued(db, email, latest.suspended ? "team suspended" : "team held for review");
+      return "parked";
+    }
+  }
 
   // Atomic claim (sentAt doubles as the claim marker): closes the
   // double-send windows — a concurrent worker on the same job, and a retry
@@ -759,9 +786,15 @@ export async function sendEmail(
     .returning({ id: schema.emails.id });
   if (claimed.length === 0) return "skipped";
 
+  const sender =
+    viaRelay && deps.relay
+      ? deps.relay.sender
+      : viaFallback && deps.fallback
+        ? deps.fallback
+        : deps.ses;
   let messageId: string;
   try {
-    ({ messageId } = await (viaFallback && deps.fallback ? deps.fallback : deps.ses).sendRaw({
+    ({ messageId } = await sender.sendRaw({
       raw: mime,
       emailId: email.id,
       to: email.to,
@@ -770,8 +803,26 @@ export async function sendEmail(
       ...(configurationSet ? { configurationSetName: configurationSet } : {}),
       ...(domain?.region ? { region: domain.region } : {}),
       ...(tenantName ? { tenantName } : {}),
+      ...(viaRelay ? { envelopeFrom: extractAddrSpec(email.from) } : {}),
     }));
   } catch (err) {
+    if (viaRelay) {
+      // The relay refused or never answered: the row parks as SES's pause
+      // parks it, never failed, and the drain hands it back while the pause
+      // lasts. Only the SMTP codes are logged: a reply can quote a recipient.
+      await db
+        .update(schema.emails)
+        .set({ sentAt: null })
+        .where(and(eq(schema.emails.id, email.id), eq(schema.emails.latestStatus, "queued")));
+      const e = err as { code?: unknown; responseCode?: unknown };
+      await parkQueued(
+        db,
+        email,
+        `SMTP relay ${deps.relay?.name} failed (${String(e.code ?? "error")} ${String(e.responseCode ?? "-")})`,
+      );
+      deps.sesQuota?.noteTransactionalParked?.(region);
+      return "parked";
+    }
     // sendRaw threw ⇒ the SDK exhausted its own retries without an accept.
     // A permanent refusal ends the email here; anything else releases the
     // claim so the job retry can send. (After a SUCCESSFUL sendRaw the claim

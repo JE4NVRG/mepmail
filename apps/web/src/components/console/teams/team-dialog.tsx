@@ -5,6 +5,7 @@ import { Fragment, useMemo } from "react";
 import { Modal } from "@/components/modal";
 import { ModalFooter } from "@/components/modal-footer";
 import { Skeleton } from "@/components/skeleton";
+import { BtnSpinner } from "@/components/spinner";
 import { Tooltip } from "@/components/tooltip";
 import { planLabel } from "@/lib/console-format";
 import { formatDayTime, formatMmSs, formatRelative } from "@/lib/format";
@@ -34,19 +35,91 @@ function LiveViewLine({ expiresAt }: { expiresAt: Date }) {
   );
 }
 
+/**
+ * The customer SMTP relay's switch per domain, shown only while
+ * CUSTOMER_SMTP_RELAY_URL is configured: on means the operator verified the
+ * domain at the relay's provider, and its transactional mail leaves there
+ * while SES has paused sending.
+ */
+function RelayDomains({
+  relay,
+  pendingId,
+  onToggle,
+}: {
+  relay: NonNullable<TeamDetail["relay"]>;
+  pendingId: string | null;
+  onToggle: (domain: { id: string; name: string }, enabled: boolean) => void;
+}) {
+  const t = useTranslations("console.teams");
+  const locale = useLocale();
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div className="ms-microlabel">{t("relay.title", { relay: relay.name })}</div>
+      <p style={{ margin: "4px 0 10px", color: "var(--ms-muted)", fontSize: 13 }}>
+        {t("relay.lead", { relay: relay.name })}
+      </p>
+      {relay.domains.length === 0 ? (
+        <p style={{ margin: 0, fontSize: 13 }}>{t("relay.none")}</p>
+      ) : (
+        <dl className="ms-kv">
+          {relay.domains.map((domain) => {
+            const on = domain.relayEnabledAt !== null;
+            const verified = domain.status === "verified";
+            return (
+              <Fragment key={domain.id}>
+                <dt>{domain.name}</dt>
+                <dd
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  <span>
+                    {domain.relayEnabledAt
+                      ? t("relay.on", { since: formatDayTime(domain.relayEnabledAt, locale) })
+                      : verified
+                        ? t("relay.off")
+                        : t("relay.unverified")}
+                  </span>
+                  <button
+                    type="button"
+                    className="ms-btn ms-btn-secondary ms-btn-sm"
+                    disabled={pendingId !== null || (!on && !verified)}
+                    onClick={() => onToggle(domain, !on)}
+                  >
+                    <BtnSpinner on={pendingId === domain.id} />
+                    {on ? t("relay.disable") : t("relay.enable")}
+                  </button>
+                </dd>
+              </Fragment>
+            );
+          })}
+        </dl>
+      )}
+    </div>
+  );
+}
+
 /** Everything the console knows about one team, with Adjust limits as the way out. */
 export function TeamDialog({
   name,
   detail,
+  relayPending,
   onClose,
   onAdjustLimits,
   onViewAsOwner,
+  onSetRelay,
 }: {
   name: string;
   detail: TeamDetail | undefined;
+  /** The domain whose relay switch is being saved. */
+  relayPending: string | null;
   onClose: () => void;
   onAdjustLimits: () => void;
   onViewAsOwner: () => void;
+  onSetRelay: (domain: { id: string; name: string }, enabled: boolean) => void;
 }) {
   const t = useTranslations("console.teams");
   const common = useTranslations("console.common");
@@ -159,6 +232,9 @@ export function TeamDialog({
             <p style={{ margin: "12px 0 0", color: "var(--ms-muted)", fontSize: 12 }}>
               {t("detail.standingAt", { ago: formatRelative(detail.standingAt, locale) })}
             </p>
+          ) : null}
+          {detail.relay ? (
+            <RelayDomains relay={detail.relay} pendingId={relayPending} onToggle={onSetRelay} />
           ) : null}
         </>
       ) : (

@@ -68,6 +68,10 @@ export const AUDIT_ACTIONS = [
   "team.reinstated",
   "team.send_review_held",
   "team.send_review_released",
+  // The operator marked one of the team's domains as verified at the
+  // customer SMTP relay's provider (or took the mark back).
+  "team.domain_relay_enabled",
+  "team.domain_relay_disabled",
   // The instance side of a break-glass content access (team_id null, so the
   // team's own audit can never show it); "content.accessed" is the row the
   // team gains seven days later, dated at the access.

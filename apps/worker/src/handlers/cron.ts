@@ -166,12 +166,20 @@ export interface DrainDeps {
     | {
         regions: readonly string[];
         exhausted(region: string): boolean;
+        /** SES's own pause in the region (enforcement), as opposed to a full window. */
+        accountPaused?(region: string): boolean;
         room?(region: string): number;
         paused?(region: string): boolean;
         recount?(): Promise<void>;
         noteBulkQueued?(region: string, n: number): void;
       }
     | undefined;
+  /**
+   * CUSTOMER_SMTP_RELAY_URL is configured: in a region SES itself has paused,
+   * the transactional rows of a domain marked for the relay still drain, as
+   * the send lane relays them instead of parking them again.
+   */
+  customerRelay?: boolean | undefined;
   /** Called for every broadcast the bulk pass touched; flips it to sent once nothing of it remains. */
   finalize?: ((broadcastId: string) => Promise<unknown>) | undefined;
   now?: Date | undefined;
@@ -206,9 +214,10 @@ interface DrainRun {
  * without this, parking would be a quota bypass.
  *
  * Two passes under one per-run cap. Transactional rows first, oldest first,
- * in every region not at its quota: a password reset never waits behind a
- * newsletter. Then broadcasts: each one still sending with parked rows gets
- * an equal slice of what is left, in the order they were scheduled, into
+ * in every region not at its quota (and a relay domain's in a region SES
+ * paused): a password reset never waits behind a newsletter. Then
+ * broadcasts: each one still sending with parked rows gets an equal slice
+ * of what is left, in the order they were scheduled, into
  * the room its region's broadcast share has; a throttled team's slice is
  * one cadence of its drip, spaced on the rows themselves so the reconcile
  * sweep leaves them alone. A broadcast whose last parked row went is
@@ -222,13 +231,17 @@ export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainRe
   await deps.sesQuota?.recount?.();
   const regions = deps.sesQuota?.regions ?? [];
   const held = regions.filter((region) => deps.sesQuota?.exhausted(region));
+  const relayed = deps.customerRelay
+    ? held.filter((region) => deps.sesQuota?.accountPaused?.(region) === true)
+    : [];
   const run: DrainRun = { now: deps.now ?? new Date(), exhaustedTeams: new Set(), failures: [] };
   let drained = 0;
-  if (regions.length === 0 || held.length < regions.length) {
+  if (regions.length === 0 || held.length < regions.length || relayed.length > 0) {
     const released = await releaseParkedRows(db, deps, run, {
       where: isNull(schema.emails.broadcastId),
       budget: DRAIN_MAX_PER_RUN,
       held,
+      relayed,
       spacingMs: 0,
     });
     drained += released.total;
@@ -326,7 +339,14 @@ async function releaseParkedRows(
   db: Db,
   deps: DrainDeps,
   run: DrainRun,
-  opts: { where: SQL; budget: number; held: readonly string[]; spacingMs: number },
+  opts: {
+    where: SQL;
+    budget: number;
+    held: readonly string[];
+    /** Held regions SES paused, whose relay domains' rows may move anyway. */
+    relayed?: readonly string[];
+    spacingMs: number;
+  },
 ): Promise<{ total: number; byRegion: Map<string, number> }> {
   const regions = deps.sesQuota?.regions ?? [];
   const region = sql<string>`coalesce(${schema.domains.region}, ${regions[0] ?? ""})`;
@@ -361,7 +381,7 @@ async function releaseParkedRows(
           run.exhaustedTeams.size > 0
             ? notInArray(schema.emails.teamId, [...run.exhaustedTeams])
             : undefined,
-          opts.held.length > 0 ? notInArray(region, [...opts.held]) : undefined,
+          outsideHeld(region, opts.held, opts.relayed ?? []),
           cursorId
             ? keysetCursorWhere(schema.emails.createdAt, schema.emails.id, cursorId)
             : undefined,
@@ -409,6 +429,18 @@ async function releaseParkedRows(
     }
   }
   return { total, byRegion };
+}
+
+/** Rows outside the held regions, plus a relay domain's rows in a held region SES paused. */
+function outsideHeld(
+  region: SQL<string>,
+  held: readonly string[],
+  relayed: readonly string[],
+): SQL | undefined {
+  if (held.length === 0) return undefined;
+  const open = notInArray(region, [...held]);
+  if (relayed.length === 0) return open;
+  return or(open, and(isNotNull(schema.domains.relayEnabledAt), inArray(region, [...relayed])));
 }
 
 async function countParked(db: Db): Promise<number> {
