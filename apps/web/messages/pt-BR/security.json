@@ -233,7 +233,7 @@
         "label": "GDPR",
         "state": "Em vigor",
         "tone": "ok",
-        "body": "O MepMail Cloud é hospedado na Alemanha e a Política de Privacidade diz o que é guardado, por quê e por quanto tempo. O DPA é acordado por cliente — peça em security@je4ndev.com."
+        "body": "O MepMail Cloud é hospedado na Alemanha e a Política de Privacidade diz o que é guardado, por quê e por quanto tempo. O DPA é acordado por cliente — peça em jean@mepmail.dev."
       },
       {
         "label": "SOC 2 · ISO 27001",
@@ -252,7 +252,7 @@
   "faq": {
     "eyebrow": "FAQ",
     "title": "As perguntas que uma revisão enterprise faz",
-    "body": "Respostas curtas, com o detalhe embaixo. O que faltar é uma pergunta justa para security@je4ndev.com.",
+    "body": "Respostas curtas, com o detalhe embaixo. O que faltar é uma pergunta justa para jean@mepmail.dev.",
     "items": [
       {
         "q": "O conteúdo dos e-mails é criptografado em repouso?",
@@ -268,7 +268,7 @@
       },
       {
         "q": "Como consigo um DPA assinado?",
-        "a": "Não existe um DPA pré-assinado publicado hoje: escreva para security@je4ndev.com com os dados da sua empresa e ele é acordado por cliente. O self-host elimina a questão — o acordo de tratamento passa a ser entre você e a sua própria infraestrutura."
+        "a": "Não existe um DPA pré-assinado publicado hoje: escreva para jean@mepmail.dev com os dados da sua empresa e ele é acordado por cliente. O self-host elimina a questão — o acordo de tratamento passa a ser entre você e a sua própria infraestrutura."
       },
       {
         "q": "Onde os meus dados ficam, e eles permanecem na UE?",
@@ -298,12 +298,12 @@
     "title": "Divulgação responsável",
     "body": "Encontrou uma vulnerabilidade? Avise e nós corrigimos — é o mesmo padrão que o código segue.",
     "bullets": [
-      "Escreva para security@je4ndev.com com os detalhes e, se tiver, uma reprodução.",
+      "Escreva para jean@mepmail.dev com os detalhes e, se tiver, uma reprodução.",
       "Confirmamos o recebimento e damos a primeira resposta em até 72 horas.",
       "Não existe bounty hoje — damos crédito público se você quiser o crédito.",
       "Dê um prazo razoável para corrigirmos antes de publicar; vamos contando o que estamos fazendo no caminho."
     ],
-    "cta": "Escrever para security@je4ndev.com"
+    "cta": "Escrever para jean@mepmail.dev"
   },
   "close": {
     "title": "Conecte um domínio e envie em minutos",

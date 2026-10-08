@@ -10,8 +10,8 @@ import { DOCS_URL } from "@/lib/docs-links";
 import { legalLinks } from "@/lib/legal-links";
 import "../landing.css";
 
-const contact = "mailto:jean@je4ndev.com";
-const disclosureContact = "mailto:security@je4ndev.com";
+const contact = "mailto:jean@mepmail.dev";
+const disclosureContact = "mailto:jean@mepmail.dev";
 const canonical = "/security";
 
 type Card = { kind: string; name: string; body: string; bullets: string[] };

@@ -93,7 +93,7 @@
         ]
       }
     ],
-    "contact": "Dúvidas sobre estes termos: jean@je4ndev.com"
+    "contact": "Dúvidas sobre estes termos: jean@mepmail.dev"
   },
   "privacy": {
     "title": "Política de Privacidade",
@@ -167,7 +167,7 @@
       {
         "title": "8. Seus direitos",
         "body": [
-          "Conforme onde você mora, você pode pedir acesso, correção, portabilidade, restrição ou exclusão dos seus dados pessoais, e se opor ao tratamento. Você pode excluir a sua conta direto pelo painel e falar conosco em privacy@je4ndev.com para qualquer pedido de privacidade. Respondemos em até 30 dias."
+          "Conforme onde você mora, você pode pedir acesso, correção, portabilidade, restrição ou exclusão dos seus dados pessoais, e se opor ao tratamento. Você pode excluir a sua conta direto pelo painel e falar conosco em jean@mepmail.dev para qualquer pedido de privacidade. Respondemos em até 30 dias."
         ]
       },
       {
@@ -189,7 +189,7 @@
         ]
       }
     ],
-    "contact": "Pedidos e dúvidas de privacidade: privacy@je4ndev.com"
+    "contact": "Pedidos e dúvidas de privacidade: jean@mepmail.dev"
   },
   "refund": {
     "title": "Política de Reembolso",
@@ -236,7 +236,7 @@
       {
         "title": "7. Como pedir reembolso",
         "body": [
-          "Envie um e-mail para jean@je4ndev.com a partir do endereço da conta (ou informe o e-mail da conta) com a referência da cobrança. Os reembolsos são processados pelo Stripe, de volta ao meio de pagamento original, normalmente em 5 a 10 dias úteis, dependendo do seu banco."
+          "Envie um e-mail para jean@mepmail.dev a partir do endereço da conta (ou informe o e-mail da conta) com a referência da cobrança. Os reembolsos são processados pelo Stripe, de volta ao meio de pagamento original, normalmente em 5 a 10 dias úteis, dependendo do seu banco."
         ]
       },
       {
@@ -252,6 +252,6 @@
         ]
       }
     ],
-    "contact": "Pedidos e dúvidas de reembolso: jean@je4ndev.com"
+    "contact": "Pedidos e dúvidas de reembolso: jean@mepmail.dev"
   }
 }

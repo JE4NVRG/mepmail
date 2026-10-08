@@ -14,7 +14,7 @@
       "Abuse reports acted on",
       "Docs · changelog · updates"
     ],
-    "ctaEmail": "Email support@je4ndev.com",
+    "ctaEmail": "Email jean@mepmail.dev",
     "ctaDocs": "Open the docs"
   },
   "channels": {
@@ -24,7 +24,7 @@
     "items": [
       {
         "name": "Email support",
-        "kind": "support@je4ndev.com",
+        "kind": "jean@mepmail.dev",
         "body": "Best for account, billing and deliverability questions the docs do not answer.",
         "bullets": [
           "Human support has no guaranteed response time.",
@@ -32,8 +32,8 @@
         ],
         "links": [
           {
-            "label": "support@je4ndev.com",
-            "href": "mailto:support@je4ndev.com"
+            "label": "jean@mepmail.dev",
+            "href": "mailto:jean@mepmail.dev"
           }
         ]
       },
@@ -143,10 +143,10 @@
       },
       {
         "q": "How do I report abuse or spam?",
-        "a": "Email security@je4ndev.com with the message id or the headers. We act on abuse reports, and sending that generates complaints can be paused or the account suspended.",
+        "a": "Email jean@mepmail.dev with the message id or the headers. We act on abuse reports, and sending that generates complaints can be paused or the account suspended.",
         "link": {
-          "label": "security@je4ndev.com",
-          "href": "mailto:security@je4ndev.com"
+          "label": "jean@mepmail.dev",
+          "href": "mailto:jean@mepmail.dev"
         }
       }
     ]
@@ -154,7 +154,7 @@
   "close": {
     "title": "Nothing here answered it?",
     "body": "Send the account email and what you expected to happen — that is usually enough to get a concrete answer.",
-    "cta": "Email support@je4ndev.com"
+    "cta": "Email jean@mepmail.dev"
   },
   "assistant": {
     "eyebrow": "Help with MepMail",

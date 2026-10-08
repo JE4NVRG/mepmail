@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.59",
+      "date": "2026-10-08",
+      "title": "Contato direto com o responsável",
+      "summary": "Todas as páginas agora apontam para jean@mepmail.dev, o e-mail do dono do MepMail.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Suporte, segurança, privacidade, reembolso e termos usam jean@mepmail.dev como contato, no domínio do próprio MepMail.",
+            "O arquivo security.txt também aponta para esse endereço."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.58",
       "date": "2026-10-08",
       "title": "Destinatários como etiquetas e contatos sugeridos",

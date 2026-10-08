@@ -13,7 +13,7 @@ import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import "../landing.css";
 
-const contact = "mailto:jean@je4ndev.com";
+const contact = "mailto:jean@mepmail.dev";
 const canonical = "/pricing";
 
 type FaqItem = { q: string; a: string };

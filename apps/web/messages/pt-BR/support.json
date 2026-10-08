@@ -14,7 +14,7 @@
       "Relatos de abuso são tratados",
       "Docs · changelog · novidades"
     ],
-    "ctaEmail": "Escrever para support@je4ndev.com",
+    "ctaEmail": "Escrever para jean@mepmail.dev",
     "ctaDocs": "Abrir a documentação"
   },
   "channels": {
@@ -24,7 +24,7 @@
     "items": [
       {
         "name": "Suporte por e-mail",
-        "kind": "support@je4ndev.com",
+        "kind": "jean@mepmail.dev",
         "body": "Melhor para dúvidas de conta, cobrança e entregabilidade que a documentação não responde.",
         "bullets": [
           "O atendimento humano não tem prazo de resposta garantido.",
@@ -32,8 +32,8 @@
         ],
         "links": [
           {
-            "label": "support@je4ndev.com",
-            "href": "mailto:support@je4ndev.com"
+            "label": "jean@mepmail.dev",
+            "href": "mailto:jean@mepmail.dev"
           }
         ]
       },
@@ -143,10 +143,10 @@
       },
       {
         "q": "Como reportar abuso ou spam?",
-        "a": "Escreva para security@je4ndev.com com o id da mensagem ou os cabeçalhos. Agimos sobre relatos de abuso, e envios que geram reclamações podem ser pausados ou a conta suspensa.",
+        "a": "Escreva para jean@mepmail.dev com o id da mensagem ou os cabeçalhos. Agimos sobre relatos de abuso, e envios que geram reclamações podem ser pausados ou a conta suspensa.",
         "link": {
-          "label": "security@je4ndev.com",
-          "href": "mailto:security@je4ndev.com"
+          "label": "jean@mepmail.dev",
+          "href": "mailto:jean@mepmail.dev"
         }
       }
     ]
@@ -154,7 +154,7 @@
   "close": {
     "title": "Nada aqui respondeu?",
     "body": "Mande o e-mail da conta e o que você esperava que acontecesse — isso normalmente basta para uma resposta concreta.",
-    "cta": "Escrever para support@je4ndev.com"
+    "cta": "Escrever para jean@mepmail.dev"
   },
   "assistant": {
     "eyebrow": "Ajuda no MepMail",

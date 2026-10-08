@@ -23,6 +23,21 @@
   },
   "releases": [
     {
+      "version": "0.59",
+      "date": "2026-10-08",
+      "title": "Direct contact with the owner",
+      "summary": "Every page now points to jean@mepmail.dev, the MepMail owner's email.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Support, security, privacy, refunds and terms use jean@mepmail.dev as the contact, on MepMail's own domain.",
+            "security.txt points to that address too."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.58",
       "date": "2026-10-08",
       "title": "Recipients as chips and suggested contacts",

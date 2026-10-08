@@ -71,7 +71,7 @@ export function EloziSupport({
       </p>
       <p className="gtm-note">{labels.privacy}</p>
       <div className="gtm-support-alternatives">
-        <a href="mailto:support@je4ndev.com">{labels.email}</a>
+        <a href="mailto:jean@mepmail.dev">{labels.email}</a>
         <a href={DOCS_URL}>{labels.docs}</a>
       </div>
     </aside>

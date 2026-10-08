@@ -93,7 +93,7 @@
         ]
       }
     ],
-    "contact": "Questions about these terms: jean@je4ndev.com"
+    "contact": "Questions about these terms: jean@mepmail.dev"
   },
   "privacy": {
     "title": "Privacy Policy",
@@ -167,7 +167,7 @@
       {
         "title": "8. Your rights",
         "body": [
-          "Depending on where you live, you can request access, correction, portability, restriction or deletion of your personal data, and object to processing. You can delete your account directly from the dashboard, and you can contact us at privacy@je4ndev.com for any privacy request. We respond within 30 days."
+          "Depending on where you live, you can request access, correction, portability, restriction or deletion of your personal data, and object to processing. You can delete your account directly from the dashboard, and you can contact us at jean@mepmail.dev for any privacy request. We respond within 30 days."
         ]
       },
       {
@@ -189,7 +189,7 @@
         ]
       }
     ],
-    "contact": "Privacy requests and questions: privacy@je4ndev.com"
+    "contact": "Privacy requests and questions: jean@mepmail.dev"
   },
   "refund": {
     "title": "Refund Policy",
@@ -236,7 +236,7 @@
       {
         "title": "7. How to request a refund",
         "body": [
-          "Email jean@je4ndev.com from your account address (or tell us the account email) with the charge reference. Refunds are processed through Stripe back to the original payment method, typically within 5–10 business days depending on your bank."
+          "Email jean@mepmail.dev from your account address (or tell us the account email) with the charge reference. Refunds are processed through Stripe back to the original payment method, typically within 5–10 business days depending on your bank."
         ]
       },
       {
@@ -252,6 +252,6 @@
         ]
       }
     ],
-    "contact": "Refund requests and questions: jean@je4ndev.com"
+    "contact": "Refund requests and questions: jean@mepmail.dev"
   }
 }

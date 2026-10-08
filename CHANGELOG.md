@@ -7,6 +7,17 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.59] - 2026-10-08
+
+One public contact: the owner's own address on the product domain.
+
+### Changed
+
+- Support, security, privacy, refund and terms contacts, the page CTAs, the
+  `auth.md` guide and `/.well-known/security.txt` use jean@mepmail.dev
+  instead of the former je4ndev.com addresses (jean@, support@, privacy@,
+  security@).
+
 ## [0.58] - 2026-10-08
 
 Recipients as chips with suggested contacts in the Correio composer.

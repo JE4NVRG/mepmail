@@ -35,8 +35,9 @@ describe("localized support page", () => {
       expect(html).toContain(copy.assistant.pending);
       expect(html).toContain("gtm-support-hero");
       expect(html.match(/<details>/g)).toHaveLength(copy.faq.items.length);
-      expect(html).toContain('href="mailto:support@je4ndev.com"');
-      expect(html).toContain('href="mailto:security@je4ndev.com"');
+      // Every contact on the page reaches the owner directly.
+      expect(html).toContain('href="mailto:jean@mepmail.dev"');
+      expect(html).not.toContain("@je4ndev.com");
       expect(html).toContain('href="/updates"');
       expect(html).not.toContain("elozi.je4ndev.com/widget.js");
       expect(html).not.toContain("<button");

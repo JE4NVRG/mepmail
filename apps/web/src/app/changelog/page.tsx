@@ -10,7 +10,7 @@ import { DOCS_URL } from "@/lib/docs-links";
 import { legalLinks } from "@/lib/legal-links";
 import "../landing.css";
 
-const contact = "mailto:jean@je4ndev.com";
+const contact = "mailto:jean@mepmail.dev";
 const canonical = "/changelog";
 
 type ChangeGroup = { kind: string; items: string[] };

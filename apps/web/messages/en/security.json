@@ -233,7 +233,7 @@
         "label": "GDPR",
         "state": "In place",
         "tone": "ok",
-        "body": "MepMail Cloud is hosted in Germany and the Privacy Policy states what is stored, why and for how long. A DPA is agreed per customer — ask at security@je4ndev.com."
+        "body": "MepMail Cloud is hosted in Germany and the Privacy Policy states what is stored, why and for how long. A DPA is agreed per customer — ask at jean@mepmail.dev."
       },
       {
         "label": "SOC 2 · ISO 27001",
@@ -252,7 +252,7 @@
   "faq": {
     "eyebrow": "FAQ",
     "title": "The questions an enterprise review asks",
-    "body": "Short answers, with the detail underneath. Anything missing is a fair question for security@je4ndev.com.",
+    "body": "Short answers, with the detail underneath. Anything missing is a fair question for jean@mepmail.dev.",
     "items": [
       {
         "q": "Is email content encrypted at rest?",
@@ -268,7 +268,7 @@
       },
       {
         "q": "How do I get a signed DPA?",
-        "a": "There is no pre-signed DPA published today: write to security@je4ndev.com with your legal entity and it is agreed per customer. Self-hosting removes the question entirely — the processing agreement is then between you and your own infrastructure."
+        "a": "There is no pre-signed DPA published today: write to jean@mepmail.dev with your legal entity and it is agreed per customer. Self-hosting removes the question entirely — the processing agreement is then between you and your own infrastructure."
       },
       {
         "q": "Where is my data stored, and does it stay in the EU?",
@@ -298,12 +298,12 @@
     "title": "Responsible disclosure",
     "body": "Found a vulnerability? Tell us and we will fix it — that is the same standard the code is held to.",
     "bullets": [
-      "Email security@je4ndev.com with the details and, if you have one, a reproduction.",
+      "Email jean@mepmail.dev with the details and, if you have one, a reproduction.",
       "We acknowledge the report and give a first answer within 72 hours.",
       "There is no bug bounty today — we will credit you publicly if you want the credit.",
       "Please give us a reasonable window to fix the issue before publishing it; we will tell you what we are doing along the way."
     ],
-    "cta": "Email security@je4ndev.com"
+    "cta": "Email jean@mepmail.dev"
   },
   "close": {
     "title": "Connect a domain and send in minutes",

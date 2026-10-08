@@ -36,7 +36,7 @@ describe("page-scoped visitor support", () => {
       createElement(EloziSupport, { config: null, labels: copy.assistant }),
     );
     expect(html).toContain(copy.assistant.pending);
-    expect(html).toContain("mailto:support@je4ndev.com");
+    expect(html).toContain("mailto:jean@mepmail.dev");
     expect(html).toContain("https://docs.mepmail.dev");
     expect(html).not.toContain("<script");
     expect(html).not.toContain("<button");
