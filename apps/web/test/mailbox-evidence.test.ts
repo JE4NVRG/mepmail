@@ -22,7 +22,7 @@ import {
   createMailboxEvidenceHandler,
   isPrivateMailboxEvent,
 } from "../../worker/src/mailbox-evidence.js";
-import { type TrustedMailboxNotification } from "../../worker/src/mailbox-receiver.js";
+import type { TrustedMailboxNotification } from "../../worker/src/mailbox-receiver.js";
 import { mailboxWorkerMime } from "../../worker/src/mailbox-sender.js";
 
 const topicArn = "arn:aws:sns:us-east-1:123456789012:private-ses-events";
@@ -262,6 +262,24 @@ describe("authenticated private SES acceptance evidence", () => {
     expect((await outbox(row.id)).status).toBe("unknown");
     expect((await outbox(row.id)).providerRfcMessageId).toBeNull();
     expect((await outbox(row.id)).ciphertext).not.toBeNull();
+  });
+
+  it("accepts the failover region's evidence only for a listed domain", async () => {
+    const { row } = await unknown();
+    const fromWest = { ...notification(row.id, row.attemptId!), topicArn: westTopic };
+    const withFailover = (domains: string[]) =>
+      createMailboxEvidenceHandler({
+        db,
+        keys,
+        mime: mailboxWorkerMime,
+        enabled: true,
+        topics: [topicArn, westTopic],
+        failover: { region: "us-west-2", domains: new Set(domains) },
+      });
+    await expect(withFailover(["other.invalid"])(fromWest)).rejects.toThrow("evidence");
+    expect((await outbox(row.id)).status).toBe("unknown");
+    expect(await withFailover(["evidence.invalid"])(fromWest)).toBe(true);
+    expect((await outbox(row.id)).status).toBe("accepted");
   });
 
   it("rejects spoofed/out-of-attempt evidence and binds exact source, envelope, count, account and region", async () => {

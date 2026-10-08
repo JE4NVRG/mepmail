@@ -116,6 +116,11 @@ const keyring = createKeyringFromEnv(env);
 const mailboxTransportEnabled =
   process.env.MAILBOX_TRANSPORT_ENABLED === "1" &&
   ["1", "true"].includes(process.env.MAILBOX_REGISTRY_ENABLED ?? "");
+// Listed domains send from the failover region while SES pauses their own.
+const failover =
+  parseSesFailover(process.env.SES_FAILOVER_REGION, process.env.SES_FAILOVER_DOMAINS) ?? undefined;
+if (failover)
+  console.log(`SES failover: ${failover.region} for ${[...failover.domains].join(", ")}`);
 const mailboxIngress = createMailboxIngress({
   db,
   keys: keyring,
@@ -123,6 +128,7 @@ const mailboxIngress = createMailboxIngress({
   enabled: mailboxTransportEnabled,
   eventTopics: env.SNS_TOPIC_ARNS ?? [],
   inbound: parseMailboxInboundConfiguration(process.env.MAILBOX_INBOUND_CONFIG),
+  failover,
 });
 // Customer mail of the domains an operator verified at a second provider
 // leaves through its relay while SES has paused the account.
@@ -131,11 +137,6 @@ const relay = relayConfig
   ? { name: relayConfig.name, sender: createCustomerSmtpRelay(relayConfig.url, relayConfig.name) }
   : undefined;
 if (relay) console.log(`customer SMTP relay: ${relay.name}`);
-// Listed domains send from the failover region while SES pauses their own.
-const failover =
-  parseSesFailover(process.env.SES_FAILOVER_REGION, process.env.SES_FAILOVER_DOMAINS) ?? undefined;
-if (failover)
-  console.log(`SES failover: ${failover.region} for ${[...failover.domains].join(", ")}`);
 const mailboxSes = mailboxTransportEnabled
   ? createMailboxSesSender(db, {
       configurationSets:

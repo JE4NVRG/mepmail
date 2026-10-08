@@ -7,10 +7,11 @@ import {
 import { createMailboxEvidenceHandler } from "./mailbox-evidence.js";
 import {
   createMailboxReceiver,
-  MailboxProviderEventError,
   isMailboxReceipt,
+  MailboxProviderEventError,
   type TrustedMailboxNotification,
 } from "./mailbox-receiver.js";
+import type { SesFailover } from "./ses-failover.js";
 
 export interface MailboxInboundConfiguration {
   region: string;
@@ -88,6 +89,7 @@ export function createMailboxIngress(options: {
   enabled: boolean;
   eventTopics: readonly string[];
   inbound: MailboxInboundConfiguration | null;
+  failover?: SesFailover | undefined;
 }) {
   const evidence = createMailboxEvidenceHandler({ ...options, topics: options.eventTopics });
   const inbound = options.inbound;

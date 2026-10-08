@@ -19,6 +19,7 @@ import {
   providerRecord,
   type TrustedMailboxNotification,
 } from "./mailbox-receiver.js";
+import type { SesFailover } from "./ses-failover.js";
 
 const OUTBOX_TAG = "mepmail_outbox_id";
 const ATTEMPT_TAG = "mepmail_attempt_id";
@@ -162,8 +163,11 @@ export function createMailboxEvidenceHandler(options: {
   mime: MailboxTransportMimeAdapter;
   enabled: boolean;
   topics: readonly string[];
+  /** A listed domain's mail may also report from the failover region it sent from. */
+  failover?: SesFailover | undefined;
 }) {
   const topics = [...options.topics];
+  const failover = options.failover;
   return async (input: TrustedMailboxNotification): Promise<boolean> => {
     if (!isPrivateMailboxEvent(input.event)) return false;
     if (!options.enabled) throw new MailboxProviderEventError("disabled");
@@ -190,6 +194,7 @@ export function createMailboxEvidenceHandler(options: {
         outbox: schema.mailboxOutbox,
         address: schema.mailboxes.address,
         region: schema.domains.region,
+        domainName: schema.domains.name,
       })
       .from(schema.mailboxOutbox)
       .innerJoin(
@@ -212,7 +217,12 @@ export function createMailboxEvidenceHandler(options: {
       bound.outbox.attemptId !== attemptId ||
       !["sending", "unknown", "accepted"].includes(bound.outbox.status) ||
       bound.address !== from ||
-      bound.region !== topic.region ||
+      (bound.region !== topic.region &&
+        !(
+          failover &&
+          topic.region === failover.region &&
+          failover.domains.has(bound.domainName)
+        )) ||
       bound.outbox.recipientCount !== destination.length ||
       (bound.outbox.status === "accepted" && bound.outbox.providerMessageId !== messageId)
     )
