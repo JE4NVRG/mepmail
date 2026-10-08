@@ -704,23 +704,164 @@
 .composerFields {
   gap: 16px;
 }
+/* From, To and Cc each get a full row: chips need the width. */
 .composerAddressFields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
   min-width: 0;
 }
 .composerAddressFields > label {
   min-width: 0;
 }
-/* Cc, or the button that reveals it, spans the row under From and To. */
-.composerAddressFields > :nth-child(3) {
-  grid-column: 1 / -1;
+/* Recipients typed as chips (To, Cc), with contact suggestions. */
+.recipientField {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
 }
-.addCc {
-  justify-self: start;
-  margin-top: -6px;
+.recipientLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.ccToggle {
+  border: 0;
+  padding: 0 2px;
+  background: none;
+  color: var(--ms-violet);
+  font: 600 var(--ms-fs-label) var(--ms-font-sans);
+  line-height: inherit;
+  cursor: pointer;
+}
+.ccToggle:hover {
+  text-decoration: underline;
+}
+.ccToggle:focus-visible {
+  outline: 2px solid var(--ms-focus-border);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.composer .recipientBox {
+  height: auto;
+}
+.recipientBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 44px;
+  max-height: 132px;
+  padding: 6px 8px;
+  overflow-y: auto;
+  cursor: text;
+}
+.recipientBox[data-focused] {
+  border-color: var(--ms-focus-border);
+  box-shadow: var(--ms-focus-ring);
+}
+.composer .recipientBox input.recipientInput {
+  flex: 1 1 140px;
+  width: auto;
+  min-width: 120px;
+  min-height: 30px;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ms-bone);
+  font-size: var(--ms-fs-body);
+  outline: none;
+}
+.recipientChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 2px 0 10px;
+  border: 1px solid var(--ms-violet-border);
+  border-radius: 999px;
+  background: var(--ms-violet-bg);
+  color: var(--ms-bone);
+  font-size: var(--ms-fs-ui);
+}
+.recipientChip[data-invalid] {
+  border-color: var(--ms-danger-border);
+  background: var(--ms-danger-bg);
+  color: var(--ms-danger);
+}
+.recipientChipText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recipientChipRemove {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.75;
+  cursor: pointer;
+}
+.recipientChipRemove:hover,
+.recipientChipRemove:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+.recipientSuggestions {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  z-index: 5;
+  display: grid;
+  max-height: 240px;
+  margin-top: 4px;
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: var(--ms-r-input);
+  background: var(--ms-panel-raised);
+  box-shadow: var(--ms-shadow-card);
+}
+.recipientOption {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.recipientOption strong,
+.recipientOption span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recipientOption strong {
+  color: var(--ms-bone);
+  font-size: var(--ms-fs-ui);
+  font-weight: 600;
+}
+.recipientOption span {
+  color: var(--ms-muted);
   font-size: 12px;
+}
+.recipientOption[aria-selected="true"] {
+  background: var(--ms-violet-bg);
 }
 .composer input:not([type="file"]),
 .composer select {

@@ -494,5 +494,12 @@
   "replyAll": "Responder a todos",
   "cc": "Cc",
   "addCc": "Adicionar Cc",
+  "addCcShort": "+ Cc",
+  "composeRecipientsPlaceholder": "Digite o e-mail e aperte vírgula ou Enter",
+  "removeRecipient": "Remover {address}",
+  "invalidRecipientShort": "Endereço inválido",
+  "invalidRecipient": "Corrija o endereço em vermelho: {address}",
+  "recipientLimit": "Até 20 destinatários somando Para e Cc.",
+  "recipientSuggestions": "Contatos sugeridos",
   "replyQuote": "Em {date}, {sender} escreveu:\n{text}"
 }

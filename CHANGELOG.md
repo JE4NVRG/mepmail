@@ -7,6 +7,31 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.58] - 2026-10-08
+
+Recipients as chips with suggested contacts in the Correio composer.
+
+### Added
+
+- `MailboxRecipientField` for To and Cc: a comma, semicolon, Enter, Tab,
+  a space after a complete address or leaving the field closes a chip; a
+  pasted list is split at once; Backspace on an empty field (or a double
+  click) takes a chip back to edit; Enter never submits from it, and Escape
+  closes the suggestions, not the composer. ARIA combobox with a listbox.
+- `lib/mailbox-recipients.ts`: address extraction ("Name <a@b>", mailto:),
+  splitting, case-insensitive merge, the same email rule as the server's
+  `z.email()` (tested against it), contact ranking and matching.
+- Suggestions from recipients used on this browser (localStorage, at most
+  100), the Sent and Inbox lists (blocked items and no-reply senders left
+  out), without the sending mailbox.
+- A visible "+ Cc" next to To. Saving checks the chips first: an invalid
+  address is named and focused, and To + Cc over 20 is refused.
+
+### Changed
+
+- From, To and Cc each take a full row in the composer.
+- Composer errors replace the footer hint, so they show without scrolling.
+
 ## [0.57] - 2026-10-08
 
 Reply all, Cc and reply quoting in Correio.

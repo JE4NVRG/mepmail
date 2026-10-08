@@ -494,5 +494,12 @@
   "replyAll": "Reply all",
   "cc": "Cc",
   "addCc": "Add Cc",
+  "addCcShort": "+ Cc",
+  "composeRecipientsPlaceholder": "Type an address, then comma or Enter",
+  "removeRecipient": "Remove {address}",
+  "invalidRecipientShort": "Invalid address",
+  "invalidRecipient": "Fix the address in red: {address}",
+  "recipientLimit": "Up to 20 recipients across To and Cc.",
+  "recipientSuggestions": "Suggested contacts",
   "replyQuote": "On {date}, {sender} wrote:\n{text}"
 }

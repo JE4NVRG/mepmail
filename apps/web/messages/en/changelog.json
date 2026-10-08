@@ -23,6 +23,30 @@
   },
   "releases": [
     {
+      "version": "0.58",
+      "date": "2026-10-08",
+      "title": "Recipients as chips and suggested contacts",
+      "summary": "While writing, each address becomes a chip when you type a comma, and Correio suggests people you already use.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "To and Cc as chips: comma, semicolon, Enter or Tab close an address; pasting a list splits it at once.",
+            "An invalid address turns red and sending asks you to fix it. Backspace brings the last chip back to edit; so does a double click.",
+            "Suggestions while you type: people you used on this browser, sent to, or heard from. No-reply senders are left out.",
+            "A “+ Cc” button next to To, easy to find."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "From, To and Cc each take the full row in the composer, with room for several addresses.",
+            "Composer notices (like an address to fix) show in the footer next to the buttons, without scrolling."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.57",
       "date": "2026-10-08",
       "title": "Reply all, Cc and quoting in Correio",

@@ -3,7 +3,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useLocale, useTranslations } from "next-intl";
-import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import {
   initialMailboxText,
@@ -19,10 +27,18 @@ import {
   mailboxPrimaryParticipant,
   mailboxSendApproval,
 } from "@/lib/mailbox-inbox-presentation";
+import {
+  isRecipientAddress,
+  mailboxContacts,
+  readRecentRecipients,
+  rememberRecipients,
+  splitRecipients,
+} from "@/lib/mailbox-recipients";
 import { mailboxSignatureText } from "@/lib/mailbox-signature";
 import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
+import { MailboxRecipientField } from "./mailbox-recipient-field";
 import { MailboxRichBody } from "./mailbox-rich-body";
 import styles from "./mailboxes.module.css";
 
@@ -31,11 +47,6 @@ type Box = Outputs["list"]["mailboxes"][number];
 type Item = Outputs["item"];
 type Folder = MailboxFolder;
 type ComposeMode = "reply" | "replyAll" | "forward";
-const addressList = (value: string) =>
-  value
-    .split(/[,;]/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
 /** Everyone on the original except this mailbox and whoever is already in To. */
 function replyAllCopies(source: Item, own: string, to: string[]) {
   const skip = new Set([own, ...to].map((address) => address.toLowerCase()));
@@ -212,25 +223,62 @@ function DraftDialog({
     ? mailboxSignatureText({ profile: sender.signatureProfile, text: sender.signatureText })
     : "";
   const previousSignature = useRef(senderSignature);
-  const [to, setTo] = useState(
+  const [to, setTo] = useState<string[]>(
     source
       ? source.kind === "draft"
-        ? source.to.join(", ")
+        ? source.to
         : mode === "forward"
-          ? ""
-          : source.replyTo
-      : "",
+          ? []
+          : splitRecipients(source.replyTo)
+      : [],
   );
-  const [cc, setCc] = useState(
+  const [cc, setCc] = useState<string[]>(
     source
       ? source.kind === "draft"
-        ? source.cc.join(", ")
+        ? source.cc
         : mode === "replyAll"
-          ? replyAllCopies(source, sender?.address ?? "", addressList(source.replyTo)).join(", ")
-          : ""
-      : "",
+          ? replyAllCopies(source, sender?.address ?? "", splitRecipients(source.replyTo))
+          : []
+      : [],
   );
-  const [showCc, setShowCc] = useState(cc !== "");
+  const [showCc, setShowCc] = useState(cc.length > 0);
+  const ccInput = useRef<HTMLInputElement>(null);
+  // Suggestions come from what this person already uses: recipients typed on
+  // this browser, people they sent to and people who wrote to them.
+  const sentList = useQuery(
+    trpc.mailboxes.items.queryOptions(
+      { mailboxId: null, folder: "sent" },
+      { retry: false, staleTime: 300_000 },
+    ),
+  );
+  const inboxList = useQuery(
+    trpc.mailboxes.items.queryOptions(
+      { mailboxId: null, folder: "inbox" },
+      { retry: false, staleTime: 300_000 },
+    ),
+  );
+  const [recent] = useState(readRecentRecipients);
+  const contacts = useMemo(
+    () =>
+      mailboxContacts(
+        [
+          recent,
+          (sentList.data?.items ?? []).flatMap((item) =>
+            item.to.map((address) => ({ address, name: "" })),
+          ),
+          (inboxList.data?.items ?? [])
+            .filter((item) => !mailboxContentBlocked(item))
+            .map((item) => ({ address: item.from, name: item.fromName })),
+        ],
+        sender ? [sender.address] : [],
+      ),
+    [recent, sentList.data, inboxList.data, sender],
+  );
+  const recipientText = {
+    remove: (address: string) => t("removeRecipient", { address }),
+    invalid: t("invalidRecipientShort"),
+    suggestions: t("recipientSuggestions"),
+  };
   const [subject, setSubject] = useState(
     source
       ? source.kind === "draft"
@@ -404,6 +452,17 @@ function DraftDialog({
           if (submitting.current || loadingFiles || !allowed || !current()) return;
           const sendNow =
             canSend && (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "send";
+          const copies = showCc ? cc : [];
+          const invalid = [...to, ...copies].find((address) => !isRecipientAddress(address));
+          if (invalid) {
+            setError(t("invalidRecipient", { address: invalid }));
+            (to.includes(invalid) ? recipientInput : ccInput).current?.focus();
+            return;
+          }
+          if (to.length + copies.length > 20) {
+            setError(t("recipientLimit"));
+            return;
+          }
           submitting.current = true;
           setSaving(true);
           setError("");
@@ -414,13 +473,17 @@ function DraftDialog({
               expectedRevision: source?.kind === "draft" ? source.revision : 0,
               sourceItemId: source?.id,
               mode: source?.kind === "draft" ? undefined : mode === "forward" ? "forward" : "reply",
-              to: addressList(to),
-              ...(showCc && addressList(cc).length ? { cc: addressList(cc) } : {}),
+              to,
+              ...(copies.length ? { cc: copies } : {}),
               subject,
               text,
               retainedAttachments: retained,
               uploads: uploads.map(({ filename, base64 }) => ({ filename, base64 })),
             });
+            rememberRecipients(
+              [...to, ...copies],
+              new Map(contacts.map((contact) => [contact.address.toLowerCase(), contact.name])),
+            );
             if (!active.current || !current()) return;
             await saved(result);
             if (sendNow && active.current && current()) await send?.(result);
@@ -470,38 +533,48 @@ function DraftDialog({
                     ))}
                 </select>
               </label>
-              <label>
-                {t("to")}
-                <input
-                  ref={recipientInput}
-                  className="ms-input"
-                  value={to}
-                  onChange={(e) => setTo(e.target.value)}
-                  placeholder={t("composeRecipientPlaceholder")}
-                  maxLength={5100}
-                  autoFocus={!source || mode === "forward"}
-                />
-              </label>
+              <MailboxRecipientField
+                label={t("to")}
+                values={to}
+                onChange={(next) => {
+                  setTo(next);
+                  setError("");
+                }}
+                contacts={contacts}
+                placeholder={t("composeRecipientsPlaceholder")}
+                inputRef={recipientInput}
+                autoFocus={!source || mode === "forward"}
+                text={recipientText}
+                action={
+                  showCc ? null : (
+                    <button
+                      type="button"
+                      className={styles.ccToggle}
+                      title={t("addCc")}
+                      onClick={() => {
+                        setShowCc(true);
+                        requestAnimationFrame(() => ccInput.current?.focus());
+                      }}
+                    >
+                      {t("addCcShort")}
+                    </button>
+                  )
+                }
+              />
               {showCc ? (
-                <label>
-                  {t("cc")}
-                  <input
-                    className="ms-input"
-                    value={cc}
-                    onChange={(e) => setCc(e.target.value)}
-                    placeholder={t("composeRecipientPlaceholder")}
-                    maxLength={5100}
-                  />
-                </label>
-              ) : (
-                <button
-                  type="button"
-                  className={`ms-btn ms-btn-ghost ${styles.addCc}`}
-                  onClick={() => setShowCc(true)}
-                >
-                  {t("addCc")}
-                </button>
-              )}
+                <MailboxRecipientField
+                  label={t("cc")}
+                  values={cc}
+                  onChange={(next) => {
+                    setCc(next);
+                    setError("");
+                  }}
+                  contacts={contacts}
+                  placeholder={t("composeRecipientsPlaceholder")}
+                  inputRef={ccInput}
+                  text={recipientText}
+                />
+              ) : null}
             </div>
             <label>
               {t("subject")}
@@ -595,16 +668,18 @@ function DraftDialog({
               </section>
             ) : null}
           </fieldset>
+        </div>
+        <footer className={`${styles.dialogFooter} ${styles.composerFooter}`}>
+          {/* The footer never scrolls away, so a problem shows where the person clicked. */}
           {error ? (
             <p role="alert" className={styles.error}>
               {error}
             </p>
-          ) : null}
-        </div>
-        <footer className={`${styles.dialogFooter} ${styles.composerFooter}`}>
-          <p className={styles.hint}>
-            {t(canSend ? "composeSendHint" : deliveryReady ? "draftSaveFirst" : "draftOnly")}
-          </p>
+          ) : (
+            <p className={styles.hint}>
+              {t(canSend ? "composeSendHint" : deliveryReady ? "draftSaveFirst" : "draftOnly")}
+            </p>
+          )}
           <div className={styles.composerActions}>
             <button type="button" className="ms-btn" disabled={busy} onClick={dismiss}>
               {t("cancel")}

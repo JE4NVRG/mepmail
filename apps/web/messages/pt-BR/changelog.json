@@ -28,6 +28,30 @@
   },
   "releases": [
     {
+      "version": "0.58",
+      "date": "2026-10-08",
+      "title": "Destinatários como etiquetas e contatos sugeridos",
+      "summary": "Ao escrever, cada endereço vira uma etiqueta ao digitar vírgula, e o Correio sugere quem você já usa.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Para e Cc em etiquetas: vírgula, ponto e vírgula, Enter ou Tab fecham o endereço; colar uma lista separa todos de uma vez.",
+            "Endereço inválido fica em vermelho e o envio pede para corrigir. Backspace traz a última etiqueta de volta para editar; duplo clique também.",
+            "Sugestões enquanto você digita: quem você usou neste navegador, para quem enviou e quem escreveu para você. Remetentes no-reply ficam de fora.",
+            "Botão “+ Cc” ao lado de Para, fácil de achar."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "De, Para e Cc ocupam a linha inteira no editor, com espaço para vários endereços.",
+            "Avisos do editor (como um endereço a corrigir) aparecem no rodapé, ao lado dos botões, sem precisar rolar."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.57",
       "date": "2026-10-08",
       "title": "Responder a todos, Cc e citação no Correio",
