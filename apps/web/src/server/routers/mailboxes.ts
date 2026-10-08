@@ -32,6 +32,7 @@ import {
   setMailboxItemTrash,
   updateMailboxFolder,
   updateMailboxRegistry,
+  updateMailboxSignature,
   withMailboxRegistryAdmin,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
@@ -790,6 +791,30 @@ export const mailboxesRouter = router({
         metadata: { status: row.status, ownerUserId: row.ownerUserId },
       });
       return { id: row.id };
+    }),
+  // The owner of a mailbox edits its signature; team admins may too.
+  updateSignature: enabled
+    .input(
+      z
+        .object({
+          mailboxId: z.uuid(),
+          name: z.string().max(200),
+          title: z.string().max(200),
+          company: z.string().max(200),
+          phone: z.string().max(100),
+          website: z.string().max(400),
+          text: z.string().max(4000),
+        })
+        .strict(),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const row = await call(() => updateMailboxSignature(ctx.db, actor(ctx), input));
+      await recordAudit(ctx, {
+        action: "mailbox.updated",
+        target: { type: "mailbox", id: row.id },
+        metadata: { signature: true },
+      });
+      return row;
     }),
   grant: enabled
     .input(

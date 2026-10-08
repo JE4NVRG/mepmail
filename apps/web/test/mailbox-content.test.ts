@@ -16,6 +16,7 @@ import {
   receiveMailboxMime,
   revokeMailboxRegistry,
   sendMailboxOutbox,
+  updateMailboxSignature,
   withMailboxAgentAccess,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
@@ -1125,6 +1126,41 @@ describe("session-authenticated mailbox content", () => {
     expect((await readMailboxItem(db, keys, actor(), { mailboxId, id: item.id })).raw).toEqual(
       mime(),
     );
+  });
+  it("sends the managed signature as formatted HTML beside the unchanged text", async () => {
+    await updateMailboxSignature(db, actor(), {
+      mailboxId,
+      name: "Jean <Vargas>",
+      title: "Fundador",
+      company: "MepMail",
+      phone: "+55 44 99999-0000",
+      website: "mepmail.dev",
+      text: "",
+    });
+    const footer = [
+      "",
+      "",
+      "--",
+      "Jean <Vargas>",
+      "Fundador · MepMail",
+      "+55 44 99999-0000 · mepmail.dev",
+    ].join("\n");
+    const saved = await as().saveDraft(draft({ text: `Olá!${footer}` }));
+    const mime = await simpleParser(
+      (await readMailboxItem(db, keys, actor(), { mailboxId, id: saved.id })).raw,
+    );
+    expect(mime.text?.trim()).toBe(`Olá!${footer}`.trim());
+    expect(mime.html).toContain('<table role="presentation"');
+    expect(mime.html).toContain("Jean &lt;Vargas&gt;");
+    expect(mime.html).toContain('href="https://mepmail.dev/"');
+    expect(mime.html).not.toContain("<Vargas>");
+    // A footer the author edited stays text in the HTML part.
+    const edited = await as().saveDraft(draft({ text: ["Olá!", "", "--", "Jean, editado"].join("\n") }));
+    const plain = await simpleParser(
+      (await readMailboxItem(db, keys, actor(), { mailboxId, id: edited.id })).raw,
+    );
+    expect(plain.html).not.toContain("<table");
+    expect(plain.html).toContain("Jean, editado");
   });
   it("reads, archives and counts unread mail through the router, in arrival order", async () => {
     const older = await imported("fixture:older");

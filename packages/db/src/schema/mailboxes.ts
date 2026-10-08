@@ -3,6 +3,7 @@ import {
   check,
   foreignKey,
   index,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -13,6 +14,24 @@ import {
 import { teamMembers, user } from "./auth.js";
 import { domains } from "./domains.js";
 import { teams } from "./teams.js";
+
+/**
+ * The structured email signature of a mailbox. Every field may be empty;
+ * `logoUrl` is set only by the logo upload route (an https URL in our public
+ * storage), never from client input.
+ */
+export interface MailboxSignatureProfile {
+  version: 1;
+  name: string;
+  title: string;
+  company: string;
+  phone: string;
+  website: string;
+  logoUrl: string | null;
+  /** Pixel size of the stored logo, so mail clients get explicit width/height. */
+  logoWidth: number | null;
+  logoHeight: number | null;
+}
 
 /** Registry only: planned does not assert inbound, SMTP or client provisioning. */
 export const mailboxes = pgTable(
@@ -28,6 +47,7 @@ export const mailboxes = pgTable(
     address: text("address").notNull(),
     label: text("label").notNull(),
     signatureText: text("signature_text").notNull().default(""),
+    signatureProfile: jsonb("signature_profile").$type<MailboxSignatureProfile>(),
     kind: text("kind").$type<"person" | "agent">().notNull(),
     // Keep the registry if its responsible account is deleted. A team admin must reassign it.
     ownerUserId: text("owner_user_id").references(() => user.id, { onDelete: "set null" }),
@@ -50,6 +70,10 @@ export const mailboxes = pgTable(
     check("mailboxes_kind_check", sql`${t.kind} in ('person', 'agent')`),
     check("mailboxes_status_check", sql`${t.status} in ('planned', 'suspended')`),
     check("mailboxes_signature_text_check", sql`char_length(${t.signatureText}) <= 4000`),
+    check(
+      "mailboxes_signature_profile_check",
+      sql`${t.signatureProfile} is null or (jsonb_typeof(${t.signatureProfile}) = 'object' and octet_length(${t.signatureProfile}::text) <= 2048)`,
+    ),
     check(
       "mailboxes_address_check",
       sql`${t.address} = lower(${t.address}) and length(${t.address}) <= 254`,

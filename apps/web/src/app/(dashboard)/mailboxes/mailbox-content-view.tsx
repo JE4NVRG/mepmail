@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { initialMailboxText, replaceMailboxSignature } from "@/lib/mailbox-compose-signature";
+import { mailboxSignatureText } from "@/lib/mailbox-signature";
 import {
   type MailboxFolder,
   mailboxContentBlocked,
@@ -186,7 +187,10 @@ function DraftDialog({
   const boxId = mailboxId;
   const sender = boxes.find((box) => box.id === boxId);
   const canSend = !!send && deliveryReady && sender?.canSend === true;
-  const previousSignature = useRef(sender?.signatureText ?? "");
+  const senderSignature = sender
+    ? mailboxSignatureText({ profile: sender.signatureProfile, text: sender.signatureText })
+    : "";
+  const previousSignature = useRef(senderSignature);
   const [to, setTo] = useState(
     source
       ? source.kind === "draft"
@@ -228,7 +232,7 @@ function DraftDialog({
                 .join("\n"),
             })
           : "",
-      source?.kind === "draft" ? "" : (sender?.signatureText ?? ""),
+      source?.kind === "draft" ? "" : senderSignature,
       source?.kind !== "draft" && mode === "forward",
     ),
   );
@@ -253,11 +257,11 @@ function DraftDialog({
   }, [mode, source]);
   useEffect(() => {
     if (source) return;
-    const next = sender?.signatureText ?? "";
+    const next = senderSignature;
     const previous = previousSignature.current;
     setText((value) => replaceMailboxSignature(value, previous, next));
     previousSignature.current = next;
-  }, [sender?.signatureText, source]);
+  }, [senderSignature, source]);
   const allowed = boxes.some(
     (b) => b.id === boxId && b.canRead && b.canDraft && b.status === "planned",
   );

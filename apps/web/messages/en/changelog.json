@@ -23,6 +23,22 @@
   },
   "releases": [
     {
+      "version": "0.56",
+      "date": "2026-10-08",
+      "title": "Professional signatures in Correio",
+      "summary": "Each mailbox gets a signature with name, title, company, phone, website and logo, and email goes out formatted.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Signature editor in Settings → Mailboxes, with a live preview of what recipients see. A mailbox owner edits theirs; admins edit any.",
+            "Signature logo: upload PNG, JPG or WebP, and we size it for email.",
+            "Correio email goes out in two versions: formatted, with the signature, clickable links and quotes, and as text for those who don't read HTML."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.55",
       "date": "2026-10-08",
       "title": "Read, archive and drag in Correio",

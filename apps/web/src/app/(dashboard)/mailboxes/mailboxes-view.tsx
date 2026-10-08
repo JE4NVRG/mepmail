@@ -24,6 +24,7 @@ import managementStyles from "./mailbox-management.module.css";
 import { MailboxOffer } from "./mailbox-offer";
 import { MailboxServicePanel } from "./mailbox-service-panel";
 import { MailboxSetupDialog } from "./mailbox-setup-dialog";
+import { MailboxSignatureDialog } from "./mailbox-signature-dialog";
 import { MailboxUsagePanel } from "./mailbox-usage-panel";
 import styles from "./mailboxes.module.css";
 
@@ -51,7 +52,6 @@ function RegistryDialog({
   const [domainId, setDomain] = useState(options.domains[0]?.id ?? "");
   const [owner, setOwner] = useState(mailbox?.ownerUserId ?? options.currentUserId);
   const [label, setLabel] = useState(mailbox?.label ?? "");
-  const [signatureText, setSignatureText] = useState(mailbox?.signatureText ?? "");
   const [local, setLocal] = useState("");
   const [kind, setKind] = useState<"person" | "agent">(mailbox?.kind ?? "person");
   const [status, setStatus] = useState<"planned" | "suspended">(mailbox?.status ?? "planned");
@@ -113,7 +113,6 @@ function RegistryDialog({
                   label,
                   ownerUserId: owner,
                   status,
-                  signatureText,
                 })
               : await create.mutateAsync({
                   domainId,
@@ -223,21 +222,6 @@ function RegistryDialog({
                   <option value="planned">{t("planned")}</option>
                   <option value="suspended">{t("suspended")}</option>
                 </select>
-              </label>
-              <label>
-                {t("signatureLabel")}
-                <textarea
-                  className={`ms-input ${managementStyles.signatureInput}`}
-                  value={signatureText}
-                  onChange={(event) => setSignatureText(event.target.value)}
-                  maxLength={4000}
-                  rows={4}
-                  placeholder={t("signaturePlaceholder")}
-                  aria-describedby="mailbox-signature-help"
-                />
-                <small id="mailbox-signature-help" className={managementStyles.signatureHelp}>
-                  {t("signatureHelp")}
-                </small>
               </label>
             </>
           ) : (
@@ -419,6 +403,7 @@ export function MailboxesView({
   const [licenseOpenRequest, openLicense] = useState(0);
   const [licenseOfferId, setLicenseOfferId] = useState<string | null>(null);
   const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
+  const [signatureDialogId, setSignatureDialogId] = useState<string | null>(null);
   const [activityDialogId, setActivityDialogId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<"boxes" | "agents" | "license">("boxes");
   const managementMenu = useRef<HTMLDetailsElement>(null);
@@ -488,6 +473,12 @@ export function MailboxesView({
       : {};
   const agentBox = boxes.find(
     (box) => box.id === agentDialogId && box.ownerActive && box.ownerUserId === session?.user.id,
+  );
+  const signatureBox = boxes.find(
+    (box) =>
+      box.id === signatureDialogId &&
+      (registry.data?.canManage === true ||
+        (box.ownerActive && box.ownerUserId === session?.user.id)),
   );
   const activityBox = boxes.find(
     (box) =>
@@ -832,6 +823,13 @@ export function MailboxesView({
           mcpUrl={correioMcpUrl}
         />
       ) : null}
+      {signatureBox ? (
+        <MailboxSignatureDialog
+          key={signatureBox.id}
+          mailbox={signatureBox}
+          close={() => setSignatureDialogId(null)}
+        />
+      ) : null}
       {activityBox ? (
         <MailboxActivityDialog
           key={activityBox.id}
@@ -961,30 +959,42 @@ export function MailboxesView({
                             {t(`scope.${box.kind}`)} · {t(box.status)}
                           </small>
                         </div>
-                        {registry.data?.canManage ? (
+                        {registry.data?.canManage ||
+                        (box.ownerActive && box.ownerUserId === session?.user.id) ? (
                           <div className={styles.settingsRowActions}>
                             <button
                               type="button"
                               className="ms-btn ms-btn-ghost"
-                              disabled={!options.data}
-                              onClick={() => {
-                                selectMailbox(box.id);
-                                setDialog("receiving");
-                              }}
+                              onClick={() => setSignatureDialogId(box.id)}
                             >
-                              {t("app.receiving")}
+                              {t("signature.action")}
                             </button>
-                            <button
-                              type="button"
-                              className="ms-btn"
-                              disabled={!options.data}
-                              onClick={() => {
-                                selectMailbox(box.id);
-                                setDialog("edit");
-                              }}
-                            >
-                              {t("manage")}
-                            </button>
+                            {registry.data?.canManage ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="ms-btn ms-btn-ghost"
+                                  disabled={!options.data}
+                                  onClick={() => {
+                                    selectMailbox(box.id);
+                                    setDialog("receiving");
+                                  }}
+                                >
+                                  {t("app.receiving")}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ms-btn"
+                                  disabled={!options.data}
+                                  onClick={() => {
+                                    selectMailbox(box.id);
+                                    setDialog("edit");
+                                  }}
+                                >
+                                  {t("manage")}
+                                </button>
+                              </>
+                            ) : null}
                           </div>
                         ) : null}
                       </li>

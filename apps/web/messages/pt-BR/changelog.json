@@ -28,6 +28,22 @@
   },
   "releases": [
     {
+      "version": "0.56",
+      "date": "2026-10-08",
+      "title": "Assinatura profissional no Correio",
+      "summary": "Cada caixa tem sua assinatura com nome, cargo, empresa, telefone, site e logo, e o e-mail sai formatado.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Editor de assinatura em Configurações → Caixas, com prévia ao vivo de como quem recebe vai ver. O dono da caixa edita a sua; administradores editam todas.",
+            "Logo da assinatura: envie PNG, JPG ou WebP, e ajustamos o tamanho para e-mail.",
+            "Os e-mails do Correio saem em duas versões: formatada, com a assinatura, links clicáveis e citações, e em texto para quem não lê HTML."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.55",
       "date": "2026-10-08",
       "title": "Lido, arquivar e arrastar no Correio",

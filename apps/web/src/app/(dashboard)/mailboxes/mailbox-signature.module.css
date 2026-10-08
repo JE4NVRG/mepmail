@@ -1,0 +1,102 @@
+.dialog {
+  width: min(920px, calc(100vw - 32px));
+  max-width: none;
+}
+/* Fields on the left, the live preview on the right; stacked on a phone. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px 24px;
+  align-items: start;
+}
+.fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.fields label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ms-muted);
+  min-width: 0;
+}
+.fields input,
+.fields textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.wide {
+  grid-column: 1 / -1;
+}
+.logoRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.logoLabel {
+  font-size: 12px;
+  color: var(--ms-muted);
+  flex-basis: 100%;
+}
+.logoThumb {
+  display: block;
+  max-width: 120px;
+  max-height: 48px;
+  border-radius: 4px;
+  background: #fff;
+  padding: 4px;
+}
+.logoRow small {
+  flex-basis: 100%;
+  color: var(--ms-muted);
+  font-size: 11px;
+}
+.preview {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.preview h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ms-muted);
+}
+.previewFrame {
+  width: 100%;
+  min-height: 200px;
+  border: 1px solid var(--ms-line);
+  border-radius: 8px;
+  background: #fff;
+}
+.textVersion {
+  font-size: 12px;
+  color: var(--ms-muted);
+}
+.textVersion summary {
+  cursor: pointer;
+}
+.textVersion pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ms-line);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  font-size: 12px;
+  color: var(--ms-bone);
+}
+.footer {
+  grid-column: 1 / -1;
+}
+@media (max-width: 720px) {
+  .layout,
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

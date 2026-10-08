@@ -22,6 +22,7 @@ import {
 } from "../../../../packages/core/src/mailbox-message-id";
 import { pilotImageMetadata } from "../../../../packages/core/src/mailbox-pilot-images";
 import { mailboxPreview } from "../lib/mailbox-inbox-presentation";
+import { mailboxDraftHtml } from "../lib/mailbox-signature";
 import { getKeyring } from "./keyring";
 import { projectMailboxHtml } from "./mailbox-html";
 
@@ -581,6 +582,12 @@ export async function saveMailboxContentDraft(
     to: input.to,
     subject: input.subject,
     text: input.text,
+    // The same words as HTML, with the mailbox's signature formatted where the
+    // composer placed it. Rebuilt from the text on every save.
+    html: mailboxDraftHtml(input.text, {
+      profile: box.signatureProfile,
+      text: box.signatureText,
+    }),
     messageId: input.id ? originalId : `<${randomUUID()}@${box.address.split("@")[1]}>`,
     inReplyTo:
       mode === "forward"

@@ -7,6 +7,35 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.56] - 2026-10-08
+
+Professional email signatures in Correio.
+
+### Added
+
+- Mailbox migration 0015: `mailboxes.signature_profile` (jsonb, checked as an
+  object of at most 2 KB): name, title, company, phone, website, logo URL and
+  its pixel size. `signature_text` stays as the free-text lines.
+- `updateMailboxSignature` (mailbox owner or team admin; phone digits and
+  `+()-. ` only; website normalized to an http(s) URL without credentials)
+  and the `mailboxes.updateSignature` procedure, audited as
+  `mailbox.updated`.
+- `/api/mailbox-signature-logo`: POST/DELETE for the owner or an admin,
+  checked before storage. PNG or JPEG bytes only (the browser re-encodes to
+  PNG at most 480x200), at most 512 KB, stored at
+  `signature-logos/<teamId>/<mailboxId>.<ext>` with a cache-buster; the pixel
+  size is read from the bytes for explicit width/height in mail.
+- `apps/web/src/lib/mailbox-signature.ts`: the text signature, the
+  email-safe HTML signature (one inline-styled table, logo behind an accent
+  rule, tel: and website links, everything escaped), text-to-HTML for bodies
+  (paragraphs, links, quote blocks) and `mailboxDraftHtml`.
+- Correio drafts are multipart/alternative: the typed text plus an HTML part
+  rebuilt on every save, where the composer's managed signature footer
+  becomes the formatted signature; an edited footer stays text.
+- Signature dialog in Correio settings with a live, sandboxed preview and the
+  text version; the old admin-only signature field leaves the registry
+  dialog.
+
 ## [0.55] - 2026-10-08
 
 Read state, Archive and drag-and-drop in Correio.

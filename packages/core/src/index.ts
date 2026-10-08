@@ -444,6 +444,7 @@ export {
   type MailboxReceivingState,
 } from "./mailbox-receiving.js";
 export {
+  assertMailboxSignatureEditor,
   createMailboxRegistry,
   grantMailboxRegistry,
   listMailboxRegistry,
@@ -451,7 +452,9 @@ export {
   MailboxRegistryError,
   mailboxDomainLock,
   revokeMailboxRegistry,
+  setMailboxSignatureLogo,
   updateMailboxRegistry,
+  updateMailboxSignature,
   withMailboxRegistryAdmin,
 } from "./mailbox-registry.js";
 export {

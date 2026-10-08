@@ -102,6 +102,7 @@ export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
       address: schema.mailboxes.address,
       label: schema.mailboxes.label,
       signatureText: schema.mailboxes.signatureText,
+      signatureProfile: schema.mailboxes.signatureProfile,
       kind: schema.mailboxes.kind,
       ownerUserId: schema.mailboxes.ownerUserId,
       ownerMembershipId: schema.mailboxes.ownerMembershipId,
@@ -272,6 +273,171 @@ export async function updateMailboxRegistry(
       .returning();
     if (!row) throw new MailboxRegistryError("not_found");
     return row;
+  });
+}
+
+function signatureField(value: unknown, max: number) {
+  if (typeof value !== "string" || invalidControl(value)) throw new MailboxRegistryError("invalid");
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (normalized.length > max) throw new MailboxRegistryError("invalid");
+  return normalized;
+}
+
+/** A website as an http(s) URL without credentials ("example.com" gains https://), or "". */
+function signatureWebsite(value: string) {
+  if (!value) return "";
+  let url: URL;
+  try {
+    url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`);
+  } catch {
+    throw new MailboxRegistryError("invalid");
+  }
+  if (
+    !["https:", "http:"].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    !url.hostname.includes(".")
+  )
+    throw new MailboxRegistryError("invalid");
+  const normalized = url.toString();
+  if (normalized.length > 200) throw new MailboxRegistryError("invalid");
+  return normalized;
+}
+
+/** Owner of the mailbox or a team admin; locks the mailbox row for the change. */
+async function signatureEditor(db: Db, actor: MailboxRegistryActor, mailboxId: string) {
+  const { id: memberId, role } = await member(db, actor, true);
+  const row = await box(db, actor, mailboxId);
+  const owned = row.ownerUserId === actor.userId && row.ownerMembershipId === memberId;
+  if (!owned && role !== "owner" && role !== "admin") throw new MailboxRegistryError("forbidden");
+  return row;
+}
+
+const EMPTY_SIGNATURE: schema.MailboxSignatureProfile = {
+  version: 1,
+  name: "",
+  title: "",
+  company: "",
+  phone: "",
+  website: "",
+  logoUrl: null,
+  logoWidth: null,
+  logoHeight: null,
+};
+
+/**
+ * The mailbox owner or a team admin sets the structured signature (name,
+ * title, company, phone, website) and its free-text lines. The logo is kept:
+ * only the upload route sets it.
+ */
+export async function updateMailboxSignature(
+  db: Db,
+  actor: MailboxRegistryActor,
+  input: {
+    mailboxId: string;
+    name: string;
+    title: string;
+    company: string;
+    phone: string;
+    website: string;
+    text: string;
+  },
+) {
+  const phone = signatureField(input.phone, 40);
+  if (phone && !/^[0-9+()\-. ]+$/.test(phone)) throw new MailboxRegistryError("invalid");
+  const profile = {
+    name: signatureField(input.name, 80),
+    title: signatureField(input.title, 80),
+    company: signatureField(input.company, 80),
+    phone,
+    website: signatureWebsite(signatureField(input.website, 200)),
+  };
+  const text = signatureText(input.text) ?? "";
+  return db.transaction(async (tx) => {
+    const row = await signatureEditor(tx as unknown as Db, actor, input.mailboxId);
+    const [updated] = await tx
+      .update(schema.mailboxes)
+      .set({
+        signatureProfile: {
+          ...EMPTY_SIGNATURE,
+          ...profile,
+          logoUrl: row.signatureProfile?.logoUrl ?? null,
+          logoWidth: row.signatureProfile?.logoWidth ?? null,
+          logoHeight: row.signatureProfile?.logoHeight ?? null,
+        },
+        signatureText: text,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(schema.mailboxes.id, row.id), eq(schema.mailboxes.teamId, actor.teamId)))
+      .returning();
+    if (!updated) throw new MailboxRegistryError("not_found");
+    return {
+      id: updated.id,
+      signatureText: updated.signatureText,
+      signatureProfile: updated.signatureProfile,
+    };
+  });
+}
+
+/** The logo route checks who may edit before it writes to storage. */
+export async function assertMailboxSignatureEditor(
+  db: Db,
+  actor: MailboxRegistryActor,
+  mailboxId: string,
+) {
+  await db.transaction(async (tx) => {
+    await signatureEditor(tx as unknown as Db, actor, mailboxId);
+  });
+}
+
+/** Sets or clears the signature logo; returns the previous URL for storage cleanup. */
+export async function setMailboxSignatureLogo(
+  db: Db,
+  actor: MailboxRegistryActor,
+  input: {
+    mailboxId: string;
+    logoUrl: string | null;
+    width?: number | null | undefined;
+    height?: number | null | undefined;
+  },
+) {
+  const dimension = (value: number | null | undefined) => {
+    if (value === undefined || value === null) return null;
+    if (!Number.isInteger(value) || value < 1 || value > 4096)
+      throw new MailboxRegistryError("invalid");
+    return value;
+  };
+  const logoWidth = input.logoUrl === null ? null : dimension(input.width);
+  const logoHeight = input.logoUrl === null ? null : dimension(input.height);
+  if (input.logoUrl !== null) {
+    let url: URL;
+    try {
+      url = new URL(input.logoUrl);
+    } catch {
+      throw new MailboxRegistryError("invalid");
+    }
+    if (!["https:", "http:"].includes(url.protocol) || input.logoUrl.length > 500)
+      throw new MailboxRegistryError("invalid");
+  }
+  return db.transaction(async (tx) => {
+    const row = await signatureEditor(tx as unknown as Db, actor, input.mailboxId);
+    const previous = row.signatureProfile?.logoUrl ?? null;
+    const [updated] = await tx
+      .update(schema.mailboxes)
+      .set({
+        signatureProfile: {
+          ...EMPTY_SIGNATURE,
+          ...row.signatureProfile,
+          logoUrl: input.logoUrl,
+          logoWidth,
+          logoHeight,
+        },
+        updatedAt: new Date(),
+      })
+      .where(and(eq(schema.mailboxes.id, row.id), eq(schema.mailboxes.teamId, actor.teamId)))
+      .returning();
+    if (!updated) throw new MailboxRegistryError("not_found");
+    return { previous, signatureProfile: updated.signatureProfile };
   });
 }
 
