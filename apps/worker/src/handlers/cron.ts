@@ -180,6 +180,12 @@ export interface DrainDeps {
    * the send lane relays them instead of parking them again.
    */
   customerRelay?: boolean | undefined;
+  /**
+   * SES_FAILOVER_REGION/SES_FAILOVER_DOMAINS: in a region SES itself has
+   * paused, the transactional rows of a listed domain still drain while the
+   * failover region has room, as the send lane sends them from there.
+   */
+  failover?: { region: string; domains: ReadonlySet<string> } | undefined;
   /** Called for every broadcast the bulk pass touched; flips it to sent once nothing of it remains. */
   finalize?: ((broadcastId: string) => Promise<unknown>) | undefined;
   now?: Date | undefined;
@@ -234,14 +240,29 @@ export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainRe
   const relayed = deps.customerRelay
     ? held.filter((region) => deps.sesQuota?.accountPaused?.(region) === true)
     : [];
+  const failover = deps.failover;
+  const failedOver =
+    failover &&
+    deps.sesQuota?.accountPaused?.(failover.region) !== true &&
+    !deps.sesQuota?.exhausted(failover.region)
+      ? held.filter((region) => deps.sesQuota?.accountPaused?.(region) === true)
+      : [];
   const run: DrainRun = { now: deps.now ?? new Date(), exhaustedTeams: new Set(), failures: [] };
   let drained = 0;
-  if (regions.length === 0 || held.length < regions.length || relayed.length > 0) {
+  if (
+    regions.length === 0 ||
+    held.length < regions.length ||
+    relayed.length > 0 ||
+    failedOver.length > 0
+  ) {
     const released = await releaseParkedRows(db, deps, run, {
       where: isNull(schema.emails.broadcastId),
       budget: DRAIN_MAX_PER_RUN,
       held,
       relayed,
+      ...(failover && failedOver.length > 0
+        ? { failedOver: { regions: failedOver, domains: [...failover.domains] } }
+        : {}),
       spacingMs: 0,
     });
     drained += released.total;
@@ -345,6 +366,8 @@ async function releaseParkedRows(
     held: readonly string[];
     /** Held regions SES paused, whose relay domains' rows may move anyway. */
     relayed?: readonly string[];
+    /** Held regions SES paused, whose listed domains' rows leave from the failover region. */
+    failedOver?: { regions: readonly string[]; domains: readonly string[] };
     spacingMs: number;
   },
 ): Promise<{ total: number; byRegion: Map<string, number> }> {
@@ -381,7 +404,7 @@ async function releaseParkedRows(
           run.exhaustedTeams.size > 0
             ? notInArray(schema.emails.teamId, [...run.exhaustedTeams])
             : undefined,
-          outsideHeld(region, opts.held, opts.relayed ?? []),
+          outsideHeld(region, opts.held, opts.relayed ?? [], opts.failedOver),
           cursorId
             ? keysetCursorWhere(schema.emails.createdAt, schema.emails.id, cursorId)
             : undefined,
@@ -431,16 +454,31 @@ async function releaseParkedRows(
   return { total, byRegion };
 }
 
-/** Rows outside the held regions, plus a relay domain's rows in a held region SES paused. */
+/**
+ * Rows outside the held regions, plus, in a held region SES paused, a relay
+ * domain's rows and a failover-listed domain's rows.
+ */
 function outsideHeld(
   region: SQL<string>,
   held: readonly string[],
   relayed: readonly string[],
+  failedOver?: { regions: readonly string[]; domains: readonly string[] },
 ): SQL | undefined {
   if (held.length === 0) return undefined;
   const open = notInArray(region, [...held]);
-  if (relayed.length === 0) return open;
-  return or(open, and(isNotNull(schema.domains.relayEnabledAt), inArray(region, [...relayed])));
+  const extra: SQL[] = [];
+  if (relayed.length > 0) {
+    const relay = and(isNotNull(schema.domains.relayEnabledAt), inArray(region, [...relayed]));
+    if (relay) extra.push(relay);
+  }
+  if (failedOver && failedOver.regions.length > 0 && failedOver.domains.length > 0) {
+    const listed = and(
+      inArray(schema.domains.name, [...failedOver.domains]),
+      inArray(region, [...failedOver.regions]),
+    );
+    if (listed) extra.push(listed);
+  }
+  return extra.length > 0 ? or(open, ...extra) : open;
 }
 
 async function countParked(db: Db): Promise<number> {

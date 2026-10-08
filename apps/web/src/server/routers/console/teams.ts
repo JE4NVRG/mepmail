@@ -24,6 +24,7 @@ import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { escapeLike } from "@/lib/sql";
+import { cutTeamSendingAccess } from "../../console/suspension";
 import { operatorProcedure, router } from "../../trpc";
 import { auditOperator, kickQuotaDrain, loadTeam, mailTeamOwners } from "./shared";
 
@@ -566,7 +567,10 @@ export const consoleTeamsRouter = router({
       await kickQuotaDrain();
     }),
 
-  /** Every send refused until reinstated; owners hear about it unless it is phishing. */
+  /**
+   * Every send refused until reinstated, with every credential and SES identity
+   * of the team taken away; owners hear about it unless it is phishing.
+   */
   suspend: operatorProcedure
     .input(
       z.object({
@@ -586,6 +590,11 @@ export const consoleTeamsRouter = router({
           suspensionNote: input.note ?? null,
         })
         .where(eq(t.id, team.id));
+      // The flag stops the send lanes at once; the cut takes away every
+      // credential and the SES identities, so nothing remains to send with.
+      const cut = await cutTeamSendingAccess(ctx.db, team, {
+        cancelParked: input.reason === "phishing",
+      });
       const notify = input.notify && input.reason !== "phishing";
       await auditOperator(ctx, {
         teamId: team.id,
@@ -596,6 +605,11 @@ export const consoleTeamsRouter = router({
           reason: input.reason,
           note: input.note ?? null,
           notified: notify,
+          revokedApiKeys: cut.apiKeys,
+          revokedAgentKeys: cut.agentKeys,
+          canceledParked: cut.parkedCanceled,
+          sesIdentitiesRemoved: cut.domains.filter((d) => d.removed).map((d) => d.name),
+          sesIdentitiesFailed: cut.domains.filter((d) => !d.removed).map((d) => d.name),
         },
       });
       if (notify) {

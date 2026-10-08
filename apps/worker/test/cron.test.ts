@@ -191,6 +191,58 @@ it("in a region SES paused, a relay domain's transactional rows drain, and only 
   expect(enqueued).toEqual([relayed]);
 });
 
+it("in a region SES paused, a failover-listed domain's transactional rows drain while the failover region has room", async () => {
+  const [listed, plain] = await db
+    .insert(schema.domains)
+    .values([
+      { teamId, name: "listed.acme.dev", region: "us-east-1" },
+      { teamId, name: "other.acme.dev", region: "us-east-1" },
+    ])
+    .returning({ id: schema.domains.id });
+  if (!listed || !plain) throw new Error("domain insert failed");
+  const [bc] = await db
+    .insert(schema.broadcasts)
+    .values({ teamId, from: "a@listed.acme.dev", subject: "news", status: "sending" })
+    .returning({ id: schema.broadcasts.id });
+  const listedRow = await insertParked(new Date("2026-08-13T01:00:00Z"), "l", {
+    domainId: listed.id,
+  });
+  const plainRow = await insertParked(new Date("2026-08-13T02:00:00Z"), "o", {
+    domainId: plain.id,
+  });
+  const bulkRow = await insertParked(new Date("2026-08-13T03:00:00Z"), "bulk", {
+    domainId: listed.id,
+    broadcastId: bc?.id ?? null,
+  });
+
+  const enqueued: string[] = [];
+  const deps = {
+    isCloud: false,
+    enqueueSends: async (batch: readonly { emailId: string }[]) => {
+      enqueued.push(...batch.map((j) => j.emailId));
+    },
+    failover: { region: "eu-west-1", domains: new Set(["listed.acme.dev"]) },
+  };
+  const euFull = new Set<string>();
+  const sesQuota = {
+    regions: ["us-east-1", "eu-west-1"],
+    exhausted: (r: string) => r === "us-east-1" || euFull.has(r),
+    accountPaused: (r: string) => r === "us-east-1",
+    room: () => 0,
+  };
+  // The failover region full: the listed domain waits.
+  euFull.add("eu-west-1");
+  expect(await drainQuotaParked(db, { ...deps, sesQuota })).toEqual({
+    drained: 0,
+    stillParked: 3,
+  });
+  euFull.clear();
+  expect(await drainQuotaParked(db, { ...deps, sesQuota })).toMatchObject({ drained: 1 });
+  expect(enqueued).toEqual([listedRow]);
+  expect(await statusOf(plainRow)).toBe("queued_quota");
+  expect(await statusOf(bulkRow)).toBe("queued_quota");
+});
+
 it("self-host drain (no caps) releases everything", async () => {
   const a = await insertParked(new Date("2026-08-13T01:00:00Z"));
   const b = await insertParked(new Date("2026-08-13T02:00:00Z"));

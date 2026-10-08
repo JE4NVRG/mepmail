@@ -5,6 +5,7 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { desc, eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { setRegionAccountDeps } from "@/server/console/ses-regions";
+import { setSuspensionSesDeps } from "@/server/console/suspension";
 import type { TeamRole } from "@/server/membership";
 import { createCaller } from "@/server/routers";
 
@@ -36,6 +37,8 @@ beforeAll(async () => {
 afterAll(() => close());
 
 beforeEach(() => {
+  // A suspension's SES cleanup never reaches AWS from these tests.
+  setSuspensionSesDeps({ deleteTenant: async () => {}, deleteIdentity: async () => {} });
   setRegionAccountDeps({
     accountClient: () => ({
       async send() {
@@ -52,6 +55,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   setRegionAccountDeps(null);
+  setSuspensionSesDeps(null);
   vi.unstubAllEnvs();
 });
 
@@ -244,6 +248,120 @@ describe("pause, resume, suspend, reinstate", () => {
       data: { reason: "manual" },
     });
     await db.delete(schema.teamFlags).where(eq(schema.teamFlags.teamId, teamId));
+  });
+
+  it("a suspension revokes every key, fails the domains and removes them from SES, tenant first", async () => {
+    const calls: string[] = [];
+    setSuspensionSesDeps({
+      deleteTenant: async ({ tenantName, region }) => {
+        calls.push(`tenant:${tenantName}:${region}`);
+      },
+      deleteIdentity: async ({ name, region }) => {
+        calls.push(`identity:${name}:${region}`);
+      },
+    });
+    const bad = await createTeam(db, "lure-shop");
+    await db
+      .update(schema.teams)
+      .set({ sesTenantName: "tenant-lure" })
+      .where(eq(schema.teams.id, bad));
+    const [domain] = await db
+      .insert(schema.domains)
+      .values({
+        teamId: bad,
+        name: "lure-shop.example",
+        region: REGION,
+        status: "verified",
+        sesTenantAssociatedAt: new Date(),
+        sesTenantConfigSet: "mepmail",
+      })
+      .returning({ id: schema.domains.id });
+    await db.insert(schema.apiKeys).values({
+      teamId: bad,
+      name: "k",
+      tokenPrefix: "ms_lure",
+      keyHash: "hash-lure-shop",
+      last4: "lure",
+    });
+    const [parked] = await db
+      .insert(schema.emails)
+      .values({
+        teamId: bad,
+        domainId: domain?.id ?? null,
+        from: "Bank <alert@lure-shop.example>",
+        to: ["victim@example.com"],
+        subject: "verify",
+        latestStatus: "queued_quota",
+      })
+      .returning({ id: schema.emails.id });
+    try {
+      await operator().console.teams.suspend({ id: bad, reason: "phishing", notify: false });
+      const [key] = await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.teamId, bad));
+      expect(key?.revokedAt).toBeInstanceOf(Date);
+      const [row] = await db.select().from(schema.domains).where(eq(schema.domains.teamId, bad));
+      expect(row).toMatchObject({ status: "failed", sesTenantAssociatedAt: null });
+      const [mail] = await db
+        .select()
+        .from(schema.emails)
+        .where(eq(schema.emails.id, parked?.id ?? ""));
+      expect(mail?.latestStatus).toBe("canceled");
+      expect(calls).toEqual([
+        `tenant:tenant-lure:${REGION}`,
+        `identity:lure-shop.example:${REGION}`,
+      ]);
+      expect((await auditRows("team.suspended"))[0]).toMatchObject({
+        teamId: bad,
+        data: {
+          reason: "phishing",
+          revokedApiKeys: 1,
+          canceledParked: 1,
+          sesIdentitiesRemoved: ["lure-shop.example"],
+          sesIdentitiesFailed: [],
+        },
+      });
+    } finally {
+      setSuspensionSesDeps({ deleteTenant: async () => {}, deleteIdentity: async () => {} });
+    }
+  });
+
+  it("a non-phishing suspension keeps the parked mail and reports an identity SES kept", async () => {
+    setSuspensionSesDeps({
+      deleteTenant: async () => {},
+      deleteIdentity: async () => {
+        throw new Error("ses down");
+      },
+    });
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    const late = await createTeam(db, "late-payer");
+    const [domain] = await db
+      .insert(schema.domains)
+      .values({ teamId: late, name: "late-payer.example", region: REGION, status: "verified" })
+      .returning({ id: schema.domains.id });
+    const [parked] = await db
+      .insert(schema.emails)
+      .values({
+        teamId: late,
+        domainId: domain?.id ?? null,
+        from: "Shop <a@late-payer.example>",
+        to: ["c@example.com"],
+        subject: "receipt",
+        latestStatus: "queued_quota",
+      })
+      .returning({ id: schema.emails.id });
+    try {
+      await operator().console.teams.suspend({ id: late, reason: "non_payment", notify: false });
+      const [mail] = await db
+        .select()
+        .from(schema.emails)
+        .where(eq(schema.emails.id, parked?.id ?? ""));
+      expect(mail?.latestStatus).toBe("queued_quota");
+      expect((await auditRows("team.suspended"))[0]).toMatchObject({
+        teamId: late,
+        data: { canceledParked: 0, sesIdentitiesFailed: ["late-payer.example"] },
+      });
+    } finally {
+      quiet.mockRestore();
+    }
   });
 
   it("members cannot reach any of it", async () => {
@@ -482,9 +600,14 @@ describe("console.audit.list", () => {
       actor: { kind: "user", id: MEMBER, email: "bob@example.com" },
     });
 
+    // One suspension in the suspend/reinstate test, two in the access-cut tests.
     const filtered = await operator().console.audit.list({ action: "team.suspended" });
-    expect(filtered.items.map((r) => r.action)).toEqual(["team.suspended"]);
-    expect(filtered.total).toBe(1);
+    expect(filtered.items.map((r) => r.action)).toEqual([
+      "team.suspended",
+      "team.suspended",
+      "team.suspended",
+    ]);
+    expect(filtered.total).toBe(3);
 
     await expect(member().console.audit.list({})).rejects.toMatchObject({ code: "NOT_FOUND" });
   });

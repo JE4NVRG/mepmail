@@ -333,6 +333,7 @@ await queue.scheduleCrons({
       enqueueSends,
       sesQuota: sendControls,
       customerRelay: relay !== undefined,
+      ...(failover ? { failover } : {}),
       finalize: (id) => finalizeBroadcast(db, { mailer, appBaseUrl: env.APP_BASE_URL }, id),
     });
     console.log(`quota.drain: drained=${result.drained} stillParked=${result.stillParked}`);
