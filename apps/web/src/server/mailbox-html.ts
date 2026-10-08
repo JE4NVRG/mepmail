@@ -6,6 +6,10 @@ const MAX_HTML = 1024 * 1024;
 const HOST_LABEL = /^[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?$/i;
 const SIZE = /^(?:\d{1,3}(?:\.\d{1,2})?)(?:px|em|rem|%)$/;
 const COLOR = /^(?:#[\da-f]{3,8}|[a-z]{1,24}|rgba?\([\d\s.,%]+\))$/i;
+/** Table attributes keep only plain values: a colour or a length, never a URL. */
+const LENGTH_ATTR = /^\d{1,4}%?$/;
+const BORDER =
+  /^(?:0|none|\d{1,2}px(?:\s+(?:solid|dashed|dotted|none))?(?:\s+(?:#[\da-f]{3,8}|[a-z]{1,24}|rgba?\([\d\s.,%]+\)))?)$/i;
 
 function contentId(value: string) {
   return value.trim().replace(/^<|>$/g, "");
@@ -31,6 +35,19 @@ function externalImage(value: string) {
   } catch {
     return null;
   }
+}
+
+function tableCell(tagName: string) {
+  return (_tag: string, attrs: sanitizeHtml.Attributes): sanitizeHtml.Tag => {
+    const attribs = { ...attrs };
+    if (attribs.bgcolor !== undefined && !COLOR.test(attribs.bgcolor.trim()))
+      delete attribs.bgcolor;
+    for (const name of ["width", "height", "border"]) {
+      const value = attribs[name];
+      if (value !== undefined && !LENGTH_ATTR.test(value.trim())) delete attribs[name];
+    }
+    return { tagName, attribs };
+  };
 }
 
 /** A private projection, never a fetch/proxy. Raw MIME remains encrypted. */
@@ -90,14 +107,16 @@ export function projectMailboxHtml(
         "pre",
         "code",
         "address",
+        "center",
       ],
       allowedAttributes: {
         "*": ["style", "dir", "lang"],
         a: ["href", "title", "target", "rel"],
         img: ["src", "alt", "width", "height"],
-        td: ["colspan", "rowspan", "align", "valign"],
-        th: ["colspan", "rowspan", "align", "valign"],
-        table: ["cellpadding", "cellspacing"],
+        td: ["colspan", "rowspan", "align", "valign", "width", "height", "bgcolor"],
+        th: ["colspan", "rowspan", "align", "valign", "width", "height", "bgcolor"],
+        tr: ["align", "valign", "bgcolor"],
+        table: ["cellpadding", "cellspacing", "width", "align", "border", "bgcolor"],
       },
       allowedSchemes: ["https", "http", "mailto"],
       allowedSchemesByTag: { img: ["data", "https"] },
@@ -108,6 +127,11 @@ export function projectMailboxHtml(
         "*": {
           color: [COLOR],
           "background-color": [COLOR],
+          // Email buttons paint their fill with the shorthand; only a plain colour passes.
+          background: [COLOR],
+          display: [/^(?:block|inline-block|inline|table|table-row|table-cell|none)$/],
+          border: [BORDER],
+          "border-radius": [SIZE],
           "font-family": [/^[\w\s,'"-]{1,160}$/],
           "font-size": [SIZE],
           "font-weight": [/^(?:normal|bold|[1-9]00)$/],
@@ -133,6 +157,12 @@ export function projectMailboxHtml(
         },
       },
       transformTags: {
+        // A button's fill often lives in bgcolor with white text on it: dropping the
+        // fill would leave the link white on white. Only plain colours and lengths stay.
+        table: tableCell("table"),
+        tr: tableCell("tr"),
+        td: tableCell("td"),
+        th: tableCell("th"),
         a: (_tag, attrs) => ({
           tagName: "a",
           attribs: { ...attrs, target: "_blank", rel: "noopener noreferrer" },

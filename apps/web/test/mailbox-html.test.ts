@@ -60,6 +60,35 @@ describe("private mailbox HTML projection", () => {
     );
   });
 
+  it("keeps an email button's fill so its white label stays readable", () => {
+    const result = projectMailboxHtml(
+      '<center><table width="100%" border="0" bgcolor="#ffffff"><tr><td align="center" bgcolor="#d97757" style="border-radius:6px"><a href="https://platform.example/magic-link#token" style="display:inline-block;padding:12px 24px;color:#ffffff;background:#d97757;border:1px solid #d97757;font-weight:bold;text-decoration:none">Sign in</a></td></tr></table></center>',
+      [],
+    );
+    const body = result.htmlBody ?? "";
+    expect(body).toContain("<center>");
+    expect(body).toContain('bgcolor="#d97757"');
+    expect(body).toContain('width="100%"');
+    expect(body).toContain("background:#d97757");
+    expect(body).toContain("display:inline-block");
+    expect(body).toContain("border:1px solid #d97757");
+    expect(body).toContain("border-radius:6px");
+    expect(body).toContain('href="https://platform.example/magic-link#token"');
+    expect(body).toContain(">Sign in</a>");
+  });
+
+  it("drops a table colour or length that carries anything but a plain value", () => {
+    const result = projectMailboxHtml(
+      '<table width="javascript:1" border="url(x)" bgcolor="url(https://track.example/a)"><tr bgcolor="expression(alert(1))"><td bgcolor="#fff" height="40" width="100%;x" style="background:url(https://track.example/b);border:1px solid url(https://track.example/c)">Cell</td></tr></table>',
+      [],
+    );
+    const body = result.htmlBody ?? "";
+    expect(body).toContain('bgcolor="#fff"');
+    expect(body).toContain('height="40"');
+    expect(body).toContain(">Cell</td>");
+    expect(body).not.toMatch(/track\.example|url\(|expression|javascript|width="100%;x"/i);
+  });
+
   it("embeds only a known CID whose bytes qualify as a bounded raster image", () => {
     const result = projectMailboxHtml(
       '<p>Image</p><img src="CID:logo" alt="Company" onerror="alert(1)" srcset="https://track.example/pixel">',
