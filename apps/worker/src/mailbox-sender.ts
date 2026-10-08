@@ -11,6 +11,7 @@ import { associateTenantResources, ensureTenant, type SesTenantClient } from "@m
 import { and, eq } from "drizzle-orm";
 import { simpleParser } from "mailparser";
 import type { SesSender } from "./handlers/send-email.js";
+import type { SesFailover } from "./ses-failover.js";
 
 export const mailboxWorkerMime: MailboxTransportMimeAdapter = {
   async parse(raw) {
@@ -112,6 +113,12 @@ export function createMailboxSesSender(
      * sends through it while SES has paused the region, as API mail does.
      */
     relay?: { name: string; sender: SesSender } | undefined;
+    /**
+     * SES_FAILOVER_REGION/SES_FAILOVER_DOMAINS: a listed domain, verified in
+     * the failover region with a Mail configuration set there, sends from it
+     * while SES has paused its own region (before any relay), untagged.
+     */
+    failover?: SesFailover | undefined;
   } = {},
 ): MailboxOutboxSender {
   const configurationSets = copyConfigurationSets(opts.configurationSets ?? {});
@@ -252,37 +259,50 @@ export function createMailboxSesSender(
       // A send-review hold keeps the message for the operator's release, as
       // it keeps the team's API mail.
       if (domain.sendReviewAt) throw new MailboxSendDeferredError();
+      const homePaused = opts.paused?.(domain.region) === true;
+      // A listed domain leaves from the failover region while SES pauses its
+      // own; the tenant and the domain's sets stay home, so it goes untagged.
+      const failoverRegion =
+        opts.failover &&
+        homePaused &&
+        opts.failover.domains.has(domain.domainName) &&
+        opts.paused?.(opts.failover.region) !== true
+          ? opts.failover.region
+          : undefined;
       // While SES has paused the region, a domain the operator verified at the
       // relay's provider leaves through the relay, as the team's API mail does.
-      if (opts.relay && domain.relayEnabledAt && opts.paused?.(domain.region) === true)
+      if (!failoverRegion && opts.relay && domain.relayEnabledAt && homePaused)
         return relaySend(opts.relay, input, recipients);
-      const configurationSet = configurationSets[domain.region];
+      const region = failoverRegion ?? domain.region;
+      const configurationSet = configurationSets[region];
       if (!configurationSet) throw new MailboxSendDeferredError();
       // Campaign configuration can enable SES Open/Click body rewriting. Mail
       // always requires its own explicit regional operator configuration.
       if (configurationSet === domain.configurationSet) throw new MailboxSendRejectedError();
       await refuseSesOverrides(input.raw);
-      if (opts.exhausted?.(domain.region)) throw new MailboxSendDeferredError();
+      if (opts.exhausted?.(region)) throw new MailboxSendDeferredError();
       try {
-        await opts.throttle?.(domain.region, recipientCount);
+        await opts.throttle?.(region, recipientCount);
       } catch {
         // Cancellation or a failed local permit cannot have accepted this message.
         throw new MailboxSendDeferredError();
       }
-      if (opts.exhausted?.(domain.region)) throw new MailboxSendDeferredError();
+      if (opts.exhausted?.(region)) throw new MailboxSendDeferredError();
       await allowedRecipients(input.teamId, recipients);
-      let client = clients.get(domain.region);
+      let client = clients.get(region);
       if (!client) {
         const options: SESv2ClientConfig = {
-          region: domain.region,
+          region,
           maxAttempts: 1,
           ignoreConfiguredEndpointUrls: true,
           requestHandler: { connectionTimeout: 10000, requestTimeout: 30000 },
         };
         client = opts.clientFactory ? opts.clientFactory(options) : new SESv2Client(options);
-        clients.set(domain.region, client);
+        clients.set(region, client);
       }
-      const tenantName = await sendingTenant(client, domain, configurationSet);
+      const tenantName = failoverRegion
+        ? undefined
+        : await sendingTenant(client, domain, configurationSet);
       let response: Awaited<ReturnType<MailboxSesClient["send"]>>;
       try {
         response = await client.send(

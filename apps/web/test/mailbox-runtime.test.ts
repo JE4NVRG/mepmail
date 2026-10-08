@@ -307,6 +307,36 @@ describe("private Mail runtime adapters", () => {
     ).rejects.toBeInstanceOf(MailboxSendRejectedError);
     expect(sendRaw).not.toHaveBeenCalled();
   });
+  it("a listed domain sends from the failover region while its own is paused, untagged and before the relay", async () => {
+    const sendRaw = vi.fn();
+    const throttle = vi.fn().mockResolvedValue(undefined);
+    const failover = { region: "eu-west-1", domains: new Set(["example.invalid"]) };
+    const result = await createMailboxSesSender(database({ relayEnabledAt: new Date() }), {
+      configurationSets: { "us-east-1": "private_mail_fixture", "eu-west-1": "private_mail_eu" },
+      throttle,
+      paused: (region) => region === "us-east-1",
+      relay: { name: "fixture", sender: { sendRaw } },
+      failover,
+      tenants: true,
+      clientFactory,
+    }).send(input);
+    expect(result).toEqual({ messageId: "accepted_fixture" });
+    expect(provider.options[0]).toMatchObject({ region: "eu-west-1" });
+    expect(provider.inputs[0]).toMatchObject({ ConfigurationSetName: "private_mail_eu" });
+    expect(provider.inputs[0]).not.toHaveProperty("TenantName");
+    expect(throttle).toHaveBeenCalledWith("eu-west-1", 1);
+    expect(sendRaw).not.toHaveBeenCalled();
+    // No Mail set in the failover region: deferred, never sent elsewhere.
+    await expect(
+      createMailboxSesSender(database(), {
+        configurationSets,
+        paused: (region) => region === "us-east-1",
+        failover,
+        clientFactory,
+      }).send(input),
+    ).rejects.toBeInstanceOf(MailboxSendDeferredError);
+    expect(provider.send).toHaveBeenCalledTimes(1);
+  });
   it("reads the relay's SMTP reply: login or 4xx retries, 5xx refuses, silence stays ambiguous", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const attempt = (error: unknown) =>

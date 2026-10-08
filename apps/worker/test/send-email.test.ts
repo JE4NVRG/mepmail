@@ -1073,16 +1073,20 @@ it("while SES has paused the account, the platform's own mail leaves through the
   expect(parked?.latestStatus).toBe("queued_quota");
 
   // Once SES sends again, the platform's mail is back on SES.
-  const healthy = { exhausted: () => false, accountPaused: () => false, refresh: async () => false };
+  const healthy = {
+    exhausted: () => false,
+    accountPaused: () => false,
+    refresh: async () => false,
+  };
   const later = await insertEmail({
     teamId: systemTeam,
     domainId: systemDomain?.id ?? null,
     from: "MepMail <account@platform.dev>",
   });
   const { ses: back, sends: viaSes } = fakeSes("ses-again");
-  expect(
-    await sendEmail(db, { ...deps, ses: back, sesQuota: healthy }, { emailId: later }),
-  ).toBe("sent");
+  expect(await sendEmail(db, { ...deps, ses: back, sesQuota: healthy }, { emailId: later })).toBe(
+    "sent",
+  );
   expect(viaSes).toHaveLength(1);
   expect(relayed).toHaveLength(2);
 });
@@ -1209,6 +1213,74 @@ it("while SES sends, a domain marked for the relay sends through SES as before",
   expect(sends[0]?.region).toBe("us-east-1");
   expect(relayed).toHaveLength(0);
   expect((await rowOf(emailId))?.sesMessageId).toBe("ses-mid");
+});
+
+it("while SES has paused a listed domain's region, its mail leaves from the failover region before any relay", async () => {
+  const listed = await relayTeam("failover-shop", true);
+  const unlisted = await relayTeam("unlisted-shop", false);
+  // The domain's own set and tenant live at home and must not ride along.
+  await db
+    .update(schema.domains)
+    .set({
+      sesConfigurationSet: "home-set",
+      sesTenantAssociatedAt: new Date(),
+      sesTenantConfigSet: "home-set",
+    })
+    .where(eq(schema.domains.id, listed.domain));
+  await db
+    .update(schema.teams)
+    .set({ sesTenantName: "tenant-home" })
+    .where(eq(schema.teams.id, listed.team));
+  const { ses, sends } = fakeSes("eu-mid");
+  const { relay, sends: relayed } = fakeRelay();
+  const throttled: (string | undefined)[] = [];
+  const homePaused = {
+    exhausted: (region?: string) => region !== "eu-west-1",
+    accountPaused: (region?: string) => region !== "eu-west-1",
+    refresh: async () => false,
+  };
+  const deps: SendDeps = {
+    keyring,
+    ses,
+    sesQuota: homePaused,
+    relay,
+    defaultConfigurationSet: "mepmail",
+    throttle: async (region) => {
+      throttled.push(region);
+    },
+    failover: { region: "eu-west-1", domains: new Set(["failover-shop.dev"]) },
+  };
+
+  const out = await listed.send();
+  expect(await sendEmail(db, deps, { emailId: out })).toBe("sent");
+  expect(sends).toHaveLength(1);
+  expect(sends[0]).toMatchObject({ region: "eu-west-1", configurationSetName: "mepmail" });
+  expect(sends[0]?.tenantName).toBeUndefined();
+  expect(throttled).toEqual(["eu-west-1"]);
+  expect(relayed).toHaveLength(0);
+  expect((await rowOf(out))?.sesMessageId).toBe("eu-mid");
+
+  // An unlisted domain keeps its own path: parked.
+  const waits = await unlisted.send();
+  expect(await sendEmail(db, deps, { emailId: waits })).toBe("parked");
+
+  // The failover region paused too: the listed domain takes the relay.
+  const both = await listed.send();
+  expect(await sendEmail(db, { ...deps, sesQuota: pausedSes() }, { emailId: both })).toBe("sent");
+  expect(relayed.map((p) => p.emailId)).toEqual([both]);
+
+  // Home healthy: back to its own region, set and tenant.
+  const healthy = { exhausted: () => false, accountPaused: () => false, refresh: async () => false };
+  const { ses: homeSes, sends: homeSends } = fakeSes("home-mid");
+  const home = await listed.send();
+  expect(await sendEmail(db, { ...deps, ses: homeSes, sesQuota: healthy }, { emailId: home })).toBe(
+    "sent",
+  );
+  expect(homeSends[0]).toMatchObject({
+    region: "us-east-1",
+    configurationSetName: "home-set",
+    tenantName: "tenant-home",
+  });
 });
 
 it("a suspended or held team is never relayed, nor a suppressed recipient", async () => {

@@ -98,6 +98,7 @@ import {
   mailboxWorkerMime,
   parseMailboxSesConfigurationSets,
 } from "./mailbox-sender.js";
+import { parseSesFailover } from "./ses-failover.js";
 import { createSesSender } from "./ses-sender.js";
 import { startSqsPoller } from "./sqs-poller.js";
 import { createSystemMailer } from "./system-mail.js";
@@ -130,6 +131,11 @@ const relay = relayConfig
   ? { name: relayConfig.name, sender: createCustomerSmtpRelay(relayConfig.url, relayConfig.name) }
   : undefined;
 if (relay) console.log(`customer SMTP relay: ${relay.name}`);
+// Listed domains send from the failover region while SES pauses their own.
+const failover =
+  parseSesFailover(process.env.SES_FAILOVER_REGION, process.env.SES_FAILOVER_DOMAINS) ?? undefined;
+if (failover)
+  console.log(`SES failover: ${failover.region} for ${[...failover.domains].join(", ")}`);
 const mailboxSes = mailboxTransportEnabled
   ? createMailboxSesSender(db, {
       configurationSets:
@@ -140,6 +146,7 @@ const mailboxSes = mailboxTransportEnabled
       tenants: sesTenantsEnabled(),
       paused: (region) => sendControls.accountPaused?.(region) === true,
       relay,
+      failover,
     })
   : null;
 // Days whole email rows (recipients, subject, events) are kept; bodies age
@@ -165,6 +172,10 @@ const unsubscribe = unsubscribeHost
   : undefined;
 // Platform mail (no domain row) goes out in the default region, the first served.
 const regions = servedRegions();
+// The failover region gets its own quota gate and send bucket without being
+// served: no new domain can be created there.
+const controlRegions =
+  failover && !regions.includes(failover.region) ? [...regions, failover.region] : regions;
 const ses = createSesSender(regions[0] ?? env.AWS_REGION);
 // The platform's own mail leaves through it while SES has paused the account.
 const fallback = env.SMTP_FALLBACK_URL ? createSmtpFallback(env.SMTP_FALLBACK_URL) : undefined;
@@ -214,7 +225,7 @@ const accountClientFor = (region: string) => {
 // than one replica each over-admits by at most one room, which the gate
 // parks, and the parked-transactional probe reads one replica's memory.
 const sendControls = createRegionSendControls({
-  regions,
+  regions: controlRegions,
   read: async (region) => {
     const account = await getAccountOverview(accountClientFor(region));
     // SES's enforcement pause (or sending switched off): no room until it lifts.
@@ -631,6 +642,7 @@ await queue.work(
         sesQuota: sendControls,
         ...(fallback ? { fallback } : {}),
         ...(relay ? { relay } : {}),
+        ...(failover ? { failover } : {}),
         enqueueWebhookDelivery: enqueueWebhook,
         tracking,
         monitor,

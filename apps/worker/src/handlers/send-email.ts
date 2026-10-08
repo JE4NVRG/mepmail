@@ -104,6 +104,14 @@ export interface SendDeps {
    * passes. A failed relay send parks the row as the pause itself would.
    */
   relay?: { name: string; sender: SesSender } | undefined;
+  /**
+   * An operator's failover SES region (SES_FAILOVER_REGION) for the domains
+   * it lists (SES_FAILOVER_DOMAINS), verified there too: their transactional
+   * mail leaves from that region while SES has paused the domain's own. The
+   * row keeps its home region; only the send moves, with the default
+   * configuration set and no tenant (both are regional).
+   */
+  failover?: { region: string; domains: ReadonlySet<string> } | undefined;
   /** Arms the webhook drain for the endpoints written; email.sent webhooks are skipped when absent. */
   enqueueWebhookDelivery?: WebhookEnqueue | undefined;
   /**
@@ -493,7 +501,19 @@ export async function sendEmail(
   // window frees. A bulk row parks earlier, at the broadcast share (or while
   // the region's broadcasts are held), so transactional mail keeps the rest.
   const bulk = email.broadcastId !== null;
-  const region = domain?.region;
+  // A listed domain's transactional mail moves to the failover region while
+  // SES has paused its own and not that one; every check below then reads the
+  // region the send actually leaves from.
+  const failoverRegion =
+    deps.failover &&
+    !bulk &&
+    domain &&
+    deps.failover.domains.has(domain.name) &&
+    deps.sesQuota?.accountPaused?.(domain.region) === true &&
+    deps.sesQuota.accountPaused?.(deps.failover.region) !== true
+      ? deps.failover.region
+      : undefined;
+  const region = failoverRegion ?? domain?.region;
   // The platform's own mail: a domain of the instance's system team, or the
   // shared onboarding sender (no domain row).
   const platformMail = !bulk && (email.domainId === null || domain?.ownerPlan === "system");
@@ -540,10 +560,14 @@ export async function sendEmail(
     await failQueuedEmail(db, email.id, "domain_not_verified");
     return "failed";
   }
-  const configurationSet = domain?.sesConfigurationSet ?? deps.defaultConfigurationSet;
+  // A domain's own set and its tenant live in its home region.
+  const configurationSet = failoverRegion
+    ? deps.defaultConfigurationSet
+    : (domain?.sesConfigurationSet ?? deps.defaultConfigurationSet);
   // TenantName rides only when the set this send names is the one associated
   // with the tenant: SES rejects a tenant send referencing an unassociated set.
   const tenantName =
+    !failoverRegion &&
     domain?.sesTenantAssociatedAt &&
     domain.sesTenantName &&
     (domain.sesTenantConfigSet ?? null) === (configurationSet ?? null)
@@ -744,7 +768,7 @@ export async function sendEmail(
 
   // The rate-limit wait comes before the final re-check so that check stays
   // immediately ahead of the claim.
-  await deps.throttle?.(domain?.region);
+  await deps.throttle?.(region);
 
   // Re-check immediately before the atomic claim: quota delays and throttling
   // can leave a row queued long enough for a recipient to opt out after the
@@ -801,7 +825,7 @@ export async function sendEmail(
       cc: email.cc,
       bcc: email.bcc,
       ...(configurationSet ? { configurationSetName: configurationSet } : {}),
-      ...(domain?.region ? { region: domain.region } : {}),
+      ...(region ? { region } : {}),
       ...(tenantName ? { tenantName } : {}),
       ...(viaRelay ? { envelopeFrom: extractAddrSpec(email.from) } : {}),
     }));
