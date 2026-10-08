@@ -7,6 +7,21 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.62] - 2026-10-08
+
+Visitor support chat on /support through Elozi.
+
+### Added
+
+- `eloziSupportChannel.enabled` is on: /support offers the Elozi webchat
+  (tenant 499f0367, MepMail channel 6376dfa3, origin https://mepmail.dev).
+  The module loads only after a click and receives no account identity.
+- Elozi side, configured in its admin: channel reception on, assistant
+  Hermes Elozi answering automatically for the MepMail product from the
+  published source "MepMail · Suporte público PT/EN" (built from the /support
+  FAQ, prices and terms), handing over to Jean for people, accounts, billing
+  and security.
+
 ## [0.61] - 2026-10-08
 
 Support FAQ in line with the product.

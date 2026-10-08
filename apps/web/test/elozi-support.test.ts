@@ -19,7 +19,11 @@ const fixture = () => {
 
 describe("page-scoped visitor support", () => {
   it("fails closed with disabled, missing or malformed channel identifiers", () => {
-    expect(resolveEloziSupportChannel()).toBeNull();
+    // The MepMail channel is on; only its two public identifiers ever leave.
+    expect(resolveEloziSupportChannel()).toEqual({
+      tenantId: "499f0367-4860-4fd1-98b3-3b1c90883a2f",
+      channelId: "6376dfa3-1def-441e-bb46-e9d99fb64d4b",
+    });
     for (const channel of [
       { enabled: false, ...config },
       { enabled: true, tenantId: "", channelId: "test_channel" },

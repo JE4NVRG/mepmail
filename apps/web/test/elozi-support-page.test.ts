@@ -25,22 +25,21 @@ vi.mock("next-intl/server", () => ({
 const { default: SupportPage } = await import("@/app/support/page");
 
 describe("localized support page", () => {
-  it.each(["pt-BR", "en"])(
-    "keeps existing channels alongside the disabled chat in %s",
-    async (locale) => {
-      current.locale = locale;
-      const copy = locale === "pt-BR" ? pt : en;
-      const html = renderToStaticMarkup(await SupportPage());
-      expect(html).toContain(copy.hero.title);
-      expect(html).toContain(copy.assistant.pending);
-      expect(html).toContain("gtm-support-hero");
-      expect(html.match(/<details>/g)).toHaveLength(copy.faq.items.length);
-      // Every contact on the page reaches the owner directly.
-      expect(html).toContain('href="mailto:jean@mepmail.dev"');
-      expect(html).not.toContain("@je4ndev.com");
-      expect(html).toContain('href="/updates"');
-      expect(html).not.toContain("elozi.je4ndev.com/widget.js");
-      expect(html).not.toContain("<button");
-    },
-  );
+  it.each(["pt-BR", "en"])("offers the chat beside the existing channels in %s", async (locale) => {
+    current.locale = locale;
+    const copy = locale === "pt-BR" ? pt : en;
+    const html = renderToStaticMarkup(await SupportPage());
+    expect(html).toContain(copy.hero.title);
+    expect(html).toContain(copy.assistant.available);
+    expect(html).toContain(copy.assistant.open);
+    expect(html).toContain("gtm-support-hero");
+    expect(html.match(/<details>/g)).toHaveLength(copy.faq.items.length);
+    // Every contact on the page reaches the owner directly.
+    expect(html).toContain('href="mailto:jean@mepmail.dev"');
+    expect(html).not.toContain("@je4ndev.com");
+    expect(html).toContain('href="/updates"');
+    // The widget loads only after a click: no script in the server HTML.
+    expect(html).not.toContain("elozi.je4ndev.com/widget.js");
+    expect(html.match(/<button/g)).toHaveLength(1);
+  });
 });

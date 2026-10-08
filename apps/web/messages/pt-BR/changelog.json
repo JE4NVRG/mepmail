@@ -28,6 +28,22 @@
   },
   "releases": [
     {
+      "version": "0.62",
+      "date": "2026-10-08",
+      "title": "Chat de suporte na página de suporte",
+      "summary": "A página /suporte ganhou um chat: o assistente responde pelo FAQ publicado e passa para o Jean quando precisa de uma pessoa.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Chat de suporte em mepmail.dev/support: o assistente virtual responde com o conteúdo publicado do MepMail, em português ou inglês.",
+            "Pedido de pessoa, dúvida de conta, cobrança ou segurança vão para o Jean, que continua no mesmo chat.",
+            "O chat só carrega quando você clica e não recebe dados da sua conta."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.61",
       "date": "2026-10-08",
       "title": "FAQ do suporte atualizado",

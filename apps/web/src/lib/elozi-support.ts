@@ -1,8 +1,8 @@
-/** Public channel identifiers only. Enable after the MepMail channel is accepted. */
+/** Public channel identifiers only. On since 2026-10-08: reception, assistant and FAQ are set in Elozi. */
 export const ELOZI_SUPPORT_ORIGIN = "https://elozi.je4ndev.com";
 export const ELOZI_SUPPORT_MODULE = `${ELOZI_SUPPORT_ORIGIN}/widget.js`;
 export const eloziSupportChannel = {
-  enabled: false,
+  enabled: true,
   tenantId: "499f0367-4860-4fd1-98b3-3b1c90883a2f",
   channelId: "6376dfa3-1def-441e-bb46-e9d99fb64d4b",
 };

@@ -23,6 +23,22 @@
   },
   "releases": [
     {
+      "version": "0.62",
+      "date": "2026-10-08",
+      "title": "Support chat on the support page",
+      "summary": "The /support page has a chat: the assistant answers from the published FAQ and hands over to Jean when a person is needed.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Support chat at mepmail.dev/support: the virtual assistant answers from MepMail's published content, in Portuguese or English.",
+            "Requests for a person, account, billing or security questions go to Jean, who carries on in the same chat.",
+            "The chat loads only when you click it and receives no data from your account."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.61",
       "date": "2026-10-08",
       "title": "Support FAQ updated",
