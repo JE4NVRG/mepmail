@@ -32,6 +32,12 @@ Recipients as chips with suggested contacts in the Correio composer.
 - From, To and Cc each take a full row in the composer.
 - Composer errors replace the footer hint, so they show without scrolling.
 
+### Fixed
+
+- The hourly `tenants.sync` skips suspended teams and failed domain rows. It
+  used to create their SES tenant again (the first provisioning step) before
+  failing on the deleted identity, undoing what a suspension removes.
+
 ## [0.57] - 2026-10-08
 
 Reply all, Cc and reply quoting in Correio.

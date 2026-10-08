@@ -2,7 +2,7 @@ import { associateDomainTenant } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { provisionDomainTenant, type SesIdentityClient } from "@millionsend/ses";
-import { asc, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, ne, or, sql } from "drizzle-orm";
 
 export interface SyncTenantsDeps {
   clientForRegion: (region: string) => SesIdentityClient;
@@ -20,6 +20,10 @@ export interface SyncTenantsDeps {
  * tenant send would name an unassociated set and be rejected), gets the
  * tenant created/adopted and its resources associated, then the marker
  * stamped. One domain's failure never blocks the rest.
+ *
+ * A suspended team is skipped, and so is a failed row: suspension deletes the
+ * team's tenant and identities on purpose, and creating the tenant again here
+ * (the first step of provisioning) would undo it every hour.
  */
 export async function syncTenants(
   db: Db,
@@ -27,13 +31,19 @@ export async function syncTenants(
 ): Promise<{ associated: number; failed: number }> {
   if (!deps.enabled) return { associated: 0, failed: 0 };
   const d = schema.domains;
+  const t = schema.teams;
   const pending = await db
     .select({ id: d.id, teamId: d.teamId, name: d.name, region: d.region })
     .from(d)
+    .innerJoin(t, eq(t.id, d.teamId))
     .where(
-      or(
-        isNull(d.sesTenantAssociatedAt),
-        sql`${d.sesTenantConfigSet} is distinct from ${deps.configurationSet ?? null}`,
+      and(
+        isNull(t.suspendedAt),
+        ne(d.status, "failed"),
+        or(
+          isNull(d.sesTenantAssociatedAt),
+          sql`${d.sesTenantConfigSet} is distinct from ${deps.configurationSet ?? null}`,
+        ),
       ),
     )
     .orderBy(asc(d.createdAt));

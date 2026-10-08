@@ -136,6 +136,37 @@ it("one failing domain is logged and skipped; the others still get associated", 
   expect(marked).toEqual([{ name: "good.dev" }]);
 });
 
+it("never recreates the tenant of a suspended team, nor touches a failed row", async () => {
+  const suspended = await createTeam(db, "phish");
+  const live = await createTeam(db, "live");
+  await insertDomain(suspended, "phish.example");
+  const failed = await insertDomain(live, "broken.example");
+  await insertDomain(live, "ok.example");
+  await db
+    .update(schema.teams)
+    .set({ suspendedAt: new Date("2026-10-07T02:41:00Z") })
+    .where(eq(schema.teams.id, suspended));
+  await db.update(schema.domains).set({ status: "failed" }).where(eq(schema.domains.id, failed));
+  const { client, calls } = fakeSes();
+
+  expect(
+    await syncTenants(db, {
+      clientForRegion: () => client,
+      configurationSet: "mepmail",
+      enabled: true,
+    }),
+  ).toEqual({ associated: 1, failed: 0 });
+  expect(
+    calls.filter((c) => c.name === "CreateTenantCommand").map((c) => c.input.TenantName),
+  ).toEqual([live]);
+  expect(calls.some((c) => String(c.input.ResourceArn ?? "").includes("phish.example"))).toBe(
+    false,
+  );
+  expect(calls.some((c) => String(c.input.ResourceArn ?? "").includes("broken.example"))).toBe(
+    false,
+  );
+});
+
 it("does nothing when tenants are disabled", async () => {
   await insertDomain(await createTeam(db, "acme"), "a.acme.dev");
   const { client, calls } = fakeSes();
