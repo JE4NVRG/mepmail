@@ -2060,6 +2060,7 @@ export function MailboxContentView({
                     externalHtml={item.htmlBodyWithExternalImages}
                     externalImages={item.externalImages}
                     trustedImageOrigin={item.trustedImageOrigin}
+                    sender={item.kind === "inbox" ? item.from : ""}
                   />
                   {item.attachments.length ? (
                     <section aria-label={t("attachments")} className={styles.attachments}>

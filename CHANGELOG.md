@@ -7,6 +7,32 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.60] - 2026-10-08
+
+Received HTML closer to the sender's design in the Correio reader.
+
+### Fixed
+
+- The HTML projection accepts `padding` with one to four lengths and
+  `margin` with one to four lengths or `auto` (never negative), unitless
+  `0`, `line-height` with units, `letter-spacing`, `text-transform`,
+  `white-space`, `min-width` and `min-height`. Email buttons
+  (`padding:12px 24px`) and centred blocks (`margin:0 auto`) keep their
+  shape.
+- A hidden image's alt text is styled (12 px, grey), so it stays readable
+  inside the `font-size:0` cells email templates use.
+
+### Added
+
+- Tracking pixels (0-2 px images, by attribute or inline style) are removed
+  from both projections and never counted as external images.
+- CSS background images (`background-image`, or `background:` shorthand
+  with `url()`) pass the external-image gate: counted while hidden, shown
+  only in the external projection and only for public https hosts; the
+  shorthand keeps its colour, `no-repeat`, `cover`/`contain` and `center`.
+- Reader: after showing images, "Always show from <domain>" remembers the
+  sender's domain on this browser (localStorage, at most 200).
+
 ## [0.59] - 2026-10-08
 
 One public contact: the owner's own address on the product domain.

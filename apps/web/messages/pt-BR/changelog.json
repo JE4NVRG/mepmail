@@ -28,6 +28,29 @@
   },
   "releases": [
     {
+      "version": "0.60",
+      "date": "2026-10-08",
+      "title": "E-mails recebidos mais fiéis ao original",
+      "summary": "Botões, espaçamentos e imagens dos e-mails aparecem como o remetente desenhou, sem abrir mão da privacidade.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "Botões e espaçamentos com mais de um valor (como 12px 24px ou 0 auto) eram descartados; agora o botão aparece com o tamanho certo.",
+            "Imagens bloqueadas deixavam buracos vazios: o texto alternativo delas agora aparece no lugar."
+          ]
+        },
+        {
+          "kind": "added",
+          "items": [
+            "Pixels de rastreamento (imagens de 1×1) são removidos: nunca carregam, nem quando você mostra as imagens.",
+            "Ao mostrar as imagens, as imagens de fundo também aparecem, só de endereços públicos seguros.",
+            "“Sempre mostrar de …”: escolha mostrar automaticamente as imagens de um domínio neste navegador."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.59",
       "date": "2026-10-08",
       "title": "Contato direto com o responsável",

@@ -4,7 +4,24 @@ import { pilotImageMetadata } from "../../../../packages/core/src/mailbox-pilot-
 type InlineAttachment = { contentId?: string | undefined; content: Buffer };
 const MAX_HTML = 1024 * 1024;
 const HOST_LABEL = /^[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?$/i;
-const SIZE = /^(?:\d{1,3}(?:\.\d{1,2})?)(?:px|em|rem|%)$/;
+const SIZE = /^(?:0|\d{1,3}(?:\.\d{1,2})?(?:px|em|rem|%))$/;
+/** padding as email buttons write it: one to four lengths ("12px 24px"). */
+const PADDING =
+  /^(?:0|\d{1,3}(?:\.\d{1,2})?(?:px|em|rem|%))(?:\s+(?:0|\d{1,3}(?:\.\d{1,2})?(?:px|em|rem|%))){0,3}$/;
+/** margin likewise, plus auto for centring ("0 auto"); never negative. */
+const MARGIN =
+  /^(?:auto|0|\d{1,3}(?:\.\d{1,2})?(?:px|em|rem|%))(?:\s+(?:auto|0|\d{1,3}(?:\.\d{1,2})?(?:px|em|rem|%))){0,3}$/;
+const MARGIN_SIDE = /^(?:auto|0|\d{1,3}(?:\.\d{1,2})?(?:px|em|rem|%))$/;
+/** What a shown CSS background image becomes once its URL passed externalImage. */
+const BACKGROUND_IMAGE = /^url\("https:\/\/[^"\\\s]+"\)$/;
+const CSS_URL = /url\(\s*(['"]?)([^'")]+)\1\s*\)/i;
+const CSS_COLOR = /#[\da-f]{3,8}\b|rgba?\([\d\s.,%]+\)/i;
+/** Shown in place of a hidden image: its alt text, readable inside font-size:0 email cells. */
+const PLACEHOLDER_STYLE = "font-size:12px;line-height:1.4;color:#80868b";
+/** A 0-2 px image is a tracking pixel: never shown, never offered. */
+const TINY = /^\s*[0-2](?:px)?\s*$/;
+const TINY_STYLE_WIDTH = /(?:^|;)\s*width\s*:\s*[0-2](?:px)?\s*(?:;|$)/i;
+const TINY_STYLE_HEIGHT = /(?:^|;)\s*height\s*:\s*[0-2](?:px)?\s*(?:;|$)/i;
 const COLOR = /^(?:#[\da-f]{3,8}|[a-z]{1,24}|rgba?\([\d\s.,%]+\))$/i;
 /** Table attributes keep only plain values: a colour or a length, never a URL. */
 const LENGTH_ATTR = /^\d{1,4}%?$/;
@@ -42,6 +59,52 @@ function externalImage(value: string) {
   } catch {
     return null;
   }
+}
+
+function trackingPixel(attrs: sanitizeHtml.Attributes) {
+  const style = attrs.style ?? "";
+  return (
+    (TINY.test(attrs.width ?? "x") && TINY.test(attrs.height ?? "x")) ||
+    (TINY_STYLE_WIDTH.test(style) && TINY_STYLE_HEIGHT.test(style))
+  );
+}
+
+/**
+ * A CSS background image passes the same gate as an <img>: hidden (and
+ * counted) unless the reader shows external images, and then only as a
+ * public https URL. A "background:" shorthand carrying an image keeps its
+ * colour, repeat, size and centring as separate declarations.
+ */
+function backgroundStyle(style: string, allowExternal: boolean, onHidden: () => void) {
+  if (!/url\(/i.test(style)) return style;
+  const kept: string[] = [];
+  for (const declaration of style.split(";")) {
+    const colon = declaration.indexOf(":");
+    if (colon === -1) continue;
+    const property = declaration.slice(0, colon).trim().toLowerCase();
+    const value = declaration.slice(colon + 1).trim();
+    if (property !== "background" && property !== "background-image") {
+      kept.push(declaration);
+      continue;
+    }
+    const url = CSS_URL.exec(value);
+    if (!url) {
+      kept.push(declaration);
+      continue;
+    }
+    const remote = externalImage(url[2] ?? "");
+    if (remote && allowExternal) kept.push(`background-image:url("${remote}")`);
+    else if (remote) onHidden();
+    if (property === "background") {
+      const color = CSS_COLOR.exec(value);
+      if (color) kept.push(`background-color:${color[0]}`);
+      if (/\bno-repeat\b/i.test(value)) kept.push("background-repeat:no-repeat");
+      const size = /\b(cover|contain)\b/i.exec(value);
+      if (size) kept.push(`background-size:${size[1]?.toLowerCase()}`);
+      if (/\bcenter\b/i.test(value)) kept.push("background-position:center");
+    }
+  }
+  return kept.join(";");
 }
 
 function tableCell(tagName: string) {
@@ -148,22 +211,34 @@ export function projectMailboxHtml(
           "font-style": [/^(?:normal|italic)$/],
           "text-align": [/^(?:left|right|center|justify)$/],
           "text-decoration": [/^(?:none|underline|line-through)$/],
-          "line-height": [/^(?:normal|\d(?:\.\d{1,2})?)$/],
+          "line-height": [/^(?:normal|\d(?:\.\d{1,2})?)$/, SIZE],
+          "letter-spacing": [SIZE],
+          "text-transform": [/^(?:none|uppercase|lowercase|capitalize)$/],
+          "white-space": [/^(?:normal|nowrap)$/],
           "vertical-align": [/^(?:top|middle|bottom|baseline)$/],
           width: [SIZE],
           "max-width": [SIZE],
+          "min-width": [SIZE],
           height: [SIZE],
-          padding: [SIZE],
+          "min-height": [SIZE],
+          padding: [PADDING],
           "padding-top": [SIZE],
           "padding-bottom": [SIZE],
           "padding-left": [SIZE],
           "padding-right": [SIZE],
-          margin: [SIZE],
-          "margin-top": [SIZE],
-          "margin-bottom": [SIZE],
-          "margin-left": [SIZE],
-          "margin-right": [SIZE],
+          margin: [MARGIN],
+          "margin-top": [MARGIN_SIDE],
+          "margin-bottom": [MARGIN_SIDE],
+          "margin-left": [MARGIN_SIDE],
+          "margin-right": [MARGIN_SIDE],
           "border-collapse": [/^(?:collapse|separate)$/],
+          // Present only in the projection that shows external images.
+          "background-image": allowExternal ? [BACKGROUND_IMAGE] : [],
+          "background-repeat": [/^(?:no-repeat|repeat|repeat-x|repeat-y)$/],
+          "background-size": [/^(?:cover|contain|auto)$/, SIZE],
+          "background-position": [
+            /^(?:center|top|bottom|left|right)(?:\s+(?:center|top|bottom|left|right))?$/,
+          ],
         },
       },
       transformTags: {
@@ -177,7 +252,21 @@ export function projectMailboxHtml(
           tagName: "a",
           attribs: { ...attrs, target: "_blank", rel: "noopener noreferrer" },
         }),
+        // Runs after the tag's own transform, on every tag.
+        "*": (tagName, attrs): sanitizeHtml.Tag =>
+          attrs.style
+            ? {
+                tagName,
+                attribs: {
+                  ...attrs,
+                  style: backgroundStyle(attrs.style, allowExternal, () => {
+                    if (!allowExternal) externalImages++;
+                  }),
+                },
+              }
+            : { tagName, attribs: attrs },
         img: (_tag, attrs): sanitizeHtml.Tag => {
+          if (trackingPixel(attrs)) return { tagName: "span", attribs: {}, text: "" };
           const source = attrs.src ?? "";
           const embedded = /^cid:/i.test(source) ? inline.get(contentId(source.slice(4))) : null;
           if (embedded && embedded.length <= inlineBudget) {
@@ -195,7 +284,9 @@ export function projectMailboxHtml(
             if (!allowExternal) externalImages++;
             else return { tagName: "img", attribs: shown };
           }
-          return { tagName: "span", attribs: {}, text: attrs.alt ?? "" };
+          return attrs.alt?.trim()
+            ? { tagName: "span", attribs: { style: PLACEHOLDER_STYLE }, text: attrs.alt }
+            : { tagName: "span", attribs: {}, text: "" };
         },
       },
     });

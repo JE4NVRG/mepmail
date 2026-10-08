@@ -6,6 +6,10 @@ const png = Buffer.from(
   "base64",
 );
 
+// A hidden image leaves its alt text, readable even inside font-size:0 cells.
+const hidden = (alt: string) =>
+  `<span style="font-size:12px;line-height:1.4;color:#80868b">${alt}</span>`;
+
 describe("private mailbox HTML projection", () => {
   it("retains bounded formatting and makes links explicit new-tab navigation", () => {
     const result = projectMailboxHtml(
@@ -110,7 +114,7 @@ describe("private mailbox HTML projection", () => {
     const result = projectMailboxHtml('<img src="cid:untrusted" alt="Attachment">', [
       { contentId: "untrusted", content },
     ]);
-    expect(result.htmlBody).toBe("<span>Attachment</span>");
+    expect(result.htmlBody).toBe(hidden("Attachment"));
     expect(result.externalImages).toBe(0);
   });
 
@@ -147,7 +151,7 @@ describe("private mailbox HTML projection", () => {
     "/api/mailboxes/private/attachment",
   ])("never offers external images for private, ambiguous or unsafe source %s", (src) => {
     const result = projectMailboxHtml(`<img src="${src}" alt="Blocked">`, []);
-    expect(result.htmlBody).toBe("<span>Blocked</span>");
+    expect(result.htmlBody).toBe(hidden("Blocked"));
     expect(result.htmlBodyWithExternalImages).toBeNull();
     expect(result.externalImages).toBe(0);
   });
@@ -159,7 +163,7 @@ describe("private mailbox HTML projection", () => {
     );
     expect(result.externalImages).toBe(2);
     expect(result.htmlBody).not.toMatch(/src="https?:/);
-    expect(result.htmlBody).toContain("<span>First</span>");
+    expect(result.htmlBody).toContain(hidden("First"));
     expect(result.htmlBody).toContain("data:image/png;base64,");
     expect(
       result.htmlBodyWithExternalImages?.match(/src="https:\/\/public\.example\/image"/g),
@@ -187,6 +191,58 @@ describe("private mailbox HTML projection", () => {
     expect(projectMailboxHtml(html, []).externalImages).toBe(3);
   });
 
+  it("keeps an email button's padding and centring shorthands, never a negative margin", () => {
+    const result = projectMailboxHtml(
+      '<a href="https://app.example/go" style="display:inline-block;padding:12px 24px;margin:0 auto;line-height:24px;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;background:#141413;color:#ffffff">Sign in</a><p style="margin:-999px 0;padding:1px 2px 3px 4px 5px">Lifted</p>',
+      [],
+    );
+    expect(result.htmlBody).toContain("padding:12px 24px");
+    expect(result.htmlBody).toContain("margin:0 auto");
+    expect(result.htmlBody).toContain("line-height:24px");
+    expect(result.htmlBody).toContain("letter-spacing:0.5px");
+    expect(result.htmlBody).toContain("background:#141413");
+    expect(result.htmlBody).not.toContain("-999px");
+    expect(result.htmlBody).not.toContain("4px 5px");
+  });
+
+  it("drops tracking pixels outright: never shown, never offered", () => {
+    const result = projectMailboxHtml(
+      '<img src="https://track.example/open" width="1" height="1" alt=""><img src="https://track.example/o2" style="width:0px;height:0px"><img src="https://cdn.example/logo.png" alt="Logo" width="180" height="20">',
+      [],
+    );
+    expect(result.externalImages).toBe(1);
+    expect(result.htmlBody).not.toContain("track.example");
+    expect(result.htmlBodyWithExternalImages).not.toContain("track.example");
+    expect(result.htmlBodyWithExternalImages).toContain('src="https://cdn.example/logo.png"');
+  });
+
+  it("shows a CSS background image only with external images, and only from a public https host", () => {
+    const result = projectMailboxHtml(
+      `<div style="width:146px;height:146px;border-radius:20px;background-image:url('https://cdn.example/spark.png')">.</div><table><tbody><tr><td style="background:#ffffff url(https://cdn.example/hero.jpg) center / cover no-repeat;padding:8px">Hero</td></tr></tbody></table><div style="background-image:url(https://127.0.0.1/x.png)">Private</div><div style="background:url(data:image/png;base64,AAAA)">Data</div>`,
+      [],
+    );
+    expect(result.externalImages).toBe(2);
+    expect(result.htmlBody).not.toMatch(/url\(|cdn\.example|127\.0\.0\.1/);
+    expect(result.htmlBody).toContain("width:146px;height:146px");
+    expect(result.htmlBody).toContain("background-color:#ffffff");
+    const shown = result.htmlBodyWithExternalImages ?? "";
+    // The quotes are HTML-escaped inside the style attribute.
+    expect(shown).toContain("background-image:url(&quot;https://cdn.example/spark.png&quot;)");
+    expect(shown).toContain("background-image:url(&quot;https://cdn.example/hero.jpg&quot;)");
+    expect(shown).toContain("background-repeat:no-repeat");
+    expect(shown).toContain("background-size:cover");
+    expect(shown).toContain("background-position:center");
+    expect(shown).not.toMatch(/127\.0\.0\.1|data:image/);
+  });
+
+  it("keeps a hidden image's alt text readable inside a font-size:0 cell", () => {
+    const result = projectMailboxHtml(
+      '<table><tbody><tr><td style="font-size:0px"><img src="https://cdn.example/logo.png" alt="Claude Console"></td></tr></tbody></table>',
+      [],
+    );
+    expect(result.htmlBody).toContain(hidden("Claude Console"));
+  });
+
   it("projects external URLs locally without fetching or rewriting them through a private proxy", () => {
     const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       throw new Error("Network is disabled in this projection test");
@@ -211,7 +267,7 @@ describe("private mailbox HTML projection", () => {
     for (const body of [result.htmlBody, result.htmlBodyWithExternalImages]) {
       expect(body?.length).toBeLessThan(2 * 1024 * 1024);
       expect(body).toContain("data:image/png;base64,");
-      expect(body).toContain("<span>Large</span>");
+      expect(body).toContain(hidden("Large"));
       expect(body).toContain("<p>End</p>");
     }
     expect(result.htmlBody?.match(/data:image\/png;base64,/g)?.length).toBe(

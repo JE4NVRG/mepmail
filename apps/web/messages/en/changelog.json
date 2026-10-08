@@ -23,6 +23,29 @@
   },
   "releases": [
     {
+      "version": "0.60",
+      "date": "2026-10-08",
+      "title": "Received email closer to the original",
+      "summary": "Buttons, spacing and images show as the sender designed them, without giving up privacy.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "Spacing with more than one value (like 12px 24px or 0 auto) was dropped; buttons now show at the right size.",
+            "Blocked images left empty gaps: their alt text now shows in their place."
+          ]
+        },
+        {
+          "kind": "added",
+          "items": [
+            "Tracking pixels (1×1 images) are removed: they never load, even when you show images.",
+            "When you show images, background images show too, only from safe public addresses.",
+            "“Always show from …”: choose to show a domain's images automatically on this browser."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.59",
       "date": "2026-10-08",
       "title": "Direct contact with the owner",
