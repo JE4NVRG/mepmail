@@ -28,6 +28,22 @@
   },
   "releases": [
     {
+      "version": "0.53",
+      "date": "2026-10-08",
+      "title": "Regras claras contra golpes",
+      "summary": "Os Termos de Uso e a Política de Reembolso agora dizem com todas as letras o que acontece com contas usadas para golpe.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Os Termos proíbem de forma explícita se passar por pessoas, marcas ou instituições, usar domínios que você não controla e trocar de remetente ou conta para escapar de bloqueios.",
+            "Sinais de phishing ou fraude levam à suspensão imediata, mesmo antes do primeiro envio: as chaves são revogadas, os domínios saem do envio e a fila é cancelada.",
+            "Contas suspensas por abuso não têm reembolso, nem dentro da garantia de 7 dias."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.52",
       "date": "2026-10-07",
       "title": "Novas telas de entrar e criar conta",

@@ -1,7 +1,7 @@
 {
   "terms": {
     "title": "Termos de Uso",
-    "updated": "Última atualização: 28 de setembro de 2026",
+    "updated": "Última atualização: 8 de outubro de 2026",
     "intro": "Estes termos regem o seu acesso e uso do MepMail, um serviço de e-mail transacional operado pela Je4nDev (\"nós\"). Ao criar uma conta ou usar o serviço, você concorda com estes termos. Se não concordar, não use o serviço.",
     "sections": [
       {
@@ -26,9 +26,11 @@
         "list": [
           "Enviar e-mail em massa não solicitado (spam) ou para listas compradas, alugadas ou raspadas.",
           "Enviar phishing, malware, mensagens fraudulentas ou enganosas, ou falsificar identidade de remetente.",
+          "Se passar por outra pessoa, marca ou instituição (bancos, órgãos públicos, transportadoras, seguradoras, avisos de segurança de conta), inclusive com domínios parecidos com os de outra marca.",
+          "Cadastrar ou enviar a partir de domínios que você não controla, como domínios de e-mail público ou descartável.",
           "Enviar conteúdo ilegal, abusivo, de ódio ou que viole direitos.",
           "Processar dados sobre os quais você não tem direitos.",
-          "Sondar, sobrecarregar ou tentar burlar limites, cotas ou a segurança do serviço."
+          "Sondar, sobrecarregar ou tentar burlar limites, cotas ou a segurança do serviço, inclusive trocando de remetente, domínio ou conta para escapar de bloqueios ou revisões."
         ]
       },
       {
@@ -60,7 +62,10 @@
       {
         "title": "8. Suspensão e encerramento",
         "body": [
-          "Podemos suspender ou encerrar a sua conta em caso de violação destes termos, por exigência legal, ou para proteger o serviço e os demais clientes. Você pode excluir a sua conta a qualquer momento. As cláusulas que por natureza devem sobreviver ao encerramento (cobrança, responsabilidade, lei aplicável) permanecem válidas."
+          "Podemos suspender ou encerrar a sua conta em caso de violação destes termos, por exigência legal, ou para proteger o serviço, os destinatários e os demais clientes. Você pode excluir a sua conta a qualquer momento.",
+          "Se houver sinais de phishing, fraude, falsificação de identidade ou outro uso proibido na seção 3, podemos suspender a conta na hora, sem aviso prévio, mesmo antes do primeiro envio. A suspensão revoga todas as chaves de API e SMTP e os acessos de integrações, retira os domínios da conta da nossa infraestrutura de envio e cancela os e-mails que ainda estiverem na fila.",
+          "Contas suspensas por esses motivos não têm direito a reembolso de nenhum valor pago, inclusive dentro da garantia de 7 dias, e contestações de cobrança (chargeback) serão contestadas com as evidências do caso. Podemos compartilhar essas evidências com os nossos provedores de infraestrutura e com autoridades, quando exigido ou para conter o abuso.",
+          "As cláusulas que por natureza devem sobreviver ao encerramento (cobrança, responsabilidade, lei aplicável) permanecem válidas."
         ]
       },
       {
@@ -188,7 +193,7 @@
   },
   "refund": {
     "title": "Política de Reembolso",
-    "updated": "Última atualização: 28 de setembro de 2026",
+    "updated": "Última atualização: 8 de outubro de 2026",
     "intro": "Queremos que você pague apenas se o MepMail funcionar para você. O degrau gratuito existe para você validar o serviço com e-mail real antes de gastar qualquer coisa.",
     "sections": [
       {
@@ -200,7 +205,7 @@
       {
         "title": "2. Garantia de 7 dias no primeiro pagamento",
         "body": [
-          "Se você fizer upgrade e não ficar satisfeito, peça em até 7 dias após o primeiro pagamento e reembolsamos integralmente — sem interrogatório. Uma garantia por conta, no primeiro período pago."
+          "Se você fizer upgrade e não ficar satisfeito, peça em até 7 dias após o primeiro pagamento e reembolsamos integralmente — sem interrogatório. Uma garantia por conta, no primeiro período pago. A garantia não vale para contas suspensas por violar os Termos de Uso (veja a seção 6)."
         ]
       },
       {
@@ -224,7 +229,8 @@
       {
         "title": "6. Abuso e spam",
         "body": [
-          "Contas suspensas ou encerradas por violar os Termos de Uso — spam, listas compradas, phishing, conteúdo proibido — não têm direito a reembolso."
+          "Contas suspensas ou encerradas por violar os Termos de Uso — spam, listas compradas, phishing, fraude, falsificação de identidade de pessoa ou marca, conteúdo proibido — não têm direito a reembolso de nenhum valor, inclusive dentro da garantia de 7 dias.",
+          "A suspensão pode acontecer antes de qualquer envio, quando houver sinais claros de abuso. Contestações de cobrança (chargeback) nesses casos são contestadas com as evidências."
         ]
       },
       {

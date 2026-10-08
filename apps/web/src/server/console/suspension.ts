@@ -28,14 +28,24 @@ const clientFor = (region: string) =>
       : {}),
   });
 
+// SES can still count a tenant deleted a moment ago as holding the identity,
+// so a refused delete is retried for a few seconds before it is reported.
+const IDENTITY_DELETE_RETRY_MS = [1_000, 2_000, 4_000];
+
 const defaultDeps: SuspensionSesDeps = {
   deleteIdentity: async ({ name, region, tenant }) => {
     const client = clientFor(region);
     if (tenant) await disassociateIdentity(client, { tenantName: tenant, region, identity: name });
-    try {
-      await deleteDomainIdentity(client, { domain: name });
-    } catch (error) {
-      if ((error as { name?: string }).name !== "NotFoundException") throw error;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await deleteDomainIdentity(client, { domain: name });
+        return;
+      } catch (error) {
+        if ((error as { name?: string }).name === "NotFoundException") return;
+        const wait = IDENTITY_DELETE_RETRY_MS[attempt];
+        if (wait === undefined) throw error;
+        await new Promise((resolve) => setTimeout(resolve, wait));
+      }
     }
   },
   deleteTenant: ({ tenantName, region }) => deleteTenant(clientFor(region), { tenantName }),

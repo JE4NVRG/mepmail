@@ -23,6 +23,22 @@
   },
   "releases": [
     {
+      "version": "0.53",
+      "date": "2026-10-08",
+      "title": "Clear rules against scams",
+      "summary": "The Terms of Service and the Refund Policy now spell out what happens to accounts used for scams.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "The Terms explicitly forbid impersonating people, brands or institutions, using domains you do not control, and switching sender or account to escape blocks.",
+            "Signs of phishing or fraud lead to an immediate suspension, even before the first send: keys are revoked, domains leave sending and the queue is canceled.",
+            "Accounts suspended for abuse get no refund, not even within the 7-day guarantee."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.52",
       "date": "2026-10-07",
       "title": "New sign-in and sign-up screens",

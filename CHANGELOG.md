@@ -7,6 +7,29 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.53] - 2026-10-08
+
+Clear rules against scams.
+
+### Changed
+
+- Terms of Service, section 3: impersonating a person, brand or institution
+  (look-alike domains included), registering domains the account does not
+  control, and switching sender, domain or account to escape blocks are named
+  as prohibited.
+- Terms of Service, section 8: signs of phishing or fraud allow an immediate
+  suspension without notice, even before the first send; the suspension
+  revokes API/SMTP keys and integration access, removes the domains from
+  sending and cancels queued mail. Such accounts get no refund and chargebacks
+  are disputed.
+- Refund Policy, sections 2 and 6: the 7-day guarantee does not apply to
+  accounts suspended for abuse.
+
+### Fixed
+
+- A suspension retries the SES identity delete for a few seconds: right after
+  the tenant is deleted, SES can still refuse it.
+
 ## [0.52] - 2026-10-07
 
 Sign-in and sign-up screens.

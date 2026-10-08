@@ -1,7 +1,7 @@
 {
   "terms": {
     "title": "Terms of Service",
-    "updated": "Last updated: September 28, 2026",
+    "updated": "Last updated: October 8, 2026",
     "intro": "These terms govern your access to and use of MepMail, a transactional email service operated by Je4nDev (\"we\", \"us\"). By creating an account or using the service, you agree to these terms. If you do not agree, do not use the service.",
     "sections": [
       {
@@ -26,9 +26,11 @@
         "list": [
           "Send unsolicited bulk email (spam) or email to purchased, rented or scraped lists.",
           "Send phishing, malware, fraudulent or deceptive messages, or spoof sender identity.",
+          "Impersonate another person, brand or institution (banks, government agencies, carriers, insurers, account-security notices), including with domains that look like another brand's.",
+          "Register or send from domains you do not control, such as public or disposable email domains.",
           "Send content that is illegal, harassing, hateful or infringing.",
           "Process data you do not have the right to process.",
-          "Probe, overload or attempt to bypass the service's limits, quotas or security."
+          "Probe, overload or attempt to bypass the service's limits, quotas or security, including by switching sender, domain or account to escape blocks or reviews."
         ]
       },
       {
@@ -60,7 +62,10 @@
       {
         "title": "8. Suspension and termination",
         "body": [
-          "We may suspend or terminate your account if you violate these terms, if required by law, or to protect the service or other customers. You may delete your account at any time. Sections that by their nature should survive termination (billing, liability, governing law) survive."
+          "We may suspend or terminate your account if you violate these terms, if required by law, or to protect the service, recipients or other customers. You may delete your account at any time.",
+          "When there are signs of phishing, fraud, impersonation or any other use prohibited in section 3, we may suspend the account immediately and without notice, even before its first send. A suspension revokes every API and SMTP key and every integration's access, removes the account's domains from our sending infrastructure and cancels any email still queued.",
+          "Accounts suspended for these reasons are not eligible for a refund of any amount paid, including within the 7-day guarantee, and chargebacks will be disputed with the evidence of the case. We may share that evidence with our infrastructure providers and with authorities when required or to stop the abuse.",
+          "Sections that by their nature should survive termination (billing, liability, governing law) survive."
         ]
       },
       {
@@ -188,7 +193,7 @@
   },
   "refund": {
     "title": "Refund Policy",
-    "updated": "Last updated: September 28, 2026",
+    "updated": "Last updated: October 8, 2026",
     "intro": "We want you to pay only if MepMail works for you. The free tier exists so you can validate the service with real email before spending anything.",
     "sections": [
       {
@@ -200,7 +205,7 @@
       {
         "title": "2. 7-day guarantee on your first payment",
         "body": [
-          "If you upgrade and are not satisfied, ask us within 7 days of your first payment and we refund it in full — no interrogation. One guarantee per account, on the first paid period."
+          "If you upgrade and are not satisfied, ask us within 7 days of your first payment and we refund it in full — no interrogation. One guarantee per account, on the first paid period. The guarantee does not apply to accounts suspended for violating the Terms of Service (see section 6)."
         ]
       },
       {
@@ -224,7 +229,8 @@
       {
         "title": "6. Abuse and spam",
         "body": [
-          "Accounts suspended or terminated for violating the Terms of Service — spam, purchased lists, phishing, prohibited content — are not eligible for refunds."
+          "Accounts suspended or terminated for violating the Terms of Service — spam, purchased lists, phishing, fraud, impersonating a person or brand, prohibited content — are not eligible for a refund of any amount, including within the 7-day guarantee.",
+          "A suspension may happen before anything is sent when there are clear signs of abuse. Chargebacks in these cases are disputed with the evidence."
         ]
       },
       {
