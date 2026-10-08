@@ -1825,6 +1825,59 @@
 .contentDetail .replyActions {
   margin-right: auto;
 }
+/* Unread received mail: a dot and a bolder sender and subject; read rows stay regular. */
+.messageRow:not([data-unread]) .rowMeta > span:first-child,
+.messageRows .messageRow:not([data-unread]) strong {
+  font-weight: 400;
+}
+.messageRow[data-unread] .rowMeta > span:first-child,
+.messageRows .messageRow[data-unread] strong {
+  font-weight: 650;
+  color: var(--ms-bone);
+}
+.messageRow[data-unread] .rowMeta > span:first-child::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--ms-violet);
+  vertical-align: 1px;
+}
+/* Unread count beside Inbox in the folder rail. */
+.folderCount {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ms-violet) 18%, transparent);
+  color: var(--ms-violet);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* A folder a dragged message would land on. */
+.compactFolders button[data-drop-active="true"],
+.customFolderRow button[data-drop-active="true"] {
+  outline: 2px dashed var(--ms-violet);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--ms-violet) 10%, transparent);
+  color: var(--ms-bone);
+}
+/* Bulk actions on the selected rows: count, then icon actions. */
+.bulkActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  min-width: 0;
+}
+.bulkActions .messageCount {
+  margin-right: 6px;
+}
 /* Spam and trash read as icons, named by their tooltip and accessible label. */
 .contentDetail .iconAction {
   min-width: 44px;
@@ -1902,6 +1955,7 @@
   gap: 10px;
   min-height: 44px;
   min-width: 0;
+  white-space: nowrap;
   font-size: 12px;
   color: var(--ms-muted);
   cursor: pointer;

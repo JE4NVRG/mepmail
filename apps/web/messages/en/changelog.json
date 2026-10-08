@@ -23,6 +23,30 @@
   },
   "releases": [
     {
+      "version": "0.55",
+      "date": "2026-10-08",
+      "title": "Read, archive and drag in Correio",
+      "summary": "The inbox gets the basics of professional email: unread mail stands out, an Archive, and dragging to folders.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "New messages show in bold with a dot. The Inbox shows how many are unread, and so does the browser tab.",
+            "Opening a message marks it read; you can mark it unread again.",
+            "Archive folder: archive to take a message out of the Inbox without deleting it, and bring it back any time.",
+            "Drag messages to Inbox, Favorites, Archive, Spam, Trash or your folders. With several selected, they all go together.",
+            "With messages selected: archive, mark as read or unread, and move to the trash in one go."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "The list keeps arrival order: starring, archiving or filing a message no longer moves it."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.54",
       "date": "2026-10-08",
       "title": "A cleaner inbox",

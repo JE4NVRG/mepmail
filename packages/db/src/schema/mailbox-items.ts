@@ -48,6 +48,10 @@ export const mailboxItems = pgTable(
     // Soft trash retains original kind, safety classification, MIME and storage usage.
     trashedAt: timestamp("trashed_at", { withTimezone: true }),
     starredAt: timestamp("starred_at", { withTimezone: true }),
+    // When the mailbox owner first read it; null = unread. Not content: no revision bump.
+    seenAt: timestamp("seen_at", { withTimezone: true }),
+    // Archived items leave the inbox for the Archive view; archiving clears folderId.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     folderId: uuid("folder_id"),
     sourceId: text("source_id"),
     revision: integer("revision").notNull().default(1),
@@ -81,6 +85,14 @@ export const mailboxItems = pgTable(
       .on(t.mailboxId, t.folderId, t.createdAt, t.id)
       .where(sql`${t.folderId} is not null and ${t.trashedAt} is null`),
     index("mailbox_items_box_created_idx").on(t.mailboxId, t.createdAt, t.id),
+    index("mailbox_items_unseen_inbox_idx")
+      .on(t.mailboxId)
+      .where(
+        sql`${t.kind} = 'inbox' and ${t.seenAt} is null and ${t.trashedAt} is null and ${t.archivedAt} is null`,
+      ),
+    index("mailbox_items_archived_created_idx")
+      .on(t.mailboxId, t.createdAt, t.id)
+      .where(sql`${t.archivedAt} is not null and ${t.trashedAt} is null`),
     index("mailbox_items_trash_created_idx")
       .on(t.mailboxId, t.trashedAt, t.id)
       .where(sql`${t.trashedAt} is not null`),

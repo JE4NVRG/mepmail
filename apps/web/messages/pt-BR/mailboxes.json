@@ -395,7 +395,22 @@
     "bulkRestored": "{count, plural, one {# mensagem restaurada} other {# mensagens restauradas}}.",
     "bulkPartial": "{count, number} de {total, number} mensagens foram alteradas. Atualize para conferir as demais antes de tentar novamente.",
     "trashHelp": "As mensagens ficam preservadas aqui. Selecione uma ou várias para restaurar à pasta de origem.",
-    "limitedList": "Mostrando as mensagens mais recentes. Escolha uma caixa ou pasta para reduzir esta lista."
+    "limitedList": "Mostrando as mensagens mais recentes. Escolha uma caixa ou pasta para reduzir esta lista.",
+    "archive": "Arquivar",
+    "unarchive": "Mover para a Entrada",
+    "archived": "Mensagem arquivada.",
+    "unarchived": "Mensagem de volta na Entrada.",
+    "markRead": "Marcar como lida",
+    "markUnread": "Marcar como não lida",
+    "markedUnread": "Mensagem marcada como não lida.",
+    "bulkMarkedRead": "{count, plural, one {# mensagem marcada como lida} other {# mensagens marcadas como lidas}}.",
+    "bulkMarkedUnread": "{count, plural, one {# mensagem marcada como não lida} other {# mensagens marcadas como não lidas}}.",
+    "bulkArchived": "{count, plural, one {# mensagem arquivada} other {# mensagens arquivadas}}.",
+    "dropDone": "{count, plural, one {# mensagem movida} other {# mensagens movidas}}.",
+    "dropNone": "Essas mensagens já estão aí ou não podem ir para essa pasta.",
+    "selectedCount": "{count, plural, one {# selecionada} other {# selecionadas}}",
+    "unread": "Não lida",
+    "unreadCount": "{count, plural, one {# não lida} other {# não lidas}}"
   },
   "usage": {
     "title": "Uso da caixa",
@@ -440,5 +455,8 @@
       "agents": "Agentes",
       "license": "Licença e uso"
     }
-  }
+  },
+  "archive": "Arquivo",
+  "archiveEmptyTitle": "Nada arquivado",
+  "archiveEmptyBody": "Arquive mensagens para tirá-las da Entrada sem apagar. Elas ficam aqui."
 }

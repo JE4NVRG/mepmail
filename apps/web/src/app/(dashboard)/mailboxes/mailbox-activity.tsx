@@ -18,6 +18,8 @@ const ACTION_KEYS = {
   "mailbox.item_restored": "actions.itemRestored",
   "mailbox.item_starred": "actions.itemStarred",
   "mailbox.item_unstarred": "actions.itemUnstarred",
+  "mailbox.item_archived": "actions.itemArchived",
+  "mailbox.item_unarchived": "actions.itemUnarchived",
   "mailbox.item_folder_changed": "actions.itemFolderChanged",
   "mailbox.folder_created": "actions.folderCreated",
   "mailbox.folder_renamed": "actions.folderRenamed",

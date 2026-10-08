@@ -25,7 +25,9 @@ import {
   revokeMailboxAgentKey,
   revokeMailboxRegistry,
   setMailboxDeliveryFolder,
+  setMailboxItemArchive,
   setMailboxItemFolder,
+  setMailboxItemSeen,
   setMailboxItemStar,
   setMailboxItemTrash,
   updateMailboxFolder,
@@ -52,6 +54,7 @@ import {
 import {
   getMailboxContent,
   getMailboxContentList,
+  getMailboxUnreadCounts,
   saveMailboxContentDraft,
 } from "../mailbox-content";
 import { mailboxReceivingDeps } from "../mailbox-receiving";
@@ -502,6 +505,45 @@ export const mailboxesRouter = router({
         }),
       ),
     ),
+  setArchive: enabled
+    .input(
+      z
+        .object({
+          mailboxId: z.uuid(),
+          id: z.uuid(),
+          expectedRevision: z.number().int().min(1).max(2147483646),
+          archived: z.boolean(),
+        })
+        .strict(),
+    )
+    .mutation(({ ctx, input }) =>
+      call(() =>
+        ctx.db.transaction(async (transaction) => {
+          const db = transaction as unknown as Db;
+          const result = await setMailboxItemArchive(db, actor(ctx), input);
+          if (result.changed)
+            await appendMailboxActivity(
+              db,
+              {
+                teamId: ctx.teamId,
+                mailboxId: input.mailboxId,
+                actor: { kind: "user", userId: ctx.session.user.id },
+              },
+              {
+                action: input.archived ? "mailbox.item_archived" : "mailbox.item_unarchived",
+                itemId: result.id,
+                revision: result.revision,
+              },
+            );
+          return result;
+        }),
+      ),
+    ),
+  // Read state is the owner's own view: not logged as activity, no revision.
+  setSeen: enabled
+    .input(z.object({ mailboxId: z.uuid(), id: z.uuid(), seen: z.boolean() }).strict())
+    .mutation(({ ctx, input }) => call(() => setMailboxItemSeen(ctx.db, actor(ctx), input))),
+  unreadCounts: enabled.query(({ ctx }) => call(() => getMailboxUnreadCounts(ctx.db, actor(ctx)))),
   setItemFolder: enabled
     .input(
       z
@@ -549,6 +591,7 @@ export const mailboxesRouter = router({
           "quarantine",
           "trash",
           "favorites",
+          "archive",
           "custom",
         ]),
         customFolderId: z.uuid().optional(),

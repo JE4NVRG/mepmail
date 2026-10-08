@@ -49,6 +49,8 @@ function itemDto(item: Item, changed: boolean) {
     mailboxId: item.mailboxId,
     revision: item.revision,
     starredAt: item.starredAt,
+    seenAt: item.seenAt,
+    archivedAt: item.archivedAt,
     folderId: item.folderId,
     changed,
   };
@@ -271,7 +273,13 @@ export async function setMailboxItemFolder(
     if (item.folderId === parsed.folderId) return itemDto(item, false);
     const [updated] = await tx
       .update(schema.mailboxItems)
-      .set({ folderId: parsed.folderId, revision: item.revision + 1, updatedAt: now })
+      // Filing an archived message takes it out of the archive, into that folder.
+      .set({
+        folderId: parsed.folderId,
+        archivedAt: null,
+        revision: item.revision + 1,
+        updatedAt: now,
+      })
       .where(
         and(
           eq(schema.mailboxItems.id, item.id),
@@ -280,6 +288,88 @@ export async function setMailboxItemFolder(
           eq(schema.mailboxItems.revision, parsed.expectedRevision),
         ),
       )
+      .returning();
+    if (!updated) throw new MailboxContentError("conflict");
+    return itemDto(updated, true);
+  });
+}
+
+/**
+ * Archiving takes a message out of the inbox (or out of a named folder) into
+ * the Archive view; un-archiving returns it to its ordinary folder. Drafts are
+ * not archived: they live in Drafts until sent or discarded.
+ */
+export async function setMailboxItemArchive(
+  db: Db,
+  actor: MailboxContentActor,
+  input: { mailboxId: string; id: string; expectedRevision: number; archived: boolean },
+  now = new Date(),
+) {
+  actor = { ...actor };
+  const parsed = parse(itemMutation.extend({ archived: z.boolean() }).strict(), input);
+  validNow(now);
+  return withMailboxOrganizationAccess(db, actor, parsed.mailboxId, async (tx) => {
+    const item = await mutableItem(tx, actor, parsed);
+    if (item.kind === "draft") throw new MailboxContentError("forbidden");
+    if ((item.archivedAt !== null) === parsed.archived) return itemDto(item, false);
+    const [updated] = await tx
+      .update(schema.mailboxItems)
+      .set({
+        archivedAt: parsed.archived ? now : null,
+        ...(parsed.archived ? { folderId: null } : {}),
+        revision: item.revision + 1,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(schema.mailboxItems.id, item.id),
+          eq(schema.mailboxItems.teamId, actor.teamId),
+          eq(schema.mailboxItems.mailboxId, parsed.mailboxId),
+          eq(schema.mailboxItems.revision, parsed.expectedRevision),
+        ),
+      )
+      .returning();
+    if (!updated) throw new MailboxContentError("conflict");
+    return itemDto(updated, true);
+  });
+}
+
+/**
+ * Read state is the owner's view of a received message, not its content: it
+ * never bumps revision or updatedAt, so open editors, pending approvals and
+ * list order stay untouched. Quarantined bytes are never "read".
+ */
+export async function setMailboxItemSeen(
+  db: Db,
+  actor: MailboxContentActor,
+  input: { mailboxId: string; id: string; seen: boolean },
+  now = new Date(),
+) {
+  actor = { ...actor };
+  const parsed = parse(
+    z.object({ mailboxId: z.uuid(), id: z.uuid(), seen: z.boolean() }).strict(),
+    input,
+  );
+  validNow(now);
+  return withMailboxOrganizationAccess(db, actor, parsed.mailboxId, async (tx) => {
+    const where = and(
+      eq(schema.mailboxItems.id, parsed.id),
+      eq(schema.mailboxItems.teamId, actor.teamId),
+      eq(schema.mailboxItems.mailboxId, parsed.mailboxId),
+    );
+    const [item] = await tx.select().from(schema.mailboxItems).where(where).for("update");
+    if (!item) throw new MailboxContentError("not_found");
+    if (
+      item.kind !== "inbox" ||
+      item.deliveryFolder === "quarantine" ||
+      item.inboundAssessment?.decision === "quarantine"
+    )
+      throw new MailboxContentError("forbidden");
+    if ((item.seenAt !== null) === parsed.seen) return itemDto(item, false);
+    const [updated] = await tx
+      .update(schema.mailboxItems)
+      .set({ seenAt: parsed.seen ? now : null })
+      .where(where)
       .returning();
     if (!updated) throw new MailboxContentError("conflict");
     return itemDto(updated, true);

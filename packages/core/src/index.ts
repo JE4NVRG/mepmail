@@ -415,11 +415,14 @@ export {
   archiveMailboxFolder,
   createMailboxFolder,
   listMailboxFolders,
+  setMailboxItemArchive,
   setMailboxItemFolder,
+  setMailboxItemSeen,
   setMailboxItemStar,
   updateMailboxFolder,
 } from "./mailbox-organization.js";
 export {
+  countUnreadMailboxItems,
   importMailboxMime,
   listMailboxItems,
   type MailboxContentActor,

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  countUnreadMailboxItems,
   getMailboxOutboundSummary,
   listMailboxFolders,
   listMailboxItems,
@@ -253,14 +254,23 @@ export async function getMailboxContentList(
   actor: MailboxContentActor,
   input: {
     mailboxId: string | null;
-    folder: "inbox" | "drafts" | "sent" | "spam" | "quarantine" | "trash" | "favorites" | "custom";
+    folder:
+      | "inbox"
+      | "drafts"
+      | "sent"
+      | "spam"
+      | "quarantine"
+      | "trash"
+      | "favorites"
+      | "archive"
+      | "custom";
     customFolderId?: string | undefined;
     mailboxKind?: "person" | "agent" | undefined;
   },
 ) {
   actor = { ...actor };
   input = { ...input };
-  if (actor.agentAccess && ["spam", "quarantine", "trash"].includes(input.folder))
+  if (actor.agentAccess && ["spam", "quarantine", "trash", "archive"].includes(input.folder))
     throw new MailboxContentError("forbidden");
   if (
     (input.folder === "custom" && (!input.mailboxId || !input.customFolderId)) ||
@@ -281,7 +291,7 @@ export async function getMailboxContentList(
       (!input.mailboxKind || b.kind === input.mailboxKind),
   );
   if (input.mailboxId && !readable.length) throw new MailboxContentError("forbidden");
-  const kind = ["trash", "favorites", "custom"].includes(input.folder)
+  const kind = ["trash", "favorites", "archive", "custom"].includes(input.folder)
     ? undefined
     : input.folder === "drafts"
       ? "draft"
@@ -296,8 +306,10 @@ export async function getMailboxContentList(
       trashed: input.folder === "trash",
       ...(input.folder === "favorites" ? { starred: true, safeOnly: true } : {}),
       ...(input.folder === "custom" ? { folderId: input.customFolderId!, safeOnly: true } : {}),
+      ...(input.folder === "archive" ? { archived: true, safeOnly: true } : {}),
+      // Filed and archived messages leave the ordinary views (agents see them all).
       ...(!actor.agentAccess && ["inbox", "drafts", "sent"].includes(input.folder)
-        ? { folderId: null }
+        ? { folderId: null, archived: false }
         : {}),
       ...(kind === "inbox"
         ? { deliveryFolder: input.folder as "inbox" | "spam" | "quarantine" }
@@ -313,9 +325,11 @@ export async function getMailboxContentList(
           mailboxKind: box.kind,
         });
   }
-  metadata.sort(
-    (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime() || b.id.localeCompare(a.id),
-  );
+  // Newest arrival first, like every box's own listing; a draft by its last edit.
+  // Starring, filing or archiving never reorders the list.
+  const order = (row: { kind: string; createdAt: Date; updatedAt: Date }) =>
+    (row.kind === "draft" ? row.updatedAt : row.createdAt).getTime();
+  metadata.sort((a, b) => order(b) - order(a) || b.id.localeCompare(a.id));
   if (metadata.length > 50) limited = true;
   const items: {
     id: string;
@@ -335,6 +349,8 @@ export async function getMailboxContentList(
     deliveryFolder: "inbox" | "spam" | "quarantine";
     trashedAt: Date | null;
     starredAt: Date | null;
+    seenAt: Date | null;
+    archivedAt: Date | null;
     folderId: string | null;
     inboundAssessment: (typeof schema.mailboxItems.$inferSelect)["inboundAssessment"];
     sentBy: { kind: "human" | "agent"; label: string | null } | null;
@@ -379,6 +395,8 @@ export async function getMailboxContentList(
       deliveryFolder: row.deliveryFolder,
       trashedAt: item.trashedAt,
       starredAt: item.starredAt,
+      seenAt: item.seenAt,
+      archivedAt: item.archivedAt,
       folderId: item.folderId,
       inboundAssessment: item.inboundAssessment,
       sentBy: item.sentBy,
@@ -447,6 +465,22 @@ export interface MailboxDraftInput {
   retainedAttachments: number[];
   uploads: { filename: string; base64: string }[];
 }
+/**
+ * Unread Inbox messages per mailbox the actor may read (the first 20, like
+ * the list), for the folder rail. Agents have no rail and get nothing.
+ */
+export async function getMailboxUnreadCounts(db: Db, actor: MailboxContentActor) {
+  actor = { ...actor };
+  if (actor.agentAccess) throw new MailboxContentError("forbidden");
+  const registry = await listMailboxRegistry(db, actor);
+  const readable = registry.mailboxes
+    .filter((box) => box.canRead && box.status === "planned")
+    .slice(0, 20);
+  const counts: Record<string, number> = {};
+  for (const box of readable) counts[box.id] = await countUnreadMailboxItems(db, actor, box.id);
+  return { counts };
+}
+
 export async function saveMailboxContentDraft(
   db: Db,
   actor: MailboxContentActor,

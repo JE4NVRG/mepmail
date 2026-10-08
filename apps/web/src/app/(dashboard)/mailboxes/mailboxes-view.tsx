@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { type DragEvent, useEffect, useRef, useState } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { authClient } from "@/lib/auth-client";
 import type { MailboxFolder, MailboxKindFilter } from "@/lib/mailbox-inbox-presentation";
@@ -12,7 +12,12 @@ import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { MailboxActivityDialog } from "./mailbox-activity";
 import { MailboxAgentKeysDialog } from "./mailbox-agent-keys";
-import { MailboxContentView } from "./mailbox-content-view";
+import {
+  MAIL_DRAG_TYPE,
+  MailboxContentView,
+  type MailboxDropHandler,
+  type MailboxDropTarget,
+} from "./mailbox-content-view";
 import { MailboxFolderDialog } from "./mailbox-folder-dialog";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import managementStyles from "./mailbox-management.module.css";
@@ -428,6 +433,59 @@ export function MailboxesView({
     ),
   );
   const canOrganize = !!selected?.ownerActive && selected.ownerUserId === session?.user.id;
+  const unreadCounts = useQuery(
+    trpc.mailboxes.unreadCounts.queryOptions(undefined, {
+      enabled: mayUseMail && !!registry.data,
+      refetchInterval: 30000,
+      retry: false,
+    }),
+  );
+  const inboxUnread = (selected ? [selected] : scopedBoxes).reduce(
+    (total, box) => total + (unreadCounts.data?.counts[box.id] ?? 0),
+    0,
+  );
+  // The tab shows the unread count the way mail apps do: "(3) Correio".
+  const baseTitle = useRef<string | null>(null);
+  useEffect(() => {
+    if (layout === "dashboard") return;
+    baseTitle.current ??= document.title.replace(/^\(\d+\) /, "");
+    document.title = inboxUnread ? `(${inboxUnread}) ${baseTitle.current}` : baseTitle.current;
+  }, [inboxUnread, layout]);
+  useEffect(
+    () => () => {
+      if (baseTitle.current) document.title = baseTitle.current;
+    },
+    [],
+  );
+  // Rows dragged from the list land on a folder through the content view's action.
+  const dropAction = useRef<MailboxDropHandler | null>(null);
+  const canDrop = boxes.some((box) => box.ownerActive && box.ownerUserId === session?.user.id);
+  const [dropHover, setDropHover] = useState<string | null>(null);
+  const dropProps = (target: MailboxDropTarget, key: string) =>
+    canDrop
+      ? {
+          "data-drop-active": dropHover === key || undefined,
+          onDragOver: (event: DragEvent) => {
+            if (!event.dataTransfer.types.includes(MAIL_DRAG_TYPE)) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            if (dropHover !== key) setDropHover(key);
+          },
+          onDragLeave: () => setDropHover((current) => (current === key ? null : current)),
+          onDrop: (event: DragEvent) => {
+            event.preventDefault();
+            setDropHover(null);
+            let keys: unknown;
+            try {
+              keys = JSON.parse(event.dataTransfer.getData(MAIL_DRAG_TYPE));
+            } catch {
+              return;
+            }
+            if (Array.isArray(keys) && keys.every((key) => typeof key === "string"))
+              dropAction.current?.(target, keys);
+          },
+        }
+      : {};
   const agentBox = boxes.find(
     (box) => box.id === agentDialogId && box.ownerActive && box.ownerUserId === session?.user.id,
   );
@@ -552,19 +610,44 @@ export function MailboxesView({
         </select>
       </label>
       <nav className={styles.compactFolders} aria-label={t("folders")}>
-        {(["inbox", "favorites", "drafts", "sent", "spam", "quarantine", "trash"] as const).map(
-          (f) => (
-            <button
-              type="button"
-              key={f}
-              aria-current={f === folder ? "page" : undefined}
-              onClick={() => chooseFolder(f)}
-            >
-              <MailboxFolderIcon name={f} />
-              {t(f)}
-            </button>
-          ),
-        )}
+        {(
+          [
+            "inbox",
+            "favorites",
+            "drafts",
+            "sent",
+            "archive",
+            "spam",
+            "quarantine",
+            "trash",
+          ] as const
+        ).map((f) => (
+          <button
+            type="button"
+            key={f}
+            aria-current={f === folder ? "page" : undefined}
+            onClick={() => chooseFolder(f)}
+            {...(f === "inbox" ||
+            f === "favorites" ||
+            f === "archive" ||
+            f === "spam" ||
+            f === "trash"
+              ? dropProps({ folder: f }, f)
+              : {})}
+          >
+            <MailboxFolderIcon name={f} />
+            {t(f)}
+            {f === "inbox" && inboxUnread ? (
+              <span
+                className={styles.folderCount}
+                role="img"
+                aria-label={t("organization.unreadCount", { count: inboxUnread })}
+              >
+                {inboxUnread > 999 ? "999+" : inboxUnread}
+              </span>
+            ) : null}
+          </button>
+        ))}
       </nav>
       <section className={styles.customFolders} aria-label={t("organization.folders")}>
         <header>
@@ -601,6 +684,7 @@ export function MailboxesView({
                   folder === "custom" && customFolderId === entry.id ? "page" : undefined
                 }
                 onClick={() => chooseFolder("custom", entry.id)}
+                {...dropProps({ folder: "custom", id: entry.id }, `custom:${entry.id}`)}
               >
                 <MailboxFolderIcon name="custom" />
                 <span>{entry.name}</span>
@@ -642,6 +726,7 @@ export function MailboxesView({
           changeFolder={chooseFolder}
           selection={itemSelection}
           select={selectItem}
+          dropHandler={dropAction}
           draftSaved={(saved) => {
             setMailboxKind("all");
             select(saved.mailboxId);

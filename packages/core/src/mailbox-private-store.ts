@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
-import { and, desc, eq, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import {
   BOUND_ENVELOPE_VERSION_OFFSET,
   decryptPayload,
@@ -55,6 +55,8 @@ function summary(item: Item) {
     inboundAssessment: item.inboundAssessment,
     trashedAt: item.trashedAt,
     starredAt: item.starredAt,
+    seenAt: item.seenAt,
+    archivedAt: item.archivedAt,
     folderId: item.folderId,
     revision: item.revision,
     createdAt: item.createdAt,
@@ -289,6 +291,8 @@ export async function listMailboxItems(
     starred?: boolean;
     folderId?: string | null;
     safeOnly?: boolean;
+    /** true: the Archive view; false: views that archived items leave. */
+    archived?: boolean;
   },
 ) {
   actor = { ...actor };
@@ -304,6 +308,8 @@ export async function listMailboxItems(
         inboundAssessment: schema.mailboxItems.inboundAssessment,
         trashedAt: schema.mailboxItems.trashedAt,
         starredAt: schema.mailboxItems.starredAt,
+        seenAt: schema.mailboxItems.seenAt,
+        archivedAt: schema.mailboxItems.archivedAt,
         folderId: schema.mailboxItems.folderId,
         revision: schema.mailboxItems.revision,
         createdAt: schema.mailboxItems.createdAt,
@@ -322,6 +328,11 @@ export async function listMailboxItems(
             ? [eq(schema.mailboxItems.deliveryFolder, filter.deliveryFolder)]
             : []),
           ...(filter?.starred ? [isNotNull(schema.mailboxItems.starredAt)] : []),
+          ...(filter?.archived === true
+            ? [isNotNull(schema.mailboxItems.archivedAt)]
+            : filter?.archived === false
+              ? [isNull(schema.mailboxItems.archivedAt)]
+              : []),
           ...(filter?.folderId === null
             ? [isNull(schema.mailboxItems.folderId)]
             : filter?.folderId
@@ -334,6 +345,36 @@ export async function listMailboxItems(
       .orderBy(desc(schema.mailboxItems.createdAt), desc(schema.mailboxItems.id))
       .limit(100);
     return items;
+  });
+}
+
+/**
+ * Unread messages in a mailbox's Inbox view: received, not opened by the
+ * owner, and not archived, filed in a folder, trashed, spam or quarantined.
+ */
+export async function countUnreadMailboxItems(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxId: string,
+): Promise<number> {
+  actor = { ...actor };
+  return scoped(db, actor, mailboxId, "read", false, async (tx) => {
+    const [row] = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.mailboxItems)
+      .where(
+        and(
+          eq(schema.mailboxItems.mailboxId, mailboxId),
+          eq(schema.mailboxItems.teamId, actor.teamId),
+          eq(schema.mailboxItems.kind, "inbox"),
+          eq(schema.mailboxItems.deliveryFolder, "inbox"),
+          isNull(schema.mailboxItems.seenAt),
+          isNull(schema.mailboxItems.trashedAt),
+          isNull(schema.mailboxItems.archivedAt),
+          isNull(schema.mailboxItems.folderId),
+        ),
+      );
+    return row?.count ?? 0;
   });
 }
 

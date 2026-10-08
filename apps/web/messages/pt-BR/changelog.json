@@ -28,6 +28,30 @@
   },
   "releases": [
     {
+      "version": "0.55",
+      "date": "2026-10-08",
+      "title": "Lido, arquivar e arrastar no Correio",
+      "summary": "A caixa de entrada ganha o básico de um e-mail profissional: não lidos em destaque, Arquivo e arrastar para pastas.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Mensagens novas aparecem em negrito, com um ponto. A Entrada mostra quantas faltam ler, e a aba do navegador também.",
+            "Abrir uma mensagem marca como lida; dá para marcar como não lida de novo.",
+            "Pasta Arquivo: arquive para tirar da Entrada sem apagar e traga de volta quando quiser.",
+            "Arraste mensagens para Entrada, Favoritos, Arquivo, Spam, Lixeira ou suas pastas. Com várias selecionadas, todas vão juntas.",
+            "Com mensagens selecionadas: arquivar, marcar como lida ou não lida e mover para a lixeira de uma vez."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "A lista segue a ordem de chegada: favoritar, arquivar ou mover uma mensagem não muda a posição dela."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.54",
       "date": "2026-10-08",
       "title": "Caixa de entrada mais limpa",

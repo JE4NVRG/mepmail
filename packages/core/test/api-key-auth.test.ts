@@ -76,8 +76,9 @@ describe("authenticateApiKey billing", () => {
       overageEnabled: true,
       dailySendCeiling: null,
     });
-    const currentPeriodStart = new Date("2026-09-01T00:00:00Z");
-    const currentPeriodEnd = new Date("2026-10-01T00:00:00Z");
+    // A period around now: a fixed date range expires and the effective plan drops to free.
+    const currentPeriodStart = new Date(Date.now() - 15 * 86_400_000);
+    const currentPeriodEnd = new Date(Date.now() + 15 * 86_400_000);
     await db
       .update(schema.teams)
       .set({

@@ -6,6 +6,7 @@ export type MailboxFolder =
   | "quarantine"
   | "trash"
   | "favorites"
+  | "archive"
   | "custom";
 export type MailboxKindFilter = "all" | "person" | "agent";
 

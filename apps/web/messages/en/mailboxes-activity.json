@@ -30,6 +30,8 @@
     "itemRestored": "Restored a message from trash",
     "itemStarred": "Added a message to favorites",
     "itemUnstarred": "Removed a message from favorites",
+    "itemArchived": "Archived a message",
+    "itemUnarchived": "Moved a message back from the archive",
     "itemFolderChanged": "Moved a message between folders",
     "folderCreated": "Created a folder",
     "folderRenamed": "Renamed a folder",

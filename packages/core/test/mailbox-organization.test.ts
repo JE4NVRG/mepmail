@@ -11,11 +11,14 @@ import {
   archiveMailboxFolder,
   createMailboxFolder,
   listMailboxFolders,
+  setMailboxItemArchive,
   setMailboxItemFolder,
+  setMailboxItemSeen,
   setMailboxItemStar,
   updateMailboxFolder,
 } from "../src/mailbox-organization.js";
 import {
+  countUnreadMailboxItems,
   importMailboxMime,
   listMailboxItems,
   readMailboxItem,
@@ -47,6 +50,13 @@ const star = (id: string, expectedRevision: number, starred = true) =>
   setMailboxItemStar(db, actor(), { mailboxId, id, expectedRevision, starred });
 const move = (id: string, expectedRevision: number, folderId: string | null) =>
   setMailboxItemFolder(db, actor(), { mailboxId, id, expectedRevision, folderId });
+const archive = (id: string, expectedRevision: number, archived = true) =>
+  setMailboxItemArchive(db, actor(), { mailboxId, id, expectedRevision, archived });
+const seen = (id: string, value: boolean, who = actor()) =>
+  setMailboxItemSeen(db, who, { mailboxId, id, seen: value });
+const unread = () => countUnreadMailboxItems(db, actor(), mailboxId);
+const stored = async (id: string) =>
+  (await db.select().from(schema.mailboxItems).where(eq(schema.mailboxItems.id, id)))[0]!;
 
 beforeEach(async () => {
   ({ db, close } = await createTestDb());
@@ -224,6 +234,85 @@ it("protects message revisions and encrypted content while starring and moving",
   expect((await readMailboxItem(db, keys, actor(), { mailboxId, id: item.id })).raw).toEqual(raw);
   expect(await star(item.id, 3, false)).toMatchObject({ starredAt: null, revision: 4 });
   expect(await move(item.id, 4, null)).toMatchObject({ folderId: null, revision: 5 });
+});
+
+it("keeps read state off the revision, list order and content, and counts the unread inbox", async () => {
+  const item = await imported();
+  const before = await stored(item.id);
+  expect(before.seenAt).toBeNull();
+  expect(await unread()).toBe(1);
+  const read = await seen(item.id, true);
+  expect(read).toMatchObject({ revision: 1, changed: true });
+  expect(read.seenAt).toBeInstanceOf(Date);
+  expect(await seen(item.id, true)).toMatchObject({ changed: false });
+  const after = await stored(item.id);
+  expect(after).toMatchObject({ revision: before.revision, updatedAt: before.updatedAt });
+  expect(after.ciphertext).toEqual(before.ciphertext);
+  expect(await unread()).toBe(0);
+  expect(await seen(item.id, false)).toMatchObject({ seenAt: null, changed: true });
+  expect(await unread()).toBe(1);
+  // A star still works on the same revision afterwards: read state never conflicts.
+  expect(await star(item.id, 1)).toMatchObject({ revision: 2, changed: true });
+  for (const denied of [
+    { teamId, userId: "delegate" },
+    { ...actor(), agentAccess: true },
+    { ...actor(), supportView: true },
+    { teamId: foreignTeamId, userId: "outsider" },
+  ])
+    await expect(seen(item.id, true, denied)).rejects.toMatchObject({ code: "forbidden" });
+  const draft = await saveMailboxDraft(db, keys, actor(), { mailboxId, expectedRevision: 0, raw });
+  await expect(seen(draft.id, true)).rejects.toMatchObject({ code: "forbidden" });
+  await expect(
+    countUnreadMailboxItems(db, { teamId: foreignTeamId, userId: "outsider" }, mailboxId),
+  ).rejects.toMatchObject({ code: "forbidden" });
+});
+
+it("archives out of the inbox and named folders and back, never drafts or Trash", async () => {
+  const item = await imported();
+  const folder = await create("Leads");
+  expect(await move(item.id, 1, folder.id)).toMatchObject({ folderId: folder.id, revision: 2 });
+  const archived = await archive(item.id, 2);
+  expect(archived).toMatchObject({ folderId: null, revision: 3, changed: true });
+  expect(archived.archivedAt).toBeInstanceOf(Date);
+  expect(await archive(item.id, 3)).toMatchObject({ changed: false });
+  await expect(archive(item.id, 2, false)).rejects.toMatchObject({ code: "conflict" });
+  expect(
+    await listMailboxItems(db, actor(), mailboxId, { folderId: null, archived: false }),
+  ).toHaveLength(0);
+  expect(
+    await listMailboxItems(db, actor(), mailboxId, { archived: true, safeOnly: true }),
+  ).toHaveLength(1);
+  expect(await unread()).toBe(0);
+  expect(await archive(item.id, 3, false)).toMatchObject({ archivedAt: null, revision: 4 });
+  expect(await unread()).toBe(1);
+  // Filing an archived message takes it out of the archive, into the folder.
+  await archive(item.id, 4);
+  expect(await move(item.id, 5, folder.id)).toMatchObject({
+    archivedAt: null,
+    folderId: folder.id,
+  });
+  await setMailboxItemTrash(db, actor(), {
+    mailboxId,
+    id: item.id,
+    expectedRevision: 6,
+    trashed: true,
+  });
+  await expect(archive(item.id, 7)).rejects.toMatchObject({ code: "forbidden" });
+  const draft = await saveMailboxDraft(db, keys, actor(), { mailboxId, expectedRevision: 0, raw });
+  await expect(archive(draft.id, 1)).rejects.toMatchObject({ code: "forbidden" });
+  await expect(
+    setMailboxItemArchive(
+      db,
+      { teamId, userId: "delegate" },
+      {
+        mailboxId,
+        id: item.id,
+        expectedRevision: 7,
+        archived: false,
+      },
+    ),
+  ).rejects.toMatchObject({ code: "forbidden" });
+  expect((await readMailboxItem(db, keys, actor(), { mailboxId, id: item.id })).raw).toEqual(raw);
 });
 
 it("rejects folder IDs from another box or team, including at the composite foreign key", async () => {
@@ -442,6 +531,8 @@ it("keeps organization activity out of general audit feeds", () => {
   for (const action of [
     "mailbox.item_starred",
     "mailbox.item_unstarred",
+    "mailbox.item_archived",
+    "mailbox.item_unarchived",
     "mailbox.item_folder_changed",
     "mailbox.folder_created",
     "mailbox.folder_renamed",

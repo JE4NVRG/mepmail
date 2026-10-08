@@ -7,6 +7,39 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.55] - 2026-10-08
+
+Read state, Archive and drag-and-drop in Correio.
+
+### Added
+
+- Mailbox migration 0014: `mailbox_items.seen_at` (existing rows backfilled
+  as read at their `created_at`) and `archived_at`, with partial indexes for
+  the unread Inbox and the Archive view.
+- `setMailboxItemSeen`: owner-only read state for received mail. It never
+  bumps `revision` or `updatedAt`, so open editors, approvals and list order
+  are untouched. `countUnreadMailboxItems` and the `mailboxes.unreadCounts`
+  query feed the Inbox badge and the "(n)" tab title.
+- `setMailboxItemArchive` and the Archive folder (`folder: "archive"`):
+  archiving clears `folderId`; filing an archived message un-archives it;
+  drafts, Trash and Spam are not archived. Activity
+  `mailbox.item_archived` / `mailbox.item_unarchived`.
+- Drag-and-drop of rows (the checked set when the dragged row is checked)
+  onto Inbox, Favorites, Archive, Spam, Trash and named folders; each row
+  gets the one change the target means for it.
+- Bulk actions on checked rows: archive (or back to Inbox), mark read,
+  mark unread, trash.
+
+### Changed
+
+- `getMailboxContentList` orders rows by arrival (`createdAt`; drafts by
+  `updatedAt`), so starring, filing or archiving no longer reorders the list.
+
+### Fixed
+
+- `api-key-auth` test: its billing period was fixed dates that expired on
+  2026-10-01; it now spans the current date.
+
 ## [0.54] - 2026-10-08
 
 A cleaner Correio inbox.

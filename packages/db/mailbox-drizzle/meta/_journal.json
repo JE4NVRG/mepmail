@@ -99,6 +99,13 @@
       "when": 1790866800013,
       "tag": "0013_mailbox_organization",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790866800014,
+      "tag": "0014_mailbox_seen_archive",
+      "breakpoints": true
     }
   ]
 }

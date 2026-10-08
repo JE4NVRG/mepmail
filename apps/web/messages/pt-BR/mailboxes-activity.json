@@ -30,6 +30,8 @@
     "itemRestored": "Restaurou uma mensagem da lixeira",
     "itemStarred": "Adicionou uma mensagem aos favoritos",
     "itemUnstarred": "Removeu uma mensagem dos favoritos",
+    "itemArchived": "Arquivou uma mensagem",
+    "itemUnarchived": "Tirou uma mensagem do arquivo",
     "itemFolderChanged": "Moveu uma mensagem de pasta",
     "folderCreated": "Criou uma pasta",
     "folderRenamed": "Renomeou uma pasta",

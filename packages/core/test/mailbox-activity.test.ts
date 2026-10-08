@@ -501,6 +501,8 @@ describe("private mailbox activity", () => {
       "mailbox.item_restored",
       "mailbox.item_starred",
       "mailbox.item_unstarred",
+      "mailbox.item_archived",
+      "mailbox.item_unarchived",
       "mailbox.item_folder_changed",
       "mailbox.folder_created",
       "mailbox.folder_renamed",

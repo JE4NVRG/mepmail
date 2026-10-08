@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useLocale, useTranslations } from "next-intl";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { initialMailboxText, replaceMailboxSignature } from "@/lib/mailbox-compose-signature";
 import {
@@ -555,6 +555,13 @@ function DraftDialog({
   );
 }
 
+/** Data type a dragged message row carries: a JSON array of "mailboxId:id" keys. */
+export const MAIL_DRAG_TYPE = "application/x-mepmail-items";
+export type MailboxDropTarget =
+  | { folder: "inbox" | "archive" | "trash" | "spam" | "favorites" }
+  | { folder: "custom"; id: string };
+export type MailboxDropHandler = (target: MailboxDropTarget, keys: string[]) => void;
+
 export function MailboxContentView({
   navigation,
   boxes,
@@ -569,6 +576,7 @@ export function MailboxContentView({
   selection,
   select,
   draftSaved,
+  dropHandler,
 }: {
   navigation: ReactNode;
   boxes: Box[];
@@ -583,6 +591,8 @@ export function MailboxContentView({
   selection: { mailboxId: string; id: string } | null;
   select: (item: { mailboxId: string; id: string } | null) => void;
   draftSaved: (item: Outputs["saveDraft"]) => void;
+  /** Filled with this view's drop action so the folder rail can take dragged rows. */
+  dropHandler?: RefObject<MailboxDropHandler | null>;
 }) {
   const t = useTranslations("mailboxes");
   const locale = useLocale();
@@ -598,6 +608,10 @@ export function MailboxContentView({
   const folderMutation = useMutation(
     trpc.mailboxes.setItemFolder.mutationOptions({ retry: false }),
   );
+  const archiveMutation = useMutation(trpc.mailboxes.setArchive.mutationOptions({ retry: false }));
+  const seenMutation = useMutation(trpc.mailboxes.setSeen.mutationOptions({ retry: false }));
+  // Read state shows at once; the server write and the refetch catch up behind it.
+  const [seenOverride, setSeenOverride] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState("");
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -718,6 +732,7 @@ export function MailboxContentView({
   async function refresh() {
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.items.queryKey() });
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.item.queryKey() });
+    await queries.invalidateQueries({ queryKey: trpc.mailboxes.unreadCounts.queryKey() });
   }
   const sendKey = item ? `${item.mailboxId}:${item.id}:${item.revision}` : null;
   const sendState = item?.sendStatus ?? (sendKey ? sendStates[sendKey] : undefined);
@@ -736,6 +751,15 @@ export function MailboxContentView({
     item.deliveryFolder !== "spam" &&
     !(item.kind === "draft" && item.sendStatus && item.sendStatus !== "failed");
   const rowKey = (row: { mailboxId: string; id: string }) => `${row.mailboxId}:${row.id}`;
+  const ownsBox = (mailboxId: string) => {
+    const box = readable.find((candidate) => candidate.id === mailboxId);
+    return !!box?.ownerActive && box.ownerUserId === currentUserId;
+  };
+  type Row = (typeof rows)[number];
+  const isUnread = (row: Row) =>
+    row.kind === "inbox" &&
+    !mailboxContentBlocked(row) &&
+    !(seenOverride[rowKey(row)] ?? row.seenAt !== null);
   const movableRows = rows.filter((row) => {
     const box = readable.find((candidate) => candidate.id === row.mailboxId);
     return (
@@ -815,6 +839,178 @@ export function MailboxContentView({
       if (mounted.current) void refresh();
     }
   }
+  /** Opening a message the owner has not read marks it read. */
+  function openRow(row: Row) {
+    select({ mailboxId: row.mailboxId, id: row.id });
+    if (isUnread(row) && ownsBox(row.mailboxId)) void changeSeen([row], true, false);
+  }
+  async function changeSeen(targets: Row[], seen: boolean, announce = true) {
+    const eligible = targets.filter(
+      (row) => row.kind === "inbox" && !mailboxContentBlocked(row) && ownsBox(row.mailboxId),
+    );
+    if (!eligible.length) return;
+    const flip = (value: boolean) =>
+      setSeenOverride((current) => {
+        const next = { ...current };
+        for (const row of eligible) next[rowKey(row)] = value;
+        return next;
+      });
+    flip(seen);
+    let done = 0;
+    try {
+      for (const row of eligible) {
+        await seenMutation.mutateAsync({ mailboxId: row.mailboxId, id: row.id, seen });
+        done += 1;
+        if (!mounted.current) return;
+      }
+      if (announce)
+        setNotice(
+          t(seen ? "organization.bulkMarkedRead" : "organization.bulkMarkedUnread", {
+            count: done,
+          }),
+        );
+    } catch {
+      if (!mounted.current) return;
+      flip(!seen);
+      setNotice(t("organization.error"));
+    } finally {
+      if (mounted.current) {
+        void queries.invalidateQueries({ queryKey: trpc.mailboxes.unreadCounts.queryKey() });
+        if (announce) setCheckedIds(new Set());
+      }
+    }
+  }
+  /**
+   * One organizing move for several rows: a drop on a folder or a bulk action.
+   * Each row gets the single change the target means for it; rows the target
+   * does not apply to are skipped.
+   */
+  async function organizeRows(targets: Row[], target: MailboxDropTarget) {
+    if (moving.current) return;
+    const plan = targets
+      .filter(
+        (row) =>
+          ownsBox(row.mailboxId) &&
+          !mailboxContentBlocked(row) &&
+          !(row.kind === "draft" && row.sendStatus && row.sendStatus !== "failed"),
+      )
+      .flatMap((row): (() => Promise<unknown>)[] => {
+        const ref = { mailboxId: row.mailboxId, id: row.id, expectedRevision: row.revision };
+        const ordinary = !row.trashedAt && row.deliveryFolder === "inbox";
+        switch (target.folder) {
+          case "archive":
+            return ordinary && row.kind !== "draft" && !row.archivedAt
+              ? [() => archiveMutation.mutateAsync({ ...ref, archived: true })]
+              : [];
+          case "trash":
+            return row.trashedAt
+              ? []
+              : [() => trashMutation.mutateAsync({ ...ref, trashed: true })];
+          case "favorites":
+            return ordinary && !row.starredAt
+              ? [() => starMutation.mutateAsync({ ...ref, starred: true })]
+              : [];
+          case "spam":
+            return ordinary && row.kind === "inbox"
+              ? [() => moveMutation.mutateAsync({ ...ref, folder: "spam" })]
+              : [];
+          case "custom":
+            return ordinary && row.mailboxId === selected?.id && row.folderId !== target.id
+              ? [() => folderMutation.mutateAsync({ ...ref, folderId: target.id })]
+              : [];
+          case "inbox":
+            if (row.trashedAt) return [() => trashMutation.mutateAsync({ ...ref, trashed: false })];
+            if (row.archivedAt)
+              return [() => archiveMutation.mutateAsync({ ...ref, archived: false })];
+            if (row.folderId) return [() => folderMutation.mutateAsync({ ...ref, folderId: null })];
+            if (row.kind === "inbox" && row.deliveryFolder === "spam")
+              return [() => moveMutation.mutateAsync({ ...ref, folder: "inbox" })];
+            return [];
+          default:
+            return [];
+        }
+      });
+    if (!plan.length) {
+      setNotice(t("organization.dropNone"));
+      return;
+    }
+    moving.current = true;
+    setBulkBusy(true);
+    setNotice("");
+    let done = 0;
+    try {
+      for (const step of plan) {
+        await step();
+        done += 1;
+        if (!mounted.current) break;
+      }
+      if (mounted.current) {
+        if (
+          selection &&
+          targets.some((row) => row.id === selection.id && row.mailboxId === selection.mailboxId)
+        )
+          select(null);
+        setCheckedIds(new Set());
+        setNotice(
+          t(target.folder === "archive" ? "organization.bulkArchived" : "organization.dropDone", {
+            count: done,
+          }),
+        );
+      }
+    } catch {
+      if (mounted.current) {
+        setCheckedIds(new Set());
+        setNotice(t("organization.bulkPartial", { count: done, total: plan.length }));
+      }
+    } finally {
+      moving.current = false;
+      if (mounted.current) {
+        setBulkBusy(false);
+        void refresh();
+      }
+    }
+  }
+  async function changeArchive(archived: boolean) {
+    if (!item || moving.current) return;
+    const observed = { mailboxId: item.mailboxId, id: item.id, expectedRevision: item.revision };
+    moving.current = true;
+    setNotice("");
+    try {
+      await archiveMutation.mutateAsync({ ...observed, archived });
+      if (!mounted.current) return;
+      setNotice(t(archived ? "organization.archived" : "organization.unarchived"));
+      if (
+        currentSelection.current?.id === observed.id &&
+        currentSelection.current.mailboxId === observed.mailboxId
+      )
+        select(null);
+    } catch (cause) {
+      if (mounted.current)
+        setNotice(
+          t(
+            (cause as { data?: { code?: string } })?.data?.code === "CONFLICT"
+              ? "organization.conflict"
+              : "organization.error",
+          ),
+        );
+    } finally {
+      moving.current = false;
+      if (mounted.current) void refresh();
+    }
+  }
+  useEffect(() => {
+    if (!dropHandler) return;
+    dropHandler.current = (target, keys) => {
+      const wanted = new Set(keys);
+      void organizeRows(
+        rows.filter((row) => wanted.has(rowKey(row))),
+        target,
+      );
+    };
+    return () => {
+      dropHandler.current = null;
+    };
+  });
   async function changeBulkTrash() {
     if (moving.current || !checkedRows.length) return;
     const observed = checkedRows.map((row) => ({
@@ -1110,20 +1306,79 @@ export function MailboxContentView({
                     </label>
                   ) : null}
                   {checkedRows.length ? (
-                    <button
-                      type="button"
-                      className="ms-btn ms-btn-ghost"
-                      disabled={bulkBusy}
-                      onClick={() => void changeBulkTrash()}
-                    >
-                      <MailboxFolderIcon name={folder === "trash" ? "restore" : "trash"} />
-                      {t(
-                        folder === "trash"
-                          ? "organization.restoreSelected"
-                          : "organization.trashSelected",
-                        { count: checkedRows.length },
-                      )}
-                    </button>
+                    <div className={styles.bulkActions}>
+                      <span className={styles.messageCount}>
+                        {t("organization.selectedCount", { count: checkedRows.length })}
+                      </span>
+                      {folder !== "trash" && folder !== "archive" ? (
+                        <button
+                          type="button"
+                          className={`ms-btn ms-btn-ghost ${styles.iconAction}`}
+                          disabled={bulkBusy}
+                          aria-label={t("organization.archive")}
+                          title={t("organization.archive")}
+                          onClick={() => void organizeRows(checkedRows, { folder: "archive" })}
+                        >
+                          <MailboxFolderIcon name="archive" />
+                        </button>
+                      ) : null}
+                      {folder === "archive" ? (
+                        <button
+                          type="button"
+                          className={`ms-btn ms-btn-ghost ${styles.iconAction}`}
+                          disabled={bulkBusy}
+                          aria-label={t("organization.unarchive")}
+                          title={t("organization.unarchive")}
+                          onClick={() => void organizeRows(checkedRows, { folder: "inbox" })}
+                        >
+                          <MailboxFolderIcon name="inbox" />
+                        </button>
+                      ) : null}
+                      {folder !== "trash" && checkedRows.some((row) => row.kind === "inbox") ? (
+                        <>
+                          <button
+                            type="button"
+                            className={`ms-btn ms-btn-ghost ${styles.iconAction}`}
+                            disabled={bulkBusy || seenMutation.isPending}
+                            aria-label={t("organization.markRead")}
+                            title={t("organization.markRead")}
+                            onClick={() => void changeSeen(checkedRows, true)}
+                          >
+                            <MailboxFolderIcon name="read" />
+                          </button>
+                          <button
+                            type="button"
+                            className={`ms-btn ms-btn-ghost ${styles.iconAction}`}
+                            disabled={bulkBusy || seenMutation.isPending}
+                            aria-label={t("organization.markUnread")}
+                            title={t("organization.markUnread")}
+                            onClick={() => void changeSeen(checkedRows, false)}
+                          >
+                            <MailboxFolderIcon name="unread" />
+                          </button>
+                        </>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={`ms-btn ms-btn-ghost ${styles.iconAction}`}
+                        disabled={bulkBusy}
+                        aria-label={t(
+                          folder === "trash"
+                            ? "organization.restoreSelected"
+                            : "organization.trashSelected",
+                          { count: checkedRows.length },
+                        )}
+                        title={t(
+                          folder === "trash"
+                            ? "organization.restoreSelected"
+                            : "organization.trashSelected",
+                          { count: checkedRows.length },
+                        )}
+                        onClick={() => void changeBulkTrash()}
+                      >
+                        <MailboxFolderIcon name={folder === "trash" ? "restore" : "trash"} />
+                      </button>
+                    </div>
                   ) : (
                     <span className={styles.messageCount}>
                       {t("messageCount", { count: rows.length })}
@@ -1158,13 +1413,29 @@ export function MailboxContentView({
                       !row.trashedAt &&
                       row.deliveryFolder !== "spam" &&
                       !(row.kind === "draft" && row.sendStatus && row.sendStatus !== "failed");
+                    const unread = isUnread(row);
+                    const draggableRow =
+                      !blocked && movableRows.some((entry) => rowKey(entry) === rowKey(row));
                     const rowStatus =
                       blocked ||
                       !!rowApproval ||
                       (!!row.approvalRequested && !row.sendStatus) ||
                       !!row.sendStatus;
                     return (
-                      <div className={styles.messageRow} key={rowKey(row)}>
+                      // biome-ignore lint/a11y/noStaticElementInteractions: dragging a row is a pointer shortcut; every move it makes is also a keyboard-reachable button (row checkbox, bulk and reader actions).
+                      <div
+                        className={styles.messageRow}
+                        key={rowKey(row)}
+                        data-unread={unread || undefined}
+                        draggable={draggableRow}
+                        onDragStart={(event) => {
+                          const keys = checkedIds.has(rowKey(row))
+                            ? checkedRows.map(rowKey)
+                            : [rowKey(row)];
+                          event.dataTransfer.setData(MAIL_DRAG_TYPE, JSON.stringify(keys));
+                          event.dataTransfer.effectAllowed = "move";
+                        }}
+                      >
                         <div className={styles.rowQuickActions}>
                           {movableRows.some((entry) => rowKey(entry) === rowKey(row)) ? (
                             <label className={styles.rowSelectionTarget}>
@@ -1201,10 +1472,15 @@ export function MailboxContentView({
                           aria-pressed={
                             selection?.id === row.id && selection?.mailboxId === row.mailboxId
                           }
-                          onClick={() => select({ mailboxId: row.mailboxId, id: row.id })}
+                          onClick={() => openRow(row)}
                         >
                           <div className={styles.rowMeta}>
                             <span>
+                              {unread ? (
+                                <span className={styles.visuallyHidden}>
+                                  {t("organization.unread")}:{" "}
+                                </span>
+                              ) : null}
                               {blocked
                                 ? t("safety.quarantineTitle")
                                 : participant || t("noRecipient")}
@@ -1284,15 +1560,17 @@ export function MailboxContentView({
                         ? "noMessageMatches"
                         : folder === "trash"
                           ? "trashEmptyTitle"
-                          : folder === "quarantine"
-                            ? "safety.quarantineEmptyTitle"
-                            : folder === "spam"
-                              ? "safety.spamEmptyTitle"
-                              : folder === "sent"
-                                ? "sentEmptyTitle"
-                                : folder === "drafts"
-                                  ? "draftsEmptyTitle"
-                                  : "inboxEmptyTitle",
+                          : folder === "archive"
+                            ? "archiveEmptyTitle"
+                            : folder === "quarantine"
+                              ? "safety.quarantineEmptyTitle"
+                              : folder === "spam"
+                                ? "safety.spamEmptyTitle"
+                                : folder === "sent"
+                                  ? "sentEmptyTitle"
+                                  : folder === "drafts"
+                                    ? "draftsEmptyTitle"
+                                    : "inboxEmptyTitle",
                     )}
                   </h3>
                   <p>
@@ -1301,15 +1579,17 @@ export function MailboxContentView({
                         ? "searchEmptyBody"
                         : folder === "trash"
                           ? "trashEmptyBody"
-                          : folder === "quarantine"
-                            ? "safety.quarantineEmptyBody"
-                            : folder === "spam"
-                              ? "safety.spamEmptyBody"
-                              : folder === "sent"
-                                ? "sentEmptyBody"
-                                : folder === "drafts"
-                                  ? "draftsEmptyBody"
-                                  : "inboxEmptyBody",
+                          : folder === "archive"
+                            ? "archiveEmptyBody"
+                            : folder === "quarantine"
+                              ? "safety.quarantineEmptyBody"
+                              : folder === "spam"
+                                ? "safety.spamEmptyBody"
+                                : folder === "sent"
+                                  ? "sentEmptyBody"
+                                  : folder === "drafts"
+                                    ? "draftsEmptyBody"
+                                    : "inboxEmptyBody",
                     )}
                   </p>
                   {search ? (
@@ -1389,6 +1669,36 @@ export function MailboxContentView({
                       </button>
                     ) : null}
                   </div>
+                ) : null}
+                {canOrganizeItem && item && item.kind !== "draft" ? (
+                  <button
+                    type="button"
+                    className={`ms-btn ms-btn-ghost ${styles.iconAction}`}
+                    disabled={archiveMutation.isPending || bulkBusy}
+                    aria-label={t(
+                      item.archivedAt ? "organization.unarchive" : "organization.archive",
+                    )}
+                    title={t(item.archivedAt ? "organization.unarchive" : "organization.archive")}
+                    onClick={() => void changeArchive(!item.archivedAt)}
+                  >
+                    <MailboxFolderIcon name={item.archivedAt ? "inbox" : "archive"} />
+                  </button>
+                ) : null}
+                {isOwner && item && selectedRow && item.kind === "inbox" && !blockedRow ? (
+                  <button
+                    type="button"
+                    className={`ms-btn ms-btn-ghost ${styles.iconAction}`}
+                    disabled={seenMutation.isPending}
+                    aria-label={t("organization.markUnread")}
+                    title={t("organization.markUnread")}
+                    onClick={() => {
+                      void changeSeen([selectedRow], false, false);
+                      select(null);
+                      setNotice(t("organization.markedUnread"));
+                    }}
+                  >
+                    <MailboxFolderIcon name="unread" />
+                  </button>
                 ) : null}
                 {canOrganizeItem && item ? (
                   <div className={styles.organizationActions}>

@@ -1126,6 +1126,42 @@ describe("session-authenticated mailbox content", () => {
       mime(),
     );
   });
+  it("reads, archives and counts unread mail through the router, in arrival order", async () => {
+    const older = await imported("fixture:older");
+    const newer = await imported("fixture:newer");
+    await db
+      .update(schema.mailboxItems)
+      .set({ createdAt: new Date(Date.now() - 60_000) })
+      .where(eq(schema.mailboxItems.id, older.id));
+    expect((await as().unreadCounts()).counts[mailboxId]).toBe(2);
+    expect(await as().setSeen({ mailboxId, id: newer.id, seen: true })).toMatchObject({
+      revision: 1,
+      changed: true,
+    });
+    expect((await as().unreadCounts()).counts[mailboxId]).toBe(1);
+    // Starring the older message reorders nothing: rows stay in arrival order.
+    await as().setStar({ mailboxId, id: older.id, expectedRevision: 1, starred: true });
+    const inbox = (await as().items({ mailboxId, folder: "inbox" })).items;
+    expect(inbox.map((row) => row.id)).toEqual([newer.id, older.id]);
+    expect(inbox[0]!.seenAt).toBeInstanceOf(Date);
+    expect(inbox[1]!.seenAt).toBeNull();
+    await as().setArchive({ mailboxId, id: older.id, expectedRevision: 2, archived: true });
+    expect((await as().items({ mailboxId, folder: "inbox" })).items.map((row) => row.id)).toEqual([
+      newer.id,
+    ]);
+    expect((await as().items({ mailboxId: null, folder: "archive" })).items[0]).toMatchObject({
+      id: older.id,
+      revision: 3,
+      folderId: null,
+    });
+    expect((await as().unreadCounts()).counts[mailboxId]).toBe(0);
+    await as().setArchive({ mailboxId, id: older.id, expectedRevision: 3, archived: false });
+    expect((await as().unreadCounts()).counts[mailboxId]).toBe(1);
+    const actions = (await as().activity({ mailboxId })).items.map((event) => event.action);
+    expect(actions).toEqual(
+      expect.arrayContaining(["mailbox.item_archived", "mailbox.item_unarchived"]),
+    );
+  });
   it("preserves existing bearer Inbox discovery and direct reads after a human files an agent message", async () => {
     const item = await imported("fixture:filed-agent", agentId);
     const folder = await as().createFolder({ mailboxId: agentId, name: "Agent leads" });

@@ -33,6 +33,8 @@ const eventSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("mailbox.item_restored"), itemId: z.uuid(), revision }).strict(),
   z.object({ action: z.literal("mailbox.item_starred"), itemId: z.uuid(), revision }).strict(),
   z.object({ action: z.literal("mailbox.item_unstarred"), itemId: z.uuid(), revision }).strict(),
+  z.object({ action: z.literal("mailbox.item_archived"), itemId: z.uuid(), revision }).strict(),
+  z.object({ action: z.literal("mailbox.item_unarchived"), itemId: z.uuid(), revision }).strict(),
   z
     .object({
       action: z.literal("mailbox.item_folder_changed"),
