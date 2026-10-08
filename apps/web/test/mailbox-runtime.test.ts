@@ -240,6 +240,89 @@ describe("private Mail runtime adapters", () => {
     ).rejects.toBeInstanceOf(MailboxSendRejectedError);
     expect(provider.send).not.toHaveBeenCalled();
   });
+  it("while SES has paused the region, a relay-marked domain sends through the relay, not SES", async () => {
+    const sendRaw = vi.fn().mockResolvedValue({ messageId: "smtp-relay:fixture:<id@relay>" });
+    const throttle = vi.fn();
+    const checkRecipients = vi.fn().mockResolvedValue(true);
+    const relayInput = { ...input, cc: ["copy@example.invalid"], bcc: ["hidden@example.invalid"] };
+    const result = await createMailboxSesSender(database({ relayEnabledAt: new Date() }), {
+      configurationSets,
+      exhausted: () => true,
+      throttle,
+      checkRecipients,
+      paused: () => true,
+      relay: { name: "fixture", sender: { sendRaw } },
+      clientFactory,
+    }).send(relayInput);
+    expect(result).toEqual({ messageId: "smtp-relay:fixture:<id@relay>" });
+    expect(sendRaw).toHaveBeenCalledWith({
+      raw: relayInput.raw,
+      emailId: input.outboxId,
+      to: input.to,
+      cc: ["copy@example.invalid"],
+      bcc: ["hidden@example.invalid"],
+      envelopeFrom: input.from,
+    });
+    expect(checkRecipients).toHaveBeenCalledWith({
+      teamId: input.teamId,
+      recipients: [...input.to, "copy@example.invalid", "hidden@example.invalid"],
+    });
+    expect(throttle).not.toHaveBeenCalled();
+    expect(provider.options).toHaveLength(0);
+    expect(provider.send).not.toHaveBeenCalled();
+  });
+  it("keeps SES when the region is not paused or the domain is not marked, and holds still apply", async () => {
+    const sendRaw = vi.fn().mockResolvedValue({ messageId: "smtp-relay:fixture:x" });
+    const relay = { name: "fixture", sender: { sendRaw } };
+    await createMailboxSesSender(database({ relayEnabledAt: new Date() }), {
+      configurationSets,
+      paused: () => false,
+      relay,
+      clientFactory,
+    }).send(input);
+    expect(provider.send).toHaveBeenCalledTimes(1);
+    await expect(
+      createMailboxSesSender(database(), {
+        configurationSets,
+        exhausted: () => true,
+        paused: () => true,
+        relay,
+        clientFactory,
+      }).send(input),
+    ).rejects.toBeInstanceOf(MailboxSendDeferredError);
+    await expect(
+      createMailboxSesSender(database({ relayEnabledAt: new Date(), sendReviewAt: new Date() }), {
+        paused: () => true,
+        relay,
+        clientFactory,
+      }).send(input),
+    ).rejects.toBeInstanceOf(MailboxSendDeferredError);
+    await expect(
+      createMailboxSesSender(database({ relayEnabledAt: new Date() }), {
+        paused: () => true,
+        relay,
+        checkRecipients: async () => false,
+        clientFactory,
+      }).send(input),
+    ).rejects.toBeInstanceOf(MailboxSendRejectedError);
+    expect(sendRaw).not.toHaveBeenCalled();
+  });
+  it("reads the relay's SMTP reply: login or 4xx retries, 5xx refuses, silence stays ambiguous", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const attempt = (error: unknown) =>
+      createMailboxSesSender(database({ relayEnabledAt: new Date() }), {
+        paused: () => true,
+        relay: { name: "fixture", sender: { sendRaw: vi.fn().mockRejectedValue(error) } },
+        clientFactory,
+      }).send(input);
+    const smtp = (code: string, responseCode?: number) =>
+      Object.assign(new Error("smtp fixture"), { code, responseCode });
+    await expect(attempt(smtp("EAUTH", 535))).rejects.toBeInstanceOf(MailboxSendDeferredError);
+    await expect(attempt(smtp("EENVELOPE", 451))).rejects.toBeInstanceOf(MailboxSendDeferredError);
+    await expect(attempt(smtp("EMESSAGE", 550))).rejects.toBeInstanceOf(MailboxSendRejectedError);
+    const timeout = smtp("ETIMEDOUT");
+    await expect(attempt(timeout)).rejects.toBe(timeout);
+  });
   it("with SES_TENANTS, associates the Mail set with the team tenant once, then tags sends", async () => {
     provider.send.mockImplementation(async (command: { constructor: { name: string } }) => {
       if (command.constructor.name === "CreateTenantCommand")

@@ -123,6 +123,13 @@ const mailboxIngress = createMailboxIngress({
   eventTopics: env.SNS_TOPIC_ARNS ?? [],
   inbound: parseMailboxInboundConfiguration(process.env.MAILBOX_INBOUND_CONFIG),
 });
+// Customer mail of the domains an operator verified at a second provider
+// leaves through its relay while SES has paused the account.
+const relayConfig = customerSmtpRelay();
+const relay = relayConfig
+  ? { name: relayConfig.name, sender: createCustomerSmtpRelay(relayConfig.url, relayConfig.name) }
+  : undefined;
+if (relay) console.log(`customer SMTP relay: ${relay.name}`);
 const mailboxSes = mailboxTransportEnabled
   ? createMailboxSesSender(db, {
       configurationSets:
@@ -131,6 +138,8 @@ const mailboxSes = mailboxTransportEnabled
       throttle: (region, recipients) => sendControls.throttle(region, recipients),
       checkRecipients: (input) => checkMailboxRecipientBlocks(db, input),
       tenants: sesTenantsEnabled(),
+      paused: (region) => sendControls.accountPaused?.(region) === true,
+      relay,
     })
   : null;
 // Days whole email rows (recipients, subject, events) are kept; bodies age
@@ -159,13 +168,6 @@ const regions = servedRegions();
 const ses = createSesSender(regions[0] ?? env.AWS_REGION);
 // The platform's own mail leaves through it while SES has paused the account.
 const fallback = env.SMTP_FALLBACK_URL ? createSmtpFallback(env.SMTP_FALLBACK_URL) : undefined;
-// Customer mail of the domains an operator verified at a second provider
-// leaves through its relay while SES has paused the account.
-const relayConfig = customerSmtpRelay();
-const relay = relayConfig
-  ? { name: relayConfig.name, sender: createCustomerSmtpRelay(relayConfig.url, relayConfig.name) }
-  : undefined;
-if (relay) console.log(`customer SMTP relay: ${relay.name}`);
 // SESv2 identity clients (GetEmailIdentity) for domain re-verification, cached
 // per region since identities live in the domain's region. Distinct from the
 // send client above (SendEmail); credentials fall back to the provider chain.

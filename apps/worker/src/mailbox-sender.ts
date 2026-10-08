@@ -10,6 +10,7 @@ import { type Db, schema } from "@millionsend/db";
 import { associateTenantResources, ensureTenant, type SesTenantClient } from "@millionsend/ses";
 import { and, eq } from "drizzle-orm";
 import { simpleParser } from "mailparser";
+import type { SesSender } from "./handlers/send-email.js";
 
 export const mailboxWorkerMime: MailboxTransportMimeAdapter = {
   async parse(raw) {
@@ -59,6 +60,15 @@ function copyConfigurationSets(value: unknown): MailboxSesConfigurationSets {
   );
 }
 
+/** Includes configuration/authorization overrides and message tags used by
+ * acceptance evidence. No X-SES-* header is a private Mail feature.
+ */
+async function refuseSesOverrides(raw: Buffer): Promise<void> {
+  const parsed = await simpleParser(raw, { skipImageLinks: true, skipTextToHtml: true });
+  if (parsed.headerLines.some((line) => line.key.toLowerCase().startsWith("x-ses-")))
+    throw new MailboxSendRejectedError();
+}
+
 /** Explicit operator JSON: { "us-east-1": "private_mail_events" }.
  * Absence disables sending preflight; malformed configuration fails startup.
  */
@@ -94,6 +104,14 @@ export function createMailboxSesSender(
     clientFactory?: (options: SESv2ClientConfig) => MailboxSesClient;
     /** SES_TENANTS: also associate the Mail configuration set with the team's tenant. */
     tenants?: boolean;
+    /** SES's own pause on the region (EnforcementStatus SHUTDOWN or sending off). */
+    paused?: (region: string) => boolean;
+    /**
+     * The customer SMTP relay (CUSTOMER_SMTP_RELAY_URL). A mailbox on a domain
+     * the operator verified at the relay's provider (domains.relay_enabled_at)
+     * sends through it while SES has paused the region, as API mail does.
+     */
+    relay?: { name: string; sender: SesSender } | undefined;
   } = {},
 ): MailboxOutboxSender {
   const configurationSets = copyConfigurationSets(opts.configurationSets ?? {});
@@ -136,6 +154,54 @@ export function createMailboxSesSender(
       return undefined;
     }
   }
+  async function allowedRecipients(teamId: string, recipients: string[]): Promise<void> {
+    if (!opts.checkRecipients) return;
+    let allowed: boolean;
+    try {
+      allowed = await opts.checkRecipients({ teamId, recipients });
+    } catch {
+      // A failed lookup is a preflight failure, never evidence of provider acceptance.
+      throw new MailboxSendDeferredError();
+    }
+    if (allowed !== true) throw new MailboxSendRejectedError();
+  }
+  /**
+   * The same raw MIME and envelope over the relay, no SES pacing (the bucket is
+   * SES's rate). The relay's explicit SMTP reply says what it did with the
+   * message: a failed login or a 4xx reply means it accepted nothing, so the
+   * row is retried; a 5xx means it refused it. A timeout or a dropped
+   * connection proves nothing and stays ambiguous. Only the codes are logged:
+   * a reply can quote a recipient.
+   */
+  async function relaySend(
+    relay: { name: string; sender: SesSender },
+    input: Parameters<MailboxOutboxSender["send"]>[0],
+    recipients: string[],
+  ): Promise<{ messageId: string }> {
+    await refuseSesOverrides(input.raw);
+    await allowedRecipients(input.teamId, recipients);
+    try {
+      return await relay.sender.sendRaw({
+        raw: input.raw,
+        emailId: input.outboxId,
+        to: input.to,
+        cc: input.cc,
+        bcc: input.bcc,
+        envelopeFrom: input.from,
+      });
+    } catch (error) {
+      const e = error as { code?: unknown; responseCode?: unknown };
+      console.warn(
+        `mailbox.send: SMTP relay ${relay.name} failed (${String(e.code ?? "error")} ${String(e.responseCode ?? "-")})`,
+      );
+      if (e.code === "EAUTH") throw new MailboxSendDeferredError();
+      if (typeof e.responseCode === "number" && e.responseCode >= 400 && e.responseCode < 600)
+        throw e.responseCode < 500
+          ? new MailboxSendDeferredError()
+          : new MailboxSendRejectedError();
+      throw error;
+    }
+  }
   return {
     async send(input) {
       // Capture the same MIME/envelope whose recipient permits are reserved below.
@@ -162,6 +228,7 @@ export function createMailboxSesSender(
           tenantName: schema.teams.sesTenantName,
           tenantAssociatedAt: schema.domains.sesTenantAssociatedAt,
           tenantConfigSet: schema.domains.sesTenantConfigSet,
+          relayEnabledAt: schema.domains.relayEnabledAt,
         })
         .from(schema.mailboxes)
         .innerJoin(
@@ -185,16 +252,16 @@ export function createMailboxSesSender(
       // A send-review hold keeps the message for the operator's release, as
       // it keeps the team's API mail.
       if (domain.sendReviewAt) throw new MailboxSendDeferredError();
+      // While SES has paused the region, a domain the operator verified at the
+      // relay's provider leaves through the relay, as the team's API mail does.
+      if (opts.relay && domain.relayEnabledAt && opts.paused?.(domain.region) === true)
+        return relaySend(opts.relay, input, recipients);
       const configurationSet = configurationSets[domain.region];
       if (!configurationSet) throw new MailboxSendDeferredError();
       // Campaign configuration can enable SES Open/Click body rewriting. Mail
       // always requires its own explicit regional operator configuration.
       if (configurationSet === domain.configurationSet) throw new MailboxSendRejectedError();
-      const parsed = await simpleParser(input.raw, { skipImageLinks: true, skipTextToHtml: true });
-      // Includes configuration/authorization overrides and message tags used by
-      // acceptance evidence. No X-SES-* header is a private Mail feature.
-      if (parsed.headerLines.some((line) => line.key.toLowerCase().startsWith("x-ses-")))
-        throw new MailboxSendRejectedError();
+      await refuseSesOverrides(input.raw);
       if (opts.exhausted?.(domain.region)) throw new MailboxSendDeferredError();
       try {
         await opts.throttle?.(domain.region, recipientCount);
@@ -203,16 +270,7 @@ export function createMailboxSesSender(
         throw new MailboxSendDeferredError();
       }
       if (opts.exhausted?.(domain.region)) throw new MailboxSendDeferredError();
-      if (opts.checkRecipients) {
-        let allowed: boolean;
-        try {
-          allowed = await opts.checkRecipients({ teamId: input.teamId, recipients });
-        } catch {
-          // A failed lookup is a preflight failure, never evidence of provider acceptance.
-          throw new MailboxSendDeferredError();
-        }
-        if (allowed !== true) throw new MailboxSendRejectedError();
-      }
+      await allowedRecipients(input.teamId, recipients);
       let client = clients.get(domain.region);
       if (!client) {
         const options: SESv2ClientConfig = {
