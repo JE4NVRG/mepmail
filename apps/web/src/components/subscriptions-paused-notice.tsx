@@ -7,9 +7,9 @@ export async function SubscriptionsPausedNotice() {
   if (!newSubscriptionsPaused()) return null;
   const t = await getTranslations("common.subscriptionsPaused");
   return (
-    <p role="status" className={styles.notice}>
+    <div role="status" className={styles.notice}>
       <span className={styles.dot} aria-hidden="true" />
       <span>{t("public")}</span>
-    </p>
+    </div>
   );
 }

@@ -3,6 +3,8 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
+  width: 100%;
+  max-width: none;
   margin: 0;
   padding: 10px 16px;
   background: color-mix(in srgb, var(--ms-warn, #f5a524) 14%, var(--ms-ground));
