@@ -113,6 +113,13 @@
       "when": 1790866800015,
       "tag": "0015_mailbox_signature_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790866800016,
+      "tag": "0016_mailbox_team_agent_keys",
+      "breakpoints": true
     }
   ]
 }

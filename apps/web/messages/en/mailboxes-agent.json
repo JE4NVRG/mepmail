@@ -49,5 +49,21 @@
   "mcpHint": "Agents that speak MCP (Claude Code, Claude Desktop, Cursor and others) can use this mailbox as tools: list, read, draft and, with the send permission, send. The command below already carries this key, so keep it as private as the key.",
   "mcpCommand": "Claude Code command",
   "mcpOther": "Other MCP clients: add a Streamable HTTP server at {url} with the header Authorization: Bearer followed by this key.",
-  "mcpCopy": "Copy MCP command"
+  "mcpCopy": "Copy MCP command",
+  "team": {
+    "open": "Connect an agent to several mailboxes",
+    "title": "Agent with access to several mailboxes",
+    "description": "One credential for the agent to work in the mailboxes you choose. Each request names the mailbox, like \"get the code in mailbox X\"; when it names none, the default mailbox is used. Every mailbox keeps its own permissions, limits, send approval and activity record.",
+    "mailboxes": "Mailboxes",
+    "mailboxesHint": "Only your active mailboxes are listed.",
+    "default": "Default mailbox",
+    "noDefault": "None: the agent always names the mailbox",
+    "chooseMailbox": "Choose at least one mailbox.",
+    "existing": "Credentials for several mailboxes",
+    "emptyTitle": "No credential for several mailboxes",
+    "emptyBody": "Create one so an agent can serve more than one mailbox with the same key.",
+    "mailboxCount": "{count, plural, =0 {no active mailbox} one {# mailbox} other {# mailboxes}}",
+    "defaultBadge": "default",
+    "mcpHint": "Agents that speak MCP (Claude Code, Claude Desktop, Cursor and others) use these mailboxes as tools: each tool takes the mailbox address, and mailbox_list_accounts shows which ones are allowed. The command below carries this key; keep it as carefully."
+  }
 }

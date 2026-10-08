@@ -25,6 +25,7 @@ import { MailboxOffer } from "./mailbox-offer";
 import { MailboxServicePanel } from "./mailbox-service-panel";
 import { MailboxSetupDialog } from "./mailbox-setup-dialog";
 import { MailboxSignatureDialog } from "./mailbox-signature-dialog";
+import { MailboxTeamAgentKeysDialog } from "./mailbox-team-agent-keys";
 import { MailboxUsagePanel } from "./mailbox-usage-panel";
 import styles from "./mailboxes.module.css";
 
@@ -367,6 +368,7 @@ export function MailboxesView({
 } = {}) {
   const t = useTranslations("mailboxes");
   const tActivity = useTranslations("mailboxes-activity");
+  const tAgent = useTranslations("mailboxes-agent");
   const { data: session } = authClient.useSession();
   const trpc = useTRPC();
   const queries = useQueryClient();
@@ -403,6 +405,7 @@ export function MailboxesView({
   const [licenseOpenRequest, openLicense] = useState(0);
   const [licenseOfferId, setLicenseOfferId] = useState<string | null>(null);
   const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
+  const [teamAgentDialog, setTeamAgentDialog] = useState(false);
   const [signatureDialogId, setSignatureDialogId] = useState<string | null>(null);
   const [activityDialogId, setActivityDialogId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<"boxes" | "agents" | "license">("boxes");
@@ -780,6 +783,12 @@ export function MailboxesView({
       )}
     </div>
   );
+  // A team credential covers only mailboxes this person owns and that are active.
+  const teamAgentBoxes = boxes
+    .filter(
+      (box) => box.ownerActive && box.ownerUserId === session?.user.id && box.status === "planned",
+    )
+    .map((box) => ({ id: box.id, address: box.address, label: box.label }));
   const dialogs = (
     <>
       {registry.data?.canManage && dialog === "new" && options.data ? (
@@ -823,6 +832,14 @@ export function MailboxesView({
           key={agentBox.id}
           mailbox={{ id: agentBox.id, address: agentBox.address }}
           onClose={() => setAgentDialogId(null)}
+          mcpUrl={correioMcpUrl}
+        />
+      ) : null}
+      {teamAgentDialog && teamAgentBoxes.length ? (
+        <MailboxTeamAgentKeysDialog
+          key="team-agent"
+          mailboxes={teamAgentBoxes}
+          onClose={() => setTeamAgentDialog(false)}
           mcpUrl={correioMcpUrl}
         />
       ) : null}
@@ -1018,6 +1035,17 @@ export function MailboxesView({
             ) : settingsTab === "agents" ? (
               <section className={styles.settingsSection} aria-label={t("app.tabs.agents")}>
                 <p className={styles.hint}>{t("app.agentsHint")}</p>
+                {teamAgentBoxes.length ? (
+                  <div className={styles.settingsRowActions}>
+                    <button
+                      type="button"
+                      className="ms-btn ms-btn-primary"
+                      onClick={() => setTeamAgentDialog(true)}
+                    >
+                      {tAgent("team.open")}
+                    </button>
+                  </div>
+                ) : null}
                 {ownedBoxes.length ? (
                   <ul className={styles.settingsList}>
                     {ownedBoxes.map((box) => (

@@ -59,16 +59,23 @@ describe("restricted mailbox agent send endpoint", () => {
   it("uses bearer-derived admission and enqueues only a committed outbox ID", async () => {
     const response = await POST(request());
     expect(response.status).toBe(202);
-    expect(h.queueDraft).toHaveBeenCalledExactlyOnceWith(h.db, h.keys, token, payload, {
-      synthetic: "mime",
-    });
+    // No MepMail-Mailbox header: the key's own mailbox (no selector) is used.
+    expect(h.queueDraft).toHaveBeenCalledExactlyOnceWith(
+      h.db,
+      h.keys,
+      token,
+      payload,
+      { synthetic: "mime" },
+      undefined,
+      null,
+    );
     expect(h.enqueue).toHaveBeenCalledExactlyOnceWith(
       "mailbox.send",
       { outboxId: id },
       { dedupeKey: id },
     );
     expect(response.headers.get("cache-control")).toBe("private, no-store");
-    expect(response.headers.get("vary")).toBe("Authorization");
+    expect(response.headers.get("vary")).toBe("Authorization, MepMail-Mailbox");
     expect(JSON.stringify(await response.json())).not.toContain(token);
   });
   it("rejects identity, mailbox, credential or MIME overrides and bounds the body before admission", async () => {

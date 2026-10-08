@@ -17,6 +17,7 @@ import type { Keyring } from "./crypto/keyring.js";
 import { appendMailboxActivity } from "./mailbox-activity.js";
 import {
   MailboxAgentAccessError,
+  type MailboxSelector,
   withMailboxAgentAccess,
   withMailboxAgentQueuedSendAccess,
 } from "./mailbox-agent-access.js";
@@ -649,25 +650,32 @@ export async function queueMailboxAgentDraft(
   input: { id: string; expectedRevision: number },
   mime: MailboxTransportMimeAdapter,
   now = new Date(),
+  /** The mailbox a team credential sends from (id or address); see withMailboxAgentAccess. */
+  mailbox: MailboxSelector | null = null,
 ) {
   input = { ...input };
   if (!Number.isInteger(input.expectedRevision) || input.expectedRevision < 1)
     throw new MailboxContentError("invalid");
-  return withMailboxAgentAccess(db, token, "send", (context) =>
-    queueAuthorizedMailboxDraft(
-      context.db,
-      keys,
-      context.actor,
-      { ...input, mailboxId: context.mailboxId },
-      mime,
-      now,
-      {
-        kind: "agent",
-        agentKeyId: context.keyId,
-        ownerMembershipId: context.ownerMembershipId,
-        expiresAt: context.expiresAt,
-      },
-    ),
+  return withMailboxAgentAccess(
+    db,
+    token,
+    "send",
+    (context) =>
+      queueAuthorizedMailboxDraft(
+        context.db,
+        keys,
+        context.actor,
+        { ...input, mailboxId: context.mailboxId },
+        mime,
+        now,
+        {
+          kind: "agent",
+          agentKeyId: context.keyId,
+          ownerMembershipId: context.ownerMembershipId,
+          expiresAt: context.expiresAt,
+        },
+      ),
+    mailbox,
   );
 }
 

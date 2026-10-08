@@ -49,5 +49,21 @@
   "mcpHint": "Agentes que falam MCP (Claude Code, Claude Desktop, Cursor e outros) usam esta caixa como ferramentas: listar, ler, criar rascunho e, com a permissão de envio, enviar. O comando abaixo já leva esta chave; guarde-o com o mesmo cuidado.",
   "mcpCommand": "Comando para o Claude Code",
   "mcpOther": "Outros clientes MCP: adicione um servidor Streamable HTTP em {url} com o cabeçalho Authorization: Bearer seguido desta chave.",
-  "mcpCopy": "Copiar comando MCP"
+  "mcpCopy": "Copiar comando MCP",
+  "team": {
+    "open": "Conectar agente a várias caixas",
+    "title": "Agente com acesso a várias caixas",
+    "description": "Uma só credencial para o agente trabalhar nas caixas que você escolher. Em cada pedido ele informa a caixa, como \"pega o código na caixa X\"; sem informar, usa a caixa padrão. Cada caixa continua com suas permissões, limites, aprovação de envio e registro de atividade.",
+    "mailboxes": "Caixas",
+    "mailboxesHint": "Aparecem só as suas caixas ativas.",
+    "default": "Caixa padrão",
+    "noDefault": "Nenhuma: o agente sempre informa a caixa",
+    "chooseMailbox": "Escolha pelo menos uma caixa.",
+    "existing": "Credenciais de várias caixas",
+    "emptyTitle": "Nenhuma credencial de várias caixas",
+    "emptyBody": "Crie uma para que um agente atenda mais de uma caixa com a mesma chave.",
+    "mailboxCount": "{count, plural, =0 {nenhuma caixa ativa} one {# caixa} other {# caixas}}",
+    "defaultBadge": "padrão",
+    "mcpHint": "Agentes que falam MCP (Claude Code, Claude Desktop, Cursor e outros) usam estas caixas como ferramentas: em cada ferramenta o agente informa a caixa pelo endereço, e mailbox_list_accounts mostra quais estão liberadas. O comando abaixo já leva esta chave; guarde-o com o mesmo cuidado."
+  }
 }

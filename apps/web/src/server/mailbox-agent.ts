@@ -7,7 +7,9 @@ import {
   MailboxAgentAccessError,
   type MailboxAgentScope,
   MailboxContentError,
+  type MailboxSelector,
   MailboxServiceError,
+  parseMailboxSelector,
   queueMailboxAgentDraft,
   withMailboxAgentAccess,
 } from "@millionsend/core";
@@ -23,8 +25,17 @@ export const MAILBOX_AGENT_HEADERS = {
   "Cache-Control": "private, no-store",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
-  Vary: "Authorization",
+  Vary: "Authorization, MepMail-Mailbox",
 };
+
+/**
+ * The mailbox a call is for, from the MepMail-Mailbox header (id or address). A team
+ * credential (mmt_) needs it unless it has a default; a mailbox key needs none.
+ */
+export const MAILBOX_SELECTOR_HEADER = "mepmail-mailbox";
+function mailboxSelector(request: Request): MailboxSelector | null {
+  return parseMailboxSelector(request.headers.get(MAILBOX_SELECTOR_HEADER));
+}
 export async function mailboxAgentRequest(
   request: Request,
   scope: MailboxAgentScope,
@@ -33,12 +44,25 @@ export async function mailboxAgentRequest(
   return mailboxAgentBearerRequest(
     request,
     (token) =>
-      withMailboxAgentAccess(getDb(), token, scope, async (context) => {
-        if (!(await mailboxActorAccessEnabled(context.db, context.actor)))
-          throw new MailboxAgentAccessError("forbidden");
-        return run(context);
-      }),
+      withMailboxAgentAccess(
+        getDb(),
+        token,
+        scope,
+        async (context) => {
+          if (!(await mailboxActorAccessEnabled(context.db, context.actor)))
+            throw new MailboxAgentAccessError("forbidden");
+          return run(context);
+        },
+        mailboxSelector(request),
+      ),
     (result) => Response.json(result, { headers: MAILBOX_AGENT_HEADERS }),
+  );
+}
+
+/** Any bearer-authenticated agent call that needs the raw credential (account listing). */
+export function mailboxAgentTokenRequest<T>(request: Request, run: (token: string) => Promise<T>) {
+  return mailboxAgentBearerRequest(request, run, (result) =>
+    Response.json(result, { headers: MAILBOX_AGENT_HEADERS }),
   );
 }
 
@@ -61,21 +85,33 @@ export async function mailboxAgentSendRequest(
           process.env.MAILBOX_PILOT_USER_IDS !== undefined ||
           process.env.MAILBOX_EARLY_ACCESS_COHORT !== undefined
         )
-          await withMailboxAgentAccess(getDb(), token, "send", async (context) => {
-            if (!(await mailboxActorAccessEnabled(context.db, context.actor)))
-              throw new MailboxAgentAccessError("forbidden");
-          });
+          await withMailboxAgentAccess(
+            getDb(),
+            token,
+            "send",
+            async (context) => {
+              if (!(await mailboxActorAccessEnabled(context.db, context.actor)))
+                throw new MailboxAgentAccessError("forbidden");
+            },
+            mailboxSelector(request),
+          );
         result = await queueMailboxAgentDraft(
           getDb(),
           getKeyring(),
           token,
           input,
           mailboxTransportMime,
+          undefined,
+          mailboxSelector(request),
         );
       } catch (error) {
         // A key without the send permission asks the mailbox owner instead.
         if (error instanceof MailboxAgentAccessError && error.code === "forbidden") {
-          const requested = await requestMailboxSendApproval(token, input);
+          const requested = await requestMailboxSendApproval(
+            token,
+            input,
+            mailboxSelector(request),
+          );
           if (requested) return requested;
         }
         throw error;
@@ -110,69 +146,76 @@ const APPROVAL_NOTICE_WINDOW_MS = 10 * 60_000;
 async function requestMailboxSendApproval(
   token: string,
   input: { id: string; expectedRevision: number },
+  mailbox: MailboxSelector | null,
 ) {
-  const facts = await withMailboxAgentAccess(getDb(), token, "draft", async (context) => {
-    if (!(await mailboxActorAccessEnabled(context.db, context.actor)))
-      throw new MailboxAgentAccessError("forbidden");
-    const [key] = await context.db
-      .select({ label: schema.mailboxAgentKeys.label, scopes: schema.mailboxAgentKeys.scopes })
-      .from(schema.mailboxAgentKeys)
-      .where(eq(schema.mailboxAgentKeys.id, context.keyId));
-    if (!key || key.scopes.includes("send")) return null;
-    const [item] = await context.db
-      .select({
-        kind: schema.mailboxItems.kind,
-        revision: schema.mailboxItems.revision,
-        trashedAt: schema.mailboxItems.trashedAt,
-      })
-      .from(schema.mailboxItems)
-      .where(
-        and(
-          eq(schema.mailboxItems.id, input.id),
-          eq(schema.mailboxItems.mailboxId, context.mailboxId),
-          eq(schema.mailboxItems.teamId, context.actor.teamId),
-        ),
-      );
-    if (!item || item.kind !== "draft" || item.trashedAt)
-      throw new MailboxContentError("not_found");
-    if (item.revision !== input.expectedRevision) throw new MailboxContentError("conflict");
-    const [prior] = await context.db
-      .select({ id: schema.auditLog.id })
-      .from(schema.auditLog)
-      .where(
-        and(
-          eq(schema.auditLog.teamId, context.actor.teamId),
-          eq(schema.auditLog.target, `mailbox:${context.mailboxId}`),
-          eq(schema.auditLog.action, "mailbox.send_requested"),
-          sql`${schema.auditLog.data}->>'itemId' = ${input.id}`,
-          sql`${schema.auditLog.data}->>'revision' = ${String(input.expectedRevision)}`,
-        ),
-      )
-      .limit(1);
-    if (!prior)
-      await appendMailboxActivity(
-        context.db,
-        {
-          teamId: context.actor.teamId,
-          mailboxId: context.mailboxId,
-          actor: { kind: "mailbox_agent", keyId: context.keyId },
-        },
-        { action: "mailbox.send_requested", itemId: input.id, revision: input.expectedRevision },
-      );
-    const [box] = await context.db
-      .select({ address: schema.mailboxes.address, ownerEmail: schema.user.email })
-      .from(schema.mailboxes)
-      .innerJoin(schema.user, eq(schema.user.id, schema.mailboxes.ownerUserId))
-      .where(eq(schema.mailboxes.id, context.mailboxId));
-    return {
-      teamId: context.actor.teamId,
-      mailboxId: context.mailboxId,
-      agent: key.label,
-      duplicate: !!prior,
-      address: box?.address ?? null,
-      ownerEmail: box?.ownerEmail ?? null,
-    };
-  });
+  const facts = await withMailboxAgentAccess(
+    getDb(),
+    token,
+    "draft",
+    async (context) => {
+      if (!(await mailboxActorAccessEnabled(context.db, context.actor)))
+        throw new MailboxAgentAccessError("forbidden");
+      const [key] = await context.db
+        .select({ label: schema.mailboxAgentKeys.label, scopes: schema.mailboxAgentKeys.scopes })
+        .from(schema.mailboxAgentKeys)
+        .where(eq(schema.mailboxAgentKeys.id, context.keyId));
+      if (!key || key.scopes.includes("send")) return null;
+      const [item] = await context.db
+        .select({
+          kind: schema.mailboxItems.kind,
+          revision: schema.mailboxItems.revision,
+          trashedAt: schema.mailboxItems.trashedAt,
+        })
+        .from(schema.mailboxItems)
+        .where(
+          and(
+            eq(schema.mailboxItems.id, input.id),
+            eq(schema.mailboxItems.mailboxId, context.mailboxId),
+            eq(schema.mailboxItems.teamId, context.actor.teamId),
+          ),
+        );
+      if (!item || item.kind !== "draft" || item.trashedAt)
+        throw new MailboxContentError("not_found");
+      if (item.revision !== input.expectedRevision) throw new MailboxContentError("conflict");
+      const [prior] = await context.db
+        .select({ id: schema.auditLog.id })
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.teamId, context.actor.teamId),
+            eq(schema.auditLog.target, `mailbox:${context.mailboxId}`),
+            eq(schema.auditLog.action, "mailbox.send_requested"),
+            sql`${schema.auditLog.data}->>'itemId' = ${input.id}`,
+            sql`${schema.auditLog.data}->>'revision' = ${String(input.expectedRevision)}`,
+          ),
+        )
+        .limit(1);
+      if (!prior)
+        await appendMailboxActivity(
+          context.db,
+          {
+            teamId: context.actor.teamId,
+            mailboxId: context.mailboxId,
+            actor: { kind: "mailbox_agent", keyId: context.keyId },
+          },
+          { action: "mailbox.send_requested", itemId: input.id, revision: input.expectedRevision },
+        );
+      const [box] = await context.db
+        .select({ address: schema.mailboxes.address, ownerEmail: schema.user.email })
+        .from(schema.mailboxes)
+        .innerJoin(schema.user, eq(schema.user.id, schema.mailboxes.ownerUserId))
+        .where(eq(schema.mailboxes.id, context.mailboxId));
+      return {
+        teamId: context.actor.teamId,
+        mailboxId: context.mailboxId,
+        agent: key.label,
+        duplicate: !!prior,
+        address: box?.address ?? null,
+        ownerEmail: box?.ownerEmail ?? null,
+      };
+    },
+    mailbox,
+  );
   if (!facts) return null;
   if (!facts.duplicate && facts.ownerEmail && facts.address) {
     // Best-effort notice, outside the authorization transaction.
@@ -233,7 +276,10 @@ async function mailboxAgentBearerRequest<T>(
 ) {
   if (!mailboxRegistryEnabled())
     return new Response(null, { status: 404, headers: MAILBOX_AGENT_HEADERS });
-  const match = /^Bearer (mmb_[A-Za-z0-9_.-]+)$/.exec(request.headers.get("authorization") ?? "");
+  // mmb_ is one mailbox's key; mmt_ a team credential over several mailboxes.
+  const match = /^Bearer (mm[bt]_[A-Za-z0-9_.-]+)$/.exec(
+    request.headers.get("authorization") ?? "",
+  );
   if (!match)
     return Response.json(
       { error: "unauthorized" },
@@ -251,6 +297,14 @@ async function mailboxAgentBearerRequest<T>(
   try {
     return respond(await run(match[1]!));
   } catch (error) {
+    // A team credential with several mailboxes and no default must name one.
+    if (error instanceof MailboxAgentAccessError && error.code === "mailbox_required")
+      return Response.json(
+        { error: "mailbox_required" },
+        { status: 400, headers: MAILBOX_AGENT_HEADERS },
+      );
+    if (error instanceof MailboxAgentAccessError && error.code === "invalid")
+      return Response.json({ error: "invalid" }, { status: 400, headers: MAILBOX_AGENT_HEADERS });
     const status =
       error instanceof MailboxAgentAccessError
         ? 403

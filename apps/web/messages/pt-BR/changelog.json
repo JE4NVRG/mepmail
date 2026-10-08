@@ -28,6 +28,22 @@
   },
   "releases": [
     {
+      "version": "0.63",
+      "date": "2026-10-08",
+      "title": "Um agente, várias caixas do Correio",
+      "summary": "Uma só credencial deixa o agente trabalhar em várias caixas: ele informa a caixa em cada pedido, como \"pega o código na caixa X\" ou \"responde pela caixa Y\".",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Correio → Configurações → Agentes: \"Conectar agente a várias caixas\" cria uma credencial (mmt_) para as suas caixas ativas, com caixa padrão opcional.",
+            "No MCP do Correio, cada ferramenta aceita a caixa pelo endereço, e mailbox_list_accounts mostra quais estão liberadas.",
+            "Cada caixa continua com suas permissões, limites, aprovação de envio e registro de atividade; uma caixa fora da credencial é recusada."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.62",
       "date": "2026-10-08",
       "title": "Chat de suporte na página de suporte",

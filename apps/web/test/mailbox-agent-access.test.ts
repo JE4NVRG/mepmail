@@ -10,8 +10,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
 import {
   createMailboxAgentKey,
+  createMailboxTeamAgentKey,
+  listMailboxAgentAccounts,
   listMailboxAgentKeys,
+  listMailboxTeamAgentKeys,
+  parseMailboxSelector,
   revokeMailboxAgentKey,
+  revokeMailboxTeamAgentKey,
   withMailboxAgentAccess,
 } from "../../../packages/core/src/mailbox-agent-access.js";
 import { assessMailboxReceipt } from "../../../packages/core/src/mailbox-inbound-safety.js";
@@ -493,5 +498,140 @@ describe("mailbox agent credentials", () => {
     expect(
       await db.select({ id: schema.mailboxAgentKeys.id }).from(schema.mailboxAgentKeys),
     ).toHaveLength(0);
+  });
+});
+
+describe("team agent credentials (mmt_)", () => {
+  const teamMint = (input: Partial<Parameters<typeof createMailboxTeamAgentKey>[2]> = {}) =>
+    createMailboxTeamAgentKey(db, owner(), {
+      label: "Sage",
+      mailboxIds: [mailboxId, personId],
+      ...input,
+    });
+  const at = (token: string, mailbox: string | null, scope: "read" | "draft" = "read") =>
+    withMailboxAgentAccess(
+      db,
+      token,
+      scope,
+      async (context) => ({ mailboxId: context.mailboxId, keyId: context.keyId }),
+      parseMailboxSelector(mailbox),
+    );
+
+  it("covers several owned mailboxes with one secret, named by address or id, else the default", async () => {
+    const team = await teamMint({ defaultMailboxId: mailboxId });
+    expect(team.token).toMatch(/^mmt_[a-f0-9-]{36}\.[A-Za-z0-9_-]{43}$/);
+    expect(team.mailboxes.map((box) => [box.address, box.isDefault]).sort()).toEqual([
+      ["agent@local.invalid", true],
+      ["person@local.invalid", false],
+    ]);
+    // One row per mailbox, each a full agent key with the same hash and its own id.
+    const rows = await db
+      .select()
+      .from(schema.mailboxAgentKeys)
+      .where(eq(schema.mailboxAgentKeys.groupId, team.id));
+    expect(rows).toHaveLength(2);
+    expect(new Set(rows.map((row) => row.keyHash)).size).toBe(1);
+    expect(JSON.stringify(rows)).not.toContain(team.token);
+    const person = await at(team.token, "PERSON@local.invalid");
+    const agent = await at(team.token, mailboxId);
+    expect(person.mailboxId).toBe(personId);
+    expect(agent.mailboxId).toBe(mailboxId);
+    expect(person.keyId).not.toBe(agent.keyId);
+    expect((await at(team.token, null)).mailboxId).toBe(mailboxId);
+    const accounts = await listMailboxAgentAccounts(db, team.token);
+    expect(accounts.credential).toBe("team");
+    expect(accounts.mailboxes.map((box) => [box.address, box.default, box.available])).toEqual([
+      ["agent@local.invalid", true, true],
+      ["person@local.invalid", false, true],
+    ]);
+    const listed = await listMailboxTeamAgentKeys(db, owner());
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({ id: team.id, label: "Sage", revokedAt: null });
+    expect(JSON.stringify(listed)).not.toContain(team.token);
+  });
+
+  it("isolates: no mailbox outside the credential, no fallback for a mismatched key, a mailbox to name without a default", async () => {
+    const team = await teamMint({ mailboxIds: [personId] });
+    const invoked = vi.fn(async () => true);
+    for (const outside of [
+      "agent@local.invalid",
+      mailboxId,
+      foreignMailboxId,
+      "other@foreign.invalid",
+    ])
+      await expect(
+        withMailboxAgentAccess(db, team.token, "read", invoked, parseMailboxSelector(outside)),
+      ).rejects.toMatchObject({ code: "forbidden" });
+    expect(invoked).not.toHaveBeenCalled();
+    // A single mailbox needs no name.
+    expect((await at(team.token, null)).mailboxId).toBe(personId);
+    const both = await teamMint();
+    await expect(at(both.token, null)).rejects.toMatchObject({ code: "mailbox_required" });
+    // A forged secret learns nothing, not even that a mailbox is required.
+    const forged = both.token.replace(/\.[^.]+$/, `.${"A".repeat(43)}`);
+    await expect(at(forged, null)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(listMailboxAgentAccounts(db, forged)).rejects.toMatchObject({ code: "forbidden" });
+    // A single-mailbox key named for another mailbox is refused, not served from its own.
+    const single = await mint();
+    await expect(at(single.token, personId)).rejects.toMatchObject({ code: "forbidden" });
+    expect((await at(single.token, "agent@local.invalid")).mailboxId).toBe(mailboxId);
+    expect(() => parseMailboxSelector("not a mailbox")).toThrow();
+  });
+
+  it("only includes the minting owner's active mailboxes and keeps each mailbox's scope", async () => {
+    await expect(teamMint({ mailboxIds: [mailboxId, foreignMailboxId] })).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    await expect(
+      createMailboxTeamAgentKey(
+        db,
+        { teamId, userId: "admin" },
+        { label: "x", mailboxIds: [personId] },
+      ),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(teamMint({ mailboxIds: [personId, personId] })).rejects.toMatchObject({
+      code: "invalid",
+    });
+    await expect(teamMint({ defaultMailboxId: foreignMailboxId })).rejects.toMatchObject({
+      code: "invalid",
+    });
+    await updateMailboxRegistry(db, owner(), {
+      id: mailboxId,
+      label: "Agent",
+      ownerUserId: "owner",
+      status: "suspended",
+    });
+    await expect(teamMint()).rejects.toMatchObject({ code: "forbidden" });
+    // Nothing partial was written.
+    expect(
+      await db.select({ id: schema.mailboxAgentKeys.id }).from(schema.mailboxAgentKeys),
+    ).toHaveLength(0);
+    const reader = await teamMint({ mailboxIds: [personId], scopes: ["read"] });
+    await expect(at(reader.token, personId, "draft")).rejects.toMatchObject({ code: "forbidden" });
+  });
+
+  it("revokes every mailbox at once, and a suspended mailbox leaves the others working", async () => {
+    const team = await teamMint({ defaultMailboxId: personId });
+    await updateMailboxRegistry(db, owner(), {
+      id: mailboxId,
+      label: "Agent",
+      ownerUserId: "owner",
+      status: "suspended",
+    });
+    await expect(at(team.token, mailboxId)).rejects.toMatchObject({ code: "forbidden" });
+    expect((await at(team.token, personId)).mailboxId).toBe(personId);
+    const accounts = await listMailboxAgentAccounts(db, team.token);
+    expect(accounts.mailboxes.find((box) => box.id === mailboxId)?.available).toBe(false);
+    await revokeMailboxTeamAgentKey(db, owner(), { id: team.id });
+    for (const box of [mailboxId, personId, null])
+      await expect(at(team.token, box)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(listMailboxAgentAccounts(db, team.token)).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    const [listed] = await listMailboxTeamAgentKeys(db, owner());
+    expect(listed?.revokedAt).not.toBeNull();
+    await expect(
+      revokeMailboxTeamAgentKey(db, { teamId, userId: "admin" }, { id: team.id }),
+    ).rejects.toMatchObject({ code: "not_found" });
   });
 });

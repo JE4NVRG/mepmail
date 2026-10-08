@@ -30,6 +30,7 @@ const h = vi.hoisted(() => {
           token: string,
           scope: MailboxAgentScope,
           operation: (context: MailboxAgentAccessContext) => Promise<unknown>,
+          mailbox?: unknown,
         ) => Promise<unknown>
       >(),
     queue: vi.fn(),
@@ -148,6 +149,53 @@ describe("agent send without the send permission", () => {
     expect((await res.json()).duplicate).toBe(true);
     expect(h.audit).not.toHaveBeenCalled();
     expect(h.mail).not.toHaveBeenCalled();
+  });
+
+  it("sends a team credential's named mailbox to admission and to the owner's approval", async () => {
+    h.answers.push(
+      [{ label: "Sage", scopes: ["read", "draft"] }],
+      [{ kind: "draft", revision: 3, trashedAt: null }],
+      [],
+      [{ address: "suporte@mepmail.dev", ownerEmail: "dono@example.com" }],
+    );
+    const res = await POST(
+      new Request("http://localhost/api/mailbox-agent/send", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer mmt_${keyId}.${"b".repeat(43)}`,
+          "mepmail-mailbox": " Suporte@MepMail.dev ",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ id: itemId, expectedRevision: 3 }),
+      }),
+    );
+    expect(res.status).toBe(202);
+    expect(await res.json()).toMatchObject({ status: "awaiting_approval", id: itemId });
+    const named = { address: "suporte@mepmail.dev" };
+    // The send admission and the approval request both act in the named mailbox.
+    expect(h.queue.mock.calls[0]?.[6]).toEqual(named);
+    expect(h.access.mock.calls.at(-1)?.[2]).toBe("draft");
+    expect(h.access.mock.calls.at(-1)?.[4]).toEqual(named);
+    expect(h.mail.mock.calls[0]?.[0]).toMatchObject({
+      values: { agent: "Sage", mailbox: "suporte@mepmail.dev" },
+    });
+  });
+
+  it("refuses a malformed mailbox header before any database work", async () => {
+    const res = await POST(
+      new Request("http://localhost/api/mailbox-agent/send", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer mmt_${keyId}.${"b".repeat(43)}`,
+          "mepmail-mailbox": "not a mailbox",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ id: itemId, expectedRevision: 3 }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid" });
+    expect(h.audit).not.toHaveBeenCalled();
   });
 
   it("refuses a stale revision and keeps a send-scoped key's refusal", async () => {

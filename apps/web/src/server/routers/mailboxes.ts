@@ -10,12 +10,14 @@ import {
   createMailboxAgentKey,
   createMailboxFolder,
   createMailboxRegistry,
+  createMailboxTeamAgentKey,
   getMailboxReceivingReadiness,
   grantMailboxRegistry,
   listMailboxActivity,
   listMailboxAgentKeys,
   listMailboxFolders,
   listMailboxRegistry,
+  listMailboxTeamAgentKeys,
   MailboxAgentAccessError,
   MailboxContentError,
   MailboxRegistryError,
@@ -24,6 +26,7 @@ import {
   queueMailboxDraft,
   revokeMailboxAgentKey,
   revokeMailboxRegistry,
+  revokeMailboxTeamAgentKey,
   setMailboxDeliveryFolder,
   setMailboxItemArchive,
   setMailboxItemFolder,
@@ -363,6 +366,40 @@ export const mailboxesRouter = router({
       });
       return key;
     }),
+  /** Team credentials (mmt_): one agent secret over several of this person's mailboxes. */
+  teamAgentKeys: enabled.query(({ ctx }) =>
+    call(() => listMailboxTeamAgentKeys(ctx.db, actor(ctx))),
+  ),
+  createTeamAgentKey: enabled
+    .input(
+      z.object({
+        label: z.string().min(1).max(80),
+        mailboxIds: z.array(z.uuid()).min(1).max(20),
+        scopes: z
+          .array(z.enum(["read", "draft", "send"]))
+          .min(1)
+          .max(3)
+          .optional(),
+        defaultMailboxId: z.uuid().nullable().optional(),
+        expiresAt: z.date().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const key = await call(() => createMailboxTeamAgentKey(ctx.db, actor(ctx), input));
+      await recordAudit(ctx, {
+        action: "mailbox.team_agent_key_created",
+        target: { type: "mailbox_team_agent_key", id: key.id },
+      });
+      return key;
+    }),
+  revokeTeamAgentKey: enabled.input(z.object({ id: z.uuid() })).mutation(async ({ ctx, input }) => {
+    const key = await call(() => revokeMailboxTeamAgentKey(ctx.db, actor(ctx), input));
+    await recordAudit(ctx, {
+      action: "mailbox.team_agent_key_revoked",
+      target: { type: "mailbox_team_agent_key", id: key.id },
+    });
+    return key;
+  }),
   queueDraft: enabled
     .input(
       z.object({

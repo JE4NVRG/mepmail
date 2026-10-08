@@ -375,10 +375,23 @@ describe("operator mailbox pilot admission", () => {
     restrict();
     const payload = { id: ITEM, expectedRevision: 1 };
     expect((await sendPost(agentRequest("send", payload))).status).toBe(202);
-    expect(h.withAccess).toHaveBeenCalledExactlyOnceWith(h.db, TOKEN, "send", expect.any(Function));
-    expect(h.queueDraft).toHaveBeenCalledExactlyOnceWith(h.db, h.keys, TOKEN, payload, {
-      synthetic: "mime",
-    });
+    // No MepMail-Mailbox header: no mailbox is named, the key's own is used.
+    expect(h.withAccess).toHaveBeenCalledExactlyOnceWith(
+      h.db,
+      TOKEN,
+      "send",
+      expect.any(Function),
+      null,
+    );
+    expect(h.queueDraft).toHaveBeenCalledExactlyOnceWith(
+      h.db,
+      h.keys,
+      TOKEN,
+      payload,
+      { synthetic: "mime" },
+      undefined,
+      null,
+    );
     expect(h.withAccess.mock.invocationCallOrder[0]).toBeLessThan(
       h.queueDraft.mock.invocationCallOrder[0]!,
     );

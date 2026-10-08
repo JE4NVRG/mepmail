@@ -397,11 +397,17 @@ export {
 } from "./mailbox-activity.js";
 export {
   createMailboxAgentKey,
+  createMailboxTeamAgentKey,
+  listMailboxAgentAccounts,
   listMailboxAgentKeys,
+  listMailboxTeamAgentKeys,
   type MailboxAgentAccessContext,
   MailboxAgentAccessError,
   type MailboxAgentScope,
+  type MailboxSelector,
+  parseMailboxSelector,
   revokeMailboxAgentKey,
+  revokeMailboxTeamAgentKey,
   withMailboxAgentAccess,
 } from "./mailbox-agent-access.js";
 export {

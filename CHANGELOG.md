@@ -7,6 +7,38 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.63] - 2026-10-08
+
+Team agent credentials for Correio: one secret over several mailboxes.
+
+### Added
+
+- Mailbox migration 0016: `mailbox_agent_keys.group_id` (nullable) and
+  `is_default`, a unique (group_id, mailbox_id) index and a check that only
+  grouped rows may be the default.
+- A team credential (`mmt_<groupId>.<secret>`) is one key row per allowed
+  mailbox sharing one hash, so each mailbox keeps its owner authorization,
+  locks, seat gate, scopes, revocation on owner change, approval and
+  activity. `createMailboxTeamAgentKey` (only the minting owner's active
+  mailboxes, 1-20, optional default), `listMailboxTeamAgentKeys`,
+  `revokeMailboxTeamAgentKey` and `listMailboxAgentAccounts`.
+- `withMailboxAgentAccess` takes a mailbox selector (id or address): a team
+  credential picks that row, else its default, else the only row, else
+  `mailbox_required` (after the secret is verified); a mailbox key named for
+  another mailbox is refused. `queueMailboxAgentDraft` passes it on.
+- Agent API: `Authorization: Bearer mmt_…` plus the `MepMail-Mailbox` header
+  on items, drafts and send; `GET /api/mailbox-agent/mailboxes` lists the
+  credential's mailboxes. A send without the send scope still becomes the
+  owner's approval request for the named mailbox.
+- Correio MCP: `mailbox_list_accounts` and a `mailbox` argument on every tool,
+  forwarded as the header.
+- Correio settings, Agents: "Connect an agent to several mailboxes" with
+  mailboxes, default, scopes and expiry; the token shows once.
+
+### Fixed
+
+- The agent label check no longer uses a control-character regex (lint).
+
 ## [0.62] - 2026-10-08
 
 Visitor support chat on /support through Elozi.

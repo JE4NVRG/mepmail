@@ -127,7 +127,14 @@ describe("transaction-bound agent activity at REST boundaries", () => {
         items: [privateItem, { ...privateItem, id: keyId }],
         limited: true,
       });
-      expect(h.access).toHaveBeenCalledExactlyOnceWith(h.db, token, "read", expect.any(Function));
+      // No MepMail-Mailbox header: no mailbox is named.
+      expect(h.access).toHaveBeenCalledExactlyOnceWith(
+        h.db,
+        token,
+        "read",
+        expect.any(Function),
+        null,
+      );
       expect(h.list).toHaveBeenCalledExactlyOnceWith(h.tx, actor, { mailboxId, folder });
       expect(h.audit).toHaveBeenCalledExactlyOnceWith(h.tx, auditContext, {
         action: "mailbox.items_listed",
@@ -135,7 +142,7 @@ describe("transaction-bound agent activity at REST boundaries", () => {
         count: 2,
       });
       expect(response.headers.get("cache-control")).toBe("private, no-store");
-      expect(response.headers.get("vary")).toBe("Authorization");
+      expect(response.headers.get("vary")).toBe("Authorization, MepMail-Mailbox");
       expectNoPrivateAuditPayload();
     },
   );
@@ -159,7 +166,14 @@ describe("transaction-bound agent activity at REST boundaries", () => {
     const response = await post();
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ id: itemId, revision: 1, kind: "draft" });
-    expect(h.access).toHaveBeenCalledExactlyOnceWith(h.db, token, "draft", expect.any(Function));
+    // No MepMail-Mailbox header: no mailbox is named.
+    expect(h.access).toHaveBeenCalledExactlyOnceWith(
+      h.db,
+      token,
+      "draft",
+      expect.any(Function),
+      null,
+    );
     expect(h.save).toHaveBeenCalledExactlyOnceWith(h.tx, actor, { ...draft, mailboxId });
     expect(h.audit).toHaveBeenCalledExactlyOnceWith(h.tx, auditContext, {
       action: "mailbox.draft_saved",

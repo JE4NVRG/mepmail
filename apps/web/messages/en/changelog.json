@@ -23,6 +23,22 @@
   },
   "releases": [
     {
+      "version": "0.63",
+      "date": "2026-10-08",
+      "title": "One agent, several Correio mailboxes",
+      "summary": "One credential lets an agent work in several mailboxes: it names the mailbox per request, like \"get the code in mailbox X\" or \"reply from mailbox Y\".",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Correio → Settings → Agents: \"Connect an agent to several mailboxes\" creates a credential (mmt_) for your active mailboxes, with an optional default mailbox.",
+            "On the Correio MCP every tool takes the mailbox address, and mailbox_list_accounts shows which ones are allowed.",
+            "Every mailbox keeps its own permissions, limits, send approval and activity record; a mailbox outside the credential is refused."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.62",
       "date": "2026-10-08",
       "title": "Support chat on the support page",
