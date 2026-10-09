@@ -349,7 +349,9 @@
 }
 .conversation {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
+  min-width: 0;
   margin: 0 0 18px;
 }
 .conversation h3 {
@@ -359,6 +361,8 @@
   font-weight: 500;
 }
 .conversationEntry {
+  min-width: 0;
+  overflow: hidden;
   border: 1px solid var(--ms-line);
   border-radius: 10px;
   background: var(--ms-panel);
@@ -386,6 +390,7 @@
   font-size: 11px;
 }
 .conversationEntry summary span {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   color: var(--ms-muted);
