@@ -23,6 +23,23 @@
   },
   "releases": [
     {
+      "version": "0.79",
+      "date": "2026-10-09",
+      "title": "Easy folders and an inbox your way",
+      "summary": "Create folders from any screen, give them a color and an order, and tune how the inbox looks: density, preview, reading pane, theme and start folder.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A “+ New folder” button that is always visible, including in the all-mailboxes view (you pick the mailbox), with create and rename right in the list; Shift+N creates a folder from the keyboard.",
+            "Each folder has a menu to rename it, pick one of eight colors, move it up or down and remove it; in the all-mailboxes view, folders are grouped by mailbox.",
+            "A View menu with density, preview lines, reading pane position and sender initials.",
+            "An Appearance tab in Mail settings: system, light or dark theme, start folder, mark as read after a few seconds and shortcut hints. Everything is saved to your account."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.78",
       "date": "2026-10-09",
       "title": "The groundwork for the new inbox",

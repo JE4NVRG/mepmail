@@ -28,6 +28,23 @@
   },
   "releases": [
     {
+      "version": "0.79",
+      "date": "2026-10-09",
+      "title": "Pastas fáceis e uma caixa de entrada do seu jeito",
+      "summary": "Crie pastas em qualquer tela, dê cor e ordem a elas, e ajuste como a caixa de entrada aparece: densidade, prévia, painel de leitura, tema e pasta inicial.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Botão “+ Nova pasta” sempre visível, inclusive na visão de todas as caixas (você escolhe em qual caixa), com criação e renomeação na própria lista; Shift+N cria uma pasta pelo teclado.",
+            "Cada pasta tem um menu para renomear, escolher uma entre oito cores, mover para cima ou para baixo e remover; na visão de todas as caixas, as pastas aparecem agrupadas por caixa.",
+            "Menu Exibição com densidade, linhas de prévia, posição do painel de leitura e iniciais dos remetentes.",
+            "Aba Aparência nas configurações do Correio: tema do sistema, claro ou escuro, pasta inicial, marcar como lida após alguns segundos e dicas de atalhos. Tudo fica salvo na sua conta."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.78",
       "date": "2026-10-09",
       "title": "A base da nova caixa de entrada",

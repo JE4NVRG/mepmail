@@ -13,7 +13,8 @@ export type MailboxShortcut =
   | "compose"
   | "search"
   | "help"
-  | "undo";
+  | "undo"
+  | "newFolder";
 
 const KEYS: Record<string, MailboxShortcut> = {
   j: "next",
@@ -30,6 +31,8 @@ const KEYS: Record<string, MailboxShortcut> = {
   "/": "search",
   "?": "help",
   z: "undo",
+  // Shift+N: the key event carries the upper-case letter.
+  N: "newFolder",
 };
 
 /** The order the help dialog lists them in, with the key a person presses. */
@@ -45,6 +48,7 @@ export const MAILBOX_SHORTCUTS: { key: string; action: MailboxShortcut }[] = [
   { key: "S", action: "star" },
   { key: "U", action: "unread" },
   { key: "Z", action: "undo" },
+  { key: "Shift+N", action: "newFolder" },
   { key: "/", action: "search" },
   { key: "?", action: "help" },
 ];

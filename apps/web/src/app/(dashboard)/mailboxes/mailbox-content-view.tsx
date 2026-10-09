@@ -32,6 +32,7 @@ import {
   readNoticePreference,
   writeNoticePreference,
 } from "@/lib/mailbox-notifications";
+import { useCorreioPrefs } from "@/lib/mailbox-preferences";
 import {
   isRecipientAddress,
   mailboxContacts,
@@ -46,6 +47,7 @@ import type { AppRouter } from "@/server/routers";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import { MailboxRecipientField } from "./mailbox-recipient-field";
 import { MailboxRichBody } from "./mailbox-rich-body";
+import { MailboxViewMenu } from "./mailbox-view-menu";
 import styles from "./mailboxes.module.css";
 
 type Outputs = inferRouterOutputs<AppRouter>["mailboxes"];
@@ -753,7 +755,7 @@ function ConversationHistory({
   );
 }
 
-function ShortcutsDialog({ close }: { close: () => void }) {
+export function ShortcutsDialog({ close }: { close: () => void }) {
   const t = useTranslations("mailboxes.shortcuts");
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -806,6 +808,7 @@ export function MailboxContentView({
   select,
   draftSaved,
   dropHandler,
+  onNewFolder,
 }: {
   navigation: ReactNode;
   boxes: Box[];
@@ -822,6 +825,8 @@ export function MailboxContentView({
   draftSaved: (item: Outputs["saveDraft"]) => void;
   /** Filled with this view's drop action so the folder rail can take dragged rows. */
   dropHandler?: RefObject<MailboxDropHandler | null>;
+  /** Shift+N: the rail opens its inline folder editor. */
+  onNewFolder?: (() => void) | undefined;
 }) {
   const t = useTranslations("mailboxes");
   const locale = useLocale();
@@ -858,6 +863,14 @@ export function MailboxContentView({
   const attempted = useRef(new Set<string>());
   const [sendStates, setSendStates] = useState<Record<string, SendState>>({});
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const { prefs, setPref } = useCorreioPrefs();
+  // Marking as read waits the preferred delay; leaving the message first cancels it.
+  const seenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (selection || !seenTimer.current) return;
+    clearTimeout(seenTimer.current);
+    seenTimer.current = null;
+  }, [selection]);
   const [unreadOnly, setUnreadOnly] = useState(false);
   // The last archive/trash can be reversed while its own notice is showing.
   const [undo, setUndo] = useState<{
@@ -1143,7 +1156,21 @@ export function MailboxContentView({
   /** Opening a message the owner has not read marks it read. */
   function openRow(row: Row) {
     select({ mailboxId: row.mailboxId, id: row.id });
-    if (isUnread(row) && ownsBox(row.mailboxId)) void changeSeen([row], true, false);
+    if (seenTimer.current) {
+      clearTimeout(seenTimer.current);
+      seenTimer.current = null;
+    }
+    if (!(isUnread(row) && ownsBox(row.mailboxId))) return;
+    const delay = prefs.markSeenAfterMs;
+    if (delay === null) return;
+    if (delay === 0) {
+      void changeSeen([row], true, false);
+      return;
+    }
+    seenTimer.current = setTimeout(() => {
+      seenTimer.current = null;
+      if (mounted.current) void changeSeen([row], true, false);
+    }, delay);
   }
   async function changeSeen(targets: Row[], seen: boolean, announce = true) {
     const eligible = targets.filter(
@@ -1679,6 +1706,9 @@ export function MailboxContentView({
       case "compose":
         if (canCompose) run(newDraft);
         return;
+      case "newFolder":
+        if (onNewFolder) run(onNewFolder);
+        return;
       case "search":
         run(() => searchInput.current?.focus());
         return;
@@ -1742,6 +1772,7 @@ export function MailboxContentView({
                 <MailboxFolderIcon name="drafts" /> {t("compose")}
               </button>
             ) : null}
+            <MailboxViewMenu prefs={prefs} setPref={setPref} />
             <button
               type="button"
               className="ms-btn ms-btn-ghost"
@@ -1817,6 +1848,18 @@ export function MailboxContentView({
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              {prefs.showShortcutHints ? (
+                <p className={styles.coachStrip} role="note">
+                  <span>{t("coach.text")}</span>
+                  <button
+                    type="button"
+                    className="ms-btn ms-btn-ghost ms-btn-sm"
+                    onClick={() => setPref({ showShortcutHints: false })}
+                  >
+                    {t("coach.dismiss")}
+                  </button>
+                </p>
+              ) : null}
               {listing.data?.limited ? (
                 <p className={styles.trashHelp}>{t("organization.limitedList")}</p>
               ) : null}

@@ -157,3 +157,41 @@ export function mailboxListDate(value: Date, now: Date, locale: string): string 
     return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(value);
   return new Intl.DateTimeFormat(locale, { dateStyle: "short" }).format(value);
 }
+
+/** The named folder colors the server stores; the UI maps them to tokens. */
+export const MAILBOX_FOLDER_TINTS = [
+  "violet",
+  "blue",
+  "green",
+  "amber",
+  "red",
+  "pink",
+  "teal",
+  "gray",
+] as const;
+export type MailboxFolderTint = (typeof MAILBOX_FOLDER_TINTS)[number];
+
+/** A stored folder color, or null for anything the UI does not know. */
+export function mailboxFolderTint(color: string | null | undefined): MailboxFolderTint | null {
+  return (MAILBOX_FOLDER_TINTS as readonly string[]).includes(color ?? "")
+    ? (color as MailboxFolderTint)
+    : null;
+}
+
+/**
+ * The folder order after moving one folder a step up or down. The same list
+ * comes back when the move is impossible, so callers can skip the request.
+ */
+export function mailboxFolderOrderAfterMove(
+  ids: readonly string[],
+  id: string,
+  direction: "up" | "down",
+): readonly string[] {
+  const index = ids.indexOf(id);
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (index < 0 || target < 0 || target >= ids.length) return ids;
+  const next = [...ids];
+  next[index] = ids[target] as string;
+  next[target] = id;
+  return next;
+}

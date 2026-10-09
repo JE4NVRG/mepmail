@@ -9,7 +9,9 @@ type MailboxIconName =
   | "replyAll"
   | "forward"
   | "read"
-  | "unread";
+  | "unread"
+  | "folderPlus"
+  | "sliders";
 
 export function MailboxFolderIcon({
   name,
@@ -37,6 +39,8 @@ export function MailboxFolderIcon({
     forward: "m15 14 5-5-5-5 M20 9H9.5a5.5 5.5 0 0 0 0 11H13",
     read: "M3 10 12 4l9 6v10H3z M3 10l9 6 9-6",
     unread: "M3 6h18v13H3z M3 7l9 6 9-6",
+    folderPlus: "M3 6h7l2 3h9v12H3z M12 12v6 M9 15h6",
+    sliders: "M4 7h9 M17 7h3 M13 4v6 M4 17h3 M11 17h9 M7 14v6",
   };
   return (
     <svg

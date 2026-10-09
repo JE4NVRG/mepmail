@@ -7,6 +7,25 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.79] - 2026-10-09
+
+New inbox, cuts 1A and 1B (from the desktop session): folders and display preferences.
+
+### Added
+
+- "+ New folder" in every scope, including the unified view (pick the owned
+  mailbox), inline create and rename (Enter saves, Esc cancels, duplicate name
+  shown next to the field); Shift+N from the list. Unified view groups the
+  folders of every owned mailbox (`folders({ mailboxId: null })`).
+- Per-folder menu: Rename, Color (8 swatches + none via `updateFolder.color`),
+  Move up/down (`reorderFolders` with the full list), Remove (confirm, then
+  `archiveFolder`); the folder glyph takes its color.
+- View menu (density, preview lines, reading pane, sender initials) applied as
+  `<html data-density|data-preview-lines|data-reading-pane>` and saved through
+  `mailboxes.preferences.set` (400 ms debounce); Appearance tab
+  (`/mail/settings?tab=appearance`): system/light/dark theme, start folder,
+  delayed mark-as-read, shortcut hints, restore defaults.
+
 ## [0.78] - 2026-10-09
 
 Server groundwork for the new Mail inbox; ad landing pages measured.

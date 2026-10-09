@@ -417,7 +417,31 @@
     "dropNone": "Essas mensagens já estão aí ou não podem ir para essa pasta.",
     "selectedCount": "{count, plural, one {# selecionada} other {# selecionadas}}",
     "unread": "Não lida",
-    "unreadCount": "{count, plural, one {# não lida} other {# não lidas}}"
+    "unreadCount": "{count, plural, one {# não lida} other {# não lidas}}",
+    "newFolder": "Nova pasta",
+    "newFolderIn": "Na caixa",
+    "folderNamePlaceholder": "Nome da pasta",
+    "saveName": "Salvar",
+    "folderCreated": "Pasta “{name}” criada.",
+    "folderRenamed": "Pasta renomeada para “{name}”.",
+    "folderRemoved": "Pasta “{name}” removida.",
+    "nameTaken": "Já existe uma pasta com esse nome.",
+    "rename": "Renomear",
+    "color": "Cor",
+    "noColor": "Sem cor",
+    "colors": {
+      "violet": "Violeta",
+      "blue": "Azul",
+      "green": "Verde",
+      "amber": "Âmbar",
+      "red": "Vermelho",
+      "pink": "Rosa",
+      "teal": "Verde-água",
+      "gray": "Cinza"
+    },
+    "moveUp": "Mover para cima",
+    "moveDown": "Mover para baixo",
+    "folderMenu": "Opções da pasta {name}"
   },
   "thread": {
     "title": "{count, plural, one {# outra mensagem nesta conversa} other {# outras mensagens nesta conversa}}",
@@ -450,7 +474,8 @@
       "unread": "Marcar como não lida",
       "search": "Buscar mensagens",
       "undo": "Desfazer a última ação",
-      "help": "Mostrar estes atalhos"
+      "help": "Mostrar estes atalhos",
+      "newFolder": "Nova pasta"
     }
   },
   "usage": {
@@ -497,7 +522,8 @@
       "migration": "Migração",
       "boxes": "Caixas",
       "agents": "Agentes",
-      "license": "Licença e uso"
+      "license": "Licença e uso",
+      "appearance": "Aparência"
     },
     "backShort": "Voltar"
   },
@@ -745,5 +771,43 @@
     "restart": "Começar de novo",
     "loading": "Carregando…",
     "statusError": "Não foi possível ler o andamento da varredura."
+  },
+  "view": {
+    "title": "Exibição",
+    "density": "Densidade",
+    "comfortable": "Confortável",
+    "compact": "Compacta",
+    "previewLines": "Linhas de prévia",
+    "previewNone": "Nenhuma",
+    "previewOne": "Uma linha",
+    "previewTwo": "Duas linhas",
+    "readingPane": "Painel de leitura",
+    "paneRight": "À direita",
+    "paneBottom": "Abaixo da lista",
+    "paneOff": "Oculto",
+    "showAvatars": "Mostrar iniciais"
+  },
+  "appearance": {
+    "hint": "Essas escolhas são suas: valem na sua conta no navegador, no app do computador e no celular.",
+    "theme": "Tema",
+    "themeSystem": "Sistema",
+    "themeLight": "Claro",
+    "themeDark": "Escuro",
+    "themeDesktopNote": "No app do computador, “Sistema” mostra o tema escuro por enquanto.",
+    "density": "Densidade",
+    "readingPane": "Painel de leitura",
+    "previewLines": "Linhas de prévia",
+    "markSeen": "Marcar como lida",
+    "markSeenOpen": "Ao abrir",
+    "markSeenAfter": "Depois de {seconds, number} s",
+    "markSeenManual": "Só quando eu marcar",
+    "startFolder": "Começar em",
+    "shortcutHints": "Dicas de teclado",
+    "viewShortcuts": "Atalhos de teclado",
+    "restoreDefaults": "Restaurar padrões"
+  },
+  "coach": {
+    "text": "J e K navegam, E arquiva, S favorita, ? mostra todos os atalhos.",
+    "dismiss": "Entendi"
   }
 }

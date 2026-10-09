@@ -5,22 +5,34 @@ import type { inferRouterOutputs } from "@trpc/server";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { type DragEvent, useEffect, useRef, useState } from "react";
+import { confirmDialog } from "@/components/confirm-dialog";
 import { NavGlyph } from "@/components/icons/nav-icons";
+import { PopoverMenu } from "@/components/popover-menu";
+import { toast } from "@/components/toast";
 import { authClient } from "@/lib/auth-client";
 import { notifyDesktop, setNativeTitle } from "@/lib/desktop-bridge";
-import type { MailboxFolder, MailboxKindFilter } from "@/lib/mailbox-inbox-presentation";
+import {
+  type MailboxFolder,
+  type MailboxKindFilter,
+  mailboxFolderOrderAfterMove,
+  mailboxFolderTint,
+} from "@/lib/mailbox-inbox-presentation";
+import { applyCorreioTheme, useCorreioPrefs } from "@/lib/mailbox-preferences";
 import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { MailboxActivityDialog } from "./mailbox-activity";
 import { MailboxAgentKeysDialog } from "./mailbox-agent-keys";
 import { MailboxAliasesSection } from "./mailbox-aliases-section";
+import { MailboxAppearanceSettings } from "./mailbox-appearance-settings";
 import {
   MAIL_DRAG_TYPE,
   MailboxContentView,
   type MailboxDropHandler,
   type MailboxDropTarget,
+  ShortcutsDialog,
 } from "./mailbox-content-view";
 import { MailboxFolderDialog } from "./mailbox-folder-dialog";
+import { type FolderEditorState, MailboxFolderEditor } from "./mailbox-folder-editor";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import managementStyles from "./mailbox-management.module.css";
 import { MailboxMigration } from "./mailbox-migration";
@@ -35,6 +47,19 @@ import styles from "./mailboxes.module.css";
 type Outputs = inferRouterOutputs<AppRouter>["mailboxes"];
 type Box = Outputs["list"]["mailboxes"][number];
 type Options = Outputs["options"];
+type FolderEntry = Outputs["folders"][number];
+const SETTINGS_TABS = ["appearance", "boxes", "agents", "license", "migration"] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+const FOLDER_TINT_CLASS: Record<string, string> = {
+  violet: "tintViolet",
+  blue: "tintBlue",
+  green: "tintGreen",
+  amber: "tintAmber",
+  red: "tintRed",
+  pink: "tintPink",
+  teal: "tintTeal",
+  gray: "tintGray",
+};
 
 function RegistryDialog({
   mailbox,
@@ -376,6 +401,7 @@ export function MailboxesView({
   const { data: session } = authClient.useSession();
   const trpc = useTRPC();
   const queries = useQueryClient();
+  const { prefs, setPref, resetPrefs, loaded: prefsLoaded } = useCorreioPrefs();
   const capability = useQuery(trpc.mailboxes.capabilities.queryOptions());
   // Start with the capability check instead of after it: one round trip less on
   // open. A team without access gets NOT_FOUND once and the queries stop.
@@ -404,6 +430,9 @@ export function MailboxesView({
   const [folder, setFolder] = useState<MailboxFolder>("inbox");
   const [customFolderId, setCustomFolderId] = useState<string | null>(null);
   const [folderDialog, setFolderDialog] = useState<string | "new" | null>(null);
+  // The mailbox a folder dialog opened from the unified view belongs to.
+  const [folderDialogBox, setFolderDialogBox] = useState<string | null>(null);
+  const [folderEditor, setFolderEditor] = useState<FolderEditorState | null>(null);
   const [mailboxKind, setMailboxKind] = useState<MailboxKindFilter>("all");
   const [dialog, setDialog] = useState<"new" | "edit" | "receiving" | null>(null);
   const [licenseOpenRequest, openLicense] = useState(0);
@@ -412,13 +441,31 @@ export function MailboxesView({
   const [teamAgentDialog, setTeamAgentDialog] = useState(false);
   const [signatureDialogId, setSignatureDialogId] = useState<string | null>(null);
   const [activityDialogId, setActivityDialogId] = useState<string | null>(null);
-  const [settingsTab, setSettingsTab] = useState<"boxes" | "agents" | "license" | "migration">(
-    "boxes",
-  );
-  // Links such as the key-expiry email open the agents tab directly.
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("appearance");
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Links such as the key-expiry email open the agents tab directly; ?tab= picks any tab.
   useEffect(() => {
-    if (layout === "settings" && window.location.hash === "#agents") setSettingsTab("agents");
+    if (layout !== "settings") return;
+    const wanted = new URLSearchParams(window.location.search).get("tab");
+    if (wanted && (SETTINGS_TABS as readonly string[]).includes(wanted))
+      setSettingsTab(wanted as SettingsTab);
+    if (window.location.hash === "#agents") setSettingsTab("agents");
   }, [layout]);
+  // The person's theme: light and dark through the account toggle, system
+  // following the device while Correio is open. Only once the server answered,
+  // so a first visit never flips the theme the person chose for the dashboard.
+  useEffect(() => {
+    if (!prefsLoaded) return undefined;
+    return applyCorreioTheme(prefs.theme);
+  }, [prefsLoaded, prefs.theme]);
+  // The start folder applies once, when the inbox opens.
+  const startApplied = useRef(false);
+  useEffect(() => {
+    if (startApplied.current || layout !== "app" || !prefsLoaded) return;
+    startApplied.current = true;
+    const start = prefs.startFolder;
+    if (start !== "inbox" && !start.startsWith("folder:")) setFolder(start as MailboxFolder);
+  }, [prefsLoaded, layout, prefs.startFolder]);
   const managementMenu = useRef<HTMLDetailsElement>(null);
   // Team switches cause a full navigation. Every id is also resolved against this request's scoped DTO.
   const boxes = registry.data?.mailboxes ?? [];
@@ -431,6 +478,28 @@ export function MailboxesView({
     ),
   );
   const canOrganize = !!selected?.ownerActive && selected.ownerUserId === session?.user.id;
+  // Mailboxes whose folders this person may organize: own, active, readable.
+  const folderBoxes = scopedBoxes.filter(
+    (box) =>
+      box.ownerActive &&
+      box.ownerUserId === session?.user.id &&
+      box.canRead &&
+      box.status === "planned",
+  );
+  const canCreateFolder = selected ? canOrganize && !!selected.canRead : folderBoxes.length > 0;
+  // The unified view shows the folders of every own mailbox, grouped by mailbox.
+  const unifiedFolders = useQuery(
+    trpc.mailboxes.folders.queryOptions(
+      { mailboxId: null },
+      { enabled: !selected && folderBoxes.length > 0, retry: false },
+    ),
+  );
+  const reorderMutation = useMutation(
+    trpc.mailboxes.reorderFolders.mutationOptions({ retry: false }),
+  );
+  const archiveFolderMutation = useMutation(
+    trpc.mailboxes.archiveFolder.mutationOptions({ retry: false }),
+  );
   const unreadCounts = useQuery(
     trpc.mailboxes.unreadCounts.queryOptions(undefined, {
       enabled: mayUseMail && !!registry.data,
@@ -530,6 +599,156 @@ export function MailboxesView({
     setMailboxKind(kind);
     selectMailbox(null);
   }
+  /** Opens a folder of a specific mailbox (from the unified view's grouped list). */
+  function openFolder(mailboxId: string, folderId: string) {
+    selectItem(null);
+    setFolderDialog(null);
+    setFolderDialogBox(null);
+    select(mailboxId);
+    setFolder("custom");
+    setCustomFolderId(folderId);
+  }
+  function startFolderCreation() {
+    setFolderEditor({ mode: "create", mailboxId: selected?.id ?? null });
+  }
+  async function refreshFolders() {
+    await queries.invalidateQueries({ queryKey: trpc.mailboxes.folders.queryKey() });
+  }
+  async function moveFolder(
+    mailboxId: string,
+    ids: readonly string[],
+    id: string,
+    direction: "up" | "down",
+  ) {
+    const next = mailboxFolderOrderAfterMove(ids, id, direction);
+    if (next === ids) return;
+    try {
+      await reorderMutation.mutateAsync({ mailboxId, ids: [...next] });
+    } catch {
+      toast(t("organization.error"), "warn");
+    }
+    await refreshFolders();
+  }
+  async function removeFolder(mailboxId: string, entry: FolderEntry) {
+    const ok = await confirmDialog({
+      title: t("organization.archiveTitle"),
+      message: t("organization.archiveHelp", { name: entry.name }),
+      confirmLabel: t("organization.archiveFolder"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await archiveFolderMutation.mutateAsync({
+        mailboxId,
+        id: entry.id,
+        expectedRevision: entry.revision,
+      });
+    } catch {
+      toast(t("organization.error"), "warn");
+      await refreshFolders();
+      return;
+    }
+    if (folder === "custom" && customFolderId === entry.id) chooseFolder("inbox");
+    await Promise.all([
+      refreshFolders(),
+      queries.invalidateQueries({ queryKey: trpc.mailboxes.items.queryKey() }),
+      queries.invalidateQueries({ queryKey: trpc.mailboxes.item.queryKey() }),
+    ]);
+    toast(t("organization.folderRemoved", { name: entry.name }), "neutral");
+  }
+  /** One folder in the rail: open it, or rename, recolor, reorder and remove it. */
+  const folderRow = (box: Box, entry: FolderEntry, list: FolderEntry[]) => {
+    const active =
+      folder === "custom" && customFolderId === entry.id && (selected?.id ?? box.id) === box.id;
+    const organizable = box.ownerActive && box.ownerUserId === session?.user.id;
+    const tint = mailboxFolderTint(entry.color);
+    const ids = list.map((item) => item.id);
+    const index = ids.indexOf(entry.id);
+    if (folderEditor?.mode === "rename" && folderEditor.folder.id === entry.id)
+      return (
+        <MailboxFolderEditor
+          key={entry.id}
+          editor={folderEditor}
+          mailboxes={[]}
+          onDone={(result) => {
+            setFolderEditor(null);
+            void refreshFolders();
+            toast(t("organization.folderRenamed", { name: result.name }));
+          }}
+          onCancel={() => setFolderEditor(null)}
+        />
+      );
+    return (
+      <div className={styles.customFolderRow} key={entry.id}>
+        <button
+          type="button"
+          title={entry.name}
+          aria-current={active ? "page" : undefined}
+          onClick={() =>
+            selected ? chooseFolder("custom", entry.id) : openFolder(box.id, entry.id)
+          }
+          {...dropProps({ folder: "custom", id: entry.id }, `custom:${entry.id}`)}
+        >
+          <span className={tint ? styles[FOLDER_TINT_CLASS[tint] ?? ""] : undefined}>
+            <MailboxFolderIcon name="custom" filled={!!tint} />
+          </span>
+          <span>{entry.name}</span>
+        </button>
+        {organizable ? (
+          <PopoverMenu
+            ariaLabel={t("organization.folderMenu", { name: entry.name })}
+            items={[
+              {
+                label: t("organization.rename"),
+                onSelect: () =>
+                  setFolderEditor({
+                    mode: "rename",
+                    mailboxId: box.id,
+                    folder: { id: entry.id, name: entry.name, revision: entry.revision },
+                  }),
+              },
+              {
+                label: t("organization.color"),
+                onSelect: () => {
+                  setFolderDialogBox(box.id);
+                  setFolderDialog(entry.id);
+                },
+              },
+              null,
+              {
+                label: t("organization.moveUp"),
+                disabled: index <= 0,
+                onSelect: () => void moveFolder(box.id, ids, entry.id, "up"),
+              },
+              {
+                label: t("organization.moveDown"),
+                disabled: index < 0 || index >= ids.length - 1,
+                onSelect: () => void moveFolder(box.id, ids, entry.id, "down"),
+              },
+              null,
+              {
+                label: t("organization.archiveFolder"),
+                danger: true,
+                onSelect: () => void removeFolder(box.id, entry),
+              },
+            ]}
+          />
+        ) : null}
+      </div>
+    );
+  };
+  const unifiedEntries = unifiedFolders.data ?? [];
+  const unifiedGroups = folderBoxes
+    .map((box) => ({ box, entries: unifiedEntries.filter((entry) => entry.mailboxId === box.id) }))
+    .filter((group) => group.entries.length > 0);
+  const dialogMailboxId = folderDialogBox ?? selected?.id ?? null;
+  const dialogFolders = folderDialogBox
+    ? unifiedEntries.filter((entry) => entry.mailboxId === folderDialogBox)
+    : (folderList.data ?? []);
+  const dialogFolder =
+    folderDialog && folderDialog !== "new"
+      ? (dialogFolders.find((entry) => entry.id === folderDialog) ?? null)
+      : null;
   async function changed(id: string) {
     await Promise.all([
       queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() }),
@@ -672,52 +891,65 @@ export function MailboxesView({
       <section className={styles.customFolders} aria-label={t("organization.folders")}>
         <header>
           <h3>{t("organization.folders")}</h3>
-          {canOrganize && selected?.canRead ? (
+        </header>
+        {folderEditor?.mode === "create" ? (
+          <MailboxFolderEditor
+            editor={folderEditor}
+            mailboxes={folderBoxes}
+            onDone={(result) => {
+              setFolderEditor(null);
+              openFolder(result.mailboxId, result.id);
+              toast(t("organization.folderCreated", { name: result.name }));
+            }}
+            onCancel={() => setFolderEditor(null)}
+          />
+        ) : canCreateFolder ? (
+          <button
+            type="button"
+            className={styles.newFolderButton}
+            onClick={() => startFolderCreation()}
+          >
+            <MailboxFolderIcon name="folderPlus" />
+            <span>{t("organization.newFolder")}</span>
+          </button>
+        ) : null}
+        {selected ? (
+          folderList.isError ? (
             <button
               type="button"
-              aria-label={t("organization.createFolder")}
-              onClick={() => setFolderDialog("new")}
+              className="ms-btn ms-btn-ghost"
+              onClick={() => void folderList.refetch()}
             >
-              +
+              {t("retry")}
             </button>
-          ) : null}
-        </header>
-        {!selected ? (
+          ) : folderList.isPending ? (
+            <p>{t("loading")}</p>
+          ) : folderList.data?.length ? (
+            <div className={styles.folderGroup}>
+              {folderList.data.map((entry) => folderRow(selected, entry, folderList.data))}
+            </div>
+          ) : (
+            <p>{t("organization.emptyFolders")}</p>
+          )
+        ) : folderBoxes.length === 0 ? (
           <p>{t("organization.chooseBox")}</p>
-        ) : folderList.isError ? (
+        ) : unifiedFolders.isError ? (
           <button
             type="button"
             className="ms-btn ms-btn-ghost"
-            onClick={() => void folderList.refetch()}
+            onClick={() => void unifiedFolders.refetch()}
           >
             {t("retry")}
           </button>
-        ) : folderList.isPending ? (
+        ) : unifiedFolders.isPending ? (
           <p>{t("loading")}</p>
-        ) : folderList.data?.length ? (
-          folderList.data.map((entry) => (
-            <div className={styles.customFolderRow} key={entry.id}>
-              <button
-                type="button"
-                title={entry.name}
-                aria-current={
-                  folder === "custom" && customFolderId === entry.id ? "page" : undefined
-                }
-                onClick={() => chooseFolder("custom", entry.id)}
-                {...dropProps({ folder: "custom", id: entry.id }, `custom:${entry.id}`)}
-              >
-                <MailboxFolderIcon name="custom" />
-                <span>{entry.name}</span>
-              </button>
-              {canOrganize ? (
-                <button
-                  type="button"
-                  aria-label={t("organization.manageFolder", { name: entry.name })}
-                  onClick={() => setFolderDialog(entry.id)}
-                >
-                  ···
-                </button>
-              ) : null}
+        ) : unifiedGroups.length ? (
+          unifiedGroups.map(({ box, entries }) => (
+            <div className={styles.folderGroup} key={box.id}>
+              <p className={styles.folderGroupLabel} title={box.address}>
+                {box.label}
+              </p>
+              {entries.map((entry) => folderRow(box, entry, entries))}
             </div>
           ))
         ) : (
@@ -734,6 +966,7 @@ export function MailboxesView({
         <MailboxContentView
           key={`${mailboxKind}:${selected?.id ?? "all"}`}
           navigation={navigation}
+          onNewFolder={canCreateFolder ? () => startFolderCreation() : undefined}
           boxes={boxes}
           selected={selected}
           mailboxKind={mailboxKind === "all" ? undefined : mailboxKind}
@@ -880,20 +1113,22 @@ export function MailboxesView({
           close={() => setActivityDialogId(null)}
         />
       ) : null}
-      {folderDialog &&
-      selected &&
-      canOrganize &&
-      (folderDialog === "new" || folderList.data?.some((entry) => entry.id === folderDialog)) ? (
+      {folderDialog && dialogMailboxId && (folderDialog === "new" || dialogFolder) ? (
         <MailboxFolderDialog
-          key={`${selected.id}:${folderDialog}`}
-          mailboxId={selected.id}
-          folder={
-            folderDialog === "new"
-              ? null
-              : (folderList.data?.find((entry) => entry.id === folderDialog) ?? null)
-          }
-          close={() => setFolderDialog(null)}
-          changed={(id) => chooseFolder(id ? "custom" : "inbox", id)}
+          key={`${dialogMailboxId}:${folderDialog}`}
+          mailboxId={dialogMailboxId}
+          folder={dialogFolder}
+          close={() => {
+            setFolderDialog(null);
+            setFolderDialogBox(null);
+          }}
+          changed={(id) => {
+            if (folderDialogBox && !selected) {
+              if (id) openFolder(folderDialogBox, id);
+              return;
+            }
+            chooseFolder(id ? "custom" : "inbox", id);
+          }}
         />
       ) : null}
     </>
@@ -983,7 +1218,7 @@ export function MailboxesView({
         ) : (
           <div className={styles.settings}>
             <div className={styles.settingsTabs} role="tablist" aria-label={t("app.settings")}>
-              {(["boxes", "agents", "license", "migration"] as const).map((tab) => (
+              {SETTINGS_TABS.map((tab) => (
                 <button
                   type="button"
                   role="tab"
@@ -995,7 +1230,17 @@ export function MailboxesView({
                 </button>
               ))}
             </div>
-            {settingsTab === "boxes" ? (
+            {settingsTab === "appearance" ? (
+              <section className={styles.settingsSection} aria-label={t("app.tabs.appearance")}>
+                <MailboxAppearanceSettings
+                  prefs={prefs}
+                  setPref={setPref}
+                  resetPrefs={resetPrefs}
+                  openShortcuts={() => setShortcutsOpen(true)}
+                />
+                {shortcutsOpen ? <ShortcutsDialog close={() => setShortcutsOpen(false)} /> : null}
+              </section>
+            ) : settingsTab === "boxes" ? (
               <section className={styles.settingsSection} aria-label={t("app.tabs.boxes")}>
                 <p className={styles.hint}>{t("app.boxesHint")}</p>
                 {registry.data?.canManage && options.data && !options.data.domains.length ? (

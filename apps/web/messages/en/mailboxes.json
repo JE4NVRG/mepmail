@@ -417,7 +417,31 @@
     "dropNone": "Those messages are already there or can't go to that folder.",
     "selectedCount": "{count, number} selected",
     "unread": "Unread",
-    "unreadCount": "{count, plural, one {# unread} other {# unread}}"
+    "unreadCount": "{count, plural, one {# unread} other {# unread}}",
+    "newFolder": "New folder",
+    "newFolderIn": "In mailbox",
+    "folderNamePlaceholder": "Folder name",
+    "saveName": "Save",
+    "folderCreated": "Folder “{name}” created.",
+    "folderRenamed": "Folder renamed to “{name}”.",
+    "folderRemoved": "Folder “{name}” removed.",
+    "nameTaken": "A folder with this name already exists.",
+    "rename": "Rename",
+    "color": "Color",
+    "noColor": "No color",
+    "colors": {
+      "violet": "Violet",
+      "blue": "Blue",
+      "green": "Green",
+      "amber": "Amber",
+      "red": "Red",
+      "pink": "Pink",
+      "teal": "Teal",
+      "gray": "Gray"
+    },
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "folderMenu": "Options for folder {name}"
   },
   "thread": {
     "title": "{count, plural, one {# other message in this conversation} other {# other messages in this conversation}}",
@@ -450,7 +474,8 @@
       "unread": "Mark as unread",
       "search": "Search messages",
       "undo": "Undo the last action",
-      "help": "Show these shortcuts"
+      "help": "Show these shortcuts",
+      "newFolder": "New folder"
     }
   },
   "usage": {
@@ -497,7 +522,8 @@
       "migration": "Migration",
       "boxes": "Mailboxes",
       "agents": "Agents",
-      "license": "License and usage"
+      "license": "License and usage",
+      "appearance": "Appearance"
     },
     "backShort": "Back"
   },
@@ -745,5 +771,43 @@
     "restart": "Start over",
     "loading": "Loading…",
     "statusError": "Could not read the scan status."
+  },
+  "view": {
+    "title": "View",
+    "density": "Density",
+    "comfortable": "Comfortable",
+    "compact": "Compact",
+    "previewLines": "Preview lines",
+    "previewNone": "None",
+    "previewOne": "One line",
+    "previewTwo": "Two lines",
+    "readingPane": "Reading pane",
+    "paneRight": "On the right",
+    "paneBottom": "Below the list",
+    "paneOff": "Hidden",
+    "showAvatars": "Show initials"
+  },
+  "appearance": {
+    "hint": "These choices are yours: they follow your account in the browser, in the desktop app and on your phone.",
+    "theme": "Theme",
+    "themeSystem": "System",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeDesktopNote": "In the desktop app, “System” shows the dark theme for now.",
+    "density": "Density",
+    "readingPane": "Reading pane",
+    "previewLines": "Preview lines",
+    "markSeen": "Mark as read",
+    "markSeenOpen": "When opened",
+    "markSeenAfter": "After {seconds, number} s",
+    "markSeenManual": "Only when I do it",
+    "startFolder": "Start in",
+    "shortcutHints": "Keyboard hints",
+    "viewShortcuts": "Keyboard shortcuts",
+    "restoreDefaults": "Restore defaults"
+  },
+  "coach": {
+    "text": "J and K move, E archives, S stars, ? shows every shortcut.",
+    "dismiss": "Got it"
   }
 }
