@@ -28,6 +28,22 @@
   },
   "releases": [
     {
+      "version": "0.65",
+      "date": "2026-10-09",
+      "title": "Chat de suporte mais útil",
+      "summary": "O assistente do chat de suporte ganhou uma base de conhecimento mais completa e a página de suporte explica melhor o que ele faz.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "O assistente responde sobre DNS e verificação de domínio, SMTP, limites da API, criação de caixas do Correio e cobrança.",
+            "Ele deixa claro que o Correio não tem plano grátis e indica jean@mepmail.dev para conta, cobrança e segurança.",
+            "O cartão do chat em /support usa uma linguagem mais simples."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.64",
       "date": "2026-10-09",
       "title": "Textos mais claros no site e no painel",

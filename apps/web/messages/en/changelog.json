@@ -23,6 +23,22 @@
   },
   "releases": [
     {
+      "version": "0.65",
+      "date": "2026-10-09",
+      "title": "A more useful support chat",
+      "summary": "The support chat assistant has a fuller knowledge base and the support page explains better what it does.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "The assistant answers about DNS and domain verification, SMTP, API limits, creating Correio mailboxes and billing.",
+            "It makes clear Correio has no free plan and points to jean@mepmail.dev for account, billing and security.",
+            "The chat card on /support uses plainer language."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.64",
       "date": "2026-10-09",
       "title": "Clearer copy on the site and in the dashboard",

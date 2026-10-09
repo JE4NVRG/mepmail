@@ -7,6 +7,19 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.65] - 2026-10-09
+
+Support chat copy on /support.
+
+### Changed
+
+- The /support chat card describes the virtual assistant plainly (what it
+  answers, that Jean replies by email for account and billing, never send a
+  password, code or API key) and no longer names the chat vendor.
+- The assistant's knowledge source on Elozi (not in this repository) was
+  rewritten: domain DNS, SMTP, API limits, Correio setup, billing, and the
+  rule that Correio has no free plan.
+
 ## [0.64] - 2026-10-09
 
 Copy and state fixes from Sage's screen-by-screen review.

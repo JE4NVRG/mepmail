@@ -157,17 +157,17 @@
     "cta": "Escrever para jean@mepmail.dev"
   },
   "assistant": {
-    "eyebrow": "Ajuda no MepMail",
-    "title": "Vamos encontrar o caminho",
-    "body": "Primeiros passos, domínios e integrações: encontre orientação aqui e procure nossa equipe para questões da conta.",
-    "available": "Conversa de visitante por texto",
+    "eyebrow": "Chat de suporte",
+    "title": "Tire sua dúvida agora",
+    "body": "O assistente virtual do MepMail responde na hora sobre domínios, SMTP, API, preços e Correio. Para conta ou cobrança, ele mostra o caminho e o Jean responde por e-mail.",
+    "available": "Assistente virtual · português e inglês",
     "pending": "Chat em preparação. E-mail e documentação disponíveis.",
-    "open": "Abrir atendimento",
-    "reopen": "Reabrir atendimento",
-    "loading": "Abrindo atendimento…",
-    "opened": "Use a janela de atendimento para iniciar sua conversa.",
+    "open": "Abrir chat",
+    "reopen": "Reabrir chat",
+    "loading": "Abrindo o chat…",
+    "opened": "O chat abriu no canto da tela.",
     "error": "Não foi possível abrir o chat. Tente novamente ou fale com a equipe por e-mail.",
-    "privacy": "Ao abrir o chat, você conversa como visitante pela Elozi. Sua conta MepMail não é vinculada automaticamente. Não envie senhas ou chaves.",
+    "privacy": "O chat não acessa sua conta. Nunca envie senha, código ou chave de API.",
     "email": "Falar por e-mail",
     "docs": "Consultar documentação"
   }
