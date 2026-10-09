@@ -1,4 +1,9 @@
-import { handleWebhook, isLiveKey, readMetaConversionConfig } from "@millionsend/billing";
+import {
+  handleWebhook,
+  isLiveKey,
+  readGoogleConversionConfig,
+  readMetaConversionConfig,
+} from "@millionsend/billing";
 import { accountEmailFrom, env, notificationsEmailFrom } from "@millionsend/config";
 import {
   type AccountMailKind,
@@ -50,6 +55,7 @@ export async function POST(request: Request) {
     webhookSecret: env.STRIPE_WEBHOOK_SECRET ?? "",
     livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
     advertisingConfig: readMetaConversionConfig(process.env),
+    googleConversionConfig: readGoogleConversionConfig(process.env),
     ...(mailboxRegistryEnabled() ? { mailboxCatalog: mailboxBillingCatalog() } : {}),
     // Only for an event that was newly applied, so a redelivery stays silent;
     // keyed by the Stripe event id, so a recurring invoice is one payment each.

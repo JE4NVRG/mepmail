@@ -5,6 +5,17 @@ import { drizzle } from "drizzle-orm/pglite";
 import type Stripe from "stripe";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PGlite } from "../../db/node_modules/@electric-sql/pglite/dist/index.js";
+import {
+  dispatchGoogleConversions,
+  type GoogleCheckoutAdvertising,
+  type GoogleConversionConfig,
+  type GoogleFetch,
+  googleClientId,
+  googleSessionId,
+  prepareGoogleCheckout,
+  readGoogleConversionConfig,
+  recordGooglePurchase,
+} from "../src/google-advertising.js";
 import type { MetaCheckoutAdvertising } from "../src/meta-advertising.js";
 import {
   dispatchMetaConversions,
@@ -83,6 +94,25 @@ CREATE TABLE meta_conversion_outbox (
 CREATE UNIQUE INDEX meta_conversion_session_idx ON meta_conversion_outbox(livemode,stripe_session_id) WHERE event_name='InitiateCheckout';
 CREATE UNIQUE INDEX meta_conversion_invoice_idx ON meta_conversion_outbox(livemode,stripe_invoice_id) WHERE event_name='Purchase';
 CREATE UNIQUE INDEX meta_conversion_acquisition_idx ON meta_conversion_outbox(livemode,stripe_subscription_id) WHERE event_name='Purchase';
+CREATE TABLE google_checkout_contexts (
+ attempt_id uuid PRIMARY KEY REFERENCES send_checkout_attempts(id) ON DELETE CASCADE,
+ consent_receipt_id uuid NOT NULL REFERENCES advertising_consent_receipts(id) ON DELETE RESTRICT,
+ client_id text NOT NULL, session_id text, captured_at timestamptz NOT NULL, expires_at timestamptz NOT NULL,
+ CHECK (client_id ~ '^[0-9]{1,20}\\.[0-9]{1,20}$' AND (session_id IS NULL OR session_id ~ '^[0-9]{1,20}$'))
+);
+CREATE TABLE google_conversion_outbox (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ attempt_id uuid NOT NULL REFERENCES send_checkout_attempts(id) ON DELETE CASCADE,
+ consent_receipt_id uuid NOT NULL REFERENCES advertising_consent_receipts(id) ON DELETE RESTRICT,
+ transaction_id text NOT NULL UNIQUE, rung text NOT NULL, value_minor integer NOT NULL, currency text NOT NULL,
+ event_time timestamptz NOT NULL,
+ status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','leased','sent','cancelled','dead')),
+ attempts integer NOT NULL DEFAULT 0, next_attempt_at timestamptz NOT NULL DEFAULT now(),
+ lease_until timestamptz, expires_at timestamptz NOT NULL, last_failure text,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ CHECK (value_minor > 0 AND attempts >= 0),
+ CHECK ((status = 'leased') = (lease_until IS NOT NULL))
+);
 `;
 
 beforeAll(async () => {
@@ -92,7 +122,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await client.exec(
-    "TRUNCATE meta_conversion_outbox, meta_checkout_contexts, advertising_consent_receipts, send_checkout_attempts CASCADE",
+    "TRUNCATE google_conversion_outbox, google_checkout_contexts, meta_conversion_outbox, meta_checkout_contexts, advertising_consent_receipts, send_checkout_attempts CASCADE",
   );
 });
 afterAll(async () => {
@@ -816,5 +846,182 @@ describe("RAM advertising consent and durable outbox", () => {
     expect((await rows())[0]).toMatchObject({ status: "dead", lastFailure: "delivery_expired" });
     expect(fetch).not.toHaveBeenCalled();
     expect(p.forbidden).not.toHaveBeenCalled();
+  });
+});
+
+const google: GoogleConversionConfig = {
+  enabled: true,
+  measurementId: "G-3624E08M6J",
+  apiSecret: "synthetic_secret_value",
+};
+const gaCookies =
+  "_ga=GA1.1.1234567890.1790996395; _ga_3624E08M6J=GS2.1.s1790996390$o1$g1$t1790996399$j0$l0$h0";
+const googleContexts = schema.googleCheckoutContexts;
+const googleOutbox = schema.googleConversionOutbox;
+
+async function googleFixture(cookieHeader = gaCookies, granted = true) {
+  const attempt = attemptInput(null);
+  await db.insert(schema.sendCheckoutAttempts).values(attempt);
+  const saved = await saveAdvertisingConsent(
+    db,
+    { granted, proof: null, userId: attempt.createdBy, sourceUrl: "https://mepmail.dev/pricing" },
+    capturedAt,
+  );
+  const advertising: GoogleCheckoutAdvertising = {
+    config: google,
+    proof: saved.proof,
+    cookieHeader,
+  };
+  await db.transaction(async (tx) => {
+    await prepareGoogleCheckout(tx as unknown as Db, attempt, advertising, capturedAt);
+  });
+  return { attempt, proof: saved.proof, ...providerGraph(attempt) };
+}
+async function googlePurchase(f: Awaited<ReturnType<typeof googleFixture>>, config = google) {
+  await db.transaction(async (tx) => {
+    await recordGooglePurchase(tx as unknown as Db, f.event, f.subscription, false, config, now);
+  });
+}
+const acceptingGoogle = () => vi.fn<GoogleFetch>(async () => ({ status: 204 }));
+
+describe("Google Analytics purchase measurement (server side)", () => {
+  it("reads only GA cookie identifiers, and only a complete enabled configuration", () => {
+    expect(googleClientId(gaCookies)).toBe("1234567890.1790996395");
+    expect(googleSessionId(gaCookies, "G-3624E08M6J")).toBe("1790996390");
+    expect(
+      googleSessionId("_ga_3624E08M6J=GS1.1.1790996391.1.1.1790996399.0.0.0", "G-3624E08M6J"),
+    ).toBe("1790996391");
+    for (const bad of [
+      "_ga=GA1.1.abc.1790996395",
+      "_ga=x; _ga=GA1.1.1.2",
+      "_ga=GA1.1.1234567890",
+      "",
+    ])
+      expect(googleClientId(bad), bad).toBeNull();
+    expect(readGoogleConversionConfig({ GA4_CONVERSIONS_ENABLED: "true" })).toEqual({
+      enabled: false,
+    });
+    expect(
+      readGoogleConversionConfig({
+        GA4_CONVERSIONS_ENABLED: "false",
+        GA4_API_SECRET: "synthetic_secret_value",
+      }),
+    ).toEqual({ enabled: false });
+    expect(
+      readGoogleConversionConfig({
+        GA4_CONVERSIONS_ENABLED: "true",
+        GA4_API_SECRET: "synthetic_secret_value",
+      }),
+    ).toEqual(google);
+  });
+
+  it("captures the GA identity only under accepted consent and a valid _ga cookie", async () => {
+    await googleFixture();
+    await googleFixture("_fbp=fb.1.2.3");
+    await googleFixture(gaCookies, false);
+    const captured = await db.select().from(googleContexts);
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toMatchObject({
+      clientId: "1234567890.1790996395",
+      sessionId: "1790996390",
+    });
+  });
+
+  it("queues one purchase for the initial invoice and sends only allowlisted fields", async () => {
+    const f = await googleFixture();
+    await googlePurchase(f);
+    await googlePurchase(f);
+    const queued = await db.select().from(googleOutbox);
+    expect(queued).toHaveLength(1);
+    expect(queued[0]).toMatchObject({
+      transactionId: "in_send",
+      rung: "pro_100k",
+      valueMinor: 1_243,
+      currency: "USD",
+      status: "pending",
+    });
+    const fetch = acceptingGoogle();
+    expect(await dispatchGoogleConversions(db, google, { fetch, now: () => now })).toEqual({
+      considered: 1,
+      sent: 1,
+    });
+    const [url, init] = required(fetch.mock.calls[0]);
+    expect(url).toBe(
+      "https://www.google-analytics.com/mp/collect?measurement_id=G-3624E08M6J&api_secret=synthetic_secret_value",
+    );
+    const body = JSON.parse(init.body);
+    expect(body).toEqual({
+      client_id: "1234567890.1790996395",
+      timestamp_micros: paidAt * 1_000_000,
+      non_personalized_ads: true,
+      consent: { ad_user_data: "GRANTED", ad_personalization: "DENIED" },
+      events: [
+        {
+          name: "purchase",
+          params: {
+            transaction_id: "in_send",
+            value: 12.43,
+            currency: "USD",
+            engagement_time_msec: 1,
+            session_id: "1790996390",
+            items: [{ item_id: "pro_100k", item_name: "MepMail Send", price: 12.43, quantity: 1 }],
+          },
+        },
+      ],
+    });
+    expect(init.body).not.toContain("private@example.invalid");
+    expect((await db.select().from(googleOutbox))[0]?.status).toBe("sent");
+    expect(await dispatchGoogleConversions(db, google, { fetch, now: () => now })).toEqual({
+      considered: 0,
+      sent: 0,
+    });
+  });
+
+  it("withdrawal cancels the pending purchase and erases the GA identity before any POST", async () => {
+    const f = await googleFixture();
+    await googlePurchase(f);
+    await saveAdvertisingConsent(
+      db,
+      { granted: false, proof: f.proof, userId: f.attempt.createdBy, sourceUrl: null },
+      now,
+    );
+    expect(await db.select().from(googleContexts)).toEqual([]);
+    expect((await db.select().from(googleOutbox))[0]).toMatchObject({
+      status: "cancelled",
+      lastFailure: "consent_withdrawn",
+    });
+    const fetch = acceptingGoogle();
+    await dispatchGoogleConversions(db, google, { fetch, now: () => now });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("retries server errors with backoff, gives up on rejections, and never reports the URL", async () => {
+    const f = await googleFixture();
+    await googlePurchase(f);
+    const failing = vi.fn<GoogleFetch>(async () => ({ status: 503 }));
+    await dispatchGoogleConversions(db, google, { fetch: failing, now: () => now });
+    const [retry] = await db.select().from(googleOutbox);
+    expect(retry).toMatchObject({ status: "pending", attempts: 1, lastFailure: "http_503" });
+    expect(required(retry).nextAttemptAt.getTime()).toBe(now.getTime() + 60_000);
+    await db.update(googleOutbox).set({ nextAttemptAt: now });
+    const rejecting = vi.fn<GoogleFetch>(async () => ({ status: 400 }));
+    await dispatchGoogleConversions(db, google, { fetch: rejecting, now: () => now });
+    const [dead] = await db.select().from(googleOutbox);
+    expect(dead).toMatchObject({ status: "dead", lastFailure: "http_400" });
+    expect(JSON.stringify(dead)).not.toContain("synthetic_secret_value");
+  });
+
+  it("does nothing while disabled or for a payment older than the capture", async () => {
+    const f = await googleFixture();
+    await googlePurchase(f, { enabled: false });
+    expect(await db.select().from(googleOutbox)).toEqual([]);
+    await db.update(googleContexts).set({ capturedAt: new Date(now.getTime() + 60_000) });
+    await googlePurchase(f);
+    expect(await db.select().from(googleOutbox)).toEqual([]);
+    const fetch = acceptingGoogle();
+    expect(
+      await dispatchGoogleConversions(db, { enabled: false }, { fetch, now: () => now }),
+    ).toEqual({ considered: 0, sent: 0 });
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.75",
+      "date": "2026-10-09",
+      "title": "Assinaturas medidas no Google Analytics",
+      "summary": "Quem permitiu a mensuração de publicidade e assina um plano pago do Envio passa a contar como compra no Google Analytics, enviada pelo nosso servidor.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A compra inicial de qualquer plano pago do Envio é enviada ao Google Analytics como purchase, com o plano e o valor, só para quem permitiu em Preferências de publicidade.",
+            "Retirar a permissão cancela o que ainda não foi enviado e apaga o identificador do Google Analytics guardado no checkout."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.74",
       "date": "2026-10-09",
       "title": "Apelidos nas caixas do Correio",

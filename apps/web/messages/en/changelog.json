@@ -23,6 +23,21 @@
   },
   "releases": [
     {
+      "version": "0.75",
+      "date": "2026-10-09",
+      "title": "Subscriptions measured in Google Analytics",
+      "summary": "When someone who allowed advertising measurement subscribes to a paid Send plan, it now counts as a purchase in Google Analytics, sent by our server.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "The initial purchase of any paid Send plan is sent to Google Analytics as a purchase, with the plan and amount, only for people who allowed it in Advertising preferences.",
+            "Withdrawing permission cancels anything not yet sent and erases the Google Analytics identifier kept at checkout."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.74",
       "date": "2026-10-09",
       "title": "Aliases for Mail inboxes",

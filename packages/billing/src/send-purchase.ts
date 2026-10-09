@@ -45,10 +45,12 @@ export function initialSendInvoiceFacts(input: {
   attempt: SendPurchaseAttempt;
   mailbox: boolean;
   canonicalPayment?: CanonicalInvoicePayment | null;
+  /** Google measures every paid Send rung; Meta keeps its two Pro rungs. */
+  anyRung?: boolean;
 }): SendInvoiceFacts | null {
   const { invoice: v, subscription: s, attempt: a } = input;
   if (
-    !["pro_100k", "pro_200k"].includes(a.rung) ||
+    (!input.anyRung && !["pro_100k", "pro_200k"].includes(a.rung)) ||
     input.mailbox ||
     s.trial_start != null ||
     s.trial_end != null

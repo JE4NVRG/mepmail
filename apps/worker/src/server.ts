@@ -1,9 +1,11 @@
 import { SQSClient } from "@aws-sdk/client-sqs";
 import {
   createStripe,
+  dispatchGoogleConversions,
   dispatchMetaConversions,
   isLiveKey,
   purgeStripeEvents,
+  readGoogleConversionConfig,
   readMetaConversionConfig,
   reconcileTeamPlan,
   reportOverage,
@@ -436,6 +438,10 @@ await queue.scheduleCrons({
       });
       if (result.sent > 0) console.log(`meta conversions: sent=${result.sent}`);
     }
+    const google = await dispatchGoogleConversions(db, readGoogleConversionConfig(process.env), {
+      fetch: (url, request) => fetch(url, request),
+    });
+    if (google.sent > 0) console.log(`google conversions: sent=${google.sent}`);
   },
   "broadcasts.reconcile": async () => {
     const requeued = await reconcileStalledBroadcasts(db, {

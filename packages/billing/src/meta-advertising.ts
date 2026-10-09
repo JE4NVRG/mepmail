@@ -23,6 +23,8 @@ import type { BillingStripe } from "./stripe.js";
 const receipts = schema.advertisingConsentReceipts;
 const contexts = schema.metaCheckoutContexts;
 const outbox = schema.metaConversionOutbox;
+const googleOutbox = schema.googleConversionOutbox;
+const googleContexts = schema.googleCheckoutContexts;
 type Attempt = typeof schema.sendCheckoutAttempts.$inferSelect;
 type Receipt = typeof receipts.$inferSelect;
 type Context = typeof contexts.$inferSelect;
@@ -30,7 +32,7 @@ type Outbox = typeof outbox.$inferSelect;
 const DELIVERY_MS = 24 * 60 * 60 * 1000;
 const CONTEXT_MS = 7 * DELIVERY_MS;
 
-function proofMatches(
+export function proofMatches(
   row: Receipt | undefined,
   proof: ConsentProof | null,
   now: Date,
@@ -44,7 +46,7 @@ function proofMatches(
     row.expiresAt > now
   );
 }
-function accepted(row: Receipt | undefined, now: Date): row is Receipt {
+export function accepted(row: Receipt | undefined, now: Date): row is Receipt {
   return (
     !!row &&
     row.state === "accepted" &&
@@ -57,7 +59,7 @@ function accepted(row: Receipt | undefined, now: Date): row is Receipt {
 function owned(row: Receipt, attempt: Attempt): boolean {
   return !!attempt.createdBy && row.userId === attempt.createdBy;
 }
-async function receiptFor(db: Db, id: string, lock = false) {
+export async function receiptFor(db: Db, id: string, lock = false) {
   const query = db.select().from(receipts).where(eq(receipts.id, id));
   const [row] = lock ? await query.for("update") : await query;
   return row;
@@ -109,6 +111,16 @@ export async function saveAdvertisingConsent(
         .update(contexts)
         .set({ eligible: false, fbp: null, fbc: null })
         .where(eq(contexts.consentReceiptId, previous.id));
+      await tx
+        .update(googleOutbox)
+        .set({ status: "cancelled", leaseUntil: null, lastFailure: "consent_withdrawn" })
+        .where(
+          and(
+            eq(googleOutbox.consentReceiptId, previous.id),
+            inArray(googleOutbox.status, ["pending", "leased"]),
+          ),
+        );
+      await tx.delete(googleContexts).where(eq(googleContexts.consentReceiptId, previous.id));
       return {
         proof: input.proof!,
         state: "denied" as const,
@@ -152,6 +164,16 @@ export async function saveAdvertisingConsent(
         .update(contexts)
         .set({ eligible: false, fbp: null, fbc: null })
         .where(eq(contexts.consentReceiptId, previous.id));
+      await tx
+        .update(googleOutbox)
+        .set({ status: "cancelled", leaseUntil: null, lastFailure: "consent_withdrawn" })
+        .where(
+          and(
+            eq(googleOutbox.consentReceiptId, previous.id),
+            inArray(googleOutbox.status, ["pending", "leased"]),
+          ),
+        );
+      await tx.delete(googleContexts).where(eq(googleContexts.consentReceiptId, previous.id));
     }
     const proof = newConsentProof(now);
     await tx.insert(receipts).values({

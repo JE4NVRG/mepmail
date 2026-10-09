@@ -3,6 +3,7 @@ import { type PlanRungKey, rungByKey } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { and, eq, ne, sql } from "drizzle-orm";
 import type Stripe from "stripe";
+import { type GoogleCheckoutAdvertising, prepareGoogleCheckout } from "./google-advertising.js";
 import {
   isMailboxSubscription,
   MAILBOX_CUSTOMER_METADATA_KEY,
@@ -56,6 +57,7 @@ export interface SendCheckoutDeps {
   stripe: BillingStripe;
   livemode: boolean;
   advertising?: MetaCheckoutAdvertising;
+  googleAdvertising?: GoogleCheckoutAdvertising;
   /** Enable only after the account's immutable launch prices and coupon are verified. */
   launchOfferEnabled?: boolean;
 }
@@ -439,6 +441,7 @@ export async function beginSendCheckout(
       .returning();
     if (!attempt) throw new SendCheckoutError("unknown");
     await prepareMetaCheckout(tx, attempt, deps.advertising, attempt.createdAt);
+    await prepareGoogleCheckout(tx, attempt, deps.googleAdvertising, attempt.createdAt);
     return attempt;
   });
   const claim = await deps.db.transaction(async (transaction) => {

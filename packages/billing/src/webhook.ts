@@ -4,6 +4,7 @@ import { and, eq, inArray, lt } from "drizzle-orm";
 import type Stripe from "stripe";
 import { mailboxManagementRequests } from "../../db/src/schema/mailbox-management-requests.js";
 import type { BillingDeps } from "./checkout.js";
+import { type GoogleConversionConfig, recordGooglePurchase } from "./google-advertising.js";
 import { isMailboxSubscription, type MailboxCatalog } from "./mailbox.js";
 import { applyMailboxSubscription } from "./mailbox-lifecycle.js";
 import { recordMetaPurchase } from "./meta-advertising.js";
@@ -17,6 +18,7 @@ export interface WebhookDeps extends BillingDeps {
   /** Mode of the configured API key; events from the other mode are rejected. */
   livemode: boolean;
   advertisingConfig?: MetaConversionConfig;
+  googleConversionConfig?: GoogleConversionConfig;
   /** Presence opts into the independent Mail ledger. Null closes paid Mail access. */
   mailboxCatalog?: MailboxCatalog | null;
   /**
@@ -166,6 +168,13 @@ export async function handleWebhook(
       sub,
       mail || !!projected?.applied,
       deps.advertisingConfig,
+    );
+    await recordGooglePurchase(
+      tx as unknown as Db,
+      event,
+      sub,
+      mail || !!projected?.applied,
+      deps.googleConversionConfig,
     );
     return {
       id: event.id,

@@ -16,6 +16,13 @@ export {
   hasLiveSubscription,
 } from "./checkout.js";
 export {
+  dispatchGoogleConversions,
+  type GoogleCheckoutAdvertising,
+  type GoogleConversionConfig,
+  googleConversionConfigured,
+  readGoogleConversionConfig,
+} from "./google-advertising.js";
+export {
   createMailboxCheckoutSession,
   isMailboxSubscription,
   MAILBOX_CHECKOUT_METADATA_KEY,

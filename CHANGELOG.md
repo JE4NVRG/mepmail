@@ -7,6 +7,24 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.75] - 2026-10-09
+
+Paid Send subscriptions reported to Google Analytics from the server.
+
+### Added
+
+- `google_checkout_contexts` and `google_conversion_outbox` (migration
+  0051). At the first financial intent, under an accepted `ads-v2` consent,
+  the checkout keeps the `_ga` client id and the GA session id; the initial
+  `invoice.payment_succeeded` of any paid Send rung queues one GA4
+  `purchase` (transaction id = Stripe invoice, value, USD, rung) in the
+  webhook transaction. The worker sends it over the Measurement Protocol
+  (`GA4_CONVERSIONS_ENABLED`, `GA4_API_SECRET`, `GA4_MEASUREMENT_ID`) with
+  `ad_user_data` granted and `ad_personalization` denied, re-checking the
+  consent under its lock, retrying 429/5xx with backoff for up to 72 hours.
+- Withdrawing or replacing the consent cancels pending Google deliveries and
+  deletes the captured GA identity. Privacy policy updated.
+
 ## [0.74] - 2026-10-09
 
 Mailbox aliases; optional Google Analytics on public pages; "Mail" in English.

@@ -6,9 +6,11 @@ import {
   changeRung,
   createPortalSession,
   decodeConsentProof,
+  googleConversionConfigured,
   hasLiveSubscription,
   isLiveKey,
   metaConversionConfigured,
+  readGoogleConversionConfig,
   readMetaConversionConfig,
   rungFromSubscription,
   SendCheckoutError,
@@ -119,17 +121,19 @@ const billingPageUrl = () => `${resolveBaseUrl(env.APP_BASE_URL)}/settings/billi
 /** Only trusted request cookies enter the server-only advertising context. */
 async function checkoutAdvertising() {
   const config = readMetaConversionConfig(process.env);
-  if (!metaConversionConfigured(config)) return {};
+  const google = readGoogleConversionConfig(process.env);
+  const meta = metaConversionConfigured(config);
+  if (!meta && !googleConversionConfigured(google)) return {};
   const cookieHeader = (await headers()).get("cookie");
+  const proof = decodeConsentProof(
+    advertisingCookie(cookieHeader, ADVERTISING_CONSENT_COOKIE),
+    env.BETTER_AUTH_SECRET ?? "",
+  );
   return {
-    advertising: {
-      config,
-      cookieHeader,
-      proof: decodeConsentProof(
-        advertisingCookie(cookieHeader, ADVERTISING_CONSENT_COOKIE),
-        env.BETTER_AUTH_SECRET ?? "",
-      ),
-    },
+    ...(meta ? { advertising: { config, cookieHeader, proof } } : {}),
+    ...(googleConversionConfigured(google)
+      ? { googleAdvertising: { config: google, cookieHeader, proof } }
+      : {}),
   };
 }
 

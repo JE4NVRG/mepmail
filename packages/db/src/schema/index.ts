@@ -12,6 +12,7 @@ export * from "./domains.js";
 export * from "./email-insights.js";
 export * from "./emails.js";
 export * from "./funnel.js";
+export * from "./google-advertising.js";
 export * from "./idempotency.js";
 export * from "./instance-probes.js";
 export * from "./instance-settings.js";

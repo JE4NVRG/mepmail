@@ -143,7 +143,7 @@
         "title": "5. Subprocessadores",
         "body": [
           "Usamos uma lista deliberadamente curta de provedores para operar o serviço:",
-          "Se você permitir a mensuração de publicidade, a Meta e o Google recebem os eventos opcionais descritos nesta política: a Meta pelo Pixel e pelos eventos de compra, o Google pelo Google Analytics nas páginas públicas. Essas conexões também informam o endereço IP e informações do navegador. Cada empresa trata esses dados conforme a sua própria política de privacidade. Não ativamos os sinais do Google nem a personalização de anúncios, e a mensuração não é necessária para usar o MepMail."
+          "Se você permitir a mensuração de publicidade, a Meta e o Google recebem os eventos opcionais descritos nesta política: a Meta pelo Pixel e pelos eventos de compra, o Google pelo Google Analytics nas páginas públicas e pela compra inicial de plano pago, que o nosso servidor envia com o identificador do cookie do Google Analytics, o plano e o valor. Essas conexões também informam o endereço IP e informações do navegador. Cada empresa trata esses dados conforme a sua própria política de privacidade. Não ativamos os sinais do Google nem a personalização de anúncios, e a mensuração não é necessária para usar o MepMail."
         ],
         "list": [
           "Amazon Web Services (Amazon SES) — entrega de e-mails e notificações de eventos. Conteúdo e metadados das mensagens passam por ele para a entrega.",
