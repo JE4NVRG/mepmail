@@ -6,8 +6,18 @@ export const META_PIXEL_ID =
     ? configuredPixelId
     : "1418150576403119";
 export const META_ORIGIN = "https://mepmail.dev";
-/** Public offer documents that may load the Pixel after consent (CSP mirrors this in next.config.ts). */
-export const META_PUBLIC_PATHS: ReadonlySet<string> = new Set(["/", "/pricing", "/correio"]);
+/**
+ * Public offer documents that may load the Pixel or the Google tag after consent
+ * (CSP mirrors this in next.config.ts). Every page an ad lands on belongs here, or
+ * a purchase after that visit cannot be attributed to the ad.
+ */
+export const META_PUBLIC_PATHS: ReadonlySet<string> = new Set([
+  "/",
+  "/pricing",
+  "/correio",
+  "/alternatives/resend",
+  "/integrations",
+]);
 const PUBLIC_PATHS = META_PUBLIC_PATHS;
 /** Product pages: ViewContent on arrival instead of when the plans section shows. */
 const VIEW_CONTENT = new Map([

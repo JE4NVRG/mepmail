@@ -61,6 +61,8 @@ vi.mock("@millionsend/core", async () => {
     MailboxContentError: UnusedMailboxError,
     MailboxRegistryError: UnusedMailboxError,
     MailboxServiceError: UnusedMailboxError,
+    // Read when the router module loads (folder color input).
+    MAILBOX_FOLDER_COLORS: ["violet", "blue", "green", "amber", "red", "pink", "teal", "gray"],
   };
 });
 vi.mock("@/server/auth", () => ({ getAuth: vi.fn(), resolveBaseUrl: (base: string) => base }));

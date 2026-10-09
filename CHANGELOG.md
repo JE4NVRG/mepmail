@@ -7,6 +7,36 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.78] - 2026-10-09
+
+Server groundwork for the new Mail inbox; ad landing pages measured.
+
+### Added
+
+- `mailboxes.items` takes `cursor` (the previous page's opaque `nextCursor`),
+  `limit` (default 50, max 100) and `groupByThread`; it returns `nextCursor`
+  and `mailboxesTruncated` (`limited` keeps meaning "not everything is shown").
+  Pages are ordered by arrival (a draft by its last edit) to the microsecond,
+  so they never skip or repeat a row across mailboxes. Every row carries
+  `threadKey` and `threadUnread`; with `groupByThread` a conversation appears
+  once, as its newest message in the view.
+- Folders: `color` (eight named tokens or null) and a manual `position`
+  (mailbox migration 0021 backfills the current alphabetical order);
+  `updateFolder` takes `name` and/or `color` and reports `renamed`;
+  `reorderFolders` takes the full active set; `folders({ mailboxId: null })`
+  lists the folders of every mailbox the user owns; `folderCounts` returns
+  unread and total for Inbox, Spam and each folder.
+- `mailboxes.preferences.get` / `.set`: per-user inbox display preferences in
+  `mailbox_user_preferences`, defaults filled by the server, a rejected field
+  named in the error (`invalid_preference:<field>`).
+- GET /api/mailbox-agent/items accepts `cursor` and `limit`.
+
+### Changed
+
+- Optional Meta Pixel and Google tag paths (after consent) add
+  /alternatives/resend and /integrations, the pages the Search ads land on;
+  the public CSP mirrors them.
+
 ## [0.77] - 2026-10-09
 
 Migration assistant: discover an old account's addresses and create them here.

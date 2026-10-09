@@ -1,6 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  notExists,
+  or,
+  sql,
+} from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import {
   BOUND_ENVELOPE_VERSION_OFFSET,
   decryptPayload,
@@ -230,23 +243,36 @@ const conversationMember = (mailboxId: string, teamId: string) => [
   eq(schema.mailboxItems.deliveryFolder, "inbox"),
 ];
 
-/** How many live messages each listed conversation has in one mailbox (for the list's count). */
-export async function countMailboxThreads(
+/**
+ * Each listed conversation in one mailbox: its live messages and how many of the
+ * received ones the owner has not opened yet (for the list's count and unread mark).
+ */
+export function summarizeMailboxThreads(
   db: Db,
   actor: MailboxContentActor,
   mailboxId: string,
   threadKeys: (string | null)[],
-): Promise<Map<string, number>> {
+): Promise<Map<string, { count: number; unread: number }>> {
+  return threadSummary(db, actor, mailboxId, threadKeys, 101);
+}
+async function threadSummary(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxId: string,
+  threadKeys: (string | null)[],
+  cap: number,
+): Promise<Map<string, { count: number; unread: number }>> {
   actor = { ...actor };
   const keys = [
     ...new Set(threadKeys.filter((key): key is string => !!key && THREAD_KEY.test(key))),
-  ].slice(0, 100);
+  ].slice(0, cap);
   if (!keys.length) return new Map();
   return scoped(db, actor, mailboxId, "read", false, async (tx) => {
     const rows = await tx
       .select({
         threadKey: schema.mailboxItems.threadKey,
         count: sql<number>`count(*)::int`,
+        unread: sql<number>`(count(*) filter (where ${schema.mailboxItems.kind} = 'inbox' and ${schema.mailboxItems.seenAt} is null))::int`,
       })
       .from(schema.mailboxItems)
       .where(
@@ -256,8 +282,24 @@ export async function countMailboxThreads(
         ),
       )
       .groupBy(schema.mailboxItems.threadKey);
-    return new Map(rows.map((row) => [row.threadKey as string, Number(row.count)]));
+    return new Map(
+      rows.map((row) => [
+        row.threadKey as string,
+        { count: Number(row.count), unread: Number(row.unread) },
+      ]),
+    );
   });
+}
+
+/** How many live messages each listed conversation has in one mailbox (for the list's count). */
+export async function countMailboxThreads(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxId: string,
+  threadKeys: (string | null)[],
+): Promise<Map<string, number>> {
+  const summary = await threadSummary(db, actor, mailboxId, threadKeys, 100);
+  return new Map([...summary].map(([key, value]) => [key, value.count]));
 }
 
 /** The conversation an item belongs to, oldest first and bounded; content stays sealed here. */
@@ -361,73 +403,139 @@ export async function withMailboxItem<T>(
   });
 }
 
-/** Bounded metadata listing. Content is decrypted only by a separate authorized read. */
+export interface MailboxListFilter {
+  kind?: "inbox" | "draft" | "sent";
+  deliveryFolder?: "inbox" | "spam" | "quarantine";
+  trashed?: boolean;
+  starred?: boolean;
+  folderId?: string | null;
+  safeOnly?: boolean;
+  /** true: the Archive view; false: views that archived items leave. */
+  archived?: boolean;
+}
+/** A position in a listing: the row's order time in epoch microseconds, then its id. */
+export interface MailboxListPosition {
+  at: string;
+  id: string;
+}
+const LIST_POSITION_AT = /^[0-9]{1,17}$/;
+const LIST_POSITION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+type ItemColumns = typeof schema.mailboxItems;
+
+/** Arrival time; a draft by its last edit, the order every listing shows. */
+function listOrder(items: ItemColumns, kind: MailboxListFilter["kind"]) {
+  if (kind === "draft") return sql`${items.updatedAt}`;
+  if (kind) return sql`${items.createdAt}`;
+  return sql`(case when ${items.kind} = 'draft' then ${items.updatedAt} else ${items.createdAt} end)`;
+}
+function listConditions(
+  items: ItemColumns,
+  actor: MailboxContentActor,
+  mailboxId: string,
+  filter: MailboxListFilter | undefined,
+) {
+  return [
+    eq(items.mailboxId, mailboxId),
+    eq(items.teamId, actor.teamId),
+    ...(filter?.kind ? [eq(items.kind, filter.kind)] : []),
+    filter?.trashed === true && !actor.agentAccess
+      ? isNotNull(items.trashedAt)
+      : isNull(items.trashedAt),
+    ...(filter?.deliveryFolder ? [eq(items.deliveryFolder, filter.deliveryFolder)] : []),
+    ...(filter?.starred ? [isNotNull(items.starredAt)] : []),
+    ...(filter?.archived === true
+      ? [isNotNull(items.archivedAt)]
+      : filter?.archived === false
+        ? [isNull(items.archivedAt)]
+        : []),
+    ...(filter?.folderId === null
+      ? [isNull(items.folderId)]
+      : filter?.folderId
+        ? [eq(items.folderId, filter.folderId)]
+        : []),
+    ...(filter?.safeOnly ? [eq(items.deliveryFolder, "inbox")] : []),
+    ...(actor.agentAccess ? [eq(items.deliveryFolder, "inbox")] : []),
+  ];
+}
+/** Exact to the microsecond: integer arithmetic, no float round trip. */
+const positionTime = (at: string) =>
+  sql`(timestamptz 'epoch' + ${at}::bigint * interval '1 microsecond')`;
+
+/**
+ * Bounded metadata listing, newest first. Content is decrypted only by a separate
+ * authorized read. `before` continues after a row the caller already showed;
+ * `latestPerThread` keeps only the newest row of each conversation in this view.
+ */
 export async function listMailboxItems(
   db: Db,
   actor: MailboxContentActor,
   mailboxId: string,
-  filter?: {
-    kind?: "inbox" | "draft" | "sent";
-    deliveryFolder?: "inbox" | "spam" | "quarantine";
-    trashed?: boolean;
-    starred?: boolean;
-    folderId?: string | null;
-    safeOnly?: boolean;
-    /** true: the Archive view; false: views that archived items leave. */
-    archived?: boolean;
-  },
+  filter?: MailboxListFilter,
+  page?: { before?: MailboxListPosition; limit?: number; latestPerThread?: boolean },
 ) {
   actor = { ...actor };
   filter = filter ? { ...filter } : undefined;
+  page = page ? { ...page, ...(page.before ? { before: { ...page.before } } : {}) } : undefined;
   if (actor.agentAccess && filter?.trashed) throw new MailboxContentError("forbidden");
+  const limit = page?.limit ?? 100;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 101)
+    throw new MailboxContentError("invalid");
+  const before = page?.before;
+  if (before && (!LIST_POSITION_AT.test(before.at) || !LIST_POSITION_ID.test(before.id)))
+    throw new MailboxContentError("invalid");
+  const items = schema.mailboxItems;
+  const order = listOrder(items, filter?.kind);
   return scoped(db, actor, mailboxId, "read", false, async (tx) => {
-    const items = await tx
+    const newer = alias(schema.mailboxItems, "newer_in_thread");
+    const latest = page?.latestPerThread
+      ? [
+          or(
+            isNull(items.threadKey),
+            notExists(
+              tx
+                .select({ one: sql`1` })
+                .from(newer)
+                .where(
+                  and(
+                    ...listConditions(newer as unknown as ItemColumns, actor, mailboxId, filter),
+                    eq(newer.threadKey, items.threadKey),
+                    sql`(${listOrder(newer as unknown as ItemColumns, filter?.kind)}, ${newer.id}) > (${order}, ${items.id})`,
+                  ),
+                ),
+            ),
+          ),
+        ]
+      : [];
+    return tx
       .select({
-        id: schema.mailboxItems.id,
-        mailboxId: schema.mailboxItems.mailboxId,
-        kind: schema.mailboxItems.kind,
-        deliveryFolder: schema.mailboxItems.deliveryFolder,
-        inboundAssessment: schema.mailboxItems.inboundAssessment,
-        trashedAt: schema.mailboxItems.trashedAt,
-        starredAt: schema.mailboxItems.starredAt,
-        seenAt: schema.mailboxItems.seenAt,
-        archivedAt: schema.mailboxItems.archivedAt,
-        folderId: schema.mailboxItems.folderId,
-        threadKey: schema.mailboxItems.threadKey,
-        revision: schema.mailboxItems.revision,
-        createdAt: schema.mailboxItems.createdAt,
-        updatedAt: schema.mailboxItems.updatedAt,
+        id: items.id,
+        mailboxId: items.mailboxId,
+        kind: items.kind,
+        deliveryFolder: items.deliveryFolder,
+        inboundAssessment: items.inboundAssessment,
+        trashedAt: items.trashedAt,
+        starredAt: items.starredAt,
+        seenAt: items.seenAt,
+        archivedAt: items.archivedAt,
+        folderId: items.folderId,
+        threadKey: items.threadKey,
+        revision: items.revision,
+        createdAt: items.createdAt,
+        updatedAt: items.updatedAt,
+        orderAt: sql<string>`(extract(epoch from ${order}) * 1000000)::bigint::text`,
       })
-      .from(schema.mailboxItems)
+      .from(items)
       .where(
         and(
-          eq(schema.mailboxItems.mailboxId, mailboxId),
-          eq(schema.mailboxItems.teamId, actor.teamId),
-          ...(filter?.kind ? [eq(schema.mailboxItems.kind, filter.kind)] : []),
-          filter?.trashed === true && !actor.agentAccess
-            ? isNotNull(schema.mailboxItems.trashedAt)
-            : isNull(schema.mailboxItems.trashedAt),
-          ...(filter?.deliveryFolder
-            ? [eq(schema.mailboxItems.deliveryFolder, filter.deliveryFolder)]
+          ...listConditions(items, actor, mailboxId, filter),
+          ...(before
+            ? [sql`(${order}, ${items.id}) < (${positionTime(before.at)}, ${before.id}::uuid)`]
             : []),
-          ...(filter?.starred ? [isNotNull(schema.mailboxItems.starredAt)] : []),
-          ...(filter?.archived === true
-            ? [isNotNull(schema.mailboxItems.archivedAt)]
-            : filter?.archived === false
-              ? [isNull(schema.mailboxItems.archivedAt)]
-              : []),
-          ...(filter?.folderId === null
-            ? [isNull(schema.mailboxItems.folderId)]
-            : filter?.folderId
-              ? [eq(schema.mailboxItems.folderId, filter.folderId)]
-              : []),
-          ...(filter?.safeOnly ? [eq(schema.mailboxItems.deliveryFolder, "inbox")] : []),
-          ...(actor.agentAccess ? [eq(schema.mailboxItems.deliveryFolder, "inbox")] : []),
+          ...latest,
         ),
       )
-      .orderBy(desc(schema.mailboxItems.createdAt), desc(schema.mailboxItems.id))
-      .limit(100);
-    return items;
+      .orderBy(desc(order), desc(items.id))
+      .limit(limit);
   });
 }
 
@@ -458,6 +566,76 @@ export async function countUnreadMailboxItems(
         ),
       );
     return row?.count ?? 0;
+  });
+}
+
+export interface MailboxViewCount {
+  unread: number;
+  total: number;
+}
+/**
+ * Totals for the folder rail: the Inbox and Spam views and each named folder, with
+ * how many received messages the owner has not opened. Same rules as the views:
+ * nothing trashed; Inbox leaves out archived and filed messages; folders hold only
+ * safe messages of any kind. Agents have no rail.
+ */
+export async function countMailboxViews(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxId: string,
+): Promise<{
+  inbox: MailboxViewCount;
+  spam: MailboxViewCount;
+  folders: Map<string, MailboxViewCount>;
+}> {
+  actor = { ...actor };
+  if (actor.agentAccess) throw new MailboxContentError("forbidden");
+  return scoped(db, actor, mailboxId, "read", false, async (tx) => {
+    const items = schema.mailboxItems;
+    const rows = await tx
+      .select({
+        folderId: items.folderId,
+        deliveryFolder: items.deliveryFolder,
+        kind: items.kind,
+        archived: sql<boolean>`${items.archivedAt} is not null`,
+        total: sql<number>`count(*)::int`,
+        unread: sql<number>`(count(*) filter (where ${items.seenAt} is null))::int`,
+      })
+      .from(items)
+      .where(
+        and(
+          eq(items.mailboxId, mailboxId),
+          eq(items.teamId, actor.teamId),
+          isNull(items.trashedAt),
+        ),
+      )
+      .groupBy(
+        items.folderId,
+        items.deliveryFolder,
+        items.kind,
+        sql`${items.archivedAt} is not null`,
+      );
+    const inbox = { unread: 0, total: 0 };
+    const spam = { unread: 0, total: 0 };
+    const folders = new Map<string, MailboxViewCount>();
+    for (const row of rows) {
+      const total = Number(row.total);
+      const unread = row.kind === "inbox" ? Number(row.unread) : 0;
+      if (row.folderId) {
+        if (row.deliveryFolder !== "inbox") continue;
+        const folder = folders.get(row.folderId) ?? { unread: 0, total: 0 };
+        folder.total += total;
+        folder.unread += unread;
+        folders.set(row.folderId, folder);
+      } else if (row.kind === "inbox" && row.deliveryFolder === "inbox" && !row.archived) {
+        inbox.total += total;
+        inbox.unread += unread;
+      } else if (row.kind === "inbox" && row.deliveryFolder === "spam") {
+        spam.total += total;
+        spam.unread += unread;
+      }
+    }
+    return { inbox, spam, folders };
   });
 }
 

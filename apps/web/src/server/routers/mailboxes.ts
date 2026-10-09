@@ -18,9 +18,9 @@ import {
   listMailboxActivity,
   listMailboxAgentKeys,
   listMailboxAliases,
-  listMailboxFolders,
   listMailboxRegistry,
   listMailboxTeamAgentKeys,
+  MAILBOX_FOLDER_COLORS,
   MailboxAgentAccessError,
   MailboxContentError,
   MailboxRegistryError,
@@ -28,6 +28,7 @@ import {
   mailboxServiceState,
   queueMailboxDraft,
   removeMailboxAlias,
+  reorderMailboxFolders,
   revokeMailboxAgentKey,
   revokeMailboxRegistry,
   revokeMailboxTeamAgentKey,
@@ -64,6 +65,8 @@ import {
 import {
   getMailboxContent,
   getMailboxContentList,
+  getMailboxFolderCounts,
+  getMailboxRailFolders,
   getMailboxThread,
   getMailboxUnreadCounts,
   saveMailboxContentDraft,
@@ -77,6 +80,11 @@ import {
   migrationStatus,
   planMigration,
 } from "../mailbox-migration/service";
+import {
+  getMailboxPreferences,
+  MailboxPreferenceError,
+  setMailboxPreferences,
+} from "../mailbox-preferences";
 import { mailboxReceivingDeps } from "../mailbox-receiving";
 import { mailboxTransportMime } from "../mailbox-transport";
 import { getMailboxUsage } from "../mailbox-usage";
@@ -172,6 +180,7 @@ const migrationItems = z
       .strict(),
   )
   .max(500);
+const folderColor = z.enum(MAILBOX_FOLDER_COLORS).nullable();
 const actor = (ctx: { teamId: string; session: { user: { id: string } } }) => ({
   teamId: ctx.teamId,
   userId: ctx.session.user.id,
@@ -546,11 +555,23 @@ export const mailboxesRouter = router({
   usage: enabled
     .input(z.object({ mailboxId: z.uuid().nullable() }).strict())
     .query(({ ctx, input }) => call(() => getMailboxUsage(ctx.db, actor(ctx), input))),
+  // null: the folders of every mailbox the user owns (each with its mailboxId).
   folders: enabled
-    .input(z.object({ mailboxId: z.uuid() }).strict())
-    .query(({ ctx, input }) => call(() => listMailboxFolders(ctx.db, actor(ctx), input))),
+    .input(z.object({ mailboxId: z.uuid().nullable() }).strict())
+    .query(({ ctx, input }) => call(() => getMailboxRailFolders(ctx.db, actor(ctx), input))),
+  folderCounts: enabled
+    .input(z.object({ mailboxId: z.uuid().nullable() }).strict())
+    .query(({ ctx, input }) => call(() => getMailboxFolderCounts(ctx.db, actor(ctx), input))),
   createFolder: enabled
-    .input(z.object({ mailboxId: z.uuid(), name: z.string().min(1).max(80) }).strict())
+    .input(
+      z
+        .object({
+          mailboxId: z.uuid(),
+          name: z.string().min(1).max(80),
+          color: folderColor.optional(),
+        })
+        .strict(),
+    )
     .mutation(({ ctx, input }) =>
       call(() =>
         ctx.db.transaction(async (transaction) => {
@@ -576,16 +597,19 @@ export const mailboxesRouter = router({
           mailboxId: z.uuid(),
           id: z.uuid(),
           expectedRevision: z.number().int().min(1).max(2147483646),
-          name: z.string().min(1).max(80),
+          name: z.string().min(1).max(80).optional(),
+          color: folderColor.optional(),
         })
-        .strict(),
+        .strict()
+        .refine((value) => value.name !== undefined || value.color !== undefined),
     )
     .mutation(({ ctx, input }) =>
       call(() =>
         ctx.db.transaction(async (transaction) => {
           const db = transaction as unknown as Db;
           const result = await updateMailboxFolder(db, actor(ctx), input);
-          if (result.changed)
+          // A color is presentation, like read state; only a new name is activity.
+          if (result.renamed)
             await appendMailboxActivity(
               db,
               {
@@ -599,6 +623,10 @@ export const mailboxesRouter = router({
         }),
       ),
     ),
+  // Manual order only: no activity entry and no folder revision change.
+  reorderFolders: enabled
+    .input(z.object({ mailboxId: z.uuid(), ids: z.array(z.uuid()).max(50) }).strict())
+    .mutation(({ ctx, input }) => call(() => reorderMailboxFolders(ctx.db, actor(ctx), input))),
   archiveFolder: enabled
     .input(
       z
@@ -752,9 +780,26 @@ export const mailboxesRouter = router({
         ]),
         customFolderId: z.uuid().optional(),
         mailboxKind: z.enum(["person", "agent"]).optional(),
+        // The previous page's nextCursor; omitted for the first page.
+        cursor: z.string().min(1).max(80).optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+        groupByThread: z.boolean().optional(),
       }),
     )
     .query(({ ctx, input }) => call(() => getMailboxContentList(ctx.db, actor(ctx), input))),
+  preferences: router({
+    get: enabled.query(({ ctx }) => getMailboxPreferences(ctx.db, ctx.session.user.id)),
+    // Only the changed fields; returns the full object with server defaults.
+    set: enabled.input(z.record(z.string(), z.unknown())).mutation(async ({ ctx, input }) => {
+      try {
+        return await setMailboxPreferences(ctx.db, ctx.session.user.id, input);
+      } catch (error) {
+        if (error instanceof MailboxPreferenceError)
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        throw error;
+      }
+    }),
+  }),
   item: enabled
     .input(z.object({ mailboxId: z.uuid(), id: z.uuid() }))
     .query(({ ctx, input }) => call(() => getMailboxContent(ctx.db, actor(ctx), input))),

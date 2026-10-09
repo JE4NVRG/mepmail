@@ -9,6 +9,9 @@ export async function GET(request: Request) {
     .object({
       id: z.uuid().optional(),
       folder: z.enum(["inbox", "drafts", "sent"]).default("inbox"),
+      // The previous page's nextCursor; pages are newest first.
+      cursor: z.string().min(1).max(80).optional(),
+      limit: z.coerce.number().int().min(1).max(100).optional(),
     })
     .strict()
     .safeParse(Object.fromEntries(url.searchParams));
@@ -29,7 +32,12 @@ export async function GET(request: Request) {
       });
       return result;
     }
-    const result = await getMailboxContentList(db, actor, { mailboxId, folder: query.data.folder });
+    const result = await getMailboxContentList(db, actor, {
+      mailboxId,
+      folder: query.data.folder,
+      ...(query.data.cursor ? { cursor: query.data.cursor } : {}),
+      ...(query.data.limit ? { limit: query.data.limit } : {}),
+    });
     await appendMailboxActivity(db, context, {
       action: "mailbox.items_listed",
       folder: query.data.folder,

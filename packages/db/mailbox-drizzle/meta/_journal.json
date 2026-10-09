@@ -148,6 +148,13 @@
       "when": 1791039600020,
       "tag": "0020_mailbox_aliases",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791558000021,
+      "tag": "0021_mailbox_inbox_personalization",
+      "breakpoints": true
     }
   ]
 }

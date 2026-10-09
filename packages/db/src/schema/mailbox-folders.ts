@@ -20,6 +20,11 @@ export const mailboxFolders = pgTable(
     teamId: uuid("team_id").notNull(),
     mailboxId: uuid("mailbox_id").notNull(),
     name: text("name").notNull(),
+    // Presentation only: a named color token and the owner's manual order.
+    color: text("color").$type<
+      "violet" | "blue" | "green" | "amber" | "red" | "pink" | "teal" | "gray"
+    >(),
+    position: integer("position").notNull().default(0),
     revision: integer("revision").notNull().default(1),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -41,5 +46,10 @@ export const mailboxFolders = pgTable(
       sql`char_length(${t.name}) between 1 and 80 and ${t.name} = btrim(${t.name})`,
     ),
     check("mailbox_folders_revision_check", sql`${t.revision} >= 1`),
+    check(
+      "mailbox_folders_color_check",
+      sql`${t.color} is null or ${t.color} in ('violet','blue','green','amber','red','pink','teal','gray')`,
+    ),
+    check("mailbox_folders_position_check", sql`${t.position} between 0 and 10000`),
   ],
 );

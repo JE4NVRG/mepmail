@@ -23,6 +23,7 @@ export * from "./mailbox-customer-requests.js";
 export * from "./mailbox-folders.js";
 export * from "./mailbox-items.js";
 export * from "./mailbox-management-requests.js";
+export * from "./mailbox-preferences.js";
 export * from "./mailbox-subscriptions.js";
 export * from "./mailbox-transport.js";
 export * from "./mailboxes.js";

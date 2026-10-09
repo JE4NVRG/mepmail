@@ -9,6 +9,19 @@ import {
 } from "./mailbox-private-store.js";
 
 const MAX_FOLDERS = 50;
+/** Named color tokens the UI maps to its palette; null shows the neutral default. */
+export const MAILBOX_FOLDER_COLORS = [
+  "violet",
+  "blue",
+  "green",
+  "amber",
+  "red",
+  "pink",
+  "teal",
+  "gray",
+] as const;
+export type MailboxFolderColor = (typeof MAILBOX_FOLDER_COLORS)[number];
+const color = z.enum(MAILBOX_FOLDER_COLORS).nullable();
 const revision = z.number().int().min(1).max(2147483646);
 const mailbox = z.object({ mailboxId: z.uuid() }).strict();
 const folderMutation = z
@@ -36,7 +49,10 @@ function name(value: string) {
 function folderDto(folder: Folder) {
   return {
     id: folder.id,
+    mailboxId: folder.mailboxId,
     name: folder.name,
+    color: folder.color ?? null,
+    position: folder.position,
     revision: folder.revision,
     archivedAt: folder.archivedAt,
     createdAt: folder.createdAt,
@@ -119,7 +135,12 @@ export async function listMailboxFolders(
           isNull(schema.mailboxFolders.archivedAt),
         ),
       )
-      .orderBy(asc(schema.mailboxFolders.name), asc(schema.mailboxFolders.id))
+      // The owner's manual order; new folders go last, ties fall back to the name.
+      .orderBy(
+        asc(schema.mailboxFolders.position),
+        asc(schema.mailboxFolders.name),
+        asc(schema.mailboxFolders.id),
+      )
       .limit(MAX_FOLDERS);
     return folders.map(folderDto);
   });
@@ -128,15 +149,21 @@ export async function listMailboxFolders(
 export async function createMailboxFolder(
   db: Db,
   actor: MailboxContentActor,
-  input: { mailboxId: string; name: string },
+  input: { mailboxId: string; name: string; color?: MailboxFolderColor | null | undefined },
 ) {
   actor = { ...actor };
-  const parsed = parse(mailbox.extend({ name: z.string() }).strict(), input);
+  const parsed = parse(
+    mailbox.extend({ name: z.string(), color: color.optional() }).strict(),
+    input,
+  );
   const folderName = name(parsed.name);
   return withMailboxOrganizationAccess(db, actor, parsed.mailboxId, async (tx) => {
     await uniqueName(tx, actor, parsed.mailboxId, folderName);
     const [total] = await tx
-      .select({ count: sql<number>`count(*)::int` })
+      .select({
+        count: sql<number>`count(*)::int`,
+        last: sql<number | null>`max(${schema.mailboxFolders.position})`,
+      })
       .from(schema.mailboxFolders)
       .where(
         and(
@@ -146,31 +173,57 @@ export async function createMailboxFolder(
         ),
       );
     if ((total?.count ?? 0) >= MAX_FOLDERS) throw new MailboxContentError("conflict");
+    const last = total?.last === null || total?.last === undefined ? -1 : Number(total.last);
     const [folder] = await tx
       .insert(schema.mailboxFolders)
-      .values({ teamId: actor.teamId, mailboxId: parsed.mailboxId, name: folderName })
+      .values({
+        teamId: actor.teamId,
+        mailboxId: parsed.mailboxId,
+        name: folderName,
+        color: parsed.color ?? null,
+        position: Math.min(last + 1, 10000),
+      })
       .returning();
     if (!folder) throw new Error("Private mailbox folder insert returned no row");
     return { ...folderDto(folder), changed: true };
   });
 }
 
+/** Rename and/or recolor. `renamed` tells the caller whether the name itself changed. */
 export async function updateMailboxFolder(
   db: Db,
   actor: MailboxContentActor,
-  input: { mailboxId: string; id: string; expectedRevision: number; name: string },
+  input: {
+    mailboxId: string;
+    id: string;
+    expectedRevision: number;
+    name?: string | undefined;
+    color?: MailboxFolderColor | null | undefined;
+  },
 ) {
   actor = { ...actor };
-  const parsed = parse(folderMutation.extend({ name: z.string() }).strict(), input);
-  const folderName = name(parsed.name);
+  const parsed = parse(
+    folderMutation.extend({ name: z.string().optional(), color: color.optional() }).strict(),
+    input,
+  );
+  if (parsed.name === undefined && parsed.color === undefined)
+    throw new MailboxContentError("invalid");
+  const folderName = parsed.name === undefined ? undefined : name(parsed.name);
   return withMailboxOrganizationAccess(db, actor, parsed.mailboxId, async (tx) => {
     const folder = await existingFolder(tx, actor, parsed);
     if (folder.revision !== parsed.expectedRevision) throw new MailboxContentError("conflict");
-    if (folder.name === folderName) return { ...folderDto(folder), changed: false };
-    await uniqueName(tx, actor, parsed.mailboxId, folderName, folder.id);
+    const renamed = folderName !== undefined && folder.name !== folderName;
+    const recolored = parsed.color !== undefined && (folder.color ?? null) !== parsed.color;
+    if (!renamed && !recolored) return { ...folderDto(folder), changed: false, renamed: false };
+    if (renamed) await uniqueName(tx, actor, parsed.mailboxId, folderName!, folder.id);
     const [updated] = await tx
       .update(schema.mailboxFolders)
-      .set({ name: folderName, revision: folder.revision + 1, updatedAt: new Date() })
+      .set({
+        ...(renamed ? { name: folderName! } : {}),
+        ...(recolored ? { color: parsed.color ?? null } : {}),
+        revision: folder.revision + 1,
+        updatedAt: new Date(),
+      })
       .where(
         and(
           eq(schema.mailboxFolders.id, folder.id),
@@ -181,7 +234,56 @@ export async function updateMailboxFolder(
       )
       .returning();
     if (!updated) throw new MailboxContentError("conflict");
-    return { ...folderDto(updated), changed: true };
+    return { ...folderDto(updated), changed: true, renamed };
+  });
+}
+
+/**
+ * The owner's manual folder order. `ids` must name every active folder of the
+ * mailbox exactly once; positions follow the array. Order is presentation only,
+ * so revisions (which guard rename/archive) stay as they are.
+ */
+export async function reorderMailboxFolders(
+  db: Db,
+  actor: MailboxContentActor,
+  input: { mailboxId: string; ids: string[] },
+) {
+  actor = { ...actor };
+  const parsed = parse(mailbox.extend({ ids: z.array(z.uuid()).max(MAX_FOLDERS) }).strict(), input);
+  if (new Set(parsed.ids).size !== parsed.ids.length) throw new MailboxContentError("invalid");
+  return withMailboxOrganizationAccess(db, actor, parsed.mailboxId, async (tx) => {
+    const active = await tx
+      .select({ id: schema.mailboxFolders.id, position: schema.mailboxFolders.position })
+      .from(schema.mailboxFolders)
+      .where(
+        and(
+          eq(schema.mailboxFolders.teamId, actor.teamId),
+          eq(schema.mailboxFolders.mailboxId, parsed.mailboxId),
+          isNull(schema.mailboxFolders.archivedAt),
+        ),
+      )
+      .for("update");
+    const known = new Set(active.map((folder) => folder.id));
+    // A stale list (a folder created or archived meanwhile) must not drop anything.
+    if (known.size !== parsed.ids.length || parsed.ids.some((id) => !known.has(id)))
+      throw new MailboxContentError("conflict");
+    const current = new Map(active.map((folder) => [folder.id, folder.position]));
+    let changed = false;
+    for (const [index, id] of parsed.ids.entries()) {
+      if (current.get(id) === index) continue;
+      changed = true;
+      await tx
+        .update(schema.mailboxFolders)
+        .set({ position: index })
+        .where(
+          and(
+            eq(schema.mailboxFolders.id, id),
+            eq(schema.mailboxFolders.teamId, actor.teamId),
+            eq(schema.mailboxFolders.mailboxId, parsed.mailboxId),
+          ),
+        );
+    }
+    return { ids: parsed.ids, changed };
   });
 }
 

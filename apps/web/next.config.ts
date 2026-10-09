@@ -124,7 +124,7 @@ const config: NextConfig = {
       },
       ...(publicMetaEnabled || publicGoogleEnabled
         ? // Mirrors META_PUBLIC_PATHS in src/lib/meta-public-events.ts.
-          ["/", "/pricing", "/correio"].map((source) => ({
+          ["/", "/pricing", "/correio", "/alternatives/resend", "/integrations"].map((source) => ({
             source,
             headers: [
               { key: "Content-Security-Policy", value: publicContentSecurityPolicy },

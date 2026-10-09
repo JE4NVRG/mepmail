@@ -30,6 +30,8 @@ describe("public Meta Content Security Policy", () => {
         "/",
         "/pricing",
         "/correio",
+        "/alternatives/resend",
+        "/integrations",
       ]);
       const csp = (source: string) =>
         rules
@@ -37,7 +39,7 @@ describe("public Meta Content Security Policy", () => {
           ?.headers.find((item) => item.key === "Content-Security-Policy")?.value ?? "";
       expect(csp("/:path*")).not.toContain("google");
       expect(csp("/support")).not.toContain("google");
-      for (const source of ["/", "/pricing", "/correio"]) {
+      for (const source of ["/", "/pricing", "/correio", "/alternatives/resend", "/integrations"]) {
         expect(csp(source)).toContain("https://www.googletagmanager.com");
         expect(csp(source)).toContain("https://*.google-analytics.com");
         expect(csp(source)).toContain("https://*.analytics.google.com");
@@ -67,6 +69,8 @@ describe("public Meta Content Security Policy", () => {
       "/",
       "/pricing",
       "/correio",
+      "/alternatives/resend",
+      "/integrations",
     ]);
     const original = rules[0]?.headers ?? [];
     expect(original.find((item) => item.key === "Content-Security-Policy")?.value).not.toContain(
@@ -74,7 +78,7 @@ describe("public Meta Content Security Policy", () => {
     );
     expect(original.find((item) => item.key === "X-Frame-Options")?.value).toBe("DENY");
     for (const rule of rules.filter((rule) =>
-      ["/", "/pricing", "/correio"].includes(rule.source),
+      ["/", "/pricing", "/correio", "/alternatives/resend", "/integrations"].includes(rule.source),
     )) {
       const csp = rule.headers.find((item) => item.key === "Content-Security-Policy")?.value ?? "";
       expect(csp).toContain("https://connect.facebook.net");

@@ -28,6 +28,29 @@
   },
   "releases": [
     {
+      "version": "0.78",
+      "date": "2026-10-09",
+      "title": "A base da nova caixa de entrada",
+      "summary": "O servidor do Correio passa a entregar a lista em páginas, conversas com contagem de não lidas, pastas com cor e ordem e preferências de exibição salvas na sua conta. A nova interface usa isso nas próximas versões.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A lista de mensagens chega em páginas, sem limite de 50 itens, e pode agrupar cada conversa em uma linha com o total de mensagens e quantas faltam ler.",
+            "Pastas ganham cor e ordem manual; as que você já tem mantêm a ordem alfabética, e as novas entram no fim.",
+            "Suas preferências de exibição (tema, densidade, painel de leitura, pasta inicial, prévia) ficam salvas na sua conta e valem em qualquer dispositivo.",
+            "A API do Correio para agentes lista mensagens em páginas com cursor e limite."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "A medição opcional da Meta e do Google Analytics, só depois que você permite, passa a valer também nas páginas de comparação com o Resend e de integrações."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.77",
       "date": "2026-10-09",
       "title": "Trazer seus endereços de outro provedor",

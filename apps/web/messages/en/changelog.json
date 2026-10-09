@@ -23,6 +23,29 @@
   },
   "releases": [
     {
+      "version": "0.78",
+      "date": "2026-10-09",
+      "title": "The groundwork for the new inbox",
+      "summary": "The Mail server now returns the list in pages, conversations with unread counts, folders with a color and an order, and display preferences saved to your account. The new interface uses this in the next versions.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "The message list comes in pages, with no 50-item limit, and can group each conversation into one row with its message total and how many are unread.",
+            "Folders get a color and a manual order; the ones you have keep their alphabetical order, and new ones go last.",
+            "Your display preferences (theme, density, reading pane, start folder, preview) are saved to your account and apply on every device.",
+            "The Mail agent API lists messages in pages with a cursor and a limit."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Optional Meta and Google Analytics measurement, only after you allow it, now also covers the Resend comparison and integrations pages."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.77",
       "date": "2026-10-09",
       "title": "Bring your addresses from another provider",
