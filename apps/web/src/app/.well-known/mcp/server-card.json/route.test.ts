@@ -10,7 +10,7 @@ describe("mcp server-card.json", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("application/json");
     const body = await res.json();
-    expect(body.name).toBe("com.je4ndev/mepmail");
+    expect(body.name).toBe("io.github.JE4NVRG/mepmail");
     expect(body.transport).toEqual({
       type: "streamable-http",
       url: "https://api.mepmail.dev/mcp",
@@ -21,7 +21,7 @@ describe("mcp server-card.json", () => {
       "https://api.mepmail.dev/.well-known/oauth-protected-resource",
     );
     expect(body.authentication.instructionsUrl).toBe("https://mepmail.dev/auth.md");
-    expect(JSON.stringify(body)).not.toContain("millionsend.com");
+    expect(JSON.stringify(body)).not.toMatch(/millionsend|je4ndev\.com/i);
   });
 
   it("carries the fields the server-card shape requires", async () => {
@@ -41,7 +41,7 @@ describe("mcp server-card.json", () => {
     ]) {
       expect(body, `missing ${key}`).toHaveProperty(key);
     }
-    expect(body.serverInfo.name).toBe("com.je4ndev/mepmail");
+    expect(body.serverInfo.name).toBe("io.github.JE4NVRG/mepmail");
     expect(body.authentication.required).toBe(true);
     expect(body.authentication.schemes).toEqual(["oauth2"]);
     // An empty capabilities.tools is what made the card useless to a scanner.

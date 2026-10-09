@@ -271,6 +271,15 @@ export const en = {
     button: "Open Correio",
     muted: ["You get at most one of these every 10 minutes per mailbox."],
   },
+  "mailbox.agent_key_expiring": {
+    subject: "Agent key {label} expires on {date}",
+    body: [
+      "The key {label}, which gives access to {mailbox}, expires on {date}. After that the agent using it can no longer read, draft or send with it, and its calls are refused.",
+      "To keep the agent working, create a new key in Correio → Settings → Agents and swap it into the agent's MCP client. If it no longer needs access, do nothing: the key lapses on its own.",
+    ],
+    button: "Open Correio agents",
+    muted: ["You get this notice once per key, about 7 days before it expires."],
+  },
   "content.access_notice": {
     subject: "An operator read content in {team}",
     body: [

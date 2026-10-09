@@ -15,10 +15,17 @@ const MAIL_TOKEN_ENVS = ["MEPMAIL_MAIL_TOKEN"] as const;
 const MAIL_ORIGIN_ENVS = ["MEPMAIL_MAIL_ORIGIN"] as const;
 const DEFAULT_MAIL_ORIGIN = "https://mepmail.dev";
 
+// The pre-rename MILLIONSEND_* names still work for now, with a warning; they go away in 0.3.
+const LEGACY_PREFIX = "MILLIONSEND_";
 const firstEnv = (names: readonly string[]): string | undefined => {
   for (const name of names) {
     const value = process.env[name]?.trim();
-    if (value) return value;
+    if (!value) continue;
+    if (name.startsWith(LEGACY_PREFIX))
+      console.error(
+        `[mepmail-mcp] ${name} is deprecated and will stop working in 0.3: rename it to ${name.replace(LEGACY_PREFIX, "MEPMAIL_")}.`,
+      );
+    return value;
   }
   return undefined;
 };

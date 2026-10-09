@@ -271,6 +271,15 @@ export const ptBR = {
     button: "Abrir o Correio",
     muted: ["Você recebe no máximo um destes a cada 10 minutos por caixa."],
   },
+  "mailbox.agent_key_expiring": {
+    subject: "A chave de agente {label} expira em {date}",
+    body: [
+      "A chave {label}, que dá acesso a {mailbox}, expira em {date}. Depois disso o agente que a usa deixa de ler, rascunhar e enviar por ela, e as chamadas passam a ser recusadas.",
+      "Para o agente continuar, crie uma chave nova em Correio → Configurações → Agentes e troque no cliente MCP dele. Se ele não precisa mais de acesso, não faça nada: a chave vence sozinha.",
+    ],
+    button: "Abrir agentes do Correio",
+    muted: ["Você recebe este aviso uma vez por chave, cerca de 7 dias antes do vencimento."],
+  },
   "content.access_notice": {
     subject: "Um operador leu conteúdo em {team}",
     body: [

@@ -34,7 +34,9 @@ describe("mcpServerCardBody", () => {
     ]) {
       expect(body, `missing ${key}`).toHaveProperty(key);
     }
-    expect(body.serverInfo.name).toBe("com.je4ndev/mepmail");
+    expect(body.serverInfo.name).toBe("io.github.JE4NVRG/mepmail");
+    expect(body.name).toBe(body.serverInfo.name);
+    expect(body.version).toBe(body.serverInfo.version);
     expect(body.authentication.required).toBe(true);
     // The field the Smithery static-card example reads.
     expect(body.authentication.schemes).toEqual(["oauth2"]);
@@ -50,7 +52,12 @@ describe("mcpServerCardBody", () => {
     expect(body.authentication.resourceMetadata).toBe(
       `${endpoint.origin}/.well-known/oauth-protected-resource`,
     );
-    expect(body.authentication.authorizationServer).toBeTruthy();
+    expect(body.authentication.authorizationServer).toBe("https://mepmail.dev");
+    expect(body.authentication.authorizationServerMetadata).toBe(
+      "https://mepmail.dev/.well-known/oauth-authorization-server",
+    );
+    // No legacy brand or host anywhere in the published card.
+    expect(mcpServerCardBody()).not.toMatch(/millionsend|je4ndev\.com/i);
   });
 
   it("lists every registered tool, with its own description and nothing invented", () => {

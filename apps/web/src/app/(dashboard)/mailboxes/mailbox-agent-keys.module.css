@@ -123,6 +123,115 @@
 .copyStatus {
   margin-bottom: 0;
 }
+/* The MCP setup under a new key: its own block, and a snippet sized by its rows. */
+.mcpSetup {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--ms-line);
+}
+.snippet {
+  height: auto;
+}
+/* Client picker beside a new key, and the expiry shortcuts under the date field. */
+.clients,
+.presets {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 10px;
+}
+.presets {
+  margin: -8px 0 0;
+}
+.client {
+  font: inherit;
+  font-size: 12px;
+  color: var(--ms-muted);
+  background: transparent;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-chip);
+  padding: 5px 10px;
+  min-height: 28px;
+  cursor: pointer;
+}
+.client:hover {
+  color: var(--ms-bone);
+  border-color: var(--ms-line-strong);
+}
+.client[aria-pressed="true"] {
+  color: var(--ms-bone);
+  border-color: var(--ms-steel);
+  background: var(--ms-panel-raised);
+}
+.secret .clientWhere {
+  margin: 0;
+}
+.testResult {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--ms-r-input);
+  border: 1px solid var(--ms-line);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.testResult[data-ok="true"] {
+  border-color: var(--ms-success-border);
+  background: var(--ms-success-bg);
+}
+.testResult[data-ok="false"] {
+  border-color: var(--ms-warn-border);
+  background: var(--ms-warn-bg);
+}
+.secret .testResult p {
+  margin: 0;
+  color: var(--ms-bone);
+}
+.testResult ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.testResult li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  min-width: 0;
+}
+.testResult li span:first-child {
+  font-family: var(--ms-font-mono);
+  overflow-wrap: anywhere;
+}
+.testResult li span:last-child {
+  color: var(--ms-muted);
+}
+.keyDetails .health {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.healthDot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ms-faint);
+}
+.health[data-status="healthy"] .healthDot {
+  background: var(--ms-success);
+}
+.health[data-status="expiring"] .healthDot {
+  background: var(--ms-warn);
+}
+.health[data-status="expired"] .healthDot,
+.health[data-status="revoked"] .healthDot {
+  background: var(--ms-danger);
+}
 .keys {
   border-top: 1px solid var(--ms-line);
   margin-top: 24px;

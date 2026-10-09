@@ -23,6 +23,30 @@
   },
   "releases": [
     {
+      "version": "0.71",
+      "date": "2026-10-09",
+      "title": "Connecting agents to Correio got easier",
+      "summary": "A ready setup for each MCP client, a connection test, each key's health and an email before a key expires.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "When you create an agent key, pick the client (Claude Code, Claude Desktop, Cursor, VS Code, Codex or other) and copy the command or configuration with the key already in it.",
+            "Test connection button: the dashboard calls the Correio MCP with the new key and lists the mailboxes it reaches.",
+            "Each key shows whether it is in use, when it was last used and the agent's last send.",
+            "A week before a key expires, the person who made it gets an email to swap it; shortcuts for 30 days, 90 days, 1 year or no expiry."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "The MCP's OAuth issuer is now https://mepmail.dev; tokens issued before keep working until they expire.",
+            "The MCP server card uses the official registry name (io.github.JE4NVRG/mepmail) and no longer names old domains."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.70",
       "date": "2026-10-09",
       "title": "New email notifications in Correio",

@@ -41,6 +41,7 @@ export const ACCOUNT_MAIL_KINDS = [
   "review.held",
   "mailbox.capacity",
   "mailbox.send_requested",
+  "mailbox.agent_key_expiring",
   "content.access_notice",
   "support.view_started",
 ] as const;

@@ -15,7 +15,7 @@
   "scopeUnknown": "Other permission",
   "chooseScope": "Select at least one permission.",
   "expiresAt": "Expiration (optional)",
-  "expirationHint": "Use your device's local date and time. Leave empty for no expiration.",
+  "expirationHint": "Use your device's local date and time, or a shortcut. Empty = never expires. A week before it expires you get an email to swap the key.",
   "futureExpiration": "Choose an expiration date and time in the future.",
   "create": "Create key",
   "creating": "Creating…",
@@ -46,10 +46,7 @@
   "revokeLabel": "Revoke key {label}",
   "revokeSuccess": "Key revocation confirmed. This credential no longer grants access.",
   "mcpTitle": "Connect over MCP",
-  "mcpHint": "Agents that speak MCP (Claude Code, Claude Desktop, Cursor and others) can use this mailbox as tools: list, read, draft and, with the send permission, send. The command below already carries this key, so keep it as private as the key.",
-  "mcpCommand": "Claude Code command",
-  "mcpOther": "Other MCP clients: add a Streamable HTTP server at {url} with the header Authorization: Bearer followed by this key.",
-  "mcpCopy": "Copy MCP command",
+  "mcpHint": "Agents that speak MCP use this mailbox as tools: list, read, save drafts and, with the send permission, send. Pick the client, copy and paste; the text carries this key, so keep it just as safe.",
   "team": {
     "open": "Connect an agent to several mailboxes",
     "title": "Agent with access to several mailboxes",
@@ -64,6 +61,56 @@
     "emptyBody": "Create one so an agent can serve more than one mailbox with the same key.",
     "mailboxCount": "{count, plural, =0 {no active mailbox} one {# mailbox} other {# mailboxes}}",
     "defaultBadge": "default",
-    "mcpHint": "Agents that speak MCP (Claude Code, Claude Desktop, Cursor and others) use these mailboxes as tools: each tool takes the mailbox address, and mailbox_list_accounts shows which ones are allowed. The command below carries this key; keep it as carefully."
+    "mcpHint": "Agents that speak MCP use these mailboxes as tools: each tool names the mailbox by address, and mailbox_list_accounts shows which ones are open. Pick the client, copy and paste; the text carries this key, so keep it just as safe."
+  },
+  "clients": {
+    "label": "MCP client",
+    "claude-code": "Claude Code",
+    "claude-desktop": "Claude Desktop",
+    "cursor": "Cursor",
+    "vscode": "VS Code",
+    "codex": "Codex",
+    "other": "Other",
+    "command": "Terminal command",
+    "config": "Configuration",
+    "copy": "Copy",
+    "where": {
+      "claude-code": "Run it in a terminal, in the project folder (or with --scope user for every project). Then /mcp in Claude Code shows mepmail-correio connected.",
+      "claude-desktop": "In Settings → Developer → Edit config, merge it into {file} and restart Claude Desktop. Needs Node.js installed (npx fetches @mepmail/mcp).",
+      "cursor": "Merge it into {file} (or .cursor/mcp.json in the project) and check Settings → MCP.",
+      "vscode": "Merge it into the project's {file} (or run MCP: Open User Configuration) and start the server from Copilot's MCP list.",
+      "codex": "Merge it into {file} and restart Codex. Needs Node.js installed (npx fetches @mepmail/mcp).",
+      "other": "Any MCP client with Streamable HTTP: server at {url} with this Authorization header."
+    }
+  },
+  "test": {
+    "run": "Test connection",
+    "running": "Testing…",
+    "ok": "Connected in {ms} ms: {count, plural, =0 {no mailbox open right now} one {# mailbox open} other {# mailboxes open}}.",
+    "rejected": "The key was refused: check that it was copied whole and has not been revoked or expired.",
+    "unreachable": "The Correio endpoint did not answer. Try again in a few seconds.",
+    "unexpected": "The endpoint answered in an unexpected way. Try again; if it keeps happening, contact support.",
+    "unavailable": "unavailable right now (mailbox suspended or owned by someone else)",
+    "scope": {
+      "read": "read",
+      "draft": "drafts",
+      "send": "send",
+      "other": "other permission"
+    }
+  },
+  "health": {
+    "healthy": "In use",
+    "unused": "Not used yet",
+    "expiring": "Expires within 7 days",
+    "expired": "Expired",
+    "revoked": "Revoked",
+    "lastUsed": "last used {when}",
+    "neverUsed": "not used yet",
+    "lastSent": "last send {when}"
+  },
+  "presets": {
+    "label": "Quick expiry",
+    "days": "{days, plural, =365 {1 year} other {# days}}",
+    "never": "No expiry"
   }
 }

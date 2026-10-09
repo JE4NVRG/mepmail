@@ -14,7 +14,11 @@ import {
   QUOTA_COLUMNS,
   signInternalActor,
 } from "@millionsend/core";
-import { MCP_SERVER_CARD_CONTENT_TYPE, mcpServerCardBody } from "@millionsend/core/mcp-server-card";
+import {
+  MCP_SERVER_CARD_CONTENT_TYPE,
+  MCP_SERVER_VERSION,
+  mcpServerCardBody,
+} from "@millionsend/core/mcp-server-card";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import {
@@ -168,7 +172,7 @@ function mcpRateLimited(userId: string, limit: number): boolean {
  */
 function createTokenVerifier(
   db: Db,
-  issuer: string,
+  issuers: readonly string[],
   resources: readonly string[],
   getKey: JWTVerifyGetKey,
   rateLimitPerMinute: number,
@@ -182,7 +186,7 @@ function createTokenVerifier(
       // Any of the resource identifiers this server answers on (the canonical
       // API host and its advertised alias): a token bound to either works.
       const verified = await jwtVerify(token, getKey, {
-        issuer,
+        issuer: [...issuers],
         audience: [...resources],
         algorithms: ["EdDSA"],
         typ: "at+jwt",
@@ -325,7 +329,7 @@ const RECORD_STATUS_NOTE =
  * the selected team's role.
  */
 function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): McpServer {
-  const server = new McpServer({ name: "mepmail", version: "1.0.0" });
+  const server = new McpServer({ name: "mepmail", version: MCP_SERVER_VERSION });
   const { auth, userId, role, teams } = authInfo.extra as unknown as McpAuthExtra;
   const scopes = new Set(authInfo.scopes);
   const canAdmin = teams ? teams.some((t) => isAdmin(t.role)) : isAdmin(role);
@@ -1329,9 +1333,14 @@ export function registerMcp(app: OpenAPIHono<Env>, deps: ApiDeps, appBaseUrl: st
     ? `${deps.advertisedApiUrl.replace(/\/+$/, "")}${MCP_RESOURCE_PATH}`
     : null;
   const resources = [...new Set([canonical, ...(advertised ? [advertised] : [])])];
+  // A retired issuer (the one in use before an issuer move) still verifies
+  // the access tokens it signed; it is never advertised.
+  const issuers = [
+    ...new Set([issuer, ...(deps.oauthRetiredIssuerUrl ? [deps.oauthRetiredIssuerUrl] : [])]),
+  ];
   const verifier = createTokenVerifier(
     deps.db,
-    issuer,
+    issuers,
     resources,
     createRemoteJWKSet(new URL(`${appBaseUrl}/api/auth/jwks`)),
     deps.rateLimitPerMinute ?? 600,

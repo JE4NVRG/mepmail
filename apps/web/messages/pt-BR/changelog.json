@@ -28,6 +28,30 @@
   },
   "releases": [
     {
+      "version": "0.71",
+      "date": "2026-10-09",
+      "title": "Conectar agentes ao Correio ficou mais fácil",
+      "summary": "Comando pronto para cada cliente MCP, teste de conexão, saúde de cada chave e aviso por e-mail antes de uma chave expirar.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Ao criar uma chave de agente, escolha o cliente (Claude Code, Claude Desktop, Cursor, VS Code, Codex ou outro) e copie o comando ou a configuração já com a chave.",
+            "Botão Testar conexão: o painel chama o MCP do Correio com a chave nova e mostra as caixas que ela alcança.",
+            "Cada chave mostra se está em uso, quando foi usada pela última vez e o último envio do agente.",
+            "Uma semana antes de uma chave expirar, quem a criou recebe um e-mail para trocá-la; atalhos de 30 dias, 90 dias, 1 ano ou sem expiração."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "O emissor OAuth do MCP passa a ser https://mepmail.dev; tokens emitidos antes continuam válidos até expirar.",
+            "O server-card do MCP usa o nome do registro oficial (io.github.JE4NVRG/mepmail) e não cita mais domínios antigos."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.70",
       "date": "2026-10-09",
       "title": "Aviso de e-mail novo no Correio",

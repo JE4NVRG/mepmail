@@ -91,7 +91,7 @@ export const EMAIL_PAGE_MAX = 100;
 
 export const TARGET_KEY_ENV = "MEPMAIL_API_KEY";
 export const TARGET_URL_ENV = "MEPMAIL_BASE_URL";
-/** Historical alias env names, still honored when the primary is unset. */
+/** Historical alias env names, still honored (with a warning) when the primary is unset; removed in 0.3. */
 export const TARGET_KEY_ENV_ALIAS = "MILLIONSEND_API_KEY";
 export const TARGET_URL_ENV_ALIAS = "MILLIONSEND_BASE_URL";
 
@@ -315,6 +315,13 @@ export function parseConfig(
   }
 
   /** Primary env names first; the historical aliases keep working when unset. */
+  for (const [primary, alias] of [
+    [TARGET_KEY_ENV, TARGET_KEY_ENV_ALIAS],
+    [TARGET_URL_ENV, TARGET_URL_ENV_ALIAS],
+  ] as const) {
+    if (env[primary] === undefined && env[alias] !== undefined)
+      warnings.push(`${alias} is deprecated and stops working in 0.3: rename it to ${primary}.`);
+  }
   const envResolved: typeof env = {
     ...env,
     [TARGET_KEY_ENV]: env[TARGET_KEY_ENV] ?? env[TARGET_KEY_ENV_ALIAS],

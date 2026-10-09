@@ -48,6 +48,7 @@ async function mintToken(
     team_id: string;
     team_role: string;
     typ: string;
+    iss: string;
   }> = {},
 ): Promise<string> {
   return new SignJWT({
@@ -57,7 +58,7 @@ async function mintToken(
     ...(overrides.team_id === "*" ? {} : { team_role: overrides.team_role ?? "admin" }),
   })
     .setProtectedHeader({ alg: "EdDSA", kid: "test-key", typ: overrides.typ ?? "at+jwt" })
-    .setIssuer(appBaseUrl)
+    .setIssuer(overrides.iss ?? appBaseUrl)
     .setAudience(overrides.aud ?? resource)
     .setSubject(overrides.sub ?? userId)
     .setIssuedAt()
@@ -271,6 +272,35 @@ describe("auth middleware", () => {
       body: ping,
     });
     expect(res.status).toBe(401);
+  });
+
+  it("accepts tokens from the retired issuer only where one is configured, and never another", async () => {
+    const retired = "https://retired-issuer.example";
+    const moved = createApi({
+      db,
+      keyring: EnvKeyring.fromBase64(randomBytes(32).toString("base64")),
+      isCloud: false,
+      appBaseUrl,
+      oauthRetiredIssuerUrl: retired,
+      enqueueEmailSend: async () => {},
+    });
+    const status = async (via: typeof app, iss: string) =>
+      (
+        await via.request("/mcp", {
+          method: "POST",
+          headers: { ...JSONRPC_HEADERS, authorization: `Bearer ${await mintToken({ iss })}` },
+          body: ping,
+        })
+      ).status;
+    expect(await status(moved, appBaseUrl)).toBe(200);
+    expect(await status(moved, retired)).toBe(200);
+    expect(await status(moved, "https://someone-else.example")).toBe(401);
+    expect(await status(app, retired)).toBe(401);
+    // Discovery names only the current issuer.
+    const metadata = (await (
+      await moved.request("/.well-known/oauth-protected-resource")
+    ).json()) as { authorization_servers: string[] };
+    expect(metadata.authorization_servers).toEqual([appBaseUrl]);
   });
 
   it("401s a valid token whose holder is no longer a team member", async () => {

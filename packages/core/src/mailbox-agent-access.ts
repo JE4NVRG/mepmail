@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
-import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { hashApiKey, verifyApiKey } from "./api-keys.js";
 import type { MailboxRegistryActor } from "./mailbox-registry.js";
 import {
@@ -43,6 +43,113 @@ const TEAM_TOKEN =
 
 /** Which mailbox a call is for: its id or its address. Anything else is refused. */
 export type MailboxSelector = { id: string } | { address: string };
+
+/** The newest send the provider accepted under this credential row (agent-approved sends only). */
+const lastAgentSendSql =
+  sql<Date | null>`(select max(${schema.mailboxOutbox.acceptedAt}) from ${schema.mailboxOutbox} where ${schema.mailboxOutbox.agentKeyId} = ${schema.mailboxAgentKeys.id})`.mapWith(
+    (value: string | Date | null) => (value === null ? null : new Date(value)),
+  );
+const latest = (a: Date | null, b: Date | null) => (!a ? b : !b ? a : a > b ? a : b);
+
+/**
+ * Last use for the agents page: after a successful authentication, at most once
+ * every five minutes per row, in its own statement so it never waits under (or
+ * upgrades) the access locks. Best-effort: a failed stamp never fails the call.
+ */
+async function touchMailboxAgentKeys(db: Db, ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const k = schema.mailboxAgentKeys;
+  await db
+    .update(k)
+    .set({ lastUsedAt: sql`now()` })
+    .where(
+      and(
+        inArray(k.id, ids),
+        or(isNull(k.lastUsedAt), sql`${k.lastUsedAt} < now() - interval '5 minutes'`),
+      ),
+    )
+    .catch((error: unknown) =>
+      console.warn(
+        "mailbox agent key last-use stamp failed",
+        error instanceof Error ? error.message : String(error),
+      ),
+    );
+}
+
+/** A live credential (single key or team credential) that expires within the window. */
+export interface ExpiringMailboxAgentCredential {
+  /** The team credential's group id, or the single key's id. */
+  credentialId: string;
+  teamId: string;
+  ownerUserId: string;
+  email: string;
+  label: string;
+  expiresAt: Date;
+  addresses: string[];
+}
+
+/**
+ * Credentials whose owner should hear they expire soon: not revoked, expiring in
+ * (now, now + within], still held by the owner's current membership, and minted
+ * more than a day ago (a key made to last a day was not forgotten).
+ */
+export async function listExpiringMailboxAgentCredentials(
+  db: Db,
+  params: { now: Date; within: number },
+): Promise<ExpiringMailboxAgentCredential[]> {
+  const k = schema.mailboxAgentKeys;
+  const rows = await db
+    .select({
+      id: k.id,
+      groupId: k.groupId,
+      teamId: k.teamId,
+      ownerUserId: k.ownerUserId,
+      label: k.label,
+      expiresAt: k.expiresAt,
+      address: schema.mailboxes.address,
+      email: schema.user.email,
+    })
+    .from(k)
+    .innerJoin(
+      schema.mailboxes,
+      and(eq(schema.mailboxes.id, k.mailboxId), eq(schema.mailboxes.teamId, k.teamId)),
+    )
+    .innerJoin(schema.user, eq(schema.user.id, k.ownerUserId))
+    .innerJoin(
+      schema.teamMembers,
+      and(
+        eq(schema.teamMembers.id, k.ownerMembershipId),
+        eq(schema.teamMembers.teamId, k.teamId),
+        eq(schema.teamMembers.userId, k.ownerUserId),
+      ),
+    )
+    .where(
+      and(
+        isNull(k.revokedAt),
+        gt(k.expiresAt, params.now),
+        lte(k.expiresAt, new Date(params.now.getTime() + params.within)),
+        lte(k.createdAt, new Date(params.now.getTime() - 24 * 3600_000)),
+      ),
+    )
+    .orderBy(asc(k.expiresAt), asc(schema.mailboxes.address))
+    .limit(2000);
+  const credentials = new Map<string, ExpiringMailboxAgentCredential>();
+  for (const row of rows) {
+    const credentialId = row.groupId ?? row.id;
+    const entry = credentials.get(credentialId) ?? {
+      credentialId,
+      teamId: row.teamId,
+      ownerUserId: row.ownerUserId,
+      email: row.email,
+      label: row.label,
+      expiresAt: row.expiresAt as Date,
+      addresses: [],
+    };
+    entry.addresses.push(row.address);
+    credentials.set(credentialId, entry);
+  }
+  return [...credentials.values()];
+}
 export function parseMailboxSelector(value: string | null | undefined): MailboxSelector | null {
   if (value === null || value === undefined) return null;
   const trimmed = typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -259,6 +366,8 @@ export async function listMailboxAgentKeys(
         createdAt: schema.mailboxAgentKeys.createdAt,
         expiresAt: schema.mailboxAgentKeys.expiresAt,
         revokedAt: schema.mailboxAgentKeys.revokedAt,
+        lastUsedAt: schema.mailboxAgentKeys.lastUsedAt,
+        lastSentAt: lastAgentSendSql,
       })
       .from(schema.mailboxAgentKeys)
       .where(
@@ -414,6 +523,8 @@ export async function listMailboxTeamAgentKeys(db: Db, actor: MailboxAgentOwnerA
         createdAt: schema.mailboxAgentKeys.createdAt,
         expiresAt: schema.mailboxAgentKeys.expiresAt,
         revokedAt: schema.mailboxAgentKeys.revokedAt,
+        lastUsedAt: schema.mailboxAgentKeys.lastUsedAt,
+        lastSentAt: lastAgentSendSql,
       })
       .from(schema.mailboxAgentKeys)
       .innerJoin(
@@ -441,6 +552,8 @@ export async function listMailboxTeamAgentKeys(db: Db, actor: MailboxAgentOwnerA
         createdAt: Date;
         expiresAt: Date | null;
         revokedAt: Date | null;
+        lastUsedAt: Date | null;
+        lastSentAt: Date | null;
         mailboxes: { mailboxId: string; address: string; isDefault: boolean; revoked: boolean }[];
       }
     >();
@@ -453,10 +566,14 @@ export async function listMailboxTeamAgentKeys(db: Db, actor: MailboxAgentOwnerA
         createdAt: row.createdAt,
         expiresAt: row.expiresAt,
         revokedAt: row.revokedAt,
+        lastUsedAt: null,
+        lastSentAt: null,
         mailboxes: [],
       };
       // The credential is revoked only when every one of its mailboxes is.
       if (!row.revokedAt) group.revokedAt = null;
+      group.lastUsedAt = latest(group.lastUsedAt, row.lastUsedAt);
+      group.lastSentAt = latest(group.lastSentAt, row.lastSentAt);
       group.mailboxes.push({
         mailboxId: row.mailboxId,
         address: row.address,
@@ -522,6 +639,7 @@ export async function listMailboxAgentAccounts(db: Db, token: string) {
   if (!team && !single) throw new MailboxAgentAccessError("forbidden");
   const rows = await db
     .select({
+      id: schema.mailboxAgentKeys.id,
       keyHash: schema.mailboxAgentKeys.keyHash,
       teamId: schema.mailboxAgentKeys.teamId,
       ownerUserId: schema.mailboxAgentKeys.ownerUserId,
@@ -570,6 +688,10 @@ export async function listMailboxAgentAccounts(db: Db, token: string) {
       (!row.expiresAt || row.expiresAt.getTime() > Date.now()),
   );
   if (!member || !live.length) throw new MailboxAgentAccessError("forbidden");
+  await touchMailboxAgentKeys(
+    db,
+    live.map((row) => row.id),
+  );
   return {
     credential: team ? ("team" as const) : ("mailbox" as const),
     mailboxes: live.map((row) => ({
@@ -617,7 +739,7 @@ export async function withMailboxAgentAccess<T>(
     .from(schema.mailboxAgentKeys)
     .where(and(eq(schema.mailboxAgentKeys.id, match[1]!), isNull(schema.mailboxAgentKeys.groupId)));
   if (!hint) throw new MailboxAgentAccessError("forbidden");
-  return withLockedMailboxAgentKey(
+  const result = await withLockedMailboxAgentKey(
     db,
     { ...hint, id: match[1]! },
     scope,
@@ -625,6 +747,8 @@ export async function withMailboxAgentAccess<T>(
     operation,
     mailbox ?? null,
   );
+  await touchMailboxAgentKeys(db, [match[1]!]);
+  return result;
 }
 
 async function withTeamMailboxAgentAccess<T>(
@@ -665,7 +789,7 @@ async function withTeamMailboxAgentAccess<T>(
     ? rows.find((row) => selects(mailbox, { id: row.mailboxId, address: row.address }))
     : (rows.find((row) => row.isDefault) ?? (rows.length === 1 ? rows[0] : undefined));
   if (!chosen) throw new MailboxAgentAccessError(mailbox ? "forbidden" : "mailbox_required");
-  return withLockedMailboxAgentKey(
+  const result = await withLockedMailboxAgentKey(
     db,
     {
       id: chosen.id,
@@ -678,6 +802,8 @@ async function withTeamMailboxAgentAccess<T>(
     operation,
     null,
   );
+  await touchMailboxAgentKeys(db, [chosen.id]);
+  return result;
 }
 
 /** Worker-only bridge for an immutable approval previously authenticated with a secret.

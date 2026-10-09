@@ -409,6 +409,10 @@ export function MailboxesView({
   const [signatureDialogId, setSignatureDialogId] = useState<string | null>(null);
   const [activityDialogId, setActivityDialogId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<"boxes" | "agents" | "license">("boxes");
+  // Links such as the key-expiry email open the agents tab directly.
+  useEffect(() => {
+    if (layout === "settings" && window.location.hash === "#agents") setSettingsTab("agents");
+  }, [layout]);
   const managementMenu = useRef<HTMLDetailsElement>(null);
   // Team switches cause a full navigation. Every id is also resolved against this request's scoped DTO.
   const boxes = registry.data?.mailboxes ?? [];

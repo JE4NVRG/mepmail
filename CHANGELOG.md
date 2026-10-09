@@ -7,6 +7,39 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.71] - 2026-10-09
+
+Correio agent setup, key health and expiry notices; MCP legacy names retired.
+
+### Added
+
+- Agent key dialogs (single mailbox and team credential) show a per-client
+  setup: Claude Code command, Claude Desktop and Codex via `npx @mepmail/mcp`
+  with `MEPMAIL_MAIL_TOKEN`, Cursor and VS Code remote HTTP config, and the
+  raw URL plus header (`correio-mcp-clients.ts`).
+- "Test connection" (`mailboxes.testAgentConnection`): the server dials its
+  own public Correio MCP URL with the new key (initialize, then
+  `mailbox_list_accounts`) and reports the mailboxes reached; the key is not
+  stored or logged.
+- `mailbox_agent_keys.last_used_at` (mailbox migration 0018), stamped at most
+  every five minutes after a successful authentication, outside the access
+  locks; listings carry it plus the last agent-approved send, shown as a
+  health line per key.
+- `notifications.sweep` mails the owner of a Correio agent credential once,
+  about seven days before it expires (`mailbox.agent_key_expiring`); expiry
+  shortcuts (30 days, 90 days, 1 year, none) in both key forms.
+- `OAUTH_RETIRED_ISSUER_URL`: verification-only previous issuer for the MCP
+  resource server, so tokens minted before an issuer move live out.
+
+### Changed
+
+- The MCP server card is named `io.github.JE4NVRG/mepmail` (the registry name,
+  matching `mcpName`), carries the platform version and names
+  `https://mepmail.dev` as its authorization server; `auth.md` and the AI
+  catalog identifiers drop the je4ndev.com host.
+- @mepmail/mcp 0.2.1 and @mepmail/cli 0.2.4 warn when the deprecated
+  `MILLIONSEND_*` variables are used; they stop working in 0.3.
+
 ## [0.70] - 2026-10-09
 
 Correio: new mail notifications.

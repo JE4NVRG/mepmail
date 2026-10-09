@@ -42,8 +42,10 @@ import { type Db, schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
+import { apiBaseUrl } from "@/lib/api-base-url";
 import { recordAudit } from "../audit";
 import { resolveBaseUrl } from "../auth";
+import { testCorreioConnection } from "../correio-connection-test";
 import { getKeyring } from "../keyring";
 import { cursorSchema } from "../keyset";
 import { activateMailboxReceiving } from "../mailbox-activation";
@@ -393,6 +395,10 @@ export const mailboxesRouter = router({
       });
       return key;
     }),
+  // Dials the public Correio MCP with a key the person holds, as their client will.
+  testAgentConnection: enabled
+    .input(z.object({ token: z.string().min(1).max(300) }))
+    .mutation(({ input }) => testCorreioConnection(`${apiBaseUrl()}/mcp/correio`, input.token)),
   revokeTeamAgentKey: enabled.input(z.object({ id: z.uuid() })).mutation(async ({ ctx, input }) => {
     const key = await call(() => revokeMailboxTeamAgentKey(ctx.db, actor(ctx), input));
     await recordAudit(ctx, {

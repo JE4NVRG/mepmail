@@ -15,7 +15,7 @@
   "scopeUnknown": "Outra permissão",
   "chooseScope": "Selecione ao menos uma permissão.",
   "expiresAt": "Expiração (opcional)",
-  "expirationHint": "Use a data e o horário local do seu dispositivo. Deixe vazio para não expirar.",
+  "expirationHint": "Use a data e o horário local do seu dispositivo, ou um atalho. Vazio = não expira. Uma semana antes do vencimento você recebe um e-mail para trocar a chave.",
   "futureExpiration": "Escolha uma data e um horário de expiração no futuro.",
   "create": "Criar chave",
   "creating": "Criando…",
@@ -46,10 +46,7 @@
   "revokeLabel": "Revogar chave {label}",
   "revokeSuccess": "Revogação da chave confirmada. Esta credencial não concede mais acesso.",
   "mcpTitle": "Conectar por MCP",
-  "mcpHint": "Agentes que falam MCP (Claude Code, Claude Desktop, Cursor e outros) usam esta caixa como ferramentas: listar, ler, criar rascunho e, com a permissão de envio, enviar. O comando abaixo já leva esta chave; guarde-o com o mesmo cuidado.",
-  "mcpCommand": "Comando para o Claude Code",
-  "mcpOther": "Outros clientes MCP: adicione um servidor Streamable HTTP em {url} com o cabeçalho Authorization: Bearer seguido desta chave.",
-  "mcpCopy": "Copiar comando MCP",
+  "mcpHint": "Agentes que falam MCP usam esta caixa como ferramentas: listar, ler, criar rascunho e, com a permissão de envio, enviar. Escolha o cliente, copie e cole; o texto já leva esta chave, então guarde-o com o mesmo cuidado.",
   "team": {
     "open": "Conectar agente a várias caixas",
     "title": "Agente com acesso a várias caixas",
@@ -64,6 +61,56 @@
     "emptyBody": "Crie uma para que um agente atenda mais de uma caixa com a mesma chave.",
     "mailboxCount": "{count, plural, =0 {nenhuma caixa ativa} one {# caixa} other {# caixas}}",
     "defaultBadge": "padrão",
-    "mcpHint": "Agentes que falam MCP (Claude Code, Claude Desktop, Cursor e outros) usam estas caixas como ferramentas: em cada ferramenta o agente informa a caixa pelo endereço, e mailbox_list_accounts mostra quais estão liberadas. O comando abaixo já leva esta chave; guarde-o com o mesmo cuidado."
+    "mcpHint": "Agentes que falam MCP usam estas caixas como ferramentas: em cada ferramenta o agente informa a caixa pelo endereço, e mailbox_list_accounts mostra quais estão liberadas. Escolha o cliente, copie e cole; o texto já leva esta chave, então guarde-o com o mesmo cuidado."
+  },
+  "clients": {
+    "label": "Cliente MCP",
+    "claude-code": "Claude Code",
+    "claude-desktop": "Claude Desktop",
+    "cursor": "Cursor",
+    "vscode": "VS Code",
+    "codex": "Codex",
+    "other": "Outro",
+    "command": "Comando para o terminal",
+    "config": "Configuração",
+    "copy": "Copiar",
+    "where": {
+      "claude-code": "Rode no terminal, na pasta do projeto (ou com --scope user para todos os projetos). Depois, /mcp no Claude Code mostra mepmail-correio conectado.",
+      "claude-desktop": "Em Configurações → Desenvolvedor → Editar configuração, junte ao {file} e reinicie o Claude Desktop. Precisa do Node.js instalado (o npx baixa o @mepmail/mcp).",
+      "cursor": "Junte ao {file} (ou .cursor/mcp.json no projeto) e confira em Configurações → MCP.",
+      "vscode": "Junte ao {file} do projeto (ou rode MCP: Abrir configuração do usuário) e inicie o servidor na lista de MCP do Copilot.",
+      "codex": "Junte ao {file} e reinicie o Codex. Precisa do Node.js instalado (o npx baixa o @mepmail/mcp).",
+      "other": "Qualquer cliente MCP com Streamable HTTP: servidor em {url} com este cabeçalho Authorization."
+    }
+  },
+  "test": {
+    "run": "Testar conexão",
+    "running": "Testando…",
+    "ok": "Conectado em {ms} ms: {count, plural, =0 {nenhuma caixa liberada agora} one {# caixa liberada} other {# caixas liberadas}}.",
+    "rejected": "A chave foi recusada: confira se ela foi copiada inteira e se não foi revogada ou expirou.",
+    "unreachable": "O endpoint do Correio não respondeu. Tente de novo em alguns segundos.",
+    "unexpected": "O endpoint respondeu de um jeito inesperado. Tente de novo; se continuar, fale com o suporte.",
+    "unavailable": "indisponível agora (caixa suspensa ou de outro dono)",
+    "scope": {
+      "read": "leitura",
+      "draft": "rascunhos",
+      "send": "envio",
+      "other": "outra permissão"
+    }
+  },
+  "health": {
+    "healthy": "Em uso",
+    "unused": "Ainda não usada",
+    "expiring": "Expira em menos de 7 dias",
+    "expired": "Expirada",
+    "revoked": "Revogada",
+    "lastUsed": "último uso {when}",
+    "neverUsed": "nenhum uso ainda",
+    "lastSent": "último envio {when}"
+  },
+  "presets": {
+    "label": "Expiração rápida",
+    "days": "{days, plural, =365 {1 ano} other {# dias}}",
+    "never": "Sem expiração"
   }
 }

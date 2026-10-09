@@ -398,6 +398,8 @@ export {
 export {
   createMailboxAgentKey,
   createMailboxTeamAgentKey,
+  type ExpiringMailboxAgentCredential,
+  listExpiringMailboxAgentCredentials,
   listMailboxAgentAccounts,
   listMailboxAgentKeys,
   listMailboxTeamAgentKeys,

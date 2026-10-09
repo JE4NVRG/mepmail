@@ -40,6 +40,8 @@ export const mailboxAgentKeys = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    /** Last successful authentication, stamped at most every few minutes; null = never used. */
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
     /** The team credential this row belongs to; null for a single-mailbox key. */
     groupId: uuid("group_id"),
     /** The mailbox a team credential uses when a call names none. */

@@ -118,7 +118,7 @@ answers \`401\` with a \`WWW-Authenticate\` challenge that points MCP clients at
 - Resource metadata:
   <https://api.mepmail.dev/.well-known/oauth-protected-resource>
 - Authorization server metadata:
-  <https://mepmail.je4ndev.com/.well-known/oauth-authorization-server>
+  <https://mepmail.dev/.well-known/oauth-authorization-server>
 
 MCP clients self-register (RFC 7591) and run the authorization-code flow with
 PKCE. Scopes mirror the API surfaces:

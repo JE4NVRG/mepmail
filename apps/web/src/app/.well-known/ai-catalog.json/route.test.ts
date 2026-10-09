@@ -18,7 +18,7 @@ describe("ai-catalog.json", () => {
     expect(urls).toContain("https://mepmail.dev/correio");
     expect(urls).toContain("https://docs.mepmail.dev/mailboxes");
     const correio = body.entries.find(
-      (e: { identifier: string }) => e.identifier === "urn:air:je4ndev.com:mepmail:correio:mcp",
+      (e: { identifier: string }) => e.identifier === "urn:air:mepmail.dev:correio:mcp",
     );
     expect(correio.description).toContain("https://api.mepmail.dev/mcp/correio");
     expect(JSON.stringify(body)).not.toContain("millionsend.com");

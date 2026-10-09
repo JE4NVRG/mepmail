@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
-import { correioMcpCommand } from "./mailbox-agent-keys";
+import { AgentKeyHealth, CorreioClientSetup, ExpiryPresets } from "./correio-client-setup";
 import styles from "./mailbox-agent-keys.module.css";
 import registryStyles from "./mailboxes.module.css";
 
@@ -288,32 +288,13 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
             </p>
           )}
           {mcpUrl ? (
-            <>
-              <h3>{t("mcpTitle")}</h3>
-              <p id={`${id}-mcp-hint`}>{t("team.mcpHint")}</p>
-              <label htmlFor={`${id}-mcp`}>{t("mcpCommand")}</label>
-              <textarea
-                id={`${id}-mcp`}
-                className={`ms-input ${styles.token}`}
-                value={correioMcpCommand(mcpUrl, secret.token)}
-                readOnly
-                rows={3}
-                autoComplete="off"
-                spellCheck={false}
-                aria-describedby={`${id}-mcp-hint`}
-              />
-              <p>{t("mcpOther", { url: mcpUrl })}</p>
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className="ms-btn"
-                  disabled={busy || copying}
-                  onClick={() => void copyToken(correioMcpCommand(mcpUrl, secret.token))}
-                >
-                  {t("mcpCopy")}
-                </button>
-              </div>
-            </>
+            <CorreioClientSetup
+              url={mcpUrl}
+              token={secret.token}
+              hint={t("team.mcpHint")}
+              disabled={busy || copying}
+              onCopy={(text) => copyToken(text)}
+            />
           ) : null}
         </section>
       ) : (
@@ -417,6 +398,7 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
               />
               <small id={`${id}-expiry-hint`}>{t("expirationHint")}</small>
             </label>
+            <ExpiryPresets onPick={(date) => setExpiry(date ? localMinute(date) : "")} />
             <div className={styles.actions}>
               <button
                 type="submit"
@@ -464,6 +446,12 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
                       <strong>{key.label}</strong>
                       <span className={styles.badge}>{t(status)}</span>
                     </div>
+                    <AgentKeyHealth
+                      expiresAt={key.expiresAt}
+                      revokedAt={key.revokedAt}
+                      lastUsedAt={key.lastUsedAt}
+                      lastSentAt={key.lastSentAt}
+                    />
                     <p>{key.scopes.map(scopeLabel).join(" · ")}</p>
                     <p>
                       {key.mailboxes

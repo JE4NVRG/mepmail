@@ -97,6 +97,7 @@ const app = createApi({
   revision: deploymentRevision(),
   appBaseUrl: env.APP_BASE_URL,
   oauthIssuerUrl: env.OAUTH_ISSUER_URL,
+  oauthRetiredIssuerUrl: env.OAUTH_RETIRED_ISSUER_URL,
   unsubscribeBaseUrl: unsubscribeBaseUrl(),
   publicApiUrl: env.PUBLIC_API_URL,
   advertisedApiUrl: env.ADVERTISED_API_URL,

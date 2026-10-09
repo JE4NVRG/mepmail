@@ -337,6 +337,11 @@ export const env = createEnv({
     // Optional single OAuth issuer, independent of the dashboard origin.
     // Unset preserves the APP_BASE_URL issuer; never an issuer allowlist.
     OAUTH_ISSUER_URL: oauthIssuerSchema.optional(),
+    // The issuer this deployment minted with before OAUTH_ISSUER_URL moved.
+    // Verification only: access tokens it signed keep working until they
+    // expire (refreshes come back from the current issuer). Never emitted
+    // and never advertised; drop it once the last such token has expired.
+    OAUTH_RETIRED_ISSUER_URL: oauthIssuerSchema.optional(),
     // Public base URL the hosted unsubscribe pages and their links use when
     // they live on their own host (e.g. https://unsubscribe.example.com):
     // the origin recipients' browsers and security scanners hit stays apart

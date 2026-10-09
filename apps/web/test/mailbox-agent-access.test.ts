@@ -11,6 +11,7 @@ import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
 import {
   createMailboxAgentKey,
   createMailboxTeamAgentKey,
+  listExpiringMailboxAgentCredentials,
   listMailboxAgentAccounts,
   listMailboxAgentKeys,
   listMailboxTeamAgentKeys,
@@ -244,6 +245,8 @@ describe("mailbox agent credentials", () => {
       "createdAt",
       "expiresAt",
       "revokedAt",
+      "lastUsedAt",
+      "lastSentAt",
     ]);
     expect(first).not.toHaveProperty("keyHash");
     expect(await bridge(first.token)).toEqual({
@@ -498,6 +501,71 @@ describe("mailbox agent credentials", () => {
     expect(
       await db.select({ id: schema.mailboxAgentKeys.id }).from(schema.mailboxAgentKeys),
     ).toHaveLength(0);
+  });
+});
+
+describe("agent credential health", () => {
+  it("stamps last use only after a successful call, and the listings carry it", async () => {
+    const key = await mint();
+    const unused = await mint({ label: "Unused" });
+    expect((await listMailboxAgentKeys(db, owner(), mailboxId)).map((k) => k.lastUsedAt)).toEqual([
+      null,
+      null,
+    ]);
+    // A wrong secret for a real key id authenticates nothing and stamps nothing.
+    const wrong = `${key.token.slice(0, key.token.indexOf(".") + 1)}${"A".repeat(43)}`;
+    await expect(bridge(wrong)).rejects.toMatchObject({ code: "forbidden" });
+    expect((await listMailboxAgentKeys(db, owner(), mailboxId)).every((k) => !k.lastUsedAt)).toBe(
+      true,
+    );
+    await bridge(key.token);
+    const listed = await listMailboxAgentKeys(db, owner(), mailboxId);
+    expect(listed.find((k) => k.id === key.id)?.lastUsedAt).toBeInstanceOf(Date);
+    expect(listed.find((k) => k.id === unused.id)?.lastUsedAt).toBeNull();
+    expect(listed.find((k) => k.id === key.id)?.lastSentAt).toBeNull();
+    // Within the resolution window a second call does not write again.
+    const first = listed.find((k) => k.id === key.id)?.lastUsedAt;
+    await bridge(key.token);
+    expect(
+      (await listMailboxAgentKeys(db, owner(), mailboxId)).find((k) => k.id === key.id)?.lastUsedAt,
+    ).toEqual(first);
+
+    const team = await createMailboxTeamAgentKey(db, owner(), {
+      label: "Sage",
+      mailboxIds: [mailboxId, personId],
+    });
+    expect((await listMailboxTeamAgentKeys(db, owner()))[0]?.lastUsedAt).toBeNull();
+    await listMailboxAgentAccounts(db, team.token);
+    expect((await listMailboxTeamAgentKeys(db, owner()))[0]?.lastUsedAt).toBeInstanceOf(Date);
+  });
+
+  it("lists live credentials expiring within the window, one entry per credential", async () => {
+    const day = 24 * 3600_000;
+    const now = new Date(Date.now() + 2 * day);
+    const soon = await mint({ label: "Soon", expiresAt: new Date(Date.now() + 4 * day) });
+    await mint({ label: "Later", expiresAt: new Date(Date.now() + 30 * day) });
+    await mint({ label: "Never" });
+    const revoked = await mint({ label: "Revoked", expiresAt: new Date(Date.now() + 4 * day) });
+    await revokeMailboxAgentKey(db, owner(), { mailboxId, id: revoked.id });
+    const team = await createMailboxTeamAgentKey(db, owner(), {
+      label: "Sage",
+      mailboxIds: [mailboxId, personId],
+      expiresAt: new Date(Date.now() + 6 * day),
+    });
+    const expiring = await listExpiringMailboxAgentCredentials(db, { now, within: 7 * day });
+    expect(expiring.map((c) => [c.credentialId, c.label, c.addresses.sort()])).toEqual([
+      [soon.id, "Soon", ["agent@local.invalid"]],
+      [team.id, "Sage", ["agent@local.invalid", "person@local.invalid"]],
+    ]);
+    expect(expiring[0]).toMatchObject({
+      teamId,
+      ownerUserId: "owner",
+      email: "owner@example.invalid",
+    });
+    // A key minted less than a day before the sweep is not "forgotten" yet.
+    expect(
+      await listExpiringMailboxAgentCredentials(db, { now: new Date(), within: 7 * day }),
+    ).toEqual([]);
   });
 });
 

@@ -39,6 +39,10 @@ describe("parseConfig", () => {
     const config = parseConfig(["migrate", "--from", "resend"], aliasEnv, true);
     expect(config.toKey).toEqual({ source: "env", value: "ms_y" });
     expect(config.toUrl).toBe("https://api.example.com");
+    expect(config.warnings).toEqual([
+      "MILLIONSEND_API_KEY is deprecated and stops working in 0.3: rename it to MEPMAIL_API_KEY.",
+      "MILLIONSEND_BASE_URL is deprecated and stops working in 0.3: rename it to MEPMAIL_BASE_URL.",
+    ]);
   });
 
   it("accepts --rps above Resend's default limit up to the ceiling, and remembers it was given", () => {

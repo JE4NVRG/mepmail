@@ -80,6 +80,7 @@ import {
 } from "./handlers/cron.js";
 import { drainWebhookEndpoint } from "./handlers/deliver-webhook.js";
 import { runInstanceProbes } from "./handlers/instance-probes.js";
+import { warnExpiringMailboxAgentKeys } from "./handlers/mailbox-agent-key-expiry.js";
 import { runMailboxCapacity } from "./handlers/mailbox-capacity.js";
 import { runMonitorHealth } from "./handlers/monitor-health.js";
 import { reportPlanMove, sweepNotifications } from "./handlers/notify.js";
@@ -112,10 +113,11 @@ if (!env.MASTER_ENCRYPTION_KEY) {
 
 const db = getDb();
 const keyring = createKeyringFromEnv(env);
+// The mailbox tables exist only where the mailbox schema was applied.
+const mailboxRegistryEnabled = ["1", "true"].includes(process.env.MAILBOX_REGISTRY_ENABLED ?? "");
 // Opt-in only after mailbox schema, provider identity and recovery qualification.
 const mailboxTransportEnabled =
-  process.env.MAILBOX_TRANSPORT_ENABLED === "1" &&
-  ["1", "true"].includes(process.env.MAILBOX_REGISTRY_ENABLED ?? "");
+  process.env.MAILBOX_TRANSPORT_ENABLED === "1" && mailboxRegistryEnabled;
 // Listed domains send from the failover region while SES pauses their own.
 const failover =
   parseSesFailover(process.env.SES_FAILOVER_REGION, process.env.SES_FAILOVER_DOMAINS) ?? undefined;
@@ -454,6 +456,10 @@ await queue.scheduleCrons({
       appBaseUrl: env.APP_BASE_URL,
     });
     if (result.sent > 0) console.log(`notifications.sweep: sent=${result.sent}`);
+    if (mailboxRegistryEnabled) {
+      const keys = await warnExpiringMailboxAgentKeys(db, { mailer, appBaseUrl: env.APP_BASE_URL });
+      if (keys.sent > 0) console.log(`notifications.sweep: agentKeysExpiring=${keys.sent}`);
+    }
   },
   "platform.breaker": async () => {
     // Without SES events there are no bounce/complaint counts to judge.

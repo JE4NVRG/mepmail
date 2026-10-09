@@ -242,6 +242,8 @@ export interface ApiDeps {
   appBaseUrl?: string | undefined;
   /** Single OAuth issuer; omitted preserves the dashboard issuer. */
   oauthIssuerUrl?: string | undefined;
+  /** The previous issuer, accepted on verification only while its tokens live out. */
+  oauthRetiredIssuerUrl?: string | undefined;
   /** Host of the hosted unsubscribe pages when they have their own; omitted → appBaseUrl. */
   unsubscribeBaseUrl?: string | undefined;
   /**

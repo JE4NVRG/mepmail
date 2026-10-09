@@ -31,13 +31,24 @@ import { MCP_TOOLS } from "./mcp-tools.js";
  * hand-written schema would be a second, unchecked source of truth.
  */
 
+/**
+ * The server's registry name: the one the official MCP registry lists and
+ * @mepmail/mcp's package.json `mcpName` declares (the registry checks that the
+ * two match). io.github.* is namespaced by the GitHub account that publishes.
+ */
+export const MCP_SERVER_NAME = "io.github.JE4NVRG/mepmail";
+/** The hosted server's version: the platform release (CHANGELOG.md) that serves it. */
+export const MCP_SERVER_VERSION = "0.71.0";
+/** The OAuth issuer that signs the endpoint's access tokens (OAUTH_ISSUER_URL in production). */
+const AUTHORIZATION_SERVER = "https://mepmail.dev";
+
 /** What the card publishes per tool: the fields it can attest to. */
 const TOOLS = MCP_TOOLS.map(({ name, description }) => ({ name, description }));
 
 export const MCP_SERVER_CARD = {
   $schema: "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json",
-  name: "com.je4ndev/mepmail",
-  version: "0.6.69",
+  name: MCP_SERVER_NAME,
+  version: MCP_SERVER_VERSION,
   description:
     "Official MepMail MCP server (hosted): transactional email with a Resend-compatible API. Send and manage emails, broadcasts, domains, contacts, templates, webhooks, API keys and Correio mailboxes for AI agents from AI assistants.",
   title: "MepMail",
@@ -53,9 +64,9 @@ export const MCP_SERVER_CARD = {
     },
   ],
   serverInfo: {
-    name: "com.je4ndev/mepmail",
+    name: MCP_SERVER_NAME,
     title: "MepMail",
-    version: "0.6.69",
+    version: MCP_SERVER_VERSION,
     description:
       "Hosted MCP server for transactional email, broadcasts, domains, contacts, templates, webhooks and Correio mailboxes.",
   },
@@ -72,10 +83,9 @@ export const MCP_SERVER_CARD = {
     required: true,
     type: "oauth2",
     schemes: ["oauth2"],
-    authorizationServer: "https://mepmail.je4ndev.com",
+    authorizationServer: AUTHORIZATION_SERVER,
     resourceMetadata: "https://api.mepmail.dev/.well-known/oauth-protected-resource",
-    authorizationServerMetadata:
-      "https://mepmail.je4ndev.com/.well-known/oauth-authorization-server",
+    authorizationServerMetadata: `${AUTHORIZATION_SERVER}/.well-known/oauth-authorization-server`,
     scopes: [
       "offline_access",
       "emails:send",
