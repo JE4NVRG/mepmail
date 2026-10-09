@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
+import { isDesktop } from "@/lib/desktop-bridge";
 import {
   initialMailboxText,
   mailboxSignature,
@@ -29,6 +30,7 @@ import {
   mailboxPrimaryParticipant,
   mailboxSendApproval,
 } from "@/lib/mailbox-inbox-presentation";
+import { mergeMailboxHead } from "@/lib/mailbox-list-pages";
 import {
   mailboxAvatarHue,
   mailboxDateSection,
@@ -49,7 +51,7 @@ import {
 } from "@/lib/mailbox-recipients";
 import { MAILBOX_SHORTCUTS, mailboxShortcut } from "@/lib/mailbox-shortcuts";
 import { mailboxSignatureText } from "@/lib/mailbox-signature";
-import { useTRPC } from "@/lib/trpc";
+import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import { MailboxRecipientField } from "./mailbox-recipient-field";
@@ -816,8 +818,13 @@ export function MailboxContentView({
   draftSaved,
   dropHandler,
   onNewFolder,
+  railOpen,
+  onToggleRail,
 }: {
   navigation: ReactNode;
+  /** Whether the phone drawer with the rail is open; the view owns it. */
+  railOpen: boolean;
+  onToggleRail: () => void;
   boxes: Box[];
   selected: Box | null;
   mailboxKind: "person" | "agent" | undefined;
@@ -856,7 +863,6 @@ export function MailboxContentView({
   const [search, setSearch] = useState("");
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [navigationExpanded, setNavigationExpanded] = useState(false);
   const [composer, compose] = useState<{
     session: number;
     mailboxId: string;
@@ -900,10 +906,12 @@ export function MailboxContentView({
   currentSelection.current = selection;
   const reader = useRef<HTMLElement>(null);
   const rowButtons = useRef(new Map<string, HTMLButtonElement>());
+  const trpcClient = useTRPCClient();
+  const listMailboxId = selected?.id ?? null;
   const listing = useInfiniteQuery(
     trpc.mailboxes.items.infiniteQueryOptions(
       {
-        mailboxId: selected?.id ?? null,
+        mailboxId: listMailboxId,
         folder,
         mailboxKind,
         ...(folder === "custom" && customFolderId ? { customFolderId } : {}),
@@ -912,10 +920,61 @@ export function MailboxContentView({
         getNextPageParam: (page) => page.nextCursor,
         retry: false,
         gcTime: 0,
-        refetchInterval: 15000,
+        // The poll below keeps the list fresh; a focus refetch would redo every page.
+        refetchOnWindowFocus: false,
       },
     ),
   );
+  // Only the first page is polled, also while the window is hidden (the desktop
+  // shell's badge and new-mail notices depend on it): new mail always lands
+  // there, and each page costs the server one decryption per message. Older
+  // pages refresh on the person's own actions, which invalidate every page.
+  useEffect(() => {
+    const input = {
+      mailboxId: listMailboxId,
+      folder,
+      mailboxKind,
+      ...(folder === "custom" && customFolderId ? { customFolderId } : {}),
+    };
+    const key = trpc.mailboxes.items.infiniteQueryKey(input);
+    let stopped = false;
+    let running = false;
+    async function poll() {
+      const state = queries.getQueryState(key);
+      const data = queries.getQueryData(key);
+      if (running || !state || !data || state.fetchStatus === "fetching") return;
+      running = true;
+      try {
+        if (data.pages.length <= 1) {
+          await queries.refetchQueries({ queryKey: key, exact: true });
+          return;
+        }
+        const fresh = await trpcClient.mailboxes.items.query(input);
+        const now = queries.getQueryState(key);
+        const current = queries.getQueryData(key);
+        // An action refetched the pages meanwhile: this answer is already old.
+        if (stopped || !now || !current || now.fetchStatus === "fetching") return;
+        if (now.dataUpdatedAt !== state.dataUpdatedAt) return;
+        const merged = mergeMailboxHead(current, fresh);
+        if (merged) queries.setQueryData(key, merged);
+        else await queries.refetchQueries({ queryKey: key, exact: true });
+      } catch {
+        // The next tick tries again.
+      } finally {
+        running = false;
+      }
+    }
+    const timer = setInterval(() => void poll(), 15000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [listMailboxId, folder, mailboxKind, customFolderId, queries, trpc, trpcClient]);
   // Every page so far, in order; "Carregar mais" appends the next one.
   const listedItems = useMemo(
     () => listing.data?.pages.flatMap((page) => page.items),
@@ -1776,14 +1835,7 @@ export function MailboxContentView({
   return (
     <>
       <div className={styles.contentWorkspace}>
-        <aside
-          className={styles.mailFolderRail}
-          id="mailbox-folders-navigation"
-          data-expanded={navigationExpanded}
-          aria-label={t("folders")}
-        >
-          {navigation}
-        </aside>
+        {navigation}
         <section className={styles.contentToolbar} aria-label={t("mailControls")}>
           <div className={styles.folderHeading}>
             <MailboxFolderIcon name={folder} />
@@ -1793,9 +1845,9 @@ export function MailboxContentView({
             type="button"
             className={`ms-btn ms-btn-ghost ${styles.mobileFolderMenu}`}
             aria-controls="mailbox-folders-navigation"
-            aria-expanded={navigationExpanded}
+            aria-expanded={railOpen}
             aria-label={t("organization.boxesAndFolders")}
-            onClick={() => setNavigationExpanded((value) => !value)}
+            onClick={onToggleRail}
           >
             <MailboxFolderIcon name="custom" />
             <span className={styles.narrowHidden}>{t("organization.boxesAndFolders")}</span>
@@ -2109,7 +2161,7 @@ export function MailboxContentView({
                         <div
                           className={styles.messageRow}
                           data-unread={unread || undefined}
-                          draggable={draggableRow}
+                          draggable={draggableRow && !isDesktop()}
                           onDragStart={(event) => {
                             const keys = checkedIds.has(rowKey(row))
                               ? checkedRows.map(rowKey)

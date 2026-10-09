@@ -11,6 +11,8 @@ const h = vi.hoisted(() => ({
 }));
 vi.mock("@millionsend/config", () => ({ env: { IS_CLOUD: true, TURNSTILE_SITE_KEY: null } }));
 vi.mock("@millionsend/db", () => ({ getDb: () => ({}) }));
+vi.mock("@/server/account-locale", () => ({ syncAccountMailLocale: async () => {} }));
+vi.mock("next-intl/server", () => ({ getLocale: async () => "en" }));
 vi.mock("next/headers", () => ({
   headers: async () => new Headers(),
   cookies: async () => ({ get: () => undefined }),

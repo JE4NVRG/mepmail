@@ -28,6 +28,29 @@
   },
   "releases": [
     {
+      "version": "0.82",
+      "date": "2026-10-09",
+      "title": "Todas as suas caixas numa barra lateral",
+      "summary": "O Correio ganha uma barra lateral com todas as caixas e as não lidas de cada uma, um menu da conta, barra recolhível e gaveta no celular. E os e-mails da conta passam a chegar no idioma que você usa no painel.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Barra lateral com Todas as caixas, grupos Pessoas e Agentes e a contagem de não lidas de cada caixa; as ações da caixa ficam num menu “···”.",
+            "A barra recolhe para ícones (e recolhe sozinha em telas médias) e vira uma gaveta no celular.",
+            "Menu da conta com tema do sistema, claro ou escuro, idioma, atalhos, preferências, suporte e sair."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "A lista atualiza só a primeira página a cada 15 segundos, e o contador de não lidas continua atualizando com a janela minimizada.",
+            "Os e-mails da conta (boas-vindas, lembretes e avisos) chegam no idioma do seu painel; quem entrou com o Google podia recebê-los em inglês."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.81",
       "date": "2026-10-09",
       "title": "Do primeiro teste ao primeiro envio de verdade",

@@ -7,6 +7,38 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.82] - 2026-10-09
+
+New inbox cut 1D (from the desktop session); account mail in the dashboard language.
+
+### Added
+
+- Mail rail (`mailbox-rail.tsx`, `lib/mailbox-rail.ts`): All mailboxes, People
+  and Agents groups as scopes, per-mailbox initials and unread counts, the
+  selected mailbox's actions in a "···" menu, admin "···" for mailboxes,
+  system folders with "More", My folders, footer with settings, shortcuts and
+  collapse. Collapsed to 56 px per device (`mepmail.correio.rail`,
+  `html[data-rail]`, applied by the pre-paint script), auto-collapsed between
+  620 and 1050 px, a focus-trapped full-screen drawer on phones.
+- App bar with tabs and an account menu (theme saved to preferences,
+  language, shortcuts, preferences, support, sign out). The
+  `layout=dashboard` branch and its unused `mailbox-management.module.css`
+  are removed.
+
+### Fixed
+
+- The list polls only its first page every 15 s and merges it into the
+  cached pages (`lib/mailbox-list-pages.ts`), refetching everything only when
+  the head cannot be reconciled; `unreadCounts` keeps polling in the
+  background, so the title, the desktop tray badge and new-mail notices stay
+  current while the window is hidden.
+- Account-mail language: the sign-in screen keeps its language in the
+  `NEXT_LOCALE` cookie before email or social sign-in, and the onboarding page
+  and dashboard layout align the account contact's `locale` with the language
+  the dashboard renders in (`syncSystemContactLocale`, accounts younger than
+  30 days, written only on a change). 16 of 19 recent Google sign-ups had
+  been enrolled as English.
+
 ## [0.81] - 2026-10-09
 
 Activation: from the onboarding test send to a verified domain.

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { captchaHeaders, useTurnstile } from "@/components/turnstile";
 import { authClient } from "@/lib/auth-client";
+import { isAppLocale, setLocaleCookie } from "@/lib/locale-cookie";
 import { postAuthNext, withNext } from "@/lib/nav";
 import { passwordStrength } from "@/lib/password-strength";
 
@@ -90,6 +91,17 @@ export function AuthForm({
   const tLegal = useTranslations("auth.legal");
 
   const tAuth = useTranslations("auth");
+  const screenLocale = useLocale();
+  // The account's mail language is read from the request that creates it.
+  // The OAuth callback reaching the server carries this site's cookies but not
+  // always the browser's Accept-Language, so a Portuguese visitor signing in
+  // with Google was enrolled as English. Keep the language this screen is in.
+  // Best-effort: a blocked cookie must never stop the sign-in itself.
+  const keepScreenLocale = () => {
+    try {
+      if (isAppLocale(screenLocale)) setLocaleCookie(screenLocale);
+    } catch {}
+  };
   const params = useSearchParams();
   // An invited user carries ?next=/invite/... — signup sends them to accept
   // the invite rather than /onboarding (which would create a new team).
@@ -136,6 +148,7 @@ export function AuthForm({
 
     setPending("email");
     setErrorMessage(null);
+    keepScreenLocale();
     let token: string | null;
     try {
       token = await turnstile.getToken();
@@ -251,6 +264,7 @@ export function AuthForm({
     if (pending !== null) return;
     setPending(provider);
     setErrorMessage(null);
+    keepScreenLocale();
     try {
       const { error } = await authClient.signIn.social({
         provider,

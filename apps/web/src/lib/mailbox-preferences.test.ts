@@ -84,6 +84,32 @@ describe("CORREIO_PREFS_PREPAINT_SCRIPT", () => {
     expect(attributes).toEqual({});
   });
 
+  it("applies the rail the person collapsed or expanded on this device", () => {
+    const rail = (stored: unknown) => {
+      const dataset: Record<string, string> = { rail: "stale" };
+      const root = { dataset, setAttribute: () => {}, removeAttribute: () => {} };
+      const fn = new Function(
+        "localStorage",
+        "document",
+        "matchMedia",
+        CORREIO_PREFS_PREPAINT_SCRIPT,
+      );
+      fn(
+        {
+          getItem: (key: string) =>
+            key === "mepmail.correio.rail" && stored !== undefined ? JSON.stringify(stored) : null,
+        },
+        { documentElement: root },
+        () => ({ matches: false }),
+      );
+      return dataset.rail;
+    };
+    expect(rail({ collapsed: true })).toBe("collapsed");
+    expect(rail({ collapsed: false })).toBe("expanded");
+    expect(rail({ collapsed: null })).toBeUndefined();
+    expect(rail(undefined)).toBeUndefined();
+  });
+
   it("survives a missing or broken mirror", () => {
     expect(() => run(undefined, false)).not.toThrow();
     const fn = new Function(

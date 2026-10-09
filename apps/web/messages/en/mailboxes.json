@@ -821,5 +821,22 @@
       "month": "This month",
       "older": "Older"
     }
+  },
+  "rail": {
+    "boxes": "Mailboxes",
+    "boxesMenu": "Mailbox options",
+    "boxMenu": "Options for {name}",
+    "manageBoxes": "Manage mailboxes",
+    "searchBoxes": "Find a mailbox",
+    "noBoxMatches": "No mailbox found.",
+    "showAll": "Show all ({count})",
+    "showFewer": "Show fewer",
+    "more": "More",
+    "collapse": "Collapse the sidebar",
+    "expand": "Expand the sidebar"
+  },
+  "account": {
+    "menu": "Account and preferences",
+    "preferences": "Preferences"
   }
 }

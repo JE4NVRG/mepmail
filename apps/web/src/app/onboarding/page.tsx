@@ -2,9 +2,11 @@ import { env } from "@millionsend/config";
 import { getDb } from "@millionsend/db";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
 import { apiBaseUrl } from "@/lib/api-base-url";
 import { postAuthNext, withNext } from "@/lib/nav";
+import { syncAccountMailLocale } from "@/server/account-locale";
 import { getAuth } from "@/server/auth";
 import { ACTIVE_TEAM_COOKIE, getActiveMembership } from "@/server/membership";
 import { uploadsEnabled } from "@/server/storage";
@@ -19,6 +21,8 @@ export default async function OnboardingPage({
   const next = postAuthNext((await searchParams).next, "");
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect(withNext("/login", next));
+  // First stop after sign-up: this request carries the real browser language.
+  await syncAccountMailLocale(getDb(), session.user, await getLocale());
   const membership = await getActiveMembership(
     getDb(),
     session.user.id,

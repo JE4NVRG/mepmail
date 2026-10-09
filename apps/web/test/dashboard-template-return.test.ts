@@ -8,6 +8,8 @@ const h = vi.hoisted(() => ({
 }));
 vi.mock("@millionsend/config", () => ({ env: { UNSUBSCRIBE_BASE_URL: null } }));
 vi.mock("@millionsend/db", () => ({ getDb: () => ({}) }));
+vi.mock("@/server/account-locale", () => ({ syncAccountMailLocale: async () => {} }));
+vi.mock("next-intl/server", () => ({ getLocale: async () => "en" }));
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ "x-mepmail-next": h.target }),
   cookies: async () => ({ get: () => undefined }),

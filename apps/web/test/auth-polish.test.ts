@@ -38,6 +38,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => h.params,
 }));
 vi.mock("next-intl", () => ({
+  useLocale: () => "en",
   useTranslations: (scope: string) =>
     Object.assign((key: string) => `${scope}.${key}`, { rich: (key: string) => `${scope}.${key}` }),
 }));

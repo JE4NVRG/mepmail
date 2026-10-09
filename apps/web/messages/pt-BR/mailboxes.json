@@ -821,5 +821,22 @@
       "month": "Este mês",
       "older": "Mais antigas"
     }
+  },
+  "rail": {
+    "boxes": "Caixas",
+    "boxesMenu": "Opções das caixas",
+    "boxMenu": "Opções de {name}",
+    "manageBoxes": "Gerenciar caixas",
+    "searchBoxes": "Buscar caixa",
+    "noBoxMatches": "Nenhuma caixa encontrada.",
+    "showAll": "Mostrar todas ({count})",
+    "showFewer": "Mostrar menos",
+    "more": "Mais",
+    "collapse": "Recolher a barra lateral",
+    "expand": "Expandir a barra lateral"
+  },
+  "account": {
+    "menu": "Conta e preferências",
+    "preferences": "Preferências"
   }
 }

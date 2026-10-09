@@ -47,6 +47,34 @@ export async function enrollSystemContact(
 }
 
 /**
+ * Keeps an account contact's mail language in line with the dashboard
+ * language the person actually uses. Enrollment reads the language once, from
+ * the request that created the account, and never overwrites a contact that
+ * existed before (an earlier updates opt-in, say); a later dashboard request
+ * carries the real browser and cookie. Writes only when the language differs.
+ */
+export async function syncSystemContactLocale(
+  db: Db,
+  teamId: string,
+  email: string,
+  locale: string,
+): Promise<boolean> {
+  const t = schema.contacts;
+  const rows = await db
+    .update(t)
+    .set({ properties: sql`${t.properties} || jsonb_build_object('locale', ${locale}::text)` })
+    .where(
+      and(
+        eq(t.teamId, teamId),
+        sql`lower(${t.email}) = lower(${email})`,
+        sql`(${t.properties}->>'locale') is distinct from ${locale}`,
+      ),
+    )
+    .returning({ id: t.id });
+  return rows.length > 0;
+}
+
+/**
  * A confirmed opt-in (the recipient opened the emailed link): enroll, and if
  * the address already has a contact that had unsubscribed, subscribe it
  * again — the explicit consent is exactly what the dashboard's re-subscribe

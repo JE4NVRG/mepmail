@@ -3,14 +3,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type DragEvent, useEffect, useRef, useState } from "react";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { NavGlyph } from "@/components/icons/nav-icons";
-import { PopoverMenu } from "@/components/popover-menu";
+import { PopoverMenu, type PopoverMenuItem } from "@/components/popover-menu";
 import { toast } from "@/components/toast";
 import { authClient } from "@/lib/auth-client";
-import { notifyDesktop, setNativeTitle } from "@/lib/desktop-bridge";
+import { isDesktop, notifyDesktop, setNativeTitle } from "@/lib/desktop-bridge";
 import {
   type MailboxFolder,
   type MailboxKindFilter,
@@ -20,6 +21,7 @@ import {
 import { applyCorreioTheme, useCorreioPrefs } from "@/lib/mailbox-preferences";
 import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
+import { MailboxAccountMenu } from "./mailbox-account-menu";
 import { MailboxActivityDialog } from "./mailbox-activity";
 import { MailboxAgentKeysDialog } from "./mailbox-agent-keys";
 import { MailboxAliasesSection } from "./mailbox-aliases-section";
@@ -34,9 +36,9 @@ import {
 import { MailboxFolderDialog } from "./mailbox-folder-dialog";
 import { type FolderEditorState, MailboxFolderEditor } from "./mailbox-folder-editor";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
-import managementStyles from "./mailbox-management.module.css";
 import { MailboxMigration } from "./mailbox-migration";
 import { MailboxOffer } from "./mailbox-offer";
+import { MailboxRail } from "./mailbox-rail";
 import { MailboxServicePanel } from "./mailbox-service-panel";
 import { MailboxSetupDialog } from "./mailbox-setup-dialog";
 import { MailboxSignatureDialog } from "./mailbox-signature-dialog";
@@ -383,17 +385,17 @@ function RegistryDialog({
 }
 
 /**
- * Correio's whole UI. `dashboard` is the legacy embedded page; `app` is the
- * standalone full-screen inbox at /mail (opened from the menu in its own tab);
- * `settings` is its companion page at /mail/settings: mailboxes, agents and
- * the license, with the same dialogs.
+ * Correio's whole UI. `app` is the full-window inbox at /mail (opened from the
+ * dashboard menu in its own tab, and the desktop app's only page); `settings`
+ * is its companion page at /mail/settings: appearance, mailboxes, agents, the
+ * license and migration, with the same dialogs.
  */
 export function MailboxesView({
   correioMcpUrl,
-  layout = "dashboard",
+  layout = "app",
 }: {
   correioMcpUrl?: string;
-  layout?: "dashboard" | "app" | "settings";
+  layout?: "app" | "settings";
 } = {}) {
   const t = useTranslations("mailboxes");
   const tActivity = useTranslations("mailboxes-activity");
@@ -401,6 +403,7 @@ export function MailboxesView({
   const { data: session } = authClient.useSession();
   const trpc = useTRPC();
   const queries = useQueryClient();
+  const router = useRouter();
   const { prefs, setPref, resetPrefs, loaded: prefsLoaded } = useCorreioPrefs();
   const capability = useQuery(trpc.mailboxes.capabilities.queryOptions());
   // Start with the capability check instead of after it: one round trip less on
@@ -443,6 +446,8 @@ export function MailboxesView({
   const [activityDialogId, setActivityDialogId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("appearance");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // The phone drawer with the rail (mailboxes and folders).
+  const [railOpen, setRailOpen] = useState(false);
   // Links such as the key-expiry email open the agents tab directly; ?tab= picks any tab.
   useEffect(() => {
     if (layout !== "settings") return;
@@ -466,7 +471,6 @@ export function MailboxesView({
     const start = prefs.startFolder;
     if (start !== "inbox" && !start.startsWith("folder:")) setFolder(start as MailboxFolder);
   }, [prefsLoaded, layout, prefs.startFolder]);
-  const managementMenu = useRef<HTMLDetailsElement>(null);
   // Team switches cause a full navigation. Every id is also resolved against this request's scoped DTO.
   const boxes = registry.data?.mailboxes ?? [];
   const scopedBoxes = boxes.filter((box) => mailboxKind === "all" || box.kind === mailboxKind);
@@ -504,6 +508,9 @@ export function MailboxesView({
     trpc.mailboxes.unreadCounts.queryOptions(undefined, {
       enabled: mayUseMail && !!registry.data,
       refetchInterval: 30000,
+      // The title, the desktop tray badge and the new-mail notice read these
+      // counts, so they keep coming while the window is hidden or in the tray.
+      refetchIntervalInBackground: true,
       retry: false,
     }),
   );
@@ -514,23 +521,22 @@ export function MailboxesView({
   // The tab shows the unread count the way mail apps do: "(3) Correio".
   const baseTitle = useRef<string | null>(null);
   useEffect(() => {
-    if (layout === "dashboard") return;
     baseTitle.current ??= document.title.replace(/^\(\d+\) /, "");
     document.title = inboxUnread ? `(${inboxUnread}) ${baseTitle.current}` : baseTitle.current;
     // The desktop shell shows the same title on its window; a no-op elsewhere.
     void setNativeTitle(document.title);
-  }, [inboxUnread, layout]);
+  }, [inboxUnread]);
   // More unread mail than the last count: one system notification (the desktop
   // shell shows it as a native toast; a browser only if it was granted before).
   const lastUnread = useRef<number | null>(null);
   useEffect(() => {
-    if (layout === "dashboard" || !unreadCounts.data) return;
+    if (!unreadCounts.data) return;
     const total = Object.values(unreadCounts.data.counts).reduce((sum, n) => sum + n, 0);
     const previous = lastUnread.current;
     lastUnread.current = total;
     if (previous === null || total <= previous) return;
     void notifyDesktop(t("title"), t("app.newMail", { count: total - previous }));
-  }, [unreadCounts.data, layout, t]);
+  }, [unreadCounts.data, t]);
   useEffect(
     () => () => {
       if (baseTitle.current) document.title = baseTitle.current;
@@ -539,7 +545,9 @@ export function MailboxesView({
   );
   // Rows dragged from the list land on a folder through the content view's action.
   const dropAction = useRef<MailboxDropHandler | null>(null);
-  const canDrop = boxes.some((box) => box.ownerActive && box.ownerUserId === session?.user.id);
+  // The desktop shell intercepts HTML drops, so its window shows no drop targets.
+  const canDrop =
+    !isDesktop() && boxes.some((box) => box.ownerActive && box.ownerUserId === session?.user.id);
   const [dropHover, setDropHover] = useState<string | null>(null);
   const dropProps = (target: MailboxDropTarget, key: string) =>
     canDrop
@@ -584,6 +592,7 @@ export function MailboxesView({
       box.ownerUserId === session?.user.id,
   );
   function selectMailbox(id: string | null) {
+    setRailOpen(false);
     selectItem(null);
     select(id);
     setCustomFolderId(null);
@@ -591,6 +600,7 @@ export function MailboxesView({
     if (folder === "custom") setFolder("inbox");
   }
   function chooseFolder(next: MailboxFolder, id: string | null = null) {
+    setRailOpen(false);
     selectItem(null);
     setFolder(next);
     setCustomFolderId(id);
@@ -601,6 +611,7 @@ export function MailboxesView({
   }
   /** Opens a folder of a specific mailbox (from the unified view's grouped list). */
   function openFolder(mailboxId: string, folderId: string) {
+    setRailOpen(false);
     selectItem(null);
     setFolderDialog(null);
     setFolderDialogBox(null);
@@ -759,28 +770,25 @@ export function MailboxesView({
   }
   // In the standalone app every state keeps the Correio bar and the way back,
   // so a team without access sees the offer framed like the app it would get.
-  const frame = (body: React.ReactNode) =>
-    layout === "dashboard" ? (
-      body
-    ) : (
-      <section className={`${styles.view} ${styles.appView}`}>
-        <header className={styles.appBar}>
-          <Link href="/mail" className={styles.appBrand}>
-            <NavGlyph name="emails" hovered={false} />
-            <span>{t("title")}</span>
+  const frame = (body: React.ReactNode) => (
+    <section className={`${styles.view} ${styles.appView}`}>
+      <header className={styles.appBar}>
+        <Link href="/mail" className={styles.appBrand}>
+          <NavGlyph name="emails" hovered={false} />
+          <span>{t("title")}</span>
+        </Link>
+        <div className={styles.appActions}>
+          <Link className="ms-btn ms-btn-ghost" href="/emails" aria-label={t("app.back")}>
+            <span className={styles.backLong}>{t("app.back")}</span>
+            <span className={styles.backShort} aria-hidden="true">
+              {t("app.backShort")}
+            </span>
           </Link>
-          <div className={styles.appActions}>
-            <Link className="ms-btn ms-btn-ghost" href="/emails" aria-label={t("app.back")}>
-              <span className={styles.backLong}>{t("app.back")}</span>
-              <span className={styles.backShort} aria-hidden="true">
-                {t("app.backShort")}
-              </span>
-            </Link>
-          </div>
-        </header>
-        <div className={styles.appCentered}>{body}</div>
-      </section>
-    );
+        </div>
+      </header>
+      <div className={styles.appCentered}>{body}</div>
+    </section>
+  );
   if (capability.isPending) return frame(<p aria-live="polite">{t("loading")}</p>);
   if (!capability.isError && !capability.data?.enabled)
     return frame(
@@ -811,153 +819,136 @@ export function MailboxesView({
         </button>
       </div>,
     );
-  const navigation = (
-    <div className={styles.workspaceNavigation}>
-      <nav className={styles.scopeFilters} aria-label={t("scope.label")}>
-        {(["all", "person", "agent"] as const).map((kind) => (
-          <button
-            type="button"
-            key={kind}
-            aria-pressed={mailboxKind === kind}
-            onClick={() => changeScope(kind)}
-          >
-            {t(`scope.${kind}`)}
-          </button>
-        ))}
-      </nav>
-      <label>
-        <span className={styles.visuallyHidden}>{t("chooseBox")}</span>
-        <select
-          className="ms-input"
-          aria-label={t("chooseBox")}
-          value={selected?.id ?? ""}
-          onChange={(e) => selectMailbox(e.target.value || null)}
+  const ownsBox = (box: Box) => box.ownerActive && box.ownerUserId === session?.user.id;
+  // The rail's "···" beside CAIXAS: mailbox management, for admins.
+  const boxesMenu: (PopoverMenuItem | null)[] = registry.data?.canManage
+    ? [
+        { label: t("new"), disabled: !options.data, onSelect: () => setDialog("new") },
+        {
+          label: t("rail.manageBoxes"),
+          onSelect: () => router.push("/mail/settings?tab=boxes"),
+        },
+      ]
+    : [];
+  // The selected mailbox's own actions, beside its name in the rail.
+  const boxMenu: (PopoverMenuItem | null)[] = selected
+    ? [
+        ...(ownsBox(selected)
+          ? [{ label: t("connectAgent"), onSelect: () => setAgentDialogId(selected.id) }]
+          : []),
+        ...(ownsBox(selected) && selected.canRead && selected.status === "planned"
+          ? [{ label: tActivity("open"), onSelect: () => setActivityDialogId(selected.id) }]
+          : []),
+        ...(registry.data?.canManage || ownsBox(selected)
+          ? [{ label: t("signature.action"), onSelect: () => setSignatureDialogId(selected.id) }]
+          : []),
+        ...(registry.data?.canManage
+          ? [
+              null,
+              {
+                label: t("app.receiving"),
+                disabled: !options.data,
+                onSelect: () => setDialog("receiving"),
+              },
+              { label: t("manage"), disabled: !options.data, onSelect: () => setDialog("edit") },
+            ]
+          : []),
+      ]
+    : [];
+  const foldersSection = (
+    <section className={styles.customFolders} aria-label={t("organization.folders")}>
+      <header>
+        <h3 className="ms-microlabel">{t("organization.folders")}</h3>
+      </header>
+      {folderEditor?.mode === "create" ? (
+        <MailboxFolderEditor
+          editor={folderEditor}
+          mailboxes={folderBoxes}
+          onDone={(result) => {
+            setFolderEditor(null);
+            openFolder(result.mailboxId, result.id);
+            toast(t("organization.folderCreated", { name: result.name }));
+          }}
+          onCancel={() => setFolderEditor(null)}
+        />
+      ) : canCreateFolder ? (
+        <button
+          type="button"
+          className={styles.newFolderButton}
+          onClick={() => startFolderCreation()}
         >
-          <option value="">{t(`scope.boxes.${mailboxKind}`)}</option>
-          {(["person", "agent"] as const).map((kind) => {
-            const group = scopedBoxes.filter((box) => box.kind === kind);
-            return group.length ? (
-              <optgroup key={kind} label={t(`scope.${kind}`)}>
-                {group.map((box) => (
-                  <option key={box.id} value={box.id}>
-                    {box.label} · {box.address}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null;
-          })}
-        </select>
-      </label>
-      <nav className={styles.compactFolders} aria-label={t("folders")}>
-        {(
-          [
-            "inbox",
-            "favorites",
-            "drafts",
-            "sent",
-            "archive",
-            "spam",
-            "quarantine",
-            "trash",
-          ] as const
-        ).map((f) => (
-          <button
-            type="button"
-            key={f}
-            aria-current={f === folder ? "page" : undefined}
-            onClick={() => chooseFolder(f)}
-            {...(f === "inbox" ||
-            f === "favorites" ||
-            f === "archive" ||
-            f === "spam" ||
-            f === "trash"
-              ? dropProps({ folder: f }, f)
-              : {})}
-          >
-            <MailboxFolderIcon name={f} />
-            {t(f)}
-            {f === "inbox" && inboxUnread ? (
-              <span
-                className={styles.folderCount}
-                role="img"
-                aria-label={t("organization.unreadCount", { count: inboxUnread })}
-              >
-                {inboxUnread > 999 ? "999+" : inboxUnread}
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </nav>
-      <section className={styles.customFolders} aria-label={t("organization.folders")}>
-        <header>
-          <h3>{t("organization.folders")}</h3>
-        </header>
-        {folderEditor?.mode === "create" ? (
-          <MailboxFolderEditor
-            editor={folderEditor}
-            mailboxes={folderBoxes}
-            onDone={(result) => {
-              setFolderEditor(null);
-              openFolder(result.mailboxId, result.id);
-              toast(t("organization.folderCreated", { name: result.name }));
-            }}
-            onCancel={() => setFolderEditor(null)}
-          />
-        ) : canCreateFolder ? (
-          <button
-            type="button"
-            className={styles.newFolderButton}
-            onClick={() => startFolderCreation()}
-          >
-            <MailboxFolderIcon name="folderPlus" />
-            <span>{t("organization.newFolder")}</span>
-          </button>
-        ) : null}
-        {selected ? (
-          folderList.isError ? (
-            <button
-              type="button"
-              className="ms-btn ms-btn-ghost"
-              onClick={() => void folderList.refetch()}
-            >
-              {t("retry")}
-            </button>
-          ) : folderList.isPending ? (
-            <p>{t("loading")}</p>
-          ) : folderList.data?.length ? (
-            <div className={styles.folderGroup}>
-              {folderList.data.map((entry) => folderRow(selected, entry, folderList.data))}
-            </div>
-          ) : (
-            <p>{t("organization.emptyFolders")}</p>
-          )
-        ) : folderBoxes.length === 0 ? (
-          <p>{t("organization.chooseBox")}</p>
-        ) : unifiedFolders.isError ? (
+          <MailboxFolderIcon name="folderPlus" />
+          <span>{t("organization.newFolder")}</span>
+        </button>
+      ) : null}
+      {selected ? (
+        // Folders exist only in a mailbox this person can read.
+        !selected.canRead || selected.status !== "planned" ? null : folderList.isError ? (
           <button
             type="button"
             className="ms-btn ms-btn-ghost"
-            onClick={() => void unifiedFolders.refetch()}
+            onClick={() => void folderList.refetch()}
           >
             {t("retry")}
           </button>
-        ) : unifiedFolders.isPending ? (
+        ) : folderList.isPending ? (
           <p>{t("loading")}</p>
-        ) : unifiedGroups.length ? (
-          unifiedGroups.map(({ box, entries }) => (
-            <div className={styles.folderGroup} key={box.id}>
-              <p className={styles.folderGroupLabel} title={box.address}>
-                {box.label}
-              </p>
-              {entries.map((entry) => folderRow(box, entry, entries))}
-            </div>
-          ))
+        ) : folderList.data?.length ? (
+          <div className={styles.folderGroup}>
+            {folderList.data.map((entry) => folderRow(selected, entry, folderList.data))}
+          </div>
         ) : (
           <p>{t("organization.emptyFolders")}</p>
-        )}
-      </section>
-      <MailboxUsagePanel mailboxId={selected?.id ?? null} />
-    </div>
+        )
+      ) : folderBoxes.length === 0 ? (
+        <p>{t("organization.chooseBox")}</p>
+      ) : unifiedFolders.isError ? (
+        <button
+          type="button"
+          className="ms-btn ms-btn-ghost"
+          onClick={() => void unifiedFolders.refetch()}
+        >
+          {t("retry")}
+        </button>
+      ) : unifiedFolders.isPending ? (
+        <p>{t("loading")}</p>
+      ) : unifiedGroups.length ? (
+        unifiedGroups.map(({ box, entries }) => (
+          <div className={styles.folderGroup} key={box.id}>
+            <p className={styles.folderGroupLabel} title={box.address}>
+              {box.label}
+            </p>
+            {entries.map((entry) => folderRow(box, entry, entries))}
+          </div>
+        ))
+      ) : (
+        <p>{t("organization.emptyFolders")}</p>
+      )}
+    </section>
+  );
+  const navigation = (
+    <MailboxRail
+      boxes={boxes}
+      selectedId={selected?.id ?? null}
+      scope={mailboxKind}
+      folder={folder}
+      unread={unreadCounts.data?.counts ?? {}}
+      inboxUnread={inboxUnread}
+      expanded={railOpen}
+      onClose={() => setRailOpen(false)}
+      onSelectBox={(id) => {
+        setMailboxKind("all");
+        selectMailbox(id);
+      }}
+      onScope={changeScope}
+      onFolder={(next) => chooseFolder(next)}
+      dropProps={(target, key) => dropProps(target as MailboxDropTarget, key)}
+      boxesMenu={boxesMenu}
+      boxMenu={boxMenu}
+      folders={foldersSection}
+      usage={<MailboxUsagePanel mailboxId={selected?.id ?? null} />}
+      onShortcuts={() => setShortcutsOpen(true)}
+    />
   );
   const workspace = (
     <div className={styles.workspace}>
@@ -966,6 +957,8 @@ export function MailboxesView({
         <MailboxContentView
           key={`${mailboxKind}:${selected?.id ?? "all"}`}
           navigation={navigation}
+          railOpen={railOpen}
+          onToggleRail={() => setRailOpen((open) => !open)}
           onNewFolder={canCreateFolder ? () => startFolderCreation() : undefined}
           boxes={boxes}
           selected={selected}
@@ -989,50 +982,66 @@ export function MailboxesView({
         />
       ) : (
         <div className={styles.registryWorkspace}>
-          <header className={styles.contentToolbar}>{navigation}</header>
-          <div className={styles.registryState}>
-            <div className={styles.hero}>
-              <NavGlyph name="emails" hovered={false} />
-              <h2>
-                {selected?.label ??
-                  t(mailboxKind === "all" ? "emptyTitle" : `scope.empty.${mailboxKind}.title`)}
-              </h2>
-              {selected ? (
-                <>
-                  <p className={styles.address}>{selected.address}</p>
-                  <span className={styles.tag}>{t(selected.status)}</span>
-                  <p>{t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}</p>
-                  {!selected.ownerActive ? (
-                    <p className={styles.hint}>{t("ownerMissing")}</p>
-                  ) : null}
-                  {!selected.canRead ? <p className={styles.hint}>{t("managementOnly")}</p> : null}
-                  {registry.data?.canManage ? (
-                    <button
-                      type="button"
-                      className="ms-btn"
-                      disabled={!options.data}
-                      onClick={() => setDialog("edit")}
-                    >
-                      {t("manage")}
-                    </button>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <p>
-                    {t(mailboxKind === "all" ? "emptyBody" : `scope.empty.${mailboxKind}.body`)}
-                  </p>
-                  {registry.data?.canManage && options.data ? (
-                    <button
-                      type="button"
-                      className="ms-btn ms-btn-primary"
-                      onClick={() => setDialog("new")}
-                    >
-                      {t("createFirst")}
-                    </button>
-                  ) : null}
-                </>
-              )}
+          {navigation}
+          <div className={styles.registryMain}>
+            <div className={styles.registryBar}>
+              <button
+                type="button"
+                className="ms-btn ms-btn-ghost"
+                aria-controls="mailbox-folders-navigation"
+                aria-expanded={railOpen}
+                onClick={() => setRailOpen((open) => !open)}
+              >
+                <MailboxFolderIcon name="custom" />
+                {t("organization.boxesAndFolders")}
+              </button>
+            </div>
+            <div className={styles.registryState}>
+              <div className={styles.hero}>
+                <NavGlyph name="emails" hovered={false} />
+                <h2>
+                  {selected?.label ??
+                    t(mailboxKind === "all" ? "emptyTitle" : `scope.empty.${mailboxKind}.title`)}
+                </h2>
+                {selected ? (
+                  <>
+                    <p className={styles.address}>{selected.address}</p>
+                    <span className={styles.tag}>{t(selected.status)}</span>
+                    <p>{t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}</p>
+                    {!selected.ownerActive ? (
+                      <p className={styles.hint}>{t("ownerMissing")}</p>
+                    ) : null}
+                    {!selected.canRead ? (
+                      <p className={styles.hint}>{t("managementOnly")}</p>
+                    ) : null}
+                    {registry.data?.canManage ? (
+                      <button
+                        type="button"
+                        className="ms-btn"
+                        disabled={!options.data}
+                        onClick={() => setDialog("edit")}
+                      >
+                        {t("manage")}
+                      </button>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      {t(mailboxKind === "all" ? "emptyBody" : `scope.empty.${mailboxKind}.body`)}
+                    </p>
+                    {registry.data?.canManage && options.data ? (
+                      <button
+                        type="button"
+                        className="ms-btn ms-btn-primary"
+                        onClick={() => setDialog("new")}
+                      >
+                        {t("createFirst")}
+                      </button>
+                    ) : null}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1135,418 +1144,244 @@ export function MailboxesView({
   );
   const ownsSelected = !!selected?.ownerActive && selected.ownerUserId === session?.user.id;
   const ownedBoxes = boxes.filter((box) => box.ownerActive && box.ownerUserId === session?.user.id);
-  if (layout !== "dashboard")
-    return (
-      <section className={`${styles.view} ${styles.appView}`}>
-        <header className={styles.appBar}>
-          <Link href="/mail" className={styles.appBrand}>
-            <NavGlyph name="emails" hovered={false} />
-            <span>{t("title")}</span>
-          </Link>
-          <span className={styles.serviceBadge}>
-            {t(systemLicense ? "system.badge" : "paidService")}
-          </span>
-          <nav className={styles.appTabs} aria-label={t("app.sections")}>
-            <Link href="/mail" aria-current={layout === "app" ? "page" : undefined}>
-              {t("app.inbox")}
-            </Link>
-            <Link href="/mail/settings" aria-current={layout === "settings" ? "page" : undefined}>
-              {t("app.settings")}
-            </Link>
-          </nav>
-          <div className={styles.appActions}>
-            {layout === "app" &&
-            selected?.canRead &&
-            selected.status === "planned" &&
-            ownsSelected ? (
-              <button
-                type="button"
-                className="ms-btn ms-btn-ghost"
-                onClick={() => setActivityDialogId(selected.id)}
-              >
-                {tActivity("open")}
-              </button>
-            ) : null}
-            {layout === "app" && selected && ownsSelected ? (
-              <button
-                type="button"
-                className="ms-btn ms-btn-ghost"
-                onClick={() => setAgentDialogId(selected.id)}
-              >
-                {t("connectAgent")}
-              </button>
-            ) : null}
-            {registry.data?.canManage ? (
-              <button
-                type="button"
-                className={`ms-btn ms-btn-primary ${styles.newMailboxAction}`}
-                disabled={!options.data}
-                onClick={() => setDialog("new")}
-              >
-                + {t("new")}
-              </button>
-            ) : null}
-            {/* A new tab keeps the inbox open; /support#chat opens the support chat. */}
-            <a
-              className={`ms-btn ms-btn-ghost ${styles.supportLink}`}
-              href="/support#chat"
-              target="_blank"
-              rel="noreferrer"
-            >
-              {t("app.support")}
-            </a>
-            <Link className="ms-btn ms-btn-ghost" href="/emails" aria-label={t("app.back")}>
-              <span className={styles.backLong}>{t("app.back")}</span>
-              <span className={styles.backShort} aria-hidden="true">
-                {t("app.backShort")}
-              </span>
-            </Link>
-          </div>
-        </header>
-        {layout === "app" ? (
-          <>
-            {licenseOpenRequest > 0 || (service.data && !service.data.active) ? (
-              <div className={styles.appLicense}>
-                <MailboxServicePanel
-                  openRequest={licenseOpenRequest}
-                  initialOfferId={licenseOfferId}
-                />
-              </div>
-            ) : null}
-            {workspace}
-          </>
-        ) : (
-          <div className={styles.settings}>
-            <div className={styles.settingsTabs} role="tablist" aria-label={t("app.settings")}>
-              {SETTINGS_TABS.map((tab) => (
-                <button
-                  type="button"
-                  role="tab"
-                  key={tab}
-                  aria-selected={settingsTab === tab}
-                  onClick={() => setSettingsTab(tab)}
-                >
-                  {t(`app.tabs.${tab}`)}
-                </button>
-              ))}
-            </div>
-            {settingsTab === "appearance" ? (
-              <section className={styles.settingsSection} aria-label={t("app.tabs.appearance")}>
-                <MailboxAppearanceSettings
-                  prefs={prefs}
-                  setPref={setPref}
-                  resetPrefs={resetPrefs}
-                  openShortcuts={() => setShortcutsOpen(true)}
-                />
-                {shortcutsOpen ? <ShortcutsDialog close={() => setShortcutsOpen(false)} /> : null}
-              </section>
-            ) : settingsTab === "boxes" ? (
-              <section className={styles.settingsSection} aria-label={t("app.tabs.boxes")}>
-                <p className={styles.hint}>{t("app.boxesHint")}</p>
-                {registry.data?.canManage && options.data && !options.data.domains.length ? (
-                  <p className={styles.notice}>
-                    {t("noDomains")} <Link href="/domains">{t("domainsLink")} ↗</Link>
-                  </p>
-                ) : null}
-                {boxes.length ? (
-                  <ul className={styles.settingsList}>
-                    {boxes.map((box) => (
-                      <li key={box.id}>
-                        <div>
-                          <strong>{box.label}</strong>
-                          <span>{box.address}</span>
-                          <small>
-                            {t(`scope.${box.kind}`)} · {t(box.status)}
-                          </small>
-                        </div>
-                        {registry.data?.canManage ||
-                        (box.ownerActive && box.ownerUserId === session?.user.id) ? (
-                          <div className={styles.settingsRowActions}>
-                            <button
-                              type="button"
-                              className="ms-btn ms-btn-ghost"
-                              onClick={() => setSignatureDialogId(box.id)}
-                            >
-                              {t("signature.action")}
-                            </button>
-                            {registry.data?.canManage ? (
-                              <>
-                                <button
-                                  type="button"
-                                  className="ms-btn ms-btn-ghost"
-                                  disabled={!options.data}
-                                  onClick={() => {
-                                    selectMailbox(box.id);
-                                    setDialog("receiving");
-                                  }}
-                                >
-                                  {t("app.receiving")}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="ms-btn"
-                                  disabled={!options.data}
-                                  onClick={() => {
-                                    selectMailbox(box.id);
-                                    setDialog("edit");
-                                  }}
-                                >
-                                  {t("manage")}
-                                </button>
-                              </>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>{t("emptyBody")}</p>
-                )}
-                {registry.data?.canManage ? (
-                  <Link className="ms-btn ms-btn-ghost" href="/domains">
-                    {t("domainsLink")}
-                  </Link>
-                ) : null}
-              </section>
-            ) : settingsTab === "agents" ? (
-              <section className={styles.settingsSection} aria-label={t("app.tabs.agents")}>
-                <p className={styles.hint}>{t("app.agentsHint")}</p>
-                {correioMcpUrl && teamAgentBoxes.length ? (
-                  <OAuthConnectCallout url={correioMcpUrl.replace(/\/correio$/, "")} />
-                ) : null}
-                {teamAgentBoxes.length ? (
-                  <div className={styles.settingsRowActions}>
-                    <button
-                      type="button"
-                      className="ms-btn ms-btn-primary"
-                      onClick={() => setTeamAgentDialog(true)}
-                    >
-                      {tAgent("team.open")}
-                    </button>
-                  </div>
-                ) : null}
-                {ownedBoxes.length ? (
-                  <ul className={styles.settingsList}>
-                    {ownedBoxes.map((box) => (
-                      <li key={box.id}>
-                        <div>
-                          <strong>{box.label}</strong>
-                          <span>{box.address}</span>
-                          <small>{t(`scope.${box.kind}`)}</small>
-                        </div>
-                        <div className={styles.settingsRowActions}>
-                          {box.canRead && box.status === "planned" ? (
-                            <button
-                              type="button"
-                              className="ms-btn ms-btn-ghost"
-                              onClick={() => setActivityDialogId(box.id)}
-                            >
-                              {tActivity("open")}
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="ms-btn"
-                            onClick={() => setAgentDialogId(box.id)}
-                          >
-                            {t("connectAgent")}
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>{t("app.agentsEmpty")}</p>
-                )}
-              </section>
-            ) : settingsTab === "license" ? (
-              <section className={styles.settingsSection} aria-label={t("app.tabs.license")}>
-                <MailboxServicePanel
-                  openRequest={licenseOpenRequest}
-                  initialOfferId={licenseOfferId}
-                />
-                <MailboxUsagePanel mailboxId={null} />
-              </section>
-            ) : (
-              <section className={styles.settingsSection} aria-label={t("app.tabs.migration")}>
-                {registry.data?.canManage ? (
-                  <MailboxMigration
-                    mailboxes={boxes.map((box) => ({
-                      id: box.id,
-                      address: box.address,
-                      label: box.label,
-                      ownerUserId: box.ownerUserId,
-                    }))}
-                    domains={options.data?.domains ?? []}
-                    members={options.data?.members ?? []}
-                    currentUserId={session?.user.id ?? ""}
-                    seatsAvailable={
-                      service.data?.unlimitedSeats
-                        ? null
-                        : Math.max(
-                            0,
-                            (service.data?.seats ?? 0) - (service.data?.reservedSeats ?? 0),
-                          )
-                    }
-                    onApplied={() => {
-                      void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
-                    }}
-                  />
-                ) : (
-                  <p className={styles.hint}>{t("managementOnly")}</p>
-                )}
-              </section>
-            )}
-          </div>
-        )}
-        {dialogs}
-      </section>
-    );
   return (
-    <section className={styles.view}>
-      <header className={`${styles.header} ${managementStyles.header}`}>
-        <div>
-          <div className={styles.productMeta}>
-            <h1>{t("title")}</h1>
-            <span className={styles.serviceBadge}>
-              {t(systemLicense ? "system.badge" : "paidService")}
-            </span>
-          </div>
-          <p>{t("subtitle")}</p>
-        </div>
-        <div className={`${styles.headerActions} ${managementStyles.actions}`}>
-          {selected?.canRead &&
-          selected.status === "planned" &&
-          selected.ownerActive &&
-          selected.ownerUserId === session?.user.id ? (
-            <button
-              type="button"
-              className="ms-btn ms-btn-ghost"
-              onClick={() => setActivityDialogId(selected.id)}
-            >
-              {tActivity("open")}
-            </button>
-          ) : null}
-          {selected?.ownerActive && selected.ownerUserId === session?.user.id ? (
-            <button
-              type="button"
-              className="ms-btn ms-btn-ghost"
-              onClick={() => setAgentDialogId(selected.id)}
-            >
-              {t("connectAgent")}
-            </button>
-          ) : null}
-          {registry.data?.canManage ? (
-            <>
-              <Link className="ms-btn ms-btn-ghost" href="/domains">
-                {t("domainsLink")}
-              </Link>
-              {selected ? (
-                <button
-                  type="button"
-                  className="ms-btn"
-                  disabled={!options.data}
-                  onClick={() => setDialog("edit")}
-                >
-                  {t("manage")}
-                </button>
-              ) : (
-                <details ref={managementMenu} className={managementStyles.menu}>
-                  <summary className={`ms-btn ${managementStyles.menuTrigger}`}>
-                    {t("manage")}
-                    <svg
-                      viewBox="0 0 16 16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      aria-hidden="true"
-                    >
-                      <path d="m4 6 4 4 4-4" />
-                    </svg>
-                  </summary>
-                  <div className={managementStyles.menuBody}>
-                    {boxes.length ? (
-                      <label className={managementStyles.chooser}>
-                        {t("chooseBox")}
-                        <select
-                          className="ms-input"
-                          value=""
-                          disabled={!options.data}
-                          onChange={(event) => {
-                            const id = event.target.value;
-                            if (!options.data || !boxes.some((box) => box.id === id)) return;
-                            if (managementMenu.current) managementMenu.current.open = false;
-                            setMailboxKind("all");
-                            selectMailbox(id);
-                            setDialog("edit");
-                          }}
-                        >
-                          <option value="">{t("chooseBox")}</option>
-                          {boxes.map((box) => (
-                            <option key={box.id} value={box.id}>
-                              {box.label} · {box.address}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : (
-                      <p>{t("emptyTitle")}</p>
-                    )}
-                  </div>
-                </details>
-              )}
-              <button
-                type="button"
-                className="ms-btn ms-btn-primary"
-                disabled={!options.data}
-                onClick={() => setDialog("new")}
-              >
-                + {t("new")}
-              </button>
-            </>
-          ) : null}
+    <section className={`${styles.view} ${styles.appView}`}>
+      <header className={styles.appBar}>
+        <Link href="/mail" className={styles.appBrand}>
+          <NavGlyph name="emails" hovered={false} />
+          <span>{t("title")}</span>
+        </Link>
+        <nav className={styles.appTabs} aria-label={t("app.sections")}>
+          <Link href="/mail" aria-current={layout === "app" ? "page" : undefined}>
+            {t("app.inbox")}
+          </Link>
+          <Link href="/mail/settings" aria-current={layout === "settings" ? "page" : undefined}>
+            {t("app.settings")}
+          </Link>
+        </nav>
+        <div className={styles.appActions}>
+          <MailboxAccountMenu
+            theme={prefs.theme}
+            setTheme={(theme) => setPref({ theme })}
+            onShortcuts={() => setShortcutsOpen(true)}
+            onPreferences={() =>
+              layout === "settings"
+                ? setSettingsTab("appearance")
+                : router.push("/mail/settings?tab=appearance")
+            }
+          />
         </div>
       </header>
-      {capability.data?.deliveryReady ? (
-        <p className={styles.previewNote}>
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <rect x="5" y="11" width="14" height="10" rx="2" />
-            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-          </svg>
-          {t("contentPrivate")}
-        </p>
+      {layout === "app" ? (
+        <>
+          {licenseOpenRequest > 0 || (service.data && !service.data.active) ? (
+            <div className={styles.appLicense}>
+              <MailboxServicePanel
+                openRequest={licenseOpenRequest}
+                initialOfferId={licenseOfferId}
+              />
+            </div>
+          ) : null}
+          {workspace}
+        </>
       ) : (
-        <p className={styles.previewNote}>
-          <span>{t("preview")}</span> {t("previewBody")}
-        </p>
-      )}
-      <MailboxServicePanel openRequest={licenseOpenRequest} initialOfferId={licenseOfferId} />
-      {registry.data?.canManage && options.data && !options.data.domains.length ? (
-        <p className={styles.notice}>
-          {t("noDomains")} <Link href="/domains">{t("domainsLink")} ↗</Link>
-        </p>
-      ) : null}
-      {options.isError && registry.data?.canManage ? (
-        <div role="alert">
-          <p>{t("loadError")}</p>
-          <button type="button" className="ms-btn" onClick={() => void options.refetch()}>
-            {t("retry")}
-          </button>
+        <div className={styles.settings}>
+          <div className={styles.settingsTabs} role="tablist" aria-label={t("app.settings")}>
+            {SETTINGS_TABS.map((tab) => (
+              <button
+                type="button"
+                role="tab"
+                key={tab}
+                aria-selected={settingsTab === tab}
+                onClick={() => setSettingsTab(tab)}
+              >
+                {t(`app.tabs.${tab}`)}
+              </button>
+            ))}
+          </div>
+          {settingsTab === "appearance" ? (
+            <section className={styles.settingsSection} aria-label={t("app.tabs.appearance")}>
+              <MailboxAppearanceSettings
+                prefs={prefs}
+                setPref={setPref}
+                resetPrefs={resetPrefs}
+                openShortcuts={() => setShortcutsOpen(true)}
+              />
+            </section>
+          ) : settingsTab === "boxes" ? (
+            <section className={styles.settingsSection} aria-label={t("app.tabs.boxes")}>
+              <p className={styles.hint}>{t("app.boxesHint")}</p>
+              {registry.data?.canManage ? (
+                <div className={styles.settingsRowActions}>
+                  <button
+                    type="button"
+                    className="ms-btn ms-btn-primary"
+                    disabled={!options.data}
+                    onClick={() => setDialog("new")}
+                  >
+                    + {t("new")}
+                  </button>
+                </div>
+              ) : null}
+              {registry.data?.canManage && options.data && !options.data.domains.length ? (
+                <p className={styles.notice}>
+                  {t("noDomains")} <Link href="/domains">{t("domainsLink")} ↗</Link>
+                </p>
+              ) : null}
+              {boxes.length ? (
+                <ul className={styles.settingsList}>
+                  {boxes.map((box) => (
+                    <li key={box.id}>
+                      <div>
+                        <strong>{box.label}</strong>
+                        <span>{box.address}</span>
+                        <small>
+                          {t(`scope.${box.kind}`)} · {t(box.status)}
+                        </small>
+                      </div>
+                      {registry.data?.canManage ||
+                      (box.ownerActive && box.ownerUserId === session?.user.id) ? (
+                        <div className={styles.settingsRowActions}>
+                          <button
+                            type="button"
+                            className="ms-btn ms-btn-ghost"
+                            onClick={() => setSignatureDialogId(box.id)}
+                          >
+                            {t("signature.action")}
+                          </button>
+                          {registry.data?.canManage ? (
+                            <>
+                              <button
+                                type="button"
+                                className="ms-btn ms-btn-ghost"
+                                disabled={!options.data}
+                                onClick={() => {
+                                  selectMailbox(box.id);
+                                  setDialog("receiving");
+                                }}
+                              >
+                                {t("app.receiving")}
+                              </button>
+                              <button
+                                type="button"
+                                className="ms-btn"
+                                disabled={!options.data}
+                                onClick={() => {
+                                  selectMailbox(box.id);
+                                  setDialog("edit");
+                                }}
+                              >
+                                {t("manage")}
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>{t("emptyBody")}</p>
+              )}
+              {registry.data?.canManage ? (
+                <Link className="ms-btn ms-btn-ghost" href="/domains">
+                  {t("domainsLink")}
+                </Link>
+              ) : null}
+            </section>
+          ) : settingsTab === "agents" ? (
+            <section className={styles.settingsSection} aria-label={t("app.tabs.agents")}>
+              <p className={styles.hint}>{t("app.agentsHint")}</p>
+              {correioMcpUrl && teamAgentBoxes.length ? (
+                <OAuthConnectCallout url={correioMcpUrl.replace(/\/correio$/, "")} />
+              ) : null}
+              {teamAgentBoxes.length ? (
+                <div className={styles.settingsRowActions}>
+                  <button
+                    type="button"
+                    className="ms-btn ms-btn-primary"
+                    onClick={() => setTeamAgentDialog(true)}
+                  >
+                    {tAgent("team.open")}
+                  </button>
+                </div>
+              ) : null}
+              {ownedBoxes.length ? (
+                <ul className={styles.settingsList}>
+                  {ownedBoxes.map((box) => (
+                    <li key={box.id}>
+                      <div>
+                        <strong>{box.label}</strong>
+                        <span>{box.address}</span>
+                        <small>{t(`scope.${box.kind}`)}</small>
+                      </div>
+                      <div className={styles.settingsRowActions}>
+                        {box.canRead && box.status === "planned" ? (
+                          <button
+                            type="button"
+                            className="ms-btn ms-btn-ghost"
+                            onClick={() => setActivityDialogId(box.id)}
+                          >
+                            {tActivity("open")}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="ms-btn"
+                          onClick={() => setAgentDialogId(box.id)}
+                        >
+                          {t("connectAgent")}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>{t("app.agentsEmpty")}</p>
+              )}
+            </section>
+          ) : settingsTab === "license" ? (
+            <section className={styles.settingsSection} aria-label={t("app.tabs.license")}>
+              <span className={styles.serviceBadge}>
+                {t(systemLicense ? "system.badge" : "paidService")}
+              </span>
+              <MailboxServicePanel
+                openRequest={licenseOpenRequest}
+                initialOfferId={licenseOfferId}
+              />
+              <MailboxUsagePanel mailboxId={null} />
+            </section>
+          ) : (
+            <section className={styles.settingsSection} aria-label={t("app.tabs.migration")}>
+              {registry.data?.canManage ? (
+                <MailboxMigration
+                  mailboxes={boxes.map((box) => ({
+                    id: box.id,
+                    address: box.address,
+                    label: box.label,
+                    ownerUserId: box.ownerUserId,
+                  }))}
+                  domains={options.data?.domains ?? []}
+                  members={options.data?.members ?? []}
+                  currentUserId={session?.user.id ?? ""}
+                  seatsAvailable={
+                    service.data?.unlimitedSeats
+                      ? null
+                      : Math.max(0, (service.data?.seats ?? 0) - (service.data?.reservedSeats ?? 0))
+                  }
+                  onApplied={() => {
+                    void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
+                  }}
+                />
+              ) : (
+                <p className={styles.hint}>{t("managementOnly")}</p>
+              )}
+            </section>
+          )}
         </div>
-      ) : null}
-      {workspace}
+      )}
       {dialogs}
+      {shortcutsOpen ? <ShortcutsDialog close={() => setShortcutsOpen(false)} /> : null}
     </section>
   );
 }

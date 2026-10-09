@@ -23,6 +23,29 @@
   },
   "releases": [
     {
+      "version": "0.82",
+      "date": "2026-10-09",
+      "title": "All your mailboxes in one sidebar",
+      "summary": "Mail gets a sidebar with every mailbox and its unread count, an account menu, a collapsible rail and a drawer on phones. And account emails now arrive in the language you use in the dashboard.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A sidebar with All mailboxes, People and Agents groups and each mailbox's unread count; mailbox actions sit in a “···” menu.",
+            "The rail collapses to icons (on its own on medium screens) and becomes a drawer on phones.",
+            "An account menu with system, light or dark theme, language, shortcuts, preferences, support and sign out."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "The list refreshes only its first page every 15 seconds, and the unread count keeps updating while the window is minimized.",
+            "Account emails (welcome, reminders and notices) arrive in your dashboard language; people who signed in with Google could get them in English."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.81",
       "date": "2026-10-09",
       "title": "From the first test to the first real send",

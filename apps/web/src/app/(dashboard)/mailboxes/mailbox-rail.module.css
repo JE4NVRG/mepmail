@@ -1,0 +1,455 @@
+/* Correio side rail: mailboxes, the selected mailbox, folders. Tokens only;
+   violet marks unread counts and nothing else. */
+.rail {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  box-sizing: border-box;
+  width: 232px;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--ms-line);
+  background: var(--ms-panel);
+  color: var(--ms-bone);
+}
+@container (max-width: 1279px) {
+  .rail {
+    width: 208px;
+  }
+}
+
+.drawerHeader {
+  display: none;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 8px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section,
+.group,
+.folders {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 2px 0 10px;
+}
+.sectionHeader h3 {
+  margin: 0;
+}
+
+.search {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 30px;
+  margin: 2px 0 6px;
+  padding: 6px 10px;
+  font-size: var(--ms-fs-ui);
+}
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--ms-r-input);
+  background: none;
+  color: var(--ms-muted);
+  font: 400 var(--ms-fs-ui) var(--ms-font-sans);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color var(--ms-dur-fast) var(--ms-ease),
+    background var(--ms-dur-fast) var(--ms-ease);
+}
+.item:hover {
+  color: var(--ms-bone);
+  background: color-mix(in srgb, var(--ms-panel-raised) 55%, transparent);
+}
+.item[aria-current] {
+  color: var(--ms-bone);
+  background: var(--ms-panel-raised);
+  font-weight: 500;
+}
+.item > svg {
+  flex: none;
+}
+.label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 26px;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--ms-r-input);
+  background: none;
+  color: var(--ms-faint);
+  font: 500 var(--ms-fs-micro) var(--ms-font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--ms-dur-fast) var(--ms-ease);
+}
+.groupHeader:hover {
+  color: var(--ms-bone);
+}
+.groupHeader[aria-current] {
+  color: var(--ms-bone);
+  background: var(--ms-panel-raised);
+}
+
+.boxInitial {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: hsl(var(--avatar-hue) 22% 28%);
+  color: var(--ms-bone);
+}
+:global(html[data-theme="light"]) .boxInitial {
+  background: hsl(var(--avatar-hue) 40% 88%);
+  color: hsl(var(--avatar-hue) 40% 28%);
+}
+
+/* The unread count: the rail's only violet. */
+.count {
+  flex: none;
+  margin-left: auto;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: var(--ms-r-pill);
+  background: color-mix(in srgb, var(--ms-violet) 18%, transparent);
+  color: var(--ms-violet);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.showAll {
+  justify-self: start;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--ms-r-input);
+  background: none;
+  color: var(--ms-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.showAll:hover {
+  color: var(--ms-bone);
+}
+.empty {
+  margin: 4px 10px;
+  color: var(--ms-muted);
+  font-size: 12px;
+}
+
+.boxHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px 8px 10px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  background: color-mix(in srgb, var(--ms-panel-raised) 45%, transparent);
+}
+.boxHeader > div {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.boxHeader strong,
+.boxHeader small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.boxHeader strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.boxHeader small {
+  font-size: 11px;
+  color: var(--ms-muted);
+  font-family: var(--ms-font-mono);
+}
+
+.chevron {
+  display: inline-flex;
+  flex: none;
+  transition: transform var(--ms-dur-fast) var(--ms-ease);
+}
+.more[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+/* A folder a dragged message would land on. */
+.item[data-drop-active="true"] {
+  outline: 2px dashed var(--ms-line-strong);
+  outline-offset: -2px;
+  background: var(--ms-panel-raised);
+  color: var(--ms-bone);
+}
+
+.custom,
+.usage {
+  min-width: 0;
+}
+.collapsedOnly {
+  display: none;
+}
+
+.footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--ms-line);
+}
+.toolButton {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ms-r-input);
+  background: none;
+  color: var(--ms-muted);
+  font: 500 16px var(--ms-font-sans);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color var(--ms-dur-fast) var(--ms-ease),
+    background var(--ms-dur-fast) var(--ms-ease);
+}
+.toolButton:hover {
+  color: var(--ms-bone);
+  background: var(--ms-panel-raised);
+}
+.toolButton kbd {
+  font: 600 11px var(--ms-font-sans);
+}
+.collapseToggle {
+  margin-left: auto;
+}
+
+.item:focus-visible,
+.groupHeader:focus-visible,
+.showAll:focus-visible,
+.toolButton:focus-visible {
+  outline: none;
+  box-shadow: var(--ms-focus-ring);
+}
+
+/* Icons only: chosen on this device (html[data-rail=collapsed]). */
+@container (min-width: 621px) {
+  :global(html[data-rail="collapsed"]) .rail {
+    width: 56px;
+  }
+  :global(html[data-rail="collapsed"]) .rail .label,
+  :global(html[data-rail="collapsed"]) .rail .sectionHeader,
+  :global(html[data-rail="collapsed"]) .rail .groupHeader,
+  :global(html[data-rail="collapsed"]) .rail .search,
+  :global(html[data-rail="collapsed"]) .rail .showAll,
+  :global(html[data-rail="collapsed"]) .rail .empty,
+  :global(html[data-rail="collapsed"]) .rail .boxHeader,
+  :global(html[data-rail="collapsed"]) .rail .custom,
+  :global(html[data-rail="collapsed"]) .rail .usage {
+    display: none;
+  }
+  :global(html[data-rail="collapsed"]) .rail .collapsedOnly {
+    display: flex;
+  }
+  :global(html[data-rail="collapsed"]) .rail .scroll {
+    padding: 12px 6px;
+    gap: 10px;
+  }
+  :global(html[data-rail="collapsed"]) .rail .item {
+    justify-content: center;
+    gap: 0;
+    padding: 6px 0;
+  }
+  :global(html[data-rail="collapsed"]) .rail .count {
+    position: absolute;
+    top: 5px;
+    right: 7px;
+    width: 7px;
+    min-width: 0;
+    height: 7px;
+    padding: 0;
+    font-size: 0;
+    background: var(--ms-violet);
+  }
+  :global(html[data-rail="collapsed"]) .rail .footer {
+    flex-direction: column;
+    padding: 6px 0;
+  }
+  :global(html[data-rail="collapsed"]) .rail .collapseToggle {
+    margin-left: 0;
+  }
+}
+/* Icons only by width, unless the person expanded it on this device. */
+@container (min-width: 621px) and (max-width: 1049px) {
+  :global(html:not([data-rail="expanded"])) .rail {
+    width: 56px;
+  }
+  :global(html:not([data-rail="expanded"])) .rail .label,
+  :global(html:not([data-rail="expanded"])) .rail .sectionHeader,
+  :global(html:not([data-rail="expanded"])) .rail .groupHeader,
+  :global(html:not([data-rail="expanded"])) .rail .search,
+  :global(html:not([data-rail="expanded"])) .rail .showAll,
+  :global(html:not([data-rail="expanded"])) .rail .empty,
+  :global(html:not([data-rail="expanded"])) .rail .boxHeader,
+  :global(html:not([data-rail="expanded"])) .rail .custom,
+  :global(html:not([data-rail="expanded"])) .rail .usage {
+    display: none;
+  }
+  :global(html:not([data-rail="expanded"])) .rail .collapsedOnly {
+    display: flex;
+  }
+  :global(html:not([data-rail="expanded"])) .rail .scroll {
+    padding: 12px 6px;
+    gap: 10px;
+  }
+  :global(html:not([data-rail="expanded"])) .rail .item {
+    justify-content: center;
+    gap: 0;
+    padding: 6px 0;
+  }
+  :global(html:not([data-rail="expanded"])) .rail .count {
+    position: absolute;
+    top: 5px;
+    right: 7px;
+    width: 7px;
+    min-width: 0;
+    height: 7px;
+    padding: 0;
+    font-size: 0;
+    background: var(--ms-violet);
+  }
+  :global(html:not([data-rail="expanded"])) .rail .footer {
+    flex-direction: column;
+    padding: 6px 0;
+  }
+  :global(html:not([data-rail="expanded"])) .rail .collapseToggle {
+    margin-left: 0;
+  }
+}
+
+/* Phone: a full-screen drawer opened from "Caixas e pastas". */
+@container (max-width: 620px) {
+  .rail {
+    display: none;
+  }
+  .rail[data-expanded="true"] {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: var(--ms-z-modal);
+    width: auto;
+    border-right: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation: railIn var(--ms-dur-base) var(--ms-ease) both;
+  }
+  .drawerHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 8px 6px 16px;
+    border-bottom: 1px solid var(--ms-line);
+  }
+  .drawerHeader strong {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .item,
+  .groupHeader,
+  .showAll {
+    min-height: 44px;
+  }
+  .toolButton {
+    width: 44px;
+    height: 44px;
+  }
+  .collapseToggle {
+    display: none;
+  }
+}
+@keyframes railIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (pointer: coarse) {
+  .item,
+  .groupHeader {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail,
+  .rail * {
+    animation: none;
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .item[aria-current],
+  .groupHeader[aria-current] {
+    outline: 2px solid CanvasText;
+    outline-offset: -2px;
+  }
+  .item[data-drop-active="true"] {
+    outline: 2px dashed CanvasText;
+  }
+}

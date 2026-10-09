@@ -8,12 +8,6 @@
   min-height: 520px;
 }
 
-.headerActions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
 .header {
   display: flex;
   align-items: center;
@@ -31,8 +25,7 @@
   color: var(--ms-muted);
   line-height: 1.7;
 }
-.eyebrow,
-.sectionLabel {
+.eyebrow {
   font-size: var(--ms-fs-micro);
   color: var(--ms-muted);
   letter-spacing: 0.05em;
@@ -47,96 +40,7 @@
   overflow: hidden;
   background: var(--ms-void);
 }
-.navigation {
-  background: var(--ms-panel);
-  padding: 16px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-.navigation button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-align: left;
-  width: 100%;
-  padding: 12px 10px;
-  border: 1px solid transparent;
-  border-radius: var(--ms-r-input);
-  background: transparent;
-  color: var(--ms-muted);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.navigation button:hover,
-.navigation .active {
-  background: var(--ms-panel-raised);
-  color: var(--ms-bone);
-  border-color: var(--ms-line);
-}
-.navigation button > span:last-child {
-  min-width: 0;
-}
-.navigation small,
-.matches small {
-  display: block;
-  margin-top: 5px;
-  font-size: 11px;
-  color: var(--ms-muted);
-  overflow-wrap: anywhere;
-}
-.navigation button > span:last-child,
-.navigation small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.navigation svg {
-  flex: none;
-}
-.avatar,
-.bigAvatar {
-  display: grid;
-  place-items: center;
-  background: var(--ms-inset);
-  border: 1px solid var(--ms-line);
-  border-radius: 50%;
-  flex: none;
-}
-.avatar {
-  width: 26px;
-  height: 26px;
-  font-size: 11px;
-}
-.bigAvatar {
-  width: 64px;
-  height: 64px;
-  font-size: 24px;
-  margin: 22px auto 18px;
-}
-.folderList {
-  border-bottom: 1px solid var(--ms-line);
-  padding: 12px 0;
-  margin-bottom: 16px;
-}
-.folderList button[aria-current] {
-  color: var(--ms-bone);
-}
-.sectionLabel {
-  padding: 0 10px 8px;
-  text-transform: uppercase;
-}
-.privateNote {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  color: var(--ms-muted);
-  font-size: 11px;
-  margin-top: auto;
-  padding: 24px 10px 4px;
-}
+
 .list {
   border-right: 1px solid var(--ms-line);
   min-width: 0;
@@ -169,20 +73,7 @@
   line-height: 1.7;
   color: var(--ms-muted);
 }
-.matches {
-  padding: 12px;
-}
-.matches button {
-  background: var(--ms-panel);
-  border: 1px solid var(--ms-line);
-  color: var(--ms-bone);
-  border-radius: var(--ms-r-input);
-  padding: 12px;
-  width: 100%;
-  margin-bottom: 6px;
-  text-align: left;
-  cursor: pointer;
-}
+
 .detail {
   min-width: 0;
   display: flex;
@@ -214,8 +105,7 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-.tag,
-.type {
+.tag {
   display: inline-flex;
   padding: 5px 9px;
   border: 1px solid var(--ms-line);
@@ -243,37 +133,7 @@
   color: var(--ms-muted);
   line-height: 1.7;
 }
-.steps {
-  list-style: none;
-  margin: 0;
-  padding: 0 24px 28px;
-}
-.steps li {
-  display: flex;
-  gap: 14px;
-  padding: 14px 0;
-  color: var(--ms-muted);
-  border-top: 1px solid var(--ms-line);
-}
-.steps li > span {
-  flex: none;
-  font-family: var(--ms-font-mono);
-  font-size: 11px;
-  padding-top: 3px;
-}
-.steps li[data-complete] > span {
-  color: var(--ms-success);
-}
-.steps strong {
-  font-size: 13px;
-  color: var(--ms-bone);
-  font-weight: 500;
-}
-.steps p {
-  margin: 7px 0 0;
-  font-size: 12px;
-  line-height: 1.6;
-}
+
 .detail > footer {
   margin-top: auto;
   padding: 16px 24px;
@@ -1113,17 +973,6 @@
   gap: 8px;
 }
 
-/* A single mail toolbar above the message list and reader. */
-.productMeta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
-.productMeta h1 {
-  margin: 0;
-  font-size: 24px;
-}
 .serviceBadge {
   border: 1px solid var(--ms-line);
   border-radius: var(--ms-r-badge);
@@ -1140,21 +989,7 @@
   margin: 6px 0 0;
   font-size: 12px;
 }
-.previewNote {
-  flex: none;
-  color: var(--ms-muted);
-  font-size: 11px;
-  line-height: 1.6;
-  margin: 0 0 16px;
-}
-.previewNote > svg {
-  vertical-align: -2px;
-  margin-right: 6px;
-}
-.previewNote > span {
-  color: var(--ms-bone);
-  margin-right: 6px;
-}
+
 .contentWorkspace,
 .registryWorkspace {
   min-width: 0;
@@ -1174,29 +1009,7 @@
   flex: none;
   background: var(--ms-panel);
 }
-.workspaceNavigation {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 24px;
-  min-width: 0;
-  flex: 1;
-}
-.workspaceNavigation label {
-  min-width: 0;
-  width: 250px;
-  max-width: 100%;
-  flex: 0 1 250px;
-}
-.workspaceNavigation select {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  min-height: 44px;
-  padding: 10px 12px;
-  font-size: var(--ms-fs-ui);
-  line-height: 1.5;
-}
+
 .visuallyHidden {
   position: absolute;
   width: 1px;
@@ -1208,49 +1021,7 @@
   white-space: nowrap;
   border: 0;
 }
-.compactFolders {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  align-items: center;
-}
-.compactFolders button {
-  font: inherit;
-  font-size: 12px;
-  padding: 12px 0;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--ms-muted);
-  cursor: pointer;
-  white-space: nowrap;
-  min-height: 44px;
-}
-.scopeFilters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-}
-.scopeFilters button {
-  min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid transparent;
-  border-radius: var(--ms-r-input);
-  background: transparent;
-  color: var(--ms-muted);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-.scopeFilters button:hover,
-.scopeFilters button[aria-pressed="true"] {
-  color: var(--ms-bone);
-  background: var(--ms-inset);
-}
-.scopeFilters button[aria-pressed="true"] {
-  border-color: var(--ms-line);
-}
+
 .rowBadges,
 .messageBadges {
   display: flex;
@@ -1307,13 +1078,7 @@
   font-size: 12px;
   color: var(--ms-muted);
 }
-.compactFolders button:hover {
-  color: var(--ms-bone);
-}
-.compactFolders button[aria-current] {
-  border-bottom-color: var(--ms-bone);
-  color: var(--ms-bone);
-}
+
 .contentActions {
   align-items: center;
   margin: 0;
@@ -1410,14 +1175,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.rowMeta,
-.rowBottom {
+.rowMeta {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.rowMeta > span:first-child,
-.rowBottom > small:first-child {
+.rowMeta > span:first-child {
   min-width: 0;
   flex: 1;
   overflow: hidden;
@@ -1449,16 +1212,12 @@
 .messageBadges:empty {
   display: none;
 }
-.rowMeta time,
-.rowBottom > small:last-child {
+.rowMeta time {
   flex: none;
   font-size: 10px;
   color: var(--ms-muted);
 }
-.rowBottom > small:first-child,
-.rowBottom > span {
-  flex: 1;
-}
+
 .contentDetail {
   min-width: 0;
   min-height: 0;
@@ -1671,10 +1430,6 @@
   padding: 50px 30px;
 }
 @container (max-width: 920px) {
-  .workspaceNavigation {
-    flex-basis: 100%;
-    justify-content: space-between;
-  }
   .contentActions {
     margin-left: auto;
   }
@@ -1719,23 +1474,12 @@
   .header p {
     display: none;
   }
-  .productMeta {
-    gap: 6px;
-  }
-  .productMeta h1 {
-    font-size: 22px;
-  }
+
   .serviceBadge {
     font-size: 10.5px;
     padding: 3px 6px;
   }
-  .workspaceNavigation label {
-    flex-basis: 100%;
-    width: 100%;
-  }
-  .compactFolders {
-    gap: 22px;
-  }
+
   .contentToolbar {
     padding: 10px 14px;
   }
@@ -1751,10 +1495,6 @@
   }
   .messageBody {
     font-size: 13px;
-  }
-  .previewNote {
-    margin-bottom: 12px;
-    font-size: 10px;
   }
 }
 @media (max-width: 900px) {
@@ -1802,83 +1542,13 @@
   }
 }
 
-/* A stable folder rail, message list and reader share one workspace. */
+/* The rail (its own width, see mailbox-rail.module.css), the list and the reader. */
 .contentWorkspace {
   display: grid;
-  grid-template-columns: 208px minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
 }
-.mailFolderRail {
-  grid-column: 1;
-  grid-row: 1 / 3;
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  border-right: 1px solid var(--ms-line);
-  background: var(--ms-panel);
-  padding: 16px 10px;
-}
-.mailFolderRail .workspaceNavigation {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 16px;
-  min-height: 100%;
-}
-.mailFolderRail .workspaceNavigation label {
-  width: 100%;
-  flex: none;
-}
-/* Segmented control: the three scopes share one inset track and never wrap mid-word. */
-.mailFolderRail .scopeFilters {
-  flex-wrap: nowrap;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--ms-line);
-  border-radius: var(--ms-r-input);
-  background: var(--ms-inset);
-}
-.mailFolderRail .scopeFilters button {
-  padding: 8px 2px;
-  flex: 1;
-  min-width: 0;
-  font-size: var(--ms-fs-badge);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mailFolderRail .scopeFilters button[aria-pressed="true"] {
-  background: var(--ms-panel-raised);
-  border-color: var(--ms-line-strong);
-}
-.mailFolderRail .compactFolders {
-  display: grid;
-  gap: 3px;
-  align-items: stretch;
-}
-.mailFolderRail .compactFolders button {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  border-radius: var(--ms-r-input);
-  text-align: left;
-  font-size: 13px;
-  min-width: 0;
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  line-height: 1.4;
-}
-.mailFolderRail .compactFolders button:hover {
-  background: var(--ms-panel-raised);
-}
-.mailFolderRail .compactFolders button[aria-current] {
-  color: var(--ms-violet);
-  border-color: var(--ms-violet-border);
-  background: var(--ms-violet-bg);
-}
+
 .contentWorkspace > .contentToolbar,
 .contentWorkspace > .contentPanels {
   grid-column: 2;
@@ -1916,6 +1586,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+  min-height: 28px;
+  padding: 0 2px 0 10px;
 }
 .customFolders h3,
 .usagePanel h3 {
@@ -1944,7 +1616,7 @@
   min-width: 0;
 }
 .customFolderRow button {
-  min-height: 44px;
+  min-height: 34px;
   border: 1px solid transparent;
   border-radius: var(--ms-r-input);
   background: transparent;
@@ -1956,8 +1628,8 @@
 .customFolderRow button:first-child {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 10px;
+  gap: 10px;
+  padding: 6px 10px;
   flex: 1;
   min-width: 0;
   text-align: left;
@@ -1971,7 +1643,7 @@
   white-space: nowrap;
 }
 .customFolderRow button:last-child:not(:first-child) {
-  width: 44px;
+  width: 34px;
   flex: none;
 }
 .customFolderRow button:hover,
@@ -2145,26 +1817,12 @@
   background: var(--ms-violet);
   vertical-align: 1px;
 }
-/* Unread count beside Inbox in the folder rail. */
-.folderCount {
-  margin-left: auto;
-  min-width: 20px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ms-violet) 18%, transparent);
-  color: var(--ms-violet);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.5;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
+
 /* A folder a dragged message would land on. */
-.compactFolders button[data-drop-active="true"],
 .customFolderRow button[data-drop-active="true"] {
-  outline: 2px dashed var(--ms-violet);
+  outline: 2px dashed var(--ms-line-strong);
   outline-offset: -2px;
-  background: color-mix(in srgb, var(--ms-violet) 10%, transparent);
+  background: var(--ms-panel-raised);
   color: var(--ms-bone);
 }
 /* Bulk actions on the selected rows: count, then icon actions. */
@@ -2289,9 +1947,6 @@
   .contentPanels {
     grid-template-columns: minmax(250px, 285px) minmax(0, 1fr);
   }
-  .contentWorkspace {
-    grid-template-columns: 192px minmax(0, 1fr);
-  }
 }
 @container (max-width: 850px) {
   .contentPanels {
@@ -2306,37 +1961,24 @@
   }
 }
 @container (max-width: 620px) {
-  .contentWorkspace {
+  .contentWorkspace,
+  .registryWorkspace {
     display: flex;
     flex-direction: column;
   }
   .mobileFolderMenu {
     display: inline-flex;
   }
-  .mailFolderRail {
-    flex: none;
-    max-height: 240px;
-    border-right: 0;
-    border-bottom: 1px solid var(--ms-line);
-  }
-  .mailFolderRail[data-expanded="false"] {
-    display: none;
-  }
-  .mailFolderRail .workspaceNavigation {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .mailFolderRail .compactFolders {
+  .registryBar {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
   }
-  .mailFolderRail .compactFolders button {
-    padding: 8px 10px;
-    font-size: 12px;
-    flex: 1 1 auto;
-    justify-content: flex-start;
+  .customFolderRow button {
+    min-height: 44px;
   }
+  .customFolderRow button:last-child:not(:first-child) {
+    width: 44px;
+  }
+
   .contentDetail .detailTop > span {
     display: none;
   }
@@ -2558,10 +2200,7 @@
   .appActions {
     margin-left: auto;
   }
-  /* A new mailbox is a settings task; on a phone the inbox bar keeps to reading. */
-  .newMailboxAction {
-    display: none;
-  }
+
   /* One compact row on a phone: brand, Inbox/Settings tabs, the way back. */
   .appBar {
     gap: 6px 10px;
@@ -2581,8 +2220,7 @@
     padding: 6px 8px;
     font-size: 12.5px;
   }
-  .backLong,
-  .supportLink {
+  .backLong {
     display: none;
   }
   .backShort {
@@ -2706,7 +2344,7 @@
 }
 .folderGroupLabel {
   margin: 10px 0 4px;
-  padding: 0 12px;
+  padding: 0 10px;
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -2975,4 +2613,82 @@
 }
 .selectionToolbar[data-active] label {
   color: var(--ms-bone);
+}
+
+/* No readable mailbox yet: the rail beside the explanation. */
+.registryWorkspace {
+  flex-direction: row;
+}
+.registryMain {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.registryBar {
+  display: none;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--ms-line);
+}
+@media (pointer: coarse) {
+  .customFolderRow button {
+    min-height: 44px;
+  }
+}
+
+/* The account menu on the Correio bar. */
+.accountMenu {
+  position: relative;
+  display: flex;
+}
+.accountTrigger {
+  display: inline-grid;
+  place-items: center;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--ms-r-pill);
+  background: none;
+  color: var(--ms-bone);
+  font: inherit;
+  cursor: pointer;
+}
+.accountTrigger:hover,
+.accountTrigger[aria-expanded="true"] {
+  box-shadow: 0 0 0 1px var(--ms-line-strong);
+}
+.accountTrigger:focus-visible {
+  outline: none;
+  box-shadow: var(--ms-focus-ring);
+}
+.accountPanel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  min-width: 248px;
+}
+.accountWho {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px 4px;
+  min-width: 0;
+}
+.accountWho strong,
+.accountWho small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.accountWho strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.accountWho small {
+  font-size: 12px;
+  color: var(--ms-muted);
+}
+.accountPanel :global(.ms-keycap),
+.accountPanel a:global(.ms-menu-item) > span {
+  margin-left: auto;
 }

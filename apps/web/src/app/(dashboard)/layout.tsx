@@ -1,6 +1,7 @@
 import { getDb } from "@millionsend/db";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { DeliverabilityBanner } from "@/components/deliverability-banner";
@@ -11,6 +12,7 @@ import { SupportViewBanner } from "@/components/support-view-banner";
 import { TeamStandingBanner } from "@/components/team-standing-banner";
 import { ToastHost } from "@/components/toast";
 import { postAuthNext, withNext } from "@/lib/nav";
+import { syncAccountMailLocale } from "@/server/account-locale";
 import { getAuth } from "@/server/auth";
 import { ACTIVE_TEAM_COOKIE, getActiveMembership } from "@/server/membership";
 import { resolveSupportView, SUPPORT_VIEW_COOKIE } from "@/server/support-view";
@@ -34,6 +36,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     : await getActiveMembership(db, session.user.id, cookieStore.get(ACTIVE_TEAM_COOKIE)?.value);
   const team = view ?? membership;
   if (!team) redirect(withNext("/onboarding", next));
+  if (!view) await syncAccountMailLocale(db, session.user, await getLocale());
 
   return (
     <AppShell

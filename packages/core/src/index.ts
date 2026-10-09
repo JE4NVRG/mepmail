@@ -726,6 +726,7 @@ export {
   confirmSystemContact,
   enrollSystemContact,
   removeSystemContact,
+  syncSystemContactLocale,
 } from "./system-contacts.js";
 export {
   CREDENTIAL_MAIL_KINDS,
