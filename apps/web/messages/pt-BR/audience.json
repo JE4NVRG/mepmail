@@ -242,7 +242,7 @@
     "deleteTitle": "Excluir tópico",
     "deleteBody": "{name} é excluído, junto com a inscrição de cada contato nele. Isto não pode ser desfeito.",
     "deleteConfirm": "Excluir tópico",
-    "previewTitle": "Página de cancelamento",
+    "previewTitle": "Página de descadastro",
     "customize": "Personalizar página",
     "detail": {
       "eyebrow": "Tópico",

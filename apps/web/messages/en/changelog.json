@@ -23,6 +23,30 @@
   },
   "releases": [
     {
+      "version": "0.64",
+      "date": "2026-10-09",
+      "title": "Clearer copy on the site and in the dashboard",
+      "summary": "Copy and state fixes from a screen-by-screen review: what each MCP mode offers, one price format and Correio mailboxes shown as active.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Working Correio mailboxes show as \"Active\" instead of \"Preparing\".",
+            "The landing page says the hosted MCP has the full toolset and the local package covers the core sending tools.",
+            "The landing FAQ talks about the Free plan instead of a beta, and the pricing page copy is more direct.",
+            "Prices use one format everywhere (US$ 29), and the public menu calls the product Mail."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "A broadcast refused during a protective pause shows a plain notice, without internal metrics.",
+            "The billing page shows a notice with \"Try again\" when it cannot load, instead of loading forever."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.63",
       "date": "2026-10-08",
       "title": "One agent, several Correio mailboxes",

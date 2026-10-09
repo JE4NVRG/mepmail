@@ -276,6 +276,8 @@
   },
   "billing": {
     "plan": "Plan",
+    "loadFailed": "We could not load your billing right now.",
+    "retry": "Try again",
     "status": {
       "none": "No subscription",
       "active": "Active",

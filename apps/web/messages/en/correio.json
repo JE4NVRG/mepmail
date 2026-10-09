@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Mail: email inboxes for AI agents | MepMail",
-    "description": "Give your AI agent an email inbox on your domain. It reads, drafts and replies over MCP, and you approve before it sends. From US$5.90 per mailbox a month, with a Send plan."
+    "description": "Give your AI agent an email inbox on your domain. It reads, drafts and replies over MCP, and you approve before it sends. From US$ 5.90 per mailbox a month, with a Send plan."
   },
   "hero": {
     "eyebrow": "MepMail Mail · email inboxes for AI agents",
@@ -71,7 +71,7 @@
     "steps": [
       {
         "title": "Check your Send plan",
-        "body": "The first opening remains for eligible earlier subscribers to plans with a recurring price above US$20/month. The new US$29 offer is being validated in this preview. Mail is paid separately, per mailbox."
+        "body": "The first opening remains for eligible earlier subscribers to plans with a recurring price above US$ 20/month. The new US$ 29 offer is being validated in this preview. Mail is paid separately, per mailbox."
       },
       {
         "title": "Connect a domain you own",
@@ -129,13 +129,13 @@
     "sending": {
       "label": "For your application",
       "title": "Send only",
-      "body": "New offer: 110,000 deliveries each month for a recurring US$29. New customers pay US$20 only for the first monthly bill. Send can be used without mailboxes; existing subscriptions are preserved.",
+      "body": "New offer: 110,000 deliveries each month for a recurring US$ 29. New customers pay US$ 20 only for the first monthly bill. Send can be used without mailboxes; existing subscriptions are preserved.",
       "link": "Compare Send plans"
     },
     "mail": {
       "label": "For your conversations and agents",
       "title": "Send + Mail",
-      "body": "Your Send plan can add Mail: US$5.90 per 1 GiB mailbox or US$9.90 per 10 GiB mailbox each month. Inboxes, outboxes and per-mailbox permissions. People and agents have the same price.",
+      "body": "Your Send plan can add Mail: US$ 5.90 per 1 GiB mailbox or US$ 9.90 per 10 GiB mailbox each month. Inboxes, outboxes and per-mailbox permissions. People and agents have the same price.",
       "note": "Offer prepared for launch. Public Mail subscriptions are not open yet; this preview does not grant access."
     },
     "terms": "Mail is paid separately. More mailboxes after confirmed payment; reductions at the next renewal, preserving stored messages. You can continue using Send on its own."
@@ -172,7 +172,7 @@
         "combined": "Initial closed access for eligible earlier subscribers"
       }
     ],
-    "earlyNote": "Mail requires a Send plan above US$20/month at its regular price. The US$29 Pro 110K offer qualifies even during its US$20 first monthly bill. Existing US$20 contracts keep their price; earlier accounts authorized for Mail may keep their current Send plan when adding mailboxes."
+    "earlyNote": "Mail requires a Send plan above US$ 20/month at its regular price. The US$ 29 Pro 110K offer qualifies even during its US$ 20 first monthly bill. Existing US$ 20 contracts keep their price; earlier accounts authorized for Mail may keep their current Send plan when adding mailboxes."
   },
   "preview": {
     "eyebrow": "Compare the new offer",
@@ -206,8 +206,8 @@
     "annualFormula": "10 × the regular monthly price for 12 months of access. Annual billing does not stack with the first-month promotion.",
     "annualConsumption": "Allowances renew monthly in the proposed annual offer, not as an annual balance. Purchasing and separate usage cycles are still being prepared.",
     "monthlyConsumption": "The 110,000 Send delivery allowance is separate from each Mail mailbox's monthly allowance. Storage is per mailbox.",
-    "introTerms": "US$20 only for the first monthly Send bill of customers who never paid MepMail; then US$29/month. Mail does not receive this discount.",
-    "eligibility": "The US$29 plan qualifies for Mail at its regular price, even during the promotion. Each mailbox still needs a verified domain and receiving activation.",
+    "introTerms": "US$ 20 only for the first monthly Send bill of customers who never paid MepMail; then US$ 29/month. Mail does not receive this discount.",
+    "eligibility": "The US$ 29 plan qualifies for Mail at its regular price, even during the promotion. Each mailbox still needs a verified domain and receiving activation.",
     "monthlyNote": "This previews a new offer. Mail remains in closed access; checkout and purchasing are not available here yet.",
     "noChange": "This comparison does not purchase a plan or change your subscription. Values in US$, before taxes and any additional usage."
   },
@@ -216,7 +216,7 @@
     "items": [
       {
         "q": "Which subscribers can purchase Mail?",
-        "a": "Mail is paid separately per mailbox and is available on every Send plan above US$20/month at its regular price, including the US$29 Pro 110K during its US$20 first monthly bill. Existing subscriptions are preserved without automatic migration. The internal System license remains exempt, with 50 GiB per mailbox and no commercial mailbox or delivery limits. Authorized earlier accounts may keep their current Send plan when purchasing the add-on."
+        "a": "Mail is paid separately per mailbox and is available on every Send plan above US$ 20/month at its regular price, including the US$ 29 Pro 110K during its US$ 20 first monthly bill. Existing subscriptions are preserved without automatic migration. The internal System license remains exempt, with 50 GiB per mailbox and no commercial mailbox or delivery limits. Authorized earlier accounts may keep their current Send plan when purchasing the add-on."
       },
       {
         "q": "I bought a domain. Can I create any address now?",
@@ -258,7 +258,7 @@
   "release": {
     "heroNote": "Mail is paid separately, per mailbox, and available on every paying Send plan. Add mailboxes from the dashboard.",
     "heroStatus": "Open to every paying Send subscriber",
-    "setupFirst": "Mail runs on top of a paying Send plan (regular price above US$20/month, including the new US$29 Pro 110K). Add mailboxes from the dashboard; existing Send contracts are preserved.",
+    "setupFirst": "Mail runs on top of a paying Send plan (regular price above US$ 20/month, including the new US$ 29 Pro 110K). Add mailboxes from the dashboard; existing Send contracts are preserved.",
     "restStatus": "Available for activated mailboxes",
     "plansBody": "Send handles application emails and campaigns. Mail adds inboxes and outboxes for people and agents, paid separately and available on every paying Send plan.",
     "mailNote": "Subscribe from the dashboard once your Send plan is active. Each mailbox still needs a verified domain, DNS/MX and receiving activation.",

@@ -445,7 +445,7 @@ describe("broadcasts.send deliverability guard", () => {
 });
 
 describe("broadcasts.send platform breaker", () => {
-  it("refuses a send while the sender domain's region is held, naming the region", async () => {
+  it("refuses a send while the sender domain's region is held, without internal details", async () => {
     const teamId = await createTeam(db, "team-a");
     const { id } = await seedDraft(teamId);
     await db.insert(schema.regionBreakers).values({
@@ -467,9 +467,14 @@ describe("broadcasts.send platform breaker", () => {
         enqueued.push(broadcastId);
       },
     });
-    await expect(caller.broadcasts.send({ id })).rejects.toMatchObject({
+    // Customers see a plain pause notice: no region, metric or platform rate.
+    const refused = caller.broadcasts.send({ id });
+    await expect(refused).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
-      message: expect.stringContaining("us-east-1"),
+      message: expect.stringContaining("paused"),
+    });
+    await expect(refused).rejects.not.toMatchObject({
+      message: expect.stringMatching(/us-east-1|bounce|platform/),
     });
     expect(enqueued).toEqual([]);
     expect((await broadcastRow(id))?.status).toBe("draft");

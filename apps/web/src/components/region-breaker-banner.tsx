@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { NoticeStrip } from "@/components/notice-strip";
 import { useTRPC } from "@/lib/trpc";
 
@@ -11,9 +11,15 @@ import { useTRPC } from "@/lib/trpc";
  */
 export function RegionBreakerBanner() {
   const t = useTranslations("settings.ses.breaker");
+  const locale = useLocale();
   const trpc = useTRPC();
   const { data } = useQuery(trpc.system.platformBreakers.queryOptions());
   if (!data) return null;
+  // "0,49" in pt-BR, "0.49" in en.
+  const percent = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   return (
     <>
       {data.map((r) => (
@@ -26,7 +32,7 @@ export function RegionBreakerBanner() {
               : t("paused", {
                   region: r.region,
                   metric: t(`metric.${r.reason?.metric ?? "complaint"}`),
-                  rate: ((r.reason?.rate ?? 0) * 100).toFixed(2),
+                  rate: percent.format((r.reason?.rate ?? 0) * 100),
                 })
           }
         />

@@ -9,8 +9,8 @@
   "lead": "Preços mensais em USD, sem fidelidade. Todo plano roda no seu domínio verificado e inclui implantação assistida. Use a API HTTPS ou o relay SMTP, conforme sua aplicação.",
   "note": "Começar é grátis: 100 e-mails por dia, sem cartão. Escolha um plano pago no painel quando precisar de mais volume.",
   "plans": {
-    "title": "A escada completa.",
-    "intro": "Mensalidades normais de Envio. A promoção de entrada e o anual Pro 110K aparecem abaixo quando disponíveis. O excedente depende do contrato e da habilitação no painel."
+    "title": "Todos os planos de Envio.",
+    "intro": "Mensalidades normais de envio. A oferta de entrada e o plano anual Pro 110K aparecem abaixo quando estiverem disponíveis. O excedente só vale quando for contratado e ativado na sua conta."
   },
   "included": {
     "eyebrow": "Incluído",

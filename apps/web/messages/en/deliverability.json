@@ -40,7 +40,7 @@
   "sendGuard": {
     "bounce": "New API, batch and broadcast sends are paused due to hard bounces. Displayed rate: {rate} over {days} days; protection threshold: {limit}. Review the rejected addresses. The evaluation uses today and yesterday in UTC; sending resumes automatically when the pause criteria are no longer met.",
     "complaint": "New API, batch and broadcast sends are paused due to complaints. Displayed rate: {rate} over {days} days; protection threshold: {limit}. Review contact sources and consent. The evaluation uses today and yesterday in UTC; sending resumes automatically when the pause criteria are no longer met.",
-    "regionPaused": "Broadcasts are paused in {region} while the platform's {metric} rate recovers. Transactional email is unaffected. Try again later.",
+    "regionPaused": "Broadcasts are paused for a short while to protect delivery. Transactional email is unaffected, and broadcasts resume on their own. Try again later.",
     "suspended": "This team is suspended by the instance operator. Sending is disabled until it is reinstated.",
     "operatorPaused": "Broadcasts are paused for this team by the instance operator. Transactional email is unaffected.",
     "regionHeld": "Broadcasts are paused in {region} by the instance operator. Transactional email is unaffected. Try again later.",

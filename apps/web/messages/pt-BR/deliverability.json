@@ -40,7 +40,7 @@
   "sendGuard": {
     "bounce": "Novos envios por API, lote e transmissões estão pausados por rejeições permanentes. Taxa exibida: {rate} em {days} dias; limite da proteção: {limit}. Revise os endereços rejeitados. A avaliação usa o dia atual e anterior em UTC; a retomada é automática quando os critérios de pausa deixam de ser atingidos.",
     "complaint": "Novos envios por API, lote e transmissões estão pausados por reclamações. Taxa exibida: {rate} em {days} dias; limite da proteção: {limit}. Revise a origem e o consentimento dos contatos. A avaliação usa o dia atual e anterior em UTC; a retomada é automática quando os critérios de pausa deixam de ser atingidos.",
-    "regionPaused": "As transmissões estão pausadas em {region} enquanto a taxa de {metric} da plataforma se recupera. E-mails transacionais não são afetados. Tente de novo mais tarde.",
+    "regionPaused": "As transmissões estão pausadas por pouco tempo para proteger a entrega. E-mails transacionais não são afetados, e as transmissões voltam sozinhas. Tente de novo mais tarde.",
     "suspended": "Esta equipe está suspensa pelo operador da instância. O envio fica desativado até a reativação.",
     "operatorPaused": "Os broadcasts desta equipe estão pausados pelo operador da instância. E-mails transacionais não são afetados.",
     "regionHeld": "Os broadcasts estão pausados em {region} pelo operador da instância. E-mails transacionais não são afetados. Tente novamente mais tarde.",

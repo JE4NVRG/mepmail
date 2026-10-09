@@ -8,7 +8,7 @@
   "navAria": "Main navigation",
   "nav": {
     "product": "Product",
-    "correio": "Mailboxes",
+    "correio": "Mail",
     "integrations": "Integrations",
     "pricing": "Pricing",
     "docs": "Docs",
@@ -53,7 +53,7 @@
       "responseLabel": "Response",
       "caption": "One base URL and the SDK you already use sends through MepMail."
     },
-    "launchOffer": "{volume} deliveries/month for a recurring {price}. US$20 only for the first eligible monthly bill."
+    "launchOffer": "{volume} deliveries/month for a recurring {price}. US$ 20 only for the first eligible monthly bill."
   },
   "stack": {
     "eyebrow": "Works with your stack",
@@ -132,7 +132,7 @@
     "overageLabel": "Overage",
     "attachmentLabel": "Attachments per message",
     "cta": "Start free",
-    "featuredBadge": "For growth",
+    "featuredBadge": "Recommended",
     "showScale": "More volumes: Pro 220K and Scale",
     "ctaNote": "Create your free account first. Choose your plan in the dashboard.",
     "items": [
@@ -195,7 +195,7 @@
     ],
     "note": "Free and Starter have a daily limit (UTC); the monthly volume is illustrative only. On Pro and Scale, per-1,000 overage depends on enablement at provisioning; without it, sending stops at the quota. Even with overage enabled, the safety ceiling of 5× the included volume applies.",
     "founders": {
-      "title": "Founders program (beta)",
+      "title": "Founders program",
       "items": [
         "Free assisted setup for the first 3 customers.",
         "2 months of free proactive management: reputation, DNS/deliverability and priority support.",
@@ -205,7 +205,7 @@
       "cta": "Claim my spot"
     },
     "noteAttach": "Per-email limit: total attachment size after decoding, not per file.",
-    "launchPriceNote": "Eligible new customers: US$20 only for the first monthly bill; then US$29/month. Annual: US$290 upfront, without stacking the promotion."
+    "launchPriceNote": "Eligible new customers: US$ 20 only for the first monthly bill; then US$ 29/month. Annual: US$ 290 upfront, without stacking the promotion."
   },
   "how": {
     "eyebrow": "Your next steps",
@@ -249,11 +249,11 @@
       },
       {
         "q": "Do I need a credit card to start?",
-        "a": "No. The beta is free. Create your account and send your first emails without adding a payment method. Paid plans are billed monthly in USD."
+        "a": "No. The Free plan needs no card: create your account and send your first emails without adding a payment method. Paid plans are billed monthly in USD."
       },
       {
-        "q": "How does the beta work?",
-        "a": "The beta is open: no seat limit, each account is capped at 100 emails per day on the Free plan. For higher volume, talk to us and we agree on a plan."
+        "q": "How does the Free plan work?",
+        "a": "Anyone can sign up, with no seat limit. Each account sends up to 100 emails per day on the Free plan. For more volume, choose a paid plan in the dashboard or talk to us."
       }
     ]
   },
@@ -264,7 +264,7 @@
     "points": [
       "Hosted: connect with OAuth at api.mepmail.dev/mcp.",
       "Local: npx @mepmail/mcp with a dedicated API key.",
-      "Both modes expose the same tools."
+      "Hosted has the full toolset; the local package covers the core sending tools."
     ],
     "caption": "Example local configuration. Replace the placeholder with your own API key in your MCP client.",
     "cta": "Create account and connect"

@@ -279,7 +279,23 @@ export function BillingView({
     return (
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
         {notice}
-        <BillingSkeleton title={t("plan")} />
+        {status.isError ? (
+          <WarnCard
+            action={
+              <button
+                type="button"
+                className="ms-btn ms-btn-secondary"
+                onClick={() => status.refetch()}
+              >
+                {t("retry")}
+              </button>
+            }
+          >
+            {t("loadFailed")}
+          </WarnCard>
+        ) : (
+          <BillingSkeleton title={t("plan")} />
+        )}
       </div>
     );
   }

@@ -132,7 +132,7 @@
     "overageLabel": "Excedente",
     "attachmentLabel": "Anexos por mensagem",
     "cta": "Começar grátis",
-    "featuredBadge": "Para crescer",
+    "featuredBadge": "Recomendado",
     "showScale": "Mais volumes: Pro 220K e Scale",
     "ctaNote": "Crie sua conta grátis. Depois, escolha seu plano no painel.",
     "items": [
@@ -195,7 +195,7 @@
     ],
     "note": "Free e Starter têm limite diário (UTC); o volume mensal é apenas ilustrativo. Em Pro e Scale, o excedente por 1.000 depende de habilitação no provisionamento; sem ele, os envios param na cota. Mesmo com excedente habilitado, vale o teto de segurança de 5× o volume incluído.",
     "founders": {
-      "title": "Programa fundadores (beta)",
+      "title": "Programa fundadores",
       "items": [
         "Setup assistido grátis para os 3 primeiros clientes.",
         "2 meses de gestão proativa grátis: reputação, DNS/entregabilidade e prioridade de atendimento.",
@@ -249,11 +249,11 @@
       },
       {
         "q": "Preciso de cartão de crédito para começar?",
-        "a": "Não. O beta é grátis. Crie sua conta e faça seus primeiros envios sem cadastrar forma de pagamento. Os planos pagos são cobrados mensalmente em USD."
+        "a": "Não. O plano Free dispensa cartão: crie sua conta e faça seus primeiros envios sem cadastrar forma de pagamento. Os planos pagos são cobrados mensalmente em USD."
       },
       {
-        "q": "Como funciona o beta?",
-        "a": "O beta está aberto: sem limite de contas, cada uma com teto de 100 e-mails por dia no plano Free. Para volume maior, fale com a gente e combinamos o plano."
+        "q": "Como funciona o plano Free?",
+        "a": "Qualquer pessoa pode criar conta, sem limite de contas. Cada uma envia até 100 e-mails por dia no plano Free. Para mais volume, escolha um plano pago no painel ou fale com a gente."
       }
     ]
   },
@@ -264,7 +264,7 @@
     "points": [
       "Hospedado: conecte com OAuth em api.mepmail.dev/mcp.",
       "Local: npx @mepmail/mcp com uma API key dedicada.",
-      "Os dois modos expõem as mesmas tools."
+      "O hospedado tem todas as ferramentas; o pacote local cobre as principais de envio."
     ],
     "caption": "Exemplo de configuração local. Substitua o placeholder pela sua API key no cliente MCP.",
     "cta": "Criar conta e conectar"

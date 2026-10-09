@@ -2,15 +2,15 @@
   "meta": {
     "title": "Pricing: every MepMail plan on one page",
     "description": "MepMail pricing in USD: free with 100 emails/day, Pro from US$ 20 for 110,000 emails/month and Scale up to 2.75M. Overage per 1,000 and no lock-in.",
-    "launchDescription": "Send Pro 110K: US$29/month; US$20 only on the first monthly bill for customers who never paid MepMail, or US$290/year upfront. Mail is a per-mailbox add-on available on every paying Send plan."
+    "launchDescription": "Send Pro 110K: US$ 29/month; US$ 20 only on the first monthly bill for customers who never paid MepMail, or US$ 290/year upfront. Mail is a per-mailbox add-on available on every paying Send plan."
   },
   "eyebrow": "Pricing",
   "title": "Pick your volume. <highlight>Pay for what you send.</highlight>",
   "lead": "Monthly prices in USD, no lock-in. Every plan runs on your own verified domain and includes assisted onboarding. Use the HTTPS API or SMTP relay, whichever fits your stack.",
   "note": "Starting is free: 100 emails a day, no card. Choose a paid plan in the dashboard when you need more volume.",
   "plans": {
-    "title": "The full ladder.",
-    "intro": "Regular Send monthly fees. The introductory promotion and Pro 110K annual offer appear below when available. Overage depends on your contract and dashboard enablement."
+    "title": "Every Send plan.",
+    "intro": "Regular Send monthly prices. The introductory offer and the Pro 110K annual plan appear below when available. Overage applies only when it is contracted and turned on for your account."
   },
   "included": {
     "eyebrow": "Included",
@@ -39,7 +39,7 @@
       },
       {
         "q": "Is there a contract, and can I change plans later?",
-        "a": "Pro 110K offers monthly and a prepaid 12-month annual period. Annual costs US$290, without stacking the introductory monthly promotion. Available subscription actions appear in the dashboard; existing contracts are preserved."
+        "a": "Pro 110K offers monthly and a prepaid 12-month annual period. Annual costs US$ 290, without stacking the introductory monthly promotion. Available subscription actions appear in the dashboard; existing contracts are preserved."
       },
       {
         "q": "What is the attachment limit per message?",
@@ -47,7 +47,7 @@
       },
       {
         "q": "Do I need a card to start?",
-        "a": "No card is needed to start on Free. The new Pro 110K offer costs US$29/month, with US$20 only for eligible new customers’ first monthly bill, or US$290/year upfront."
+        "a": "No card is needed to start on Free. The new Pro 110K offer costs US$ 29/month, with US$ 20 only for eligible new customers’ first monthly bill, or US$ 290/year upfront."
       },
       {
         "q": "What happens above the top plan?",
@@ -65,15 +65,15 @@
     "title": "One monthly allowance. Two ways to pay.",
     "body": "110,000 Send deliveries each month for your application, campaigns and agents. Choose monthly or annual in the dashboard; introductory eligibility is confirmed before checkout.",
     "monthTitle": "Monthly",
-    "monthIntro": "US$20 only for eligible new customers’ first monthly bill. Renewal: US$29/month.",
+    "monthIntro": "US$ 20 only for eligible new customers’ first monthly bill. Renewal: US$ 29/month.",
     "monthQuota": "Overage only when supported by your contract and enabled in the dashboard.",
     "yearTitle": "Annual",
     "perYear": "/year",
-    "yearUpfront": "US$290 paid upfront for 12 months: the price of 10 regular monthly fees. The introduction does not stack.",
+    "yearUpfront": "US$ 290 paid upfront for 12 months: the price of 10 regular monthly fees. The introduction does not stack.",
     "yearQuota": "The 110,000 allowance renews monthly, without an accumulated annual balance. Sending stops at the monthly quota; annual billing does not include metered overage.",
     "preserved": "Existing contracts keep their prices and limits; there is no automatic migration. System remains exempt.",
     "mailCta": "Explore Mail",
-    "mailAccess": "Mail is paid separately per mailbox and available on every paying Send plan, including Pro 110K during its US$20 first month."
+    "mailAccess": "Mail is paid separately per mailbox and available on every paying Send plan, including Pro 110K during its US$ 20 first month."
   },
   "launchFaq": [
     {
@@ -82,7 +82,7 @@
     },
     {
       "q": "Is there a contract, and can I change plans later?",
-      "a": "Pro 110K offers monthly and a prepaid 12-month annual period. Annual costs US$290, without stacking the introductory monthly promotion. Available subscription actions appear in the dashboard; existing contracts are preserved."
+      "a": "Pro 110K offers monthly and a prepaid 12-month annual period. Annual costs US$ 290, without stacking the introductory monthly promotion. Available subscription actions appear in the dashboard; existing contracts are preserved."
     },
     {
       "q": "What is the attachment limit per message?",
@@ -90,7 +90,7 @@
     },
     {
       "q": "Do I need a card to start?",
-      "a": "No card is needed to start on Free. The new Pro 110K offer costs US$29/month, with US$20 only for eligible new customers’ first monthly bill, or US$290/year upfront."
+      "a": "No card is needed to start on Free. The new Pro 110K offer costs US$ 29/month, with US$ 20 only for eligible new customers’ first monthly bill, or US$ 290/year upfront."
     },
     {
       "q": "What happens above the top plan?",

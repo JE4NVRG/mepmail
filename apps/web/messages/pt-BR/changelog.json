@@ -28,6 +28,30 @@
   },
   "releases": [
     {
+      "version": "0.64",
+      "date": "2026-10-09",
+      "title": "Textos mais claros no site e no painel",
+      "summary": "Ajustes de texto e de estado vindos de uma revisão tela a tela: o que cada modo do MCP oferece, preços com a mesma formatação e caixas do Correio marcadas como ativas.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Caixas do Correio em funcionamento aparecem como \"Ativa\", não mais \"Em preparação\".",
+            "A landing explica que o MCP hospedado tem todas as ferramentas e o pacote local cobre as principais de envio.",
+            "As dúvidas da landing falam do plano Free, sem citar beta, e a página de preços ganhou textos mais diretos.",
+            "\"Página de cancelamento\" passou a se chamar \"Página de descadastro\", para não parecer cancelamento de assinatura."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Uma transmissão recusada durante uma pausa de proteção mostra um aviso simples, sem métricas internas.",
+            "A tela de cobrança mostra um aviso com \"Tentar de novo\" quando não consegue carregar, em vez de ficar carregando."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.63",
       "date": "2026-10-08",
       "title": "Um agente, várias caixas do Correio",

@@ -7,6 +7,34 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.64] - 2026-10-09
+
+Copy and state fixes from Sage's screen-by-screen review.
+
+### Changed
+
+- Mailboxes in the `planned` state (the live state) are labeled "Active" /
+  "Ativa" instead of "Preparing" / "Em preparação".
+- Landing MCP point: the hosted server has the full toolset, the local
+  package covers the core sending tools (was "Both modes expose the same
+  tools").
+- Landing FAQ speaks of the Free plan instead of a beta; "Founders program"
+  drops "(beta)"; the featured pricing badge reads "Recommended".
+- Pricing ladder title and intro rewritten in both locales.
+- English price strings use the same `US$ 29` spacing as `formatUsd`; the
+  public nav calls the product "Mail" in English.
+- pt-BR: "Página de cancelamento" becomes "Página de descadastro" (the
+  unsubscribe page, not a subscription cancellation).
+
+### Fixed
+
+- `sendGuard.regionPaused` (shown to customers when a broadcast is refused
+  during a platform pause) no longer names the region or the platform metric.
+- The operator's breaker banner formats the rate for the locale (0,49 in
+  pt-BR).
+- `/settings/billing` shows a retry notice when `billing.status` fails instead
+  of an endless skeleton.
+
 ## [0.63] - 2026-10-08
 
 Team agent credentials for Correio: one secret over several mailboxes.

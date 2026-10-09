@@ -90,8 +90,8 @@ const expectations = {
     subscribeInDashboard: /Subscribe from the dashboard once your Send plan is active/,
     minimumPlan: /Send plan above US\$\s*20\/month/,
     recurringEligibility:
-      /US\$29 Pro 110K offer qualifies even during its US\$20 first monthly bill/,
-    legacyPreserved: /Existing US\$20 contracts keep their price/,
+      /US\$ 29 Pro 110K offer qualifies even during its US\$ 20 first monthly bill/,
+    legacyPreserved: /Existing US\$ 20 contracts keep their price/,
     authorizedEarlierPlan:
       /earlier accounts authorized for Mail may keep their current Send plan when adding mailboxes/,
     systemUnlimited:
@@ -105,7 +105,7 @@ const expectations = {
     firstPayment: "First monthly bill for new customers:",
     renewal: "Renewal:",
     introRestricted:
-      /US\$20 only for the first monthly Send bill of customers who never paid MepMail; then US\$29\/month/,
+      /US\$ 20 only for the first monthly Send bill of customers who never paid MepMail; then US\$ 29\/month/,
     mailNoDiscount: /Mail does not receive this discount/,
     recipientAccounting: /To and Cc count; this is not a limit on distinct contacts/,
     noSubscriptionChange: /does not purchase a plan or change your subscription/,
