@@ -312,6 +312,36 @@ export const en = {
       ref: " (reference {reference})",
     },
   },
+  "activation.add_domain": {
+    subject: "Just your domain left to start sending with MepMail",
+    body: [
+      "Your team {team} is ready. To send email to any address, add the domain your messages come from, such as yourcompany.com.",
+      "It takes three DNS records. The page shows exactly what to copy into your DNS provider (Cloudflare, GoDaddy, Namecheap and others) and checks on its own until they show up, usually within five minutes.",
+    ],
+    button: "Add a domain",
+    muted: ["Stuck on a step? Talk to us in the chat: {supportUrl}"],
+  },
+  "activation.finish_domain": {
+    subject: "{domain} is not verified yet",
+    body: [
+      "The DNS records for {domain} have not shown up for the mail provider yet.",
+      "Publish them at your DNS provider before {deadline}. After that the verification expires and the domain has to be added again.",
+    ],
+    button: "See the records",
+    muted: [
+      "Already published them? DNS can take a few minutes; the domain page checks again every 30 seconds.",
+      "Questions? Chat with us: {supportUrl}",
+    ],
+  },
+  "activation.help": {
+    subject: "Need a hand getting started with MepMail?",
+    body: [
+      "Your team {team} has no verified domain yet, so sending is limited to the test message to your own address.",
+      "If something got in the way (DNS, your provider, n8n, SMTP or the API), chat with us and we will sort it out together.",
+    ],
+    button: "Chat with support",
+    muted: ["Rather do it yourself? The step-by-step guide is at {docsUrl}"],
+  },
 } as const satisfies Record<AccountMailKind, AccountMailEntry>;
 
 /** Sentences several kinds share, filled by the builders. */

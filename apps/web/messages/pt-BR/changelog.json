@@ -28,6 +28,22 @@
   },
   "releases": [
     {
+      "version": "0.81",
+      "date": "2026-10-09",
+      "title": "Do primeiro teste ao primeiro envio de verdade",
+      "summary": "Depois do envio de teste, o MepMail mostra o próximo passo, adicionar o seu domínio, e lembra você por e-mail nos primeiros dias se ele ainda não estiver verificado.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Em Primeiros passos, um cartão “Próximo passo” aparece depois do envio de teste: adicionar o domínio, ou terminar a verificação do domínio que você já adicionou, com a data limite.",
+            "Lembretes de primeiros passos por e-mail, cada um uma única vez: falta o domínio, termine o DNS do domínio antes do prazo, e uma oferta de ajuda pelo chat depois de três dias.",
+            "Os lembretes podem ser desligados em Configurações → Notificações → Primeiros passos."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.80",
       "date": "2026-10-09",
       "title": "Uma lista de mensagens mais fácil de ler",

@@ -16,6 +16,7 @@ type Fixture = {
   delivered: number;
   deliveredEvent: boolean;
   verifiedDomain: boolean;
+  pendingDomain?: boolean;
   metricsPending?: boolean;
   sendAccepted?: boolean;
   failedQuery?: "emails" | "latest" | "metrics" | "detail" | "keys";
@@ -61,7 +62,18 @@ vi.mock("@tanstack/react-query", () => ({
     if (path === "keys")
       data = f.hasKey ? [{ tokenPrefix: "ms_fixture", last4: "0001", createdAt: new Date(0) }] : [];
     if (path === "domains")
-      data = f.verifiedDomain ? [{ name: "example.com", status: "verified" }] : [];
+      data = f.verifiedDomain
+        ? [{ name: "example.com", status: "verified" }]
+        : f.pendingDomain
+          ? [
+              {
+                id: "pending-domain",
+                name: "pending.example.com",
+                status: "pending",
+                createdAt: new Date("2026-10-01T12:00:00Z"),
+              },
+            ]
+          : [];
     if (path === "emails") {
       const email = input?.order === "desc" ? (f.latest ?? f.first) : f.first;
       data = { items: email ? [email] : [], total: f.latest ? 2 : f.first ? 1 : 0 };
@@ -84,6 +96,7 @@ vi.mock("@tanstack/react-query", () => ({
     return {
       data: isError ? undefined : data,
       isPending: path === "metrics" && f.metricsPending === true,
+      isSuccess: !isError && data !== undefined,
       isError,
       refetch: hooks.refetch,
     };
@@ -194,6 +207,32 @@ for (const [locale, copy] of [
   ["pt-BR", pt],
 ] as const) {
   describe(`OnboardingSteps (${locale})`, () => {
+    it("after the test send, points to adding a domain while none is verified", () => {
+      hooks.fixture.first = attempt("first-send", "delivered");
+      hooks.fixture.delivered = 1;
+      const html = render(locale);
+      expect(html).toContain('data-testid="onboarding-next-domain"');
+      expect(html).toContain(copy.next.addTitle);
+      expect(html).toContain('href="/domains/new"');
+      expect(html).toContain('href="/support#chat"');
+      // Before any send there is nothing to point past yet.
+      delete hooks.fixture.first;
+      hooks.fixture.delivered = 0;
+      expect(render(locale)).not.toContain('data-testid="onboarding-next-domain"');
+    });
+
+    it("asks to finish a pending domain, and says nothing once one is verified", () => {
+      hooks.fixture.first = attempt("first-send", "delivered");
+      hooks.fixture.delivered = 1;
+      hooks.fixture.pendingDomain = true;
+      let html = render(locale);
+      expect(html).toContain(copy.next.finishTitle.replace("{domain}", "pending.example.com"));
+      expect(html).toContain('href="/domains/pending-domain"');
+      hooks.fixture.verifiedDomain = true;
+      html = render(locale);
+      expect(html).not.toContain('data-testid="onboarding-next-domain"');
+    });
+
     it("keeps the translated HTML payload intact in the send snippet", () => {
       const html = render(locale);
       expect(html).toContain(copy.step2.html.replaceAll("<", "&lt;").replaceAll(">", "&gt;"));

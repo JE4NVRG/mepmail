@@ -44,6 +44,9 @@ export const ACCOUNT_MAIL_KINDS = [
   "mailbox.agent_key_expiring",
   "content.access_notice",
   "support.view_started",
+  "activation.add_domain",
+  "activation.finish_domain",
+  "activation.help",
 ] as const;
 export type AccountMailKind = (typeof ACCOUNT_MAIL_KINDS)[number];
 

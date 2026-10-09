@@ -518,7 +518,8 @@
       "broadcasts": "Broadcasts",
       "sending": "Sending health",
       "webhooks": "Webhooks",
-      "billing": "Billing"
+      "billing": "Billing",
+      "activation": "Getting started"
     },
     "items": {
       "domain_verified": {
@@ -588,6 +589,10 @@
       "billing_downgraded": {
         "label": "Back on Free",
         "note": "The paid plan ended."
+      },
+      "activation": {
+        "label": "Getting-started reminders",
+        "note": "Up to three emails in the first days, while the team has no verified domain yet."
       }
     }
   },

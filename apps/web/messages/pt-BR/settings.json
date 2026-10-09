@@ -518,7 +518,8 @@
       "broadcasts": "Broadcasts",
       "sending": "Saúde do envio",
       "webhooks": "Webhooks",
-      "billing": "Cobrança"
+      "billing": "Cobrança",
+      "activation": "Primeiros passos"
     },
     "items": {
       "domain_verified": {
@@ -588,6 +589,10 @@
       "billing_downgraded": {
         "label": "De volta ao Free",
         "note": "O plano pago terminou."
+      },
+      "activation": {
+        "label": "Lembretes de primeiros passos",
+        "note": "Até três e-mails nos primeiros dias, enquanto a equipe ainda não tem um domínio verificado."
       }
     }
   },

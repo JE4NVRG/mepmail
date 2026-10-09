@@ -23,6 +23,22 @@
   },
   "releases": [
     {
+      "version": "0.81",
+      "date": "2026-10-09",
+      "title": "From the first test to the first real send",
+      "summary": "After the test send, MepMail shows the next step, adding your domain, and reminds you by email in the first days if it is not verified yet.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "In Getting started, a “Next step” card appears after the test send: add your domain, or finish verifying the one you added, with its deadline.",
+            "Getting-started reminders by email, each sent once: the domain is missing, finish the domain's DNS before the deadline, and an offer of help in the chat after three days.",
+            "The reminders can be turned off under Settings → Notifications → Getting started."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.80",
       "date": "2026-10-09",
       "title": "A message list that is easier to read",

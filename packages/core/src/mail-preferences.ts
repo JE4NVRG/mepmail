@@ -34,6 +34,8 @@ export const MAIL_PREFERENCE_GROUPS = [
       "billing.downgraded",
     ],
   },
+  // Getting-started reminders for a new team without a verified domain.
+  { group: "activation", cloudOnly: true, keys: ["activation"] },
 ] as const;
 
 export type MailPreferenceKey = (typeof MAIL_PREFERENCE_GROUPS)[number]["keys"][number];
@@ -53,5 +55,6 @@ export function mailPreferenceOf(kind: SystemMailKind): MailPreferenceKey | null
   if (kind === "broadcast.sending") return "broadcast.sent";
   if (kind.startsWith("quota.")) return "quota";
   if (kind.startsWith("deliverability.")) return "deliverability";
+  if (kind.startsWith("activation.")) return "activation";
   return isMailPreferenceKey(kind) ? kind : null;
 }

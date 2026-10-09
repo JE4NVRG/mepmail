@@ -77,6 +77,16 @@
     "readUnavailable": "We could not load your current delivery status. Reload it before making another attempt; you can still open the email history.",
     "reload": "Reload status"
   },
+  "next": {
+    "label": "Next step",
+    "addTitle": "Add your domain to send to anyone",
+    "addBody": "For now MepMail only sends the test to your own address. With your domain verified, you send from hello@yourcompany.com to any address. It takes three DNS records, and the page checks on its own until they show up.",
+    "addCta": "Add a domain",
+    "finishTitle": "Finish verifying {domain}",
+    "finishBody": "The DNS records are still missing. Publish them at your provider before {deadline}: the domain page shows what to copy and checks again every 30 seconds.",
+    "finishCta": "See the records",
+    "help": "Stuck? Chat with us"
+  },
   "explore": {
     "label": "Explore more",
     "recommended": "Recommended",

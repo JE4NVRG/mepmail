@@ -7,6 +7,24 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.81] - 2026-10-09
+
+Activation: from the onboarding test send to a verified domain.
+
+### Added
+
+- Onboarding "Next step" card after the test send while the team has no
+  verified domain: add a domain (`/domains/new`), or finish the pending one
+  (`/domains/<id>`) with its 72-hour deadline; a link to the support chat.
+- Getting-started reminders in the worker's notifications sweep (cloud
+  only, each claimed once in `team_notifications`):
+  `activation.add_domain` about 20 hours after the team was created when it
+  has no domain, `activation.finish_domain` 6 to 60 hours after a domain was
+  added and is still unverified (with the date SES gives up), and
+  `activation.help` from 72 hours to 14 days without a verified domain.
+  Suspended teams and the system team are skipped.
+- Mail preference `activation` (Settings, Notifications, Getting started).
+
 ## [0.80] - 2026-10-09
 
 New inbox, cut 1C (from the desktop session): list and reader.

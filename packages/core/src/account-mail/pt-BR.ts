@@ -312,6 +312,36 @@ export const ptBR = {
       ref: " (referência {reference})",
     },
   },
+  "activation.add_domain": {
+    subject: "Falta só o domínio para enviar com o MepMail",
+    body: [
+      "Sua equipe {team} está pronta. Para enviar e-mails para qualquer endereço, adicione o domínio que aparece no remetente, como suaempresa.com.br.",
+      "São três registros DNS. A tela mostra exatamente o que copiar no seu provedor (Cloudflare, Registro.br, Hostinger e outros) e confere sozinha até eles aparecerem, em geral em uns cinco minutos.",
+    ],
+    button: "Adicionar domínio",
+    muted: ["Travou em algum passo? Fale com a gente pelo chat: {supportUrl}"],
+  },
+  "activation.finish_domain": {
+    subject: "{domain} ainda não foi verificado",
+    body: [
+      "Os registros DNS de {domain} ainda não apareceram para o provedor de e-mail.",
+      "Publique-os no seu provedor de DNS até {deadline}. Depois disso a verificação expira e o domínio precisa ser adicionado de novo.",
+    ],
+    button: "Ver os registros",
+    muted: [
+      "Já publicou? O DNS pode levar alguns minutos; a página do domínio confere de novo a cada 30 segundos.",
+      "Dúvidas? Fale com a gente pelo chat: {supportUrl}",
+    ],
+  },
+  "activation.help": {
+    subject: "Precisa de ajuda para começar com o MepMail?",
+    body: [
+      "Sua equipe {team} ainda não tem um domínio verificado, então os envios estão limitados ao teste para o seu próprio endereço.",
+      "Se algo travou (DNS, provedor, n8n, SMTP ou a API), fale com a gente pelo chat e resolvemos juntos.",
+    ],
+    button: "Falar com o suporte",
+    muted: ["Prefere seguir sozinho? O passo a passo está em {docsUrl}"],
+  },
 } as const satisfies Record<AccountMailKind, AccountMailEntry>;
 
 export const ptBRPhrases = {

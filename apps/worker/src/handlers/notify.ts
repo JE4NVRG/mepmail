@@ -46,6 +46,7 @@ import {
   gte,
   inArray,
   isNotNull,
+  isNull,
   like,
   lt,
   ne,
@@ -805,5 +806,130 @@ export async function sweepNotifications(db: Db, deps: NotifyDeps): Promise<{ se
     }
   }
 
+  if (deps.isCloud) sent += await sweepActivation(db, deps.mailer, base, now);
+
   return { sent };
+}
+
+/** A new team hears about getting started this long after it was created. */
+export const ACTIVATION_ADD_DOMAIN_AFTER_MS = 20 * 60 * 60 * 1000;
+/** From this age the reminder becomes an offer of help instead. */
+export const ACTIVATION_HELP_AFTER_MS = 72 * 60 * 60 * 1000;
+/** Teams older than this are past onboarding: no reminders at all. */
+export const ACTIVATION_WINDOW_MS = 14 * DAY_MS;
+/** A domain still unverified this long after it was added gets one reminder. */
+export const ACTIVATION_FINISH_DOMAIN_AFTER_MS = 6 * 60 * 60 * 1000;
+/**
+ * SES stops looking for the DKIM records 72 hours after the identity is
+ * created and the reaper removes the domain then (cron.ts); the reminder is
+ * pointless in the last hours before that.
+ */
+export const DOMAIN_VERIFICATION_DEADLINE_MS = 72 * 60 * 60 * 1000;
+const ACTIVATION_FINISH_DOMAIN_UNTIL_MS = 60 * 60 * 60 * 1000;
+const ACTIVATION_GUIDE_URL = "https://docs.mepmail.dev/concepts/domains";
+
+/**
+ * Getting-started reminders for cloud teams that never verified a sending
+ * domain, each at most once and only while the team is young:
+ * - activation.add_domain: about a day in, when the team has no domain yet;
+ * - activation.finish_domain: hours after a domain was added and still not
+ *   verified, with the date the verification expires;
+ * - activation.help: from three days in, an offer of help instead.
+ * A team gets add_domain or help depending on its age, never both in one
+ * sweep. Owners who turned off "activation" are skipped by mailOwners. The
+ * instance's own team (plan "system") and suspended teams hear nothing.
+ */
+export async function sweepActivation(
+  db: Db,
+  mailer: SystemMailer,
+  base: string,
+  now: Date,
+): Promise<number> {
+  const t = schema.teams;
+  const d = schema.domains;
+  const supportUrl = `${base}/support#chat`;
+  let sent = 0;
+  const send = async (
+    teamId: string,
+    kind: "activation.add_domain" | "activation.finish_domain" | "activation.help",
+    claimKind: string,
+    path: string,
+    values: (locale: MailLocale) => Record<string, string>,
+  ) => {
+    if (!(await claimNotification(db, { teamId, kind: claimKind, periodKey: "once" }))) return;
+    try {
+      sent += await mailTeamOwners(db, mailer, teamId, kind, (locale) =>
+        buildAccountMail({ kind, locale, url: `${base}${path}`, values: values(locale) }),
+      );
+    } catch (err) {
+      console.error(`notifications.sweep: ${kind} for team ${teamId} failed`, err);
+    }
+  };
+
+  // A join, not a correlated subquery: the select list would leave the outer
+  // team column unqualified and the subquery would compare a domain to itself.
+  const teams = await db
+    .select({
+      id: t.id,
+      name: t.name,
+      createdAt: t.createdAt,
+      domains: sql<number>`count(${d.id})::int`,
+      verified: sql<boolean>`coalesce(bool_or(${d.verifiedAt} is not null), false)`,
+    })
+    .from(t)
+    .leftJoin(d, eq(d.teamId, t.id))
+    .where(
+      and(
+        isNull(t.suspendedAt),
+        ne(t.plan, "system"),
+        gt(t.createdAt, new Date(now.getTime() - ACTIVATION_WINDOW_MS)),
+        lt(t.createdAt, new Date(now.getTime() - ACTIVATION_ADD_DOMAIN_AFTER_MS)),
+      ),
+    )
+    .groupBy(t.id, t.name, t.createdAt);
+  for (const team of teams) {
+    if (team.verified) continue;
+    const age = now.getTime() - team.createdAt.getTime();
+    if (age >= ACTIVATION_HELP_AFTER_MS) {
+      await send(team.id, "activation.help", "activation.help", "/support#chat", () => ({
+        team: team.name,
+        docsUrl: ACTIVATION_GUIDE_URL,
+      }));
+    } else if (Number(team.domains) === 0) {
+      await send(team.id, "activation.add_domain", "activation.add_domain", "/domains/new", () => ({
+        team: team.name,
+        supportUrl,
+      }));
+    }
+  }
+
+  const pending = await db
+    .select({ id: d.id, name: d.name, teamId: d.teamId, createdAt: d.createdAt })
+    .from(d)
+    .innerJoin(t, eq(t.id, d.teamId))
+    .where(
+      and(
+        isNull(d.verifiedAt),
+        ne(d.status, "verified"),
+        isNull(t.suspendedAt),
+        ne(t.plan, "system"),
+        lt(d.createdAt, new Date(now.getTime() - ACTIVATION_FINISH_DOMAIN_AFTER_MS)),
+        gt(d.createdAt, new Date(now.getTime() - ACTIVATION_FINISH_DOMAIN_UNTIL_MS)),
+      ),
+    );
+  for (const domain of pending) {
+    const deadline = new Date(domain.createdAt.getTime() + DOMAIN_VERIFICATION_DEADLINE_MS);
+    await send(
+      domain.teamId,
+      "activation.finish_domain",
+      `activation.finish_domain:${domain.id}`,
+      `/domains/${domain.id}`,
+      (locale) => ({
+        domain: domain.name,
+        deadline: formatMailDateTime(locale, deadline),
+        supportUrl,
+      }),
+    );
+  }
+  return sent;
 }

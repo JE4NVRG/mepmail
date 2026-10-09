@@ -77,6 +77,16 @@
     "readUnavailable": "Não foi possível consultar o status atual de entrega. Recarregue antes de tentar outro envio; o histórico de e-mails continua disponível.",
     "reload": "Recarregar status"
   },
+  "next": {
+    "label": "Próximo passo",
+    "addTitle": "Adicione seu domínio para enviar para qualquer pessoa",
+    "addBody": "Por enquanto o MepMail só envia o teste para o seu próprio e-mail. Com o domínio verificado, você envia de contato@suaempresa.com.br para qualquer endereço. São três registros DNS, e a página confere sozinha quando eles aparecem.",
+    "addCta": "Adicionar domínio",
+    "finishTitle": "Termine a verificação de {domain}",
+    "finishBody": "Faltam os registros DNS. Publique-os no seu provedor até {deadline}: a página do domínio mostra o que copiar e confere de novo a cada 30 segundos.",
+    "finishCta": "Ver os registros",
+    "help": "Travou? Fale com a gente pelo chat"
+  },
   "explore": {
     "label": "Explore mais",
     "recommended": "Recomendado",

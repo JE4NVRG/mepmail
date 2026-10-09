@@ -203,6 +203,10 @@ export function OnboardingSteps({
 
   const domainsQuery = useQuery(trpc.domains.list.queryOptions());
   const verifiedDomain = domainsQuery.data?.find((d) => d.status === "verified")?.name;
+  // A domain still waiting for its DNS records; SES gives up on it 72 hours in.
+  const pendingDomain = domainsQuery.data?.find(
+    (d) => d.status === "pending" || d.status === "temporary_failure",
+  );
 
   // Keep the first attempt as history, not as the team's current progress.
   // Reads must not depend on an active key: keys can be revoked after sending.
@@ -313,6 +317,53 @@ export function OnboardingSteps({
   const readUnavailable = progressQueries.some((query) => query.isError);
 
   const toDisplay = currentEmail?.to.join(", ") ?? userEmail;
+
+  // After the test send, the one thing between a team and real sending is its
+  // own verified domain: say so first, before anything else to explore.
+  const nextStep =
+    firstEmail && domainsQuery.isSuccess && !verifiedDomain ? (
+      <section
+        className="ms-card"
+        data-testid="onboarding-next-domain"
+        style={{ marginTop: 28, padding: 22, backgroundImage: statusGlow("success", 10) }}
+      >
+        <div className="ms-microlabel">{t("next.label")}</div>
+        <h2 style={{ margin: "6px 0 0", fontSize: 18, fontWeight: 600, color: "var(--ms-bone)" }}>
+          {pendingDomain
+            ? t("next.finishTitle", { domain: pendingDomain.name })
+            : t("next.addTitle")}
+        </h2>
+        <p style={{ margin: "6px 0 0", fontSize: 13.5, color: "var(--ms-muted)", lineHeight: 1.5 }}>
+          {pendingDomain
+            ? t("next.finishBody", {
+                deadline: formatDayTime(
+                  new Date(pendingDomain.createdAt).getTime() + 72 * 3_600_000,
+                  locale,
+                ),
+              })
+            : t("next.addBody")}
+        </p>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 14,
+            marginTop: 16,
+          }}
+        >
+          <Link
+            href={pendingDomain ? `/domains/${pendingDomain.id}` : "/domains/new"}
+            className="ms-btn ms-btn-primary"
+          >
+            {pendingDomain ? t("next.finishCta") : t("next.addCta")}
+          </Link>
+          <Link href="/support#chat" style={{ fontSize: 13, color: "var(--ms-bone)" }}>
+            {t("next.help")}
+          </Link>
+        </div>
+      </section>
+    ) : null;
 
   const explore = (
     <div style={{ marginTop: 56 }}>
@@ -619,6 +670,8 @@ export function OnboardingSteps({
               ? t("attempt.failed")
               : t("subtitle")}
       </div>
+
+      {nextStep}
 
       {success ? (
         <>

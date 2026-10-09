@@ -288,6 +288,11 @@ it("a quiet week ends the episode even though the team is never observed healthy
   // The drain would have settled the pause's own delivery row long before;
   // left open it would read as a week-old webhook backlog.
   await db.update(schema.webhookDeliveries).set({ status: "success", nextAttemptAt: null });
+  // A week-old team with no verified domain would also hear the getting-started
+  // offer of help; that one went out already and is not what this test counts.
+  await db
+    .insert(schema.teamNotifications)
+    .values({ teamId, kind: "activation.help", periodKey: "once" });
   expect(await sweepNotifications(db, deps(true, later))).toEqual({ sent: 0 });
   await counters({ sent: 200, complained: 3 }, utcDay(later.getTime()));
   expect(await sweepNotifications(db, deps(true, later))).toEqual({ sent: 1 });
