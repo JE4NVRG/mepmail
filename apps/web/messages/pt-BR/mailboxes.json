@@ -616,5 +616,26 @@
     "checkNow": "Verificar agora",
     "checking": "Verificando…",
     "propagation": "A mudança no DNS costuma aparecer em poucos minutos, mas pode levar até algumas horas."
+  },
+  "aliases": {
+    "title": "Apelidos",
+    "hint": "Outros endereços que entregam nesta caixa. Um e-mail para eles chega em {address}.",
+    "delivers": "Entrega em {address}",
+    "empty": "Nenhum apelido ainda.",
+    "add": "Novo apelido",
+    "placeholder": "suporte",
+    "submit": "Adicionar apelido",
+    "adding": "Adicionando…",
+    "remove": "Remover",
+    "removeLabel": "Remover o apelido {address}",
+    "removed": "Apelido {address} removido. Ele deixa de entregar nesta caixa.",
+    "addedLive": "{address} já recebe nesta caixa.",
+    "addedPending": "{address} foi criado. Ele começa a receber quando o recebimento do domínio for confirmado (MX).",
+    "taken": "Esse endereço já está em uso por uma caixa ou outro apelido.",
+    "invalid": "Use letras, números, ponto, hífen ou sublinhado (até 20 apelidos por caixa).",
+    "error": "Não foi possível salvar. Tente de novo.",
+    "loadError": "Não foi possível carregar os apelidos.",
+    "loading": "Carregando apelidos…",
+    "retry": "Tentar de novo"
   }
 }

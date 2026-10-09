@@ -141,6 +141,13 @@
       "when": 1791039600019,
       "tag": "0019_mailbox_agent_key_oauth",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791039600020,
+      "tag": "0020_mailbox_aliases",
+      "breakpoints": true
     }
   ]
 }

@@ -103,7 +103,7 @@
       },
       {
         "q": "Meus agentes podem usar o MepMail?",
-        "a": "Sim, pela API de Envio ou pelo MCP publicado, respeitando as permissões da conexão. Copie o endpoint em Configurações → MCP. O MCP de Envio não abre as caixas do Correio: para elas, o agente usa o MCP do Correio, com aprovação opcional antes de cada envio.",
+        "a": "Sim, pela API de Envio ou pelo MCP publicado, respeitando as permissões da conexão. Copie o endpoint em Configurações → MCP. Com as permissões de e-mail, o mesmo MCP também lê e rascunha nas caixas do Correio que você marcar ao conectar, pedindo sua aprovação antes de cada envio; uma chave de agente no MCP do Correio também funciona.",
         "link": {
           "label": "MCP",
           "href": "https://docs.mepmail.dev/pt-BR/mcp"

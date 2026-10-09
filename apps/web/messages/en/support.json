@@ -103,7 +103,7 @@
       },
       {
         "q": "Can my agents use MepMail?",
-        "a": "Yes, through the Send API or the published MCP, within the connection's permissions. Copy the endpoint from Settings → MCP. The Send MCP does not open Correio mailboxes: for those, the agent uses the Correio MCP, with optional approval before each send.",
+        "a": "Yes, through the Send API or the published MCP, within the connection's permissions. Copy the endpoint from Settings → MCP. With the mail permissions, the same MCP also reads and drafts in the Mail inboxes you tick when you connect it, asking your approval before each send; an agent key on the Mail MCP works too.",
         "link": {
           "label": "MCP",
           "href": "https://docs.mepmail.dev/mcp"
@@ -111,7 +111,7 @@
       },
       {
         "q": "Can I receive email or import Gmail/Hotmail?",
-        "a": "Yes, with Correio: email mailboxes on your domain for people and AI agents. It is an add-on at US$ 9.90/month per mailbox (10 GiB and 2,000 outbound deliveries a month), available on any paid Send plan; each mailbox needs a verified domain with receiving turned on. We do not offer IMAP or Gmail/Hotmail/MBOX/PST import yet, and Google sign-in does not sync a Gmail inbox.",
+        "a": "Yes, with MepMail Mail: email inboxes on your domain for people and AI agents. It is an add-on at US$ 9.90/month per mailbox (10 GiB and 2,000 outbound deliveries a month), available on any paid Send plan; each mailbox needs a verified domain with receiving turned on. We do not offer IMAP or Gmail/Hotmail/MBOX/PST import yet, and Google sign-in does not sync a Gmail inbox.",
         "link": {
           "label": "Mailboxes",
           "href": "https://docs.mepmail.dev/mailboxes"
@@ -119,7 +119,7 @@
       },
       {
         "q": "What are the prices and limits?",
-        "a": "Send and Correio prices are on the pricing page. Send and Correio have separate licences and quotas, and checkout shows the final price for your organization.",
+        "a": "Send and Mail prices are on the pricing page. Send and Mail have separate licences and quotas, and checkout shows the final price for your organization.",
         "link": {
           "label": "Pricing",
           "href": "/pricing"
@@ -159,7 +159,7 @@
   "assistant": {
     "eyebrow": "Support chat",
     "title": "Get an answer now",
-    "body": "MepMail's virtual assistant answers right away about domains, SMTP, the API, pricing and Correio. For account or billing questions, it points the way and Jean replies by email.",
+    "body": "MepMail's virtual assistant answers right away about domains, SMTP, the API, pricing and Mail. For account or billing questions, it points the way and Jean replies by email.",
     "available": "Virtual assistant · English and Portuguese",
     "pending": "Chat is being prepared. Email and documentation are available.",
     "open": "Open chat",

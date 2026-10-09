@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { adConsent } from "@/lib/ad-consent";
+import { createGooglePublicController, loadGoogleTag } from "@/lib/google-public-events";
 import {
   createMetaPublicController,
   guardMetaNavigation,
@@ -14,11 +15,73 @@ import {
 } from "@/lib/meta-public-events";
 import styles from "./advertising-consent.module.css";
 
-const configured =
+const metaConfigured =
   process.env.NODE_ENV === "production" &&
   process.env.NEXT_PUBLIC_META_PIXEL_ENABLED === "true" &&
   process.env.NEXT_PUBLIC_META_PIXEL_ID === META_PIXEL_ID;
-let controller: ReturnType<typeof createMetaPublicController> | undefined;
+const googleConfigured =
+  process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_GOOGLE_TAG_ENABLED === "true";
+const configured = metaConfigured || googleConfigured;
+interface PublicController {
+  reconcile(): void;
+  beforeNavigation(href: string): boolean;
+  dispose(): void;
+}
+let controller: PublicController | undefined;
+let leaving = false;
+/** Both tags leave a public document the same way; the first caller navigates. */
+function leaveDocument(href: string) {
+  if (leaving) return;
+  leaving = true;
+  window.location.assign(href);
+}
+
+/** Meta and Google share one consent and one navigation guard; each decides for itself. */
+function publicController(): PublicController {
+  const port = {
+    href: () => window.location.href,
+    referrer: () => document.referrer,
+    consent: () => adConsent.getSnapshot().state,
+    leaveDocument,
+  };
+  const meta = metaConfigured
+    ? createMetaPublicController({
+        ...port,
+        load: () => loadManualMetaSdk(window, document),
+        watchPlans: (callback) => {
+          const plans = document.getElementById("planos");
+          if (!plans || typeof IntersectionObserver === "undefined") return () => {};
+          const observer = new IntersectionObserver(
+            (entries) => {
+              if (entries.some((entry) => entry.isIntersecting)) callback();
+            },
+            { threshold: 0.25 },
+          );
+          observer.observe(plans);
+          return () => observer.disconnect();
+        },
+      })
+    : undefined;
+  const google = googleConfigured
+    ? createGooglePublicController({ ...port, load: () => loadGoogleTag(window, document) })
+    : undefined;
+  return {
+    reconcile() {
+      meta?.reconcile();
+      google?.reconcile();
+    },
+    beforeNavigation(href) {
+      // Both run, Google first: its signup lead is queued before the document is left.
+      const googleLeaves = google?.beforeNavigation(href) ?? false;
+      const metaLeaves = meta?.beforeNavigation(href) ?? false;
+      return googleLeaves || metaLeaves;
+    },
+    dispose() {
+      meta?.dispose();
+      google?.dispose();
+    },
+  };
+}
 const SETTINGS_EVENT = "mepmail:advertising-settings";
 
 function publicDocument(pathname = window.location.pathname) {
@@ -72,25 +135,7 @@ export function AdvertisingConsent() {
       };
     }
     // The singleton survives React StrictMode's effect replay and avoids duplicate events.
-    controller ??= createMetaPublicController({
-      href: () => window.location.href,
-      referrer: () => document.referrer,
-      consent: () => adConsent.getSnapshot().state,
-      load: () => loadManualMetaSdk(window, document),
-      leaveDocument: (href) => window.location.assign(href),
-      watchPlans: (callback) => {
-        const plans = document.getElementById("planos");
-        if (!plans || typeof IntersectionObserver === "undefined") return () => {};
-        const observer = new IntersectionObserver(
-          (entries) => {
-            if (entries.some((entry) => entry.isIntersecting)) callback();
-          },
-          { threshold: 0.25 },
-        );
-        observer.observe(plans);
-        return () => observer.disconnect();
-      },
-    });
+    controller ??= publicController();
     const active = controller;
     const unsubscribe = adConsent.subscribe(active.reconcile);
     const stopNavigation = guardMetaNavigation(window, document, active);

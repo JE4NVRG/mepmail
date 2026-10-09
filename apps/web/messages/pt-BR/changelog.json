@@ -28,6 +28,28 @@
   },
   "releases": [
     {
+      "version": "0.74",
+      "date": "2026-10-09",
+      "title": "Apelidos nas caixas do Correio",
+      "summary": "Uma caixa agora recebe por vários endereços do mesmo domínio: suporte@ e contato@ podem cair direto em jean@, sem criar outra caixa.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Apelidos: em Gerenciar caixa, adicione até 20 endereços do mesmo domínio que entregam nela. Um e-mail para a caixa e para um apelido dela ao mesmo tempo chega uma vez só.",
+            "O apelido passa a receber assim que o recebimento (MX) do domínio estiver confirmado; com o domínio já recebendo, ele vale na hora.",
+            "Medição opcional com o Google Analytics nas páginas públicas (início, preços e Correio), só depois que você permite em Preferências de publicidade. Quem já tinha permitido só a Meta recebe a pergunta de novo."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Em inglês, o Correio passa a se chamar MepMail Mail em todo o painel, nos e-mails da conta e no suporte."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.73",
       "date": "2026-10-09",
       "title": "Correio no MCP sem colar chave",

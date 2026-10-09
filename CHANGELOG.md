@@ -7,6 +7,37 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.74] - 2026-10-09
+
+Mailbox aliases; optional Google Analytics on public pages; "Mail" in English.
+
+### Added
+
+- Mailbox aliases (mailbox migration 0020, `mailbox_aliases`): up to 20
+  extra addresses on the mailbox's own domain, managed by owners and admins
+  (`mailboxes.aliases`, `addAlias`, `removeAlias`, audited as
+  `mailbox.alias_added` / `mailbox.alias_removed`). An address is taken by
+  a mailbox or an alias, never both, under the same domain lock.
+- Receiving resolves each RCPT through the mailbox address or an alias; a
+  message to a mailbox and its alias is stored once. Activation lists the
+  aliases of licensed mailboxes in the SES receipt rule, and adding an alias
+  runs it right away.
+- Optional Google Analytics 4 (`G-3624E08M6J`) on `/`, `/pricing` and
+  `/correio`, behind the same server-side advertising consent as the Pixel:
+  gtag.js loads only after acceptance, with Consent Mode v2 (ad
+  personalization never granted, Google signals off), sanitized
+  `page_location`/`page_referrer` and `generate_lead` when a visitor leaves
+  for `/signup`. Leaving the public pages reloads the document. Enabled by
+  `NEXT_PUBLIC_GOOGLE_TAG_ENABLED=true`; CSP for the Google hosts applies to
+  those three pages only.
+
+### Changed
+
+- Advertising consent policy `ads-v2` (Meta and Google): consent given under
+  `meta-ads-v1` is asked again. Privacy policy updated.
+- English copy names the inbox product "Mail" / "MepMail Mail" across the
+  dashboard, account emails, consent scopes and support.
+
 ## [0.73] - 2026-10-09
 
 Correio mail on the hosted MCP over OAuth.

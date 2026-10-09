@@ -23,6 +23,28 @@
   },
   "releases": [
     {
+      "version": "0.74",
+      "date": "2026-10-09",
+      "title": "Aliases for Mail inboxes",
+      "summary": "An inbox now receives at several addresses on its domain: support@ and contact@ can land straight in jean@, without another inbox.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Aliases: in Manage mailbox, add up to 20 addresses on the same domain that deliver into that mailbox. A message sent to the inbox and one of its aliases at once arrives only once.",
+            "An alias starts receiving once the domain's receiving (MX) is confirmed; on a domain that already receives, it works right away.",
+            "Optional Google Analytics measurement on public pages (home, pricing and Mail), only after you allow it in Advertising preferences. If you had allowed only Meta before, you are asked again."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "In English, Correio is now called MepMail Mail across the dashboard, account emails and support."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.73",
       "date": "2026-10-09",
       "title": "Correio over MCP without pasting a key",

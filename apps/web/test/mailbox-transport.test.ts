@@ -13,6 +13,7 @@ import {
   createMailboxAgentKey,
   revokeMailboxAgentKey,
 } from "../../../packages/core/src/mailbox-agent-access.js";
+import { addMailboxAlias, removeMailboxAlias } from "../../../packages/core/src/mailbox-aliases.js";
 import { assessMailboxReceipt } from "../../../packages/core/src/mailbox-inbound-safety.js";
 import {
   countMailboxThreads,
@@ -327,6 +328,27 @@ describe("durable private Correio transport contracts with captured provider", (
         fixture("external@example.invalid", "visible-wrong@example.invalid", "changed"),
       ),
     ).rejects.toMatchObject({ code: "conflict" });
+  });
+  it("delivers an alias into its mailbox once, even when the mailbox is also addressed directly", async () => {
+    const alias = await addMailboxAlias(db, owner(), { mailboxId, localPart: "support" });
+    expect(alias.address).toBe("support@transport.invalid");
+    const viaAlias = await receive("alias:1", ["support@transport.invalid"]);
+    expect(viaAlias.items).toMatchObject([{ mailboxId, duplicate: false }]);
+    const both = await receive("alias:2", [
+      "person@transport.invalid",
+      "support@transport.invalid",
+    ]);
+    expect(both.items).toHaveLength(1);
+    expect(both.items[0]!.mailboxId).toBe(mailboxId);
+    expect(await db.select().from(schema.mailboxItems)).toHaveLength(2);
+    await expect(
+      receive("alias:3", ["support@transport.invalid", "absent@transport.invalid"]),
+    ).rejects.toMatchObject({ code: "not_found" });
+    await removeMailboxAlias(db, owner(), { id: alias.id });
+    await expect(receive("alias:4", ["support@transport.invalid"])).rejects.toMatchObject({
+      code: "not_found",
+    });
+    expect(await db.select().from(schema.mailboxItems)).toHaveLength(2);
   });
   it("rolls the whole fanout back for an unknown recipient, unverified domain or insufficient storage", async () => {
     await expect(

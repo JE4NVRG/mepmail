@@ -335,7 +335,7 @@
     "domainStep": "Domain",
     "licenseStep": "License",
     "domainBody": "The domain defines the address after @. Sending verification and receiving setup are separate steps.",
-    "existingProviderBody": "Already receiving email with another provider (Google, Microsoft…)? Use a subdomain just for Correio, such as agents.yourdomain.com. Changing the MX records of your main domain redirects all of its incoming email to MepMail, and registration does not migrate old messages.",
+    "existingProviderBody": "Already receiving email with another provider (Google, Microsoft…)? Use a subdomain just for Mail, such as agents.yourdomain.com. Changing the MX records of your main domain redirects all of its incoming email to MepMail, and registration does not migrate old messages.",
     "mxDestination": "Required MX destination:",
     "receiving": {
       "unknown": "Receiving setup has not been confirmed. Check DNS (MX) and service activation before using this domain.",
@@ -427,7 +427,7 @@
   "notices": {
     "enable": "Notify me of new email",
     "disable": "Stop new email notifications",
-    "enabled": "Notifications on: the browser tells you when email arrives while Correio is in another tab.",
+    "enabled": "Notifications on: the browser tells you when email arrives while Mail is in another tab.",
     "disabled": "New email notifications off.",
     "blocked": "The browser blocked notifications for this site. Allow them in the site settings and try again.",
     "unsupported": "This browser does not show notifications.",
@@ -469,7 +469,7 @@
     "allBoxes": "Sum of the mailboxes you can open"
   },
   "offer": {
-    "eyebrow": "Correio · Mail",
+    "eyebrow": "MepMail Mail",
     "title": "Mailboxes for you and your agents",
     "body": "Real addresses on your own domain for people and AI agents to receive, read and reply to email — from the dashboard or through the API.",
     "points": {
@@ -477,13 +477,13 @@
       "agents": "Per-mailbox API keys for agents, with a sending allowance on each mailbox.",
       "price": "{small} for {smallPrice} or {large} for {largePrice} per mailbox a month."
     },
-    "requirement": "Correio is an add-on to the paid Send plans, from {price} a month. Eligible new customers pay {first} for the first month of Send.",
-    "cta": "Get Send + Correio",
-    "learn": "Learn about Correio",
+    "requirement": "Mail is an add-on to the paid Send plans, from {price} a month. Eligible new customers pay {first} for the first month of Send.",
+    "cta": "Get Send + Mail",
+    "learn": "Learn about Mail",
     "adminOnly": "Ask a team owner or admin to subscribe."
   },
   "app": {
-    "sections": "Correio sections",
+    "sections": "Mail sections",
     "inbox": "Inbox",
     "settings": "Settings",
     "support": "Support",
@@ -564,8 +564,8 @@
       "locaweb": "Locaweb",
       "other": "DNS provider"
     },
-    "currentKnown": "Mail for {domain} arrives through {provider} today ({hosts}). Changing the MX sends all mail for any @{domain} address to Correio, and the {provider} mailboxes stop receiving. If you still use {provider}, put the Correio mailboxes on a subdomain (e.g. correio.{domain}) or move every mailbox first.",
-    "currentOther": "The MX for {domain} points to {hosts} today. Changing it sends all of this domain's mail to Correio. If that server still receives mail you use, put the mailboxes on a subdomain (e.g. correio.{domain}).",
+    "currentKnown": "Mail for {domain} arrives through {provider} today ({hosts}). Changing the MX sends all mail for any @{domain} address to MepMail Mail, and the {provider} mailboxes stop receiving. If you still use {provider}, put the MepMail Mail inboxes on a subdomain (e.g. correio.{domain}) or move every mailbox first.",
+    "currentOther": "The MX for {domain} points to {hosts} today. Changing it sends all of this domain's mail to MepMail Mail. If that server still receives mail you use, put the mailboxes on a subdomain (e.g. correio.{domain}).",
     "type": "Type",
     "name": "Name",
     "value": "Value",
@@ -611,10 +611,31 @@
         "3": "Save and come back here to check."
       }
     },
-    "removeOld": "Once the Correio MX exists, delete the old MX records ({hosts}). With both in place, part of the mail keeps going to the old server and receiving is not confirmed.",
+    "removeOld": "Once the MepMail MX record exists, delete the old MX records ({hosts}). With both in place, part of the mail keeps going to the old server and receiving is not confirmed.",
     "openProvider": "Open {provider}",
     "checkNow": "Check now",
     "checking": "Checking…",
     "propagation": "DNS changes usually show up within minutes, but can take a few hours."
+  },
+  "aliases": {
+    "title": "Aliases",
+    "hint": "Other addresses that deliver into this inbox. Mail sent to them arrives at {address}.",
+    "delivers": "Delivers to {address}",
+    "empty": "No aliases yet.",
+    "add": "New alias",
+    "placeholder": "support",
+    "submit": "Add alias",
+    "adding": "Adding…",
+    "remove": "Remove",
+    "removeLabel": "Remove the alias {address}",
+    "removed": "Alias {address} removed. It no longer delivers into this inbox.",
+    "addedLive": "{address} now receives into this inbox.",
+    "addedPending": "{address} was created. It starts receiving once the domain's receiving (MX) is confirmed.",
+    "taken": "That address is already used by an inbox or another alias.",
+    "invalid": "Use letters, numbers, dot, hyphen or underscore (up to 20 aliases per inbox).",
+    "error": "Could not save. Try again.",
+    "loadError": "Could not load the aliases.",
+    "loading": "Loading aliases…",
+    "retry": "Try again"
   }
 }

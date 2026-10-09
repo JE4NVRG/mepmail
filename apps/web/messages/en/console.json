@@ -185,7 +185,7 @@
       "noPoints": "Nothing recorded in this window yet.",
       "monitor_samples_1h": "Monitor samples per hour",
       "monitor_unjudged_rate": "Monitor unjudged share",
-      "mailbox_receiving_used_rate": "Correio receiving slots in use"
+      "mailbox_receiving_used_rate": "Mail receiving slots in use"
     },
     "monitoring": {
       "title": "Monitoring",

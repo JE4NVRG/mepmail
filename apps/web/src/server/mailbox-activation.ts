@@ -3,6 +3,7 @@ import { env } from "@millionsend/config";
 import {
   type MailboxRegistryActor,
   MailboxRegistryError,
+  mailboxAliasAddresses,
   mailboxDomainLock,
   mailboxServiceEntitlement,
   withMailboxRegistryAdmin,
@@ -87,14 +88,19 @@ export async function activateMailboxReceiving(
       .from(schema.teamMembers)
       .where(eq(schema.teamMembers.teamId, actor.teamId))
       .for("share");
-    const recipients = boxes
-      .filter(
-        (box) =>
-          licensed.has(box.id) &&
-          owners.some((owner) => owner.id === box.membershipId && owner.userId === box.ownerUserId),
-      )
-      .map((box) => box.address);
-    if (!recipients.length) throw new MailboxRegistryError("forbidden");
+    const eligible = boxes.filter(
+      (box) =>
+        licensed.has(box.id) &&
+        owners.some((owner) => owner.id === box.membershipId && owner.userId === box.ownerUserId),
+    );
+    if (!eligible.length) throw new MailboxRegistryError("forbidden");
+    // Aliases of an eligible mailbox receive with it (each takes one SES slot).
+    const aliases = await mailboxAliasAddresses(
+      tx,
+      actor.teamId,
+      eligible.map((box) => box.id),
+    );
+    const recipients = [...eligible.map((box) => box.address), ...aliases.map((a) => a.address)];
     if (recipients.some((x) => x.split("@")[1] !== domain.name.toLowerCase()))
       throw new MailboxRegistryError("invalid");
     const [mx, identity] = await Promise.all([

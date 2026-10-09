@@ -24,9 +24,16 @@ const META_REFERRER_ORIGINS = new Set([
   "https://l.instagram.com",
 ]);
 const FACEBOOK_LINK_ORIGINS = new Set(["https://l.facebook.com", "https://lm.facebook.com"]);
-const PUBLIC_HASHES = new Set(["", "#planos", "#como-funciona", "#comparativo", "#mcp"]);
+export const PUBLIC_HASHES: ReadonlySet<string> = new Set([
+  "",
+  "#planos",
+  "#como-funciona",
+  "#comparativo",
+  "#mcp",
+]);
 
-function contextUrl(value: string): URL | null {
+/** Parses a page or referrer URL, refusing control characters, credentials and dot tricks. */
+export function contextUrl(value: string): URL | null {
   // URL parsing otherwise drops control characters or accepts embedded credentials.
   if (value.trim() !== value || value.includes("\\")) return null;
   for (let index = 0; index < value.length; index++) {

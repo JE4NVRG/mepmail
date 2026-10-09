@@ -21,6 +21,31 @@ describe("public Meta Content Security Policy", () => {
     expect(JSON.stringify(rules)).not.toContain("facebook");
   });
 
+  it("adds the Google tag hosts to public documents only, alone or beside the Pixel", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_TAG_ENABLED", "true");
+    for (const rules of [await headers(""), await headers("true")]) {
+      expect(rules.map((rule) => rule.source)).toEqual([
+        "/:path*",
+        "/support",
+        "/",
+        "/pricing",
+        "/correio",
+      ]);
+      const csp = (source: string) =>
+        rules
+          .find((rule) => rule.source === source)
+          ?.headers.find((item) => item.key === "Content-Security-Policy")?.value ?? "";
+      expect(csp("/:path*")).not.toContain("google");
+      expect(csp("/support")).not.toContain("google");
+      for (const source of ["/", "/pricing", "/correio"]) {
+        expect(csp(source)).toContain("https://www.googletagmanager.com");
+        expect(csp(source)).toContain("https://*.google-analytics.com");
+        expect(csp(source)).toContain("https://*.analytics.google.com");
+        expect(csp(source)).toContain("frame-ancestors 'none'");
+      }
+    }
+    expect(JSON.stringify(await headers(""))).not.toContain("facebook");
+  });
   it("rejects a malformed dataset and never broadens private paths", async () => {
     expect(await headers("true", "bad; https://untrusted.invalid")).toHaveLength(2);
   });

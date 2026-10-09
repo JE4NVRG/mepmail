@@ -255,7 +255,7 @@ export const en = {
     button: "Open review",
   },
   "mailbox.capacity": {
-    subject: "Correio receiving at {share} of its slots",
+    subject: "Mail receiving at {share} of its slots",
     body: [
       "The SES receiving rules hold {used} of {total} recipient slots ({rules} rules of 100). New mailboxes stop activating when they are full.",
       "Add receipt rules to the active rule set (SES allows up to 200, about 20,000 mailboxes) and list them in MAILBOX_RECEIVING_PROVISIONING_CONFIG, or move customers to receiving by domain. This notice repeats at most once a day while usage stays over 80%.",
@@ -268,16 +268,16 @@ export const en = {
       "The agent {agent} saved a draft in {mailbox} and asked you to approve sending it. Its key does not carry the send permission, so nothing has gone out.",
       "Open the draft, check the recipients and the text, and send it if it is right. To decline, edit or delete the draft.",
     ],
-    button: "Open Correio",
+    button: "Open Mail",
     muted: ["You get at most one of these every 10 minutes per mailbox."],
   },
   "mailbox.agent_key_expiring": {
     subject: "Agent key {label} expires on {date}",
     body: [
       "The key {label}, which gives access to {mailbox}, expires on {date}. After that the agent using it can no longer read, draft or send with it, and its calls are refused.",
-      "To keep the agent working, create a new key in Correio → Settings → Agents and swap it into the agent's MCP client. If it no longer needs access, do nothing: the key lapses on its own.",
+      "To keep the agent working, create a new key in Mail → Settings → Agents and swap it into the agent's MCP client. If it no longer needs access, do nothing: the key lapses on its own.",
     ],
-    button: "Open Correio agents",
+    button: "Open Mail agents",
     muted: ["You get this notice once per key, about 7 days before it expires."],
   },
   "content.access_notice": {

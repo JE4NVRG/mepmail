@@ -1,4 +1,5 @@
-export const AD_POLICY_VERSION = "meta-ads-v1" as const;
+// Mirrors ADVERTISING_POLICY_VERSION in @millionsend/billing.
+export const AD_POLICY_VERSION = "ads-v2" as const;
 export type AdConsentState = "unknown" | "accepted" | "denied";
 export interface AdConsentSnapshot {
   state: AdConsentState;

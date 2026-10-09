@@ -1,6 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
-export const ADVERTISING_POLICY_VERSION = "meta-ads-v1";
+// v2 adds Google Analytics: consent given for Meta alone is asked again.
+export const ADVERTISING_POLICY_VERSION = "ads-v2";
 export const ADVERTISING_CONSENT_COOKIE = "mm_ads_consent";
 export const ADVERTISING_CONSENT_MAX_AGE = 90 * 24 * 60 * 60;
 export type AdvertisingConsentState = "unknown" | "accepted" | "denied";

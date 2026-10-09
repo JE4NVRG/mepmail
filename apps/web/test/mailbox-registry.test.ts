@@ -363,6 +363,47 @@ describe("authenticated persistent mailbox registry", () => {
       box({ localPart: "control", signatureText: "bad\u0000text" }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
+  it("adds, lists and removes aliases on the mailbox's own domain, admin-only and conflict-safe", async () => {
+    const id = await box();
+    const other = await box({ localPart: "julia", ownerUserId: "member" });
+    const added = await as().mailboxes.addAlias({ mailboxId: id, localPart: " Support " });
+    expect(added).toMatchObject({ address: "support@piloto.test", receiving: "not_configured" });
+    expect(await as().mailboxes.aliases({ mailboxId: id })).toMatchObject([
+      { id: added.id, mailboxId: id, address: "support@piloto.test" },
+    ]);
+    // Taken by another alias, by a mailbox, or the box's own address.
+    await expect(
+      as().mailboxes.addAlias({ mailboxId: other, localPart: "support" }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(
+      as().mailboxes.addAlias({ mailboxId: id, localPart: "julia" }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(
+      as().mailboxes.addAlias({ mailboxId: id, localPart: "jean" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(
+      as().mailboxes.addAlias({ mailboxId: id, localPart: "bad local" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    // A mailbox can never claim an address an alias holds.
+    await expect(box({ localPart: "support" })).rejects.toMatchObject({ code: "CONFLICT" });
+    // Members and other teams cannot manage aliases.
+    await expect(
+      as("member", team, "member").mailboxes.addAlias({ mailboxId: id, localPart: "sales" }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      as("outsider", otherTeam).mailboxes.addAlias({ mailboxId: id, localPart: "sales" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(
+      as("outsider", otherTeam).mailboxes.removeAlias({ id: added.id }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(await as().mailboxes.removeAlias({ id: added.id })).toEqual({ id: added.id });
+    expect(await as().mailboxes.aliases({ mailboxId: id })).toEqual([]);
+    expect(await box({ localPart: "support" })).toBeTruthy();
+    const actions = (await db.select().from(schema.auditLog)).map((row) => row.action);
+    expect(actions).toEqual(
+      expect.arrayContaining(["mailbox.alias_added", "mailbox.alias_removed"]),
+    );
+  });
   it("uses an idempotent independent mailbox migration ledger alongside the current Main schema", async () => {
     await box();
     await migrate(drizzle(client), {
@@ -380,7 +421,7 @@ describe("authenticated persistent mailbox registry", () => {
     expect((await db.select().from(schema.mailboxes)).length).toBe(1);
     expect(
       (await client.query("select count(*) as count from drizzle.__mailbox_migrations")).rows[0],
-    ).toMatchObject({ count: 20 });
+    ).toMatchObject({ count: 21 });
     expect(
       (await client.query("select to_regclass('drizzle.__drizzle_migrations') as ledger")).rows[0],
     ).toMatchObject({ ledger: null });

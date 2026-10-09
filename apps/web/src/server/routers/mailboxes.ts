@@ -5,6 +5,7 @@ import {
 } from "@millionsend/billing";
 import { env } from "@millionsend/config";
 import {
+  addMailboxAlias,
   appendMailboxActivity,
   archiveMailboxFolder,
   createMailboxAgentKey,
@@ -16,6 +17,7 @@ import {
   grantMailboxRegistry,
   listMailboxActivity,
   listMailboxAgentKeys,
+  listMailboxAliases,
   listMailboxFolders,
   listMailboxRegistry,
   listMailboxTeamAgentKeys,
@@ -25,6 +27,7 @@ import {
   MailboxServiceError,
   mailboxServiceState,
   queueMailboxDraft,
+  removeMailboxAlias,
   revokeMailboxAgentKey,
   revokeMailboxRegistry,
   revokeMailboxTeamAgentKey,
@@ -957,4 +960,40 @@ export const mailboxesRouter = router({
     });
     return row;
   }),
+  // Aliases: extra addresses that deliver into one mailbox on its own domain.
+  aliases: enabled
+    .input(z.object({ mailboxId: z.uuid() }).strict())
+    .query(({ ctx, input }) => call(() => listMailboxAliases(ctx.db, actor(ctx), input.mailboxId))),
+  addAlias: enabled
+    .input(z.object({ mailboxId: z.uuid(), localPart: z.string().min(1).max(64) }).strict())
+    .mutation(async ({ ctx, input }) => {
+      const row = await call(() => addMailboxAlias(ctx.db, actor(ctx), input));
+      await recordAudit(ctx, {
+        action: "mailbox.alias_added",
+        target: { type: "mailbox", id: row.mailboxId },
+        metadata: { aliasId: row.id },
+      });
+      // Where the domain already receives, list the alias in the SES rules now.
+      let receiving: string = "unknown";
+      try {
+        receiving = (await activateMailboxReceiving(ctx.db, actor(ctx), row.domainId)).state;
+      } catch (error) {
+        console.warn(
+          "alias receiving activation deferred",
+          error instanceof Error ? error.message : error,
+        );
+      }
+      return { id: row.id, address: row.address, receiving };
+    }),
+  removeAlias: enabled
+    .input(z.object({ id: z.uuid() }).strict())
+    .mutation(async ({ ctx, input }) => {
+      const row = await call(() => removeMailboxAlias(ctx.db, actor(ctx), input));
+      await recordAudit(ctx, {
+        action: "mailbox.alias_removed",
+        target: { type: "mailbox", id: row.mailboxId },
+        metadata: { aliasId: row.id },
+      });
+      return { id: row.id };
+    }),
 });

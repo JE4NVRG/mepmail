@@ -106,7 +106,7 @@
       {
         "kind": "Send · MCP",
         "title": "Your agent in Send",
-        "body": "The MepMail MCP connects compatible clients to Send, through hosted OAuth or the official local package. With the mailbox permissions it also lists and creates mailboxes and agent keys, without reading their content.",
+        "body": "The MepMail MCP connects compatible clients to Send, through hosted OAuth or the official local package. With the mail permissions it also reads and drafts in the inboxes you tick when you connect it, with no key to paste.",
         "status": "Available",
         "link": "Explore the Send MCP",
         "path": "/mcp"
@@ -114,7 +114,7 @@
       {
         "kind": "Mail · MCP",
         "title": "Your agent inside the mailbox",
-        "body": "The Correio MCP gives the agent its own mailbox as tools: list, read, draft and send. Without the send permission it asks for your approval before each send.",
+        "body": "The Mail MCP gives the agent its own inbox as tools: list, read, draft and send. Without the send permission it asks for your approval before each send.",
         "status": "Available for activated mailboxes",
         "link": "Connect over MCP",
         "path": "/mailboxes#connect-an-agent-over-mcp"

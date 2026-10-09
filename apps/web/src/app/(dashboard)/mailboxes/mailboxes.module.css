@@ -502,6 +502,18 @@
   padding-bottom: 10px;
   color: var(--ms-muted);
 }
+/* An alias: the local part, then its fixed @domain. */
+.aliasFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.aliasFields > span {
+  color: var(--ms-muted);
+  overflow-wrap: anywhere;
+}
 .kind {
   display: flex;
   gap: 8px;

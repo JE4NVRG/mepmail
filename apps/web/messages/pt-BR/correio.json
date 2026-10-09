@@ -106,7 +106,7 @@
       {
         "kind": "Envio · MCP",
         "title": "Seu agente no Envio",
-        "body": "O MCP do MepMail conecta clientes compatíveis ao Envio, por OAuth hospedado ou pelo pacote local oficial. Com as permissões de caixas, ele também lista e cria caixas e chaves de agente, sem ler o conteúdo delas.",
+        "body": "O MCP do MepMail conecta clientes compatíveis ao Envio, por OAuth hospedado ou pelo pacote local oficial. Com as permissões de e-mail, ele também lê e rascunha nas caixas que você marcar ao conectar, sem chave para colar.",
         "status": "Disponível",
         "link": "Conhecer o MCP de Envio",
         "path": "/mcp"

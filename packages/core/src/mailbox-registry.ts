@@ -205,6 +205,12 @@ export async function createMailboxRegistry(
     );
     const address = local + "@" + domain.name.toLowerCase();
     if (address.length > 254) throw new MailboxRegistryError("invalid");
+    // An alias holds the address: still a plain conflict, never which team.
+    const [alias] = await tx
+      .select({ id: schema.mailboxAliases.id })
+      .from(schema.mailboxAliases)
+      .where(eq(schema.mailboxAliases.address, address));
+    if (alias) throw new MailboxRegistryError("conflict");
     const [row] = await tx
       .insert(schema.mailboxes)
       .values({

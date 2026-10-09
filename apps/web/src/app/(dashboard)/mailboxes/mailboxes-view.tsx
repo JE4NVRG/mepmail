@@ -12,6 +12,7 @@ import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { MailboxActivityDialog } from "./mailbox-activity";
 import { MailboxAgentKeysDialog } from "./mailbox-agent-keys";
+import { MailboxAliasesSection } from "./mailbox-aliases-section";
 import {
   MAIL_DRAG_TYPE,
   MailboxContentView,
@@ -349,6 +350,7 @@ function RegistryDialog({
           </form>
         </section>
       ) : null}
+      {mailbox && mailbox.status === "planned" ? <MailboxAliasesSection mailbox={mailbox} /> : null}
     </dialog>
   );
 }

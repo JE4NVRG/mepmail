@@ -417,6 +417,14 @@ export {
   withMailboxAgentAccess,
 } from "./mailbox-agent-access.js";
 export {
+  addMailboxAlias,
+  listMailboxAliases,
+  MAX_ALIASES_PER_MAILBOX,
+  type MailboxAlias,
+  mailboxAliasAddresses,
+  removeMailboxAlias,
+} from "./mailbox-aliases.js";
+export {
   assessMailboxReceipt,
   type MailboxInboundAssessment,
   type MailboxSafetyReason,

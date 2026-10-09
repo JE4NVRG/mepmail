@@ -97,7 +97,7 @@
   },
   "privacy": {
     "title": "Privacy Policy",
-    "updated": "Last updated: October 3, 2026",
+    "updated": "Last updated: October 9, 2026",
     "intro": "This policy explains what data MepMail collects, how it is used, and the choices you have. We keep it short on purpose: collect little, encrypt the sensitive parts, and name our subprocessors.",
     "sections": [
       {
@@ -120,7 +120,7 @@
           "Sending data: sending domains, contacts you upload, suppressions, and message metadata (recipient, subject, status, events).",
           "Message content: the HTML/text you send, stored encrypted at rest, processed to deliver the message.",
           "Technical data: IP address, user agent, session cookies and application logs.",
-          "Optional advertising measurement: public pages visited, Meta cookie and click identifiers, and paid-plan checkout and initial-purchase events with their value and currency. We do not send names, email addresses, phone numbers, contacts, recipients, or message content for this purpose."
+          "Optional advertising measurement: public pages visited, Meta and Google cookie and click identifiers, clicks to create an account, and paid-plan checkout and initial-purchase events with their value and currency. We do not send names, email addresses, phone numbers, contacts, recipients, or message content for this purpose."
         ]
       },
       {
@@ -143,7 +143,7 @@
         "title": "5. Subprocessors",
         "body": [
           "We use a deliberately short list of providers to run the service:",
-          "If you allow advertising measurement, Meta receives the optional events described in this policy. Pixel connections also provide Meta with your IP address and browser information. Meta processes this data under its own privacy policy; measurement is not required to use MepMail."
+          "If you allow advertising measurement, Meta and Google receive the optional events described in this policy: Meta through its Pixel and purchase events, Google through Google Analytics on public pages. These connections also provide your IP address and browser information. Each company processes this data under its own privacy policy. We do not turn on Google signals or ad personalization, and measurement is not required to use MepMail."
         ],
         "list": [
           "Amazon Web Services (Amazon SES) — email delivery and event notifications. Message content and metadata pass through it for delivery.",
@@ -155,7 +155,7 @@
         "title": "6. Retention",
         "body": [
           "Account and sending data are kept while your account is active. After you delete your account, we remove personal data within 30 days, except where retention is required (for example, billing records kept for tax and accounting obligations) or where limited delivery logs are needed for security. Aggregated, non-identifying statistics may be kept.",
-          "You can withdraw advertising permission through the footer link. Withdrawal stops new transmissions and cancels pending events; it does not erase events already received by Meta. We do not send events from before your permission."
+          "You can withdraw advertising permission through the footer link. Withdrawal stops new transmissions and cancels pending events; it does not erase events already received by Meta or Google. We do not send events from before your permission."
         ]
       },
       {
@@ -179,7 +179,7 @@
       {
         "title": "10. Cookies",
         "body": [
-          "Essential cookies maintain your session, language, and advertising preference. Optional Meta cookies, such as _fbp and _fbc, are used only after you allow measurement. The initial state has no permission; declining or withdrawing keeps the service working. Use “Advertising preferences” in the footer to review your choice. Measurement is limited to public offer pages and confirmed checkout and payment events, without dashboard or mailbox content."
+          "Essential cookies maintain your session, language, and advertising preference. Optional Meta cookies, such as _fbp and _fbc, and Google cookies, such as _ga and _gcl_aw, are used only after you allow measurement. The initial state has no permission; declining or withdrawing keeps the service working. Use “Advertising preferences” in the footer to review your choice. Measurement is limited to public offer pages and confirmed checkout and payment events, without dashboard or mailbox content."
         ]
       },
       {

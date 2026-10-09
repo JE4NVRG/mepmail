@@ -536,6 +536,24 @@ export async function receiveMailboxMime(
   const sourceId = `ingress:${hash(input.sourceId)}`;
   return db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
+    // Each RCPT resolves to one mailbox, by its own address or by an alias of it;
+    // a mailbox reached through several of them receives the message once.
+    const direct = await tx
+      .select({ id: schema.mailboxes.id, address: schema.mailboxes.address })
+      .from(schema.mailboxes)
+      .where(inArray(schema.mailboxes.address, recipients));
+    const aliased = await tx
+      .select({
+        mailboxId: schema.mailboxAliases.mailboxId,
+        address: schema.mailboxAliases.address,
+      })
+      .from(schema.mailboxAliases)
+      .where(inArray(schema.mailboxAliases.address, recipients));
+    const resolved = new Map<string, string>(direct.map((box) => [box.address, box.id]));
+    for (const alias of aliased)
+      if (!resolved.has(alias.address)) resolved.set(alias.address, alias.mailboxId);
+    if (resolved.size !== recipients.length) throw new MailboxContentError("not_found");
+    const targets = [...new Set(resolved.values())];
     const boxes = await tx
       .select({
         id: schema.mailboxes.id,
@@ -543,9 +561,9 @@ export async function receiveMailboxMime(
         address: schema.mailboxes.address,
       })
       .from(schema.mailboxes)
-      .where(inArray(schema.mailboxes.address, recipients))
+      .where(inArray(schema.mailboxes.id, targets))
       .orderBy(asc(schema.mailboxes.teamId), asc(schema.mailboxes.id));
-    if (boxes.length !== recipients.length) throw new MailboxContentError("not_found");
+    if (boxes.length !== targets.length) throw new MailboxContentError("not_found");
     // No membership is needed for trusted ingress. Lock subscriptions by team
     // before any box so cross-team fanout cannot reverse the mutation order.
     const plans = new Map<string, Awaited<ReturnType<typeof lockMailboxService>>>();

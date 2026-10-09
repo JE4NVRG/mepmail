@@ -16,6 +16,7 @@ export * from "./idempotency.js";
 export * from "./instance-probes.js";
 export * from "./instance-settings.js";
 export * from "./mailbox-agent-keys.js";
+export * from "./mailbox-aliases.js";
 export * from "./mailbox-checkouts.js";
 export * from "./mailbox-customer-requests.js";
 export * from "./mailbox-folders.js";

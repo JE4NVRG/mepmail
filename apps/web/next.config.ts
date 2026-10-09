@@ -56,16 +56,33 @@ const config: NextConfig = {
       "frame-ancestors 'none'",
       "form-action 'self'",
     ].join("; ");
-    // The optional Pixel is confined to public offer documents. A new document
-    // is required when leaving those routes after its SDK has loaded.
+    // The optional Pixel and Google tag are confined to public offer documents.
+    // A new document is required when leaving those routes after a tag has loaded.
     const publicMetaEnabled =
       process.env.NEXT_PUBLIC_META_PIXEL_ENABLED === "true" &&
       /^[0-9]{5,30}$/.test(process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "");
+    // Keep in sync with GOOGLE_TAG_ID in src/lib/google-public-events.ts.
+    const publicGoogleEnabled = process.env.NEXT_PUBLIC_GOOGLE_TAG_ENABLED === "true";
+    const publicScripts = [
+      ...(publicMetaEnabled ? ["https://connect.facebook.net"] : []),
+      ...(publicGoogleEnabled ? ["https://www.googletagmanager.com"] : []),
+    ];
+    // GA4 collects on the regional *.google-analytics.com and *.analytics.google.com hosts.
+    const publicConnections = [
+      ...(publicMetaEnabled ? ["https://www.facebook.com"] : []),
+      ...(publicGoogleEnabled
+        ? [
+            "https://*.google-analytics.com",
+            "https://*.analytics.google.com",
+            "https://*.googletagmanager.com",
+          ]
+        : []),
+    ];
     const publicContentSecurityPolicy = contentSecurityPolicy
-      .replace(scriptPolicy, `${scriptPolicy} https://connect.facebook.net`)
+      .replace(scriptPolicy, [scriptPolicy, ...publicScripts].join(" "))
       .replace(
         `connect-src 'self' ${UMAMI_ORIGIN}`,
-        `connect-src 'self' ${UMAMI_ORIGIN} https://www.facebook.com`,
+        [`connect-src 'self' ${UMAMI_ORIGIN}`, ...publicConnections].join(" "),
       );
     const supportContentSecurityPolicy = contentSecurityPolicy
       .replace(scriptPolicy, `${scriptPolicy} ${ELOZI_ORIGIN}`)
@@ -101,7 +118,7 @@ const config: NextConfig = {
         source: "/support",
         headers: [{ key: "Content-Security-Policy", value: supportContentSecurityPolicy }],
       },
-      ...(publicMetaEnabled
+      ...(publicMetaEnabled || publicGoogleEnabled
         ? // Mirrors META_PUBLIC_PATHS in src/lib/meta-public-events.ts.
           ["/", "/pricing", "/correio"].map((source) => ({
             source,

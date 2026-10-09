@@ -359,6 +359,29 @@ describe("explicit licensed receiving activation", () => {
       "seat_not_licensed",
     );
   });
+  it("lists a licensed box's aliases in the SES rule as soon as they are added", async () => {
+    await verify();
+    const added = await as().addAlias({ mailboxId: second, localPart: "help" });
+    expect(added).toMatchObject({ address: `help@${domainName}`, receiving: "confirmed" });
+    expect(currentRule.Recipients).toEqual(
+      [
+        `first@${domainName}`,
+        `help@${domainName}`,
+        `second@${domainName}`,
+        "support@existing.invalid",
+      ].sort(),
+    );
+    expect(commands.filter(isUpdate)).toHaveLength(2);
+    // An alias of a box without a licensed seat waits with its box.
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({ seats: 1 })
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+    await as().addAlias({ mailboxId: second, localPart: "sales" });
+    await verify();
+    expect(currentRule.Recipients).not.toContain(`sales@${domainName}`);
+    expect(commands.filter(isUpdate)).toHaveLength(2);
+  });
   it("rejects boxes whose owner membership is no longer current", async () => {
     await db
       .update(schema.mailboxes)

@@ -48,17 +48,17 @@ const request = (body: unknown, extra: Record<string, string> = {}) =>
 describe("advertising consent API contract", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.read.mockResolvedValue({ state: "unknown", policyVersion: "meta-ads-v1" });
+    mocks.read.mockResolvedValue({ state: "unknown", policyVersion: "ads-v2" });
     mocks.save.mockResolvedValue({
       state: "accepted",
-      policyVersion: "meta-ads-v1",
+      policyVersion: "ads-v2",
       proof: newConsentProof(),
     });
     mocks.session.mockResolvedValue(null);
   });
   it("GET absent proof exposes only unknown and does not set cookie/write", async () => {
     const response = await GET(new Request("https://mepmail.dev/api/advertising-consent"));
-    expect(await response.json()).toEqual({ state: "unknown", policyVersion: "meta-ads-v1" });
+    expect(await response.json()).toEqual({ state: "unknown", policyVersion: "ads-v2" });
     expect(response.headers.get("set-cookie")).toBeNull();
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(mocks.save).not.toHaveBeenCalled();
@@ -68,12 +68,12 @@ describe("advertising consent API contract", () => {
     mocks.session.mockResolvedValue({ user: { id: "user_server" } });
     const response = await POST(
       request(
-        { granted: true, policyVersion: "meta-ads-v1" },
+        { granted: true, policyVersion: "ads-v2" },
         { referer: "https://mepmail.dev/pricing" },
       ),
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ state: "accepted", policyVersion: "meta-ads-v1" });
+    expect(await response.json()).toEqual({ state: "accepted", policyVersion: "ads-v2" });
     expect(mocks.save).toHaveBeenCalledWith(mocks.db, {
       granted: true,
       proof: null,
@@ -86,27 +86,27 @@ describe("advertising consent API contract", () => {
   });
   it("anonymous withdrawal uses signed proof without needing an auth session", async () => {
     const proof = newConsentProof();
-    mocks.save.mockResolvedValue({ state: "denied", policyVersion: "meta-ads-v1", proof });
+    mocks.save.mockResolvedValue({ state: "denied", policyVersion: "ads-v2", proof });
     mocks.session.mockRejectedValue(new Error("auth-unavailable"));
     const response = await POST(
       request(
-        { granted: false, policyVersion: "meta-ads-v1" },
+        { granted: false, policyVersion: "ads-v2" },
         { cookie: `mm_ads_consent=${encodeConsentProof(proof, "offline-auth-secret")}` },
       ),
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ state: "denied", policyVersion: "meta-ads-v1" });
+    expect(await response.json()).toEqual({ state: "denied", policyVersion: "ads-v2" });
     expect(mocks.session).not.toHaveBeenCalled();
     expect(mocks.save.mock.calls[0]?.[1]).toMatchObject({ granted: false, proof, userId: null });
   });
   it.each([
     [{ granted: true, policyVersion: "old" }, {}, 400],
-    [{ granted: "true", policyVersion: "meta-ads-v1" }, {}, 400],
-    [{ granted: true, policyVersion: "meta-ads-v1", receiptId: "fake" }, {}, 400],
-    [{ granted: true, policyVersion: "meta-ads-v1" }, { origin: "https://attacker.invalid" }, 403],
-    [{ granted: true, policyVersion: "meta-ads-v1" }, { "sec-fetch-site": "cross-site" }, 403],
-    [{ granted: true, policyVersion: "meta-ads-v1" }, { "content-type": "text/plain" }, 415],
-    [{ granted: true, policyVersion: "meta-ads-v1", padding: "x".repeat(300) }, {}, 413],
+    [{ granted: "true", policyVersion: "ads-v2" }, {}, 400],
+    [{ granted: true, policyVersion: "ads-v2", receiptId: "fake" }, {}, 400],
+    [{ granted: true, policyVersion: "ads-v2" }, { origin: "https://attacker.invalid" }, 403],
+    [{ granted: true, policyVersion: "ads-v2" }, { "sec-fetch-site": "cross-site" }, 403],
+    [{ granted: true, policyVersion: "ads-v2" }, { "content-type": "text/plain" }, 415],
+    [{ granted: true, policyVersion: "ads-v2", padding: "x".repeat(300) }, {}, 413],
   ] as const)(
     "rejects invalid choice/origin/oversize without persistence",
     async (body, headers, status) => {
@@ -118,7 +118,7 @@ describe("advertising consent API contract", () => {
   );
   it("storage errors fail closed with a public unknown response", async () => {
     mocks.save.mockRejectedValue(new Error("private-dsn-not-for-response"));
-    const response = await POST(request({ granted: true, policyVersion: "meta-ads-v1" }));
+    const response = await POST(request({ granted: true, policyVersion: "ads-v2" }));
     expect(response.status).toBe(503);
     expect(await response.text()).not.toContain("private");
     expect(response.headers.get("set-cookie")).toBeNull();

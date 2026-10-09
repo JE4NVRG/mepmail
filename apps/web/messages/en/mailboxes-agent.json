@@ -89,7 +89,7 @@
     "running": "Testing…",
     "ok": "Connected in {ms} ms: {count, plural, =0 {no mailbox open right now} one {# mailbox open} other {# mailboxes open}}.",
     "rejected": "The key was refused: check that it was copied whole and has not been revoked or expired.",
-    "unreachable": "The Correio endpoint did not answer. Try again in a few seconds.",
+    "unreachable": "The Mail endpoint did not answer. Try again in a few seconds.",
     "unexpected": "The endpoint answered in an unexpected way. Try again; if it keeps happening, contact support.",
     "unavailable": "unavailable right now (mailbox suspended or owned by someone else)",
     "scope": {
