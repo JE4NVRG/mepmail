@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-forget-agent-key"
+description = "Enables the forget_agent_key command without any pre-configured scope."
+commands.allow = ["forget_agent_key"]
+
+[[permission]]
+identifier = "deny-forget-agent-key"
+description = "Denies the forget_agent_key command without any pre-configured scope."
+commands.deny = ["forget_agent_key"]

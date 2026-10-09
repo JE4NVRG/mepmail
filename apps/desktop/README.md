@@ -27,6 +27,36 @@ WebView2. The same shell is the base for macOS, Linux, iOS and Android.
 - Dark title bar, black background behind the page (no white flash),
   Ctrl +/- zoom.
 
+## What 0.2 adds
+
+- Tray menu: "Iniciar com o Windows" (autostart plugin, the entry launches the
+  app with `--minimized`, which keeps the window in the tray) and "Manter na
+  bandeja ao fechar" (the X hides the window; "Sair" quits). Preferences live
+  in `%APPDATA%\dev.mepmail.correio\settings.json`.
+- Unread badge: the hosted app mirrors "(N) Correio · MepMail" into the window
+  title; the shell reads it every 3 s and shows a taskbar overlay dot plus a
+  tray tooltip "N não lidas".
+- `mepmail://` deep links: `mepmail://mail[/path?query]` and `mepmail://open`
+  bring the window to that page (installer registers the scheme; a debug build
+  registers it itself). A second launch with a link hands it to the running
+  instance.
+- Agents bridge: `mepmail-correio.exe --mcp --mailbox <id>` is a stdio MCP
+  server that forwards every JSON-RPC message to
+  `https://api.mepmail.dev/mcp/correio` with the mailbox's `mmb_` key from the
+  Windows credential vault (`MEPMAIL_AGENT_KEY` overrides it, for tests;
+  `MEPMAIL_CORREIO_MCP_URL` overrides the endpoint). Session id, SSE answers
+  and 202 notifications are handled; errors come back as JSON-RPC errors.
+- Agent commands the hosted page may call through the IPC:
+  `store_agent_key(mailboxId, token)`, `has_agent_key(mailboxId)`,
+  `forget_agent_key(mailboxId)` and `install_agent(target, mailboxId,
+  serverName?)` with targets `claude-desktop` (writes
+  `%APPDATA%\Claude\claude_desktop_config.json`), `cursor`
+  (`~/.cursor/mcp.json`), `claude-code` (`claude mcp add … -- <exe> --mcp
+  --mailbox <id>`) and `codex` (`codex mcp add …`). Every entry points at this
+  executable; no key is written anywhere. The commands are declared in
+  `build.rs` (`AppManifest::commands`), which is what lets the capability
+  grant them to the remote origin as `allow-<command>`.
+
 ## Layout
 
 - `src/`: the splash page. Static HTML, CSS and JS, no build step.
@@ -67,7 +97,8 @@ lockfile and a Rust toolchain the server build does not need.
 | `npm run dev` | Debug build, opens the window. The first build takes a few minutes. |
 | `npm run build` | Release build plus the NSIS installer in `src-tauri/target/release/bundle/nsis/`. |
 | `npm run build:exe` | Release executable only, in `src-tauri/target/release/`. |
-| `cargo test` (in `src-tauri`) | Tests of the navigation guard. |
+| `cargo test` (in `src-tauri`) | Unit tests: navigation guard, deep-link routing, badge parsing, SSE parsing, agent config merge. |
+| `node <scratch>/bridge-test.mjs <exe>` | Drives `--mcp` against a fake MCP server (auth, session, JSON, SSE, 202, 4xx). |
 | `npm run icons` | Regenerates the icons from the brand SVG. |
 
 ## First-run checklist

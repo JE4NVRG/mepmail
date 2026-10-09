@@ -1,17 +1,25 @@
 //! MepMail Correio for the desktop.
 //!
-//! Version 0.1 is a native shell around the hosted Correio app. The window
-//! opens on a bundled splash page (`src/index.html`) that checks mepmail.dev
-//! answers and then loads <https://mepmail.dev/mail>. The shell adds what a
-//! browser tab cannot: a single instance, a tray icon, remembered window
-//! placement, links outside MepMail opened in the system browser, and a
-//! `window.__MEPMAIL_DESKTOP__` marker the web app can read.
+//! A native shell around the hosted Correio app. The window opens on a
+//! bundled splash page (`src/index.html`) that checks mepmail.dev answers and
+//! then loads <https://mepmail.dev/mail>. The shell adds what a browser tab
+//! cannot: a single instance, a tray icon with start-with-Windows and
+//! keep-in-tray, an unread badge, `mepmail://` deep links, links outside
+//! MepMail opened in the system browser, a `window.__MEPMAIL_DESKTOP__`
+//! marker the web app reads, and the agents bridge (`bridge`, `agents`).
+
+mod agents;
+mod badge;
+pub mod bridge;
+mod deeplink;
+mod settings;
+mod tray;
+
+use std::sync::Mutex;
 
 use tauri::{
-    menu::{Menu, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     webview::{Color, NewWindowResponse, PageLoadEvent},
-    AppHandle, Manager, Runtime, Theme, Url, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Manager, Runtime, Theme, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_opener::OpenerExt;
 
@@ -36,12 +44,22 @@ const SIGN_IN_HOSTS: &[&str] = &[
     "myaccount.google.com",
 ];
 
+/// `--minimized` (the autostart entry): the window stays hidden in the tray
+/// until the user asks for it.
+struct StartHidden(bool);
+
 fn is_in_app_host(host: &str) -> bool {
     IN_APP_HOSTS.contains(&host)
 }
 
 fn is_sign_in_host(host: &str) -> bool {
     SIGN_IN_HOSTS.contains(&host)
+}
+
+pub(crate) fn is_portuguese() -> bool {
+    sys_locale::get_locale()
+        .map(|locale| locale.to_ascii_lowercase().starts_with("pt"))
+        .unwrap_or(false)
 }
 
 /// Whether the main webview may navigate to `url` itself (a link, a redirect,
@@ -95,7 +113,7 @@ fn open_outside<R: Runtime>(handle: &AppHandle<R>, url: Url) {
 }
 
 /// Loads `url` in the main window, off the webview callback that asked for it.
-fn navigate_main<R: Runtime>(handle: &AppHandle<R>, url: Url) {
+pub(crate) fn navigate_main<R: Runtime>(handle: &AppHandle<R>, url: Url) {
     let handle = handle.clone();
     let _ = tauri::async_runtime::spawn(async move {
         if let Some(window) = handle.get_webview_window(MAIN_WINDOW) {
@@ -106,8 +124,8 @@ fn navigate_main<R: Runtime>(handle: &AppHandle<R>, url: Url) {
     });
 }
 
-/// Brings the main window to the front (tray click, second launch).
-fn show_main<R: Runtime>(handle: &AppHandle<R>) {
+/// Brings the main window to the front (tray click, second launch, deep link).
+pub(crate) fn show_main<R: Runtime>(handle: &AppHandle<R>) {
     if let Some(window) = handle.get_webview_window(MAIN_WINDOW) {
         let _ = window.unminimize();
         let _ = window.show();
@@ -117,8 +135,8 @@ fn show_main<R: Runtime>(handle: &AppHandle<R>) {
 
 /// Script injected before every document the webview loads, the hosted app
 /// included. It marks the page as running inside the desktop shell so the
-/// web app can adapt (hide "back to the dashboard", send native
-/// notifications) without sniffing the user agent.
+/// web app can adapt (native title, notifications, agent setup) without
+/// sniffing the user agent.
 fn bridge_script() -> String {
     format!(
         r#"(() => {{
@@ -148,59 +166,6 @@ fn bridge_script() -> String {
         version = env!("CARGO_PKG_VERSION"),
         platform = std::env::consts::OS,
     )
-}
-
-struct TrayStrings {
-    open: &'static str,
-    quit: &'static str,
-}
-
-fn tray_strings() -> TrayStrings {
-    let portuguese = sys_locale::get_locale()
-        .map(|locale| locale.to_ascii_lowercase().starts_with("pt"))
-        .unwrap_or(false);
-    if portuguese {
-        TrayStrings {
-            open: "Abrir Correio",
-            quit: "Sair",
-        }
-    } else {
-        TrayStrings {
-            open: "Open Correio",
-            quit: "Quit",
-        }
-    }
-}
-
-fn build_tray<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
-    let strings = tray_strings();
-    let open = MenuItem::with_id(app, "open", strings.open, true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", strings.quit, true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &quit])?;
-    let mut tray = TrayIconBuilder::new()
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .tooltip("MepMail Correio")
-        .on_menu_event(|handle, event| match event.id.as_ref() {
-            "open" => show_main(handle),
-            "quit" => handle.exit(0),
-            _ => {}
-        })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                show_main(tray.app_handle());
-            }
-        });
-    if let Some(icon) = app.default_window_icon() {
-        tray = tray.icon(icon.clone());
-    }
-    tray.build(app)?;
-    Ok(())
 }
 
 fn build_main_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
@@ -242,6 +207,18 @@ fn build_main_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
             }
         })
         .build()?;
+    // "Keep in the tray on close": the X hides the window; Quit in the tray exits.
+    let close_handle = app.handle().clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { api, .. } = event {
+            if settings::current(&close_handle).keep_in_tray {
+                api.prevent_close();
+                if let Some(window) = close_handle.get_webview_window(MAIN_WINDOW) {
+                    let _ = window.hide();
+                }
+            }
+        }
+    });
     // Safety net: if the splash never reports a finished load, the window
     // still appears instead of leaving a process without a window.
     let window = window.clone();
@@ -252,9 +229,15 @@ fn build_main_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Shows and focuses a window that is still hidden; a no-op once visible.
+/// Shows and focuses a window that is still hidden; a no-op once visible or
+/// when the app was started minimized to the tray.
 fn reveal<R: Runtime>(window: &tauri::WebviewWindow<R>) {
-    if window.is_visible().unwrap_or(true) {
+    let start_hidden = window
+        .app_handle()
+        .try_state::<StartHidden>()
+        .map(|state| state.0)
+        .unwrap_or(false);
+    if start_hidden || window.is_visible().unwrap_or(true) {
         return;
     }
     let _ = window.show();
@@ -263,11 +246,12 @@ fn reveal<R: Runtime>(window: &tauri::WebviewWindow<R>) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let start_hidden = std::env::args().any(|arg| arg == "--minimized");
     let mut builder = tauri::Builder::default();
     #[cfg(desktop)]
     {
         // Registered first, as its documentation asks: a second launch only
-        // focuses the running window.
+        // focuses the running window (and hands its deep link over).
         builder = builder
             .plugin(tauri_plugin_single_instance::init(|handle, _args, _cwd| {
                 show_main(handle);
@@ -281,15 +265,35 @@ pub fn run() {
                             & !tauri_plugin_window_state::StateFlags::VISIBLE,
                     )
                     .build(),
+            )
+            .plugin(
+                tauri_plugin_autostart::Builder::new()
+                    .args(["--minimized"])
+                    .build(),
             );
     }
     builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_deep_link::init())
+        .manage(StartHidden(start_hidden))
+        .invoke_handler(tauri::generate_handler![
+            agents::store_agent_key,
+            agents::has_agent_key,
+            agents::forget_agent_key,
+            agents::install_agent,
+        ])
         .setup(|app| {
+            app.manage(settings::SettingsState(Mutex::new(settings::load(
+                app.handle(),
+            ))));
             build_main_window(app)?;
             #[cfg(desktop)]
-            build_tray(app)?;
+            {
+                tray::build(app)?;
+                deeplink::install(app)?;
+                badge::watch(app.handle().clone());
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
