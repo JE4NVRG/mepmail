@@ -28,6 +28,27 @@
   },
   "releases": [
     {
+      "version": "0.68",
+      "date": "2026-10-09",
+      "title": "Desfazer e filtro de não lidas no Correio",
+      "summary": "Arquivou ou apagou sem querer? Agora dá para desfazer. E um clique mostra só as não lidas.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "\"Desfazer\" aparece por alguns segundos depois de arquivar ou mandar para a lixeira, uma ou várias mensagens. O atalho é Z.",
+            "Botão \"Não lidas\" na Entrada mostra só as mensagens que você ainda não abriu."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Mandar uma mensagem para a lixeira mantém você na pasta em que estava."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.67",
       "date": "2026-10-09",
       "title": "Atalhos de teclado no Correio",

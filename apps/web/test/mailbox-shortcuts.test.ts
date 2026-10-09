@@ -27,6 +27,7 @@ describe("Correio keyboard shortcuts", () => {
     expect(mailboxShortcut(press("c"), null)).toBe("compose");
     expect(mailboxShortcut(press("/"), null)).toBe("search");
     expect(mailboxShortcut(press("?"), null)).toBe("help");
+    expect(mailboxShortcut(press("z"), null)).toBe("undo");
   });
 
   it("leaves typing, modifiers, repeats and dialogs alone", () => {

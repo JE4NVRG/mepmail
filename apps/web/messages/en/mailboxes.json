@@ -369,6 +369,9 @@
   "favorites": "Favorites",
   "custom": "Folder",
   "organization": {
+    "undo": "Undo",
+    "undone": "{count, plural, one {Undone} other {Undone for # messages}}",
+    "unreadFilter": "{count, plural, =0 {Unread} other {Unread · #}}",
     "folders": "My folders",
     "chooseBox": "Choose a mailbox to see folders for this person or agent.",
     "emptyFolders": "Organize this mailbox with your own folders.",
@@ -432,6 +435,7 @@
       "star": "Star",
       "unread": "Mark as unread",
       "search": "Search messages",
+      "undo": "Undo the last action",
       "help": "Show these shortcuts"
     }
   },

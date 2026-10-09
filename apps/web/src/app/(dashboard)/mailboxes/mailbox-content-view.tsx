@@ -817,6 +817,13 @@ export function MailboxContentView({
   const attempted = useRef(new Set<string>());
   const [sendStates, setSendStates] = useState<Record<string, SendState>>({});
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  // The last archive/trash can be reversed while its own notice is showing.
+  const [undo, setUndo] = useState<{
+    notice: string;
+    steps: (() => Promise<unknown>)[];
+  } | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   // One window listener reads the current render through this ref.
   const shortcut = useRef<(event: KeyboardEvent) => void>(() => {});
@@ -840,6 +847,15 @@ export function MailboxContentView({
   const readable = boxes.filter((b) => b.canRead && b.status === "planned");
   const rows =
     listing.data?.items.filter((i) => {
+      if (
+        unreadOnly &&
+        !(
+          i.kind === "inbox" &&
+          !mailboxContentBlocked(i) &&
+          (i.seenAt === null || (selection?.id === i.id && selection.mailboxId === i.mailboxId))
+        )
+      )
+        return false;
       const searchable = mailboxContentBlocked(i)
         ? `${i.address} ${i.mailboxLabel}`
         : `${i.subject ?? ""} ${i.from ?? ""} ${i.fromName ?? ""} ${i.to?.join(" ") ?? ""} ${i.snippet ?? ""} ${i.address}`;
@@ -926,6 +942,40 @@ export function MailboxContentView({
   }
   const date = (value: Date) =>
     new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(value);
+  function offerUndo(message: string, steps: (() => Promise<unknown>)[]) {
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    if (!steps.length) {
+      setUndo(null);
+      return;
+    }
+    setUndo({ notice: message, steps });
+    undoTimer.current = setTimeout(() => {
+      if (mounted.current) setUndo(null);
+    }, 10000);
+  }
+  async function runUndo() {
+    const offer = undo;
+    if (!offer || moving.current) return;
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    setUndo(null);
+    moving.current = true;
+    setNotice("");
+    let done = 0;
+    try {
+      for (const step of offer.steps) {
+        await step();
+        done += 1;
+        if (!mounted.current) break;
+      }
+      if (mounted.current) setNotice(t("organization.undone", { count: done }));
+    } catch {
+      if (mounted.current)
+        setNotice(t("organization.bulkPartial", { count: done, total: offer.steps.length }));
+    } finally {
+      moving.current = false;
+      if (mounted.current) void refresh();
+    }
+  }
   async function refresh() {
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.items.queryKey() });
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.item.queryKey() });
@@ -973,6 +1023,8 @@ export function MailboxContentView({
       previousOrganizationScope.current = organizationScope;
       setCheckedIds(new Set());
       setNotice("");
+      setUndo(null);
+      setUnreadOnly(false);
     }
   }, [organizationScope]);
   async function changeStar(row: {
@@ -1084,6 +1136,7 @@ export function MailboxContentView({
    */
   async function organizeRows(targets: Row[], target: MailboxDropTarget) {
     if (moving.current) return;
+    const reversals: (() => Promise<unknown>)[] = [];
     const plan = targets
       .filter(
         (row) =>
@@ -1097,12 +1150,36 @@ export function MailboxContentView({
         switch (target.folder) {
           case "archive":
             return ordinary && row.kind !== "draft" && !row.archivedAt
-              ? [() => archiveMutation.mutateAsync({ ...ref, archived: true })]
+              ? [
+                  async () => {
+                    const done = await archiveMutation.mutateAsync({ ...ref, archived: true });
+                    reversals.push(() =>
+                      archiveMutation.mutateAsync({
+                        mailboxId: ref.mailboxId,
+                        id: ref.id,
+                        expectedRevision: done.revision,
+                        archived: false,
+                      }),
+                    );
+                  },
+                ]
               : [];
           case "trash":
             return row.trashedAt
               ? []
-              : [() => trashMutation.mutateAsync({ ...ref, trashed: true })];
+              : [
+                  async () => {
+                    const done = await trashMutation.mutateAsync({ ...ref, trashed: true });
+                    reversals.push(() =>
+                      trashMutation.mutateAsync({
+                        mailboxId: ref.mailboxId,
+                        id: ref.id,
+                        expectedRevision: done.revision,
+                        trashed: false,
+                      }),
+                    );
+                  },
+                ];
           case "favorites":
             return ordinary && !row.starredAt
               ? [() => starMutation.mutateAsync({ ...ref, starred: true })]
@@ -1148,16 +1225,19 @@ export function MailboxContentView({
         )
           select(null);
         setCheckedIds(new Set());
-        setNotice(
-          t(target.folder === "archive" ? "organization.bulkArchived" : "organization.dropDone", {
-            count: done,
-          }),
+        const message = t(
+          target.folder === "archive" ? "organization.bulkArchived" : "organization.dropDone",
+          { count: done },
         );
+        setNotice(message);
+        offerUndo(message, reversals);
       }
     } catch {
       if (mounted.current) {
         setCheckedIds(new Set());
-        setNotice(t("organization.bulkPartial", { count: done, total: plan.length }));
+        const message = t("organization.bulkPartial", { count: done, total: plan.length });
+        setNotice(message);
+        offerUndo(message, reversals);
       }
     } finally {
       moving.current = false;
@@ -1173,9 +1253,19 @@ export function MailboxContentView({
     moving.current = true;
     setNotice("");
     try {
-      await archiveMutation.mutateAsync({ ...observed, archived });
+      const result = await archiveMutation.mutateAsync({ ...observed, archived });
       if (!mounted.current) return;
-      setNotice(t(archived ? "organization.archived" : "organization.unarchived"));
+      const message = t(archived ? "organization.archived" : "organization.unarchived");
+      setNotice(message);
+      offerUndo(message, [
+        () =>
+          archiveMutation.mutateAsync({
+            mailboxId: observed.mailboxId,
+            id: observed.id,
+            expectedRevision: result.revision,
+            archived: !archived,
+          }),
+      ]);
       if (
         currentSelection.current?.id === observed.id &&
         currentSelection.current.mailboxId === observed.mailboxId
@@ -1220,25 +1310,38 @@ export function MailboxContentView({
     setBulkBusy(true);
     setNotice("");
     let done = 0;
+    const reversals: (() => Promise<unknown>)[] = [];
     try {
       for (const input of observed) {
-        await trashMutation.mutateAsync(input);
+        const result = await trashMutation.mutateAsync(input);
+        if (input.trashed)
+          reversals.push(() =>
+            trashMutation.mutateAsync({
+              mailboxId: input.mailboxId,
+              id: input.id,
+              expectedRevision: result.revision,
+              trashed: false,
+            }),
+          );
         done += 1;
         if (!mounted.current) break;
       }
       if (mounted.current) {
         select(null);
         setCheckedIds(new Set());
-        setNotice(
-          t(folder === "trash" ? "organization.bulkRestored" : "organization.bulkTrashed", {
-            count: done,
-          }),
+        const message = t(
+          folder === "trash" ? "organization.bulkRestored" : "organization.bulkTrashed",
+          { count: done },
         );
+        setNotice(message);
+        offerUndo(message, reversals);
       }
     } catch {
       if (mounted.current) {
         setCheckedIds(new Set());
-        setNotice(t("organization.bulkPartial", { count: done, total: observed.length }));
+        const message = t("organization.bulkPartial", { count: done, total: observed.length });
+        setNotice(message);
+        offerUndo(message, reversals);
       }
     } finally {
       moving.current = false;
@@ -1305,16 +1408,30 @@ export function MailboxContentView({
     moving.current = true;
     setNotice("");
     try {
-      await trashMutation.mutateAsync({ ...observed, trashed });
+      const result = await trashMutation.mutateAsync({ ...observed, trashed });
       if (!mounted.current) return;
-      setNotice(t(trashed ? "trashedNotice" : "restoredNotice"));
+      const message = t(trashed ? "trashedNotice" : "restoredNotice");
+      setNotice(message);
+      if (trashed)
+        offerUndo(message, [
+          () =>
+            trashMutation.mutateAsync({
+              mailboxId: observed.mailboxId,
+              id: observed.id,
+              expectedRevision: result.revision,
+              trashed: false,
+            }),
+        ]);
       if (
         currentSelection.current?.id === observed.id &&
         currentSelection.current.mailboxId === observed.mailboxId
       ) {
         select(null);
-        setSearch("");
-        changeFolder(destination);
+        // Trashing keeps you where you were; restoring shows where it went back to.
+        if (!trashed) {
+          setSearch("");
+          changeFolder(destination);
+        }
       }
     } catch (cause) {
       if (!mounted.current) return;
@@ -1385,6 +1502,13 @@ export function MailboxContentView({
     }
   }
   const hasRows = !listing.isError && !listing.isPending && rows.length > 0;
+  const unreadTotal =
+    listing.data?.items.filter(
+      (i) =>
+        i.kind === "inbox" &&
+        !mailboxContentBlocked(i) &&
+        !(seenOverride[rowKey(i)] ?? i.seenAt !== null),
+    ).length ?? 0;
   const now = new Date();
   const listDate = (value: Date) => mailboxListDate(value, now, locale);
   // Which mailbox a row belongs to matters only when rows of several are mixed.
@@ -1461,6 +1585,9 @@ export function MailboxContentView({
       case "help":
         run(() => setShortcutsOpen(true));
         return;
+      case "undo":
+        if (undo && undo.notice === notice) run(() => void runUndo());
+        return;
     }
   };
   return (
@@ -1493,6 +1620,15 @@ export function MailboxContentView({
           {notice ? (
             <p role="alert" className={styles.contentNotice}>
               {notice}
+              {undo && undo.notice === notice ? (
+                <button
+                  type="button"
+                  className={`ms-btn ms-btn-ghost ${styles.undoAction}`}
+                  onClick={() => void runUndo()}
+                >
+                  {t("organization.undo")}
+                </button>
+              ) : null}
             </p>
           ) : null}
           <div className={styles.contentActions}>
@@ -1659,8 +1795,20 @@ export function MailboxContentView({
                       </button>
                     </div>
                   ) : (
-                    <span className={styles.messageCount}>
-                      {t("messageCount", { count: rows.length })}
+                    <span className={styles.listFilters}>
+                      {folder === "inbox" && (unreadOnly || unreadTotal > 0) ? (
+                        <button
+                          type="button"
+                          className={`ms-btn ms-btn-ghost ${styles.unreadFilter}`}
+                          aria-pressed={unreadOnly}
+                          onClick={() => setUnreadOnly((value) => !value)}
+                        >
+                          {t("organization.unreadFilter", { count: unreadTotal })}
+                        </button>
+                      ) : null}
+                      <span className={styles.messageCount}>
+                        {t("messageCount", { count: rows.length })}
+                      </span>
                     </span>
                   )}
                 </div>

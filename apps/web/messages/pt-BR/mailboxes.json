@@ -369,6 +369,9 @@
   "favorites": "Favoritos",
   "custom": "Pasta",
   "organization": {
+    "undo": "Desfazer",
+    "undone": "{count, plural, one {Ação desfeita} other {Ação desfeita em # mensagens}}",
+    "unreadFilter": "{count, plural, =0 {Não lidas} other {Não lidas · #}}",
     "folders": "Minhas pastas",
     "chooseBox": "Escolha uma caixa para ver as pastas dessa pessoa ou agente.",
     "emptyFolders": "Organize esta caixa com suas próprias pastas.",
@@ -432,6 +435,7 @@
       "star": "Favoritar",
       "unread": "Marcar como não lida",
       "search": "Buscar mensagens",
+      "undo": "Desfazer a última ação",
       "help": "Mostrar estes atalhos"
     }
   },

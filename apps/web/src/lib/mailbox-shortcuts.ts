@@ -12,7 +12,8 @@ export type MailboxShortcut =
   | "forward"
   | "compose"
   | "search"
-  | "help";
+  | "help"
+  | "undo";
 
 const KEYS: Record<string, MailboxShortcut> = {
   j: "next",
@@ -28,6 +29,7 @@ const KEYS: Record<string, MailboxShortcut> = {
   c: "compose",
   "/": "search",
   "?": "help",
+  z: "undo",
 };
 
 /** The order the help dialog lists them in, with the key a person presses. */
@@ -42,6 +44,7 @@ export const MAILBOX_SHORTCUTS: { key: string; action: MailboxShortcut }[] = [
   { key: "#", action: "trash" },
   { key: "S", action: "star" },
   { key: "U", action: "unread" },
+  { key: "Z", action: "undo" },
   { key: "/", action: "search" },
   { key: "?", action: "help" },
 ];

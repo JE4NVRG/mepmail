@@ -7,6 +7,23 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.68] - 2026-10-09
+
+Correio inbox: undo and an unread filter.
+
+### Added
+
+- Undo for archive and trash, single and bulk (including drag and drop): each
+  step records the reverse mutation with the revision it returned; the offer
+  is tied to its own notice, lasts 10 s and also answers the Z shortcut.
+- "Unread" chip in the Inbox list header filters to unread inbox rows; the
+  open message stays visible until you move on.
+
+### Changed
+
+- Trashing the open message no longer jumps to the Trash folder; restoring
+  still shows where it went back to.
+
 ## [0.67] - 2026-10-09
 
 Correio inbox: keyboard shortcuts and copy.

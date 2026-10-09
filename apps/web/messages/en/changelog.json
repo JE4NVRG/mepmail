@@ -23,6 +23,27 @@
   },
   "releases": [
     {
+      "version": "0.68",
+      "date": "2026-10-09",
+      "title": "Undo and an unread filter in Correio",
+      "summary": "Archived or deleted by mistake? Now you can undo it. And one click shows only unread mail.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "\"Undo\" shows for a few seconds after archiving or trashing one or several messages. The shortcut is Z.",
+            "An \"Unread\" button in the Inbox shows only the messages you have not opened."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Moving a message to the trash keeps you in the folder you were in."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.67",
       "date": "2026-10-09",
       "title": "Keyboard shortcuts in Correio",
