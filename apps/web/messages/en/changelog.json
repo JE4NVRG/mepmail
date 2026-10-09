@@ -23,6 +23,21 @@
   },
   "releases": [
     {
+      "version": "0.69",
+      "date": "2026-10-09",
+      "title": "Conversations in Correio",
+      "summary": "Replies and original messages are now linked: the list shows how many messages a conversation has and the reading pane shows the earlier ones.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "In the list, a number next to the sender shows how many messages the conversation has.",
+            "When you open a message, the others from the same conversation (received and sent) show above it; click to read each one."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.68",
       "date": "2026-10-09",
       "title": "Undo and an unread filter in Correio",
@@ -37,9 +52,7 @@
         },
         {
           "kind": "changed",
-          "items": [
-            "Moving a message to the trash keeps you in the folder you were in."
-          ]
+          "items": ["Moving a message to the trash keeps you in the folder you were in."]
         }
       ]
     },

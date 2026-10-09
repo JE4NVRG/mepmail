@@ -57,6 +57,9 @@ export const mailboxOutbox = pgTable(
     // Complete RFC alias observed in authenticated provider event publishing.
     // The API's bare MessageId must never be expanded into this field.
     providerRfcMessageId: text("provider_rfc_message_id"),
+    // Copied onto the sent item at acceptance (mailbox-thread.ts).
+    messageKey: text("message_key"),
+    threadKey: text("thread_key"),
     errorCode: text("error_code"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

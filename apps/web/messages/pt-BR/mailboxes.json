@@ -419,6 +419,11 @@
     "unread": "Não lida",
     "unreadCount": "{count, plural, one {# não lida} other {# não lidas}}"
   },
+  "thread": {
+    "title": "{count, plural, one {# outra mensagem nesta conversa} other {# outras mensagens nesta conversa}}",
+    "you": "Você",
+    "count": "{count} mensagens nesta conversa"
+  },
   "shortcuts": {
     "title": "Atalhos de teclado",
     "close": "Fechar",

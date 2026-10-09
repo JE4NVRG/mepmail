@@ -15,15 +15,19 @@ import {
 } from "../../../packages/core/src/mailbox-agent-access.js";
 import { assessMailboxReceipt } from "../../../packages/core/src/mailbox-inbound-safety.js";
 import {
+  countMailboxThreads,
+  listMailboxThread,
   readMailboxItem,
   saveMailboxDraft,
   setMailboxDeliveryFolder,
+  setMailboxItemTrash,
 } from "../../../packages/core/src/mailbox-private-store.js";
 import {
   createMailboxRegistry,
   grantMailboxRegistry,
   updateMailboxRegistry,
 } from "../../../packages/core/src/mailbox-registry.js";
+import { mailboxIdKey } from "../../../packages/core/src/mailbox-thread.js";
 import {
   acceptMailboxOutbox,
   failQueuedMailboxOutbox,
@@ -395,6 +399,47 @@ describe("durable private Correio transport contracts with captured provider", (
     expect(await db.select().from(schema.emails)).toHaveLength(0);
     expect(await db.select().from(schema.usageCounters)).toHaveLength(0);
   });
+  it("groups a received message and its sent reply into one conversation", async () => {
+    const received = (await receive("provider:receipt:thread")).items[0]!;
+    const reply = Buffer.from(
+      "From: person@transport.invalid\r\nTo: external@example.invalid\r\nSubject: Re: Private attachment fixture\r\nMessage-ID: <reply@transport.invalid>\r\nIn-Reply-To: <synthetic@transport.invalid>\r\nReferences: <synthetic@transport.invalid>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain\r\n\r\nObrigado!\r\n",
+    );
+    const saved = await draft(reply);
+    const admitted = await queue(saved.id);
+    await send(admitted.id, { send: async () => ({ messageId: "api-id-thread" }) });
+    const rows = await db
+      .select({
+        id: schema.mailboxItems.id,
+        kind: schema.mailboxItems.kind,
+        threadKey: schema.mailboxItems.threadKey,
+      })
+      .from(schema.mailboxItems)
+      .where(eq(schema.mailboxItems.mailboxId, mailboxId));
+    const key = mailboxIdKey("<synthetic@transport.invalid>");
+    expect(rows.find((row) => row.id === received.id)?.threadKey).toBe(key);
+    expect(rows.find((row) => row.id === admitted.id)).toMatchObject({
+      kind: "sent",
+      threadKey: key,
+    });
+    // The draft shares the key but is not a conversation message.
+    expect((await countMailboxThreads(db, owner(), mailboxId, [key, "not-a-key"])).get(key)).toBe(
+      2,
+    );
+    expect(
+      (await listMailboxThread(db, owner(), { mailboxId, id: admitted.id })).map((m) => m.kind),
+    ).toEqual(["inbox", "sent"]);
+    const inbox = (
+      await db.select().from(schema.mailboxItems).where(eq(schema.mailboxItems.id, received.id))
+    )[0]!;
+    await setMailboxItemTrash(db, owner(), {
+      mailboxId,
+      id: received.id,
+      expectedRevision: inbox.revision,
+      trashed: true,
+    });
+    expect((await countMailboxThreads(db, owner(), mailboxId, [key])).get(key)).toBe(1);
+  });
+
   it("enriches an accepted snapshot with an observed RFC alias without replay, mutation or ambiguous same-box matches", async () => {
     const raw = fixture();
     const admitted = await queue((await draft(raw)).id);
@@ -429,11 +474,14 @@ describe("durable private Correio transport contracts with captured provider", (
       acceptedAt: accepted.acceptedAt,
       ciphertext: null,
     });
-    expect(
-      (
-        await db.select().from(schema.mailboxItems).where(eq(schema.mailboxItems.id, admitted.id))
-      )[0],
-    ).toEqual(sentBefore);
+    // Only the conversation keys follow the provider's ID (replies quote it);
+    // the sent copy's content, revision and timestamps stay as they were.
+    const sentAfter = (
+      await db.select().from(schema.mailboxItems).where(eq(schema.mailboxItems.id, admitted.id))
+    )[0]!;
+    const aliasKey = mailboxIdKey(alias);
+    expect(sentAfter).toEqual({ ...sentBefore, messageKey: aliasKey, threadKey: aliasKey });
+    expect(sentBefore.threadKey).toBe(sentBefore.messageKey);
     expect((await readMailboxItem(db, keys, owner(), { mailboxId, id: admitted.id })).raw).toEqual(
       raw,
     );

@@ -428,9 +428,11 @@ export {
   updateMailboxFolder,
 } from "./mailbox-organization.js";
 export {
+  countMailboxThreads,
   countUnreadMailboxItems,
   importMailboxMime,
   listMailboxItems,
+  listMailboxThread,
   type MailboxContentActor,
   MailboxContentError,
   readMailboxItem,
@@ -473,6 +475,12 @@ export {
   requireMailboxSeat,
   reserveMailboxSeat,
 } from "./mailbox-service.js";
+export {
+  type MailboxThreadKeys,
+  mailboxIdKey,
+  mailboxProviderThreadKeys,
+  mailboxThreadKeys,
+} from "./mailbox-thread.js";
 export {
   acceptMailboxOutbox,
   checkMailboxRecipientBlocks,

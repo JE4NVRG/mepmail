@@ -419,6 +419,11 @@
     "unread": "Unread",
     "unreadCount": "{count, plural, one {# unread} other {# unread}}"
   },
+  "thread": {
+    "title": "{count, plural, one {# other message in this conversation} other {# other messages in this conversation}}",
+    "you": "You",
+    "count": "{count} messages in this conversation"
+  },
   "shortcuts": {
     "title": "Keyboard shortcuts",
     "close": "Close",

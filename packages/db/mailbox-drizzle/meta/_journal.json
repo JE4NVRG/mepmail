@@ -120,6 +120,13 @@
       "when": 1790866800016,
       "tag": "0016_mailbox_team_agent_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790953200017,
+      "tag": "0017_mailbox_thread_keys",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
-import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import {
   BOUND_ENVELOPE_VERSION_OFFSET,
   decryptPayload,
@@ -16,6 +16,7 @@ import {
   requireMailboxOperationalPlan,
   requireMailboxSeat,
 } from "./mailbox-service.js";
+import { mailboxThreadKeys } from "./mailbox-thread.js";
 
 /** Actor comes from a trusted session adapter, never from an HTTP body or API key. */
 export interface MailboxContentActor extends MailboxRegistryActor {
@@ -210,11 +211,92 @@ export async function importMailboxMime(
         kind: "inbox",
         sourceId: input.sourceId,
         rawBytes: raw.length,
+        ...mailboxThreadKeys(raw),
         ...sealed,
       })
       .returning();
     if (!item) throw new Error("Private mailbox import returned no item");
     return summary(item);
+  });
+}
+
+const THREAD_KEY = /^[a-f0-9]{32}$/;
+/** The live messages of a conversation: received (outside spam/quarantine) and sent. */
+const conversationMember = (mailboxId: string, teamId: string) => [
+  eq(schema.mailboxItems.mailboxId, mailboxId),
+  eq(schema.mailboxItems.teamId, teamId),
+  isNull(schema.mailboxItems.trashedAt),
+  inArray(schema.mailboxItems.kind, ["inbox", "sent"]),
+  eq(schema.mailboxItems.deliveryFolder, "inbox"),
+];
+
+/** How many live messages each listed conversation has in one mailbox (for the list's count). */
+export async function countMailboxThreads(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxId: string,
+  threadKeys: (string | null)[],
+): Promise<Map<string, number>> {
+  actor = { ...actor };
+  const keys = [
+    ...new Set(threadKeys.filter((key): key is string => !!key && THREAD_KEY.test(key))),
+  ].slice(0, 100);
+  if (!keys.length) return new Map();
+  return scoped(db, actor, mailboxId, "read", false, async (tx) => {
+    const rows = await tx
+      .select({
+        threadKey: schema.mailboxItems.threadKey,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(schema.mailboxItems)
+      .where(
+        and(
+          ...conversationMember(mailboxId, actor.teamId),
+          inArray(schema.mailboxItems.threadKey, keys),
+        ),
+      )
+      .groupBy(schema.mailboxItems.threadKey);
+    return new Map(rows.map((row) => [row.threadKey as string, Number(row.count)]));
+  });
+}
+
+/** The conversation an item belongs to, oldest first and bounded; content stays sealed here. */
+export async function listMailboxThread(
+  db: Db,
+  actor: MailboxContentActor,
+  input: { mailboxId: string; id: string },
+) {
+  actor = { ...actor };
+  input = { ...input };
+  return scoped(db, actor, input.mailboxId, "read", false, async (tx) => {
+    const [anchor] = await tx
+      .select({ threadKey: schema.mailboxItems.threadKey })
+      .from(schema.mailboxItems)
+      .where(
+        and(
+          eq(schema.mailboxItems.id, input.id),
+          eq(schema.mailboxItems.mailboxId, input.mailboxId),
+          eq(schema.mailboxItems.teamId, actor.teamId),
+        ),
+      );
+    if (!anchor) throw new MailboxContentError("not_found");
+    if (!anchor.threadKey) return [];
+    return tx
+      .select({
+        id: schema.mailboxItems.id,
+        mailboxId: schema.mailboxItems.mailboxId,
+        kind: schema.mailboxItems.kind,
+        createdAt: schema.mailboxItems.createdAt,
+      })
+      .from(schema.mailboxItems)
+      .where(
+        and(
+          ...conversationMember(input.mailboxId, actor.teamId),
+          eq(schema.mailboxItems.threadKey, anchor.threadKey),
+        ),
+      )
+      .orderBy(asc(schema.mailboxItems.createdAt), asc(schema.mailboxItems.id))
+      .limit(25);
   });
 }
 
@@ -311,6 +393,7 @@ export async function listMailboxItems(
         seenAt: schema.mailboxItems.seenAt,
         archivedAt: schema.mailboxItems.archivedAt,
         folderId: schema.mailboxItems.folderId,
+        threadKey: schema.mailboxItems.threadKey,
         revision: schema.mailboxItems.revision,
         createdAt: schema.mailboxItems.createdAt,
         updatedAt: schema.mailboxItems.updatedAt,
@@ -558,6 +641,7 @@ export async function saveMailboxDraft(
       rawBytes: raw.length,
       revision: input.expectedRevision + 1,
       updatedAt: new Date(),
+      ...mailboxThreadKeys(raw),
       ...sealed,
     };
     const [item] = previous

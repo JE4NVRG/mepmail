@@ -58,6 +58,7 @@ import {
 import {
   getMailboxContent,
   getMailboxContentList,
+  getMailboxThread,
   getMailboxUnreadCounts,
   saveMailboxContentDraft,
 } from "../mailbox-content";
@@ -640,6 +641,9 @@ export const mailboxesRouter = router({
   item: enabled
     .input(z.object({ mailboxId: z.uuid(), id: z.uuid() }))
     .query(({ ctx, input }) => call(() => getMailboxContent(ctx.db, actor(ctx), input))),
+  thread: enabled
+    .input(z.object({ mailboxId: z.uuid(), id: z.uuid() }))
+    .query(({ ctx, input }) => call(() => getMailboxThread(ctx.db, actor(ctx), input))),
   setDeliveryFolder: enabled
     .input(
       z.object({

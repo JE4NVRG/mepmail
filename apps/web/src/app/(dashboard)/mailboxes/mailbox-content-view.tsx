@@ -712,6 +712,42 @@ export type MailboxDropTarget =
   | { folder: "custom"; id: string };
 export type MailboxDropHandler = (target: MailboxDropTarget, keys: string[]) => void;
 
+function ConversationHistory({
+  mailboxId,
+  id,
+  count,
+}: {
+  mailboxId: string;
+  id: string;
+  count: number;
+}) {
+  const t = useTranslations("mailboxes.thread");
+  const locale = useLocale();
+  const trpc = useTRPC();
+  const thread = useQuery(
+    trpc.mailboxes.thread.queryOptions({ mailboxId, id }, { enabled: count > 1, retry: false }),
+  );
+  const others = thread.data?.entries.filter((entry) => !entry.current) ?? [];
+  if (count <= 1 || !others.length) return null;
+  const when = (value: Date) =>
+    new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(value);
+  return (
+    <section className={styles.conversation} aria-label={t("title", { count: others.length })}>
+      <h3>{t("title", { count: others.length })}</h3>
+      {others.map((entry) => (
+        <details key={entry.id} className={styles.conversationEntry}>
+          <summary>
+            <strong>{entry.kind === "sent" ? t("you") : entry.fromName || entry.from}</strong>
+            <time dateTime={entry.date.toISOString()}>{when(entry.date)}</time>
+            <span>{entry.snippet}</span>
+          </summary>
+          <p>{entry.text}</p>
+        </details>
+      ))}
+    </section>
+  );
+}
+
 function ShortcutsDialog({ close }: { close: () => void }) {
   const t = useTranslations("mailboxes.shortcuts");
   const dialog = useRef<HTMLDialogElement>(null);
@@ -1911,6 +1947,17 @@ export function MailboxContentView({
                               {blocked
                                 ? t("safety.quarantineTitle")
                                 : participant || t("noRecipient")}
+                              {!blocked && row.threadCount > 1 ? (
+                                <span
+                                  className={styles.threadCount}
+                                  title={t("thread.count", { count: row.threadCount })}
+                                >
+                                  <span className={styles.visuallyHidden}>
+                                    {t("thread.count", { count: row.threadCount })}
+                                  </span>
+                                  <span aria-hidden="true">{row.threadCount}</span>
+                                </span>
+                              ) : null}
                             </span>
                             {!blocked && row.attachmentCount ? (
                               <span
@@ -2255,6 +2302,12 @@ export function MailboxContentView({
                   {item.kind === "inbox" && item.deliveryFolder === "spam" ? (
                     <SafetyNotice assessment={item.inboundAssessment} quarantined={false} />
                   ) : null}
+                  <ConversationHistory
+                    key={`${item.mailboxId}:${item.id}`}
+                    mailboxId={item.mailboxId}
+                    id={item.id}
+                    count={selectedRow?.threadCount ?? 1}
+                  />
                   <header>
                     <h2>{item.subject || t("noSubject")}</h2>
                     <div className={styles.senderDetails}>

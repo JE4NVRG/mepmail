@@ -336,6 +336,74 @@
   border-color: var(--ms-bone);
   color: var(--ms-void);
 }
+.threadCount {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  color: var(--ms-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+}
+.conversation {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 18px;
+}
+.conversation h3 {
+  margin: 0 0 2px;
+  color: var(--ms-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.conversationEntry {
+  border: 1px solid var(--ms-line);
+  border-radius: 10px;
+  background: var(--ms-panel);
+}
+.conversationEntry summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+  min-width: 0;
+}
+.conversationEntry summary::-webkit-details-marker {
+  display: none;
+}
+.conversationEntry summary strong {
+  flex: none;
+  font-size: 13px;
+  font-weight: 500;
+}
+.conversationEntry summary time {
+  flex: none;
+  color: var(--ms-muted);
+  font-size: 11px;
+}
+.conversationEntry summary span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ms-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conversationEntry[open] summary span {
+  display: none;
+}
+.conversationEntry p {
+  margin: 0;
+  padding: 0 12px 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .shortcutsDialog {
   width: min(420px, calc(100% - 24px));
 }

@@ -54,6 +54,9 @@ export const mailboxItems = pgTable(
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     folderId: uuid("folder_id"),
     sourceId: text("source_id"),
+    // Digests of this message's Message-ID and of its conversation's root (mailbox-thread.ts).
+    messageKey: text("message_key"),
+    threadKey: text("thread_key"),
     revision: integer("revision").notNull().default(1),
     rawBytes: integer("raw_bytes").notNull(),
     ciphertext: bytea("ciphertext").notNull(),
@@ -73,6 +76,9 @@ export const mailboxItems = pgTable(
       .on(t.mailboxId, t.sourceId)
       .where(sql`${t.sourceId} is not null`),
     uniqueIndex("mailbox_items_id_box_team_idx").on(t.id, t.mailboxId, t.teamId),
+    index("mailbox_items_thread_idx")
+      .on(t.mailboxId, t.threadKey)
+      .where(sql`${t.threadKey} is not null`),
     foreignKey({
       name: "mailbox_items_named_folder_fk",
       columns: [t.folderId, t.mailboxId, t.teamId],

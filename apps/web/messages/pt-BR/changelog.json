@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.69",
+      "date": "2026-10-09",
+      "title": "Conversas no Correio",
+      "summary": "Respostas e mensagens originais agora ficam ligadas: a lista mostra quantas mensagens a conversa tem e o painel de leitura mostra as anteriores.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Na lista, um número ao lado do remetente indica quantas mensagens a conversa tem.",
+            "Ao abrir uma mensagem, as outras da mesma conversa (recebidas e enviadas) aparecem acima dela; clique para ler cada uma."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.68",
       "date": "2026-10-09",
       "title": "Desfazer e filtro de não lidas no Correio",
@@ -42,9 +57,7 @@
         },
         {
           "kind": "changed",
-          "items": [
-            "Mandar uma mensagem para a lixeira mantém você na pasta em que estava."
-          ]
+          "items": ["Mandar uma mensagem para a lixeira mantém você na pasta em que estava."]
         }
       ]
     },

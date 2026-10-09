@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import {
+  countMailboxThreads,
   countUnreadMailboxItems,
   getMailboxOutboundSummary,
   listMailboxFolders,
   listMailboxItems,
+  listMailboxThread,
   listMailboxRegistry,
   type MailboxContentActor,
   MailboxContentError,
@@ -255,6 +257,34 @@ export async function getMailboxContent(
   }));
 }
 
+/** A message's conversation in its mailbox, oldest first, each entry read with live access. */
+export async function getMailboxThread(
+  db: Db,
+  actor: MailboxContentActor,
+  input: { mailboxId: string; id: string },
+) {
+  actor = { ...actor };
+  input = { ...input };
+  const members = await listMailboxThread(db, actor, input);
+  const entries = [];
+  for (const member of members) {
+    const item = await getMailboxContent(db, actor, { mailboxId: member.mailboxId, id: member.id });
+    entries.push({
+      id: member.id,
+      mailboxId: member.mailboxId,
+      kind: member.kind,
+      from: item.from,
+      fromName: item.fromName,
+      to: item.to,
+      date: item.date ?? member.createdAt,
+      snippet: mailboxPreview(item.text),
+      text: item.text.slice(0, 20000),
+      current: member.id === input.id,
+    });
+  }
+  return { entries, contentTrust: "untrusted-message" as const };
+}
+
 /** Bounded unified view; every decrypted row rechecks live mailbox access. */
 export async function getMailboxContentList(
   db: Db,
@@ -364,8 +394,23 @@ export async function getMailboxContentList(
     sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null;
     outboundSummary: MailboxOutboundSummary | null;
     blocked: boolean;
+    threadCount: number;
   }[] = [];
-  for (const row of metadata.slice(0, 50)) {
+  // Messages per conversation, counted inside each listed mailbox.
+  const shown = metadata.slice(0, 50);
+  const threadCounts = new Map<string, number>();
+  for (const mailboxId of new Set(shown.map((row) => row.mailboxId))) {
+    const counts = await countMailboxThreads(
+      db,
+      actor,
+      mailboxId,
+      shown.filter((row) => row.mailboxId === mailboxId).map((row) => row.threadKey),
+    );
+    for (const [key, count] of counts) threadCounts.set(`${mailboxId}:${key}`, count);
+  }
+  const threadCount = (row: { mailboxId: string; threadKey: string | null }) =>
+    row.threadKey ? (threadCounts.get(`${row.mailboxId}:${row.threadKey}`) ?? 1) : 1;
+  for (const row of shown) {
     if (row.deliveryFolder === "quarantine" || row.inboundAssessment?.decision === "quarantine") {
       items.push({
         ...row,
@@ -380,6 +425,7 @@ export async function getMailboxContentList(
         sendStatus: null,
         outboundSummary: null,
         blocked: true,
+        threadCount: 1,
       });
       continue;
     }
@@ -410,6 +456,7 @@ export async function getMailboxContentList(
       sendStatus: item.sendStatus,
       outboundSummary: item.outboundSummary,
       blocked: false,
+      threadCount: threadCount(row),
     });
   }
   const requests = await draftApprovalRequests(db, actor.teamId, items);

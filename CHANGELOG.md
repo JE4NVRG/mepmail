@@ -7,6 +7,26 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.69] - 2026-10-09
+
+Correio conversations.
+
+### Added
+
+- Mailbox migration 0017: `message_key` and `thread_key` on `mailbox_items`
+  and `mailbox_outbox` (32-hex digests of Message-ID values, never the
+  values) and a partial index on (mailbox_id, thread_key).
+- `packages/core/src/mailbox-thread.ts`: keys from the top-level MIME header
+  block; a conversation is rooted at the oldest References entry, else
+  In-Reply-To, else the message itself. Every received item, draft and queued
+  send gets keys; acceptance copies them to the sent item and moves a
+  self-rooted send to the provider's Message-ID when SES rewrites it, so
+  replies join it.
+- `countMailboxThreads` and `listMailboxThread` (live inbox and sent messages,
+  oldest first, at most 25), `mailboxes.thread`, a per-row `threadCount`, the
+  count chip in the list and the earlier messages above the open one.
+- A one-off backfill keys items written before the migration.
+
 ## [0.68] - 2026-10-09
 
 Correio inbox: undo and an unread filter.

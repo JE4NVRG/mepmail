@@ -38,6 +38,7 @@ import {
   mailboxSubscriptionUsagePeriod,
   requireMailboxSeat,
 } from "./mailbox-service.js";
+import { mailboxProviderThreadKeys, mailboxThreadKeys } from "./mailbox-thread.js";
 import { parseMailbox } from "./sender-address.js";
 import { hashRecipient } from "./suppressions.js";
 
@@ -608,6 +609,7 @@ export async function receiveMailboxMime(
         inboundAssessment: assessment,
         sourceId,
         rawBytes: input.raw.length,
+        ...mailboxThreadKeys(input.raw),
         ...sealed,
       });
       items.push({ id, mailboxId: box.id, duplicate: false });
@@ -803,6 +805,7 @@ async function queueAuthorizedMailboxDraft(
       periodEnd: plan.usagePeriod.end,
       rawBytes: raw.length,
       rawSha256: hash(raw),
+      ...mailboxThreadKeys(raw),
       ...sealed,
     })
     .returning();
@@ -899,10 +902,25 @@ export async function acceptMailboxOutbox(
       // A worker acknowledgement may arrive before a complete RFC header is
       // observed. Enrich metadata only; preserve MIME, acceptance and no-replay.
       if (rfcMessageId && !row!.providerRfcMessageId) {
+        const keys = mailboxProviderThreadKeys(
+          { messageKey: row!.messageKey, threadKey: row!.threadKey },
+          rfcMessageId,
+        );
         await tx
           .update(mailboxOutbox)
-          .set({ providerRfcMessageId: rfcMessageId, updatedAt: now })
+          .set({ providerRfcMessageId: rfcMessageId, ...keys, updatedAt: now })
           .where(eq(mailboxOutbox.id, row!.id));
+        // Replies quote the provider's ID: keep the sent copy in their conversation.
+        await tx
+          .update(schema.mailboxItems)
+          .set(keys)
+          .where(
+            and(
+              eq(schema.mailboxItems.id, row!.id),
+              eq(schema.mailboxItems.mailboxId, row!.mailboxId),
+              eq(schema.mailboxItems.teamId, row!.teamId),
+            ),
+          );
       }
       if (evidence.outboundEvidence)
         await recordOutboundEvidence(tx, row!, evidence.messageId, evidence.outboundEvidence, now);
@@ -916,12 +934,19 @@ export async function acceptMailboxOutbox(
       !row!.keyVersion
     )
       throw new MailboxContentError("conflict");
+    const sentKeys = rfcMessageId
+      ? mailboxProviderThreadKeys(
+          { messageKey: row!.messageKey, threadKey: row!.threadKey },
+          rfcMessageId,
+        )
+      : { messageKey: row!.messageKey, threadKey: row!.threadKey };
     await tx.insert(schema.mailboxItems).values({
       id: row!.id,
       teamId: row!.teamId,
       mailboxId: row!.mailboxId,
       kind: "sent",
       sourceId: `sent:${row!.id}`,
+      ...sentKeys,
       rawBytes: row!.rawBytes,
       ciphertext: row!.ciphertext,
       iv: row!.iv,
@@ -936,6 +961,7 @@ export async function acceptMailboxOutbox(
         status: "accepted",
         providerMessageId: evidence.messageId,
         providerRfcMessageId: rfcMessageId,
+        ...sentKeys,
         acceptedAt: now,
         updatedAt: now,
         ciphertext: null,
