@@ -147,7 +147,7 @@
   "imagesAlwaysShown": "Images from {domain} always show on this browser.",
   "stopShowingImages": "Ask again",
   "inboxEmptyTitle": "No conversations yet",
-  "inboxEmptyBody": "New messages for this mailbox will appear here.",
+  "inboxEmptyBody": "New messages show up here.",
   "draftsEmptyTitle": "No saved drafts",
   "draftsEmptyBody": "Prepare a message and continue whenever you like.",
   "sentEmptyTitle": "No sent messages",
@@ -170,8 +170,8 @@
     "agent": "Agents",
     "boxes": {
       "all": "All mailboxes",
-      "person": "All people's mailboxes",
-      "agent": "All agent mailboxes"
+      "person": "People's mailboxes",
+      "agent": "Agent mailboxes"
     },
     "empty": {
       "person": {
@@ -416,20 +416,39 @@
     "unread": "Unread",
     "unreadCount": "{count, plural, one {# unread} other {# unread}}"
   },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "close": "Close",
+    "actions": {
+      "next": "Next / previous message",
+      "previous": "Previous message",
+      "close": "Back to the list",
+      "reply": "Reply",
+      "replyAll": "Reply all",
+      "forward": "Forward",
+      "compose": "Compose",
+      "archive": "Archive",
+      "trash": "Move to trash",
+      "star": "Star",
+      "unread": "Mark as unread",
+      "search": "Search messages",
+      "help": "Show these shortcuts"
+    }
+  },
   "usage": {
-    "title": "Mailbox usage",
+    "title": "Usage",
     "storage": "Storage",
     "outbound": "Outbound recipients",
     "ratio": "{used} of {total}",
     "unlimited": "No monthly allowance",
-    "internalHelp": "Total outbound usage. Your System license has no monthly allowance.",
+    "internalHelp": "Total outbound usage. The system account has no monthly allowance.",
     "outboundHelp": "Usage in the period, including queued sends. Messages and attachments in Trash use storage.",
     "renews": "Period ends {date}",
     "loading": "Checking usage…",
     "retry": "Check usage again",
     "empty": "Choose an available mailbox to check usage.",
     "noPolicy": "No capacity configured",
-    "allBoxes": "Total across accessible mailboxes"
+    "allBoxes": "Sum of the mailboxes you can open"
   },
   "offer": {
     "eyebrow": "Correio · Mail",

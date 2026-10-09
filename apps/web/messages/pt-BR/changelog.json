@@ -28,6 +28,28 @@
   },
   "releases": [
     {
+      "version": "0.67",
+      "date": "2026-10-09",
+      "title": "Atalhos de teclado no Correio",
+      "summary": "A caixa de entrada ganhou atalhos de teclado e textos mais claros.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Atalhos: J e K passam de mensagem, R responde, A responde a todos, F encaminha, C escreve, E arquiva, # manda para a lixeira, S favorita, U marca como não lida, / busca e Esc volta para a lista.",
+            "Aperte ? (ou o botão ? no topo) para ver todos os atalhos."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "O painel de leitura não mostra mais \"Todas as caixas\" quando nenhuma mensagem está aberta.",
+            "Textos de caixa vazia e de uso valem para uma ou várias caixas, e a barra de armazenamento ficou visível."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.66",
       "date": "2026-10-09",
       "title": "Suporte a um clique no painel",

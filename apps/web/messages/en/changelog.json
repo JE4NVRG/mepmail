@@ -23,6 +23,28 @@
   },
   "releases": [
     {
+      "version": "0.67",
+      "date": "2026-10-09",
+      "title": "Keyboard shortcuts in Correio",
+      "summary": "The inbox has keyboard shortcuts and clearer copy.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Shortcuts: J and K move between messages, R replies, A replies all, F forwards, C composes, E archives, # moves to trash, S stars, U marks unread, / searches and Esc goes back to the list.",
+            "Press ? (or the ? button at the top) to see every shortcut."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "The reading pane no longer shows \"All mailboxes\" when no message is open.",
+            "Empty-inbox and usage copy fits one or several mailboxes, and the storage bar is visible."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.66",
       "date": "2026-10-09",
       "title": "One-click support from the dashboard",

@@ -7,6 +7,26 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.67] - 2026-10-09
+
+Correio inbox: keyboard shortcuts and copy.
+
+### Added
+
+- `src/lib/mailbox-shortcuts.ts`: webmail keys (J/K, Esc, R, A, F, C, E, #,
+  S, U, /, ?), ignored while typing, with modifiers, on repeats or inside a
+  dialog. The inbox view registers one window listener that reads the current
+  render through a ref and applies the same conditions as the matching buttons.
+- A "?" help dialog listing the shortcuts, also opened from a toolbar button.
+
+### Changed
+
+- The reading pane header no longer falls back to "All mailboxes" when nothing
+  is open.
+- Empty inbox body, scope selector labels and the usage panel title fit one or
+  several mailboxes; the System wording became "system account"; the storage
+  progress track uses the strong line color so it shows when nearly empty.
+
 ## [0.66] - 2026-10-09
 
 Support entry points for signed-in users.

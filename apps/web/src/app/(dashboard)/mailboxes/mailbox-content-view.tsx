@@ -34,6 +34,7 @@ import {
   rememberRecipients,
   splitRecipients,
 } from "@/lib/mailbox-recipients";
+import { MAILBOX_SHORTCUTS, mailboxShortcut } from "@/lib/mailbox-shortcuts";
 import { mailboxSignatureText } from "@/lib/mailbox-signature";
 import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
@@ -711,6 +712,44 @@ export type MailboxDropTarget =
   | { folder: "custom"; id: string };
 export type MailboxDropHandler = (target: MailboxDropTarget, keys: string[]) => void;
 
+function ShortcutsDialog({ close }: { close: () => void }) {
+  const t = useTranslations("mailboxes.shortcuts");
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      className={`${styles.dialog} ${styles.shortcutsDialog}`}
+      aria-labelledby="mailbox-shortcuts-title"
+      onClose={close}
+    >
+      <header className={styles.dialogHeader}>
+        <h2 id="mailbox-shortcuts-title">{t("title")}</h2>
+        <button
+          type="button"
+          className="ms-btn ms-btn-ghost"
+          aria-label={t("close")}
+          onClick={() => dialog.current?.close()}
+        >
+          ×
+        </button>
+      </header>
+      <dl className={styles.shortcutsList}>
+        {MAILBOX_SHORTCUTS.map((entry) => (
+          <div key={entry.action}>
+            <dt>
+              <kbd>{entry.key}</kbd>
+            </dt>
+            <dd>{t(`actions.${entry.action}`)}</dd>
+          </div>
+        ))}
+      </dl>
+    </dialog>
+  );
+}
+
 export function MailboxContentView({
   navigation,
   boxes,
@@ -777,6 +816,10 @@ export function MailboxContentView({
   const sending = useRef<string | null>(null);
   const attempted = useRef(new Set<string>());
   const [sendStates, setSendStates] = useState<Record<string, SendState>>({});
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const searchInput = useRef<HTMLInputElement>(null);
+  // One window listener reads the current render through this ref.
+  const shortcut = useRef<(event: KeyboardEvent) => void>(() => {});
   const mounted = useRef(true);
   const moving = useRef(false);
   const currentSelection = useRef(selection);
@@ -850,6 +893,11 @@ export function MailboxContentView({
       composerSession.current = null;
       mounted.current = false;
     };
+  }, []);
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => shortcut.current(event);
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
   }, []);
   useEffect(() => {
     if (denied) void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
@@ -1345,6 +1393,76 @@ export function MailboxContentView({
   const newDraft = () => openComposer(selected?.id ?? writable[0]!.id, null);
   const folderTitle =
     folder === "custom" ? (customFolderName ?? t("organization.folders")) : t(folder);
+  shortcut.current = (event) => {
+    const action = mailboxShortcut(event, event.target);
+    if (!action || composer || shortcutsOpen) return;
+    const run = (act: () => void) => {
+      event.preventDefault();
+      act();
+    };
+    const index = selectedRow ? rows.indexOf(selectedRow) : -1;
+    const lockedDraft = !!(item?.kind === "draft" && sendState && sendState !== "failed");
+    switch (action) {
+      case "next": {
+        const row = rows[index + 1];
+        if (row) run(() => openRow(row));
+        return;
+      }
+      case "previous": {
+        const row = index > 0 ? rows[index - 1] : undefined;
+        if (row) run(() => openRow(row));
+        return;
+      }
+      case "close":
+        if (selection) run(backToList);
+        return;
+      case "archive":
+        if (canOrganizeItem && item && item.kind !== "draft" && !bulkBusy)
+          run(() => void changeArchive(!item.archivedAt));
+        return;
+      case "trash":
+        if (actions?.canMoveToTrash && !bulkBusy && !lockedDraft) run(() => void changeTrash(true));
+        return;
+      case "star":
+        if (canOrganizeItem && item && !bulkBusy) run(() => void changeStar(item));
+        return;
+      case "unread":
+        if (isOwner && item && selectedRow && item.kind === "inbox" && !blockedRow)
+          run(() => {
+            void changeSeen([selectedRow], false, false);
+            select(null);
+            setNotice(t("organization.markedUnread"));
+          });
+        return;
+      case "reply":
+        if (item && actions?.canRespond && !pendingSentReply && !lockedDraft)
+          run(() => openComposer(item.mailboxId, item));
+        return;
+      case "replyAll":
+        if (
+          item &&
+          actions?.canRespond &&
+          item.kind !== "draft" &&
+          item.to.length + item.cc.length > 1 &&
+          !pendingSentReply
+        )
+          run(() => openComposer(item.mailboxId, item, "replyAll"));
+        return;
+      case "forward":
+        if (item && actions?.canRespond && item.kind !== "draft")
+          run(() => openComposer(item.mailboxId, item, "forward"));
+        return;
+      case "compose":
+        if (canCompose) run(newDraft);
+        return;
+      case "search":
+        run(() => searchInput.current?.focus());
+        return;
+      case "help":
+        run(() => setShortcutsOpen(true));
+        return;
+    }
+  };
   return (
     <>
       <div className={styles.contentWorkspace}>
@@ -1397,8 +1515,18 @@ export function MailboxContentView({
             >
               <MailboxFolderIcon name="refresh" />
             </button>
+            <button
+              type="button"
+              className={`ms-btn ms-btn-ghost ${styles.narrowHidden}`}
+              aria-label={t("shortcuts.title")}
+              title={t("shortcuts.title")}
+              onClick={() => setShortcutsOpen(true)}
+            >
+              <kbd className={styles.shortcutsHint}>?</kbd>
+            </button>
           </div>
         </section>
+        {shortcutsOpen ? <ShortcutsDialog close={() => setShortcutsOpen(false)} /> : null}
         <div className={styles.contentPanels} data-empty={!hasRows}>
           <div
             className={`${styles.list} ${styles.contentList}`}
@@ -1422,6 +1550,7 @@ export function MailboxContentView({
                   <path d="m16 16 4.5 4.5" />
                 </svg>
                 <input
+                  ref={searchInput}
                   className="ms-input"
                   aria-label={t("searchMessages")}
                   placeholder={t("searchMessages")}
@@ -1778,9 +1907,9 @@ export function MailboxContentView({
                 >
                   ← {t("back")}
                 </button>
-                {item || blockedRow ? null : (
+                {item || blockedRow || !(selectedBox ?? selected) ? null : (
                   <span title={selectedBox?.address ?? selected?.address}>
-                    {selectedBox?.address ?? selected?.address ?? t("all")}
+                    {selectedBox?.address ?? selected?.address}
                   </span>
                 )}
                 {item && actions?.canRespond ? (

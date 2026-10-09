@@ -309,6 +309,40 @@
 .dialog::backdrop {
   background: rgba(0, 0, 0, 0.7);
 }
+.shortcutsDialog {
+  width: min(420px, calc(100% - 24px));
+}
+.shortcutsList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.shortcutsList > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.shortcutsList dt {
+  flex: none;
+  width: 72px;
+}
+.shortcutsList dd {
+  margin: 0;
+  color: var(--ms-muted);
+  font-size: 13px;
+}
+.shortcutsList kbd,
+.shortcutsHint {
+  display: inline-block;
+  min-width: 22px;
+  padding: 2px 6px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 6px;
+  background: var(--ms-inset);
+  color: var(--ms-bone);
+  font: 500 12px/1.4 var(--ms-font-mono, ui-monospace, monospace);
+  text-align: center;
+}
 .dialogHeader {
   display: flex;
   align-items: center;
@@ -1867,12 +1901,12 @@
   height: 5px;
   border: 0;
   border-radius: 10px;
-  background: var(--ms-inset);
+  background: var(--ms-line-strong);
   color: var(--ms-violet);
   overflow: hidden;
 }
 .usagePanel progress::-webkit-progress-bar {
-  background: var(--ms-inset);
+  background: var(--ms-line-strong);
   border-radius: 10px;
 }
 .usagePanel progress::-webkit-progress-value {

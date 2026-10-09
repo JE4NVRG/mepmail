@@ -147,7 +147,7 @@
   "imagesAlwaysShown": "Imagens de {domain} aparecem sempre neste navegador.",
   "stopShowingImages": "Voltar a perguntar",
   "inboxEmptyTitle": "Sem conversas ainda",
-  "inboxEmptyBody": "As novas mensagens desta caixa aparecerão aqui.",
+  "inboxEmptyBody": "As mensagens novas aparecem aqui.",
   "draftsEmptyTitle": "Nenhum rascunho salvo",
   "draftsEmptyBody": "Prepare uma mensagem e continue quando quiser.",
   "sentEmptyTitle": "Nenhuma mensagem enviada",
@@ -170,8 +170,8 @@
     "agent": "Agentes",
     "boxes": {
       "all": "Todas as caixas",
-      "person": "Todas as caixas de pessoas",
-      "agent": "Todas as caixas de agentes"
+      "person": "Caixas de pessoas",
+      "agent": "Caixas de agentes"
     },
     "empty": {
       "person": {
@@ -416,20 +416,39 @@
     "unread": "Não lida",
     "unreadCount": "{count, plural, one {# não lida} other {# não lidas}}"
   },
+  "shortcuts": {
+    "title": "Atalhos de teclado",
+    "close": "Fechar",
+    "actions": {
+      "next": "Mensagem seguinte / anterior",
+      "previous": "Mensagem anterior",
+      "close": "Voltar para a lista",
+      "reply": "Responder",
+      "replyAll": "Responder a todos",
+      "forward": "Encaminhar",
+      "compose": "Escrever",
+      "archive": "Arquivar",
+      "trash": "Mover para a lixeira",
+      "star": "Favoritar",
+      "unread": "Marcar como não lida",
+      "search": "Buscar mensagens",
+      "help": "Mostrar estes atalhos"
+    }
+  },
   "usage": {
-    "title": "Uso da caixa",
+    "title": "Uso",
     "storage": "Armazenamento",
     "outbound": "Destinatários de envio",
     "ratio": "{used} de {total}",
     "unlimited": "Sem franquia mensal",
-    "internalHelp": "Consumo total de envio. Sua licença System não tem franquia mensal.",
+    "internalHelp": "Consumo total de envio. A conta do sistema não tem franquia mensal.",
     "outboundHelp": "Consumo no período, incluindo envios em fila. Mensagens e anexos da lixeira usam armazenamento.",
     "renews": "Período até {date}",
     "loading": "Consultando o uso…",
     "retry": "Consultar uso novamente",
     "empty": "Escolha uma caixa disponível para consultar o uso.",
     "noPolicy": "Sem capacidade configurada",
-    "allBoxes": "Total das caixas acessíveis"
+    "allBoxes": "Soma das caixas que você acessa"
   },
   "offer": {
     "eyebrow": "Correio",
