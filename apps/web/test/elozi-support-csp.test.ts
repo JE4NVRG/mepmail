@@ -20,7 +20,7 @@ describe("Elozi support document policy", () => {
       const csp = support?.headers.find((h) => h.key === "Content-Security-Policy")?.value ?? "";
       expect(csp.split("; ").filter((directive) => directive.includes("elozi"))).toEqual([
         `script-src 'self' 'unsafe-inline'${env === "development" ? " 'unsafe-eval'" : ""} https://challenges.cloudflare.com https://umami.je4ndev.com https://elozi.je4ndev.com`,
-        "connect-src 'self' https://umami.je4ndev.com https://elozi.je4ndev.com",
+        "connect-src 'self' https://umami.je4ndev.com ipc: http://ipc.localhost https://ipc.localhost https://elozi.je4ndev.com",
       ]);
       for (const rule of rules.filter((rule) => rule.source !== "/support")) {
         expect(JSON.stringify(rule)).not.toContain("elozi");

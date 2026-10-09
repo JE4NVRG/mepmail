@@ -10,6 +10,10 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 const UMAMI_ORIGIN = "https://umami.je4ndev.com";
 // Public visitor support; keep in sync with src/lib/elozi-support.ts.
 const ELOZI_ORIGIN = "https://elozi.je4ndev.com";
+// The desktop shell (apps/desktop, Tauri 2) reaches its host over these
+// origins: ipc: (macOS/Linux), http://ipc.localhost (Windows) and
+// https://ipc.localhost (Windows with useHttpsScheme). See src/lib/desktop-bridge.ts.
+const DESKTOP_IPC = "ipc: http://ipc.localhost https://ipc.localhost";
 
 const config: NextConfig = {
   poweredByHeader: false,
@@ -45,7 +49,7 @@ const config: NextConfig = {
       "img-src 'self' data: blob: https:",
       "font-src 'self'",
       // Umami envia pageviews e eventos por fetch/beacon para a própria origem.
-      `connect-src 'self' ${UMAMI_ORIGIN}`,
+      `connect-src 'self' ${UMAMI_ORIGIN} ${DESKTOP_IPC}`,
       "media-src 'self'",
       "object-src 'none'",
       // Turnstile renders its challenge in a Cloudflare frame.
@@ -81,14 +85,14 @@ const config: NextConfig = {
     const publicContentSecurityPolicy = contentSecurityPolicy
       .replace(scriptPolicy, [scriptPolicy, ...publicScripts].join(" "))
       .replace(
-        `connect-src 'self' ${UMAMI_ORIGIN}`,
-        [`connect-src 'self' ${UMAMI_ORIGIN}`, ...publicConnections].join(" "),
+        `connect-src 'self' ${UMAMI_ORIGIN} ${DESKTOP_IPC}`,
+        [`connect-src 'self' ${UMAMI_ORIGIN} ${DESKTOP_IPC}`, ...publicConnections].join(" "),
       );
     const supportContentSecurityPolicy = contentSecurityPolicy
       .replace(scriptPolicy, `${scriptPolicy} ${ELOZI_ORIGIN}`)
       .replace(
-        `connect-src 'self' ${UMAMI_ORIGIN}`,
-        `connect-src 'self' ${UMAMI_ORIGIN} ${ELOZI_ORIGIN}`,
+        `connect-src 'self' ${UMAMI_ORIGIN} ${DESKTOP_IPC}`,
+        `connect-src 'self' ${UMAMI_ORIGIN} ${DESKTOP_IPC} ${ELOZI_ORIGIN}`,
       );
     return [
       {

@@ -7,6 +7,26 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.76] - 2026-10-09
+
+Groundwork for the Correio desktop app (not yet offered to users, so no public
+changelog entry).
+
+### Added
+
+- `apps/desktop`: Tauri 2 shell for Windows that loads `/mail` (committed by the
+  desktop session, a7eff9e8).
+- `src/lib/desktop-bridge.ts`: inside the shell (`window.__MEPMAIL_DESKTOP__`,
+  app `mepmail-correio`) the inbox mirrors its unread title into the native
+  window and shows one system notification when unread mail grows. Outside the
+  shell every call is a no-op; a browser is never prompted for notification
+  permission.
+
+### Changed
+
+- `connect-src` on every route allows the desktop IPC origins
+  (`ipc: http://ipc.localhost https://ipc.localhost`).
+
 ## [0.75] - 2026-10-09
 
 Paid Send subscriptions reported to Google Analytics from the server.

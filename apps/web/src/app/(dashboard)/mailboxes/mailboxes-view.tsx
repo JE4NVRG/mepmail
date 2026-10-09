@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { type DragEvent, useEffect, useRef, useState } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { authClient } from "@/lib/auth-client";
+import { notifyDesktop, setNativeTitle } from "@/lib/desktop-bridge";
 import type { MailboxFolder, MailboxKindFilter } from "@/lib/mailbox-inbox-presentation";
 import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
@@ -444,7 +445,20 @@ export function MailboxesView({
     if (layout === "dashboard") return;
     baseTitle.current ??= document.title.replace(/^\(\d+\) /, "");
     document.title = inboxUnread ? `(${inboxUnread}) ${baseTitle.current}` : baseTitle.current;
+    // The desktop shell shows the same title on its window; a no-op elsewhere.
+    void setNativeTitle(document.title);
   }, [inboxUnread, layout]);
+  // More unread mail than the last count: one system notification (the desktop
+  // shell shows it as a native toast; a browser only if it was granted before).
+  const lastUnread = useRef<number | null>(null);
+  useEffect(() => {
+    if (layout === "dashboard" || !unreadCounts.data) return;
+    const total = Object.values(unreadCounts.data.counts).reduce((sum, n) => sum + n, 0);
+    const previous = lastUnread.current;
+    lastUnread.current = total;
+    if (previous === null || total <= previous) return;
+    void notifyDesktop(t("title"), t("app.newMail", { count: total - previous }));
+  }, [unreadCounts.data, layout, t]);
   useEffect(
     () => () => {
       if (baseTitle.current) document.title = baseTitle.current;

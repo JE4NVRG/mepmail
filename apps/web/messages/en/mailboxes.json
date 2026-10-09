@@ -483,6 +483,7 @@
     "adminOnly": "Ask a team owner or admin to subscribe."
   },
   "app": {
+    "newMail": "{count, plural, one {# new message} other {# new messages}}",
     "sections": "Mail sections",
     "inbox": "Inbox",
     "settings": "Settings",

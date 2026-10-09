@@ -46,6 +46,15 @@ describe("public Meta Content Security Policy", () => {
     }
     expect(JSON.stringify(await headers(""))).not.toContain("facebook");
   });
+  it("lets the desktop shell reach its IPC origins from every route's connect-src", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_TAG_ENABLED", "true");
+    for (const rule of await headers("true")) {
+      const csp = rule.headers.find((item) => item.key === "Content-Security-Policy")?.value ?? "";
+      const connect = csp.split("; ").find((part) => part.startsWith("connect-src")) ?? "";
+      expect(connect, rule.source).toContain("ipc: http://ipc.localhost https://ipc.localhost");
+      expect(csp, rule.source).not.toContain("script-src 'self' ipc:");
+    }
+  });
   it("rejects a malformed dataset and never broadens private paths", async () => {
     expect(await headers("true", "bad; https://untrusted.invalid")).toHaveLength(2);
   });

@@ -483,6 +483,7 @@
     "adminOnly": "Peça a um proprietário ou administrador da equipe para assinar."
   },
   "app": {
+    "newMail": "{count, plural, one {# mensagem nova} other {# mensagens novas}}",
     "sections": "Seções do Correio",
     "inbox": "Caixa de entrada",
     "settings": "Configurações",
