@@ -809,5 +809,17 @@
   "coach": {
     "text": "J and K move, E archives, S stars, ? shows every shortcut.",
     "dismiss": "Got it"
+  },
+  "list": {
+    "loadMore": "Load more",
+    "loadingMore": "Loading…",
+    "newArrivals": "{count, plural, one {# new message} other {# new messages}}",
+    "sections": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "Last 7 days",
+      "month": "This month",
+      "older": "Older"
+    }
   }
 }

@@ -5,6 +5,7 @@ import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { SupportViewBanner } from "@/components/support-view-banner";
 import { TeamStandingBanner } from "@/components/team-standing-banner";
 import { ToastHost } from "@/components/toast";
+import { CORREIO_PREFS_PREPAINT_SCRIPT } from "@/lib/mailbox-preferences-prepaint";
 import { postAuthNext, withNext } from "@/lib/nav";
 import { getAuth } from "@/server/auth";
 import { ACTIVE_TEAM_COOKIE, getActiveMembership } from "@/server/membership";
@@ -33,6 +34,10 @@ export default async function MailLayout({ children }: { children: React.ReactNo
   if (!(view ?? membership)) redirect(withNext("/onboarding", next));
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
+      {/* Before the inbox paints: density, preview lines, reading pane, avatars and a
+          "system" theme from the last saved preferences, so the defaults never flash. */}
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static preferences bootstrap, no user input */}
+      <script dangerouslySetInnerHTML={{ __html: CORREIO_PREFS_PREPAINT_SCRIPT }} />
       {view ? (
         <SupportViewBanner
           grantId={view.grantId}

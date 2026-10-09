@@ -1,9 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useLocale, useTranslations } from "next-intl";
 import {
+  type CSSProperties,
+  Fragment,
   type ReactNode,
   type RefObject,
   useCallback,
@@ -27,6 +29,11 @@ import {
   mailboxPrimaryParticipant,
   mailboxSendApproval,
 } from "@/lib/mailbox-inbox-presentation";
+import {
+  mailboxAvatarHue,
+  mailboxDateSection,
+  mailboxInitials,
+} from "@/lib/mailbox-list-presentation";
 import {
   newUnreadArrivals,
   readNoticePreference,
@@ -878,6 +885,9 @@ export function MailboxContentView({
     steps: (() => Promise<unknown>)[];
   } | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Unread mail that arrived while the list was scrolled down: a chip offers the way back up.
+  const [freshCount, setFreshCount] = useState(0);
+  const listBody = useRef<HTMLDivElement>(null);
   // Browser notices for new mail while Correio sits in another tab (opt-in).
   const [noticesOn, setNoticesOn] = useState(false);
   const knownRows = useRef<Set<string> | null>(null);
@@ -890,20 +900,31 @@ export function MailboxContentView({
   currentSelection.current = selection;
   const reader = useRef<HTMLElement>(null);
   const rowButtons = useRef(new Map<string, HTMLButtonElement>());
-  const listing = useQuery(
-    trpc.mailboxes.items.queryOptions(
+  const listing = useInfiniteQuery(
+    trpc.mailboxes.items.infiniteQueryOptions(
       {
         mailboxId: selected?.id ?? null,
         folder,
         mailboxKind,
         ...(folder === "custom" && customFolderId ? { customFolderId } : {}),
       },
-      { retry: false, gcTime: 0, refetchInterval: 15000 },
+      {
+        getNextPageParam: (page) => page.nextCursor,
+        retry: false,
+        gcTime: 0,
+        refetchInterval: 15000,
+      },
     ),
   );
+  // Every page so far, in order; "Carregar mais" appends the next one.
+  const listedItems = useMemo(
+    () => listing.data?.pages.flatMap((page) => page.items),
+    [listing.data],
+  );
+  const mailboxesTruncated = listing.data?.pages.some((page) => page.mailboxesTruncated) ?? false;
   const readable = boxes.filter((b) => b.canRead && b.status === "planned");
   const rows =
-    listing.data?.items.filter((i) => {
+    listedItems?.filter((i) => {
       if (
         unreadOnly &&
         !(
@@ -1089,6 +1110,7 @@ export function MailboxContentView({
       setNotice("");
       setUndo(null);
       setUnreadOnly(false);
+      setFreshCount(0);
       knownRows.current = null;
     }
   }, [organizationScope]);
@@ -1128,16 +1150,26 @@ export function MailboxContentView({
     if (!item || !canOrganizeItem || moving.current) return;
     moving.current = true;
     setNotice("");
+    const previousFolder = item.folderId;
+    const ref = { mailboxId: item.mailboxId, id: item.id };
     try {
-      await folderMutation.mutateAsync({
-        mailboxId: item.mailboxId,
-        id: item.id,
+      const done = await folderMutation.mutateAsync({
+        ...ref,
         expectedRevision: item.revision,
         folderId: id,
       });
       if (mounted.current) {
         select(null);
-        setNotice(t("organization.moved"));
+        const message = t("organization.moved");
+        setNotice(message);
+        offerUndo(message, [
+          () =>
+            folderMutation.mutateAsync({
+              ...ref,
+              expectedRevision: done.revision,
+              folderId: previousFolder,
+            }),
+        ]);
       }
     } catch (cause) {
       if (mounted.current)
@@ -1191,12 +1223,19 @@ export function MailboxContentView({
         done += 1;
         if (!mounted.current) return;
       }
-      if (announce)
-        setNotice(
-          t(seen ? "organization.bulkMarkedRead" : "organization.bulkMarkedUnread", {
-            count: done,
+      if (announce) {
+        const message = t(seen ? "organization.bulkMarkedRead" : "organization.bulkMarkedUnread", {
+          count: done,
+        });
+        setNotice(message);
+        offerUndo(
+          message,
+          eligible.slice(0, done).map((row) => async () => {
+            setSeenOverride((current) => ({ ...current, [rowKey(row)]: !seen }));
+            await seenMutation.mutateAsync({ mailboxId: row.mailboxId, id: row.id, seen: !seen });
           }),
         );
+      }
     } catch {
       if (!mounted.current) return;
       flip(!seen);
@@ -1441,9 +1480,19 @@ export function MailboxContentView({
     moving.current = true;
     setNotice("");
     try {
-      await moveMutation.mutateAsync({ ...observed, folder: target });
+      const done = await moveMutation.mutateAsync({ ...observed, folder: target });
       if (!mounted.current) return;
-      setNotice(t(target === "inbox" ? "safety.restored" : "safety.markedSpam"));
+      const message = t(target === "inbox" ? "safety.restored" : "safety.markedSpam");
+      setNotice(message);
+      offerUndo(message, [
+        () =>
+          moveMutation.mutateAsync({
+            mailboxId: observed.mailboxId,
+            id: observed.id,
+            expectedRevision: done.revision,
+            folder: target === "inbox" ? "spam" : "inbox",
+          }),
+      ]);
       if (
         currentSelection.current?.id === observed.id &&
         currentSelection.current.mailboxId === observed.mailboxId
@@ -1580,11 +1629,13 @@ export function MailboxContentView({
       if (mounted.current) void refresh();
     }
   }
-  const listed = listing.data?.items;
+  const listed = listedItems;
   useEffect(() => {
     if (!listed || folder !== "inbox") return;
     const { known, arrivals } = newUnreadArrivals(knownRows.current, listed);
     knownRows.current = known;
+    if (arrivals.length && (listBody.current?.scrollTop ?? 0) > 80)
+      setFreshCount((count) => count + arrivals.length);
     if (
       !noticesOn ||
       !arrivals.length ||
@@ -1630,7 +1681,7 @@ export function MailboxContentView({
   }
   const hasRows = !listing.isError && !listing.isPending && rows.length > 0;
   const unreadTotal =
-    listing.data?.items.filter(
+    listedItems?.filter(
       (i) =>
         i.kind === "inbox" &&
         !mailboxContentBlocked(i) &&
@@ -1657,6 +1708,8 @@ export function MailboxContentView({
       case "next": {
         const row = rows[index + 1];
         if (row) run(() => openRow(row));
+        else if (listing.hasNextPage && !listing.isFetchingNextPage)
+          run(() => void listing.fetchNextPage());
         return;
       }
       case "previous": {
@@ -1860,11 +1913,14 @@ export function MailboxContentView({
                   </button>
                 </p>
               ) : null}
-              {listing.data?.limited ? (
+              {mailboxesTruncated ? (
                 <p className={styles.trashHelp}>{t("organization.limitedList")}</p>
               ) : null}
               {!listing.isPending && !listing.isError ? (
-                <div className={styles.selectionToolbar}>
+                <div
+                  className={styles.selectionToolbar}
+                  data-active={checkedRows.length > 0 || undefined}
+                >
                   {movableRows.length ? (
                     <label>
                       <input
@@ -1980,7 +2036,25 @@ export function MailboxContentView({
                 </div>
               ) : null}
             </div>
-            <div className={styles.listBody}>
+            <div
+              ref={listBody}
+              className={styles.listBody}
+              onScroll={(event) => {
+                if (freshCount && event.currentTarget.scrollTop < 40) setFreshCount(0);
+              }}
+            >
+              {freshCount ? (
+                <button
+                  type="button"
+                  className={styles.freshChip}
+                  onClick={() => {
+                    listBody.current?.scrollTo({ top: 0 });
+                    setFreshCount(0);
+                  }}
+                >
+                  {t("list.newArrivals", { count: freshCount })}
+                </button>
+              ) : null}
               {listing.isError ? (
                 <div role="alert" className={styles.emptyFolder}>
                   <p>{t("contentError")}</p>
@@ -1994,8 +2068,20 @@ export function MailboxContentView({
                 </p>
               ) : rows.length ? (
                 <div className={styles.messageRows}>
-                  {rows.map((row) => {
+                  {rows.map((row, index) => {
                     const blocked = mailboxContentBlocked(row);
+                    const section = mailboxDateSection(row.date, now);
+                    const previous = rows[index - 1];
+                    const heading =
+                      !previous || mailboxDateSection(previous.date, now) !== section
+                        ? section
+                        : null;
+                    const avatarAddress = blocked
+                      ? row.address
+                      : row.kind === "inbox"
+                        ? row.from
+                        : (row.to[0] ?? row.address);
+                    const avatarName = blocked || row.kind !== "inbox" ? null : row.fromName;
                     const participant = mailboxPrimaryParticipant(row);
                     const rowApproval = mailboxSendApproval(row.sentBy);
                     const ownerBox = readable.find((box) => box.id === row.mailboxId);
@@ -2015,145 +2101,180 @@ export function MailboxContentView({
                       (!!row.approvalRequested && !row.sendStatus) ||
                       !!row.sendStatus;
                     return (
-                      // biome-ignore lint/a11y/noStaticElementInteractions: dragging a row is a pointer shortcut; every move it makes is also a keyboard-reachable button (row checkbox, bulk and reader actions).
-                      <div
-                        className={styles.messageRow}
-                        key={rowKey(row)}
-                        data-unread={unread || undefined}
-                        draggable={draggableRow}
-                        onDragStart={(event) => {
-                          const keys = checkedIds.has(rowKey(row))
-                            ? checkedRows.map(rowKey)
-                            : [rowKey(row)];
-                          event.dataTransfer.setData(MAIL_DRAG_TYPE, JSON.stringify(keys));
-                          event.dataTransfer.effectAllowed = "move";
-                        }}
-                      >
-                        <div className={styles.rowQuickActions}>
-                          {movableRows.some((entry) => rowKey(entry) === rowKey(row)) ? (
-                            <label className={styles.rowSelectionTarget}>
-                              <input
-                                type="checkbox"
-                                className="ms-checkbox"
-                                aria-label={t("organization.selectMessage", {
-                                  subject: blocked
-                                    ? t("safety.blockedMessage")
-                                    : row.subject || t("noSubject"),
-                                })}
-                                checked={checkedIds.has(rowKey(row))}
-                                disabled={bulkBusy}
-                                onChange={(event) =>
-                                  setCheckedIds((previous) => {
-                                    const next = new Set(previous);
-                                    if (event.target.checked) next.add(rowKey(row));
-                                    else next.delete(rowKey(row));
-                                    return next;
-                                  })
-                                }
-                              />
-                            </label>
-                          ) : null}
-                        </div>
-                        <button
-                          type="button"
-                          className={styles.messageRowOpen}
-                          ref={(button) => {
-                            const key = `${row.mailboxId}:${row.id}`;
-                            if (button) rowButtons.current.set(key, button);
-                            else rowButtons.current.delete(key);
+                      <Fragment key={rowKey(row)}>
+                        {heading ? (
+                          <h3 className={styles.rowSection}>{t(`list.sections.${heading}`)}</h3>
+                        ) : null}
+                        {/* biome-ignore lint/a11y/noStaticElementInteractions: dragging a row is a pointer shortcut; every move it makes is also a keyboard-reachable button (row checkbox, bulk and reader actions). */}
+                        <div
+                          className={styles.messageRow}
+                          data-unread={unread || undefined}
+                          draggable={draggableRow}
+                          onDragStart={(event) => {
+                            const keys = checkedIds.has(rowKey(row))
+                              ? checkedRows.map(rowKey)
+                              : [rowKey(row)];
+                            event.dataTransfer.setData(MAIL_DRAG_TYPE, JSON.stringify(keys));
+                            event.dataTransfer.effectAllowed = "move";
                           }}
-                          aria-pressed={
-                            selection?.id === row.id && selection?.mailboxId === row.mailboxId
-                          }
-                          onClick={() => openRow(row)}
                         >
-                          <div className={styles.rowMeta}>
-                            <span>
-                              {unread ? (
-                                <span className={styles.visuallyHidden}>
-                                  {t("organization.unread")}:{" "}
-                                </span>
-                              ) : null}
-                              {blocked
-                                ? t("safety.quarantineTitle")
-                                : participant || t("noRecipient")}
-                              {!blocked && row.threadCount > 1 ? (
-                                <span
-                                  className={styles.threadCount}
-                                  title={t("thread.count", { count: row.threadCount })}
-                                >
-                                  <span className={styles.visuallyHidden}>
-                                    {t("thread.count", { count: row.threadCount })}
-                                  </span>
-                                  <span aria-hidden="true">{row.threadCount}</span>
-                                </span>
-                              ) : null}
-                            </span>
-                            {!blocked && row.attachmentCount ? (
-                              <span
-                                className={styles.rowAttachment}
-                                role="img"
-                                aria-label={t("attachmentsCount", { count: row.attachmentCount })}
-                                title={t("attachmentsCount", { count: row.attachmentCount })}
-                              >
-                                <MailboxFolderIcon name="attachment" />
-                              </span>
-                            ) : null}
-                            <time title={date(row.date)} dateTime={row.date.toISOString()}>
-                              {listDate(row.date)}
-                            </time>
-                          </div>
-                          <strong>
-                            {blocked ? t("safety.blockedMessage") : row.subject || t("noSubject")}
-                          </strong>
-                          <p>{blocked ? t("safety.blockedPreview") : row.snippet}</p>
-                          {rowStatus ? (
-                            <div className={styles.rowBadges}>
-                              {blocked ? (
-                                <span className={styles.warningBadge}>{t("quarantine")}</span>
-                              ) : null}
-                              {!blocked && rowApproval ? (
-                                <span>
-                                  {t(rowApproval.key, {
-                                    label: "label" in rowApproval ? rowApproval.label : "",
+                          <div className={styles.rowQuickActions}>
+                            {movableRows.some((entry) => rowKey(entry) === rowKey(row)) ? (
+                              <label className={styles.rowSelectionTarget}>
+                                <input
+                                  type="checkbox"
+                                  className="ms-checkbox"
+                                  aria-label={t("organization.selectMessage", {
+                                    subject: blocked
+                                      ? t("safety.blockedMessage")
+                                      : row.subject || t("noSubject"),
                                   })}
-                                </span>
-                              ) : null}
-                              {!blocked && row.approvalRequested && !row.sendStatus ? (
-                                <span className={styles.warningBadge}>
-                                  {t("approval.requested")}
-                                </span>
-                              ) : null}
-                              {!blocked && row.sendStatus ? (
-                                <span>{t(`deliveryStatus.${row.sendStatus}`)}</span>
-                              ) : null}
-                            </div>
-                          ) : null}
-                          {showRowAddress ? (
-                            <small className={styles.rowAddress} title={row.address}>
-                              {row.address}
-                            </small>
-                          ) : null}
-                        </button>
-                        {rowOrganizable ? (
+                                  checked={checkedIds.has(rowKey(row))}
+                                  disabled={bulkBusy}
+                                  onChange={(event) =>
+                                    setCheckedIds((previous) => {
+                                      const next = new Set(previous);
+                                      if (event.target.checked) next.add(rowKey(row));
+                                      else next.delete(rowKey(row));
+                                      return next;
+                                    })
+                                  }
+                                />
+                              </label>
+                            ) : null}
+                          </div>
                           <button
                             type="button"
-                            className={`${styles.starButton} ${styles.rowStar}`}
-                            aria-label={t(
-                              row.starredAt
-                                ? "organization.removeFavorite"
-                                : "organization.addFavorite",
-                            )}
-                            aria-pressed={!!row.starredAt}
-                            disabled={starMutation.isPending || bulkBusy}
-                            onClick={() => void changeStar(row)}
+                            className={styles.messageRowOpen}
+                            ref={(button) => {
+                              const key = `${row.mailboxId}:${row.id}`;
+                              if (button) rowButtons.current.set(key, button);
+                              else rowButtons.current.delete(key);
+                            }}
+                            aria-pressed={
+                              selection?.id === row.id && selection?.mailboxId === row.mailboxId
+                            }
+                            onClick={() => openRow(row)}
                           >
-                            <MailboxFolderIcon name="favorites" filled={!!row.starredAt} />
+                            {prefs.showAvatars ? (
+                              <span
+                                className={styles.rowAvatar}
+                                aria-hidden="true"
+                                style={
+                                  {
+                                    "--avatar-hue": mailboxAvatarHue(avatarAddress),
+                                  } as CSSProperties
+                                }
+                              >
+                                {blocked ? "!" : mailboxInitials(avatarName, avatarAddress)}
+                              </span>
+                            ) : null}
+                            <span className={styles.rowBody}>
+                              <div className={styles.rowMeta}>
+                                <span>
+                                  {unread ? (
+                                    <span className={styles.visuallyHidden}>
+                                      {t("organization.unread")}:{" "}
+                                    </span>
+                                  ) : null}
+                                  {blocked
+                                    ? t("safety.quarantineTitle")
+                                    : participant || t("noRecipient")}
+                                  {!blocked && row.threadCount > 1 ? (
+                                    <span
+                                      className={styles.threadCount}
+                                      title={t("thread.count", { count: row.threadCount })}
+                                    >
+                                      <span className={styles.visuallyHidden}>
+                                        {t("thread.count", { count: row.threadCount })}
+                                      </span>
+                                      <span aria-hidden="true">{row.threadCount}</span>
+                                    </span>
+                                  ) : null}
+                                </span>
+                                {!blocked && row.attachmentCount ? (
+                                  <span
+                                    className={styles.rowAttachment}
+                                    role="img"
+                                    aria-label={t("attachmentsCount", {
+                                      count: row.attachmentCount,
+                                    })}
+                                    title={t("attachmentsCount", { count: row.attachmentCount })}
+                                  >
+                                    <MailboxFolderIcon name="attachment" />
+                                  </span>
+                                ) : null}
+                                <time title={date(row.date)} dateTime={row.date.toISOString()}>
+                                  {listDate(row.date)}
+                                </time>
+                              </div>
+                              <strong>
+                                {blocked
+                                  ? t("safety.blockedMessage")
+                                  : row.subject || t("noSubject")}
+                              </strong>
+                              <p>{blocked ? t("safety.blockedPreview") : row.snippet}</p>
+                              {rowStatus ? (
+                                <div className={styles.rowBadges}>
+                                  {blocked ? (
+                                    <span className={styles.warningBadge}>{t("quarantine")}</span>
+                                  ) : null}
+                                  {!blocked && rowApproval ? (
+                                    <span>
+                                      {t(rowApproval.key, {
+                                        label: "label" in rowApproval ? rowApproval.label : "",
+                                      })}
+                                    </span>
+                                  ) : null}
+                                  {!blocked && row.approvalRequested && !row.sendStatus ? (
+                                    <span className={styles.warningBadge}>
+                                      {t("approval.requested")}
+                                    </span>
+                                  ) : null}
+                                  {!blocked && row.sendStatus ? (
+                                    <span>{t(`deliveryStatus.${row.sendStatus}`)}</span>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              {showRowAddress ? (
+                                <small className={styles.rowAddress} title={row.address}>
+                                  {row.address}
+                                </small>
+                              ) : null}
+                            </span>
                           </button>
-                        ) : null}
-                      </div>
+                          {rowOrganizable ? (
+                            <button
+                              type="button"
+                              className={`${styles.starButton} ${styles.rowStar}`}
+                              aria-label={t(
+                                row.starredAt
+                                  ? "organization.removeFavorite"
+                                  : "organization.addFavorite",
+                              )}
+                              aria-pressed={!!row.starredAt}
+                              disabled={starMutation.isPending || bulkBusy}
+                              onClick={() => void changeStar(row)}
+                            >
+                              <MailboxFolderIcon name="favorites" filled={!!row.starredAt} />
+                            </button>
+                          ) : null}
+                        </div>
+                      </Fragment>
                     );
                   })}
+                  {listing.hasNextPage ? (
+                    <div className={styles.loadMore}>
+                      <button
+                        type="button"
+                        className="ms-btn ms-btn-ghost"
+                        disabled={listing.isFetchingNextPage}
+                        onClick={() => void listing.fetchNextPage()}
+                      >
+                        {t(listing.isFetchingNextPage ? "list.loadingMore" : "list.loadMore")}
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className={styles.emptyFolder}>
@@ -2211,7 +2332,7 @@ export function MailboxContentView({
                   ) : null}
                 </div>
               )}
-              {listing.data?.limited && !listing.isError ? (
+              {mailboxesTruncated && !listing.isError ? (
                 <p className={styles.notice}>{t("listLimit")}</p>
               ) : null}
             </div>
@@ -2308,9 +2429,23 @@ export function MailboxContentView({
                     aria-label={t("organization.markUnread")}
                     title={t("organization.markUnread")}
                     onClick={() => {
+                      const message = t("organization.markedUnread");
                       void changeSeen([selectedRow], false, false);
                       select(null);
-                      setNotice(t("organization.markedUnread"));
+                      setNotice(message);
+                      offerUndo(message, [
+                        async () => {
+                          setSeenOverride((current) => ({
+                            ...current,
+                            [rowKey(selectedRow)]: true,
+                          }));
+                          await seenMutation.mutateAsync({
+                            mailboxId: selectedRow.mailboxId,
+                            id: selectedRow.id,
+                            seen: true,
+                          });
+                        },
+                      ]);
                     }}
                   >
                     <MailboxFolderIcon name="unread" />

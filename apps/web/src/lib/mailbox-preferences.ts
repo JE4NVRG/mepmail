@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import { CORREIO_PREFS_KEY } from "./mailbox-preferences-prepaint";
 import { applyTheme } from "./theme";
 import { useTRPC } from "./trpc";
 
@@ -14,7 +15,7 @@ import { useTRPC } from "./trpc";
  * writes changes back with a short debounce.
  */
 
-export const CORREIO_PREFS_KEY = "mepmail.correio.prefs";
+export { CORREIO_PREFS_KEY, CORREIO_PREFS_PREPAINT_SCRIPT } from "./mailbox-preferences-prepaint";
 
 const FIELDS = {
   theme: z.enum(["system", "light", "dark"]),
@@ -93,12 +94,14 @@ function writeLocalCorreioPrefs(prefs: CorreioPrefs): void {
 
 /** The attributes the CSS reads, applied to <html> so they survive remounts. */
 export function applyCorreioLayout(
-  prefs: Pick<CorreioPrefs, "density" | "readingPane" | "previewLines">,
+  prefs: Pick<CorreioPrefs, "density" | "readingPane" | "previewLines" | "showAvatars">,
 ): void {
   const root = document.documentElement;
   root.dataset.density = prefs.density;
   root.dataset.readingPane = prefs.readingPane;
   root.dataset.previewLines = String(prefs.previewLines);
+  if (prefs.showAvatars) delete root.dataset.avatars;
+  else root.dataset.avatars = "off";
 }
 
 /**
@@ -120,13 +123,6 @@ export function applyCorreioTheme(theme: CorreioPrefs["theme"]): () => void {
   media.addEventListener("change", follow);
   return () => media.removeEventListener("change", follow);
 }
-
-/**
- * Inlined before the first paint of a Correio page: reads the local mirror and
- * applies the layout attributes, plus the device theme when "system" is set,
- * so the page never flashes the defaults.
- */
-export const CORREIO_PREFS_PREPAINT_SCRIPT = `try{var p=JSON.parse(localStorage.getItem(${JSON.stringify(CORREIO_PREFS_KEY)})||"{}"),r=document.documentElement;r.dataset.density=p.density==="compact"?"compact":"comfortable";r.dataset.readingPane=p.readingPane==="bottom"||p.readingPane==="off"?p.readingPane:"right";r.dataset.previewLines=p.previewLines===0||p.previewLines===2?String(p.previewLines):"1";if(p.theme==="system"){if(matchMedia("(prefers-color-scheme: light)").matches)r.setAttribute("data-theme","light");else r.removeAttribute("data-theme")}}catch(e){}`;
 
 const DEBOUNCE_MS = 400;
 
@@ -223,9 +219,9 @@ export function useCorreioPrefs(): {
   );
 
   const prefs = { ...local, ...overrides } as CorreioPrefs;
-  const { density, readingPane, previewLines } = prefs;
+  const { density, readingPane, previewLines, showAvatars } = prefs;
   useEffect(() => {
-    applyCorreioLayout({ density, readingPane, previewLines });
-  }, [density, readingPane, previewLines]);
+    applyCorreioLayout({ density, readingPane, previewLines, showAvatars });
+  }, [density, readingPane, previewLines, showAvatars]);
   return { prefs, loaded: !!query.data || query.isError, setPref, resetPrefs };
 }

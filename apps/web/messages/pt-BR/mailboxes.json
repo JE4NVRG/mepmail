@@ -809,5 +809,17 @@
   "coach": {
     "text": "J e K navegam, E arquiva, S favorita, ? mostra todos os atalhos.",
     "dismiss": "Entendi"
+  },
+  "list": {
+    "loadMore": "Carregar mais",
+    "loadingMore": "Carregando…",
+    "newArrivals": "{count, plural, one {# nova mensagem} other {# novas mensagens}}",
+    "sections": {
+      "today": "Hoje",
+      "yesterday": "Ontem",
+      "week": "Últimos 7 dias",
+      "month": "Este mês",
+      "older": "Mais antigas"
+    }
   }
 }

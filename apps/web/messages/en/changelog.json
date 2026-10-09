@@ -23,6 +23,30 @@
   },
   "releases": [
     {
+      "version": "0.80",
+      "date": "2026-10-09",
+      "title": "A message list that is easier to read",
+      "summary": "The inbox groups messages by date, shows each sender's initials, loads more messages with no limit and lets you undo bulk actions.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Today, Yesterday and Last 7 days sections that stay at the top while you scroll.",
+            "Colored initials for each sender next to the message (you can hide them in the View menu).",
+            "“Load more” at the end of the list, without the old 50-message limit; J on the last row loads too.",
+            "A “new messages” notice when mail arrives while you are further down the list.",
+            "Undo for bulk mark read or unread, move to folder and spam; “mark as unread” in the reader."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "When Mail opens, density, preview and reading pane already look the way you left them, with no flash of the defaults."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.79",
       "date": "2026-10-09",
       "title": "Easy folders and an inbox your way",

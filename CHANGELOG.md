@@ -7,6 +7,27 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.80] - 2026-10-09
+
+New inbox, cut 1C (from the desktop session): list and reader.
+
+### Added
+
+- Cursor pages through `mailboxes.items` (infinite query on `nextCursor`) with
+  "Load more" (also J on the last row); sticky Today / Yesterday / Last 7 days
+  sections (`lib/mailbox-list-presentation.ts`); initials avatars with a
+  stable per-sender hue (hidden with `showAvatars: false`); a "n new messages"
+  chip when unread mail arrives while the list is scrolled; undo for bulk
+  mark read/unread, move to folder and spam/not spam; "mark as unread" in the
+  reader; highlighted bulk bar.
+
+### Fixed
+
+- `src/app/(mail)/layout.tsx` inlines the preferences pre-paint script
+  (`lib/mailbox-preferences-prepaint.ts`, a module without "use client"), so
+  density, preview lines, reading pane, avatars and a "system" theme apply
+  before the first paint.
+
 ## [0.79] - 2026-10-09
 
 New inbox, cuts 1A and 1B (from the desktop session): folders and display preferences.

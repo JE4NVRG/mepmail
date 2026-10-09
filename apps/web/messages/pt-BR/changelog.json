@@ -28,6 +28,30 @@
   },
   "releases": [
     {
+      "version": "0.80",
+      "date": "2026-10-09",
+      "title": "Uma lista de mensagens mais fácil de ler",
+      "summary": "A caixa de entrada agrupa as mensagens por data, mostra as iniciais de quem enviou, carrega mais mensagens sem limite e deixa desfazer as ações em massa.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Seções Hoje, Ontem e Últimos 7 dias, que ficam no topo enquanto você rola.",
+            "Iniciais coloridas de cada remetente ao lado da mensagem (dá para esconder no menu Exibição).",
+            "“Carregar mais” no fim da lista, sem o limite antigo de 50 mensagens; J na última linha também carrega.",
+            "Aviso “novas mensagens” quando chega e-mail enquanto você está mais abaixo na lista.",
+            "Desfazer em marcar como lida ou não lida em massa, mover para pasta e spam; “marcar como não lida” no leitor."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Ao abrir o Correio, densidade, prévia e painel de leitura já aparecem como você deixou, sem piscar o padrão."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.79",
       "date": "2026-10-09",
       "title": "Pastas fáceis e uma caixa de entrada do seu jeito",
