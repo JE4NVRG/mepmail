@@ -7,6 +7,18 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.66] - 2026-10-09
+
+Support entry points for signed-in users.
+
+### Added
+
+- Dashboard sidebar "Support" link (`/support#chat`, document navigation so
+  the /support policy loads the chat); `EloziSupport` opens the chat once when
+  the page loads with `#chat` and clears the hash.
+- Correio app header "Support" button, opening `/support#chat` in a new tab;
+  hidden on narrow screens like the long back label.
+
 ## [0.65] - 2026-10-09
 
 Support chat copy on /support.

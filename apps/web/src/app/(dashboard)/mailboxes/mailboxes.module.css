@@ -2431,7 +2431,8 @@
     padding: 6px 8px;
     font-size: 12.5px;
   }
-  .backLong {
+  .backLong,
+  .supportLink {
     display: none;
   }
   .backShort {

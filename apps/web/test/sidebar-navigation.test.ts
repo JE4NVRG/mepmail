@@ -82,6 +82,8 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(initialLinks.filter((href) => href === "/settings")).toHaveLength(1);
       expect(initialLinks).toContain("https://docs.mepmail.dev");
       expect(initialLinks).toContain("/source");
+      // Document navigation to the page that loads and opens the support chat.
+      expect(initialLinks).toContain("/support#chat");
       for (const pathname of ["/domains/new", "/settings/connected-apps", "/emails/123"]) {
         state.pathname = pathname;
         const { html, nav } = navMarkup(locale);

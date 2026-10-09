@@ -37,6 +37,11 @@ export function EloziSupport({
     if (!config) return;
     const current = createEloziSupportSession(config, setStatus);
     session.current = current;
+    // The dashboard's Support link lands on /support#chat: open the chat once.
+    if (window.location.hash === "#chat") {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      void current.open();
+    }
     return () => {
       current.destroy();
       session.current = null;

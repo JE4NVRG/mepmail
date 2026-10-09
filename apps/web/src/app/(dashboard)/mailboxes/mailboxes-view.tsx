@@ -928,6 +928,15 @@ export function MailboxesView({
                 + {t("new")}
               </button>
             ) : null}
+            {/* A new tab keeps the inbox open; /support#chat opens the support chat. */}
+            <a
+              className={`ms-btn ms-btn-ghost ${styles.supportLink}`}
+              href="/support#chat"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("app.support")}
+            </a>
             <Link className="ms-btn ms-btn-ghost" href="/emails" aria-label={t("app.back")}>
               <span className={styles.backLong}>{t("app.back")}</span>
               <span className={styles.backShort} aria-hidden="true">

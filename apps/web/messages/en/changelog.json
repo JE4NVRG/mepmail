@@ -23,6 +23,21 @@
   },
   "releases": [
     {
+      "version": "0.66",
+      "date": "2026-10-09",
+      "title": "One-click support from the dashboard",
+      "summary": "Signed-in users reach the support chat straight from the dashboard and from Correio.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A \"Support\" item in the dashboard sidebar opens the support page with the chat already open.",
+            "A \"Support\" button at the top of Correio opens it in a new tab, so your inbox stays open."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.65",
       "date": "2026-10-09",
       "title": "A more useful support chat",

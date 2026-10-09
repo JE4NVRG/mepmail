@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.66",
+      "date": "2026-10-09",
+      "title": "Suporte a um clique no painel",
+      "summary": "Quem está logado chega ao chat de suporte direto do painel e do Correio.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Item \"Suporte\" na barra lateral do painel: abre a página de suporte já com o chat aberto.",
+            "Botão \"Suporte\" no topo do Correio, em uma nova aba, para não fechar a sua caixa."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.65",
       "date": "2026-10-09",
       "title": "Chat de suporte mais útil",

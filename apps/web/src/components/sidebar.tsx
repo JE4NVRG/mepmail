@@ -316,6 +316,24 @@ export function Sidebar({
           ))}
         </section>
         <section className={styles.navResources} aria-label={t("products.resources")}>
+          {/* Document navigation: the /support policy loads the chat, which opens on #chat. */}
+          <a href="/support#chat">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              style={{ flex: "none", display: "block" }}
+            >
+              <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" />
+            </svg>
+            {t("support")}
+          </a>
           <a href={DOCS_URL} target="_blank" rel="noreferrer">
             <svg
               width="16"
