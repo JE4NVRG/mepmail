@@ -424,6 +424,15 @@
     "you": "Você",
     "count": "{count} mensagens nesta conversa"
   },
+  "notices": {
+    "enable": "Avisar e-mails novos",
+    "disable": "Parar os avisos de e-mails novos",
+    "enabled": "Avisos ligados: o navegador avisa quando chegar e-mail com o Correio em outra aba.",
+    "disabled": "Avisos de e-mails novos desligados.",
+    "blocked": "O navegador bloqueou os avisos deste site. Libere nas configurações do site e tente de novo.",
+    "unsupported": "Este navegador não mostra avisos.",
+    "newMail": "E-mail novo"
+  },
   "shortcuts": {
     "title": "Atalhos de teclado",
     "close": "Fechar",

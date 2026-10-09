@@ -424,6 +424,15 @@
     "you": "You",
     "count": "{count} messages in this conversation"
   },
+  "notices": {
+    "enable": "Notify me of new email",
+    "disable": "Stop new email notifications",
+    "enabled": "Notifications on: the browser tells you when email arrives while Correio is in another tab.",
+    "disabled": "New email notifications off.",
+    "blocked": "The browser blocked notifications for this site. Allow them in the site settings and try again.",
+    "unsupported": "This browser does not show notifications.",
+    "newMail": "New email"
+  },
   "shortcuts": {
     "title": "Keyboard shortcuts",
     "close": "Close",

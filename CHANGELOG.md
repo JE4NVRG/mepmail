@@ -7,6 +7,23 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.70] - 2026-10-09
+
+Correio: new mail notifications.
+
+### Added
+
+- Opt-in browser notifications (bell in the inbox toolbar, preference in
+  localStorage `mepmail.correio.notices`): `newUnreadArrivals` treats the
+  first listing of a scope as the baseline and then notifies, at most three
+  at a time, for unread received messages not seen before, only while the
+  tab is hidden; clicking a notification opens the message.
+
+### Fixed
+
+- The conversation count chip stays inline (row spans are display: block)
+  and the earlier messages above an open message stay inside the reader.
+
 ## [0.69] - 2026-10-09
 
 Correio conversations.

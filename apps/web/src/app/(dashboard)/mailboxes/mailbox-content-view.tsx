@@ -28,6 +28,11 @@ import {
   mailboxSendApproval,
 } from "@/lib/mailbox-inbox-presentation";
 import {
+  newUnreadArrivals,
+  readNoticePreference,
+  writeNoticePreference,
+} from "@/lib/mailbox-notifications";
+import {
   isRecipientAddress,
   mailboxContacts,
   readRecentRecipients,
@@ -860,6 +865,9 @@ export function MailboxContentView({
     steps: (() => Promise<unknown>)[];
   } | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Browser notices for new mail while Correio sits in another tab (opt-in).
+  const [noticesOn, setNoticesOn] = useState(false);
+  const knownRows = useRef<Set<string> | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   // One window listener reads the current render through this ref.
   const shortcut = useRef<(event: KeyboardEvent) => void>(() => {});
@@ -945,6 +953,13 @@ export function MailboxContentView({
       composerSession.current = null;
       mounted.current = false;
     };
+  }, []);
+  useEffect(() => {
+    setNoticesOn(
+      readNoticePreference() &&
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted",
+    );
   }, []);
   useEffect(() => {
     const listener = (event: KeyboardEvent) => shortcut.current(event);
@@ -1061,6 +1076,7 @@ export function MailboxContentView({
       setNotice("");
       setUndo(null);
       setUnreadOnly(false);
+      knownRows.current = null;
     }
   }, [organizationScope]);
   async function changeStar(row: {
@@ -1537,6 +1553,54 @@ export function MailboxContentView({
       if (mounted.current) void refresh();
     }
   }
+  const listed = listing.data?.items;
+  useEffect(() => {
+    if (!listed || folder !== "inbox") return;
+    const { known, arrivals } = newUnreadArrivals(knownRows.current, listed);
+    knownRows.current = known;
+    if (
+      !noticesOn ||
+      !arrivals.length ||
+      typeof Notification === "undefined" ||
+      Notification.permission !== "granted" ||
+      document.visibilityState !== "hidden"
+    )
+      return;
+    for (const row of arrivals.slice(0, 3)) {
+      const notice = new Notification(row.fromName || row.from || t("notices.newMail"), {
+        body: row.subject || t("noSubject"),
+        tag: `${row.mailboxId}:${row.id}`,
+      });
+      notice.onclick = () => {
+        window.focus();
+        select({ mailboxId: row.mailboxId, id: row.id });
+        notice.close();
+      };
+    }
+  }, [listed, folder, noticesOn, select, t]);
+  async function toggleNotices() {
+    if (typeof Notification === "undefined") {
+      setNotice(t("notices.unsupported"));
+      return;
+    }
+    if (noticesOn) {
+      setNoticesOn(false);
+      writeNoticePreference(false);
+      setNotice(t("notices.disabled"));
+      return;
+    }
+    const permission =
+      Notification.permission === "default"
+        ? await Notification.requestPermission()
+        : Notification.permission;
+    if (permission !== "granted") {
+      setNotice(t("notices.blocked"));
+      return;
+    }
+    setNoticesOn(true);
+    writeNoticePreference(true);
+    setNotice(t("notices.enabled"));
+  }
   const hasRows = !listing.isError && !listing.isPending && rows.length > 0;
   const unreadTotal =
     listing.data?.items.filter(
@@ -1686,6 +1750,29 @@ export function MailboxContentView({
               onClick={() => void refresh()}
             >
               <MailboxFolderIcon name="refresh" />
+            </button>
+            <button
+              type="button"
+              className={`ms-btn ms-btn-ghost ${styles.narrowHidden}`}
+              aria-label={t(noticesOn ? "notices.disable" : "notices.enable")}
+              title={t(noticesOn ? "notices.disable" : "notices.enable")}
+              aria-pressed={noticesOn}
+              onClick={() => void toggleNotices()}
+            >
+              <svg
+                aria-hidden="true"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill={noticesOn ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M6 9a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8" />
+                <path d="M10.3 21a1.9 1.9 0 0 0 3.4 0" />
+              </svg>
             </button>
             <button
               type="button"

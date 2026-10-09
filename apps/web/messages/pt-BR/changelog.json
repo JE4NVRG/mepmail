@@ -28,6 +28,24 @@
   },
   "releases": [
     {
+      "version": "0.70",
+      "date": "2026-10-09",
+      "title": "Aviso de e-mail novo no Correio",
+      "summary": "Com o Correio aberto em outra aba, o navegador avisa quando chega e-mail.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Botão de sino no topo da caixa de entrada liga os avisos do navegador para e-mails novos; clicar no aviso abre a mensagem."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": ["O número de mensagens da conversa fica na mesma linha do remetente."]
+        }
+      ]
+    },
+    {
       "version": "0.69",
       "date": "2026-10-09",
       "title": "Conversas no Correio",

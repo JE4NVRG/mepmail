@@ -23,6 +23,24 @@
   },
   "releases": [
     {
+      "version": "0.70",
+      "date": "2026-10-09",
+      "title": "New email notifications in Correio",
+      "summary": "With Correio open in another tab, the browser tells you when email arrives.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A bell button at the top of the inbox turns on browser notifications for new email; clicking one opens the message."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": ["The conversation count sits on the sender's line."]
+        }
+      ]
+    },
+    {
       "version": "0.69",
       "date": "2026-10-09",
       "title": "Conversations in Correio",
