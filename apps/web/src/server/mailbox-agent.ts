@@ -1,16 +1,20 @@
 import { createHash } from "node:crypto";
-import { accountEmailFrom } from "@millionsend/config";
+import { accountEmailFrom, env } from "@millionsend/config";
 import {
   accountLocale,
   appendMailboxActivity,
   claimNotification,
+  deriveInternalActorKey,
+  INTERNAL_ACTOR_HEADER,
   MailboxAgentAccessError,
+  type MailboxAgentCredential,
   type MailboxAgentScope,
   MailboxContentError,
   type MailboxSelector,
   MailboxServiceError,
   parseMailboxSelector,
   queueMailboxAgentDraft,
+  verifyInternalActor,
   withMailboxAgentAccess,
 } from "@millionsend/core";
 import { getDb, schema } from "@millionsend/db";
@@ -60,7 +64,10 @@ export async function mailboxAgentRequest(
 }
 
 /** Any bearer-authenticated agent call that needs the raw credential (account listing). */
-export function mailboxAgentTokenRequest<T>(request: Request, run: (token: string) => Promise<T>) {
+export function mailboxAgentTokenRequest<T>(
+  request: Request,
+  run: (credential: MailboxAgentCredential) => Promise<T>,
+) {
   return mailboxAgentBearerRequest(request, run, (result) =>
     Response.json(result, { headers: MAILBOX_AGENT_HEADERS }),
   );
@@ -144,7 +151,7 @@ const APPROVAL_NOTICE_WINDOW_MS = 10 * 60_000;
  * carry the send permission, so the original refusal stands.
  */
 async function requestMailboxSendApproval(
-  token: string,
+  token: MailboxAgentCredential,
   input: { id: string; expectedRevision: number },
   mailbox: MailboxSelector | null,
 ) {
@@ -255,7 +262,11 @@ async function requestMailboxSendApproval(
 // API, so process memory is the shared counter; restarts only reset the window.
 const RATE_WINDOW_MS = 60_000;
 const agentWindows = new Map<string, { start: number; count: number }>();
-function agentRateLimit(token: string, now = Date.now()): number | null {
+function agentRateLimit(credential: MailboxAgentCredential, now = Date.now()): number | null {
+  const token =
+    typeof credential === "string"
+      ? credential
+      : `oauth:${credential.oauth.teamId}:${credential.oauth.userId}:${credential.oauth.clientId}`;
   const parsed = Number(process.env.MAILBOX_AGENT_RATE_LIMIT_PER_MINUTE);
   const limit = Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 120;
   const start = now - (now % RATE_WINDOW_MS);
@@ -269,23 +280,40 @@ function agentRateLimit(token: string, now = Date.now()): number | null {
   return count > limit ? Math.max(1, Math.ceil((start + RATE_WINDOW_MS - now) / 1000)) : null;
 }
 
+/**
+ * The credential a call carries: a bearer agent key (mmb_ one mailbox, mmt_ several), or,
+ * from the MCP server in the API on loopback, a signed internal actor naming the OAuth
+ * user, team and client whose consent granted mail. Nothing else authenticates here.
+ */
+function agentCredential(request: Request): MailboxAgentCredential | null {
+  const match = /^Bearer (mm[bt]_[A-Za-z0-9_.-]+)$/.exec(
+    request.headers.get("authorization") ?? "",
+  );
+  if (match) return match[1]!;
+  const header = request.headers.get(INTERNAL_ACTOR_HEADER);
+  if (!header || !env.MASTER_ENCRYPTION_KEY) return null;
+  const actor = verifyInternalActor(
+    deriveInternalActorKey(Buffer.from(env.MASTER_ENCRYPTION_KEY, "base64")),
+    header,
+  );
+  if (!actor?.clientId) return null;
+  return { oauth: { teamId: actor.teamId, userId: actor.userId, clientId: actor.clientId } };
+}
+
 async function mailboxAgentBearerRequest<T>(
   request: Request,
-  run: (token: string) => Promise<T>,
+  run: (credential: MailboxAgentCredential) => Promise<T>,
   respond: (result: T) => Response,
 ) {
   if (!mailboxRegistryEnabled())
     return new Response(null, { status: 404, headers: MAILBOX_AGENT_HEADERS });
-  // mmb_ is one mailbox's key; mmt_ a team credential over several mailboxes.
-  const match = /^Bearer (mm[bt]_[A-Za-z0-9_.-]+)$/.exec(
-    request.headers.get("authorization") ?? "",
-  );
-  if (!match)
+  const credential = agentCredential(request);
+  if (!credential)
     return Response.json(
       { error: "unauthorized" },
       { status: 401, headers: MAILBOX_AGENT_HEADERS },
     );
-  const retryAfter = agentRateLimit(match[1]!);
+  const retryAfter = agentRateLimit(credential);
   if (retryAfter !== null)
     return Response.json(
       { error: "rate_limited" },
@@ -295,7 +323,7 @@ async function mailboxAgentBearerRequest<T>(
       },
     );
   try {
-    return respond(await run(match[1]!));
+    return respond(await run(credential));
   } catch (error) {
     // A team credential with several mailboxes and no default must name one.
     if (error instanceof MailboxAgentAccessError && error.code === "mailbox_required")

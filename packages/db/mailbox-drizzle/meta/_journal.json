@@ -134,6 +134,13 @@
       "when": 1791039600018,
       "tag": "0018_mailbox_agent_key_last_used",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791039600019,
+      "tag": "0019_mailbox_agent_key_oauth",
+      "breakpoints": true
     }
   ]
 }

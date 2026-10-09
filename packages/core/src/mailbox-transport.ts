@@ -17,6 +17,7 @@ import type { Keyring } from "./crypto/keyring.js";
 import { appendMailboxActivity } from "./mailbox-activity.js";
 import {
   MailboxAgentAccessError,
+  type MailboxAgentCredential,
   type MailboxSelector,
   withMailboxAgentAccess,
   withMailboxAgentQueuedSendAccess,
@@ -648,7 +649,7 @@ export async function queueMailboxDraft(
 export async function queueMailboxAgentDraft(
   db: Db,
   keys: Keyring,
-  token: string,
+  token: MailboxAgentCredential,
   input: { id: string; expectedRevision: number },
   mime: MailboxTransportMimeAdapter,
   now = new Date(),

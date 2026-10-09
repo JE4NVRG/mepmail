@@ -1048,6 +1048,9 @@ export function MailboxesView({
             ) : settingsTab === "agents" ? (
               <section className={styles.settingsSection} aria-label={t("app.tabs.agents")}>
                 <p className={styles.hint}>{t("app.agentsHint")}</p>
+                {correioMcpUrl && teamAgentBoxes.length ? (
+                  <OAuthConnectCallout url={correioMcpUrl.replace(/\/correio$/, "")} />
+                ) : null}
                 {teamAgentBoxes.length ? (
                   <div className={styles.settingsRowActions}>
                     <button
@@ -1252,5 +1255,33 @@ export function MailboxesView({
       {workspace}
       {dialogs}
     </section>
+  );
+}
+
+/** The no-secret path: add the hosted MCP once and tick the mailboxes in the browser. */
+function OAuthConnectCallout({ url }: { url: string }) {
+  const t = useTranslations("mailboxes-agent.oauth");
+  const [copied, setCopied] = useState(false);
+  const command = `claude mcp add --transport http mepmail ${url}`;
+  return (
+    <div className={styles.oauthCallout}>
+      <strong>{t("title")}</strong>
+      <p>{t("body", { url })}</p>
+      <code>{command}</code>
+      <div className={styles.settingsRowActions}>
+        <button
+          type="button"
+          className="ms-btn"
+          onClick={() =>
+            void navigator.clipboard.writeText(command).then(
+              () => setCopied(true),
+              () => setCopied(false),
+            )
+          }
+        >
+          {copied ? t("copied") : t("copy")}
+        </button>
+      </div>
+    </div>
   );
 }

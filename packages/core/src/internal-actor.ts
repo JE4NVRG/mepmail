@@ -11,6 +11,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export interface InternalActor {
   teamId: string;
   userId: string;
+  /** The OAuth client the token was issued to, when the call acts through that client's grant. */
+  clientId?: string;
   /** Unix seconds after which the statement is refused. */
   exp: number;
 }
@@ -30,13 +32,14 @@ function signature(key: Buffer, payload: string): string {
 /** `<payload>.<signature>`, both base64url. */
 export function signInternalActor(
   key: Buffer,
-  actor: { teamId: string; userId: string },
+  actor: { teamId: string; userId: string; clientId?: string | undefined },
   now = Date.now(),
 ): string {
   const payload = Buffer.from(
     JSON.stringify({
       teamId: actor.teamId,
       userId: actor.userId,
+      ...(actor.clientId ? { clientId: actor.clientId } : {}),
       exp: Math.floor(now / 1000) + TTL_SECONDS,
     }),
   ).toString("base64url");
@@ -61,10 +64,16 @@ export function verifyInternalActor(
       typeof actor.teamId !== "string" ||
       typeof actor.userId !== "string" ||
       typeof actor.exp !== "number" ||
-      actor.exp < Math.floor(now / 1000)
+      actor.exp < Math.floor(now / 1000) ||
+      (actor.clientId !== undefined && typeof actor.clientId !== "string")
     )
       return null;
-    return { teamId: actor.teamId, userId: actor.userId, exp: actor.exp };
+    return {
+      teamId: actor.teamId,
+      userId: actor.userId,
+      ...(actor.clientId ? { clientId: actor.clientId } : {}),
+      exp: actor.exp,
+    };
   } catch {
     return null;
   }

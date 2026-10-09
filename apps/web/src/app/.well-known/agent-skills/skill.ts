@@ -126,7 +126,9 @@ key opens exactly one mailbox and carries the permissions the owner chose:
 - **From the main MCP server**, the ${B}mailboxes:read${B} and
   ${B}mailboxes:write${B} scopes add ${B}list_mailboxes${B}, ${B}create_mailbox${B}
   and ${B}create_mailbox_agent_key${B} (read/draft keys only). Those tools never
-  read mailbox content.
+  read mailbox content. The ${B}mail:read${B} and ${B}mail:draft${B} scopes add the
+  same ${B}mailbox_*${B} tools as the Correio server, without a key: they act only
+  in the mailboxes the person ticked on the consent screen.
 - Correio is paid per mailbox on top of a paying Send plan; each mailbox needs a
   verified domain and receiving turned on. Guide:
   <https://docs.mepmail.dev/mailboxes>

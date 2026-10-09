@@ -1,8 +1,9 @@
-import { ALL_TEAMS_GRANT } from "@millionsend/core";
+import { ALL_TEAMS_GRANT, revokeMailboxOAuthClient } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, exists, or } from "drizzle-orm";
 import { z } from "zod";
+import { mailboxRegistryEnabled } from "../mailboxes";
 import { listMemberships } from "../membership";
 import { router, teamProcedure } from "../trpc";
 
@@ -117,6 +118,15 @@ export const connectedAppsRouter = router({
         await tx.delete(schema.oauthRefreshToken).where(tokenScope(schema.oauthRefreshToken));
         await tx.delete(schema.oauthConsent).where(eq(schema.oauthConsent.id, consent.id));
       });
+      // Its mail grant goes too (it is already unusable without a token; this keeps the
+      // agents page honest). Best-effort: the app is cut off either way.
+      if (mailboxRegistryEnabled() && consent.userId && consent.referenceId !== ALL_TEAMS_GRANT) {
+        await revokeMailboxOAuthClient(
+          ctx.db,
+          { teamId: consent.referenceId ?? ctx.teamId, userId: consent.userId },
+          { clientId: consent.clientId },
+        ).catch((error: unknown) => console.warn("connected app mail grant revoke failed", error));
+      }
       return { id: consent.id };
     }),
 });

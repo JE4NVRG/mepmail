@@ -61,7 +61,8 @@
     "emptyBody": "Create one so an agent can serve more than one mailbox with the same key.",
     "mailboxCount": "{count, plural, =0 {no active mailbox} one {# mailbox} other {# mailboxes}}",
     "defaultBadge": "default",
-    "mcpHint": "Agents that speak MCP use these mailboxes as tools: each tool names the mailbox by address, and mailbox_list_accounts shows which ones are open. Pick the client, copy and paste; the text carries this key, so keep it just as safe."
+    "mcpHint": "Agents that speak MCP use these mailboxes as tools: each tool names the mailbox by address, and mailbox_list_accounts shows which ones are open. Pick the client, copy and paste; the text carries this key, so keep it just as safe.",
+    "oauthBadge": "connected over OAuth"
   },
   "clients": {
     "label": "MCP client",
@@ -112,5 +113,11 @@
     "label": "Quick expiry",
     "days": "{days, plural, =365 {1 year} other {# days}}",
     "never": "No expiry"
+  },
+  "oauth": {
+    "title": "Connect without pasting a key",
+    "body": "Add the MCP server {url} to your client (Claude Code, Claude Desktop, Cursor, VS Code). It opens the browser: you sign in, tick the mailboxes the agent may use and allow it. To revoke, use Revoke below or Connected apps.",
+    "copy": "Copy the Claude Code command",
+    "copied": "Copied"
   }
 }

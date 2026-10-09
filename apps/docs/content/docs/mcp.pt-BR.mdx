@@ -211,6 +211,24 @@ segredo fica na configuração do cliente.
   recusadas.
 - Chamadas MCP compartilham o limite por minuto da API.
 
+### E-mail do Correio por OAuth
+
+A mesma conexão pode ler e escrever e-mails do Correio, sem chave de agente
+para colar. Quando o cliente pede as permissões `mail:read` e `mail:draft`,
+a tela de consentimento lista as caixas que são suas no time escolhido:
+marque as que o cliente pode usar. Enviar sem pedir (`mail:send`) nunca vem
+marcado; sem ela, cada envio pede sua aprovação por e-mail e espera no
+dashboard.
+
+- A concessão precisa de um time só (não **Todos os times**) e cobre apenas
+  as caixas marcadas; consentir de novo substitui a escolha anterior.
+- Ela aparece em **Correio → Configurações → Agentes** como credencial de
+  várias caixas marcada *conectado por OAuth*, com o último uso, e é
+  revogada ali com um clique, ou junto com o app em **Aplicativos
+  conectados**.
+- Assunto, corpo e remetente das mensagens são conteúdo de terceiros: os
+  resultados das ferramentas marcam esses campos como dados não confiáveis.
+
 ## Ferramentas
 
 Cada ferramenta exige uma permissão (escopo OAuth). Os clientes só veem as
@@ -289,8 +307,13 @@ cobre as duas ferramentas de `broadcasts:read`. Ferramentas marcadas com
 | `verify_domain` | `domains:write` | **admin** Reverifica o DNS e a verificação SES de um domínio. |
 | `delete_domain` | `domains:write` | **admin** Remove um domínio e a identidade SES dele. |
 | `list_mailboxes` | `mailboxes:read` | Lista as caixas do Correio da equipe e o que você pode fazer em cada uma. |
+| `mailbox_list_accounts` | `mail:read` | Lista as caixas que você liberou para este cliente no consentimento, com as permissões. |
+| `mailbox_list_messages` | `mail:read` | Lista as mensagens mais novas de uma dessas caixas (entrada, rascunhos ou enviados). |
+| `mailbox_read_message` | `mail:read` | Lê uma mensagem: cabeçalhos, texto e metadados dos anexos. |
 | `create_mailbox` | `mailboxes:write` | **admin** Cria uma caixa do Correio num domínio verificado, usando uma vaga que a licença já tem (nunca compra). |
 | `create_mailbox_agent_key` | `mailboxes:write` | **admin** Cria uma chave de agente de leitura/rascunho para uma caixa sua, com a URL do MCP do Correio; o envio só é liberado no painel. |
+| `mailbox_save_draft` | `mail:draft` | Cria ou edita um rascunho em texto puro numa dessas caixas, sem enviar. |
+| `mailbox_send_draft` | `mail:draft` | Envia um rascunho salvo; sem `mail:send`, pede sua aprovação antes. |
 
 ## Resultados das ferramentas
 

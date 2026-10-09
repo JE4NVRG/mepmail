@@ -18,6 +18,7 @@ import {
 } from "@/lib/mailbox-setup";
 import { useTRPC } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
+import { MailboxDnsGuidePanel } from "./mailbox-dns-guide-panel";
 import styles from "./mailbox-setup-dialog.module.css";
 
 type Options = inferRouterOutputs<AppRouter>["mailboxes"]["options"];
@@ -263,6 +264,13 @@ export function MailboxSetupDialog({
               <p>
                 {t("mxDestination")} <code className={styles.mxHost}>{receiving.mxHost}</code>
               </p>
+            ) : null}
+            {receiving.state === "needs_mx" && domainId ? (
+              <MailboxDnsGuidePanel
+                domainId={domainId}
+                checking={receivingQuery.isFetching}
+                onRecheck={() => void receivingQuery.refetch()}
+              />
             ) : null}
           </div>
         </li>

@@ -102,6 +102,9 @@ export const MCP_SERVER_CARD = {
       "api-keys:write",
       "mailboxes:read",
       "mailboxes:write",
+      "mail:read",
+      "mail:draft",
+      "mail:send",
     ],
     instructionsUrl: "https://mepmail.dev/auth.md",
     description:

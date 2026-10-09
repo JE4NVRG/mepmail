@@ -543,5 +543,78 @@
   "invalidRecipient": "Corrija o endereço em vermelho: {address}",
   "recipientLimit": "Até 20 destinatários somando Para e Cc.",
   "recipientSuggestions": "Contatos sugeridos",
-  "replyQuote": "Em {date}, {sender} escreveu:\n{text}"
+  "replyQuote": "Em {date}, {sender} escreveu:\n{text}",
+  "dnsGuide": {
+    "title": "Como apontar o recebimento (MX)",
+    "provider": {
+      "cloudflare": "O DNS de {zone} está na Cloudflare.",
+      "registrobr": "O DNS de {zone} está no Registro.br.",
+      "godaddy": "O DNS de {zone} está na GoDaddy.",
+      "route53": "O DNS de {zone} está no AWS Route 53.",
+      "hostinger": "O DNS de {zone} está na Hostinger.",
+      "locaweb": "O DNS de {zone} está na Locaweb.",
+      "other": "O DNS de {zone} é servido por {nameservers}."
+    },
+    "providerName": {
+      "cloudflare": "Cloudflare",
+      "registrobr": "Registro.br",
+      "godaddy": "GoDaddy",
+      "route53": "Route 53",
+      "hostinger": "Hostinger",
+      "locaweb": "Locaweb",
+      "other": "provedor de DNS"
+    },
+    "currentKnown": "Hoje o e-mail de {domain} chega pelo {provider} ({hosts}). Trocar o MX leva todo o e-mail de qualquer endereço @{domain} para o Correio, e as caixas no {provider} param de receber. Se ainda usa o {provider}, crie as caixas do Correio num subdomínio (ex.: correio.{domain}) ou migre todas as caixas antes.",
+    "currentOther": "Hoje o MX de {domain} aponta para {hosts}. Trocar o MX leva todo o e-mail deste domínio para o Correio. Se esse servidor ainda recebe e-mail que você usa, crie as caixas num subdomínio (ex.: correio.{domain}).",
+    "type": "Tipo",
+    "name": "Nome",
+    "value": "Valor",
+    "priority": "Prioridade",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "copyLabel": "Copiar {field}",
+    "apexHint": "@ é o próprio domínio. Se o painel não aceitar @, deixe o nome em branco.",
+    "steps": {
+      "cloudflare": {
+        "1": "Na Cloudflare, abra a zona {zone} e vá em DNS → Records → Add record.",
+        "2": "Escolha MX, nome {name}, mail server {value} e prioridade 10. MX não passa pelo proxy, então não há nuvem laranja.",
+        "3": "Salve e volte aqui para verificar."
+      },
+      "registrobr": {
+        "1": "No Registro.br, entre no painel, abra {zone} e escolha Editar zona.",
+        "2": "Nova entrada: tipo MX, nome {name}, servidor {value}, prioridade 10.",
+        "3": "Salve a zona. O Registro.br pode levar alguns minutos para publicar."
+      },
+      "godaddy": {
+        "1": "Na GoDaddy, abra Meus domínios → {zone} → DNS.",
+        "2": "Adicionar novo registro: tipo MX, nome {name}, valor {value}, prioridade 10.",
+        "3": "Salve e volte aqui para verificar."
+      },
+      "route53": {
+        "1": "No AWS Route 53, abra a hosted zone {zone} e clique em Create record.",
+        "2": "Record name {name} (vazio para @), tipo MX, valor {value}: a prioridade vai junto, na frente.",
+        "3": "Crie o registro e volte aqui para verificar."
+      },
+      "hostinger": {
+        "1": "No hPanel da Hostinger, abra Domínios → {zone} → DNS / Nameservers.",
+        "2": "Adicione um registro MX: nome {name}, aponta para {value}, prioridade 10.",
+        "3": "Salve e volte aqui para verificar."
+      },
+      "locaweb": {
+        "1": "No painel da Locaweb, abra o domínio {zone} e a edição de DNS.",
+        "2": "Adicione um registro MX: nome {name}, destino {value}, prioridade 10.",
+        "3": "Salve e volte aqui para verificar."
+      },
+      "other": {
+        "1": "Abra o painel onde o DNS de {zone} é editado (o dono dos nameservers {nameservers}).",
+        "2": "Crie um registro MX: nome {name}, valor {value}, prioridade 10.",
+        "3": "Salve e volte aqui para verificar."
+      }
+    },
+    "removeOld": "Depois de criar o MX do Correio, apague os MX antigos ({hosts}). Com os dois juntos, parte do e-mail continua indo para o servidor antigo e o recebimento não é confirmado.",
+    "openProvider": "Abrir {provider}",
+    "checkNow": "Verificar agora",
+    "checking": "Verificando…",
+    "propagation": "A mudança no DNS costuma aparecer em poucos minutos, mas pode levar até algumas horas."
+  }
 }

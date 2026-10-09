@@ -382,3 +382,97 @@
     justify-content: center;
   }
 }
+
+/* The receiving (MX) assistant inside the domain readiness checks. */
+.dnsGuide {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-card);
+  background: var(--ms-inset);
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.dnsGuide h4 {
+  margin: 0;
+  font-size: 13px;
+}
+.dnsGuide p {
+  margin: 0;
+}
+.dnsWarning {
+  padding: 10px 12px;
+  border: 1px solid var(--ms-warn-border);
+  background: var(--ms-warn-bg);
+  border-radius: var(--ms-r-input);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.dnsRecord {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.dnsRecord > div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+.dnsRecord dt {
+  color: var(--ms-muted);
+  font-size: 12px;
+}
+.dnsRecord dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.dnsRecord code {
+  font-family: var(--ms-font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.dialog .copy {
+  min-height: 28px;
+}
+.copy {
+  flex: none;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ms-muted);
+  background: transparent;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-chip);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.copy:hover {
+  color: var(--ms-bone);
+  border-color: var(--ms-line-strong);
+}
+.dnsSteps {
+  margin: 0;
+  padding-left: 18px;
+  list-style: decimal;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+/* The guide sits inside a readiness check, whose rows are flex. */
+.checks .dnsSteps li {
+  display: list-item;
+  padding: 0;
+  border: 0;
+}
+@media (max-width: 520px) {
+  .dnsRecord > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

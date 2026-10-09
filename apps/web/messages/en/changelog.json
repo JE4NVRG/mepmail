@@ -23,6 +23,40 @@
   },
   "releases": [
     {
+      "version": "0.73",
+      "date": "2026-10-09",
+      "title": "Correio over MCP without pasting a key",
+      "summary": "The main MCP server now reads and writes Correio mail over OAuth: you tick the mailboxes in the browser and the agent connects, with no key to copy.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "New mail:read, mail:draft and mail:send permissions on the hosted MCP (https://api.mepmail.dev/mcp), with the mailbox_list_accounts, mailbox_list_messages, mailbox_read_message, mailbox_save_draft and mailbox_send_draft tools.",
+            "On the authorization screen you choose which of your mailboxes the app may use. Sending without approval starts unticked; without it, each send asks for your approval by email.",
+            "The connection shows up in Correio → Settings → Agents as a credential marked \"connected over OAuth\", with its last use, and is revoked in one click there or in Connected apps.",
+            "The Agents tab shows the command to connect without a key."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.72",
+      "date": "2026-10-09",
+      "title": "Receiving (MX) assistant in Correio",
+      "summary": "When you create a mailbox, Correio shows where the domain's DNS lives, the exact MX record to copy and where mail goes today.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "While the domain's MX is not pointed yet, the domain step detects the DNS host (Cloudflare, Registro.br, GoDaddy, Route 53, Hostinger, Locaweb or other) and shows its steps, with a button to open its panel.",
+            "The record to create is ready, with copy buttons for name and value; on a subdomain the name is already relative to the zone.",
+            "If the domain already receives mail elsewhere (Google, Microsoft, Purelymail, Titan and others), a warning explains that changing the MX sends all mail to Correio and suggests a subdomain.",
+            "A Check now button looks at DNS again without leaving the screen."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.71",
       "date": "2026-10-09",
       "title": "Connecting agents to Correio got easier",

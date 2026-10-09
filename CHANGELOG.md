@@ -7,6 +7,52 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.73] - 2026-10-09
+
+Correio mail on the hosted MCP over OAuth.
+
+### Added
+
+- OAuth scopes `mail:read`, `mail:draft` and `mail:send` (advertised by the
+  protected resource and the server card). With them the hosted `/mcp`
+  registers `mailbox_list_accounts`, `mailbox_list_messages`,
+  `mailbox_read_message` (reads, listed with the other reads) and
+  `mailbox_save_draft`, `mailbox_send_draft`, which call the dashboard's
+  agent API on loopback with a signed internal actor that now also carries
+  the OAuth client id.
+- The consent screen lists the person's own active mailboxes in the chosen
+  team (one team only) when a mail scope is requested; `mail:send` starts
+  unticked. On Allow, `mailboxes.grantOAuthClient` (team named explicitly,
+  membership re-checked) mints a team credential bound to the client
+  (`mailbox_agent_keys.oauth_client_id`, mailbox migration 0019) whose
+  secret is discarded; a new consent replaces the previous one.
+- `MailboxAgentCredential` (bearer secret or verified OAuth grant) in core:
+  `withMailboxAgentAccess`, `listMailboxAgentAccounts` and the send path
+  accept either; a bound credential is never reachable with a bearer and an
+  unbound one never through a grant. Revoking a connected app revokes its
+  mail credential; the agents page marks such credentials "connected over
+  OAuth" and shows the no-key connect command.
+- Docs: the MCP pages document the five tools and the consent flow.
+
+## [0.72] - 2026-10-09
+
+Correio receiving (MX) assistant.
+
+### Added
+
+- `mailboxes.receivingGuide` (read-only): for a team domain whose receiving
+  is configured, the zone that holds its NS (walking up from a subdomain),
+  the DNS host recognised from the nameservers, the current MX records with
+  any recognised mailbox provider, and the record to add
+  (`mailbox-dns-guide.ts`). Public DNS only; activation still goes through
+  the receiving readiness check.
+- `MailboxDnsGuidePanel` in the setup dialog while the domain needs its MX:
+  per-host steps (Cloudflare, Registro.br, GoDaddy, Route 53, Hostinger,
+  Locaweb, other) with a link to the host's panel, the MX record with copy
+  buttons (Route 53 gets the priority in the value), a warning naming the
+  provider that receives the domain's mail today, a reminder to delete the
+  old MX records and "Check now".
+
 ## [0.71] - 2026-10-09
 
 Correio agent setup, key health and expiry notices; MCP legacy names retired.

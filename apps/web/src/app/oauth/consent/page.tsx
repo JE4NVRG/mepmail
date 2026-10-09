@@ -1,11 +1,12 @@
 import { verifyOAuthQueryParams } from "@better-auth/oauth-provider";
 import { env } from "@millionsend/config";
 import { getDb, schema } from "@millionsend/db";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { httpOrigin } from "@/lib/http-url";
 import { getAuth, OAUTH_SCOPES } from "@/server/auth";
+import { mailboxRegistryEnabled } from "@/server/mailboxes";
 import { ACTIVE_TEAM_COOKIE, getActiveMembership, listMemberships } from "@/server/membership";
 import { ConsentForm } from "./consent-form";
 
@@ -55,6 +56,39 @@ export default async function ConsentPage({
     session.user.id,
     (await cookies()).get(ACTIVE_TEAM_COOKIE)?.value,
   );
+  // Mail scopes act only in mailboxes the person owns and ticks here, per team.
+  const mailboxes: Record<string, { id: string; address: string; label: string }[]> = {};
+  if (mailboxRegistryEnabled() && teams.length) {
+    try {
+      const rows = await db
+        .select({
+          id: schema.mailboxes.id,
+          teamId: schema.mailboxes.teamId,
+          address: schema.mailboxes.address,
+          label: schema.mailboxes.label,
+        })
+        .from(schema.mailboxes)
+        .where(
+          and(
+            eq(schema.mailboxes.ownerUserId, session.user.id),
+            eq(schema.mailboxes.status, "planned"),
+            inArray(
+              schema.mailboxes.teamId,
+              teams.map((team) => team.teamId),
+            ),
+          ),
+        )
+        .orderBy(asc(schema.mailboxes.address))
+        .limit(200);
+      for (const row of rows) {
+        const list = mailboxes[row.teamId] ?? [];
+        list.push(row);
+        mailboxes[row.teamId] = list;
+      }
+    } catch (error) {
+      console.warn("consent: mailbox list unavailable", error);
+    }
+  }
   // Only known scopes are described; the provider rejects unknown ones anyway.
   const scopes = (query.get("scope") ?? "")
     .split(" ")
@@ -84,6 +118,7 @@ export default async function ConsentPage({
       scopes={scopes}
       teams={teams.map(({ teamId, teamName, role }) => ({ teamId, teamName, role }))}
       defaultTeamId={active?.teamId ?? null}
+      mailboxes={mailboxes}
     />
   );
 }

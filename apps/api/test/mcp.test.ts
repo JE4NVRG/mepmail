@@ -377,6 +377,9 @@ describe("tool listing", () => {
       "list_domains",
       "get_domain",
       "list_mailboxes",
+      "mailbox_list_accounts",
+      "mailbox_list_messages",
+      "mailbox_read_message",
       "send_email",
       "send_email_batch",
       "update_email",
@@ -422,6 +425,8 @@ describe("tool listing", () => {
       "delete_domain",
       "create_mailbox",
       "create_mailbox_agent_key",
+      "mailbox_save_draft",
+      "mailbox_send_draft",
     ]);
     await full.close();
 

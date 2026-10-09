@@ -25,6 +25,12 @@ export const MCP_SCOPES = [
   // the seats the team already pays for (never a purchase).
   "mailboxes:read",
   "mailboxes:write",
+  // Correio mail content, only in the mailboxes the person ticks at consent:
+  // read messages, write drafts (and ask the owner to send them), and send
+  // without asking. A consent mints a team credential bound to the client.
+  "mail:read",
+  "mail:draft",
+  "mail:send",
 ] as const;
 
 export type McpScope = (typeof MCP_SCOPES)[number];

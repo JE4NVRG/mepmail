@@ -207,6 +207,23 @@ client's config.
   team, and calls into a team where you are a member are refused.
 - MCP calls share the API's per-minute rate limit.
 
+### Correio mail over OAuth
+
+The same connection can read and write Correio mail, with no agent key to
+paste. When the client asks for the `mail:read` and `mail:draft`
+permissions, the consent screen lists the mailboxes you own in the chosen
+team: tick the ones the client may use. Sending without asking
+(`mail:send`) is never pre-ticked; without it, every send emails you for
+approval and waits in the dashboard.
+
+- The grant needs a single team (not **All teams**) and covers only the
+  ticked mailboxes; consenting again replaces the previous choice.
+- It shows up in **Correio → Settings → Agents** as a multi-mailbox
+  credential marked *connected over OAuth*, with its last use, and is
+  revoked there in one click, or with the app under **Connected apps**.
+- Message subjects, bodies and senders are third-party content: tool
+  results mark them as untrusted data.
+
 ## Tools
 
 Each tool requires a permission (OAuth scope). Clients only see the tools
@@ -285,8 +302,13 @@ and admins.
 | `verify_domain` | `domains:write` | **admin** Re-check a domain's DNS and SES verification. |
 | `delete_domain` | `domains:write` | **admin** Remove a domain and its SES identity. |
 | `list_mailboxes` | `mailboxes:read` | List the team's Correio mailboxes and what you may do with each. |
+| `mailbox_list_accounts` | `mail:read` | List the mailboxes you allowed this client to use at consent, with their permissions. |
+| `mailbox_list_messages` | `mail:read` | List the newest messages in one of those mailboxes (inbox, drafts or sent). |
+| `mailbox_read_message` | `mail:read` | Read one message: headers, text and attachment metadata. |
 | `create_mailbox` | `mailboxes:write` | **admin** Create a Correio mailbox on a verified domain, using a seat the license already has (never a purchase). |
 | `create_mailbox_agent_key` | `mailboxes:write` | **admin** Create a read/draft agent key for a mailbox you own, with the Correio MCP URL; send is granted only in the dashboard. |
+| `mailbox_save_draft` | `mail:draft` | Create or edit a plain-text draft in one of those mailboxes, without sending. |
+| `mailbox_send_draft` | `mail:draft` | Send a saved draft; without `mail:send` it asks you to approve it first. |
 
 ## Tool results
 

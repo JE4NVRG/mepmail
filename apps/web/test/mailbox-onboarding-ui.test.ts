@@ -64,6 +64,8 @@ vi.mock("@tanstack/react-query", () => ({
     if (query.kind === "service") return fixture.service;
     if (query.kind === "receiving") return fixture.receiving;
     if (query.kind === "billing") return fixture.billing;
+    // The MX guide is public-DNS only; with no answer yet it renders nothing.
+    if (query.kind === "receivingGuide") return { data: undefined, isFetching: false };
     throw new Error("Unexpected onboarding query");
   },
   useMutation: (options: { kind: string }) => ({
@@ -80,20 +82,27 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/lib/trpc", () => ({
   useTRPC: () => ({
     mailboxes: Object.fromEntries(
-      ["service", "receiving", "billing", "create", "checkout", "manage", "verifyReceiving"].map(
-        (kind) => [
-          kind,
-          {
-            queryOptions: (input: unknown, options: Record<string, unknown>) => ({
-              kind,
-              input,
-              ...options,
-            }),
-            queryKey: () => ["mailboxes", kind],
-            mutationOptions: () => ({ kind }),
-          },
-        ],
-      ),
+      [
+        "service",
+        "receiving",
+        "receivingGuide",
+        "billing",
+        "create",
+        "checkout",
+        "manage",
+        "verifyReceiving",
+      ].map((kind) => [
+        kind,
+        {
+          queryOptions: (input: unknown, options: Record<string, unknown>) => ({
+            kind,
+            input,
+            ...options,
+          }),
+          queryKey: () => ["mailboxes", kind],
+          mutationOptions: () => ({ kind }),
+        },
+      ]),
     ),
   }),
 }));

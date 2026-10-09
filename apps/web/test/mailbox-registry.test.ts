@@ -290,6 +290,58 @@ describe("authenticated persistent mailbox registry", () => {
     await expect(db.delete(schema.domains).where(eq(schema.domains.id, domain))).rejects.toThrow();
     expect(await withMailboxDomainDeletion(db, otherTeam, otherDomain, external)).toBe("deleted");
   });
+  it("grants an OAuth client mail in the team the consent names, for a member only", async () => {
+    const id = await box();
+    await db.insert(schema.oauthClient).values({
+      id: "oauth-client-row-1",
+      clientId: "client-claude",
+      name: "Claude",
+      redirectUris: ["http://127.0.0.1:33418/callback"],
+    });
+    // The active team in the context does not decide where the grant lands.
+    const granted = await as("owner", otherTeam, "owner").mailboxes.grantOAuthClient({
+      teamId: team,
+      clientId: "client-claude",
+      mailboxIds: [id],
+    });
+    expect(granted).toEqual({ id: expect.any(String), mailboxes: 1 });
+    const rows = await db
+      .select()
+      .from(schema.mailboxAgentKeys)
+      .where(eq(schema.mailboxAgentKeys.groupId, granted.id));
+    expect(rows).toMatchObject([
+      {
+        teamId: team,
+        ownerUserId: "owner",
+        oauthClientId: "client-claude",
+        label: "Claude (OAuth)",
+      },
+    ]);
+    expect(rows[0]?.scopes).toEqual(["read", "draft"]);
+    await expect(
+      as("outsider", otherTeam).mailboxes.grantOAuthClient({
+        teamId: team,
+        clientId: "client-claude",
+        mailboxIds: [id],
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      as("owner").mailboxes.grantOAuthClient({
+        teamId: team,
+        clientId: "client-unknown",
+        mailboxIds: [id],
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    // A member cannot grant someone else's mailbox.
+    await expect(
+      as("member").mailboxes.grantOAuthClient({
+        teamId: team,
+        clientId: "client-claude",
+        mailboxIds: [id],
+      }),
+    ).rejects.toBeTruthy();
+  });
+
   it("stores a bounded per-box plaintext signature and preserves it when old clients omit the field", async () => {
     const id = await box({ signatureText: "Jean\r\nSuporte\rMepMail" });
     const entry = (await as().mailboxes.list()).mailboxes.find((row) => row.id === id)!;
@@ -328,7 +380,7 @@ describe("authenticated persistent mailbox registry", () => {
     expect((await db.select().from(schema.mailboxes)).length).toBe(1);
     expect(
       (await client.query("select count(*) as count from drizzle.__mailbox_migrations")).rows[0],
-    ).toMatchObject({ count: 19 });
+    ).toMatchObject({ count: 20 });
     expect(
       (await client.query("select to_regclass('drizzle.__drizzle_migrations') as ledger")).rows[0],
     ).toMatchObject({ ledger: null });

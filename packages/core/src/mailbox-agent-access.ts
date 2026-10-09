@@ -44,6 +44,75 @@ const TEAM_TOKEN =
 /** Which mailbox a call is for: its id or its address. Anything else is refused. */
 export type MailboxSelector = { id: string } | { address: string };
 
+/**
+ * An MCP client's OAuth grant over mailboxes: the user, team and client the API
+ * verified from the access token, handed over on loopback with a signed internal
+ * actor. Never anything an HTTP caller states about itself.
+ */
+export interface MailboxOAuthCredential {
+  oauth: { teamId: string; userId: string; clientId: string };
+}
+/** A bearer secret (mmb_ / mmt_) or a verified OAuth grant. */
+export type MailboxAgentCredential = string | MailboxOAuthCredential;
+const OAUTH_CLIENT_ID = /^[A-Za-z0-9._~-]{1,200}$/;
+
+function oauthGrant(credential: MailboxAgentCredential) {
+  if (typeof credential === "string") return null;
+  const oauth = (credential as Partial<MailboxOAuthCredential> | null)?.oauth;
+  if (
+    !oauth ||
+    typeof oauth.teamId !== "string" ||
+    !UUID.test(oauth.teamId) ||
+    typeof oauth.userId !== "string" ||
+    !oauth.userId ||
+    oauth.userId.length > 128 ||
+    typeof oauth.clientId !== "string" ||
+    !OAUTH_CLIENT_ID.test(oauth.clientId)
+  )
+    throw new MailboxAgentAccessError("forbidden");
+  return { teamId: oauth.teamId, userId: oauth.userId, clientId: oauth.clientId };
+}
+
+/** The live team credential an OAuth consent minted for this client, if any. */
+async function oauthGroupId(
+  db: Db,
+  grant: { teamId: string; userId: string; clientId: string },
+): Promise<string | null> {
+  const k = schema.mailboxAgentKeys;
+  const [row] = await db
+    .select({ groupId: k.groupId })
+    .from(k)
+    .where(
+      and(
+        eq(k.teamId, grant.teamId),
+        eq(k.ownerUserId, grant.userId),
+        eq(k.oauthClientId, grant.clientId),
+        isNull(k.revokedAt),
+      ),
+    )
+    .orderBy(desc(k.createdAt))
+    .limit(1);
+  return row?.groupId ?? null;
+}
+
+/** Who may use a credential row: its OAuth client's grant, or its bearer secret (never both). */
+function credentialMatcher(
+  credential: MailboxAgentCredential,
+  grant: ReturnType<typeof oauthGrant>,
+) {
+  return (row: {
+    keyHash: string;
+    oauthClientId: string | null;
+    ownerUserId: string;
+    teamId: string;
+  }) =>
+    grant
+      ? row.oauthClientId === grant.clientId &&
+        row.ownerUserId === grant.userId &&
+        row.teamId === grant.teamId
+      : row.oauthClientId === null && verifyApiKey(credential as string, row.keyHash);
+}
+
 /** The newest send the provider accepted under this credential row (agent-approved sends only). */
 const lastAgentSendSql =
   sql<Date | null>`(select max(${schema.mailboxOutbox.acceptedAt}) from ${schema.mailboxOutbox} where ${schema.mailboxOutbox.agentKeyId} = ${schema.mailboxAgentKeys.id})`.mapWith(
@@ -432,10 +501,15 @@ export async function createMailboxTeamAgentKey(
     scopes?: MailboxAgentScope[] | undefined;
     defaultMailboxId?: string | null | undefined;
     expiresAt?: Date | null | undefined;
+    /** Set only by grantMailboxOAuthClient: the consented MCP client. */
+    oauthClientId?: string | null | undefined;
   },
 ) {
   actor = { ...actor };
   if (!Array.isArray(input.mailboxIds)) throw new MailboxAgentAccessError("invalid");
+  const oauthClientId = input.oauthClientId ?? null;
+  if (oauthClientId !== null && !OAUTH_CLIENT_ID.test(oauthClientId))
+    throw new MailboxAgentAccessError("invalid");
   const mailboxIds = [...input.mailboxIds];
   const defaultMailboxId = input.defaultMailboxId ?? null;
   const { label, scopes, expiresAt } = credentialFields({
@@ -483,6 +557,7 @@ export async function createMailboxTeamAgentKey(
           expiresAt,
           groupId,
           isDefault: box.id === defaultMailboxId,
+          oauthClientId,
         })),
       )
       .returning();
@@ -525,6 +600,7 @@ export async function listMailboxTeamAgentKeys(db: Db, actor: MailboxAgentOwnerA
         revokedAt: schema.mailboxAgentKeys.revokedAt,
         lastUsedAt: schema.mailboxAgentKeys.lastUsedAt,
         lastSentAt: lastAgentSendSql,
+        oauthClientId: schema.mailboxAgentKeys.oauthClientId,
       })
       .from(schema.mailboxAgentKeys)
       .innerJoin(
@@ -554,6 +630,8 @@ export async function listMailboxTeamAgentKeys(db: Db, actor: MailboxAgentOwnerA
         revokedAt: Date | null;
         lastUsedAt: Date | null;
         lastSentAt: Date | null;
+        /** Minted by an OAuth consent for this MCP client (no secret was ever shown). */
+        oauthClientId: string | null;
         mailboxes: { mailboxId: string; address: string; isDefault: boolean; revoked: boolean }[];
       }
     >();
@@ -568,6 +646,7 @@ export async function listMailboxTeamAgentKeys(db: Db, actor: MailboxAgentOwnerA
         revokedAt: row.revokedAt,
         lastUsedAt: null,
         lastSentAt: null,
+        oauthClientId: row.oauthClientId,
         mailboxes: [],
       };
       // The credential is revoked only when every one of its mailboxes is.
@@ -626,21 +705,102 @@ export async function revokeMailboxTeamAgentKey(
   });
 }
 
+const OAUTH_LABEL_SUFFIX = " (OAuth)";
+
+/**
+ * What an OAuth consent grants over mail: a team credential bound to the MCP client
+ * the person approved, over the mailboxes they ticked, with read and drafts and, only
+ * when they chose it, sending without per-message approval. Its secret is dropped
+ * here and never shown; the API reaches it through the verified grant. A new consent
+ * for the same client replaces the previous credential (minted first, so a refused
+ * mint leaves the old one working).
+ */
+export async function grantMailboxOAuthClient(
+  db: Db,
+  actor: MailboxAgentOwnerActor,
+  input: { clientId: string; clientName?: string | null; mailboxIds: string[]; send?: boolean },
+) {
+  actor = { ...actor };
+  const clientId = input.clientId;
+  if (typeof clientId !== "string" || !OAUTH_CLIENT_ID.test(clientId))
+    throw new MailboxAgentAccessError("invalid");
+  const name = (typeof input.clientName === "string" ? input.clientName.trim() : "") || "App MCP";
+  const label = `${name.slice(0, 80 - OAUTH_LABEL_SUFFIX.length)}${OAUTH_LABEL_SUFFIX}`;
+  const previous = await oauthGroupIds(db, {
+    teamId: actor.teamId,
+    userId: actor.userId,
+    clientId,
+  });
+  const mailboxIds = Array.isArray(input.mailboxIds) ? [...input.mailboxIds] : [];
+  const { token: _secret, ...credential } = await createMailboxTeamAgentKey(db, actor, {
+    label,
+    mailboxIds,
+    scopes: input.send === true ? ["read", "draft", "send"] : ["read", "draft"],
+    defaultMailboxId: mailboxIds.length === 1 ? (mailboxIds[0] ?? null) : null,
+    expiresAt: null,
+    oauthClientId: clientId,
+  });
+  for (const id of previous) await revokeMailboxTeamAgentKey(db, actor, { id });
+  return { ...credential, oauthClientId: clientId, replaced: previous.length };
+}
+
+/** Revokes what earlier consents granted this client over mail (e.g. its OAuth access was revoked). */
+export async function revokeMailboxOAuthClient(
+  db: Db,
+  actor: MailboxAgentOwnerActor,
+  input: { clientId: string },
+) {
+  actor = { ...actor };
+  if (typeof input.clientId !== "string" || !OAUTH_CLIENT_ID.test(input.clientId))
+    throw new MailboxAgentAccessError("invalid");
+  const groups = await oauthGroupIds(db, {
+    teamId: actor.teamId,
+    userId: actor.userId,
+    clientId: input.clientId,
+  });
+  for (const id of groups) await revokeMailboxTeamAgentKey(db, actor, { id });
+  return { revoked: groups.length };
+}
+
+async function oauthGroupIds(
+  db: Db,
+  grant: { teamId: string; userId: string; clientId: string },
+): Promise<string[]> {
+  const k = schema.mailboxAgentKeys;
+  const rows = await db
+    .selectDistinct({ groupId: k.groupId })
+    .from(k)
+    .where(
+      and(
+        eq(k.teamId, grant.teamId),
+        eq(k.ownerUserId, grant.userId),
+        eq(k.oauthClientId, grant.clientId),
+        isNull(k.revokedAt),
+      ),
+    );
+  return rows.map((row) => row.groupId).filter((id): id is string => typeof id === "string");
+}
+
 /**
  * The mailboxes an agent credential reaches, without any message content: for a
  * team credential every live mailbox of it (and which is the default), for a
  * single-mailbox key its one mailbox. `available` is false when the mailbox is
  * suspended or changed owner since the credential was made.
  */
-export async function listMailboxAgentAccounts(db: Db, token: string) {
-  if (typeof token !== "string") throw new MailboxAgentAccessError("forbidden");
-  const team = TEAM_TOKEN.exec(token);
-  const single = team ? null : TOKEN.exec(token);
-  if (!team && !single) throw new MailboxAgentAccessError("forbidden");
+export async function listMailboxAgentAccounts(db: Db, credential: MailboxAgentCredential) {
+  const grant = oauthGrant(credential);
+  if (!grant && typeof credential !== "string") throw new MailboxAgentAccessError("forbidden");
+  const token = grant ? "" : (credential as string);
+  const team = grant ? null : TEAM_TOKEN.exec(token);
+  const single = grant || team ? null : TOKEN.exec(token);
+  const groupId = grant ? await oauthGroupId(db, grant) : (team?.[1] ?? null);
+  if (!groupId && !single) throw new MailboxAgentAccessError("forbidden");
+  const matches = credentialMatcher(credential, grant);
   const rows = await db
     .select({
       id: schema.mailboxAgentKeys.id,
       keyHash: schema.mailboxAgentKeys.keyHash,
+      oauthClientId: schema.mailboxAgentKeys.oauthClientId,
       teamId: schema.mailboxAgentKeys.teamId,
       ownerUserId: schema.mailboxAgentKeys.ownerUserId,
       ownerMembershipId: schema.mailboxAgentKeys.ownerMembershipId,
@@ -665,13 +825,13 @@ export async function listMailboxAgentAccounts(db: Db, token: string) {
       ),
     )
     .where(
-      team
-        ? eq(schema.mailboxAgentKeys.groupId, team[1]!)
+      groupId
+        ? eq(schema.mailboxAgentKeys.groupId, groupId)
         : and(eq(schema.mailboxAgentKeys.id, single![1]!), isNull(schema.mailboxAgentKeys.groupId)),
     )
     .orderBy(asc(schema.mailboxes.address));
   const first = rows[0];
-  if (!first || !verifyApiKey(token, first.keyHash)) throw new MailboxAgentAccessError("forbidden");
+  if (!first || !matches(first)) throw new MailboxAgentAccessError("forbidden");
   const [member] = await db
     .select({ id: schema.teamMembers.id })
     .from(schema.teamMembers)
@@ -693,14 +853,14 @@ export async function listMailboxAgentAccounts(db: Db, token: string) {
     live.map((row) => row.id),
   );
   return {
-    credential: team ? ("team" as const) : ("mailbox" as const),
+    credential: groupId ? ("team" as const) : ("mailbox" as const),
     mailboxes: live.map((row) => ({
       id: row.mailboxId,
       address: row.address,
       label: row.label,
       kind: row.kind,
       scopes: [...row.scopes],
-      default: team ? row.isDefault : true,
+      default: groupId ? row.isDefault : true,
       available:
         row.status === "planned" &&
         row.boxOwnerUserId === row.ownerUserId &&
@@ -718,15 +878,37 @@ export async function listMailboxAgentAccounts(db: Db, token: string) {
  */
 export async function withMailboxAgentAccess<T>(
   db: Db,
-  token: string,
+  credential: MailboxAgentCredential,
   scope: MailboxAgentScope,
   operation: (context: MailboxAgentAccessContext) => Promise<T>,
   mailbox?: MailboxSelector | null,
 ): Promise<T> {
-  if (typeof token !== "string" || !SCOPES.includes(scope))
-    throw new MailboxAgentAccessError("forbidden");
+  if (!SCOPES.includes(scope)) throw new MailboxAgentAccessError("forbidden");
+  const grant = oauthGrant(credential);
+  if (grant) {
+    const groupId = await oauthGroupId(db, grant);
+    if (!groupId) throw new MailboxAgentAccessError("forbidden");
+    return withTeamMailboxAgentAccess(
+      db,
+      credentialMatcher(credential, grant),
+      groupId,
+      scope,
+      operation,
+      mailbox,
+    );
+  }
+  if (typeof credential !== "string") throw new MailboxAgentAccessError("forbidden");
+  const token = credential;
   const team = TEAM_TOKEN.exec(token);
-  if (team) return withTeamMailboxAgentAccess(db, token, team[1]!, scope, operation, mailbox);
+  if (team)
+    return withTeamMailboxAgentAccess(
+      db,
+      credentialMatcher(token, null),
+      team[1]!,
+      scope,
+      operation,
+      mailbox,
+    );
   const match = TOKEN.exec(token);
   if (!match) throw new MailboxAgentAccessError("forbidden");
   // Discovery acquires no row lock. All authorization fields are re-read under locks below.
@@ -753,7 +935,7 @@ export async function withMailboxAgentAccess<T>(
 
 async function withTeamMailboxAgentAccess<T>(
   db: Db,
-  token: string,
+  matches: ReturnType<typeof credentialMatcher>,
   groupId: string,
   scope: MailboxAgentScope,
   operation: (context: MailboxAgentAccessContext) => Promise<T>,
@@ -768,6 +950,7 @@ async function withTeamMailboxAgentAccess<T>(
       mailboxId: schema.mailboxAgentKeys.mailboxId,
       ownerUserId: schema.mailboxAgentKeys.ownerUserId,
       keyHash: schema.mailboxAgentKeys.keyHash,
+      oauthClientId: schema.mailboxAgentKeys.oauthClientId,
       isDefault: schema.mailboxAgentKeys.isDefault,
       address: schema.mailboxes.address,
     })
@@ -782,9 +965,8 @@ async function withTeamMailboxAgentAccess<T>(
     .where(
       and(eq(schema.mailboxAgentKeys.groupId, groupId), isNull(schema.mailboxAgentKeys.revokedAt)),
     );
-  // The secret is checked before anything about the mailbox set is revealed.
-  if (!rows[0] || !verifyApiKey(token, rows[0].keyHash))
-    throw new MailboxAgentAccessError("forbidden");
+  // The secret (or the OAuth grant) is checked before anything about the mailbox set is revealed.
+  if (!rows[0] || !matches(rows[0])) throw new MailboxAgentAccessError("forbidden");
   const chosen = mailbox
     ? rows.find((row) => selects(mailbox, { id: row.mailboxId, address: row.address }))
     : (rows.find((row) => row.isDefault) ?? (rows.length === 1 ? rows[0] : undefined));
@@ -798,7 +980,7 @@ async function withTeamMailboxAgentAccess<T>(
       ownerUserId: chosen.ownerUserId,
     },
     scope,
-    (key) => key.groupId === groupId && verifyApiKey(token, key.keyHash),
+    (key) => key.groupId === groupId && matches(key),
     operation,
     null,
   );

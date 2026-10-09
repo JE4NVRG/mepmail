@@ -126,8 +126,10 @@ PKCE. Scopes mirror the API surfaces:
 \`emails:send\`, \`emails:read\`, \`audience:read\`, \`audience:write\`,
 \`broadcasts:read\`, \`broadcasts:write\`, \`domains:read\`, \`domains:write\`,
 \`templates:read\`, \`templates:write\`, \`webhooks:write\`,
-\`api-keys:write\`, \`mailboxes:read\`, \`mailboxes:write\`, plus \`offline_access\`
-for refresh tokens. Access tokens
+\`api-keys:write\`, \`mailboxes:read\`, \`mailboxes:write\`, \`mail:read\`,
+\`mail:draft\`, \`mail:send\`, plus \`offline_access\` for refresh tokens. The
+\`mail:*\` scopes act only in the Correio mailboxes the person ticks on the
+consent screen. Access tokens
 are audience-bound to the MCP resource and are not accepted on the REST API.
 
 ## Related discovery documents

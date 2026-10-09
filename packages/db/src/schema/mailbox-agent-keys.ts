@@ -42,6 +42,11 @@ export const mailboxAgentKeys = pgTable(
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     /** Last successful authentication, stamped at most every few minutes; null = never used. */
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    /**
+     * The OAuth client a consent minted this team credential for. Such a credential is
+     * reached only through that client's verified grant, never with its bearer secret.
+     */
+    oauthClientId: text("oauth_client_id"),
     /** The team credential this row belongs to; null for a single-mailbox key. */
     groupId: uuid("group_id"),
     /** The mailbox a team credential uses when a call names none. */
@@ -61,6 +66,13 @@ export const mailboxAgentKeys = pgTable(
       "mailbox_agent_keys_default_group_check",
       sql`${t.groupId} is not null or not ${t.isDefault}`,
     ),
+    check(
+      "mailbox_agent_keys_oauth_group_check",
+      sql`${t.oauthClientId} is null or ${t.groupId} is not null`,
+    ),
+    index("mailbox_agent_keys_oauth_idx")
+      .on(t.teamId, t.ownerUserId, t.oauthClientId)
+      .where(sql`${t.oauthClientId} is not null`),
     check("mailbox_agent_keys_hash_check", sql`${t.keyHash} ~ '^[a-f0-9]{64}$'`),
     check("mailbox_agent_keys_label_check", sql`length(${t.label}) between 1 and 80`),
     check(

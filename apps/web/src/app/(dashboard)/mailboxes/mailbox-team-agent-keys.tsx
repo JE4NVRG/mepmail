@@ -445,6 +445,9 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
                     <div className={styles.keyHeading}>
                       <strong>{key.label}</strong>
                       <span className={styles.badge}>{t(status)}</span>
+                      {key.oauthClientId ? (
+                        <span className={styles.badge}>{t("team.oauthBadge")}</span>
+                      ) : null}
                     </div>
                     <AgentKeyHealth
                       expiresAt={key.expiresAt}

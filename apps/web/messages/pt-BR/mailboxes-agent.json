@@ -61,7 +61,8 @@
     "emptyBody": "Crie uma para que um agente atenda mais de uma caixa com a mesma chave.",
     "mailboxCount": "{count, plural, =0 {nenhuma caixa ativa} one {# caixa} other {# caixas}}",
     "defaultBadge": "padrão",
-    "mcpHint": "Agentes que falam MCP usam estas caixas como ferramentas: em cada ferramenta o agente informa a caixa pelo endereço, e mailbox_list_accounts mostra quais estão liberadas. Escolha o cliente, copie e cole; o texto já leva esta chave, então guarde-o com o mesmo cuidado."
+    "mcpHint": "Agentes que falam MCP usam estas caixas como ferramentas: em cada ferramenta o agente informa a caixa pelo endereço, e mailbox_list_accounts mostra quais estão liberadas. Escolha o cliente, copie e cole; o texto já leva esta chave, então guarde-o com o mesmo cuidado.",
+    "oauthBadge": "conectado por OAuth"
   },
   "clients": {
     "label": "Cliente MCP",
@@ -112,5 +113,11 @@
     "label": "Expiração rápida",
     "days": "{days, plural, =365 {1 ano} other {# dias}}",
     "never": "Sem expiração"
+  },
+  "oauth": {
+    "title": "Conectar sem colar chave",
+    "body": "Adicione o servidor MCP {url} no seu cliente (Claude Code, Claude Desktop, Cursor, VS Code). Ele abre o navegador: você entra, marca as caixas que o agente pode usar e permite. Para revogar, use Revogar aqui embaixo ou Apps conectados.",
+    "copy": "Copiar comando do Claude Code",
+    "copied": "Copiado"
   }
 }

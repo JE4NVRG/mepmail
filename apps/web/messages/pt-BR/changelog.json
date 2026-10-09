@@ -28,6 +28,40 @@
   },
   "releases": [
     {
+      "version": "0.73",
+      "date": "2026-10-09",
+      "title": "Correio no MCP sem colar chave",
+      "summary": "O servidor MCP principal agora lê e escreve e-mails do Correio por OAuth: você marca as caixas no navegador e o agente conecta, sem chave para copiar.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Novas permissões mail:read, mail:draft e mail:send no MCP hospedado (https://api.mepmail.dev/mcp), com as ferramentas mailbox_list_accounts, mailbox_list_messages, mailbox_read_message, mailbox_save_draft e mailbox_send_draft.",
+            "Na tela de autorização, você escolhe quais das suas caixas o app pode usar. Enviar sem pedir aprovação vem desmarcado; sem isso, cada envio pede sua aprovação por e-mail.",
+            "A conexão aparece em Correio → Configurações → Agentes como credencial marcada \"conectado por OAuth\", com último uso, e é revogada com um clique ali ou em Apps conectados.",
+            "A aba Agentes mostra o comando para conectar sem chave."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.72",
+      "date": "2026-10-09",
+      "title": "Assistente de recebimento (MX) no Correio",
+      "summary": "Ao criar uma caixa, o Correio mostra onde está o DNS do domínio, o registro MX exato para copiar e para onde o e-mail vai hoje.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Enquanto o domínio ainda não aponta o MX, o passo de domínio detecta o provedor de DNS (Cloudflare, Registro.br, GoDaddy, Route 53, Hostinger, Locaweb ou outro) e mostra os passos dele, com botão para abrir o painel.",
+            "O registro a criar aparece pronto, com botões de copiar para nome e valor; em subdomínio, o nome já vem relativo à zona.",
+            "Se o domínio já recebe e-mail em outro lugar (Google, Microsoft, Purelymail, Titan e outros), um aviso explica que trocar o MX leva todo o e-mail para o Correio e sugere um subdomínio.",
+            "Botão Verificar agora confere o DNS de novo sem sair da tela."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.71",
       "date": "2026-10-09",
       "title": "Conectar agentes ao Correio ficou mais fácil",

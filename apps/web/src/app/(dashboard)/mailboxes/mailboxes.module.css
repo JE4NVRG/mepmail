@@ -444,7 +444,7 @@
   border-radius: 6px;
   background: var(--ms-inset);
   color: var(--ms-bone);
-  font: 500 12px/1.4 var(--ms-font-mono, ui-monospace, monospace);
+  font: 500 12px / 1.4 var(--ms-font-mono, ui-monospace, monospace);
   text-align: center;
 }
 .dialogHeader {
@@ -2580,4 +2580,27 @@
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* Agents tab: connecting over OAuth, without a key to paste. */
+.oauthCallout {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  margin: 0 0 16px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: var(--ms-r-card);
+  background: var(--ms-inset);
+  font-size: 12px;
+  min-width: 0;
+}
+.oauthCallout p {
+  margin: 0;
+  color: var(--ms-muted);
+  line-height: 1.6;
+}
+.oauthCallout code {
+  font-family: var(--ms-font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }

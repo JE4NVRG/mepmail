@@ -29,6 +29,7 @@ let privateKey: Awaited<ReturnType<typeof generateKeyPair>>["privateKey"];
 const userId = "mcp-mailbox-user";
 const actorKey = deriveInternalActorKey(randomBytes(32));
 const calls: { actor: unknown; body: Record<string, unknown> }[] = [];
+const mailCalls: { actor: unknown; path: string; mailbox: string | null; body: unknown }[] = [];
 
 beforeAll(async () => {
   ({ db, close: closeDb } = await createTestDb());
@@ -51,16 +52,36 @@ beforeAll(async () => {
   resource = mcpResourceUrl(appBaseUrl);
   // Stands in for the dashboard's internal mailbox admin endpoint.
   const dashboard = await listen(
-    new Hono().post("/api/internal/mailbox-admin", async (c) => {
-      const body = await c.req.json();
-      calls.push({
-        actor: verifyInternalActor(actorKey, c.req.header(INTERNAL_ACTOR_HEADER)),
-        body,
-      });
-      if (body.action === "list") return c.json({ can_manage: true, mailboxes: [] });
-      if (body.action === "create") return c.json({ error: "service", code: "quota" }, 409);
-      return c.json({ id: "k1", token: "mmb_secret", scopes: body.scopes });
-    }).fetch,
+    new Hono()
+      .post("/api/internal/mailbox-admin", async (c) => {
+        const body = await c.req.json();
+        calls.push({
+          actor: verifyInternalActor(actorKey, c.req.header(INTERNAL_ACTOR_HEADER)),
+          body,
+        });
+        if (body.action === "list") return c.json({ can_manage: true, mailboxes: [] });
+        if (body.action === "create") return c.json({ error: "service", code: "quota" }, 409);
+        return c.json({ id: "k1", token: "mmb_secret", scopes: body.scopes });
+      })
+      // Stands in for the dashboard's agent API, reached over OAuth with a signed actor.
+      .all("/api/mailbox-agent/*", async (c) => {
+        const body = c.req.method === "POST" ? await c.req.json() : undefined;
+        mailCalls.push({
+          actor: verifyInternalActor(actorKey, c.req.header(INTERNAL_ACTOR_HEADER)),
+          path: `${c.req.method} ${new URL(c.req.url).pathname}${new URL(c.req.url).search}`,
+          mailbox: c.req.header("mepmail-mailbox") ?? null,
+          body,
+        });
+        if (c.req.header("authorization")) return c.json({ error: "unexpected bearer" }, 500);
+        if (c.req.header("mepmail-mailbox") === "outra@acme.dev")
+          return c.json({ error: "access_denied" }, 403);
+        if (new URL(c.req.url).pathname.endsWith("/mailboxes"))
+          return c.json({
+            credential: "team",
+            mailboxes: [{ address: "jean@acme.dev", scopes: ["read", "draft"], available: true }],
+          });
+        return c.json({ ok: true });
+      }).fetch,
   );
   web = dashboard.server;
   app = createApi({
@@ -156,6 +177,72 @@ it("calls the dashboard as the signed-in user and relays its answers", async () 
     kind: "agent",
   });
   await client.close();
+});
+
+it("offers the mail tools for the mail scopes and calls the agent API as this user and app", async () => {
+  const reader = await connect("mail:read");
+  expect((await reader.listTools()).tools.map((t) => t.name)).toEqual([
+    "mailbox_list_accounts",
+    "mailbox_list_messages",
+    "mailbox_read_message",
+  ]);
+  await reader.close();
+  const client = await connect("mail:read mail:draft");
+  expect((await client.listTools()).tools.map((t) => t.name)).toEqual([
+    "mailbox_list_accounts",
+    "mailbox_list_messages",
+    "mailbox_read_message",
+    "mailbox_save_draft",
+    "mailbox_send_draft",
+  ]);
+  expect(data(await client.callTool({ name: "mailbox_list_accounts", arguments: {} }))).toEqual({
+    credential: "team",
+    mailboxes: [{ address: "jean@acme.dev", scopes: ["read", "draft"], available: true }],
+  });
+  await client.callTool({
+    name: "mailbox_list_messages",
+    arguments: { folder: "drafts", mailbox: "jean@acme.dev" },
+  });
+  await client.callTool({
+    name: "mailbox_save_draft",
+    arguments: {
+      to: ["ana@example.com"],
+      subject: "Oi",
+      text: "Tudo bem?",
+      mailbox: "jean@acme.dev",
+    },
+  });
+  const refused = await client.callTool({
+    name: "mailbox_send_draft",
+    arguments: {
+      id: "00000000-0000-4000-8000-0000000000d1",
+      expected_revision: 2,
+      mailbox: "outra@acme.dev",
+    },
+  });
+  expect(refused.isError).toBe(true);
+  expect(data(refused)).toMatchObject({ error: "access_denied", status: 403 });
+  expect(mailCalls.map((c) => [c.path, c.mailbox])).toEqual([
+    ["GET /api/mailbox-agent/mailboxes", null],
+    ["GET /api/mailbox-agent/items?folder=drafts", "jean@acme.dev"],
+    ["POST /api/mailbox-agent/drafts", "jean@acme.dev"],
+    ["POST /api/mailbox-agent/send", "outra@acme.dev"],
+  ]);
+  // Every call names the verified user, team and OAuth client; never a bearer secret.
+  for (const call of mailCalls) expect(call.actor).toMatchObject({ teamId, userId, clientId: "c" });
+  expect(mailCalls[2]?.body).toMatchObject({
+    expectedRevision: 0,
+    to: ["ana@example.com"],
+    subject: "Oi",
+    text: "Tudo bem?",
+  });
+  await client.close();
+  // Without a mail scope there are no mail tools at all.
+  const sender = await connect("emails:send");
+  expect((await sender.listTools()).tools.map((t) => t.name)).not.toContain(
+    "mailbox_list_accounts",
+  );
+  await sender.close();
 });
 
 it("keeps the write tools from a member", async () => {

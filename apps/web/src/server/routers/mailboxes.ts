@@ -12,6 +12,7 @@ import {
   createMailboxRegistry,
   createMailboxTeamAgentKey,
   getMailboxReceivingReadiness,
+  grantMailboxOAuthClient,
   grantMailboxRegistry,
   listMailboxActivity,
   listMailboxAgentKeys,
@@ -64,6 +65,7 @@ import {
   getMailboxUnreadCounts,
   saveMailboxContentDraft,
 } from "../mailbox-content";
+import { mailboxDnsGuide } from "../mailbox-dns-guide";
 import { mailboxReceivingDeps } from "../mailbox-receiving";
 import { mailboxTransportMime } from "../mailbox-transport";
 import { getMailboxUsage } from "../mailbox-usage";
@@ -71,9 +73,10 @@ import {
   mailboxActorAccessEnabled,
   mailboxCreateAccessEnabled,
   mailboxOfferOpen,
+  mailboxRegistryEnabled,
 } from "../mailboxes";
 import { getQueue } from "../queue";
-import { router, teamProcedure } from "../trpc";
+import { protectedProcedure, router, teamProcedure } from "../trpc";
 
 const enabled = teamProcedure.use(async ({ ctx, next }) => {
   if (
@@ -157,6 +160,23 @@ export const mailboxesRouter = router({
         getMailboxReceivingReadiness(ctx.db, actor(ctx), input.domainId, mailboxReceivingDeps()),
       );
       return { ...readiness, state: readiness.receiving_state, mxHost: readiness.mx.value };
+    }),
+  // The MX guide: public DNS facts (zone host, current MX) and the record to add; reads only.
+  receivingGuide: enabled
+    .input(z.object({ domainId: z.uuid() }).strict())
+    .query(async ({ ctx, input }) => {
+      const [domain] = await ctx.db
+        .select({
+          id: schema.domains.id,
+          teamId: schema.domains.teamId,
+          name: schema.domains.name,
+          region: schema.domains.region,
+        })
+        .from(schema.domains)
+        .where(and(eq(schema.domains.id, input.domainId), eq(schema.domains.teamId, ctx.teamId)));
+      if (!domain) throw new TRPCError({ code: "NOT_FOUND" });
+      const exchange = mailboxReceivingDeps().configuration(domain)?.mxExchange;
+      return exchange ? mailboxDnsGuide(domain.name, exchange) : null;
     }),
   verifyReceiving: enabled
     .input(z.object({ domainId: z.uuid() }).strict())
@@ -394,6 +414,54 @@ export const mailboxesRouter = router({
         target: { type: "mailbox_team_agent_key", id: key.id },
       });
       return key;
+    }),
+  // OAuth consent over mail: the mailboxes the person ticked for this MCP client become a
+  // team credential bound to it (no secret is ever shown). Runs right before the consent
+  // is recorded, in the team the consent screen selected (named here, never the active
+  // team cookie, which may point elsewhere).
+  grantOAuthClient: protectedProcedure
+    .input(
+      z
+        .object({
+          teamId: z.uuid(),
+          clientId: z.string().min(1).max(200),
+          mailboxIds: z.array(z.uuid()).min(1).max(20),
+          send: z.boolean().default(false),
+        })
+        .strict(),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const who = { teamId: input.teamId, userId: ctx.session.user.id };
+      const [member] = await ctx.db
+        .select({ id: schema.teamMembers.id })
+        .from(schema.teamMembers)
+        .where(
+          and(eq(schema.teamMembers.teamId, who.teamId), eq(schema.teamMembers.userId, who.userId)),
+        );
+      if (!member || !mailboxRegistryEnabled() || !(await mailboxActorAccessEnabled(ctx.db, who)))
+        throw new TRPCError({ code: "FORBIDDEN" });
+      const [client] = await ctx.db
+        .select({ name: schema.oauthClient.name })
+        .from(schema.oauthClient)
+        .where(eq(schema.oauthClient.clientId, input.clientId));
+      if (!client) throw new TRPCError({ code: "NOT_FOUND" });
+      const granted = await call(() =>
+        grantMailboxOAuthClient(ctx.db, who, {
+          clientId: input.clientId,
+          clientName: client.name,
+          mailboxIds: input.mailboxIds,
+          send: input.send,
+        }),
+      );
+      await recordAudit(
+        { ...ctx, teamId: who.teamId },
+        {
+          action: "mailbox.team_agent_key_created",
+          target: { type: "mailbox_agent_key", id: granted.id },
+          metadata: { via: "oauth", mailboxes: granted.mailboxes.length, send: input.send },
+        },
+      );
+      return { id: granted.id, mailboxes: granted.mailboxes.length };
     }),
   // Dials the public Correio MCP with a key the person holds, as their client will.
   testAgentConnection: enabled

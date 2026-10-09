@@ -543,5 +543,78 @@
   "invalidRecipient": "Fix the address in red: {address}",
   "recipientLimit": "Up to 20 recipients across To and Cc.",
   "recipientSuggestions": "Suggested contacts",
-  "replyQuote": "On {date}, {sender} wrote:\n{text}"
+  "replyQuote": "On {date}, {sender} wrote:\n{text}",
+  "dnsGuide": {
+    "title": "How to point receiving (MX)",
+    "provider": {
+      "cloudflare": "The DNS for {zone} is at Cloudflare.",
+      "registrobr": "The DNS for {zone} is at Registro.br.",
+      "godaddy": "The DNS for {zone} is at GoDaddy.",
+      "route53": "The DNS for {zone} is at AWS Route 53.",
+      "hostinger": "The DNS for {zone} is at Hostinger.",
+      "locaweb": "The DNS for {zone} is at Locaweb.",
+      "other": "The DNS for {zone} is served by {nameservers}."
+    },
+    "providerName": {
+      "cloudflare": "Cloudflare",
+      "registrobr": "Registro.br",
+      "godaddy": "GoDaddy",
+      "route53": "Route 53",
+      "hostinger": "Hostinger",
+      "locaweb": "Locaweb",
+      "other": "DNS provider"
+    },
+    "currentKnown": "Mail for {domain} arrives through {provider} today ({hosts}). Changing the MX sends all mail for any @{domain} address to Correio, and the {provider} mailboxes stop receiving. If you still use {provider}, put the Correio mailboxes on a subdomain (e.g. correio.{domain}) or move every mailbox first.",
+    "currentOther": "The MX for {domain} points to {hosts} today. Changing it sends all of this domain's mail to Correio. If that server still receives mail you use, put the mailboxes on a subdomain (e.g. correio.{domain}).",
+    "type": "Type",
+    "name": "Name",
+    "value": "Value",
+    "priority": "Priority",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyLabel": "Copy {field}",
+    "apexHint": "@ is the domain itself. If the panel does not accept @, leave the name empty.",
+    "steps": {
+      "cloudflare": {
+        "1": "In Cloudflare, open the {zone} zone and go to DNS → Records → Add record.",
+        "2": "Pick MX, name {name}, mail server {value} and priority 10. MX is never proxied, so there is no orange cloud.",
+        "3": "Save and come back here to check."
+      },
+      "registrobr": {
+        "1": "In Registro.br, sign in to the panel, open {zone} and choose Edit zone.",
+        "2": "New entry: type MX, name {name}, server {value}, priority 10.",
+        "3": "Save the zone. Registro.br can take a few minutes to publish it."
+      },
+      "godaddy": {
+        "1": "In GoDaddy, open My domains → {zone} → DNS.",
+        "2": "Add new record: type MX, name {name}, value {value}, priority 10.",
+        "3": "Save and come back here to check."
+      },
+      "route53": {
+        "1": "In AWS Route 53, open the {zone} hosted zone and click Create record.",
+        "2": "Record name {name} (empty for @), type MX, value {value}: the priority goes in front of it.",
+        "3": "Create the record and come back here to check."
+      },
+      "hostinger": {
+        "1": "In Hostinger's hPanel, open Domains → {zone} → DNS / Nameservers.",
+        "2": "Add an MX record: name {name}, points to {value}, priority 10.",
+        "3": "Save and come back here to check."
+      },
+      "locaweb": {
+        "1": "In the Locaweb panel, open the {zone} domain and its DNS editor.",
+        "2": "Add an MX record: name {name}, target {value}, priority 10.",
+        "3": "Save and come back here to check."
+      },
+      "other": {
+        "1": "Open the panel where the DNS for {zone} is edited (whoever runs the nameservers {nameservers}).",
+        "2": "Create an MX record: name {name}, value {value}, priority 10.",
+        "3": "Save and come back here to check."
+      }
+    },
+    "removeOld": "Once the Correio MX exists, delete the old MX records ({hosts}). With both in place, part of the mail keeps going to the old server and receiving is not confirmed.",
+    "openProvider": "Open {provider}",
+    "checkNow": "Check now",
+    "checking": "Checking…",
+    "propagation": "DNS changes usually show up within minutes, but can take a few hours."
+  }
 }

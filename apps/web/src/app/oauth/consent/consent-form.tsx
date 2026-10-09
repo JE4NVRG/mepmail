@@ -24,6 +24,12 @@ const OFFLINE_ACCESS = "offline_access";
  * them.
  */
 const ADMIN_ONLY_SCOPES = ["domains:write", "webhooks:write", "api-keys:write"];
+/**
+ * Mail content scopes act only in the mailboxes ticked below (a credential bound to
+ * this app is minted on Allow). Sending without asking is never pre-ticked.
+ */
+const MAIL_SCOPES = ["mail:read", "mail:draft", "mail:send"];
+const MAIL_SEND = "mail:send";
 
 export function ConsentForm({
   app,
@@ -31,6 +37,7 @@ export function ConsentForm({
   scopes,
   teams,
   defaultTeamId,
+  mailboxes = {},
 }: {
   app: {
     clientId: string;
@@ -44,13 +51,21 @@ export function ConsentForm({
   scopes: string[];
   teams: { teamId: string; teamName: string; role: "owner" | "admin" | "member" }[];
   defaultTeamId: string | null;
+  /** The person's own active Correio mailboxes, per team. */
+  mailboxes?: Record<string, { id: string; address: string; label: string }[]>;
 }) {
   const t = useTranslations("auth.consent");
   const locale = useLocale();
   const trpc = useTRPC();
   const grantTeam = useMutation(trpc.team.grantTeam.mutationOptions());
+  const grantMail = useMutation(trpc.mailboxes.grantOAuthClient.mutationOptions());
   const [teamId, setTeamId] = useState(defaultTeamId ?? teams[0]?.teamId ?? "");
-  const [granted, setGranted] = useState(() => new Set(scopes));
+  const [granted, setGranted] = useState(
+    () => new Set(scopes.filter((scope) => scope !== MAIL_SEND)),
+  );
+  const [boxes, setBoxes] = useState<Set<string>>(
+    () => new Set((mailboxes[defaultTeamId ?? teams[0]?.teamId ?? ""] ?? []).map((box) => box.id)),
+  );
   const [pending, setPending] = useState<"allow" | "deny" | null>(null);
   const [failed, setFailed] = useState(false);
   const appName = app?.name || t("unknownApp");
@@ -60,9 +75,12 @@ export function ConsentForm({
     teamId === ALL_TEAMS
       ? teams.every((team) => team.role === "member")
       : (teams.find((team) => team.teamId === teamId)?.role ?? "member") === "member";
-  const visible = memberOnly
-    ? scopes.filter((scope) => !ADMIN_ONLY_SCOPES.includes(scope))
-    : scopes;
+  const teamBoxes = teamId === ALL_TEAMS ? [] : (mailboxes[teamId] ?? []);
+  // Mail needs one team and a mailbox of the person's own in it; otherwise it is not offered.
+  const visible = (
+    memberOnly ? scopes.filter((scope) => !ADMIN_ONLY_SCOPES.includes(scope)) : scopes
+  ).filter((scope) => !MAIL_SCOPES.includes(scope) || teamBoxes.length > 0);
+  const mailWanted = visible.some((scope) => MAIL_SCOPES.includes(scope) && granted.has(scope));
   const nothingGranted = visible.every((scope) => scope === OFFLINE_ACCESS || !granted.has(scope));
 
   function toggle(scope: string) {
@@ -81,7 +99,19 @@ export function ConsentForm({
       // The grant binds to session.activeTeamId, so the selection must be
       // persisted (and membership-checked) before consent is recorded.
       if (accept) await grantTeam.mutateAsync({ teamId });
-      const kept = visible.filter((scope) => granted.has(scope));
+      const chosen = teamBoxes.filter((box) => boxes.has(box.id)).map((box) => box.id);
+      const mailGranted = accept && mailWanted && chosen.length > 0;
+      // The mail credential is minted before the consent, in the team just selected.
+      if (mailGranted)
+        await grantMail.mutateAsync({
+          teamId,
+          clientId: app?.clientId ?? "",
+          mailboxIds: chosen,
+          send: granted.has(MAIL_SEND),
+        });
+      const kept = visible.filter(
+        (scope) => granted.has(scope) && (mailGranted || !MAIL_SCOPES.includes(scope)),
+      );
       const { data, error } = await authClient.oauth2.consent({
         accept,
         // Omitted = everything requested; sent only when the user unticked
@@ -153,7 +183,10 @@ export function ConsentForm({
             <Select
               id="consent-team"
               value={teamId}
-              onChange={setTeamId}
+              onChange={(next) => {
+                setTeamId(next);
+                setBoxes(new Set((mailboxes[next] ?? []).map((box) => box.id)));
+              }}
               options={[
                 ...teams.map((team) => ({ value: team.teamId, label: team.teamName })),
                 ...(teams.length > 1 ? [{ value: ALL_TEAMS, label: t("allTeams") }] : []),
@@ -197,6 +230,50 @@ export function ConsentForm({
             ))}
           </div>
         </div>
+        {mailWanted ? (
+          <fieldset
+            className={`ms-field ${styles.field}`}
+            style={{ border: 0, padding: 0, margin: 0 }}
+          >
+            <legend className="ms-microlabel">{t("mailboxes")}</legend>
+            <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
+              {teamBoxes.map((box) => (
+                <label
+                  key={box.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: "var(--ms-fs-label)",
+                    cursor: "pointer",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    className="ms-checkbox"
+                    checked={boxes.has(box.id)}
+                    onChange={() =>
+                      setBoxes((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(box.id)) next.delete(box.id);
+                        else next.add(box.id);
+                        return next;
+                      })
+                    }
+                    disabled={pending !== null}
+                  />
+                  <span>
+                    {box.label} <span className="ms-mono">{box.address}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <span style={{ fontSize: "var(--ms-fs-micro)", color: "var(--ms-faint)" }}>
+              {t(granted.has(MAIL_SEND) ? "mailboxesSendNote" : "mailboxesNote")}
+            </span>
+          </fieldset>
+        ) : null}
         {failed ? (
           <p className={styles.error} role="alert">
             {t("error")}
@@ -205,7 +282,12 @@ export function ConsentForm({
         <button
           type="submit"
           className={`ms-btn ms-btn-primary ${styles.button}`}
-          disabled={pending !== null || teams.length === 0 || nothingGranted}
+          disabled={
+            pending !== null ||
+            teams.length === 0 ||
+            nothingGranted ||
+            (mailWanted && !teamBoxes.some((box) => boxes.has(box.id)))
+          }
         >
           <BtnSpinner on={pending === "allow"} />
           {t("allow")}

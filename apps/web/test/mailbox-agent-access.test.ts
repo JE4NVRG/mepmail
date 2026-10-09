@@ -11,12 +11,14 @@ import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
 import {
   createMailboxAgentKey,
   createMailboxTeamAgentKey,
+  grantMailboxOAuthClient,
   listExpiringMailboxAgentCredentials,
   listMailboxAgentAccounts,
   listMailboxAgentKeys,
   listMailboxTeamAgentKeys,
   parseMailboxSelector,
   revokeMailboxAgentKey,
+  revokeMailboxOAuthClient,
   revokeMailboxTeamAgentKey,
   withMailboxAgentAccess,
 } from "../../../packages/core/src/mailbox-agent-access.js";
@@ -566,6 +568,134 @@ describe("agent credential health", () => {
     expect(
       await listExpiringMailboxAgentCredentials(db, { now: new Date(), within: 7 * day }),
     ).toEqual([]);
+  });
+});
+
+describe("OAuth mail grants", () => {
+  const grant = (clientId = "client-claude") => ({ oauth: { teamId, userId: "owner", clientId } });
+  const via = (
+    credential: unknown,
+    scope: "read" | "draft" | "send" = "read",
+    box: string | null = null,
+  ) =>
+    withMailboxAgentAccess(
+      db,
+      credential as Parameters<typeof withMailboxAgentAccess>[1],
+      scope,
+      async (context) => ({ mailboxId: context.mailboxId, keyId: context.keyId }),
+      parseMailboxSelector(box),
+    );
+
+  it("mints a credential bound to the app that only its verified grant reaches", async () => {
+    const granted = await grantMailboxOAuthClient(db, owner(), {
+      clientId: "client-claude",
+      clientName: "Claude",
+      mailboxIds: [mailboxId, personId],
+    });
+    expect(granted).not.toHaveProperty("token");
+    expect(granted).toMatchObject({
+      label: "Claude (OAuth)",
+      scopes: ["read", "draft"],
+      replaced: 0,
+    });
+    const rows = await db
+      .select()
+      .from(schema.mailboxAgentKeys)
+      .where(eq(schema.mailboxAgentKeys.groupId, granted.id));
+    expect(rows.map((row) => row.oauthClientId)).toEqual(["client-claude", "client-claude"]);
+    expect((await via(grant(), "read", "person@local.invalid")).mailboxId).toBe(personId);
+    expect((await via(grant(), "draft", mailboxId)).mailboxId).toBe(mailboxId);
+    // Sending without approval was not granted, and two mailboxes need one named.
+    await expect(via(grant(), "send", mailboxId)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(via(grant())).rejects.toMatchObject({ code: "mailbox_required" });
+    // Another app, another user or another team gets nothing.
+    await expect(via(grant("client-other"), "read", mailboxId)).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    await expect(
+      via({ oauth: { teamId, userId: "admin", clientId: "client-claude" } }, "read", mailboxId),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(
+      via(
+        { oauth: { teamId: foreignTeamId, userId: "owner", clientId: "client-claude" } },
+        "read",
+        mailboxId,
+      ),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(
+      via({ oauth: { teamId, userId: "owner" } }, "read", mailboxId),
+    ).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    const accounts = await listMailboxAgentAccounts(db, grant());
+    expect(accounts.mailboxes.map((box) => [box.address, box.scopes])).toEqual([
+      ["agent@local.invalid", ["read", "draft"]],
+      ["person@local.invalid", ["read", "draft"]],
+    ]);
+    const listed = await listMailboxTeamAgentKeys(db, owner());
+    expect(listed.find((key) => key.id === granted.id)).toMatchObject({
+      oauthClientId: "client-claude",
+      revokedAt: null,
+    });
+    expect(listed.find((key) => key.id === granted.id)?.lastUsedAt).toBeInstanceOf(Date);
+  });
+
+  it("never lets a grant reach a credential minted with a secret, nor the other way round", async () => {
+    const team = await createMailboxTeamAgentKey(db, owner(), {
+      label: "Sage",
+      mailboxIds: [mailboxId],
+    });
+    await expect(via(grant(), "read", mailboxId)).rejects.toMatchObject({ code: "forbidden" });
+    expect((await via(team.token, "read")).mailboxId).toBe(mailboxId);
+    await grantMailboxOAuthClient(db, owner(), {
+      clientId: "client-claude",
+      mailboxIds: [mailboxId],
+    });
+    // The bearer path refuses any row bound to an OAuth client, even with the right hash.
+    const [bound] = await db
+      .select()
+      .from(schema.mailboxAgentKeys)
+      .where(eq(schema.mailboxAgentKeys.oauthClientId, "client-claude"));
+    await db
+      .update(schema.mailboxAgentKeys)
+      .set({
+        keyHash: createHash("sha256")
+          .update(team.token.replace(team.id, bound!.groupId!))
+          .digest("hex"),
+      })
+      .where(eq(schema.mailboxAgentKeys.id, bound!.id));
+    await expect(via(team.token.replace(team.id, bound!.groupId!), "read")).rejects.toMatchObject({
+      code: "forbidden",
+    });
+  });
+
+  it("replaces the previous grant on a new consent and revokes with the app", async () => {
+    const first = await grantMailboxOAuthClient(db, owner(), {
+      clientId: "client-claude",
+      mailboxIds: [mailboxId, personId],
+    });
+    const second = await grantMailboxOAuthClient(db, owner(), {
+      clientId: "client-claude",
+      clientName: "Claude",
+      mailboxIds: [personId],
+      send: true,
+    });
+    expect(second).toMatchObject({ replaced: 1, scopes: ["read", "draft", "send"] });
+    const listed = await listMailboxTeamAgentKeys(db, owner());
+    expect(listed.find((key) => key.id === first.id)?.revokedAt).toBeInstanceOf(Date);
+    // One mailbox is the default; the old one is no longer reachable.
+    expect((await via(grant(), "send")).mailboxId).toBe(personId);
+    await expect(via(grant(), "read", mailboxId)).rejects.toMatchObject({ code: "forbidden" });
+    expect(await revokeMailboxOAuthClient(db, owner(), { clientId: "client-claude" })).toEqual({
+      revoked: 1,
+    });
+    await expect(via(grant(), "read")).rejects.toMatchObject({ code: "forbidden" });
+    await expect(listMailboxAgentAccounts(db, grant())).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    await expect(
+      grantMailboxOAuthClient(db, owner(), { clientId: "bad client id!", mailboxIds: [mailboxId] }),
+    ).rejects.toMatchObject({ code: "invalid" });
   });
 });
 
