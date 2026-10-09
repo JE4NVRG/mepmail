@@ -53,7 +53,11 @@ WebView2. The same shell is the base for macOS, Linux, iOS and Android.
   `%APPDATA%\Claude\claude_desktop_config.json`), `cursor`
   (`~/.cursor/mcp.json`), `claude-code` (`claude mcp add … -- <exe> --mcp
   --mailbox <id>`) and `codex` (`codex mcp add …`). Every entry points at this
-  executable; no key is written anywhere. The commands are declared in
+  executable; no key is written anywhere. `store_agent_key` and
+  `install_agent` first ask the user in a native dialog (target, mailbox and
+  server name spelled out) and validate every value (UUID mailbox id,
+  `[a-z0-9-]` server name, `mmb_` token, fixed targets); CLI arguments go as
+  a list. A script injected into the hosted page cannot plant a config. The commands are declared in
   `build.rs` (`AppManifest::commands`), which is what lets the capability
   grant them to the remote origin as `allow-<command>`.
 
