@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>MepMail Correio</title>
+    <link rel="stylesheet" href="shell.css" />
+  </head>
+  <body>
+    <main class="shell" data-state="connecting">
+      <svg class="mark" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="0.25" y2="1">
+            <stop offset="0" stop-color="#16183A" />
+            <stop offset="1" stop-color="#080A16" />
+          </linearGradient>
+          <linearGradient id="env" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#9A6BFF" />
+            <stop offset="1" stop-color="#7343E0" />
+          </linearGradient>
+        </defs>
+        <rect x="4" y="4" width="504" height="504" rx="100" fill="url(#bg)" stroke="#7742EA" stroke-opacity="0.5" stroke-width="7" />
+        <g transform="translate(35.8 182.9) scale(0.86)">
+          <path d="M0,170 L0,0 L44,0 L95,64 L146,0 L190,0 L190,166 L178,170 L142,170 L95,122 L48,170 L12,170 L0,166 Z" fill="#F5F6FA" />
+          <path d="M208,0 L350,0 L368,42 L208,42 Z" fill="#F5F6FA" />
+          <path d="M214,128 L362,128 L362,170 L214,170 Z" fill="#F5F6FA" />
+          <path d="M208,54 L368,54 L288,121 Z" fill="url(#env)" />
+          <path d="M242,54 L334,54 L288,97 Z" fill="#5228C8" />
+          <path d="M390,170 L390,22 L412,0 L438,0 C478,0 512,30 512,78 C512,126 478,156 438,156 L438,170 Z M438,44 C462,44 484,57 484,78 C484,99 462,112 438,112 Z" fill="#F5F6FA" fill-rule="evenodd" />
+        </g>
+      </svg>
+      <h1 class="title">Correio</h1>
+
+      <section class="state state-connecting" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <p class="lead" data-i18n="connecting">Conectando ao Correio…</p>
+      </section>
+
+      <section class="state state-offline" aria-live="assertive">
+        <p class="lead" data-i18n="offlineTitle">Sem conexão com mepmail.dev</p>
+        <p class="hint" data-i18n="offlineHint">
+          O Correio precisa de internet para abrir. Verifique a conexão e tente de novo.
+        </p>
+        <button type="button" class="button" id="retry" data-i18n="retry">Tentar de novo</button>
+      </section>
+    </main>
+    <script src="shell.js"></script>
+  </body>
+</html>

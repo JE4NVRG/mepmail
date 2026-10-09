@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "The Correio window: the bundled splash page and, after it, the hosted app on mepmail.dev. The hosted origin may set the window title and raise notifications, nothing else: no file system, shell, process or window control. Scoped to the two hosts the navigation guard lets into the window, not to every subdomain.",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["https://mepmail.dev", "https://www.mepmail.dev"]
+  },
+  "permissions": ["core:event:default", "core:window:allow-set-title", "notification:default"]
+}

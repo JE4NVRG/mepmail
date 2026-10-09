@@ -1,0 +1,36 @@
+[package]
+name = "mepmail-correio"
+version = "0.1.0"
+description = "MepMail Correio for the desktop"
+authors = ["MepMail"]
+license = "AGPL-3.0-only"
+repository = "https://github.com/JE4NVRG/mepmail"
+edition = "2021"
+rust-version = "1.90"
+
+# The binary in main.rs is the desktop entry point. When this src-tauri also
+# serves Android and iOS (0.3), add "staticlib" and "cdylib" here: until then
+# they would only double the LTO link of every release build.
+[lib]
+name = "mepmail_correio_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = ["tray-icon"] }
+tauri-plugin-notification = "2.5"
+tauri-plugin-opener = "2.7"
+sys-locale = "0.3"
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = "2.5"
+tauri-plugin-window-state = "2.5"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

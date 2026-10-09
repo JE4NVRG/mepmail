@@ -1,0 +1,19 @@
+{
+  "name": "@mepmail/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MepMail Correio for Windows (Tauri 2): a native shell around the hosted Correio app",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:exe": "tauri build --no-bundle",
+    "icons": "tauri icon ../web/public/logo/mepmail-favicon.svg -o src-tauri/icons",
+    "info": "tauri info",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.1"
+  }
+}

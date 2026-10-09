@@ -1,6 +1,8 @@
 packages:
   - "apps/*"
   - "packages/*"
+  # The desktop shell (apps/desktop, Tauri/Rust) keeps its own npm lockfile: not a workspace member.
+  - "!apps/desktop"
 allowBuilds:
   # Both ship prebuilt binaries; their build scripts are unnecessary.
   '@parcel/watcher': false

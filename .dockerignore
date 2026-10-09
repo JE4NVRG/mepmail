@@ -24,3 +24,6 @@ Dockerfile
 docker-compose*.yml
 deploy
 .DS_Store
+
+# Desktop shell (Tauri/Rust): built on Windows, never part of the server image
+apps/desktop
