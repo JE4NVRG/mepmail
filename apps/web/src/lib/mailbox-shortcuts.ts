@@ -14,7 +14,8 @@ export type MailboxShortcut =
   | "search"
   | "help"
   | "undo"
-  | "newFolder";
+  | "newFolder"
+  | "moveTo";
 
 const KEYS: Record<string, MailboxShortcut> = {
   j: "next",
@@ -31,6 +32,7 @@ const KEYS: Record<string, MailboxShortcut> = {
   "/": "search",
   "?": "help",
   z: "undo",
+  v: "moveTo",
   // Shift+N: the key event carries the upper-case letter.
   N: "newFolder",
 };
@@ -44,6 +46,7 @@ export const MAILBOX_SHORTCUTS: { key: string; action: MailboxShortcut }[] = [
   { key: "F", action: "forward" },
   { key: "C", action: "compose" },
   { key: "E", action: "archive" },
+  { key: "V", action: "moveTo" },
   { key: "#", action: "trash" },
   { key: "S", action: "star" },
   { key: "U", action: "unread" },

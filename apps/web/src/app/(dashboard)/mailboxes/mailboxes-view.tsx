@@ -698,7 +698,10 @@ export function MailboxesView({
           onClick={() =>
             selected ? chooseFolder("custom", entry.id) : openFolder(box.id, entry.id)
           }
-          {...dropProps({ folder: "custom", id: entry.id }, `custom:${entry.id}`)}
+          {...dropProps(
+            { folder: "custom", id: entry.id, mailboxId: box.id },
+            `custom:${entry.id}`,
+          )}
         >
           <span className={tint ? styles[FOLDER_TINT_CLASS[tint] ?? ""] : undefined}>
             <MailboxFolderIcon name="custom" filled={!!tint} />
@@ -1142,7 +1145,6 @@ export function MailboxesView({
       ) : null}
     </>
   );
-  const ownsSelected = !!selected?.ownerActive && selected.ownerUserId === session?.user.id;
   const ownedBoxes = boxes.filter((box) => box.ownerActive && box.ownerUserId === session?.user.id);
   return (
     <section className={`${styles.view} ${styles.appView}`}>

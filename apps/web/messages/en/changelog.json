@@ -23,6 +23,28 @@
   },
   "releases": [
     {
+      "version": "0.83",
+      "date": "2026-10-09",
+      "title": "Move to, with search",
+      "summary": "Moving messages got faster: a searchable menu that also creates the folder on the spot, in bulk and with the V key, with undo on every bulk action.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "“Move to” with search: the mailbox's folders with their colors, “Remove from folder” and “Create folder and move” when the name does not exist yet.",
+            "The same menu in the selection bar, when the selected messages share a mailbox, and with the V key; on phones it opens as a bottom sheet.",
+            "Undo on every bulk action: folder, favorite, spam, inbox, archive and trash."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Dragging or bulk-moving to a folder also works in the all-mailboxes view."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.82",
       "date": "2026-10-09",
       "title": "All your mailboxes in one sidebar",

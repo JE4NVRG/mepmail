@@ -441,7 +441,13 @@
     },
     "moveUp": "Move up",
     "moveDown": "Move down",
-    "folderMenu": "Options for folder {name}"
+    "folderMenu": "Options for folder {name}",
+    "moveTo": "Move to",
+    "moveToSearch": "Find or create a folder…",
+    "moveToFilter": "Find a folder…",
+    "createAndMove": "Create folder “{name}” and move",
+    "createdNotMoved": "Folder “{name}” created, but the message could not be moved.",
+    "noFolderMatches": "No folder with that name."
   },
   "thread": {
     "title": "{count, plural, one {# other message in this conversation} other {# other messages in this conversation}}",
@@ -475,7 +481,8 @@
       "search": "Search messages",
       "undo": "Undo the last action",
       "help": "Show these shortcuts",
-      "newFolder": "New folder"
+      "newFolder": "New folder",
+      "moveTo": "Move to a folder"
     }
   },
   "usage": {

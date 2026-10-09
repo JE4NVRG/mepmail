@@ -28,6 +28,28 @@
   },
   "releases": [
     {
+      "version": "0.83",
+      "date": "2026-10-09",
+      "title": "Mover para, com busca",
+      "summary": "Mover mensagens ficou mais rápido: um menu com busca que também cria a pasta na hora, em lote e pela tecla V, com desfazer em todas as ações em lote.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "“Mover para” com busca: as pastas da caixa com a cor de cada uma, “Tirar da pasta” e “Criar pasta e mover” quando o nome ainda não existe.",
+            "O mesmo menu na barra de seleção, quando as mensagens marcadas são da mesma caixa, e pela tecla V; no celular abre de baixo para cima.",
+            "Desfazer em todas as ações em lote: pasta, favorito, spam, entrada, arquivo e lixeira."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Arrastar ou mover em lote para uma pasta funciona também na visão de todas as caixas."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.82",
       "date": "2026-10-09",
       "title": "Todas as suas caixas numa barra lateral",

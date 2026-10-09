@@ -441,7 +441,13 @@
     },
     "moveUp": "Mover para cima",
     "moveDown": "Mover para baixo",
-    "folderMenu": "Opções da pasta {name}"
+    "folderMenu": "Opções da pasta {name}",
+    "moveTo": "Mover para",
+    "moveToSearch": "Buscar ou criar pasta…",
+    "moveToFilter": "Buscar pasta…",
+    "createAndMove": "Criar pasta “{name}” e mover",
+    "createdNotMoved": "Pasta “{name}” criada, mas não foi possível mover a mensagem.",
+    "noFolderMatches": "Nenhuma pasta com esse nome."
   },
   "thread": {
     "title": "{count, plural, one {# outra mensagem nesta conversa} other {# outras mensagens nesta conversa}}",
@@ -475,7 +481,8 @@
       "search": "Buscar mensagens",
       "undo": "Desfazer a última ação",
       "help": "Mostrar estes atalhos",
-      "newFolder": "Nova pasta"
+      "newFolder": "Nova pasta",
+      "moveTo": "Mover para uma pasta"
     }
   },
   "usage": {

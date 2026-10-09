@@ -7,6 +7,25 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.83] - 2026-10-09
+
+New inbox cut 1E (from the desktop session): Move to.
+
+### Added
+
+- Searchable "Move to" menu (`mailbox-move-menu.tsx`, `lib/mailbox-move.ts`)
+  in the reader, in the selection bar when every selected row shares a
+  mailbox, and on V: the mailbox's folders with their colors, a check on the
+  current one, "Remove from folder", and "Create folder and move" under the
+  server's naming rules; a bottom sheet on phones.
+- Undo on every bulk move (folder, favorite, spam, inbox, archive, trash)
+  from the returned revision.
+
+### Fixed
+
+- Drag or bulk move to a folder in the unified view carries the folder's
+  mailbox, so it no longer does nothing without a selected mailbox.
+
 ## [0.82] - 2026-10-09
 
 New inbox cut 1D (from the desktop session); account mail in the dashboard language.

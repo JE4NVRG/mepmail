@@ -1,0 +1,141 @@
+/* "Move to": search, the mailbox's folders, "create and move". */
+.iconTrigger {
+  min-width: 30px;
+  justify-content: center;
+}
+.buttonTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel {
+  z-index: var(--ms-z-modal);
+  box-sizing: border-box;
+  width: 280px;
+  max-width: calc(100vw - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+}
+/* Phone: a sheet at the bottom of the screen. */
+.panel[data-sheet="true"] {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-width: none;
+  max-height: 70vh;
+  padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  border: 0;
+  border-top: 1px solid var(--ms-line-strong);
+  border-radius: var(--ms-r-modal) var(--ms-r-modal) 0 0;
+  background: var(--ms-panel);
+  box-shadow: var(--ms-shadow-card);
+}
+
+.search {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 10px;
+  font-size: var(--ms-fs-ui);
+}
+
+.list {
+  display: grid;
+  gap: 1px;
+  max-height: 264px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.panel[data-sheet="true"] .list {
+  flex: 1;
+  max-height: none;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.option[data-active] {
+  background: var(--ms-panel-raised);
+  color: var(--ms-bone);
+}
+.option[data-kind="create"] {
+  color: var(--ms-bone);
+  font-weight: 500;
+}
+.option[data-kind="remove"] {
+  color: var(--ms-muted);
+}
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.check {
+  flex: none;
+  color: var(--ms-muted);
+}
+
+/* The folder's own color, as on the rail. */
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ms-faint);
+}
+.dot[data-tint="violet"] {
+  background: var(--ms-violet);
+}
+.dot[data-tint="blue"] {
+  background: var(--ms-info);
+}
+.dot[data-tint="green"] {
+  background: var(--ms-success);
+}
+.dot[data-tint="amber"] {
+  background: var(--ms-warn);
+}
+.dot[data-tint="red"] {
+  background: var(--ms-danger);
+}
+.dot[data-tint="pink"] {
+  background: var(--ms-pink);
+}
+.dot[data-tint="teal"] {
+  background: color-mix(in srgb, var(--ms-info) 55%, var(--ms-success));
+}
+.dot[data-tint="gray"] {
+  background: var(--ms-neutral);
+}
+
+.state {
+  margin: 6px 8px;
+  color: var(--ms-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 620px), (pointer: coarse) {
+  .option {
+    min-height: 44px;
+  }
+  .search {
+    min-height: 40px;
+    font-size: 16px;
+  }
+}
+@media (forced-colors: active) {
+  .option[data-active] {
+    outline: 2px solid CanvasText;
+    outline-offset: -2px;
+  }
+}

@@ -54,6 +54,7 @@ import { mailboxSignatureText } from "@/lib/mailbox-signature";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
+import { MailboxMoveMenu, type MailboxMoveMenuHandle } from "./mailbox-move-menu";
 import { MailboxRecipientField } from "./mailbox-recipient-field";
 import { MailboxRichBody } from "./mailbox-rich-body";
 import { MailboxViewMenu } from "./mailbox-view-menu";
@@ -725,7 +726,8 @@ function DraftDialog({
 export const MAIL_DRAG_TYPE = "application/x-mepmail-items";
 export type MailboxDropTarget =
   | { folder: "inbox" | "archive" | "trash" | "spam" | "favorites" }
-  | { folder: "custom"; id: string };
+  // mailboxId: the folder's mailbox, when the list mixes several (unified view).
+  | { folder: "custom"; id: string; mailboxId?: string };
 export type MailboxDropHandler = (target: MailboxDropTarget, keys: string[]) => void;
 
 function ConversationHistory({
@@ -891,6 +893,9 @@ export function MailboxContentView({
     steps: (() => Promise<unknown>)[];
   } | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // "Move to" in the reader and in the bulk bar; V opens whichever applies.
+  const moveMenu = useRef<MailboxMoveMenuHandle>(null);
+  const bulkMoveMenu = useRef<MailboxMoveMenuHandle>(null);
   // Unread mail that arrived while the list was scrolled down: a chip offers the way back up.
   const [freshCount, setFreshCount] = useState(0);
   const listBody = useRef<HTMLDivElement>(null);
@@ -999,7 +1004,8 @@ export function MailboxContentView({
       return searchable.toLowerCase().includes(search.toLowerCase().trim());
     }) ?? [];
   const selectedBox = readable.find((b) => b.id === selection?.mailboxId);
-  const availableFolders = useQuery(
+  // Warms the folder list "Move to" opens with, as soon as a message is open.
+  useQuery(
     trpc.mailboxes.folders.queryOptions(
       { mailboxId: selectedBox?.id ?? NIL },
       { enabled: !!selectedBox, retry: false },
@@ -1160,6 +1166,14 @@ export function MailboxContentView({
     );
   });
   const checkedRows = movableRows.filter((row) => checkedIds.has(rowKey(row)));
+  // Folders belong to one mailbox: the bulk "Move to" needs every checked row in it.
+  const bulkMailboxId =
+    checkedRows.length > 0 &&
+    checkedRows.every(
+      (row) => row.mailboxId === checkedRows[0]?.mailboxId && !mailboxContentBlocked(row),
+    )
+      ? (checkedRows[0]?.mailboxId ?? null)
+      : null;
   const organizationScope = `${folder}:${customFolderId ?? ""}:${selected?.id ?? ""}:${mailboxKind ?? ""}`;
   const previousOrganizationScope = useRef(organizationScope);
   useEffect(() => {
@@ -1205,8 +1219,9 @@ export function MailboxContentView({
       if (mounted.current) void refresh();
     }
   }
-  async function moveToFolder(id: string | null) {
-    if (!item || !canOrganizeItem || moving.current) return;
+  async function moveToFolder(id: string | null): Promise<boolean> {
+    if (!item || !canOrganizeItem || moving.current) return false;
+    let moved = false;
     moving.current = true;
     setNotice("");
     const previousFolder = item.folderId;
@@ -1217,6 +1232,7 @@ export function MailboxContentView({
         expectedRevision: item.revision,
         folderId: id,
       });
+      moved = true;
       if (mounted.current) {
         select(null);
         const message = t("organization.moved");
@@ -1243,6 +1259,7 @@ export function MailboxContentView({
       moving.current = false;
       if (mounted.current) void refresh();
     }
+    return moved;
   }
   /** Opening a message the owner has not read marks it read. */
   function openRow(row: Row) {
@@ -1323,59 +1340,104 @@ export function MailboxContentView({
       )
       .flatMap((row): (() => Promise<unknown>)[] => {
         const ref = { mailboxId: row.mailboxId, id: row.id, expectedRevision: row.revision };
+        const at = (revision: number) => ({
+          mailboxId: row.mailboxId,
+          id: row.id,
+          expectedRevision: revision,
+        });
+        // Every change records its inverse with the revision it produced, for "Desfazer".
+        const step =
+          (
+            change: () => Promise<{ revision: number }>,
+            inverse: (revision: number) => Promise<unknown>,
+          ) =>
+          async () => {
+            const done = await change();
+            reversals.push(() => inverse(done.revision));
+          };
         const ordinary = !row.trashedAt && row.deliveryFolder === "inbox";
         switch (target.folder) {
           case "archive":
             return ordinary && row.kind !== "draft" && !row.archivedAt
               ? [
-                  async () => {
-                    const done = await archiveMutation.mutateAsync({ ...ref, archived: true });
-                    reversals.push(() =>
-                      archiveMutation.mutateAsync({
-                        mailboxId: ref.mailboxId,
-                        id: ref.id,
-                        expectedRevision: done.revision,
-                        archived: false,
-                      }),
-                    );
-                  },
+                  step(
+                    () => archiveMutation.mutateAsync({ ...ref, archived: true }),
+                    (revision) => archiveMutation.mutateAsync({ ...at(revision), archived: false }),
+                  ),
                 ]
               : [];
           case "trash":
             return row.trashedAt
               ? []
               : [
-                  async () => {
-                    const done = await trashMutation.mutateAsync({ ...ref, trashed: true });
-                    reversals.push(() =>
-                      trashMutation.mutateAsync({
-                        mailboxId: ref.mailboxId,
-                        id: ref.id,
-                        expectedRevision: done.revision,
-                        trashed: false,
-                      }),
-                    );
-                  },
+                  step(
+                    () => trashMutation.mutateAsync({ ...ref, trashed: true }),
+                    (revision) => trashMutation.mutateAsync({ ...at(revision), trashed: false }),
+                  ),
                 ];
           case "favorites":
             return ordinary && !row.starredAt
-              ? [() => starMutation.mutateAsync({ ...ref, starred: true })]
+              ? [
+                  step(
+                    () => starMutation.mutateAsync({ ...ref, starred: true }),
+                    (revision) => starMutation.mutateAsync({ ...at(revision), starred: false }),
+                  ),
+                ]
               : [];
           case "spam":
             return ordinary && row.kind === "inbox"
-              ? [() => moveMutation.mutateAsync({ ...ref, folder: "spam" })]
+              ? [
+                  step(
+                    () => moveMutation.mutateAsync({ ...ref, folder: "spam" }),
+                    (revision) => moveMutation.mutateAsync({ ...at(revision), folder: "inbox" }),
+                  ),
+                ]
               : [];
-          case "custom":
-            return ordinary && row.mailboxId === selected?.id && row.folderId !== target.id
-              ? [() => folderMutation.mutateAsync({ ...ref, folderId: target.id })]
+          case "custom": {
+            const previous = row.folderId;
+            return ordinary &&
+              row.mailboxId === (target.mailboxId ?? selected?.id) &&
+              row.folderId !== target.id
+              ? [
+                  step(
+                    () => folderMutation.mutateAsync({ ...ref, folderId: target.id }),
+                    (revision) =>
+                      folderMutation.mutateAsync({ ...at(revision), folderId: previous }),
+                  ),
+                ]
               : [];
+          }
           case "inbox":
-            if (row.trashedAt) return [() => trashMutation.mutateAsync({ ...ref, trashed: false })];
+            if (row.trashedAt)
+              return [
+                step(
+                  () => trashMutation.mutateAsync({ ...ref, trashed: false }),
+                  (revision) => trashMutation.mutateAsync({ ...at(revision), trashed: true }),
+                ),
+              ];
             if (row.archivedAt)
-              return [() => archiveMutation.mutateAsync({ ...ref, archived: false })];
-            if (row.folderId) return [() => folderMutation.mutateAsync({ ...ref, folderId: null })];
+              return [
+                step(
+                  () => archiveMutation.mutateAsync({ ...ref, archived: false }),
+                  (revision) => archiveMutation.mutateAsync({ ...at(revision), archived: true }),
+                ),
+              ];
+            if (row.folderId) {
+              const previous = row.folderId;
+              return [
+                step(
+                  () => folderMutation.mutateAsync({ ...ref, folderId: null }),
+                  (revision) => folderMutation.mutateAsync({ ...at(revision), folderId: previous }),
+                ),
+              ];
+            }
             if (row.kind === "inbox" && row.deliveryFolder === "spam")
-              return [() => moveMutation.mutateAsync({ ...ref, folder: "inbox" })];
+              return [
+                step(
+                  () => moveMutation.mutateAsync({ ...ref, folder: "inbox" }),
+                  (revision) => moveMutation.mutateAsync({ ...at(revision), folder: "spam" }),
+                ),
+              ];
             return [];
           default:
             return [];
@@ -1821,6 +1883,15 @@ export function MailboxContentView({
       case "newFolder":
         if (onNewFolder) run(onNewFolder);
         return;
+      case "moveTo":
+        if (checkedRows.length && bulkMoveMenu.current) {
+          const menu = bulkMoveMenu.current;
+          run(() => menu.open());
+        } else if (canOrganizeItem && moveMenu.current) {
+          const menu = moveMenu.current;
+          run(() => menu.open());
+        }
+        return;
       case "search":
         run(() => searchInput.current?.focus());
         return;
@@ -2022,6 +2093,24 @@ export function MailboxContentView({
                         >
                           <MailboxFolderIcon name="inbox" />
                         </button>
+                      ) : null}
+                      {bulkMailboxId && folder !== "trash" ? (
+                        <MailboxMoveMenu
+                          ref={bulkMoveMenu}
+                          mailboxId={bulkMailboxId}
+                          currentFolderId={folder === "custom" ? (customFolderId ?? null) : null}
+                          canCreate
+                          disabled={bulkBusy}
+                          onMove={async (folderId) => {
+                            await organizeRows(
+                              checkedRows,
+                              folderId
+                                ? { folder: "custom", id: folderId, mailboxId: bulkMailboxId }
+                                : { folder: "inbox" },
+                            );
+                            return true;
+                          }}
+                        />
                       ) : null}
                       {folder !== "trash" && checkedRows.some((row) => row.kind === "inbox") ? (
                         <>
@@ -2505,35 +2594,14 @@ export function MailboxContentView({
                 ) : null}
                 {canOrganizeItem && item ? (
                   <div className={styles.organizationActions}>
-                    {!availableFolders.isError ? (
-                      <label>
-                        <span className={styles.visuallyHidden}>
-                          {t("organization.moveToFolder")}
-                        </span>
-                        <select
-                          className="ms-input"
-                          aria-label={t("organization.moveToFolder")}
-                          value={item.folderId ?? ""}
-                          disabled={
-                            folderMutation.isPending || availableFolders.isPending || bulkBusy
-                          }
-                          onChange={(event) => void moveToFolder(event.target.value || null)}
-                        >
-                          <option value="">
-                            {t(
-                              item.folderId
-                                ? "organization.removeFromFolder"
-                                : "organization.moveToFolderPlaceholder",
-                            )}
-                          </option>
-                          {availableFolders.data?.map((entry) => (
-                            <option key={entry.id} value={entry.id}>
-                              {entry.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
+                    <MailboxMoveMenu
+                      ref={moveMenu}
+                      mailboxId={item.mailboxId}
+                      currentFolderId={item.folderId}
+                      canCreate
+                      disabled={folderMutation.isPending || bulkBusy}
+                      onMove={moveToFolder}
+                    />
                     <button
                       type="button"
                       className={`ms-btn ms-btn-ghost ${styles.starButton}`}
