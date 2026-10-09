@@ -32,6 +32,8 @@ export const AUDIT_ACTIONS = [
   "mailbox.revoked",
   "mailbox.alias_added",
   "mailbox.alias_removed",
+  "mailbox.migration_connected",
+  "mailbox.migration_applied",
   "mailbox.items_listed",
   "mailbox.item_read",
   "mailbox.draft_saved",

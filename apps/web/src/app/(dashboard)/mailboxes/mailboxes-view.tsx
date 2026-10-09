@@ -23,6 +23,7 @@ import {
 import { MailboxFolderDialog } from "./mailbox-folder-dialog";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import managementStyles from "./mailbox-management.module.css";
+import { MailboxMigration } from "./mailbox-migration";
 import { MailboxOffer } from "./mailbox-offer";
 import { MailboxServicePanel } from "./mailbox-service-panel";
 import { MailboxSetupDialog } from "./mailbox-setup-dialog";
@@ -411,7 +412,9 @@ export function MailboxesView({
   const [teamAgentDialog, setTeamAgentDialog] = useState(false);
   const [signatureDialogId, setSignatureDialogId] = useState<string | null>(null);
   const [activityDialogId, setActivityDialogId] = useState<string | null>(null);
-  const [settingsTab, setSettingsTab] = useState<"boxes" | "agents" | "license">("boxes");
+  const [settingsTab, setSettingsTab] = useState<"boxes" | "agents" | "license" | "migration">(
+    "boxes",
+  );
   // Links such as the key-expiry email open the agents tab directly.
   useEffect(() => {
     if (layout === "settings" && window.location.hash === "#agents") setSettingsTab("agents");
@@ -980,7 +983,7 @@ export function MailboxesView({
         ) : (
           <div className={styles.settings}>
             <div className={styles.settingsTabs} role="tablist" aria-label={t("app.settings")}>
-              {(["boxes", "agents", "license"] as const).map((tab) => (
+              {(["boxes", "agents", "license", "migration"] as const).map((tab) => (
                 <button
                   type="button"
                   role="tab"
@@ -1112,13 +1115,42 @@ export function MailboxesView({
                   <p>{t("app.agentsEmpty")}</p>
                 )}
               </section>
-            ) : (
+            ) : settingsTab === "license" ? (
               <section className={styles.settingsSection} aria-label={t("app.tabs.license")}>
                 <MailboxServicePanel
                   openRequest={licenseOpenRequest}
                   initialOfferId={licenseOfferId}
                 />
                 <MailboxUsagePanel mailboxId={null} />
+              </section>
+            ) : (
+              <section className={styles.settingsSection} aria-label={t("app.tabs.migration")}>
+                {registry.data?.canManage ? (
+                  <MailboxMigration
+                    mailboxes={boxes.map((box) => ({
+                      id: box.id,
+                      address: box.address,
+                      label: box.label,
+                      ownerUserId: box.ownerUserId,
+                    }))}
+                    domains={options.data?.domains ?? []}
+                    members={options.data?.members ?? []}
+                    currentUserId={session?.user.id ?? ""}
+                    seatsAvailable={
+                      service.data?.unlimitedSeats
+                        ? null
+                        : Math.max(
+                            0,
+                            (service.data?.seats ?? 0) - (service.data?.reservedSeats ?? 0),
+                          )
+                    }
+                    onApplied={() => {
+                      void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
+                    }}
+                  />
+                ) : (
+                  <p className={styles.hint}>{t("managementOnly")}</p>
+                )}
               </section>
             )}
           </div>

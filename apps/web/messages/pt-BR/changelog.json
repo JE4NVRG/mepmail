@@ -28,6 +28,23 @@
   },
   "releases": [
     {
+      "version": "0.77",
+      "date": "2026-10-09",
+      "title": "Trazer seus endereços de outro provedor",
+      "summary": "Um assistente no Correio descobre quais endereços da sua conta antiga recebem e-mail e cria as caixas e os apelidos de uma vez, antes de você trocar o MX.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Em Correio → Configurações → Migração, conecte a conta antiga por IMAP (Purelymail, Titan, Gmail, Outlook ou outro servidor). O MepMail lê só os cabeçalhos para ver quais endereços dos seus domínios recebem mensagens, com quantas e a mais recente.",
+            "Marque o que vira caixa, o que vira apelido de uma caixa e o que fica de fora; o resumo mostra o que será criado e se faltam licenças.",
+            "Por domínio, o assistente avisa os endereços que ainda não têm caixa nem apelido e o estado do MX, para a troca não recusar nenhum e-mail.",
+            "A senha é usada uma vez para entrar e não é guardada; o corpo das mensagens nunca é lido. A importação do histórico vem a seguir."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.75",
       "date": "2026-10-09",
       "title": "Assinaturas medidas no Google Analytics",

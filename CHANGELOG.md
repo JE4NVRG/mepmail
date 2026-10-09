@@ -7,6 +7,28 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.77] - 2026-10-09
+
+Migration assistant: discover an old account's addresses and create them here.
+
+### Added
+
+- `mailboxes.migration` (owners and admins): `connect` signs in over IMAPS
+  (port 993 only, TLS verified, pinned to a public address; private, loopback
+  and link-local targets refused) and starts a header-only scan in the web
+  process; `status` reports progress and the own-domain recipients found (other
+  domains only as counts); `plan` (dry run: ok, exists, ignored, conflict,
+  over_alias_cap, needs_license, domain_missing, invalid); `applyPlan` creates
+  the approved mailboxes and aliases with the registry rules and activates
+  receiving where the domain already receives; `mxReadiness` lists, per domain,
+  addresses still missing, the recipient count against the 100-recipient rule
+  and the MX. The password is used for one LOGIN and dropped; sources live two
+  hours in memory, private to who connected; one scan per team, ten sign-ins
+  per hour. Audited as `mailbox.migration_connected` / `mailbox.migration_applied`.
+- Minimal IMAP4rev1 client (LOGIN with a literal, LIST, EXAMINE, FETCH of
+  header fields) with no new dependency.
+- The Migration tab in Mail settings (from the desktop session).
+
 ## [0.76] - 2026-10-09
 
 Groundwork for the Correio desktop app (not yet offered to users, so no public

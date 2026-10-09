@@ -494,6 +494,7 @@
     "agentsHint": "Chaves para agentes trabalharem nas suas caixas, por MCP ou pela API. Sem a permissão de envio, o agente pede sua aprovação antes de enviar.",
     "agentsEmpty": "Você ainda não é responsável por nenhuma caixa.",
     "tabs": {
+      "migration": "Migração",
       "boxes": "Caixas",
       "agents": "Agentes",
       "license": "Licença e uso"
@@ -638,5 +639,111 @@
     "loadError": "Não foi possível carregar os apelidos.",
     "loading": "Carregando apelidos…",
     "retry": "Tentar de novo"
+  },
+  "migration": {
+    "tab": "Migração",
+    "title": "Trazer endereços de outro provedor",
+    "hint": "Conecte a conta antiga por IMAP. O Correio lê só os cabeçalhos das mensagens para descobrir quais endereços dos seus domínios recebem email de verdade; você escolhe o que vira caixa ou apelido. Nada é copiado ainda e a senha não é guardada.",
+    "stepsLabel": "Etapas da migração",
+    "steps": {
+      "source": "Conta antiga",
+      "addresses": "Endereços",
+      "mx": "Trocar o MX",
+      "history": "Histórico"
+    },
+    "provider": "Provedor",
+    "providers": {
+      "purelymail": "Purelymail",
+      "titan": "Titan (HostGator)",
+      "gmail": "Gmail / Google Workspace",
+      "outlook": "Outlook / Microsoft 365",
+      "imap": "Outro (IMAP)"
+    },
+    "host": "Servidor IMAP",
+    "port": "Porta",
+    "username": "Usuário (o endereço completo)",
+    "password": "Senha",
+    "appPasswordHint": "Este provedor só aceita uma senha de app, criada nas configurações de segurança da conta.",
+    "passwordHint": "Usada uma vez para ler os cabeçalhos; não é guardada.",
+    "connect": "Conectar e descobrir endereços",
+    "connecting": "Conectando…",
+    "errors": {
+      "login": "O provedor recusou o usuário ou a senha.",
+      "network": "Não foi possível alcançar o servidor IMAP.",
+      "reconnect": "A varredura foi interrompida. Conecte de novo para continuar.",
+      "generic": "Não foi possível conectar. Tente de novo."
+    },
+    "scanning": "Lendo cabeçalhos… {done} de {total} pastas, {messages, plural, one {# mensagem} other {# mensagens}}",
+    "truncated": "Pastas grandes foram lidas só nas mensagens mais recentes.",
+    "found": "{count, plural, one {# endereço encontrado} other {# endereços encontrados}} em {domains, plural, one {# domínio} other {# domínios}}",
+    "externalTitle": "Outros domínios, só contagem",
+    "externalRow": "{domain}: {count, plural, one {# mensagem} other {# mensagens}}",
+    "messages": "{count, plural, one {# mensagem} other {# mensagens}}",
+    "lastSeen": "última em {date}",
+    "never": "sem data",
+    "selectRecent": "Selecionar os usados nos últimos 12 meses",
+    "selectAll": "Selecionar todos",
+    "selectNone": "Limpar seleção",
+    "selectAddress": "Incluir {address}",
+    "action": {
+      "label": "O que vira",
+      "mailbox": "Caixa",
+      "alias": "Apelido de",
+      "ignore": "Ignorar"
+    },
+    "aliasTarget": "Entrega em",
+    "owner": "Responsável",
+    "mailboxLabel": "Nome da caixa",
+    "existing": {
+      "mailbox": "já é caixa",
+      "alias": "já é apelido"
+    },
+    "outcome": {
+      "ok": "",
+      "exists": "Já existe",
+      "ignored": "",
+      "conflict": "Endereço em uso",
+      "over_alias_cap": "A caixa já tem 20 apelidos",
+      "needs_license": "Precisa de licença",
+      "domain_missing": "Domínio não está no MepMail",
+      "invalid": "Endereço inválido"
+    },
+    "domainMissingHint": "Adicione o domínio em Domínios antes de criar endereços nele.",
+    "summary": "{mailboxes, plural, =0 {nenhuma caixa nova} one {# caixa nova} other {# caixas novas}} · {aliases, plural, =0 {nenhum apelido novo} one {# apelido novo} other {# apelidos novos}}",
+    "licenses": "{count, plural, one {# licença a mais} other {# licenças a mais}}",
+    "apply": "Criar caixas e apelidos",
+    "applyAccepted": "Criar os {count} aceitos",
+    "applying": "Criando…",
+    "applied": "{created, plural, one {# endereço criado} other {# endereços criados}}; {failed, plural, =0 {nenhuma falha} one {# falha} other {# falhas}}.",
+    "applyError": "Não foi possível aplicar. Tente de novo.",
+    "reviewFirst": "Alguns endereços foram recusados; ajuste-os ou crie só os aceitos.",
+    "mx": {
+      "title": "Trocar o MX por domínio",
+      "hint": "Só troque o MX de um domínio quando todos os endereços descobertos nele já existirem no MepMail: o recebimento recusa destinatários que não estão na lista.",
+      "ready": "Pronto para trocar",
+      "pending": "{count, plural, one {# endereço sem destino} other {# endereços sem destino}}",
+      "capacity": "{used} de {cap} vagas da regra de recebimento",
+      "capWarning": "Este domínio passa de {cap} destinatários; a regra de recebimento não comporta todos.",
+      "record": "Registro MX: {exchange} (prioridade {priority})",
+      "state": {
+        "receiving": "Recebendo no MepMail",
+        "needs_mx": "Aguardando o MX",
+        "needs_dns": "Aguardando o DNS",
+        "needs_activation": "O MX já aponta para cá; ative o recebimento para listar os endereços",
+        "not_in_mepmail": "Domínio ainda não está no MepMail",
+        "unknown": "Não verificado"
+      },
+      "refresh": "Verificar de novo",
+      "loadError": "Não foi possível verificar os domínios."
+    },
+    "history": {
+      "title": "Histórico de mensagens",
+      "soon": "A importação das mensagens antigas é a próxima etapa do assistente. Mantenha a conta antiga até lá."
+    },
+    "back": "Voltar",
+    "next": "Continuar",
+    "restart": "Começar de novo",
+    "loading": "Carregando…",
+    "statusError": "Não foi possível ler o andamento da varredura."
   }
 }

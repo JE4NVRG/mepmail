@@ -23,6 +23,23 @@
   },
   "releases": [
     {
+      "version": "0.77",
+      "date": "2026-10-09",
+      "title": "Bring your addresses from another provider",
+      "summary": "An assistant in Mail finds which addresses of your old account receive mail and creates the mailboxes and aliases at once, before you switch the MX.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "In Mail → Settings → Migration, connect the old account over IMAP (Purelymail, Titan, Gmail, Outlook or another server). MepMail reads only headers to see which addresses on your domains receive mail, how much, and the latest.",
+            "Pick what becomes a mailbox, what becomes an alias of a mailbox and what stays out; the summary shows what will be created and whether licenses are missing.",
+            "Per domain, the assistant lists addresses that still have no mailbox or alias and the MX state, so the switch rejects no mail.",
+            "The password is used once to sign in and is not stored; message bodies are never read. History import comes next."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.75",
       "date": "2026-10-09",
       "title": "Subscriptions measured in Google Analytics",

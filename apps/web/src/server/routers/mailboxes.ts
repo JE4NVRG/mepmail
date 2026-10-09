@@ -69,6 +69,14 @@ import {
   saveMailboxContentDraft,
 } from "../mailbox-content";
 import { mailboxDnsGuide } from "../mailbox-dns-guide";
+import {
+  applyMigration,
+  connectMigrationSource,
+  MigrationError,
+  migrationMxReadiness,
+  migrationStatus,
+  planMigration,
+} from "../mailbox-migration/service";
 import { mailboxReceivingDeps } from "../mailbox-receiving";
 import { mailboxTransportMime } from "../mailbox-transport";
 import { getMailboxUsage } from "../mailbox-usage";
@@ -132,6 +140,38 @@ async function call<T>(run: () => Promise<T>): Promise<T> {
     throw error;
   }
 }
+/** Migration failures keep a reason word the assistant maps to its own copy. */
+async function migrationCall<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await call(run);
+  } catch (error) {
+    if (!(error instanceof MigrationError)) throw error;
+    throw new TRPCError({
+      code:
+        error.code === "rate_limited"
+          ? "TOO_MANY_REQUESTS"
+          : error.code === "busy"
+            ? "CONFLICT"
+            : error.code === "not_found"
+              ? "NOT_FOUND"
+              : "BAD_REQUEST",
+      message: error.code,
+    });
+  }
+}
+const migrationItems = z
+  .array(
+    z
+      .object({
+        address: z.string().min(3).max(254),
+        action: z.enum(["mailbox", "alias", "ignore"]),
+        mailboxId: z.uuid().nullable(),
+        ownerUserId: z.string().min(1).max(128).nullable(),
+        label: z.string().max(80).nullable(),
+      })
+      .strict(),
+  )
+  .max(500);
 const actor = (ctx: { teamId: string; session: { user: { id: string } } }) => ({
   teamId: ctx.teamId,
   userId: ctx.session.user.id,
@@ -959,6 +999,85 @@ export const mailboxesRouter = router({
       target: { type: "mailbox_grant", id: row.id },
     });
     return row;
+  }),
+  // Migration assistant: discover an old account's addresses over IMAP, then create them here.
+  migration: router({
+    connect: enabled
+      .input(
+        z
+          .object({
+            provider: z.enum(["purelymail", "titan", "gmail", "outlook", "imap"]),
+            host: z.string().min(1).max(253),
+            port: z.number().int(),
+            secure: z.literal(true),
+            username: z.string().min(1).max(254),
+            password: z.string().min(1).max(1024),
+          })
+          .strict(),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const source = await migrationCall(() => connectMigrationSource(ctx.db, actor(ctx), input));
+        await recordAudit(ctx, {
+          action: "mailbox.migration_connected",
+          target: { type: "mailbox_migration", id: source.sourceId },
+          metadata: { provider: input.provider, host: input.host.trim().toLowerCase() },
+        });
+        return source;
+      }),
+    status: enabled
+      .input(z.object({ sourceId: z.uuid() }).strict())
+      .query(({ ctx, input }) =>
+        migrationCall(() => migrationStatus(ctx.db, actor(ctx), input.sourceId)),
+      ),
+    plan: enabled
+      .input(z.object({ sourceId: z.uuid(), items: migrationItems }).strict())
+      .mutation(async ({ ctx, input }) => {
+        const plan = await migrationCall(() => planMigration(ctx.db, actor(ctx), input.items));
+        return {
+          results: plan.results.map(({ address, outcome }) => ({ address, outcome })),
+          newMailboxes: plan.newMailboxes,
+          newAliases: plan.newAliases,
+          licensesNeeded: plan.licensesNeeded,
+        };
+      }),
+    applyPlan: enabled
+      .input(z.object({ sourceId: z.uuid(), items: migrationItems }).strict())
+      .mutation(async ({ ctx, input }) => {
+        const applied = await migrationCall(() =>
+          applyMigration(ctx.db, actor(ctx), input.items, (tx) =>
+            mailboxCreateAccessEnabled(tx, actor(ctx)),
+          ),
+        );
+        const count = (outcome: string) =>
+          applied.results.filter((r) => r.outcome === outcome).length;
+        await recordAudit(ctx, {
+          action: "mailbox.migration_applied",
+          target: { type: "mailbox_migration", id: input.sourceId },
+          metadata: {
+            mailboxes: count("created_mailbox"),
+            aliases: count("created_alias"),
+            skipped: count("skipped"),
+            failed: count("failed"),
+          },
+        });
+        // Where a domain already receives, its new addresses join the SES rule now.
+        for (const domainId of applied.touchedDomains) {
+          try {
+            await activateMailboxReceiving(ctx.db, actor(ctx), domainId);
+          } catch (error) {
+            console.warn(
+              "migration receiving activation deferred",
+              error instanceof Error ? error.message : error,
+            );
+          }
+        }
+        return { results: applied.results };
+      }),
+    mxReadiness: enabled
+      .input(z.object({ sourceId: z.uuid() }).strict())
+      .query(({ ctx, input }) =>
+        migrationCall(() => migrationMxReadiness(ctx.db, actor(ctx), input.sourceId)),
+      ),
   }),
   // Aliases: extra addresses that deliver into one mailbox on its own domain.
   aliases: enabled

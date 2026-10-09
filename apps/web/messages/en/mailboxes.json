@@ -494,6 +494,7 @@
     "agentsHint": "Keys for agents to work in your mailboxes, over MCP or the API. Without the send permission, the agent asks for your approval before sending.",
     "agentsEmpty": "You don't own a mailbox yet.",
     "tabs": {
+      "migration": "Migration",
       "boxes": "Mailboxes",
       "agents": "Agents",
       "license": "License and usage"
@@ -638,5 +639,111 @@
     "loadError": "Could not load the aliases.",
     "loading": "Loading aliases…",
     "retry": "Try again"
+  },
+  "migration": {
+    "tab": "Migration",
+    "title": "Bring addresses from another provider",
+    "hint": "Connect the old account over IMAP. Correio reads only message headers to find which addresses on your domains really receive mail; you choose what becomes a mailbox or an alias. Nothing is copied yet and the password is not kept.",
+    "stepsLabel": "Migration steps",
+    "steps": {
+      "source": "Old account",
+      "addresses": "Addresses",
+      "mx": "Switch the MX",
+      "history": "History"
+    },
+    "provider": "Provider",
+    "providers": {
+      "purelymail": "Purelymail",
+      "titan": "Titan (HostGator)",
+      "gmail": "Gmail / Google Workspace",
+      "outlook": "Outlook / Microsoft 365",
+      "imap": "Other (IMAP)"
+    },
+    "host": "IMAP server",
+    "port": "Port",
+    "username": "User (the full address)",
+    "password": "Password",
+    "appPasswordHint": "This provider only accepts an app password, created in the account's security settings.",
+    "passwordHint": "Used once to read the headers; it is not kept.",
+    "connect": "Connect and discover addresses",
+    "connecting": "Connecting…",
+    "errors": {
+      "login": "The provider refused the user or password.",
+      "network": "The IMAP server could not be reached.",
+      "reconnect": "The scan was interrupted. Connect again to continue.",
+      "generic": "Could not connect. Try again."
+    },
+    "scanning": "Reading headers… {done} of {total} folders, {messages, plural, one {# message} other {# messages}}",
+    "truncated": "Large folders were read only in their newest messages.",
+    "found": "{count, plural, one {# address found} other {# addresses found}} on {domains, plural, one {# domain} other {# domains}}",
+    "externalTitle": "Other domains, counted only",
+    "externalRow": "{domain}: {count, plural, one {# message} other {# messages}}",
+    "messages": "{count, plural, one {# message} other {# messages}}",
+    "lastSeen": "last on {date}",
+    "never": "no date",
+    "selectRecent": "Select the ones used in the last 12 months",
+    "selectAll": "Select all",
+    "selectNone": "Clear selection",
+    "selectAddress": "Include {address}",
+    "action": {
+      "label": "What it becomes",
+      "mailbox": "Mailbox",
+      "alias": "Alias of",
+      "ignore": "Ignore"
+    },
+    "aliasTarget": "Delivers into",
+    "owner": "Owner",
+    "mailboxLabel": "Mailbox name",
+    "existing": {
+      "mailbox": "already a mailbox",
+      "alias": "already an alias"
+    },
+    "outcome": {
+      "ok": "",
+      "exists": "Already exists",
+      "ignored": "",
+      "conflict": "Address in use",
+      "over_alias_cap": "The mailbox has 20 aliases",
+      "needs_license": "Needs a license",
+      "domain_missing": "Domain not in MepMail",
+      "invalid": "Invalid address"
+    },
+    "domainMissingHint": "Add the domain in Domains before creating addresses on it.",
+    "summary": "{mailboxes, plural, =0 {no new mailbox} one {# new mailbox} other {# new mailboxes}} · {aliases, plural, =0 {no new alias} one {# new alias} other {# new aliases}}",
+    "licenses": "{count, plural, one {# more license} other {# more licenses}} needed",
+    "apply": "Create mailboxes and aliases",
+    "applyAccepted": "Create the {count} accepted",
+    "applying": "Creating…",
+    "applied": "{created, plural, one {# address created} other {# addresses created}}; {failed, plural, =0 {no failure} one {# failure} other {# failures}}.",
+    "applyError": "Could not apply. Try again.",
+    "reviewFirst": "Some addresses were refused; adjust them or create only the accepted ones.",
+    "mx": {
+      "title": "Switch the MX per domain",
+      "hint": "Switch a domain's MX only once every discovered address on it exists in MepMail: receiving refuses recipients it does not list.",
+      "ready": "Ready to switch",
+      "pending": "{count, plural, one {# address without a destination} other {# addresses without a destination}}",
+      "capacity": "{used} of {cap} receipt-rule slots",
+      "capWarning": "This domain exceeds {cap} recipients; the receipt rule cannot hold them all.",
+      "record": "MX record: {exchange} (priority {priority})",
+      "state": {
+        "receiving": "Receiving in MepMail",
+        "needs_mx": "Waiting for the MX",
+        "needs_dns": "Waiting for DNS",
+        "needs_activation": "MX points here; activate receiving to list the addresses",
+        "not_in_mepmail": "Domain not in MepMail yet",
+        "unknown": "Not checked"
+      },
+      "refresh": "Check again",
+      "loadError": "Could not check the domains."
+    },
+    "history": {
+      "title": "Message history",
+      "soon": "Importing the old messages is the assistant's next step. Keep the old account until then."
+    },
+    "back": "Back",
+    "next": "Continue",
+    "restart": "Start over",
+    "loading": "Loading…",
+    "statusError": "Could not read the scan status."
   }
 }
