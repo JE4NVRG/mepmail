@@ -76,6 +76,7 @@ import {
 } from "@/lib/mailbox-undo-send";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
+import { MailboxColumnDivider } from "./mailbox-column-divider";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import { MailboxInviteCard } from "./mailbox-invite-card";
 import { MailboxMoveMenu, type MailboxMoveMenuHandle } from "./mailbox-move-menu";
@@ -2416,6 +2417,12 @@ export function MailboxContentView({
     <>
       <div className={styles.contentWorkspace}>
         {navigation}
+        <MailboxColumnDivider
+          column="rail"
+          controls="mailbox-folders-navigation"
+          label={t("view.resizeRail")}
+          className={styles.railDivider}
+        />
         <section className={styles.contentToolbar} aria-label={t("mailControls")}>
           <div className={styles.folderHeading}>
             <MailboxFolderIcon name={folder} />
@@ -2508,6 +2515,7 @@ export function MailboxContentView({
           data-wide={wideReader && (!!visibleItem || !!blockedRow) ? "true" : undefined}
         >
           <div
+            id="mailbox-message-list"
             className={`${styles.list} ${styles.contentList}`}
             data-reading={!!visibleItem || !!blockedRow}
           >
@@ -3061,6 +3069,12 @@ export function MailboxContentView({
               ) : null}
             </div>
           </div>
+          <MailboxColumnDivider
+            column="list"
+            controls="mailbox-message-list"
+            label={t("view.resizeList")}
+            className={styles.listDivider}
+          />
           {hasRows ? (
             <section
               ref={reader}

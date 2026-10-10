@@ -854,7 +854,10 @@
     "paneRight": "On the right",
     "paneBottom": "Below the list",
     "paneOff": "Hidden",
-    "showAvatars": "Show initials"
+    "showAvatars": "Show initials",
+    "resetColumns": "Reset column widths",
+    "resizeRail": "Resize mailboxes and folders",
+    "resizeList": "Resize message list"
   },
   "appearance": {
     "hint": "These choices are yours: they follow your account in the browser, in the desktop app and on your phone.",

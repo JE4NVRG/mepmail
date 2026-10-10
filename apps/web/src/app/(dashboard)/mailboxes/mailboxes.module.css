@@ -178,10 +178,12 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* In a narrow list the filters drop below "Selecionar todas", kept on the right. */
 .listFilters {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  margin-left: auto;
 }
 .listFilters .unreadFilter {
   height: 28px;
@@ -1805,9 +1807,11 @@
 .organizationActions .starButton {
   min-width: 44px;
 }
+/* A narrow reader wraps its actions; the rows stay packed on the right. */
 .contentDetail .detailTop {
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .contentDetail .detailTop > span {
   flex-basis: 100%;
@@ -1936,9 +1940,10 @@
 /* One quiet row under the search: select-all on the left, count or bulk action on the right. */
 .selectionToolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 0 8px;
   min-height: 44px;
   margin: 4px 0 0;
 }
@@ -2923,4 +2928,100 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Column dividers (mailbox-column-divider.tsx): [rail] | [list] | [reader].
+   Each sits on the edge it moves, as an absolutely placed grid child, so it
+   takes no track; the widths come from lib/mailbox-columns (same limits). */
+.contentWorkspace,
+.contentPanels {
+  position: relative;
+}
+.columnDivider {
+  display: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 9px;
+  z-index: 3;
+  cursor: col-resize;
+  touch-action: none;
+  border-radius: 4px;
+}
+.columnDivider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 3px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background var(--ms-dur-fast) var(--ms-ease);
+}
+.columnDivider:hover::before {
+  background: color-mix(in srgb, var(--ms-steel) 60%, transparent);
+  transition-delay: 80ms;
+}
+.columnDivider[data-active="true"]::before,
+.columnDivider:focus-visible::before {
+  background: var(--ms-steel);
+  transition-delay: 0ms;
+}
+.columnDivider:focus {
+  outline: none;
+}
+.columnDivider:focus-visible {
+  box-shadow: var(--ms-focus-ring);
+}
+.railDivider {
+  grid-column: 2;
+  grid-row: 1 / -1;
+}
+.listDivider {
+  grid-column: 2;
+  grid-row: 1;
+}
+/* Beside the rail only while it shows names (not icons only, not the drawer). */
+@container (min-width: 1050px) {
+  :global(html:not([data-rail="collapsed"])) .railDivider {
+    display: block;
+  }
+}
+@container (min-width: 621px) and (max-width: 1049px) {
+  :global(html[data-rail="expanded"]) .railDivider {
+    display: block;
+  }
+}
+/* Between the list and the reader only when both are side by side. */
+@container (min-width: 851px) {
+  :global(html[data-reading-pane="right"])
+    .contentPanels:not([data-empty="true"]):not([data-wide="true"])
+    > .listDivider {
+    display: block;
+  }
+  :global(html[data-reading-pane="right"][data-col-list])
+    .contentPanels:not([data-empty="true"]):not([data-wide="true"]) {
+    grid-template-columns:
+      clamp(260px, var(--correio-list-w), max(260px, calc(100% - 380px)))
+      minmax(0, 1fr);
+  }
+}
+/* While a divider moves: the resize cursor, no text selection, and the
+   message iframe never takes the pointer (the divider also holds capture). */
+:global(html[data-col-resizing]) .contentWorkspace,
+:global(html[data-col-resizing]) .contentWorkspace * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+:global(html[data-col-resizing]) .contentWorkspace iframe {
+  pointer-events: none;
+}
+@media (forced-colors: active) {
+  .columnDivider:hover::before,
+  .columnDivider[data-active="true"]::before,
+  .columnDivider:focus-visible::before {
+    background: Highlight;
+  }
 }

@@ -1,22 +1,31 @@
 /* Caixa inteligente: one row of piles above the Inbox list; scrolls sideways on a phone. */
+/* Sized so the four piles fit the list's 380 px column without scrolling. */
 .tabs {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   min-inline-size: 0;
   margin: 0;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border: 0;
   border-bottom: 1px solid var(--ms-line);
   overflow-x: auto;
   scrollbar-width: none;
 }
+/* Beside the reader the list can be narrowed with its divider: the piles wrap
+   to a second row instead of hiding past the edge. */
+@container (min-width: 621px) {
+  .tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
 .tab {
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   height: 28px;
-  padding: 0 12px;
+  padding: 0 9px;
   border: 1px solid var(--ms-line-strong);
   border-radius: 999px;
   background: transparent;
@@ -42,8 +51,8 @@
   color: var(--ms-void);
 }
 .count {
-  min-width: 18px;
-  padding: 0 5px;
+  min-width: 16px;
+  padding: 0 4px;
   border-radius: 999px;
   background: var(--ms-violet);
   color: #fff;

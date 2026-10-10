@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useId, useRef, useState } from "react";
 import { useDismiss } from "@/components/popover-menu";
+import { resetColumnWidths, useColumnWidths } from "@/lib/mailbox-columns";
 import type { CorreioPrefs } from "@/lib/mailbox-preferences";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import styles from "./mailboxes.module.css";
@@ -12,7 +13,9 @@ type Choice<K extends keyof CorreioPrefs> = { value: CorreioPrefs[K]; label: str
 /**
  * "Exibição": the list's own look, changed in place. Density, preview lines,
  * reading pane and initials, each a radio group with a check on the current
- * value; every choice is written to the person's preferences at once.
+ * value; every choice is written to the person's preferences at once. Last,
+ * "Restaurar larguras padrão" forgets the column widths dragged on this
+ * device (and nothing else).
  */
 export function MailboxViewMenu({
   prefs,
@@ -27,6 +30,7 @@ export function MailboxViewMenu({
   const panel = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   useDismiss([panel, trigger], open, () => setOpen(false));
+  const columns = useColumnWidths();
 
   const density: Choice<"density">[] = [
     { value: "comfortable", label: t("comfortable") },
@@ -120,6 +124,16 @@ export function MailboxViewMenu({
                 ✓
               </span>
             ) : null}
+          </button>
+          <hr className="ms-menu-sep" />
+          <button
+            type="button"
+            role="menuitem"
+            className="ms-menu-item"
+            disabled={!Object.keys(columns).length}
+            onClick={() => resetColumnWidths()}
+          >
+            <span>{t("resetColumns")}</span>
           </button>
         </div>
       ) : null}

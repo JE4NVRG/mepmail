@@ -23,6 +23,27 @@
   },
   "releases": [
     {
+      "version": "0.101",
+      "date": "2026-10-10",
+      "title": "Resize Correio's columns",
+      "summary": "Drag the dividers between mailboxes and folders, the message list and the reader to give each column the width you want; Correio remembers it on this device.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Two dividers between the folder rail, the list and the reader: drag them, or use the keyboard (Tab, arrows, Shift for bigger steps, Home and End), with sensible minimum and maximum widths.",
+            "Double-click a divider to restore its default width, or use Restore default widths in the view menu; widths are saved per device and applied before the page paints."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "In a narrow list the Select all bar wraps instead of overflowing, and the reader's actions stay aligned to the right when they wrap."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.100",
       "date": "2026-10-10",
       "title": "A dedicated support inbox: suporte@mepmail.dev",

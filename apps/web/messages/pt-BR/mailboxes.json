@@ -854,7 +854,10 @@
     "paneRight": "À direita",
     "paneBottom": "Abaixo da lista",
     "paneOff": "Oculto",
-    "showAvatars": "Mostrar iniciais"
+    "showAvatars": "Mostrar iniciais",
+    "resetColumns": "Restaurar larguras padrão",
+    "resizeRail": "Redimensionar caixas e pastas",
+    "resizeList": "Redimensionar lista de mensagens"
   },
   "appearance": {
     "hint": "Essas escolhas são suas: valem na sua conta no navegador, no app do computador e no celular.",

@@ -28,6 +28,27 @@
   },
   "releases": [
     {
+      "version": "0.101",
+      "date": "2026-10-10",
+      "title": "Ajuste a largura das colunas do Correio",
+      "summary": "Arraste os divisores entre caixas e pastas, a lista de mensagens e a leitura para deixar cada coluna do tamanho que preferir; o Correio lembra neste dispositivo.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Dois divisores entre a barra de pastas, a lista e a leitura: arraste ou use o teclado (Tab, setas, Shift para passos maiores, Home e End), com larguras mínima e máxima.",
+            "Duplo clique no divisor volta à largura padrão, ou use Restaurar larguras padrão no menu de visualização; as larguras ficam salvas por dispositivo e já aparecem antes da página pintar."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Numa lista estreita, a barra Selecionar todas quebra a linha em vez de transbordar, e as ações da leitura ficam alinhadas à direita quando quebram."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.100",
       "date": "2026-10-10",
       "title": "Uma caixa só para o suporte: suporte@mepmail.dev",

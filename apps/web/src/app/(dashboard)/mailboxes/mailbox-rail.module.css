@@ -397,6 +397,20 @@
   }
 }
 
+/* A width dragged on this device (lib/mailbox-columns), never past what leaves
+   the narrowest list and reader their room; the saved width returns when the
+   window widens again. */
+@container (min-width: 1050px) {
+  :global(html[data-col-rail]:not([data-rail="collapsed"])) .rail {
+    width: clamp(180px, var(--correio-rail-w), max(180px, calc(100cqw - 640px)));
+  }
+}
+@container (min-width: 621px) and (max-width: 1049px) {
+  :global(html[data-col-rail][data-rail="expanded"]) .rail {
+    width: clamp(180px, var(--correio-rail-w), max(180px, calc(100cqw - 640px)));
+  }
+}
+
 /* Phone: a full-screen drawer opened from "Caixas e pastas". */
 @container (max-width: 620px) {
   .rail {
