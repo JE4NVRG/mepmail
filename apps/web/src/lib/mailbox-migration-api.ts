@@ -1,5 +1,6 @@
 import { getUntypedClient, type TRPCClient } from "@trpc/client";
 import type { AppRouter } from "@/server/routers";
+import type { ImportJob, ImportTarget } from "./mailbox-import";
 import type {
   ApplyResult,
   MigrationConnectInput,
@@ -22,6 +23,19 @@ export type MigrationApi = {
   plan(sourceId: string, items: PlanItem[]): Promise<PlanSummary>;
   apply(sourceId: string, items: PlanItem[]): Promise<ApplyResult>;
   mxReadiness(sourceId: string): Promise<MxReadiness>;
+  /** History import (mailboxes.migration.import*): the password is held in memory only. */
+  importStart(input: {
+    host: string;
+    port: 993;
+    username: string;
+    password: string;
+    mailboxId: string;
+    folders: { name: string; target: ImportTarget; folderId?: string | null }[];
+  }): Promise<ImportJob>;
+  importStatus(jobId: string): Promise<ImportJob>;
+  importJobs(mailboxId: string | null): Promise<ImportJob[]>;
+  importResume(jobId: string, password: string): Promise<ImportJob>;
+  importCancel(jobId: string): Promise<ImportJob>;
 };
 
 export function createMigrationApi(client: TRPCClient<AppRouter>): MigrationApi {
@@ -37,5 +51,15 @@ export function createMigrationApi(client: TRPCClient<AppRouter>): MigrationApi 
       raw.mutation("mailboxes.migration.applyPlan", { sourceId, items }) as Promise<ApplyResult>,
     mxReadiness: (sourceId) =>
       raw.query("mailboxes.migration.mxReadiness", { sourceId }) as Promise<MxReadiness>,
+    importStart: (input) =>
+      raw.mutation("mailboxes.migration.importStart", input) as Promise<ImportJob>,
+    importStatus: (jobId) =>
+      raw.query("mailboxes.migration.importStatus", { jobId }) as Promise<ImportJob>,
+    importJobs: (mailboxId) =>
+      raw.query("mailboxes.migration.importJobs", { mailboxId }) as Promise<ImportJob[]>,
+    importResume: (jobId, password) =>
+      raw.mutation("mailboxes.migration.importResume", { jobId, password }) as Promise<ImportJob>,
+    importCancel: (jobId) =>
+      raw.mutation("mailboxes.migration.importCancel", { jobId }) as Promise<ImportJob>,
   };
 }

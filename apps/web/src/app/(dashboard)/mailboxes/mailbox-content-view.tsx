@@ -23,6 +23,7 @@ import {
   mailboxSignature,
   replaceMailboxSignature,
 } from "@/lib/mailbox-compose-signature";
+import { importRunning } from "@/lib/mailbox-import";
 import {
   type MailboxFolder,
   mailboxContentBlocked,
@@ -1025,6 +1026,13 @@ export function MailboxContentView({
   const listBody = useRef<HTMLDivElement>(null);
   // Browser notices for new mail while Correio sits in another tab (opt-in).
   const [noticesOn, setNoticesOn] = useState(false);
+  // A history import brings old mail in (see the notice effect below).
+  const imports = useQuery(
+    trpc.mailboxes.migration.importJobs.queryOptions(
+      { mailboxId: null },
+      { enabled: noticesOn, retry: false, refetchInterval: 30_000 },
+    ),
+  );
   const knownRows = useRef<Set<string> | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   // One window listener reads the current render through this ref.
@@ -2237,9 +2245,11 @@ export function MailboxContentView({
       setFreshCount((count) => count + arrivals.length);
     // The desktop app announces new mail itself (mailboxes-view, by sender and
     // subject, from any folder); these per-message notices are the browser's.
+    // A history import brings old mail in: no notices while it runs.
     if (
       isDesktop() ||
       !noticesOn ||
+      importRunning(imports.data) ||
       !arrivals.length ||
       typeof Notification === "undefined" ||
       Notification.permission !== "granted" ||
@@ -2261,7 +2271,7 @@ export function MailboxContentView({
         notice.close();
       };
     }
-  }, [listed, folder, noticesOn, select, t, prefs.smartInbox]);
+  }, [listed, folder, noticesOn, select, t, prefs.smartInbox, imports.data]);
   async function toggleNotices() {
     if (typeof Notification === "undefined") {
       setNotice(t("notices.unsupported"));

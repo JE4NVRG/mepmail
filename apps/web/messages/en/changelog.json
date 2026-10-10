@@ -23,6 +23,28 @@
   },
   "releases": [
     {
+      "version": "0.97",
+      "date": "2026-10-10",
+      "title": "Bring your old email into Correio",
+      "summary": "The migration assistant now imports an IMAP account's history (Gmail, Outlook, Purelymail, Titan and others) into a Correio mailbox, keeping folders, dates and read state.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "History import over IMAP: pick the folders and where each one goes (Inbox, Sent, Archive or a folder of your own); dates and read state are kept, and the old account is only read.",
+            "Your password is used only while the import runs and is never saved. If the connection drops, the import resumes where it stopped once you type it again.",
+            "Bring only the history: an account whose mailboxes already exist goes straight to the import."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "New-mail notices stay quiet while an import is running."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.96",
       "date": "2026-10-10",
       "title": "Large emails and attachments now arrive",

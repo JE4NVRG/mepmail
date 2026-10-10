@@ -127,8 +127,10 @@ afterEach(async () => {
 
 describe("mailbox migration assistant", () => {
   it("discovers own-domain addresses, plans, applies and reports MX readiness", async () => {
-    const { sourceId, folders } = await as().connect(connectInput);
+    const { sourceId, folders, folderTargets } = await as().connect(connectInput);
     expect(folders).toEqual(["INBOX"]);
+    // The history import's suggested destination, by special-use flags.
+    expect(folderTargets).toEqual([{ name: "INBOX", display: "INBOX", target: "inbox" }]);
     expect(imap.open.mock.calls[0]?.[0]).toMatchObject({
       host: "imap.purelymail.com",
       port: 993,

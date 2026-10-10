@@ -777,13 +777,66 @@
     },
     "history": {
       "title": "Message history",
-      "soon": "Importing the old messages is the assistant's next step. Keep the old account until then."
+      "hint": "Bring over the old messages of {username} at {host}. Each folder goes to the Inbox, Sent, Archive or a folder with the same name. The old account is not changed: Correio only reads it.",
+      "noMailbox": "You need to own a mailbox in Correio to receive the history. Create it in the addresses step and come back.",
+      "mailbox": "Target mailbox",
+      "folders": "{count, plural, one {# folder chosen} other {# folders chosen}}",
+      "targetFor": "Where {folder} goes",
+      "target": {
+        "inbox": "Inbox",
+        "sent": "Sent",
+        "archive": "Archive",
+        "folder": "Folder"
+      },
+      "targetFolder": "Folder “{name}”",
+      "tooMany": "Choose up to {max, number} folders per import. You can bring the rest in a second import.",
+      "noFolders": "The account has no folders to import.",
+      "password": "Password for {username}",
+      "passwordHint": "The password stays only in the server's memory while the import runs and is never saved. If the connection drops, we ask again.",
+      "start": "Bring the history",
+      "starting": "Starting…",
+      "back": "Back",
+      "cancel": "Cancel import",
+      "resume": "Continue where it stopped",
+      "resuming": "Continuing…",
+      "another": "Import other folders",
+      "counting": "Counting messages…",
+      "percent": "{value} done",
+      "folderCount": "{imported, number} of {total, number}",
+      "failedCount": "{count, plural, one {# failed} other {# failed}}",
+      "state": {
+        "running": "Importing… {imported, number} messages so far ({size} MB).",
+        "done": "Done: {imported, number} messages imported ({size} MB). They are already in the mailbox, where you chose.",
+        "failed": "The import stopped with {imported, number} messages brought over.",
+        "interrupted": "The connection dropped with {imported, number} messages brought over. Type the password to continue where it stopped.",
+        "canceled": "Import canceled with {imported, number} messages brought over."
+      },
+      "errors": {
+        "login": "Username or password refused. If the account uses two-step verification, use an app password.",
+        "network": "Could not reach the server. Check the address and try again.",
+        "blocked": "The server blocked IMAP access. Allow IMAP on the old account and try again.",
+        "invalid": "A choice is no longer valid (folder or mailbox). Refresh the page and choose again.",
+        "running": "An import is already running for this mailbox. Wait for it or cancel it.",
+        "not_found": "This import no longer exists.",
+        "folders": "The mailbox would go over 50 folders. Send some to the Archive or untick folders.",
+        "generic": "The import could not start. Try again in a moment."
+      },
+      "jobErrors": {
+        "login": "The old server refused the password.",
+        "network": "The connection to the old server dropped.",
+        "protocol": "The old server answered in a way we could not read.",
+        "blocked": "The old server blocked IMAP access.",
+        "quota": "The mailbox ran out of space. Free some space or upgrade the plan and continue.",
+        "not_entitled": "Correio is not active for this team.",
+        "canceled": "Canceled."
+      }
     },
     "back": "Back",
     "next": "Continue",
     "restart": "Start over",
     "loading": "Loading…",
-    "statusError": "Could not read the scan status."
+    "statusError": "Could not read the scan status.",
+    "skipToHistory": "Just bring the history"
   },
   "view": {
     "title": "View",

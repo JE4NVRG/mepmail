@@ -12,6 +12,7 @@ import {
   groupByDomain,
   MIGRATION_PROVIDERS,
   type MigrationProviderId,
+  type MigrationSource,
   type MigrationStatus,
   type MxDomainReadiness,
   type PlanItem,
@@ -27,6 +28,7 @@ import {
 import { createMigrationApi, type MigrationApi } from "@/lib/mailbox-migration-api";
 import { useTRPCClient } from "@/lib/trpc";
 import styles from "./mailbox-migration.module.css";
+import { MailboxMigrationHistory } from "./mailbox-migration-history";
 
 const STEPS = ["source", "addresses", "mx", "history"] as const;
 type Step = (typeof STEPS)[number];
@@ -57,7 +59,7 @@ function connectFailure(cause: unknown): ConnectError {
 /**
  * The migration assistant: connect an account hosted elsewhere, pick which
  * of its addresses become mailboxes or aliases here, check each domain is
- * ready for its MX switch, and (next) bring the message history over.
+ * ready for its MX switch, and bring the message history over.
  */
 export function MailboxMigration({
   mailboxes,
@@ -83,6 +85,8 @@ export function MailboxMigration({
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<ConnectError | null>(null);
   const [sourceId, setSourceId] = useState<string | null>(null);
+  // The connected account's folders, for the history step.
+  const [source, setSource] = useState<MigrationSource | null>(null);
 
   const status = useQuery({
     queryKey: ["mailbox-migration", "status", sourceId],
@@ -159,6 +163,7 @@ export function MailboxMigration({
         password,
       });
       setPassword("");
+      setSource(source);
       setSourceId(source.sourceId);
       setSeededFor(null);
       setServerPlan(null);
@@ -568,6 +573,14 @@ export function MailboxMigration({
                 >
                   {t("back")}
                 </button>
+                {/* The mailbox may already be here: the history needs no new address. */}
+                <button
+                  type="button"
+                  className="ms-btn ms-btn-ghost"
+                  onClick={() => setStep("history")}
+                >
+                  {t("skipToHistory")}
+                </button>
                 <button
                   type="button"
                   className="ms-btn ms-btn-primary"
@@ -635,17 +648,15 @@ export function MailboxMigration({
       ) : null}
 
       {step === "history" ? (
-        <>
-          <div>
-            <h4>{t("history.title")}</h4>
-            <p className="ms-meta-tall">{t("history.soon")}</p>
-          </div>
-          <div className={styles.actions}>
-            <button type="button" className="ms-btn ms-btn-ghost" onClick={() => setStep("mx")}>
-              {t("back")}
-            </button>
-          </div>
-        </>
+        <MailboxMigrationHistory
+          api={api}
+          host={host}
+          username={username}
+          source={source}
+          mailboxes={mailboxes}
+          currentUserId={currentUserId}
+          onBack={() => setStep("mx")}
+        />
       ) : null}
     </section>
   );

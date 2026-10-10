@@ -777,13 +777,66 @@
     },
     "history": {
       "title": "Histórico de mensagens",
-      "soon": "A importação das mensagens antigas é a próxima etapa do assistente. Mantenha a conta antiga até lá."
+      "hint": "Traga as mensagens antigas de {username} em {host}. Cada pasta vai para a Entrada, Enviados, Arquivo ou uma pasta com o mesmo nome. A conta antiga não é alterada: o Correio só lê.",
+      "noMailbox": "Você precisa ser dono de uma caixa no Correio para receber o histórico. Crie a caixa na etapa de endereços e volte aqui.",
+      "mailbox": "Caixa de destino",
+      "folders": "{count, plural, one {# pasta escolhida} other {# pastas escolhidas}}",
+      "targetFor": "Destino de {folder}",
+      "target": {
+        "inbox": "Entrada",
+        "sent": "Enviados",
+        "archive": "Arquivo",
+        "folder": "Pasta"
+      },
+      "targetFolder": "Pasta “{name}”",
+      "tooMany": "Escolha até {max, number} pastas por importação. Dá para trazer o resto numa segunda importação.",
+      "noFolders": "A conta não tem pastas para importar.",
+      "password": "Senha de {username}",
+      "passwordHint": "A senha fica só na memória do servidor enquanto a importação roda e nunca é salva. Se a conexão cair, pedimos de novo.",
+      "start": "Trazer o histórico",
+      "starting": "Começando…",
+      "back": "Voltar",
+      "cancel": "Cancelar importação",
+      "resume": "Continuar de onde parou",
+      "resuming": "Continuando…",
+      "another": "Importar outras pastas",
+      "counting": "Contando as mensagens…",
+      "percent": "{value} concluído",
+      "folderCount": "{imported, number} de {total, number}",
+      "failedCount": "{count, plural, one {# falhou} other {# falharam}}",
+      "state": {
+        "running": "Importando… {imported, number} mensagens até agora ({size} MB).",
+        "done": "Pronto: {imported, number} mensagens importadas ({size} MB). Elas já estão na caixa, nos lugares escolhidos.",
+        "failed": "A importação parou com {imported, number} mensagens trazidas.",
+        "interrupted": "A conexão caiu com {imported, number} mensagens trazidas. Digite a senha para continuar de onde parou.",
+        "canceled": "Importação cancelada com {imported, number} mensagens trazidas."
+      },
+      "errors": {
+        "login": "Usuário ou senha recusados. Se a conta usa verificação em duas etapas, use uma senha de app.",
+        "network": "Não deu para falar com o servidor. Confira o endereço e tente de novo.",
+        "blocked": "O servidor bloqueou o acesso por IMAP. Libere o IMAP na conta antiga e tente de novo.",
+        "invalid": "Alguma escolha não vale mais (pasta ou caixa). Atualize a página e escolha de novo.",
+        "running": "Já existe uma importação rodando para essa caixa. Espere terminar ou cancele.",
+        "not_found": "Essa importação não existe mais.",
+        "folders": "A caixa chegaria a mais de 50 pastas. Mande algumas para o Arquivo ou desmarque pastas.",
+        "generic": "Não deu para começar a importação. Tente de novo em instantes."
+      },
+      "jobErrors": {
+        "login": "O servidor antigo recusou a senha.",
+        "network": "A conexão com o servidor antigo caiu.",
+        "protocol": "O servidor antigo respondeu de um jeito que não entendemos.",
+        "blocked": "O servidor antigo bloqueou o acesso por IMAP.",
+        "quota": "A caixa ficou sem espaço. Libere espaço ou aumente o plano e continue.",
+        "not_entitled": "O Correio desta equipe não está ativo.",
+        "canceled": "Cancelada."
+      }
     },
     "back": "Voltar",
     "next": "Continuar",
     "restart": "Começar de novo",
     "loading": "Carregando…",
-    "statusError": "Não foi possível ler o andamento da varredura."
+    "statusError": "Não foi possível ler o andamento da varredura.",
+    "skipToHistory": "Só trazer o histórico"
   },
   "view": {
     "title": "Exibição",

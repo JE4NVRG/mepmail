@@ -13,6 +13,7 @@ import { type Db, schema } from "@millionsend/db";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { mailboxReceivingDeps } from "../mailbox-receiving";
 import { ImapError, type ImapOpenDeps, type ImapSession, openImap } from "./imap";
+import { type ImportTarget, importTarget } from "./import";
 import { type ScanResult, scanAccount, scannableFolders } from "./scan";
 
 /**
@@ -86,7 +87,11 @@ export async function connectMigrationSource(
   actor: MailboxRegistryActor,
   input: ConnectInput,
   deps: ImapOpenDeps & { scan?: typeof scanAccount } = {},
-): Promise<{ sourceId: string; folders: string[] }> {
+): Promise<{
+  sourceId: string;
+  folders: string[];
+  folderTargets: { name: string; display: string; target: ImportTarget }[];
+}> {
   await withMailboxRegistryAdmin(db, actor, async () => null);
   sweep();
   const now = Date.now();
@@ -112,8 +117,15 @@ export async function connectMigrationSource(
     : null;
   if (accountDomain) ownDomains.add(accountDomain);
   let folders: string[];
+  let folderTargets: { name: string; display: string; target: ImportTarget }[];
   try {
-    folders = scannableFolders(await session.list()).map((folder) => folder.display);
+    const listed = await session.list();
+    folders = scannableFolders(listed).map((folder) => folder.display);
+    // Where each folder's mail would go in a history import, by its special-use flags.
+    folderTargets = listed.flatMap((folder) => {
+      const target = importTarget(folder);
+      return target ? [{ name: folder.name, display: folder.display, target }] : [];
+    });
   } catch {
     await session.logout();
     throw new MigrationError("network");
@@ -152,7 +164,7 @@ export async function connectMigrationSource(
       source.failure = error instanceof ImapError && error.reason === "login" ? "login" : "network";
     })
     .finally(() => session.logout());
-  return { sourceId: source.id, folders };
+  return { sourceId: source.id, folders, folderTargets };
 }
 
 async function presence(db: Db, teamId: string, addresses: string[]) {

@@ -28,6 +28,28 @@
   },
   "releases": [
     {
+      "version": "0.97",
+      "date": "2026-10-10",
+      "title": "Traga seu e-mail antigo para o Correio",
+      "summary": "O assistente de migração agora importa o histórico de uma conta IMAP (Gmail, Outlook, Purelymail, Titan e outros) para uma caixa do Correio, mantendo pastas, datas e o que já foi lido.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Importação do histórico por IMAP: escolha as pastas e para onde vai cada uma (Entrada, Enviados, Arquivo ou uma pasta sua); as datas e o que já foi lido são mantidos, e a conta antiga só é lida.",
+            "Sua senha é usada só enquanto a importação roda e nunca é salva. Se a conexão cair, a importação continua de onde parou quando você digitar a senha de novo.",
+            "Só trazer o histórico: quem já tem as caixas vai direto para a importação."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Os avisos de e-mail novo ficam em silêncio enquanto uma importação está rodando."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.96",
       "date": "2026-10-10",
       "title": "E-mails e anexos grandes agora chegam",

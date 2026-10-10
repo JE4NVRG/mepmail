@@ -294,3 +294,51 @@
     justify-content: flex-end;
   }
 }
+/* History import: one row per remote folder, its destination beside it. */
+.importChoices {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+.importChoices legend {
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.importFolders {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.importFolders li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 220px);
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+}
+.importFolders li[data-selected="false"] {
+  opacity: 0.6;
+}
+.importFolderName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 620px) {
+  .importFolders li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* In the status list the counts take their own line under the folder and its destination. */
+.importFolders li > span:last-child:not(:first-child) {
+  grid-column: 1 / -1;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-label);
+}

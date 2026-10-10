@@ -44,7 +44,16 @@ export type MigrationConnectInput = {
   password: string;
 };
 
-export type MigrationSource = { sourceId: string; folders: string[] };
+export type MigrationSource = {
+  sourceId: string;
+  folders: string[];
+  /** Where each folder's history goes by default, from its IMAP flags (when the server sends it). */
+  folderTargets?: {
+    name: string;
+    display: string;
+    target: "inbox" | "sent" | "archive" | "folder";
+  }[];
+};
 
 export type MigrationPhase = "connected" | "scanning" | "scanned" | "failed";
 

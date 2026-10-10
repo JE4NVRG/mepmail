@@ -12,6 +12,7 @@ import { PopoverMenu, type PopoverMenuItem } from "@/components/popover-menu";
 import { toast } from "@/components/toast";
 import { authClient } from "@/lib/auth-client";
 import { htmlDropsWork, isDesktop, notifyDesktop, setNativeTitle } from "@/lib/desktop-bridge";
+import { importRunning } from "@/lib/mailbox-import";
 import {
   type MailboxFolder,
   type MailboxKindFilter,
@@ -547,6 +548,15 @@ export function MailboxesView({
   const trpcClient = useTRPCClient();
   const smartInbox = useRef(prefs.smartInbox);
   smartInbox.current = prefs.smartInbox;
+  // A history import raises the unread count as old mail lands: no notices meanwhile.
+  const imports = useQuery(
+    trpc.mailboxes.migration.importJobs.queryOptions(
+      { mailboxId: null },
+      { enabled: isDesktop(), retry: false, refetchInterval: 30_000 },
+    ),
+  );
+  const importing = useRef(false);
+  importing.current = importRunning(imports.data);
   const lastUnread = useRef<number | null>(null);
   const announced = useRef<Set<string> | null>(null);
   useEffect(() => {
@@ -554,7 +564,7 @@ export function MailboxesView({
     const total = Object.values(unreadCounts.data.counts).reduce((sum, n) => sum + n, 0);
     const previous = lastUnread.current;
     lastUnread.current = total;
-    if (!isDesktop() || !noticesWanted(true)) return;
+    if (!isDesktop() || !noticesWanted(true) || importing.current) return;
     const inboxTop = () =>
       trpcClient.mailboxes.items.query({ mailboxId: null, folder: "inbox", limit: 10 });
     if (announced.current === null) {
