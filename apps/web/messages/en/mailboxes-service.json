@@ -152,6 +152,17 @@
     "downgraded": "Done: the team is now on {name}, starting today.",
     "tooSmall": "The team's current usage doesn't fit in {name} (mailboxes or storage). Remove mailboxes or free up space and try again.",
     "pending": "A subscription change is already in progress. Refresh the status in a moment.",
-    "changeError": "Couldn't change plan right now. Try again in a moment."
+    "changeError": "Couldn't change plan right now. Try again in a moment.",
+    "pendingPlan": "You started subscribing to {name}. Resume checkout or choose another plan.",
+    "pendingPlanResume": "You started subscribing to {name}. Resume checkout to finish.",
+    "pendingBody": "The subscription isn't finished yet: nothing was charged. Resume checkout to pay or choose another plan.",
+    "resume": "Resume purchase",
+    "chooseAnother": "Choose another plan",
+    "abandoning": "Canceling the started purchase…",
+    "abandoned": "The started purchase was canceled, with no charge. Choose the plan.",
+    "abandonCompleted": "The payment had already been confirmed: the purchase was kept. Updating the license…",
+    "abandonPending": "Stripe didn't answer right now; the purchase stays as it was. Try again in a moment.",
+    "abandonForbidden": "Only a team admin can cancel the started purchase.",
+    "abandonError": "Couldn't cancel the started purchase right now. Refresh the status and try again."
   }
 }

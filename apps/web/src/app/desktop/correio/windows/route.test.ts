@@ -22,7 +22,7 @@ describe("Correio desktop downloads", () => {
     expect(latest.version).toMatch(/^\d+\.\d+\.\d+$/);
     const url = new URL(windows.url);
     expect(url.origin).toBe("https://mepmail.dev");
-    expect(url.pathname).toBe(`/desktop/correio/MepMail-Correio_${latest.version}_x64-setup.exe`);
+    expect(url.pathname).toBe(`/desktop/correio/MepMail_${latest.version}_x64-setup.exe`);
     const file = `${publicDir}${url.pathname.split("/").pop()}`;
     expect(existsSync(file)).toBe(true);
     expect(statSync(file).size).toBeGreaterThan(500_000);

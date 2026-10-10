@@ -135,10 +135,10 @@ fn badge(unread: u32, scale: u32) -> (Vec<u8>, u32) {
 
 fn tooltip(unread: u32) -> String {
     match (unread, is_portuguese()) {
-        (0, _) => "MepMail Correio".to_string(),
-        (1, true) => "MepMail Correio · 1 não lida".to_string(),
-        (n, true) => format!("MepMail Correio · {n} não lidas"),
-        (n, false) => format!("MepMail Correio · {n} unread"),
+        (0, _) => "MepMail".to_string(),
+        (1, true) => "MepMail · 1 não lida".to_string(),
+        (n, true) => format!("MepMail · {n} não lidas"),
+        (n, false) => format!("MepMail · {n} unread"),
     }
 }
 

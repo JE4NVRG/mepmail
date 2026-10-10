@@ -265,6 +265,7 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
       pendingOffer: null,
       checkoutPending: false,
       pendingCheckoutSeats: null,
+      canAbandonCheckout: false,
       management: {
         canReconcile: false,
         canCancel: false,
@@ -524,6 +525,8 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
       canPurchase: false,
       availability: "recovery_required",
       pendingCheckoutSeats: 3,
+      // The buyer can leave this purchase to choose from the current offers.
+      canAbandonCheckout: true,
     });
     await expect(as().mailboxes.checkout({ seats: 3 })).rejects.toMatchObject({
       message: "conflict",

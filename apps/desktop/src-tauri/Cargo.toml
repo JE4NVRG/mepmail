@@ -1,7 +1,7 @@
 [package]
 name = "mepmail-correio"
-version = "1.0.0"
-description = "MepMail Correio for the desktop"
+version = "1.0.1"
+description = "MepMail for the desktop"
 authors = ["MepMail"]
 license = "AGPL-3.0-only"
 repository = "https://github.com/JE4NVRG/mepmail"

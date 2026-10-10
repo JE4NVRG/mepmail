@@ -54,6 +54,8 @@ export {
   withMailboxTeamErasure,
 } from "./mailbox-erasure.js";
 export {
+  type AbandonMailboxCheckoutResult,
+  abandonMailboxCheckout,
   applyMailboxSubscription,
   type BeginMailboxCheckoutInput,
   type BeginMailboxCheckoutResult,

@@ -454,6 +454,9 @@ export async function mailboxBillingPresentation(
     pendingOffer,
     checkoutPending: !!checkout || customerRequest?.status === "creating",
     pendingCheckoutSeats: checkout?.seats ?? null,
+    /** An unpaid purchase can be left to choose another plan (mailboxes.abandonCheckout). */
+    canAbandonCheckout:
+      !!checkout && canManage && !member.suspendedAt && !mailboxBillingMutationsPaused(),
     management: {
       canReconcile: manageable,
       canCancel:

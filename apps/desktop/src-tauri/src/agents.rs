@@ -85,9 +85,9 @@ fn target_label(target: &str) -> Option<&'static str> {
 /// here: commands that call it are async, so they run off the main thread.
 fn confirm<R: Runtime>(app: &AppHandle<R>, message: String) -> bool {
     let (title, allow, cancel) = if is_portuguese() {
-        ("MepMail Correio", "Permitir", "Cancelar")
+        ("MepMail", "Permitir", "Cancelar")
     } else {
-        ("MepMail Correio", "Allow", "Cancel")
+        ("MepMail", "Allow", "Cancel")
     };
     app.dialog()
         .message(message)

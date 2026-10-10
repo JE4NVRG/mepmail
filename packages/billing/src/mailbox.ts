@@ -504,6 +504,7 @@ export interface MailboxBillingStripe extends BillingStripe {
   checkout: {
     sessions: BillingStripe["checkout"]["sessions"] & {
       retrieve?: (id: string) => Promise<Stripe.Checkout.Session>;
+      expire?: (id: string) => Promise<Stripe.Checkout.Session>;
       list?: (
         params: Stripe.Checkout.SessionListParams,
       ) => Promise<Stripe.ApiList<Stripe.Checkout.Session>>;

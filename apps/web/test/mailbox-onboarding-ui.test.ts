@@ -92,6 +92,7 @@ vi.mock("@/lib/trpc", () => ({
         "manage",
         "verifyReceiving",
         "changePlan",
+        "abandonCheckout",
         "usage",
       ].map((kind) => [
         kind,

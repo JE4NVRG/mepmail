@@ -23,6 +23,27 @@
   },
   "releases": [
     {
+      "version": "0.106",
+      "date": "2026-10-10",
+      "title": "The Windows app is now called MepMail",
+      "summary": "The Windows app 1.0.1 shows the name MepMail in its window, tray, notices, shortcuts and installed apps list, and updates itself from 1.0.0 without a second install.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Windows app 1.0.1: the window, tray, permission dialogs, update notices, Start menu and desktop shortcuts and Settings > Apps say MepMail; the install folder and updates stay the same.",
+            "The direct download is now MepMail_1.0.1_x64-setup.exe; the app is also on the Microsoft Store."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Correio: a purchase you started and did not pay can be left with Choose another plan, without any charge; a payment Stripe already took is kept."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.105",
       "date": "2026-10-10",
       "title": "Correio plans: Solo, Duo and Equipe",

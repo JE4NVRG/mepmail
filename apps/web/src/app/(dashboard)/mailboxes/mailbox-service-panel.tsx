@@ -82,6 +82,7 @@ export function MailboxServicePanel({
   const checkout = useMutation(trpc.mailboxes.checkout.mutationOptions());
   const management = useMutation(trpc.mailboxes.manage.mutationOptions());
   const changePlan = useMutation(trpc.mailboxes.changePlan.mutationOptions());
+  const abandon = useMutation(trpc.mailboxes.abandonCheckout.mutationOptions());
   const queries = useQueryClient();
   const planChangeTitleId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -113,6 +114,11 @@ export function MailboxServicePanel({
   // Trocar de plano: the card chosen (not the current one) and the outcome.
   const [changeTarget, setChangeTarget] = useState<string | null>(null);
   const [planNotice, setPlanNotice] = useState<{
+    tone: "status" | "alert";
+    text: string;
+  } | null>(null);
+  // "Escolher outro plano": the outcome of leaving an unpaid purchase.
+  const [abandonNotice, setAbandonNotice] = useState<{
     tone: "status" | "alert";
     text: string;
   } | null>(null);
@@ -335,6 +341,42 @@ export function MailboxServicePanel({
   const planDirection = planTarget
     ? mailboxPlanDirection(currentPlanOffer, plan?.seats ?? 0, planTarget)
     : null;
+  // Leaves the purchase begun in Stripe Checkout (never one already paid) so
+  // another plan can be chosen; a payment that landed meanwhile is kept.
+  const canAbandon = !!billing.data?.canAbandonCheckout;
+  async function abandonPurchase() {
+    if (!canAbandon || abandon.isPending || checkout.isPending || systemIdentified) return;
+    setAbandonNotice(null);
+    try {
+      const result = await abandon.mutateAsync();
+      if (!alive.current) return;
+      if (result.state === "completed") {
+        setAbandonNotice({ tone: "status", text: t("plans.abandonCompleted") });
+        await refresh();
+        return;
+      }
+      setAttemptedSeats(null);
+      setAttemptedOfferId(null);
+      setSelectedOfferId(null);
+      setFailure(null);
+      if (result.state === "abandoned")
+        setAbandonNotice({ tone: "status", text: t("plans.abandoned") });
+    } catch (error) {
+      if (!alive.current) return;
+      const reason = error instanceof TRPCClientError ? error.message : "";
+      const code = error instanceof TRPCClientError ? error.data?.code : null;
+      setAbandonNotice({
+        tone: "alert",
+        text:
+          reason === "pending"
+            ? t("plans.abandonPending")
+            : code === "FORBIDDEN"
+              ? t("plans.abandonForbidden")
+              : t("plans.abandonError"),
+      });
+    }
+    await Promise.allSettled([service.refetch(), billing.refetch()]);
+  }
   async function runChangePlan() {
     if (!planTarget || busy || systemIdentified) return;
     const name = MAILBOX_PLAN_NAMES[planTarget.plan.code];
@@ -852,11 +894,15 @@ export function MailboxServicePanel({
                           disabled={selection.locked || lockedSeats !== null}
                         />
                         <p className={styles.hint}>
-                          {t(
-                            selection.locked || lockedSeats !== null
-                              ? "planLocked"
-                              : "plans.choiceHint",
-                          )}
+                          {selection.locked || lockedSeats !== null
+                            ? t(canAbandon ? "plans.pendingPlan" : "plans.pendingPlanResume", {
+                                name: offer.plan
+                                  ? (MAILBOX_PLAN_NAMES[
+                                      offer.plan.code as keyof typeof MAILBOX_PLAN_NAMES
+                                    ] ?? "")
+                                  : "",
+                              })
+                            : t("plans.choiceHint")}
                         </p>
                       </>
                     ) : selection.offers.length || selection.locked ? (
@@ -1031,23 +1077,40 @@ export function MailboxServicePanel({
                             ? "unavailableBody"
                             : failure === "error"
                               ? "checkoutError"
-                              : "pendingBody",
+                              : planPurchase
+                                ? "plans.pendingBody"
+                                : "pendingBody",
                         )}
                       </p>
                     ) : null}
-                    <button
-                      type="submit"
-                      className="ms-btn ms-btn-primary"
-                      disabled={!validSeats || checkout.isPending || refreshing}
-                    >
-                      {checkout.isPending
-                        ? t("opening")
-                        : pending || lockedSeats !== null
-                          ? t("retryCheckout")
-                          : offer.trialDays
-                            ? t("startTrial", { days: offer.trialDays })
-                            : t("subscribe")}
-                    </button>
+                    <div className={styles.purchaseActions}>
+                      <button
+                        type="submit"
+                        className="ms-btn ms-btn-primary"
+                        disabled={
+                          !validSeats || checkout.isPending || refreshing || abandon.isPending
+                        }
+                      >
+                        {checkout.isPending
+                          ? t("opening")
+                          : pending || lockedSeats !== null
+                            ? t(planPurchase ? "plans.resume" : "retryCheckout")
+                            : offer.trialDays
+                              ? t("startTrial", { days: offer.trialDays })
+                              : t("subscribe")}
+                      </button>
+                      {canAbandon && (pending || lockedSeats !== null) ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-ghost"
+                          disabled={checkout.isPending || abandon.isPending}
+                          onClick={() => void abandonPurchase()}
+                        >
+                          {abandon.isPending ? t("plans.abandoning") : t("plans.chooseAnother")}
+                        </button>
+                      ) : null}
+                    </div>
+                    {abandonNotice ? <p role={abandonNotice.tone}>{abandonNotice.text}</p> : null}
                   </fieldset>
                 </form>
               ) : null}

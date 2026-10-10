@@ -65,14 +65,14 @@ struct Strings {
 fn strings() -> Strings {
     if is_portuguese() {
         Strings {
-            open: "Abrir Correio",
+            open: "Abrir MepMail",
             autostart: "Iniciar com o Windows",
             keep_in_tray: "Manter na bandeja ao fechar",
             quit: "Sair",
         }
     } else {
         Strings {
-            open: "Open Correio",
+            open: "Open MepMail",
             autostart: "Start with Windows",
             keep_in_tray: "Keep in the tray on close",
             quit: "Quit",
@@ -134,7 +134,7 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     let mut tray = TrayIconBuilder::new()
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip("MepMail Correio")
+        .tooltip("MepMail")
         .on_menu_event(move |handle, event| match event.id.as_ref() {
             "open" => show_main(handle),
             "autostart" => {

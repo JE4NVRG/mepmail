@@ -13,8 +13,16 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq, sql } from "drizzle-orm";
 import Stripe from "stripe";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { type MailboxCatalog, type MailboxPriceTerms } from "../src/mailbox.js";
-import { applyMailboxSubscription, beginMailboxCheckout } from "../src/mailbox-lifecycle.js";
+import {
+  type MailboxCatalog,
+  type MailboxPriceTerms,
+  recoverMailboxCheckoutSession,
+} from "../src/mailbox.js";
+import {
+  abandonMailboxCheckout,
+  applyMailboxSubscription,
+  beginMailboxCheckout,
+} from "../src/mailbox-lifecycle.js";
 import { changeMailboxPlan } from "../src/mailbox-management.js";
 import { claimMailboxTrial } from "../src/mailbox-trial.js";
 import { stripeCliHttpClient } from "./stripe-cli-transport.js";
@@ -441,4 +449,45 @@ describe.skipIf(!enabled)("Correio plans against Stripe test mode", () => {
     expect(Math.abs(invoice.total)).toBeLessThanOrEqual(5);
     expect(await row(teamId)).toMatchObject({ status: "active", ...expected("equipe") });
   }, 240_000);
+  it("lets a buyer leave an unpaid Checkout and start another plan", async () => {
+    const { teamId, userId } = await team("leave");
+    const deps = {
+      db,
+      stripe,
+      requirePaidSendingPlan: true,
+      earlyAccessCohort: opened(),
+      recoverCheckout: (lease: Parameters<typeof recoverMailboxCheckoutSession>[1]) =>
+        recoverMailboxCheckoutSession(stripe, lease),
+    };
+    const urls = {
+      successUrl: "https://mepmail.dev/mailboxes?checkout=success",
+      cancelUrl: "https://mepmail.dev/mailboxes",
+    };
+    await beginMailboxCheckout(deps, forPlan("duo"), { teamId, userId, seats: 3, ...urls });
+    // Another plan is refused while the Duo purchase is open.
+    await expect(
+      beginMailboxCheckout(deps, forPlan("solo"), { teamId, userId, seats: 1, ...urls }),
+    ).rejects.toMatchObject({ code: "conflict" });
+    const [duo] = await db
+      .select()
+      .from(schema.mailboxCheckouts)
+      .where(eq(schema.mailboxCheckouts.teamId, teamId));
+    expect(await abandonMailboxCheckout(deps, { teamId, userId })).toEqual({ state: "abandoned" });
+    expect((await stripe.checkout.sessions.retrieve(duo!.stripeSessionId!)).status).toBe("expired");
+    const solo = await beginMailboxCheckout(deps, forPlan("solo"), {
+      teamId,
+      userId,
+      seats: 1,
+      ...urls,
+    });
+    expect(solo.url).toMatch(/^https:\/\/checkout\.stripe\.com\//);
+    const leases = await db
+      .select()
+      .from(schema.mailboxCheckouts)
+      .where(eq(schema.mailboxCheckouts.teamId, teamId));
+    expect(leases.map((lease) => [lease.planCode, lease.status]).sort()).toEqual([
+      ["duo", "expired"],
+      ["solo", "ready"],
+    ]);
+  }, 180_000);
 });

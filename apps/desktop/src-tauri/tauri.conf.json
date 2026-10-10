@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "MepMail Correio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "identifier": "dev.mepmail.correio",
   "build": {
     "frontendDist": "../src"
@@ -46,7 +46,7 @@
     "publisher": "MepMail",
     "copyright": "MepMail. AGPL-3.0.",
     "category": "Productivity",
-    "shortDescription": "MepMail Correio",
+    "shortDescription": "MepMail",
     "longDescription": "Correio, the MepMail inbox for people and their agents, as a Windows app.",
     "homepage": "https://mepmail.dev/correio",
     "icon": [
@@ -67,7 +67,8 @@
           "PortugueseBR",
           "English"
         ],
-        "displayLanguageSelector": false
+        "displayLanguageSelector": false,
+        "installerHooks": "./windows/installer-hooks.nsh"
       }
     }
   }

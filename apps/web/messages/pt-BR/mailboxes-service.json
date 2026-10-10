@@ -152,6 +152,17 @@
     "downgraded": "Pronto: agora a equipe está no {name}, a partir de hoje.",
     "tooSmall": "O uso atual da equipe não cabe no {name} (caixas ou armazenamento). Remova caixas ou libere espaço e tente de novo.",
     "pending": "Já existe uma alteração da assinatura em andamento. Atualize o status em instantes.",
-    "changeError": "Não deu para mudar de plano agora. Tente de novo em instantes."
+    "changeError": "Não deu para mudar de plano agora. Tente de novo em instantes.",
+    "pendingPlan": "Você começou a assinar o {name}. Retome o checkout ou escolha outro plano.",
+    "pendingPlanResume": "Você começou a assinar o {name}. Retome o checkout para concluir.",
+    "pendingBody": "A assinatura ainda não foi concluída: nada foi cobrado. Retome o checkout para pagar ou escolha outro plano.",
+    "resume": "Retomar compra",
+    "chooseAnother": "Escolher outro plano",
+    "abandoning": "Cancelando a compra iniciada…",
+    "abandoned": "A compra iniciada foi cancelada, sem cobrança. Escolha o plano.",
+    "abandonCompleted": "O pagamento já tinha sido confirmado: a compra foi mantida. Atualizando a licença…",
+    "abandonPending": "O Stripe não respondeu agora; a compra continua como estava. Tente de novo em instantes.",
+    "abandonForbidden": "Só quem administra a equipe pode cancelar a compra iniciada.",
+    "abandonError": "Não deu para cancelar a compra iniciada agora. Atualize o status e tente de novo."
   }
 }

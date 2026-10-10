@@ -28,6 +28,27 @@
   },
   "releases": [
     {
+      "version": "0.106",
+      "date": "2026-10-10",
+      "title": "O app para Windows agora se chama MepMail",
+      "summary": "O app para Windows 1.0.1 mostra o nome MepMail na janela, na bandeja, nos avisos, nos atalhos e na lista de aplicativos, e se atualiza a partir da 1.0.0 sem uma segunda instalação.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "App para Windows 1.0.1: janela, bandeja, diálogos de permissão, avisos de atualização, atalhos do menu Iniciar e da área de trabalho e Configurações > Aplicativos dizem MepMail; a pasta de instalação e as atualizações continuam as mesmas.",
+            "O download direto agora é MepMail_1.0.1_x64-setup.exe; o app também está na Microsoft Store."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Correio: uma compra iniciada e não paga pode ser deixada com Escolher outro plano, sem cobrança; um pagamento que o Stripe já confirmou é mantido."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.105",
       "date": "2026-10-10",
       "title": "Planos do Correio: Solo, Duo e Equipe",

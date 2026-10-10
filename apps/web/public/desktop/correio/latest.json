@@ -1,11 +1,11 @@
 {
-  "version": "1.0.0",
-  "notes": "Número de mensagens não lidas no ícone da barra de tarefas e avisos de e-mail novo só para pessoas quando a caixa inteligente está ligada.",
-  "pub_date": "2026-10-10T08:40:31Z",
+  "version": "1.0.1",
+  "notes": "O app agora se chama MepMail: atalhos, bandeja, avisos e a lista de programas do Windows mostram o novo nome. Suas configurações e o login continuam iguais.",
+  "pub_date": "2026-10-10T20:07:38Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITm8yYmwvL3pQcEdEdlFadllsV0tjK21UYnNCYWNsZHk1ekU4WXBxQXBlVTRLVEJRcitYdHVUYStYOEZZMXliMEI4ZWdCSDFoU1ZtMlZmSWNSU2haN2dFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjIxNjA2CWZpbGU6TWVwTWFpbCBDb3JyZWlvXzEuMC4wX3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjAuMAp3U0tLeHRlbE5pcXczd1loMG5jRzk3allzeTZlMHJ6ZWhyZWNCMTJuL014Z1RsZndSOUZVaFBRTDlaajNuanB2TkJXTkt2SXZEN3pRNlRncTdrakVDZz09Cg==",
-      "url": "https://mepmail.dev/desktop/correio/MepMail-Correio_1.0.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITmxUOUkyb1FLcmdWNlNHdzAxMFhqeENzNkFrVXdRYWhNKyt6YU4yTHF3VFVGM0x1RFVjTlorNnZ6aDJGRWdZaXZiZ1ZhMzFUa2NwRFo3Sjg0UjJ0NkF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjYyODI2CWZpbGU6TWVwTWFpbCBDb3JyZWlvXzEuMC4xX3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjAuMQpaZ3BFZEloQ1gyWFdRK1BYS3k2dldWOFNZamFjblVMQ0h2bW9IUk1hRFEvK05WSmhaTllITWtyOFNBT1RCWlNOOWJDOC9Qb3ZpRTgwT2FWZldIRXdBZz09Cg==",
+      "url": "https://mepmail.dev/desktop/correio/MepMail_1.0.1_x64-setup.exe"
     }
   }
 }

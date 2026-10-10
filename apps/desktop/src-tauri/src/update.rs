@@ -147,12 +147,12 @@ fn offer_text(update: &Update) -> String {
     let notes = notes_paragraph(update.body.as_deref());
     if pt() {
         format!(
-            "A versão {} do MepMail Correio está disponível (você tem a {}).{notes}\n\nAtualizar agora fecha o Correio e abre de novo em alguns segundos. Depois: ela instala quando você sair do Correio.",
+            "A versão {} do MepMail está disponível (você tem a {}).{notes}\n\nAtualizar agora fecha o MepMail e abre de novo em alguns segundos. Depois: ela instala quando você sair do MepMail.",
             update.version, update.current_version
         )
     } else {
         format!(
-            "MepMail Correio {} is available (you have {}).{notes}\n\nUpdate now closes Correio and opens it again in a few seconds. Later: it installs when you quit Correio.",
+            "MepMail {} is available (you have {}).{notes}\n\nUpdate now closes MepMail and opens it again in a few seconds. Later: it installs when you quit MepMail.",
             update.version, update.current_version
         )
     }
@@ -160,9 +160,9 @@ fn offer_text(update: &Update) -> String {
 
 fn up_to_date_text(version: &str) -> String {
     if pt() {
-        format!("Você já tem a versão mais recente do MepMail Correio ({version}).")
+        format!("Você já tem a versão mais recente do MepMail ({version}).")
     } else {
-        format!("You have the latest MepMail Correio ({version}).")
+        format!("You have the latest MepMail ({version}).")
     }
 }
 
@@ -179,11 +179,11 @@ fn check_failed_text(error: &str) -> String {
 fn install_failed_text(error: &str) -> String {
     if pt() {
         format!(
-            "A atualização não pôde ser instalada. O Correio continua na versão atual.\n\n{error}"
+            "A atualização não pôde ser instalada. O MepMail continua na versão atual.\n\n{error}"
         )
     } else {
         format!(
-            "The update could not be installed. Correio stays on the current version.\n\n{error}"
+            "The update could not be installed. MepMail stays on the current version.\n\n{error}"
         )
     }
 }
@@ -191,22 +191,22 @@ fn install_failed_text(error: &str) -> String {
 fn ready_notice(version: &str) -> (String, String) {
     if pt() {
         (
-            format!("MepMail Correio {version} está pronto"),
-            "A atualização instala quando você sair do Correio. Para instalar agora: ícone na bandeja, Reiniciar para atualizar.".to_string(),
+            format!("MepMail {version} está pronto"),
+            "A atualização instala quando você sair do MepMail. Para instalar agora: ícone na bandeja, Reiniciar para atualizar.".to_string(),
         )
     } else {
         (
-            format!("MepMail Correio {version} is ready"),
-            "The update installs when you quit Correio. To install now: tray icon, Restart to update.".to_string(),
+            format!("MepMail {version} is ready"),
+            "The update installs when you quit MepMail. To install now: tray icon, Restart to update.".to_string(),
         )
     }
 }
 
 fn ready_tooltip(version: &str) -> String {
     if pt() {
-        format!("MepMail Correio: versão {version} pronta para instalar")
+        format!("MepMail: versão {version} pronta para instalar")
     } else {
-        format!("MepMail Correio: version {version} ready to install")
+        format!("MepMail: version {version} ready to install")
     }
 }
 
@@ -227,7 +227,7 @@ async fn ask<R: Runtime>(
     let mut dialog = handle
         .dialog()
         .message(message)
-        .title("MepMail Correio")
+        .title("MepMail")
         .kind(kind)
         .buttons(buttons);
     if let Some(window) = handle.get_webview_window(MAIN_WINDOW) {
@@ -374,7 +374,7 @@ async fn from_tray<R: Runtime>(handle: AppHandle<R>) {
         if let Err(error) = install(ready, true) {
             note(&handle, &format!("update install failed: {error}"));
             tray::set_updates_label(&handle, &tray_label(None));
-            tray::set_tooltip(&handle, "MepMail Correio");
+            tray::set_tooltip(&handle, "MepMail");
             tell(
                 &handle,
                 install_failed_text(&error),

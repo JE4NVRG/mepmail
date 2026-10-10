@@ -182,7 +182,7 @@ fn build_main_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     #[cfg(feature = "store")]
     let builder = builder.initialization_script(packaged::notification_shim());
     let window = builder
-        .title("MepMail Correio")
+        .title("MepMail")
         .inner_size(1280.0, 840.0)
         .min_inner_size(900.0, 600.0)
         .center()
@@ -331,7 +331,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building MepMail Correio")
+        .expect("error while building MepMail")
         .run(|_handle, _event| {
             // A downloaded shell update installs as the app quits.
             #[cfg(all(desktop, not(feature = "store")))]

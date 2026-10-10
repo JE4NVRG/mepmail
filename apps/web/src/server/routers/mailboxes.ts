@@ -1,4 +1,5 @@
 import {
+  abandonMailboxCheckout,
   beginMailboxCheckout,
   changeMailboxPlan,
   MailboxLifecycleError,
@@ -379,6 +380,19 @@ export const mailboxesRouter = router({
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
       });
     }),
+  /** Leaves an unpaid Checkout so another plan can be chosen; a paid one is kept. */
+  abandonCheckout: enabled.mutation(async ({ ctx }) => {
+    const presentation = await call(() => mailboxBillingPresentation(ctx.db, actor(ctx)));
+    if (!presentation.canAbandonCheckout)
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "unavailable" });
+    return call(() => abandonMailboxCheckout(mailboxPurchaseDeps(ctx.db), actor(ctx))).catch(
+      (error: unknown) => {
+        if (error instanceof TRPCError) throw error;
+        // Stripe unreachable: the purchase stays as it was, to be resumed or left later.
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
+      },
+    );
+  }),
   checkout: enabled
     .input(
       z

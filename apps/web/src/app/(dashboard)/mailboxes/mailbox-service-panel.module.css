@@ -100,6 +100,11 @@
 .planChange .hint {
   margin: 0;
 }
+.purchaseActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .planActions {
   display: flex;
   flex-wrap: wrap;

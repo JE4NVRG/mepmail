@@ -14,6 +14,7 @@ import {
   recoverMailboxCheckoutSession,
 } from "../src/mailbox.js";
 import {
+  abandonMailboxCheckout,
   applyMailboxSubscription,
   type BeginMailboxCheckoutInput,
   beginMailboxCheckout,
@@ -1591,5 +1592,83 @@ describe("Mailbox lifecycle with real optional migrations", () => {
     ).rejects.toMatchObject({ code: "unavailable" });
     expect(await leases()).toEqual([]);
     expect(state.checkouts).toEqual([]);
+  });
+  describe("leaving an unpaid Checkout to choose another plan", () => {
+    const abandon = () => abandonMailboxCheckout({ db, stripe }, { teamId, userId: USER });
+    const readable = () => {
+      stripe.checkout.sessions.retrieve = async (id: string) => {
+        const found = sessions.find((session) => session.id === id);
+        if (!found) throw new Error("fixture: no such session");
+        return { ...found };
+      };
+    };
+    const expiring = (onExpire?: (session: Stripe.Checkout.Session) => void) => {
+      stripe.checkout.sessions.expire = async (id: string) => {
+        const found = sessions.find((session) => session.id === id)!;
+        onExpire?.(found);
+        if (found.status !== "open") throw new Error("fixture: only open sessions expire");
+        found.status = "expired";
+        return { ...found };
+      };
+    };
+
+    it("expires the open session, releases the lease and lets another purchase start", async () => {
+      readable();
+      expiring();
+      await purchase();
+      expect(await abandon()).toEqual({ state: "abandoned" });
+      expect(sessions[0]!.status).toBe("expired");
+      expect((await leases())[0]).toMatchObject({
+        status: "expired",
+        stripeSessionId: "cs_fixture_1",
+      });
+      // Nothing was granted, and a new purchase opens its own Checkout.
+      expect(await plan()).toBeUndefined();
+      await purchase();
+      expect(state.checkouts).toHaveLength(2);
+      expect((await leases()).filter((lease) => lease.status === "ready")).toHaveLength(1);
+      // Nothing left open: a second request finds no purchase.
+      expect(await abandon()).toEqual({ state: "abandoned" });
+      expect(await abandon()).toEqual({ state: "none" });
+    });
+
+    it("keeps a Checkout paid at the same moment as completed, never discarding it", async () => {
+      readable();
+      // Stripe takes the payment just before the expiry request reaches it.
+      expiring((session) => {
+        session.status = "complete";
+        session.subscription = "sub_paid_while_leaving";
+      });
+      await purchase();
+      expect(await abandon()).toEqual({ state: "completed" });
+      expect((await leases())[0]).toMatchObject({
+        status: "completed",
+        stripeSubscriptionId: "sub_paid_while_leaving",
+      });
+    });
+
+    it("stays pending when Stripe cannot be read, and only an owner or admin may leave", async () => {
+      expiring();
+      await purchase();
+      stripe.checkout.sessions.retrieve = async () => {
+        throw new Error("fixture: Stripe unreachable");
+      };
+      await expect(abandon()).rejects.toMatchObject({ code: "pending" });
+      expect((await leases())[0]!.status).toBe("ready");
+      expect(sessions[0]!.status).toBe("open");
+      readable();
+      await db
+        .update(schema.teamMembers)
+        .set({ role: "member" })
+        .where(eq(schema.teamMembers.userId, USER));
+      await expect(abandon()).rejects.toMatchObject({ code: "forbidden" });
+      expect((await leases())[0]!.status).toBe("ready");
+    });
+
+    it("answers none without a Customer or an open purchase", async () => {
+      expect(await abandon()).toEqual({ state: "none" });
+      await unlinkCustomer();
+      expect(await abandon()).toEqual({ state: "none" });
+    });
   });
 });

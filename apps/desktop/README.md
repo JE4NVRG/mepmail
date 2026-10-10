@@ -151,7 +151,7 @@ changes.
    ```
 
 3. Publish through a web release: copy the installer to
-   `apps/web/public/desktop/correio/MepMail-Correio_<version>_x64-setup.exe`,
+   `apps/web/public/desktop/correio/MepMail_<version>_x64-setup.exe`,
    remove the previous one, and rewrite `latest.json` there (version, notes,
    pub_date, `platforms.windows-x86_64.signature` = the `.sig` file content,
    `url` = the new installer). `route.test.ts` next to the download route

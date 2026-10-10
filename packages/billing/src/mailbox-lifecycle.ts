@@ -23,6 +23,7 @@ import {
   mailboxPlanUpgradePaid,
   mailboxStripeQuantity,
   projectMailboxSubscription,
+  recoverMailboxCheckoutSession,
 } from "./mailbox.js";
 import { hasPaidSendingPlanForMailbox } from "./mailbox-addon.js";
 import { mailboxTrialDays } from "./mailbox-trial-eligibility.js";
@@ -450,6 +451,83 @@ async function applyMailboxProjection(
         .where(eq(schema.mailboxCheckouts.id, lease.id));
     }
     return result("applied", true);
+  });
+}
+
+export interface AbandonMailboxCheckoutResult {
+  /** "none": no open purchase; "completed": Stripe already took it, it is kept. */
+  state: "abandoned" | "none" | "completed";
+}
+
+/**
+ * Leaves an unpaid purchase so the buyer can choose another plan. Only a Checkout
+ * session Stripe confirms expired releases the lease: an open one is expired first, a
+ * paid one is recorded as completed and never discarded, and an unreadable one (or a
+ * creation whose session cannot be found) stays pending.
+ */
+export async function abandonMailboxCheckout(
+  deps: Pick<MailboxPurchaseDeps, "db" | "stripe">,
+  input: { teamId: string; userId: string },
+): Promise<AbandonMailboxCheckoutResult> {
+  return deps.db.transaction(async (tx) => {
+    const db = tx as unknown as Db;
+    // Customer -> team -> membership -> lease, the purchase path's lock order.
+    const [team] = await db
+      .select({ customerId: schema.teams.stripeCustomerId })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, input.teamId));
+    if (!team) throw new MailboxLifecycleError("not_found");
+    if (!team.customerId) return { state: "none" as const };
+    await lockCustomer(db, team.customerId);
+    await currentAdmin(db, input);
+    const [lease] = await db
+      .select()
+      .from(schema.mailboxCheckouts)
+      .where(
+        and(
+          eq(schema.mailboxCheckouts.teamId, input.teamId),
+          inArray(schema.mailboxCheckouts.status, [...OPEN_CHECKOUTS]),
+        ),
+      )
+      .for("update");
+    if (!lease) return { state: "none" as const };
+    const close = async (status: "expired" | "completed", session?: Stripe.Checkout.Session) => {
+      await db
+        .update(schema.mailboxCheckouts)
+        .set({
+          status,
+          ...(session ? { stripeSessionId: session.id } : {}),
+          ...(status === "completed" && session
+            ? { stripeSubscriptionId: idOf(session.subscription) }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.mailboxCheckouts.id, lease.id));
+    };
+    // A prepared lease never reached Stripe: the creation marker commits first.
+    if (lease.status === "prepared" && !lease.stripeSessionId) {
+      await close("expired");
+      return { state: "abandoned" as const };
+    }
+    const readback = () => recoverMailboxCheckoutSession(deps.stripe, lease);
+    let session = await readback();
+    if (!session) throw new MailboxLifecycleError("pending");
+    if (session.status === "open") {
+      const sessions = deps.stripe.checkout.sessions;
+      if (!sessions.expire) throw new MailboxLifecycleError("unavailable");
+      // Stripe refuses to expire a session that was just paid; read it again then.
+      await sessions.expire(session.id).catch(() => null);
+      session = await readback();
+      if (!session) throw new MailboxLifecycleError("pending");
+    }
+    if (session.status === "complete") {
+      if (!idOf(session.subscription)) throw new MailboxLifecycleError("pending");
+      await close("completed", session);
+      return { state: "completed" as const };
+    }
+    if (session.status !== "expired") throw new MailboxLifecycleError("pending");
+    await close("expired", session);
+    return { state: "abandoned" as const };
   });
 }
 
