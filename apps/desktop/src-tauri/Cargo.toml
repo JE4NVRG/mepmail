@@ -1,6 +1,6 @@
 [package]
 name = "mepmail-correio"
-version = "0.2.0"
+version = "0.3.0"
 description = "MepMail Correio for the desktop"
 authors = ["MepMail"]
 license = "AGPL-3.0-only"
@@ -38,6 +38,8 @@ keyring = { version = "3", features = ["windows-native"] }
 tauri-plugin-single-instance = { version = "2.5", features = ["deep-link"] }
 tauri-plugin-window-state = "2.5"
 tauri-plugin-autostart = "2.7"
+# Signed self-updates from mepmail.dev (src/update.rs).
+tauri-plugin-updater = "2.13"
 
 [profile.release]
 codegen-units = 1

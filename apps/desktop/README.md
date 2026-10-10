@@ -61,6 +61,23 @@ WebView2. The same shell is the base for macOS, Linux, iOS and Android.
   `build.rs` (`AppManifest::commands`), which is what lets the capability
   grant them to the remote origin as `allow-<command>`.
 
+## What 0.3 adds
+
+- Signed self-updates (`src/update.rs`, `tauri-plugin-updater`). The shell
+  reads `https://mepmail.dev/desktop/correio/latest.json` 20 s after start and
+  every 6 h; the tray has "Procurar atualizações". A newer version is offered
+  in a native dialog ("Atualizar agora" / "Depois"). Yes downloads the
+  installer, checks its minisign signature against `plugins.updater.pubkey`
+  and runs it in passive mode; the app closes and reopens on the new version.
+  "Depois" silences background offers of that version until the next start.
+  An update found while the window sits hidden in the tray waits until the
+  window gets focus. Nothing installs without a yes.
+- HTML drag and drop reaches the page (`disable_drag_drop_handler`): drag a
+  message onto a folder, or a file onto the composer, as in a browser tab.
+- The web app offers the download in the Correio account menu ("App para
+  Windows", Windows browsers only); the stable link is
+  `https://mepmail.dev/desktop/correio/windows`.
+
 ## Layout
 
 - `src/`: the splash page. Static HTML, CSS and JS, no build step.
@@ -104,6 +121,42 @@ lockfile and a Rust toolchain the server build does not need.
 | `cargo test` (in `src-tauri`) | Unit tests: navigation guard, deep-link routing, badge parsing, SSE parsing, agent config merge. |
 | `node <scratch>/bridge-test.mjs <exe>` | Drives `--mcp` against a fake MCP server (auth, session, JSON, SSE, 202, 4xx). |
 | `npm run icons` | Regenerates the icons from the brand SVG. |
+
+## Releasing an update
+
+Most changes need no desktop release: the window shows mepmail.dev, so a web
+release reaches every installed app. Release the shell only when `src-tauri`
+changes.
+
+1. Bump `version` in `package.json`, `src-tauri/Cargo.toml` and
+   `src-tauri/tauri.conf.json` (all three, same value).
+2. Build with the updater key. The private key lives outside the repository,
+   in `%USERPROFILE%\.tauri\mepmail-correio-updater.key` on Jean's PC (no
+   password). Losing it means installed apps can never update again: keep a
+   backup. `createUpdaterArtifacts` makes the build write `*.exe.sig` next to
+   the installer.
+
+   ```bash
+   TAURI_SIGNING_PRIVATE_KEY="$USERPROFILE/.tauri/mepmail-correio-updater.key" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" npm run build
+   ```
+
+3. Publish through a web release: copy the installer to
+   `apps/web/public/desktop/correio/MepMail-Correio_<version>_x64-setup.exe`,
+   remove the previous one, and rewrite `latest.json` there (version, notes,
+   pub_date, `platforms.windows-x86_64.signature` = the `.sig` file content,
+   `url` = the new installer). `route.test.ts` next to the download route
+   checks the pair. Installed apps pick it up within 6 h, or at once from the
+   tray.
+4. Test locally first with a throwaway identifier, so nothing touches the
+   installed app: build two versions with `--config` overriding
+   `identifier`, `productName`, `version`, the deep-link scheme and
+   `plugins.updater.endpoints` (`http://127.0.0.1:<port>/latest.json` plus
+   `dangerousInsecureTransportProtocol: true`), install the older one, serve
+   the newer one and click "Procurar atualizações".
+
+The installer is not code-signed yet: SmartScreen shows "Windows protected
+your PC" until it builds reputation (More info, Run anyway). A code-signing
+certificate or the Microsoft Store removes that; both are a cost Jean decides.
 
 ## First-run checklist
 
@@ -171,7 +224,8 @@ lockfile and a Rust toolchain the server build does not need.
      composer, the updater (signing key plus an endpoint on mepmail.dev), a
      code-signing certificate for SmartScreen (a cost, Jean decides), start
      with Windows, close-to-tray option.
-3. 0.3: offline reading cache and the Correio UI extracted into a shared
+3. 0.3: signed self-updates and the public download (done, see above).
+4. 0.4: offline reading cache and the Correio UI extracted into a shared
    package loaded locally. The app stores reject plain web wrappers, so this
    is the step that unlocks Android and iOS builds from the same `src-tauri`.
 

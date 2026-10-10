@@ -521,6 +521,7 @@
     "inbox": "Inbox",
     "settings": "Settings",
     "support": "Support",
+    "windowsApp": "Windows app",
     "back": "Back to MepMail",
     "receiving": "Receiving",
     "boxesHint": "Your team's mailboxes on your domains. Manage name, owner and signature, or check each one's receiving (MX).",

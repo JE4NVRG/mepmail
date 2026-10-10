@@ -31,7 +31,7 @@
   "loadError": "Não foi possível consultar a licença. Atualize antes de continuar.",
   "retry": "Tentar novamente",
   "refresh": "Atualizar status",
-  "equalPrice": "Correio é um adicional do plano pago de Envio, contratado por caixa com o mesmo preço para pessoas e agentes. Envio pode ser contratado sozinho.",
+  "equalPrice": "Correio é contratado por caixa, com o mesmo preço para pessoas e agentes: sozinho ou com desconto junto de um plano pago de Envio.",
   "seatsSummary": "{used} de {included} caixas reservadas",
   "includedSummary": "{storage} e {messages, number} destinatários por caixa / período",
   "currentStatus": "Status da licença",

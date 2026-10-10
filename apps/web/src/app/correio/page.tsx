@@ -85,6 +85,9 @@ export default async function CorreioPage() {
                 {t(mailOpen ? "release.heroNote" : "hero.note")}
               </p>
               <p className="correio-status">{t(mailOpen ? "release.heroStatus" : "hero.status")}</p>
+              <a className="correio-text-link" href="/desktop/correio/windows">
+                {t("plans.windows")} <span aria-hidden="true">↓</span>
+              </a>
             </div>
 
             <AgentDemo labels={t.raw("demo") as AgentDemoLabels} />

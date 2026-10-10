@@ -7,6 +7,31 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.89] - 2026-10-10
+
+### Added
+
+- Correio desktop app 0.3 for Windows (from the desktop session): Tauri
+  updater manifest `public/desktop/correio/latest.json`, minisign-signed
+  installer, stable link `/desktop/correio/windows` (302 to the current
+  installer), "Windows app" in the account menu on Windows browsers outside
+  the app, and the download link on /correio.
+- `repriceMailboxAddOnsWithoutSending` (billing) in the daily
+  `billing.reconcile`: an active add-on Correio contract whose team has had
+  no paid Envio contract for more than 7 days (Envio's grace) moves to the
+  standalone price of the same interval with no proration, so the next
+  renewal charges it. Skips cancellations, schedules, pending updates, open
+  management requests and any mismatch with the stored contract;
+  idempotent per subscription and price. Owners get the always-sent account
+  mail `mailbox.repriced` once per subscription.
+
+### Changed
+
+- The Stripe payment-risk screen (Radar blocked or highest-risk charges hold
+  the team's sending for review) now runs for Mail subscriptions too.
+- `equalPrice` copy no longer states a price: the panel shows only catalog
+  terms.
+
 ## [0.88] - 2026-10-10
 
 Correio sold without Envio: one plan, US$ 12.90 per mailbox a month

@@ -69,6 +69,13 @@ export {
   manageMailboxSubscription,
 } from "./mailbox-management.js";
 export {
+  MAILBOX_ADDON_GRACE_MS,
+  type MailboxRepriceDeps,
+  type MailboxRepricedChange,
+  mailboxCatalogFromJson,
+  repriceMailboxAddOnsWithoutSending,
+} from "./mailbox-reprice.js";
+export {
   dispatchMetaConversions,
   type MetaCheckoutAdvertising,
   readAdvertisingConsent,

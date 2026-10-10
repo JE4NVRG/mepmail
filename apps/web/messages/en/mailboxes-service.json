@@ -31,7 +31,7 @@
   "loadError": "The license could not be loaded. Refresh before continuing.",
   "retry": "Try again",
   "refresh": "Refresh status",
-  "equalPrice": "Mail is an add-on to a paid Send plan, purchased per mailbox at the same price for people and agents. Send can be purchased on its own.",
+  "equalPrice": "Mail is purchased per mailbox at the same price for people and agents: on its own, or at a discount with a paid Send plan.",
   "seatsSummary": "{used} of {included} mailboxes reserved",
   "includedSummary": "{storage} and {messages, number} recipients per mailbox / period",
   "currentStatus": "License status",

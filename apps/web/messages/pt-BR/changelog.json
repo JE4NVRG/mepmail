@@ -28,6 +28,27 @@
   },
   "releases": [
     {
+      "version": "0.89",
+      "date": "2026-10-10",
+      "title": "App do Correio para Windows",
+      "summary": "O Correio ganhou app para Windows com atualização automática. E a cobrança do Correio ficou mais segura: proteção contra fraude também em quem assina só o Correio.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "App do Correio para Windows, com atualização automática: baixe em mepmail.dev/desktop/correio/windows ou pelo item “App para Windows” no menu da conta."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Caixas compradas com o desconto do plano de Envio passam ao preço do Correio sem Envio na renovação seguinte se a equipe ficar sem Envio por mais de 7 dias; o dono recebe um aviso por e-mail antes.",
+            "A verificação de fraude da Stripe agora vale também para quem assina só o Correio."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.88",
       "date": "2026-10-10",
       "title": "Correio sem plano de Envio",

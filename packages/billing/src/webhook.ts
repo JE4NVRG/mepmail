@@ -148,9 +148,10 @@ export async function handleWebhook(
         deps.stripe,
       );
     const customerId = idOf(sub.customer);
-    // Send subscriptions only: the fraud screen holds the team's sending for
-    // review when Radar blocked one of its payments (payment-risk).
-    if (!mail && customerId) {
+    // Send and Mail alike: the fraud screen holds the team's sending (Correio
+    // outbound included) for review when Radar blocked one of its payments. Mail
+    // is sold without Envio too, so its buyers are screened on their own.
+    if (customerId) {
       await screenPaymentRisk(tx as unknown as Db, deps.stripe, customerId, (m) =>
         log(`stripe webhook ${event.id}: ${m}`),
       );

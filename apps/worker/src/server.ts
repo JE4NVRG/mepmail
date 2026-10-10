@@ -5,6 +5,7 @@ import {
   dispatchMetaConversions,
   dispatchSignupConversions,
   isLiveKey,
+  mailboxCatalogFromJson,
   purgeStripeEvents,
   readGoogleConversionConfig,
   readMetaConversionConfig,
@@ -63,6 +64,7 @@ import {
   type SesIdentityClient,
 } from "@millionsend/ses";
 import { and, eq } from "drizzle-orm";
+import { parseMailboxLaunchCohort } from "../../../packages/core/src/mailbox-launch-cohort.js";
 import { createAbuseJudge } from "./abuse-judge/index.js";
 import { judgeSample } from "./handlers/abuse-judge.js";
 import {
@@ -85,6 +87,7 @@ import { drainWebhookEndpoint } from "./handlers/deliver-webhook.js";
 import { runInstanceProbes } from "./handlers/instance-probes.js";
 import { warnExpiringMailboxAgentKeys } from "./handlers/mailbox-agent-key-expiry.js";
 import { runMailboxCapacity } from "./handlers/mailbox-capacity.js";
+import { runMailboxReprice } from "./handlers/mailbox-reprice.js";
 import { runMailboxSchedules } from "./handlers/mailbox-scheduling.js";
 import { runMonitorHealth } from "./handlers/monitor-health.js";
 import { reportPlanMove, sweepNotifications } from "./handlers/notify.js";
@@ -406,6 +409,30 @@ await queue.scheduleCrons({
         await reportPlanMove(db, mailer, env.APP_BASE_URL ?? "", team, before, after);
       },
     });
+    // Correio add-on contracts that lost Envio move to the standalone price at renewal.
+    const mailCatalog =
+      mailboxRegistryEnabled && process.env.MAILBOX_STANDALONE_OPEN === "true"
+        ? mailboxCatalogFromJson(
+            process.env.MAILBOX_BILLING_CATALOG,
+            isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
+          )
+        : null;
+    if (mailCatalog) {
+      try {
+        const rawCohort = process.env.MAILBOX_EARLY_ACCESS_COHORT;
+        const reprice = await runMailboxReprice(db, {
+          stripe,
+          catalog: mailCatalog,
+          cohort: rawCohort === undefined ? undefined : parseMailboxLaunchCohort(rawCohort),
+          mailer,
+          appBaseUrl: env.APP_BASE_URL ?? "",
+        });
+        if (reprice.repriced > 0)
+          console.log(`mailbox.reprice: checked=${reprice.checked} repriced=${reprice.repriced}`);
+      } catch (err) {
+        console.warn("mailbox.reprice: run skipped", err instanceof Error ? err.message : err);
+      }
+    }
     // Sold capacity against the shared SES quotas, once a day where the operator reads logs.
     const committed = await committedDailyVolume(db);
     const sesDaily = await Promise.all(

@@ -13,6 +13,11 @@ import type { CorreioPrefs } from "@/lib/mailbox-preferences";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import styles from "./mailboxes.module.css";
 
+/** The desktop app is Windows-only for now: offer it in a Windows browser. */
+function offersWindowsApp() {
+  return !isDesktop() && typeof navigator !== "undefined" && /Windows/.test(navigator.userAgent);
+}
+
 const THEMES = [
   { value: "system", icon: "monitor", label: "themeSystem" },
   { value: "light", icon: "sun", label: "themeLight" },
@@ -22,7 +27,8 @@ const THEMES = [
 /**
  * The account menu on the Correio bar: the theme (system, light or dark, saved
  * to the person's preferences), the language, shortcuts, preferences, support,
- * the way back to the dashboard (not in the desktop app) and signing out.
+ * the Windows app download (in a Windows browser), the way back to the
+ * dashboard (not in the desktop app) and signing out.
  */
 export function MailboxAccountMenu({
   theme,
@@ -181,6 +187,17 @@ export function MailboxAccountMenu({
             {t("app.support")}
             <span aria-hidden="true">↗</span>
           </button>
+          {offersWindowsApp() ? (
+            <a
+              role="menuitem"
+              className="ms-menu-item"
+              href="/desktop/correio/windows"
+              onClick={() => setOpen(false)}
+            >
+              {t("app.windowsApp")}
+              <span aria-hidden="true">↓</span>
+            </a>
+          ) : null}
           {isDesktop() ? null : (
             <Link
               role="menuitem"

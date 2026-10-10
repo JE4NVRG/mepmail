@@ -23,6 +23,27 @@
   },
   "releases": [
     {
+      "version": "0.89",
+      "date": "2026-10-10",
+      "title": "Correio app for Windows",
+      "summary": "Correio now has a Windows app with automatic updates. And Mail billing got safer: fraud protection also covers people who subscribe to Mail on its own.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Correio app for Windows, with automatic updates: download it at mepmail.dev/desktop/correio/windows or from “Windows app” in the account menu."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Mailboxes bought at the Send-plan discount move to the price of Mail without Send at the next renewal when the team goes without Send for more than 7 days; the owner gets an email notice first.",
+            "Stripe's fraud screening now also covers people who subscribe to Mail on its own."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.88",
       "date": "2026-10-10",
       "title": "Mail without a Send plan",

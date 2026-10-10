@@ -1,5 +1,5 @@
 //! The tray icon: open the window, start with Windows, keep in the tray on
-//! close, quit. The unread badge updates its tooltip.
+//! close, check for updates, quit. The unread badge updates its tooltip.
 
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
@@ -8,9 +8,13 @@ use tauri::{
 };
 use tauri_plugin_autostart::ManagerExt;
 
-use crate::{is_portuguese, settings, show_main};
+use crate::{is_portuguese, settings, show_main, update};
 
 pub struct TrayHandle<R: Runtime>(pub TrayIcon<R>);
+
+/// The "Check for updates" item, relabelled "Restart to update (x.y.z)"
+/// once an update is downloaded (see `update`).
+struct UpdatesItem<R: Runtime>(MenuItem<R>);
 
 struct Strings {
     open: &'static str,
@@ -60,6 +64,7 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
         keep_in_tray,
         None::<&str>,
     )?;
+    let updates = MenuItem::with_id(app, "updates", update::tray_label(None), true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", strings.quit, true, None::<&str>)?;
     let menu = Menu::with_items(
         app,
@@ -69,6 +74,7 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
             &autostart,
             &keep,
             &PredefinedMenuItem::separator(app)?,
+            &updates,
             &quit,
         ],
     )?;
@@ -100,6 +106,7 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
                 });
                 let _ = keep_item.set_checked(next.keep_in_tray);
             }
+            "updates" => update::tray_clicked(handle),
             "quit" => handle.exit(0),
             _ => {}
         })
@@ -118,6 +125,7 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     }
     let tray = tray.build(app)?;
     app.manage(TrayHandle(tray));
+    app.manage(UpdatesItem(updates));
     Ok(())
 }
 
@@ -125,5 +133,12 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
 pub fn set_tooltip<R: Runtime>(handle: &AppHandle<R>, text: &str) {
     if let Some(tray) = handle.try_state::<TrayHandle<R>>() {
         let _ = tray.0.set_tooltip(Some(text));
+    }
+}
+
+/// Relabels the updates item (the updater calls this).
+pub fn set_updates_label<R: Runtime>(handle: &AppHandle<R>, text: &str) {
+    if let Some(item) = handle.try_state::<UpdatesItem<R>>() {
+        let _ = item.0.set_text(text);
     }
 }

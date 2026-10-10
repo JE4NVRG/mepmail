@@ -576,6 +576,25 @@ describe("Mailbox isolation from Send billing, real handler and database", () =>
     return send;
   }
 
+  it("screens a Mail-only buyer's payments and holds the team's sending when Radar blocked one", async () => {
+    state.charges = [
+      {
+        id: "ch_mail_blocked",
+        object: "charge",
+        customer: OWNER.customerId,
+        created: 900,
+        outcome: { type: "blocked", risk_level: "highest" },
+      } as unknown as Stripe.Charge,
+    ];
+    const mail = mailSubscription();
+    state.subscriptions[mail.id] = mail;
+    expect(await deliver(mail)).toBe(200);
+    const held = await row();
+    expect(held.sendReviewReason).toBe("payment_risk");
+    expect(held.sendReviewNote).toContain("ch_mail_blocked");
+    expect(held.plan).toBe("free");
+  });
+
   it("excludes a Mail subscription before querying any Send schema, including billing terms", async () => {
     await expect(
       applySubscription({} as Db, mailSubscription(), () => {}, stripe),

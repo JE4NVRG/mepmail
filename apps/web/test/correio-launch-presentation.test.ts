@@ -204,6 +204,7 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     expect(links(hero)).toEqual([
       { href: "#como-funciona", text: expect.any(String) },
       { href: "/pricing", text: expect.any(String) },
+      { href: "/desktop/correio/windows", text: expect.any(String) },
     ]);
     expect(links(hero).every((link) => link.text.length > 0)).toBe(true);
     expect(html).toContain('id="como-funciona"');

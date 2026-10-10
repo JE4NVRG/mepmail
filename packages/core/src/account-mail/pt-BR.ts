@@ -342,6 +342,15 @@ export const ptBR = {
     button: "Falar com o suporte",
     muted: ["Prefere seguir sozinho? O passo a passo está em {docsUrl}"],
   },
+  "mailbox.repriced": {
+    subject: "O Correio de {team} passa ao preço sem plano de Envio",
+    body: [
+      "Sua equipe {team} não tem mais um plano pago de Envio, que é o que dá o preço com desconto nas caixas do Correio.",
+      "A partir da renovação de {date}, cada caixa passa a custar {price}, o preço do Correio sem Envio, com 10 GiB e 2.000 entregas de saída por mês. O período que você já pagou não muda.",
+      "Se preferir reduzir caixas ou cancelar o Correio, faça isso em Cobrança antes da renovação.",
+    ],
+    button: "Abrir cobrança",
+  },
 } as const satisfies Record<AccountMailKind, AccountMailEntry>;
 
 export const ptBRPhrases = {

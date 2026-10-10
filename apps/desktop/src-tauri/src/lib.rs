@@ -6,7 +6,8 @@
 //! cannot: a single instance, a tray icon with start-with-Windows and
 //! keep-in-tray, an unread badge, `mepmail://` deep links, links outside
 //! MepMail opened in the system browser, a `window.__MEPMAIL_DESKTOP__`
-//! marker the web app reads, and the agents bridge (`bridge`, `agents`).
+//! marker the web app reads, the agents bridge (`bridge`, `agents`) and
+//! signed self-updates of the shell (`update`).
 
 mod agents;
 mod badge;
@@ -14,6 +15,8 @@ pub mod bridge;
 mod deeplink;
 mod settings;
 mod tray;
+#[cfg(desktop)]
+mod update;
 
 use std::sync::Mutex;
 
@@ -46,7 +49,7 @@ const SIGN_IN_HOSTS: &[&str] = &[
 
 /// `--minimized` (the autostart entry): the window stays hidden in the tray
 /// until the user asks for it.
-struct StartHidden(bool);
+pub(crate) struct StartHidden(pub(crate) bool);
 
 fn is_in_app_host(host: &str) -> bool {
     IN_APP_HOSTS.contains(&host)
@@ -183,6 +186,10 @@ fn build_main_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
         .theme(Some(Theme::Dark))
         .background_color(Color(0, 0, 0, 255))
         .zoom_hotkeys_enabled(true)
+        // The OS file drop handler would swallow HTML drag and drop: dragging
+        // a message onto a folder or a file onto the composer must reach the
+        // page, as it does in a browser tab.
+        .disable_drag_drop_handler()
         .initialization_script(bridge_script())
         .on_navigation(move |url| {
             if navigation_allowed(url) {
@@ -270,7 +277,8 @@ pub fn run() {
                 tauri_plugin_autostart::Builder::new()
                     .args(["--minimized"])
                     .build(),
-            );
+            )
+            .plugin(tauri_plugin_updater::Builder::new().build());
     }
     builder
         .plugin(tauri_plugin_opener::init())
@@ -294,11 +302,19 @@ pub fn run() {
                 tray::build(app)?;
                 deeplink::install(app)?;
                 badge::watch(app.handle().clone());
+                update::start(app.handle().clone());
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running MepMail Correio");
+        .build(tauri::generate_context!())
+        .expect("error while building MepMail Correio")
+        .run(|_handle, _event| {
+            // A downloaded shell update installs as the app quits.
+            #[cfg(desktop)]
+            if let tauri::RunEvent::Exit = _event {
+                update::on_exit(_handle);
+            }
+        });
 }
 
 #[cfg(test)]

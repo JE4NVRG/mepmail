@@ -342,6 +342,15 @@ export const en = {
     button: "Chat with support",
     muted: ["Rather do it yourself? The step-by-step guide is at {docsUrl}"],
   },
+  "mailbox.repriced": {
+    subject: "{team}'s Mail moves to the price without a Send plan",
+    body: [
+      "Your team {team} no longer has a paid Send plan, which is what gives Mail mailboxes their discounted price.",
+      "From the renewal on {date}, each mailbox costs {price}, the price of Mail without Send, with 10 GiB and 2,000 outbound deliveries a month. The period you already paid for does not change.",
+      "If you would rather reduce mailboxes or cancel Mail, do it in Billing before the renewal.",
+    ],
+    button: "Open billing",
+  },
 } as const satisfies Record<AccountMailKind, AccountMailEntry>;
 
 /** Sentences several kinds share, filled by the builders. */
