@@ -48,6 +48,23 @@ changed it. `data` carries the contact in Resend's shape — `id`, `email`,
 | `contact.topic_opt_in` / `contact.topic_opt_out` | The contact's effective subscription to a topic flipped. | `topic_id`, `topic_name` |
 | `suppression.added` / `suppression.removed` | An address joined or left the [suppression list](/concepts/suppressions). Bounce and complaint rows come from SES, with `source: null`. | `data` is `{ id, email, origin, source, created_at }` |
 
+### Correio events
+
+Correio events tell an agent that mail arrived without carrying the mail
+itself: sender, subject and body stay encrypted in the mailbox.
+
+| Event | Fired when | `data` |
+| --- | --- | --- |
+| `mailbox.received` | A message reached the Inbox of an **agent** mailbox. Person mailboxes never emit it, nor do mail filed in Spam or quarantine and messages brought in by a history import. Opt-in: delivered only to endpoints that name it, never to "all events". | `{ mailbox_id, mailbox, item_id, folder, size_bytes, received_at }` |
+
+Read the message with the mailbox's own agent key:
+`GET /api/mailbox-agent/items?id=<item_id>` on the dashboard origin
+(`https://mepmail.dev`), or the `mailbox_read_message` tool of the
+[Correio MCP server](/mailboxes#connect-an-agent-over-mcp). A team credential
+(`mmt_`) also sends the `mepmail-mailbox` header with the `mailbox` address. A
+redelivered provider receipt never emits a second event, and a retried delivery
+keeps its `webhook-id`.
+
 ## Signatures (Standard Webhooks)
 
 Deliveries are signed following the

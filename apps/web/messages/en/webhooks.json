@@ -23,7 +23,8 @@
     "engagement": "Engagement",
     "problems": "Problems",
     "account": "Account",
-    "audience": "Audience"
+    "audience": "Audience",
+    "mailbox": "Correio"
   },
   "eventLabel": {
     "email": {
@@ -57,6 +58,9 @@
     "suppression": {
       "added": "Address suppressed",
       "removed": "Suppression removed"
+    },
+    "mailbox": {
+      "received": "Email received (agent mailbox)"
     }
   },
   "status": {

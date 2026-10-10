@@ -48,6 +48,10 @@ export const WEBHOOK_EVENT_TYPES = [
   "contact.topic_opt_out",
   "suppression.added",
   "suppression.removed",
+  // Opt-in Correio event: a message reached an agent mailbox's inbox. `data`
+  // carries identifiers only (mailbox, item, size, time), never sender,
+  // subject or body; the agent reads the message with its own mailbox key.
+  "mailbox.received",
 ] as const;
 
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
@@ -57,7 +61,10 @@ export function isWebhookEventType(value: string): value is WebhookEventType {
 }
 
 /** Event types an endpoint receives only by naming them; "all events" (null) skips them. */
-const OPT_IN_EVENT_TYPES: ReadonlySet<string> = new Set<WebhookEventType>(["email.prefetched"]);
+const OPT_IN_EVENT_TYPES: ReadonlySet<string> = new Set<WebhookEventType>([
+  "email.prefetched",
+  "mailbox.received",
+]);
 
 export function endpointSubscribes(
   events: readonly string[] | null,

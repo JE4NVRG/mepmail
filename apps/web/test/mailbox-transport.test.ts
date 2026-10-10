@@ -1058,3 +1058,84 @@ describe("durable private Correio transport contracts with captured provider", (
     expect(await folder(await deliver("sender:keyless", "blocked@example.invalid"))).toBe("inbox");
   });
 });
+
+describe("mailbox.received webhooks", () => {
+  const endpoint = async (
+    team: string,
+    events: string[] | null,
+    status: "enabled" | "disabled" = "enabled",
+  ) =>
+    (
+      await db
+        .insert(schema.webhookEndpoints)
+        .values({
+          teamId: team,
+          url: "https://hooks.example.invalid/correio",
+          secretCiphertext: Buffer.alloc(1),
+          secretIv: Buffer.alloc(1),
+          secretWrappedDek: Buffer.alloc(1),
+          secretKeyVersion: 1,
+          secretLast4: "abcd",
+          events,
+          status,
+        })
+        .returning({ id: schema.webhookEndpoints.id })
+    )[0]!.id;
+
+  it("writes identifier-only deliveries for agent mailboxes, only to endpoints that name the event", async () => {
+    const named = await endpoint(teamId, ["mailbox.received"]);
+    // "All events" never carries an opt-in type; other teams and disabled endpoints get nothing.
+    await endpoint(teamId, null);
+    await endpoint(teamId, ["email.sent"]);
+    await endpoint(teamId, ["mailbox.received"], "disabled");
+    await endpoint(foreignTeamId, ["mailbox.received"]);
+    const raw = fixture("external@example.invalid", "agent@transport.invalid");
+    const recipients = ["agent@transport.invalid", "person@transport.invalid"];
+    const first = await receive("provider:agent:1", recipients, raw);
+    const agentItem = first.items.find((item) => item.mailboxId === agentId)!;
+    expect(first.items).toHaveLength(2);
+    expect(first.webhooks).toEqual([{ id: expect.any(String), endpointId: named }]);
+    const rows = await db.select().from(schema.webhookDeliveries);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: first.webhooks[0]!.id,
+      endpointId: named,
+      eventType: "mailbox.received",
+      emailId: null,
+      status: "pending",
+    });
+    expect(rows[0]!.payload).toEqual({
+      type: "mailbox.received",
+      created_at: expect.any(String),
+      data: {
+        mailbox_id: agentId,
+        mailbox: "agent@transport.invalid",
+        item_id: agentItem.id,
+        folder: "inbox",
+        size_bytes: raw.length,
+        received_at: expect.any(String),
+      },
+    });
+    const payload = JSON.stringify(rows[0]!.payload);
+    for (const content of ["external@example.invalid", "Private attachment", "private original"])
+      expect(payload).not.toContain(content);
+    // A redelivered receipt is a duplicate and writes nothing more.
+    const replay = await receive("provider:agent:1", recipients, raw);
+    expect(replay.items.every((item) => item.duplicate)).toBe(true);
+    expect(replay.webhooks).toEqual([]);
+    // Mail filed outside the inbox stays quiet.
+    const assessment = assessMailboxReceipt({
+      virusVerdict: { status: "PASS" },
+      spamVerdict: { status: "FAIL" },
+    });
+    expect(assessment.decision).not.toBe("inbox");
+    const filed = await receiveMailboxMime(
+      db,
+      keys,
+      { sourceId: "provider:agent:2", recipients: ["agent@transport.invalid"], raw, assessment },
+      mimeAdapter,
+    );
+    expect(filed.webhooks).toEqual([]);
+    expect(await db.select().from(schema.webhookDeliveries)).toHaveLength(1);
+  });
+});

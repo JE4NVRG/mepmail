@@ -27,6 +27,7 @@ export const WEBHOOK_EVENT_TYPES = [
   "contact.topic_opt_out",
   "suppression.added",
   "suppression.removed",
+  "mailbox.received",
 ] as const;
 
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
@@ -38,6 +39,7 @@ export const WEBHOOK_EVENT_GROUPS = [
   "problems",
   "account",
   "audience",
+  "mailbox",
 ] as const;
 export type WebhookEventGroup = (typeof WEBHOOK_EVENT_GROUPS)[number];
 
@@ -75,6 +77,7 @@ export const WEBHOOK_EVENT_META: Record<
   "contact.topic_opt_out": { group: "audience", dot: "var(--ms-dot-queued)" },
   "suppression.added": { group: "audience", dot: "var(--ms-dot-suppressed)" },
   "suppression.removed": { group: "audience", dot: "var(--ms-dot-sent)" },
+  "mailbox.received": { group: "mailbox", dot: "var(--ms-dot-delivered)", optIn: true },
 };
 
 /** "whsec_••••••••abcd" — scheme plus last 4, nothing recoverable. */

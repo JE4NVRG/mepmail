@@ -11,5 +11,7 @@ describe("endpointSubscribes", () => {
   it("hands opt-in events only to endpoints that name them", () => {
     expect(endpointSubscribes(null, "email.prefetched")).toBe(false);
     expect(endpointSubscribes(["email.prefetched"], "email.prefetched")).toBe(true);
+    expect(endpointSubscribes(null, "mailbox.received")).toBe(false);
+    expect(endpointSubscribes(["mailbox.received"], "mailbox.received")).toBe(true);
   });
 });

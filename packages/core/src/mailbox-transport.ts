@@ -44,6 +44,11 @@ import {
 import { mailboxProviderThreadKeys, mailboxThreadKeys } from "./mailbox-thread.js";
 import { parseMailbox } from "./sender-address.js";
 import { hashRecipient } from "./suppressions.js";
+import {
+  enqueueTeamWebhookEvents,
+  type QueuedWebhookDelivery,
+  type TeamWebhookEvent,
+} from "./webhooks.js";
 
 export interface MailboxTransportMimeAdapter {
   /** Trusted MIME parser; implementation belongs to the runtime with mailparser.
@@ -587,6 +592,10 @@ export async function receiveMailboxMime(
     for (const teamId of [...new Set(boxes.map((b) => b.teamId))].sort())
       plans.set(teamId, await lockMailboxService(tx, teamId, now));
     const items: { id: string; mailboxId: string; duplicate: boolean }[] = [];
+    // mailbox.received for agent mailboxes, written with the item so a crash after
+    // commit leaves due rows the webhook reconcile arms; a redelivery is a duplicate
+    // and writes none.
+    const received = new Map<string, TeamWebhookEvent[]>();
     for (const box of boxes) {
       const plan = plans.get(box.teamId)!;
       await requireMailboxSeat(tx, box.teamId, box.id, plan);
@@ -647,12 +656,13 @@ export async function receiveMailboxMime(
         keys,
         binding({ teamId: box.teamId, mailboxId: box.id, id }),
       );
+      const folder = blocked ? "spam" : (assessment?.decision ?? "inbox");
       await tx.insert(schema.mailboxItems).values({
         id,
         teamId: box.teamId,
         mailboxId: box.id,
         kind: "inbox",
-        deliveryFolder: blocked ? "spam" : (assessment?.decision ?? "inbox"),
+        deliveryFolder: folder,
         inboundAssessment: assessment,
         sourceId,
         rawBytes: input.raw.length,
@@ -660,8 +670,34 @@ export async function receiveMailboxMime(
         ...sealed,
       });
       items.push({ id, mailboxId: box.id, duplicate: false });
+      // Identifiers only: sender, subject and body stay sealed in the mailbox.
+      if (current.kind === "agent" && folder === "inbox") {
+        const events = received.get(box.teamId) ?? [];
+        events.push({
+          type: "mailbox.received",
+          occurredAt: now,
+          data: {
+            mailbox_id: box.id,
+            mailbox: current.address,
+            item_id: id,
+            folder,
+            size_bytes: input.raw.length,
+            received_at: now.toISOString(),
+          },
+        });
+        received.set(box.teamId, events);
+      }
     }
-    return { items };
+    const webhooks: QueuedWebhookDelivery[] = [];
+    for (const [teamId, events] of received)
+      await enqueueTeamWebhookEvents(tx, {
+        teamId,
+        events,
+        enqueue: async (rows) => {
+          webhooks.push(...rows);
+        },
+      });
+    return { items, webhooks };
   });
 }
 

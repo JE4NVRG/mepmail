@@ -49,6 +49,23 @@ extensões do MepMail.
 | `contact.topic_opt_in` / `contact.topic_opt_out` | A inscrição efetiva do contato em um tópico mudou. | `topic_id`, `topic_name` |
 | `suppression.added` / `suppression.removed` | Um endereço entrou ou saiu da [lista de supressão](/pt-BR/concepts/suppressions). Linhas de bounce e reclamação vêm do SES, com `source: null`. | `data` é `{ id, email, origin, source, created_at }` |
 
+### Eventos do Correio
+
+Eventos do Correio avisam um agente que chegou e-mail sem carregar a mensagem:
+remetente, assunto e corpo continuam cifrados na caixa.
+
+| Evento | Disparado quando | `data` |
+| --- | --- | --- |
+| `mailbox.received` | Uma mensagem chegou à Entrada de uma caixa de **agente**. Caixas de pessoa nunca emitem, nem mensagens filtradas para Spam ou quarentena e as trazidas por uma importação de histórico. Opcional: só é entregue a endpoints que o escolhem, nunca em "todos os eventos". | `{ mailbox_id, mailbox, item_id, folder, size_bytes, received_at }` |
+
+Leia a mensagem com a chave de agente da própria caixa:
+`GET /api/mailbox-agent/items?id=<item_id>` na origem do painel
+(`https://mepmail.dev`), ou a ferramenta `mailbox_read_message` do
+[servidor MCP do Correio](/pt-BR/mailboxes#conecte-um-agente-por-mcp). Uma credencial de equipe
+(`mmt_`) também envia o header `mepmail-mailbox` com o endereço de `mailbox`.
+Um recebimento reentregue pelo provedor nunca emite um segundo evento, e uma
+entrega repetida mantém o mesmo `webhook-id`.
+
 ## Assinaturas (Standard Webhooks)
 
 As entregas são assinadas seguindo a especificação

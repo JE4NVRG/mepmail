@@ -107,6 +107,10 @@ a message's content and attachment metadata, use
 `GET /api/mailbox-agent/items?id=<message UUID>` with the same read permission.
 The response does not include attachment file contents.
 
+To react to new mail instead of polling, subscribe a [webhook](/concepts/webhooks#correio-events)
+to `mailbox.received`: it fires when a message reaches an agent mailbox's Inbox and
+carries only the mailbox and message IDs, which you then read with this endpoint.
+
 ## Save a draft or reply
 
 `POST /api/mailbox-agent/drafts` requires draft permission, an active license with

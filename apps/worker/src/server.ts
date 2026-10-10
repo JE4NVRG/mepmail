@@ -142,6 +142,8 @@ const mailboxIngress = createMailboxIngress({
   failover,
   // The owner's sender decisions (Aprovação de remetentes): blocked senders go to Spam.
   senderKey: deriveMailboxSenderKey(Buffer.from(env.MASTER_ENCRYPTION_KEY, "base64")),
+  // Called only after boot: enqueueWebhook and the queue are defined further down.
+  enqueueWebhook: (deliveries) => enqueueWebhook(deliveries),
 });
 // Customer mail of the domains an operator verified at a second provider
 // leaves through its relay while SES has paused the account.

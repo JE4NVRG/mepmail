@@ -4,6 +4,7 @@ import {
   type MailboxTransportMimeAdapter,
   parseMailbox,
   receiveMailboxMime,
+  type WebhookEnqueue,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { assessMailboxReceipt } from "../../../packages/core/src/mailbox-inbound-safety.js";
@@ -76,6 +77,8 @@ export function createMailboxReceiver(options: {
   locations: readonly MailboxPrivateObjectLocation[];
   /** Sender-decision key (deriveMailboxSenderKey): blocked senders are filed in Spam. */
   senderKey?: Buffer | undefined;
+  /** Arms the drains for the mailbox.received rows the receive committed. */
+  enqueueWebhook?: WebhookEnqueue | undefined;
 }) {
   const topics = [...options.topics];
   const locations = options.locations.map((location) => ({ ...location }));
@@ -118,7 +121,7 @@ export function createMailboxReceiver(options: {
         JSON.stringify([topic.region, topic.accountId, location.bucket, objectKey, messageId]),
       )
       .digest("hex")}`;
-    await receiveMailboxMime(
+    const { webhooks } = await receiveMailboxMime(
       options.db,
       options.keys,
       {
@@ -130,6 +133,14 @@ export function createMailboxReceiver(options: {
       },
       options.mime,
     );
+    // The message is stored: a failed arm only delays the webhook until the reconcile
+    // sweep, so it never fails the receipt (a redelivery would write no new rows).
+    if (webhooks.length && options.enqueueWebhook)
+      await options.enqueueWebhook(webhooks).catch((error: unknown) => {
+        console.warn(
+          `mailbox.received: drain not armed, reconcile picks it up (${error instanceof Error ? error.name : "error"})`,
+        );
+      });
     return true;
   };
 }

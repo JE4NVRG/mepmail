@@ -193,6 +193,84 @@ describe("trusted private SES receipt adapter with real encrypted persistence", 
     expect(item?.ciphertext.includes(Buffer.from("see the attached report"))).toBe(false);
   });
 
+  it("arms the mailbox.received drain after commit and never fails the receipt over it", async () => {
+    const agent = await createMailboxRegistry(
+      db,
+      { teamId, userId: "owner" },
+      {
+        domainId: (
+          await db.select().from(schema.domains).where(eq(schema.domains.teamId, teamId))
+        )[0]!.id,
+        localPart: "agent",
+        label: "Agent",
+        kind: "agent",
+        ownerUserId: "owner",
+      },
+    );
+    const [hook] = await db
+      .insert(schema.webhookEndpoints)
+      .values({
+        teamId,
+        url: "https://hooks.example.invalid/correio",
+        secretCiphertext: Buffer.alloc(1),
+        secretIv: Buffer.alloc(1),
+        secretWrappedDek: Buffer.alloc(1),
+        secretKeyVersion: 1,
+        secretLast4: "abcd",
+        events: ["mailbox.received"],
+      })
+      .returning({ id: schema.webhookEndpoints.id });
+    const enqueueWebhook = vi.fn(async () => {});
+    const handle = createMailboxReceiver({
+      db,
+      keys,
+      mime: mailboxWorkerMime,
+      reader: reader().objectReader,
+      enabled: true,
+      topics: [topicArn],
+      locations: [location],
+      enqueueWebhook,
+    });
+    expect(await handle(notification(event(["agent@receiver.invalid"])))).toBe(true);
+    expect(enqueueWebhook).toHaveBeenCalledTimes(1);
+    expect(enqueueWebhook.mock.calls[0]).toEqual([
+      [{ id: expect.any(String), endpointId: hook!.id }],
+    ]);
+    const [delivery] = await db.select().from(schema.webhookDeliveries);
+    expect(delivery?.payload).toMatchObject({
+      type: "mailbox.received",
+      data: { mailbox_id: agent.id, mailbox: "agent@receiver.invalid" },
+    });
+    // The SNS retry is a duplicate: nothing new to arm.
+    expect(await handle(notification(event(["agent@receiver.invalid"])))).toBe(true);
+    expect(enqueueWebhook).toHaveBeenCalledTimes(1);
+    // A person mailbox never produces the event; a queue failure leaves the row for reconcile.
+    const failing = vi.fn(async () => {
+      throw new Error("queue down");
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const second = createMailboxReceiver({
+      db,
+      keys,
+      mime: mailboxWorkerMime,
+      reader: reader().objectReader,
+      enabled: true,
+      topics: [topicArn],
+      locations: [location],
+      enqueueWebhook: failing,
+    });
+    expect(await second(notification(event(["person@receiver.invalid"])))).toBe(true);
+    expect(failing).not.toHaveBeenCalled();
+    const next = event(["agent@receiver.invalid"]);
+    next.mail.messageId = "stable-provider-receipt-2";
+    next.receipt.action.objectKey = "receipts/stable-provider-receipt-2";
+    expect(await second(notification(next))).toBe(true);
+    expect(failing).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(await db.select().from(schema.webhookDeliveries)).toHaveLength(2);
+    warn.mockRestore();
+  });
+
   it("routes receipt RCPT across teams, preserves private attachment and deduplicates SNS retries", async () => {
     const captured = reader();
     const handle = createMailboxReceiver({

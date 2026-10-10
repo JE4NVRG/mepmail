@@ -23,6 +23,21 @@
   },
   "releases": [
     {
+      "version": "0.99",
+      "date": "2026-10-10",
+      "title": "A webhook when mail reaches an agent mailbox",
+      "summary": "Agents no longer need to poll Correio: subscribe a webhook to the new mailbox.received event and MepMail calls it as soon as a message lands in an agent mailbox's inbox.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "mailbox.received webhook event, in a new Correio group of the event picker: it carries the mailbox and message IDs, the size and the time, never the sender, subject or body, which the agent reads with its own mailbox key or the Correio MCP.",
+            "Opt-in, like email.prefetched: endpoints receive it only when they pick it, never through All events. Person mailboxes, Spam, quarantine and history imports never fire it."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.98",
       "date": "2026-10-10",
       "title": "New mail shows up the moment it arrives",

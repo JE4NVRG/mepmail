@@ -108,6 +108,10 @@ Para ler o conteúdo de uma mensagem e os metadados dos anexos, use
 `GET /api/mailbox-agent/items?id=<UUID da mensagem>` com a mesma permissão de leitura.
 A resposta não inclui o conteúdo dos arquivos anexados.
 
+Para reagir a e-mail novo sem consultar a lista, assine um [webhook](/pt-BR/concepts/webhooks#eventos-do-correio)
+em `mailbox.received`: ele dispara quando uma mensagem chega à Entrada de uma caixa de
+agente e traz só os IDs da caixa e da mensagem, que você lê com este endpoint.
+
 ## Salve um rascunho ou resposta
 
 `POST /api/mailbox-agent/drafts` exige permissão de rascunho, licença vigente com

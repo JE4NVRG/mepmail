@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.99",
+      "date": "2026-10-10",
+      "title": "Um webhook quando chega e-mail numa caixa de agente",
+      "summary": "Agentes não precisam mais ficar consultando o Correio: assine um webhook no novo evento mailbox.received e o MepMail chama o seu endpoint assim que uma mensagem chega à Entrada de uma caixa de agente.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Evento de webhook mailbox.received, num grupo novo Correio na escolha de eventos: traz os IDs da caixa e da mensagem, o tamanho e a hora, nunca remetente, assunto ou corpo, que o agente lê com a chave da própria caixa ou pelo MCP do Correio.",
+            "Opcional, como o email.prefetched: o endpoint só recebe se escolher o evento, nunca por Todos. Caixas de pessoa, Spam, quarentena e importação de histórico nunca disparam o evento."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.98",
       "date": "2026-10-10",
       "title": "E-mail novo aparece na hora em que chega",
