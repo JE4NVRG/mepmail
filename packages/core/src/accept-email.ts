@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import { type EmailAttachment, encryptEmailBody, sealAttachments } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
 import { emitFunnelEvent, type FunnelEventTarget, teamFunnelProps } from "./funnel-events.js";
@@ -26,7 +26,17 @@ export function senderDomain(from: string): string | null {
 export type SenderDomainVerdict =
   | { ok: true; domainId: string; region: string; fromDomain: string; address: string }
   | { ok: false; reason: "invalid_sender"; fromDomain: null }
-  | { ok: false; reason: "unverified_domain"; fromDomain: string };
+  | { ok: false; reason: "unverified_domain"; fromDomain: string }
+  | { ok: false; reason: "mailbox_sender"; fromDomain: string };
+
+/** What a caller tells the sender when its From is refused. */
+export function senderVerdictMessage(verdict: Exclude<SenderDomainVerdict, { ok: true }>): string {
+  return verdict.reason === "invalid_sender"
+    ? 'from must be a single address like ada@example.com or "Ada Lovelace" <ada@example.com>; quote a display name that contains a comma'
+    : verdict.reason === "mailbox_sender"
+      ? "This address is a MepMail Correio mailbox: send from it in Correio, where its plan counts those recipients, or use another address of this domain here. Sending from a mailbox address through this API needs a paid Send plan."
+      : `The ${verdict.fromDomain} domain is not verified for this team`;
+}
 
 /** True when `from` is the instance's shared onboarding sender (same addr-spec). */
 export function isOnboardingSender(from: string, onboardingFrom: string | undefined): boolean {
@@ -105,6 +115,10 @@ export async function verifySenderDomain(
   if (domain?.status !== "verified") {
     return { ok: false, reason: "unverified_domain", fromDomain: sender.domain };
   }
+  // A Correio mailbox (or alias) address sends through Correio, where its plan meters it;
+  // without a paid Envio plan, Envio is not a second, unmetered way out for it.
+  if (await correioAddressWithoutPaidSending(db, teamId, sender.address))
+    return { ok: false, reason: "mailbox_sender", fromDomain: sender.domain };
   return {
     ok: true,
     domainId: domain.id,
@@ -112,6 +126,33 @@ export async function verifySenderDomain(
     fromDomain: sender.domain,
     address: sender.address,
   };
+}
+
+/** The mailbox tables exist only where the mailbox schema was applied. */
+async function correioAddressWithoutPaidSending(db: Db, teamId: string, address: string) {
+  const [team] = await db
+    .select({ plan: schema.teams.plan })
+    .from(schema.teams)
+    .where(eq(schema.teams.id, teamId));
+  if (!team || team.plan !== "free") return false;
+  const [installed] = await db
+    .select({ yes: sql<boolean>`to_regclass('public.mailboxes') is not null` })
+    .from(sql`(select 1) as mailbox_extension`);
+  if (!installed?.yes) return false;
+  const target = address.toLowerCase();
+  const [box] = await db
+    .select({ id: schema.mailboxes.id })
+    .from(schema.mailboxes)
+    .where(and(eq(schema.mailboxes.teamId, teamId), eq(schema.mailboxes.address, target)))
+    .limit(1);
+  if (box) return true;
+  const [alias] = await db
+    .select({ id: schema.mailboxes.id })
+    .from(schema.mailboxAliases)
+    .innerJoin(schema.mailboxes, eq(schema.mailboxes.id, schema.mailboxAliases.mailboxId))
+    .where(and(eq(schema.mailboxes.teamId, teamId), eq(schema.mailboxAliases.address, target)))
+    .limit(1);
+  return !!alias;
 }
 
 export interface AcceptEmailDeps {

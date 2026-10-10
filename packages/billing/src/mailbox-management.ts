@@ -1,15 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type Stripe from "stripe";
 import {
   type MailboxLaunchCohort,
   mailboxLaunchCohortAllows,
 } from "../../core/src/mailbox-launch-cohort.js";
+import { mailboxPlanUsage } from "../../core/src/mailbox-plan-usage.js";
 import { mailboxManagementRequests as requests } from "../../db/src/schema/mailbox-management-requests.js";
 import {
   isStandaloneMailboxPrice,
   type MailboxCatalog,
+  type MailboxPlanCode,
+  type MailboxPriceTerms,
+  mailboxIncludedSeats,
   mailboxIncreaseInvoiceMatches,
   mailboxIncreasePaymentConfirmed,
   projectMailboxSubscription,
@@ -369,7 +373,11 @@ async function prepare(
     )
       throw new MailboxLifecycleError("unavailable");
     // The base price covers its included mailboxes: going below them saves nothing.
-    if (input.action === "quantity" && input.seats! < c.projection.includedMailboxes)
+    // A plan's mailboxes are fixed; more or fewer means another plan (changeMailboxPlan).
+    if (
+      input.action === "quantity" &&
+      (input.seats! < c.projection.includedMailboxes || c.projection.planCode !== null)
+    )
       throw new MailboxLifecycleError("invalid");
     if ((reduction || action === "decrease") && !deps.stripe.subscriptionSchedules.retrieve)
       throw new MailboxLifecycleError("unavailable");
@@ -695,4 +703,104 @@ export async function manageMailboxSubscription(
     if (!step.again) return step.value;
   }
   throw new MailboxLifecycleError("pending");
+}
+
+const PLAN_RANK: Record<MailboxPlanCode, number> = { solo: 1, duo: 2, equipe: 3 };
+
+export interface MailboxPlanChangeInput {
+  teamId: string;
+  userId: string;
+  /** A purchasable plan price of the catalog; never a client-supplied amount. */
+  priceId: string;
+}
+export interface MailboxPlanChangeResult {
+  planCode: MailboxPlanCode;
+  direction: "upgrade" | "downgrade";
+}
+
+/**
+ * Moves a Correio subscription to another plan (or a pre-plan contract into one, the
+ * voluntary migration). An upgrade applies now, prorated and paid at once: a failed
+ * payment leaves the contract as it was (error_if_incomplete), and an upgrade during
+ * the free trial ends it, so a bigger plan is never free. A downgrade applies now with
+ * no refund, only when everything the team already uses fits the smaller plan. The
+ * billing period never changes, so the period's usage carries over instead of resetting.
+ */
+export async function changeMailboxPlan(
+  deps: MailboxManagementDeps,
+  catalog: MailboxCatalog | null,
+  input: MailboxPlanChangeInput,
+): Promise<MailboxPlanChangeResult> {
+  if (!catalog || deps.readOnly) throw new MailboxLifecycleError("unavailable");
+  const target = catalog.prices.find((price) => price.priceId === input.priceId);
+  const planCode = target?.planCode;
+  if (!target || !planCode || !isStandaloneMailboxPrice(catalog, target.priceId))
+    throw new MailboxLifecycleError("invalid");
+  return deps.db.transaction(async (tx) => {
+    const db = tx as unknown as Db;
+    const c = await context(db, deps, catalog, { ...input, action: "reconcile" });
+    if (c.plan.stripePriceId === target.priceId) throw new MailboxLifecycleError("invalid");
+    if (
+      !["active", "trialing"].includes(c.sub.status) ||
+      c.sub.collection_method !== "charge_automatically"
+    )
+      throw new MailboxLifecycleError("unavailable");
+    if (c.sub.pending_update || c.sub.schedule) throw new MailboxLifecycleError("pending");
+    const [open] = await db
+      .select({ id: requests.id })
+      .from(requests)
+      .where(and(eq(requests.teamId, input.teamId), inArray(requests.status, [...OPEN])))
+      .limit(1);
+    if (open) throw new MailboxLifecycleError("pending");
+    const currency = c.sub.currency;
+    if (target.currency !== currency && target.localCurrency?.currency !== currency)
+      throw new MailboxLifecycleError("invalid");
+    if (target.interval !== c.plan.interval) throw new MailboxLifecycleError("invalid");
+    const current = c.plan.planCode;
+    // A larger plan, or (from a pre-plan contract) more mailboxes or a higher price, is
+    // paid now; anything else must fit what the team already has, without a refund.
+    const upgrade = current
+      ? PLAN_RANK[planCode] > PLAN_RANK[current]
+      : mailboxIncludedSeats(target) > c.plan.seats || target.unitAmount > (c.plan.unitAmount ?? 0);
+    if (!upgrade) await assertFits(db, input.teamId, c.plan.periodStart, target);
+    const ending = upgrade && c.sub.status === "trialing";
+    await deps.stripe.subscriptions.update(
+      c.sub.id,
+      {
+        items: [{ id: c.plan.stripeSubscriptionItemId!, price: target.priceId, quantity: 1 }],
+        proration_behavior: upgrade ? "always_invoice" : "none",
+        ...(upgrade ? { payment_behavior: "error_if_incomplete" as const } : {}),
+        ...(ending ? { trial_end: "now" as const } : {}),
+      },
+      { idempotencyKey: `mailbox-plan:${c.sub.id}:${c.plan.stripePriceId}:${target.priceId}` },
+    );
+    const sub = await deps.stripe.subscriptions.retrieve(c.sub.id, {
+      expand: ["items.data.price.product", "latest_invoice", "schedule"],
+    });
+    const applied = await reconcileExistingMailboxSubscription(
+      db,
+      sub,
+      mailboxSubscriptionCatalog(catalog, c.plan),
+    );
+    if (!applied.applied) throw new MailboxLifecycleError("pending");
+    return { planCode, direction: upgrade ? "upgrade" : "downgrade" };
+  });
+}
+
+/** A smaller plan must hold what the team already has: mailboxes, storage and this period's use. */
+async function assertFits(db: Db, teamId: string, periodStart: Date, target: MailboxPriceTerms) {
+  const [boxes] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.mailboxes)
+    .where(eq(schema.mailboxes.teamId, teamId));
+  const used = await mailboxPlanUsage(db, teamId, periodStart);
+  if (
+    (boxes?.count ?? 0) > mailboxIncludedSeats(target) ||
+    used.storageBytes > target.storageBytesPerMailbox ||
+    used.outboundRecipients > target.includedOutboundPerMailbox ||
+    used.outboundBytes > (target.outboundBytesPerPeriod ?? Number.MAX_SAFE_INTEGER) ||
+    used.inboundDeliveries > (target.inboundDeliveriesPerPeriod ?? Number.MAX_SAFE_INTEGER) ||
+    used.inboundBytes > (target.inboundBytesPerPeriod ?? Number.MAX_SAFE_INTEGER)
+  )
+    throw new MailboxLifecycleError("plan_too_small");
 }

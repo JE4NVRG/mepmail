@@ -44,6 +44,10 @@ const terms = z
       })
       .strict()
       .optional(),
+    planCode: z.enum(["solo", "duo", "equipe"]).optional(),
+    inboundDeliveriesPerPeriod: z.number().int().min(0).max(10000000).optional(),
+    inboundBytesPerPeriod: z.number().int().min(0).max(10995116277760).optional(),
+    outboundBytesPerPeriod: z.number().int().min(0).max(10995116277760).optional(),
   })
   .strict();
 /** Operator-controlled catalog; an absent value cannot create or price a purchase.
@@ -130,9 +134,14 @@ function purchasableTerms(
   const addOn =
     catalog.checkoutPriceIds ?? (catalog.checkoutPriceId ? [catalog.checkoutPriceId] : []);
   const standalone = mailboxStandaloneOpen() ? (catalog.standalonePriceIds ?? []) : [];
+  // The Correio plans sell to everyone; a team with paid Envio also keeps the
+  // per-mailbox add-ons. Other standalone prices (pre-plan) sell only without Envio.
+  const plans = standalone.filter((id) =>
+    catalog.prices.some((p) => p.priceId === id && p.planCode),
+  );
   const ids =
     audience === "with_sending"
-      ? addOn
+      ? [...plans, ...addOn]
       : audience === "standalone"
         ? standalone
         : [...addOn, ...standalone];
@@ -162,12 +171,23 @@ function publicTerms(price: MailboxPriceTerms) {
           extraUnitAmount: price.localCurrency.extraUnitAmount ?? null,
         }
       : null,
+    /** A Correio plan: fixed mailboxes and team-wide allowances per billing period. */
+    plan: price.planCode
+      ? {
+          code: price.planCode,
+          inboundDeliveriesPerPeriod: price.inboundDeliveriesPerPeriod ?? 0,
+          inboundBytesPerPeriod: price.inboundBytesPerPeriod ?? 0,
+          outboundBytesPerPeriod: price.outboundBytesPerPeriod ?? 0,
+        }
+      : null,
   };
 }
 
 function publicOffer(catalog: MailboxCatalog, price: MailboxPriceTerms) {
+  // A pre-plan offer hashes without the plan field, so its id stays what it was.
+  const { plan, ...shape } = publicTerms(price);
   const offerId = `mbo_${createHash("sha256")
-    .update(JSON.stringify([catalog.livemode, price.priceId, publicTerms(price)]))
+    .update(JSON.stringify([catalog.livemode, price.priceId, plan ? { ...shape, plan } : shape]))
     .digest("base64url")}`;
   // The trial a first purchase of this price carries; the presentation zeroes it
   // for a team that is not eligible. Not part of the offer id.
@@ -386,6 +406,18 @@ export async function mailboxBillingPresentation(
   // The caller must also enforce the mutation flag and use read-only provider reconciliation.
   const mutable = manageable && !mailboxBillingMutationsPaused();
   const openManagement = !!managementRequest && managementRequest.status !== "scheduled";
+  // The Correio plans this team can move to (or migrate into), with the current one marked.
+  const planTerms = catalog
+    ? purchasableTerms(catalog, "standalone").filter((price) => price.planCode)
+    : [];
+  const planOffers = catalog
+    ? planTerms.map((price) => ({
+        ...publicOffer(catalog, price),
+        trialDays: 0,
+        current: subscription?.stripePriceId === price.priceId,
+      }))
+    : [];
+  const onPlan = !!subscription?.planCode;
   const scheduledReduction =
     managementRequest?.status === "scheduled" &&
     !!subscription &&
@@ -444,7 +476,8 @@ export async function mailboxBillingPresentation(
         beforeEnd &&
         subscription!.status === "active" &&
         !subscription!.cancelAtPeriodEnd &&
-        !openManagement,
+        !openManagement &&
+        !onPlan,
       canIncrease:
         mutable &&
         !sendingPlanRequired &&
@@ -453,7 +486,18 @@ export async function mailboxBillingPresentation(
         beforeEnd &&
         subscription!.status === "active" &&
         !subscription!.cancelAtPeriodEnd &&
-        !openManagement,
+        !openManagement &&
+        !onPlan,
+      /** A plan changes plan instead of quantity; a pre-plan contract may migrate into one. */
+      canChangePlan:
+        mutable &&
+        beforeEnd &&
+        ["active", "trialing"].includes(subscription!.status) &&
+        !subscription!.cancelAtPeriodEnd &&
+        !openManagement &&
+        planOffers.length > 0,
+      currentPlan: subscription?.planCode ?? null,
+      planOffers,
       pending: openManagement,
       requestedSeats:
         openManagement && managementRequest?.action === "increase" ? managementRequest.seats : null,

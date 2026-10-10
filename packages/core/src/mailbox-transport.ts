@@ -28,6 +28,13 @@ import {
 } from "./mailbox-inbound-safety.js";
 import { mailboxMessageId } from "./mailbox-message-id.js";
 import {
+  assertMailboxOutboundBytes,
+  mailboxHoldReason,
+  mailboxPlanUsage,
+  recordMailboxInboundReceipt,
+  requestMailboxReceivingHold,
+} from "./mailbox-plan-usage.js";
+import {
   type MailboxContentActor,
   MailboxContentError,
   withMailboxWriteAccess,
@@ -596,6 +603,8 @@ export async function receiveMailboxMime(
     // commit leaves due rows the webhook reconcile arms; a redelivery is a duplicate
     // and writes none.
     const received = new Map<string, TeamWebhookEvent[]>();
+    // Teams this receipt stored something new for: each counts one delivery.
+    const stored = new Set<string>();
     for (const box of boxes) {
       const plan = plans.get(box.teamId)!;
       await requireMailboxSeat(tx, box.teamId, box.id, plan);
@@ -638,7 +647,10 @@ export async function receiveMailboxMime(
         items.push({ id: previous.id, mailboxId: box.id, duplicate: true });
         continue;
       }
-      await assertMailboxStorage(tx, box.teamId, box.id, input.raw.length, plan);
+      // A plan stores mail SES already accepted even past its storage (dropping it would
+      // lose mail the provider billed); the receiving hold below stops what comes next.
+      if (!plan.planCode)
+        await assertMailboxStorage(tx, box.teamId, box.id, input.raw.length, plan);
       // Mail the provider would file in the inbox goes to Spam when the owner blocked
       // its sender; quarantine and provider spam keep their own folder.
       const blocked =
@@ -670,6 +682,7 @@ export async function receiveMailboxMime(
         ...sealed,
       });
       items.push({ id, mailboxId: box.id, duplicate: false });
+      stored.add(box.teamId);
       // Identifiers only: sender, subject and body stay sealed in the mailbox.
       if (current.kind === "agent" && folder === "inbox") {
         const events = received.get(box.teamId) ?? [];
@@ -697,7 +710,21 @@ export async function receiveMailboxMime(
           webhooks.push(...rows);
         },
       });
-    return { items, webhooks };
+    // Plans meter one delivery per receipt and team, however many mailboxes or aliases
+    // it reached; past the allowance (or out of storage) receiving pauses in SES.
+    const holds: string[] = [];
+    for (const teamId of [...stored].sort()) {
+      const plan = plans.get(teamId)!;
+      if (!plan.planCode) continue;
+      await recordMailboxInboundReceipt(tx, teamId, plan.usagePeriod, input.raw.length);
+      const reason = mailboxHoldReason(
+        plan,
+        await mailboxPlanUsage(tx, teamId, plan.usagePeriod.start),
+      );
+      if (reason && (await requestMailboxReceivingHold(tx, teamId, reason, plan.usagePeriod.end)))
+        holds.push(teamId);
+    }
+    return { items, webhooks, holds };
   });
 }
 
@@ -861,6 +888,8 @@ async function queueAuthorizedMailboxDraft(
       BigInt(plan.includedOutboundPerMailbox)
     )
       throw new MailboxServiceError("quota");
+    // A plan also caps the MIME bytes it sends: each recipient is a copy SES bills.
+    await assertMailboxOutboundBytes(tx, plan, plan.usagePeriod.start, raw.length, parsed.count);
     // A free trial sends a little, from verified domains only (checked above), until paid.
     await assertMailboxTrialSending(tx, plan, parsed.count, now);
   }

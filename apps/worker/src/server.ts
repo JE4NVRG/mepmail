@@ -88,6 +88,7 @@ import { drainWebhookEndpoint } from "./handlers/deliver-webhook.js";
 import { runInstanceProbes } from "./handlers/instance-probes.js";
 import { warnExpiringMailboxAgentKeys } from "./handlers/mailbox-agent-key-expiry.js";
 import { runMailboxCapacity } from "./handlers/mailbox-capacity.js";
+import { reconcileMailboxReceivingHolds } from "./handlers/mailbox-receiving-holds.js";
 import { runMailboxReprice } from "./handlers/mailbox-reprice.js";
 import { runMailboxSchedules } from "./handlers/mailbox-scheduling.js";
 import { warnEndingMailboxTrials } from "./handlers/mailbox-trial-ending.js";
@@ -597,6 +598,19 @@ await queue.scheduleCrons({
         `mailbox.schedules: woken=${result.woken} followUps=${result.followUps} sent=${result.sent} failed=${result.failed} deferred=${result.deferred}`,
       );
     }
+    // Same minute: plans whose inbound allowance or storage ran out stop receiving in
+    // SES (and start again on a new period or an upgrade).
+    const holds = await reconcileMailboxReceivingHolds(db, {
+      configuration: process.env.MAILBOX_RECEIVING_PROVISIONING_CONFIG,
+      credentials:
+        env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
+          ? { accessKeyId: env.AWS_ACCESS_KEY_ID, secretAccessKey: env.AWS_SECRET_ACCESS_KEY }
+          : {},
+    });
+    if (holds.paused || holds.resumed || holds.failed)
+      console.log(
+        `mailbox.receiving: paused=${holds.paused} resumed=${holds.resumed} failed=${holds.failed}`,
+      );
   },
   "events.health": async () => {
     // No topic allowlist = ingestion disabled on purpose; nothing to judge.

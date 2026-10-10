@@ -32,7 +32,7 @@ export async function activateMailboxReceiving(
   actor: MailboxRegistryActor,
   domainId: string,
   deps: ActivationDependencies = {},
-): Promise<{ state: "not_configured" | "needs_dns" | "confirmed"; added: number }> {
+): Promise<{ state: "not_configured" | "needs_dns" | "paused" | "confirmed"; added: number }> {
   const config = parseMailboxProvisioningConfiguration(
     deps.configuration ?? process.env.MAILBOX_RECEIVING_PROVISIONING_CONFIG,
   );
@@ -122,6 +122,23 @@ export async function activateMailboxReceiving(
       return { state: "needs_dns", added: 0 };
     // One executor across Web replicas; preserves the same global SES recipient set.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('mailbox-receiving-provisioning'))`);
+    // A team whose plan ran out of inbound allowance or storage stays out of SES: the
+    // addresses wait in its hold and go in when receiving resumes.
+    const [hold] = await tx
+      .select()
+      .from(schema.mailboxReceivingHolds)
+      .where(eq(schema.mailboxReceivingHolds.teamId, actor.teamId))
+      .for("update");
+    if (hold) {
+      await tx
+        .update(schema.mailboxReceivingHolds)
+        .set({
+          recipients: [...new Set([...hold.recipients, ...recipients])].sort(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.mailboxReceivingHolds.teamId, actor.teamId));
+      return { state: "paused", added: 0 };
+    }
     const result = await appendMailboxReceivingRecipients(
       deps.client
         ? deps.client()

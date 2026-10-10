@@ -270,6 +270,7 @@ describe("operator catalog changes stay bounded and do not create entitlements",
       includedMailboxes: 1,
       extraUnitAmount: null,
       localCurrency: null,
+      plan: null,
     });
     expect(runtime.getStripe).not.toHaveBeenCalled();
   });
@@ -368,6 +369,7 @@ describe("server-owned selectable offers and immutable pending purchases", () =>
       includedMailboxes: 1,
       extraUnitAmount: null,
       localCurrency: null,
+      plan: null,
     });
     expect(mailboxBillingCatalogForOffer(larger.priceId)).toBeNull();
     expect(mailboxBillingCatalogForOffer(`mbo_${"x".repeat(43)}`)).toBeNull();

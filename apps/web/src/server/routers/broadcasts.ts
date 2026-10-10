@@ -16,6 +16,7 @@ import {
   PAUSE_COMPLAINT_RATE,
   parseSingleSender,
   regionPause,
+  senderVerdictMessage,
   splitPersonName,
   substituteUnsubscribeUrl,
   verifySenderDomain,
@@ -542,7 +543,9 @@ export const broadcastsRouter = router({
           message:
             sender.reason === "invalid_sender"
               ? "From must be a single address."
-              : `The ${sender.fromDomain} domain is not verified for this team.`,
+              : sender.reason === "mailbox_sender"
+                ? senderVerdictMessage(sender)
+                : `The ${sender.fromDomain} domain is not verified for this team.`,
         });
       }
       // Same pre-send protection as the API: a disguised sender never fans out.
@@ -624,7 +627,9 @@ export const broadcastsRouter = router({
           message:
             sender.reason === "invalid_sender"
               ? "From must be a single address."
-              : `The ${sender.fromDomain} domain is not verified for this team.`,
+              : sender.reason === "mailbox_sender"
+                ? senderVerdictMessage(sender)
+                : `The ${sender.fromDomain} domain is not verified for this team.`,
         });
       }
       const guardError =

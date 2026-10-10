@@ -8,6 +8,7 @@ import {
   isTeamSuspended,
   OVERAGE_HARD_CAP,
   parseMailbox,
+  senderVerdictMessage,
   verifySenderDomain,
 } from "@millionsend/core";
 import { type AddressObject, simpleParser } from "mailparser";
@@ -127,7 +128,9 @@ async function handleMessage(
   if (!domain.ok) {
     throw smtpError(
       554,
-      `The ${domain.fromDomain ?? "sender"} domain is not verified for this team`,
+      domain.reason === "mailbox_sender"
+        ? senderVerdictMessage(domain)
+        : `The ${domain.fromDomain ?? "sender"} domain is not verified for this team`,
     );
   }
   // SECURITY: a domain-scoped key may only send from its one domain — the same

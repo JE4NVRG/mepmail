@@ -28,6 +28,27 @@
   },
   "releases": [
     {
+      "version": "0.104",
+      "date": "2026-10-10",
+      "title": "Endereços do Correio enviam pelo Correio",
+      "summary": "No plano grátis de Envio, um endereço de caixa ou alias do Correio agora envia pelo Correio, onde o plano conta os destinatários; a API, o SMTP e as campanhas explicam o motivo e os outros endereços do domínio continuam funcionando.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Enviar de um endereço de caixa ou alias do Correio pela API, pelo SMTP ou numa campanha exige um plano pago de Envio; os outros endereços do mesmo domínio verificado seguem no plano grátis.",
+            "Os testes grátis do Correio dividem um teto diário de envio, além do limite de cada teste (50 por dia e 200 no total)."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Uma troca de plano que adiciona caixas só vale depois que a fatura é paga, inclusive quando a mudança chega do Stripe antes da confirmação."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.103",
       "date": "2026-10-10",
       "title": "Escolha quem chega em Pessoas no Correio",

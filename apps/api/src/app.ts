@@ -63,6 +63,7 @@ import {
   scoreBand,
   segmentContactsWhere,
   segmentFilterSchema,
+  senderVerdictMessage,
   sendingBroadcasts,
   teamQuota,
   verifyOnboardingSender,
@@ -2717,13 +2718,7 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
     // the sender.
     const domain = await verifySenderDomain(db, auth.teamId, broadcast.from);
     if (!domain.ok) {
-      return fail(
-        422,
-        "validation_error",
-        domain.reason === "invalid_sender"
-          ? 'from must be a single address like ada@example.com or "Ada Lovelace" <ada@example.com>; quote a display name that contains a comma'
-          : `The ${domain.fromDomain} domain is not verified for this team`,
-      );
+      return fail(422, "validation_error", senderVerdictMessage(domain));
     }
     // Same per-key domain confinement as /emails and SMTP: a domain-scoped
     // key must not send from a different team domain.
@@ -3617,16 +3612,7 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
     const from = onboarding ? (deps.onboardingEmailFrom ?? body.from) : body.from;
     const domain = onboarding ?? (await verifySenderDomain(deps.db, auth.teamId, body.from));
     if (!domain.ok) {
-      return c.json(
-        errorBody(
-          422,
-          "validation_error",
-          domain.reason === "invalid_sender"
-            ? 'from must be a single address like ada@example.com or "Ada Lovelace" <ada@example.com>; quote a display name that contains a comma'
-            : `The ${domain.fromDomain} domain is not verified for this team`,
-        ),
-        422,
-      );
+      return c.json(errorBody(422, "validation_error", senderVerdictMessage(domain)), 422);
     }
     // A domain-restricted key is confined to its domain, the shared sender included.
     if (
@@ -3775,10 +3761,7 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
       return {
         status: 422,
         name: "validation_error",
-        message:
-          domain.reason === "invalid_sender"
-            ? 'from must be a single address like ada@example.com or "Ada Lovelace" <ada@example.com>; quote a display name that contains a comma'
-            : `The ${domain.fromDomain} domain is not verified for this team`,
+        message: senderVerdictMessage(domain),
       };
     }
     if (keyForbidsSendingDomain(auth, domain.domainId)) {

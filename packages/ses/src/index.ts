@@ -56,9 +56,14 @@ export {
 } from "./domain-verification.js";
 export { createKeyringFromEnv, type KeyringEnv } from "./kms.js";
 export {
+  appendMailboxReceivingRecipients,
   createMailboxProvisioningClient,
+  type MailboxProvisioningClient,
+  type MailboxProvisioningConfiguration,
+  MailboxProvisioningError,
   mailboxReceivingCapacity,
   parseMailboxProvisioningConfiguration,
+  removeMailboxReceivingRecipients,
 } from "./mailbox-provisioning.js";
 export {
   createMailboxReceivingRuleClient,

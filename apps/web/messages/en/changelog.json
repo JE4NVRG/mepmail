@@ -23,6 +23,27 @@
   },
   "releases": [
     {
+      "version": "0.104",
+      "date": "2026-10-10",
+      "title": "Correio addresses send through Correio",
+      "summary": "On the free Send plan, a Correio mailbox or alias address now sends from Correio, where its plan counts the recipients; the API, SMTP and broadcasts explain why and keep every other address of the domain working.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Sending from a Correio mailbox or alias address through the API, SMTP or a broadcast needs a paid Send plan; other addresses of the same verified domain keep the free Send plan.",
+            "Correio free trials share one daily sending ceiling on top of each trial's own 50 a day and 200 in total."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "A plan change that adds mailboxes is applied only after its invoice is paid, also when the change arrives from Stripe before the confirmation."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.103",
       "date": "2026-10-10",
       "title": "Choose who reaches People in Correio",

@@ -13,6 +13,7 @@ import {
   type MailboxProvisioningClient,
   mailboxProtectedRuleSha256,
 } from "../../../packages/ses/src/mailbox-provisioning";
+import { reconcileMailboxReceivingHolds } from "../../worker/src/handlers/mailbox-receiving-holds";
 import { seedMailboxTestService } from "./mailbox-service-fixture";
 
 type ReceiptRule = Parameters<typeof mailboxProtectedRuleSha256>[0];
@@ -400,5 +401,118 @@ describe("explicit licensed receiving activation", () => {
       message: "receiving_unavailable",
     });
     expect(currentRule.Recipients).toEqual(initial.Recipients);
+  });
+});
+
+describe("receiving holds of a plan out of inbound allowance", () => {
+  const reconcile = () =>
+    reconcileMailboxReceivingHolds(db, { configuration: config, client: () => client });
+  const subscriptionRow = async () =>
+    (
+      await db
+        .select()
+        .from(schema.mailboxSubscriptions)
+        .where(eq(schema.mailboxSubscriptions.teamId, teamId))
+    )[0]!;
+  const holdRow = async () =>
+    (
+      await db
+        .select()
+        .from(schema.mailboxReceivingHolds)
+        .where(eq(schema.mailboxReceivingHolds.teamId, teamId))
+    )[0];
+  /** Turn the seeded license into a Duo plan that received `deliveries` this period. */
+  const planOverAllowance = async (deliveries: number, allowance = 10) => {
+    const sub = await subscriptionRow();
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({
+        planCode: "duo",
+        quotaScope: "team",
+        includedMailboxes: 3,
+        inboundDeliveriesPerPeriod: allowance,
+        inboundBytesPerPeriod: 10 ** 9,
+        outboundBytesPerPeriod: 10 ** 9,
+      })
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+    await db.insert(schema.mailboxUsagePeriods).values({
+      teamId,
+      periodStart: sub.periodStart,
+      periodEnd: sub.periodEnd,
+      inboundDeliveries: deliveries,
+      inboundBytes: 0,
+    });
+    await db
+      .insert(schema.mailboxReceivingHolds)
+      .values({ teamId, reason: "inbound_deliveries", periodEnd: sub.periodEnd });
+  };
+
+  it("takes the team out of SES, keeps activation from putting it back, and restores it", async () => {
+    await verify();
+    const addresses = [`first@${domainName}`, `second@${domainName}`];
+    expect(currentRule.Recipients).toEqual([...addresses, "support@existing.invalid"].sort());
+    await planOverAllowance(11);
+    expect(await reconcile()).toEqual({ paused: 1, resumed: 0, failed: 0 });
+    // SES now refuses their mail before accepting it; other routes are untouched.
+    expect(currentRule.Recipients).toEqual(["support@existing.invalid"]);
+    expect(currentRule.Actions).toEqual(initial.Actions);
+    expect(await holdRow()).toMatchObject({ state: "paused", recipients: addresses });
+    // Activating while paused writes nothing to SES; the addresses wait in the hold.
+    const updates = commands.filter(isUpdate).length;
+    await verify();
+    expect(commands.filter(isUpdate)).toHaveLength(updates);
+    expect(currentRule.Recipients).toEqual(["support@existing.invalid"]);
+    // Nothing more to do while the reason stands.
+    expect(await reconcile()).toEqual({ paused: 0, resumed: 0, failed: 0 });
+    // An upgrade (or the next period) clears the reason: the same addresses come back.
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({ inboundDeliveriesPerPeriod: 1000 })
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+    expect(await reconcile()).toEqual({ paused: 0, resumed: 1, failed: 0 });
+    expect(currentRule.Recipients).toEqual([...addresses, "support@existing.invalid"].sort());
+    expect(await holdRow()).toBeUndefined();
+  });
+
+  it("pauses only past the allowance plus its margin, and leaves the hold for a failed SES call", async () => {
+    await verify();
+    // 10 allowed, pause at 11 (10 * 1.1): 10 received keeps the hold unapplied and lifts it.
+    await planOverAllowance(10);
+    expect(await reconcile()).toEqual({ paused: 0, resumed: 1, failed: 0 });
+    expect(await holdRow()).toBeUndefined();
+    await db
+      .update(schema.mailboxUsagePeriods)
+      .set({ inboundDeliveries: 11 })
+      .where(eq(schema.mailboxUsagePeriods.teamId, teamId));
+    const sub = await subscriptionRow();
+    await db
+      .insert(schema.mailboxReceivingHolds)
+      .values({ teamId, reason: "inbound_deliveries", periodEnd: sub.periodEnd });
+    const working = client;
+    client = { send: async () => Promise.reject(new Error("ses unavailable")) };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await reconcile()).toEqual({ paused: 0, resumed: 0, failed: 1 });
+    expect(await holdRow()).toMatchObject({ state: "pausing" });
+    warn.mockRestore();
+    client = working;
+    expect(await reconcile()).toEqual({ paused: 1, resumed: 0, failed: 0 });
+  });
+
+  it("never empties a rule: its placeholder stays when the last address leaves", async () => {
+    await verify();
+    const addresses = [`first@${domainName}`, `second@${domainName}`];
+    // The rule now holds only this team (another route left it meanwhile).
+    currentRule.Recipients = [...addresses];
+    await planOverAllowance(11);
+    expect(await reconcile()).toEqual({ paused: 1, resumed: 0, failed: 0 });
+    expect(currentRule.Recipients).toEqual(["reservado@regra-01.mepmail.invalid"]);
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({ inboundDeliveriesPerPeriod: 1000 })
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+    expect(await reconcile()).toEqual({ paused: 0, resumed: 1, failed: 0 });
+    expect(currentRule.Recipients).toEqual(
+      [...addresses, "reservado@regra-01.mepmail.invalid"].sort(),
+    );
   });
 });

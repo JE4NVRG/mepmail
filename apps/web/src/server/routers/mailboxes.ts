@@ -1,5 +1,6 @@
 import {
   beginMailboxCheckout,
+  changeMailboxPlan,
   MailboxLifecycleError,
   manageMailboxSubscription,
 } from "@millionsend/billing";
@@ -349,6 +350,32 @@ export const mailboxesRouter = router({
         ),
       ).catch((error: unknown) => {
         if (error instanceof TRPCError) throw error;
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
+      });
+    }),
+  /** Move to another Correio plan; the offer comes from billing.management.planOffers. */
+  changePlan: enabled
+    .input(z.object({ offerId: z.string().regex(/^mbo_[A-Za-z0-9_-]{43}$/) }).strict())
+    .mutation(async ({ ctx, input }) => {
+      const presentation = await call(() => mailboxBillingPresentation(ctx.db, actor(ctx)));
+      if (!presentation.canManage) throw new TRPCError({ code: "FORBIDDEN" });
+      if (mailboxBillingMutationsPaused() || !presentation.management.canChangePlan)
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "mailbox_billing_unavailable",
+        });
+      const catalog = mailboxBillingCatalogForOffer(input.offerId, "standalone");
+      const offer = presentation.management.planOffers.find((o) => o.offerId === input.offerId);
+      if (!catalog?.checkoutPriceId || !offer || offer.current)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "invalid" });
+      return call(() =>
+        changeMailboxPlan(mailboxPurchaseDeps(ctx.db), mailboxBillingCatalog(), {
+          ...actor(ctx),
+          priceId: catalog.checkoutPriceId!,
+        }),
+      ).catch((error: unknown) => {
+        if (error instanceof TRPCError) throw error;
+        // A provider error may follow an applied change: the webhook settles it.
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
       });
     }),

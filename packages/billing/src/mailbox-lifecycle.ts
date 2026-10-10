@@ -20,6 +20,8 @@ import {
   mailboxCheckoutTerms,
   mailboxIncludedSeats,
   mailboxIncreasePaymentConfirmed,
+  mailboxPlanUpgradePaid,
+  mailboxStripeQuantity,
   projectMailboxSubscription,
 } from "./mailbox.js";
 import { hasPaidSendingPlanForMailbox } from "./mailbox-addon.js";
@@ -39,7 +41,8 @@ export class MailboxLifecycleError extends Error {
       | "expired"
       | "subscription_exists"
       | "sending_plan_required"
-      | "early_access_required",
+      | "early_access_required"
+      | "plan_too_small",
   ) {
     super(code);
   }
@@ -59,16 +62,40 @@ const OCCUPIED_SUBSCRIPTIONS = new Set([
 ]);
 const epoch = (value: number) => Number.isSafeInteger(value) && value > 0 && value <= 2147483647;
 
-/** The tiered and team-quota terms a row or lease was sold with (absent = the per-unit shape). */
+/** The tiered, team-quota and plan terms a row or lease was sold with (absent = the per-unit shape). */
 function soldShape(row: {
   quotaScope: "mailbox" | "team";
   includedMailboxes: number;
   extraUnitAmount: number | null;
-}): Pick<MailboxPriceTerms, "quotaScope" | "includedMailboxes" | "extraUnitAmount"> {
+  planCode: "solo" | "duo" | "equipe" | null;
+  inboundDeliveriesPerPeriod: number | null;
+  inboundBytesPerPeriod: number | null;
+  outboundBytesPerPeriod: number | null;
+}): Pick<
+  MailboxPriceTerms,
+  | "quotaScope"
+  | "includedMailboxes"
+  | "extraUnitAmount"
+  | "planCode"
+  | "inboundDeliveriesPerPeriod"
+  | "inboundBytesPerPeriod"
+  | "outboundBytesPerPeriod"
+> {
   return {
     ...(row.quotaScope === "team" ? { quotaScope: "team" as const } : {}),
-    ...(row.includedMailboxes !== 1 ? { includedMailboxes: row.includedMailboxes } : {}),
+    // A plan keeps includedMailboxes even for one mailbox: Solo is a plan of one.
+    ...(row.includedMailboxes !== 1 || row.planCode !== null
+      ? { includedMailboxes: row.includedMailboxes }
+      : {}),
     ...(row.extraUnitAmount !== null ? { extraUnitAmount: row.extraUnitAmount } : {}),
+    ...(row.planCode !== null
+      ? {
+          planCode: row.planCode,
+          inboundDeliveriesPerPeriod: row.inboundDeliveriesPerPeriod ?? 0,
+          inboundBytesPerPeriod: row.inboundBytesPerPeriod ?? 0,
+          outboundBytesPerPeriod: row.outboundBytesPerPeriod ?? 0,
+        }
+      : {}),
   };
 }
 function historicalTerms(row: MailboxSubscriptionRow): MailboxPriceTerms | null {
@@ -212,7 +239,9 @@ async function applyMailboxProjection(
       current.stripeCustomerId === customerId &&
       current.livemode === catalog?.livemode
         ? historicalTerms(current)
-        : lease && item?.price.id === lease.stripePriceId && item.quantity === lease.seats
+        : lease &&
+            item?.price.id === lease.stripePriceId &&
+            item.quantity === mailboxStripeQuantity(leaseTerms(lease), lease.seats)
           ? leaseTerms(lease)
           : null;
     const creationMatches =
@@ -280,25 +309,35 @@ async function applyMailboxProjection(
         .update(mailboxManagementRequests)
         .set({ status: "expired", updatedAt: new Date() })
         .where(eq(mailboxManagementRequests.id, increase.id));
+    // More mailboxes need their payment: a quantity increase its prorated debit, a move to
+    // a larger plan its own paid update invoice.
+    const planUpgrade =
+      projection.planCode !== null && projection.stripePriceId !== current?.stripePriceId;
     if (
       !terminal &&
       current?.stripeSubscriptionId === sub.id &&
       current.seats > 0 &&
       projection.seats > current.seats &&
-      !mailboxIncreasePaymentConfirmed(
-        sub,
-        {
-          customerId,
-          livemode: projection.livemode,
-          previousInvoiceId: increase?.previousInvoiceId,
-          invoiceId: increase?.stripeInvoiceId,
-          seats: projection.seats,
-          periodStart: increase?.periodStart ?? projection.periodStart,
-          periodEnd: increase?.periodEnd ?? projection.periodEnd,
-          prorationAt: increase?.createdAt,
-        },
-        paymentInvoice,
-      )
+      !(planUpgrade
+        ? mailboxPlanUpgradePaid(
+            sub,
+            { customerId, livemode: projection.livemode },
+            paymentInvoice ?? sub.latest_invoice,
+          )
+        : mailboxIncreasePaymentConfirmed(
+            sub,
+            {
+              customerId,
+              livemode: projection.livemode,
+              previousInvoiceId: increase?.previousInvoiceId,
+              invoiceId: increase?.stripeInvoiceId,
+              seats: projection.seats,
+              periodStart: increase?.periodStart ?? projection.periodStart,
+              periodEnd: increase?.periodEnd ?? projection.periodEnd,
+              prorationAt: increase?.createdAt,
+            },
+            paymentInvoice,
+          ))
     )
       return result("invalid_projection");
     const [reduction] = current
@@ -949,6 +988,10 @@ async function purchase(
         quotaScope: terms.quotaScope ?? "mailbox",
         includedMailboxes: mailboxIncludedSeats(terms),
         extraUnitAmount: terms.extraUnitAmount ?? null,
+        planCode: terms.planCode ?? null,
+        inboundDeliveriesPerPeriod: terms.inboundDeliveriesPerPeriod ?? null,
+        inboundBytesPerPeriod: terms.inboundBytesPerPeriod ?? null,
+        outboundBytesPerPeriod: terms.outboundBytesPerPeriod ?? null,
         trialDays,
         successUrl: input.successUrl,
         cancelUrl: input.cancelUrl,
@@ -1087,7 +1130,10 @@ export async function beginMailboxCheckout(
   )
     throw new MailboxLifecycleError("invalid");
   // The base price covers its included mailboxes: asking for fewer buys them all.
-  const seats = Math.max(input.seats, mailboxIncludedSeats(terms));
+  // A plan sells exactly its mailboxes.
+  const seats = terms.planCode
+    ? mailboxIncludedSeats(terms)
+    : Math.max(input.seats, mailboxIncludedSeats(terms));
   await ensureMailboxCustomer(deps, catalog, { ...input, seats });
   return purchase(deps, catalog, terms, { ...input, seats });
 }

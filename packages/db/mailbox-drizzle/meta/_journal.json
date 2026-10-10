@@ -204,6 +204,13 @@
       "when": 1791730800028,
       "tag": "0028_mailbox_arrival_notify",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791730800029,
+      "tag": "0029_mailbox_plans",
+      "breakpoints": true
     }
   ]
 }

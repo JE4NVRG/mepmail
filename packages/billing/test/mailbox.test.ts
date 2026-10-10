@@ -13,6 +13,7 @@ import {
   type MailboxPriceTerms,
   mailboxIncreaseInvoiceMatches,
   mailboxIncreasePaymentConfirmed,
+  mailboxPlanUpgradePaid,
   projectMailboxSubscription,
 } from "../src/mailbox.js";
 import type { BillingStripe } from "../src/stripe.js";
@@ -268,6 +269,107 @@ describe("Mailbox tiered price projection", () => {
   });
 });
 
+/** Duo: US$5.90 flat for 3 mailboxes, with the team's allowances per billing period. */
+const DUO: MailboxPriceTerms = {
+  priceId: "price_mailbox_duo_fixture",
+  currency: "usd",
+  unitAmount: 590,
+  interval: "month",
+  storageBytesPerMailbox: 3 * 1024 ** 3,
+  includedOutboundPerMailbox: 2000,
+  quotaScope: "team",
+  includedMailboxes: 3,
+  trialDays: 7,
+  localCurrency: { currency: "brl", unitAmount: 2990 },
+  planCode: "duo",
+  inboundDeliveriesPerPeriod: 5000,
+  inboundBytesPerPeriod: 1610612736,
+  outboundBytesPerPeriod: 1073741824,
+};
+
+describe("Correio plan projection and checkout", () => {
+  const catalog: MailboxCatalog = {
+    ...CATALOG,
+    checkoutPriceId: DUO.priceId,
+    prices: [TERMS, DUO],
+  };
+  const planSub = (quantity = 1) => {
+    const sub = mailSubscription("sub_duo", "active", DUO);
+    sub.items.data[0]!.quantity = quantity;
+    return sub;
+  };
+  const checkout: MailboxCheckoutInput = {
+    teamId: OWNER.teamId,
+    customerId: OWNER.customerId,
+    seats: 3,
+    successUrl: "https://app.example.com/mailboxes?checkout=success",
+    cancelUrl: "https://app.example.com/mailboxes",
+    idempotencyKey: "mailbox-checkout:plan-fixture",
+  };
+
+  it("grants a plan its mailboxes and per-period allowances for one unit", () => {
+    expect(projectMailboxSubscription(planSub(), catalog, OWNER)).toMatchObject({
+      seats: 3,
+      includedMailboxes: 3,
+      quotaScope: "team",
+      extraUnitAmount: null,
+      planCode: "duo",
+      storageBytesPerMailbox: 3 * 1024 ** 3,
+      includedOutboundPerMailbox: 2000,
+      inboundDeliveriesPerPeriod: 5000,
+      inboundBytesPerPeriod: 1610612736,
+      outboundBytesPerPeriod: 1073741824,
+      unitAmount: 590,
+    });
+    // A pre-plan price projects no plan and no allowances.
+    expect(projectMailboxSubscription(mailSubscription(), CATALOG, OWNER)).toMatchObject({
+      planCode: null,
+      inboundDeliveriesPerPeriod: null,
+      inboundBytesPerPeriod: null,
+      outboundBytesPerPeriod: null,
+    });
+  });
+
+  it("projects nothing for a plan bought as more than one unit", () => {
+    expect(projectMailboxSubscription(planSub(3), catalog, OWNER)).toBeNull();
+    expect(projectMailboxSubscription(planSub(2), catalog, OWNER)).toBeNull();
+  });
+
+  it("refuses plan terms that lack an allowance, add a seat tier or are not team-wide", () => {
+    const { inboundBytesPerPeriod: _missing, ...partial } = DUO;
+    for (const prices of [
+      [TERMS, partial],
+      [TERMS, { ...DUO, extraUnitAmount: 190 }],
+      [TERMS, { ...DUO, quotaScope: "mailbox" as const }],
+      [TERMS, { ...DUO, includedMailboxes: undefined }],
+    ])
+      expect(projectMailboxSubscription(planSub(), { ...catalog, prices }, OWNER)).toBeNull();
+    // Allowances without a plan code belong to no plan.
+    expect(
+      projectMailboxSubscription(
+        mailSubscription(),
+        { ...CATALOG, prices: [{ ...TERMS, inboundDeliveriesPerPeriod: 10 }] },
+        OWNER,
+      ),
+    ).toBeNull();
+  });
+
+  it("checks a plan out as quantity 1 for exactly its mailboxes", async () => {
+    const { stripe, state } = fakeStripe();
+    await createMailboxCheckoutSession(stripe, catalog, { ...checkout, trialDays: 7 });
+    expect(state.checkouts[0]).toMatchObject({
+      line_items: [{ price: DUO.priceId, quantity: 1 }],
+      subscription_data: { trial_period_days: 7 },
+      payment_method_collection: "always",
+    });
+    for (const seats of [1, 2, 4])
+      await expect(
+        createMailboxCheckoutSession(stripe, catalog, { ...checkout, seats }),
+      ).rejects.toMatchObject({ code: "invalid" });
+    expect(state.checkouts).toHaveLength(1);
+  });
+});
+
 describe("Mailbox subscription projection", () => {
   it("projects a trusted licensed quantity and its contract, using the linked owner", () => {
     expect(projectMailboxSubscription(mailSubscription(), CATALOG, OWNER)).toEqual({
@@ -279,6 +381,10 @@ describe("Mailbox subscription projection", () => {
       quotaScope: "mailbox",
       includedMailboxes: 1,
       extraUnitAmount: null,
+      planCode: null,
+      inboundDeliveriesPerPeriod: null,
+      inboundBytesPerPeriod: null,
+      outboundBytesPerPeriod: null,
       periodStart: new Date(PERIOD_START * 1000),
       periodEnd: new Date(PERIOD_END * 1000),
       stripeCustomerId: OWNER.customerId,
@@ -809,5 +915,90 @@ describe("Mailbox isolation from Send billing, real handler and database", () =>
     );
     await reconcileTeamPlan({ db, stripe, log: () => {} }, teamId);
     expect(await row()).toEqual(before);
+  });
+});
+
+describe("Correio plan upgrade payment evidence", () => {
+  const owner = { customerId: OWNER.customerId, livemode: false };
+  const fixture = () => {
+    const sub = mailSubscription("sub_upgrade", "active", DUO);
+    sub.pending_update = null;
+    const item = sub.items.data[0]!;
+    item.quantity = 1;
+    const invoice = {
+      id: "in_plan_upgrade",
+      customer: OWNER.customerId,
+      livemode: false,
+      currency: "brl",
+      billing_reason: "subscription_update",
+      status: "paid",
+      amount_remaining: 0,
+      parent: { subscription_details: { subscription: sub.id } },
+      lines: {
+        object: "list",
+        has_more: false,
+        data: [
+          {
+            id: "il_plan_upgrade",
+            invoice: "in_plan_upgrade",
+            livemode: false,
+            currency: "brl",
+            amount: 2990,
+            quantity: 1,
+            pricing: { type: "price_details", price_details: { price: DUO.priceId } },
+            period: { start: PERIOD_START + 10, end: PERIOD_END },
+            parent: {
+              type: "subscription_item_details",
+              subscription_item_details: {
+                subscription: sub.id,
+                subscription_item: item.id,
+                proration: true,
+                proration_details: null,
+              },
+            },
+          },
+        ],
+      },
+    } as unknown as Stripe.Invoice;
+    sub.currency = "brl";
+    return { sub, invoice };
+  };
+
+  it("accepts only the paid update invoice for the new plan on this item and period", () => {
+    const { sub, invoice } = fixture();
+    expect(mailboxPlanUpgradePaid(sub, owner, invoice)).toBe(true);
+    const mutate = (change: (i: Stripe.Invoice & Record<string, unknown>) => void) => {
+      const copy = structuredClone(invoice) as Stripe.Invoice & Record<string, unknown>;
+      change(copy);
+      return mailboxPlanUpgradePaid(sub, owner, copy);
+    };
+    // Unpaid, partly paid, a renewal, another customer or currency, or a credit: no seats.
+    expect(mutate((i) => (i.status = "open"))).toBe(false);
+    expect(mutate((i) => (i.amount_remaining = 100))).toBe(false);
+    expect(mutate((i) => (i.billing_reason = "subscription_cycle"))).toBe(false);
+    expect(mutate((i) => (i.customer = "cus_someone_else"))).toBe(false);
+    expect(mutate((i) => (i.currency = "usd"))).toBe(false);
+    expect(mutate((i) => (i.livemode = true))).toBe(false);
+    expect(mutate((i) => (i.lines.data[0]!.amount = -2990))).toBe(false);
+    expect(mutate((i) => (i.lines.data[0]!.quantity = 3))).toBe(false);
+    expect(mutate((i) => (i.lines.data[0]!.period.end = PERIOD_END - 1))).toBe(false);
+    expect(
+      mutate((i) => {
+        i.lines.data[0]!.pricing = {
+          type: "price_details",
+          price_details: { price: "price_previous_plan", product: "prod" },
+          unit_amount_decimal: null,
+        };
+      }),
+    ).toBe(false);
+    expect(mutate((i) => (i.lines.has_more = true))).toBe(false);
+    expect(mailboxPlanUpgradePaid(sub, owner, "in_plan_upgrade")).toBe(false);
+    expect(mailboxPlanUpgradePaid(sub, owner, null)).toBe(false);
+    // A pending (unpaid) Stripe update, or a quantity other than one plan, grants nothing.
+    expect(mailboxPlanUpgradePaid({ ...sub, pending_update: {} as never }, owner, invoice)).toBe(
+      false,
+    );
+    sub.items.data[0]!.quantity = 2;
+    expect(mailboxPlanUpgradePaid(sub, owner, invoice)).toBe(false);
   });
 });

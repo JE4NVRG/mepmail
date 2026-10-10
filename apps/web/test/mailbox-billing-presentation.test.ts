@@ -64,6 +64,7 @@ const offer = {
   includedMailboxes: 1,
   extraUnitAmount: null,
   localCurrency: null,
+  plan: null,
 };
 const sendingPeriodStart = new Date("2020-01-01");
 const sendingPeriodEnd = new Date("2030-01-01");
@@ -270,6 +271,9 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
         canResume: false,
         canAdjust: false,
         canIncrease: false,
+        canChangePlan: false,
+        currentPlan: null,
+        planOffers: [],
         pending: false,
         requestedSeats: null,
         scheduledSeats: null,

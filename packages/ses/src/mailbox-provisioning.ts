@@ -187,6 +187,84 @@ export async function mailboxReceivingCapacity(
   }
 }
 
+/** Read-only: every address the pinned rules route now (placeholders included). */
+export async function mailboxRoutedRecipients(
+  client: MailboxProvisioningClient,
+  config: MailboxProvisioningConfiguration,
+): Promise<Set<string>> {
+  try {
+    return new Set(
+      verifiedRules(await client.send(new DescribeActiveReceiptRuleSetCommand({})), config).flatMap(
+        (rule) => rule.Recipients,
+      ),
+    );
+  } finally {
+    client.destroy?.();
+  }
+}
+
+/** The placeholder a pinned rule keeps when every real address left it: a rule with no
+ * recipients would match every verified domain, so a rule is never emptied. */
+function placeholderFor(ruleName: string, index: number): string {
+  const suffix = /-(\d{2})$/.exec(ruleName)?.[1] ?? String(index + 1).padStart(2, "0");
+  return `reservado@regra-${suffix}.mepmail.invalid`;
+}
+
+/**
+ * Caller must hold the shared PostgreSQL provisioning lock. Takes `recipients` out of the
+ * pinned rules so SES refuses their mail before accepting it (a receiving hold). A rule
+ * left with no real address keeps its placeholder; nothing else in the rules changes.
+ */
+export async function removeMailboxReceivingRecipients(
+  client: MailboxProvisioningClient,
+  config: MailboxProvisioningConfiguration,
+  recipients: readonly string[],
+): Promise<{ confirmed: true; removed: number }> {
+  try {
+    if (
+      !recipients.length ||
+      !recipients.every(address) ||
+      new Set(recipients).size !== recipients.length ||
+      recipients.some((x) => x.endsWith(".mepmail.invalid"))
+    )
+      throw new MailboxProvisioningError("configuration");
+    const unwanted = new Set(recipients);
+    const original = verifiedRules(
+      await client.send(new DescribeActiveReceiptRuleSetCommand({})),
+      config,
+    );
+    const updates: (ReceiptRule & { Recipients: string[] })[] = [];
+    original.forEach((rule, index) => {
+      const kept = rule.Recipients.filter((x) => !unwanted.has(x));
+      if (kept.length === rule.Recipients.length) return;
+      updates.push({
+        ...rule,
+        Recipients: kept.length ? kept : [placeholderFor(rule.Name, index)],
+      });
+    });
+    const present = original.flatMap((rule) => rule.Recipients).filter((x) => unwanted.has(x));
+    if (!updates.length) return { confirmed: true, removed: 0 };
+    for (const rule of updates) {
+      try {
+        await client.send(
+          new UpdateReceiptRuleCommand({ RuleSetName: config.ruleSetName, Rule: rule }),
+        );
+      } catch {
+        /* reconciliation below is authoritative */
+      }
+    }
+    const after = new Set(
+      verifiedRules(await client.send(new DescribeActiveReceiptRuleSetCommand({})), config).flatMap(
+        (rule) => rule.Recipients,
+      ),
+    );
+    if (recipients.some((x) => after.has(x))) throw new MailboxProvisioningError("unconfirmed");
+    return { confirmed: true, removed: present.length };
+  } finally {
+    client.destroy?.();
+  }
+}
+
 /** Caller must hold the shared PostgreSQL provisioning lock. Never removes recipients. */
 export async function appendMailboxReceivingRecipients(
   client: MailboxProvisioningClient,

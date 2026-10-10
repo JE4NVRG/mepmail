@@ -43,6 +43,30 @@ export async function mailboxTrialUsage(
   return { today: Number(usage?.today ?? 0), total: Number(usage?.total ?? 0) };
 }
 
+/**
+ * All trials together send at most this many recipients a UTC day: a burst of new
+ * trials cannot turn the free week into a campaign budget (paid plans are not counted).
+ */
+export const MAILBOX_TRIAL_GLOBAL_DAILY_RECIPIENTS = 2000;
+
+/** Recipients every trialing team queued today (UTC). */
+export async function mailboxTrialGlobalToday(db: Db, now = new Date()) {
+  const outbox = schema.mailboxOutbox;
+  const subs = schema.mailboxSubscriptions;
+  const [usage] = await db
+    .select({ total: sql<string>`coalesce(sum(${outbox.recipientCount}),0)::text` })
+    .from(outbox)
+    .innerJoin(subs, eq(subs.teamId, outbox.teamId))
+    .where(
+      and(
+        eq(subs.status, "trialing"),
+        sql`${outbox.createdAt} >= ${utcDayStart(now)}`,
+        sql`${outbox.status} <> 'failed'`,
+      ),
+    );
+  return Number(usage?.total ?? 0);
+}
+
 /** Call under the subscription lock, before queueing `recipients` more for a trialing team. */
 export async function assertMailboxTrialSending(
   db: Db,
@@ -54,7 +78,8 @@ export async function assertMailboxTrialSending(
   const usage = await mailboxTrialUsage(db, plan.teamId, plan.periodStart, now);
   if (
     usage.today + recipients > MAILBOX_TRIAL_DAILY_RECIPIENTS ||
-    usage.total + recipients > MAILBOX_TRIAL_TOTAL_RECIPIENTS
+    usage.total + recipients > MAILBOX_TRIAL_TOTAL_RECIPIENTS ||
+    (await mailboxTrialGlobalToday(db, now)) + recipients > MAILBOX_TRIAL_GLOBAL_DAILY_RECIPIENTS
   )
     throw new MailboxServiceError("trial_limit");
 }

@@ -31,6 +31,36 @@ export interface MailboxPriceTerms {
   localCurrency?:
     | { currency: string; unitAmount: number; extraUnitAmount?: number | undefined }
     | undefined;
+  /**
+   * A Correio plan: a flat price, bought as Stripe quantity 1, that grants its
+   * includedMailboxes and team-wide allowances (quotaScope "team"). The per-period
+   * byte and inbound allowances below exist only on plans.
+   */
+  planCode?: MailboxPlanCode | undefined;
+  inboundDeliveriesPerPeriod?: number | undefined;
+  inboundBytesPerPeriod?: number | undefined;
+  outboundBytesPerPeriod?: number | undefined;
+}
+
+export type MailboxPlanCode = "solo" | "duo" | "equipe";
+export const MAILBOX_PLAN_CODES: readonly MailboxPlanCode[] = ["solo", "duo", "equipe"];
+const MAX_BYTES = 10995116277760;
+
+/** Stripe quantity for a purchase of `seats`: a plan is always one unit. */
+export function mailboxStripeQuantity(
+  terms: Pick<MailboxPriceTerms, "planCode">,
+  seats: number,
+): number {
+  return terms.planCode ? 1 : seats;
+}
+
+/** Seats a Stripe quantity grants under `terms`; null when a plan is not bought as one unit. */
+export function mailboxSeatsForQuantity(
+  terms: Pick<MailboxPriceTerms, "planCode" | "includedMailboxes">,
+  quantity: number,
+): number | null {
+  if (!terms.planCode) return quantity;
+  return quantity === 1 ? mailboxIncludedSeats(terms) : null;
 }
 
 export interface MailboxCatalog {
@@ -105,7 +135,31 @@ function validTerms(terms: MailboxPriceTerms): boolean {
         terms.localCurrency.currency !== terms.currency &&
         positiveInt(terms.localCurrency.unitAmount, 2147483647) &&
         (terms.localCurrency.extraUnitAmount === undefined ||
-          positiveInt(terms.localCurrency.extraUnitAmount, 2147483647))))
+          positiveInt(terms.localCurrency.extraUnitAmount, 2147483647)))) &&
+    validPlan(terms)
+  );
+}
+
+/** A plan is flat (no extra-seat tier), team-scoped and carries all three period allowances. */
+function validPlan(terms: MailboxPriceTerms): boolean {
+  const allowances = [
+    terms.inboundDeliveriesPerPeriod,
+    terms.inboundBytesPerPeriod,
+    terms.outboundBytesPerPeriod,
+  ];
+  if (terms.planCode === undefined) return allowances.every((x) => x === undefined);
+  return (
+    MAILBOX_PLAN_CODES.includes(terms.planCode) &&
+    terms.quotaScope === "team" &&
+    terms.includedMailboxes !== undefined &&
+    terms.extraUnitAmount === undefined &&
+    terms.localCurrency?.extraUnitAmount === undefined &&
+    Number.isSafeInteger(terms.inboundDeliveriesPerPeriod) &&
+    terms.inboundDeliveriesPerPeriod! >= 0 &&
+    terms.inboundDeliveriesPerPeriod! <= 10000000 &&
+    [terms.inboundBytesPerPeriod, terms.outboundBytesPerPeriod].every(
+      (x) => Number.isSafeInteger(x) && x! >= 0 && x! <= MAX_BYTES,
+    )
   );
 }
 
@@ -256,6 +310,57 @@ export function mailboxIncreasePaymentConfirmed(
   );
 }
 
+/**
+ * A move to a plan with more mailboxes is paid at once (always_invoice, error_if_incomplete):
+ * its own update invoice for the new price, paid in full, billed on this subscription item
+ * for the current period. Without it, more mailboxes are never granted.
+ */
+export function mailboxPlanUpgradePaid(
+  sub: Stripe.Subscription,
+  owner: { customerId: string; livemode: boolean },
+  evidence: Stripe.Invoice | string | null = sub.latest_invoice,
+): boolean {
+  const item = sub.items.data[0];
+  const currency = sub.currency || item?.price.currency;
+  const invoice = evidence;
+  if (
+    sub.pending_update ||
+    !item ||
+    sub.items.data.length !== 1 ||
+    item.quantity !== 1 ||
+    !invoice ||
+    typeof invoice !== "object" ||
+    !invoice.id ||
+    invoice.status !== "paid" ||
+    invoice.amount_remaining !== 0 ||
+    idOf(invoice.customer) !== owner.customerId ||
+    invoice.livemode !== owner.livemode ||
+    invoice.currency !== currency ||
+    idOf(invoice.parent?.subscription_details?.subscription) !== sub.id ||
+    invoice.billing_reason !== "subscription_update" ||
+    invoice.lines?.has_more !== false ||
+    !Array.isArray(invoice.lines.data)
+  )
+    return false;
+  return invoice.lines.data.some((line) => {
+    const details = line.parent?.subscription_item_details;
+    return (
+      line.invoice === invoice.id &&
+      line.livemode === owner.livemode &&
+      line.currency === currency &&
+      line.parent?.type === "subscription_item_details" &&
+      details?.subscription === sub.id &&
+      details.subscription_item === item.id &&
+      Number.isSafeInteger(line.amount) &&
+      line.amount > 0 &&
+      line.pricing?.type === "price_details" &&
+      idOf(line.pricing.price_details?.price) === item.price.id &&
+      line.quantity === 1 &&
+      line.period?.end === item.current_period_end
+    );
+  });
+}
+
 type MailboxStatus = "inactive" | "trialing" | "active" | "past_due" | "canceled";
 
 export interface MailboxSubscriptionProjection {
@@ -267,6 +372,10 @@ export interface MailboxSubscriptionProjection {
   quotaScope: "mailbox" | "team";
   includedMailboxes: number;
   extraUnitAmount: number | null;
+  planCode: MailboxPlanCode | null;
+  inboundDeliveriesPerPeriod: number | null;
+  inboundBytesPerPeriod: number | null;
+  outboundBytesPerPeriod: number | null;
   periodStart: Date;
   periodEnd: Date;
   stripeCustomerId: string;
@@ -310,7 +419,11 @@ export function projectMailboxSubscription(
   const item = sub.items.data[0];
   if (!item) return null;
   const terms = trustedTerms(catalog, item.price.id);
-  const seats = item.quantity;
+  // A plan grants its mailboxes for quantity 1; any other quantity projects nothing.
+  const seats =
+    terms && Number.isSafeInteger(item.quantity)
+      ? mailboxSeatsForQuantity(terms, item.quantity!)
+      : null;
   const periodStart = dateOf(item.current_period_start);
   const periodEnd = dateOf(item.current_period_end);
   if (
@@ -345,6 +458,10 @@ export function projectMailboxSubscription(
     quotaScope: terms.quotaScope ?? "mailbox",
     includedMailboxes: mailboxIncludedSeats(terms),
     extraUnitAmount: terms.extraUnitAmount ?? null,
+    planCode: terms.planCode ?? null,
+    inboundDeliveriesPerPeriod: terms.inboundDeliveriesPerPeriod ?? null,
+    inboundBytesPerPeriod: terms.inboundBytesPerPeriod ?? null,
+    outboundBytesPerPeriod: terms.outboundBytesPerPeriod ?? null,
     periodStart,
     periodEnd,
     stripeCustomerId: owner.customerId,
@@ -483,6 +600,8 @@ export async function createMailboxCheckoutSession(
     !Number.isSafeInteger(input.seats) ||
     input.seats < mailboxIncludedSeats(terms) ||
     input.seats > 10000 ||
+    // A plan sells exactly its mailboxes; more means the next plan, not more units.
+    (terms.planCode !== undefined && input.seats !== mailboxIncludedSeats(terms)) ||
     (input.trialDays !== undefined &&
       (!Number.isSafeInteger(input.trialDays) || input.trialDays < 0 || input.trialDays > 30)) ||
     !/^[\x21-\x7e]{1,255}$/.test(input.idempotencyKey) ||
@@ -512,7 +631,7 @@ export async function createMailboxCheckoutSession(
           : {}),
       },
       ...(input.trialDays ? { payment_method_collection: "always" as const } : {}),
-      line_items: [{ price: terms.priceId, quantity: input.seats }],
+      line_items: [{ price: terms.priceId, quantity: mailboxStripeQuantity(terms, input.seats) }],
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
       automatic_tax: { enabled: input.automaticTax ?? false },

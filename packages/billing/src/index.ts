@@ -29,6 +29,7 @@ export {
   isStandaloneMailboxPrice,
   MAILBOX_CHECKOUT_METADATA_KEY,
   MAILBOX_CUSTOMER_METADATA_KEY,
+  MAILBOX_PLAN_CODES,
   MAILBOX_SERVICE,
   MAILBOX_SERVICE_METADATA_KEY,
   MailboxBillingError,
@@ -36,10 +37,13 @@ export {
   type MailboxCatalog,
   type MailboxCheckoutInput,
   type MailboxCheckoutReadbackInput,
+  type MailboxPlanCode,
   type MailboxPriceTerms,
   type MailboxSubscriptionProjection,
   mailboxCheckoutSessionMatches,
   mailboxIncludedSeats,
+  mailboxSeatsForQuantity,
+  mailboxStripeQuantity,
   projectMailboxSubscription,
   recoverMailboxCheckoutSession,
 } from "./mailbox.js";
@@ -64,9 +68,12 @@ export {
   resolveMailboxCustomer,
 } from "./mailbox-lifecycle.js";
 export {
+  changeMailboxPlan,
   type MailboxManagementDeps,
   type MailboxManagementInput,
   type MailboxManagementResult,
+  type MailboxPlanChangeInput,
+  type MailboxPlanChangeResult,
   manageMailboxSubscription,
 } from "./mailbox-management.js";
 export {

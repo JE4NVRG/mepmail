@@ -39,6 +39,10 @@ export const mailboxCheckouts = pgTable(
     quotaScope: text("quota_scope").$type<"mailbox" | "team">().notNull().default("mailbox"),
     includedMailboxes: integer("included_mailboxes").notNull().default(1),
     extraUnitAmount: integer("extra_unit_amount"),
+    planCode: text("plan_code").$type<"solo" | "duo" | "equipe">(),
+    inboundDeliveriesPerPeriod: integer("inbound_deliveries_per_period"),
+    inboundBytesPerPeriod: bigint("inbound_bytes_per_period", { mode: "number" }),
+    outboundBytesPerPeriod: bigint("outbound_bytes_per_period", { mode: "number" }),
     /** Free trial the Checkout was opened with (0 = none); decided when the lease is created. */
     trialDays: integer("trial_days").notNull().default(0),
     successUrl: text("success_url").notNull(),
@@ -77,6 +81,10 @@ export const mailboxCheckouts = pgTable(
     check(
       "mailbox_checkouts_terms_check",
       sql`${t.quotaScope} in ('mailbox','team') and ${t.includedMailboxes} between 1 and 10000 and (${t.extraUnitAmount} is null or ${t.extraUnitAmount} > 0) and ${t.trialDays} between 0 and 30 and ${t.seats} >= ${t.includedMailboxes}`,
+    ),
+    check(
+      "mailbox_checkouts_plan_check",
+      sql`(${t.planCode} is null or ${t.planCode} in ('solo','duo','equipe')) and (${t.inboundDeliveriesPerPeriod} is null or ${t.inboundDeliveriesPerPeriod} between 0 and 10000000) and (${t.inboundBytesPerPeriod} is null or ${t.inboundBytesPerPeriod} between 0 and 10995116277760) and (${t.outboundBytesPerPeriod} is null or ${t.outboundBytesPerPeriod} between 0 and 10995116277760)`,
     ),
     check(
       "mailbox_checkouts_ready_check",
