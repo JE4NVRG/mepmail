@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest of the Microsoft Store build. pack.ps1 fills the double-brace tokens:
+  identity values come from Partner Center (Product identity page) through
+  identity.json, the version from tauri.conf.json. The executable is the
+  store flavour of the app (Cargo feature "store", src/packaged.rs); see
+  pack.ps1 for the build command. No double hyphens in this comment: XML
+  forbids them there.
+  Application Id "App", TaskId and the execution alias are referenced by the
+  Rust code: change them together.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap3 desktop rescap">
+
+  <Identity
+    Name="{{IDENTITY_NAME}}"
+    Publisher="{{PUBLISHER}}"
+    Version="{{VERSION}}"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <!-- Must equal the name reserved in Partner Center. -->
+    <DisplayName>MepMail</DisplayName>
+    <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Correio, the MepMail inbox for people and their AI agents.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="pt-BR" />
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App" Executable="mepmail-correio.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="MepMail"
+        Description="Correio, the MepMail inbox for people and their AI agents."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Square71x71Logo="Assets\Square71x71Logo.png" ShortName="MepMail" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- mepmail://mail/... and mepmail://open (src/deeplink.rs). -->
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="mepmail">
+            <uap:DisplayName>MepMail</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
+        <!-- Stable command for agent configs (the MCP bridge), see agents.rs. -->
+        <uap3:Extension Category="windows.appExecutionAlias" Executable="mepmail-correio.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="mepmail-correio.exe" />
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
+        <!-- "Iniciar com o Windows" in the tray; off until the user turns it on. -->
+        <desktop:Extension Category="windows.startupTask" Executable="mepmail-correio.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="MepMailCorreioStartup" Enabled="false" DisplayName="MepMail" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <Capability Name="internetClient" />
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

@@ -1,9 +1,12 @@
 /**
  * End to end against Stripe TEST mode, skipped unless STRIPE_E2E_KEY holds a
- * test-mode key (sk_test_/rk_test_). Uses an in-memory database, never a real
- * one. Creates its own test product and prices, and archives them at the end.
+ * test-mode key (sk_test_/rk_test_) or STRIPE_E2E_TRANSPORT=cli routes the
+ * requests through the paired Stripe CLI (sandbox only). Uses an in-memory
+ * database, never a real one. Creates its own test product and prices, and
+ * archives them at the end.
  *
  *   STRIPE_E2E_KEY=... npx vitest run test/mailbox-standalone.stripe-e2e.test.ts
+ *   STRIPE_E2E_TRANSPORT=cli npx vitest run test/mailbox-standalone.stripe-e2e.test.ts
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -15,15 +18,21 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { MailboxCatalog, MailboxPriceTerms } from "../src/mailbox.js";
 import { applyMailboxSubscription, beginMailboxCheckout } from "../src/mailbox-lifecycle.js";
 import { repriceMailboxAddOnsWithoutSending } from "../src/mailbox-reprice.js";
+import { stripeCliHttpClient } from "./stripe-cli-transport.js";
 
 const KEY = process.env.STRIPE_E2E_KEY ?? "";
-const enabled = /^(sk|rk)_test_/.test(KEY);
+const viaCli = process.env.STRIPE_E2E_TRANSPORT === "cli";
+const enabled = viaCli || /^(sk|rk)_test_/.test(KEY);
 const extension = fileURLToPath(new URL("../../db/mailbox-drizzle/", import.meta.url));
 const DAY = 86_400_000;
 
 describe.skipIf(!enabled)("standalone Correio against Stripe test mode", () => {
   // The describe body runs even when skipped: build the client only with a key.
-  const stripe = enabled ? new Stripe(KEY) : (null as unknown as Stripe);
+  const stripe = !enabled
+    ? (null as unknown as Stripe)
+    : viaCli
+      ? new Stripe("sk_test_via_cli", { httpClient: stripeCliHttpClient(), maxNetworkRetries: 0 })
+      : new Stripe(KEY);
   let db: Db;
   let close: () => Promise<void>;
   let product: Stripe.Product;

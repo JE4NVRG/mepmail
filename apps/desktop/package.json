@@ -1,6 +1,6 @@
 {
   "name": "@mepmail/desktop",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "private": true,
   "description": "MepMail Correio for Windows (Tauri 2): a native shell around the hosted Correio app",
   "license": "AGPL-3.0-only",

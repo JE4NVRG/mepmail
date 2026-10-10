@@ -7,15 +7,19 @@
 //! keep-in-tray, an unread badge, `mepmail://` deep links, links outside
 //! MepMail opened in the system browser, a `window.__MEPMAIL_DESKTOP__`
 //! marker the web app reads, the agents bridge (`bridge`, `agents`) and
-//! signed self-updates of the shell (`update`).
+//! signed self-updates of the shell (`update`). The Microsoft Store build
+//! (`--features store`) swaps the updater, autostart and toasts for their
+//! package equivalents (`packaged`).
 
 mod agents;
 mod badge;
 pub mod bridge;
 mod deeplink;
+#[cfg(feature = "store")]
+mod packaged;
 mod settings;
 mod tray;
-#[cfg(desktop)]
+#[cfg(all(desktop, not(feature = "store")))]
 mod update;
 
 use std::sync::Mutex;
@@ -174,7 +178,10 @@ fn bridge_script() -> String {
 fn build_main_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     let navigation_handle = app.handle().clone();
     let new_window_handle = app.handle().clone();
-    let window = WebviewWindowBuilder::new(app, MAIN_WINDOW, WebviewUrl::App("index.html".into()))
+    let builder = WebviewWindowBuilder::new(app, MAIN_WINDOW, WebviewUrl::App("index.html".into()));
+    #[cfg(feature = "store")]
+    let builder = builder.initialization_script(packaged::notification_shim());
+    let window = builder
         .title("MepMail Correio")
         .inner_size(1280.0, 840.0)
         .min_inner_size(900.0, 600.0)
@@ -254,6 +261,8 @@ fn reveal<R: Runtime>(window: &tauri::WebviewWindow<R>) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let start_hidden = std::env::args().any(|arg| arg == "--minimized");
+    #[cfg(feature = "store")]
+    let start_hidden = start_hidden || packaged::launched_at_startup();
     let mut builder = tauri::Builder::default();
     #[cfg(desktop)]
     {
@@ -272,26 +281,40 @@ pub fn run() {
                             & !tauri_plugin_window_state::StateFlags::VISIBLE,
                     )
                     .build(),
-            )
+            );
+    }
+    // The Store updates and starts the packaged app itself (see `packaged`).
+    #[cfg(all(desktop, not(feature = "store")))]
+    {
+        builder = builder
             .plugin(
                 tauri_plugin_autostart::Builder::new()
                     .args(["--minimized"])
                     .build(),
             )
-            .plugin(tauri_plugin_updater::Builder::new().build());
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_notification::init());
     }
+    #[cfg(not(feature = "store"))]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        agents::store_agent_key,
+        agents::has_agent_key,
+        agents::forget_agent_key,
+        agents::install_agent,
+    ]);
+    #[cfg(feature = "store")]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        agents::store_agent_key,
+        agents::has_agent_key,
+        agents::forget_agent_key,
+        agents::install_agent,
+        packaged::notify_native,
+    ]);
     builder
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(StartHidden(start_hidden))
-        .invoke_handler(tauri::generate_handler![
-            agents::store_agent_key,
-            agents::has_agent_key,
-            agents::forget_agent_key,
-            agents::install_agent,
-        ])
         .setup(|app| {
             app.manage(settings::SettingsState(Mutex::new(settings::load(
                 app.handle(),
@@ -302,6 +325,7 @@ pub fn run() {
                 tray::build(app)?;
                 deeplink::install(app)?;
                 badge::watch(app.handle().clone());
+                #[cfg(not(feature = "store"))]
                 update::start(app.handle().clone());
             }
             Ok(())
@@ -310,7 +334,7 @@ pub fn run() {
         .expect("error while building MepMail Correio")
         .run(|_handle, _event| {
             // A downloaded shell update installs as the app quits.
-            #[cfg(desktop)]
+            #[cfg(all(desktop, not(feature = "store")))]
             if let tauri::RunEvent::Exit = _event {
                 update::on_exit(_handle);
             }

@@ -2233,7 +2233,7 @@ dependencies = [
 
 [[package]]
 name = "mepmail-correio"
-version = "0.3.0"
+version = "1.0.0"
 dependencies = [
  "futures-util",
  "keyring",
@@ -2251,7 +2251,10 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
+ "tauri-winrt-notification",
  "tokio",
+ "windows",
+ "windows-future",
 ]
 
 [[package]]

@@ -1,3 +1,7 @@
 node_modules
 src-tauri/target
 src-tauri/gen/schemas
+# Store screenshots and the script that captures them from the local
+# /fixture-mail harness: local-only, regenerated per submission.
+msix/listing/screenshots
+msix/listing/store-shots.mjs

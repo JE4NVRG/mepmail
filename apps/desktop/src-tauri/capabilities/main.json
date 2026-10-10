@@ -13,6 +13,7 @@
     "allow-store-agent-key",
     "allow-has-agent-key",
     "allow-forget-agent-key",
-    "allow-install-agent"
+    "allow-install-agent",
+    "allow-notify-native"
   ]
 }

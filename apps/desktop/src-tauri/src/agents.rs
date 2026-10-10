@@ -143,15 +143,32 @@ pub fn forget_agent_key(mailbox_id: String) -> Result<(), String> {
     }
 }
 
-/// Where this executable is, as the agent config must launch it.
+/// Where this executable is, as the agent config must launch it. Installed
+/// from the Microsoft Store, the exe sits in a versioned folder under
+/// WindowsApps that other programs may not start and that moves with every
+/// update; the package's execution alias (AppxManifest.xml) is the stable
+/// name for it.
 fn bridge_command() -> Result<String, String> {
-    std::env::current_exe()
-        .map_err(|error| error.to_string())
-        .and_then(|path| {
-            path.to_str()
-                .map(str::to_string)
-                .ok_or("exe_path".to_string())
-        })
+    let exe = std::env::current_exe().map_err(|error| error.to_string())?;
+    let exe = exe.to_str().ok_or("exe_path".to_string())?.to_string();
+    if !is_packaged_path(&exe) {
+        return Ok(exe);
+    }
+    let local = env_dir("LOCALAPPDATA")?;
+    local
+        .join("Microsoft")
+        .join("WindowsApps")
+        .join(EXECUTION_ALIAS)
+        .to_str()
+        .map(str::to_string)
+        .ok_or("alias_path".to_string())
+}
+
+/// The `desktop:ExecutionAlias` of the Store package.
+const EXECUTION_ALIAS: &str = "mepmail-correio.exe";
+
+fn is_packaged_path(exe: &str) -> bool {
+    exe.to_ascii_lowercase().contains("\\windowsapps\\")
 }
 
 fn bridge_args(mailbox_id: &str) -> Vec<String> {
@@ -350,5 +367,15 @@ mod tests {
         );
         assert_eq!(root["mcpServers"]["mepmail-correio"]["args"][2], "abc");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn store_installs_are_recognized_by_their_folder() {
+        assert!(is_packaged_path(
+            "C:\\Program Files\\WindowsApps\\MepMail.Correio_1.0.0.0_x64__abc\\mepmail-correio.exe"
+        ));
+        assert!(!is_packaged_path(
+            "C:\\Users\\jean\\AppData\\Local\\MepMail Correio\\mepmail-correio.exe"
+        ));
     }
 }

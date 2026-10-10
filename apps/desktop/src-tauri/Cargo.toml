@@ -1,6 +1,6 @@
 [package]
 name = "mepmail-correio"
-version = "0.3.0"
+version = "1.0.0"
 description = "MepMail Correio for the desktop"
 authors = ["MepMail"]
 license = "AGPL-3.0-only"
@@ -33,6 +33,16 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 futures-util = "0.3"
 # Agent keys live in the Windows credential vault, never in config files.
 keyring = { version = "3", features = ["windows-native"] }
+
+[features]
+# The Microsoft Store build (MSIX, apps/desktop/msix): no self-updater, the
+# package's StartupTask and toast identity (src/packaged.rs).
+store = ["dep:windows", "dep:windows-future", "dep:tauri-winrt-notification"]
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", optional = true, features = ["ApplicationModel", "ApplicationModel_Activation", "Foundation"] }
+windows-future = { version = "0.3", optional = true }
+tauri-winrt-notification = { version = "0.8", optional = true }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2.5", features = ["deep-link"] }

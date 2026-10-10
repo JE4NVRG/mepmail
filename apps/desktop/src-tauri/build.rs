@@ -7,6 +7,8 @@ fn main() {
             "has_agent_key",
             "forget_agent_key",
             "install_agent",
+            // Store build only (src/packaged.rs); unregistered elsewhere.
+            "notify_native",
         ]),
     ))
     .expect("failed to run tauri-build");

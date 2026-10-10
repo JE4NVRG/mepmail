@@ -158,6 +158,41 @@ The installer is not code-signed yet: SmartScreen shows "Windows protected
 your PC" until it builds reputation (More info, Run anyway). A code-signing
 certificate or the Microsoft Store removes that; both are a cost Jean decides.
 
+## Microsoft Store (MSIX)
+
+The Store build is the same app packaged as MSIX. The Store signs MSIX
+packages itself, for free, so this channel needs no certificate (an EXE/MSI
+submission would need one from a Trusted Root CA, and Azure Artifact Signing
+is not offered in Brazil). Files are in `msix/`:
+
+- `AppxManifest.xml`: package manifest; `pack.ps1` fills the identity and the
+  version (tauri.conf.json `x.y.z` becomes `x.y.z.0`; the Store needs x ≥ 1).
+- `identity.json`: the three values from Partner Center > the app > Product
+  identity (`identityName`, `publisher`, `publisherDisplayName`). Without it
+  the package gets placeholders that Partner Center refuses.
+- `pack.ps1`: builds the store exe (`tauri build --no-bundle --features
+  store`) and packs `src-tauri/target/msix/MepMail-Correio_<version>_x64.msix`
+  with makeappx from the Windows SDK.
+- `listing/listing.md`: Store listing text in pt-BR and en-US;
+  `listing/screenshots` (local, not in git) holds 1920×1080 captures made from
+  the `/fixture-mail` harness with generic names.
+
+What the `store` feature changes (`src/packaged.rs`): no self-updater (the
+Store updates the app); "Iniciar com o Windows" uses the package StartupTask,
+and a start by that task stays in the tray; toasts are sent with the package
+AppUserModelID through `notify_native` and a `window.Notification` shim,
+because the notification plugin's bundle identifier is not the package's;
+agent configs point at the execution alias
+`%LOCALAPPDATA%\Microsoft\WindowsApps\mepmail-correio.exe`, since the exe
+folder under WindowsApps is versioned and protected. `mepmail://` comes from
+the manifest. Bump the version in the three files before each submission;
+the Store refuses a package that is not higher than the published one.
+
+Testing an MSIX before submitting needs Windows Developer Mode (then
+`Add-AppxPackage -Register src-tauri\target\msix\layout\AppxManifest.xml`) or
+a Store submission to a private audience. The Windows App Certification Kit
+(`appcert.exe`) needs an elevated prompt.
+
 ## First-run checklist
 
 - The window opens on the splash, then on the Correio sign-in or inbox.
@@ -225,7 +260,8 @@ certificate or the Microsoft Store removes that; both are a cost Jean decides.
      code-signing certificate for SmartScreen (a cost, Jean decides), start
      with Windows, close-to-tray option.
 3. 0.3: signed self-updates and the public download (done, see above).
-4. 0.4: offline reading cache and the Correio UI extracted into a shared
+4. 1.0: Microsoft Store (MSIX) build, see "Microsoft Store (MSIX)".
+5. Next: offline reading cache and the Correio UI extracted into a shared
    package loaded locally. The app stores reject plain web wrappers, so this
    is the step that unlocks Android and iOS builds from the same `src-tauri`.
 
