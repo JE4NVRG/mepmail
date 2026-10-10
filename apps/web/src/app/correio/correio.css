@@ -413,6 +413,19 @@
   color: var(--ms-violet);
 }
 
+.correio .correio-windows-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 20px;
+}
+
+.correio .correio-text-link-quiet {
+  color: var(--ms-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
 .correio .correio-integrations-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

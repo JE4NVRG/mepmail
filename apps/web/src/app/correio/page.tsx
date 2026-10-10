@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { PublicFooter, PublicHeader, type PublicSiteLabels } from "@/components/site-chrome";
+import { WINDOWS_INSTALLER_URL, WINDOWS_STORE_URL } from "@/lib/desktop-download";
 import { legalLinks } from "@/lib/legal-links";
 import { AgentDemo, type AgentDemoLabels } from "./agent-demo";
 import { LaunchPlanPreview } from "./launch-plan-preview";
@@ -85,9 +86,24 @@ export default async function CorreioPage() {
                 {t(mailOpen ? "release.heroNote" : "hero.note")}
               </p>
               <p className="correio-status">{t(mailOpen ? "release.heroStatus" : "hero.status")}</p>
-              <a className="correio-text-link" href="/desktop/correio/windows">
-                {t("plans.windows")} <span aria-hidden="true">↓</span>
-              </a>
+              {/* The Store copy is signed by Microsoft and updated by the Store; the direct
+                  installer stays for PCs where the Store is blocked. */}
+              <div className="correio-windows-links">
+                <a
+                  className="correio-text-link"
+                  href={WINDOWS_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {t("plans.windows")} <span aria-hidden="true">↗</span>
+                </a>
+                <a
+                  className="correio-text-link correio-text-link-quiet"
+                  href={WINDOWS_INSTALLER_URL}
+                >
+                  {t("plans.windowsInstaller")}
+                </a>
+              </div>
             </div>
 
             <AgentDemo labels={t.raw("demo") as AgentDemoLabels} />

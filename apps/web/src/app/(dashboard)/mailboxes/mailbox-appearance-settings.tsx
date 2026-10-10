@@ -6,6 +6,7 @@ import { type ReactNode, useEffect, useId, useState } from "react";
 import { Select } from "@/components/select";
 import { Switch } from "@/components/switch";
 import { isDesktop } from "@/lib/desktop-bridge";
+import { WINDOWS_STORE_URL } from "@/lib/desktop-download";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { noticesWanted, writeNoticePreference } from "@/lib/mailbox-notifications";
 import type { CorreioPrefs } from "@/lib/mailbox-preferences";
@@ -149,7 +150,7 @@ export function MailboxAppearanceSettings({
           {
             key: "windows",
             label: t("guideWindows"),
-            run: () => window.location.assign("/desktop/correio/windows"),
+            run: () => window.open(WINDOWS_STORE_URL, "_blank", "noopener,noreferrer"),
           },
         ]
       : []),

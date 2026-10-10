@@ -145,7 +145,8 @@
       "body": "Solo: 1 caixa por US$ 2,90 por mês (R$ 14,90). Duo: 3 caixas por US$ 5,90 (R$ 29,90). Equipe: 10 caixas por US$ 12,90 (R$ 64,90). Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios e sem precisar de plano de Envio. Comece com 7 dias grátis; o cartão é obrigatório.",
       "cta": "Assinar o Correio"
     },
-    "windows": "Baixar o app para Windows"
+    "windows": "Instalar o app para Windows pela Microsoft Store",
+    "windowsInstaller": "ou baixe o instalador"
   },
   "comparison": {
     "caption": "O que muda entre as duas modalidades",

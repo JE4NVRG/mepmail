@@ -145,7 +145,8 @@
       "body": "Solo: 1 mailbox for US$ 2.90 a month. Duo: 3 mailboxes for US$ 5.90. Equipe: 10 mailboxes for US$ 12.90. Each plan's storage, sends and received messages are shared by its mailboxes, with up to 3 domains and no Send plan needed. Start with 7 days free; the card is required.",
       "cta": "Subscribe to Mail"
     },
-    "windows": "Download the Windows app"
+    "windows": "Get the Windows app on the Microsoft Store",
+    "windowsInstaller": "or download the installer"
   },
   "comparison": {
     "caption": "What changes between the two options",

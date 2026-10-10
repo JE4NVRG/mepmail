@@ -23,6 +23,20 @@
   },
   "releases": [
     {
+      "version": "0.107",
+      "date": "2026-10-10",
+      "title": "Get the Windows app on the Microsoft Store",
+      "summary": "Correio and the account menu now point to the MepMail app on the Microsoft Store, signed by Microsoft and updated by the Store; the direct installer stays as the alternative.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "The account menu, Preferences and the Correio page open the MepMail app on the Microsoft Store; the direct installer is still offered, and apps installed from it keep updating themselves."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.106",
       "date": "2026-10-10",
       "title": "The Windows app is now called MepMail",

@@ -28,6 +28,20 @@
   },
   "releases": [
     {
+      "version": "0.107",
+      "date": "2026-10-10",
+      "title": "Instale o app para Windows pela Microsoft Store",
+      "summary": "O Correio e o menu da conta agora apontam para o app MepMail na Microsoft Store, assinado pela Microsoft e atualizado pela loja; o instalador direto continua como alternativa.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "O menu da conta, as Preferências e a página do Correio abrem o app MepMail na Microsoft Store; o instalador direto continua disponível, e os apps instalados por ele seguem se atualizando sozinhos."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.106",
       "date": "2026-10-10",
       "title": "O app para Windows agora se chama MepMail",

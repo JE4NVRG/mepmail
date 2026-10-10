@@ -8,6 +8,7 @@ import { useDismiss } from "@/components/popover-menu";
 import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
 import { isDesktop } from "@/lib/desktop-bridge";
+import { WINDOWS_STORE_URL } from "@/lib/desktop-download";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import type { CorreioPrefs } from "@/lib/mailbox-preferences";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
@@ -191,11 +192,13 @@ export function MailboxAccountMenu({
             <a
               role="menuitem"
               className="ms-menu-item"
-              href="/desktop/correio/windows"
+              href={WINDOWS_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={() => setOpen(false)}
             >
               {t("app.windowsApp")}
-              <span aria-hidden="true">↓</span>
+              <span aria-hidden="true">↗</span>
             </a>
           ) : null}
           {isDesktop() ? null : (
