@@ -108,6 +108,11 @@ export function formatUsd(value: number | null, locale: string): string {
   return `US$ ${formatted}`;
 }
 
+/** A reais price for Brazil, always with cents ("R$ 14,90"; "R$ 14.90" in en). */
+export function formatBrl(value: number, locale: string): string {
+  return `R$ ${value.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 /**
  * Volume label for the table's first column and the calculator, derived from the
  * row's own `volume` so the label and the prices it heads can never drift apart:

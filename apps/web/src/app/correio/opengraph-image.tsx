@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { getLocale, getTranslations } from "next-intl/server";
 import { formatUsd } from "@/lib/landing-pricing";
-import { LAUNCH_OFFER } from "@/lib/launch-offer";
+import { CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 import type { AgentDemoLabels } from "./agent-demo";
 
 /**
@@ -26,8 +26,13 @@ const INK = {
 export default async function Image() {
   const [t, locale] = await Promise.all([getTranslations("correio"), getLocale()]);
   const demo = t.raw("demo") as AgentDemoLabels;
+  const standaloneOpen =
+    process.env.MAILBOX_EARLY_ACCESS_OPEN === "true" &&
+    process.env.MAILBOX_STANDALONE_OPEN === "true";
   const price = formatUsd(
-    Math.min(...LAUNCH_OFFER.mailboxes.map((box) => box.monthlyCents)) / 100,
+    (standaloneOpen
+      ? CORREIO_FROM_CENTS
+      : Math.min(...LAUNCH_OFFER.mailboxes.map((box) => box.monthlyCents))) / 100,
     locale,
   );
 

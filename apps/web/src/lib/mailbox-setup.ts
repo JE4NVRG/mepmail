@@ -7,7 +7,8 @@ export type MailboxSetupPlan = {
 };
 
 export type MailboxSetupReceiving = {
-  state: "unknown" | "needs_mx" | "needs_activation" | "ready";
+  /** "paused": the domain is verified but the team's receiving is paused by its plan's quota. */
+  state: "unknown" | "needs_mx" | "needs_activation" | "ready" | "paused";
   mxHost: string | null;
 };
 
@@ -24,6 +25,13 @@ export type MailboxPurchaseOffer = {
   extraUnitAmount?: number | null;
   localCurrency?: { currency: string; unitAmount: number; extraUnitAmount: number | null } | null;
   trialDays?: number;
+  /** A Correio plan (Solo, Duo, Equipe; lib/mailbox-plans), or null for older offers. */
+  plan?: {
+    code: string;
+    inboundDeliveriesPerPeriod: number;
+    inboundBytesPerPeriod: number;
+    outboundBytesPerPeriod: number;
+  } | null;
 };
 type LegacyOffer = Omit<MailboxPurchaseOffer, "offerId">;
 type OfferCatalog = {
@@ -74,7 +82,10 @@ export function formatMailboxPrice(amount: number, currency: string, locale: str
 export function mailboxSetupReceiving(
   receiving: MailboxSetupReceiving | undefined,
 ): MailboxSetupReceiving {
-  if (!receiving || !["unknown", "needs_mx", "needs_activation", "ready"].includes(receiving.state))
+  if (
+    !receiving ||
+    !["unknown", "needs_mx", "needs_activation", "ready", "paused"].includes(receiving.state)
+  )
     return { state: "unknown", mxHost: null };
   return { state: receiving.state, mxHost: receiving.mxHost ?? null };
 }

@@ -2,7 +2,7 @@
   "meta": {
     "title": "Pricing: every MepMail plan on one page",
     "description": "MepMail pricing in USD: free with 100 emails/day, Pro from US$ 20 for 110,000 emails/month and Scale up to 2.75M. Overage per 1,000 and no lock-in.",
-    "launchDescription": "Send Pro 110K: US$ 29/month; US$ 20 only on the first monthly bill for customers who never paid MepMail, or US$ 290/year upfront. Mail is a per-mailbox add-on available on every paying Send plan."
+    "launchDescription": "Send Pro 110K: US$ 29/month; US$ 20 only on the first monthly bill for customers who never paid MepMail, or US$ 290/year upfront. Mail plans start at US$ 2.90 a month, with or without Send."
   },
   "eyebrow": "Pricing",
   "title": "Pick your volume. <highlight>Pay for what you send.</highlight>",
@@ -73,7 +73,7 @@
     "yearQuota": "The 110,000 allowance renews monthly, without an accumulated annual balance. Sending stops at the monthly quota; annual billing does not include metered overage.",
     "preserved": "Existing contracts keep their prices and limits; there is no automatic migration. System remains exempt.",
     "mailCta": "Explore Mail",
-    "mailAccess": "Mail is paid separately per mailbox and available on every paying Send plan, including Pro 110K during its US$ 20 first month."
+    "mailAccess": "Mail is paid separately, with or without a Send plan: Solo US$ 2.90, Duo US$ 5.90 or Equipe US$ 12.90 a month."
   },
   "launchFaq": [
     {
@@ -102,27 +102,29 @@
     "title": "Email inboxes for people and AI agents",
     "body": "An add-on to your paying Send plan: every mailbox has an address on your domain, its own inbox, outbox and permissions. Person or agent, the same price.",
     "perMonth": "/month per mailbox",
-    "perMonthIncluded": "/month · 3 mailboxes",
-    "extraMailbox": "Extra mailbox: {price} a month",
     "sharedStorage": "{size} GiB shared by the mailboxes",
     "sharedSends": "{count, number} outbound deliveries a month, shared",
     "trial": "7 days free, card required",
-    "localPrice": "In Brazil, charged in reais: R$ 64.90 a month",
     "storage": "{size} GiB of storage",
     "sends": "{count, number} outbound deliveries a month",
     "agents": "Agents connect through the Mail MCP, with optional approval before each send",
     "note": "Requires an active paying Send plan. Each mailbox needs a verified domain and receiving turned on.",
-    "noteStandalone": "Without a Send plan, Mail costs US$ 12.90 a month with 3 mailboxes and US$ 3.90 for each extra one, with 7 days free (card required). With a paying Send plan, single mailboxes cost US$ 5.90 or US$ 9.90. Each mailbox needs a verified domain and receiving turned on.",
-    "bodyStandalone": "Mailboxes with an address on your domain and their own inbox, outbox and permissions. Subscribe to Mail on its own, with 3 mailboxes included, or add single mailboxes to a paying Send plan. Person or agent, the same price.",
-    "withoutSending": "No Send plan needed",
-    "withSending": "With a paying Send plan",
+    "noteStandalone": "Upgrade at any time: the difference is charged now. Move to a smaller plan when your usage fits it, with no refund for the current month. Contracts bought before keep their price and terms. Each mailbox needs a verified domain and receiving turned on.",
+    "bodyStandalone": "Three plans for mailboxes on your domain, each with its own inbox, outbox and permissions. With or without a Send plan; person or agent, the same price. Each plan's limits are shared by the team's mailboxes.",
     "domains": "Up to {count} domains",
     "subscribe": "Subscribe to Mail",
     "cta": "Explore Mail",
     "names": {
       "gib1": "1 GiB mailbox",
       "gib10": "10 GiB mailbox",
-      "solo": "Mail on its own"
-    }
+      "solo": "Solo",
+      "duo": "Duo",
+      "equipe": "Equipe"
+    },
+    "perMonthPlan": "/month",
+    "planMailboxes": "{count, plural, one {# mailbox} other {# mailboxes}}",
+    "planInbound": "{count, number} messages received a month",
+    "planLocal": "In Brazil, charged in reais: {price} a month",
+    "noteLimits": "Limits renew every billing month and nothing is charged beyond the plan. Sending stops at the plan's limit; receiving pauses past the limit plus a 10% margin, or with storage full, until the next month or an upgrade. Stored mail stays readable."
   }
 }

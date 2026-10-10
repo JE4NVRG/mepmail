@@ -22,6 +22,7 @@ import {
 import { MAILBOX_NEW_MAIL_EVENT, useMailboxLive } from "@/lib/mailbox-live";
 import { type NewMailNotice, newMailNotices, rememberUnread } from "@/lib/mailbox-new-mail";
 import { noticesWanted } from "@/lib/mailbox-notifications";
+import { MAILBOX_OPEN_LICENSE_EVENT } from "@/lib/mailbox-plans";
 import { applyCorreioTheme, useCorreioPrefs } from "@/lib/mailbox-preferences";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
@@ -48,7 +49,7 @@ import { MailboxServicePanel } from "./mailbox-service-panel";
 import { MailboxSetupDialog } from "./mailbox-setup-dialog";
 import { MailboxSignatureDialog } from "./mailbox-signature-dialog";
 import { MailboxTeamAgentKeysDialog } from "./mailbox-team-agent-keys";
-import { MailboxUsagePanel } from "./mailbox-usage-panel";
+import { MailboxReceivingBanner, MailboxUsagePanel } from "./mailbox-usage-panel";
 import styles from "./mailboxes.module.css";
 
 type Outputs = inferRouterOutputs<AppRouter>["mailboxes"];
@@ -450,6 +451,18 @@ export function MailboxesView({
   const [signatureDialogId, setSignatureDialogId] = useState<string | null>(null);
   const [activityDialogId, setActivityDialogId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("appearance");
+  // "Fazer upgrade" and "Ver planos" anywhere in the Correio open the license
+  // dialog, on the plan they name when they name one.
+  useEffect(() => {
+    const onOpenLicense = (event: Event) => {
+      const offerId = (event as CustomEvent<{ offerId: string | null }>).detail?.offerId ?? null;
+      setLicenseOfferId(offerId);
+      if (layout !== "app") setSettingsTab("license");
+      openLicense((request) => request + 1);
+    };
+    window.addEventListener(MAILBOX_OPEN_LICENSE_EVENT, onOpenLicense);
+    return () => window.removeEventListener(MAILBOX_OPEN_LICENSE_EVENT, onOpenLicense);
+  }, [layout]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   // The phone drawer with the rail (mailboxes and folders).
   const [railOpen, setRailOpen] = useState(false);
@@ -1325,6 +1338,7 @@ export function MailboxesView({
       </header>
       {layout === "app" ? (
         <>
+          <MailboxReceivingBanner enabled={mayUseMail && !!registry.data} />
           {licenseOpenRequest > 0 || (service.data && !service.data.active) ? (
             <div className={styles.appLicense}>
               <MailboxServicePanel
@@ -1509,7 +1523,7 @@ export function MailboxesView({
                 openRequest={licenseOpenRequest}
                 initialOfferId={licenseOfferId}
               />
-              <MailboxUsagePanel mailboxId={null} />
+              <MailboxUsagePanel mailboxId={null} detailed />
             </section>
           ) : (
             <section className={styles.settingsSection} aria-label={t("app.tabs.migration")}>

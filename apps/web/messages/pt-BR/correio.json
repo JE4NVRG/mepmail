@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Correio: caixas de e-mail para agentes de IA | MepMail",
-    "description": "Dê ao seu agente de IA uma caixa de e-mail no seu domínio. Ele lê, rascunha e responde por MCP, e você aprova antes de enviar. US$ 12,90 por mês com 3 caixas (R$ 64,90 no Brasil), com 7 dias grátis."
+    "description": "Dê ao seu agente de IA uma caixa de e-mail no seu domínio. Ele lê, rascunha e responde por MCP, e você aprova antes de enviar. Planos a partir de US$ 2,90 por mês (R$ 14,90 no Brasil), com 7 dias grátis."
   },
   "hero": {
     "eyebrow": "Correio · caixas de e-mail para agentes de IA",
@@ -135,14 +135,14 @@
     "mail": {
       "label": "Para suas conversas e agentes",
       "title": "Envio + Correio",
-      "body": "Seu plano de Envio pode receber o adicional Correio: US$ 5,90 por caixa de 1 GiB ou US$ 9,90 por caixa de 10 GiB, ao mês. Entrada, saída e permissões por caixa. Humano ou agente: o mesmo preço.",
+      "body": "Com um plano pago de Envio você escolhe os mesmos planos do Correio. Caixas já contratadas como adicional do Envio mantêm preço e condições.",
       "note": "Oferta preparada para lançamento. A contratação pública do Correio ainda não está aberta; esta prévia não libera acesso."
     },
-    "terms": "Correio é pago à parte. Aumento de caixas após pagamento confirmado; redução na próxima renovação, preservando as mensagens. Você pode continuar usando só Envio.",
+    "terms": "Correio é pago à parte. O upgrade é cobrado na hora; um plano menor vale quando o seu uso couber nele, sem reembolso do mês em curso. As mensagens guardadas são preservadas. Você pode continuar usando só Envio.",
     "solo": {
-      "label": "Só caixas",
-      "title": "Correio",
-      "body": "US$ 12,90 por mês com 3 caixas, sem plano de Envio (R$ 64,90 no Brasil): elas dividem 10 GiB e 2.000 entregas de saída por mês, com até 3 domínios. Cada caixa extra custa US$ 3,90 por mês (R$ 19,90). Humano ou agente, o mesmo preço. Comece com 7 dias grátis; o cartão é obrigatório.",
+      "label": "Planos do Correio",
+      "title": "Solo, Duo ou Equipe",
+      "body": "Solo: 1 caixa por US$ 2,90 por mês (R$ 14,90). Duo: 3 caixas por US$ 5,90 (R$ 29,90). Equipe: 10 caixas por US$ 12,90 (R$ 64,90). Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios e sem precisar de plano de Envio. Comece com 7 dias grátis; o cartão é obrigatório.",
       "cta": "Assinar o Correio"
     },
     "windows": "Baixar o app para Windows"
@@ -223,7 +223,7 @@
     "items": [
       {
         "q": "Preciso de um plano de Envio para usar o Correio?",
-        "a": "Não. Sozinho, o Correio custa US$ 12,90 por mês com 3 caixas (US$ 3,90 por caixa extra; no Brasil, R$ 64,90 e R$ 19,90), que dividem 10 GiB e 2.000 entregas de saída por mês, com até 3 domínios e 7 dias grátis. Com um plano de Envio acima de US$ 20/mês pelo preço regular, inclusive o Pro 110K, cada caixa sai por US$ 5,90 (1 GiB) ou US$ 9,90 (10 GiB). Assinaturas existentes são preservadas sem migração automática. A licença interna System continua isenta, com 50 GiB por caixa e sem limites comerciais de caixas ou entregas."
+        "a": "Não. Os planos do Correio funcionam sozinhos: Solo US$ 2,90 por mês com 1 caixa, Duo US$ 5,90 com 3 ou Equipe US$ 12,90 com 10 (no Brasil, R$ 14,90, R$ 29,90 e R$ 64,90), com 7 dias grátis. Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios. Assinaturas existentes mantêm as condições, sem migração automática. A licença interna System continua isenta, com 50 GiB por caixa e sem limites comerciais de caixas ou entregas."
       },
       {
         "q": "Comprei um domínio. Já posso criar qualquer endereço?",
@@ -243,7 +243,7 @@
       },
       {
         "q": "Posso trazer as mensagens do Gmail ou de outro provedor?",
-        "a": "Vincular um domínio não transfere mensagens antigas nem migra automaticamente uma conta Gmail ou Outlook. A mudança de provedor e a importação precisam de uma jornada própria, ainda não disponível publicamente no Correio. Preserve o acesso ao provedor atual durante a transição."
+        "a": "Vincular um domínio não transfere mensagens antigas. No Correio você pode importar o histórico de uma caixa por IMAP do Gmail, do Outlook ou de outro provedor, com senha de app quando o provedor exigir; arquivos MBOX/PST ainda não são importados. Preserve o acesso ao provedor atual durante a transição."
       },
       {
         "q": "O Correio funciona com agentes por MCP?",
@@ -251,30 +251,32 @@
       },
       {
         "q": "Como vou acessar no computador e no celular?",
-        "a": "Pelo painel web do MepMail no navegador. Estamos preparando a experiência responsiva para computador e celular. Aplicativos nativos para Windows e iOS ainda não estão publicados."
+        "a": "No navegador, pelo painel do MepMail, no computador e no celular, ou com o app para Windows que você baixa nesta página. O app para iOS ainda não foi publicado."
       }
     ]
   },
   "close": {
     "eyebrow": "O próximo endereço pode ser do seu agente",
     "title": "Sua empresa conversa. Você acompanha.",
-    "body": "O Correio está aberto a todos. Adicione caixas para você, sua equipe ou seu agente pelo painel: US$ 12,90 por mês com 3 caixas (R$ 64,90 no Brasil), com 7 dias grátis.",
+    "body": "O Correio está aberto a todos. Adicione caixas para você, sua equipe ou seu agente pelo painel: planos a partir de US$ 2,90 por mês (R$ 14,90 no Brasil), com 7 dias grátis.",
     "primary": "Conhecer planos de Envio",
     "secondary": "Ler a documentação do Correio"
   },
   "release": {
-    "heroNote": "Só o Correio: US$ 12,90 por mês com 3 caixas (R$ 64,90 no Brasil) e 7 dias grátis. Junto de um plano pago de Envio, caixas avulsas a partir de US$ 5,90. Contrate pelo painel.",
+    "heroNote": "Planos do Correio a partir de US$ 2,90 por mês (R$ 14,90 no Brasil): Solo com 1 caixa, Duo com 3 ou Equipe com 10, com 7 dias grátis. Com ou sem Envio. Contrate pelo painel.",
     "heroStatus": "Aberto a todos, com ou sem plano de Envio",
     "setupFirstTitle": "Escolha como assinar",
-    "setupFirst": "Sem plano de Envio, o Correio custa US$ 12,90 por mês com 3 caixas (US$ 3,90 por caixa extra; no Brasil, R$ 64,90 e R$ 19,90), que dividem 10 GiB e 2.000 entregas de saída, com até 3 domínios. Com um plano pago de Envio (acima de US$ 20/mês, inclusive o Pro 110K de US$ 29), as caixas saem por US$ 5,90 (1 GiB) ou US$ 9,90 (10 GiB). Contratos existentes são preservados.",
+    "setupFirst": "Escolha Solo (1 caixa, US$ 2,90 por mês), Duo (3, US$ 5,90) ou Equipe (10, US$ 12,90); no Brasil, R$ 14,90, R$ 29,90 ou R$ 64,90. As caixas dividem armazenamento, envios e mensagens recebidas do plano, com até 3 domínios. Não é preciso ter Envio, e os contratos existentes são preservados.",
     "restStatus": "Disponível para caixas ativadas",
-    "plansBody": "Envio cuida dos e-mails da aplicação e das campanhas. Correio dá caixas com entrada e saída para pessoas e agentes: assine sozinho ou junto de um plano pago de Envio, pagando menos por caixa.",
+    "plansBody": "Envio cuida dos e-mails da aplicação e das campanhas. Correio dá caixas com entrada e saída para pessoas e agentes em três planos, com ou sem plano de Envio.",
     "mailNote": "Contrate pelo painel. Cada caixa ainda precisa de domínio verificado, DNS/MX e ativação do recebimento.",
     "previewStatus": "Comparação de preços · contrate pelo painel",
     "annualConsumption": "As franquias renovam mensalmente, sem acumular saldo anual. Armazenamento é contínuo; as mensagens não são apagadas na virada do período.",
     "monthlyNote": "Esta comparação não contrata nenhum plano. O painel confirma contrato, cobrança e ativação de cada caixa.",
     "checkAccess": "Abrir o Correio no painel",
-    "availability": "Disponível sozinho ou com qualquer plano pago de Envio"
+    "availability": "Disponível sozinho ou com qualquer plano pago de Envio",
+    "plansNote": "O Correio não exige plano de Envio. Caixas contratadas antes como adicional do Envio mantêm o preço, e as assinaturas de Envio são preservadas.",
+    "billingPlans": "Plano de Envio + um plano do Correio"
   },
   "demo": {
     "label": "Exemplo de uso · conteúdo fictício",
@@ -299,6 +301,6 @@
     "badge": "Novo · Correio",
     "title": "Caixas de e-mail para seus agentes de IA",
     "body": "Eles leem, rascunham e respondem por MCP. Você aprova antes de enviar.",
-    "price": "A partir de {price} por caixa ao mês"
+    "price": "A partir de {price} por mês"
   }
 }

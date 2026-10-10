@@ -8,7 +8,7 @@ import {
   SignupLink,
 } from "@/components/site-chrome";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
-import { formatUsd } from "@/lib/landing-pricing";
+import { formatBrl, formatUsd } from "@/lib/landing-pricing";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import "../landing.css";
@@ -70,7 +70,7 @@ export default async function PricingPage() {
   const mailOpen = process.env.MAILBOX_EARLY_ACCESS_OPEN === "true";
   // Correio on its own, without an Envio plan (checkout stays server-gated).
   const standaloneOpen = mailOpen && process.env.MAILBOX_STANDALONE_OPEN === "true";
-  const solo = LAUNCH_OFFER.standaloneMailbox;
+  const correioPlans = LAUNCH_OFFER.correioPlans;
   const allPlans = plansWithCopy(
     l.raw("plans.items") as PlanCopy[],
     launchOfferEnabled,
@@ -157,45 +157,49 @@ export default async function PricingPage() {
               <h2 id="pricing-correio-title">{t("correio.title")}</h2>
               <p>{t(standaloneOpen ? "correio.bodyStandalone" : "correio.body")}</p>
               <div className={`gtm-split${standaloneOpen ? " gtm-split-three" : ""}`}>
-                {standaloneOpen ? (
-                  <article className="ms-card gtm-plan" key={solo.id}>
-                    <h3>{t("correio.names.solo")}</h3>
-                    <p className="gtm-price">
-                      {formatUsd(solo.monthlyCents / 100, locale)}
-                      <span>{t("correio.perMonthIncluded")}</span>
-                    </p>
-                    <ul className="gtm-points">
-                      <li>{t("correio.trial")}</li>
-                      <li>{t("correio.withoutSending")}</li>
-                      <li>{t("correio.sharedStorage", { size: solo.storageGiB })}</li>
-                      <li>{t("correio.sharedSends", { count: solo.monthlyRecipientDeliveries })}</li>
-                      <li>
-                        {t("correio.extraMailbox", {
-                          price: formatUsd(solo.extraMonthlyCents / 100, locale),
-                        })}
-                      </li>
-                      <li>{t("correio.domains", { count: solo.domains })}</li>
-                      <li>{t("correio.agents")}</li>
-                      <li>{t("correio.localPrice")}</li>
-                    </ul>
-                  </article>
-                ) : null}
-                {LAUNCH_OFFER.mailboxes.map((box) => (
-                  <article className="ms-card gtm-plan" key={box.id}>
-                    <h3>{t(`correio.names.${box.id}`)}</h3>
-                    <p className="gtm-price">
-                      {formatUsd(box.monthlyCents / 100, locale)}
-                      <span>{t("correio.perMonth")}</span>
-                    </p>
-                    <ul className="gtm-points">
-                      {standaloneOpen ? <li>{t("correio.withSending")}</li> : null}
-                      <li>{t("correio.storage", { size: box.storageGiB })}</li>
-                      <li>{t("correio.sends", { count: box.monthlyRecipientDeliveries })}</li>
-                      <li>{t("correio.agents")}</li>
-                    </ul>
-                  </article>
-                ))}
+                {standaloneOpen
+                  ? correioPlans.map((plan) => (
+                      <article className="ms-card gtm-plan" key={plan.id}>
+                        <h3>{t(`correio.names.${plan.id}`)}</h3>
+                        <p className="gtm-price">
+                          {formatUsd(plan.monthlyCents / 100, locale)}
+                          <span>{t("correio.perMonthPlan")}</span>
+                        </p>
+                        <ul className="gtm-points">
+                          <li>{t("correio.planMailboxes", { count: plan.mailboxes })}</li>
+                          <li>{t("correio.sharedStorage", { size: plan.storageGiB })}</li>
+                          <li>
+                            {t("correio.sharedSends", { count: plan.monthlyRecipientDeliveries })}
+                          </li>
+                          <li>
+                            {t("correio.planInbound", { count: plan.monthlyInboundMessages })}
+                          </li>
+                          <li>{t("correio.domains", { count: LAUNCH_OFFER.correioDomains })}</li>
+                          <li>{t("correio.trial")}</li>
+                          <li>
+                            {t("correio.planLocal", {
+                              price: formatBrl(plan.brlMonthlyCents / 100, locale),
+                            })}
+                          </li>
+                        </ul>
+                      </article>
+                    ))
+                  : LAUNCH_OFFER.mailboxes.map((box) => (
+                      <article className="ms-card gtm-plan" key={box.id}>
+                        <h3>{t(`correio.names.${box.id}`)}</h3>
+                        <p className="gtm-price">
+                          {formatUsd(box.monthlyCents / 100, locale)}
+                          <span>{t("correio.perMonth")}</span>
+                        </p>
+                        <ul className="gtm-points">
+                          <li>{t("correio.storage", { size: box.storageGiB })}</li>
+                          <li>{t("correio.sends", { count: box.monthlyRecipientDeliveries })}</li>
+                          <li>{t("correio.agents")}</li>
+                        </ul>
+                      </article>
+                    ))}
               </div>
+              {standaloneOpen ? <p className="gtm-note">{t("correio.noteLimits")}</p> : null}
               <p className="gtm-note">
                 {t(standaloneOpen ? "correio.noteStandalone" : "correio.note")}
               </p>

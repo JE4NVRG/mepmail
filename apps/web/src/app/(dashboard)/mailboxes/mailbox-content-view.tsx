@@ -45,6 +45,7 @@ import {
   readNoticePreference,
   writeNoticePreference,
 } from "@/lib/mailbox-notifications";
+import { openMailboxLicense } from "@/lib/mailbox-plans";
 import { useCorreioPrefs } from "@/lib/mailbox-preferences";
 import { withQuickReply } from "@/lib/mailbox-quick-replies";
 import {
@@ -587,7 +588,9 @@ function DraftDialog({
                   ? "draftConflict"
                   : code === "FORBIDDEN"
                     ? "accessLost"
-                    : "draftError",
+                    : code === "PRECONDITION_FAILED" && (cause as Error)?.message === "quota"
+                      ? "draftQuota"
+                      : "draftError",
               ),
             );
           } finally {
@@ -2286,6 +2289,20 @@ export function MailboxContentView({
       );
     } catch (cause) {
       const code = (cause as { data?: { code?: string } })?.data?.code;
+      // The plan's limit for this period (recipients, bytes sent or storage):
+      // nothing went out, the draft stays, and the plans are one click away.
+      if (code === "PRECONDITION_FAILED" && (cause as Error)?.message === "quota") {
+        attempted.current.delete(key);
+        toast(t("planQuota"), "danger", {
+          action: { label: t("viewPlans"), run: () => openMailboxLicense() },
+        });
+        if (mounted.current)
+          setSendStates((states) => {
+            const { [key]: _blocked, ...rest } = states;
+            return rest;
+          });
+        return;
+      }
       // The free trial's sending limit: nothing went out and the draft stays as
       // it is, ready to send once the limit lifts.
       if (code === "PRECONDITION_FAILED" && (cause as Error)?.message === "trial_limit") {

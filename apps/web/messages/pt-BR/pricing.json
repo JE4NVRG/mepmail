@@ -2,7 +2,7 @@
   "meta": {
     "title": "Preços: todos os planos MepMail em uma página",
     "description": "Preços do MepMail em USD: grátis com 100 e-mails/dia, Pro a partir de US$ 20 para 110.000 e-mails/mês e Scale até 2,75M. Excedente por 1.000 e sem fidelidade.",
-    "launchDescription": "Envio Pro 110K: US$ 29/mês; US$ 20 só na primeira mensalidade de quem nunca pagou o MepMail, ou US$ 290/ano antecipados. Correio é um adicional por caixa, disponível em todos os planos pagos de Envio."
+    "launchDescription": "Envio Pro 110K: US$ 29/mês; US$ 20 só na primeira mensalidade de quem nunca pagou o MepMail, ou US$ 290/ano antecipados. Os planos do Correio começam em US$ 2,90 por mês, com ou sem Envio."
   },
   "eyebrow": "Preços",
   "title": "Escolha o volume. <highlight>Pague pelo que envia.</highlight>",
@@ -73,7 +73,7 @@
     "yearQuota": "A franquia de 110 mil renova mensalmente, sem saldo anual acumulado. O envio para na cota mensal; o anual não inclui cobrança de excedentes.",
     "preserved": "Contratos existentes mantêm seus valores e limites; não há migração automática. System continua isento.",
     "mailCta": "Conhecer o Correio",
-    "mailAccess": "Correio é pago à parte por caixa e está disponível em todos os planos pagos de Envio, inclusive no Pro 110K durante a primeira mensalidade de US$ 20."
+    "mailAccess": "O Correio é pago à parte, com ou sem plano de Envio: Solo US$ 2,90, Duo US$ 5,90 ou Equipe US$ 12,90 por mês."
   },
   "launchFaq": [
     {
@@ -102,27 +102,29 @@
     "title": "Caixas de e-mail para pessoas e agentes de IA",
     "body": "Um adicional do seu plano pago de Envio: cada caixa tem endereço no seu domínio, entrada, saída e permissões próprias. Humano ou agente, o mesmo preço.",
     "perMonth": "/mês por caixa",
-    "perMonthIncluded": "/mês · 3 caixas",
-    "extraMailbox": "Caixa extra: {price} por mês",
     "sharedStorage": "{size} GiB divididos entre as caixas",
     "sharedSends": "{count, number} entregas de saída por mês, divididas",
     "trial": "7 dias grátis, com cartão",
-    "localPrice": "No Brasil, cobrado em reais: R$ 64,90 por mês",
     "storage": "{size} GiB de armazenamento",
     "sends": "{count, number} entregas de saída por mês",
     "agents": "Agentes conectam pelo MCP do Correio, com aprovação opcional antes de cada envio",
     "note": "Exige um plano pago de Envio ativo. Cada caixa precisa de domínio verificado e do recebimento ativado.",
-    "noteStandalone": "Sem plano de Envio, o Correio custa US$ 12,90 por mês com 3 caixas e US$ 3,90 por caixa extra (no Brasil, R$ 64,90 e R$ 19,90), com 7 dias grátis (cartão obrigatório). Com um plano pago de Envio, caixas avulsas saem por US$ 5,90 ou US$ 9,90. Cada caixa precisa de domínio verificado e do recebimento ativado.",
-    "bodyStandalone": "Caixas com endereço no seu domínio, entrada, saída e permissões próprias. Assine só o Correio, com 3 caixas incluídas, ou junte caixas avulsas a um plano pago de Envio. Humano ou agente, o mesmo preço.",
-    "withoutSending": "Sem precisar de plano de Envio",
-    "withSending": "Com um plano pago de Envio",
+    "noteStandalone": "Faça upgrade quando quiser: a diferença é cobrada na hora. Mude para um plano menor quando o seu uso couber nele, sem reembolso do mês em curso. Contratos anteriores mantêm preço e condições. Cada caixa precisa de domínio verificado e do recebimento ativado.",
+    "bodyStandalone": "Três planos de caixas no seu domínio, cada uma com entrada, saída e permissões próprias. Com ou sem plano de Envio; humano ou agente, o mesmo preço. Os limites de cada plano são divididos entre as caixas da equipe.",
     "domains": "Até {count} domínios",
     "subscribe": "Assinar o Correio",
     "cta": "Conhecer o Correio",
     "names": {
       "gib1": "Caixa 1 GiB",
       "gib10": "Caixa 10 GiB",
-      "solo": "Só o Correio"
-    }
+      "solo": "Solo",
+      "duo": "Duo",
+      "equipe": "Equipe"
+    },
+    "perMonthPlan": "/mês",
+    "planMailboxes": "{count, plural, one {# caixa} other {# caixas}}",
+    "planInbound": "{count, number} mensagens recebidas por mês",
+    "planLocal": "No Brasil, cobrado em reais: {price} por mês",
+    "noteLimits": "Os limites renovam a cada mês de cobrança e nada é cobrado além do plano. O envio para no limite do plano; o recebimento pausa depois do limite mais 10% de margem, ou com o armazenamento cheio, até o mês seguinte ou um upgrade. As mensagens guardadas continuam legíveis."
   }
 }

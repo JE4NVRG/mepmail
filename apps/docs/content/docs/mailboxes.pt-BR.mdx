@@ -3,10 +3,9 @@ title: Caixas para pessoas e agentes
 description: Separe uma caixa pessoal ou de agente do envio de campanhas e mensagens da aplicação.
 ---
 
-**Estado do piloto:** o Correio está sendo validado separadamente do Envio.
-Receber mensagens reais e enviar respostas exige uma instalação habilitada e
-um domínio verificado. Uma caixa no painel, um rascunho salvo ou um Checkout
-concluído não confirma que esses serviços estão ativos.
+Receber mensagens reais exige um domínio verificado com o MX apontando para o
+MepMail e o recebimento ativado nele. Criar uma caixa, salvar um rascunho ou
+concluir um Checkout não altera o MX do domínio.
 
 ## Escolha o serviço
 
@@ -15,12 +14,38 @@ Use **Correio** para um endereço no seu domínio: conversas pessoais, uma caixa
 da empresa ou um agente que lê e responde mensagens. Você pode continuar usando
 Envio sem criar uma caixa.
 
-As licenças de Correio são contadas por caixa. Pessoas e agentes seguem o mesmo
-preço por caixa e modelo de licença; armazenamento e franquia de envio vêm dos
-termos registrados do serviço. Consulte o contrato atual no painel. Franquias
-do piloto não são preços públicos.
-A franquia de envio conta destinatários por caixa e período da licença. Na
-admissão do envio, uma mensagem para três endereços distintos reserva três unidades.
+## Planos e limites
+
+O Correio é vendido em três planos mensais, com ou sem plano de Envio. Pessoas e
+agentes custam o mesmo.
+
+| Plano | Caixas | Armazenamento | Destinatários enviados por mês | Mensagens recebidas por mês | Preço por mês |
+| --- | --- | --- | --- | --- | --- |
+| Solo | 1 | 1 GiB | 500 | 2.000 | US$ 2,90 (R$ 14,90 no Brasil) |
+| Duo | 3 | 3 GiB | 2.000 | 5.000 | US$ 5,90 (R$ 29,90) |
+| Equipe | 10 | 10 GiB | 6.000 | 10.000 | US$ 12,90 (R$ 64,90) |
+
+- Todos os limites são divididos entre as caixas da equipe e renovam a cada mês de
+  cobrança. Nada é cobrado além do plano.
+- **O envio** conta destinatários: uma mensagem para três endereços distintos conta
+  três. O plano também limita os bytes enviados (tamanho da mensagem vezes os
+  destinatários): 256 MiB, 1 GiB e 3 GiB por mês. Passado qualquer limite, o envio
+  é recusado com `quota` até o mês de cobrança seguinte ou um upgrade.
+- **O recebimento** conta cada mensagem recebida uma vez, não importa quantas caixas
+  ou aliases da equipe ela alcance; a reentrega da mesma mensagem não conta de novo,
+  e apagar mensagens não devolve a franquia. O plano também limita os bytes
+  recebidos: 512 MiB, 1,5 GiB e 3 GiB por mês.
+- **O recebimento pausa** depois do limite de recebidas mais 10% de margem, ou com o
+  armazenamento cheio. Os remetentes recebem então uma devolução permanente de
+  "caixa indisponível" (5.1.1) e nada é guardado. O recebimento volta no mês de
+  cobrança seguinte ou após um upgrade (só com upgrade, se o armazenamento estiver
+  cheio). O que foi aceito antes da pausa é sempre guardado.
+- **Com o armazenamento cheio**, leitura, busca, download de anexos e a API continuam
+  funcionando; novos rascunhos e envios são recusados até haver espaço.
+- **Teste grátis:** a primeira compra começa com 7 dias grátis; o cartão é
+  obrigatório. Durante o teste, a equipe envia para no máximo 50 destinatários por
+  dia e 200 no total.
+- Contratos anteriores a estes planos mantêm preço e condições.
 
 ## Prepare uma caixa
 
@@ -41,15 +66,17 @@ de Envio existentes não dão acesso a esta API de caixas.
 
 Quando a gestão de assinatura estiver habilitada para a instalação e o contrato,
 proprietários e administradores da organização podem usar os controles no painel
-de Correio. Se estiverem indisponíveis, consulte o responsável pela instalação.
-Se já houver uma licença do piloto, confira os termos atuais dela em vez de
-iniciar outra compra para contornar controles ou transporte indisponíveis.
+de Correio. Se estiverem indisponíveis, consulte o responsável pela instalação;
+não inicie outra compra para contornar controles indisponíveis.
 
-- **Aumentar:** solicite a nova quantidade e use **Concluir pagamento do aumento**
-  quando oferecido. As novas unidades só ficam disponíveis após pagamento
-  confirmado; a quantidade atual permanece igual enquanto ele estiver pendente.
-- **Reduzir:** programe a quantidade para a próxima renovação. O painel mostra
-  a data de aplicação; a quantidade atual continua disponível até lá.
+- **Trocar de plano:** um plano maior vale na hora e cobra agora a diferença
+  proporcional; durante o teste grátis, encerra o teste e cobra o novo plano. Um
+  plano menor vale na hora quando suas caixas, o armazenamento e o uso deste mês
+  couberem nele, sem reembolso do mês em curso. A data de cobrança não muda.
+- **Contratos anteriores aos planos:** solicite a nova quantidade e use **Concluir
+  pagamento do aumento** quando oferecido (as novas unidades só ficam disponíveis
+  após pagamento confirmado), ou programe uma redução para a próxima renovação.
+  Também é possível passar esse contrato para um plano.
 - **Cancelar a renovação:** o cancelamento confirmado vale ao fim do período
   indicado e remove uma redução futura programada. Use **Retomar renovação**
   antes dessa data quando a opção estiver disponível.
@@ -58,9 +85,8 @@ iniciar outra compra para contornar controles ou transporte indisponíveis.
   cobrança ou assinatura para contornar o estado.
 
 As mensagens armazenadas são preservadas; leitura e exportação continuam
-dependendo do acesso atual à caixa. Alterar a licença de Correio não muda o
-plano de Envio nem habilita recebimento e transporte. Mantenha as verificações
-de prontidão do piloto descritas acima.
+dependendo do acesso atual à caixa. Trocar o plano de Correio não muda o plano de
+Envio nem ativa o recebimento.
 
 ## Conecte um agente por MCP
 
@@ -135,7 +161,7 @@ com o UUID da mensagem recebida; o servidor preserva as referências da resposta
 Para editar um rascunho existente, informe seu `id`, o mesmo ID em `sourceItemId`
 e a última `expectedRevision`. Um conflito exige recarregar antes de editar.
 
-A lista aceita 1–20 destinatários. O piloto permite até 10 anexos, cada um com
+A lista aceita 1–20 destinatários. Rascunhos desta API aceitam até 10 anexos, cada um com
 no máximo 256 KiB, e mensagem MIME final de até 1 MiB. Um upload usa
 `{ "filename": "nota.txt", "base64": "..." }`; anexos preservados usam os índices
 da mensagem de origem. As duas listas vazias continuam obrigatórias sem anexos.

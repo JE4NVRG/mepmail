@@ -10,27 +10,55 @@ export const LAUNCH_OFFER = {
     { id: "gib10", storageGiB: 10, monthlyCents: 990, monthlyRecipientDeliveries: 2000 },
   ],
   /**
-   * Correio without Envio (Jean, 2026-10-10): a base with 3 mailboxes that share
-   * the storage and outbound allowance, extra mailboxes on top, a 7-day free trial
-   * with the card, and the same terms in reais in Brazil. Display only.
+   * Correio plans (Jean, 2026-10-10), sold to every team with or without Envio: a fixed
+   * number of mailboxes and team-wide monthly allowances (storage, outbound recipients,
+   * inbound messages), the same plan in reais in Brazil, a 7-day free trial with the
+   * card on a first purchase and no automatic overage. Display only: the billing
+   * catalog sells them.
    */
-  standaloneMailbox: {
-    id: "solo",
-    storageGiB: 10,
-    monthlyCents: 1290,
-    monthlyRecipientDeliveries: 2000,
-    domains: 3,
-    includedMailboxes: 3,
-    extraMonthlyCents: 390,
-    trialDays: 7,
-    brl: { monthlyCents: 6490, extraMonthlyCents: 1990 },
-  },
+  correioPlans: [
+    {
+      id: "solo",
+      mailboxes: 1,
+      storageGiB: 1,
+      monthlyCents: 290,
+      brlMonthlyCents: 1490,
+      monthlyRecipientDeliveries: 500,
+      monthlyInboundMessages: 2000,
+    },
+    {
+      id: "duo",
+      mailboxes: 3,
+      storageGiB: 3,
+      monthlyCents: 590,
+      brlMonthlyCents: 2990,
+      monthlyRecipientDeliveries: 2000,
+      monthlyInboundMessages: 5000,
+    },
+    {
+      id: "equipe",
+      mailboxes: 10,
+      storageGiB: 10,
+      monthlyCents: 1290,
+      brlMonthlyCents: 6490,
+      monthlyRecipientDeliveries: 6000,
+      monthlyInboundMessages: 10000,
+    },
+  ],
+  correioTrialDays: 7,
+  /** Domains a team with an active Correio subscription may verify on the free Envio plan. */
+  correioDomains: 3,
   internal: { storageGiBPerMailbox: 50 },
 } as const;
 
 export type LaunchBillingPeriod = "month" | "year";
 export type LaunchMailboxTierId = (typeof LAUNCH_OFFER.mailboxes)[number]["id"];
 export type LaunchMailboxPlan = (typeof LAUNCH_OFFER.mailboxes)[number];
+export type CorreioPlan = (typeof LAUNCH_OFFER.correioPlans)[number];
+/** The smallest Correio plan price, for "from" claims. */
+export const CORREIO_FROM_CENTS = Math.min(
+  ...LAUNCH_OFFER.correioPlans.map((plan) => plan.monthlyCents),
+);
 
 export function parseLaunchMailboxQuantity(value: string): number | null {
   if (!/^\d+$/.test(value)) return null;

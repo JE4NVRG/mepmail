@@ -91,6 +91,8 @@ vi.mock("@/lib/trpc", () => ({
         "checkout",
         "manage",
         "verifyReceiving",
+        "changePlan",
+        "usage",
       ].map((kind) => [
         kind,
         {
@@ -100,6 +102,7 @@ vi.mock("@/lib/trpc", () => ({
             ...options,
           }),
           queryKey: () => ["mailboxes", kind],
+          pathKey: () => ["mailboxes", kind],
           mutationOptions: () => ({ kind }),
         },
       ]),

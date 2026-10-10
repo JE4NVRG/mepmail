@@ -16,7 +16,7 @@ import {
 import { StackLogoRow } from "@/components/stack-logos";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
 import { formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricing";
-import { LAUNCH_OFFER } from "@/lib/launch-offer";
+import { CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
 import { AgentDemo, type AgentDemoLabels } from "./correio/agent-demo";
@@ -75,8 +75,12 @@ export default async function RootPage() {
   const launchOfferEnabled = process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
   // The Correio section and announcement follow the same switch as /correio.
   const mailOpen = process.env.MAILBOX_EARLY_ACCESS_OPEN === "true";
+  // Open to every team, Correio starts at its smallest plan; otherwise at the add-on.
+  const standaloneOpen = mailOpen && process.env.MAILBOX_STANDALONE_OPEN === "true";
   const mailFrom = formatUsd(
-    Math.min(...LAUNCH_OFFER.mailboxes.map((box) => box.monthlyCents)) / 100,
+    (standaloneOpen
+      ? CORREIO_FROM_CENTS
+      : Math.min(...LAUNCH_OFFER.mailboxes.map((box) => box.monthlyCents))) / 100,
     locale,
   );
   const priceRows = priceRowsForOffer(launchOfferEnabled);

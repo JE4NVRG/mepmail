@@ -74,9 +74,9 @@ export function MailboxSetupDialog({
     existingMailbox ?? null,
   );
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
-  const [activationMessage, setActivationMessage] = useState<"ready" | "pending" | "error" | null>(
-    null,
-  );
+  const [activationMessage, setActivationMessage] = useState<
+    "ready" | "pending" | "paused" | "error" | null
+  >(null);
   const domain = options.domains.find((entry) => entry.id === domainId);
   const receivingQuery = useQuery(
     trpc.mailboxes.receiving.queryOptions(
@@ -150,7 +150,9 @@ export function MailboxSetupDialog({
       setActivationMessage(
         result.mailboxes.find((box) => box.id === saved.id)?.receiving_state === "ready"
           ? "ready"
-          : "pending",
+          : (result.state as string) === "paused"
+            ? "paused"
+            : "pending",
       );
     } catch {
       setActivationMessage("error");
@@ -355,7 +357,9 @@ export function MailboxSetupDialog({
                   ? "activationError"
                   : activationMessage === "ready"
                     ? "activationReady"
-                    : "activationPending",
+                    : activationMessage === "paused"
+                      ? "activationPaused"
+                      : "activationPending",
               )}
             </p>
           ) : null}

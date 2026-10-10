@@ -28,6 +28,29 @@
   },
   "releases": [
     {
+      "version": "0.105",
+      "date": "2026-10-10",
+      "title": "Planos do Correio: Solo, Duo e Equipe",
+      "summary": "O Correio agora tem três planos mensais, com ou sem Envio: Solo com 1 caixa por US$ 2,90, Duo com 3 por US$ 5,90 e Equipe com 10 por US$ 12,90, limites divididos, 7 dias grátis e sem cobrança excedente.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Três planos com limites mensais da equipe: armazenamento, destinatários enviados e mensagens recebidas, divididos entre as caixas. No Brasil, R$ 14,90, R$ 29,90 e R$ 64,90.",
+            "Troca de plano pelo Correio: o upgrade vale na hora e cobra a diferença; um plano menor vale quando o uso couber, sem reembolso do mês.",
+            "Medidores de uso de cada limite no Correio, com a data de renovação e um botão de upgrade, e um aviso quando o recebimento pausa."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Depois do limite de recebidas mais 10% de margem, ou com o armazenamento cheio, o recebimento pausa até o mês seguinte ou um upgrade; as mensagens guardadas continuam legíveis.",
+            "Contratos anteriores aos planos mantêm preço e condições, e podem passar para um plano quando você quiser."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.104",
       "date": "2026-10-10",
       "title": "Endereços do Correio enviam pelo Correio",

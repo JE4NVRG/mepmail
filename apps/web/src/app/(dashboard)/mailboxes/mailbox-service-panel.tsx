@@ -1,6 +1,7 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { TRPCClientError } from "@trpc/client";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { DOCS_URL } from "@/lib/docs-links";
@@ -13,12 +14,19 @@ import {
   validMailboxPlanSeats,
 } from "@/lib/mailbox-plan-terms";
 import {
+  defaultMailboxPlanOffer,
+  MAILBOX_PLAN_NAMES,
+  mailboxPlanDirection,
+  mailboxPlanOffers,
+} from "@/lib/mailbox-plans";
+import {
   formatMailboxPrice,
   formatMailboxStorage,
   mailboxHasUnlimitedSeats,
   mailboxOfferSelection,
 } from "@/lib/mailbox-setup";
 import { useTRPC } from "@/lib/trpc";
+import { MailboxPlanCards } from "./mailbox-plan-cards";
 import styles from "./mailbox-service-panel.module.css";
 
 export function safeMailboxPaymentUrl(value: string): string | null {
@@ -73,6 +81,9 @@ export function MailboxServicePanel({
   );
   const checkout = useMutation(trpc.mailboxes.checkout.mutationOptions());
   const management = useMutation(trpc.mailboxes.manage.mutationOptions());
+  const changePlan = useMutation(trpc.mailboxes.changePlan.mutationOptions());
+  const queries = useQueryClient();
+  const planChangeTitleId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const alive = useRef(false);
   const returnChecked = useRef(false);
@@ -99,9 +110,18 @@ export function MailboxServicePanel({
   } | null>(null);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(initialOfferId);
   const [attemptedOfferId, setAttemptedOfferId] = useState<string | null>(null);
+  // Trocar de plano: the card chosen (not the current one) and the outcome.
+  const [changeTarget, setChangeTarget] = useState<string | null>(null);
+  const [planNotice, setPlanNotice] = useState<{
+    tone: "status" | "alert";
+    text: string;
+  } | null>(null);
   useEffect(() => {
     if (openRequest > 0) {
       setSelectedOfferId(initialOfferId);
+      // "Fazer upgrade" from the usage screens opens on that plan's change.
+      setChangeTarget(initialOfferId);
+      setPlanNotice(null);
       setOpen(true);
     }
   }, [openRequest, initialOfferId]);
@@ -207,9 +227,17 @@ export function MailboxServicePanel({
     (systemLicense || (!!billing.data && !billing.isPending && !billing.isError));
   const plan = loaded ? service.data : undefined;
   const systemUnlimited = systemLicense && mailboxHasUnlimitedSeats(plan);
+  // The Correio plans (Solo, Duo, Equipe): when the catalog sells them, a new
+  // purchase picks one of them (cards) instead of a price and a quantity.
+  const planChoices =
+    loaded && !systemIdentified ? mailboxPlanOffers(billing.data?.offers ?? []) : [];
+  const planSelectedId =
+    planChoices.length && !planChoices.some((entry) => entry.offerId === selectedOfferId)
+      ? (defaultMailboxPlanOffer(planChoices, billing.data?.defaultOfferId)?.offerId ?? null)
+      : selectedOfferId;
   const selection = mailboxOfferSelection(
     loaded && !systemIdentified ? billing.data : undefined,
-    selectedOfferId,
+    planSelectedId,
     attemptedOfferId,
   );
   const offer = selection.offer;
@@ -217,6 +245,8 @@ export function MailboxServicePanel({
   const minSeats = offer ? mailboxPlanMinimumSeats(offer) : 1;
   const maxSeats = offer ? mailboxPlanMaximumSeats(offer) : 10000;
   const bundle = !!offer && isMailboxBundle(offer);
+  // A plan always buys exactly its mailboxes (the server fixes the quantity).
+  const planPurchase = !!offer?.plan;
   useEffect(() => {
     setSeats((current) => {
       const value = Math.trunc(Number(current));
@@ -295,7 +325,44 @@ export function MailboxServicePanel({
     manage.requestedSeats === managementReadback?.requestedSeats
       ? paymentUrl
       : null;
-  const busy = !systemIdentified && (checkout.isPending || management.isPending);
+  const busy =
+    !systemIdentified && (checkout.isPending || management.isPending || changePlan.isPending);
+  const currentPlanCode = manage?.currentPlan ?? null;
+  const planChange = manage?.canChangePlan ? mailboxPlanOffers(manage.planOffers) : [];
+  const currentPlanOffer = planChange.find((entry) => entry.current) ?? null;
+  const planTarget =
+    planChange.find((entry) => entry.offerId === changeTarget && !entry.current) ?? null;
+  const planDirection = planTarget
+    ? mailboxPlanDirection(currentPlanOffer, plan?.seats ?? 0, planTarget)
+    : null;
+  async function runChangePlan() {
+    if (!planTarget || busy || systemIdentified) return;
+    const name = MAILBOX_PLAN_NAMES[planTarget.plan.code];
+    setPlanNotice(null);
+    try {
+      const result = await changePlan.mutateAsync({ offerId: planTarget.offerId });
+      if (!alive.current) return;
+      setChangeTarget(null);
+      setPlanNotice({
+        tone: "status",
+        text: t(result.direction === "upgrade" ? "plans.upgraded" : "plans.downgraded", { name }),
+      });
+    } catch (error) {
+      if (!alive.current) return;
+      const reason = error instanceof TRPCClientError ? error.message : "";
+      setPlanNotice({
+        tone: "alert",
+        text:
+          reason === "plan_too_small"
+            ? t("plans.tooSmall", { name })
+            : reason === "pending"
+              ? t("plans.pending")
+              : t("plans.changeError"),
+      });
+    }
+    await Promise.allSettled([service.refetch(), billing.refetch()]);
+    void queries.invalidateQueries({ queryKey: trpc.mailboxes.usage.pathKey() });
+  }
   const changeSeats = Number(managedSeats);
   const maxChangeSeats = manage?.canIncrease ? 10000 : (plan?.seats ?? 0);
   const validChange =
@@ -335,6 +402,9 @@ export function MailboxServicePanel({
       <div className={styles.summary}>
         <div className={styles.identity}>
           <strong>{t("title")}</strong>
+          {currentPlanCode && !systemLicense ? (
+            <span className={styles.planName}>{MAILBOX_PLAN_NAMES[currentPlanCode]}</span>
+          ) : null}
           {plan ? (
             <span className={styles.badge} data-active={plan.active}>
               {systemLicense ? systemT("licenseLabel") : t(`status.${status}`)}
@@ -412,6 +482,7 @@ export function MailboxServicePanel({
         <dialog
           ref={dialog}
           className={styles.dialog}
+          data-wide={planChoices.length > 0 || planChange.length > 0 || undefined}
           aria-labelledby={titleId}
           onClose={() => {
             setSelectedOfferId(null);
@@ -442,7 +513,9 @@ export function MailboxServicePanel({
             <p className={styles.hint}>
               {systemLicense
                 ? systemT("licenseBody")
-                : t(bundle ? "equalPriceBundle" : "equalPrice")}
+                : planChoices.length || currentPlanCode
+                  ? t("plans.intro")
+                  : t(bundle ? "equalPriceBundle" : "equalPrice")}
             </p>
           ) : null}
           {!loaded ? (
@@ -583,10 +656,75 @@ export function MailboxServicePanel({
                   </a>
                 </div>
               ) : null}
+              {planChange.length ? (
+                <section className={styles.planChange} aria-labelledby={planChangeTitleId}>
+                  <h3 className={styles.sectionTitle} id={planChangeTitleId}>
+                    {t(currentPlanCode ? "plans.changeTitle" : "plans.migrateTitle")}
+                  </h3>
+                  <p className={styles.hint}>
+                    {t(currentPlanCode ? "plans.changeHint" : "plans.migrateHint")}
+                  </p>
+                  <MailboxPlanCards
+                    offers={planChange}
+                    selectedId={planTarget?.offerId ?? currentPlanOffer?.offerId ?? null}
+                    onSelect={(id) => {
+                      setPlanNotice(null);
+                      setChangeTarget(
+                        planChange.find((entry) => entry.offerId === id)?.current ? null : id,
+                      );
+                    }}
+                    label={t(currentPlanCode ? "plans.changeTitle" : "plans.migrateTitle")}
+                    disabled={busy}
+                  />
+                  {planTarget && planDirection ? (
+                    <div className={styles.notice} role="status">
+                      <p>
+                        {t(
+                          planDirection === "downgrade"
+                            ? "plans.downgradeTerms"
+                            : status === "trialing"
+                              ? "plans.upgradeTrialTerms"
+                              : "plans.upgradeTerms",
+                          { name: MAILBOX_PLAN_NAMES[planTarget.plan.code] },
+                        )}
+                      </p>
+                      <div className={styles.planActions}>
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-primary"
+                          disabled={busy}
+                          onClick={() => void runChangePlan()}
+                        >
+                          {changePlan.isPending
+                            ? t("plans.changing")
+                            : t(
+                                planDirection === "upgrade"
+                                  ? "plans.upgradeTo"
+                                  : "plans.downgradeTo",
+                                {
+                                  name: MAILBOX_PLAN_NAMES[planTarget.plan.code],
+                                },
+                              )}
+                        </button>
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-ghost"
+                          disabled={busy}
+                          onClick={() => setChangeTarget(null)}
+                        >
+                          {t("plans.keep")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                  {planNotice ? <p role={planNotice.tone}>{planNotice.text}</p> : null}
+                </section>
+              ) : null}
               {manage &&
               (manage.canReconcile || manage.canAdjust || manage.canCancel || manage.canResume) ? (
                 <div className={styles.management}>
-                  <p className={styles.hint}>{t("managementTerms")}</p>
+                  {/* Quantity terms belong to the older contracts; a plan changes plan instead. */}
+                  {!currentPlanCode ? <p className={styles.hint}>{t("managementTerms")}</p> : null}
                   {manage.canAdjust ? (
                     <form
                       onSubmit={(event) => {
@@ -700,7 +838,28 @@ export function MailboxServicePanel({
                   }}
                 >
                   <fieldset className={styles.purchase} disabled={checkout.isPending}>
-                    {selection.offers.length || selection.locked ? (
+                    {planPurchase ? (
+                      <>
+                        <MailboxPlanCards
+                          offers={
+                            selection.locked
+                              ? mailboxPlanOffers([{ ...offer, offerId: selection.offerId ?? "" }])
+                              : planChoices
+                          }
+                          selectedId={selection.offerId}
+                          onSelect={setSelectedOfferId}
+                          label={t("plans.choose")}
+                          disabled={selection.locked || lockedSeats !== null}
+                        />
+                        <p className={styles.hint}>
+                          {t(
+                            selection.locked || lockedSeats !== null
+                              ? "planLocked"
+                              : "plans.choiceHint",
+                          )}
+                        </p>
+                      </>
+                    ) : selection.offers.length || selection.locked ? (
                       <>
                         <label htmlFor={offerId}>
                           {t(bundle ? "planChoiceBundle" : "planChoice")}
@@ -744,91 +903,108 @@ export function MailboxServicePanel({
                         </p>
                       </>
                     ) : null}
-                    <label htmlFor={seatsId}>{t("quantity")}</label>
-                    <input
-                      id={seatsId}
-                      className="ms-input"
-                      type="number"
-                      inputMode="numeric"
-                      min={minSeats}
-                      max={maxSeats}
-                      step={1}
-                      required
-                      value={lockedSeats ?? seats}
-                      disabled={lockedSeats !== null}
-                      aria-describedby={seatsHintId}
-                      onChange={(event) => setSeats(event.target.value)}
-                      autoFocus
-                    />
-                    <p id={seatsHintId} className={styles.hint}>
-                      {lockedSeats !== null
-                        ? t("quantityLocked")
-                        : bundle && offer.extraUnitAmount
-                          ? t("quantityHintBundle", {
-                              included: minSeats,
-                              extra: t("priceInterval", {
+                    {!planPurchase ? (
+                      <>
+                        <label htmlFor={seatsId}>{t("quantity")}</label>
+                        <input
+                          id={seatsId}
+                          className="ms-input"
+                          type="number"
+                          inputMode="numeric"
+                          min={minSeats}
+                          max={maxSeats}
+                          step={1}
+                          required
+                          value={lockedSeats ?? seats}
+                          disabled={lockedSeats !== null}
+                          aria-describedby={seatsHintId}
+                          onChange={(event) => setSeats(event.target.value)}
+                          autoFocus
+                        />
+                        <p id={seatsHintId} className={styles.hint}>
+                          {lockedSeats !== null
+                            ? t("quantityLocked")
+                            : bundle && offer.extraUnitAmount
+                              ? t("quantityHintBundle", {
+                                  included: minSeats,
+                                  extra: t("priceInterval", {
+                                    amount: formatMailboxPrice(
+                                      offer.extraUnitAmount,
+                                      offer.currency,
+                                      locale,
+                                    ),
+                                    interval: t(`interval.${offer.interval}`),
+                                  }),
+                                })
+                              : t("quantityHint")}
+                        </p>
+                        <dl className={styles.offer}>
+                          <div>
+                            <dt>
+                              {t(bundle ? "bundlePrice" : "pricePerMailbox", { count: minSeats })}
+                            </dt>
+                            <dd>
+                              {t("priceInterval", {
                                 amount: formatMailboxPrice(
-                                  offer.extraUnitAmount,
+                                  offer.unitAmount,
                                   offer.currency,
                                   locale,
                                 ),
                                 interval: t(`interval.${offer.interval}`),
-                              }),
-                            })
-                          : t("quantityHint")}
-                    </p>
-                    <dl className={styles.offer}>
-                      <div>
-                        <dt>
-                          {t(bundle ? "bundlePrice" : "pricePerMailbox", { count: minSeats })}
-                        </dt>
-                        <dd>
-                          {t("priceInterval", {
-                            amount: formatMailboxPrice(offer.unitAmount, offer.currency, locale),
-                            interval: t(`interval.${offer.interval}`),
-                          })}
-                        </dd>
-                      </div>
-                      {bundle && offer.extraUnitAmount ? (
-                        <div>
-                          <dt>{t("extraMailbox")}</dt>
-                          <dd>
-                            {t("priceInterval", {
-                              amount: formatMailboxPrice(
-                                offer.extraUnitAmount,
-                                offer.currency,
-                                locale,
-                              ),
-                              interval: t(`interval.${offer.interval}`),
-                            })}
-                          </dd>
-                        </div>
-                      ) : null}
-                      <div>
-                        <dt>{t(offer.quotaScope === "team" ? "includedTeam" : "included")}</dt>
-                        <dd>
-                          {t(
-                            offer.quotaScope === "team" ? "includedTeamSummary" : "includedSummary",
-                            {
-                              storage: formatMailboxStorage(offer.storageBytesPerMailbox, locale),
-                              messages: offer.includedOutboundPerMailbox,
-                            },
-                          )}
-                        </dd>
-                      </div>
-                      <div className={styles.total}>
-                        <dt>{t("total", { count: validSeats ? quantity : 0 })}</dt>
-                        <dd>
-                          {total
-                            ? t("priceInterval", {
-                                amount: formatMailboxPrice(total.amount, total.currency, locale),
-                                interval: t(`interval.${offer.interval}`),
-                              })
-                            : "—"}
-                        </dd>
-                      </div>
-                    </dl>
-                    {localTotal ? (
+                              })}
+                            </dd>
+                          </div>
+                          {bundle && offer.extraUnitAmount ? (
+                            <div>
+                              <dt>{t("extraMailbox")}</dt>
+                              <dd>
+                                {t("priceInterval", {
+                                  amount: formatMailboxPrice(
+                                    offer.extraUnitAmount,
+                                    offer.currency,
+                                    locale,
+                                  ),
+                                  interval: t(`interval.${offer.interval}`),
+                                })}
+                              </dd>
+                            </div>
+                          ) : null}
+                          <div>
+                            <dt>{t(offer.quotaScope === "team" ? "includedTeam" : "included")}</dt>
+                            <dd>
+                              {t(
+                                offer.quotaScope === "team"
+                                  ? "includedTeamSummary"
+                                  : "includedSummary",
+                                {
+                                  storage: formatMailboxStorage(
+                                    offer.storageBytesPerMailbox,
+                                    locale,
+                                  ),
+                                  messages: offer.includedOutboundPerMailbox,
+                                },
+                              )}
+                            </dd>
+                          </div>
+                          <div className={styles.total}>
+                            <dt>{t("total", { count: validSeats ? quantity : 0 })}</dt>
+                            <dd>
+                              {total
+                                ? t("priceInterval", {
+                                    amount: formatMailboxPrice(
+                                      total.amount,
+                                      total.currency,
+                                      locale,
+                                    ),
+                                    interval: t(`interval.${offer.interval}`),
+                                  })
+                                : "—"}
+                            </dd>
+                          </div>
+                        </dl>
+                      </>
+                    ) : null}
+                    {localTotal && !planPurchase ? (
                       <p className={styles.hint}>
                         {t("localTotal", {
                           amount: t("priceInterval", {

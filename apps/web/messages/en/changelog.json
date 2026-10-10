@@ -23,6 +23,29 @@
   },
   "releases": [
     {
+      "version": "0.105",
+      "date": "2026-10-10",
+      "title": "Correio plans: Solo, Duo and Equipe",
+      "summary": "Correio now comes in three monthly plans, with or without Send: Solo with 1 mailbox for US$ 2.90, Duo with 3 for US$ 5.90 and Equipe with 10 for US$ 12.90, shared limits, 7 days free and no overage.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Three plans with team-wide monthly limits: storage, recipients sent and messages received, shared by the team's mailboxes. In Brazil R$ 14.90, R$ 29.90 and R$ 64.90.",
+            "Change plan from Correio: an upgrade applies at once and charges the difference; a smaller plan applies when your usage fits, without a refund for the month.",
+            "Usage meters for every limit in Correio, with the renewal date and an upgrade button, and a notice when receiving pauses."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Past the received limit plus a 10% margin, or with storage full, receiving pauses until the next month or an upgrade; stored mail stays readable.",
+            "Contracts bought before the plans keep their price and terms, and can move to a plan when you choose."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.104",
       "date": "2026-10-10",
       "title": "Correio addresses send through Correio",

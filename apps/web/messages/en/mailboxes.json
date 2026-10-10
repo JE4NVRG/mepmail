@@ -343,7 +343,8 @@
       "unknown": "Receiving setup has not been confirmed. Check DNS (MX) and service activation before using this domain.",
       "needs_mx": "DNS (MX) still needs to be configured to receive with MepMail. You can reserve the address while preparing this step.",
       "needs_activation": "Receiving activation is still pending. Reserving the address does not complete this setup.",
-      "ready": "The service confirmed receiving setup for this domain. Each new address still requires activation."
+      "ready": "The service confirmed receiving setup for this domain. Each new address still requires activation.",
+      "paused": "Domain verified. The team's receiving is paused by the plan's quota; the addresses start receiving when the pause ends (next period or after an upgrade)."
     },
     "noDomainsTitle": "Start with your domain",
     "noDomainsBody": "Add the domain you bought or already use to your organization. Then return to create your email.",
@@ -366,7 +367,8 @@
     "activationHint": "After your license, domain and MX are confirmed, activate receiving for this domain’s licensed mailboxes. DNS is managed separately.",
     "activationError": "Receiving activation could not be confirmed. Your address remains reserved. Check receiving before trying again.",
     "activationPending": "Receiving is still pending. Review the domain configuration and service availability, then check again.",
-    "activationReady": "Receiving has been confirmed for your mailbox."
+    "activationReady": "Receiving has been confirmed for your mailbox.",
+    "activationPaused": "Domain verified, but the team's receiving is paused by the plan's quota. The addresses join when the pause ends."
   },
   "favorites": "Favorites",
   "custom": "Folder",
@@ -502,7 +504,35 @@
     "empty": "Choose an available mailbox to check usage.",
     "noPolicy": "No capacity configured",
     "allBoxes": "Sum of the mailboxes you can open",
-    "teamShared": "Shared by all the team's mailboxes"
+    "teamShared": "Shared by all the team's mailboxes",
+    "planLine": "{name} plan · period until {date}",
+    "planTrialLine": "{name} plan · free trial until {date}",
+    "metric": {
+      "mailboxes": "Mailboxes",
+      "storageBytes": "Storage",
+      "outboundRecipients": "Outbound recipients",
+      "outboundBytes": "Data sent",
+      "inboundDeliveries": "Received messages",
+      "inboundBytes": "Data received"
+    },
+    "level": {
+      "near": "Close to the limit. Renews on {date}.",
+      "full": "Limit reached. Renews on {date}.",
+      "paused": "Past the margin: receiving pauses."
+    },
+    "trialSends": "Free trial: {today} of {daily} recipients today · {total} of {totalLimit} in total",
+    "upgradeTo": "Upgrade to {name}",
+    "receiving": {
+      "reason": {
+        "inbound_deliveries": "received messages",
+        "inbound_bytes": "received data",
+        "storage": "storage"
+      },
+      "pausing": "Pausing receiving: the team passed this period's {reason} limit. New mail will go back to the sender.",
+      "paused": "Receiving paused: the team passed this period's {reason} limit. New mail goes back to the sender until {date} or until you upgrade. Reading and exporting work as usual.",
+      "pausedStorage": "Receiving paused: the team's storage is full. New mail goes back to the sender until you upgrade. Reading and exporting work as usual.",
+      "resuming": "Resuming receiving: the mailboxes receive again in a moment."
+    }
   },
   "offer": {
     "eyebrow": "MepMail Mail",
@@ -1111,6 +1141,9 @@
     "google": "Add to Google Calendar",
     "download": "Download invite (.ics)"
   },
-  "trialLimit": "The free trial allows up to 50 recipients a day and 200 in total. Nothing was sent and the draft is still saved; the limit lifts once the first invoice is paid.",
-  "attachmentsLeftBehind": "{count, plural, one {This attachment stays behind because it is over 256 KB, the sending limit: {names}.} other {These attachments stay behind because they are over 256 KB, the sending limit: {names}.}}"
+  "trialLimit": "The free trial reached its sending limit for now (up to 50 recipients a day and 200 in total). Nothing was sent and the draft is still saved; the limit lifts once the first invoice is paid.",
+  "attachmentsLeftBehind": "{count, plural, one {This attachment stays behind because it is over 256 KB, the sending limit: {names}.} other {These attachments stay behind because they are over 256 KB, the sending limit: {names}.}}",
+  "planQuota": "The plan reached this period's limit (recipients or data sent, or storage). Nothing was sent and the draft is still saved.",
+  "viewPlans": "See plans",
+  "draftQuota": "The plan's storage is full: new drafts can't be saved. Upgrade in Settings → License and usage. Your text stays here."
 }

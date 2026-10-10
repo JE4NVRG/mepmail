@@ -92,7 +92,7 @@ describe("domain receiving feedback", () => {
   it("does not infer receiving from the absence of a domain check", () => {
     expect(mailboxSetupReceiving(undefined)).toEqual({ state: "unknown", mxHost: null });
   });
-  it.each(["unknown", "needs_mx", "needs_activation", "ready"] as const)(
+  it.each(["unknown", "needs_mx", "needs_activation", "ready", "paused"] as const)(
     "preserves the authoritative receiving state %s independently of sending verification",
     (state) => {
       expect(mailboxSetupReceiving({ state, mxHost: "inbound.synthetic.invalid" })).toEqual({

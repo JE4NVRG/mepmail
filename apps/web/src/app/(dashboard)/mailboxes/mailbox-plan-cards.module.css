@@ -1,0 +1,92 @@
+/* Solo / Duo / Equipe, one radio group of cards. Tokens only. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+.card {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: var(--ms-r-card);
+  background: var(--ms-panel);
+  color: var(--ms-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    border-color var(--ms-dur-fast) var(--ms-ease),
+    background var(--ms-dur-fast) var(--ms-ease);
+}
+.card:hover {
+  border-color: var(--ms-steel);
+}
+.card[data-checked] {
+  border-color: var(--ms-bone);
+  background: var(--ms-panel-raised);
+}
+.card:has(.radio:focus-visible) {
+  box-shadow: var(--ms-focus-ring);
+}
+.card:has(.radio:disabled) {
+  cursor: default;
+  opacity: 0.7;
+}
+.radio {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.head strong {
+  color: var(--ms-bone);
+  font-size: 14px;
+  font-weight: 600;
+}
+.current {
+  padding: 1px 8px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.price {
+  color: var(--ms-bone);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.local {
+  font-variant-numeric: tabular-nums;
+}
+.facts {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  line-height: 1.45;
+}
+.facts li {
+  overflow-wrap: anywhere;
+}
+.traffic {
+  color: var(--ms-muted);
+  font-size: 11px;
+}
+@media (forced-colors: active) {
+  .card[data-checked] {
+    outline: 2px solid Highlight;
+  }
+}

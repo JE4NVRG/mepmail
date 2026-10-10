@@ -316,7 +316,7 @@
       "Connect Claude, Cursor or any agent through the Mail MCP, no code.",
       "You choose what each agent can do: read, draft or send."
     ],
-    "price": "US$ 12.90 a month for 3 mailboxes with 7 days free, or from {price} per mailbox with a paying Send plan.",
+    "price": "From {price} a month: Solo with 1 mailbox, Duo with 3 or Equipe with 10, with 7 days free.",
     "cta": "Explore Mail",
     "pricing": "See Mail pricing"
   }

@@ -287,15 +287,20 @@ export default async function CorreioPage() {
                       <td>
                         {mailOpen && index === comparison.length - 1
                           ? t("release.availability")
-                          : row.combined}
+                          : standaloneOpen && index === comparison.length - 2
+                            ? t("release.billingPlans")
+                            : row.combined}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="correio-note correio-under-grid">{t("comparison.earlyNote")}</p>
-            <LaunchPlanPreview earlyAccessOpen={mailOpen} />
+            <p className="correio-note correio-under-grid">
+              {t(standaloneOpen ? "release.plansNote" : "comparison.earlyNote")}
+            </p>
+            {/* The Envio + add-on calculator; the plans need none (their prices are above). */}
+            {standaloneOpen ? null : <LaunchPlanPreview earlyAccessOpen={mailOpen} />}
             <p className="correio-note correio-under-grid">{t("plans.terms")}</p>
           </div>
         </section>

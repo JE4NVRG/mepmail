@@ -75,6 +75,37 @@
   background: var(--ms-panel);
   color: var(--ms-bone);
 }
+/* Three plan cards side by side need more room than the 560 px form. */
+.dialog[data-wide] {
+  width: min(
+    760px,
+    calc(100vw - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))
+  );
+}
+.planName {
+  padding: 1px 8px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.planChange {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+.planChange .sectionTitle {
+  margin-bottom: 0;
+}
+.planChange .hint {
+  margin: 0;
+}
+.planActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
 .dialog::backdrop {
   background: rgb(0 0 0 / 65%);
 }

@@ -118,6 +118,10 @@ const expectations = {
     publicMailboxMcpPending: /The Mail MCP gives the agent its own inbox as tools/,
     agentFragment: "connect-an-agent-over-mcp",
     docsPrefix: "https://docs.mepmail.dev",
+    plansPrices:
+      /Solo: 1 mailbox for US\$ 2\.90 a month\. Duo: 3 mailboxes for US\$ 5\.90\. Equipe: 10 mailboxes for US\$ 12\.90/,
+    plansNoSending: /Mail does not require a Send plan/,
+    plansBilling: "Send plan + a Mail plan",
   },
   "pt-BR": {
     open: /Aberto a todos, com ou sem plano de Envio/,
@@ -155,6 +159,10 @@ const expectations = {
     publicMailboxMcpPending: /O MCP do Correio dá ao agente as ferramentas da própria caixa/,
     agentFragment: "conecte-um-agente-por-mcp",
     docsPrefix: "https://docs.mepmail.dev/pt-BR",
+    plansPrices:
+      /Solo: 1 caixa por US\$ 2,90 por mês \(R\$ 14,90\)\. Duo: 3 caixas por US\$ 5,90 \(R\$ 29,90\)\. Equipe: 10 caixas por US\$ 12,90 \(R\$ 64,90\)/,
+    plansNoSending: /O Correio não exige plano de Envio/,
+    plansBilling: "Plano de Envio + um plano do Correio",
   },
 };
 
@@ -215,6 +223,17 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     expect(plans).toMatch(expected.everyPayingPlan);
     expect(plans).toMatch(expected.subscribeInDashboard);
     expect(plans).toMatch(expected.paidSeparately);
+  });
+
+  it("presents the three Correio plans, without the add-on calculator, when Mail opens on its own", async () => {
+    vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");
+    const plans = textContent(section(await render(locale), "correio-plans-title"));
+    expect(plans).toMatch(expected.plansPrices);
+    expect(plans).toMatch(expected.plansNoSending);
+    expect(plans).toContain(expected.plansBilling);
+    expect(plans).not.toMatch(expected.minimumPlan);
+    // The Envio + add-on calculator gives way to the plans.
+    expect(plans).not.toContain(expected.annualUpfront);
   });
 
   it("qualifies Mail by the recurring base while preserving old contracts and internal System access", () => {

@@ -2930,6 +2930,65 @@
   white-space: nowrap;
 }
 
+/* Correio plan meters (mailbox-usage-panel.tsx): calm until 80 %, then a
+   warning tone, the danger tone at the limit or when receiving pauses. */
+.planMetric {
+  display: grid;
+  gap: 4px;
+}
+.planMetric[data-level="near"] progress::-webkit-progress-value {
+  background: var(--ms-warn);
+}
+.planMetric[data-level="near"] progress::-moz-progress-bar {
+  background: var(--ms-warn);
+}
+.planMetric[data-level="full"] progress::-webkit-progress-value,
+.planMetric[data-level="paused"] progress::-webkit-progress-value {
+  background: var(--ms-danger);
+}
+.planMetric[data-level="full"] progress::-moz-progress-bar,
+.planMetric[data-level="paused"] progress::-moz-progress-bar {
+  background: var(--ms-danger);
+}
+.metricNote {
+  color: var(--ms-muted);
+}
+.planMetric[data-level="full"] .metricNote,
+.planMetric[data-level="paused"] .metricNote {
+  color: var(--ms-danger);
+}
+.receivingBanner,
+.receivingCompact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  border: 1px solid color-mix(in srgb, var(--ms-danger) 45%, var(--ms-line));
+  border-radius: var(--ms-r-card);
+  background: color-mix(in srgb, var(--ms-danger) 8%, var(--ms-panel));
+  font-size: 12px;
+  line-height: 1.6;
+}
+.receivingBanner {
+  margin: 8px 12px 0;
+  padding: 10px 14px;
+}
+.receivingCompact {
+  padding: 8px 10px;
+}
+.receivingBanner p,
+.receivingCompact p {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+.receivingBanner[data-state="resuming"],
+.receivingCompact[data-state="resuming"] {
+  border-color: var(--ms-line-strong);
+  background: var(--ms-panel-raised);
+}
+
 /* Column dividers (mailbox-column-divider.tsx): [rail] | [list] | [reader].
    Each sits on the edge it moves, as an absolutely placed grid child, so it
    takes no track; the widths come from lib/mailbox-columns (same limits). */

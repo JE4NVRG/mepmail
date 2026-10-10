@@ -343,7 +343,8 @@
       "unknown": "A configuração de recebimento não foi confirmada. Confira o DNS (MX) e a ativação do serviço antes de usar este domínio.",
       "needs_mx": "O DNS (MX) ainda precisa ser configurado para receber pelo MepMail. Você pode reservar o endereço enquanto prepara essa etapa.",
       "needs_activation": "A ativação do recebimento ainda está pendente. Reservar o endereço não conclui essa configuração.",
-      "ready": "O serviço confirmou a configuração de recebimento deste domínio. Cada novo endereço ainda depende da sua ativação."
+      "ready": "O serviço confirmou a configuração de recebimento deste domínio. Cada novo endereço ainda depende da sua ativação.",
+      "paused": "Domínio verificado. O recebimento da equipe está pausado pela cota do plano; os endereços passam a receber quando a pausa terminar (no próximo período ou com um upgrade)."
     },
     "noDomainsTitle": "Comece pelo seu domínio",
     "noDomainsBody": "Adicione à organização o domínio que você comprou ou já usa. Depois volte para criar seu e-mail.",
@@ -366,7 +367,8 @@
     "activationHint": "Após confirmar licença, domínio e MX, ative o recebimento das caixas licenciadas deste domínio. O DNS é gerenciado separadamente.",
     "activationError": "Não foi possível confirmar a ativação do recebimento. Seu endereço continua reservado. Confira o recebimento antes de tentar novamente.",
     "activationPending": "O recebimento continua pendente. Revise a configuração do domínio e a disponibilidade do serviço e confira novamente.",
-    "activationReady": "O recebimento foi confirmado para sua caixa."
+    "activationReady": "O recebimento foi confirmado para sua caixa.",
+    "activationPaused": "Domínio verificado, mas o recebimento da equipe está pausado pela cota do plano. Os endereços entram quando a pausa terminar."
   },
   "favorites": "Favoritos",
   "custom": "Pasta",
@@ -502,7 +504,35 @@
     "empty": "Escolha uma caixa disponível para consultar o uso.",
     "noPolicy": "Sem capacidade configurada",
     "allBoxes": "Soma das caixas que você acessa",
-    "teamShared": "Dividido entre todas as caixas da equipe"
+    "teamShared": "Dividido entre todas as caixas da equipe",
+    "planLine": "Plano {name} · período até {date}",
+    "planTrialLine": "Plano {name} · teste grátis até {date}",
+    "metric": {
+      "mailboxes": "Caixas",
+      "storageBytes": "Armazenamento",
+      "outboundRecipients": "Destinatários de envio",
+      "outboundBytes": "Dados enviados",
+      "inboundDeliveries": "Mensagens recebidas",
+      "inboundBytes": "Dados recebidos"
+    },
+    "level": {
+      "near": "Perto do limite. Renova em {date}.",
+      "full": "Limite atingido. Renova em {date}.",
+      "paused": "Passou da margem: o recebimento pausa."
+    },
+    "trialSends": "Teste grátis: {today} de {daily} destinatários hoje · {total} de {totalLimit} no total",
+    "upgradeTo": "Fazer upgrade para o {name}",
+    "receiving": {
+      "reason": {
+        "inbound_deliveries": "mensagens recebidas",
+        "inbound_bytes": "dados recebidos",
+        "storage": "armazenamento"
+      },
+      "pausing": "Pausando o recebimento: a equipe passou do limite de {reason} deste período. Mensagens novas vão voltar para quem enviou.",
+      "paused": "Recebimento pausado: a equipe passou do limite de {reason} deste período. Mensagens novas voltam para quem enviou até {date} ou até você fazer upgrade. Ler e exportar continua normal.",
+      "pausedStorage": "Recebimento pausado: o armazenamento da equipe está cheio. Mensagens novas voltam para quem enviou até você fazer upgrade. Ler e exportar continua normal.",
+      "resuming": "Retomando o recebimento: as caixas voltam a receber em instantes."
+    }
   },
   "offer": {
     "eyebrow": "Correio",
@@ -1111,6 +1141,9 @@
     "google": "Adicionar ao Google Agenda",
     "download": "Baixar convite (.ics)"
   },
-  "trialLimit": "O teste grátis permite até 50 destinatários por dia e 200 no total. Nada foi enviado e o rascunho continua guardado; o limite cai quando a primeira fatura for paga.",
-  "attachmentsLeftBehind": "{count, plural, one {Este anexo ficou de fora porque passa de 256 KB, o limite de envio: {names}.} other {Estes anexos ficaram de fora porque passam de 256 KB, o limite de envio: {names}.}}"
+  "trialLimit": "O teste grátis chegou ao limite de envio por agora (até 50 destinatários por dia e 200 no total). Nada foi enviado e o rascunho continua guardado; o limite cai quando a primeira fatura for paga.",
+  "attachmentsLeftBehind": "{count, plural, one {Este anexo ficou de fora porque passa de 256 KB, o limite de envio: {names}.} other {Estes anexos ficaram de fora porque passam de 256 KB, o limite de envio: {names}.}}",
+  "planQuota": "O plano chegou ao limite deste período (destinatários ou dados enviados, ou armazenamento). Nada foi enviado e o rascunho continua guardado.",
+  "viewPlans": "Ver planos",
+  "draftQuota": "O armazenamento do plano está cheio: não dá para guardar rascunhos novos. Faça upgrade em Configurações → Licença e uso. Seu texto permanece aqui."
 }

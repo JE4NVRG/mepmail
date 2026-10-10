@@ -3,10 +3,9 @@ title: Mailboxes for people and agents
 description: Separate a personal or agent mailbox from application and campaign sending.
 ---
 
-**Pilot status:** Mail is being validated separately from Send. Receiving real
-messages and sending replies require an enabled deployment and a verified domain.
-A mailbox in the dashboard, a saved draft, or a completed Checkout does not confirm
-that these services are active.
+Receiving real messages needs a verified domain whose MX points at MepMail and
+receiving turned on for it. Creating a mailbox, saving a draft or completing a
+Checkout does not change your domain's MX.
 
 ## Choose the service
 
@@ -15,12 +14,37 @@ Use **Mail** for a named mailbox on your domain: personal conversations, a compa
 address or an agent that reads and replies to messages. You can continue using
 Send without creating a mailbox.
 
-Mail licenses are counted per mailbox. People and agents use the same per-mailbox
-price and seat model; storage and outbound allowances come from the recorded
-service terms. Consult the dashboard for your current contract. Pilot allowances
-are not public prices.
-The outbound allowance counts recipients per mailbox and license period: when a
-send is admitted, one message to three distinct addresses reserves three units.
+## Plans and limits
+
+Mail is sold in three monthly plans, with or without a Send plan. People and
+agents cost the same.
+
+| Plan | Mailboxes | Storage | Recipients sent a month | Messages received a month | Price a month |
+| --- | --- | --- | --- | --- | --- |
+| Solo | 1 | 1 GiB | 500 | 2,000 | US$ 2.90 (R$ 14.90 in Brazil) |
+| Duo | 3 | 3 GiB | 2,000 | 5,000 | US$ 5.90 (R$ 29.90) |
+| Equipe | 10 | 10 GiB | 6,000 | 10,000 | US$ 12.90 (R$ 64.90) |
+
+- Every limit is shared by the team's mailboxes and renews each billing month.
+  Nothing is charged beyond the plan.
+- **Sending** counts recipients: one message to three distinct addresses counts
+  three. The plan also caps the bytes sent (message size times recipients):
+  256 MiB, 1 GiB and 3 GiB a month. Past either limit a send is refused with
+  `quota` until the next billing month or an upgrade.
+- **Receiving** counts each received message once, however many of the team's
+  mailboxes or aliases it reaches; a redelivery of the same message is not counted
+  again, and deleting mail does not give the allowance back. The plan also caps
+  the bytes received: 512 MiB, 1.5 GiB and 3 GiB a month.
+- **Receiving pauses** past the received limit plus a 10% margin, or when storage
+  is full. Senders then get a permanent "mailbox unavailable" bounce (5.1.1) and
+  nothing is stored. Receiving resumes on the next billing month or after an
+  upgrade (only an upgrade, when storage is full). Mail accepted before the pause
+  is always stored.
+- **With storage full**, reading, search, attachment downloads and the API keep
+  working; new drafts and sends are refused until space is available.
+- **Free trial:** a first purchase starts with 7 days free; the card is required.
+  During the trial a team sends to at most 50 recipients a day and 200 in total.
+- Contracts bought before these plans keep their price and terms.
 
 ## Prepare a mailbox
 
@@ -41,15 +65,18 @@ not provide access to this mailbox API.
 
 When subscription management is enabled for your deployment and contract,
 organization owners and admins can use the controls in the Mail dashboard.
-If they are unavailable, consult the installation operator. If you already have
-a pilot license, check its current terms instead of starting another purchase
-to work around unavailable controls or transport.
+If they are unavailable, consult the installation operator; do not start another
+purchase to work around unavailable controls.
 
-- **Increase:** request the new quantity and use **Complete increase payment**
-  when offered. Extra seats become available only after confirmed payment;
-  the current quantity stays unchanged while payment is pending.
-- **Reduce:** schedule the quantity for the next renewal. The dashboard shows
-  the effective date; the current quantity remains available until then.
+- **Change plan:** a larger plan applies at once and charges the prorated
+  difference now; during the free trial it ends the trial and charges the new
+  plan. A smaller plan applies at once when your mailboxes, storage and this
+  month's usage fit it, without a refund for the current month. The billing date
+  does not change.
+- **Contracts bought before the plans:** request a new quantity and use **Complete
+  increase payment** when offered (extra seats become available only after
+  confirmed payment), or schedule a reduction for the next renewal. You can also
+  move such a contract to a plan.
 - **Cancel renewal:** the confirmed cancellation takes effect at the displayed
   period end and removes a scheduled future reduction. Use **Resume renewal**
   before that date when the option is available.
@@ -58,8 +85,7 @@ to work around unavailable controls or transport.
   or subscription to work around it.
 
 Stored messages are preserved; reading and export still require current mailbox
-access. Mail license changes do not change your Send plan or enable receiving
-and transport. Keep the pilot readiness checks above.
+access. Mail plan changes do not change your Send plan or turn on receiving.
 
 ## Connect an agent over MCP
 
@@ -134,7 +160,7 @@ inbox message UUID; the server preserves its reply references. To edit an
 existing draft, supply its `id`, the same ID as `sourceItemId`, and its latest
 `expectedRevision`. A conflict requires reloading the draft before editing.
 
-Recipient lists contain 1–20 addresses. The pilot supports up to 10 attachments,
+Recipient lists contain 1–20 addresses. Drafts from this API take up to 10 attachments,
 each at most 256 KiB, and a final MIME message at most 1 MiB. An upload is
 `{ "filename": "note.txt", "base64": "..." }`; retained attachments use the indexes
 from the source message. Empty arrays are still required when there are none.
