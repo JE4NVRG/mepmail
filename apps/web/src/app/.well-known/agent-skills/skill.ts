@@ -87,11 +87,12 @@ queued, sent, delivered, bounced and complained.
   silently; if every recipient is gone the call answers
   ${B}422 all_recipients_suppressed${B}. Never "fix" a send by re-subscribing
   someone — honour the opt-out.
-- **Quotas park before they refuse.** On a daily plan (Free, Starter) a send
-  past the cap is *accepted* as ${B}queued_quota${B} and drains after midnight
-  UTC; ${B}429 daily_quota_exceeded${B} arrives only once the parked backlog
-  reaches three times the daily cap. Monthly plans answer
-  ${B}429 monthly_quota_exceeded${B} at the period's included volume.
+- **Quotas park before they refuse.** On a daily plan (Free, Starter) sends
+  keep going up to 50% past the cap, then are *accepted* as ${B}queued_quota${B}
+  and drain after midnight UTC; ${B}429 daily_quota_exceeded${B} arrives only once the parked backlog
+  reaches three times the daily cap. Monthly Pro and Scale bill
+  overage by default (switchable off, hard stop at 5x the included volume); with
+  overage off or on annual plans they answer ${B}429 monthly_quota_exceeded${B}.
 - **Sending can be paused for reputation, not for you.**
   ${B}403 sending_paused${B} (your own bounce or complaint rate),
   ${B}403 broadcasts_paused${B} (broadcasts only — a region-wide or operator

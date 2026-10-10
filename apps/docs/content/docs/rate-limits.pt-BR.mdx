@@ -69,9 +69,9 @@ e um `429 rate_limit_exceeded` responde pela que estiver cheia:
 
 | Plano | Incluído | Período | Passando do teto |
 | --- | --- | --- | --- |
-| Free | 100 | dia UTC | Envios ficam parqueados como `queued_quota` e drenam depois da virada do dia; quando o backlog parqueado chega a **3× o teto diário**, novos envios são recusados com `429 daily_quota_exceeded` |
+| Free | 100 | dia UTC | Os envios seguem até 50% acima do teto, depois ficam parqueados como `queued_quota` e drenam depois da virada do dia; quando o backlog parqueado chega a **3× o teto diário**, novos envios são recusados com `429 daily_quota_exceeded` |
 | Starter | 1.500 | dia UTC | Mesmo comportamento de parqueamento e mesma recusa com 3× de backlog |
-| Pro / Scale | volume comprado | mês | Excedente cobrado por 1.000 quando ligado; caso contrário, `429 monthly_quota_exceeded` |
+| Pro / Scale | volume comprado | mês | Planos mensais: excedente cobrado por 1.000, ligado por padrão e desligável em Cobrança, até 5× o volume incluído; desligado (e nos planos anuais), `429 monthly_quota_exceeded` |
 
 - O parqueamento é deliberado: um envio diário acima da cota é **aceito** e
   entra na fila — a API responde `200` com um id — para uma rajada perto da
@@ -98,9 +98,9 @@ e um `429 rate_limit_exceeded` responde pela que estiver cheia:
 
 ## Limites por plano (objetos)
 
-- Contatos: 1.000 no Free, 10.000 no Starter, ilimitado do Pro para cima.
-- Domínios remetentes: 1 / 3 / 10 / ilimitado (Free / Starter / Pro / Scale).
-- Times por usuário: 1 / 2 / 5 / 10.
+- Contatos: 1.000 no Free, ilimitado em todos os planos pagos.
+- Domínios remetentes: 1 / 10 / 25 / ilimitado (Free / Starter / Pro / Scale); até 3 enquanto só o Correio estiver ativo.
+- Times por usuário: 1 / 3 / 10 / ilimitado.
 
 Veja [Cobrança](/pt-BR/billing) para preços e a escada completa.
 

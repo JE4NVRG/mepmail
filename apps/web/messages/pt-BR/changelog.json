@@ -28,6 +28,24 @@
   },
   "releases": [
     {
+      "version": "0.92",
+      "date": "2026-10-10",
+      "title": "Planos e políticas iguais ao produto",
+      "summary": "Preços, termos, privacidade, segurança e a documentação agora descrevem limites, excedente e onde os dados são processados do jeito que o produto funciona.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Excedente: no Pro e no Scale mensais ele vem ligado e pode ser desligado em Cobrança, até 5× o volume incluído. Free e Starter nunca cobram excedente.",
+            "Limite diário no Free e no Starter: os envios seguem até 50% acima dele e depois esperam numa fila para o dia seguinte.",
+            "As páginas de privacidade e segurança dizem onde os dados rodam: a aplicação e o banco na Alemanha (Contabo), a entrega de e-mails e os pagamentos nos Estados Unidos, e as nossas métricas próprias sem cookies.",
+            "Página de limites da documentação: domínios remetentes 1 / 10 / 25 / ilimitado, times 1 / 3 / 10 / ilimitado, contatos ilimitados em todos os planos pagos.",
+            "O mepmail.dev agora publica DMARC, relatórios TLS e CAA, o SPF autoriza só a Amazon SES, e www.mepmail.dev redireciona para mepmail.dev."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.90",
       "date": "2026-10-10",
       "title": "Suporte a um clique no painel",

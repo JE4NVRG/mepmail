@@ -1,14 +1,14 @@
 {
   "terms": {
     "title": "Termos de Uso",
-    "updated": "Última atualização: 8 de outubro de 2026",
+    "updated": "Última atualização: 10 de outubro de 2026",
     "intro": "Estes termos regem o seu acesso e uso do MepMail, um serviço de e-mail transacional operado pela Je4nDev (\"nós\"). Ao criar uma conta ou usar o serviço, você concorda com estes termos. Se não concordar, não use o serviço.",
     "sections": [
       {
         "title": "1. O serviço",
         "body": [
           "O MepMail permite enviar e-mails transacionais por API HTTPS, relay SMTP ou servidor MCP, e gerenciar domínios de envio, contatos, supressões e eventos de entrega. A entrega é feita pelo Amazon SES, que atua como nossa infraestrutura de envio.",
-          "O serviço é oferecido em degraus com volumes mensais de envio. Você é responsável por escolher o degrau adequado ao seu volume; excedê-lo move os envios para cobrança de excedente, conforme descrito na página de preços."
+          "O serviço é oferecido em degraus: Free e Starter têm limite diário de envio, e Pro e Scale incluem um volume mensal. Você é responsável por escolher o degrau adequado ao seu volume. No Free e no Starter, os envios além do limite diário esperam numa fila e nunca são cobrados; no Pro e no Scale mensais, os envios além do volume incluído são cobrados como excedente, que vem ligado e pode ser desligado em Cobrança, conforme descrito na página de preços."
         ]
       },
       {
@@ -42,7 +42,7 @@
       {
         "title": "5. Planos, cobrança e excedente",
         "body": [
-          "Planos pagos são cobrados em dólar, via Stripe, mensalmente e antecipado. O volume é contado por destinatário distinto, como faz a nossa infraestrutura de entrega. Envios além do volume incluído são cobrados pela taxa de excedente do plano e podem ser limitados no painel.",
+          "Planos pagos são cobrados em dólar, via Stripe, por mês ou por ano, antecipadamente. O volume é contado por destinatário distinto, como faz a nossa infraestrutura de entrega. No Pro e no Scale mensais, os envios além do volume incluído são cobrados pela taxa de excedente do plano, até 5× esse volume; o excedente vem ligado e pode ser desligado em Cobrança. Planos anuais, Free e Starter não têm cobrança de excedente.",
           "Se um pagamento falhar, podemos suspender o envio até a regularização. Preços podem mudar com aviso de pelo menos 30 dias; mudanças nunca valem retroativamente para um período já pago."
         ]
       },
@@ -97,7 +97,7 @@
   },
   "privacy": {
     "title": "Política de Privacidade",
-    "updated": "Última atualização: 9 de outubro de 2026",
+    "updated": "Última atualização: 10 de outubro de 2026",
     "intro": "Esta política explica quais dados o MepMail coleta, como eles são usados e quais escolhas você tem. Ela é curta de propósito: coletar pouco, criptografar o que é sensível e nomear os subprocessadores.",
     "sections": [
       {
@@ -142,13 +142,14 @@
       {
         "title": "5. Subprocessadores",
         "body": [
-          "Usamos uma lista deliberadamente curta de provedores para operar o serviço:",
+          "Usamos uma lista deliberadamente curta de provedores para operar o serviço. As métricas das páginas usam o Umami, que hospedamos nos nossos próprios servidores, sem cookies nem rastreamento entre sites.",
           "Se você permitir a mensuração de publicidade, a Meta e o Google recebem os eventos opcionais descritos nesta política: a Meta pelo Pixel e pelos eventos de cadastro concluído e de compra, o Google pelo Google Analytics nas páginas públicas e pelos eventos de cadastro concluído e de compra inicial de plano pago, que o nosso servidor envia com os identificadores dos cookies da Meta e do Google Analytics e, na compra, o plano e o valor. Essas conexões também informam o endereço IP e informações do navegador. Cada empresa trata esses dados conforme a sua própria política de privacidade. Não ativamos os sinais do Google nem a personalização de anúncios, e a mensuração não é necessária para usar o MepMail."
         ],
         "list": [
+          "Contabo GmbH (Alemanha) — hospedagem da aplicação, do banco de dados e das nossas métricas próprias.",
           "Amazon Web Services (Amazon SES) — entrega de e-mails e notificações de eventos. Conteúdo e metadados das mensagens passam por ele para a entrega.",
           "Stripe — processamento de pagamentos, faturas e recibos.",
-          "Cloudflare — DNS, CDN e proteção de rede na frente dos nossos servidores."
+          "Cloudflare — DNS, CDN e proteção de rede na frente dos nossos servidores, e o desafio Turnstile que pode proteger login, cadastro e redefinição de senha."
         ]
       },
       {
@@ -173,7 +174,7 @@
       {
         "title": "9. Transferências internacionais",
         "body": [
-          "A nossa infraestrutura, incluindo Amazon SES e Stripe, processa dados nos Estados Unidos e em outros países onde esses provedores operam. As transferências se apoiam nas cláusulas contratuais padrão desses provedores e salvaguardas equivalentes."
+          "A aplicação e o banco de dados rodam na Alemanha (Contabo). A entrega de e-mails (Amazon SES) e os pagamentos (Stripe) processam dados nos Estados Unidos e em outros países onde esses provedores operam, e a Cloudflare opera no mundo todo. As transferências se apoiam nas cláusulas contratuais padrão desses provedores e salvaguardas equivalentes."
         ]
       },
       {

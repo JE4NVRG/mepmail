@@ -10,7 +10,7 @@
   "note": "Starting is free: 100 emails a day, no card. Choose a paid plan in the dashboard when you need more volume.",
   "plans": {
     "title": "Every Send plan.",
-    "intro": "Regular Send monthly prices. The introductory offer and the Pro 110K annual plan appear below when available. Overage applies only when it is contracted and turned on for your account."
+    "intro": "Regular Send monthly prices. The introductory offer and the Pro 110K annual plan appear below when available. On monthly Pro and Scale, overage comes switched on and can be turned off in Billing."
   },
   "included": {
     "eyebrow": "Included",
@@ -35,7 +35,7 @@
     "items": [
       {
         "q": "How does overage work?",
-        "a": "Free and Starter stop at the UTC daily limit. Annual Pro 110K has a 110,000 monthly allowance with no paid overage. Monthly Pro and Scale contracts support overage only when contracted and enabled, at their plan’s rate; the safety ceiling remains."
+        "a": "Free and Starter have a daily limit (UTC) and no overage: sends keep going up to 50% past it, then wait in a queue for the next day, and new sends are refused only when that queue reaches 3× the daily limit. Annual Pro 110K has a 110,000 monthly allowance with no paid overage. On monthly Pro and Scale, overage comes switched on (you can turn it off in Billing) and is billed per 1,000 at the plan’s rate, up to a safety ceiling of 5× the included volume."
       },
       {
         "q": "Is there a contract, and can I change plans later?",
@@ -66,7 +66,7 @@
     "body": "110,000 Send deliveries each month for your application, campaigns and agents. Choose monthly or annual in the dashboard; introductory eligibility is confirmed before checkout.",
     "monthTitle": "Monthly",
     "monthIntro": "US$ 20 only for eligible new customers’ first monthly bill. Renewal: US$ 29/month.",
-    "monthQuota": "Overage only when supported by your contract and enabled in the dashboard.",
+    "monthQuota": "Overage comes switched on for monthly plans and can be turned off in Billing.",
     "yearTitle": "Annual",
     "perYear": "/year",
     "yearUpfront": "US$ 290 paid upfront for 12 months: the price of 10 regular monthly fees. The introduction does not stack.",
@@ -78,7 +78,7 @@
   "launchFaq": [
     {
       "q": "How does overage work?",
-      "a": "Free and Starter stop at the UTC daily limit. Annual Pro 110K has a 110,000 monthly allowance with no paid overage. Monthly Pro and Scale contracts support overage only when contracted and enabled, at their plan’s rate; the safety ceiling remains."
+      "a": "Free and Starter have a daily limit (UTC) and no overage: sends keep going up to 50% past it, then wait in a queue for the next day, and new sends are refused only when that queue reaches 3× the daily limit. Annual Pro 110K has a 110,000 monthly allowance with no paid overage. On monthly Pro and Scale, overage comes switched on (you can turn it off in Billing) and is billed per 1,000 at the plan’s rate, up to a safety ceiling of 5× the included volume."
     },
     {
       "q": "Is there a contract, and can I change plans later?",

@@ -831,20 +831,7 @@
     "notifyDesktopHint": "O app mostra um aviso do Windows com o remetente e o assunto.",
     "notifyBrowserHint": "O navegador avisa quando o Correio estiver aberto em outra aba.",
     "notifyBlocked": "O navegador bloqueou os avisos deste site. Libere nas configurações do site e ligue de novo.",
-    "notifyUnsupported": "Este navegador não mostra avisos.",
-    "sending": "Envio",
-    "undoSend": "Desfazer envio",
-    "undoSendOff": "Desligado",
-    "undoSendSeconds": "{seconds, number} segundos",
-    "undoSendHint": "Depois de clicar em Enviar, você tem esse tempo para desfazer (botão Desfazer ou tecla Z).",
-    "quickReplies": "Respostas rápidas",
-    "quickRepliesHint": "Aparecem no fim de cada e-mail recebido: um clique começa a resposta com o texto.",
-    "quickReplyPlaceholder": "Ex.: Obrigado, recebi!",
-    "quickReplyLabel": "Resposta rápida {number, number}",
-    "quickReplyAdd": "Adicionar resposta",
-    "quickReplyRemove": "Remover esta resposta",
-    "quickRepliesDefault": "Usar as sugeridas",
-    "quickRepliesInvalid": "Use até 8 respostas curtas, de até 160 caracteres cada."
+    "notifyUnsupported": "Este navegador não mostra avisos."
   },
   "coach": {
     "text": "J e K navegam, E arquiva, S favorita, ? mostra todos os atalhos.",
@@ -947,19 +934,5 @@
         "body": "Mensagens enviadas com lembrete aparecem aqui se ninguém responder."
       }
     }
-  },
-  "undoSend": {
-    "waiting": "Enviando em {seconds, number} s…",
-    "waitingDraft": "Este e-mail sai em instantes.",
-    "countdown": "{seconds, number} s",
-    "cancelled": "Envio desfeito. O e-mail voltou para Rascunhos."
-  },
-  "quickReplies": {
-    "title": "Respostas rápidas",
-    "use": "Começar a resposta com este texto",
-    "default1": "Obrigado!",
-    "default2": "Recebido, vou verificar e retorno em breve.",
-    "default3": "Perfeito, combinado.",
-    "default4": "Podemos falar sobre isso amanhã?"
   }
 }

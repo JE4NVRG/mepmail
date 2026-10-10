@@ -139,14 +139,14 @@
       {
         "volume": "100/dia (~3k/mês)",
         "limits": "1 domínio · 1 workspace · 1.000 contatos",
-        "overage": "para no cap",
+        "overage": "sem (limite diário)",
         "attachment": "1 MB",
         "cta": "Começar grátis"
       },
       {
         "volume": "1.500/dia (~45k/mês)",
         "limits": "10 domínios · 3 workspaces · contatos ilimitados",
-        "overage": "para no cap",
+        "overage": "sem (limite diário)",
         "attachment": "1 MB",
         "cta": "Começar no Starter"
       },
@@ -193,7 +193,7 @@
         "cta": "Começar no Scale 2.75M"
       }
     ],
-    "note": "Free e Starter têm limite diário (UTC); o volume mensal é apenas ilustrativo. Em Pro e Scale, o excedente por 1.000 depende de habilitação no provisionamento; sem ele, os envios param na cota. Mesmo com excedente habilitado, vale o teto de segurança de 5× o volume incluído.",
+    "note": "Free e Starter têm limite diário (UTC) e não têm excedente; o volume mensal é apenas ilustrativo. No Pro e no Scale mensais, o excedente por 1.000 vem ligado e pode ser desligado em Cobrança; desligado, os envios param na cota. Mesmo com o excedente ligado, vale o teto de segurança de 5× o volume incluído.",
     "founders": {
       "title": "Programa fundadores",
       "items": [
@@ -245,7 +245,7 @@
       },
       {
         "q": "O que acontece quando passo da cota?",
-        "a": "No Free e Starter, os envios param no limite diário. Nos planos Pro e Scale, com excedente habilitado, os envios adicionais são cobrados pela tarifa de cada plano por 1.000 e respeitam o teto de segurança de 5× o volume incluído; sem excedente habilitado, param na cota mensal. Se você prevê aumento de volume, fale conosco antes."
+        "a": "No Free e no Starter não há excedente: os envios seguem até 50% acima do limite diário, depois esperam numa fila, e novos envios só são recusados quando essa fila chega a 3× o limite. No Pro e no Scale mensais, o excedente vem ligado: os envios adicionais são cobrados pela tarifa de cada plano por 1.000 até o teto de segurança de 5× o volume incluído, e você pode desligá-lo em Cobrança para parar na cota mensal. Se você prevê aumento de volume, fale conosco antes."
       },
       {
         "q": "Preciso de cartão de crédito para começar?",

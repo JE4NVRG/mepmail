@@ -139,14 +139,14 @@
       {
         "volume": "100/day (~3k/month)",
         "limits": "1 domain · 1 workspace · 1,000 contacts",
-        "overage": "stops at cap",
+        "overage": "none (daily limit)",
         "attachment": "1 MB",
         "cta": "Start free"
       },
       {
         "volume": "1,500/day (~45k/month)",
         "limits": "10 domains · 3 workspaces · unlimited contacts",
-        "overage": "stops at cap",
+        "overage": "none (daily limit)",
         "attachment": "1 MB",
         "cta": "Start with Starter"
       },
@@ -193,7 +193,7 @@
         "cta": "Start with Scale 2.75M"
       }
     ],
-    "note": "Free and Starter have a daily limit (UTC); the monthly volume is illustrative only. On Pro and Scale, per-1,000 overage depends on enablement at provisioning; without it, sending stops at the quota. Even with overage enabled, the safety ceiling of 5× the included volume applies.",
+    "note": "Free and Starter have a daily limit (UTC) and no overage; the monthly volume is illustrative only. On monthly Pro and Scale, per-1,000 overage comes switched on and can be turned off in Billing; with it off, sending stops at the quota. Even with overage on, the safety ceiling of 5× the included volume applies.",
     "founders": {
       "title": "Founders program",
       "items": [
@@ -245,7 +245,7 @@
       },
       {
         "q": "What happens when I go over the quota?",
-        "a": "On Free and Starter, sending stops at the daily limit. On Pro and Scale, with overage enabled, extra sends are billed at each plan's per-1,000 rate and respect the safety ceiling of 5× the included volume; without overage enabled, they stop at the monthly quota. If you expect volume growth, talk to us first."
+        "a": "On Free and Starter there is no overage: sends keep going up to 50% past the daily limit, then wait in a queue, and new sends are refused only when that queue reaches 3× the limit. On monthly Pro and Scale, overage comes switched on: extra sends are billed at each plan's per-1,000 rate up to the safety ceiling of 5× the included volume, and you can turn it off in Billing to stop at the monthly quota. If you expect volume growth, talk to us first."
       },
       {
         "q": "Do I need a credit card to start?",

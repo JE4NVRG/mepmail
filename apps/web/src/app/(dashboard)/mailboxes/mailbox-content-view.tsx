@@ -43,7 +43,6 @@ import {
   writeNoticePreference,
 } from "@/lib/mailbox-notifications";
 import { useCorreioPrefs } from "@/lib/mailbox-preferences";
-import { withQuickReply } from "@/lib/mailbox-quick-replies";
 import {
   isRecipientAddress,
   mailboxContacts,
@@ -81,8 +80,7 @@ function replyAllCopies(source: Item, own: string, to: string[]) {
   }
   return copies;
 }
-/** "waiting": Send was pressed and the undo-send wait has not ended yet. */
-type SendState = "waiting" | "requesting" | Outputs["queueDraft"]["status"];
+type SendState = "requesting" | Outputs["queueDraft"]["status"];
 const NIL = "00000000-0000-0000-0000-000000000000";
 function SendResults({
   summary,
@@ -218,14 +216,11 @@ function DraftDialog({
   selectBox,
   current,
   send,
-  quickReply,
 }: {
   boxes: Box[];
   mailboxId: string;
   source: Item | null;
   mode: ComposeMode;
-  /** A quick reply picked in the reader: it starts the reply, above the signature. */
-  quickReply?: string | undefined;
   deliveryReady: boolean;
   close: () => void;
   saved: (item: Outputs["saveDraft"]) => Promise<void>;
@@ -333,8 +328,7 @@ function DraftDialog({
           .join("\n"),
       });
       const footer = mailboxSignature(senderSignature);
-      const body = footer ? `${footer}\n\n${quote}` : `\n\n${quote}`;
-      return quickReply ? withQuickReply(body, quickReply) : body;
+      return footer ? `${footer}\n\n${quote}` : `\n\n${quote}`;
     }
     return initialMailboxText(
       source?.kind === "draft"
@@ -377,13 +371,11 @@ function DraftDialog({
     active.current = true;
     dialog.current?.showModal();
     (source && mode !== "forward" ? messageInput.current : recipientInput.current)?.focus();
-    // The cursor waits at the top of a reply, or right after a quick reply.
-    const start = source && mode !== "forward" ? (quickReply?.trim().length ?? 0) : 0;
-    if (source?.kind !== "draft") messageInput.current?.setSelectionRange(start, start);
+    if (source?.kind !== "draft") messageInput.current?.setSelectionRange(0, 0);
     return () => {
       active.current = false;
     };
-  }, [mode, source, quickReply]);
+  }, [mode, source]);
   useEffect(() => {
     if (source) return;
     const next = senderSignature;
@@ -894,7 +886,6 @@ export function MailboxContentView({
     mailboxId: string;
     source: Item | null;
     mode: ComposeMode;
-    quickReply?: string;
   } | null>(null);
   const composerSequence = useRef(0);
   const composerSession = useRef<number | null>(null);
@@ -902,19 +893,6 @@ export function MailboxContentView({
   const sending = useRef<string | null>(null);
   const attempted = useRef(new Set<string>());
   const [sendStates, setSendStates] = useState<Record<string, SendState>>({});
-  // Desfazer envio: Send waits the preferred seconds before the message
-  // reaches the server, with "Desfazer" in a toast and on the open draft.
-  // One send waits at a time; timers and the toast reach the latest render
-  // through `sendActions`.
-  type PendingSend = {
-    key: string;
-    revision: { mailboxId: string; id: string; expectedRevision: number };
-    deadline: number;
-    timer: ReturnType<typeof setTimeout>;
-  };
-  const pendingSend = useRef<PendingSend | null>(null);
-  const [pendingDeadline, setPendingDeadline] = useState<number | null>(null);
-  const [, setSendClock] = useState(0);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const { prefs, setPref } = useCorreioPrefs();
   // Marking as read waits the preferred delay; leaving the message first cancels it.
@@ -1134,13 +1112,6 @@ export function MailboxContentView({
   );
   const item = visibleItem && !detail.isError ? detail.data : null;
   const pendingSentReply = item?.kind === "sent" && !item.transportMessageId;
-  // The person's own quick replies, or the built-in set in their language.
-  const quickReplies = prefs.quickReplies ?? [
-    t("quickReplies.default1"),
-    t("quickReplies.default2"),
-    t("quickReplies.default3"),
-    t("quickReplies.default4"),
-  ];
   const writable = boxes.filter(
     (b) => b.canDraft && b.status === "planned" && (!mailboxKind || b.kind === mailboxKind),
   );
@@ -1148,15 +1119,10 @@ export function MailboxContentView({
     (cause) => (cause as { data?: { code?: string } } | null)?.data?.code === "FORBIDDEN",
   );
   const composerAllowed = !!composer && writable.some((b) => b.id === composer.mailboxId);
-  function openComposer(
-    mailboxId: string,
-    source: Item | null,
-    mode: ComposeMode = "reply",
-    quickReply?: string,
-  ) {
+  function openComposer(mailboxId: string, source: Item | null, mode: ComposeMode = "reply") {
     const session = ++composerSequence.current;
     composerSession.current = session;
-    compose({ session, mailboxId, source, mode, ...(quickReply ? { quickReply } : {}) });
+    compose({ session, mailboxId, source, mode });
   }
   const closeComposer = useCallback((session: number) => {
     if (composerSession.current !== session) return;
@@ -1972,93 +1938,8 @@ export function MailboxContentView({
       expectedRevision: item.revision,
     });
   }
-  /**
-   * Send from the open draft or the composer: after the undo-send wait when
-   * the person keeps one (Preferências), at once otherwise.
-   */
+  /** One send of one exact saved revision: from the open draft or the composer's Send. */
   async function submitRevision(revision: {
-    mailboxId: string;
-    id: string;
-    expectedRevision: number;
-  }) {
-    const key = `${revision.mailboxId}:${revision.id}:${revision.expectedRevision}`;
-    if (attempted.current.has(key) || pendingSend.current?.key === key) return;
-    const seconds = prefs.undoSendSeconds;
-    if (!seconds) return deliverRevision(revision);
-    // An earlier send still waiting goes now instead of being held behind this one.
-    if (pendingSend.current) releasePendingSend();
-    const deadline = Date.now() + seconds * 1000;
-    const pending: PendingSend = {
-      key,
-      revision,
-      deadline,
-      timer: setTimeout(() => sendActions.current.release(pending), seconds * 1000),
-    };
-    pendingSend.current = pending;
-    setSendStates((states) => ({ ...states, [key]: "waiting" }));
-    setPendingDeadline(deadline);
-    setNotice("");
-    toast(t("undoSend.waiting", { seconds }), "info", {
-      action: { label: t("organization.undo"), run: () => sendActions.current.undo() },
-      durationMs: seconds * 1000,
-    });
-  }
-  /** The wait is over (or a newer send needs the slot): the message goes now. */
-  function releasePendingSend(expected?: PendingSend) {
-    const pending = pendingSend.current;
-    if (!pending || (expected && pending !== expected)) return;
-    clearTimeout(pending.timer);
-    // One request at a time: try again shortly while another send is in flight.
-    if (sending.current) {
-      pending.timer = setTimeout(() => sendActions.current.release(pending), 400);
-      return;
-    }
-    pendingSend.current = null;
-    setPendingDeadline(null);
-    void deliverRevision(pending.revision);
-  }
-  /** "Desfazer": nothing was sent; the draft opens again to be changed. */
-  function undoSend() {
-    const pending = pendingSend.current;
-    if (!pending) return;
-    clearTimeout(pending.timer);
-    pendingSend.current = null;
-    setPendingDeadline(null);
-    setSendStates((states) => {
-      const { [pending.key]: _cancelled, ...rest } = states;
-      return rest;
-    });
-    toast(t("undoSend.cancelled"), "info");
-    const { mailboxId, id } = pending.revision;
-    if (!(folder === "drafts" && selection?.mailboxId === mailboxId && selection.id === id)) {
-      changeFolder("drafts");
-      select({ mailboxId, id });
-    }
-    void queries
-      .fetchQuery(trpc.mailboxes.item.queryOptions({ mailboxId, id }, { staleTime: 0 }))
-      .then((draft) => {
-        if (mounted.current && draft.kind === "draft" && !composerSession.current)
-          openComposer(mailboxId, draft);
-      })
-      .catch(() => {
-        // The draft stays in Rascunhos; opening it is one click away.
-      });
-  }
-  const sendActions = useRef({ release: releasePendingSend, undo: undoSend });
-  sendActions.current = { release: releasePendingSend, undo: undoSend };
-  // While a send waits: leaving the page asks first, and the open draft counts down.
-  useEffect(() => {
-    if (pendingDeadline === null) return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    const tick = setInterval(() => setSendClock((value) => value + 1), 1000);
-    return () => {
-      window.removeEventListener("beforeunload", warn);
-      clearInterval(tick);
-    };
-  }, [pendingDeadline]);
-  /** One send of one exact saved revision, now. */
-  async function deliverRevision(revision: {
     mailboxId: string;
     id: string;
     expectedRevision: number;
@@ -2256,8 +2137,7 @@ export function MailboxContentView({
         run(() => setShortcutsOpen(true));
         return;
       case "undo":
-        if (pendingSend.current) run(undoSend);
-        else if (undo) run(() => void runUndo());
+        if (undo && undo.notice === notice) run(() => void runUndo());
         return;
     }
   };
@@ -3294,25 +3174,7 @@ export function MailboxContentView({
                       {t("sentReplyPending")}
                     </p>
                   ) : null}
-                  {item.kind === "draft" && sendState === "waiting" ? (
-                    <p className={styles.contentNotice}>
-                      <span role="status">{t("undoSend.waitingDraft")}</span>{" "}
-                      {pendingDeadline !== null ? (
-                        <span aria-hidden="true">
-                          {t("undoSend.countdown", {
-                            seconds: Math.max(1, Math.ceil((pendingDeadline - Date.now()) / 1000)),
-                          })}
-                        </span>
-                      ) : null}
-                      <button
-                        type="button"
-                        className={`ms-btn ms-btn-ghost ${styles.undoAction}`}
-                        onClick={undoSend}
-                      >
-                        {t("organization.undo")}
-                      </button>
-                    </p>
-                  ) : item.kind === "draft" && sendState ? (
+                  {item.kind === "draft" && sendState ? (
                     <p className={styles.contentNotice} role="status">
                       {t(
                         sendState === "requesting"
@@ -3355,22 +3217,6 @@ export function MailboxContentView({
                       ))}
                     </section>
                   ) : null}
-                  {item.kind === "inbox" && actions?.canRespond && quickReplies.length ? (
-                    <section aria-label={t("quickReplies.title")} className={styles.quickReplies}>
-                      <span className={styles.quickRepliesLabel}>{t("quickReplies.title")}</span>
-                      {quickReplies.map((reply) => (
-                        <button
-                          key={reply}
-                          type="button"
-                          className={styles.quickReply}
-                          title={t("quickReplies.use")}
-                          onClick={() => openComposer(item.mailboxId, item, "reply", reply)}
-                        >
-                          {reply}
-                        </button>
-                      ))}
-                    </section>
-                  ) : null}
                 </article>
               ) : (
                 <div className={styles.hero}>
@@ -3390,7 +3236,6 @@ export function MailboxContentView({
           mailboxId={composer.mailboxId}
           source={composer.source}
           mode={composer.mode}
-          quickReply={composer.quickReply}
           deliveryReady={deliveryReady}
           current={() => composerSession.current === composer.session}
           close={() => closeComposer(composer.session)}

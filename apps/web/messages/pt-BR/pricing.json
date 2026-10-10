@@ -10,7 +10,7 @@
   "note": "Começar é grátis: 100 e-mails por dia, sem cartão. Escolha um plano pago no painel quando precisar de mais volume.",
   "plans": {
     "title": "Todos os planos de Envio.",
-    "intro": "Mensalidades normais de envio. A oferta de entrada e o plano anual Pro 110K aparecem abaixo quando estiverem disponíveis. O excedente só vale quando for contratado e ativado na sua conta."
+    "intro": "Mensalidades normais de envio. A oferta de entrada e o plano anual Pro 110K aparecem abaixo quando estiverem disponíveis. No Pro e no Scale mensais, o excedente vem ligado e pode ser desligado em Cobrança."
   },
   "included": {
     "eyebrow": "Incluído",
@@ -35,7 +35,7 @@
     "items": [
       {
         "q": "Como funciona o excedente?",
-        "a": "Free e Starter param no limite diário UTC. O Pro 110K anual tem franquia mensal de 110 mil, sem excedente pago. Nos contratos mensais Pro e Scale, excedente só quando contratado e habilitado, pela tarifa do próprio plano; o teto de segurança permanece."
+        "a": "Free e Starter têm limite diário (UTC) e não têm excedente: os envios seguem até 50% acima dele, depois esperam numa fila para o dia seguinte, e novos envios só são recusados quando essa fila chega a 3× o limite diário. O Pro 110K anual tem franquia mensal de 110 mil, sem excedente pago. No Pro e no Scale mensais, o excedente vem ligado (você pode desligar em Cobrança) e é cobrado por 1.000 pela tarifa do plano, até o teto de segurança de 5× o volume incluído."
       },
       {
         "q": "Existe fidelidade e posso trocar de plano depois?",
@@ -66,7 +66,7 @@
     "body": "110 mil entregas de Envio por mês para sua aplicação, campanhas e agentes. Escolha mensal ou anual no painel; a elegibilidade da promoção é confirmada antes do checkout.",
     "monthTitle": "Mensal",
     "monthIntro": "US$ 20 só na primeira mensalidade de novos clientes elegíveis. Renovação: US$ 29/mês.",
-    "monthQuota": "Excedente apenas quando previsto no contrato e habilitado no painel.",
+    "monthQuota": "O excedente vem ligado nos planos mensais e pode ser desligado em Cobrança.",
     "yearTitle": "Anual",
     "perYear": "/ano",
     "yearUpfront": "US$ 290 pagos antecipadamente para 12 meses: o valor de 10 mensalidades normais. Não acumula a promoção inicial.",
@@ -78,7 +78,7 @@
   "launchFaq": [
     {
       "q": "Como funciona o excedente?",
-      "a": "Free e Starter param no limite diário UTC. O Pro 110K anual tem franquia mensal de 110 mil, sem excedente pago. Nos contratos mensais Pro e Scale, excedente só quando contratado e habilitado, pela tarifa do próprio plano; o teto de segurança permanece."
+      "a": "Free e Starter têm limite diário (UTC) e não têm excedente: os envios seguem até 50% acima dele, depois esperam numa fila para o dia seguinte, e novos envios só são recusados quando essa fila chega a 3× o limite diário. O Pro 110K anual tem franquia mensal de 110 mil, sem excedente pago. No Pro e no Scale mensais, o excedente vem ligado (você pode desligar em Cobrança) e é cobrado por 1.000 pela tarifa do plano, até o teto de segurança de 5× o volume incluído."
     },
     {
       "q": "Existe fidelidade e posso trocar de plano depois?",

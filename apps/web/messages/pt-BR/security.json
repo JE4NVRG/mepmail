@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Segurança no MepMail — hospedagem na UE, conteúdo selado, self-host",
-    "description": "O MepMail Cloud roda na Alemanha, é open source sob AGPL e pode ser self-hosted. Corpos de mensagem e anexos selados em repouso, HTTPS com HSTS e CSP estrita, senhas com scrypt e API keys com hash, isolamento por time, backups validados, DKIM/SPF/DMARC — com a lista completa de subprocessadores, o roadmap de compliance e o FAQ enterprise."
+    "description": "O MepMail Cloud roda na Alemanha, é open source sob AGPL e pode ser self-hosted. Corpos de mensagem e anexos selados em repouso, HTTPS com HSTS e CSP restrita por origem, senhas com scrypt e API keys com hash, isolamento por time, backups validados, DKIM/SPF/DMARC — com a lista completa de subprocessadores, o roadmap de compliance e o FAQ enterprise."
   },
   "hero": {
     "eyebrow": "Segurança",
@@ -38,7 +38,7 @@
         "name": "Todo trecho é criptografado, inclusive o relay",
         "body": "Painel, API, relay SMTP e a entrega na caixa de entrada trafegam em conexões criptografadas.",
         "bullets": [
-          "O painel e a API são servidos por HTTPS, com HSTS (um ano, subdomínios incluídos), Content-Security-Policy estrita, X-Frame-Options DENY, nosniff e Permissions-Policy restrita.",
+          "O painel e a API são servidos por HTTPS, com HSTS (um ano, subdomínios incluídos), Content-Security-Policy restrita por origem (scripts e estilos inline ainda são permitidos enquanto migramos para nonces), X-Frame-Options DENY, nosniff e Permissions-Policy restrita.",
           "O relay SMTP exige TLS: o STARTTLS é oferecido com o nosso certificado, e o relay se recusa a iniciar sem o par de chaves — a menos que o operador opte explicitamente por uma rede privada confiável.",
           "Os e-mails saem pelo Amazon SES por TLS, autenticados no seu domínio por DKIM e SPF."
         ]
@@ -65,7 +65,7 @@
         "name": "Seus dados ficam na UE",
         "body": "A Alemanha é onde o MepMail Cloud roda, não uma região que você precisa pedir em uma reunião comercial.",
         "bullets": [
-          "A aplicação e o banco rodam em infraestrutura da Contabo na Alemanha — um provedor de hospedagem, nomeado nesta página.",
+          "A aplicação, o banco e as nossas métricas próprias com Umami (sem cookies) rodam em infraestrutura da Contabo na Alemanha — um provedor de hospedagem, nomeado nesta página. A entrega de e-mails passa pela Amazon SES nos Estados Unidos.",
           "O GDPR é o quadro em que o produto foi construído: hospedagem na UE é o padrão, não uma nota de rodapé sobre transferência de dados.",
           "A entrega passa pelo Amazon SES (us-east-1) e os pagamentos pelo Stripe, ambos listados como subprocessadores, e a Política de Privacidade diz o que é guardado, por quê e por quanto tempo."
         ]
@@ -111,7 +111,7 @@
         "name": "Criptografia em trânsito",
         "body": "Tudo entre você e o MepMail trafega em conexão criptografada.",
         "bullets": [
-          "O painel e a API são servidos por HTTPS, com HSTS (um ano, subdomínios incluídos), Content-Security-Policy estrita, X-Frame-Options DENY, nosniff e Permissions-Policy restrita.",
+          "O painel e a API são servidos por HTTPS, com HSTS (um ano, subdomínios incluídos), Content-Security-Policy restrita por origem (scripts e estilos inline ainda são permitidos enquanto migramos para nonces), X-Frame-Options DENY, nosniff e Permissions-Policy restrita.",
           "O relay SMTP exige TLS: o STARTTLS é oferecido com o nosso certificado, e o relay se recusa a iniciar sem o par de chaves — a menos que o operador opte explicitamente por uma rede privada confiável.",
           "Os e-mails saem pelo Amazon SES por TLS, autenticados no seu domínio por DKIM e SPF."
         ]

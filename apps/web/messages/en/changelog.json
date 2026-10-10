@@ -23,6 +23,24 @@
   },
   "releases": [
     {
+      "version": "0.92",
+      "date": "2026-10-10",
+      "title": "Plans and policies that match the product",
+      "summary": "Pricing, terms, privacy, security and the docs now describe limits, overage and where data is processed the way the product actually works.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Overage: on monthly Pro and Scale it comes switched on and can be turned off in Billing, up to 5× the included volume. Free and Starter never bill overage.",
+            "Daily limit on Free and Starter: sends keep going up to 50% past it, then wait in a queue for the next day.",
+            "Privacy and security pages say where data runs: the application and its database in Germany (Contabo), email delivery and payments in the United States, and our self-hosted analytics without cookies.",
+            "Docs limits page: sender domains 1 / 10 / 25 / unlimited, teams 1 / 3 / 10 / unlimited, unlimited contacts on every paid plan.",
+            "mepmail.dev now publishes DMARC, TLS reporting and CAA records, its SPF authorizes only Amazon SES, and www.mepmail.dev redirects to mepmail.dev."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.90",
       "date": "2026-10-10",
       "title": "Support one click away in the dashboard",

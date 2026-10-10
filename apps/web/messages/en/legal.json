@@ -1,14 +1,14 @@
 {
   "terms": {
     "title": "Terms of Service",
-    "updated": "Last updated: October 8, 2026",
+    "updated": "Last updated: October 10, 2026",
     "intro": "These terms govern your access to and use of MepMail, a transactional email service operated by Je4nDev (\"we\", \"us\"). By creating an account or using the service, you agree to these terms. If you do not agree, do not use the service.",
     "sections": [
       {
         "title": "1. The service",
         "body": [
           "MepMail lets you send transactional email through an HTTPS API, an SMTP relay, or an MCP server, and to manage sending domains, contacts, suppressions and delivery events. Email is delivered through Amazon SES, which acts as our delivery infrastructure.",
-          "The service is offered in tiers with monthly send volumes. You are responsible for choosing the tier that fits your volume; exceeding it moves sends to overage billing as described on the pricing page."
+          "The service is offered in tiers: Free and Starter have a daily sending limit, and Pro and Scale include a monthly volume. You are responsible for choosing the tier that fits your volume. On Free and Starter, sends beyond the daily limit wait in a queue and are never billed; on monthly Pro and Scale, sends beyond the included volume are billed as overage, which comes switched on and can be turned off in Billing, as described on the pricing page."
         ]
       },
       {
@@ -42,7 +42,7 @@
       {
         "title": "5. Plans, billing and overage",
         "body": [
-          "Paid plans are billed in US dollars through Stripe, monthly, in advance. Volume is counted per distinct recipient, like our delivery infrastructure does. Sends beyond your plan's included volume are billed at the plan's overage rate, and can be capped from the dashboard.",
+          "Paid plans are billed in US dollars through Stripe, monthly or yearly, in advance. Volume is counted per distinct recipient, like our delivery infrastructure does. On monthly Pro and Scale, sends beyond the included volume are billed at the plan's overage rate, up to 5× that volume; overage comes switched on and can be turned off in Billing. Annual plans, Free and Starter have no overage billing.",
           "If a payment fails, we may suspend sending until it is settled. Prices may change with at least 30 days' notice; changes never apply retroactively to a period you already paid."
         ]
       },
@@ -97,7 +97,7 @@
   },
   "privacy": {
     "title": "Privacy Policy",
-    "updated": "Last updated: October 9, 2026",
+    "updated": "Last updated: October 10, 2026",
     "intro": "This policy explains what data MepMail collects, how it is used, and the choices you have. We keep it short on purpose: collect little, encrypt the sensitive parts, and name our subprocessors.",
     "sections": [
       {
@@ -142,13 +142,14 @@
       {
         "title": "5. Subprocessors",
         "body": [
-          "We use a deliberately short list of providers to run the service:",
+          "We use a deliberately short list of providers to run the service. Page analytics use Umami, which we host ourselves on the same servers, without cookies or cross-site tracking.",
           "If you allow advertising measurement, Meta and Google receive the optional events described in this policy: Meta through its Pixel and its completed sign-up and purchase events, Google through Google Analytics on public pages and its completed sign-up and initial paid-plan purchase events, which our server sends with the Meta and Google Analytics cookie identifiers and, for a purchase, the plan and the amount. These connections also provide your IP address and browser information. Each company processes this data under its own privacy policy. We do not turn on Google signals or ad personalization, and measurement is not required to use MepMail."
         ],
         "list": [
+          "Contabo GmbH (Germany) — hosting of the application, its database and our self-hosted analytics.",
           "Amazon Web Services (Amazon SES) — email delivery and event notifications. Message content and metadata pass through it for delivery.",
           "Stripe — payment processing, invoices and receipts.",
-          "Cloudflare — DNS, CDN and network protection in front of our servers."
+          "Cloudflare — DNS, CDN and network protection in front of our servers, and the Turnstile challenge that can protect sign-in, sign-up and password reset."
         ]
       },
       {
@@ -173,7 +174,7 @@
       {
         "title": "9. International transfers",
         "body": [
-          "Our infrastructure, including Amazon SES and Stripe, processes data in the United States and other countries where these providers operate. Transfers rely on the providers' standard contractual clauses and equivalent safeguards."
+          "The application and its database run in Germany (Contabo). Email delivery (Amazon SES) and payments (Stripe) process data in the United States and other countries where these providers operate, and Cloudflare operates worldwide. Transfers rely on the providers' standard contractual clauses and equivalent safeguards."
         ]
       },
       {
