@@ -29,6 +29,7 @@ import {
   mailboxReplyIds,
 } from "../../../../packages/core/src/mailbox-message-id";
 import { pilotImageMetadata } from "../../../../packages/core/src/mailbox-pilot-images";
+import { type MailboxCategory, mailboxCategory } from "../lib/mailbox-category";
 import { mailboxSignature } from "../lib/mailbox-compose-signature";
 import { mailboxHtmlPreviewText } from "../lib/mailbox-html-preview";
 import { mailboxPreview } from "../lib/mailbox-inbox-presentation";
@@ -160,6 +161,11 @@ function listDto(mime: Awaited<ReturnType<typeof parseForList>>) {
     text: mime.text || mailboxHtmlPreviewText(mime.html),
     date: mime.date && !Number.isNaN(mime.date.getTime()) ? mime.date : null,
     attachmentCount: mime.attachments.length,
+    // The smart inbox pile (people, notifications, newsletters), from the headers.
+    category: mailboxCategory({
+      from: mime.from?.value[0]?.address ?? "",
+      headerLines: mime.headerLines,
+    }),
   };
 }
 type OutboundResults = NonNullable<Awaited<ReturnType<typeof getMailboxOutboundSummary>>>;
@@ -341,8 +347,9 @@ async function listRowContents(
   await runLimited([...byMailbox], 8, async ([mailboxId, ids]) => {
     const keyring = getKeyring();
     // Rows read from the message this time, sealed afterwards as list summaries.
-    const fresh: { id: string; revision: number; summary: Buffer }[] = [];
-    // Summaries that opened but no longer decode: read from the message below.
+    const fresh: { id: string; revision: number; summary: Buffer; replace: boolean }[] = [];
+    // Summaries that opened but no longer decode (an older format, such as one
+    // without the smart inbox pile): read from the message below and rewritten.
     const stale: string[] = [];
     const fromSummaries = await withMailboxListContents(
       db,
@@ -360,18 +367,25 @@ async function listRowContents(
           }
           const content = listDto(await parseForList(item.raw));
           const summary = encodeMailboxListSummary(content);
-          if (summary) fresh.push({ id: item.id, revision: item.revision, summary });
+          if (summary)
+            fresh.push({
+              id: item.id,
+              revision: item.revision,
+              summary,
+              replace: item.unreadableSummary,
+            });
           return { ...head, ...content };
         }),
     );
     const reread = stale.length
       ? await withMailboxItems(db, keyring, actor, { mailboxId, ids: stale }, (items) =>
-          runLimited(items, 8, async (item) => ({
-            id: item.id,
-            kind: item.kind,
-            revision: item.revision,
-            ...listDto(await parseForList(item.raw)),
-          })),
+          runLimited(items, 8, async (item) => {
+            const content = listDto(await parseForList(item.raw));
+            const summary = encodeMailboxListSummary(content);
+            if (summary)
+              fresh.push({ id: item.id, revision: item.revision, summary, replace: true });
+            return { id: item.id, kind: item.kind, revision: item.revision, ...content };
+          }),
         )
       : [];
     const parsed = [
@@ -639,6 +653,8 @@ export async function getMailboxContentList(
     snippet: string;
     date: Date;
     attachmentCount: number;
+    /** Smart inbox pile; null when the row's content is withheld. */
+    category: MailboxCategory | null;
     mailboxKind: "person" | "agent";
     deliveryFolder: "inbox" | "spam" | "quarantine";
     trashedAt: Date | null;
@@ -701,6 +717,7 @@ export async function getMailboxContentList(
         snippet: "",
         date: row.createdAt,
         attachmentCount: 0,
+        category: null,
         sentBy: null,
         sendStatus: null,
         outboundSummary: null,
@@ -729,6 +746,7 @@ export async function getMailboxContentList(
       snippet: mailboxPreview(item.text),
       date: item.date ?? row.updatedAt,
       attachmentCount: item.attachmentCount,
+      category: item.category,
       mailboxKind: row.mailboxKind,
       deliveryFolder: row.deliveryFolder,
       trashedAt: row.trashedAt,

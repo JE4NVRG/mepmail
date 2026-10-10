@@ -9,6 +9,11 @@ import { isDesktop } from "@/lib/desktop-bridge";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { noticesWanted, writeNoticePreference } from "@/lib/mailbox-notifications";
 import type { CorreioPrefs } from "@/lib/mailbox-preferences";
+import {
+  cleanQuickReplies,
+  QUICK_REPLY_LIMITS,
+  UNDO_SEND_CHOICES,
+} from "@/lib/mailbox-quick-replies";
 import styles from "./mailboxes.module.css";
 
 const START_FOLDERS = ["inbox", "favorites", "drafts", "sent", "archive", "trash"] as const;
@@ -61,6 +66,32 @@ export function MailboxAppearanceSettings({
     setNotices(readNoticeState());
     setWindowsApp(offersWindowsApp());
   }, []);
+
+  // Quick replies are edited line by line and saved when a line loses focus.
+  // What the account keeps replaces the lines whenever it changes (first
+  // load, "Usar as sugeridas", another device, another language).
+  const suggested = [
+    common("quickReplies.default1"),
+    common("quickReplies.default2"),
+    common("quickReplies.default3"),
+    common("quickReplies.default4"),
+  ];
+  const shownReplies = prefs.quickReplies ?? suggested;
+  const storedReplies = `${locale}:${JSON.stringify(prefs.quickReplies)}`;
+  const [replies, setReplies] = useState<string[]>(shownReplies);
+  const [repliesFrom, setRepliesFrom] = useState(storedReplies);
+  const [repliesError, setRepliesError] = useState(false);
+  if (repliesFrom !== storedReplies) {
+    setRepliesFrom(storedReplies);
+    setReplies(shownReplies);
+  }
+  function commitReplies(list: string[]) {
+    const clean = cleanQuickReplies(list);
+    if (!clean) return setRepliesError(true);
+    setRepliesError(false);
+    if (JSON.stringify(clean) === JSON.stringify(shownReplies)) return;
+    setPref({ quickReplies: clean });
+  }
 
   async function changeNotices(on: boolean) {
     if (!on) {
@@ -188,6 +219,96 @@ export function MailboxAppearanceSettings({
         </p>
       </section>
 
+      <section className={styles.appearanceGroup} aria-labelledby={`${id}-sending`}>
+        <h3 id={`${id}-sending`}>{t("sending")}</h3>
+        <div className={styles.appearanceRow}>
+          <label htmlFor={`${id}-undoSend`}>{t("undoSend")}</label>
+          <Select
+            id={`${id}-undoSend`}
+            ariaLabel={t("undoSend")}
+            value={String(prefs.undoSendSeconds)}
+            width={220}
+            onChange={(value) =>
+              setPref({ undoSendSeconds: Number(value) as CorreioPrefs["undoSendSeconds"] })
+            }
+            options={UNDO_SEND_CHOICES.map((seconds) => ({
+              value: String(seconds),
+              label: seconds ? t("undoSendSeconds", { seconds }) : t("undoSendOff"),
+            }))}
+          />
+        </div>
+        <p className={styles.hint}>{t("undoSendHint")}</p>
+        <h4 id={`${id}-quick`} className={styles.appearanceSubhead}>
+          {t("quickReplies")}
+        </h4>
+        <p className={styles.hint}>{t("quickRepliesHint")}</p>
+        <ul className={styles.quickReplyEditor} aria-labelledby={`${id}-quick`}>
+          {replies.map((reply, index) => (
+            // Lines have no identity of their own beyond their place in the list.
+            // biome-ignore lint/suspicious/noArrayIndexKey: positional editor rows
+            <li key={index}>
+              <input
+                className="ms-input"
+                value={reply}
+                maxLength={QUICK_REPLY_LIMITS.chars}
+                placeholder={t("quickReplyPlaceholder")}
+                aria-label={t("quickReplyLabel", { number: index + 1 })}
+                onChange={(event) =>
+                  setReplies((current) =>
+                    current.map((value, at) => (at === index ? event.target.value : value)),
+                  )
+                }
+                onBlur={(event) =>
+                  commitReplies(
+                    replies.map((value, at) => (at === index ? event.target.value : value)),
+                  )
+                }
+              />
+              <button
+                type="button"
+                className="ms-btn ms-btn-ghost"
+                aria-label={t("quickReplyRemove")}
+                title={t("quickReplyRemove")}
+                onClick={() => {
+                  const next = replies.filter((_, at) => at !== index);
+                  setReplies(next);
+                  commitReplies(next);
+                }}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+        {repliesError ? (
+          <p className={styles.hint} role="alert">
+            {t("quickRepliesInvalid")}
+          </p>
+        ) : null}
+        <div className={styles.quickReplyActions}>
+          <button
+            type="button"
+            className="ms-btn ms-btn-ghost"
+            disabled={replies.length >= QUICK_REPLY_LIMITS.count}
+            onClick={() => setReplies((current) => [...current, ""])}
+          >
+            {t("quickReplyAdd")}
+          </button>
+          {prefs.quickReplies !== null ? (
+            <button
+              type="button"
+              className="ms-btn ms-btn-ghost"
+              onClick={() => {
+                setRepliesError(false);
+                setPref({ quickReplies: null });
+              }}
+            >
+              {t("quickRepliesDefault")}
+            </button>
+          ) : null}
+        </div>
+      </section>
+
       <p className={styles.hint}>{t("hint")}</p>
 
       <section className={styles.appearanceGroup} aria-labelledby={`${id}-theme`}>
@@ -271,6 +392,16 @@ export function MailboxAppearanceSettings({
             options={START_FOLDERS.map((folder) => ({ value: folder, label: common(folder) }))}
           />
         </div>
+        <div className={styles.appearanceRow}>
+          <span id={`${id}-smart`}>{t("smartInbox")}</span>
+          <Switch
+            checked={prefs.smartInbox}
+            disabled={false}
+            ariaLabel={t("smartInbox")}
+            onChange={(checked) => setPref({ smartInbox: checked })}
+          />
+        </div>
+        <p className={styles.hint}>{t("smartInboxHint")}</p>
         <div className={styles.appearanceRow}>
           <span id={`${id}-avatars`}>{common("view.showAvatars")}</span>
           <Switch

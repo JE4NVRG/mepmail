@@ -2109,19 +2109,26 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  /* The padding sits inside the 100%: no sideways scroll on a phone. */
+  box-sizing: border-box;
   width: 100%;
   max-width: 960px;
   margin: 0 auto;
   padding: 24px clamp(16px, 4vw, 48px);
   animation: mailAppIn 0.22s ease-out both;
 }
+/* On a phone the tabs scroll sideways instead of widening the page. */
 .settingsTabs {
   display: flex;
   gap: 4px;
   margin-bottom: 20px;
   border-bottom: 1px solid var(--ms-line);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 .settingsTabs button {
+  flex: none;
+  white-space: nowrap;
   padding: 10px 12px;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -2827,4 +2834,75 @@
 .guideStep:focus-visible {
   background: var(--ms-void);
   outline: none;
+}
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+/* Quick replies at the end of a received message: one click starts the reply. */
+.quickReplies {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 24px 0 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ms-line);
+}
+.quickRepliesLabel {
+  margin-right: 4px;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-label);
+}
+.quickReply {
+  max-width: 100%;
+  padding: 6px 12px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  background: var(--ms-panel-raised);
+  color: var(--ms-bone);
+  font: inherit;
+  font-size: var(--ms-fs-ui);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--ms-dur-fast) var(--ms-ease);
+}
+.quickReply:hover {
+  border-color: var(--ms-violet-border);
+}
+.quickReply:focus-visible {
+  outline: none;
+  box-shadow: var(--ms-focus-ring);
+}
+/* Preferências → Envio: the quick replies being edited, one line each. */
+.quickReplyEditor {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.quickReplyEditor li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.quickReplyEditor input {
+  flex: 1;
+  min-width: 0;
+}
+.quickReplyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.appearanceSubhead {
+  margin: 18px 0 0;
+  font-size: var(--ms-fs-ui);
+  font-weight: 600;
 }

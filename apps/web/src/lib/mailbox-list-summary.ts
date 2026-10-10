@@ -1,3 +1,4 @@
+import { isMailboxCategory, type MailboxCategory } from "./mailbox-category";
 import { mailboxPreview } from "./mailbox-inbox-presentation";
 
 /**
@@ -15,9 +16,11 @@ export type MailboxListSummary = {
   text: string;
   date: Date | null;
   attachmentCount: number;
+  category: MailboxCategory;
 };
 
-const VERSION = 1;
+/** 2 adds the smart inbox pile; a version-1 summary is rebuilt from its message. */
+const VERSION = 2;
 const LIMITS = { subject: 500, from: 320, fromName: 200, to: 10, address: 320, preview: 400 };
 /** Matches core MAILBOX_LIST_SUMMARY_MAX_BYTES. */
 export const MAILBOX_LIST_SUMMARY_BYTES = 8 * 1024;
@@ -35,6 +38,7 @@ export function encodeMailboxListSummary(summary: MailboxListSummary): Buffer | 
       p: mailboxPreview(summary.text, LIMITS.preview),
       d: summary.date && !Number.isNaN(summary.date.getTime()) ? summary.date.toISOString() : null,
       a: Math.max(0, Math.trunc(summary.attachmentCount)),
+      c: summary.category,
     }),
     "utf8",
   );
@@ -53,7 +57,8 @@ export function decodeMailboxListSummary(raw: Buffer): MailboxListSummary | null
       !value.t.every((address) => typeof address === "string") ||
       typeof value.p !== "string" ||
       !(value.d === null || typeof value.d === "string") ||
-      typeof value.a !== "number"
+      typeof value.a !== "number" ||
+      !isMailboxCategory(value.c)
     )
       return null;
     const date = typeof value.d === "string" ? new Date(value.d) : null;
@@ -65,6 +70,7 @@ export function decodeMailboxListSummary(raw: Buffer): MailboxListSummary | null
       text: value.p,
       date: date && !Number.isNaN(date.getTime()) ? date : null,
       attachmentCount: value.a,
+      category: value.c,
     };
   } catch {
     return null;

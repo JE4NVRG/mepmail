@@ -1,6 +1,7 @@
 import { type Db, schema } from "@millionsend/db";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
+import { quickRepliesSchema, undoSendSchema } from "../lib/mailbox-quick-replies";
 
 /**
  * How one person likes the Correio inbox to look and behave. Stored per user (not
@@ -23,6 +24,9 @@ const FIELDS = {
   showAvatars: z.boolean(),
   markSeenAfterMs: z.union([z.literal(0), z.literal(1500), z.literal(3000), z.null()]),
   showShortcutHints: z.boolean(),
+  undoSendSeconds: undoSendSchema,
+  quickReplies: quickRepliesSchema,
+  smartInbox: z.boolean(),
 };
 type Field = keyof typeof FIELDS;
 export type MailboxPreferences = { [K in Field]: z.output<(typeof FIELDS)[K]> };
@@ -37,6 +41,9 @@ export const MAILBOX_PREFERENCE_DEFAULTS: MailboxPreferences = {
   showAvatars: true,
   markSeenAfterMs: 1500,
   showShortcutHints: true,
+  undoSendSeconds: 10,
+  quickReplies: null,
+  smartInbox: true,
 };
 
 /** A rejected change, naming the field so the UI can point at it. */

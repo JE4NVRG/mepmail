@@ -831,7 +831,22 @@
     "notifyDesktopHint": "The app shows a Windows notification with the sender and subject.",
     "notifyBrowserHint": "The browser notifies you while Correio is open in another tab.",
     "notifyBlocked": "The browser blocked notifications for this site. Allow them in the site settings and turn this on again.",
-    "notifyUnsupported": "This browser does not show notifications."
+    "notifyUnsupported": "This browser does not show notifications.",
+    "sending": "Sending",
+    "undoSend": "Undo send",
+    "undoSendOff": "Off",
+    "undoSendSeconds": "{seconds, number} seconds",
+    "undoSendHint": "After you click Send, you have this long to undo it (Undo button or the Z key).",
+    "quickReplies": "Quick replies",
+    "quickRepliesHint": "They show at the end of every received email: one click starts the reply with the text.",
+    "quickReplyPlaceholder": "E.g. Thanks, got it!",
+    "quickReplyLabel": "Quick reply {number, number}",
+    "quickReplyAdd": "Add reply",
+    "quickReplyRemove": "Remove this reply",
+    "quickRepliesDefault": "Use the suggested ones",
+    "quickRepliesInvalid": "Use up to 8 short replies, up to 160 characters each.",
+    "smartInbox": "Smart inbox",
+    "smartInboxHint": "Splits the Inbox into People, Notifications and Newsletters. Anyone you have written to always stays in People."
   },
   "coach": {
     "text": "J and K move, E archives, S stars, ? shows every shortcut.",
@@ -932,6 +947,43 @@
       "followups": {
         "title": "No follow-ups due",
         "body": "Sent messages you asked to be reminded about show up here if nobody replies."
+      }
+    }
+  },
+  "undoSend": {
+    "waiting": "Sending in {seconds, number} s…",
+    "waitingDraft": "This email is about to go out.",
+    "countdown": "{seconds, number} s",
+    "cancelled": "Send undone. The email is back in Drafts."
+  },
+  "quickReplies": {
+    "title": "Quick replies",
+    "use": "Start the reply with this text",
+    "default1": "Thank you!",
+    "default2": "Got it, I'll check and get back to you soon.",
+    "default3": "Perfect, sounds good.",
+    "default4": "Can we talk about this tomorrow?"
+  },
+  "smart": {
+    "label": "Smart inbox",
+    "people": "People",
+    "notifications": "Notifications",
+    "newsletters": "Newsletters",
+    "all": "All",
+    "unread": "{count, plural, one {# unread} other {# unread}}",
+    "showAll": "Show all",
+    "empty": {
+      "people": {
+        "title": "No messages from people",
+        "body": "Messages from people show up here. Notifications and newsletters wait in the other tabs."
+      },
+      "notifications": {
+        "title": "No notifications",
+        "body": "Receipts, alerts and automatic notices from services show up here."
+      },
+      "newsletters": {
+        "title": "No newsletters",
+        "body": "Newsletters and list mail show up here, away from your conversations."
       }
     }
   }

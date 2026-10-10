@@ -28,6 +28,29 @@
   },
   "releases": [
     {
+      "version": "0.93",
+      "date": "2026-10-10",
+      "title": "Desfazer envio, respostas rápidas e Caixa inteligente",
+      "summary": "O Correio espera alguns segundos antes de enviar para você poder desfazer, oferece respostas com um clique e separa a Entrada em Pessoas, Notificações e Newsletters.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Desfazer envio: o Correio espera 10 segundos antes de enviar (0, 5, 10, 20 ou 30 em Preferências); desfaça pelo aviso, pelo rascunho aberto ou com a tecla Z.",
+            "Respostas rápidas no fim de cada e-mail recebido: um clique abre a resposta com o texto acima da sua assinatura. Edite a lista em Preferências.",
+            "Abas da Caixa inteligente: Pessoas, Notificações, Newsletters e Tudo, com contagem de não lidas. Quem você já respondeu fica sempre em Pessoas. Desligue em Preferências."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "A tecla Z voltou a desfazer arquivar e apagar.",
+            "No celular, o aviso cabe numa linha e Configurações não rola mais para o lado."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.92",
       "date": "2026-10-10",
       "title": "Planos e políticas iguais ao produto",

@@ -69,6 +69,9 @@ export function ToastHost() {
         bottom: 24,
         transform: "translateX(-50%)",
         zIndex: "var(--ms-z-menu)",
+        // Centered by left/transform, a shrink-to-fit box would stop at half the
+        // screen and wrap short messages on a phone.
+        width: "max-content",
         maxWidth: "calc(100vw - 32px)",
       }}
     >

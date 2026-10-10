@@ -506,7 +506,11 @@ export async function withMailboxItems<T>(
 }
 
 export type MailboxListContent = ReturnType<typeof summary> &
-  ({ listSummary: Buffer; raw: null } | { listSummary: null; raw: Buffer });
+  (
+    | { listSummary: Buffer; raw: null; unreadableSummary: false }
+    /** `unreadableSummary`: one is stored but does not open; storing a new one replaces it. */
+    | { listSummary: null; raw: Buffer; unreadableSummary: boolean }
+  );
 
 /**
  * What a list page needs from several items of one mailbox, under one
@@ -554,8 +558,13 @@ export async function withMailboxListContents<T>(
           const item = allowed[index]!;
           const listSummary = await openListSummary(item, keyring);
           opened[index] = listSummary
-            ? { ...summary(item), listSummary, raw: null }
-            : { ...summary(item), listSummary: null, raw: await open(item, keyring) };
+            ? { ...summary(item), listSummary, raw: null, unreadableSummary: false }
+            : {
+                ...summary(item),
+                listSummary: null,
+                raw: await open(item, keyring),
+                unreadableSummary: item.summaryCiphertext !== null,
+              };
         }
       }),
     );
@@ -565,7 +574,8 @@ export async function withMailboxListContents<T>(
 
 /**
  * Stores list summaries the caller projected from each item's own message
- * (never from request input), for rows that have none yet. A draft is skipped
+ * (never from request input), for rows that have none yet, or replacing one in
+ * an older format or that no longer opens (`replace`). A draft is skipped
  * when its revision moved since it was read, so a summary never describes an
  * older version; received and sent messages never change content. A cache:
  * nothing else changes on the row (no revision, no updatedAt).
@@ -574,7 +584,11 @@ export async function storeMailboxListSummaries(
   db: Db,
   keyring: Keyring,
   actor: MailboxContentActor,
-  input: { mailboxId: string; entries: { id: string; revision: number; summary: Buffer }[] },
+  input: {
+    mailboxId: string;
+    /** `replace`: the row's summary is from an older format and is rewritten. */
+    entries: { id: string; revision: number; summary: Buffer; replace?: boolean }[];
+  },
 ): Promise<number> {
   actor = { ...actor };
   const entries = input.entries.filter(
@@ -606,7 +620,9 @@ export async function storeMailboxListSummaries(
             eq(schema.mailboxItems.id, entry.id),
             eq(schema.mailboxItems.mailboxId, input.mailboxId),
             eq(schema.mailboxItems.teamId, actor.teamId),
-            isNull(schema.mailboxItems.summaryCiphertext),
+            // A message never changes, so rewriting an outdated summary from it is
+            // safe; a draft must still be at the revision that was read.
+            entry.replace ? undefined : isNull(schema.mailboxItems.summaryCiphertext),
             or(
               ne(schema.mailboxItems.kind, "draft"),
               eq(schema.mailboxItems.revision, entry.revision),

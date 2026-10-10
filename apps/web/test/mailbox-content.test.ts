@@ -16,6 +16,7 @@ import {
   receiveMailboxMime,
   revokeMailboxRegistry,
   sendMailboxOutbox,
+  storeMailboxListSummaries,
   updateMailboxSignature,
   withMailboxAgentAccess,
 } from "@millionsend/core";
@@ -335,6 +336,9 @@ describe("session-authenticated mailbox content", () => {
       .set({ summaryCiphertext: Buffer.alloc(40, 1) })
       .where(eq(schema.mailboxItems.id, a.id));
     expect((await as().items({ mailboxId, folder: "inbox" })).items[0]).toEqual(first);
+    // ...and replaced, so the next listing opens a summary again.
+    const replaced = Buffer.from((await summaryOf(a.id))!.summaryCiphertext!);
+    expect(replaced.equals(Buffer.alloc(40, 1))).toBe(false);
     // Drafts: new content drops the summary, the next listing seals the new one.
     await db
       .update(schema.domains)
@@ -358,6 +362,80 @@ describe("session-authenticated mailbox content", () => {
       id: edited.id,
       subject: "Segunda versão",
     });
+  });
+  it("rewrites a 0.91 summary (version 1, no pile) once, then lists from the new one", async () => {
+    const a = await imported(
+      "legacy",
+      mailboxId,
+      Buffer.from(
+        "From: Loja <contato@loja.invalid>\r\nTo: person@content.invalid\r\nSubject: Ofertas\r\nList-Unsubscribe: <mailto:sair@loja.invalid>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nPromo\r\n",
+      ),
+    );
+    const legacy = Buffer.from(
+      JSON.stringify({
+        v: 1,
+        s: "Ofertas",
+        f: "contato@loja.invalid",
+        n: "Loja",
+        t: [],
+        p: "Promo",
+        d: null,
+        a: 0,
+      }),
+    );
+    expect(
+      await storeMailboxListSummaries(db, keys, actor(), {
+        mailboxId,
+        entries: [{ id: a.id, revision: a.revision, summary: legacy }],
+      }),
+    ).toBe(1);
+    const sealed = async () =>
+      Buffer.from(
+        (await db.select().from(schema.mailboxItems).where(eq(schema.mailboxItems.id, a.id)))[0]!
+          .summaryCiphertext!,
+      );
+    const fromV1 = await sealed();
+    const row = async () =>
+      (await as().items({ mailboxId, folder: "inbox" })).items.find((item) => item.id === a.id);
+    const rewritten = await row();
+    expect(rewritten).toMatchObject({ subject: "Ofertas", category: "newsletter" });
+    const fromV2 = await sealed();
+    expect(fromV2.equals(fromV1)).toBe(false);
+    // Rewritten once: the next listing opens it and leaves it alone.
+    expect(await row()).toEqual(rewritten);
+    expect((await sealed()).equals(fromV2)).toBe(true);
+  });
+  it("sorts rows into the smart inbox piles from their headers, the same from the summary", async () => {
+    const message = (from: string, headers: string) =>
+      Buffer.from(
+        `From: ${from}\r\nTo: person@content.invalid\r\nSubject: Pile\r\n${headers}MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nBody\r\n`,
+      );
+    await imported("pile:person", mailboxId, message("Ana <ana@example.invalid>", ""));
+    await imported(
+      "pile:newsletter",
+      mailboxId,
+      message("Loja <contato@loja.invalid>", "List-Unsubscribe: <mailto:sair@loja.invalid>\r\n"),
+    );
+    await imported(
+      "pile:notification",
+      mailboxId,
+      message("Banco <no-reply@banco.invalid>", "Auto-Submitted: auto-generated\r\n"),
+    );
+    const piles = async () =>
+      Object.fromEntries(
+        (await as().items({ mailboxId, folder: "inbox" })).items.map((row) => [
+          row.from,
+          row.category,
+        ]),
+      );
+    const fromMessages = await piles();
+    expect(fromMessages).toEqual({
+      "ana@example.invalid": "person",
+      "contato@loja.invalid": "newsletter",
+      "no-reply@banco.invalid": "notification",
+    });
+    // The second listing opens the sealed summaries and keeps the same piles.
+    expect(await piles()).toEqual(fromMessages);
   });
   it("exposes text and attachment metadata without original HTML or binary payload", async () => {
     const a = await imported();

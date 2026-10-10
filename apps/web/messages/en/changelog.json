@@ -23,6 +23,29 @@
   },
   "releases": [
     {
+      "version": "0.93",
+      "date": "2026-10-10",
+      "title": "Undo send, quick replies and a smart inbox",
+      "summary": "Correio waits a few seconds before sending so you can take a message back, offers one-click replies, and sorts the Inbox into People, Notifications and Newsletters.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Undo send: Correio waits 10 seconds before sending (0, 5, 10, 20 or 30 in Preferences); undo from the notice, from the open draft or with the Z key.",
+            "Quick replies at the end of every received email: one click starts the reply with the text above your signature. Edit the list in Preferences.",
+            "Smart inbox tabs: People, Notifications, Newsletters and All, with unread counts. People you have replied to always stay in People. Turn it off in Preferences."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "The Z key undoes archive and delete again.",
+            "On phones, the notice fits on one line and Settings no longer scrolls sideways."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.92",
       "date": "2026-10-10",
       "title": "Plans and policies that match the product",

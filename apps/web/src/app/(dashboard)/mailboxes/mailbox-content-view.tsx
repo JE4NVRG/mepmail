@@ -13,6 +13,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { toast } from "@/components/toast";
@@ -43,6 +44,7 @@ import {
   writeNoticePreference,
 } from "@/lib/mailbox-notifications";
 import { useCorreioPrefs } from "@/lib/mailbox-preferences";
+import { withQuickReply } from "@/lib/mailbox-quick-replies";
 import {
   isRecipientAddress,
   mailboxContacts,
@@ -52,13 +54,31 @@ import {
 } from "@/lib/mailbox-recipients";
 import { MAILBOX_SHORTCUTS, mailboxShortcut } from "@/lib/mailbox-shortcuts";
 import { mailboxSignatureText } from "@/lib/mailbox-signature";
+import {
+  knownPeopleFrom,
+  pileCounts,
+  rowPile,
+  type SmartPile,
+  shouldLoadMore,
+} from "@/lib/mailbox-smart-inbox";
 import { mailboxTimeLabel } from "@/lib/mailbox-time";
+import {
+  type HeldRevision,
+  type HeldSend,
+  heldSend,
+  heldSendKey,
+  holdSend,
+  setHeldSendHandlers,
+  subscribeHeldSend,
+  undoHeldSend,
+} from "@/lib/mailbox-undo-send";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import { MailboxMoveMenu, type MailboxMoveMenuHandle } from "./mailbox-move-menu";
 import { MailboxRecipientField } from "./mailbox-recipient-field";
 import { MailboxRichBody } from "./mailbox-rich-body";
+import { MailboxSmartTabs } from "./mailbox-smart-tabs";
 import { MailboxTimeMenu, type MailboxTimeMenuHandle } from "./mailbox-time-menu";
 import { MailboxViewMenu } from "./mailbox-view-menu";
 import styles from "./mailboxes.module.css";
@@ -80,7 +100,10 @@ function replyAllCopies(source: Item, own: string, to: string[]) {
   }
   return copies;
 }
-type SendState = "requesting" | Outputs["queueDraft"]["status"];
+/** "waiting": Send was pressed and the undo-send wait has not ended yet. */
+type SendState = "waiting" | "requesting" | Outputs["queueDraft"]["status"];
+/** The server render never has a send waiting. */
+const noHeldSend = () => null;
 const NIL = "00000000-0000-0000-0000-000000000000";
 function SendResults({
   summary,
@@ -216,11 +239,14 @@ function DraftDialog({
   selectBox,
   current,
   send,
+  quickReply,
 }: {
   boxes: Box[];
   mailboxId: string;
   source: Item | null;
   mode: ComposeMode;
+  /** A quick reply picked in the reader: it starts the reply, above the signature. */
+  quickReply?: string | undefined;
   deliveryReady: boolean;
   close: () => void;
   saved: (item: Outputs["saveDraft"]) => Promise<void>;
@@ -328,7 +354,8 @@ function DraftDialog({
           .join("\n"),
       });
       const footer = mailboxSignature(senderSignature);
-      return footer ? `${footer}\n\n${quote}` : `\n\n${quote}`;
+      const body = footer ? `${footer}\n\n${quote}` : `\n\n${quote}`;
+      return quickReply ? withQuickReply(body, quickReply) : body;
     }
     return initialMailboxText(
       source?.kind === "draft"
@@ -371,11 +398,13 @@ function DraftDialog({
     active.current = true;
     dialog.current?.showModal();
     (source && mode !== "forward" ? messageInput.current : recipientInput.current)?.focus();
-    if (source?.kind !== "draft") messageInput.current?.setSelectionRange(0, 0);
+    // The cursor waits at the top of a reply, or right after a quick reply.
+    const start = source && mode !== "forward" ? (quickReply?.trim().length ?? 0) : 0;
+    if (source?.kind !== "draft") messageInput.current?.setSelectionRange(start, start);
     return () => {
       active.current = false;
     };
-  }, [mode, source]);
+  }, [mode, source, quickReply]);
   useEffect(() => {
     if (source) return;
     const next = senderSignature;
@@ -886,6 +915,7 @@ export function MailboxContentView({
     mailboxId: string;
     source: Item | null;
     mode: ComposeMode;
+    quickReply?: string;
   } | null>(null);
   const composerSequence = useRef(0);
   const composerSession = useRef<number | null>(null);
@@ -893,6 +923,12 @@ export function MailboxContentView({
   const sending = useRef<string | null>(null);
   const attempted = useRef(new Set<string>());
   const [sendStates, setSendStates] = useState<Record<string, SendState>>({});
+  // Desfazer envio: Send waits the preferred seconds before the message
+  // reaches the server, with "Desfazer" in a toast and on the open draft. The
+  // waiting send lives in mailbox-undo-send, so it survives this view
+  // remounting when the mailbox scope changes.
+  const held = useSyncExternalStore(subscribeHeldSend, heldSend, noHeldSend);
+  const [, setSendClock] = useState(0);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const { prefs, setPref } = useCorreioPrefs();
   // Marking as read waits the preferred delay; leaving the message first cancels it.
@@ -903,6 +939,20 @@ export function MailboxContentView({
     seenTimer.current = null;
   }, [selection]);
   const [unreadOnly, setUnreadOnly] = useState(false);
+  // Caixa inteligente: the Inbox shows one pile at a time, Pessoas first.
+  // People this person wrote to (the Sent list) always count as people.
+  const [pile, setPile] = useState<SmartPile>("people");
+  const smartOn = prefs.smartInbox && folder === "inbox" && !search.trim();
+  const sentForPeople = useQuery(
+    trpc.mailboxes.items.queryOptions(
+      { mailboxId: null, folder: "sent" },
+      { enabled: folder === "inbox", retry: false, staleTime: 300_000 },
+    ),
+  );
+  const knownPeople = useMemo(
+    () => knownPeopleFrom(sentForPeople.data?.items ?? []),
+    [sentForPeople.data],
+  );
   // "Expandir leitura": the open message takes the list's place too. The
   // choice is remembered on this device.
   const [wideReader, setWideReader] = useState(false);
@@ -1080,10 +1130,34 @@ export function MailboxContentView({
   // The inbox shows its pinned messages first, under their own heading, and only there.
   const pinnedRows = folder === "inbox" ? (pinnedListing.data?.items ?? []).filter(keepRow) : [];
   const pinnedKeys = new Set(pinnedRows.map((i) => `${i.mailboxId}:${i.id}`));
+  // The pile filter leaves pinned messages and the open one in place.
+  const inPile = (i: ListedItem) =>
+    !smartOn ||
+    pile === "all" ||
+    rowPile(i, knownPeople) === pile ||
+    (selection?.id === i.id && selection.mailboxId === i.mailboxId);
   const rows = [
     ...pinnedRows,
-    ...(listedItems?.filter((i) => !pinnedKeys.has(`${i.mailboxId}:${i.id}`) && keepRow(i)) ?? []),
+    ...(listedItems?.filter(
+      (i) => !pinnedKeys.has(`${i.mailboxId}:${i.id}`) && keepRow(i) && inPile(i),
+    ) ?? []),
   ];
+  // A thin pile loads the next pages on its own (a few at most).
+  const pileShown = rows.length - pinnedRows.length;
+  const pagesLoaded = listing.data?.pages.length ?? 0;
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = listing;
+  useEffect(() => {
+    if (!smartOn || pile === "all") return;
+    if (
+      shouldLoadMore({
+        shown: pileShown,
+        pagesLoaded,
+        hasNextPage,
+        fetching: isFetchingNextPage,
+      })
+    )
+      void fetchNextPage();
+  }, [smartOn, pile, pileShown, pagesLoaded, hasNextPage, isFetchingNextPage, fetchNextPage]);
   const selectedBox = readable.find((b) => b.id === selection?.mailboxId);
   // Warms the folder list "Move to" opens with, as soon as a message is open.
   useQuery(
@@ -1112,6 +1186,13 @@ export function MailboxContentView({
   );
   const item = visibleItem && !detail.isError ? detail.data : null;
   const pendingSentReply = item?.kind === "sent" && !item.transportMessageId;
+  // The person's own quick replies, or the built-in set in their language.
+  const quickReplies = prefs.quickReplies ?? [
+    t("quickReplies.default1"),
+    t("quickReplies.default2"),
+    t("quickReplies.default3"),
+    t("quickReplies.default4"),
+  ];
   const writable = boxes.filter(
     (b) => b.canDraft && b.status === "planned" && (!mailboxKind || b.kind === mailboxKind),
   );
@@ -1119,10 +1200,15 @@ export function MailboxContentView({
     (cause) => (cause as { data?: { code?: string } } | null)?.data?.code === "FORBIDDEN",
   );
   const composerAllowed = !!composer && writable.some((b) => b.id === composer.mailboxId);
-  function openComposer(mailboxId: string, source: Item | null, mode: ComposeMode = "reply") {
+  function openComposer(
+    mailboxId: string,
+    source: Item | null,
+    mode: ComposeMode = "reply",
+    quickReply?: string,
+  ) {
     const session = ++composerSequence.current;
     composerSession.current = session;
-    compose({ session, mailboxId, source, mode });
+    compose({ session, mailboxId, source, mode, ...(quickReply ? { quickReply } : {}) });
   }
   const closeComposer = useCallback((session: number) => {
     if (composerSession.current !== session) return;
@@ -1309,7 +1395,9 @@ export function MailboxContentView({
     );
   }
   const sendKey = item ? `${item.mailboxId}:${item.id}:${item.revision}` : null;
-  const sendState = item?.sendStatus ?? (sendKey ? sendStates[sendKey] : undefined);
+  const sendState: SendState | null | undefined =
+    item?.sendStatus ??
+    (sendKey ? (held?.key === sendKey ? "waiting" : sendStates[sendKey]) : undefined);
   const deliveryReady = capability.data?.deliveryReady === true;
   const isOwner = !!selectedBox?.ownerActive && selectedBox.ownerUserId === currentUserId;
   const actionItem = item ?? blockedRow;
@@ -1938,8 +2026,76 @@ export function MailboxContentView({
       expectedRevision: item.revision,
     });
   }
-  /** One send of one exact saved revision: from the open draft or the composer's Send. */
+  /**
+   * Send from the open draft or the composer: after the undo-send wait when
+   * the person keeps one (Preferências), at once otherwise.
+   */
   async function submitRevision(revision: {
+    mailboxId: string;
+    id: string;
+    expectedRevision: number;
+  }) {
+    const key = heldSendKey(revision);
+    if (attempted.current.has(key) || heldSend()?.key === key) return;
+    const seconds = prefs.undoSendSeconds;
+    if (!seconds) return deliverRevision(revision);
+    holdSend(revision, seconds * 1000);
+    setNotice("");
+    toast(t("undoSend.waiting", { seconds }), "info", {
+      action: { label: t("organization.undo"), run: () => void undoHeldSend() },
+      durationMs: seconds * 1000,
+    });
+  }
+  /** The wait is over: the message goes now, after any send still in flight. */
+  function deliverHeld(revision: HeldRevision) {
+    if (sending.current) {
+      setTimeout(() => sendActions.current.deliver(revision), 400);
+      return;
+    }
+    void deliverRevision(revision);
+  }
+  /** After "Desfazer": nothing was sent; the draft opens again to be changed. */
+  function afterUndoSend(send: HeldSend) {
+    toast(t("undoSend.cancelled"), "info");
+    const { mailboxId, id } = send.revision;
+    if (!(folder === "drafts" && selection?.mailboxId === mailboxId && selection.id === id)) {
+      changeFolder("drafts");
+      select({ mailboxId, id });
+    }
+    void queries
+      .fetchQuery(trpc.mailboxes.item.queryOptions({ mailboxId, id }, { staleTime: 0 }))
+      .then((draft) => {
+        if (mounted.current && draft.kind === "draft" && !composerSession.current)
+          openComposer(mailboxId, draft);
+      })
+      .catch(() => {
+        // The draft stays in Rascunhos; opening it is one click away.
+      });
+  }
+  // The view that mounted last delivers and answers "Desfazer", through this
+  // ref so the timer and the toast always reach its latest render.
+  const sendActions = useRef({ deliver: deliverHeld, undone: afterUndoSend });
+  sendActions.current = { deliver: deliverHeld, undone: afterUndoSend };
+  useEffect(() => {
+    setHeldSendHandlers({
+      deliver: (revision) => sendActions.current.deliver(revision),
+      undone: (send) => sendActions.current.undone(send),
+    });
+  }, []);
+  // While a send waits: leaving the page asks first, and the open draft counts down.
+  const heldKey = held?.key;
+  useEffect(() => {
+    if (!heldKey) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    const tick = setInterval(() => setSendClock((value) => value + 1), 1000);
+    return () => {
+      window.removeEventListener("beforeunload", warn);
+      clearInterval(tick);
+    };
+  }, [heldKey]);
+  /** One send of one exact saved revision, now. */
+  async function deliverRevision(revision: {
     mailboxId: string;
     id: string;
     expectedRevision: number;
@@ -2040,6 +2196,17 @@ export function MailboxContentView({
         !mailboxContentBlocked(i) &&
         !(seenOverride[rowKey(i)] ?? i.seenAt !== null),
     ).length ?? 0;
+  const piles = smartOn
+    ? pileCounts(
+        // Rows on their way out (archived, deleted...) leave the counts at once too.
+        (listedItems ?? []).filter((i) => !departing.has(rowKey(i))),
+        knownPeople,
+        (i) =>
+          i.kind === "inbox" &&
+          !mailboxContentBlocked(i) &&
+          !(seenOverride[rowKey(i)] ?? i.seenAt !== null),
+      )
+    : null;
   const now = new Date();
   const listDate = (value: Date) => mailboxListDate(value, now, locale);
   // Which mailbox a row belongs to matters only when rows of several are mixed.
@@ -2137,7 +2304,8 @@ export function MailboxContentView({
         run(() => setShortcutsOpen(true));
         return;
       case "undo":
-        if (undo && undo.notice === notice) run(() => void runUndo());
+        if (heldSend()) run(() => void undoHeldSend());
+        else if (undo) run(() => void runUndo());
         return;
     }
   };
@@ -2408,7 +2576,9 @@ export function MailboxContentView({
                           aria-pressed={unreadOnly}
                           onClick={() => setUnreadOnly((value) => !value)}
                         >
-                          {t("organization.unreadFilter", { count: unreadTotal })}
+                          {t("organization.unreadFilter", {
+                            count: piles && pile !== "all" ? piles[pile].unread : unreadTotal,
+                          })}
                         </button>
                       ) : null}
                       <span className={styles.messageCount}>
@@ -2419,6 +2589,16 @@ export function MailboxContentView({
                 </div>
               ) : null}
             </div>
+            {piles ? (
+              <MailboxSmartTabs
+                value={pile}
+                counts={piles}
+                onChange={(next) => {
+                  setPile(next);
+                  listBody.current?.scrollTo({ top: 0 });
+                }}
+              />
+            ) : null}
             <div
               ref={listBody}
               className={styles.listBody}
@@ -2694,51 +2874,71 @@ export function MailboxContentView({
                   <NavGlyph name="emails" hovered={false} />
                   <h3>
                     {t(
-                      search
-                        ? "noMessageMatches"
-                        : folder === "trash"
-                          ? "trashEmptyTitle"
-                          : folder === "archive"
-                            ? "archiveEmptyTitle"
-                            : folder === "quarantine"
-                              ? "safety.quarantineEmptyTitle"
-                              : folder === "spam"
-                                ? "safety.spamEmptyTitle"
-                                : folder === "sent"
-                                  ? "sentEmptyTitle"
-                                  : folder === "drafts"
-                                    ? "draftsEmptyTitle"
-                                    : folder === "snoozed" ||
-                                        folder === "scheduled" ||
-                                        folder === "followups"
-                                      ? `timing.empty.${folder}.title`
-                                      : "inboxEmptyTitle",
+                      smartOn && pile !== "all"
+                        ? `smart.empty.${pile}.title`
+                        : search
+                          ? "noMessageMatches"
+                          : folder === "trash"
+                            ? "trashEmptyTitle"
+                            : folder === "archive"
+                              ? "archiveEmptyTitle"
+                              : folder === "quarantine"
+                                ? "safety.quarantineEmptyTitle"
+                                : folder === "spam"
+                                  ? "safety.spamEmptyTitle"
+                                  : folder === "sent"
+                                    ? "sentEmptyTitle"
+                                    : folder === "drafts"
+                                      ? "draftsEmptyTitle"
+                                      : folder === "snoozed" ||
+                                          folder === "scheduled" ||
+                                          folder === "followups"
+                                        ? `timing.empty.${folder}.title`
+                                        : "inboxEmptyTitle",
                     )}
                   </h3>
                   <p>
                     {t(
-                      search
-                        ? "searchEmptyBody"
-                        : folder === "trash"
-                          ? "trashEmptyBody"
-                          : folder === "archive"
-                            ? "archiveEmptyBody"
-                            : folder === "quarantine"
-                              ? "safety.quarantineEmptyBody"
-                              : folder === "spam"
-                                ? "safety.spamEmptyBody"
-                                : folder === "sent"
-                                  ? "sentEmptyBody"
-                                  : folder === "drafts"
-                                    ? "draftsEmptyBody"
-                                    : folder === "snoozed" ||
-                                        folder === "scheduled" ||
-                                        folder === "followups"
-                                      ? `timing.empty.${folder}.body`
-                                      : "inboxEmptyBody",
+                      smartOn && pile !== "all"
+                        ? `smart.empty.${pile}.body`
+                        : search
+                          ? "searchEmptyBody"
+                          : folder === "trash"
+                            ? "trashEmptyBody"
+                            : folder === "archive"
+                              ? "archiveEmptyBody"
+                              : folder === "quarantine"
+                                ? "safety.quarantineEmptyBody"
+                                : folder === "spam"
+                                  ? "safety.spamEmptyBody"
+                                  : folder === "sent"
+                                    ? "sentEmptyBody"
+                                    : folder === "drafts"
+                                      ? "draftsEmptyBody"
+                                      : folder === "snoozed" ||
+                                          folder === "scheduled" ||
+                                          folder === "followups"
+                                        ? `timing.empty.${folder}.body`
+                                        : "inboxEmptyBody",
                     )}
                   </p>
-                  {search ? (
+                  {smartOn && pile !== "all" ? (
+                    <span className={styles.emptyActions}>
+                      <button type="button" className="ms-btn" onClick={() => setPile("all")}>
+                        {t("smart.showAll")}
+                      </button>
+                      {listing.hasNextPage ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-ghost"
+                          disabled={listing.isFetchingNextPage}
+                          onClick={() => void listing.fetchNextPage()}
+                        >
+                          {t(listing.isFetchingNextPage ? "list.loadingMore" : "list.loadMore")}
+                        </button>
+                      ) : null}
+                    </span>
+                  ) : search ? (
                     <button type="button" className="ms-btn" onClick={() => setSearch("")}>
                       {t("clearSearch")}
                     </button>
@@ -3174,7 +3374,25 @@ export function MailboxContentView({
                       {t("sentReplyPending")}
                     </p>
                   ) : null}
-                  {item.kind === "draft" && sendState ? (
+                  {item.kind === "draft" && sendState === "waiting" ? (
+                    <p className={styles.contentNotice}>
+                      <span role="status">{t("undoSend.waitingDraft")}</span>{" "}
+                      {held ? (
+                        <span aria-hidden="true">
+                          {t("undoSend.countdown", {
+                            seconds: Math.max(1, Math.ceil((held.deadline - Date.now()) / 1000)),
+                          })}
+                        </span>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={`ms-btn ms-btn-ghost ${styles.undoAction}`}
+                        onClick={() => void undoHeldSend()}
+                      >
+                        {t("organization.undo")}
+                      </button>
+                    </p>
+                  ) : item.kind === "draft" && sendState ? (
                     <p className={styles.contentNotice} role="status">
                       {t(
                         sendState === "requesting"
@@ -3217,6 +3435,22 @@ export function MailboxContentView({
                       ))}
                     </section>
                   ) : null}
+                  {item.kind === "inbox" && actions?.canRespond && quickReplies.length ? (
+                    <section aria-label={t("quickReplies.title")} className={styles.quickReplies}>
+                      <span className={styles.quickRepliesLabel}>{t("quickReplies.title")}</span>
+                      {quickReplies.map((reply) => (
+                        <button
+                          key={reply}
+                          type="button"
+                          className={styles.quickReply}
+                          title={t("quickReplies.use")}
+                          onClick={() => openComposer(item.mailboxId, item, "reply", reply)}
+                        >
+                          {reply}
+                        </button>
+                      ))}
+                    </section>
+                  ) : null}
                 </article>
               ) : (
                 <div className={styles.hero}>
@@ -3236,6 +3470,7 @@ export function MailboxContentView({
           mailboxId={composer.mailboxId}
           source={composer.source}
           mode={composer.mode}
+          quickReply={composer.quickReply}
           deliveryReady={deliveryReady}
           current={() => composerSession.current === composer.session}
           close={() => closeComposer(composer.session)}

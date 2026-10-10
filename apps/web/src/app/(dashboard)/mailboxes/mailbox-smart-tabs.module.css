@@ -1,0 +1,53 @@
+/* Caixa inteligente: one row of piles above the Inbox list; scrolls sideways on a phone. */
+.tabs {
+  display: flex;
+  gap: 6px;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--ms-line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ms-muted);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--ms-dur-fast) var(--ms-ease),
+    border-color var(--ms-dur-fast) var(--ms-ease);
+}
+.tab:hover {
+  color: var(--ms-bone);
+}
+.tab:focus-visible {
+  outline: none;
+  box-shadow: var(--ms-focus-ring);
+}
+.tab[aria-pressed="true"] {
+  background: var(--ms-bone);
+  border-color: var(--ms-bone);
+  color: var(--ms-void);
+}
+.count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ms-violet);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}

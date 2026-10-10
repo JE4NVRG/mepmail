@@ -13,6 +13,7 @@ const base = {
   text: "Oi, Ana!   Adicionei os registros DKIM https://example.com/x na Cloudflare.",
   date: new Date("2026-10-10T11:42:00Z"),
   attachmentCount: 2,
+  category: "person" as const,
 };
 
 describe("mailbox list summary", () => {
@@ -45,5 +46,11 @@ describe("mailbox list summary", () => {
     expect(decodeMailboxListSummary(Buffer.from("not json"))).toBeNull();
     expect(decodeMailboxListSummary(Buffer.from(JSON.stringify({ v: 2, s: "x" })))).toBeNull();
     expect(decodeMailboxListSummary(Buffer.from(JSON.stringify({ v: 1, s: 1 })))).toBeNull();
+    // Version 1 (0.91, no smart inbox pile) is rebuilt from the message, not guessed.
+    const { c: _pile, ...current } = JSON.parse(
+      (encodeMailboxListSummary(base) as Buffer).toString("utf8"),
+    );
+    expect(decodeMailboxListSummary(Buffer.from(JSON.stringify({ ...current, v: 1 })))).toBeNull();
+    expect(decodeMailboxListSummary(Buffer.from(JSON.stringify(current)))).toBeNull();
   });
 });

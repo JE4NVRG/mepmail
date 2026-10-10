@@ -317,6 +317,42 @@ describe("inbox preferences", () => {
       density: "compact",
     });
   });
+
+  it("keeps the undo-send delay and short quick replies within the stored object's ceiling", async () => {
+    const saved = await as().preferences.set({
+      undoSendSeconds: 20,
+      quickReplies: ["  Obrigado! ", "Combinado."],
+    });
+    expect(saved).toMatchObject({ undoSendSeconds: 20, quickReplies: ["Obrigado!", "Combinado."] });
+    expect(await as().preferences.set({ quickReplies: null })).toMatchObject({
+      quickReplies: null,
+    });
+    await expect(as().preferences.set({ undoSendSeconds: 7 })).rejects.toMatchObject({
+      message: "invalid_preference:undoSendSeconds",
+    });
+    await expect(
+      as().preferences.set({ quickReplies: Array.from({ length: 9 }, (_, i) => `r${i}`) }),
+    ).rejects.toMatchObject({ message: "invalid_preference:quickReplies" });
+    await expect(
+      as().preferences.set({
+        quickReplies: Array.from({ length: 8 }, (_, i) => `${i}${"😀".repeat(79)}`),
+      }),
+    ).rejects.toMatchObject({ message: "invalid_preference:quickReplies" });
+    // The largest accepted list next to the longest value of every other field
+    // still fits the 4 KiB check on the stored object.
+    const widest = Array.from({ length: 8 }, (_, i) => `${i || ""}${"ç".repeat(126)}`);
+    const folderStart = `folder:${"0".repeat(8)}-0000-4000-8000-${"0".repeat(12)}`;
+    expect(
+      await as().preferences.set({
+        ...MAILBOX_PREFERENCE_DEFAULTS,
+        theme: "system",
+        density: "comfortable",
+        readingPane: "bottom",
+        startFolder: folderStart,
+        quickReplies: widest,
+      }),
+    ).toMatchObject({ quickReplies: widest });
+  });
 });
 
 describe("folder rail across mailboxes", () => {

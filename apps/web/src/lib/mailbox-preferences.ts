@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { CORREIO_PREFS_KEY } from "./mailbox-preferences-prepaint";
+import { quickRepliesSchema, type UndoSendSeconds, undoSendSchema } from "./mailbox-quick-replies";
 import { applyTheme } from "./theme";
 import { useTRPC } from "./trpc";
 
@@ -30,6 +31,9 @@ const FIELDS = {
   showAvatars: z.boolean(),
   markSeenAfterMs: z.union([z.literal(0), z.literal(1500), z.literal(3000), z.null()]),
   showShortcutHints: z.boolean(),
+  undoSendSeconds: undoSendSchema,
+  quickReplies: quickRepliesSchema,
+  smartInbox: z.boolean(),
 };
 
 export type CorreioPrefs = {
@@ -42,6 +46,12 @@ export type CorreioPrefs = {
   showAvatars: boolean;
   markSeenAfterMs: 0 | 1500 | 3000 | null;
   showShortcutHints: boolean;
+  /** Seconds Send waits for "Desfazer"; 0 sends at once. */
+  undoSendSeconds: UndoSendSeconds;
+  /** The person's own quick replies, or null for the built-in set. */
+  quickReplies: string[] | null;
+  /** Caixa inteligente: the Inbox split into Pessoas, Notificações and Newsletters. */
+  smartInbox: boolean;
 };
 
 export const CORREIO_PREF_DEFAULTS: CorreioPrefs = {
@@ -54,6 +64,9 @@ export const CORREIO_PREF_DEFAULTS: CorreioPrefs = {
   showAvatars: true,
   markSeenAfterMs: 1500,
   showShortcutHints: true,
+  undoSendSeconds: 10,
+  quickReplies: null,
+  smartInbox: true,
 };
 
 type Field = keyof CorreioPrefs;
@@ -204,8 +217,11 @@ export function useCorreioPrefs(): {
     [flush],
   );
 
+  // "Restaurar padrão" is about how the inbox looks and behaves: the quick
+  // replies the person wrote stay.
   const resetPrefs = useCallback(() => {
-    setPref({ ...CORREIO_PREF_DEFAULTS });
+    const { quickReplies: _kept, ...defaults } = CORREIO_PREF_DEFAULTS;
+    setPref(defaults);
   }, [setPref]);
 
   useEffect(
