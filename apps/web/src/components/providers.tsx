@@ -1,7 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { createTRPCClient, httpBatchStreamLink } from "@trpc/client";
 import { useState } from "react";
 import superjson from "superjson";
 import { TRPCProvider } from "@/lib/trpc";
@@ -38,7 +38,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const queryClient = getQueryClient();
   const [trpcClient] = useState(() =>
     createTRPCClient<AppRouter>({
-      links: [httpBatchLink({ url: "/api/trpc", transformer: superjson })],
+      // Still batched, but each answer streams back as soon as it is ready, so a
+      // slow query (the Correio list) never holds the folders and counters behind it.
+      links: [httpBatchStreamLink({ url: "/api/trpc", transformer: superjson })],
     }),
   );
   return (

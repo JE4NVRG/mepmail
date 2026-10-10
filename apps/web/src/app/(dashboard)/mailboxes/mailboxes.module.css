@@ -2718,3 +2718,10 @@
   border-color: var(--ms-warn-border);
   background: var(--ms-warn-bg);
 }
+
+/* The body of a message still loading under its known header. */
+.readerLoading {
+  margin: 24px 0 0;
+  color: var(--ms-muted);
+  font-size: 12px;
+}

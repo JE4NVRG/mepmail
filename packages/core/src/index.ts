@@ -463,6 +463,7 @@ export {
   summarizeMailboxThreads,
   withMailboxContentAccess,
   withMailboxItem,
+  withMailboxItems,
 } from "./mailbox-private-store.js";
 export {
   getMailboxReceivingReadiness,

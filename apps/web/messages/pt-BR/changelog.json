@@ -28,6 +28,23 @@
   },
   "releases": [
     {
+      "version": "0.86",
+      "date": "2026-10-10",
+      "title": "Correio mais rápido",
+      "summary": "A lista do Correio carrega muito mais depressa, pastas já visitadas abrem na hora e as mensagens começam a carregar quando você passa o mouse.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "A lista de mensagens lê só o que a linha mostra, em lote por caixa, em vez de abrir cada mensagem inteira.",
+            "Voltar a uma pasta mostra a lista na hora e atualiza em segundo plano; passar o mouse numa pasta ou mensagem já começa a carregá-la.",
+            "O leitor mostra assunto, remetente e data enquanto o corpo da mensagem chega.",
+            "No painel inteiro, cada consulta chega assim que fica pronta: uma resposta lenta não segura as outras."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.85",
       "date": "2026-10-10",
       "title": "Aviso de cookies mais discreto",

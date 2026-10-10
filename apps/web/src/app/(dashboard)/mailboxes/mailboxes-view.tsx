@@ -834,6 +834,20 @@ export function MailboxesView({
       </div>,
     );
   const ownsBox = (box: Box) => box.ownerActive && box.ownerUserId === session?.user.id;
+  // The rail reads a folder's first page ahead, under the same key the list uses.
+  const prefetchFolder = (next: MailboxFolder) => {
+    if (next === "custom" || next === folder) return;
+    void queries.prefetchInfiniteQuery(
+      trpc.mailboxes.items.infiniteQueryOptions(
+        {
+          mailboxId: selected?.id ?? null,
+          folder: next,
+          mailboxKind: mailboxKind === "all" ? undefined : mailboxKind,
+        },
+        { getNextPageParam: (page) => page.nextCursor, retry: false, staleTime: 15_000 },
+      ),
+    );
+  };
   // The rail's "···" beside CAIXAS: mailbox management, for admins.
   const boxesMenu: (PopoverMenuItem | null)[] = registry.data?.canManage
     ? [
@@ -957,6 +971,7 @@ export function MailboxesView({
       }}
       onScope={changeScope}
       onFolder={(next) => chooseFolder(next)}
+      onPrefetch={prefetchFolder}
       dropProps={(target, key) => dropProps(target as MailboxDropTarget, key)}
       boxesMenu={boxesMenu}
       boxMenu={boxMenu}

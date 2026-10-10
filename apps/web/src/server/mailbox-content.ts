@@ -16,6 +16,7 @@ import {
   summarizeMailboxThreads,
   withMailboxContentAccess,
   withMailboxItem,
+  withMailboxItems,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
@@ -106,6 +107,56 @@ function dto(mime: Awaited<ReturnType<typeof parse>>) {
       return { index, filename: filename(a.filename), bytes: a.content.length, image };
     }),
   };
+}
+
+/** Runs `work` over `items` with at most `limit` at a time, keeping their order. */
+async function runLimited<T, R>(
+  items: readonly T[],
+  limit: number,
+  work: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(Math.max(1, limit), items.length) }, async () => {
+      while (next < items.length) {
+        const index = next++;
+        results[index] = await work(items[index]!, index);
+      }
+    }),
+  );
+  return results;
+}
+/** What a list row shows: no HTML projection, image probing or reply lookups. */
+function listDto(mime: Awaited<ReturnType<typeof parse>>) {
+  return {
+    subject: mime.subject ?? "",
+    from: mime.from?.value[0]?.address ?? "",
+    fromName: mime.from?.value[0]?.name ?? "",
+    to: addresses(mime.to),
+    text: mime.text ?? "",
+    date: mime.date && !Number.isNaN(mime.date.getTime()) ? mime.date : null,
+    attachmentCount: mime.attachments.length,
+  };
+}
+type OutboundResults = NonNullable<Awaited<ReturnType<typeof getMailboxOutboundSummary>>>;
+/** Keep the private ledger behind the server boundary, including if its internal
+ * contract later acquires correlation or recipient metadata. */
+function outboundDto(results: OutboundResults | null): MailboxOutboundSummary | null {
+  return results
+    ? {
+        totalRecipients: results.totalRecipients,
+        delivered: results.delivered,
+        delayed: results.delayed,
+        hardBounce: results.hardBounce,
+        complaint: results.complaint,
+        softBounce: results.softBounce,
+        rejected: results.rejected,
+        renderingFailed: results.renderingFailed,
+        unconfirmed: results.unconfirmed,
+        lastObservedAt: results.lastObservedAt,
+      }
+    : null;
 }
 
 /** Metadata is a correlation hint, never authority. Only accepted outboxes with
@@ -233,22 +284,7 @@ export async function getMailboxContent(
         outboxId,
       })
     : null;
-  // Keep the private ledger behind the server boundary, including if its
-  // internal contract later acquires correlation or recipient metadata.
-  const outboundSummary: MailboxOutboundSummary | null = results
-    ? {
-        totalRecipients: results.totalRecipients,
-        delivered: results.delivered,
-        delayed: results.delayed,
-        hardBounce: results.hardBounce,
-        complaint: results.complaint,
-        softBounce: results.softBounce,
-        rejected: results.rejected,
-        renderingFailed: results.renderingFailed,
-        unconfirmed: results.unconfirmed,
-        lastObservedAt: results.lastObservedAt,
-      }
-    : null;
+  const outboundSummary = outboundDto(results);
   return withMailboxContentAccess(db, actor, [input.mailboxId], async () => ({
     ...content,
     contentTrust: "untrusted-message" as const,
@@ -258,6 +294,91 @@ export async function getMailboxContent(
     sentBy,
     outboundSummary,
   }));
+}
+
+/**
+ * The content of a page of list rows, mailbox by mailbox: one authorization per
+ * mailbox, envelopes opened a few at a time, and the send state of drafts and
+ * sent messages read in one query each. The reader keeps getMailboxContent.
+ */
+async function listRowContents(
+  db: Db,
+  actor: MailboxContentActor,
+  rows: { id: string; mailboxId: string }[],
+) {
+  type Content = ReturnType<typeof listDto> & {
+    sentBy: { kind: "human" | "agent"; label: string | null } | null;
+    sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null;
+    outboundSummary: MailboxOutboundSummary | null;
+  };
+  const contents = new Map<string, Content>();
+  const byMailbox = new Map<string, string[]>();
+  for (const row of rows)
+    byMailbox.set(row.mailboxId, [...(byMailbox.get(row.mailboxId) ?? []), row.id]);
+  await runLimited([...byMailbox], 4, async ([mailboxId, ids]) => {
+    const parsed = await withMailboxItems(db, getKeyring(), actor, { mailboxId, ids }, (items) =>
+      runLimited(items, 8, async (item) => ({
+        id: item.id,
+        kind: item.kind,
+        revision: item.revision,
+        ...listDto(await parse(item.raw)),
+      })),
+    );
+    const draftIds = parsed.filter((item) => item.kind === "draft").map((item) => item.id);
+    const sentIds = parsed.filter((item) => item.kind === "sent").map((item) => item.id);
+    const drafts = draftIds.length
+      ? await db
+          .select({
+            id: schema.mailboxOutbox.id,
+            draftId: schema.mailboxOutbox.draftId,
+            draftRevision: schema.mailboxOutbox.draftRevision,
+            status: schema.mailboxOutbox.status,
+          })
+          .from(schema.mailboxOutbox)
+          .where(
+            and(
+              eq(schema.mailboxOutbox.teamId, actor.teamId),
+              eq(schema.mailboxOutbox.mailboxId, mailboxId),
+              inArray(schema.mailboxOutbox.draftId, draftIds),
+            ),
+          )
+      : [];
+    const sent = sentIds.length
+      ? await acceptedSent(db, actor, mailboxId, inArray(schema.mailboxOutbox.id, sentIds))
+      : [];
+    await runLimited(parsed, 8, async ({ id, kind, revision, ...content }) => {
+      let sendStatus: Content["sendStatus"] = null;
+      let sentBy: Content["sentBy"] = null;
+      let outboxId: string | null = null;
+      if (kind === "sent") {
+        const match = sent.find((entry) => entry.id === id);
+        if (match) {
+          outboxId = match.id;
+          sendStatus = "accepted";
+          sentBy = {
+            kind: match.approvalKind,
+            label: match.approvalKind === "agent" ? match.agentLabel : null,
+          };
+        }
+      } else if (kind === "draft") {
+        const match = drafts.find(
+          (entry) => entry.draftId === id && entry.draftRevision === revision,
+        );
+        sendStatus = match?.status ?? null;
+        outboxId = match?.id ?? null;
+      }
+      const results = outboxId
+        ? await getMailboxOutboundSummary(db, { teamId: actor.teamId, mailboxId, outboxId })
+        : null;
+      contents.set(`${mailboxId}:${id}`, {
+        ...content,
+        sendStatus,
+        sentBy,
+        outboundSummary: outboundDto(results),
+      });
+    });
+  });
+  return contents;
 }
 
 /** A message's conversation in its mailbox, oldest first, each entry read with live access. */
@@ -383,9 +504,10 @@ export async function getMailboxContentList(
         : "inbox";
   const metadata = [];
   const mailboxesTruncated = readable.length > 20;
-  for (const box of readable.slice(0, 20)) {
+  const pages = await runLimited(readable.slice(0, 20), 4, async (box) => ({
+    box,
     // One extra row per box tells whether anything follows this page.
-    const rows = await listMailboxItems(
+    rows: await listMailboxItems(
       db,
       actor,
       box.id,
@@ -421,7 +543,9 @@ export async function getMailboxContentList(
         limit: pageSize + 1,
         latestPerThread: input.groupByThread === true,
       },
-    );
+    ),
+  }));
+  for (const { box, rows } of pages)
     for (const row of rows)
       if (!kind || row.kind === kind)
         metadata.push({
@@ -430,7 +554,6 @@ export async function getMailboxContentList(
           mailboxLabel: box.label,
           mailboxKind: box.kind,
         });
-  }
   // Newest arrival first, like every box's own listing; a draft by its last edit.
   // Starring, filing or archiving never reorders the list. Same key as the store's
   // ORDER BY, so pages across mailboxes never skip or repeat a row.
@@ -479,7 +602,7 @@ export async function getMailboxContentList(
   }[] = [];
   // Messages per conversation, counted inside each listed mailbox.
   const threadStates = new Map<string, { count: number; unread: number }>();
-  for (const mailboxId of new Set(shown.map((row) => row.mailboxId))) {
+  await runLimited([...new Set(shown.map((row) => row.mailboxId))], 4, async (mailboxId) => {
     const states = await summarizeMailboxThreads(
       db,
       actor,
@@ -487,7 +610,14 @@ export async function getMailboxContentList(
       shown.filter((row) => row.mailboxId === mailboxId).map((row) => row.threadKey),
     );
     for (const [key, state] of states) threadStates.set(`${mailboxId}:${key}`, state);
-  }
+  });
+  const blockedRow = (row: (typeof shown)[number]) =>
+    row.deliveryFolder === "quarantine" || row.inboundAssessment?.decision === "quarantine";
+  const contents = await listRowContents(
+    db,
+    actor,
+    shown.filter((row) => !blockedRow(row)),
+  );
   // Without a conversation (or outside one, e.g. a draft) a row stands for itself.
   const threadState = (row: {
     mailboxId: string;
@@ -500,7 +630,7 @@ export async function getMailboxContentList(
       unread: row.kind === "inbox" && row.seenAt === null ? 1 : 0,
     };
   for (const row of shown) {
-    if (row.deliveryFolder === "quarantine" || row.inboundAssessment?.decision === "quarantine") {
+    if (blockedRow(row)) {
       items.push({
         ...row,
         subject: "",
@@ -521,35 +651,37 @@ export async function getMailboxContentList(
       continue;
     }
     const thread = threadState(row);
-    const item = await getMailboxContent(db, actor, { mailboxId: row.mailboxId, id: row.id });
+    const item = contents.get(`${row.mailboxId}:${row.id}`);
+    // Gone between the listing and the read (deleted, or access changed): skip it.
+    if (!item) continue;
     items.push({
       id: row.id,
       mailboxId: row.mailboxId,
       address: row.address,
       mailboxLabel: row.mailboxLabel,
       kind: row.kind,
-      revision: item.revision,
+      revision: row.revision,
       subject: item.subject,
       from: item.from,
       fromName: item.fromName,
       to: item.to,
       snippet: mailboxPreview(item.text),
       date: item.date ?? row.updatedAt,
-      attachmentCount: item.attachments.length,
+      attachmentCount: item.attachmentCount,
       mailboxKind: row.mailboxKind,
       deliveryFolder: row.deliveryFolder,
-      trashedAt: item.trashedAt,
-      starredAt: item.starredAt,
-      seenAt: item.seenAt,
-      archivedAt: item.archivedAt,
-      folderId: item.folderId,
-      snoozedUntil: item.snoozedUntil,
-      pinnedAt: item.pinnedAt,
-      sendAt: item.sendAt,
-      sendFailure: item.sendFailure,
-      remindAt: item.remindAt,
-      remindedAt: item.remindedAt,
-      inboundAssessment: item.inboundAssessment,
+      trashedAt: row.trashedAt,
+      starredAt: row.starredAt,
+      seenAt: row.seenAt,
+      archivedAt: row.archivedAt,
+      folderId: row.folderId,
+      snoozedUntil: row.snoozedUntil,
+      pinnedAt: row.pinnedAt,
+      sendAt: row.sendAt,
+      sendFailure: row.sendFailure,
+      remindAt: row.remindAt,
+      remindedAt: row.remindedAt,
+      inboundAssessment: row.inboundAssessment,
       sentBy: item.sentBy,
       sendStatus: item.sendStatus,
       outboundSummary: item.outboundSummary,

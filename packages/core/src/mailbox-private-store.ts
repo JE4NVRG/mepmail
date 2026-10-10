@@ -410,6 +410,58 @@ export async function withMailboxItem<T>(
   });
 }
 
+/**
+ * Several items of one mailbox under one authorization: what a list page needs.
+ * Envelopes open a few at a time instead of one transaction per row. Items
+ * withMailboxItem would refuse (quarantined; for agents, trashed or unsafe)
+ * are left out. The operation runs inside the same locks, like withMailboxItem.
+ */
+export async function withMailboxItems<T>(
+  db: Db,
+  keyring: Keyring,
+  actor: MailboxContentActor,
+  input: { mailboxId: string; ids: string[] },
+  operation: (items: (ReturnType<typeof summary> & { raw: Buffer })[]) => Promise<T>,
+  concurrency = 8,
+): Promise<T> {
+  actor = { ...actor };
+  const ids = [...new Set(input.ids)];
+  if (ids.length > 101) throw new MailboxContentError("invalid");
+  return scoped(db, actor, input.mailboxId, "read", false, async (tx) => {
+    const found = ids.length
+      ? await tx
+          .select()
+          .from(schema.mailboxItems)
+          .where(
+            and(
+              inArray(schema.mailboxItems.id, ids),
+              eq(schema.mailboxItems.mailboxId, input.mailboxId),
+              eq(schema.mailboxItems.teamId, actor.teamId),
+            ),
+          )
+      : [];
+    const allowed = found.filter(
+      (item) =>
+        item.deliveryFolder !== "quarantine" &&
+        item.inboundAssessment?.decision !== "quarantine" &&
+        !(actor.agentAccess && item.trashedAt !== null) &&
+        !(actor.agentAccess && item.kind === "inbox" && item.deliveryFolder !== "inbox"),
+    );
+    const opened: (ReturnType<typeof summary> & { raw: Buffer })[] = new Array(allowed.length);
+    let next = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(Math.max(1, concurrency), allowed.length) }, async () => {
+        while (next < allowed.length) {
+          const index = next++;
+          const item = allowed[index]!;
+          opened[index] = { ...summary(item), raw: await open(item, keyring) };
+        }
+      }),
+    );
+    return operation(opened);
+  });
+}
+
 export interface MailboxListFilter {
   kind?: "inbox" | "draft" | "sent";
   deliveryFolder?: "inbox" | "spam" | "quarantine";

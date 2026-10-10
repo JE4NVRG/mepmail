@@ -938,7 +938,9 @@ export function MailboxContentView({
       {
         getNextPageParam: (page) => page.nextCursor,
         retry: false,
-        gcTime: 0,
+        // Coming back to a folder shows what it had at once and refreshes behind it.
+        gcTime: 10 * 60_000,
+        staleTime: 15_000,
         // The poll below keeps the list fresh; a focus refetch would redo every page.
         refetchOnWindowFocus: false,
       },
@@ -1054,7 +1056,9 @@ export function MailboxContentView({
     trpc.mailboxes.item.queryOptions(visibleItem ?? { mailboxId: NIL, id: NIL }, {
       enabled: !!visibleItem,
       retry: false,
-      gcTime: 0,
+      // A message read a moment ago, or prefetched on hover, opens at once.
+      gcTime: 2 * 60_000,
+      staleTime: 10_000,
       refetchInterval: 15000,
     }),
   );
@@ -1372,6 +1376,30 @@ export function MailboxContentView({
       if (mounted.current) void refresh();
     }
     return moved;
+  }
+  // Hovering a row reads its message ahead, so opening it shows it at once.
+  const prefetched = useRef(new Set<string>());
+  function prefetchRow(row: Row) {
+    if (mailboxContentBlocked(row)) return;
+    const key = `${row.mailboxId}:${row.id}:${row.revision}`;
+    if (prefetched.current.has(key)) return;
+    prefetched.current.add(key);
+    void queries.prefetchQuery(
+      trpc.mailboxes.item.queryOptions(
+        { mailboxId: row.mailboxId, id: row.id },
+        { retry: false, gcTime: 2 * 60_000, staleTime: 10_000 },
+      ),
+    );
+  }
+  // Only a pointer that rests on a row reads ahead, not one sweeping across the list.
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function hoverRow(row: Row) {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => prefetchRow(row), 120);
+  }
+  function leaveRow() {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = null;
   }
   /** Opening a message the owner has not read marks it read. */
   function openRow(row: Row) {
@@ -2419,6 +2447,9 @@ export function MailboxContentView({
                               selection?.id === row.id && selection?.mailboxId === row.mailboxId
                             }
                             onClick={() => openRow(row)}
+                            onPointerEnter={() => hoverRow(row)}
+                            onPointerLeave={leaveRow}
+                            onFocus={() => prefetchRow(row)}
                           >
                             {prefs.showAvatars ? (
                               <span
@@ -2878,9 +2909,26 @@ export function MailboxContentView({
                   </button>
                 </div>
               ) : visibleItem && detail.isPending ? (
-                <p className={styles.emptyFolder} aria-live="polite">
-                  {t("loading")}
-                </p>
+                // What the row already knows, at once; the body follows.
+                selectedRow ? (
+                  <article className={styles.message} aria-busy="true">
+                    <header>
+                      <h2>{selectedRow.subject || t("noSubject")}</h2>
+                      <p className={styles.address}>
+                        {selectedRow.fromName ? `${selectedRow.fromName} · ` : ""}
+                        {selectedRow.from}
+                      </p>
+                      <small>{date(selectedRow.date)}</small>
+                    </header>
+                    <p className={styles.readerLoading} aria-live="polite">
+                      {t("loading")}
+                    </p>
+                  </article>
+                ) : (
+                  <p className={styles.emptyFolder} aria-live="polite">
+                    {t("loading")}
+                  </p>
+                )
               ) : item ? (
                 <article className={styles.message}>
                   {item.trashedAt ? (

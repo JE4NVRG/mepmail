@@ -7,6 +7,25 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.86] - 2026-10-10
+
+Correio performance cut (from the desktop session). Measured in production
+before it: mailboxes.items 3.3-4.3 s per load, visible list about 10 s.
+
+### Changed
+
+- core `withMailboxItems`: one authorization per mailbox and envelopes
+  opened 8 at a time, with the same exclusions as `withMailboxItem`.
+- `mailbox-content.ts` list path (`listRowContents`): only the row fields,
+  draft/sent outbox in one query per mailbox, threads and send summaries
+  with bounded concurrency; the reader keeps `getMailboxContent`. Local
+  benchmark, 50 messages: 493 ms to 50 ms.
+- Client: list cached 10 min (stale after 15 s), message 2 min, 120 ms hover
+  prefetch on rail folders and rows, reader shows the row's header while the
+  body loads.
+- tRPC client uses `httpBatchStreamLink`: still batched, but each response
+  streams back when ready, so a slow procedure no longer delays the rest.
+
 ## [0.85] - 2026-10-10
 
 ### Changed

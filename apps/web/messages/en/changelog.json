@@ -23,6 +23,23 @@
   },
   "releases": [
     {
+      "version": "0.86",
+      "date": "2026-10-10",
+      "title": "A faster Correio",
+      "summary": "The Correio list loads much faster, folders you already visited open instantly, and messages start loading when you hover them.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "The message list reads only what each row shows, batched per mailbox, instead of opening every message in full.",
+            "Going back to a folder shows its list at once and refreshes in the background; hovering a folder or a message starts loading it.",
+            "The reader shows subject, sender and date while the body arrives.",
+            "Across the dashboard, each query arrives as soon as it is ready, so one slow answer no longer holds the others."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.85",
       "date": "2026-10-10",
       "title": "A quieter cookie notice",

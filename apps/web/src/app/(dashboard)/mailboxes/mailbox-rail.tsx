@@ -58,6 +58,7 @@ export function MailboxRail({
   onSelectBox,
   onScope,
   onFolder,
+  onPrefetch,
   dropProps,
   boxesMenu,
   boxMenu,
@@ -79,6 +80,8 @@ export function MailboxRail({
   onSelectBox: (id: string) => void;
   onScope: (kind: MailboxKindFilter) => void;
   onFolder: (folder: MailboxFolder) => void;
+  /** Reads a folder's first page ahead when the pointer or focus reaches it. */
+  onPrefetch?: (folder: MailboxFolder) => void;
   dropProps: (target: { folder: MailboxFolder }, key: string) => DropProps;
   boxesMenu: (PopoverMenuItem | null)[];
   boxMenu: (PopoverMenuItem | null)[];
@@ -89,6 +92,7 @@ export function MailboxRail({
   const t = useTranslations("mailboxes");
   const id = useId();
   const rail = useRef<HTMLElement>(null);
+  const hover = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState<Partial<Record<"person" | "agent", boolean>>>({});
   const [moreOpen, setMoreOpen] = useState(() => MORE.includes(folder));
@@ -168,6 +172,14 @@ export function MailboxRail({
       aria-current={entry === folder ? "page" : undefined}
       title={t(entry)}
       onClick={() => onFolder(entry)}
+      onPointerEnter={() => {
+        if (hover.current) clearTimeout(hover.current);
+        hover.current = setTimeout(() => onPrefetch?.(entry), 120);
+      }}
+      onPointerLeave={() => {
+        if (hover.current) clearTimeout(hover.current);
+      }}
+      onFocus={() => onPrefetch?.(entry)}
       {...(DROPPABLE.has(entry) ? dropProps({ folder: entry }, entry) : {})}
     >
       <MailboxFolderIcon name={entry} />
