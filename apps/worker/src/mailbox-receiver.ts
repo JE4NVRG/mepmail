@@ -74,6 +74,8 @@ export function createMailboxReceiver(options: {
   enabled: boolean;
   topics: readonly string[];
   locations: readonly MailboxPrivateObjectLocation[];
+  /** Sender-decision key (deriveMailboxSenderKey): blocked senders are filed in Spam. */
+  senderKey?: Buffer | undefined;
 }) {
   const topics = [...options.topics];
   const locations = options.locations.map((location) => ({ ...location }));
@@ -119,7 +121,13 @@ export function createMailboxReceiver(options: {
     await receiveMailboxMime(
       options.db,
       options.keys,
-      { sourceId, recipients, raw, assessment },
+      {
+        sourceId,
+        recipients,
+        raw,
+        assessment,
+        ...(options.senderKey ? { senderKey: options.senderKey } : {}),
+      },
       options.mime,
     );
     return true;

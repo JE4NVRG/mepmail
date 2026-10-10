@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.94",
+      "date": "2026-10-10",
+      "title": "Aprovação de remetentes e convites de calendário",
+      "summary": "O Correio pergunta antes de uma pessoa nova chegar à sua Entrada e mostra convites de calendário num cartão para entrar na reunião ou salvar na agenda.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Aprovação de remetentes: o primeiro e-mail de alguém novo mostra Remetente novo, com Aprovar e Bloquear. Bloquear manda esta e as próximas mensagens para o Spam, com Desfazer; desligue em Preferências.",
+            "Convites de calendário: o convite mostra título, horário no seu fuso, local, organizador e convidados, com Entrar na reunião, Adicionar ao Google Agenda e Baixar convite (.ics)."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.93",
       "date": "2026-10-10",
       "title": "Desfazer envio, respostas rápidas e Caixa inteligente",

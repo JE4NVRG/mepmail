@@ -545,6 +545,8 @@ export function MailboxesView({
   // announced. In a browser the inbox list raises its own per-message notices
   // (the bell), so nothing is shown from here.
   const trpcClient = useTRPCClient();
+  const smartInbox = useRef(prefs.smartInbox);
+  smartInbox.current = prefs.smartInbox;
   const lastUnread = useRef<number | null>(null);
   const announced = useRef<Set<string> | null>(null);
   useEffect(() => {
@@ -577,6 +579,10 @@ export function MailboxesView({
             more: (count) => t("app.newMailMore", { count }),
           },
           fallback,
+          // With the caixa inteligente on, only people notify.
+          smartInbox.current
+            ? (row) => row.category === "notification" || row.category === "newsletter"
+            : undefined,
         ),
       )
       .catch(() => [fallback])

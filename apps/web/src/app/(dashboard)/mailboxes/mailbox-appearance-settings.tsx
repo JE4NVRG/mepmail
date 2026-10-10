@@ -403,6 +403,16 @@ export function MailboxAppearanceSettings({
         </div>
         <p className={styles.hint}>{t("smartInboxHint")}</p>
         <div className={styles.appearanceRow}>
+          <span id={`${id}-senders`}>{t("askNewSenders")}</span>
+          <Switch
+            checked={prefs.askNewSenders}
+            disabled={false}
+            ariaLabel={t("askNewSenders")}
+            onChange={(checked) => setPref({ askNewSenders: checked })}
+          />
+        </div>
+        <p className={styles.hint}>{t("askNewSendersHint")}</p>
+        <div className={styles.appearanceRow}>
           <span id={`${id}-avatars`}>{common("view.showAvatars")}</span>
           <Switch
             checked={prefs.showAvatars}

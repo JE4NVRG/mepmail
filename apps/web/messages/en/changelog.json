@@ -23,6 +23,21 @@
   },
   "releases": [
     {
+      "version": "0.94",
+      "date": "2026-10-10",
+      "title": "Sender approval and calendar invites",
+      "summary": "Correio asks before a new person reaches your Inbox, and shows calendar invitations as a card you can join or save to your calendar.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Sender approval: the first email from someone new shows New sender with Approve and Block. Blocking files this and future messages in Spam, with Undo; turn it off in Preferences.",
+            "Calendar invites: the invitation shows its title, the time in your time zone, place, organizer and guests, with Join meeting, Add to Google Calendar and Download invite (.ics)."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.93",
       "date": "2026-10-10",
       "title": "Undo send, quick replies and a smart inbox",

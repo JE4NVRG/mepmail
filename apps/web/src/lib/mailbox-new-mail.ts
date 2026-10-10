@@ -12,6 +12,8 @@ export type NewMailRow = {
   from: string;
   fromName: string;
   subject: string;
+  /** Smart inbox pile, when the list carries one. */
+  category?: "person" | "notification" | "newsletter" | null;
 };
 
 export type NewMailNotice = { title: string; body: string };
@@ -39,17 +41,23 @@ export function rememberUnread(rows: readonly NewMailRow[], notified: Set<string
 /**
  * The notifications for unread rows not announced before (and marks them as
  * announced). When none of the new mail is in `rows`, the count-only
- * `fallback` is shown so an arrival is never silent.
+ * `fallback` is shown so an arrival is never silent. `quiet` rows (with the
+ * caixa inteligente on: notifications and newsletters) are marked as
+ * announced without a notification; when all the new mail is quiet, nothing
+ * is shown.
  */
 export function newMailNotices(
   rows: readonly NewMailRow[],
   notified: Set<string>,
   labels: NewMailLabels,
   fallback: NewMailNotice,
+  quiet?: (row: NewMailRow) => boolean,
 ): NewMailNotice[] {
-  const fresh = rows.filter((row) => row.seenAt === null && !notified.has(rowKey(row)));
-  for (const row of fresh) notified.add(rowKey(row));
-  if (!fresh.length) return [fallback];
+  const arrived = rows.filter((row) => row.seenAt === null && !notified.has(rowKey(row)));
+  for (const row of arrived) notified.add(rowKey(row));
+  if (!arrived.length) return [fallback];
+  const fresh = quiet ? arrived.filter((row) => !quiet(row)) : arrived;
+  if (!fresh.length) return [];
   if (fresh.length <= EACH)
     return fresh.map((row) => ({
       title: sender(row) || labels.fallbackTitle,

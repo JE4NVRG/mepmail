@@ -75,9 +75,11 @@ import {
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
+import { MailboxInviteCard } from "./mailbox-invite-card";
 import { MailboxMoveMenu, type MailboxMoveMenuHandle } from "./mailbox-move-menu";
 import { MailboxRecipientField } from "./mailbox-recipient-field";
 import { MailboxRichBody } from "./mailbox-rich-body";
+import { MailboxSenderBar } from "./mailbox-sender-bar";
 import { MailboxSmartTabs } from "./mailbox-smart-tabs";
 import { MailboxTimeMenu, type MailboxTimeMenuHandle } from "./mailbox-time-menu";
 import { MailboxViewMenu } from "./mailbox-view-menu";
@@ -895,6 +897,13 @@ export function MailboxContentView({
   );
   const archiveMutation = useMutation(trpc.mailboxes.setArchive.mutationOptions({ retry: false }));
   const seenMutation = useMutation(trpc.mailboxes.setSeen.mutationOptions({ retry: false }));
+  const senderMutation = useMutation(
+    trpc.mailboxes.senders.decide.mutationOptions({ retry: false }),
+  );
+  // Answers given here show at once, keyed by mailbox and sender address.
+  const [senderAnswers, setSenderAnswers] = useState<Record<string, "allow" | "block" | "none">>(
+    {},
+  );
   const snoozeMutation = useMutation(
     trpc.mailboxes.scheduling.snooze.mutationOptions({ retry: false }),
   );
@@ -1893,7 +1902,11 @@ export function MailboxContentView({
       }
     }
   }
-  async function moveDeliveryFolder(target: "inbox" | "spam") {
+  async function moveDeliveryFolder(
+    target: "inbox" | "spam",
+    // Blocking a sender stays where it is and undoes its answer too.
+    options: { stay?: boolean; message?: string; undo?: () => Promise<unknown> } = {},
+  ) {
     if (
       !item ||
       moving.current ||
@@ -1908,7 +1921,8 @@ export function MailboxContentView({
     try {
       const done = await moveMutation.mutateAsync({ ...observed, folder: target });
       if (!mounted.current) return;
-      const message = t(target === "inbox" ? "safety.restored" : "safety.markedSpam");
+      const message =
+        options.message ?? t(target === "inbox" ? "safety.restored" : "safety.markedSpam");
       offerUndo(
         message,
         [
@@ -1919,10 +1933,12 @@ export function MailboxContentView({
               expectedRevision: done.revision,
               folder: target === "inbox" ? "spam" : "inbox",
             }),
+          ...(options.undo ? [options.undo] : []),
         ],
         [key],
       );
       if (
+        !options.stay &&
         currentSelection.current?.id === observed.id &&
         currentSelection.current.mailboxId === observed.mailboxId
       ) {
@@ -1939,6 +1955,57 @@ export function MailboxContentView({
       moving.current = false;
       if (mounted.current) void refresh();
     }
+  }
+  // Aprovação de remetentes, for the open received message.
+  const senderAddress = item?.kind === "inbox" ? item.from.trim().toLowerCase() : "";
+  const senderKey = selectedRow && senderAddress ? `${selectedRow.mailboxId}:${senderAddress}` : "";
+  const senderAnswer = senderKey
+    ? (senderAnswers[senderKey] ?? selectedRow?.senderDecision ?? null)
+    : null;
+  const askSender =
+    prefs.askNewSenders &&
+    isOwner &&
+    item?.kind === "inbox" &&
+    item.deliveryFolder === "inbox" &&
+    !item.trashedAt &&
+    senderAnswer === "none" &&
+    selectedRow?.category === "person" &&
+    !knownPeople.has(senderAddress);
+  async function answerSender(decision: "allow" | "block" | null) {
+    if (!item || item.kind !== "inbox" || !senderKey || senderMutation.isPending) return;
+    const ref = { mailboxId: item.mailboxId, address: senderAddress };
+    const key = senderKey;
+    const previous = senderAnswers[key];
+    const remember = (answer: "allow" | "block" | "none" | undefined) =>
+      setSenderAnswers((current) => {
+        const next = { ...current };
+        if (answer === undefined) delete next[key];
+        else next[key] = answer;
+        return next;
+      });
+    remember(decision ?? "none");
+    try {
+      await senderMutation.mutateAsync({ ...ref, decision });
+    } catch {
+      remember(previous);
+      toast(t("senders.error"), "danger");
+      return;
+    }
+    if (decision === "allow") toast(t("senders.allowedNotice"), "success");
+    else if (decision === "block")
+      await moveDeliveryFolder("spam", {
+        stay: true,
+        message: t("senders.blockedNotice"),
+        undo: () =>
+          senderMutation.mutateAsync({ ...ref, decision: null }).then(() => remember("none")),
+      });
+    else
+      await moveDeliveryFolder("inbox", {
+        stay: true,
+        message: t("senders.unblockedNotice"),
+        undo: () =>
+          senderMutation.mutateAsync({ ...ref, decision: "block" }).then(() => remember("block")),
+      });
   }
   const canSubmitDraft =
     item?.kind === "draft" &&
@@ -3313,8 +3380,32 @@ export function MailboxContentView({
                       ) : null}
                     </p>
                   ) : null}
+                  {askSender ? (
+                    <MailboxSenderBar
+                      sender={item.fromName ? `${item.fromName} <${item.from}>` : item.from}
+                      busy={senderMutation.isPending}
+                      onAllow={() => void answerSender("allow")}
+                      onBlock={() => void answerSender("block")}
+                    />
+                  ) : null}
                   {item.kind === "inbox" && item.deliveryFolder === "spam" ? (
                     <SafetyNotice assessment={item.inboundAssessment} quarantined={false} />
+                  ) : null}
+                  {isOwner &&
+                  item.kind === "inbox" &&
+                  item.deliveryFolder === "spam" &&
+                  senderAnswer === "block" ? (
+                    <p className={styles.contentNotice}>
+                      {t("senders.blockedHere")}{" "}
+                      <button
+                        type="button"
+                        className={`ms-btn ms-btn-ghost ${styles.undoAction}`}
+                        disabled={senderMutation.isPending}
+                        onClick={() => void answerSender(null)}
+                      >
+                        {t("senders.unblock")}
+                      </button>
+                    </p>
                   ) : null}
                   <ConversationHistory
                     key={`${item.mailboxId}:${item.id}`}
@@ -3413,6 +3504,12 @@ export function MailboxContentView({
                     <SendResults
                       summary={item.outboundSummary}
                       accepted={item.sendStatus === "accepted"}
+                    />
+                  ) : null}
+                  {item.invite ? (
+                    <MailboxInviteCard
+                      invite={item.invite}
+                      downloadHref={attachmentUrl(item, item.invite.attachmentIndex)}
                     />
                   ) : null}
                   <MailboxRichBody

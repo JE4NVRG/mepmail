@@ -27,6 +27,7 @@ const FIELDS = {
   undoSendSeconds: undoSendSchema,
   quickReplies: quickRepliesSchema,
   smartInbox: z.boolean(),
+  askNewSenders: z.boolean(),
 };
 type Field = keyof typeof FIELDS;
 export type MailboxPreferences = { [K in Field]: z.output<(typeof FIELDS)[K]> };
@@ -44,6 +45,7 @@ export const MAILBOX_PREFERENCE_DEFAULTS: MailboxPreferences = {
   undoSendSeconds: 10,
   quickReplies: null,
   smartInbox: true,
+  askNewSenders: true,
 };
 
 /** A rejected change, naming the field so the UI can point at it. */

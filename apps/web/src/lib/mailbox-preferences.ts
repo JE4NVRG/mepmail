@@ -34,6 +34,7 @@ const FIELDS = {
   undoSendSeconds: undoSendSchema,
   quickReplies: quickRepliesSchema,
   smartInbox: z.boolean(),
+  askNewSenders: z.boolean(),
 };
 
 export type CorreioPrefs = {
@@ -52,6 +53,8 @@ export type CorreioPrefs = {
   quickReplies: string[] | null;
   /** Caixa inteligente: the Inbox split into Pessoas, Notificações and Newsletters. */
   smartInbox: boolean;
+  /** Aprovação de remetentes: ask on a first message from someone unanswered. */
+  askNewSenders: boolean;
 };
 
 export const CORREIO_PREF_DEFAULTS: CorreioPrefs = {
@@ -67,6 +70,7 @@ export const CORREIO_PREF_DEFAULTS: CorreioPrefs = {
   undoSendSeconds: 10,
   quickReplies: null,
   smartInbox: true,
+  askNewSenders: true,
 };
 
 type Field = keyof CorreioPrefs;

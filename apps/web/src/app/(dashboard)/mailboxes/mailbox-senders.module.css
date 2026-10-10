@@ -1,0 +1,64 @@
+/* Aprovação de remetentes: the bar above a message from a new sender. */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border: 1px solid var(--ms-violet-border);
+  border-radius: var(--ms-r-card);
+  background: var(--ms-panel-raised);
+}
+.bar p {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--ms-fs-ui);
+}
+.bar p span {
+  color: var(--ms-muted);
+  overflow-wrap: anywhere;
+}
+.barActions {
+  display: flex;
+  gap: 6px;
+}
+/* Preferências: the answers kept for one mailbox. */
+.list {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+}
+.address {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ms-fs-ui);
+}
+.decision {
+  flex: none;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-label);
+}
+.decision[data-decision="block"] {
+  color: var(--ms-danger);
+}
+.listHint {
+  margin: 8px 0 0;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-label);
+}

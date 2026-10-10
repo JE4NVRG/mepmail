@@ -846,7 +846,9 @@
     "quickRepliesDefault": "Use the suggested ones",
     "quickRepliesInvalid": "Use up to 8 short replies, up to 160 characters each.",
     "smartInbox": "Smart inbox",
-    "smartInboxHint": "Splits the Inbox into People, Notifications and Newsletters. Anyone you have written to always stays in People."
+    "smartInboxHint": "Splits the Inbox into People, Notifications and Newsletters. Anyone you have written to always stays in People.",
+    "askNewSenders": "Ask about new senders",
+    "askNewSendersHint": "On a first message from someone you have never written to, Correio asks whether to approve or block them. Blocked senders go straight to Spam."
   },
   "coach": {
     "text": "J and K move, E archives, S stars, ? shows every shortcut.",
@@ -986,5 +988,41 @@
         "body": "Newsletters and list mail show up here, away from your conversations."
       }
     }
+  },
+  "senders": {
+    "barLabel": "New sender",
+    "newSender": "New sender:",
+    "newSenderBody": "{sender}. Approve keeps their mail in the Inbox; block sends this and future messages to Spam.",
+    "allow": "Approve",
+    "block": "Block",
+    "allowed": "Approved",
+    "blocked": "Blocked",
+    "allowedNotice": "Sender approved.",
+    "blockedNotice": "Sender blocked. This and future messages go to Spam.",
+    "blockedHere": "You blocked this sender.",
+    "unblock": "Unblock",
+    "unblockedNotice": "Sender unblocked. The message is back in the Inbox.",
+    "error": "Your answer could not be saved. Try again.",
+    "loading": "Loading…",
+    "empty": "No approved or blocked senders in this mailbox.",
+    "clear": "Forget {address}"
+  },
+  "invite": {
+    "label": "Calendar invite",
+    "badge": {
+      "request": "Invite",
+      "reply": "Invite reply",
+      "cancelled": "Cancelled",
+      "event": "Event"
+    },
+    "untitled": "(untitled)",
+    "when": "When",
+    "where": "Where",
+    "organizer": "Organizer",
+    "guests": "Guests",
+    "guestCount": "{count, plural, one {# person} other {# people}}",
+    "join": "Join meeting",
+    "google": "Add to Google Calendar",
+    "download": "Download invite (.ics)"
   }
 }

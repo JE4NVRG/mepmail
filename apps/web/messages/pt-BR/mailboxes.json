@@ -846,7 +846,9 @@
     "quickRepliesDefault": "Usar as sugeridas",
     "quickRepliesInvalid": "Use até 8 respostas curtas, de até 160 caracteres cada.",
     "smartInbox": "Caixa inteligente",
-    "smartInboxHint": "Separa a Entrada em Pessoas, Notificações e Newsletters. Quem você já respondeu fica sempre em Pessoas."
+    "smartInboxHint": "Separa a Entrada em Pessoas, Notificações e Newsletters. Quem você já respondeu fica sempre em Pessoas.",
+    "askNewSenders": "Perguntar sobre remetentes novos",
+    "askNewSendersHint": "Na primeira mensagem de alguém para quem você nunca escreveu, o Correio pergunta se aprova ou bloqueia. Bloqueados vão direto para o Spam."
   },
   "coach": {
     "text": "J e K navegam, E arquiva, S favorita, ? mostra todos os atalhos.",
@@ -986,5 +988,41 @@
         "body": "Newsletters e e-mails de listas aparecem aqui, longe das conversas."
       }
     }
+  },
+  "senders": {
+    "barLabel": "Remetente novo",
+    "newSender": "Remetente novo:",
+    "newSenderBody": "{sender}. Aprovar mantém na Entrada; bloquear manda esta e as próximas mensagens para o Spam.",
+    "allow": "Aprovar",
+    "block": "Bloquear",
+    "allowed": "Aprovado",
+    "blocked": "Bloqueado",
+    "allowedNotice": "Remetente aprovado.",
+    "blockedNotice": "Remetente bloqueado. Esta e as próximas mensagens vão para o Spam.",
+    "blockedHere": "Você bloqueou este remetente.",
+    "unblock": "Desbloquear",
+    "unblockedNotice": "Remetente desbloqueado. A mensagem voltou para a Entrada.",
+    "error": "Não deu para salvar sua resposta. Tente de novo.",
+    "loading": "Carregando…",
+    "empty": "Nenhum remetente aprovado ou bloqueado nesta caixa.",
+    "clear": "Esquecer {address}"
+  },
+  "invite": {
+    "label": "Convite de calendário",
+    "badge": {
+      "request": "Convite",
+      "reply": "Resposta a convite",
+      "cancelled": "Cancelado",
+      "event": "Evento"
+    },
+    "untitled": "(sem título)",
+    "when": "Quando",
+    "where": "Onde",
+    "organizer": "Organizador",
+    "guests": "Convidados",
+    "guestCount": "{count, plural, one {# pessoa} other {# pessoas}}",
+    "join": "Entrar na reunião",
+    "google": "Adicionar ao Google Agenda",
+    "download": "Baixar convite (.ics)"
   }
 }

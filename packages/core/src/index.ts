@@ -512,6 +512,7 @@ export {
   snoozeMailboxItem,
   wakeSnoozedMailboxItems,
 } from "./mailbox-scheduling.js";
+export { deriveMailboxSenderKey } from "./mailbox-senders.js";
 export {
   assertMailboxStorage,
   effectiveDomainLimit,

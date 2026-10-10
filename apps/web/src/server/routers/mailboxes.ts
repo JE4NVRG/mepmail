@@ -97,6 +97,7 @@ import {
 import { getQueue } from "../queue";
 import { protectedProcedure, router, teamProcedure } from "../trpc";
 import { mailboxSchedulingRouter } from "./mailbox-scheduling";
+import { mailboxSendersRouter } from "./mailbox-senders";
 
 const enabled = teamProcedure.use(async ({ ctx, next }) => {
   if (
@@ -794,6 +795,7 @@ export const mailboxesRouter = router({
     )
     .query(({ ctx, input }) => call(() => getMailboxContentList(ctx.db, actor(ctx), input))),
   scheduling: mailboxSchedulingRouter,
+  senders: mailboxSendersRouter,
   preferences: router({
     get: enabled.query(({ ctx }) => getMailboxPreferences(ctx.db, ctx.session.user.id)),
     // Only the changed fields; returns the full object with server defaults.

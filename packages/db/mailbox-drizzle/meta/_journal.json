@@ -169,6 +169,13 @@
       "when": 1791730800023,
       "tag": "0023_mailbox_list_summary",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791730800024,
+      "tag": "0024_mailbox_sender_decisions",
+      "breakpoints": true
     }
   ]
 }

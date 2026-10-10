@@ -1,0 +1,59 @@
+/* Convites de calendário: the event card at the top of a message that carries one. */
+.card {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border: 1px solid var(--ms-line-strong);
+  border-left: 3px solid var(--ms-violet);
+  border-radius: var(--ms-r-card);
+  background: var(--ms-panel-raised);
+}
+.card[data-cancelled="true"] {
+  border-left-color: var(--ms-danger);
+}
+.card[data-cancelled="true"] .title {
+  text-decoration: line-through;
+  color: var(--ms-muted);
+}
+.badge {
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ms-void);
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-label);
+}
+.badge[data-kind="cancelled"] {
+  color: var(--ms-danger);
+}
+.title {
+  margin: 0;
+  font-size: var(--ms-fs-section);
+  overflow-wrap: anywhere;
+}
+/* Scoped under .card so the reader header's dl/dt rules do not reach in. */
+.card .details {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+  font-size: var(--ms-fs-ui);
+}
+.card .details dt {
+  width: auto;
+  color: var(--ms-muted);
+}
+.card .details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.zone {
+  color: var(--ms-muted);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}

@@ -1,11 +1,11 @@
 {
-  "version": "0.3.0",
-  "notes": "Primeira versão com atualização automática e arrastar e soltar dentro da janela.",
-  "pub_date": "2026-10-10T02:47:44Z",
+  "version": "1.0.0",
+  "notes": "Número de mensagens não lidas no ícone da barra de tarefas e avisos de e-mail novo só para pessoas quando a caixa inteligente está ligada.",
+  "pub_date": "2026-10-10T08:40:31Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITm9ydXo4Y0NsWHZlMlpuTCswTUpMMnBZaGRvcjZORnBza0VxSzRtV1AwYmZTa0w3SGYwWTBMQUJuRUtnZzVaeVRsSVVNYWVxRXJvYVdieVdtc0pXS1FBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjAwNDUzCWZpbGU6TWVwTWFpbCBDb3JyZWlvXzAuMy4wX3g2NC1zZXR1cC5leGUJdmVyc2lvbjowLjMuMAo5Slo2TzN6TTRFT1NQZ2svZ3d6RERRY3MxbnJHRVRjYng0MXBMWks4RkJMSGt5VnZtWUsya2lUZUR4TXh5S0w4NjlxMy9KWkd5eVd1Q2pMQVMxS1hCZz09Cg==",
-      "url": "https://mepmail.dev/desktop/correio/MepMail-Correio_0.3.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITm8yYmwvL3pQcEdEdlFadllsV0tjK21UYnNCYWNsZHk1ekU4WXBxQXBlVTRLVEJRcitYdHVUYStYOEZZMXliMEI4ZWdCSDFoU1ZtMlZmSWNSU2haN2dFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjIxNjA2CWZpbGU6TWVwTWFpbCBDb3JyZWlvXzEuMC4wX3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjAuMAp3U0tLeHRlbE5pcXczd1loMG5jRzk3allzeTZlMHJ6ZWhyZWNCMTJuL014Z1RsZndSOUZVaFBRTDlaajNuanB2TkJXTkt2SXZEN3pRNlRncTdrakVDZz09Cg==",
+      "url": "https://mepmail.dev/desktop/correio/MepMail-Correio_1.0.0_x64-setup.exe"
     }
   }
 }

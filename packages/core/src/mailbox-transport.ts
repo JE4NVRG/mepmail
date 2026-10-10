@@ -32,6 +32,7 @@ import {
   MailboxContentError,
   withMailboxWriteAccess,
 } from "./mailbox-private-store.js";
+import { isMailboxSenderBlocked } from "./mailbox-senders.js";
 import {
   assertMailboxStorage,
   lockMailboxService,
@@ -514,6 +515,8 @@ export async function receiveMailboxMime(
     recipients: string[];
     raw: Buffer;
     assessment?: MailboxInboundAssessment;
+    /** deriveMailboxSenderKey(master key): with it, a sender the owner blocked lands in Spam. */
+    senderKey?: Buffer;
   },
   mime: MailboxTransportMimeAdapter,
   now = new Date(),
@@ -532,7 +535,8 @@ export async function receiveMailboxMime(
   if (!recipients.length || recipients.length > MAX_RECIPIENTS)
     throw new MailboxContentError("invalid");
   // Unsafe bytes are durably sealed without parsing or exposing their content.
-  if (assessment?.decision !== "quarantine") await envelope(mime, input.raw, false);
+  const from =
+    assessment?.decision !== "quarantine" ? (await envelope(mime, input.raw, false)).from : null;
   const sourceId = `ingress:${hash(input.sourceId)}`;
   return db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
@@ -613,6 +617,17 @@ export async function receiveMailboxMime(
         continue;
       }
       await assertMailboxStorage(tx, box.teamId, box.id, input.raw.length, plan);
+      // Mail the provider would file in the inbox goes to Spam when the owner blocked
+      // its sender; quarantine and provider spam keep their own folder.
+      const blocked =
+        !!input.senderKey &&
+        !!from &&
+        (assessment?.decision ?? "inbox") === "inbox" &&
+        (await isMailboxSenderBlocked(tx, input.senderKey, {
+          teamId: box.teamId,
+          mailboxId: box.id,
+          address: from,
+        }));
       const id = randomUUID();
       const sealed = await encryptPayload(
         input.raw,
@@ -624,7 +639,7 @@ export async function receiveMailboxMime(
         teamId: box.teamId,
         mailboxId: box.id,
         kind: "inbox",
-        deliveryFolder: assessment?.decision ?? "inbox",
+        deliveryFolder: blocked ? "spam" : (assessment?.decision ?? "inbox"),
         inboundAssessment: assessment,
         sourceId,
         rawBytes: input.raw.length,

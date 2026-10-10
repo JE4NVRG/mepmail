@@ -19,6 +19,29 @@ const row = (id: string, extra: Partial<NewMailRow> = {}): NewMailRow => ({
 });
 
 describe("newMailNotices", () => {
+  it("keeps notifications and newsletters quiet with the smart inbox, and stays silent when all are", () => {
+    const quiet = (r: NewMailRow) => r.category === "notification" || r.category === "newsletter";
+    const notified = new Set<string>();
+    expect(
+      newMailNotices(
+        [
+          row("a", { category: "person" }),
+          row("ci", { category: "notification" }),
+          row("news", { category: "newsletter" }),
+        ],
+        notified,
+        labels,
+        fallback,
+        quiet,
+      ),
+    ).toEqual([{ title: "Pessoa a", body: "Assunto a" }]);
+    // Quiet rows count as announced: they never come back later.
+    expect(notified.has("box:ci")).toBe(true);
+    expect(
+      newMailNotices([row("promo", { category: "newsletter" })], notified, labels, fallback, quiet),
+    ).toEqual([]);
+  });
+
   it("announces each new unread message by sender and subject, once", () => {
     const notified = new Set<string>();
     rememberUnread([row("old")], notified);

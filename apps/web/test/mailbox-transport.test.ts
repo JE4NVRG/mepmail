@@ -28,6 +28,10 @@ import {
   grantMailboxRegistry,
   updateMailboxRegistry,
 } from "../../../packages/core/src/mailbox-registry.js";
+import {
+  decideMailboxSender,
+  deriveMailboxSenderKey,
+} from "../../../packages/core/src/mailbox-senders.js";
 import { mailboxIdKey } from "../../../packages/core/src/mailbox-thread.js";
 import {
   acceptMailboxOutbox,
@@ -1017,5 +1021,40 @@ describe("durable private Correio transport contracts with captured provider", (
       agentKeyId: key.id,
       status: "accepted",
     });
+  });
+
+  it("files new mail from a sender the owner blocked in Spam, and only with the sender key", async () => {
+    const senderKey = deriveMailboxSenderKey(randomBytes(32));
+    await decideMailboxSender(db, keys, senderKey, owner(), {
+      mailboxId,
+      address: " Blocked@Example.invalid ",
+      decision: "block",
+    });
+    const deliver = (sourceId: string, from: string, key?: Buffer) =>
+      receiveMailboxMime(
+        db,
+        keys,
+        {
+          sourceId,
+          recipients: ["person@transport.invalid"],
+          raw: fixture(from, "person@transport.invalid"),
+          ...(key ? { senderKey: key } : {}),
+        },
+        mimeAdapter,
+      );
+    const folder = async (result: Awaited<ReturnType<typeof deliver>>) =>
+      (
+        await db
+          .select({ folder: schema.mailboxItems.deliveryFolder })
+          .from(schema.mailboxItems)
+          .where(eq(schema.mailboxItems.id, result.items[0]!.id))
+      )[0]?.folder;
+    expect(
+      await folder(await deliver("sender:blocked", "blocked@example.invalid", senderKey)),
+    ).toBe("spam");
+    expect(await folder(await deliver("sender:other", "friend@example.invalid", senderKey))).toBe(
+      "inbox",
+    );
+    expect(await folder(await deliver("sender:keyless", "blocked@example.invalid"))).toBe("inbox");
   });
 });

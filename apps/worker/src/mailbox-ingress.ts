@@ -90,6 +90,7 @@ export function createMailboxIngress(options: {
   eventTopics: readonly string[];
   inbound: MailboxInboundConfiguration | null;
   failover?: SesFailover | undefined;
+  senderKey?: Buffer | undefined;
 }) {
   const evidence = createMailboxEvidenceHandler({ ...options, topics: options.eventTopics });
   const inbound = options.inbound;

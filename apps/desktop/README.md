@@ -65,18 +65,28 @@ WebView2. The same shell is the base for macOS, Linux, iOS and Android.
 
 - Signed self-updates (`src/update.rs`, `tauri-plugin-updater`). The shell
   reads `https://mepmail.dev/desktop/correio/latest.json` 20 s after start and
-  every 6 h; the tray has "Procurar atualizações". A newer version is offered
-  in a native dialog ("Atualizar agora" / "Depois"). Yes downloads the
-  installer, checks its minisign signature against `plugins.updater.pubkey`
-  and runs it in passive mode; the app closes and reopens on the new version.
-  "Depois" silences background offers of that version until the next start.
-  An update found while the window sits hidden in the tray waits until the
-  window gets focus. Nothing installs without a yes.
+  every 6 h, downloads a newer installer in the background and checks its
+  minisign signature against `plugins.updater.pubkey`. It installs only at a
+  safe moment: while the window sits hidden in the tray, when the app quits,
+  or from the tray item "Reiniciar para atualizar (x.y.z)". No dialog, so a
+  stray click can never accept an update; `updates.log` in the app data
+  folder records each step.
 - HTML drag and drop reaches the page (`disable_drag_drop_handler`): drag a
   message onto a folder, or a file onto the composer, as in a browser tab.
 - The web app offers the download in the Correio account menu ("App para
   Windows", Windows browsers only); the stable link is
   `https://mepmail.dev/desktop/correio/windows`.
+
+## What 1.0 adds
+
+- The unread count on the taskbar icon (`src/badge.rs`): a red disc with the
+  number, 1 to 9 and then "9+", drawn at the icon's size. The Microsoft Store
+  build uses the system badge (`BadgeUpdateManager`) and falls back to the
+  overlay.
+- A Microsoft Store package (`msix/`, cargo feature `store`): starts with
+  Windows through a `StartupTask`, native toasts under the package identity,
+  and the `mepmail-correio` alias that agent integrations call. See
+  "Microsoft Store (MSIX)" below.
 
 ## Layout
 

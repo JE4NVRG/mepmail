@@ -29,14 +29,20 @@ import {
   mailboxReplyIds,
 } from "../../../../packages/core/src/mailbox-message-id";
 import { pilotImageMetadata } from "../../../../packages/core/src/mailbox-pilot-images";
+import {
+  mailboxSenderDecisionsFor,
+  normalizeMailboxSender,
+} from "../../../../packages/core/src/mailbox-senders";
 import { type MailboxCategory, mailboxCategory } from "../lib/mailbox-category";
 import { mailboxSignature } from "../lib/mailbox-compose-signature";
 import { mailboxHtmlPreviewText } from "../lib/mailbox-html-preview";
+import { type MailboxInvite, parseMailboxInvite } from "../lib/mailbox-ics";
 import { mailboxPreview } from "../lib/mailbox-inbox-presentation";
 import { decodeMailboxListSummary, encodeMailboxListSummary } from "../lib/mailbox-list-summary";
 import { mailboxDraftHtml, mailboxSignatureText } from "../lib/mailbox-signature";
 import { getKeyring } from "./keyring";
 import { projectMailboxHtml } from "./mailbox-html";
+import { mailboxSenderHmacKey } from "./mailbox-sender-key";
 import { publicStorageOrigin, publicStoragePrefix } from "./storage";
 
 const MAX_MIME = 1024 * 1024;
@@ -92,6 +98,22 @@ function references(mime: Awaited<ReturnType<typeof parse>>) {
     .filter((v): v is string => v !== null)
     .slice(-50);
 }
+/**
+ * Convites de calendário: the first text/calendar part (or .ics attachment),
+ * read into what the invite card shows, with its attachment index for the
+ * download. Null when there is none or it does not read as an event.
+ */
+function inviteFrom(
+  mime: Awaited<ReturnType<typeof parse>>,
+): (MailboxInvite & { attachmentIndex: number }) | null {
+  const index = mime.attachments.findIndex(
+    (a) => /^text\/calendar\b/i.test(a.contentType ?? "") || /\.ics$/i.test(a.filename ?? ""),
+  );
+  const part = index >= 0 ? mime.attachments[index] : undefined;
+  if (!part || part.content.length > 256 * 1024) return null;
+  const invite = parseMailboxInvite(part.content.toString("utf8"));
+  return invite ? { ...invite, attachmentIndex: index } : null;
+}
 function dto(mime: Awaited<ReturnType<typeof parse>>) {
   return {
     subject: mime.subject ?? "",
@@ -111,6 +133,7 @@ function dto(mime: Awaited<ReturnType<typeof parse>>) {
       const image = pilotImageMetadata(a.content);
       return { index, filename: filename(a.filename), bytes: a.content.length, image };
     }),
+    invite: inviteFrom(mime),
   };
 }
 
@@ -339,6 +362,7 @@ async function listRowContents(
     sentBy: { kind: "human" | "agent"; label: string | null } | null;
     sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null;
     outboundSummary: MailboxOutboundSummary | null;
+    senderDecision: "allow" | "block" | "none" | null;
   };
   const contents = new Map<string, Content>();
   const byMailbox = new Map<string, string[]>();
@@ -421,6 +445,16 @@ async function listRowContents(
     const sent = sentIds.length
       ? await acceptedSent(db, actor, mailboxId, inArray(schema.mailboxOutbox.id, sentIds))
       : [];
+    // Aprovação de remetentes: the owner's answer for each received row's
+    // sender ("none" when there is none yet; null when screening is off).
+    const senderHmac = mailboxSenderHmacKey();
+    const senderDecisions = senderHmac
+      ? await mailboxSenderDecisionsFor(db, senderHmac, {
+          teamId: actor.teamId,
+          mailboxId,
+          addresses: parsed.filter((item) => item.kind === "inbox").map((item) => item.from),
+        })
+      : null;
     await runLimited(parsed, 8, async ({ id, kind, revision, ...content }) => {
       let sendStatus: Content["sendStatus"] = null;
       let sentBy: Content["sentBy"] = null;
@@ -450,6 +484,10 @@ async function listRowContents(
         sendStatus,
         sentBy,
         outboundSummary: outboundDto(results),
+        senderDecision:
+          kind === "inbox" && senderDecisions
+            ? (senderDecisions.get(normalizeMailboxSender(content.from) ?? "") ?? "none")
+            : null,
       });
     });
   });
@@ -672,6 +710,7 @@ export async function getMailboxContentList(
     sentBy: { kind: "human" | "agent"; label: string | null } | null;
     sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null;
     outboundSummary: MailboxOutboundSummary | null;
+    senderDecision: "allow" | "block" | "none" | null;
     blocked: boolean;
     threadKey: string | null;
     threadCount: number;
@@ -721,6 +760,7 @@ export async function getMailboxContentList(
         sentBy: null,
         sendStatus: null,
         outboundSummary: null,
+        senderDecision: null,
         blocked: true,
         threadKey: null,
         threadCount: 1,
@@ -764,6 +804,7 @@ export async function getMailboxContentList(
       sentBy: item.sentBy,
       sendStatus: item.sendStatus,
       outboundSummary: item.outboundSummary,
+      senderDecision: item.senderDecision,
       blocked: false,
       threadKey: row.threadKey,
       threadCount: thread.count,

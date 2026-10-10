@@ -33,12 +33,16 @@ import {
   getMailboxContentList,
   saveMailboxContentDraft,
 } from "@/server/mailbox-content";
+import { mailboxSenderHmacKey } from "@/server/mailbox-sender-key";
 import { mailboxTransportMime } from "@/server/mailbox-transport";
 import { mailboxesRouter } from "@/server/routers/mailboxes";
 import { type Context, createCallerFactory, createContext, router } from "@/server/trpc";
+import { decideMailboxSender } from "../../../packages/core/src/mailbox-senders";
 import { seedMailboxTestService } from "./mailbox-service-fixture";
 
 vi.mock("@/server/keyring", () => ({ getKeyring: vi.fn() }));
+// Screening is off unless a test gives it a key.
+vi.mock("@/server/mailbox-sender-key", () => ({ mailboxSenderHmacKey: vi.fn(() => null) }));
 vi.mock("@/server/trpc", async (original) => ({
   ...(await original<typeof import("@/server/trpc")>()),
   createContext: vi.fn(),
@@ -404,6 +408,66 @@ describe("session-authenticated mailbox content", () => {
     // Rewritten once: the next listing opens it and leaves it alone.
     expect(await row()).toEqual(rewritten);
     expect((await sealed()).equals(fromV2)).toBe(true);
+  });
+  it("carries the owner's answer for each received sender, and none when screening is off", async () => {
+    const from = (address: string) =>
+      Buffer.from(
+        `From: ${address}\r\nTo: person@content.invalid\r\nSubject: Oi\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nCorpo\r\n`,
+      );
+    await imported("ask:new", mailboxId, from("nova@example.invalid"));
+    await imported("ask:blocked", mailboxId, from("Spam@Bad.invalid"));
+    const answers = async () =>
+      Object.fromEntries(
+        (await as().items({ mailboxId, folder: "inbox" })).items.map((row) => [
+          row.from,
+          row.senderDecision,
+        ]),
+      );
+    expect(await answers()).toEqual({
+      "nova@example.invalid": null,
+      "Spam@Bad.invalid": null,
+    });
+    const key = randomBytes(32);
+    vi.mocked(mailboxSenderHmacKey).mockReturnValue(key);
+    await decideMailboxSender(db, keys, key, actor(), {
+      mailboxId,
+      address: "spam@bad.invalid",
+      decision: "block",
+    });
+    expect(await answers()).toEqual({
+      "nova@example.invalid": "none",
+      "Spam@Bad.invalid": "block",
+    });
+    vi.mocked(mailboxSenderHmacKey).mockReturnValue(null);
+  });
+  it("reads a calendar invite into the open message, with its attachment for the download", async () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "METHOD:REQUEST",
+      "BEGIN:VEVENT",
+      "UID:piloto@example.invalid",
+      "DTSTART:20261015T170000Z",
+      "DTEND:20261015T180000Z",
+      "SUMMARY:Piloto",
+      "ORGANIZER;CN=Priya:mailto:priya@example.invalid",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const raw = Buffer.from(
+      `From: Priya <priya@example.invalid>\r\nTo: person@content.invalid\r\nSubject: Convite\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=b\r\n\r\n--b\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nVocê foi convidado.\r\n--b\r\nContent-Type: text/calendar; charset=utf-8; method=REQUEST\r\nContent-Transfer-Encoding: base64\r\n\r\n${Buffer.from(ics).toString("base64")}\r\n--b--\r\n`,
+    );
+    const a = await imported("invite", mailboxId, raw);
+    const item = await as().item({ mailboxId, id: a.id });
+    expect(item.invite).toMatchObject({
+      method: "REQUEST",
+      summary: "Piloto",
+      start: { utc: "2026-10-15T17:00:00.000Z" },
+      organizer: { name: "Priya", address: "priya@example.invalid" },
+      attachmentIndex: 0,
+    });
+    // A message without one has none.
+    const plain = await imported();
+    expect((await as().item({ mailboxId, id: plain.id })).invite).toBeNull();
   });
   it("sorts rows into the smart inbox piles from their headers, the same from the summary", async () => {
     const message = (from: string, headers: string) =>

@@ -25,6 +25,7 @@ import {
 import {
   checkMailboxRecipientBlocks,
   committedDailyVolume,
+  deriveMailboxSenderKey,
   deriveSamplingKey,
   deriveTrackingKey,
   deriveUnsubscribeKey,
@@ -138,6 +139,8 @@ const mailboxIngress = createMailboxIngress({
   eventTopics: env.SNS_TOPIC_ARNS ?? [],
   inbound: parseMailboxInboundConfiguration(process.env.MAILBOX_INBOUND_CONFIG),
   failover,
+  // The owner's sender decisions (Aprovação de remetentes): blocked senders go to Spam.
+  senderKey: deriveMailboxSenderKey(Buffer.from(env.MASTER_ENCRYPTION_KEY, "base64")),
 });
 // Customer mail of the domains an operator verified at a second provider
 // leaves through its relay while SES has paused the account.
