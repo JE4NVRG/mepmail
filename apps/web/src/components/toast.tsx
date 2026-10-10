@@ -4,10 +4,15 @@ import { useEffect, useState } from "react";
 
 type Tone = "success" | "info" | "warn" | "danger" | "neutral";
 
+/** A button inside the toast, such as "Desfazer"; it closes the toast. */
+export type ToastAction = { label: string; run: () => void };
+
 interface ToastRequest {
   id: number;
   message: string;
   tone: Tone;
+  action?: ToastAction;
+  durationMs: number;
 }
 
 /* Imperative bridge like confirm-dialog.tsx: callable from event handlers
@@ -15,12 +20,25 @@ interface ToastRequest {
 let listener: ((request: ToastRequest) => void) | null = null;
 let nextId = 1;
 
+const TOAST_MS = 3_200;
+/** Long enough to reach an action button. */
+const ACTION_MS = 8_000;
+
 /** A transient bottom-center notice; falls back to nothing when no host is mounted. */
-export function toast(message: string, tone: Tone = "success"): void {
-  listener?.({ id: nextId++, message, tone });
+export function toast(
+  message: string,
+  tone: Tone = "success",
+  options: { action?: ToastAction; durationMs?: number } = {},
+): void {
+  listener?.({
+    id: nextId++,
+    message,
+    tone,
+    ...(options.action ? { action: options.action } : {}),
+    durationMs: options.durationMs ?? (options.action ? ACTION_MS : TOAST_MS),
+  });
 }
 
-const TOAST_MS = 3_200;
 const ICON: Record<Tone, string> = {
   success: "✓",
   info: "i",
@@ -39,7 +57,7 @@ export function ToastHost() {
   }, []);
   useEffect(() => {
     if (!current) return;
-    const timer = setTimeout(() => setCurrent(null), TOAST_MS);
+    const timer = setTimeout(() => setCurrent(null), current.durationMs);
     return () => clearTimeout(timer);
   }, [current]);
   if (!current) return null;
@@ -59,6 +77,20 @@ export function ToastHost() {
           {ICON[current.tone]}
         </span>
         <span>{current.message}</span>
+        {current.action ? (
+          <button
+            type="button"
+            className="ms-btn ms-btn-ghost ms-btn-sm"
+            style={{ marginLeft: 8, color: "inherit", fontWeight: 600 }}
+            onClick={() => {
+              const action = current.action;
+              setCurrent(null);
+              action?.run();
+            }}
+          >
+            {current.action.label}
+          </button>
+        ) : null}
       </div>
     </div>
   );

@@ -313,6 +313,52 @@ describe("session-authenticated mailbox content", () => {
       as("owner", { teamId: otherTeam }).item({ mailboxId, id: a.id }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
+  it("seals a list summary on the first listing, lists from it after, and drops it when a draft changes", async () => {
+    const a = await imported();
+    const summaryOf = async (id: string) =>
+      (await db.select().from(schema.mailboxItems).where(eq(schema.mailboxItems.id, id)))[0];
+    const first = (await as().items({ mailboxId, folder: "inbox" })).items[0]!;
+    const stored = await summaryOf(a.id);
+    expect(stored?.summaryCiphertext).toBeTruthy();
+    expect(stored?.summaryKeyVersion).toBeGreaterThanOrEqual(2_000_000);
+    // Sealed like the body: the subject and sender never appear in its bytes.
+    const sealed = Buffer.from(stored!.summaryCiphertext!).toString("latin1");
+    expect(sealed).not.toContain("Private subject");
+    expect(sealed).not.toContain("sender@example.invalid");
+    // A cache: the row's own state is untouched.
+    expect(stored?.revision).toBe(a.revision);
+    const second = (await as().items({ mailboxId, folder: "inbox" })).items[0]!;
+    expect(second).toEqual(first);
+    // A summary that no longer opens is rebuilt from the message.
+    await db
+      .update(schema.mailboxItems)
+      .set({ summaryCiphertext: Buffer.alloc(40, 1) })
+      .where(eq(schema.mailboxItems.id, a.id));
+    expect((await as().items({ mailboxId, folder: "inbox" })).items[0]).toEqual(first);
+    // Drafts: new content drops the summary, the next listing seals the new one.
+    await db
+      .update(schema.domains)
+      .set({ status: "verified" })
+      .where(eq(schema.domains.teamId, teamId));
+    const saved = await as().saveDraft(draft({ subject: "Primeira versão" }));
+    expect((await as().items({ mailboxId, folder: "drafts" })).items[0]?.subject).toBe(
+      "Primeira versão",
+    );
+    expect((await summaryOf(saved.id))?.summaryCiphertext).toBeTruthy();
+    const edited = await as().saveDraft(
+      draft({
+        id: saved.id,
+        sourceItemId: saved.id,
+        expectedRevision: saved.revision,
+        subject: "Segunda versão",
+      }),
+    );
+    expect((await summaryOf(saved.id))?.summaryCiphertext).toBeNull();
+    expect((await as().items({ mailboxId, folder: "drafts" })).items[0]).toMatchObject({
+      id: edited.id,
+      subject: "Segunda versão",
+    });
+  });
   it("exposes text and attachment metadata without original HTML or binary payload", async () => {
     const a = await imported();
     const item = await as().item({ mailboxId, id: a.id });

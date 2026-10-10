@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { newUnreadArrivals } from "@/lib/mailbox-notifications";
+import { newUnreadArrivals, noticesWanted } from "@/lib/mailbox-notifications";
 
 const row = (
   id: string,
@@ -37,5 +37,15 @@ describe("new mail notices", () => {
     const { known } = newUnreadArrivals(null, [row("old")]);
     const later = newUnreadArrivals(known, [row("new")]);
     expect(newUnreadArrivals(later.known, [row("old"), row("new")]).arrivals).toEqual([]);
+  });
+});
+
+describe("noticesWanted", () => {
+  it("is opt-in in a browser and on by default in the desktop app", () => {
+    expect(noticesWanted(false, null)).toBe(false);
+    expect(noticesWanted(false, "on")).toBe(true);
+    expect(noticesWanted(true, null)).toBe(true);
+    expect(noticesWanted(true, "off")).toBe(false);
+    expect(noticesWanted(true, "on")).toBe(true);
   });
 });

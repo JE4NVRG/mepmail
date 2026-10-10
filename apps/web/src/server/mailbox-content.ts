@@ -13,10 +13,12 @@ import {
   type MailboxListPosition,
   type MailboxOutboundSummary,
   saveMailboxDraft,
+  storeMailboxListSummaries,
   summarizeMailboxThreads,
   withMailboxContentAccess,
   withMailboxItem,
   withMailboxItems,
+  withMailboxListContents,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
@@ -30,6 +32,7 @@ import { pilotImageMetadata } from "../../../../packages/core/src/mailbox-pilot-
 import { mailboxSignature } from "../lib/mailbox-compose-signature";
 import { mailboxHtmlPreviewText } from "../lib/mailbox-html-preview";
 import { mailboxPreview } from "../lib/mailbox-inbox-presentation";
+import { decodeMailboxListSummary, encodeMailboxListSummary } from "../lib/mailbox-list-summary";
 import { mailboxDraftHtml, mailboxSignatureText } from "../lib/mailbox-signature";
 import { getKeyring } from "./keyring";
 import { projectMailboxHtml } from "./mailbox-html";
@@ -336,14 +339,52 @@ async function listRowContents(
   for (const row of rows)
     byMailbox.set(row.mailboxId, [...(byMailbox.get(row.mailboxId) ?? []), row.id]);
   await runLimited([...byMailbox], 8, async ([mailboxId, ids]) => {
-    const parsed = await withMailboxItems(db, getKeyring(), actor, { mailboxId, ids }, (items) =>
-      runLimited(items, 8, async (item) => ({
-        id: item.id,
-        kind: item.kind,
-        revision: item.revision,
-        ...listDto(await parseForList(item.raw)),
-      })),
+    const keyring = getKeyring();
+    // Rows read from the message this time, sealed afterwards as list summaries.
+    const fresh: { id: string; revision: number; summary: Buffer }[] = [];
+    // Summaries that opened but no longer decode: read from the message below.
+    const stale: string[] = [];
+    const fromSummaries = await withMailboxListContents(
+      db,
+      keyring,
+      actor,
+      { mailboxId, ids },
+      (items) =>
+        runLimited(items, 8, async (item) => {
+          const head = { id: item.id, kind: item.kind, revision: item.revision };
+          if (item.listSummary) {
+            const stored = decodeMailboxListSummary(item.listSummary);
+            if (stored) return { ...head, ...stored };
+            stale.push(item.id);
+            return null;
+          }
+          const content = listDto(await parseForList(item.raw));
+          const summary = encodeMailboxListSummary(content);
+          if (summary) fresh.push({ id: item.id, revision: item.revision, summary });
+          return { ...head, ...content };
+        }),
     );
+    const reread = stale.length
+      ? await withMailboxItems(db, keyring, actor, { mailboxId, ids: stale }, (items) =>
+          runLimited(items, 8, async (item) => ({
+            id: item.id,
+            kind: item.kind,
+            revision: item.revision,
+            ...listDto(await parseForList(item.raw)),
+          })),
+        )
+      : [];
+    const parsed = [
+      ...fromSummaries.filter((item): item is NonNullable<typeof item> => item !== null),
+      ...reread,
+    ];
+    if (fresh.length) {
+      try {
+        await storeMailboxListSummaries(db, keyring, actor, { mailboxId, entries: fresh });
+      } catch {
+        // A cache: the next listing reads these rows from the message again.
+      }
+    }
     const draftIds = parsed.filter((item) => item.kind === "draft").map((item) => item.id);
     const sentIds = parsed.filter((item) => item.kind === "sent").map((item) => item.id);
     const drafts = draftIds.length

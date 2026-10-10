@@ -34,6 +34,24 @@ export function isDesktop(): boolean {
   return desktopInfo() !== null;
 }
 
+/** "0.3.0" → [0, 3, 0]; anything unparsable counts as 0.0.0. */
+function versionParts(version: string): [number, number, number] {
+  const [major, minor, patch] = version.split(".").map((part) => Number.parseInt(part, 10));
+  return [major || 0, minor || 0, patch || 0];
+}
+
+/**
+ * Whether HTML drag and drop reaches the page: always in a browser; in the
+ * desktop shell from 0.3.0 on, which turned off the native file-drop handler
+ * that used to swallow every drag (older installs update themselves).
+ */
+export function htmlDropsWork(): boolean {
+  const info = desktopInfo();
+  if (!info) return true;
+  const [major, minor] = versionParts(info.version);
+  return major > 0 || minor >= 3;
+}
+
 function ipc(): TauriInternals | null {
   if (!isDesktop()) return null;
   const internals = window.__TAURI_INTERNALS__;

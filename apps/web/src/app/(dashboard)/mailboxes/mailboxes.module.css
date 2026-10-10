@@ -573,10 +573,13 @@
   min-width: 0;
   margin-top: 20px;
 }
+/* One row: the format switch on the left, the external-images notice beside it. */
 .bodyControls {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin-bottom: 10px;
 }
 .bodyControls > fieldset {
   display: flex;
@@ -598,9 +601,25 @@
   color: var(--ms-muted);
   font-size: 12px;
 }
+.externalImages {
+  flex: 1 1 320px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
 .externalImages p {
   margin: 0;
-  flex: 1 1 220px;
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.externalImages button {
+  flex: none;
+}
+.externalImages button {
+  padding-block: 4px;
 }
 .htmlMessage {
   display: block;
@@ -1895,6 +1914,15 @@
   height: auto;
   min-height: 320px;
 }
+/* Sized to the message itself (mailbox-rich-body): the reader pane scrolls. */
+.htmlMessage[data-fitted] {
+  flex: none;
+  min-height: 120px;
+}
+.contentDetail .htmlMessage[data-fitted] {
+  flex: none;
+  min-height: 120px;
+}
 .contentDetail .dangerAction {
   color: var(--ms-danger);
 }
@@ -2724,4 +2752,144 @@
   margin: 24px 0 0;
   color: var(--ms-muted);
   font-size: 12px;
+}
+
+/* "Expandir leitura": the open message takes the whole width beside the rail. */
+.contentPanels[data-wide="true"] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+.contentPanels[data-wide="true"] .contentList {
+  display: none;
+}
+.wideToggle[aria-pressed="true"] {
+  color: var(--ms-violet);
+}
+@media (max-width: 900px) {
+  /* Phones and narrow windows already show one pane at a time. */
+  .wideToggle {
+    display: none;
+  }
+}
+
+/* Preferências: the first-steps guide, a list of shortcuts into the settings. */
+.guide {
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.guideSteps {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  counter-reset: guide;
+}
+.guideSteps li {
+  counter-increment: guide;
+}
+.guideStep {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ms-bone);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.guideStep::before {
+  content: counter(guide);
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--ms-void);
+  border: 1px solid var(--ms-line);
+  color: var(--ms-muted);
+  font-size: 12px;
+}
+.guideStep > span:first-child {
+  flex: 1;
+}
+.guideStep > span:last-child {
+  color: var(--ms-muted);
+}
+.guideStep:hover,
+.guideStep:focus-visible {
+  background: var(--ms-void);
+  outline: none;
+}
+/* Quick replies at the end of a received message: one click starts the reply. */
+.quickReplies {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 24px 0 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ms-line);
+}
+.quickRepliesLabel {
+  margin-right: 4px;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-label);
+}
+.quickReply {
+  max-width: 100%;
+  padding: 6px 12px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  background: var(--ms-panel-raised);
+  color: var(--ms-bone);
+  font: inherit;
+  font-size: var(--ms-fs-ui);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--ms-dur-fast) var(--ms-ease);
+}
+.quickReply:hover {
+  border-color: var(--ms-violet-border);
+}
+.quickReply:focus-visible {
+  outline: none;
+  box-shadow: var(--ms-focus-ring);
+}
+/* Preferências → Envio: the quick replies being edited, one line each. */
+.quickReplyEditor {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.quickReplyEditor li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.quickReplyEditor input {
+  flex: 1;
+  min-width: 0;
+}
+.quickReplyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.appearanceSubhead {
+  margin: 18px 0 0;
+  font-size: var(--ms-fs-ui);
+  font-weight: 600;
 }

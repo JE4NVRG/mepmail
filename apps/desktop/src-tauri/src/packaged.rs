@@ -12,6 +12,8 @@
 //!   `notify_native` instead.
 //! - The executable lives in a versioned, protected folder; agent configs
 //!   point at the package's execution alias instead (see `agents`).
+//! - A package owns a taskbar badge Windows draws itself: the unread count
+//!   goes there (`set_badge`) instead of into an overlay icon.
 
 use tauri::{AppHandle, Runtime};
 use windows::{
@@ -19,6 +21,8 @@ use windows::{
     ApplicationModel::{
         Activation::ActivationKind, AppInstance, Package, StartupTask, StartupTaskState,
     },
+    Data::Xml::Dom::XmlDocument,
+    UI::Notifications::{BadgeNotification, BadgeUpdateManager},
 };
 
 /// `TaskId` of the StartupTask in AppxManifest.xml.
@@ -36,6 +40,24 @@ pub fn has_identity() -> bool {
 fn app_user_model_id() -> Option<String> {
     let family = Package::Current().ok()?.Id().ok()?.FamilyName().ok()?;
     Some(format!("{family}!{APPLICATION_ID}"))
+}
+
+/// Shows `unread` on the package's taskbar badge (Windows caps it at "99+")
+/// or clears it at 0. Fails without package identity, so the caller can fall
+/// back to the overlay icon.
+pub fn set_badge(unread: u32) -> windows::core::Result<()> {
+    if !has_identity() {
+        return Err(windows::core::Error::from_hresult(windows::core::HRESULT(
+            0x80070490_u32 as i32,
+        )));
+    }
+    let updater = BadgeUpdateManager::CreateBadgeUpdaterForApplication()?;
+    if unread == 0 {
+        return updater.Clear();
+    }
+    let xml = XmlDocument::new()?;
+    xml.LoadXml(&HSTRING::from(format!("<badge value=\"{unread}\"/>")))?;
+    updater.Update(&BadgeNotification::CreateBadgeNotification(&xml)?)
 }
 
 /// Started by the StartupTask at sign-in: stay in the tray.

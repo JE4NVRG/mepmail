@@ -162,6 +162,13 @@
       "when": 1791644400022,
       "tag": "0022_mailbox_scheduling",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791730800023,
+      "tag": "0023_mailbox_list_summary",
+      "breakpoints": true
     }
   ]
 }

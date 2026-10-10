@@ -88,6 +88,11 @@ export const mailboxItems = pgTable(
     iv: bytea("iv").notNull(),
     wrappedDek: bytea("wrapped_dek").notNull(),
     keyVersion: integer("key_version").notNull(),
+    // Sealed list summary (cache, migration 0023): all four set or all null.
+    summaryCiphertext: bytea("summary_ciphertext"),
+    summaryIv: bytea("summary_iv"),
+    summaryWrappedDek: bytea("summary_wrapped_dek"),
+    summaryKeyVersion: integer("summary_key_version"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -183,6 +188,10 @@ export const mailboxItems = pgTable(
     check(
       "mailbox_items_envelope_check",
       sql`${t.keyVersion} >= 2000000 and octet_length(${t.iv}) = 12 and octet_length(${t.ciphertext}) between 17 and 1048592`,
+    ),
+    check(
+      "mailbox_items_summary_check",
+      sql`(${t.summaryCiphertext} is null and ${t.summaryIv} is null and ${t.summaryWrappedDek} is null and ${t.summaryKeyVersion} is null) or (${t.summaryKeyVersion} >= 2000000 and octet_length(${t.summaryIv}) = 12 and octet_length(${t.summaryCiphertext}) between 17 and 8208 and ${t.summaryWrappedDek} is not null)`,
     ),
   ],
 );

@@ -128,6 +128,8 @@
   "signaturePlaceholder": "Seu nome\nEmpresa\nContato",
   "trash": "Lixeira",
   "moveToTrash": "Mover para lixeira",
+  "expandReader": "Expandir leitura: esconder a lista",
+  "collapseReader": "Mostrar a lista de novo",
   "restoreMessage": "Restaurar mensagem",
   "movingTrash": "Movendo…",
   "trashedNotice": "Mensagem movida para a lixeira. Você pode restaurá-la.",
@@ -517,6 +519,7 @@
   },
   "app": {
     "newMail": "{count, plural, one {# mensagem nova} other {# mensagens novas}}",
+    "newMailMore": "e mais {count}",
     "sections": "Seções do Correio",
     "inbox": "Caixa de entrada",
     "settings": "Configurações",
@@ -532,7 +535,7 @@
       "boxes": "Caixas",
       "agents": "Agentes",
       "license": "Licença e uso",
-      "appearance": "Aparência"
+      "appearance": "Preferências"
     },
     "backShort": "Voltar"
   },
@@ -813,7 +816,35 @@
     "startFolder": "Começar em",
     "shortcutHints": "Dicas de teclado",
     "viewShortcuts": "Atalhos de teclado",
-    "restoreDefaults": "Restaurar padrões"
+    "restoreDefaults": "Restaurar padrões",
+    "guideTitle": "Primeiros passos",
+    "guideHint": "Tudo o que você precisa para começar, num só lugar.",
+    "guideReceive": "Configurar o recebimento do seu domínio (MX)",
+    "guideMailbox": "Criar uma caixa para você ou para um agente",
+    "guideMigrate": "Trazer seus endereços de outro provedor",
+    "guideAgent": "Conectar um agente de IA",
+    "guideWindows": "Baixar o app para Windows",
+    "guideShortcuts": "Aprender os atalhos de teclado",
+    "language": "Idioma",
+    "notifications": "Notificações",
+    "notifyNewMail": "Avisar quando chegar e-mail novo",
+    "notifyDesktopHint": "O app mostra um aviso do Windows com o remetente e o assunto.",
+    "notifyBrowserHint": "O navegador avisa quando o Correio estiver aberto em outra aba.",
+    "notifyBlocked": "O navegador bloqueou os avisos deste site. Libere nas configurações do site e ligue de novo.",
+    "notifyUnsupported": "Este navegador não mostra avisos.",
+    "sending": "Envio",
+    "undoSend": "Desfazer envio",
+    "undoSendOff": "Desligado",
+    "undoSendSeconds": "{seconds, number} segundos",
+    "undoSendHint": "Depois de clicar em Enviar, você tem esse tempo para desfazer (botão Desfazer ou tecla Z).",
+    "quickReplies": "Respostas rápidas",
+    "quickRepliesHint": "Aparecem no fim de cada e-mail recebido: um clique começa a resposta com o texto.",
+    "quickReplyPlaceholder": "Ex.: Obrigado, recebi!",
+    "quickReplyLabel": "Resposta rápida {number, number}",
+    "quickReplyAdd": "Adicionar resposta",
+    "quickReplyRemove": "Remover esta resposta",
+    "quickRepliesDefault": "Usar as sugeridas",
+    "quickRepliesInvalid": "Use até 8 respostas curtas, de até 160 caracteres cada."
   },
   "coach": {
     "text": "J e K navegam, E arquiva, S favorita, ? mostra todos os atalhos.",
@@ -916,5 +947,19 @@
         "body": "Mensagens enviadas com lembrete aparecem aqui se ninguém responder."
       }
     }
+  },
+  "undoSend": {
+    "waiting": "Enviando em {seconds, number} s…",
+    "waitingDraft": "Este e-mail sai em instantes.",
+    "countdown": "{seconds, number} s",
+    "cancelled": "Envio desfeito. O e-mail voltou para Rascunhos."
+  },
+  "quickReplies": {
+    "title": "Respostas rápidas",
+    "use": "Começar a resposta com este texto",
+    "default1": "Obrigado!",
+    "default2": "Recebido, vou verificar e retorno em breve.",
+    "default3": "Perfeito, combinado.",
+    "default4": "Podemos falar sobre isso amanhã?"
   }
 }

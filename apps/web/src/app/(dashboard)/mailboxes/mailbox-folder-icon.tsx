@@ -19,7 +19,9 @@ type MailboxIconName =
   | "monitor"
   | "sun"
   | "moon"
-  | "pin";
+  | "pin"
+  | "expand"
+  | "collapse";
 
 export function MailboxFolderIcon({
   name,
@@ -63,6 +65,8 @@ export function MailboxFolderIcon({
     sun: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M12 2v2 M12 20v2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M2 12h2 M20 12h2 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4",
     moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
     pin: "M9 3h6l-1 7 4 3H6l4-3z M12 13v8",
+    expand: "M15 3h6v6 M21 3l-7 7 M9 21H3v-6 M3 21l7-7",
+    collapse: "M4 14h6v6 M10 14l-7 7 M20 10h-6V4 M14 10l7-7",
   };
   return (
     <svg

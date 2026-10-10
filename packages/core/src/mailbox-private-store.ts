@@ -84,6 +84,49 @@ function summary(item: Item) {
     updatedAt: item.updatedAt,
   };
 }
+/** The list summary's own row namespace: it never opens as the body, nor the body as it. */
+function summaryBinding(item: { teamId: string; mailboxId: string; id: string }) {
+  return {
+    teamId: item.teamId,
+    rowId: `mailbox-list-summary-v1:${item.mailboxId}:${item.id}`,
+    kind: "email_body" as const,
+  };
+}
+/** Sealed summaries stay small: a list row is a few short fields. */
+export const MAILBOX_LIST_SUMMARY_MAX_BYTES = 8 * 1024;
+/** The stored list summary, or null when there is none or it does not open
+ * (the caller then rebuilds it from the message). */
+async function openListSummary(item: Item, keyring: Keyring): Promise<Buffer | null> {
+  if (
+    !item.summaryCiphertext ||
+    !item.summaryIv ||
+    !item.summaryWrappedDek ||
+    item.summaryKeyVersion === null
+  )
+    return null;
+  try {
+    const plain = await decryptPayload(
+      {
+        ciphertext: item.summaryCiphertext,
+        iv: item.summaryIv,
+        wrappedDek: item.summaryWrappedDek,
+        keyVersion: item.summaryKeyVersion,
+      },
+      keyring,
+      summaryBinding(item),
+    );
+    return plain.length <= MAILBOX_LIST_SUMMARY_MAX_BYTES ? plain : null;
+  } catch {
+    return null;
+  }
+}
+/** Columns that drop a stored summary (a draft whose content changed). */
+const NO_LIST_SUMMARY = {
+  summaryCiphertext: null,
+  summaryIv: null,
+  summaryWrappedDek: null,
+  summaryKeyVersion: null,
+} as const;
 async function open(item: Item, keyring: Keyring) {
   if (item.keyVersion < BOUND_ENVELOPE_VERSION_OFFSET)
     throw new Error("Private mailbox requires a bound envelope");
@@ -459,6 +502,121 @@ export async function withMailboxItems<T>(
       }),
     );
     return operation(opened);
+  });
+}
+
+export type MailboxListContent = ReturnType<typeof summary> &
+  ({ listSummary: Buffer; raw: null } | { listSummary: null; raw: Buffer });
+
+/**
+ * What a list page needs from several items of one mailbox, under one
+ * authorization (the same exclusions as withMailboxItems): the sealed list
+ * summary when one is stored, a few hundred bytes, and otherwise the message
+ * itself so the caller can project the row and store a summary for next time.
+ */
+export async function withMailboxListContents<T>(
+  db: Db,
+  keyring: Keyring,
+  actor: MailboxContentActor,
+  input: { mailboxId: string; ids: string[] },
+  operation: (items: MailboxListContent[]) => Promise<T>,
+  concurrency = 8,
+): Promise<T> {
+  actor = { ...actor };
+  const ids = [...new Set(input.ids)];
+  if (ids.length > 101) throw new MailboxContentError("invalid");
+  return scoped(db, actor, input.mailboxId, "read", false, async (tx) => {
+    const found = ids.length
+      ? await tx
+          .select()
+          .from(schema.mailboxItems)
+          .where(
+            and(
+              inArray(schema.mailboxItems.id, ids),
+              eq(schema.mailboxItems.mailboxId, input.mailboxId),
+              eq(schema.mailboxItems.teamId, actor.teamId),
+            ),
+          )
+      : [];
+    const allowed = found.filter(
+      (item) =>
+        item.deliveryFolder !== "quarantine" &&
+        item.inboundAssessment?.decision !== "quarantine" &&
+        !(actor.agentAccess && item.trashedAt !== null) &&
+        !(actor.agentAccess && item.kind === "inbox" && item.deliveryFolder !== "inbox"),
+    );
+    const opened: MailboxListContent[] = new Array(allowed.length);
+    let next = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(Math.max(1, concurrency), allowed.length) }, async () => {
+        while (next < allowed.length) {
+          const index = next++;
+          const item = allowed[index]!;
+          const listSummary = await openListSummary(item, keyring);
+          opened[index] = listSummary
+            ? { ...summary(item), listSummary, raw: null }
+            : { ...summary(item), listSummary: null, raw: await open(item, keyring) };
+        }
+      }),
+    );
+    return operation(opened);
+  });
+}
+
+/**
+ * Stores list summaries the caller projected from each item's own message
+ * (never from request input), for rows that have none yet. A draft is skipped
+ * when its revision moved since it was read, so a summary never describes an
+ * older version; received and sent messages never change content. A cache:
+ * nothing else changes on the row (no revision, no updatedAt).
+ */
+export async function storeMailboxListSummaries(
+  db: Db,
+  keyring: Keyring,
+  actor: MailboxContentActor,
+  input: { mailboxId: string; entries: { id: string; revision: number; summary: Buffer }[] },
+): Promise<number> {
+  actor = { ...actor };
+  const entries = input.entries.filter(
+    (entry) =>
+      Buffer.isBuffer(entry.summary) &&
+      entry.summary.length > 0 &&
+      entry.summary.length <= MAILBOX_LIST_SUMMARY_MAX_BYTES,
+  );
+  if (!entries.length) return 0;
+  if (entries.length > 101) throw new MailboxContentError("invalid");
+  return scoped(db, actor, input.mailboxId, "read", false, async (tx) => {
+    let stored = 0;
+    for (const entry of entries) {
+      const sealed = await encryptPayload(
+        Buffer.from(entry.summary),
+        keyring,
+        summaryBinding({ teamId: actor.teamId, mailboxId: input.mailboxId, id: entry.id }),
+      );
+      const updated = await tx
+        .update(schema.mailboxItems)
+        .set({
+          summaryCiphertext: sealed.ciphertext,
+          summaryIv: sealed.iv,
+          summaryWrappedDek: sealed.wrappedDek,
+          summaryKeyVersion: sealed.keyVersion,
+        })
+        .where(
+          and(
+            eq(schema.mailboxItems.id, entry.id),
+            eq(schema.mailboxItems.mailboxId, input.mailboxId),
+            eq(schema.mailboxItems.teamId, actor.teamId),
+            isNull(schema.mailboxItems.summaryCiphertext),
+            or(
+              ne(schema.mailboxItems.kind, "draft"),
+              eq(schema.mailboxItems.revision, entry.revision),
+            ),
+          ),
+        )
+        .returning({ id: schema.mailboxItems.id });
+      stored += updated.length;
+    }
+    return stored;
   });
 }
 
@@ -918,6 +1076,8 @@ export async function saveMailboxDraft(
       updatedAt: new Date(),
       ...mailboxThreadKeys(raw),
       ...sealed,
+      // New content: the old list summary no longer describes it.
+      ...NO_LIST_SUMMARY,
     };
     const [item] = previous
       ? await tx

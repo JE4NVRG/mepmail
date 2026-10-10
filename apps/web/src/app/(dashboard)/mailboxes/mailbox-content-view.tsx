@@ -15,7 +15,8 @@ import {
   useState,
 } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
-import { isDesktop } from "@/lib/desktop-bridge";
+import { toast } from "@/components/toast";
+import { htmlDropsWork, isDesktop } from "@/lib/desktop-bridge";
 import {
   initialMailboxText,
   mailboxSignature,
@@ -42,6 +43,7 @@ import {
   writeNoticePreference,
 } from "@/lib/mailbox-notifications";
 import { useCorreioPrefs } from "@/lib/mailbox-preferences";
+import { withQuickReply } from "@/lib/mailbox-quick-replies";
 import {
   isRecipientAddress,
   mailboxContacts,
@@ -79,7 +81,8 @@ function replyAllCopies(source: Item, own: string, to: string[]) {
   }
   return copies;
 }
-type SendState = "requesting" | Outputs["queueDraft"]["status"];
+/** "waiting": Send was pressed and the undo-send wait has not ended yet. */
+type SendState = "waiting" | "requesting" | Outputs["queueDraft"]["status"];
 const NIL = "00000000-0000-0000-0000-000000000000";
 function SendResults({
   summary,
@@ -215,11 +218,14 @@ function DraftDialog({
   selectBox,
   current,
   send,
+  quickReply,
 }: {
   boxes: Box[];
   mailboxId: string;
   source: Item | null;
   mode: ComposeMode;
+  /** A quick reply picked in the reader: it starts the reply, above the signature. */
+  quickReply?: string | undefined;
   deliveryReady: boolean;
   close: () => void;
   saved: (item: Outputs["saveDraft"]) => Promise<void>;
@@ -327,7 +333,8 @@ function DraftDialog({
           .join("\n"),
       });
       const footer = mailboxSignature(senderSignature);
-      return footer ? `${footer}\n\n${quote}` : `\n\n${quote}`;
+      const body = footer ? `${footer}\n\n${quote}` : `\n\n${quote}`;
+      return quickReply ? withQuickReply(body, quickReply) : body;
     }
     return initialMailboxText(
       source?.kind === "draft"
@@ -370,11 +377,13 @@ function DraftDialog({
     active.current = true;
     dialog.current?.showModal();
     (source && mode !== "forward" ? messageInput.current : recipientInput.current)?.focus();
-    if (source?.kind !== "draft") messageInput.current?.setSelectionRange(0, 0);
+    // The cursor waits at the top of a reply, or right after a quick reply.
+    const start = source && mode !== "forward" ? (quickReply?.trim().length ?? 0) : 0;
+    if (source?.kind !== "draft") messageInput.current?.setSelectionRange(start, start);
     return () => {
       active.current = false;
     };
-  }, [mode, source]);
+  }, [mode, source, quickReply]);
   useEffect(() => {
     if (source) return;
     const next = senderSignature;
@@ -806,6 +815,9 @@ export function ShortcutsDialog({ close }: { close: () => void }) {
   );
 }
 
+/** localStorage: "1" when the open message also takes the list's place. */
+const WIDE_READER_KEY = "mepmail.correio.wideReader";
+
 export function MailboxContentView({
   navigation,
   boxes,
@@ -882,6 +894,7 @@ export function MailboxContentView({
     mailboxId: string;
     source: Item | null;
     mode: ComposeMode;
+    quickReply?: string;
   } | null>(null);
   const composerSequence = useRef(0);
   const composerSession = useRef<number | null>(null);
@@ -889,6 +902,19 @@ export function MailboxContentView({
   const sending = useRef<string | null>(null);
   const attempted = useRef(new Set<string>());
   const [sendStates, setSendStates] = useState<Record<string, SendState>>({});
+  // Desfazer envio: Send waits the preferred seconds before the message
+  // reaches the server, with "Desfazer" in a toast and on the open draft.
+  // One send waits at a time; timers and the toast reach the latest render
+  // through `sendActions`.
+  type PendingSend = {
+    key: string;
+    revision: { mailboxId: string; id: string; expectedRevision: number };
+    deadline: number;
+    timer: ReturnType<typeof setTimeout>;
+  };
+  const pendingSend = useRef<PendingSend | null>(null);
+  const [pendingDeadline, setPendingDeadline] = useState<number | null>(null);
+  const [, setSendClock] = useState(0);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const { prefs, setPref } = useCorreioPrefs();
   // Marking as read waits the preferred delay; leaving the message first cancels it.
@@ -899,12 +925,45 @@ export function MailboxContentView({
     seenTimer.current = null;
   }, [selection]);
   const [unreadOnly, setUnreadOnly] = useState(false);
+  // "Expandir leitura": the open message takes the list's place too. The
+  // choice is remembered on this device.
+  const [wideReader, setWideReader] = useState(false);
+  useEffect(() => {
+    try {
+      setWideReader(window.localStorage.getItem(WIDE_READER_KEY) === "1");
+    } catch {
+      // Storage blocked: the default (list and message side by side) stays.
+    }
+  }, []);
+  const toggleWideReader = () =>
+    setWideReader((current) => {
+      try {
+        window.localStorage.setItem(WIDE_READER_KEY, current ? "0" : "1");
+      } catch {
+        // The choice lasts for this visit only.
+      }
+      return !current;
+    });
   // The last archive/trash can be reversed while its own notice is showing.
-  const [undo, setUndo] = useState<{
-    notice: string;
-    steps: (() => Promise<unknown>)[];
-  } | null>(null);
+  // The ref holds the same offer for the toast's "Desfazer", which runs after
+  // the render that created it.
+  type UndoOffer = { notice: string; steps: (() => Promise<unknown>)[]; keys: string[] };
+  const UNDO_MS = 10_000;
+  const [undo, setUndo] = useState<UndoOffer | null>(null);
+  const undoOffer = useRef<UndoOffer | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Rows an action is taking out of this view (trash, archive, spam, another
+  // folder) leave the list at once instead of after the server and the list
+  // reload answer; a failure brings them back.
+  const [departing, setDeparting] = useState<ReadonlySet<string>>(() => new Set());
+  const departRows = (keys: string[]) => setDeparting((current) => new Set([...current, ...keys]));
+  const returnRows = (keys: string[]) =>
+    setDeparting((current) => {
+      if (!keys.some((key) => current.has(key))) return current;
+      const next = new Set(current);
+      for (const key of keys) next.delete(key);
+      return next;
+    });
   // "Move to" in the reader and in the bulk bar; V opens whichever applies.
   const moveMenu = useRef<MailboxMoveMenuHandle>(null);
   const bulkMoveMenu = useRef<MailboxMoveMenuHandle>(null);
@@ -1013,8 +1072,19 @@ export function MailboxContentView({
       { enabled: folder === "inbox", retry: false, refetchInterval: 60000 },
     ),
   );
+  // Once the list comes back without a departed row, forget it.
+  useEffect(() => {
+    if (!listedItems) return;
+    setDeparting((current) => {
+      if (!current.size) return current;
+      const present = new Set(listedItems.map((i) => `${i.mailboxId}:${i.id}`));
+      const next = new Set([...current].filter((key) => present.has(key)));
+      return next.size === current.size ? current : next;
+    });
+  }, [listedItems]);
   type ListedItem = NonNullable<typeof listedItems>[number];
   const keepRow = (i: ListedItem) => {
+    if (departing.has(`${i.mailboxId}:${i.id}`)) return false;
     if (
       unreadOnly &&
       !(
@@ -1064,6 +1134,13 @@ export function MailboxContentView({
   );
   const item = visibleItem && !detail.isError ? detail.data : null;
   const pendingSentReply = item?.kind === "sent" && !item.transportMessageId;
+  // The person's own quick replies, or the built-in set in their language.
+  const quickReplies = prefs.quickReplies ?? [
+    t("quickReplies.default1"),
+    t("quickReplies.default2"),
+    t("quickReplies.default3"),
+    t("quickReplies.default4"),
+  ];
   const writable = boxes.filter(
     (b) => b.canDraft && b.status === "planned" && (!mailboxKind || b.kind === mailboxKind),
   );
@@ -1071,10 +1148,15 @@ export function MailboxContentView({
     (cause) => (cause as { data?: { code?: string } } | null)?.data?.code === "FORBIDDEN",
   );
   const composerAllowed = !!composer && writable.some((b) => b.id === composer.mailboxId);
-  function openComposer(mailboxId: string, source: Item | null, mode: ComposeMode = "reply") {
+  function openComposer(
+    mailboxId: string,
+    source: Item | null,
+    mode: ComposeMode = "reply",
+    quickReply?: string,
+  ) {
     const session = ++composerSequence.current;
     composerSession.current = session;
-    compose({ session, mailboxId, source, mode });
+    compose({ session, mailboxId, source, mode, ...(quickReply ? { quickReply } : {}) });
   }
   const closeComposer = useCallback((session: number) => {
     if (composerSession.current !== session) return;
@@ -1127,22 +1209,35 @@ export function MailboxContentView({
   }
   const date = (value: Date) =>
     new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(value);
-  function offerUndo(message: string, steps: (() => Promise<unknown>)[]) {
+  /** The result of an organizing action as a toast at the bottom of the
+   * screen, with "Desfazer" for ten seconds when it can be reversed. */
+  function offerUndo(message: string, steps: (() => Promise<unknown>)[], keys: string[] = []) {
     if (undoTimer.current) clearTimeout(undoTimer.current);
     if (!steps.length) {
+      undoOffer.current = null;
       setUndo(null);
+      toast(message, "success");
       return;
     }
-    setUndo({ notice: message, steps });
+    const offer = { notice: message, steps, keys };
+    undoOffer.current = offer;
+    setUndo(offer);
+    toast(message, "success", {
+      action: { label: t("organization.undo"), run: () => void runUndo() },
+      durationMs: UNDO_MS,
+    });
     undoTimer.current = setTimeout(() => {
+      if (undoOffer.current === offer) undoOffer.current = null;
       if (mounted.current) setUndo(null);
-    }, 10000);
+    }, UNDO_MS);
   }
   async function runUndo() {
-    const offer = undo;
+    const offer = undoOffer.current;
     if (!offer || moving.current) return;
     if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoOffer.current = null;
     setUndo(null);
+    returnRows(offer.keys);
     moving.current = true;
     setNotice("");
     let done = 0;
@@ -1152,10 +1247,10 @@ export function MailboxContentView({
         done += 1;
         if (!mounted.current) break;
       }
-      if (mounted.current) setNotice(t("organization.undone", { count: done }));
+      if (mounted.current) toast(t("organization.undone", { count: done }), "success");
     } catch {
       if (mounted.current)
-        setNotice(t("organization.bulkPartial", { count: done, total: offer.steps.length }));
+        toast(t("organization.bulkPartial", { count: done, total: offer.steps.length }), "warn");
     } finally {
       moving.current = false;
       if (mounted.current) void refresh();
@@ -1471,6 +1566,8 @@ export function MailboxContentView({
   async function organizeRows(targets: Row[], target: MailboxDropTarget) {
     if (moving.current) return;
     const reversals: (() => Promise<unknown>)[] = [];
+    // Rows this plan takes out of the current view (all but "favorites").
+    const leaving: string[] = [];
     const plan = targets
       .filter(
         (row) =>
@@ -1478,118 +1575,126 @@ export function MailboxContentView({
           !mailboxContentBlocked(row) &&
           !(row.kind === "draft" && row.sendStatus && row.sendStatus !== "failed"),
       )
-      .flatMap((row): (() => Promise<unknown>)[] => {
-        const ref = { mailboxId: row.mailboxId, id: row.id, expectedRevision: row.revision };
-        const at = (revision: number) => ({
-          mailboxId: row.mailboxId,
-          id: row.id,
-          expectedRevision: revision,
-        });
-        // Every change records its inverse with the revision it produced, for "Desfazer".
-        const step =
-          (
-            change: () => Promise<{ revision: number }>,
-            inverse: (revision: number) => Promise<unknown>,
-          ) =>
-          async () => {
-            const done = await change();
-            reversals.push(() => inverse(done.revision));
-          };
-        const ordinary = !row.trashedAt && row.deliveryFolder === "inbox";
-        switch (target.folder) {
-          case "archive":
-            return ordinary && row.kind !== "draft" && !row.archivedAt
-              ? [
+      .flatMap((row) => {
+        const steps = ((): (() => Promise<unknown>)[] => {
+          const ref = { mailboxId: row.mailboxId, id: row.id, expectedRevision: row.revision };
+          const at = (revision: number) => ({
+            mailboxId: row.mailboxId,
+            id: row.id,
+            expectedRevision: revision,
+          });
+          // Every change records its inverse with the revision it produced, for "Desfazer".
+          const step =
+            (
+              change: () => Promise<{ revision: number }>,
+              inverse: (revision: number) => Promise<unknown>,
+            ) =>
+            async () => {
+              const done = await change();
+              reversals.push(() => inverse(done.revision));
+            };
+          const ordinary = !row.trashedAt && row.deliveryFolder === "inbox";
+          switch (target.folder) {
+            case "archive":
+              return ordinary && row.kind !== "draft" && !row.archivedAt
+                ? [
+                    step(
+                      () => archiveMutation.mutateAsync({ ...ref, archived: true }),
+                      (revision) =>
+                        archiveMutation.mutateAsync({ ...at(revision), archived: false }),
+                    ),
+                  ]
+                : [];
+            case "trash":
+              return row.trashedAt
+                ? []
+                : [
+                    step(
+                      () => trashMutation.mutateAsync({ ...ref, trashed: true }),
+                      (revision) => trashMutation.mutateAsync({ ...at(revision), trashed: false }),
+                    ),
+                  ];
+            case "favorites":
+              return ordinary && !row.starredAt
+                ? [
+                    step(
+                      () => starMutation.mutateAsync({ ...ref, starred: true }),
+                      (revision) => starMutation.mutateAsync({ ...at(revision), starred: false }),
+                    ),
+                  ]
+                : [];
+            case "spam":
+              return ordinary && row.kind === "inbox"
+                ? [
+                    step(
+                      () => moveMutation.mutateAsync({ ...ref, folder: "spam" }),
+                      (revision) => moveMutation.mutateAsync({ ...at(revision), folder: "inbox" }),
+                    ),
+                  ]
+                : [];
+            case "custom": {
+              const previous = row.folderId;
+              return ordinary &&
+                row.mailboxId === (target.mailboxId ?? selected?.id) &&
+                row.folderId !== target.id
+                ? [
+                    step(
+                      () => folderMutation.mutateAsync({ ...ref, folderId: target.id }),
+                      (revision) =>
+                        folderMutation.mutateAsync({ ...at(revision), folderId: previous }),
+                    ),
+                  ]
+                : [];
+            }
+            case "inbox":
+              if (row.trashedAt)
+                return [
                   step(
-                    () => archiveMutation.mutateAsync({ ...ref, archived: true }),
-                    (revision) => archiveMutation.mutateAsync({ ...at(revision), archived: false }),
-                  ),
-                ]
-              : [];
-          case "trash":
-            return row.trashedAt
-              ? []
-              : [
-                  step(
-                    () => trashMutation.mutateAsync({ ...ref, trashed: true }),
-                    (revision) => trashMutation.mutateAsync({ ...at(revision), trashed: false }),
+                    () => trashMutation.mutateAsync({ ...ref, trashed: false }),
+                    (revision) => trashMutation.mutateAsync({ ...at(revision), trashed: true }),
                   ),
                 ];
-          case "favorites":
-            return ordinary && !row.starredAt
-              ? [
+              if (row.archivedAt)
+                return [
                   step(
-                    () => starMutation.mutateAsync({ ...ref, starred: true }),
-                    (revision) => starMutation.mutateAsync({ ...at(revision), starred: false }),
+                    () => archiveMutation.mutateAsync({ ...ref, archived: false }),
+                    (revision) => archiveMutation.mutateAsync({ ...at(revision), archived: true }),
                   ),
-                ]
-              : [];
-          case "spam":
-            return ordinary && row.kind === "inbox"
-              ? [
+                ];
+              if (row.folderId) {
+                const previous = row.folderId;
+                return [
                   step(
-                    () => moveMutation.mutateAsync({ ...ref, folder: "spam" }),
-                    (revision) => moveMutation.mutateAsync({ ...at(revision), folder: "inbox" }),
-                  ),
-                ]
-              : [];
-          case "custom": {
-            const previous = row.folderId;
-            return ordinary &&
-              row.mailboxId === (target.mailboxId ?? selected?.id) &&
-              row.folderId !== target.id
-              ? [
-                  step(
-                    () => folderMutation.mutateAsync({ ...ref, folderId: target.id }),
+                    () => folderMutation.mutateAsync({ ...ref, folderId: null }),
                     (revision) =>
                       folderMutation.mutateAsync({ ...at(revision), folderId: previous }),
                   ),
-                ]
-              : [];
+                ];
+              }
+              if (row.kind === "inbox" && row.deliveryFolder === "spam")
+                return [
+                  step(
+                    () => moveMutation.mutateAsync({ ...ref, folder: "inbox" }),
+                    (revision) => moveMutation.mutateAsync({ ...at(revision), folder: "spam" }),
+                  ),
+                ];
+              return [];
+            default:
+              return [];
           }
-          case "inbox":
-            if (row.trashedAt)
-              return [
-                step(
-                  () => trashMutation.mutateAsync({ ...ref, trashed: false }),
-                  (revision) => trashMutation.mutateAsync({ ...at(revision), trashed: true }),
-                ),
-              ];
-            if (row.archivedAt)
-              return [
-                step(
-                  () => archiveMutation.mutateAsync({ ...ref, archived: false }),
-                  (revision) => archiveMutation.mutateAsync({ ...at(revision), archived: true }),
-                ),
-              ];
-            if (row.folderId) {
-              const previous = row.folderId;
-              return [
-                step(
-                  () => folderMutation.mutateAsync({ ...ref, folderId: null }),
-                  (revision) => folderMutation.mutateAsync({ ...at(revision), folderId: previous }),
-                ),
-              ];
-            }
-            if (row.kind === "inbox" && row.deliveryFolder === "spam")
-              return [
-                step(
-                  () => moveMutation.mutateAsync({ ...ref, folder: "inbox" }),
-                  (revision) => moveMutation.mutateAsync({ ...at(revision), folder: "spam" }),
-                ),
-              ];
-            return [];
-          default:
-            return [];
-        }
+        })();
+        if (steps.length && target.folder !== "favorites") leaving.push(rowKey(row));
+        return steps;
       });
     if (!plan.length) {
-      setNotice(t("organization.dropNone"));
+      toast(t("organization.dropNone"), "neutral");
       return;
     }
     moving.current = true;
     setBulkBusy(true);
     setNotice("");
+    departRows(leaving);
+    if (selection && leaving.includes(rowKey(selection))) select(null);
     let done = 0;
     try {
       for (const step of plan) {
@@ -1598,25 +1703,19 @@ export function MailboxContentView({
         if (!mounted.current) break;
       }
       if (mounted.current) {
-        if (
-          selection &&
-          targets.some((row) => row.id === selection.id && row.mailboxId === selection.mailboxId)
-        )
-          select(null);
         setCheckedIds(new Set());
         const message = t(
           target.folder === "archive" ? "organization.bulkArchived" : "organization.dropDone",
           { count: done },
         );
-        setNotice(message);
-        offerUndo(message, reversals);
+        offerUndo(message, reversals, leaving);
       }
     } catch {
       if (mounted.current) {
+        returnRows(leaving);
         setCheckedIds(new Set());
         const message = t("organization.bulkPartial", { count: done, total: plan.length });
-        setNotice(message);
-        offerUndo(message, reversals);
+        offerUndo(message, reversals, leaving);
       }
     } finally {
       moving.current = false;
@@ -1631,34 +1730,41 @@ export function MailboxContentView({
     const observed = { mailboxId: item.mailboxId, id: item.id, expectedRevision: item.revision };
     moving.current = true;
     setNotice("");
+    const key = rowKey(observed);
+    departRows([key]);
+    if (
+      currentSelection.current?.id === observed.id &&
+      currentSelection.current.mailboxId === observed.mailboxId
+    )
+      select(null);
     try {
       const result = await archiveMutation.mutateAsync({ ...observed, archived });
       if (!mounted.current) return;
       const message = t(archived ? "organization.archived" : "organization.unarchived");
-      setNotice(message);
-      offerUndo(message, [
-        () =>
-          archiveMutation.mutateAsync({
-            mailboxId: observed.mailboxId,
-            id: observed.id,
-            expectedRevision: result.revision,
-            archived: !archived,
-          }),
-      ]);
-      if (
-        currentSelection.current?.id === observed.id &&
-        currentSelection.current.mailboxId === observed.mailboxId
-      )
-        select(null);
+      offerUndo(
+        message,
+        [
+          () =>
+            archiveMutation.mutateAsync({
+              mailboxId: observed.mailboxId,
+              id: observed.id,
+              expectedRevision: result.revision,
+              archived: !archived,
+            }),
+        ],
+        [key],
+      );
     } catch (cause) {
-      if (mounted.current)
-        setNotice(
-          t(
-            (cause as { data?: { code?: string } })?.data?.code === "CONFLICT"
-              ? "organization.conflict"
-              : "organization.error",
-          ),
-        );
+      if (!mounted.current) return;
+      returnRows([key]);
+      toast(
+        t(
+          (cause as { data?: { code?: string } })?.data?.code === "CONFLICT"
+            ? "organization.conflict"
+            : "organization.error",
+        ),
+        "danger",
+      );
     } finally {
       moving.current = false;
       if (mounted.current) void refresh();
@@ -1688,6 +1794,10 @@ export function MailboxContentView({
     moving.current = true;
     setBulkBusy(true);
     setNotice("");
+    // Trashing (or restoring from the trash) takes every checked row out of this view.
+    const leaving = observed.map(rowKey);
+    departRows(leaving);
+    if (selection && leaving.includes(rowKey(selection))) select(null);
     let done = 0;
     const reversals: (() => Promise<unknown>)[] = [];
     try {
@@ -1712,15 +1822,14 @@ export function MailboxContentView({
           folder === "trash" ? "organization.bulkRestored" : "organization.bulkTrashed",
           { count: done },
         );
-        setNotice(message);
-        offerUndo(message, reversals);
+        offerUndo(message, reversals, leaving);
       }
     } catch {
       if (mounted.current) {
+        returnRows(leaving);
         setCheckedIds(new Set());
         const message = t("organization.bulkPartial", { count: done, total: observed.length });
-        setNotice(message);
-        offerUndo(message, reversals);
+        offerUndo(message, reversals, leaving);
       }
     } finally {
       moving.current = false;
@@ -1740,20 +1849,25 @@ export function MailboxContentView({
     const observed = { mailboxId: item.mailboxId, id: item.id, expectedRevision: item.revision };
     moving.current = true;
     setNotice("");
+    const key = rowKey(observed);
+    departRows([key]);
     try {
       const done = await moveMutation.mutateAsync({ ...observed, folder: target });
       if (!mounted.current) return;
       const message = t(target === "inbox" ? "safety.restored" : "safety.markedSpam");
-      setNotice(message);
-      offerUndo(message, [
-        () =>
-          moveMutation.mutateAsync({
-            mailboxId: observed.mailboxId,
-            id: observed.id,
-            expectedRevision: done.revision,
-            folder: target === "inbox" ? "spam" : "inbox",
-          }),
-      ]);
+      offerUndo(
+        message,
+        [
+          () =>
+            moveMutation.mutateAsync({
+              mailboxId: observed.mailboxId,
+              id: observed.id,
+              expectedRevision: done.revision,
+              folder: target === "inbox" ? "spam" : "inbox",
+            }),
+        ],
+        [key],
+      );
       if (
         currentSelection.current?.id === observed.id &&
         currentSelection.current.mailboxId === observed.mailboxId
@@ -1764,8 +1878,9 @@ export function MailboxContentView({
       }
     } catch (cause) {
       if (!mounted.current) return;
+      returnRows([key]);
       const code = (cause as { data?: { code?: string } })?.data?.code;
-      setNotice(t(code === "FORBIDDEN" ? "accessLost" : "safety.moveError"));
+      toast(t(code === "FORBIDDEN" ? "accessLost" : "safety.moveError"), "danger");
     } finally {
       moving.current = false;
       if (mounted.current) void refresh();
@@ -1796,36 +1911,43 @@ export function MailboxContentView({
             : actionItem.deliveryFolder;
     moving.current = true;
     setNotice("");
+    // The row leaves this view now; the server catches up behind it.
+    const key = rowKey(observed);
+    departRows([key]);
+    const wasOpen = () =>
+      currentSelection.current?.id === observed.id &&
+      currentSelection.current.mailboxId === observed.mailboxId;
+    if (trashed && wasOpen()) select(null);
     try {
       const result = await trashMutation.mutateAsync({ ...observed, trashed });
       if (!mounted.current) return;
       const message = t(trashed ? "trashedNotice" : "restoredNotice");
-      setNotice(message);
-      if (trashed)
-        offerUndo(message, [
-          () =>
-            trashMutation.mutateAsync({
-              mailboxId: observed.mailboxId,
-              id: observed.id,
-              expectedRevision: result.revision,
-              trashed: false,
-            }),
-        ]);
-      if (
-        currentSelection.current?.id === observed.id &&
-        currentSelection.current.mailboxId === observed.mailboxId
-      ) {
+      offerUndo(
+        message,
+        trashed
+          ? [
+              () =>
+                trashMutation.mutateAsync({
+                  mailboxId: observed.mailboxId,
+                  id: observed.id,
+                  expectedRevision: result.revision,
+                  trashed: false,
+                }),
+            ]
+          : [],
+        [key],
+      );
+      // Trashing keeps you where you were; restoring shows where it went back to.
+      if (!trashed && wasOpen()) {
         select(null);
-        // Trashing keeps you where you were; restoring shows where it went back to.
-        if (!trashed) {
-          setSearch("");
-          changeFolder(destination);
-        }
+        setSearch("");
+        changeFolder(destination);
       }
     } catch (cause) {
       if (!mounted.current) return;
+      returnRows([key]);
       const code = (cause as { data?: { code?: string } })?.data?.code;
-      setNotice(
+      toast(
         t(
           code === "FORBIDDEN"
             ? "accessLost"
@@ -1833,6 +1955,7 @@ export function MailboxContentView({
               ? "trashConflict"
               : "trashError",
         ),
+        "danger",
       );
     } finally {
       moving.current = false;
@@ -1849,8 +1972,93 @@ export function MailboxContentView({
       expectedRevision: item.revision,
     });
   }
-  /** One send of one exact saved revision: from the open draft or the composer's Send. */
+  /**
+   * Send from the open draft or the composer: after the undo-send wait when
+   * the person keeps one (Preferências), at once otherwise.
+   */
   async function submitRevision(revision: {
+    mailboxId: string;
+    id: string;
+    expectedRevision: number;
+  }) {
+    const key = `${revision.mailboxId}:${revision.id}:${revision.expectedRevision}`;
+    if (attempted.current.has(key) || pendingSend.current?.key === key) return;
+    const seconds = prefs.undoSendSeconds;
+    if (!seconds) return deliverRevision(revision);
+    // An earlier send still waiting goes now instead of being held behind this one.
+    if (pendingSend.current) releasePendingSend();
+    const deadline = Date.now() + seconds * 1000;
+    const pending: PendingSend = {
+      key,
+      revision,
+      deadline,
+      timer: setTimeout(() => sendActions.current.release(pending), seconds * 1000),
+    };
+    pendingSend.current = pending;
+    setSendStates((states) => ({ ...states, [key]: "waiting" }));
+    setPendingDeadline(deadline);
+    setNotice("");
+    toast(t("undoSend.waiting", { seconds }), "info", {
+      action: { label: t("organization.undo"), run: () => sendActions.current.undo() },
+      durationMs: seconds * 1000,
+    });
+  }
+  /** The wait is over (or a newer send needs the slot): the message goes now. */
+  function releasePendingSend(expected?: PendingSend) {
+    const pending = pendingSend.current;
+    if (!pending || (expected && pending !== expected)) return;
+    clearTimeout(pending.timer);
+    // One request at a time: try again shortly while another send is in flight.
+    if (sending.current) {
+      pending.timer = setTimeout(() => sendActions.current.release(pending), 400);
+      return;
+    }
+    pendingSend.current = null;
+    setPendingDeadline(null);
+    void deliverRevision(pending.revision);
+  }
+  /** "Desfazer": nothing was sent; the draft opens again to be changed. */
+  function undoSend() {
+    const pending = pendingSend.current;
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    pendingSend.current = null;
+    setPendingDeadline(null);
+    setSendStates((states) => {
+      const { [pending.key]: _cancelled, ...rest } = states;
+      return rest;
+    });
+    toast(t("undoSend.cancelled"), "info");
+    const { mailboxId, id } = pending.revision;
+    if (!(folder === "drafts" && selection?.mailboxId === mailboxId && selection.id === id)) {
+      changeFolder("drafts");
+      select({ mailboxId, id });
+    }
+    void queries
+      .fetchQuery(trpc.mailboxes.item.queryOptions({ mailboxId, id }, { staleTime: 0 }))
+      .then((draft) => {
+        if (mounted.current && draft.kind === "draft" && !composerSession.current)
+          openComposer(mailboxId, draft);
+      })
+      .catch(() => {
+        // The draft stays in Rascunhos; opening it is one click away.
+      });
+  }
+  const sendActions = useRef({ release: releasePendingSend, undo: undoSend });
+  sendActions.current = { release: releasePendingSend, undo: undoSend };
+  // While a send waits: leaving the page asks first, and the open draft counts down.
+  useEffect(() => {
+    if (pendingDeadline === null) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    const tick = setInterval(() => setSendClock((value) => value + 1), 1000);
+    return () => {
+      window.removeEventListener("beforeunload", warn);
+      clearInterval(tick);
+    };
+  }, [pendingDeadline]);
+  /** One send of one exact saved revision, now. */
+  async function deliverRevision(revision: {
     mailboxId: string;
     id: string;
     expectedRevision: number;
@@ -1897,7 +2105,10 @@ export function MailboxContentView({
     knownRows.current = known;
     if (arrivals.length && (listBody.current?.scrollTop ?? 0) > 80)
       setFreshCount((count) => count + arrivals.length);
+    // The desktop app announces new mail itself (mailboxes-view, by sender and
+    // subject, from any folder); these per-message notices are the browser's.
     if (
+      isDesktop() ||
       !noticesOn ||
       !arrivals.length ||
       typeof Notification === "undefined" ||
@@ -2045,7 +2256,8 @@ export function MailboxContentView({
         run(() => setShortcutsOpen(true));
         return;
       case "undo":
-        if (undo && undo.notice === notice) run(() => void runUndo());
+        if (pendingSend.current) run(undoSend);
+        else if (undo) run(() => void runUndo());
         return;
     }
   };
@@ -2139,7 +2351,11 @@ export function MailboxContentView({
           </div>
         </section>
         {shortcutsOpen ? <ShortcutsDialog close={() => setShortcutsOpen(false)} /> : null}
-        <div className={styles.contentPanels} data-empty={!hasRows}>
+        <div
+          className={styles.contentPanels}
+          data-empty={!hasRows}
+          data-wide={wideReader && (!!visibleItem || !!blockedRow) ? "true" : undefined}
+        >
           <div
             className={`${styles.list} ${styles.contentList}`}
             data-reading={!!visibleItem || !!blockedRow}
@@ -2401,7 +2617,7 @@ export function MailboxContentView({
                         <div
                           className={styles.messageRow}
                           data-unread={unread || undefined}
-                          draggable={draggableRow && !isDesktop()}
+                          draggable={draggableRow && htmlDropsWork()}
                           onDragStart={(event) => {
                             const keys = checkedIds.has(rowKey(row))
                               ? checkedRows.map(rowKey)
@@ -2886,6 +3102,18 @@ export function MailboxContentView({
                     ) : null}
                   </button>
                 ) : null}
+                {visibleItem || blockedRow ? (
+                  <button
+                    type="button"
+                    className={`ms-btn ms-btn-ghost ${styles.iconAction} ${styles.wideToggle}`}
+                    aria-pressed={wideReader}
+                    aria-label={t(wideReader ? "collapseReader" : "expandReader")}
+                    title={t(wideReader ? "collapseReader" : "expandReader")}
+                    onClick={toggleWideReader}
+                  >
+                    <MailboxFolderIcon name={wideReader ? "collapse" : "expand"} />
+                  </button>
+                ) : null}
               </div>
               {blockedRow ? (
                 <div className={styles.quarantineDetail}>
@@ -3066,7 +3294,25 @@ export function MailboxContentView({
                       {t("sentReplyPending")}
                     </p>
                   ) : null}
-                  {item.kind === "draft" && sendState ? (
+                  {item.kind === "draft" && sendState === "waiting" ? (
+                    <p className={styles.contentNotice}>
+                      <span role="status">{t("undoSend.waitingDraft")}</span>{" "}
+                      {pendingDeadline !== null ? (
+                        <span aria-hidden="true">
+                          {t("undoSend.countdown", {
+                            seconds: Math.max(1, Math.ceil((pendingDeadline - Date.now()) / 1000)),
+                          })}
+                        </span>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={`ms-btn ms-btn-ghost ${styles.undoAction}`}
+                        onClick={undoSend}
+                      >
+                        {t("organization.undo")}
+                      </button>
+                    </p>
+                  ) : item.kind === "draft" && sendState ? (
                     <p className={styles.contentNotice} role="status">
                       {t(
                         sendState === "requesting"
@@ -3109,6 +3355,22 @@ export function MailboxContentView({
                       ))}
                     </section>
                   ) : null}
+                  {item.kind === "inbox" && actions?.canRespond && quickReplies.length ? (
+                    <section aria-label={t("quickReplies.title")} className={styles.quickReplies}>
+                      <span className={styles.quickRepliesLabel}>{t("quickReplies.title")}</span>
+                      {quickReplies.map((reply) => (
+                        <button
+                          key={reply}
+                          type="button"
+                          className={styles.quickReply}
+                          title={t("quickReplies.use")}
+                          onClick={() => openComposer(item.mailboxId, item, "reply", reply)}
+                        >
+                          {reply}
+                        </button>
+                      ))}
+                    </section>
+                  ) : null}
                 </article>
               ) : (
                 <div className={styles.hero}>
@@ -3128,6 +3390,7 @@ export function MailboxContentView({
           mailboxId={composer.mailboxId}
           source={composer.source}
           mode={composer.mode}
+          quickReply={composer.quickReply}
           deliveryReady={deliveryReady}
           current={() => composerSession.current === composer.session}
           close={() => closeComposer(composer.session)}

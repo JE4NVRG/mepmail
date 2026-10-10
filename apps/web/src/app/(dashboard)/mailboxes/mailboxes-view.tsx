@@ -11,15 +11,17 @@ import { NavGlyph } from "@/components/icons/nav-icons";
 import { PopoverMenu, type PopoverMenuItem } from "@/components/popover-menu";
 import { toast } from "@/components/toast";
 import { authClient } from "@/lib/auth-client";
-import { isDesktop, notifyDesktop, setNativeTitle } from "@/lib/desktop-bridge";
+import { htmlDropsWork, isDesktop, notifyDesktop, setNativeTitle } from "@/lib/desktop-bridge";
 import {
   type MailboxFolder,
   type MailboxKindFilter,
   mailboxFolderOrderAfterMove,
   mailboxFolderTint,
 } from "@/lib/mailbox-inbox-presentation";
+import { newMailNotices, rememberUnread } from "@/lib/mailbox-new-mail";
+import { noticesWanted } from "@/lib/mailbox-notifications";
 import { applyCorreioTheme, useCorreioPrefs } from "@/lib/mailbox-preferences";
-import { useTRPC } from "@/lib/trpc";
+import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { MailboxAccountMenu } from "./mailbox-account-menu";
 import { MailboxActivityDialog } from "./mailbox-activity";
@@ -537,17 +539,51 @@ export function MailboxesView({
     // The desktop shell shows the same title on its window; a no-op elsewhere.
     void setNativeTitle(document.title);
   }, [inboxUnread]);
-  // More unread mail than the last count: one system notification (the desktop
-  // shell shows it as a native toast; a browser only if it was granted before).
+  // More unread mail than the last count, in the desktop app: native toasts
+  // naming the sender and subject of what arrived (lib/mailbox-new-mail). The
+  // top of the inbox is read once at start so mail already there is never
+  // announced. In a browser the inbox list raises its own per-message notices
+  // (the bell), so nothing is shown from here.
+  const trpcClient = useTRPCClient();
   const lastUnread = useRef<number | null>(null);
+  const announced = useRef<Set<string> | null>(null);
   useEffect(() => {
     if (!unreadCounts.data) return;
     const total = Object.values(unreadCounts.data.counts).reduce((sum, n) => sum + n, 0);
     const previous = lastUnread.current;
     lastUnread.current = total;
+    if (!isDesktop() || !noticesWanted(true)) return;
+    const inboxTop = () =>
+      trpcClient.mailboxes.items.query({ mailboxId: null, folder: "inbox", limit: 10 });
+    if (announced.current === null) {
+      const seen = new Set<string>();
+      announced.current = seen;
+      void inboxTop()
+        .then((page) => rememberUnread(page.items, seen))
+        .catch(() => {});
+    }
     if (previous === null || total <= previous) return;
-    void notifyDesktop(t("title"), t("app.newMail", { count: total - previous }));
-  }, [unreadCounts.data, t]);
+    const notified = announced.current;
+    const fallback = { title: t("title"), body: t("app.newMail", { count: total - previous }) };
+    void inboxTop()
+      .then((page) =>
+        newMailNotices(
+          page.items,
+          notified,
+          {
+            fallbackTitle: t("title"),
+            noSubject: t("noSubject"),
+            count: (count) => t("app.newMail", { count }),
+            more: (count) => t("app.newMailMore", { count }),
+          },
+          fallback,
+        ),
+      )
+      .catch(() => [fallback])
+      .then((notices) => {
+        for (const notice of notices) void notifyDesktop(notice.title, notice.body);
+      });
+  }, [unreadCounts.data, t, trpcClient]);
   useEffect(
     () => () => {
       if (baseTitle.current) document.title = baseTitle.current;
@@ -556,9 +592,9 @@ export function MailboxesView({
   );
   // Rows dragged from the list land on a folder through the content view's action.
   const dropAction = useRef<MailboxDropHandler | null>(null);
-  // The desktop shell intercepts HTML drops, so its window shows no drop targets.
+  // Desktop shells older than 0.3 swallowed HTML drops: no drop targets there.
   const canDrop =
-    !isDesktop() && boxes.some((box) => box.ownerActive && box.ownerUserId === session?.user.id);
+    htmlDropsWork() && boxes.some((box) => box.ownerActive && box.ownerUserId === session?.user.id);
   const [dropHover, setDropHover] = useState<string | null>(null);
   const dropProps = (target: MailboxDropTarget, key: string) =>
     canDrop
@@ -1235,6 +1271,7 @@ export function MailboxesView({
                 setPref={setPref}
                 resetPrefs={resetPrefs}
                 openShortcuts={() => setShortcutsOpen(true)}
+                openTab={setSettingsTab}
               />
             </section>
           ) : settingsTab === "boxes" ? (

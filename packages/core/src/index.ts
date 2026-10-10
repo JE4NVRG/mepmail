@@ -451,8 +451,10 @@ export {
   importMailboxMime,
   listMailboxItems,
   listMailboxThread,
+  MAILBOX_LIST_SUMMARY_MAX_BYTES,
   type MailboxContentActor,
   MailboxContentError,
+  type MailboxListContent,
   type MailboxListFilter,
   type MailboxListPosition,
   type MailboxViewCount,
@@ -460,10 +462,12 @@ export {
   saveMailboxDraft,
   setMailboxDeliveryFolder,
   setMailboxItemTrash,
+  storeMailboxListSummaries,
   summarizeMailboxThreads,
   withMailboxContentAccess,
   withMailboxItem,
   withMailboxItems,
+  withMailboxListContents,
 } from "./mailbox-private-store.js";
 export {
   getMailboxReceivingReadiness,

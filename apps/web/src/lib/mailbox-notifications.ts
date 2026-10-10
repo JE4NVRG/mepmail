@@ -1,4 +1,4 @@
-/** Browser notices for new Correio mail, opt-in per browser. */
+/** New-mail notices: opt-in per browser, on by default in the desktop app. */
 export const MAILBOX_NOTICE_PREFERENCE = "mepmail.correio.notices";
 
 export interface NoticeRow {
@@ -43,5 +43,25 @@ export function writeNoticePreference(on: boolean) {
     window.localStorage.setItem(MAILBOX_NOTICE_PREFERENCE, on ? "on" : "off");
   } catch {
     // Private windows may refuse storage; the toggle then lasts this visit.
+  }
+}
+
+/**
+ * Whether new-mail notices are wanted on this device. A browser asks first
+ * (opt-in, plus its own permission); the desktop app shows them unless the
+ * person turned them off in Preferências.
+ */
+export function noticesWanted(
+  desktop: boolean,
+  stored: string | null = readStoredNotice(),
+): boolean {
+  return desktop ? stored !== "off" : stored === "on";
+}
+
+function readStoredNotice(): string | null {
+  try {
+    return window.localStorage.getItem(MAILBOX_NOTICE_PREFERENCE);
+  } catch {
+    return null;
   }
 }
