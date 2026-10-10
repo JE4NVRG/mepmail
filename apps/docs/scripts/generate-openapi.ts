@@ -46,6 +46,19 @@ await generateFiles({
   output: "./content/docs/api-reference/endpoints",
   groupBy: "route",
   includeDescription: true,
+  // The body shows the full description; the frontmatter carries its first
+  // sentence, in plain text, as the page's meta description.
+  frontmatter: (_title, description) => {
+    const summary = metaDescription(description);
+    return summary ? { description: summary } : {};
+  },
 });
 
 console.log("generated public/openapi.json and content/docs/api-reference/endpoints");
+
+function metaDescription(text: string | undefined): string | undefined {
+  const plain = text?.replace(/`/g, "").replace(/\s+/g, " ").trim();
+  if (!plain) return undefined;
+  const first = plain.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? plain;
+  return first.length > 200 ? `${first.slice(0, 197).trimEnd()}…` : first;
+}

@@ -30,7 +30,8 @@ export default async function Page(props: PageParams) {
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD built from our own frontmatter, escaped above */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription>{page.data.description}</DocsDescription>
+      {/* An API page shows its full description in the body; this one is its meta summary. */}
+      {"_openapi" in page.data ? null : <DocsDescription>{page.data.description}</DocsDescription>}
       <PageActions
         markdownUrl={markdownUrl}
         markdownHref={absoluteUrl(markdownUrl)}
