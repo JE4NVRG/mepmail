@@ -23,6 +23,10 @@ vi.mock("@millionsend/billing", () => ({
     }
   },
   beginMailboxCheckout: runtime.begin,
+  isStandaloneMailboxPrice: (
+    catalog: { standalonePriceIds?: readonly string[] } | null,
+    priceId: string | null,
+  ) => !!priceId && !!catalog?.standalonePriceIds?.includes(priceId),
   manageMailboxSubscription: vi.fn(),
   recoverMailboxCheckoutSession: vi.fn(),
 }));
@@ -406,5 +410,96 @@ describe("customer checkout resolves only server-approved mailbox offers", () =>
     });
     expect(select).not.toHaveBeenCalled();
     noCheckout();
+  });
+});
+
+describe("standalone Correio offer, for teams without Envio", () => {
+  // Provisional TEST terms for the single standalone plan.
+  const solo = {
+    ...small,
+    priceId: "price_customer_fixture_solo",
+    unitAmount: 1290,
+    storageBytesPerMailbox: 10737418240,
+    includedOutboundPerMailbox: 2000,
+  };
+  const soloCatalog = {
+    ...catalog,
+    standalonePriceIds: [solo.priceId],
+    prices: [...catalog.prices, solo],
+  };
+  const freeMember: Member = {
+    id: teamId,
+    role: "owner",
+    plan: "free",
+    suspendedAt: null,
+    planStatus: "active",
+    stripeCustomerId: null as unknown as string,
+    stripeSubscriptionId: null as unknown as string,
+    currentPeriodStart: null as unknown as Date,
+    currentPeriodEnd: null as unknown as Date,
+    cancelAt: null,
+    sendBillingContract: null,
+  };
+  beforeEach(() => {
+    vi.stubEnv("MAILBOX_BILLING_CATALOG", JSON.stringify(soloCatalog));
+    vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");
+  });
+
+  it("offers only the standalone plan to a team without Envio or a Customer, and buys it", async () => {
+    const billing = await customer({ member: freeMember }).caller.mailboxes.billing();
+    expect(billing).toMatchObject({
+      canPurchase: true,
+      audience: "standalone",
+      sendingPlanRequired: false,
+      earlyAccessRequired: false,
+      availability: "available",
+      offer: { unitAmount: 1290, storageBytesPerMailbox: 10737418240 },
+    });
+    expect(billing.offers.map((offer) => offer.unitAmount)).toEqual([1290]);
+    expect(billing.defaultOfferId).toBe(billing.offers[0]?.offerId);
+
+    const { caller, db } = customer({ member: freeMember });
+    expect(await caller.mailboxes.checkout({ seats: 1 })).toEqual({ url: checkoutUrl });
+    expect(runtime.begin).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ db, requirePaidSendingPlan: true }),
+      { ...soloCatalog, checkoutPriceId: solo.priceId },
+      expect.objectContaining({ teamId, userId, seats: 1 }),
+    );
+  });
+
+  it("refuses an add-on offer to a team without Envio", async () => {
+    const addOn = mailboxBillingOffers("with_sending")[0]?.offerId;
+    if (!addOn) throw new Error("missing_fixture_offer");
+    await expect(
+      customer({ member: freeMember }).caller.mailboxes.checkout({ seats: 1, offerId: addOn }),
+    ).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: "mailbox_billing_unavailable",
+    });
+    noCheckout();
+  });
+
+  it("keeps Envio subscribers on the add-on prices", async () => {
+    const billing = await customer().caller.mailboxes.billing();
+    expect(billing.audience).toBe("with_sending");
+    expect(billing.offers.map((offer) => offer.unitAmount)).toEqual([390, 690]);
+  });
+
+  it("keeps requiring Envio while the standalone offer is closed", async () => {
+    vi.stubEnv("MAILBOX_STANDALONE_OPEN", "false");
+    expect(await customer({ member: freeMember }).caller.mailboxes.billing()).toMatchObject({
+      canPurchase: false,
+      sendingPlanRequired: true,
+      availability: "sending_plan_required",
+    });
+  });
+
+  it("rejects a catalog that lists a price as both add-on and standalone", async () => {
+    vi.stubEnv(
+      "MAILBOX_BILLING_CATALOG",
+      JSON.stringify({ ...soloCatalog, standalonePriceIds: [small.priceId] }),
+    );
+    expect(mailboxBillingOffers("standalone")).toEqual([]);
+    expect(mailboxBillingOffers("with_sending")).toEqual([]);
   });
 });

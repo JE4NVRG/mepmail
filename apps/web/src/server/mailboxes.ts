@@ -7,6 +7,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { hasPaidSendingPlanForMailbox } from "../../../../packages/billing/src/mailbox-addon";
 import {
   mailboxLaunchCohortAllows,
+  mailboxLaunchCohortOpen,
   parseMailboxLaunchCohort,
 } from "../../../../packages/core/src/mailbox-launch-cohort";
 
@@ -22,6 +23,34 @@ export function mailboxOfferOpen(): boolean {
     mailboxRegistryEnabled() &&
     process.env.MAILBOX_EARLY_ACCESS_OPEN === "true"
   );
+}
+
+/**
+ * Correio sold without Envio (MAILBOX_STANDALONE_OPEN=true): every team may
+ * open the Correio area and buy the standalone offer. Purchases stay
+ * server-gated; this only lifts the Envio and existing-Customer prerequisites.
+ */
+export function mailboxStandaloneOpen(): boolean {
+  return (
+    isCloudDeployment() &&
+    mailboxRegistryEnabled() &&
+    process.env.MAILBOX_STANDALONE_OPEN === "true"
+  );
+}
+
+/** The standalone offer's price ids, from the operator catalog (validated again at checkout). */
+export function standaloneMailboxPriceIds(): readonly string[] {
+  try {
+    const raw = JSON.parse(process.env.MAILBOX_BILLING_CATALOG ?? "null") as {
+      standalonePriceIds?: unknown;
+    } | null;
+    const ids = raw?.standalonePriceIds;
+    return Array.isArray(ids)
+      ? ids.filter((id): id is string => typeof id === "string" && /^price_[A-Za-z0-9_]+$/.test(id))
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 export function mailboxRegistryEnabled(): boolean {
@@ -99,6 +128,8 @@ export async function mailboxActorAccessEnabled(
     )
   )
     return true;
+  // The standalone offer is bought from inside Correio, before any Customer exists.
+  if (mailboxStandaloneOpen() && mailboxLaunchCohortOpen(cohort, now)) return true;
   const [existing] = await db
     .select({ teamId: schema.mailboxSubscriptions.teamId })
     .from(schema.mailboxSubscriptions)
@@ -129,12 +160,23 @@ export async function mailboxCreateAccessEnabled(
   if (!member || member.suspendedAt) return false;
   if (member.plan === "system")
     return (await mailboxServiceEntitlement(db, actor.teamId)).unlimitedSeats;
-  return (
-    mailboxLaunchCohortAllows(
+  if (
+    !mailboxLaunchCohortAllows(
       cohort,
       { teamId: member.id, customerId: member.stripeCustomerId },
       now,
-    ) && hasPaidSendingPlanForMailbox(member, cohort, now)
+    )
+  )
+    return false;
+  if (hasPaidSendingPlanForMailbox(member, cohort, now)) return true;
+  // A standalone Correio contract needs no Envio: its own active seats are the grant.
+  const standalone = standaloneMailboxPriceIds();
+  if (standalone.length === 0) return false;
+  const entitlement = await mailboxServiceEntitlement(db, actor.teamId, false, now);
+  return (
+    entitlement.active &&
+    !!entitlement.plan?.stripePriceId &&
+    standalone.includes(entitlement.plan.stripePriceId)
   );
 }
 

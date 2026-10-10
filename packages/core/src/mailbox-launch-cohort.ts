@@ -70,6 +70,20 @@ export function parseMailboxLaunchCohort(raw: string | undefined): MailboxLaunch
  * by hasPaidSendingPlanForMailbox. Members only carry explicit grants such as
  * grandfatheredTwentyDollarPlan.
  */
+/** Whether the hosted opening has happened at all, for buyers without a Stripe
+ * Customer yet: the standalone Correio offer creates one in its own flow.
+ * Undefined keeps self-hosted/legacy behavior; an invalid config stays closed.
+ */
+export function mailboxLaunchCohortOpen(
+  cohort: MailboxLaunchCohort | null | undefined,
+  now = new Date(),
+): boolean {
+  if (cohort === undefined) return true;
+  if (!cohort || !Number.isFinite(now.getTime())) return false;
+  const captured = new Date(cohort.capturedAt).getTime();
+  return Number.isFinite(captured) && captured <= now.getTime();
+}
+
 export function mailboxLaunchCohortAllows(
   cohort: MailboxLaunchCohort | null | undefined,
   binding: { teamId: string; customerId: string | null },

@@ -239,6 +239,11 @@
   background: var(--ms-panel);
 }
 
+/* With Correio sold on its own, the grid holds three plans side by side. */
+.correio .correio-plans-grid.correio-plans-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .correio .correio-use-case,
 .correio .correio-plan {
   min-width: 0;
@@ -812,6 +817,16 @@
   .correio .correio-use-case,
   .correio .correio-plan {
     padding: 24px;
+  }
+
+  /* Three plans are too narrow side by side here: stack them. */
+  .correio .correio-plans-grid.correio-plans-three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .correio .correio-plans-three .correio-plan + .correio-plan {
+    border-left: 0;
+    border-top: 1px solid var(--ms-line-strong);
   }
 }
 

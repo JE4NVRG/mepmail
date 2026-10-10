@@ -370,6 +370,7 @@ export const mailboxesRouter = router({
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "conflict" });
       const catalog = mailboxBillingCatalogForOffer(
         input.offerId ?? presentation.pendingOfferId ?? undefined,
+        presentation.audience,
       );
       if (!catalog)
         throw new TRPCError({

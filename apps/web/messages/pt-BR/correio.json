@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Correio: caixas de e-mail para agentes de IA | MepMail",
-    "description": "Dê ao seu agente de IA uma caixa de e-mail no seu domínio. Ele lê, rascunha e responde por MCP, e você aprova antes de enviar. A partir de US$ 5,90 por caixa ao mês, com um plano de Envio."
+    "description": "Dê ao seu agente de IA uma caixa de e-mail no seu domínio. Ele lê, rascunha e responde por MCP, e você aprova antes de enviar. US$ 12,90 por caixa ao mês, ou a partir de US$ 5,90 com um plano de Envio."
   },
   "hero": {
     "eyebrow": "Correio · caixas de e-mail para agentes de IA",
@@ -138,7 +138,14 @@
       "body": "Seu plano de Envio pode receber o adicional Correio: US$ 5,90 por caixa de 1 GiB ou US$ 9,90 por caixa de 10 GiB, ao mês. Entrada, saída e permissões por caixa. Humano ou agente: o mesmo preço.",
       "note": "Oferta preparada para lançamento. A contratação pública do Correio ainda não está aberta; esta prévia não libera acesso."
     },
-    "terms": "Correio é pago à parte. Aumento de caixas após pagamento confirmado; redução na próxima renovação, preservando as mensagens. Você pode continuar usando só Envio."
+    "terms": "Correio é pago à parte. Aumento de caixas após pagamento confirmado; redução na próxima renovação, preservando as mensagens. Você pode continuar usando só Envio.",
+    "solo": {
+      "label": "Só caixas",
+      "title": "Correio",
+      "body": "US$ 12,90 por caixa ao mês, sem plano de Envio: 10 GiB, 2.000 entregas de saída por mês e até 3 domínios. Humano ou agente, o mesmo preço.",
+      "cta": "Assinar o Correio"
+    },
+    "windows": "Baixar o app para Windows"
   },
   "comparison": {
     "caption": "O que muda entre as duas modalidades",
@@ -215,12 +222,12 @@
     "title": "Antes de trazer seu e-mail",
     "items": [
       {
-        "q": "Quais assinantes podem contratar o Correio?",
-        "a": "Correio é pago à parte por caixa e está disponível em todo plano de Envio acima de US$ 20/mês pelo preço regular, inclusive o Pro 110K de US$ 29 na primeira mensalidade promocional de US$ 20. Assinaturas existentes são preservadas sem migração automática. A licença interna System continua isenta, com 50 GiB por caixa e sem limites comerciais de caixas ou entregas. Contas anteriores autorizadas podem manter o plano atual de Envio ao contratar o adicional."
+        "q": "Preciso de um plano de Envio para usar o Correio?",
+        "a": "Não. Sozinho, o Correio custa US$ 12,90 por caixa ao mês, com 10 GiB, 2.000 entregas de saída por mês e até 3 domínios. Com um plano de Envio acima de US$ 20/mês pelo preço regular, inclusive o Pro 110K, cada caixa sai por US$ 5,90 (1 GiB) ou US$ 9,90 (10 GiB). Assinaturas existentes são preservadas sem migração automática. A licença interna System continua isenta, com 50 GiB por caixa e sem limites comerciais de caixas ou entregas."
       },
       {
         "q": "Comprei um domínio. Já posso criar qualquer endereço?",
-        "a": "Você pode escolher um endereço disponível no domínio que controla. Para enviar e receber, é necessário ter um plano pago de Envio, contratar o Correio, verificar o domínio, configurar DNS/MX e confirmar a ativação do recebimento. Só cadastrar o endereço não conclui essas etapas."
+        "a": "Você pode escolher um endereço disponível no domínio que controla. Para enviar e receber, é necessário contratar o Correio (sozinho ou junto de um plano de Envio), verificar o domínio, configurar DNS/MX e confirmar a ativação do recebimento. Se o DNS estiver na Cloudflare, o painel cria os registros de envio por você. Só cadastrar o endereço não conclui essas etapas."
       },
       {
         "q": "Preciso ter um site ou contratar hospedagem?",
@@ -239,8 +246,8 @@
         "a": "Vincular um domínio não transfere mensagens antigas nem migra automaticamente uma conta Gmail ou Outlook. A mudança de provedor e a importação precisam de uma jornada própria, ainda não disponível publicamente no Correio. Preserve o acesso ao provedor atual durante a transição."
       },
       {
-        "q": "O MCP público já abre essas caixas?",
-        "a": "O MCP público atual atende ao Envio. O Correio usa uma API REST própria com chaves por caixa, e o fluxo de leitura e rascunhos foi testado com uma integração de agente. Um MCP público para caixas ainda não está disponível."
+        "q": "O Correio funciona com agentes por MCP?",
+        "a": "Sim. O Correio tem MCP próprio: conecte Claude, Cursor ou outro cliente MCP com uma chave de agente por caixa, ou pelo MCP do MepMail marcando as caixas que ele pode usar. O agente lê e rascunha, e cada envio pode esperar a sua aprovação. Também há uma API REST com chaves por caixa."
       },
       {
         "q": "Como vou acessar no computador e no celular?",
@@ -251,22 +258,23 @@
   "close": {
     "eyebrow": "O próximo endereço pode ser do seu agente",
     "title": "Sua empresa conversa. Você acompanha.",
-    "body": "O Correio está aberto a todos os assinantes pagantes de Envio. Adicione uma caixa para você, sua equipe ou seu agente pelo painel, paga à parte por caixa.",
+    "body": "O Correio está aberto a todos. Adicione uma caixa para você, sua equipe ou seu agente pelo painel: US$ 12,90 por caixa ao mês, ou menos com um plano de Envio.",
     "primary": "Conhecer planos de Envio",
     "secondary": "Ler a documentação do Correio"
   },
   "release": {
-    "heroNote": "Correio é pago à parte, por caixa, e está disponível em todos os planos pagos de Envio. Adicione caixas pelo painel.",
-    "heroStatus": "Aberto a todos os assinantes pagantes de Envio",
-    "setupFirst": "O Correio funciona sobre um plano pago de Envio (preço regular acima de US$ 20/mês, inclusive o novo Pro 110K de US$ 29). Adicione caixas pelo painel; contratos de Envio existentes são preservados.",
+    "heroNote": "Correio é pago por caixa: US$ 12,90 ao mês sozinho, ou a partir de US$ 5,90 junto de um plano pago de Envio. Contrate pelo painel.",
+    "heroStatus": "Aberto a todos, com ou sem plano de Envio",
+    "setupFirstTitle": "Escolha como assinar",
+    "setupFirst": "Sem plano de Envio, o Correio custa US$ 12,90 por caixa ao mês, com 10 GiB, 2.000 entregas de saída e até 3 domínios. Com um plano pago de Envio (acima de US$ 20/mês, inclusive o Pro 110K de US$ 29), as caixas saem por US$ 5,90 (1 GiB) ou US$ 9,90 (10 GiB). Contratos existentes são preservados.",
     "restStatus": "Disponível para caixas ativadas",
-    "plansBody": "Envio cuida dos e-mails da aplicação e das campanhas. Correio acrescenta caixas com entrada e saída para pessoas e agentes, pago à parte e disponível em todos os planos pagos de Envio.",
-    "mailNote": "Contrate pelo painel quando o seu plano de Envio estiver ativo. Cada caixa ainda precisa de domínio verificado, DNS/MX e ativação do recebimento.",
+    "plansBody": "Envio cuida dos e-mails da aplicação e das campanhas. Correio dá caixas com entrada e saída para pessoas e agentes: assine sozinho ou junto de um plano pago de Envio, pagando menos por caixa.",
+    "mailNote": "Contrate pelo painel. Cada caixa ainda precisa de domínio verificado, DNS/MX e ativação do recebimento.",
     "previewStatus": "Comparação de preços · contrate pelo painel",
     "annualConsumption": "As franquias renovam mensalmente, sem acumular saldo anual. Armazenamento é contínuo; as mensagens não são apagadas na virada do período.",
     "monthlyNote": "Esta comparação não contrata nenhum plano. O painel confirma contrato, cobrança e ativação de cada caixa.",
     "checkAccess": "Abrir o Correio no painel",
-    "availability": "Disponível em todos os planos pagos de Envio"
+    "availability": "Disponível sozinho ou com qualquer plano pago de Envio"
   },
   "demo": {
     "label": "Exemplo de uso · conteúdo fictício",

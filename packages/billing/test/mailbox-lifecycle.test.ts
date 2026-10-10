@@ -10,6 +10,7 @@ import {
   MAILBOX_CUSTOMER_METADATA_KEY,
   type MailboxBillingStripe,
   type MailboxCatalog,
+  type MailboxPriceTerms,
   recoverMailboxCheckoutSession,
 } from "../src/mailbox.js";
 import {
@@ -323,6 +324,75 @@ describe("Mailbox lifecycle with real optional migrations", () => {
       expect(await leases()).toMatchObject([{ status: "creating" }]);
     },
   );
+
+  describe("standalone Correio, sold without Envio", () => {
+    const SOLO_TERMS: MailboxPriceTerms = {
+      ...TERMS,
+      priceId: "price_standalone_fixture",
+      unitAmount: 1290,
+      storageBytesPerMailbox: 10 * 1024 ** 3,
+      includedOutboundPerMailbox: 2000,
+    };
+    const SOLO: MailboxCatalog = {
+      livemode: false,
+      checkoutPriceId: SOLO_TERMS.priceId,
+      standalonePriceIds: [SOLO_TERMS.priceId],
+      prices: [TERMS, SOLO_TERMS],
+    };
+    const opened = {
+      version: 1 as const,
+      capturedAt: new Date(Date.now() - 86_400_000).toISOString(),
+      members: [],
+    };
+
+    it.each([true, false])(
+      "creates the Customer when needed and opens Checkout on the standalone price, linked customer=%s",
+      async (linked) => {
+        if (!linked) await unlinkCustomer();
+        expect(
+          await beginMailboxCheckout(
+            { db, stripe, requirePaidSendingPlan: true, earlyAccessCohort: opened },
+            SOLO,
+            request(),
+          ),
+        ).toMatchObject({ url: expect.stringContaining("checkout.stripe.com") });
+        expect(state.customers).toHaveLength(linked ? 0 : 1);
+        expect(state.checkouts).toHaveLength(1);
+        expect(await leases()).toMatchObject([
+          { stripePriceId: SOLO_TERMS.priceId, unitAmount: 1290, status: "ready" },
+        ]);
+      },
+    );
+
+    it("keeps the Envio requirement for an add-on price in the same catalog", async () => {
+      await expect(
+        beginMailboxCheckout(
+          { db, stripe, requirePaidSendingPlan: true, earlyAccessCohort: opened },
+          { ...SOLO, checkoutPriceId: TERMS.priceId },
+          request(),
+        ),
+      ).rejects.toMatchObject({ code: "sending_plan_required" });
+      expect(state.checkouts).toHaveLength(0);
+    });
+
+    it("stays closed before the hosted opening and with an invalid cohort", async () => {
+      await unlinkCustomer();
+      for (const cohort of [
+        { ...opened, capturedAt: new Date(Date.now() + 86_400_000).toISOString() },
+        null,
+      ]) {
+        await expect(
+          beginMailboxCheckout(
+            { db, stripe, requirePaidSendingPlan: true, earlyAccessCohort: cohort },
+            SOLO,
+            request(),
+          ),
+        ).rejects.toMatchObject({ code: "early_access_required" });
+      }
+      expect(state.customers).toHaveLength(0);
+      expect(state.checkouts).toHaveLength(0);
+    });
+  });
 
   it("allows hosted Correio checkout for an active paid Envio subscriber", async () => {
     await sendingContract();

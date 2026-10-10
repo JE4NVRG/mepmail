@@ -510,7 +510,9 @@ export {
 } from "./mailbox-scheduling.js";
 export {
   assertMailboxStorage,
+  effectiveDomainLimit,
   lockMailboxService,
+  MAILBOX_PLAN_DOMAIN_LIMIT,
   MailboxServiceError,
   mailboxServiceActive,
   mailboxServiceEntitlement,

@@ -28,6 +28,27 @@
   },
   "releases": [
     {
+      "version": "0.88",
+      "date": "2026-10-10",
+      "title": "Correio sem plano de Envio",
+      "summary": "Agora dá para assinar só o Correio: US$ 12,90 por caixa ao mês, com 10 GiB, 2.000 entregas de saída e até 3 domínios, sem precisar de um plano de Envio.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Correio sozinho: US$ 12,90 por caixa ao mês ou US$ 129 por ano, com 10 GiB, 2.000 entregas de saída por mês e até 3 domínios. A conta de pagamento é criada no próprio checkout.",
+            "Com um plano pago de Envio, as caixas continuam saindo por US$ 5,90 (1 GiB) ou US$ 9,90 (10 GiB)."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "As páginas de preços e do Correio mostram as duas formas de assinar, e as perguntas frequentes foram atualizadas, inclusive sobre o MCP do Correio."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.87",
       "date": "2026-10-10",
       "title": "DNS automático na Cloudflare",

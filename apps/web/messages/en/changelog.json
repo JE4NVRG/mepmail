@@ -23,6 +23,27 @@
   },
   "releases": [
     {
+      "version": "0.88",
+      "date": "2026-10-10",
+      "title": "Mail without a Send plan",
+      "summary": "You can now subscribe to Mail on its own: US$ 12.90 per mailbox a month, with 10 GiB, 2,000 outbound deliveries and up to 3 domains, no Send plan needed.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Mail on its own: US$ 12.90 per mailbox a month or US$ 129 a year, with 10 GiB, 2,000 outbound deliveries a month and up to 3 domains. The billing account is created in the checkout itself.",
+            "With a paying Send plan, mailboxes still cost US$ 5.90 (1 GiB) or US$ 9.90 (10 GiB)."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "The pricing and Mail pages show both ways to subscribe, and the FAQ is updated, including the Mail MCP."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.87",
       "date": "2026-10-10",
       "title": "Automatic DNS at Cloudflare",

@@ -9,6 +9,14 @@ export const LAUNCH_OFFER = {
     { id: "gib1", storageGiB: 1, monthlyCents: 590, monthlyRecipientDeliveries: 500 },
     { id: "gib10", storageGiB: 10, monthlyCents: 990, monthlyRecipientDeliveries: 2000 },
   ],
+  /** Correio without Envio: one plan per mailbox (Jean, 2026-10-10). Display only. */
+  standaloneMailbox: {
+    id: "solo",
+    storageGiB: 10,
+    monthlyCents: 1290,
+    monthlyRecipientDeliveries: 2000,
+    domains: 3,
+  },
   internal: { storageGiBPerMailbox: 50 },
 } as const;
 

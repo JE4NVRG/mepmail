@@ -6,6 +6,7 @@ import {
   clearTrackingClock,
   createFixedWindowLimiter,
   DOMAIN_CREATE_LIMIT_PER_HOUR,
+  effectiveDomainLimit,
   failQueuedEmailsForDomain,
   isIdentitySharedByOtherDomains,
   isLoopbackUrl,
@@ -405,7 +406,7 @@ export function registerDomainRoutes(
         // team stand up the same sender elsewhere.
         const [taken] = await db.select({ id: d.id }).from(d).where(eq(d.name, body.name));
         if (taken) return c.json(errorBody(409, "conflict", "domain already registered"), 409);
-        const limit = PLAN_DOMAIN_LIMIT[auth.plan];
+        const limit = await effectiveDomainLimit(db, auth.teamId, PLAN_DOMAIN_LIMIT[auth.plan]);
         const [owned] = await db.select({ n: count() }).from(d).where(eq(d.teamId, auth.teamId));
         if (limit !== null && (owned?.n ?? 0) >= limit) {
           return c.json(

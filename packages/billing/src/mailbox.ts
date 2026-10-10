@@ -22,7 +22,21 @@ export interface MailboxCatalog {
   checkoutPriceId: string | null;
   /** Explicit purchasable offers. When absent, only the legacy default is purchasable. */
   checkoutPriceIds?: readonly string[] | undefined;
+  /**
+   * Correio sold on its own: these prices need no paid Envio contract and no
+   * Stripe Customer beforehand (the Mail Customer flow creates one). Every
+   * other price keeps the Envio requirement.
+   */
+  standalonePriceIds?: readonly string[] | undefined;
   prices: readonly MailboxPriceTerms[];
+}
+
+/** Whether `priceId` is sold without an Envio plan. */
+export function isStandaloneMailboxPrice(
+  catalog: Pick<MailboxCatalog, "standalonePriceIds"> | null | undefined,
+  priceId: string | null | undefined,
+): boolean {
+  return !!priceId && !!catalog?.standalonePriceIds?.includes(priceId);
 }
 
 export class MailboxBillingError extends Error {

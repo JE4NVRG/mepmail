@@ -5,11 +5,13 @@ import type Stripe from "stripe";
 import {
   type MailboxLaunchCohort,
   mailboxLaunchCohortAllows,
+  mailboxLaunchCohortOpen,
 } from "../../core/src/mailbox-launch-cohort.js";
 import { mailboxManagementRequests } from "../../db/src/schema/mailbox-management-requests.js";
 import {
   createMailboxCheckoutSession,
   isMailboxSubscription,
+  isStandaloneMailboxPrice,
   MAILBOX_CUSTOMER_METADATA_KEY,
   type MailboxBillingStripe,
   type MailboxCatalog,
@@ -541,6 +543,16 @@ async function ensureMailboxCustomer(
   catalog: MailboxCatalog,
   input: BeginMailboxCheckoutInput,
 ): Promise<void> {
+  // The standalone offer is bought without Envio, so its buyer may have no
+  // Customer yet: only the hosted opening itself is required here.
+  const standalone = isStandaloneMailboxPrice(catalog, catalog.checkoutPriceId);
+  const admitted = (team: { id: string; customerId: string | null }) =>
+    standalone
+      ? mailboxLaunchCohortOpen(deps.earlyAccessCohort)
+      : mailboxLaunchCohortAllows(deps.earlyAccessCohort, {
+          teamId: team.id,
+          customerId: team.customerId,
+        });
   const prepared = await deps.db.transaction(async (tx) => {
     const db = tx as unknown as Db;
     const [discovered] = await tx
@@ -573,19 +585,14 @@ async function ensureMailboxCustomer(
     if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
     if (
       deps.requirePaidSendingPlan &&
+      !standalone &&
       !hasPaidSendingPlanForMailbox(
         { ...team, stripeCustomerId: team.customerId },
         deps.earlyAccessCohort,
       )
     )
       throw new MailboxLifecycleError("sending_plan_required");
-    if (
-      !mailboxLaunchCohortAllows(deps.earlyAccessCohort, {
-        teamId: team.id,
-        customerId: team.customerId,
-      })
-    )
-      throw new MailboxLifecycleError("early_access_required");
+    if (!admitted(team)) throw new MailboxLifecycleError("early_access_required");
     await assertNoOccupiedMailboxPlan(db, team.id);
     const [existing] = await tx
       .select()
@@ -646,19 +653,14 @@ async function ensureMailboxCustomer(
       if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
       if (
         deps.requirePaidSendingPlan &&
+        !standalone &&
         !hasPaidSendingPlanForMailbox(
           { ...team, stripeCustomerId: team.customerId },
           deps.earlyAccessCohort,
         )
       )
         throw new MailboxLifecycleError("sending_plan_required");
-      if (
-        !mailboxLaunchCohortAllows(deps.earlyAccessCohort, {
-          teamId: team.id,
-          customerId: team.customerId,
-        })
-      )
-        throw new MailboxLifecycleError("early_access_required");
+      if (!admitted(team)) throw new MailboxLifecycleError("early_access_required");
       // The first Customer intent committed before this transaction. A grant may
       // have arrived in that gap; preserve the intent and reject before the SDK call.
       await assertNoOccupiedMailboxPlan(db, input.teamId);
@@ -714,6 +716,8 @@ async function purchaseTeam(
   input: BeginMailboxCheckoutInput,
   requirePaidSendingPlan = false,
   earlyAccessCohort?: MailboxLaunchCohort | null,
+  /** The price is sold without Envio: no Envio contract is required. */
+  standalone = false,
 ) {
   // Discovery takes no row lock. Customer -> team -> membership -> service/lease
   // matches webhook writers and team deletion, avoiding an advisory/row lock cycle.
@@ -746,6 +750,7 @@ async function purchaseTeam(
   if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
   if (
     requirePaidSendingPlan &&
+    !standalone &&
     !hasPaidSendingPlanForMailbox({ ...team, stripeCustomerId: team.customerId }, earlyAccessCohort)
   )
     throw new MailboxLifecycleError("sending_plan_required");
@@ -857,9 +862,16 @@ async function purchase(
   terms: MailboxPriceTerms,
   input: BeginMailboxCheckoutInput,
 ): Promise<BeginMailboxCheckoutResult> {
+  const standalone = isStandaloneMailboxPrice(catalog, terms.priceId);
   const prepared = await deps.db.transaction(async (tx) => {
     const db = tx as unknown as Db;
-    const team = await purchaseTeam(db, input, deps.requirePaidSendingPlan, deps.earlyAccessCohort);
+    const team = await purchaseTeam(
+      db,
+      input,
+      deps.requirePaidSendingPlan,
+      deps.earlyAccessCohort,
+      standalone,
+    );
     await assertNoSubscription(db, deps.stripe, catalog, team.id, team.customerId);
     const [existing] = await tx
       .select()
@@ -916,6 +928,7 @@ async function purchase(
         input,
         deps.requirePaidSendingPlan,
         deps.earlyAccessCohort,
+        standalone,
       );
       await assertNoSubscription(db, deps.stripe, catalog, team.id, team.customerId);
       const [lease] = await tx

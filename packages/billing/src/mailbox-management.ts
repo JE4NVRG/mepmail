@@ -8,6 +8,7 @@ import {
 } from "../../core/src/mailbox-launch-cohort.js";
 import { mailboxManagementRequests as requests } from "../../db/src/schema/mailbox-management-requests.js";
 import {
+  isStandaloneMailboxPrice,
   type MailboxCatalog,
   mailboxIncreaseInvoiceMatches,
   mailboxIncreasePaymentConfirmed,
@@ -185,8 +186,10 @@ async function context(
     !plan.stripePriceId
   )
     throw new MailboxLifecycleError("unavailable");
+  // A standalone Correio contract was bought without Envio and keeps needing none.
   const paidSendingPlanEligible =
     !deps.requirePaidSendingPlan ||
+    isStandaloneMailboxPrice(catalog, plan.stripePriceId) ||
     hasPaidSendingPlanForMailbox(team, deps.earlyAccessCohort, deps.now?.());
   const earlyAccessEligible = mailboxLaunchCohortAllows(
     deps.earlyAccessCohort,

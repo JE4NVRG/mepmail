@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Mail: email inboxes for AI agents | MepMail",
-    "description": "Give your AI agent an email inbox on your domain. It reads, drafts and replies over MCP, and you approve before it sends. From US$ 5.90 per mailbox a month, with a Send plan."
+    "description": "Give your AI agent an email inbox on your domain. It reads, drafts and replies over MCP, and you approve before it sends. US$ 12.90 per mailbox a month, or from US$ 5.90 with a Send plan."
   },
   "hero": {
     "eyebrow": "MepMail Mail · email inboxes for AI agents",
@@ -138,7 +138,14 @@
       "body": "Your Send plan can add Mail: US$ 5.90 per 1 GiB mailbox or US$ 9.90 per 10 GiB mailbox each month. Inboxes, outboxes and per-mailbox permissions. People and agents have the same price.",
       "note": "Offer prepared for launch. Public Mail subscriptions are not open yet; this preview does not grant access."
     },
-    "terms": "Mail is paid separately. More mailboxes after confirmed payment; reductions at the next renewal, preserving stored messages. You can continue using Send on its own."
+    "terms": "Mail is paid separately. More mailboxes after confirmed payment; reductions at the next renewal, preserving stored messages. You can continue using Send on its own.",
+    "solo": {
+      "label": "Mailboxes only",
+      "title": "Mail",
+      "body": "US$ 12.90 per mailbox a month, no Send plan: 10 GiB, 2,000 outbound deliveries a month and up to 3 domains. Person or agent, the same price.",
+      "cta": "Subscribe to Mail"
+    },
+    "windows": "Download the Windows app"
   },
   "comparison": {
     "caption": "What changes between the two options",
@@ -215,12 +222,12 @@
     "title": "Before bringing your email",
     "items": [
       {
-        "q": "Which subscribers can purchase Mail?",
-        "a": "Mail is paid separately per mailbox and is available on every Send plan above US$ 20/month at its regular price, including the US$ 29 Pro 110K during its US$ 20 first monthly bill. Existing subscriptions are preserved without automatic migration. The internal System license remains exempt, with 50 GiB per mailbox and no commercial mailbox or delivery limits. Authorized earlier accounts may keep their current Send plan when purchasing the add-on."
+        "q": "Do I need a Send plan to use Mail?",
+        "a": "No. On its own, Mail costs US$ 12.90 per mailbox a month, with 10 GiB, 2,000 outbound deliveries a month and up to 3 domains. With a Send plan above US$ 20/month at its regular price, including Pro 110K, each mailbox costs US$ 5.90 (1 GiB) or US$ 9.90 (10 GiB). Existing subscriptions are preserved without automatic migration. The internal System license remains exempt, with 50 GiB per mailbox and no commercial mailbox or delivery limits."
       },
       {
         "q": "I bought a domain. Can I create any address now?",
-        "a": "You can choose an available address on a domain you control. Sending and receiving require a paying Send plan, a Mail subscription, domain verification, DNS/MX configuration and confirmed receiving activation. Registering an address alone does not complete these steps."
+        "a": "You can choose an available address on a domain you control. Sending and receiving require a Mail subscription (on its own or with a Send plan), domain verification, DNS/MX configuration and confirmed receiving activation. If your DNS is at Cloudflare, the dashboard creates the sending records for you. Registering an address alone does not complete these steps."
       },
       {
         "q": "Do I need a website or hosting?",
@@ -239,8 +246,8 @@
         "a": "Connecting a domain does not transfer old messages or automatically migrate a Gmail or Outlook account. Changing providers and importing messages need a separate workflow, which is not publicly available in Mail yet. Keep access to your current provider during the transition."
       },
       {
-        "q": "Does the public MCP already open these mailboxes?",
-        "a": "The current public MCP serves Send. Mail uses its own REST API with per-mailbox keys, and read-and-draft has been tested with an agent integration. A public MCP for mailboxes is not available yet."
+        "q": "Does Mail work with agents over MCP?",
+        "a": "Yes. Mail has its own MCP: connect Claude, Cursor or another MCP client with a per-mailbox agent key, or through the MepMail MCP by choosing which mailboxes it may use. The agent reads and drafts, and each send can wait for your approval. There is also a REST API with per-mailbox keys."
       },
       {
         "q": "How will I access it on my computer and phone?",
@@ -251,22 +258,23 @@
   "close": {
     "eyebrow": "The next address could be your agent's",
     "title": "Your company talks. You follow.",
-    "body": "Mail is open to every paying Send subscriber. Add a mailbox for you, your team or your agent from the dashboard, paid separately per mailbox.",
+    "body": "Mail is open to everyone. Add a mailbox for you, your team or your agent from the dashboard: US$ 12.90 per mailbox a month, or less with a Send plan.",
     "primary": "Explore Send plans",
     "secondary": "Read the Mail documentation"
   },
   "release": {
-    "heroNote": "Mail is paid separately, per mailbox, and available on every paying Send plan. Add mailboxes from the dashboard.",
-    "heroStatus": "Open to every paying Send subscriber",
-    "setupFirst": "Mail runs on top of a paying Send plan (regular price above US$ 20/month, including the new US$ 29 Pro 110K). Add mailboxes from the dashboard; existing Send contracts are preserved.",
+    "heroNote": "Mail is paid per mailbox: US$ 12.90 a month on its own, or from US$ 5.90 with a paying Send plan. Subscribe from the dashboard.",
+    "heroStatus": "Open to everyone, with or without a Send plan",
+    "setupFirstTitle": "Choose how to subscribe",
+    "setupFirst": "Without a Send plan, Mail costs US$ 12.90 per mailbox a month, with 10 GiB, 2,000 outbound deliveries and up to 3 domains. With a paying Send plan (above US$ 20/month, including the US$ 29 Pro 110K), mailboxes cost US$ 5.90 (1 GiB) or US$ 9.90 (10 GiB). Existing contracts are preserved.",
     "restStatus": "Available for activated mailboxes",
-    "plansBody": "Send handles application emails and campaigns. Mail adds inboxes and outboxes for people and agents, paid separately and available on every paying Send plan.",
-    "mailNote": "Subscribe from the dashboard once your Send plan is active. Each mailbox still needs a verified domain, DNS/MX and receiving activation.",
+    "plansBody": "Send handles application emails and campaigns. Mail gives people and agents inboxes and outboxes: subscribe on its own, or with a paying Send plan and pay less per mailbox.",
+    "mailNote": "Subscribe from the dashboard. Each mailbox still needs a verified domain, DNS/MX and receiving activation.",
     "previewStatus": "Price comparison · subscribe in the dashboard",
     "annualConsumption": "Allowances renew monthly, without an accumulated annual balance. Storage is continuous; messages are not deleted when a period changes.",
     "monthlyNote": "This comparison does not purchase a plan. The dashboard confirms your contract, billing and activation for each mailbox.",
     "checkAccess": "Open Mail in the dashboard",
-    "availability": "Available on every paying Send plan"
+    "availability": "Available on its own or with any paying Send plan"
   },
   "demo": {
     "label": "Usage example · fictional content",

@@ -68,6 +68,9 @@ export default async function PricingPage() {
   } satisfies PlanCardLabels;
   const launchOfferEnabled = process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
   const mailOpen = process.env.MAILBOX_EARLY_ACCESS_OPEN === "true";
+  // Correio on its own, without an Envio plan (checkout stays server-gated).
+  const standaloneOpen = mailOpen && process.env.MAILBOX_STANDALONE_OPEN === "true";
+  const solo = LAUNCH_OFFER.standaloneMailbox;
   const allPlans = plansWithCopy(
     l.raw("plans.items") as PlanCopy[],
     launchOfferEnabled,
@@ -152,8 +155,24 @@ export default async function PricingPage() {
             <div className="gtm-container">
               <p className="gtm-eyebrow">{t("correio.eyebrow")}</p>
               <h2 id="pricing-correio-title">{t("correio.title")}</h2>
-              <p>{t("correio.body")}</p>
-              <div className="gtm-split">
+              <p>{t(standaloneOpen ? "correio.bodyStandalone" : "correio.body")}</p>
+              <div className={`gtm-split${standaloneOpen ? " gtm-split-three" : ""}`}>
+                {standaloneOpen ? (
+                  <article className="ms-card gtm-plan" key={solo.id}>
+                    <h3>{t("correio.names.solo")}</h3>
+                    <p className="gtm-price">
+                      {formatUsd(solo.monthlyCents / 100, locale)}
+                      <span>{t("correio.perMonth")}</span>
+                    </p>
+                    <ul className="gtm-points">
+                      <li>{t("correio.withoutSending")}</li>
+                      <li>{t("correio.storage", { size: solo.storageGiB })}</li>
+                      <li>{t("correio.sends", { count: solo.monthlyRecipientDeliveries })}</li>
+                      <li>{t("correio.domains", { count: solo.domains })}</li>
+                      <li>{t("correio.agents")}</li>
+                    </ul>
+                  </article>
+                ) : null}
                 {LAUNCH_OFFER.mailboxes.map((box) => (
                   <article className="ms-card gtm-plan" key={box.id}>
                     <h3>{t(`correio.names.${box.id}`)}</h3>
@@ -162,6 +181,7 @@ export default async function PricingPage() {
                       <span>{t("correio.perMonth")}</span>
                     </p>
                     <ul className="gtm-points">
+                      {standaloneOpen ? <li>{t("correio.withSending")}</li> : null}
                       <li>{t("correio.storage", { size: box.storageGiB })}</li>
                       <li>{t("correio.sends", { count: box.monthlyRecipientDeliveries })}</li>
                       <li>{t("correio.agents")}</li>
@@ -169,10 +189,19 @@ export default async function PricingPage() {
                   </article>
                 ))}
               </div>
-              <p className="gtm-note">{t("correio.note")}</p>
-              <a className="ms-btn ms-btn-secondary gtm-action" href="/correio">
-                {t("correio.cta")}
-              </a>
+              <p className="gtm-note">
+                {t(standaloneOpen ? "correio.noteStandalone" : "correio.note")}
+              </p>
+              <div className="ms-wrap-row" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                {standaloneOpen ? (
+                  <a className="ms-btn ms-btn-primary gtm-action" href="/signup?next=/mail">
+                    {t("correio.subscribe")}
+                  </a>
+                ) : null}
+                <a className="ms-btn ms-btn-secondary gtm-action" href="/correio">
+                  {t("correio.cta")}
+                </a>
+              </div>
             </div>
           </section>
         ) : null}

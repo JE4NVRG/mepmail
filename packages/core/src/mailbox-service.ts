@@ -38,6 +38,33 @@ export function mailboxServiceActive(plan: MailboxSubscription | undefined, now 
   );
 }
 
+/** Sender domains a team with an active Correio subscription may hold, whatever its Envio plan. */
+export const MAILBOX_PLAN_DOMAIN_LIMIT = 3;
+
+/**
+ * The domain cap for a team: its Envio plan's, raised to MAILBOX_PLAN_DOMAIN_LIMIT
+ * while a Correio subscription is active (a Correio-only team sits on the free
+ * Envio plan, which allows one). `base` null stays unlimited. The mailbox tables
+ * exist only where the mailbox schema was applied.
+ */
+export async function effectiveDomainLimit(
+  db: Db,
+  teamId: string,
+  base: number | null,
+  now = new Date(),
+): Promise<number | null> {
+  if (base === null || base >= MAILBOX_PLAN_DOMAIN_LIMIT) return base;
+  const [extension] = await db
+    .select({ installed: sql<boolean>`to_regclass('public.mailbox_subscriptions') is not null` })
+    .from(sql`(select 1) as mailbox_extension`);
+  if (!extension?.installed) return base;
+  const [plan] = await db
+    .select()
+    .from(schema.mailboxSubscriptions)
+    .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+  return mailboxServiceActive(plan, now) ? MAILBOX_PLAN_DOMAIN_LIMIT : base;
+}
+
 /** System is the platform operator's own team, not an ordinary tenant administrator.
  * Resolve current database authority; session roles and request fields cannot grant it.
  * The team lock stabilizes plan changes, and the owner lock stabilizes this privilege.

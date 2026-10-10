@@ -1182,6 +1182,11 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 56px;
   }
+  /* /pricing Correio: the standalone plan beside the two add-on mailboxes. */
+  .gtm-split.gtm-split-three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+  }
 }
 
 /* Página /integrations: cards das integrações (n8n, canais de chat, MCP,

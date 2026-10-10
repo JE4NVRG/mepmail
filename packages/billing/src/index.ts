@@ -26,6 +26,7 @@ export {
 export {
   createMailboxCheckoutSession,
   isMailboxSubscription,
+  isStandaloneMailboxPrice,
   MAILBOX_CHECKOUT_METADATA_KEY,
   MAILBOX_CUSTOMER_METADATA_KEY,
   MAILBOX_SERVICE,

@@ -57,6 +57,8 @@ export default async function CorreioPage() {
   const faq = t.raw("faq.items") as FaqItem[];
   const comparison = t.raw("comparison.rows") as ComparisonRow[];
   const mailOpen = earlyAccessOpen();
+  // Correio on its own, without an Envio plan (checkout stays server-gated).
+  const standaloneOpen = mailOpen && process.env.MAILBOX_STANDALONE_OPEN === "true";
 
   return (
     <div className="gtm correio">
@@ -170,7 +172,7 @@ export default async function CorreioPage() {
                   <span className="correio-setup-number" aria-hidden="true">
                     {String(index + 1).padStart(2, "0")}
                   </span>
-                  <h3>{step.title}</h3>
+                  <h3>{mailOpen && index === 0 ? t("release.setupFirstTitle") : step.title}</h3>
                   <p>{mailOpen && index === 0 ? t("release.setupFirst") : step.body}</p>
                 </li>
               ))}
@@ -231,7 +233,17 @@ export default async function CorreioPage() {
                 {t(mailOpen ? "release.plansBody" : "plans.body")}
               </p>
             </div>
-            <div className="correio-plans-grid">
+            <div className={`correio-plans-grid${standaloneOpen ? " correio-plans-three" : ""}`}>
+              {standaloneOpen ? (
+                <article className="correio-plan">
+                  <p className="correio-eyebrow">{t("plans.solo.label")}</p>
+                  <h3>{t("plans.solo.title")}</h3>
+                  <p>{t("plans.solo.body")}</p>
+                  <a className="ms-btn ms-btn-primary correio-action" href="/signup?next=/mail">
+                    {t("plans.solo.cta")}
+                  </a>
+                </article>
+              ) : null}
               <article className="correio-plan">
                 <p className="correio-eyebrow">{t("plans.sending.label")}</p>
                 <h3>{t("plans.sending.title")}</h3>

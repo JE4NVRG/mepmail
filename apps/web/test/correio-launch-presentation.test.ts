@@ -82,12 +82,12 @@ function links(html: string): Array<{ href: string; text: string }> {
 
 const expectations = {
   en: {
-    open: /Open to every paying Send subscriber/,
+    open: /Open to everyone, with or without a Send plan/,
     closed: /Launch preview · closed access/,
     fictional: /fictional content/,
     noMessageSent: /No message was sent/,
-    everyPayingPlan: /available on every paying Send plan/i,
-    subscribeInDashboard: /Subscribe from the dashboard once your Send plan is active/,
+    everyPayingPlan: /on its own or with any paying Send plan/i,
+    subscribeInDashboard: /Subscribe from the dashboard\. Each mailbox still needs/,
     minimumPlan: /Send plan above US\$\s*20\/month/,
     recurringEligibility:
       /US\$ 29 Pro 110K offer qualifies even during its US\$ 20 first monthly bill/,
@@ -120,12 +120,12 @@ const expectations = {
     docsPrefix: "https://docs.mepmail.dev",
   },
   "pt-BR": {
-    open: /Aberto a todos os assinantes pagantes de Envio/,
+    open: /Aberto a todos, com ou sem plano de Envio/,
     closed: /Prévia de lançamento · acesso fechado/,
     fictional: /conteúdo fictício/,
     noMessageSent: /Nenhuma mensagem foi enviada/,
-    everyPayingPlan: /disponível em todos os planos pagos de Envio/i,
-    subscribeInDashboard: /Contrate pelo painel quando o seu plano de Envio estiver ativo/,
+    everyPayingPlan: /sozinho ou com qualquer plano pago de Envio/i,
+    subscribeInDashboard: /Contrate pelo painel\. Cada caixa ainda precisa/,
     minimumPlan: /plano de Envio acima de US\$ 20\/mês/,
     recurringEligibility:
       /oferta Pro 110K de US\$ 29 qualifica mesmo na primeira mensalidade promocional de US\$ 20/,
@@ -209,7 +209,7 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     expect(html).toContain('id="como-funciona"');
   });
 
-  it("opens Mail to every paying Send plan as a separately paid add-on", () => {
+  it("opens Mail on its own or with any paying Send plan, paid separately", () => {
     const plans = textContent(section(html, "correio-plans-title"));
     expect(plans).toMatch(expected.everyPayingPlan);
     expect(plans).toMatch(expected.subscribeInDashboard);
@@ -255,8 +255,13 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     for (const link of links(content)) {
       expect(link.href).not.toMatch(/checkout|subscribe|signup|\/settings\/billing/);
       expect(
-        ["#como-funciona", "/pricing", "/integrations", "/mail"].includes(link.href) ||
-          link.href.startsWith(`${expected.docsPrefix}/`),
+        [
+          "#como-funciona",
+          "/pricing",
+          "/integrations",
+          "/mail",
+          "/desktop/correio/windows",
+        ].includes(link.href) || link.href.startsWith(`${expected.docsPrefix}/`),
       ).toBe(true);
     }
     expect(links(content).some((link) => link.href === "/mail")).toBe(true);
@@ -420,5 +425,20 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
       description: copy.meta.description,
       url: "/correio",
     });
+  });
+});
+
+describe.each(["en", "pt-BR"] as const)("Correio sold without Envio in %s", (locale) => {
+  afterEach(() => vi.unstubAllEnvs());
+  it("adds the standalone plan, priced and linked to sign-up, only when its flag is on", async () => {
+    vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
+    const closed = section(await render(locale), "correio-plans-title");
+    expect(closed).not.toMatch(/12[.,]90/);
+    vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");
+    const html = await render(locale);
+    const plansHtml = section(html, "correio-plans-title");
+    expect(textContent(plansHtml)).toMatch(/US\$ 12[.,]90/);
+    expect(links(plansHtml).map((link) => link.href)).toContain("/signup?next=/mail");
+    expect(html).not.toMatch(/<form\b/);
   });
 });

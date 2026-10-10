@@ -7,6 +7,30 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.88] - 2026-10-10
+
+Correio sold without Envio: one plan, US$ 12.90 per mailbox a month
+(US$ 129 a year), 10 GiB, 2,000 outbound deliveries, up to 3 domains.
+
+### Added
+
+- Catalog `standalonePriceIds` (disjoint from the add-on `checkoutPriceIds`)
+  and the `MAILBOX_STANDALONE_OPEN` flag. Teams without a paid Envio
+  contract are offered only the standalone prices (`audience: "standalone"`);
+  Envio subscribers keep the add-on prices.
+- Lifecycle: a standalone price needs no Envio contract and no Customer
+  beforehand (`mailboxLaunchCohortOpen`); the Mail Customer flow creates it.
+  Management lets a standalone contract grow and resume without Envio.
+- `mailboxCreateAccessEnabled` accepts an active standalone subscription;
+  `effectiveDomainLimit` raises the free plan to 3 domains while a Correio
+  subscription is active (dashboard and public API).
+- /pricing and /correio show the standalone plan beside the add-on prices.
+
+### Changed
+
+- Correio and pricing copy, FAQ (including the Correio MCP answer), landing
+  and support answers describe both ways to subscribe.
+
 ## [0.87] - 2026-10-10
 
 ### Added

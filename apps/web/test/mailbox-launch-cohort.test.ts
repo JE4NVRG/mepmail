@@ -1,6 +1,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { createMailboxAgentKey, withMailboxAgentAccess } from "@millionsend/core";
+import {
+  createMailboxAgentKey,
+  effectiveDomainLimit,
+  withMailboxAgentAccess,
+} from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq, sql } from "drizzle-orm";
@@ -222,6 +226,79 @@ describe("Correio hosted opening admission", () => {
     });
     expect(await mailboxCreateAccessEnabled(db, actor())).toBe(false);
     await expect(as().list()).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+  it("opens the standalone offer to a team that never paid for Envio, and its seats grant creation", async () => {
+    configure({ ...cohort, members: [] });
+    vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");
+    const solo = {
+      priceId: "price_cohort_solo_fixture",
+      currency: "usd",
+      unitAmount: 1290,
+      interval: "month",
+      storageBytesPerMailbox: 10 * 1024 ** 3,
+      includedOutboundPerMailbox: 2000,
+    };
+    const addOn = {
+      priceId: "price_cohort_fixture",
+      currency: "usd",
+      unitAmount: 590,
+      interval: "month",
+      storageBytesPerMailbox: 1024 ** 3,
+      includedOutboundPerMailbox: 500,
+    };
+    vi.stubEnv(
+      "MAILBOX_BILLING_CATALOG",
+      JSON.stringify({
+        livemode: false,
+        checkoutPriceId: addOn.priceId,
+        standalonePriceIds: [solo.priceId],
+        prices: [addOn, solo],
+      }),
+    );
+    await update({
+      plan: "free",
+      planStatus: "none",
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      sendBillingContract: null,
+    });
+    expect((await as().capabilities()).enabled).toBe(true);
+    expect(await mailboxBillingPresentation(db, actor())).toMatchObject({
+      canPurchase: true,
+      audience: "standalone",
+      sendingPlanRequired: false,
+      earlyAccessRequired: false,
+      availability: "available",
+      offers: [expect.objectContaining({ unitAmount: 1290 })],
+    });
+    // Buying is not creating: until a contract exists, no mailbox may be made.
+    expect(await mailboxCreateAccessEnabled(db, actor())).toBe(false);
+    expect(await effectiveDomainLimit(db, teamId, 1)).toBe(1);
+
+    const now = Date.now();
+    await update({ stripeCustomerId: `cus_cohort_solo_${sequence}` });
+    await db.insert(schema.mailboxSubscriptions).values({
+      teamId,
+      status: "active",
+      seats: 2,
+      storageBytesPerMailbox: solo.storageBytesPerMailbox,
+      includedOutboundPerMailbox: solo.includedOutboundPerMailbox,
+      stripePriceId: solo.priceId,
+      periodStart: new Date(now - 86_400_000),
+      periodEnd: new Date(now + 30 * 86_400_000),
+    });
+    expect(await mailboxCreateAccessEnabled(db, actor())).toBe(true);
+    // Correio-only teams sit on the free Envio plan but may hold three domains.
+    expect(await effectiveDomainLimit(db, teamId, 1)).toBe(3);
+    expect(await effectiveDomainLimit(db, teamId, 25)).toBe(25);
+    expect(await effectiveDomainLimit(db, teamId, null)).toBeNull();
+
+    // An add-on contract without Envio keeps needing Envio to create.
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({ stripePriceId: addOn.priceId })
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
+    expect(await mailboxCreateAccessEnabled(db, actor())).toBe(false);
   });
   it("does not grant an ordinary US20 contract a default exception", async () => {
     await update({

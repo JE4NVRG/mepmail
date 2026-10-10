@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   isLiveKey,
+  isStandaloneMailboxPrice,
   type MailboxCatalog,
   MailboxLifecycleError,
   type MailboxPriceTerms,
@@ -12,10 +13,13 @@ import { type Db, schema } from "@millionsend/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { hasPaidSendingPlanForMailbox } from "../../../../packages/billing/src/mailbox-addon";
-import { mailboxLaunchCohortAllows } from "../../../../packages/core/src/mailbox-launch-cohort";
+import {
+  mailboxLaunchCohortAllows,
+  mailboxLaunchCohortOpen,
+} from "../../../../packages/core/src/mailbox-launch-cohort";
 import { mailboxManagementRequests } from "../../../../packages/db/src/schema/mailbox-management-requests";
 import { getStripe } from "./billing";
-import { mailboxEarlyAccessCohort } from "./mailboxes";
+import { mailboxEarlyAccessCohort, mailboxStandaloneOpen } from "./mailboxes";
 import { newSubscriptionsPaused } from "./new-subscriptions";
 
 const terms = z
@@ -46,12 +50,24 @@ export function mailboxBillingCatalog(): MailboxCatalog | null {
         .array(z.string().regex(/^price_[A-Za-z0-9_]+$/))
         .max(10)
         .optional(),
+      standalonePriceIds: z
+        .array(z.string().regex(/^price_[A-Za-z0-9_]+$/))
+        .max(10)
+        .optional(),
       prices: z.array(terms).max(100),
     })
     .strict()
     .safeParse(raw);
+  const standalone = parsed.success ? (parsed.data.standalonePriceIds ?? []) : [];
   if (
     !parsed.success ||
+    new Set(standalone).size !== standalone.length ||
+    standalone.some(
+      (id) =>
+        !parsed.data.prices.some((p) => p.priceId === id) ||
+        (parsed.data.checkoutPriceIds ?? []).includes(id) ||
+        parsed.data.checkoutPriceId === id,
+    ) ||
     parsed.data.livemode !== isLiveKey(env.STRIPE_SECRET_KEY ?? "") ||
     new Set(parsed.data.prices.map((p) => p.priceId)).size !== parsed.data.prices.length ||
     (parsed.data.checkoutPriceIds !== undefined &&
@@ -86,10 +102,26 @@ function purchasesAvailable() {
   );
 }
 
-function purchasableTerms(catalog: MailboxCatalog | null) {
+/**
+ * Who a purchase is for: teams with a paid Envio contract buy the add-on
+ * prices; everyone else, only the standalone ones (when that offer is open).
+ */
+export type MailboxAudience = "with_sending" | "standalone";
+
+function purchasableTerms(
+  catalog: MailboxCatalog | null,
+  audience: MailboxAudience | "any" = "with_sending",
+) {
   if (!catalog) return [];
-  const ids =
+  const addOn =
     catalog.checkoutPriceIds ?? (catalog.checkoutPriceId ? [catalog.checkoutPriceId] : []);
+  const standalone = mailboxStandaloneOpen() ? (catalog.standalonePriceIds ?? []) : [];
+  const ids =
+    audience === "with_sending"
+      ? addOn
+      : audience === "standalone"
+        ? standalone
+        : [...addOn, ...standalone];
   return ids.flatMap((id) => {
     const price = catalog.prices.find((p) => p.priceId === id);
     return price ? [price] : [];
@@ -114,22 +146,30 @@ function publicOffer(catalog: MailboxCatalog, price: MailboxPriceTerms) {
 }
 
 /** Provider IDs and historical-only terms never become client-selectable offers. */
-export function mailboxBillingOffers() {
+export function mailboxBillingOffers(audience: MailboxAudience = "with_sending") {
   if (!purchasesAvailable()) return [];
   const catalog = mailboxBillingCatalog();
-  return catalog ? purchasableTerms(catalog).map((price) => publicOffer(catalog, price)) : [];
+  return catalog
+    ? purchasableTerms(catalog, audience).map((price) => publicOffer(catalog, price))
+    : [];
 }
 
 /** Resolve only a server-approved offer; client amounts, prices and limits are never inputs. */
-export function mailboxBillingCatalogForOffer(offerId?: string): MailboxCatalog | null {
+export function mailboxBillingCatalogForOffer(
+  offerId?: string,
+  audience: MailboxAudience = "with_sending",
+): MailboxCatalog | null {
   if (!purchasesAvailable()) return null;
   const catalog = mailboxBillingCatalog();
   if (!catalog) return null;
   if (offerId !== undefined && !/^mbo_[A-Za-z0-9_-]{43}$/.test(offerId)) return null;
-  const price = purchasableTerms(catalog).find((entry) =>
-    offerId === undefined
-      ? entry.priceId === catalog.checkoutPriceId
-      : publicOffer(catalog, entry).offerId === offerId,
+  const choices = purchasableTerms(catalog, audience);
+  const price = choices.find((entry) =>
+    offerId !== undefined
+      ? publicOffer(catalog, entry).offerId === offerId
+      : audience === "with_sending"
+        ? entry.priceId === catalog.checkoutPriceId
+        : entry === choices[0],
   );
   return price ? { ...catalog, checkoutPriceId: price.priceId } : null;
 }
@@ -176,14 +216,21 @@ export async function mailboxBillingPresentation(
     );
   if (!member) throw new MailboxLifecycleError("forbidden");
   const canManage = member.role === "owner" || member.role === "admin";
+  const cohort = mailboxEarlyAccessCohort();
+  const paidSending = hasPaidSendingPlanForMailbox(member, cohort);
+  // Without Envio the team buys the standalone offer, when it is open.
+  const audience: MailboxAudience = paidSending ? "with_sending" : "standalone";
+  const standaloneOffers = paidSending ? [] : mailboxBillingOffers("standalone");
   const sendingPlanRequired =
-    member.plan !== "system" && !hasPaidSendingPlanForMailbox(member, mailboxEarlyAccessCohort());
+    member.plan !== "system" && !paidSending && standaloneOffers.length === 0;
   const earlyAccessRequired =
     member.plan !== "system" &&
-    !mailboxLaunchCohortAllows(mailboxEarlyAccessCohort(), {
-      teamId: member.id,
-      customerId: member.stripeCustomerId,
-    });
+    !(audience === "standalone" && standaloneOffers.length > 0
+      ? mailboxLaunchCohortOpen(cohort)
+      : mailboxLaunchCohortAllows(cohort, {
+          teamId: member.id,
+          customerId: member.stripeCustomerId,
+        }));
   const [subscription] = await db
     .select()
     .from(schema.mailboxSubscriptions)
@@ -224,12 +271,17 @@ export async function mailboxBillingPresentation(
     .select({ status: schema.mailboxCustomerRequests.status })
     .from(schema.mailboxCustomerRequests)
     .where(eq(schema.mailboxCustomerRequests.teamId, actor.teamId));
-  const offer = mailboxBillingOffer();
-  const offers = mailboxBillingOffers();
+  const offers = paidSending ? mailboxBillingOffers("with_sending") : standaloneOffers;
+  const firstStandalone = standaloneOffers[0];
+  const offer = paidSending
+    ? mailboxBillingOffer()
+    : firstStandalone
+      ? (({ offerId: _offerId, ...rest }) => rest)(firstStandalone)
+      : mailboxBillingOffer();
   const catalog = mailboxBillingCatalog();
   const pendingPrice =
     checkout && catalog && checkout.livemode === catalog.livemode
-      ? purchasableTerms(catalog).find(
+      ? purchasableTerms(catalog, "any").find(
           (price) =>
             checkout.priceId === price.priceId &&
             checkout.currency === price.currency &&
@@ -243,8 +295,16 @@ export async function mailboxBillingPresentation(
   const defaultPrice = purchasableTerms(catalog).find(
     (price) => price.priceId === catalog?.checkoutPriceId,
   );
-  const defaultOfferId =
-    offer && catalog && defaultPrice ? publicOffer(catalog, defaultPrice).offerId : null;
+  const defaultOfferId = !paidSending
+    ? (firstStandalone?.offerId ?? null)
+    : offer && catalog && defaultPrice
+      ? publicOffer(catalog, defaultPrice).offerId
+      : null;
+  // An add-on contract keeps needing Envio to grow or resume; a standalone one never does.
+  const contractNeedsSending =
+    !paidSending &&
+    !!subscription?.stripePriceId &&
+    !isStandaloneMailboxPrice(catalog, subscription.stripePriceId);
   const sameOffer = !checkout || pendingOffer !== null;
   const ended =
     subscription?.status === "canceled" &&
@@ -313,6 +373,8 @@ export async function mailboxBillingPresentation(
   return {
     canManage,
     canPurchase: availability === "available",
+    /** Which price list this team buys from; checkout resolves offers within it only. */
+    audience,
     sendingPlanRequired,
     earlyAccessRequired,
     availability,
@@ -334,6 +396,7 @@ export async function mailboxBillingPresentation(
       canResume:
         mutable &&
         !sendingPlanRequired &&
+        !contractNeedsSending &&
         !earlyAccessRequired &&
         beforeEnd &&
         ["active", "trialing"].includes(subscription!.status) &&
@@ -348,6 +411,7 @@ export async function mailboxBillingPresentation(
       canIncrease:
         mutable &&
         !sendingPlanRequired &&
+        !contractNeedsSending &&
         !earlyAccessRequired &&
         beforeEnd &&
         subscription!.status === "active" &&

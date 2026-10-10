@@ -247,6 +247,7 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
     expect(await as().mailboxes.billing()).toEqual({
       canManage: true,
       canPurchase: true,
+      audience: "with_sending",
       sendingPlanRequired: false,
       earlyAccessRequired: false,
       availability: "available",
