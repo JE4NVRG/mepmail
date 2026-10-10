@@ -28,6 +28,27 @@
   },
   "releases": [
     {
+      "version": "0.103",
+      "date": "2026-10-10",
+      "title": "Escolha quem chega em Pessoas no Correio",
+      "summary": "Gerencie remetentes aprovados e bloqueados nas Preferências e devolva para Pessoas, com um clique, um remetente que a Caixa inteligente pôs em Notificações ou Newsletters.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Preferências, Remetentes aprovados e bloqueados: por caixa, mais recentes primeiro; troque entre aprovar e bloquear ou esqueça um remetente, com Desfazer; adicione um endereço antes da primeira mensagem; filtros, busca e páginas quando a lista cresce.",
+            "No leitor, uma mensagem em Notificações ou Newsletters oferece Mover para Pessoas, que aprova o remetente (com Desfazer)."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Remetente aprovado conta como Pessoa na Caixa inteligente: na lista, nos contadores e nos avisos de e-mail novo."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.102",
       "date": "2026-10-10",
       "title": "O n8n lê e responde o Correio",

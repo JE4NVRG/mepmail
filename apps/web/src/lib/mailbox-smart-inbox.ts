@@ -3,8 +3,9 @@ import type { MailboxCategory } from "./mailbox-category";
 /**
  * Caixa inteligente: the Inbox split into Pessoas, Notificações and
  * Newsletters (plus Tudo). The pile comes from the row's category (decided
- * from its headers on the server); anyone this person has written to counts
- * as a person whatever their messages look like, so a client writing from
+ * from its headers on the server); anyone this person has written to, or
+ * approved ("Mover para Pessoas", or Aprovar on a new sender), counts as a
+ * person whatever their messages look like, so a client writing from
  * billing@ still lands in Pessoas.
  */
 export type SmartPile = "people" | "notifications" | "newsletters" | "all";
@@ -12,7 +13,12 @@ export type MessagePile = Exclude<SmartPile, "all">;
 
 export const SMART_PILES: readonly SmartPile[] = ["people", "notifications", "newsletters", "all"];
 
-type PileRow = { from: string; category: MailboxCategory | null };
+type PileRow = {
+  from: string;
+  category: MailboxCategory | null;
+  /** The owner's answer for this sender (Aprovação de remetentes). */
+  senderDecision?: "allow" | "block" | "none" | null;
+};
 
 const PILE: Record<MailboxCategory, MessagePile> = {
   person: "people",
@@ -29,7 +35,12 @@ export function knownPeopleFrom(sent: readonly { to: readonly string[] }[]): Set
 
 /** A row whose content is withheld (no category) stays with the people, never hidden away. */
 export function rowPile(row: PileRow, knownPeople: ReadonlySet<string>): MessagePile {
-  if (!row.category || knownPeople.has(row.from.trim().toLowerCase())) return "people";
+  if (
+    !row.category ||
+    row.senderDecision === "allow" ||
+    knownPeople.has(row.from.trim().toLowerCase())
+  )
+    return "people";
   return PILE[row.category];
 }
 

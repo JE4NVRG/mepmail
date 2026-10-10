@@ -1185,11 +1185,17 @@ export function MailboxContentView({
   // The inbox shows its pinned messages first, under their own heading, and only there.
   const pinnedRows = folder === "inbox" ? (pinnedListing.data?.items ?? []).filter(keepRow) : [];
   const pinnedKeys = new Set(pinnedRows.map((i) => `${i.mailboxId}:${i.id}`));
+  // A sender answered here and now (Aprovar, "Mover para Pessoas") moves every
+  // one of their rows at once, before the list reads the answer back.
+  const pileRow = <R extends { mailboxId: string; from: string }>(i: R) => {
+    const answer = senderAnswers[`${i.mailboxId}:${i.from.trim().toLowerCase()}`];
+    return answer ? { ...i, senderDecision: answer } : i;
+  };
   // The pile filter leaves pinned messages and the open one in place.
   const inPile = (i: ListedItem) =>
     !smartOn ||
     pile === "all" ||
-    rowPile(i, knownPeople) === pile ||
+    rowPile(pileRow(i), knownPeople) === pile ||
     (selection?.id === i.id && selection.mailboxId === i.mailboxId);
   const rows = [
     ...pinnedRows,
@@ -2053,6 +2059,48 @@ export function MailboxContentView({
           senderMutation.mutateAsync({ ...ref, decision: "block" }).then(() => remember("block")),
       });
   }
+  // Caixa inteligente: a sender filed under Notificações or Newsletters can be
+  // moved to Pessoas by its owner (an approval); "Desfazer" puts it back.
+  const senderPile =
+    prefs.smartInbox &&
+    isOwner &&
+    item?.kind === "inbox" &&
+    item.deliveryFolder === "inbox" &&
+    selectedRow
+      ? rowPile(pileRow(selectedRow), knownPeople)
+      : null;
+  async function moveSenderToPeople() {
+    if (!item || item.kind !== "inbox" || !senderKey || senderMutation.isPending) return;
+    const ref = { mailboxId: item.mailboxId, address: senderAddress };
+    const key = senderKey;
+    const previous = senderAnswers[key];
+    const before = senderAnswer === "block" ? "block" : null;
+    const remember = (answer: "allow" | "block" | "none" | undefined) =>
+      setSenderAnswers((current) => {
+        const next = { ...current };
+        if (answer === undefined) delete next[key];
+        else next[key] = answer;
+        return next;
+      });
+    remember("allow");
+    try {
+      await senderMutation.mutateAsync({ ...ref, decision: "allow" });
+    } catch {
+      remember(previous);
+      toast(t("senders.error"), "danger");
+      return;
+    }
+    toast(t("senders.movedToPeople"), "success", {
+      action: {
+        label: t("organization.undo"),
+        run: () =>
+          void senderMutation
+            .mutateAsync({ ...ref, decision: before })
+            .then(() => remember(before ?? "none"))
+            .catch(() => toast(t("senders.error"), "danger")),
+      },
+    });
+  }
   const canSubmitDraft =
     item?.kind === "draft" &&
     !item.trashedAt &&
@@ -2303,7 +2351,7 @@ export function MailboxContentView({
   const piles = smartOn
     ? pileCounts(
         // Rows on their way out (archived, deleted...) leave the counts at once too.
-        (listedItems ?? []).filter((i) => !departing.has(rowKey(i))),
+        (listedItems ?? []).filter((i) => !departing.has(rowKey(i))).map(pileRow),
         knownPeople,
         (i) =>
           i.kind === "inbox" &&
@@ -3440,6 +3488,19 @@ export function MailboxContentView({
                   ) : null}
                   {item.kind === "inbox" && item.deliveryFolder === "spam" ? (
                     <SafetyNotice assessment={item.inboundAssessment} quarantined={false} />
+                  ) : null}
+                  {senderPile && senderPile !== "people" && !askSender ? (
+                    <p className={styles.contentNotice}>
+                      {t("senders.pileHere", { pile: t(`smart.${senderPile}`) })}{" "}
+                      <button
+                        type="button"
+                        className={`ms-btn ms-btn-ghost ${styles.undoAction}`}
+                        disabled={senderMutation.isPending}
+                        onClick={() => void moveSenderToPeople()}
+                      >
+                        {t("senders.moveToPeople")}
+                      </button>
+                    </p>
                   ) : null}
                   {isOwner &&
                   item.kind === "inbox" &&

@@ -40,18 +40,21 @@ export function MailboxSenderBar({
 
 /**
  * Preferências: the answers kept for one mailbox, newest first, each one
- * removable (the sender goes back to unanswered).
+ * removable (the sender goes back to unanswered) and, with `onSwitch`,
+ * switchable between approved and blocked.
  */
 export function MailboxSenderList({
   entries,
   loading,
   busyAddress,
   onClear,
+  onSwitch,
 }: {
   entries: { address: string; decision: "allow" | "block" }[];
   loading: boolean;
   busyAddress: string | null;
   onClear: (address: string) => void;
+  onSwitch?: (address: string, decision: "allow" | "block") => void;
 }) {
   const t = useTranslations("mailboxes.senders");
   if (loading) return <p className={styles.listHint}>{t("loading")}</p>;
@@ -64,6 +67,21 @@ export function MailboxSenderList({
           <span className={styles.decision} data-decision={entry.decision}>
             {t(entry.decision === "block" ? "blocked" : "allowed")}
           </span>
+          {onSwitch ? (
+            <button
+              type="button"
+              className={`ms-btn ms-btn-ghost ${styles.switch}`}
+              disabled={busyAddress === entry.address}
+              aria-label={t(entry.decision === "block" ? "toAllow" : "toBlock", {
+                address: entry.address,
+              })}
+              onClick={() =>
+                onSwitch(entry.address, entry.decision === "block" ? "allow" : "block")
+              }
+            >
+              {t(entry.decision === "block" ? "allow" : "block")}
+            </button>
+          ) : null}
           <button
             type="button"
             className="ms-btn ms-btn-ghost"

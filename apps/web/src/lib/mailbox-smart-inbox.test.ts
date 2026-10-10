@@ -23,6 +23,22 @@ describe("smart inbox", () => {
     expect(rowPile(row("", null), known)).toBe("people");
   });
 
+  it("keeps an approved sender with the people ('Mover para Pessoas')", () => {
+    const news = row("contato@loja.example", "newsletter");
+    expect(rowPile({ ...news, senderDecision: "allow" }, known)).toBe("people");
+    expect(rowPile({ ...news, senderDecision: "none" }, known)).toBe("newsletters");
+    expect(rowPile({ ...news, senderDecision: "block" }, known)).toBe("newsletters");
+    expect(rowPile({ ...news, senderDecision: null }, known)).toBe("newsletters");
+    const counts = pileCounts(
+      [news, { ...row("no-reply@bank.example", "notification"), senderDecision: "allow" as const }],
+      known,
+      () => false,
+    );
+    expect(counts.people.total).toBe(1);
+    expect(counts.notifications.total).toBe(0);
+    expect(counts.newsletters.total).toBe(1);
+  });
+
   it("counts every pile and the whole inbox, with unread", () => {
     const counts = pileCounts(
       [

@@ -20,7 +20,7 @@
         "bullets": [
           "Send, schedule, cancel and batch messages from a workflow node.",
           "MepMail Trigger subscribes to the events you pick and registers (and removes) its own webhook automatically.",
-          "Correio: start a workflow when mail reaches an agent mailbox, read the message and save a reply draft — sent only after the owner approves when the key has no send permission.",
+          "Correio: start a workflow when mail reaches an agent mailbox, read the message and save a reply draft, sent only after the owner approves when the key has no send permission.",
           "Payload signatures (Svix / Standard Webhooks) verified out of the box.",
           "Works with MepMail Cloud or any self-hosted instance. Requires a full access API key."
         ],

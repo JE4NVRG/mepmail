@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import { Select } from "@/components/select";
 import { Switch } from "@/components/switch";
 import { isDesktop } from "@/lib/desktop-bridge";
@@ -47,12 +47,15 @@ export function MailboxAppearanceSettings({
   resetPrefs,
   openShortcuts,
   openTab,
+  senders,
 }: {
   prefs: CorreioPrefs;
   setPref: (patch: Partial<CorreioPrefs>) => void;
   resetPrefs: () => void;
   openShortcuts: () => void;
   openTab: (tab: GuideTab) => void;
+  /** "Remetentes aprovados e bloqueados", for a person who owns a mailbox. */
+  senders?: ReactNode;
 }) {
   const t = useTranslations("mailboxes.appearance");
   const common = useTranslations("mailboxes");
@@ -431,6 +434,13 @@ export function MailboxAppearanceSettings({
           />
         </div>
       </section>
+
+      {senders ? (
+        <section className={styles.appearanceGroup} aria-labelledby={`${id}-senderList`}>
+          <h3 id={`${id}-senderList`}>{common("senders.listTitle")}</h3>
+          {senders}
+        </section>
+      ) : null}
 
       <div className={styles.appearanceActions}>
         <button type="button" className="ms-btn ms-btn-ghost" onClick={openShortcuts}>

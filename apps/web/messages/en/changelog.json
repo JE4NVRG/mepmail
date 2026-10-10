@@ -23,6 +23,27 @@
   },
   "releases": [
     {
+      "version": "0.103",
+      "date": "2026-10-10",
+      "title": "Choose who reaches People in Correio",
+      "summary": "Manage approved and blocked senders in Preferences, and move a sender the smart inbox filed under Notifications or Newsletters back to People with one click.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Preferences, Approved and blocked senders: per mailbox, newest first; switch between approve and block or forget a sender, with Undo; add an address before its first message; filters, search and pages once the list grows.",
+            "In the reader, a message filed under Notifications or Newsletters offers Move to People, which approves the sender (with Undo)."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "An approved sender counts as People in the smart inbox: in the list, the counters and the new mail notices."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.102",
       "date": "2026-10-10",
       "title": "n8n reads and answers Correio",

@@ -14,6 +14,8 @@ export type NewMailRow = {
   subject: string;
   /** Smart inbox pile, when the list carries one. */
   category?: "person" | "notification" | "newsletter" | null;
+  /** An approved sender always counts as a person. */
+  senderDecision?: "allow" | "block" | "none" | null;
 };
 
 export type NewMailNotice = {
