@@ -15,6 +15,7 @@ import {
   readMailboxItem,
   receiveMailboxMime,
   revokeMailboxRegistry,
+  saveMailboxDraft,
   sendMailboxOutbox,
   storeMailboxListSummaries,
   updateMailboxSignature,
@@ -366,6 +367,131 @@ describe("session-authenticated mailbox content", () => {
       id: edited.id,
       subject: "Segunda versão",
     });
+  });
+  it("reads received mail with attachments past the composer's limits, and keeps drafts within them", async () => {
+    // A 300 KB PDF and eleven attachments were refused by the old read limits.
+    const pdf = randomBytes(300 * 1024);
+    const parts = Array.from(
+      { length: 11 },
+      (_, i) =>
+        `--b\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename="doc${i}.pdf"\r\nContent-Transfer-Encoding: base64\r\n\r\n${(i === 0 ? pdf : randomBytes(512)).toString("base64")}\r\n`,
+    ).join("");
+    const raw = Buffer.from(
+      `From: Contabilidade <contas@example.invalid>\r\nTo: person@content.invalid\r\nSubject: Notas fiscais\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=b\r\n\r\n--b\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nSeguem as notas.\r\n${parts}--b--\r\n`,
+    );
+    const a = await imported("big-attachment", mailboxId, raw);
+    const row = (await as().items({ mailboxId, folder: "inbox" })).items.find((r) => r.id === a.id);
+    expect(row).toMatchObject({ subject: "Notas fiscais", attachmentCount: 11 });
+    const item = await as().item({ mailboxId, id: a.id });
+    expect(item.attachments[0]).toMatchObject({ filename: "doc0.pdf", bytes: 300 * 1024 });
+    const response = await download(a.id, "0", mailboxId);
+    expect(response.status).toBe(200);
+    expect(Buffer.from(await response.arrayBuffer()).equals(pdf)).toBe(true);
+    // Drafts still hold to the composer's 1 MiB.
+    await expect(
+      saveMailboxDraft(db, keys, actor(), {
+        mailboxId,
+        expectedRevision: 0,
+        raw: Buffer.concat([Buffer.from("Subject: grande\r\n\r\n"), Buffer.alloc(1024 * 1024)]),
+      }),
+    ).rejects.toMatchObject({ code: "invalid" });
+  });
+  it("imports history in its old place and state, never as new mail", async () => {
+    const message = (subject: string, from = "Ana <ana@example.invalid>") =>
+      Buffer.from(
+        `From: ${from}\r\nTo: person@content.invalid\r\nSubject: ${subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nCorpo\r\n`,
+      );
+    const at = (day: number) => new Date(Date.UTC(2025, 0, day, 12));
+    const fresh = await imported("fresh", mailboxId, message("Recente"));
+    await importMailboxMime(db, keys, actor(), {
+      mailboxId,
+      sourceId: "imap:old-read",
+      raw: message("Antiga lida"),
+      history: { kind: "inbox", receivedAt: at(2), seen: true, archived: false },
+    });
+    await importMailboxMime(db, keys, actor(), {
+      mailboxId,
+      sourceId: "imap:old-unread",
+      raw: message("Antiga não lida"),
+      history: { kind: "inbox", receivedAt: at(3), seen: false, archived: false },
+    });
+    await importMailboxMime(db, keys, actor(), {
+      mailboxId,
+      sourceId: "imap:archived",
+      raw: message("Arquivada"),
+      history: { kind: "inbox", receivedAt: at(4), seen: true, archived: true },
+    });
+    await importMailboxMime(db, keys, actor(), {
+      mailboxId,
+      sourceId: "imap:sent",
+      raw: message("Enviada", "Eu <person@content.invalid>"),
+      history: { kind: "sent", receivedAt: at(5), seen: true, archived: false },
+    });
+    const folder = await as().createFolder({ mailboxId, name: "Clientes antigos" });
+    await importMailboxMime(db, keys, actor(), {
+      mailboxId,
+      sourceId: "imap:filed",
+      raw: message("Na pasta"),
+      history: {
+        kind: "inbox",
+        receivedAt: at(6),
+        seen: true,
+        archived: false,
+        folderId: folder.id,
+      },
+    });
+    // The Inbox keeps arrival order: the message received now first, history after it.
+    const inbox = (await as().items({ mailboxId, folder: "inbox" })).items;
+    expect(inbox.map((row) => row.subject)).toEqual(["Recente", "Antiga não lida", "Antiga lida"]);
+    expect(inbox[0]?.id).toBe(fresh.id);
+    expect(inbox.find((row) => row.subject === "Antiga lida")?.seenAt).toEqual(at(2));
+    // Only real unread mail counts: the fresh one and the old one left unread.
+    expect((await as().unreadCounts()).counts[mailboxId]).toBe(2);
+    expect(
+      (await as().items({ mailboxId, folder: "archive" })).items.map((r) => r.subject),
+    ).toEqual(["Arquivada"]);
+    expect((await as().items({ mailboxId, folder: "sent" })).items.map((r) => r.subject)).toEqual([
+      "Enviada",
+    ]);
+    expect(
+      (await as().items({ mailboxId, folder: "custom", customFolderId: folder.id })).items.map(
+        (r) => r.subject,
+      ),
+    ).toEqual(["Na pasta"]);
+    // A repeat with the same source is the same message; bad history is refused.
+    await expect(
+      importMailboxMime(db, keys, actor(), {
+        mailboxId,
+        sourceId: "imap:old-read",
+        raw: message("Antiga lida"),
+        history: { kind: "inbox", receivedAt: at(2), seen: true, archived: false },
+      }),
+    ).resolves.toMatchObject({ kind: "inbox" });
+    for (const history of [
+      {
+        kind: "inbox" as const,
+        receivedAt: new Date(Date.now() + 7 * 86_400_000),
+        seen: false,
+        archived: false,
+      },
+      { kind: "inbox" as const, receivedAt: new Date(Number.NaN), seen: false, archived: false },
+      {
+        kind: "inbox" as const,
+        receivedAt: at(7),
+        seen: false,
+        archived: false,
+        folderId: randomUUID(),
+      },
+      { kind: "draft" as unknown as "inbox", receivedAt: at(7), seen: false, archived: false },
+    ])
+      await expect(
+        importMailboxMime(db, keys, actor(), {
+          mailboxId,
+          sourceId: `imap:bad-${randomUUID().slice(0, 8)}`,
+          raw: message("Ruim"),
+          history,
+        }),
+      ).rejects.toMatchObject({ code: "invalid" });
   });
   it("rewrites a 0.91 summary (version 1, no pile) once, then lists from the new one", async () => {
     const a = await imported(
@@ -1146,13 +1272,30 @@ describe("session-authenticated mailbox content", () => {
     await expect(as().saveDraft(draft({ retainedAttachments: [0] }))).rejects.toMatchObject({
       code: "BAD_REQUEST",
     });
+    // Received attachments past the composer's 256 KiB open and download, but
+    // cannot ride along in a forward (the send would refuse them).
     const a = await imported(
       "oversize",
       mailboxId,
       mime(Buffer.alloc(256 * 1024 + 1), "large.bin"),
     );
-    await expect(as().item({ mailboxId, id: a.id })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    expect((await download(a.id)).status).toBe(422);
+    expect((await as().item({ mailboxId, id: a.id })).attachments[0]?.bytes).toBe(256 * 1024 + 1);
+    expect((await download(a.id)).status).toBe(200);
+    await db
+      .update(schema.domains)
+      .set({ status: "verified" })
+      .where(eq(schema.domains.teamId, teamId));
+    await expect(
+      as().saveDraft(
+        draft({ sourceItemId: a.id, mode: "forward", retainedAttachments: [0], to: [] }),
+      ),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    // The same forward without that attachment is fine.
+    await expect(
+      as().saveDraft(
+        draft({ sourceItemId: a.id, mode: "forward", retainedAttachments: [], to: [] }),
+      ),
+    ).resolves.toMatchObject({ kind: "draft" });
   });
   it("soft-trashes and restores through the API with private atomic audit and no changed MIME", async () => {
     const item = await imported();

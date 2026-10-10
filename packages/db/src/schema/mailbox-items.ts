@@ -184,10 +184,11 @@ export const mailboxItems = pgTable(
       sql`(${t.kind} in ('inbox', 'sent') and ${t.sourceId} is not null and length(${t.sourceId}) between 1 and 128) or (${t.kind} = 'draft' and ${t.sourceId} is null)`,
     ),
     check("mailbox_items_revision_check", sql`${t.revision} >= 1`),
-    check("mailbox_items_raw_bytes_check", sql`${t.rawBytes} between 1 and 1048576`),
+    // Received and imported mail up to 25 MiB (mailbox migration 0026); the composer caps drafts lower.
+    check("mailbox_items_raw_bytes_check", sql`${t.rawBytes} between 1 and 26214400`),
     check(
       "mailbox_items_envelope_check",
-      sql`${t.keyVersion} >= 2000000 and octet_length(${t.iv}) = 12 and octet_length(${t.ciphertext}) between 17 and 1048592`,
+      sql`${t.keyVersion} >= 2000000 and octet_length(${t.iv}) = 12 and octet_length(${t.ciphertext}) between 17 and 26214416`,
     ),
     check(
       "mailbox_items_summary_check",

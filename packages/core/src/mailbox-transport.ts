@@ -139,9 +139,16 @@ const OUTCOMES = new Set<MailboxOutboundOutcome>([
   "rejected",
   "rendering_failed",
 ]);
+/** What the composer sends: the draft limit, attachments included. */
 const MAX_MIME_BYTES = 1024 * 1024;
 const MAX_RECIPIENTS = 20;
 const MAX_ATTACHMENT_BYTES = 256 * 1024;
+/**
+ * What other people send us is not ours to limit to the composer's size: received
+ * mail up to 25 MiB (Gmail's ceiling, under SES's 40 MB), attachments included.
+ */
+export const MAX_INBOUND_MIME_BYTES = 25 * 1024 * 1024;
+const MAX_INBOUND_ATTACHMENTS = 100;
 
 function hasAsciiControl(value: string, includeSpace = false) {
   const limit = includeSpace ? 32 : 31;
@@ -152,8 +159,8 @@ function hasAsciiControl(value: string, includeSpace = false) {
   return false;
 }
 
-function copyRaw(value: Buffer) {
-  if (!Buffer.isBuffer(value) || !value.length || value.length > MAX_MIME_BYTES)
+function copyRaw(value: Buffer, max = MAX_MIME_BYTES) {
+  if (!Buffer.isBuffer(value) || !value.length || value.length > max)
     throw new MailboxContentError("invalid");
   return Buffer.from(value);
 }
@@ -459,18 +466,19 @@ async function open(
     keys,
     binding(row),
   );
-  if (raw.length !== row.rawBytes || raw.length > MAX_MIME_BYTES)
+  // Sealed rows are bounded by what was admitted: drafts by the composer, received mail by the inbound cap.
+  if (raw.length !== row.rawBytes || raw.length > MAX_INBOUND_MIME_BYTES)
     throw new MailboxContentError("invalid");
   return raw;
 }
 async function envelope(adapter: MailboxTransportMimeAdapter, raw: Buffer, outbound: boolean) {
   const parsed = await adapter.parse(Buffer.from(raw));
+  const maxAttachments = outbound ? 10 : MAX_INBOUND_ATTACHMENTS;
+  const maxAttachment = outbound ? MAX_ATTACHMENT_BYTES : MAX_INBOUND_MIME_BYTES;
   if (
     !Array.isArray(parsed.attachmentBytes) ||
-    parsed.attachmentBytes.length > 10 ||
-    parsed.attachmentBytes.some(
-      (n) => !Number.isSafeInteger(n) || n < 0 || n > MAX_ATTACHMENT_BYTES,
-    )
+    parsed.attachmentBytes.length > maxAttachments ||
+    parsed.attachmentBytes.some((n) => !Number.isSafeInteger(n) || n < 0 || n > maxAttachment)
   )
     throw new MailboxContentError("invalid");
   const from = addr(parsed.from);
@@ -522,7 +530,11 @@ export async function receiveMailboxMime(
   mime: MailboxTransportMimeAdapter,
   now = new Date(),
 ) {
-  input = { ...input, recipients: [...input.recipients], raw: copyRaw(input.raw) };
+  input = {
+    ...input,
+    recipients: [...input.recipients],
+    raw: copyRaw(input.raw, MAX_INBOUND_MIME_BYTES),
+  };
   const assessment =
     input.assessment === undefined ? null : validateMailboxInboundAssessment(input.assessment);
   if (

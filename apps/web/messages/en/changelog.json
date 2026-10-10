@@ -23,6 +23,22 @@
   },
   "releases": [
     {
+      "version": "0.96",
+      "date": "2026-10-10",
+      "title": "Large emails and attachments now arrive",
+      "summary": "Correio receives and opens messages up to 25 MB with up to 100 attachments. Before, an email over 1 MB, or with an attachment over 256 KB, never reached the mailbox.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "Received emails up to 25 MB, with attachments up to 25 MB, arrive, open and download in full.",
+            "Very long HTML emails are cut at 5 MB and keep their layout, instead of falling back to plain text.",
+            "Forwarding an email whose attachment is over the 256 KB sending limit says so when saving, instead of failing at send time."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.95",
       "date": "2026-10-10",
       "title": "Mail with 3 mailboxes for US$ 12.90, 7 days free",

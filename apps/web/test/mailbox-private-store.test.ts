@@ -345,10 +345,14 @@ describe("private mailbox persistence", () => {
     await expect(imported("empty", mailboxId, Buffer.alloc(0))).rejects.toMatchObject({
       code: "invalid",
     });
-    await expect(imported("large", mailboxId, Buffer.alloc(1048577))).rejects.toMatchObject({
-      code: "invalid",
-    });
+    // Received and imported mail is kept up to 25 MiB (migration 0026), not 1 MiB.
+    await expect(
+      imported("large", mailboxId, Buffer.alloc(25 * 1024 * 1024 + 1)),
+    ).rejects.toMatchObject({ code: "invalid" });
     expect(await db.select().from(schema.mailboxItems)).toHaveLength(0);
+    const big = Buffer.concat([mime, Buffer.alloc(2 * 1024 * 1024, 0x61)]);
+    const stored = await imported("two-megabytes", mailboxId, big);
+    expect((await read(stored.id)).raw.equals(big)).toBe(true);
   });
   it("snapshots caller bytes before asynchronous key operations", async () => {
     const mutable = Buffer.from(mime);

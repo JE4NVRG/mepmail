@@ -45,6 +45,11 @@ import { projectMailboxHtml } from "./mailbox-html";
 import { mailboxSenderHmacKey } from "./mailbox-sender-key";
 import { publicStorageOrigin, publicStoragePrefix } from "./storage";
 
+// Reading: what receipt and import keep (up to 25 MiB a message).
+const READ_MAX_MIME = 25 * 1024 * 1024;
+const READ_MAX_ATTACHMENT = 25 * 1024 * 1024;
+const READ_MAX_ATTACHMENTS = 100;
+// Writing: what the composer sends (unchanged).
 const MAX_MIME = 1024 * 1024;
 const MAX_ATTACHMENT = 256 * 1024;
 const MAX_ATTACHMENTS = 10;
@@ -68,11 +73,11 @@ function filename(value: string | undefined) {
   return sanitized || "attachment";
 }
 async function parse(raw: Buffer) {
-  if (!raw.length || raw.length > MAX_MIME) throw new MailboxContentError("invalid");
+  if (!raw.length || raw.length > READ_MAX_MIME) throw new MailboxContentError("invalid");
   const mime = await simpleParser(raw, { skipImageLinks: true, skipTextToHtml: true });
   if (
-    mime.attachments.length > MAX_ATTACHMENTS ||
-    mime.attachments.some((a) => a.content.length > MAX_ATTACHMENT)
+    mime.attachments.length > READ_MAX_ATTACHMENTS ||
+    mime.attachments.some((a) => a.content.length > READ_MAX_ATTACHMENT)
   )
     throw new MailboxContentError("invalid");
   return mime;
@@ -160,15 +165,15 @@ async function runLimited<T, R>(
  * which costs several times the rest of the parse on an HTML-only message.
  */
 async function parseForList(raw: Buffer) {
-  if (!raw.length || raw.length > MAX_MIME) throw new MailboxContentError("invalid");
+  if (!raw.length || raw.length > READ_MAX_MIME) throw new MailboxContentError("invalid");
   const mime = await simpleParser(raw, {
     skipImageLinks: true,
     skipTextToHtml: true,
     skipHtmlToText: true,
   });
   if (
-    mime.attachments.length > MAX_ATTACHMENTS ||
-    mime.attachments.some((a) => a.content.length > MAX_ATTACHMENT)
+    mime.attachments.length > READ_MAX_ATTACHMENTS ||
+    mime.attachments.some((a) => a.content.length > READ_MAX_ATTACHMENT)
   )
     throw new MailboxContentError("invalid");
   return mime;
@@ -1028,7 +1033,9 @@ export async function saveMailboxContentDraft(
     throw new MailboxContentError("invalid");
   const attachments = input.retainedAttachments.map((index) => {
     const a = source?.mime.attachments[index];
-    if (!a) throw new MailboxContentError("invalid");
+    // A received attachment can be larger than what we send: refuse it here,
+    // not when the send fails later.
+    if (!a || a.content.length > MAX_ATTACHMENT) throw new MailboxContentError("invalid");
     return {
       filename: filename(a.filename),
       content: a.content,

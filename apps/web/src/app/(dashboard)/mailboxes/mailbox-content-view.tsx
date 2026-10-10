@@ -104,6 +104,8 @@ function replyAllCopies(source: Item, own: string, to: string[]) {
 }
 /** "waiting": Send was pressed and the undo-send wait has not ended yet. */
 type SendState = "waiting" | "requesting" | Outputs["queueDraft"]["status"];
+/** Largest attachment the composer sends (server: mailbox-content MAX_ATTACHMENT). */
+const SEND_ATTACHMENT_BYTES = 256 * 1024;
 /** The server render never has a send waiting. */
 const noHeldSend = () => null;
 const NIL = "00000000-0000-0000-0000-000000000000";
@@ -382,10 +384,14 @@ function DraftDialog({
     );
   });
   // A forward (or an edited draft) carries the attachments; a reply, like mail apps, does not.
+  // Received attachments over what we send (256 KiB each) stay behind, with a note.
+  const carried =
+    source && (source.kind === "draft" || mode === "forward") ? source.attachments : [];
   const [retained, setRetained] = useState(
-    source && (source.kind === "draft" || mode === "forward")
-      ? source.attachments.map((a) => a.index)
-      : [],
+    carried.filter((a) => a.bytes <= SEND_ATTACHMENT_BYTES).map((a) => a.index),
+  );
+  const [leftBehind] = useState(() =>
+    carried.filter((a) => a.bytes > SEND_ATTACHMENT_BYTES).map((a) => a.filename),
   );
   const [uploads, setUploads] = useState<{ id: number; filename: string; base64: string }[]>([]);
   const uploadSequence = useRef(0);
@@ -684,6 +690,14 @@ function DraftDialog({
                 {t("attachmentLimit")}
               </small>
             </div>
+            {leftBehind.length ? (
+              <p className={styles.hint} role="status">
+                {t("attachmentsLeftBehind", {
+                  count: leftBehind.length,
+                  names: leftBehind.join(", "),
+                })}
+              </p>
+            ) : null}
             {retained.length + uploads.length > 0 ? (
               <section className={styles.draftAttachments} aria-label={t("attachments")}>
                 <h3 className={styles.composerAttachmentSummary}>

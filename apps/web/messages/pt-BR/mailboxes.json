@@ -1026,5 +1026,6 @@
     "google": "Adicionar ao Google Agenda",
     "download": "Baixar convite (.ics)"
   },
-  "trialLimit": "O teste grátis permite até 50 destinatários por dia e 200 no total. Nada foi enviado e o rascunho continua guardado; o limite cai quando a primeira fatura for paga."
+  "trialLimit": "O teste grátis permite até 50 destinatários por dia e 200 no total. Nada foi enviado e o rascunho continua guardado; o limite cai quando a primeira fatura for paga.",
+  "attachmentsLeftBehind": "{count, plural, one {Este anexo ficou de fora porque passa de 256 KB, o limite de envio: {names}.} other {Estes anexos ficaram de fora porque passam de 256 KB, o limite de envio: {names}.}}"
 }

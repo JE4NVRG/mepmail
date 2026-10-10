@@ -1,6 +1,7 @@
 import { GetObjectCommand, S3Client, type S3ClientConfig } from "@aws-sdk/client-s3";
 
-export const MAILBOX_MAX_MIME_BYTES = 1024 * 1024;
+/** Received mail up to 25 MiB, the same ceiling as the Correio receiver (core MAX_INBOUND_MIME_BYTES). */
+export const MAILBOX_MAX_MIME_BYTES = 25 * 1024 * 1024;
 
 export interface MailboxPrivateObjectLocation {
   bucket: string;

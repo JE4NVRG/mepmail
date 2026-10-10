@@ -5,8 +5,10 @@ import tls from "node:tls";
 
 /**
  * A deliberately small IMAP4rev1 client for the migration assistant: LOGIN,
- * LIST, EXAMINE (read-only) and FETCH of a few header fields. It never reads a
- * message body, never writes to the remote account and only speaks TLS on 993.
+ * LIST, EXAMINE (read-only), FETCH of a few header fields for the scan, and
+ * UID SEARCH / UID FETCH of whole messages (BODY.PEEK, so nothing is marked
+ * read) for the history import. It never writes to the remote account and only
+ * speaks TLS on 993.
  */
 export type ImapFailure = "login" | "network" | "protocol" | "blocked";
 export class ImapError extends Error {
@@ -26,12 +28,34 @@ export interface ImapHeaders {
   internalDate: Date | null;
   header: string;
 }
+export interface ImapExamined {
+  exists: number;
+  /** The folder's UIDVALIDITY: when it changes, UIDs seen before mean nothing. */
+  uidValidity: number | null;
+  uidNext: number | null;
+}
+export interface ImapMessage {
+  uid: number;
+  flags: string[];
+  internalDate: Date | null;
+  raw: Buffer;
+}
 export interface ImapSession {
   list(): Promise<ImapFolder[]>;
   examine(name: string): Promise<{ exists: number }>;
   /** Header fields of sequence numbers `from..to` (inclusive). */
   fetchHeaders(from: number, to: number, fields: readonly string[]): Promise<ImapHeaders[]>;
   logout(): Promise<void>;
+}
+/** What the history import needs on top of the scan. */
+export interface ImapImportSession extends ImapSession {
+  examine(name: string): Promise<ImapExamined>;
+  /** UIDs above `afterUid` in the examined folder, ascending. */
+  uidSearchAfter(afterUid: number): Promise<number[]>;
+  /** Whole messages (BODY.PEEK[]) with their flags and INTERNALDATE, in UID order. */
+  uidFetchMessages(uids: readonly number[]): Promise<ImapMessage[]>;
+  /** RFC822.SIZE of each UID, to batch the fetches by bytes. */
+  uidFetchSizes(uids: readonly number[]): Promise<Map<number, number>>;
 }
 
 const HOSTNAME = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
@@ -139,7 +163,7 @@ function parseInternalDate(value: string | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-class Session implements ImapSession {
+class Session implements ImapImportSession {
   private buffer = Buffer.alloc(0);
   private closed = false;
   private wake: (() => void) | null = null;
@@ -148,6 +172,7 @@ class Session implements ImapSession {
   constructor(
     private readonly socket: Duplex,
     private readonly timeoutMs: number,
+    private readonly maxLiteral = 4 * 1024 * 1024,
   ) {
     socket.on("data", (chunk: Buffer) => {
       this.buffer = Buffer.concat([this.buffer, chunk]);
@@ -178,7 +203,7 @@ class Session implements ImapSession {
         return { text, literals };
       }
       const size = Number(literal[1]);
-      if (size > 4 * 1024 * 1024) throw new ImapError("protocol");
+      if (size > this.maxLiteral) throw new ImapError("protocol");
       const start = end + 2;
       if (this.buffer.length < start + size) return null;
       text += `${line.slice(0, literal.index)}\uE000${literals.length}`;
@@ -278,13 +303,69 @@ class Session implements ImapSession {
     return folders;
   }
 
-  async examine(name: string): Promise<{ exists: number }> {
+  async examine(name: string): Promise<ImapExamined> {
     let exists = 0;
+    let uidValidity: number | null = null;
+    let uidNext: number | null = null;
     for (const response of await this.command([`EXAMINE ${quote(name)}`])) {
       const match = /^\* (\d+) EXISTS/i.exec(response.text);
       if (match) exists = Number(match[1]);
+      const validity = /\[UIDVALIDITY (\d+)\]/i.exec(response.text);
+      if (validity) uidValidity = Number(validity[1]);
+      const next = /\[UIDNEXT (\d+)\]/i.exec(response.text);
+      if (next) uidNext = Number(next[1]);
     }
-    return { exists };
+    return { exists, uidValidity, uidNext };
+  }
+
+  async uidSearchAfter(afterUid: number): Promise<number[]> {
+    if (!Number.isSafeInteger(afterUid) || afterUid < 0) throw new ImapError("protocol");
+    const uids: number[] = [];
+    for (const response of await this.command([`UID SEARCH UID ${afterUid + 1}:*`])) {
+      const match = /^\* SEARCH(.*)$/i.exec(response.text);
+      if (!match) continue;
+      for (const token of match[1]!.trim().split(/\s+/))
+        if (/^\d+$/.test(token)) uids.push(Number(token));
+    }
+    // "n:*" also matches the highest UID when every UID is below n.
+    return [...new Set(uids)].filter((uid) => uid > afterUid).sort((a, b) => a - b);
+  }
+
+  async uidFetchMessages(uids: readonly number[]): Promise<ImapMessage[]> {
+    if (!uids.length) return [];
+    if (uids.some((uid) => !Number.isSafeInteger(uid) || uid < 1)) throw new ImapError("protocol");
+    const out: ImapMessage[] = [];
+    for (const response of await this.command([
+      `UID FETCH ${uids.join(",")} (UID FLAGS INTERNALDATE BODY.PEEK[])`,
+    ])) {
+      if (!/^\* \d+ FETCH /i.test(response.text)) continue;
+      const uid = Number(/\bUID (\d+)/i.exec(response.text)?.[1]);
+      const body = /BODY\[\] \uE000(\d+)/i.exec(response.text);
+      if (!Number.isSafeInteger(uid) || !body) continue;
+      const flags = (/FLAGS \(([^)]*)\)/i.exec(response.text)?.[1] ?? "")
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((flag) => flag.toLowerCase());
+      out.push({
+        uid,
+        flags,
+        internalDate: parseInternalDate(/INTERNALDATE "([^"]+)"/i.exec(response.text)?.[1]),
+        raw: response.literals[Number(body[1])]!,
+      });
+    }
+    return out.sort((a, b) => a.uid - b.uid);
+  }
+
+  async uidFetchSizes(uids: readonly number[]): Promise<Map<number, number>> {
+    const sizes = new Map<number, number>();
+    if (!uids.length) return sizes;
+    if (uids.some((uid) => !Number.isSafeInteger(uid) || uid < 1)) throw new ImapError("protocol");
+    for (const response of await this.command([`UID FETCH ${uids.join(",")} (UID RFC822.SIZE)`])) {
+      const uid = Number(/\bUID (\d+)/i.exec(response.text)?.[1]);
+      const size = Number(/RFC822\.SIZE (\d+)/i.exec(response.text)?.[1]);
+      if (Number.isSafeInteger(uid) && Number.isSafeInteger(size)) sizes.set(uid, size);
+    }
+    return sizes;
   }
 
   async fetchHeaders(from: number, to: number, fields: readonly string[]): Promise<ImapHeaders[]> {
@@ -325,6 +406,8 @@ export interface ImapOpenDeps {
   /** Opens the transport to a checked address; TLS with SNI and certificate checks by default. */
   connect?: (endpoint: { host: string; address: string; port: number }) => Duplex;
   timeoutMs?: number;
+  /** The largest literal (message) accepted; the scan keeps the small default. */
+  maxLiteralBytes?: number;
 }
 
 function tlsConnect(endpoint: { host: string; address: string; port: number }): Duplex {
@@ -341,10 +424,10 @@ function tlsConnect(endpoint: { host: string; address: string; port: number }): 
 export async function openImap(
   input: { host: string; port: number; username: string; password: string },
   deps: ImapOpenDeps = {},
-): Promise<ImapSession> {
+): Promise<ImapImportSession> {
   const endpoint = await resolveImapEndpoint(input.host, input.port, deps.resolve);
   const socket = (deps.connect ?? tlsConnect)({ ...endpoint, port: input.port });
-  const session = new Session(socket, deps.timeoutMs ?? 30_000);
+  const session = new Session(socket, deps.timeoutMs ?? 30_000, deps.maxLiteralBytes);
   try {
     await session.greet();
     await session.login(input.username, input.password);

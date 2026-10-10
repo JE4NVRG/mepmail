@@ -168,6 +168,31 @@ describe("trusted private SES receipt adapter with real encrypted persistence", 
     };
   };
 
+  it("receives a 3 MiB message with a 2 MiB attachment, which the 1 MiB pilot cap refused", async () => {
+    const attachment = Buffer.alloc(2 * 1024 * 1024, 0x61)
+      .toString("base64")
+      .replace(/.{76}/g, "$&\r\n");
+    const large = Buffer.from(
+      `From: outside@example.invalid\r\nTo: person@receiver.invalid\r\nSubject: Large fixture\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=big\r\n\r\n--big\r\nContent-Type: text/plain\r\n\r\nsee the attached report\r\n--big\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename=report.pdf\r\nContent-Transfer-Encoding: base64\r\n\r\n${attachment}\r\n--big--\r\n`,
+    );
+    expect(large.length).toBeGreaterThan(2 * 1024 * 1024);
+    // The fixture plan is tiny; a real one has gigabytes.
+    await db.update(schema.mailboxSubscriptions).set({ storageBytesPerMailbox: 1024 ** 3 });
+    const handle = createMailboxReceiver({
+      db,
+      keys,
+      mime: mailboxWorkerMime,
+      reader: reader(large).objectReader,
+      enabled: true,
+      topics: [topicArn],
+      locations: [location],
+    });
+    expect(await handle(notification(event(["person@receiver.invalid"])))).toBe(true);
+    const [item] = await db.select().from(schema.mailboxItems);
+    expect(item?.rawBytes).toBe(large.length);
+    expect(item?.ciphertext.includes(Buffer.from("see the attached report"))).toBe(false);
+  });
+
   it("routes receipt RCPT across teams, preserves private attachment and deduplicates SNS retries", async () => {
     const captured = reader();
     const handle = createMailboxReceiver({
@@ -198,7 +223,7 @@ describe("trusted private SES receipt adapter with real encrypted persistence", 
       Bucket: location.bucket,
       Key: "receipts/stable-provider-receipt-1",
       ExpectedBucketOwner: location.ownerAccountId,
-      Range: "bytes=0-1048576",
+      Range: "bytes=0-26214400",
     });
     expect(await db.select().from(schema.emails)).toHaveLength(0);
   });

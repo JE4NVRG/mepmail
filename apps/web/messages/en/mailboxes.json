@@ -1026,5 +1026,6 @@
     "google": "Add to Google Calendar",
     "download": "Download invite (.ics)"
   },
-  "trialLimit": "The free trial allows up to 50 recipients a day and 200 in total. Nothing was sent and the draft is still saved; the limit lifts once the first invoice is paid."
+  "trialLimit": "The free trial allows up to 50 recipients a day and 200 in total. Nothing was sent and the draft is still saved; the limit lifts once the first invoice is paid.",
+  "attachmentsLeftBehind": "{count, plural, one {This attachment stays behind because it is over 256 KB, the sending limit: {names}.} other {These attachments stay behind because they are over 256 KB, the sending limit: {names}.}}"
 }

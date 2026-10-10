@@ -28,6 +28,22 @@
   },
   "releases": [
     {
+      "version": "0.96",
+      "date": "2026-10-10",
+      "title": "E-mails e anexos grandes agora chegam",
+      "summary": "O Correio recebe e abre mensagens de até 25 MB com até 100 anexos. Antes, um e-mail acima de 1 MB, ou com anexo acima de 256 KB, não chegava à caixa.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "E-mails recebidos de até 25 MB, com anexos de até 25 MB, chegam, abrem e baixam inteiros.",
+            "E-mails HTML muito longos são cortados em 5 MB e mantêm o layout, em vez de virar só texto.",
+            "Encaminhar um e-mail com anexo acima do limite de envio de 256 KB avisa ao salvar, em vez de falhar no envio."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.95",
       "date": "2026-10-10",
       "title": "Correio com 3 caixas por US$ 12,90 e 7 dias grátis",

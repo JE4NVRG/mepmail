@@ -73,6 +73,14 @@ import {
 } from "../mailbox-content";
 import { mailboxDnsGuide } from "../mailbox-dns-guide";
 import {
+  cancelMailboxImport,
+  listMailboxImports,
+  MailboxImportError,
+  mailboxImportStatus,
+  resumeMailboxImport,
+  startMailboxImport,
+} from "../mailbox-migration/import";
+import {
   applyMigration,
   connectMigrationSource,
   MigrationError,
@@ -165,6 +173,23 @@ async function migrationCall<T>(run: () => Promise<T>): Promise<T> {
             : error.code === "not_found"
               ? "NOT_FOUND"
               : "BAD_REQUEST",
+      message: error.code,
+    });
+  }
+}
+/** Import failures keep a reason word the import screen maps to its own copy. */
+async function importCall<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await call(run);
+  } catch (error) {
+    if (!(error instanceof MailboxImportError)) throw error;
+    throw new TRPCError({
+      code:
+        error.code === "running" || error.code === "busy"
+          ? "CONFLICT"
+          : error.code === "not_found"
+            ? "NOT_FOUND"
+            : "BAD_REQUEST",
       message: error.code,
     });
   }
@@ -1132,6 +1157,76 @@ export const mailboxesRouter = router({
       .query(({ ctx, input }) =>
         migrationCall(() => migrationMxReadiness(ctx.db, actor(ctx), input.sourceId)),
       ),
+    // History import over IMAP: the password lives only in this process while the job runs.
+    importStart: enabled
+      .input(
+        z
+          .object({
+            host: z.string().min(1).max(253),
+            port: z.literal(993),
+            username: z.string().min(1).max(254),
+            password: z.string().min(1).max(1024),
+            mailboxId: z.uuid(),
+            folders: z
+              .array(
+                z
+                  .object({
+                    name: z.string().min(1).max(512),
+                    target: z.enum(["inbox", "sent", "archive", "folder"]),
+                    folderId: z.uuid().nullable().optional(),
+                  })
+                  .strict(),
+              )
+              .min(1)
+              .max(50),
+          })
+          .strict(),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const job = await importCall(() =>
+          startMailboxImport(ctx.db, getKeyring(), actor(ctx), input),
+        );
+        await recordAudit(ctx, {
+          action: "mailbox.import_started",
+          target: { type: "mailbox", id: input.mailboxId },
+          metadata: { jobId: job.jobId, host: job.host, folders: input.folders.length },
+        });
+        return job;
+      }),
+    importStatus: enabled
+      .input(z.object({ jobId: z.uuid() }).strict())
+      .query(({ ctx, input }) =>
+        importCall(() => mailboxImportStatus(ctx.db, actor(ctx), input.jobId)),
+      ),
+    importJobs: enabled
+      .input(z.object({ mailboxId: z.uuid().nullable() }).strict())
+      .query(({ ctx, input }) =>
+        importCall(() => listMailboxImports(ctx.db, actor(ctx), input.mailboxId)),
+      ),
+    importResume: enabled
+      .input(z.object({ jobId: z.uuid(), password: z.string().min(1).max(1024) }).strict())
+      .mutation(async ({ ctx, input }) => {
+        const job = await importCall(() =>
+          resumeMailboxImport(ctx.db, getKeyring(), actor(ctx), input),
+        );
+        await recordAudit(ctx, {
+          action: "mailbox.import_resumed",
+          target: { type: "mailbox", id: job.mailboxId },
+          metadata: { jobId: job.jobId },
+        });
+        return job;
+      }),
+    importCancel: enabled
+      .input(z.object({ jobId: z.uuid() }).strict())
+      .mutation(async ({ ctx, input }) => {
+        const job = await importCall(() => cancelMailboxImport(ctx.db, actor(ctx), input.jobId));
+        await recordAudit(ctx, {
+          action: "mailbox.import_canceled",
+          target: { type: "mailbox", id: job.mailboxId },
+          metadata: { jobId: job.jobId },
+        });
+        return job;
+      }),
   }),
   // Aliases: extra addresses that deliver into one mailbox on its own domain.
   aliases: enabled

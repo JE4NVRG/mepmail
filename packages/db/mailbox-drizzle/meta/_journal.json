@@ -183,6 +183,20 @@
       "when": 1791730800025,
       "tag": "0025_mailbox_team_quota_trial",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791730800026,
+      "tag": "0026_mailbox_large_messages",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791730800027,
+      "tag": "0027_mailbox_import_jobs",
+      "breakpoints": true
     }
   ]
 }

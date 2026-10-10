@@ -44,10 +44,16 @@ export class MailboxContentError extends Error {
 }
 type Item = typeof schema.mailboxItems.$inferSelect;
 type Permission = "read" | "draft" | "owner";
-const MAX_MIME_BYTES = 1024 * 1024;
+/**
+ * Received and imported mail is kept up to 25 MiB (Gmail's limit, under SES's
+ * 40 MB): a message from outside cannot be held to what our composer writes.
+ * Drafts keep the composer's 1 MiB.
+ */
+const MAX_STORED_MIME_BYTES = 25 * 1024 * 1024;
+const MAX_DRAFT_MIME_BYTES = 1024 * 1024;
 
-function bytes(raw: Buffer) {
-  if (!Buffer.isBuffer(raw) || !raw.length || raw.length > MAX_MIME_BYTES)
+function bytes(raw: Buffer, max = MAX_STORED_MIME_BYTES) {
+  if (!Buffer.isBuffer(raw) || !raw.length || raw.length > max)
     throw new MailboxContentError("invalid");
   // Snapshot before the first await so the caller cannot mutate stored bytes in flight.
   return Buffer.from(raw);
@@ -131,7 +137,7 @@ async function open(item: Item, keyring: Keyring) {
   if (item.keyVersion < BOUND_ENVELOPE_VERSION_OFFSET)
     throw new Error("Private mailbox requires a bound envelope");
   const raw = await decryptPayload(item, keyring, binding(item));
-  if (raw.length !== item.rawBytes || raw.length > MAX_MIME_BYTES)
+  if (raw.length !== item.rawBytes || raw.length > MAX_STORED_MIME_BYTES)
     throw new Error("Invalid private mailbox payload size");
   return raw;
 }
@@ -231,16 +237,54 @@ export function withMailboxOrganizationAccess<T>(
 }
 
 /** Owner-only import for local qualification/export restore. No inbound transport is activated. */
+/**
+ * How an imported message sat in its old mailbox (IMAP history import): its
+ * kind, when it arrived (INTERNALDATE), whether it was read, archived or in
+ * a named folder. The row keeps that time and state, so old mail sorts into
+ * place and is never presented as new.
+ */
+export interface MailboxImportHistory {
+  kind: "inbox" | "sent";
+  receivedAt: Date;
+  seen: boolean;
+  archived: boolean;
+  folderId?: string | null;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Received times from 1970 up to a day ahead (clock skew); anything else is refused. */
+function historyTime(value: unknown): Date {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime()))
+    throw new MailboxContentError("invalid");
+  if (value.getTime() < 0 || value.getTime() > Date.now() + 86_400_000)
+    throw new MailboxContentError("invalid");
+  return new Date(value.getTime());
+}
+
 export async function importMailboxMime(
   db: Db,
   keyring: Keyring,
   actor: MailboxContentActor,
-  input: { mailboxId: string; sourceId: string; raw: Buffer },
+  input: { mailboxId: string; sourceId: string; raw: Buffer; history?: MailboxImportHistory },
 ) {
   actor = { ...actor };
   input = { ...input };
   const raw = bytes(input.raw);
   if (typeof input.sourceId !== "string" || !/^[a-zA-Z0-9._:-]{1,128}$/.test(input.sourceId))
+    throw new MailboxContentError("invalid");
+  const history = input.history
+    ? {
+        kind: input.history.kind,
+        receivedAt: historyTime(input.history.receivedAt),
+        seen: input.history.seen === true,
+        archived: input.history.archived === true,
+        folderId: input.history.folderId ?? null,
+      }
+    : null;
+  if (history && history.kind !== "inbox" && history.kind !== "sent")
+    throw new MailboxContentError("invalid");
+  if (history?.folderId !== null && history?.folderId !== undefined && !UUID.test(history.folderId))
     throw new MailboxContentError("invalid");
   return scoped(db, actor, input.mailboxId, "owner", true, async (tx) => {
     const [previous] = await tx
@@ -257,6 +301,21 @@ export async function importMailboxMime(
       if (!(await open(previous, keyring)).equals(raw)) throw new MailboxContentError("conflict");
       return summary(previous);
     }
+    // A named folder must be one of this mailbox's own, still in use.
+    if (history?.folderId) {
+      const [folder] = await tx
+        .select({ id: schema.mailboxFolders.id })
+        .from(schema.mailboxFolders)
+        .where(
+          and(
+            eq(schema.mailboxFolders.id, history.folderId),
+            eq(schema.mailboxFolders.mailboxId, input.mailboxId),
+            eq(schema.mailboxFolders.teamId, actor.teamId),
+            isNull(schema.mailboxFolders.archivedAt),
+          ),
+        );
+      if (!folder) throw new MailboxContentError("invalid");
+    }
     const id = randomUUID();
     const plan = await lockMailboxService(tx, actor.teamId);
     await assertMailboxStorage(tx, actor.teamId, input.mailboxId, raw.length, plan);
@@ -271,9 +330,17 @@ export async function importMailboxMime(
         id,
         mailboxId: input.mailboxId,
         teamId: actor.teamId,
-        kind: "inbox",
+        kind: history?.kind ?? "inbox",
         sourceId: input.sourceId,
         rawBytes: raw.length,
+        ...(history
+          ? {
+              createdAt: history.receivedAt,
+              seenAt: history.seen ? history.receivedAt : null,
+              archivedAt: history.archived ? history.receivedAt : null,
+              folderId: history.folderId,
+            }
+          : {}),
         ...mailboxThreadKeys(raw),
         ...sealed,
       })
@@ -1045,7 +1112,7 @@ export async function saveMailboxDraft(
 ) {
   actor = { ...actor };
   input = { ...input };
-  const raw = bytes(input.raw);
+  const raw = bytes(input.raw, MAX_DRAFT_MIME_BYTES);
   if (
     !Number.isInteger(input.expectedRevision) ||
     input.expectedRevision < 0 ||

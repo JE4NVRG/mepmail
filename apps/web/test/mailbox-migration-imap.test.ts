@@ -60,8 +60,24 @@ function fakeServer(options: { password?: string } = {}) {
           socket.write(`${tag} OK LIST done\r\n`);
         } else if (command === "EXAMINE") {
           socket.write(
-            `* ${line.includes("INBOX") ? 3 : 1} EXISTS\r\n${tag} OK [READ-ONLY] done\r\n`,
+            `* ${line.includes("INBOX") ? 3 : 1} EXISTS\r\n* OK [UIDVALIDITY 777] ok\r\n* OK [UIDNEXT 13] ok\r\n${tag} OK [READ-ONLY] done\r\n`,
           );
+        } else if (command === "UID" && /^\S+ UID SEARCH UID \d+:\*$/.test(line)) {
+          // Like real servers, "n:*" still answers the highest UID when n is past it.
+          socket.write(`* SEARCH 10 11 12\r\n${tag} OK SEARCH done\r\n`);
+        } else if (
+          command === "UID" &&
+          / UID FETCH [\d,]+ \(UID FLAGS INTERNALDATE BODY\.PEEK\[\]\)$/.test(line)
+        ) {
+          const uids = / UID FETCH ([\d,]+) /.exec(line)![1]!.split(",").map(Number);
+          for (const [index, uid] of uids.entries()) {
+            const raw = `From: ana@piloto.test\r\nSubject: Message ${uid}\r\n\r\nBody of ${uid}\r\n`;
+            const flags = uid === 10 ? "\\Seen" : "";
+            socket.write(
+              `* ${index + 1} FETCH (UID ${uid} FLAGS (${flags}) INTERNALDATE "0${index + 1}-Mar-2025 10:00:00 +0000" BODY[] {${Buffer.byteLength(raw)}}\r\n${raw})\r\n`,
+            );
+          }
+          socket.write(`${tag} OK FETCH done\r\n`);
         } else if (command === "FETCH") {
           const header =
             "To: Ana <ana@piloto.test>, outside@else.example\r\nDelivered-To: contato@piloto.test\r\n\r\n";
@@ -117,7 +133,7 @@ describe("migration IMAP client", () => {
       "Caixa é",
     ]);
     expect(sentFolder(folders[1]!)).toBe(true);
-    expect(await session.examine("INBOX")).toEqual({ exists: 3 });
+    expect(await session.examine("INBOX")).toEqual({ exists: 3, uidValidity: 777, uidNext: 13 });
     const [message] = await session.fetchHeaders(1, 3, ["TO", "CC"]);
     expect(message?.internalDate?.toISOString()).toBe("2026-07-17T05:44:25.000Z");
     expect(message?.header).toContain("Delivered-To: contato@piloto.test");
@@ -129,6 +145,22 @@ describe("migration IMAP client", () => {
     expect(seen.find((line) => line.includes("FETCH"))).toContain(
       "BODY.PEEK[HEADER.FIELDS (TO CC)]",
     );
+  });
+  it("lists UIDs after a cursor and fetches whole messages read-only, with flags and dates", async () => {
+    const { session, seen } = await open();
+    await session.examine("INBOX");
+    expect(await session.uidSearchAfter(9)).toEqual([10, 11, 12]);
+    // Past the last UID the server still answers it; the client drops it.
+    expect(await session.uidSearchAfter(12)).toEqual([]);
+    const messages = await session.uidFetchMessages([10, 11]);
+    expect(messages.map((m) => [m.uid, m.flags, m.internalDate?.toISOString()])).toEqual([
+      [10, ["\\seen"], "2025-03-01T10:00:00.000Z"],
+      [11, [], "2025-03-02T10:00:00.000Z"],
+    ]);
+    expect(messages[1]?.raw.toString()).toContain("Body of 11");
+    await session.logout();
+    expect(seen.find((line) => line.includes("UID FETCH"))).toContain("BODY.PEEK[]");
+    expect(seen.some((line) => /\bSTORE\b|\bEXPUNGE\b|\bSELECT\b/.test(line))).toBe(false);
   });
   it("reports a rejected password as login", async () => {
     await expect(open("wrong")).rejects.toMatchObject({ reason: "login" });

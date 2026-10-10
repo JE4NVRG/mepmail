@@ -11,6 +11,13 @@ const hidden = (alt: string) =>
   `<span style="font-size:12px;line-height:1.4;color:#80868b">${alt}</span>`;
 
 describe("private mailbox HTML projection", () => {
+  it("cuts a very long body instead of dropping it", () => {
+    const paragraph = "<p>Linha de newsletter com bastante texto.</p>";
+    const huge = `<h1>Topo</h1>${paragraph.repeat(Math.ceil((6 * 1024 * 1024) / paragraph.length))}`;
+    const result = projectMailboxHtml(huge, []);
+    expect(result.htmlBody).toContain("<h1>Topo</h1>");
+    expect(result.htmlBody!.length).toBeLessThanOrEqual(5 * 1024 * 1024 + 1024);
+  });
   it("retains bounded formatting and makes links explicit new-tab navigation", () => {
     const result = projectMailboxHtml(
       '<h2>Hello</h2><table cellpadding="4"><tr><td style="color:#fff;font-size:14px">Content</td></tr></table><a href="https://public.example/page" target="_self" rel="opener" ping="https://track.example">Open</a>',
@@ -275,8 +282,8 @@ describe("private mailbox HTML projection", () => {
     );
   });
 
-  it.each([false, undefined, "", "x".repeat(1024 * 1024 + 1)] as const)(
-    "returns no projection for missing or oversized source HTML",
+  it.each([false, undefined, ""] as const)(
+    "returns no projection for missing source HTML",
     (html) => {
       expect(projectMailboxHtml(html, [])).toEqual({
         htmlBody: null,

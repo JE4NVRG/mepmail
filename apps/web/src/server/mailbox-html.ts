@@ -2,7 +2,10 @@ import sanitizeHtml from "sanitize-html";
 import { pilotImageMetadata } from "../../../../packages/core/src/mailbox-pilot-images";
 
 type InlineAttachment = { contentId?: string | undefined; content: Buffer };
-const MAX_HTML = 1024 * 1024;
+/** HTML read for display: a longer body is cut here (the sanitizer closes what the cut opens). */
+const MAX_HTML = 5 * 1024 * 1024;
+/** Inline images turned into data: URLs, all together. */
+const MAX_INLINE = 2 * 1024 * 1024;
 const HOST_LABEL = /^[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?$/i;
 const SIZE = /^(?:0|\d{1,3}(?:\.\d{1,2})?(?:px|em|rem|%))$/;
 /** padding as email buttons write it: one to four lengths ("12px 24px"). */
@@ -128,8 +131,8 @@ export function projectMailboxHtml(
    * logos) show at once: they reveal nothing to a third party. */
   options: { trustedImagePrefix?: string | null } = {},
 ) {
-  if (!html || html.length > MAX_HTML)
-    return { htmlBody: null, htmlBodyWithExternalImages: null, externalImages: 0 };
+  if (!html) return { htmlBody: null, htmlBodyWithExternalImages: null, externalImages: 0 };
+  if (html.length > MAX_HTML) html = html.slice(0, MAX_HTML);
   const inline = new Map<string, string>();
   for (const attachment of attachments) {
     if (!attachment.contentId || attachment.content.length > 256 * 1024) continue;
@@ -143,7 +146,7 @@ export function projectMailboxHtml(
   let externalImages = 0;
   const project = (allowExternal: boolean) => {
     // Repeated CID references must not amplify a bounded MIME body into unbounded base64 HTML.
-    let inlineBudget = MAX_HTML;
+    let inlineBudget = MAX_INLINE;
     return sanitizeHtml(html, {
       allowedTags: [
         "p",
