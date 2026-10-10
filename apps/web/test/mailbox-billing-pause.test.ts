@@ -266,6 +266,10 @@ describe("operator catalog changes stay bounded and do not create entitlements",
       interval: next.interval,
       storageBytesPerMailbox: next.storageBytesPerMailbox,
       includedOutboundPerMailbox: next.includedOutboundPerMailbox,
+      quotaScope: "mailbox",
+      includedMailboxes: 1,
+      extraUnitAmount: null,
+      localCurrency: null,
     });
     expect(runtime.getStripe).not.toHaveBeenCalled();
   });
@@ -360,6 +364,10 @@ describe("server-owned selectable offers and immutable pending purchases", () =>
       interval: price.interval,
       storageBytesPerMailbox: price.storageBytesPerMailbox,
       includedOutboundPerMailbox: price.includedOutboundPerMailbox,
+      quotaScope: "mailbox",
+      includedMailboxes: 1,
+      extraUnitAmount: null,
+      localCurrency: null,
     });
     expect(mailboxBillingCatalogForOffer(larger.priceId)).toBeNull();
     expect(mailboxBillingCatalogForOffer(`mbo_${"x".repeat(43)}`)).toBeNull();

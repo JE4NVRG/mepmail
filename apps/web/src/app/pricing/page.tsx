@@ -35,7 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       url: canonical,
       type: "website",
-      images: [{ url: "/og.png", width: 1280, height: 640, alt: "MepMail" }],
+      images: [{ url: "/og.jpg", width: 1280, height: 640, alt: "MepMail" }],
     },
   };
 }
@@ -162,14 +162,21 @@ export default async function PricingPage() {
                     <h3>{t("correio.names.solo")}</h3>
                     <p className="gtm-price">
                       {formatUsd(solo.monthlyCents / 100, locale)}
-                      <span>{t("correio.perMonth")}</span>
+                      <span>{t("correio.perMonthIncluded")}</span>
                     </p>
                     <ul className="gtm-points">
+                      <li>{t("correio.trial")}</li>
                       <li>{t("correio.withoutSending")}</li>
-                      <li>{t("correio.storage", { size: solo.storageGiB })}</li>
-                      <li>{t("correio.sends", { count: solo.monthlyRecipientDeliveries })}</li>
+                      <li>{t("correio.sharedStorage", { size: solo.storageGiB })}</li>
+                      <li>{t("correio.sharedSends", { count: solo.monthlyRecipientDeliveries })}</li>
+                      <li>
+                        {t("correio.extraMailbox", {
+                          price: formatUsd(solo.extraMonthlyCents / 100, locale),
+                        })}
+                      </li>
                       <li>{t("correio.domains", { count: solo.domains })}</li>
                       <li>{t("correio.agents")}</li>
+                      <li>{t("correio.localPrice")}</li>
                     </ul>
                   </article>
                 ) : null}

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState } from "react";
 import { DOCS_URL } from "@/lib/docs-links";
+import { isMailboxBundle, mailboxPlanMinimumSeats } from "@/lib/mailbox-plan-terms";
 import {
   formatMailboxPrice,
   formatMailboxStorage,
@@ -551,7 +552,8 @@ export function MailboxSetupDialog({
                             : selection.offers
                           ).map((entry) => (
                             <option key={entry.offerId} value={entry.offerId}>
-                              {planT("planOption", {
+                              {planT(isMailboxBundle(entry) ? "planOptionBundle" : "planOption", {
+                                mailboxes: mailboxPlanMinimumSeats(entry),
                                 storage: formatMailboxStorage(entry.storageBytesPerMailbox, locale),
                                 price: planT("priceInterval", {
                                   amount: formatMailboxPrice(
@@ -581,14 +583,25 @@ export function MailboxSetupDialog({
                           })}
                         </strong>
                         <p className={styles.hint}>
-                          {planT("selectedPlanAllowance", {
-                            storage: formatMailboxStorage(
-                              selection.offer.storageBytesPerMailbox,
-                              locale,
-                            ),
-                            messages: selection.offer.includedOutboundPerMailbox,
-                          })}
+                          {planT(
+                            selection.offer.quotaScope === "team"
+                              ? "selectedPlanAllowanceTeam"
+                              : "selectedPlanAllowance",
+                            {
+                              storage: formatMailboxStorage(
+                                selection.offer.storageBytesPerMailbox,
+                                locale,
+                              ),
+                              messages: selection.offer.includedOutboundPerMailbox,
+                              mailboxes: mailboxPlanMinimumSeats(selection.offer),
+                            },
+                          )}
                         </p>
+                        {selection.offer.trialDays ? (
+                          <p className={styles.hint}>
+                            {planT("trialOffer", { days: selection.offer.trialDays })}
+                          </p>
+                        ) : null}
                       </div>
                       <button type="button" className="ms-btn" onClick={openLicense}>
                         {planT(selection.locked ? "retryCheckout" : "reviewSelectedPlan")}

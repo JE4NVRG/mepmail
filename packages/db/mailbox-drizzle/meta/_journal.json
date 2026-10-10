@@ -176,6 +176,13 @@
       "when": 1791730800024,
       "tag": "0024_mailbox_sender_decisions",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791730800025,
+      "tag": "0025_mailbox_team_quota_trial",
+      "breakpoints": true
     }
   ]
 }

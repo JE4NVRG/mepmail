@@ -501,7 +501,8 @@
     "retry": "Consultar uso novamente",
     "empty": "Escolha uma caixa disponível para consultar o uso.",
     "noPolicy": "Sem capacidade configurada",
-    "allBoxes": "Soma das caixas que você acessa"
+    "allBoxes": "Soma das caixas que você acessa",
+    "teamShared": "Dividido entre todas as caixas da equipe"
   },
   "offer": {
     "eyebrow": "Correio",
@@ -1024,5 +1025,6 @@
     "join": "Entrar na reunião",
     "google": "Adicionar ao Google Agenda",
     "download": "Baixar convite (.ics)"
-  }
+  },
+  "trialLimit": "O teste grátis permite até 50 destinatários por dia e 200 no total. Nada foi enviado e o rascunho continua guardado; o limite cai quando a primeira fatura for paga."
 }

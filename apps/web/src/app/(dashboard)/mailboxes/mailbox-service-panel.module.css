@@ -292,3 +292,19 @@
     flex-wrap: wrap;
   }
 }
+/* The 7-day trial: its end and the sending limits while it lasts. */
+.trial {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--ms-violet-border);
+  border-radius: var(--ms-r-input);
+  background: var(--ms-panel-raised);
+  font-size: var(--ms-fs-label);
+}
+.trialOffer {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--ms-violet);
+  background: var(--ms-panel-raised);
+  font-size: var(--ms-fs-ui);
+}

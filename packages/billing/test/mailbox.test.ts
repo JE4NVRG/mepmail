@@ -34,6 +34,20 @@ const CATALOG: MailboxCatalog = {
   checkoutPriceId: TERMS.priceId,
   prices: [TERMS],
 };
+/** US$12.90 covering 3 mailboxes, US$3.90 each above them, one shared allowance. */
+const TIERED: MailboxPriceTerms = {
+  priceId: "price_mailbox_tiered_fixture",
+  currency: "usd",
+  unitAmount: 1290,
+  interval: "month",
+  storageBytesPerMailbox: 10 * 1024 ** 3,
+  includedOutboundPerMailbox: 2000,
+  quotaScope: "team",
+  includedMailboxes: 3,
+  extraUnitAmount: 390,
+  trialDays: 7,
+  localCurrency: { currency: "brl", unitAmount: 6490, extraUnitAmount: 1990 },
+};
 const OWNER = { teamId: "team_fixture", customerId: "cus_1" };
 
 function mailSubscription(
@@ -217,6 +231,43 @@ describe("Mailbox increase invoice evidence", () => {
   );
 });
 
+describe("Mailbox tiered price projection", () => {
+  const catalog: MailboxCatalog = { ...CATALOG, prices: [TERMS, TIERED] };
+  const tiered = (status: Stripe.Subscription.Status = "trialing") => {
+    const sub = mailSubscription("sub_tiered", status, TIERED);
+    const item = sub.items.data[0]!;
+    item.price = {
+      ...item.price,
+      unit_amount: null,
+      billing_scheme: "tiered",
+      tiers_mode: "graduated",
+    };
+    return sub;
+  };
+
+  it("grants the tiered contract its shared allowance, included mailboxes and trial status", () => {
+    expect(projectMailboxSubscription(tiered(), catalog, OWNER)).toMatchObject({
+      status: "trialing",
+      seats: 3,
+      quotaScope: "team",
+      includedMailboxes: 3,
+      extraUnitAmount: 390,
+      storageBytesPerMailbox: 10 * 1024 ** 3,
+      includedOutboundPerMailbox: 2000,
+      unitAmount: 1290,
+    });
+  });
+
+  it("refuses a per-unit item under tiered terms and a tiered item under per-unit terms", () => {
+    expect(
+      projectMailboxSubscription(mailSubscription("sub_tiered", "active", TIERED), catalog, OWNER),
+    ).toBeNull();
+    const perUnitAsTiered = mailSubscription("sub_plain", "active", TERMS);
+    perUnitAsTiered.items.data[0]!.price.billing_scheme = "tiered";
+    expect(projectMailboxSubscription(perUnitAsTiered, catalog, OWNER)).toBeNull();
+  });
+});
+
 describe("Mailbox subscription projection", () => {
   it("projects a trusted licensed quantity and its contract, using the linked owner", () => {
     expect(projectMailboxSubscription(mailSubscription(), CATALOG, OWNER)).toEqual({
@@ -225,6 +276,9 @@ describe("Mailbox subscription projection", () => {
       seats: 3,
       storageBytesPerMailbox: 4096,
       includedOutboundPerMailbox: 7,
+      quotaScope: "mailbox",
+      includedMailboxes: 1,
+      extraUnitAmount: null,
       periodStart: new Date(PERIOD_START * 1000),
       periodEnd: new Date(PERIOD_END * 1000),
       stripeCustomerId: OWNER.customerId,
@@ -502,6 +556,36 @@ describe("Mailbox Checkout factory", () => {
       ).rejects.toMatchObject({ code: "invalid" });
     }
     expect(state.calls).toEqual([]);
+  });
+
+  it("opens a tiered team-quota price with the free trial and the card collected, from its included mailboxes up", async () => {
+    const { stripe, state } = fakeStripe();
+    const catalog: MailboxCatalog = {
+      ...CATALOG,
+      checkoutPriceId: TIERED.priceId,
+      prices: [TERMS, TIERED],
+    };
+    await createMailboxCheckoutSession(stripe, catalog, { ...input, trialDays: 7 });
+    expect(state.checkouts[0]).toMatchObject({
+      line_items: [{ price: TIERED.priceId, quantity: 3 }],
+      payment_method_collection: "always",
+      subscription_data: {
+        metadata: { mepmail_service: "mailbox" },
+        trial_period_days: 7,
+        trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+      },
+    });
+    await createMailboxCheckoutSession(stripe, catalog, {
+      ...input,
+      idempotencyKey: "mailbox-checkout:no-trial",
+    });
+    expect(state.checkouts[1]).not.toHaveProperty("payment_method_collection");
+    expect(state.checkouts[1]?.subscription_data).not.toHaveProperty("trial_period_days");
+    for (const invalid of [{ seats: 2 }, { trialDays: 31 }, { trialDays: -1 }]) {
+      await expect(
+        createMailboxCheckoutSession(stripe, catalog, { ...input, ...invalid }),
+      ).rejects.toMatchObject({ code: "invalid" });
+    }
   });
 
   it("reports an unavailable Checkout URL without any fulfillment side effect", async () => {

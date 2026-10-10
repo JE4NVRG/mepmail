@@ -141,9 +141,12 @@ export async function repriceMailboxAddOnsWithoutSending(
     )
       continue;
     const current = catalog.prices.find((price) => price.priceId === plan.stripePriceId);
+    // Only a per-unit standalone price keeps the contract's quantity meaning the same;
+    // a tiered one (mailboxes included in a base) is bought at Checkout, not moved into.
     const target = catalog.prices.find(
       (price): price is MailboxPriceTerms =>
         standalone.includes(price.priceId) &&
+        price.extraUnitAmount === undefined &&
         price.interval === current?.interval &&
         price.currency === current?.currency,
     );

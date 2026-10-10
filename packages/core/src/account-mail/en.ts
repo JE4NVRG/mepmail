@@ -351,6 +351,15 @@ export const en = {
     ],
     button: "Open billing",
   },
+  "mailbox.trial_ending": {
+    subject: "{team}'s Mail free trial ends on {date}",
+    body: [
+      "The free trial of Mail for {team} ends on {date}. From then on, the card you added is charged for the plan you chose ({mailboxes} mailboxes), and the trial's sending limit no longer applies.",
+      "To keep Mail, there is nothing to do. To stop before any charge, cancel Mail in Billing before {date}.",
+    ],
+    button: "Open billing",
+    muted: ["You get this notice once, about 2 days before the trial ends."],
+  },
 } as const satisfies Record<AccountMailKind, AccountMailEntry>;
 
 /** Sentences several kinds share, filled by the builders. */

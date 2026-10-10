@@ -35,7 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       url: canonical,
       type: "website",
-      images: [{ url: "/og.png", width: 1280, height: 640, alt: "MepMail" }],
+      images: [{ url: "/og.jpg", width: 1280, height: 640, alt: "MepMail" }],
     },
   };
 }

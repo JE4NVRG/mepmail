@@ -515,13 +515,17 @@ export {
 export { deriveMailboxSenderKey } from "./mailbox-senders.js";
 export {
   assertMailboxStorage,
+  assertMailboxTrialSending,
   effectiveDomainLimit,
   lockMailboxService,
   MAILBOX_PLAN_DOMAIN_LIMIT,
+  MAILBOX_TRIAL_DAILY_RECIPIENTS,
+  MAILBOX_TRIAL_TOTAL_RECIPIENTS,
   MailboxServiceError,
   mailboxServiceActive,
   mailboxServiceEntitlement,
   mailboxServiceState,
+  mailboxTrialUsage,
   requireMailboxSeat,
   reserveMailboxSeat,
 } from "./mailbox-service.js";

@@ -763,3 +763,75 @@ describe("finite Correio customer outbound allowances", () => {
     expect(send).not.toHaveBeenCalled();
   });
 });
+
+describe("Correio sold as a base with included mailboxes", () => {
+  async function teamFixture(status: "active" | "trialing", outbound: number, storageBytes = GIB) {
+    const f = await fixture({ name: "team quota", storageBytes, outbound } as unknown as Plan);
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({ status, quotaScope: "team", includedMailboxes: 3, extraUnitAmount: 390, seats: 3 })
+      .where(eq(schema.mailboxSubscriptions.teamId, f.teamId));
+    return f;
+  }
+
+  it("shares one outbound allowance across every mailbox of the team", async () => {
+    const f = await teamFixture("active", 30);
+    await fill(f, f.person, 20);
+    await fill(f, f.agent, 10);
+    // Each box alone is under 30, but the team is at it.
+    await expect(reserve(f, f.person, 1)).rejects.toMatchObject({ code: "quota" });
+    await expect(reserve(f, f.agent, 1)).rejects.toMatchObject({ code: "quota" });
+  });
+
+  it("shares one storage allowance across every mailbox of the team", async () => {
+    const f = await teamFixture("active", 2000, 8192);
+    const padded = Buffer.concat([rawFor(f.agent, 1), Buffer.alloc(6000, 0x61)]);
+    await draft(f, f.agent, 1, padded);
+    const plan = await lockMailboxService(db, f.teamId);
+    // The person's own box is empty; the agent's draft already uses most of the team's 8 KiB.
+    await expect(
+      assertMailboxStorage(db, f.teamId, f.person.id, 8192 - padded.length + 1, plan),
+    ).rejects.toMatchObject({ code: "quota" });
+    await assertMailboxStorage(db, f.teamId, f.person.id, 8192 - padded.length, plan);
+  });
+
+  it("caps a free trial at 50 recipients a day and 200 in all, and lifts it once paid", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const day = new Date("2026-10-10T12:00:00Z");
+      vi.setSystemTime(day);
+      const f = await teamFixture("trialing", 2000);
+      await db
+        .update(schema.mailboxSubscriptions)
+        .set({
+          periodStart: new Date(day.getTime() - 3600000),
+          periodEnd: new Date(day.getTime() + 7 * 86400000),
+        })
+        .where(eq(schema.mailboxSubscriptions.teamId, f.teamId));
+      await fill(f, f.person, 40);
+      await fill(f, f.agent, 10);
+      await expect(reserve(f, f.person, 1)).rejects.toMatchObject({ code: "trial_limit" });
+      expect((await mailboxServiceState(db, f.teamId)).trial).toMatchObject({
+        dailyLimit: 50,
+        totalLimit: 200,
+        sentToday: 50,
+        sentTotal: 50,
+      });
+      for (const offset of [1, 2, 3]) {
+        vi.setSystemTime(new Date(day.getTime() + offset * 86400000));
+        await fill(f, f.person, 50);
+      }
+      vi.setSystemTime(new Date(day.getTime() + 4 * 86400000));
+      // 200 queued over four days: the trial's total is spent.
+      await expect(reserve(f, f.person, 1)).rejects.toMatchObject({ code: "trial_limit" });
+      await db
+        .update(schema.mailboxSubscriptions)
+        .set({ status: "active" })
+        .where(eq(schema.mailboxSubscriptions.teamId, f.teamId));
+      expect((await reserve(f, f.person, 1)).recipientCount).toBe(1);
+      expect((await mailboxServiceState(db, f.teamId)).trial).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

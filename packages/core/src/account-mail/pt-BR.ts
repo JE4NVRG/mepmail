@@ -351,6 +351,15 @@ export const ptBR = {
     ],
     button: "Abrir cobrança",
   },
+  "mailbox.trial_ending": {
+    subject: "O teste grátis do Correio de {team} termina em {date}",
+    body: [
+      "O teste grátis do Correio da equipe {team} termina em {date}. A partir daí, o cartão cadastrado é cobrado pelo plano que você escolheu ({mailboxes} caixas), e o limite de envio do teste deixa de valer.",
+      "Para continuar com o Correio, não precisa fazer nada. Para não ser cobrado, cancele o Correio em Cobrança antes de {date}.",
+    ],
+    button: "Abrir cobrança",
+    muted: ["Você recebe este aviso uma vez, cerca de 2 dias antes do fim do teste."],
+  },
 } as const satisfies Record<AccountMailKind, AccountMailEntry>;
 
 export const ptBRPhrases = {

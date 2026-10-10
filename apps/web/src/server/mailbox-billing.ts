@@ -12,7 +12,9 @@ import { env, isCloudDeployment } from "@millionsend/config";
 import { type Db, schema } from "@millionsend/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { mailboxIncludedSeats } from "../../../../packages/billing/src/mailbox";
 import { hasPaidSendingPlanForMailbox } from "../../../../packages/billing/src/mailbox-addon";
+import { mailboxTrialDays } from "../../../../packages/billing/src/mailbox-trial-eligibility";
 import {
   mailboxLaunchCohortAllows,
   mailboxLaunchCohortOpen,
@@ -30,6 +32,18 @@ const terms = z
     interval: z.enum(["month", "year"]),
     storageBytesPerMailbox: z.number().int().min(1).max(10995116277760),
     includedOutboundPerMailbox: z.number().int().min(0).max(1000000),
+    quotaScope: z.enum(["mailbox", "team"]).optional(),
+    includedMailboxes: z.number().int().min(1).max(10000).optional(),
+    extraUnitAmount: z.number().int().positive().max(2147483647).optional(),
+    trialDays: z.number().int().min(0).max(30).optional(),
+    localCurrency: z
+      .object({
+        currency: z.string().regex(/^[a-z]{3}$/),
+        unitAmount: z.number().int().positive().max(2147483647),
+        extraUnitAmount: z.number().int().positive().max(2147483647).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 /** Operator-controlled catalog; an absent value cannot create or price a purchase.
@@ -135,6 +149,19 @@ function publicTerms(price: MailboxPriceTerms) {
     interval: price.interval,
     storageBytesPerMailbox: price.storageBytesPerMailbox,
     includedOutboundPerMailbox: price.includedOutboundPerMailbox,
+    /** "team": the storage and outbound figures are shared by all the team's mailboxes. */
+    quotaScope: price.quotaScope ?? ("mailbox" as const),
+    /** Mailboxes unitAmount covers; every one above them costs extraUnitAmount. */
+    includedMailboxes: mailboxIncludedSeats(price),
+    extraUnitAmount: price.extraUnitAmount ?? null,
+    /** Display only: Stripe Checkout picks the currency it charges. */
+    localCurrency: price.localCurrency
+      ? {
+          currency: price.localCurrency.currency,
+          unitAmount: price.localCurrency.unitAmount,
+          extraUnitAmount: price.localCurrency.extraUnitAmount ?? null,
+        }
+      : null,
   };
 }
 
@@ -142,7 +169,9 @@ function publicOffer(catalog: MailboxCatalog, price: MailboxPriceTerms) {
   const offerId = `mbo_${createHash("sha256")
     .update(JSON.stringify([catalog.livemode, price.priceId, publicTerms(price)]))
     .digest("base64url")}`;
-  return { offerId, ...publicTerms(price) };
+  // The trial a first purchase of this price carries; the presentation zeroes it
+  // for a team that is not eligible. Not part of the offer id.
+  return { offerId, ...publicTerms(price), trialDays: price.trialDays ?? 0 };
 }
 
 /** Provider IDs and historical-only terms never become client-selectable offers. */
@@ -271,8 +300,16 @@ export async function mailboxBillingPresentation(
     .select({ status: schema.mailboxCustomerRequests.status })
     .from(schema.mailboxCustomerRequests)
     .where(eq(schema.mailboxCustomerRequests.teamId, actor.teamId));
-  const offers = paidSending ? mailboxBillingOffers("with_sending") : standaloneOffers;
-  const firstStandalone = standaloneOffers[0];
+  // A free trial only for a team that never had Correio (the Customer and the
+  // card are checked again at Checkout and after it).
+  const listed = paidSending ? mailboxBillingOffers("with_sending") : standaloneOffers;
+  const trialEligible =
+    listed.some((entry) => entry.trialDays > 0) &&
+    (await mailboxTrialDays(db, { trialDays: 1 }, actor.teamId, member.stripeCustomerId)) > 0;
+  const offers = listed.map((entry) => (trialEligible ? entry : { ...entry, trialDays: 0 }));
+  const firstStandalone = offers.find((entry) =>
+    standaloneOffers.some((standalone) => standalone.offerId === entry.offerId),
+  );
   const offer = paidSending
     ? mailboxBillingOffer()
     : firstStandalone

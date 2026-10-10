@@ -23,6 +23,34 @@
   },
   "releases": [
     {
+      "version": "0.95",
+      "date": "2026-10-10",
+      "title": "Mail with 3 mailboxes for US$ 12.90, 7 days free",
+      "summary": "Mail on its own now includes 3 mailboxes that share 10 GiB and 2,000 outbound deliveries, extra mailboxes cost US$ 3.90, and a first subscription starts with 7 days free. In Brazil it is charged in reais.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Mail without a Send plan: US$ 12.90 a month (US$ 129 a year) with 3 mailboxes, for people or agents, sharing 10 GiB and 2,000 outbound deliveries a month; each extra mailbox is US$ 3.90 a month.",
+            "In Brazil, Checkout charges in reais: R$ 64.90 a month and R$ 19.90 per extra mailbox."
+          ]
+        },
+        {
+          "kind": "added",
+          "items": [
+            "7-day free trial on a first subscription, card collected up front: up to 50 recipients a day and 200 in total until the first payment, and a reminder 2 days before it ends.",
+            "The API reference names every endpoint, with summaries, a sending example and the rate-limit answer, and the docs list the n8n community node."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Lighter pages: the browser no longer downloads copy only the server uses, and the share image is ten times smaller."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.94",
       "date": "2026-10-10",
       "title": "Sender approval and calendar invites",

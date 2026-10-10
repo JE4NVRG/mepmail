@@ -316,7 +316,7 @@
       "Conecte Claude, Cursor ou outro agente pelo MCP do Correio, sem código.",
       "Você escolhe o que cada agente pode fazer: ler, rascunhar ou enviar."
     ],
-    "price": "US$ 12,90 por caixa ao mês, ou a partir de {price} junto de um plano pago de Envio.",
+    "price": "US$ 12,90 por mês com 3 caixas (R$ 64,90 no Brasil) e 7 dias grátis, ou a partir de {price} por caixa junto de um plano pago de Envio.",
     "cta": "Conhecer o Correio",
     "pricing": "Ver preços do Correio"
   }

@@ -501,7 +501,8 @@
     "retry": "Check usage again",
     "empty": "Choose an available mailbox to check usage.",
     "noPolicy": "No capacity configured",
-    "allBoxes": "Sum of the mailboxes you can open"
+    "allBoxes": "Sum of the mailboxes you can open",
+    "teamShared": "Shared by all the team's mailboxes"
   },
   "offer": {
     "eyebrow": "MepMail Mail",
@@ -1024,5 +1025,6 @@
     "join": "Join meeting",
     "google": "Add to Google Calendar",
     "download": "Download invite (.ics)"
-  }
+  },
+  "trialLimit": "The free trial allows up to 50 recipients a day and 200 in total. Nothing was sent and the draft is still saved; the limit lifts once the first invoice is paid."
 }

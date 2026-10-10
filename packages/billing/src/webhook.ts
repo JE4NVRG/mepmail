@@ -7,6 +7,7 @@ import type { BillingDeps } from "./checkout.js";
 import { type GoogleConversionConfig, recordGooglePurchase } from "./google-advertising.js";
 import { isMailboxSubscription, type MailboxCatalog } from "./mailbox.js";
 import { applyMailboxSubscription } from "./mailbox-lifecycle.js";
+import { claimMailboxTrial } from "./mailbox-trial.js";
 import { recordMetaPurchase } from "./meta-advertising.js";
 import type { MetaConversionConfig } from "./meta-conversions.js";
 import { screenPaymentRisk } from "./payment-risk.js";
@@ -111,7 +112,7 @@ export async function handleWebhook(
     const mail = isMailboxSubscription(sub);
     if (mail)
       sub = await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
-        expand: [...SUBSCRIPTION_EXPAND, "latest_invoice"],
+        expand: [...SUBSCRIPTION_EXPAND, "latest_invoice", "default_payment_method"],
       });
     let paymentInvoice: Stripe.Invoice | undefined;
     if (mail && "mailboxCatalog" in deps && deps.stripe.invoices) {
@@ -140,6 +141,16 @@ export async function handleWebhook(
             paymentInvoice,
           )
         : null;
+    // One free trial per card: a trial on a card that already had one ends now.
+    if (mail && projected?.applied && projected.teamId && sub.status === "trialing") {
+      const claim = await claimMailboxTrial(
+        tx as unknown as Db,
+        deps.stripe,
+        sub,
+        projected.teamId,
+      );
+      if (claim !== "claimed") log(`stripe webhook ${event.id}: Correio trial ended (${claim})`);
+    }
     if (!mail)
       await applySubscription(
         tx as unknown as Db,

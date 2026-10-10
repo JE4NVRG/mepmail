@@ -1,21 +1,22 @@
 ---
 title: Pacotes npm
-description: Os dois pacotes que o MepMail publica no npm — @mepmail/mcp e @mepmail/cli — o que cada um faz e como instalar.
+description: Os pacotes que o MepMail publica no npm — @mepmail/mcp, @mepmail/cli e o nó do n8n — o que cada um faz e como instalar.
 ---
 
-O MepMail publica dois pacotes npm. Nenhum dos dois é um SDK: a API fala o
+O MepMail publica três pacotes npm. Nenhum é um SDK: a API fala o
 protocolo do Resend, então enviar e-mail significa usar os SDKs oficiais do
 Resend apontados para a origem da sua instância ([SDKs](/pt-BR/sdks)). Estes
-dois cobrem o que aqueles SDKs não fazem — rodar MCP localmente e mover uma
-conta de provedor.
+cobrem o que aqueles SDKs não fazem — rodar MCP localmente, mover uma
+conta de provedor e ligar o MepMail ao n8n.
 
 | Pacote | Última | O que é | Guia |
 | --- | --- | --- | --- |
-| [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) | [Atual no npm](https://www.npmjs.com/package/@mepmail/mcp) (documentado: 0.2.0) | Servidor MCP para clientes locais (stdio): 22 ferramentas para ler, enviar e gerenciar contatos, mais 5 ferramentas das caixas do Correio com uma chave de agente (`MEPMAIL_MAIL_TOKEN`), no Claude, Cursor, Codex ou qualquer cliente MCP. | [Servidor MCP](/pt-BR/mcp) |
-| [`@mepmail/cli`](https://www.npmjs.com/package/@mepmail/cli) | [Atual no npm](https://www.npmjs.com/package/@mepmail/cli) (documentado: 0.2.3) | CLI de migração: lê uma conta do Resend, compara com a sua instância, aplica a diferença e escreve um relatório. | [CLI](/pt-BR/cli) |
+| [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) | [Atual no npm](https://www.npmjs.com/package/@mepmail/mcp) (documentado: 0.2.1) | Servidor MCP para clientes locais (stdio): 22 ferramentas para ler, enviar e gerenciar contatos, mais 5 ferramentas das caixas do Correio com uma chave de agente (`MEPMAIL_MAIL_TOKEN`), no Claude, Cursor, Codex ou qualquer cliente MCP. | [Servidor MCP](/pt-BR/mcp) |
+| [`@mepmail/cli`](https://www.npmjs.com/package/@mepmail/cli) | [Atual no npm](https://www.npmjs.com/package/@mepmail/cli) (documentado: 0.2.4) | CLI de migração: lê uma conta do Resend, compara com a sua instância, aplica a diferença e escreve um relatório. | [CLI](/pt-BR/cli) |
+| [`n8n-nodes-mepmail`](https://www.npmjs.com/package/n8n-nodes-mepmail) | [Atual no npm](https://www.npmjs.com/package/n8n-nodes-mepmail) (documentado: 0.1.0) | Nós da comunidade para o n8n: enviar e agendar e-mails, gerenciar contatos, domínios, broadcasts e supressões, e um gatilho que inicia workflows a partir de eventos do MepMail. | [Integrações](/pt-BR/integrations#n8n) |
 
 A CLI exige Node 18 ou superior; o servidor MCP exige Node 20 ou superior.
-Ambos são publicados como um único bundle, sem dependências. Rode com `npx`, que sempre resolve a última versão publicada; os
+Ambos são publicados como um único bundle, sem dependências. O nó do n8n se instala pelo próprio n8n (Settings → Community nodes). Rode com `npx`, que sempre resolve a última versão publicada; os
 números acima são as versões com que esta página foi escrita.
 
 ## @mepmail/mcp — o servidor MCP local

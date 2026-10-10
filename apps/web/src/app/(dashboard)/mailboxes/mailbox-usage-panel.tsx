@@ -20,16 +20,28 @@ export function MailboxUsagePanel({ mailboxId }: { mailboxId: string | null }) {
     trpc.mailboxes.usage.queryOptions({ mailboxId }, { retry: false, refetchInterval: 30000 }),
   );
   const rows = query.data?.mailboxes ?? [];
-  const used = rows.reduce((sum, row) => sum + row.storageUsedBytes, 0);
-  const limit = rows.reduce((sum, row) => sum + row.storageLimitBytes, 0);
-  const sent = rows.reduce((sum, row) => sum + row.outboundUsedRecipients, 0);
-  const unlimited = rows.some((row) => row.outboundLimitRecipients === null);
-  const sendLimit = rows.reduce((sum, row) => sum + (row.outboundLimitRecipients ?? 0), 0);
+  // A team plan shares one allowance by all its mailboxes: show the pool, not a sum.
+  const team = query.data?.quotaScope === "team" ? (query.data.team ?? null) : null;
+  const used = team
+    ? team.storageUsedBytes
+    : rows.reduce((sum, row) => sum + row.storageUsedBytes, 0);
+  const limit = team
+    ? team.storageLimitBytes
+    : rows.reduce((sum, row) => sum + row.storageLimitBytes, 0);
+  const sent = team
+    ? team.outboundUsedRecipients
+    : rows.reduce((sum, row) => sum + row.outboundUsedRecipients, 0);
+  const unlimited = team
+    ? team.outboundLimitRecipients === null
+    : rows.some((row) => row.outboundLimitRecipients === null);
+  const sendLimit = team
+    ? (team.outboundLimitRecipients ?? 0)
+    : rows.reduce((sum, row) => sum + (row.outboundLimitRecipients ?? 0), 0);
   const number = (value: number) => new Intl.NumberFormat(locale).format(value);
   return (
     <section className={styles.usagePanel} aria-label={t("title")}>
       <h3>{t("title")}</h3>
-      {!mailboxId ? <small>{t("allBoxes")}</small> : null}
+      {team ? <small>{t("teamShared")}</small> : !mailboxId ? <small>{t("allBoxes")}</small> : null}
       {query.isError ? (
         <button className="ms-btn ms-btn-ghost" type="button" onClick={() => void query.refetch()}>
           {t("retry")}

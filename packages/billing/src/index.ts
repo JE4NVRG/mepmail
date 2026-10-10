@@ -39,6 +39,7 @@ export {
   type MailboxPriceTerms,
   type MailboxSubscriptionProjection,
   mailboxCheckoutSessionMatches,
+  mailboxIncludedSeats,
   projectMailboxSubscription,
   recoverMailboxCheckoutSession,
 } from "./mailbox.js";
@@ -75,6 +76,14 @@ export {
   mailboxCatalogFromJson,
   repriceMailboxAddOnsWithoutSending,
 } from "./mailbox-reprice.js";
+export {
+  claimMailboxTrial,
+  MAILBOX_TRIAL_DAILY_RECIPIENTS,
+  MAILBOX_TRIAL_TOTAL_RECIPIENTS,
+  type MailboxTrialClaim,
+  mailboxTrialFingerprintHash,
+} from "./mailbox-trial.js";
+export { mailboxTrialDays } from "./mailbox-trial-eligibility.js";
 export {
   dispatchMetaConversions,
   type MetaCheckoutAdvertising,

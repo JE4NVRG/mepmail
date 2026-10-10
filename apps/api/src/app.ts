@@ -102,6 +102,7 @@ import { createMiddleware } from "hono/factory";
 import { secureHeaders } from "hono/secure-headers";
 import { INTERNAL_AUTH, registerMcp } from "./mcp.js";
 import { registerCorreioMcp } from "./mcp-correio.js";
+import { enrichOpenApiDocument } from "./openapi-meta.js";
 import { loggedBody, maskEmailPathSegments } from "./request-log.js";
 import { registerApiKeyRoutes } from "./routes/api-keys.js";
 import { registerContactPropertyRoutes } from "./routes/contact-properties.js";
@@ -3341,19 +3342,32 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
   const health = { status: "ok" as const, revision: deps.revision ?? "unknown" };
   app.get("/health", (c) => c.json(health));
 
-  app.doc("/openapi.json", {
-    openapi: "3.1.0",
-    info: { title: "MepMail API", version: "1.0.0" },
-    // Servers drive the docs playground's target picker: Cloud first (docs
-    // convention), then a variable entry self-hosters point at their origin.
-    servers: [
-      { url: "https://api.mepmail.dev", description: "MepMail Cloud" },
-      {
-        url: "{baseUrl}",
-        description: "Self-hosted instance",
-        variables: { baseUrl: { default: "http://localhost:3001" } },
-      },
-    ],
+  // Built on the first request, when every route is registered, then enriched
+  // with what the route definitions do not carry (see openapi-meta.ts).
+  let openApiDocument: Record<string, unknown> | undefined;
+  app.get("/openapi.json", (c) => {
+    openApiDocument ??= enrichOpenApiDocument(
+      app.getOpenAPI31Document({
+        openapi: "3.1.0",
+        info: {
+          title: "MepMail API",
+          version: "1.0.0",
+          description:
+            "Resend-compatible email API: send transactional email and manage contacts, domains, broadcasts, webhooks and suppressions.",
+        },
+        // Servers drive the docs playground's target picker: Cloud first (docs
+        // convention), then a variable entry self-hosters point at their origin.
+        servers: [
+          { url: "https://api.mepmail.dev", description: "MepMail Cloud" },
+          {
+            url: "{baseUrl}",
+            description: "Self-hosted instance",
+            variables: { baseUrl: { default: "http://localhost:3001" } },
+          },
+        ],
+      }) as unknown as Record<string, unknown>,
+    );
+    return c.json(openApiDocument);
   });
 
   // After-response request logging, authenticated requests only — an

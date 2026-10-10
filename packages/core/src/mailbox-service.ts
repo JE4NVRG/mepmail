@@ -3,9 +3,60 @@ import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
 import { monthlyBillingUsagePeriod } from "./billing-usage-period.js";
 
 export class MailboxServiceError extends Error {
-  constructor(public readonly code: "not_entitled" | "quota" | "invalid") {
+  constructor(public readonly code: "not_entitled" | "quota" | "invalid" | "trial_limit") {
     super(code);
   }
+}
+
+/** Sending during a Correio free trial, until the first paid invoice ends it (status active). */
+export const MAILBOX_TRIAL_DAILY_RECIPIENTS = 50;
+export const MAILBOX_TRIAL_TOTAL_RECIPIENTS = 200;
+
+function utcDayStart(at: Date) {
+  const start = new Date(at);
+  start.setUTCHours(0, 0, 0, 0);
+  return start;
+}
+
+/** Recipients the team queued while trialing: today (UTC) and since the trial began. */
+export async function mailboxTrialUsage(
+  db: Db,
+  teamId: string,
+  trialStart: Date,
+  now = new Date(),
+) {
+  const outbox = schema.mailboxOutbox;
+  const today = utcDayStart(now);
+  const [usage] = await db
+    .select({
+      today: sql<string>`coalesce(sum(${outbox.recipientCount}) filter (where ${outbox.createdAt} >= ${today}),0)::text`,
+      total: sql<string>`coalesce(sum(${outbox.recipientCount}),0)::text`,
+    })
+    .from(outbox)
+    .where(
+      and(
+        eq(outbox.teamId, teamId),
+        sql`${outbox.createdAt} >= ${trialStart}`,
+        sql`${outbox.status} <> 'failed'`,
+      ),
+    );
+  return { today: Number(usage?.today ?? 0), total: Number(usage?.total ?? 0) };
+}
+
+/** Call under the subscription lock, before queueing `recipients` more for a trialing team. */
+export async function assertMailboxTrialSending(
+  db: Db,
+  plan: MailboxSubscription,
+  recipients: number,
+  now = new Date(),
+) {
+  if (plan.status !== "trialing") return;
+  const usage = await mailboxTrialUsage(db, plan.teamId, plan.periodStart, now);
+  if (
+    usage.today + recipients > MAILBOX_TRIAL_DAILY_RECIPIENTS ||
+    usage.total + recipients > MAILBOX_TRIAL_TOTAL_RECIPIENTS
+  )
+    throw new MailboxServiceError("trial_limit");
 }
 export type MailboxSubscription = typeof schema.mailboxSubscriptions.$inferSelect;
 /** Internal capacity for the verified platform operator; never a paid-plan allowance. */
@@ -164,6 +215,21 @@ export async function mailboxServiceState(db: Db, teamId: string) {
     reservedSeats: usage?.boxes ?? 0,
     storageBytesPerMailbox: plan?.storageBytesPerMailbox ?? 0,
     includedOutboundPerMailbox: plan?.includedOutboundPerMailbox ?? 0,
+    /** "team": the two figures above are shared by all of the team's mailboxes. */
+    quotaScope: plan?.quotaScope ?? ("mailbox" as const),
+    includedMailboxes: plan?.includedMailboxes ?? 1,
+    trial:
+      plan?.status === "trialing" && entitlement.active
+        ? {
+            endsAt: plan.periodEnd.toISOString(),
+            dailyLimit: MAILBOX_TRIAL_DAILY_RECIPIENTS,
+            totalLimit: MAILBOX_TRIAL_TOTAL_RECIPIENTS,
+            ...(await mailboxTrialUsage(db, teamId, plan.periodStart).then((u) => ({
+              sentToday: u.today,
+              sentTotal: u.total,
+            }))),
+          }
+        : null,
     periodStart: entitlement.unlimitedOutbound ? null : (plan?.periodStart ?? null),
     periodEnd: entitlement.unlimitedOutbound ? null : (plan?.periodEnd ?? null),
     usagePeriodStart: entitlement.usagePeriod?.start ?? null,
@@ -222,7 +288,8 @@ export async function requireMailboxSeat(
   if (!licensed.some((b) => b.id === mailboxId)) throw new MailboxServiceError("not_entitled");
 }
 
-/** All encrypted MIME, including drafts, counts toward the box's included storage.
+/** All encrypted MIME, including drafts, counts toward the box's included storage
+ * (the team's, summed over its mailboxes, when the plan's quota scope is "team").
  * Call while holding the subscription and mailbox locks. Updates charge only delta.
  */
 export async function assertMailboxStorage(
@@ -233,11 +300,15 @@ export async function assertMailboxStorage(
   plan: MailboxSubscription,
 ) {
   if (!Number.isSafeInteger(delta)) throw new MailboxServiceError("invalid");
+  const team = plan.quotaScope === "team";
   const [usage] = await db
     .select({ bytes: sql<string>`coalesce(sum(${schema.mailboxItems.rawBytes}),0)::text` })
     .from(schema.mailboxItems)
     .where(
-      and(eq(schema.mailboxItems.teamId, teamId), eq(schema.mailboxItems.mailboxId, mailboxId)),
+      and(
+        eq(schema.mailboxItems.teamId, teamId),
+        team ? undefined : eq(schema.mailboxItems.mailboxId, mailboxId),
+      ),
     );
   const total = BigInt(usage?.bytes ?? "0") + BigInt(delta);
   const [submitted] = await db
@@ -246,7 +317,7 @@ export async function assertMailboxStorage(
     .where(
       and(
         eq(schema.mailboxOutbox.teamId, teamId),
-        eq(schema.mailboxOutbox.mailboxId, mailboxId),
+        team ? undefined : eq(schema.mailboxOutbox.mailboxId, mailboxId),
         isNotNull(schema.mailboxOutbox.ciphertext),
       ),
     );

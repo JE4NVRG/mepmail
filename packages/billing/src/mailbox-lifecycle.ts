@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
-import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import type Stripe from "stripe";
 import {
   type MailboxLaunchCohort,
@@ -18,10 +18,12 @@ import {
   type MailboxPriceTerms,
   mailboxCheckoutSessionMatches,
   mailboxCheckoutTerms,
+  mailboxIncludedSeats,
   mailboxIncreasePaymentConfirmed,
   projectMailboxSubscription,
 } from "./mailbox.js";
 import { hasPaidSendingPlanForMailbox } from "./mailbox-addon.js";
+import { mailboxTrialDays } from "./mailbox-trial-eligibility.js";
 import type { BillingStripe } from "./stripe.js";
 import { idOf, lockCustomer } from "./subscription.js";
 
@@ -57,6 +59,18 @@ const OCCUPIED_SUBSCRIPTIONS = new Set([
 ]);
 const epoch = (value: number) => Number.isSafeInteger(value) && value > 0 && value <= 2147483647;
 
+/** The tiered and team-quota terms a row or lease was sold with (absent = the per-unit shape). */
+function soldShape(row: {
+  quotaScope: "mailbox" | "team";
+  includedMailboxes: number;
+  extraUnitAmount: number | null;
+}): Pick<MailboxPriceTerms, "quotaScope" | "includedMailboxes" | "extraUnitAmount"> {
+  return {
+    ...(row.quotaScope === "team" ? { quotaScope: "team" as const } : {}),
+    ...(row.includedMailboxes !== 1 ? { includedMailboxes: row.includedMailboxes } : {}),
+    ...(row.extraUnitAmount !== null ? { extraUnitAmount: row.extraUnitAmount } : {}),
+  };
+}
 function historicalTerms(row: MailboxSubscriptionRow): MailboxPriceTerms | null {
   if (!row.stripePriceId || !row.currency || row.unitAmount === null || !row.interval) return null;
   return {
@@ -66,6 +80,7 @@ function historicalTerms(row: MailboxSubscriptionRow): MailboxPriceTerms | null 
     interval: row.interval,
     storageBytesPerMailbox: row.storageBytesPerMailbox,
     includedOutboundPerMailbox: row.includedOutboundPerMailbox,
+    ...soldShape(row),
   };
 }
 function leaseTerms(lease: MailboxCheckoutLease): MailboxPriceTerms {
@@ -76,6 +91,7 @@ function leaseTerms(lease: MailboxCheckoutLease): MailboxPriceTerms {
     interval: lease.interval,
     storageBytesPerMailbox: lease.storageBytesPerMailbox,
     includedOutboundPerMailbox: lease.includedOutboundPerMailbox,
+    ...soldShape(lease),
   };
 }
 function withHistoricalTerms(
@@ -762,13 +778,15 @@ async function purchaseTeam(
   if (!team.customerId) throw new MailboxLifecycleError("unavailable");
   return { ...team, customerId: team.customerId };
 }
+/** Returns whether the Customer ever held a Correio subscription (any status). */
 async function assertNoSubscription(
   db: Db,
   stripe: BillingStripe,
   catalog: MailboxCatalog,
   teamId: string,
   customerId: string,
-) {
+): Promise<{ priorSubscription: boolean }> {
+  let priorSubscription = false;
   await assertNoOccupiedMailboxPlan(db, teamId);
   // A recovered complete Checkout does not grant access, but its known subscription
   // still prevents another purchase while the fulfillment webhook is outstanding.
@@ -785,6 +803,7 @@ async function assertNoSubscription(
     .orderBy(desc(schema.mailboxCheckouts.createdAt))
     .limit(1);
   if (completed?.subscriptionId) {
+    priorSubscription = true;
     const sub = await stripe.subscriptions.retrieve(completed.subscriptionId);
     if (idOf(sub.customer) !== customerId || sub.livemode !== catalog.livemode)
       throw new MailboxLifecycleError("unavailable");
@@ -809,8 +828,9 @@ async function assertNoSubscription(
       if (sub.livemode !== catalog.livemode) throw new MailboxLifecycleError("unavailable");
       if (OCCUPIED_SUBSCRIPTIONS.has(sub.status))
         throw new MailboxLifecycleError("subscription_exists");
+      priorSubscription = true;
     }
-    if (!page.has_more) return;
+    if (!page.has_more) return { priorSubscription };
     const lastId = page.data.at(-1)?.id;
     if (!lastId || lastId === startingAfter) throw new MailboxLifecycleError("unavailable");
     startingAfter = lastId;
@@ -847,13 +867,15 @@ function compatible(
   terms: MailboxPriceTerms,
   input: BeginMailboxCheckoutInput,
   customerId: string,
+  trialDays: number,
 ) {
   return (
     lease.stripeCustomerId === customerId &&
     lease.stripePriceId === terms.priceId &&
     lease.seats === input.seats &&
     lease.livemode === catalog.livemode &&
-    lease.automaticTax === (input.automaticTax ?? false)
+    lease.automaticTax === (input.automaticTax ?? false) &&
+    lease.trialDays === trialDays
   );
 }
 async function purchase(
@@ -872,7 +894,20 @@ async function purchase(
       deps.earlyAccessCohort,
       standalone,
     );
-    await assertNoSubscription(db, deps.stripe, catalog, team.id, team.customerId);
+    const { priorSubscription } = await assertNoSubscription(
+      db,
+      deps.stripe,
+      catalog,
+      team.id,
+      team.customerId,
+    );
+    const trialDays = await mailboxTrialDays(
+      db,
+      terms,
+      team.id,
+      team.customerId,
+      priorSubscription,
+    );
     const [existing] = await tx
       .select()
       .from(schema.mailboxCheckouts)
@@ -884,7 +919,7 @@ async function purchase(
       )
       .for("update");
     if (existing) {
-      if (!compatible(existing, catalog, terms, input, team.customerId))
+      if (!compatible(existing, catalog, terms, input, team.customerId, trialDays))
         throw new MailboxLifecycleError("conflict");
       if (existing.status !== "prepared") return { lease: existing, create: false };
       await tx
@@ -911,6 +946,10 @@ async function purchase(
         interval: terms.interval,
         storageBytesPerMailbox: terms.storageBytesPerMailbox,
         includedOutboundPerMailbox: terms.includedOutboundPerMailbox,
+        quotaScope: terms.quotaScope ?? "mailbox",
+        includedMailboxes: mailboxIncludedSeats(terms),
+        extraUnitAmount: terms.extraUnitAmount ?? null,
+        trialDays,
         successUrl: input.successUrl,
         cancelUrl: input.cancelUrl,
         automaticTax: input.automaticTax ?? false,
@@ -930,13 +969,26 @@ async function purchase(
         deps.earlyAccessCohort,
         standalone,
       );
-      await assertNoSubscription(db, deps.stripe, catalog, team.id, team.customerId);
+      const { priorSubscription } = await assertNoSubscription(
+        db,
+        deps.stripe,
+        catalog,
+        team.id,
+        team.customerId,
+      );
+      const trialDays = await mailboxTrialDays(
+        db,
+        terms,
+        team.id,
+        team.customerId,
+        priorSubscription,
+      );
       const [lease] = await tx
         .select()
         .from(schema.mailboxCheckouts)
         .where(eq(schema.mailboxCheckouts.id, prepared.lease.id))
         .for("update");
-      if (!lease || !compatible(lease, catalog, terms, input, team.customerId))
+      if (!lease || !compatible(lease, catalog, terms, input, team.customerId, trialDays))
         throw new MailboxLifecycleError("conflict");
       if (lease.status === "ready" && lease.checkoutUrl && !deps.recoverCheckout)
         return { checkoutId: lease.id, url: lease.checkoutUrl };
@@ -971,6 +1023,7 @@ async function purchase(
             cancelUrl: lease.cancelUrl,
             idempotencyKey: lease.idempotencyKey,
             automaticTax: lease.automaticTax,
+            trialDays: lease.trialDays,
           },
         );
       } else if (deps.recoverCheckout) {
@@ -1033,6 +1086,8 @@ export async function beginMailboxCheckout(
     !safeUrl(input.cancelUrl)
   )
     throw new MailboxLifecycleError("invalid");
-  await ensureMailboxCustomer(deps, catalog, input);
-  return purchase(deps, catalog, terms, input);
+  // The base price covers its included mailboxes: asking for fewer buys them all.
+  const seats = Math.max(input.seats, mailboxIncludedSeats(terms));
+  await ensureMailboxCustomer(deps, catalog, { ...input, seats });
+  return purchase(deps, catalog, terms, { ...input, seats });
 }

@@ -368,6 +368,9 @@ async function prepare(
         c.sub.collection_method !== "charge_automatically")
     )
       throw new MailboxLifecycleError("unavailable");
+    // The base price covers its included mailboxes: going below them saves nothing.
+    if (input.action === "quantity" && input.seats! < c.projection.includedMailboxes)
+      throw new MailboxLifecycleError("invalid");
     if ((reduction || action === "decrease") && !deps.stripe.subscriptionSchedules.retrieve)
       throw new MailboxLifecycleError("unavailable");
     if (

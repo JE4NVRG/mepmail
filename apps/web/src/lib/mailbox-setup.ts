@@ -18,6 +18,12 @@ export type MailboxPurchaseOffer = {
   interval: "month" | "year";
   storageBytesPerMailbox: number;
   includedOutboundPerMailbox: number;
+  // Bundles (lib/mailbox-plan-terms): one price for several mailboxes.
+  quotaScope?: "mailbox" | "team";
+  includedMailboxes?: number;
+  extraUnitAmount?: number | null;
+  localCurrency?: { currency: string; unitAmount: number; extraUnitAmount: number | null } | null;
+  trialDays?: number;
 };
 type LegacyOffer = Omit<MailboxPurchaseOffer, "offerId">;
 type OfferCatalog = {

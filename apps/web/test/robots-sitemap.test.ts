@@ -58,6 +58,24 @@ describe("robots.txt + sitemap.xml agreement", () => {
     }
   });
 
+  it("lets crawlers fetch the public images, the manifest and the agent-facing files", () => {
+    const allow = allowedPaths();
+    for (const path of [
+      "/logos/integrations/n8n.svg",
+      "/product/templates-gallery.webp",
+      "/manifest.webmanifest",
+      "/llms.txt",
+      "/auth.md",
+      "/.well-known/agent-skills/mepmail/SKILL.md",
+      "/apple-icon.png",
+    ]) {
+      expect(isAllowed(path, allow), path).toBe(true);
+    }
+    for (const path of ["/mail", "/mailboxes", "/empty-states/emails.webp"]) {
+      expect(isAllowed(path, allow), path).toBe(false);
+    }
+  });
+
   it("does not advertise request time as a page update", () => {
     expect(sitemap().every((entry) => entry.lastModified === undefined)).toBe(true);
   });

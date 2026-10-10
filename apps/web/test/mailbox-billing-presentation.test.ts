@@ -60,6 +60,10 @@ const offer = {
   interval: price.interval,
   storageBytesPerMailbox: price.storageBytesPerMailbox,
   includedOutboundPerMailbox: price.includedOutboundPerMailbox,
+  quotaScope: "mailbox" as const,
+  includedMailboxes: 1,
+  extraUnitAmount: null,
+  localCurrency: null,
 };
 const sendingPeriodStart = new Date("2020-01-01");
 const sendingPeriodEnd = new Date("2030-01-01");
@@ -252,7 +256,9 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
       earlyAccessRequired: false,
       availability: "available",
       offer,
-      offers: [{ ...offer, offerId: expect.stringMatching(/^mbo_[A-Za-z0-9_-]{43}$/) }],
+      offers: [
+        { ...offer, offerId: expect.stringMatching(/^mbo_[A-Za-z0-9_-]{43}$/), trialDays: 0 },
+      ],
       defaultOfferId: expect.stringMatching(/^mbo_[A-Za-z0-9_-]{43}$/),
       pendingOfferId: null,
       pendingOffer: null,
@@ -282,6 +288,9 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
       reservedSeats: 0,
       storageBytesPerMailbox: 0,
       includedOutboundPerMailbox: 0,
+      quotaScope: "mailbox",
+      includedMailboxes: 1,
+      trial: null,
       periodStart: null,
       periodEnd: null,
       usagePeriodStart: null,

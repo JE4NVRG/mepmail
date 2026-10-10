@@ -26,6 +26,11 @@ export const mailboxSubscriptions = pgTable(
     seats: integer("seats").notNull().default(0),
     storageBytesPerMailbox: bigint("storage_bytes_per_mailbox", { mode: "number" }).notNull(),
     includedOutboundPerMailbox: integer("included_outbound_per_mailbox").notNull(),
+    /** "team": the storage and outbound figures above are the whole team's, shared by its mailboxes. */
+    quotaScope: text("quota_scope").$type<"mailbox" | "team">().notNull().default("mailbox"),
+    /** Seats the base price covers; every seat above them is billed at extraUnitAmount. */
+    includedMailboxes: integer("included_mailboxes").notNull().default(1),
+    extraUnitAmount: integer("extra_unit_amount"),
     periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
     periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
     stripeCustomerId: text("stripe_customer_id"),
@@ -60,5 +65,9 @@ export const mailboxSubscriptions = pgTable(
       sql`${t.includedOutboundPerMailbox} between 0 and 1000000`,
     ),
     check("mailbox_subscriptions_period_check", sql`${t.periodEnd} > ${t.periodStart}`),
+    check(
+      "mailbox_subscriptions_quota_scope_check",
+      sql`${t.quotaScope} in ('mailbox','team') and ${t.includedMailboxes} between 1 and 10000 and (${t.extraUnitAmount} is null or ${t.extraUnitAmount} > 0)`,
+    ),
   ],
 );

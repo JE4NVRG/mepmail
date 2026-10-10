@@ -111,7 +111,7 @@
       },
       {
         "q": "Can I receive email or import Gmail/Hotmail?",
-        "a": "Yes, with MepMail Mail: email inboxes on your domain for people and AI agents. It costs US$ 12.90/month per mailbox on its own (10 GiB, 2,000 outbound deliveries a month and up to 3 domains), or from US$ 5.90 with a paid Send plan; each mailbox needs a verified domain with receiving turned on. We do not offer IMAP or Gmail/Hotmail/MBOX/PST import yet, and Google sign-in does not sync a Gmail inbox.",
+        "a": "Yes, with MepMail Mail: email inboxes on your domain for people and AI agents. On its own it costs US$ 12.90/month with 3 mailboxes (US$ 3.90 per extra one), sharing 10 GiB and 2,000 outbound deliveries a month, with up to 3 domains and 7 days free, or from US$ 5.90 with a paid Send plan; each mailbox needs a verified domain with receiving turned on. We do not offer IMAP or Gmail/Hotmail/MBOX/PST import yet, and Google sign-in does not sync a Gmail inbox.",
         "link": {
           "label": "Mailboxes",
           "href": "https://docs.mepmail.dev/mailboxes"

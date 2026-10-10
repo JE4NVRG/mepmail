@@ -1,20 +1,22 @@
 ---
 title: npm packages
-description: The two packages MepMail publishes on npm — @mepmail/mcp and @mepmail/cli — what each one does and how to install it.
+description: The packages MepMail publishes on npm — @mepmail/mcp, @mepmail/cli and the n8n node — what each one does and how to install it.
 ---
 
-MepMail publishes two npm packages. Neither is an SDK: the API speaks the
+MepMail publishes three npm packages. None is an SDK: the API speaks the
 Resend wire protocol, so sending mail means using the official Resend SDKs with
-your instance's base URL ([SDKs](/sdks)). These two cover what those SDKs cannot
-do — running MCP locally and moving an account over.
+your instance's base URL ([SDKs](/sdks)). These cover what those SDKs cannot
+do — running MCP locally, moving an account over and wiring MepMail into n8n.
 
 | Package | Latest | What it is | Guide |
 | --- | --- | --- | --- |
-| [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) | [Latest on npm](https://www.npmjs.com/package/@mepmail/mcp) (documented: 0.2.0) | MCP server for local clients (stdio): 22 tools to read, send and manage contacts, plus 5 Correio mailbox tools with a mailbox agent key (`MEPMAIL_MAIL_TOKEN`), from Claude, Cursor, Codex or any MCP client. | [MCP server](/mcp) |
-| [`@mepmail/cli`](https://www.npmjs.com/package/@mepmail/cli) | [Latest on npm](https://www.npmjs.com/package/@mepmail/cli) (documented: 0.2.3) | Migration CLI: reads a Resend account, diffs it against your instance, applies the difference and writes a report. | [CLI](/cli) |
+| [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) | [Latest on npm](https://www.npmjs.com/package/@mepmail/mcp) (documented: 0.2.1) | MCP server for local clients (stdio): 22 tools to read, send and manage contacts, plus 5 Correio mailbox tools with a mailbox agent key (`MEPMAIL_MAIL_TOKEN`), from Claude, Cursor, Codex or any MCP client. | [MCP server](/mcp) |
+| [`@mepmail/cli`](https://www.npmjs.com/package/@mepmail/cli) | [Latest on npm](https://www.npmjs.com/package/@mepmail/cli) (documented: 0.2.4) | Migration CLI: reads a Resend account, diffs it against your instance, applies the difference and writes a report. | [CLI](/cli) |
+| [`n8n-nodes-mepmail`](https://www.npmjs.com/package/n8n-nodes-mepmail) | [Latest on npm](https://www.npmjs.com/package/n8n-nodes-mepmail) (documented: 0.1.0) | n8n community nodes: send and schedule email, manage contacts, domains, broadcasts and suppressions, and a trigger that starts workflows from MepMail events. | [Integrations](/integrations#n8n) |
 
 The CLI needs Node 18 or newer; the MCP server needs Node 20 or newer. Both
-ship as a single bundle with no dependencies.
+ship as a single bundle with no dependencies. The n8n node installs from n8n
+itself (Settings → Community nodes).
 Run them with `npx`, which always resolves the latest published version; the
 numbers above are the versions this page was written against.
 

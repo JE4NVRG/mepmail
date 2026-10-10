@@ -35,6 +35,7 @@ import {
 import { isMailboxSenderBlocked } from "./mailbox-senders.js";
 import {
   assertMailboxStorage,
+  assertMailboxTrialSending,
   lockMailboxService,
   MailboxServiceError,
   mailboxSubscriptionUsagePeriod,
@@ -795,12 +796,13 @@ async function queueAuthorizedMailboxDraft(
     throw new MailboxContentError("forbidden");
   const plan = await lockMailboxService(tx, actor.teamId, now);
   if (!plan.unlimitedOutbound) {
+    // A "team" quota is shared: every mailbox of the team draws on one allowance.
     const [usage] = await tx
       .select({ recipients: sql<string>`coalesce(sum(${mailboxOutbox.recipientCount}),0)::text` })
       .from(mailboxOutbox)
       .where(
         and(
-          eq(mailboxOutbox.mailboxId, input.mailboxId),
+          plan.quotaScope === "team" ? undefined : eq(mailboxOutbox.mailboxId, input.mailboxId),
           eq(mailboxOutbox.teamId, actor.teamId),
           eq(mailboxOutbox.periodStart, plan.usagePeriod.start),
           ne(mailboxOutbox.status, "failed"),
@@ -811,6 +813,8 @@ async function queueAuthorizedMailboxDraft(
       BigInt(plan.includedOutboundPerMailbox)
     )
       throw new MailboxServiceError("quota");
+    // A free trial sends a little, from verified domains only (checked above), until paid.
+    await assertMailboxTrialSending(tx, plan, parsed.count, now);
   }
   await assertMailboxStorage(tx, actor.teamId, input.mailboxId, raw.length, plan);
   const id = randomUUID();

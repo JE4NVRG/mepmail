@@ -2191,8 +2191,20 @@ export function MailboxContentView({
         ),
       );
     } catch (cause) {
-      if (!mounted.current) return;
       const code = (cause as { data?: { code?: string } })?.data?.code;
+      // The free trial's sending limit: nothing went out and the draft stays as
+      // it is, ready to send once the limit lifts.
+      if (code === "PRECONDITION_FAILED" && (cause as Error)?.message === "trial_limit") {
+        attempted.current.delete(key);
+        toast(t("trialLimit"), "danger");
+        if (mounted.current)
+          setSendStates((states) => {
+            const { [key]: _blocked, ...rest } = states;
+            return rest;
+          });
+        return;
+      }
+      if (!mounted.current) return;
       setSendStates((states) => ({ ...states, [key]: "unknown" }));
       setNotice(t(code === "FORBIDDEN" ? "accessLost" : "sendUnknown"));
       if (code === "FORBIDDEN")
@@ -2220,7 +2232,11 @@ export function MailboxContentView({
       document.visibilityState !== "hidden"
     )
       return;
-    for (const row of arrivals.slice(0, 3)) {
+    // With the caixa inteligente on, only people ring (as in the desktop app).
+    const loud = prefs.smartInbox
+      ? arrivals.filter((row) => row.category !== "notification" && row.category !== "newsletter")
+      : arrivals;
+    for (const row of loud.slice(0, 3)) {
       const notice = new Notification(row.fromName || row.from || t("notices.newMail"), {
         body: row.subject || t("noSubject"),
         tag: `${row.mailboxId}:${row.id}`,
@@ -2231,7 +2247,7 @@ export function MailboxContentView({
         notice.close();
       };
     }
-  }, [listed, folder, noticesOn, select, t]);
+  }, [listed, folder, noticesOn, select, t, prefs.smartInbox]);
   async function toggleNotices() {
     if (typeof Notification === "undefined") {
       setNotice(t("notices.unsupported"));

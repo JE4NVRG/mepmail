@@ -6,6 +6,13 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { DOCS_URL } from "@/lib/docs-links";
 import { mailboxCheckoutFailure, safeMailboxCheckoutUrl } from "@/lib/mailbox-checkout";
 import {
+  isMailboxBundle,
+  mailboxPlanMaximumSeats,
+  mailboxPlanMinimumSeats,
+  mailboxPlanTotal,
+  validMailboxPlanSeats,
+} from "@/lib/mailbox-plan-terms";
+import {
   formatMailboxPrice,
   formatMailboxStorage,
   mailboxHasUnlimitedSeats,
@@ -206,11 +213,33 @@ export function MailboxServicePanel({
     attemptedOfferId,
   );
   const offer = selection.offer;
+  // A bundle (3 mailboxes for one price, a shared allowance) starts at its size.
+  const minSeats = offer ? mailboxPlanMinimumSeats(offer) : 1;
+  const maxSeats = offer ? mailboxPlanMaximumSeats(offer) : 10000;
+  const bundle = !!offer && isMailboxBundle(offer);
+  useEffect(() => {
+    setSeats((current) => {
+      const value = Math.trunc(Number(current));
+      return String(
+        Math.min(maxSeats, Math.max(minSeats, Number.isFinite(value) ? value : minSeats)),
+      );
+    });
+  }, [minSeats, maxSeats]);
   const lockedSeats = billing.data?.pendingOfferId
     ? (billing.data.pendingCheckoutSeats ?? null)
     : (billing.data?.pendingCheckoutSeats ?? attemptedSeats ?? null);
   const quantity = lockedSeats ?? Number(seats);
-  const validSeats = Number.isSafeInteger(quantity) && quantity >= 1 && quantity <= 10000;
+  const validSeats = offer
+    ? validMailboxPlanSeats(offer, quantity)
+    : Number.isSafeInteger(quantity) && quantity >= 1 && quantity <= 10000;
+  const total = offer ? mailboxPlanTotal(offer, quantity) : null;
+  const localTotal = offer ? mailboxPlanTotal(offer, quantity, true) : null;
+  const teamQuota = plan?.quotaScope === "team";
+  const trial = plan?.trial ?? null;
+  const trialEnd = trial
+    ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(trial.endsAt))
+    : null;
+  const minChangeSeats = plan?.includedMailboxes ?? 1;
   const availability = billing.data?.availability;
   const sendingPlanRequired =
     loaded &&
@@ -270,7 +299,9 @@ export function MailboxServicePanel({
   const changeSeats = Number(managedSeats);
   const maxChangeSeats = manage?.canIncrease ? 10000 : (plan?.seats ?? 0);
   const validChange =
-    Number.isSafeInteger(changeSeats) && changeSeats >= 1 && changeSeats <= maxChangeSeats;
+    Number.isSafeInteger(changeSeats) &&
+    changeSeats >= minChangeSeats &&
+    changeSeats <= maxChangeSeats;
   async function runManagement(action: "cancel" | "resume" | "quantity", seats?: number) {
     if (busy || systemIdentified) return;
     const sequence = ++managementSequence.current;
@@ -329,7 +360,7 @@ export function MailboxServicePanel({
                         messages: plan.includedOutboundPerMailbox,
                       },
                     )
-                  : t("includedSummary", {
+                  : t(teamQuota ? "includedTeamSummary" : "includedSummary", {
                       storage: formatMailboxStorage(plan.storageBytesPerMailbox, locale),
                       messages: plan.includedOutboundPerMailbox,
                     })}
@@ -353,6 +384,17 @@ export function MailboxServicePanel({
           {t("viewPlan")}
         </button>
       </div>
+      {trial && trialEnd && !systemIdentified ? (
+        <p className={styles.trial} role="status">
+          {t("trialSummary", {
+            date: trialEnd,
+            sentToday: trial.sentToday,
+            dailyLimit: trial.dailyLimit,
+            sentTotal: trial.sentTotal,
+            totalLimit: trial.totalLimit,
+          })}
+        </p>
+      ) : null}
       {returned && !systemIdentified ? (
         <div className={styles.returnNotice} role="status">
           <span>{t(plan?.active ? "confirmed" : "awaitingConfirmation")}</span>
@@ -398,7 +440,9 @@ export function MailboxServicePanel({
           </header>
           {loaded ? (
             <p className={styles.hint}>
-              {systemLicense ? systemT("licenseBody") : t("equalPrice")}
+              {systemLicense
+                ? systemT("licenseBody")
+                : t(bundle ? "equalPriceBundle" : "equalPrice")}
             </p>
           ) : null}
           {!loaded ? (
@@ -481,14 +525,26 @@ export function MailboxServicePanel({
                 {plan!.storageBytesPerMailbox > 0 ? (
                   <>
                     <div>
-                      <dt>{t("storagePerMailbox")}</dt>
+                      <dt>{t(teamQuota ? "storageTeam" : "storagePerMailbox")}</dt>
                       <dd>{formatMailboxStorage(plan!.storageBytesPerMailbox, locale)}</dd>
                     </div>
                     <div>
-                      <dt>{t("outboundPerMailbox")}</dt>
+                      <dt>{t(teamQuota ? "outboundTeam" : "outboundPerMailbox")}</dt>
                       <dd>{t("messageCount", { count: plan!.includedOutboundPerMailbox })}</dd>
                     </div>
                   </>
+                ) : null}
+                {trial && trialEnd ? (
+                  <div>
+                    <dt>{t("trialFact")}</dt>
+                    <dd>
+                      {t("trialFactValue", {
+                        date: trialEnd,
+                        dailyLimit: trial.dailyLimit,
+                        totalLimit: trial.totalLimit,
+                      })}
+                    </dd>
+                  </div>
                 ) : null}
                 {date ? (
                   <div>
@@ -497,6 +553,7 @@ export function MailboxServicePanel({
                   </div>
                 ) : null}
               </dl>
+              {trial ? <p className={styles.notice}>{t("trialLimitsLift")}</p> : null}
               {plan!.cancelAtPeriodEnd ? (
                 <p className={styles.notice}>{t("cancelScheduled", { date: date ?? "" })}</p>
               ) : null}
@@ -543,7 +600,7 @@ export function MailboxServicePanel({
                         className="ms-input"
                         type="number"
                         inputMode="numeric"
-                        min={1}
+                        min={minChangeSeats}
                         max={maxChangeSeats}
                         step={1}
                         required
@@ -645,7 +702,9 @@ export function MailboxServicePanel({
                   <fieldset className={styles.purchase} disabled={checkout.isPending}>
                     {selection.offers.length || selection.locked ? (
                       <>
-                        <label htmlFor={offerId}>{t("planChoice")}</label>
+                        <label htmlFor={offerId}>
+                          {t(bundle ? "planChoiceBundle" : "planChoice")}
+                        </label>
                         <select
                           id={offerId}
                           className="ms-input"
@@ -659,7 +718,8 @@ export function MailboxServicePanel({
                             : selection.offers
                           ).map((entry) => (
                             <option key={entry.offerId} value={entry.offerId}>
-                              {t("planOption", {
+                              {t(isMailboxBundle(entry) ? "planOptionBundle" : "planOption", {
+                                mailboxes: mailboxPlanMinimumSeats(entry),
                                 storage: formatMailboxStorage(entry.storageBytesPerMailbox, locale),
                                 price: t("priceInterval", {
                                   amount: formatMailboxPrice(
@@ -677,7 +737,9 @@ export function MailboxServicePanel({
                           {t(
                             selection.locked || lockedSeats !== null
                               ? "planLocked"
-                              : "planChoiceHint",
+                              : bundle
+                                ? "planChoiceHintBundle"
+                                : "planChoiceHint",
                           )}
                         </p>
                       </>
@@ -688,8 +750,8 @@ export function MailboxServicePanel({
                       className="ms-input"
                       type="number"
                       inputMode="numeric"
-                      min={1}
-                      max={10000}
+                      min={minSeats}
+                      max={maxSeats}
                       step={1}
                       required
                       value={lockedSeats ?? seats}
@@ -699,11 +761,27 @@ export function MailboxServicePanel({
                       autoFocus
                     />
                     <p id={seatsHintId} className={styles.hint}>
-                      {t(lockedSeats !== null ? "quantityLocked" : "quantityHint")}
+                      {lockedSeats !== null
+                        ? t("quantityLocked")
+                        : bundle && offer.extraUnitAmount
+                          ? t("quantityHintBundle", {
+                              included: minSeats,
+                              extra: t("priceInterval", {
+                                amount: formatMailboxPrice(
+                                  offer.extraUnitAmount,
+                                  offer.currency,
+                                  locale,
+                                ),
+                                interval: t(`interval.${offer.interval}`),
+                              }),
+                            })
+                          : t("quantityHint")}
                     </p>
                     <dl className={styles.offer}>
                       <div>
-                        <dt>{t("pricePerMailbox")}</dt>
+                        <dt>
+                          {t(bundle ? "bundlePrice" : "pricePerMailbox", { count: minSeats })}
+                        </dt>
                         <dd>
                           {t("priceInterval", {
                             amount: formatMailboxPrice(offer.unitAmount, offer.currency, locale),
@@ -711,31 +789,64 @@ export function MailboxServicePanel({
                           })}
                         </dd>
                       </div>
+                      {bundle && offer.extraUnitAmount ? (
+                        <div>
+                          <dt>{t("extraMailbox")}</dt>
+                          <dd>
+                            {t("priceInterval", {
+                              amount: formatMailboxPrice(
+                                offer.extraUnitAmount,
+                                offer.currency,
+                                locale,
+                              ),
+                              interval: t(`interval.${offer.interval}`),
+                            })}
+                          </dd>
+                        </div>
+                      ) : null}
                       <div>
-                        <dt>{t("included")}</dt>
+                        <dt>{t(offer.quotaScope === "team" ? "includedTeam" : "included")}</dt>
                         <dd>
-                          {t("includedSummary", {
-                            storage: formatMailboxStorage(offer.storageBytesPerMailbox, locale),
-                            messages: offer.includedOutboundPerMailbox,
-                          })}
+                          {t(
+                            offer.quotaScope === "team" ? "includedTeamSummary" : "includedSummary",
+                            {
+                              storage: formatMailboxStorage(offer.storageBytesPerMailbox, locale),
+                              messages: offer.includedOutboundPerMailbox,
+                            },
+                          )}
                         </dd>
                       </div>
                       <div className={styles.total}>
                         <dt>{t("total", { count: validSeats ? quantity : 0 })}</dt>
                         <dd>
-                          {validSeats
+                          {total
                             ? t("priceInterval", {
-                                amount: formatMailboxPrice(
-                                  offer.unitAmount * quantity,
-                                  offer.currency,
-                                  locale,
-                                ),
+                                amount: formatMailboxPrice(total.amount, total.currency, locale),
                                 interval: t(`interval.${offer.interval}`),
                               })
                             : "—"}
                         </dd>
                       </div>
                     </dl>
+                    {localTotal ? (
+                      <p className={styles.hint}>
+                        {t("localTotal", {
+                          amount: t("priceInterval", {
+                            amount: formatMailboxPrice(
+                              localTotal.amount,
+                              localTotal.currency,
+                              locale,
+                            ),
+                            interval: t(`interval.${offer.interval}`),
+                          }),
+                        })}
+                      </p>
+                    ) : null}
+                    {offer.trialDays ? (
+                      <p className={styles.trialOffer}>
+                        {t("trialOffer", { days: offer.trialDays })}
+                      </p>
+                    ) : null}
                     <p className={styles.hint}>{t("checkoutTerms")}</p>
                     {pending || failure ? (
                       <p className={styles.notice} role={failure ? "alert" : "status"}>
@@ -753,13 +864,13 @@ export function MailboxServicePanel({
                       className="ms-btn ms-btn-primary"
                       disabled={!validSeats || checkout.isPending || refreshing}
                     >
-                      {t(
-                        checkout.isPending
-                          ? "opening"
-                          : pending || lockedSeats !== null
-                            ? "retryCheckout"
-                            : "subscribe",
-                      )}
+                      {checkout.isPending
+                        ? t("opening")
+                        : pending || lockedSeats !== null
+                          ? t("retryCheckout")
+                          : offer.trialDays
+                            ? t("startTrial", { days: offer.trialDays })
+                            : t("subscribe")}
                     </button>
                   </fieldset>
                 </form>

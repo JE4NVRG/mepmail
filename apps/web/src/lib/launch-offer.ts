@@ -9,13 +9,21 @@ export const LAUNCH_OFFER = {
     { id: "gib1", storageGiB: 1, monthlyCents: 590, monthlyRecipientDeliveries: 500 },
     { id: "gib10", storageGiB: 10, monthlyCents: 990, monthlyRecipientDeliveries: 2000 },
   ],
-  /** Correio without Envio: one plan per mailbox (Jean, 2026-10-10). Display only. */
+  /**
+   * Correio without Envio (Jean, 2026-10-10): a base with 3 mailboxes that share
+   * the storage and outbound allowance, extra mailboxes on top, a 7-day free trial
+   * with the card, and the same terms in reais in Brazil. Display only.
+   */
   standaloneMailbox: {
     id: "solo",
     storageGiB: 10,
     monthlyCents: 1290,
     monthlyRecipientDeliveries: 2000,
     domains: 3,
+    includedMailboxes: 3,
+    extraMonthlyCents: 390,
+    trialDays: 7,
+    brl: { monthlyCents: 6490, extraMonthlyCents: 1990 },
   },
   internal: { storageGiBPerMailbox: 50 },
 } as const;

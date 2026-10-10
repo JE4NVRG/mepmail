@@ -71,7 +71,20 @@ export async function getMailboxUsage(
   const storage = new Map(stored.map((row) => [row.mailboxId, Number(row.bytes)]));
   const queue = new Map(queued.map((row) => [row.mailboxId, Number(row.bytes)]));
   const recipients = new Map(outbound.map((row) => [row.mailboxId, Number(row.recipients)]));
+  // A "team" quota is one allowance for every mailbox of the team, readable or not.
+  const team =
+    plan?.quotaScope === "team"
+      ? await teamUsage(db, actor.teamId, entitlement.usagePeriod?.start ?? null)
+      : null;
   return {
+    quotaScope: plan?.quotaScope ?? ("mailbox" as const),
+    team: team && {
+      ...team,
+      storageLimitBytes: plan?.storageBytesPerMailbox ?? 0,
+      outboundLimitRecipients: entitlement.unlimitedOutbound
+        ? null
+        : (plan?.includedOutboundPerMailbox ?? 0),
+    },
     mailboxes: readable.map((box) => ({
       mailboxId: box.id,
       address: box.address,
@@ -86,5 +99,26 @@ export async function getMailboxUsage(
       periodStart: entitlement.usagePeriod?.start ?? null,
       periodEnd: entitlement.usagePeriod?.end ?? null,
     })),
+  };
+}
+
+/** The whole team's storage and this period's recipients, for a shared ("team") quota. */
+async function teamUsage(db: Db, teamId: string, periodStart: Date | null) {
+  const [items] = await db
+    .select({ bytes: sql<string>`coalesce(sum(${schema.mailboxItems.rawBytes}),0)::text` })
+    .from(schema.mailboxItems)
+    .where(eq(schema.mailboxItems.teamId, teamId));
+  const [outbox] = await db
+    .select({
+      bytes: sql<string>`coalesce(sum(${schema.mailboxOutbox.rawBytes}) filter (where ${schema.mailboxOutbox.ciphertext} is not null),0)::text`,
+      recipients: periodStart
+        ? sql<string>`coalesce(sum(${schema.mailboxOutbox.recipientCount}) filter (where ${schema.mailboxOutbox.periodStart} = ${periodStart} and ${schema.mailboxOutbox.status} <> 'failed'),0)::text`
+        : sql<string>`'0'`,
+    })
+    .from(schema.mailboxOutbox)
+    .where(eq(schema.mailboxOutbox.teamId, teamId));
+  return {
+    storageUsedBytes: Number(items?.bytes ?? 0) + Number(outbox?.bytes ?? 0),
+    outboundUsedRecipients: Number(outbox?.recipients ?? 0),
   };
 }

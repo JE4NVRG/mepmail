@@ -36,6 +36,11 @@ export const mailboxCheckouts = pgTable(
     interval: text("interval").$type<"month" | "year">().notNull(),
     storageBytesPerMailbox: bigint("storage_bytes_per_mailbox", { mode: "number" }).notNull(),
     includedOutboundPerMailbox: integer("included_outbound_per_mailbox").notNull(),
+    quotaScope: text("quota_scope").$type<"mailbox" | "team">().notNull().default("mailbox"),
+    includedMailboxes: integer("included_mailboxes").notNull().default(1),
+    extraUnitAmount: integer("extra_unit_amount"),
+    /** Free trial the Checkout was opened with (0 = none); decided when the lease is created. */
+    trialDays: integer("trial_days").notNull().default(0),
     successUrl: text("success_url").notNull(),
     cancelUrl: text("cancel_url").notNull(),
     automaticTax: boolean("automatic_tax").notNull().default(false),
@@ -69,6 +74,10 @@ export const mailboxCheckouts = pgTable(
     check("mailbox_checkouts_amount_check", sql`${t.unitAmount} > 0`),
     check("mailbox_checkouts_interval_check", sql`${t.interval} in ('month','year')`),
     check("mailbox_checkouts_currency_check", sql`${t.currency} ~ '^[a-z]{3}$'`),
+    check(
+      "mailbox_checkouts_terms_check",
+      sql`${t.quotaScope} in ('mailbox','team') and ${t.includedMailboxes} between 1 and 10000 and (${t.extraUnitAmount} is null or ${t.extraUnitAmount} > 0) and ${t.trialDays} between 0 and 30 and ${t.seats} >= ${t.includedMailboxes}`,
+    ),
     check(
       "mailbox_checkouts_ready_check",
       sql`${t.status} <> 'ready' or (${t.stripeSessionId} is not null and ${t.checkoutUrl} is not null)`,

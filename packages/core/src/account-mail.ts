@@ -48,6 +48,7 @@ export const ACCOUNT_MAIL_KINDS = [
   "activation.finish_domain",
   "activation.help",
   "mailbox.repriced",
+  "mailbox.trial_ending",
 ] as const;
 export type AccountMailKind = (typeof ACCOUNT_MAIL_KINDS)[number];
 

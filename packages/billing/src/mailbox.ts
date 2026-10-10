@@ -14,6 +14,23 @@ export interface MailboxPriceTerms {
   interval: "month" | "year";
   storageBytesPerMailbox: number;
   includedOutboundPerMailbox: number;
+  /**
+   * "team": storageBytesPerMailbox and includedOutboundPerMailbox are the whole
+   * team's allowance, shared by its mailboxes. Absent = per mailbox.
+   */
+  quotaScope?: "mailbox" | "team" | undefined;
+  /**
+   * A graduated tiered price: unitAmount covers the first includedMailboxes
+   * seats and every seat above them costs extraUnitAmount. Absent = per unit.
+   */
+  includedMailboxes?: number | undefined;
+  extraUnitAmount?: number | undefined;
+  /** Free trial offered with a first purchase of this price, in days (Checkout only). */
+  trialDays?: number | undefined;
+  /** Display only: the same terms in a local currency set on the price's currency_options. */
+  localCurrency?:
+    | { currency: string; unitAmount: number; extraUnitAmount?: number | undefined }
+    | undefined;
 }
 
 export interface MailboxCatalog {
@@ -75,8 +92,30 @@ function validTerms(terms: MailboxPriceTerms): boolean {
     terms.storageBytesPerMailbox <= 10995116277760 &&
     Number.isSafeInteger(terms.includedOutboundPerMailbox) &&
     terms.includedOutboundPerMailbox >= 0 &&
-    terms.includedOutboundPerMailbox <= 1000000
+    terms.includedOutboundPerMailbox <= 1000000 &&
+    (terms.quotaScope === undefined ||
+      terms.quotaScope === "mailbox" ||
+      terms.quotaScope === "team") &&
+    (terms.includedMailboxes === undefined || positiveInt(terms.includedMailboxes, 10000)) &&
+    (terms.extraUnitAmount === undefined || positiveInt(terms.extraUnitAmount, 2147483647)) &&
+    (terms.trialDays === undefined ||
+      (Number.isSafeInteger(terms.trialDays) && terms.trialDays >= 0 && terms.trialDays <= 30)) &&
+    (terms.localCurrency === undefined ||
+      (/^[a-z]{3}$/.test(terms.localCurrency.currency) &&
+        terms.localCurrency.currency !== terms.currency &&
+        positiveInt(terms.localCurrency.unitAmount, 2147483647) &&
+        (terms.localCurrency.extraUnitAmount === undefined ||
+          positiveInt(terms.localCurrency.extraUnitAmount, 2147483647))))
   );
+}
+
+function positiveInt(value: number, max: number) {
+  return Number.isSafeInteger(value) && value >= 1 && value <= max;
+}
+
+/** Seats the base price covers (1 for a per-unit price). */
+export function mailboxIncludedSeats(terms: Pick<MailboxPriceTerms, "includedMailboxes">) {
+  return terms.includedMailboxes ?? 1;
 }
 
 function trustedTerms(catalog: MailboxCatalog | null, priceId: string): MailboxPriceTerms | null {
@@ -92,11 +131,16 @@ export function mailboxCheckoutTerms(catalog: MailboxCatalog | null): MailboxPri
 }
 
 function licensedPrice(price: Stripe.Price, terms: MailboxPriceTerms): boolean {
+  // A Stripe price's amounts are immutable, so its id plus the scheme binds the
+  // approved tiers; the tiers themselves are only returned when expanded.
+  const amounts =
+    terms.extraUnitAmount === undefined
+      ? price.unit_amount === terms.unitAmount && price.billing_scheme === "per_unit"
+      : price.billing_scheme === "tiered" && price.tiers_mode === "graduated";
   return (
     price.id === terms.priceId &&
     price.currency === terms.currency &&
-    price.unit_amount === terms.unitAmount &&
-    price.billing_scheme === "per_unit" &&
+    amounts &&
     price.recurring?.usage_type === "licensed" &&
     price.recurring.interval === terms.interval &&
     price.recurring.interval_count === 1 &&
@@ -133,14 +177,17 @@ export function mailboxIncreaseInvoiceMatches(
 ): boolean {
   const invoice = evidence;
   const item = sub.items.data[0];
+  const tiered = item?.price.billing_scheme === "tiered";
+  // A multi-currency price bills in the subscription's currency, not the price's default.
+  const currency = sub.currency || item?.price.currency;
   const start = Math.floor(owner.periodStart.getTime() / 1000);
   const end = Math.floor(owner.periodEnd.getTime() / 1000);
   const proration = owner.prorationAt ? Math.floor(owner.prorationAt.getTime() / 1000) : null;
   if (
     !item ||
     sub.items.data.length !== 1 ||
-    !Number.isSafeInteger(item.price.unit_amount) ||
-    (item.price.unit_amount ?? 0) <= 0 ||
+    (!tiered &&
+      (!Number.isSafeInteger(item.price.unit_amount) || (item.price.unit_amount ?? 0) <= 0)) ||
     !Number.isSafeInteger(owner.seats) ||
     owner.seats < 1 ||
     !Number.isSafeInteger(start) ||
@@ -153,7 +200,7 @@ export function mailboxIncreaseInvoiceMatches(
     (owner.invoiceId && invoice.id !== owner.invoiceId) ||
     idOf(invoice.customer) !== owner.customerId ||
     invoice.livemode !== owner.livemode ||
-    invoice.currency !== item.price.currency ||
+    invoice.currency !== currency ||
     idOf(invoice.parent?.subscription_details?.subscription) !== sub.id ||
     invoice.billing_reason !== "subscription_update" ||
     invoice.lines?.has_more !== false ||
@@ -165,7 +212,7 @@ export function mailboxIncreaseInvoiceMatches(
     return (
       line.invoice === invoice.id &&
       line.livemode === owner.livemode &&
-      line.currency === item.price.currency &&
+      line.currency === currency &&
       line.parent?.type === "subscription_item_details" &&
       details?.subscription === sub.id &&
       details.subscription_item === item.id &&
@@ -175,9 +222,12 @@ export function mailboxIncreaseInvoiceMatches(
       line.pricing?.type === "price_details" &&
       idOf(line.pricing.price_details?.price) === item.price.id &&
       // Stripe may omit the unit amount on a proration; its canonical price remains bound.
-      (line.pricing.unit_amount_decimal == null
-        ? details.proration === true
-        : Number(line.pricing.unit_amount_decimal) === item.price.unit_amount) &&
+      // A tiered or local-currency line has no single default-currency unit amount.
+      (tiered || currency !== item.price.currency
+        ? true
+        : line.pricing.unit_amount_decimal == null
+          ? details.proration === true
+          : Number(line.pricing.unit_amount_decimal) === item.price.unit_amount) &&
       line.quantity === owner.seats &&
       (line.quantity_decimal == null || Number(line.quantity_decimal) === owner.seats) &&
       Number.isSafeInteger(line.period?.start) &&
@@ -214,6 +264,9 @@ export interface MailboxSubscriptionProjection {
   seats: number;
   storageBytesPerMailbox: number;
   includedOutboundPerMailbox: number;
+  quotaScope: "mailbox" | "team";
+  includedMailboxes: number;
+  extraUnitAmount: number | null;
   periodStart: Date;
   periodEnd: Date;
   stripeCustomerId: string;
@@ -289,6 +342,9 @@ export function projectMailboxSubscription(
     seats,
     storageBytesPerMailbox: terms.storageBytesPerMailbox,
     includedOutboundPerMailbox: terms.includedOutboundPerMailbox,
+    quotaScope: terms.quotaScope ?? "mailbox",
+    includedMailboxes: mailboxIncludedSeats(terms),
+    extraUnitAmount: terms.extraUnitAmount ?? null,
     periodStart,
     periodEnd,
     stripeCustomerId: owner.customerId,
@@ -315,6 +371,8 @@ export interface MailboxCheckoutInput {
   idempotencyKey: string;
   /** Explicit only; no new tax registration or automatic tax default. */
   automaticTax?: boolean;
+  /** Free trial the caller decided for this first purchase; 0 or absent = none. */
+  trialDays?: number;
 }
 
 /** Additional methods already supplied by the pinned SDK; readers are optional for offline fixtures. */
@@ -423,8 +481,10 @@ export async function createMailboxCheckoutSession(
     !input.teamId ||
     !/^cus_[A-Za-z0-9_]+$/.test(input.customerId) ||
     !Number.isSafeInteger(input.seats) ||
-    input.seats < 1 ||
+    input.seats < mailboxIncludedSeats(terms) ||
     input.seats > 10000 ||
+    (input.trialDays !== undefined &&
+      (!Number.isSafeInteger(input.trialDays) || input.trialDays < 0 || input.trialDays > 30)) ||
     !/^[\x21-\x7e]{1,255}$/.test(input.idempotencyKey) ||
     !safeUrl(input.successUrl) ||
     !safeUrl(input.cancelUrl)
@@ -441,7 +501,17 @@ export async function createMailboxCheckoutSession(
       customer: input.customerId,
       client_reference_id: input.teamId,
       metadata,
-      subscription_data: { metadata },
+      subscription_data: {
+        metadata,
+        ...(input.trialDays
+          ? {
+              trial_period_days: input.trialDays,
+              // The card is collected up front; a trial without one ends canceled.
+              trial_settings: { end_behavior: { missing_payment_method: "cancel" as const } },
+            }
+          : {}),
+      },
+      ...(input.trialDays ? { payment_method_collection: "always" as const } : {}),
       line_items: [{ price: terms.priceId, quantity: input.seats }],
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,

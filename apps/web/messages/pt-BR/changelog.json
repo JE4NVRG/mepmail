@@ -28,6 +28,34 @@
   },
   "releases": [
     {
+      "version": "0.95",
+      "date": "2026-10-10",
+      "title": "Correio com 3 caixas por US$ 12,90 e 7 dias grátis",
+      "summary": "Só o Correio agora inclui 3 caixas que dividem 10 GiB e 2.000 entregas de saída, caixas extras custam US$ 3,90 e a primeira assinatura começa com 7 dias grátis. No Brasil a cobrança é em reais.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Correio sem plano de Envio: US$ 12,90 por mês (US$ 129 por ano) com 3 caixas, para pessoas ou agentes, dividindo 10 GiB e 2.000 entregas de saída por mês; cada caixa extra custa US$ 3,90 por mês.",
+            "No Brasil, o checkout cobra em reais: R$ 64,90 por mês e R$ 19,90 por caixa extra."
+          ]
+        },
+        {
+          "kind": "added",
+          "items": [
+            "Teste grátis de 7 dias na primeira assinatura, com o cartão cadastrado na hora: até 50 destinatários por dia e 200 no total até o primeiro pagamento, e um aviso 2 dias antes do fim.",
+            "A referência da API nomeia cada endpoint, com resumo, um exemplo de envio e a resposta de limite de taxa, e a documentação lista o nó da comunidade para o n8n."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Páginas mais leves: o navegador não baixa mais textos que só o servidor usa, e a imagem de compartilhamento ficou dez vezes menor."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.94",
       "date": "2026-10-10",
       "title": "Aprovação de remetentes e convites de calendário",

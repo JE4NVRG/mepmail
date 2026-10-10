@@ -90,6 +90,7 @@ import { warnExpiringMailboxAgentKeys } from "./handlers/mailbox-agent-key-expir
 import { runMailboxCapacity } from "./handlers/mailbox-capacity.js";
 import { runMailboxReprice } from "./handlers/mailbox-reprice.js";
 import { runMailboxSchedules } from "./handlers/mailbox-scheduling.js";
+import { warnEndingMailboxTrials } from "./handlers/mailbox-trial-ending.js";
 import { runMonitorHealth } from "./handlers/monitor-health.js";
 import { reportPlanMove, sweepNotifications } from "./handlers/notify.js";
 import { runPlatformBreaker } from "./handlers/platform-breaker.js";
@@ -510,6 +511,8 @@ await queue.scheduleCrons({
     if (mailboxRegistryEnabled) {
       const keys = await warnExpiringMailboxAgentKeys(db, { mailer, appBaseUrl: env.APP_BASE_URL });
       if (keys.sent > 0) console.log(`notifications.sweep: agentKeysExpiring=${keys.sent}`);
+      const trials = await warnEndingMailboxTrials(db, { mailer, appBaseUrl: env.APP_BASE_URL });
+      if (trials.sent > 0) console.log(`notifications.sweep: trialsEnding=${trials.sent}`);
     }
   },
   "platform.breaker": async () => {

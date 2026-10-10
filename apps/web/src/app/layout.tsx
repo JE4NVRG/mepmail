@@ -6,10 +6,11 @@ import { env } from "@millionsend/config";
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
-import { getLocale, getTranslations } from "next-intl/server";
+import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { AdvertisingConsent } from "@/components/advertising-consent";
 import { Providers } from "@/components/providers";
 import { UmamiAnalytics } from "@/components/umami-analytics";
+import { SERVER_ONLY_NAMESPACES } from "@/lib/client-messages";
 import { THEME_INIT_SCRIPT, THEME_KEY } from "@/lib/theme";
 
 export const viewport: Viewport = {
@@ -42,7 +43,7 @@ export async function generateMetadata(): Promise<Metadata> {
       type: "website",
       title: t("meta.title"),
       description: t("meta.description"),
-      images: [{ url: "/og.png", width: 1280, height: 640, alt: t("appName") }],
+      images: [{ url: "/og.jpg", width: 1280, height: 640, alt: t("appName") }],
     },
     twitter: { card: "summary_large_image" },
   };
@@ -53,6 +54,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Cookie mirror of the localStorage preference lets SSR paint the right
   // theme; the inline script below corrects any stale cookie pre-paint.
   const theme = (await cookies()).get(THEME_KEY)?.value;
+  // The browser gets only what client components read: the public pages render
+  // these long namespaces on the server, and shipping them made every page (the 404
+  // included) carry ~110 KB of copy it never uses.
+  const messages = Object.fromEntries(
+    Object.entries(await getMessages()).filter(([ns]) => !SERVER_ONLY_NAMESPACES.has(ns)),
+  );
   return (
     <html
       lang={locale}
@@ -63,7 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static theme bootstrap, no user input */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <UmamiAnalytics />
-        <NextIntlClientProvider>
+        <NextIntlClientProvider messages={messages}>
           <Providers>
             {children}
             <AdvertisingConsent />
