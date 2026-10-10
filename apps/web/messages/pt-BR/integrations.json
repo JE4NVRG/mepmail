@@ -20,6 +20,7 @@
         "bullets": [
           "Envie, agende, cancele e envie em lote direto de um node do fluxo.",
           "O MepMail Trigger assina os eventos que você escolher e registra (e remove) o próprio webhook automaticamente.",
+          "Correio: inicie um fluxo quando chega e-mail numa caixa de agente, leia a mensagem e salve um rascunho de resposta — enviado só depois da aprovação do dono quando a chave não tem permissão de envio.",
           "Assinaturas de payload (Svix / Standard Webhooks) verificadas de fábrica.",
           "Funciona com o MepMail Cloud ou qualquer instância auto-hospedada. Exige API key de acesso total."
         ],

@@ -20,6 +20,14 @@ e o trigger dele inicia fluxos a partir de eventos do MepMail.
 - **Credencial** — `MepMail API`: a origem da sua API mais uma chave `ms_` com
   acesso total (o trigger gerencia o próprio webhook, então acesso total é
   obrigatório).
+- **Correio** (0.2.0) — o evento *Mailbox Received* do trigger dispara quando
+  chega e-mail numa caixa de agente; ligue *Fetch Correio Message* e o trigger
+  lê a mensagem (remetente, assunto, texto, nomes dos anexos) com uma credencial
+  `MepMail Correio API`: a origem do painel mais uma chave da caixa (`mmb_` ou
+  `mmt_`). O recurso *Correio Message* do node lista e lê mensagens, salva um
+  rascunho ou uma resposta e envia um rascunho — ou pede a aprovação do dono
+  quando a chave não tem permissão de envio. Veja
+  [eventos do Correio](/pt-BR/concepts/webhooks#eventos-do-correio).
 
 Instale em **Configurações → Community nodes → Install** com o nome
 `n8n-nodes-mepmail`, ou pelo

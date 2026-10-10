@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.102",
+      "date": "2026-10-10",
+      "title": "O n8n lê e responde o Correio",
+      "summary": "O nó do n8n 0.2.0 inicia fluxos quando chega e-mail numa caixa de agente e consegue ler mensagens, salvar rascunhos de resposta e enviá-los, com a aprovação do dono quando a chave não tem permissão de envio.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "n8n-nodes-mepmail 0.2.0: gatilho Mailbox Received com Fetch Correio Message, credencial MepMail Correio API (chave da caixa) e o recurso Correio Message (Get, Get Many, Create Draft, Send Draft).",
+            "A página de integrações e os docs (pacotes, integrações) descrevem o fluxo do Correio."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.101",
       "date": "2026-10-10",
       "title": "Ajuste a largura das colunas do Correio",

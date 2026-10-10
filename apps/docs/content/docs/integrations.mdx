@@ -19,6 +19,13 @@ workflow, and its trigger starts workflows from MepMail events.
   and verifies payload signatures (Svix / Standard Webhooks) out of the box.
 - **Credential** — `MepMail API`: your API origin plus an `ms_` key with full
   access (the trigger manages its own webhook, so full access is required).
+- **Correio** (0.2.0) — the trigger's *Mailbox Received* event fires when mail
+  reaches an agent mailbox; turn on *Fetch Correio Message* and the trigger
+  reads it (sender, subject, text, attachment names) with a `MepMail Correio API`
+  credential: the dashboard origin plus a mailbox key (`mmb_` or `mmt_`). The
+  node's *Correio Message* resource lists and reads messages, saves a draft or a
+  reply, and sends a draft — or asks the owner to approve it when the key has
+  no send permission. See [Correio events](/concepts/webhooks#correio-events).
 
 Install it from **Settings → Community nodes → Install** with the package
 name `n8n-nodes-mepmail`, or from

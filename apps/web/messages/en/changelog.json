@@ -23,6 +23,21 @@
   },
   "releases": [
     {
+      "version": "0.102",
+      "date": "2026-10-10",
+      "title": "n8n reads and answers Correio",
+      "summary": "The n8n node 0.2.0 starts workflows when mail reaches an agent mailbox and can read messages, save reply drafts and send them, with the owner's approval when the key has no send permission.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "n8n-nodes-mepmail 0.2.0: Mailbox Received trigger with Fetch Correio Message, a MepMail Correio API credential (mailbox key) and the Correio Message resource (Get, Get Many, Create Draft, Send Draft).",
+            "The integrations page and the docs (packages, integrations) describe the Correio flow."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.101",
       "date": "2026-10-10",
       "title": "Resize Correio's columns",
