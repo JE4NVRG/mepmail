@@ -2930,6 +2930,22 @@
   white-space: nowrap;
 }
 
+/* "Esvaziar lixeira" under the trash help, and "Excluir para sempre" in the reader. */
+.emptyTrash {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 10px;
+  padding: 6px 10px;
+  min-height: 36px;
+  font-size: 12px;
+  color: var(--ms-danger);
+}
+.purgeAction {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 /* Correio plan meters (mailbox-usage-panel.tsx): calm until 80 %, then a
    warning tone, the danger tone at the limit or when receiving pauses. */
 .planMetric {

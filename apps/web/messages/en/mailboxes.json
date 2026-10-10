@@ -405,7 +405,7 @@
     "bulkTrashed": "{count, plural, one {# message moved} other {# messages moved}} to Trash.",
     "bulkRestored": "{count, plural, one {# message restored} other {# messages restored}}.",
     "bulkPartial": "{count, number} of {total, number} messages changed. Refresh to check the remaining messages before trying again.",
-    "trashHelp": "Messages are preserved here. Select one or more to restore them to their original folder.",
+    "trashHelp": "Messages are kept here. Select to restore them to their folder, or delete forever to free space.",
     "limitedList": "Showing the most recent messages. Choose a mailbox or folder to narrow this list.",
     "archive": "Archive",
     "unarchive": "Move to Inbox",
@@ -530,9 +530,10 @@
       },
       "pausing": "Pausing receiving: the team passed this period's {reason} limit. New mail will go back to the sender.",
       "paused": "Receiving paused: the team passed this period's {reason} limit. New mail goes back to the sender until {date} or until you upgrade. Reading and exporting work as usual.",
-      "pausedStorage": "Receiving paused: the team's storage is full. New mail goes back to the sender until you upgrade. Reading and exporting work as usual.",
+      "pausedStorage": "Receiving paused: the team's storage is full. Empty the Trash or upgrade; until then, new mail goes back to the sender. Reading and exporting work as usual.",
       "resuming": "Resuming receiving: the mailboxes receive again in a moment."
-    }
+    },
+    "storageTrashHint": "The Trash takes space too: emptying it frees storage."
   },
   "offer": {
     "eyebrow": "MepMail Mail",
@@ -1145,5 +1146,19 @@
   "attachmentsLeftBehind": "{count, plural, one {This attachment stays behind because it is over 256 KB, the sending limit: {names}.} other {These attachments stay behind because they are over 256 KB, the sending limit: {names}.}}",
   "planQuota": "The plan reached this period's limit (recipients or data sent, or storage). Nothing was sent and the draft is still saved.",
   "viewPlans": "See plans",
-  "draftQuota": "The plan's storage is full: new drafts can't be saved. Upgrade in Settings → License and usage. Your text stays here."
+  "draftQuota": "The plan's storage is full: new drafts can't be saved. Upgrade in Settings → License and usage. Your text stays here.",
+  "purge": {
+    "emptyTrash": "Empty trash",
+    "deleteForever": "Delete forever",
+    "deleteSelected": "{count, plural, one {Delete # message forever} other {Delete # messages forever}}",
+    "working": "Deleting…",
+    "confirmAllTitle": "Empty the trash?",
+    "confirmSomeTitle": "{count, plural, one {Delete # message forever?} other {Delete # messages forever?}}",
+    "confirmBody": "This can't be undone. The messages and attachments leave MepMail and the space returns to your plan; copies in backups are gone within 30 days. Sent messages stay as the record of the send.",
+    "done": "{count, plural, one {# message deleted forever} other {# messages deleted forever}} · {size} freed.",
+    "kept": "{count, plural, one {# sent message stays as the record of the send.} other {# sent messages stay as the record of the send.}}",
+    "onlySent": "{count, plural, one {Nothing deleted: the sent message stays as the record of the send.} other {Nothing deleted: the # sent messages stay as the record of the send.}}",
+    "empty": "The trash is already empty.",
+    "error": "Couldn't delete right now. Some may already be gone; refresh the list and try again."
+  }
 }

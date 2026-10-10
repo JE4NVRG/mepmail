@@ -360,6 +360,82 @@ export const ptBR = {
     button: "Abrir cobrança",
     muted: ["Você recebe este aviso uma vez, cerca de 2 dias antes do fim do teste."],
   },
+  "mailbox.usage_near": {
+    subject: "{team}: {title} em {share} do plano {plan}",
+    body: ["{detail}", "{upgradeLine}"],
+    button: "Ver uso e planos",
+    muted: ["Você recebe este aviso uma vez por mês de cobrança para cada limite do plano."],
+    extra: {
+      title_outboundRecipients: "destinatários enviados",
+      title_outboundBytes: "envios",
+      title_inboundDeliveries: "mensagens recebidas",
+      title_inboundBytes: "recebimentos",
+      title_storageBytes: "armazenamento",
+      outboundRecipients:
+        "{team} já enviou para {used} dos {limit} destinatários incluídos neste mês de cobrança. No limite, novos envios são recusados até o mês renovar em {date}.",
+      outboundBytes:
+        "{team} já enviou {used} dos {limit} de e-mail incluídos neste mês de cobrança. No limite, novos envios são recusados até o mês renovar em {date}.",
+      inboundDeliveries:
+        "{team} já recebeu {used} das {limit} mensagens incluídas neste mês de cobrança. Um pouco depois do limite, o recebimento pausa até o mês renovar em {date}, e o remetente recebe uma devolução.",
+      inboundBytes:
+        "{team} já recebeu {used} dos {limit} de e-mail incluídos neste mês de cobrança. Um pouco depois do limite, o recebimento pausa até o mês renovar em {date}, e o remetente recebe uma devolução.",
+      storageBytes:
+        "As caixas de {team} usam {used} dos {limit} de armazenamento do plano. Quando encher, o recebimento pausa e novos rascunhos são recusados; as mensagens guardadas continuam legíveis.",
+      upgrade:
+        "Para ter mais agora, passe para o plano {next} no Correio; a diferença é cobrada na hora.",
+      largest:
+        "O Equipe é o maior plano. Escreva para suporte@mepmail.dev se a sua equipe precisar de mais.",
+    },
+  },
+  "mailbox.usage_reached": {
+    subject: "{team}: limite de {title} atingido no plano {plan}",
+    body: ["{detail}", "{upgradeLine}"],
+    button: "Ver uso e planos",
+    muted: ["Você recebe este aviso uma vez por mês de cobrança para cada limite do plano."],
+    extra: {
+      title_outboundRecipients: "destinatários enviados",
+      title_outboundBytes: "envios",
+      title_inboundDeliveries: "mensagens recebidas",
+      title_inboundBytes: "recebimentos",
+      title_storageBytes: "armazenamento",
+      outboundRecipients:
+        "{team} já enviou para todos os {limit} destinatários incluídos neste mês de cobrança. Novos envios são recusados até o mês renovar em {date}.",
+      outboundBytes:
+        "{team} já enviou todos os {limit} de e-mail incluídos neste mês de cobrança. Novos envios são recusados até o mês renovar em {date}.",
+      inboundDeliveries:
+        "{team} já recebeu as {limit} mensagens incluídas neste mês de cobrança ({used} até agora). Um pouco depois do limite, o recebimento pausa até o mês renovar em {date}, e o remetente recebe uma devolução.",
+      inboundBytes:
+        "{team} já recebeu os {limit} de e-mail incluídos neste mês de cobrança ({used} até agora). Um pouco depois do limite, o recebimento pausa até o mês renovar em {date}, e o remetente recebe uma devolução.",
+      storageBytes:
+        "As caixas de {team} usam todos os {limit} de armazenamento do plano. O recebimento está pausado e novos rascunhos são recusados; as mensagens guardadas continuam legíveis.",
+      upgrade:
+        "Para ter mais agora, passe para o plano {next} no Correio; a diferença é cobrada na hora.",
+      largest:
+        "O Equipe é o maior plano. Escreva para suporte@mepmail.dev se a sua equipe precisar de mais.",
+    },
+  },
+  "mailbox.receiving_paused": {
+    subject: "{team}: o recebimento do Correio está pausado",
+    body: [
+      "Desde {since}, e-mails para os endereços de {team} voltam para o remetente (caixa indisponível) e não são guardados, porque {reason}.",
+      "{resume} {upgradeLine}",
+    ],
+    button: "Ver uso e planos",
+    muted: ["As mensagens recebidas antes da pausa continuam guardadas e legíveis."],
+    extra: {
+      reason_inbound_deliveries:
+        "as mensagens recebidas neste mês de cobrança passaram do limite do plano {plan}",
+      reason_inbound_bytes:
+        "os e-mails recebidos neste mês de cobrança passaram do limite do plano {plan}",
+      reason_storage: "o armazenamento do plano {plan} está cheio",
+      resumePeriod: "O recebimento volta sozinho quando o mês de cobrança renovar em {date}.",
+      resumeStorage: "O recebimento volta sozinho quando o armazenamento ficar abaixo do limite.",
+      upgrade:
+        "Para receber de novo agora, passe para o plano {next} no Correio; a diferença é cobrada na hora.",
+      largest:
+        "O Equipe é o maior plano. Escreva para suporte@mepmail.dev se a sua equipe precisar de mais.",
+    },
+  },
 } as const satisfies Record<AccountMailKind, AccountMailEntry>;
 
 export const ptBRPhrases = {

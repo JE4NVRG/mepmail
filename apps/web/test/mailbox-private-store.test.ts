@@ -11,10 +11,13 @@ import { EnvKeyring, type Keyring } from "../../../packages/core/src/crypto/keyr
 import {
   importMailboxMime,
   listMailboxItems,
+  MAILBOX_PURGE_BATCH,
   type MailboxContentActor,
+  purgeMailboxTrash,
   readMailboxItem,
   saveMailboxDraft,
   setMailboxDeliveryFolder,
+  setMailboxItemTrash,
 } from "../../../packages/core/src/mailbox-private-store.js";
 import {
   createMailboxRegistry,
@@ -365,5 +368,139 @@ describe("private mailbox persistence", () => {
     };
     const item = await imported("mutable", mailboxId, mutable, hook);
     expect((await read(item.id)).raw.equals(mime)).toBe(true);
+  });
+});
+
+describe("permanent deletion from the trash", () => {
+  const trash = async (id: string) => {
+    const [row] = await db.select().from(schema.mailboxItems).where(eq(schema.mailboxItems.id, id));
+    await setMailboxItemTrash(db, owner(), {
+      mailboxId,
+      id,
+      expectedRevision: row!.revision,
+      trashed: true,
+    });
+  };
+  const exists = async (id: string) =>
+    (await db.select().from(schema.mailboxItems).where(eq(schema.mailboxItems.id, id))).length ===
+    1;
+
+  it("removes only trashed messages, frees their bytes and lets only the human owner do it", async () => {
+    const kept = await imported("fixture:kept");
+    const gone = await imported("fixture:gone");
+    await trash(gone.id);
+    await grantMailboxRegistry(db, owner(), { mailboxId, userId: "member", permission: "draft" });
+    for (const actor of [
+      member(),
+      { teamId, userId: "admin" },
+      { ...owner(), supportView: true },
+      { ...owner(), agentAccess: true },
+    ])
+      await expect(purgeMailboxTrash(db, actor, { mailboxId })).rejects.toMatchObject({
+        code: "forbidden",
+      });
+    await expect(
+      purgeMailboxTrash(db, { teamId: otherTeam, userId: "outsider" }, { mailboxId }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    // A message outside the trash is never touched, even when named.
+    expect(await purgeMailboxTrash(db, owner(), { mailboxId, ids: [kept.id] })).toEqual({
+      deleted: 0,
+      freedBytes: 0,
+      keptSent: 0,
+      remaining: 0,
+    });
+    const [stored] = await db
+      .select({ rawBytes: schema.mailboxItems.rawBytes })
+      .from(schema.mailboxItems)
+      .where(eq(schema.mailboxItems.id, gone.id));
+    const result = await purgeMailboxTrash(db, owner(), { mailboxId });
+    expect(result).toEqual({
+      deleted: 1,
+      freedBytes: stored!.rawBytes,
+      keptSent: 0,
+      remaining: 0,
+    });
+    expect(await exists(gone.id)).toBe(false);
+    expect(await exists(kept.id)).toBe(true);
+    await expect(read(gone.id)).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("keeps a sent message (outbox provenance and sending count) and reports it", async () => {
+    const draft = await saveMailboxDraft(db, keyring, owner(), {
+      mailboxId,
+      expectedRevision: 0,
+      raw: mime,
+    });
+    const [membership] = await db
+      .select({ id: schema.teamMembers.id })
+      .from(schema.teamMembers)
+      .where(and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamMembers.userId, "owner")));
+    await db.insert(schema.mailboxOutbox).values({
+      teamId,
+      mailboxId,
+      draftId: draft.id,
+      draftRevision: draft.revision,
+      approvedBy: "owner",
+      approvedMembershipId: membership!.id,
+      recipientCount: 1,
+      periodStart: new Date(Date.UTC(2026, 9, 1)),
+      periodEnd: new Date(Date.UTC(2026, 10, 1)),
+      rawBytes: 300,
+      rawSha256: "a".repeat(64),
+      // A failed submission keeps its sealed payload (mailbox_outbox_payload_check).
+      ciphertext: Buffer.alloc(17),
+      iv: Buffer.alloc(12),
+      wrappedDek: Buffer.alloc(32),
+      keyVersion: 2_000_001,
+      status: "failed",
+    });
+    await trash(draft.id);
+    const received = await imported("fixture:received");
+    await trash(received.id);
+    const result = await purgeMailboxTrash(db, owner(), { mailboxId });
+    expect(result).toMatchObject({ deleted: 1, keptSent: 1, remaining: 0 });
+    expect(await exists(draft.id)).toBe(true);
+    expect(await exists(received.id)).toBe(false);
+    // Asked again, the kept one never blocks the batch.
+    expect(await purgeMailboxTrash(db, owner(), { mailboxId })).toMatchObject({
+      deleted: 0,
+      keptSent: 1,
+      remaining: 0,
+    });
+  });
+
+  it("goes by the ids it is given and says how many removable ones remain", async () => {
+    const first = await imported("fixture:a");
+    const second = await imported("fixture:b");
+    const third = await imported("fixture:c");
+    for (const item of [first, second, third]) await trash(item.id);
+    expect(await purgeMailboxTrash(db, owner(), { mailboxId, ids: [second.id] })).toMatchObject({
+      deleted: 1,
+      remaining: 0,
+    });
+    expect(
+      await purgeMailboxTrash(db, owner(), { mailboxId, ids: [first.id, second.id] }),
+    ).toMatchObject({
+      deleted: 1,
+    });
+    expect(await exists(third.id)).toBe(true);
+    expect(await purgeMailboxTrash(db, owner(), { mailboxId })).toMatchObject({
+      deleted: 1,
+      remaining: 0,
+    });
+  });
+
+  it("refuses malformed input", async () => {
+    for (const ids of [
+      [],
+      ["not-a-uuid"],
+      Array.from({ length: MAILBOX_PURGE_BATCH + 1 }, () => crypto.randomUUID()),
+    ])
+      await expect(purgeMailboxTrash(db, owner(), { mailboxId, ids })).rejects.toMatchObject({
+        code: "invalid",
+      });
+    await expect(purgeMailboxTrash(db, owner(), { mailboxId: "x" })).rejects.toMatchObject({
+      code: "invalid",
+    });
   });
 });

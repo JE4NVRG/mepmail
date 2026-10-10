@@ -405,7 +405,7 @@
     "bulkTrashed": "{count, plural, one {# mensagem movida} other {# mensagens movidas}} para a lixeira.",
     "bulkRestored": "{count, plural, one {# mensagem restaurada} other {# mensagens restauradas}}.",
     "bulkPartial": "{count, number} de {total, number} mensagens foram alteradas. Atualize para conferir as demais antes de tentar novamente.",
-    "trashHelp": "As mensagens ficam preservadas aqui. Selecione uma ou várias para restaurar à pasta de origem.",
+    "trashHelp": "As mensagens ficam preservadas aqui. Selecione para restaurar à pasta de origem, ou exclua para sempre para liberar espaço.",
     "limitedList": "Mostrando as mensagens mais recentes. Escolha uma caixa ou pasta para reduzir esta lista.",
     "archive": "Arquivar",
     "unarchive": "Mover para a Entrada",
@@ -530,9 +530,10 @@
       },
       "pausing": "Pausando o recebimento: a equipe passou do limite de {reason} deste período. Mensagens novas vão voltar para quem enviou.",
       "paused": "Recebimento pausado: a equipe passou do limite de {reason} deste período. Mensagens novas voltam para quem enviou até {date} ou até você fazer upgrade. Ler e exportar continua normal.",
-      "pausedStorage": "Recebimento pausado: o armazenamento da equipe está cheio. Mensagens novas voltam para quem enviou até você fazer upgrade. Ler e exportar continua normal.",
+      "pausedStorage": "Recebimento pausado: o armazenamento da equipe está cheio. Esvazie a Lixeira ou faça upgrade; até lá, mensagens novas voltam para quem enviou. Ler e exportar continua normal.",
       "resuming": "Retomando o recebimento: as caixas voltam a receber em instantes."
-    }
+    },
+    "storageTrashHint": "A Lixeira também ocupa espaço: esvaziá-la libera armazenamento."
   },
   "offer": {
     "eyebrow": "Correio",
@@ -1145,5 +1146,19 @@
   "attachmentsLeftBehind": "{count, plural, one {Este anexo ficou de fora porque passa de 256 KB, o limite de envio: {names}.} other {Estes anexos ficaram de fora porque passam de 256 KB, o limite de envio: {names}.}}",
   "planQuota": "O plano chegou ao limite deste período (destinatários ou dados enviados, ou armazenamento). Nada foi enviado e o rascunho continua guardado.",
   "viewPlans": "Ver planos",
-  "draftQuota": "O armazenamento do plano está cheio: não dá para guardar rascunhos novos. Faça upgrade em Configurações → Licença e uso. Seu texto permanece aqui."
+  "draftQuota": "O armazenamento do plano está cheio: não dá para guardar rascunhos novos. Faça upgrade em Configurações → Licença e uso. Seu texto permanece aqui.",
+  "purge": {
+    "emptyTrash": "Esvaziar lixeira",
+    "deleteForever": "Excluir para sempre",
+    "deleteSelected": "{count, plural, one {Excluir # mensagem para sempre} other {Excluir # mensagens para sempre}}",
+    "working": "Excluindo…",
+    "confirmAllTitle": "Esvaziar a lixeira?",
+    "confirmSomeTitle": "{count, plural, one {Excluir # mensagem para sempre?} other {Excluir # mensagens para sempre?}}",
+    "confirmBody": "Não dá para desfazer. As mensagens e os anexos saem do MepMail e o espaço volta para o plano; as cópias nos backups somem em até 30 dias. Mensagens enviadas continuam guardadas como registro do envio.",
+    "done": "{count, plural, one {# mensagem excluída para sempre} other {# mensagens excluídas para sempre}} · {size} liberados.",
+    "kept": "{count, plural, one {# enviada continua como registro do envio.} other {# enviadas continuam como registro do envio.}}",
+    "onlySent": "{count, plural, one {Nada excluído: a mensagem enviada fica como registro do envio.} other {Nada excluído: as # mensagens enviadas ficam como registro do envio.}}",
+    "empty": "A lixeira já está vazia.",
+    "error": "Não deu para excluir agora. Parte pode já ter saído; atualize a lista e tente de novo."
+  }
 }

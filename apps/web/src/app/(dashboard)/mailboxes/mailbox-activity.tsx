@@ -16,6 +16,7 @@ const ACTION_KEYS = {
   "mailbox.send_requested": "actions.sendRequested",
   "mailbox.item_trashed": "actions.itemTrashed",
   "mailbox.item_restored": "actions.itemRestored",
+  "mailbox.trash_emptied": "actions.trashEmptied",
   "mailbox.item_starred": "actions.itemStarred",
   "mailbox.item_unstarred": "actions.itemUnstarred",
   "mailbox.item_archived": "actions.itemArchived",

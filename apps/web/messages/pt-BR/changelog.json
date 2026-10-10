@@ -28,6 +28,22 @@
   },
   "releases": [
     {
+      "version": "0.109",
+      "date": "2026-10-10",
+      "title": "E-mails de limite do plano e Excluir para sempre no Correio",
+      "summary": "Os donos de equipes em um plano do Correio agora recebem um e-mail aos 80% e aos 100% de cada limite e quando o recebimento pausa, e a lixeira pode ser esvaziada para liberar espaço.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Um e-mail aos 80% e outro aos 100% de cada limite do plano (destinatários e e-mails enviados, mensagens e e-mails recebidos, armazenamento), uma vez por mês de cobrança, com a data de renovação e o próximo plano.",
+            "Um e-mail quando o recebimento pausa, com o motivo e quando ele volta sozinho; as mensagens recebidas antes da pausa ficam guardadas.",
+            "Esvaziar lixeira e Excluir para sempre numa mensagem ou numa seleção da lixeira: libera espaço na hora, e um recebimento pausado volta em até um minuto quando o armazenamento couber. Mensagens enviadas ficam; as cópias nos backups somem em até 30 dias."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.108",
       "date": "2026-10-10",
       "title": "Páginas abertas avisam quando sai uma nova versão",

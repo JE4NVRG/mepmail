@@ -15,6 +15,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { confirmDialog } from "@/components/confirm-dialog";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { toast } from "@/components/toast";
 import { htmlDropsWork } from "@/lib/desktop-bridge";
@@ -45,7 +46,7 @@ import {
   readNoticePreference,
   writeNoticePreference,
 } from "@/lib/mailbox-notifications";
-import { openMailboxLicense } from "@/lib/mailbox-plans";
+import { formatMailboxBytes, openMailboxLicense } from "@/lib/mailbox-plans";
 import { useCorreioPrefs } from "@/lib/mailbox-preferences";
 import { withQuickReply } from "@/lib/mailbox-quick-replies";
 import {
@@ -936,6 +937,8 @@ export function MailboxContentView({
     trpc.mailboxes.setDeliveryFolder.mutationOptions({ retry: false }),
   );
   const trashMutation = useMutation(trpc.mailboxes.setTrash.mutationOptions({ retry: false }));
+  const purgeMutation = useMutation(trpc.mailboxes.purgeTrash.mutationOptions({ retry: false }));
+  const purgeLocale = useLocale();
   const starMutation = useMutation(trpc.mailboxes.setStar.mutationOptions({ retry: false }));
   const folderMutation = useMutation(
     trpc.mailboxes.setItemFolder.mutationOptions({ retry: false }),
@@ -1495,6 +1498,10 @@ export function MailboxContentView({
     );
   });
   const checkedRows = movableRows.filter((row) => checkedIds.has(rowKey(row)));
+  // "Esvaziar lixeira": the open mailbox, or every own mailbox in this view.
+  const trashTargets = (selectedBox ? [selectedBox] : readable)
+    .filter((box) => ownsBox(box.id))
+    .map((box) => ({ mailboxId: box.id }));
   // Folders belong to one mailbox: the bulk "Move to" needs every checked row in it.
   const bulkMailboxId =
     checkedRows.length > 0 &&
@@ -1901,6 +1908,78 @@ export function MailboxContentView({
       dropHandler.current = null;
     };
   });
+  /**
+   * "Excluir para sempre" (chosen messages) and "Esvaziar lixeira" (a target
+   * without ids): asks first, then removes in server batches. Sent messages
+   * stay as the record of the send; the toast says how many and how much
+   * space came back.
+   */
+  async function purgeForever(
+    targets: { mailboxId: string; ids?: string[] }[],
+    count: number | null,
+  ) {
+    if (purgeMutation.isPending || !targets.length) return;
+    const confirmed = await confirmDialog({
+      title: count === null ? t("purge.confirmAllTitle") : t("purge.confirmSomeTitle", { count }),
+      message: t("purge.confirmBody"),
+      confirmLabel: t("purge.deleteForever"),
+      danger: true,
+    });
+    if (!confirmed) return;
+    const leaving = targets.flatMap((target) =>
+      (target.ids ?? []).map((id) => rowKey({ mailboxId: target.mailboxId, id })),
+    );
+    if (leaving.length) {
+      departRows(leaving);
+      if (selection && leaving.includes(rowKey(selection))) select(null);
+    } else if (selection) select(null);
+    let deleted = 0;
+    let freed = 0;
+    let kept = 0;
+    let failed = false;
+    try {
+      for (const target of targets) {
+        if (target.ids) {
+          for (let start = 0; start < target.ids.length; start += 200) {
+            const result = await purgeMutation.mutateAsync({
+              mailboxId: target.mailboxId,
+              ids: target.ids.slice(start, start + 200),
+            });
+            deleted += result.deleted;
+            freed += result.freedBytes;
+            kept += result.keptSent;
+          }
+          continue;
+        }
+        // The whole trash: one batch per call until no removable message remains.
+        let keptHere = 0;
+        for (let round = 0; round < 100; round++) {
+          const result = await purgeMutation.mutateAsync({ mailboxId: target.mailboxId });
+          deleted += result.deleted;
+          freed += result.freedBytes;
+          keptHere = result.keptSent;
+          if (!result.remaining || !result.deleted) break;
+        }
+        kept += keptHere;
+      }
+    } catch {
+      failed = true;
+    }
+    if (!mounted.current) return;
+    setCheckedIds(new Set());
+    if (failed) {
+      returnRows(leaving);
+      toast(t("purge.error"), "danger");
+    } else if (deleted > 0) {
+      const done = t("purge.done", {
+        count: deleted,
+        size: formatMailboxBytes(freed, purgeLocale),
+      });
+      toast(kept ? `${done} ${t("purge.kept", { count: kept })}` : done, "success");
+    } else toast(kept ? t("purge.onlySent", { count: kept }) : t("purge.empty"), "info");
+    void queries.invalidateQueries({ queryKey: trpc.mailboxes.usage.pathKey() });
+    void refresh();
+  }
   async function changeBulkTrash() {
     if (moving.current || !checkedRows.length) return;
     const observed = checkedRows.map((row) => ({
@@ -2588,6 +2667,17 @@ export function MailboxContentView({
               {folder === "trash" ? (
                 <p className={styles.trashHelp}>{t("organization.trashHelp")}</p>
               ) : null}
+              {folder === "trash" && rows.length > 0 && trashTargets.length > 0 ? (
+                <button
+                  type="button"
+                  className={`ms-btn ms-btn-ghost ${styles.emptyTrash}`}
+                  disabled={purgeMutation.isPending || bulkBusy}
+                  onClick={() => void purgeForever(trashTargets, null)}
+                >
+                  <MailboxFolderIcon name="trash" />
+                  {purgeMutation.isPending ? t("purge.working") : t("purge.emptyTrash")}
+                </button>
+              ) : null}
               <div className={styles.searchField}>
                 <svg
                   aria-hidden="true"
@@ -2742,6 +2832,29 @@ export function MailboxContentView({
                       >
                         <MailboxFolderIcon name={folder === "trash" ? "restore" : "trash"} />
                       </button>
+                      {folder === "trash" ? (
+                        <button
+                          type="button"
+                          className={`ms-btn ms-btn-ghost ${styles.iconAction} ${styles.dangerAction}`}
+                          disabled={bulkBusy || purgeMutation.isPending}
+                          aria-label={t("purge.deleteSelected", { count: checkedRows.length })}
+                          title={t("purge.deleteSelected", { count: checkedRows.length })}
+                          onClick={() => {
+                            const byBox = new Map<string, string[]>();
+                            for (const row of checkedRows)
+                              byBox.set(row.mailboxId, [
+                                ...(byBox.get(row.mailboxId) ?? []),
+                                row.id,
+                              ]);
+                            void purgeForever(
+                              [...byBox].map(([mailboxId, ids]) => ({ mailboxId, ids })),
+                              checkedRows.length,
+                            );
+                          }}
+                        >
+                          <MailboxFolderIcon name="trash" />
+                        </button>
+                      ) : null}
                     </div>
                   ) : (
                     <span className={styles.listFilters}>
@@ -3362,6 +3475,21 @@ export function MailboxContentView({
                     ) : actions.canRestore ? (
                       t("restoreMessage")
                     ) : null}
+                  </button>
+                ) : null}
+                {actions?.canRestore && actionItem && ownsBox(actionItem.mailboxId) ? (
+                  <button
+                    type="button"
+                    className={`ms-btn ms-btn-ghost ${styles.dangerAction} ${styles.purgeAction}`}
+                    disabled={purgeMutation.isPending || trashMutation.isPending || bulkBusy}
+                    onClick={() =>
+                      void purgeForever(
+                        [{ mailboxId: actionItem.mailboxId, ids: [actionItem.id] }],
+                        1,
+                      )
+                    }
+                  >
+                    {purgeMutation.isPending ? t("purge.working") : t("purge.deleteForever")}
                   </button>
                 ) : null}
                 {visibleItem || blockedRow ? (

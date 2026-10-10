@@ -35,7 +35,8 @@
     "itemFolderChanged": "Moveu uma mensagem de pasta",
     "folderCreated": "Criou uma pasta",
     "folderRenamed": "Renomeou uma pasta",
-    "folderArchived": "Removeu uma pasta preservando as mensagens"
+    "folderArchived": "Removeu uma pasta preservando as mensagens",
+    "trashEmptied": "Excluiu mensagens da lixeira para sempre"
   },
   "folders": {
     "inbox": "Entrada",

@@ -1103,6 +1103,93 @@ export async function setMailboxItemTrash(
   });
 }
 
+/** Messages removed per purge call; "Esvaziar lixeira" calls again while some remain. */
+export const MAILBOX_PURGE_BATCH = 200;
+
+/**
+ * "Excluir para sempre": removes messages that are already in the trash,
+ * encrypted bytes included, so their storage stops counting. Only the human
+ * owner, never an agent or a support view, and with no entitlement needed:
+ * freeing space must work for a paused or lapsed plan too. A sent message
+ * stays: its row is the outbox's provenance and this period's sending count
+ * (the outbox foreign key refuses the delete), so it is reported as kept.
+ * Without ids, the oldest trashed messages of the mailbox go first, one batch
+ * per call; `remaining` says how many removable ones are still there.
+ */
+export async function purgeMailboxTrash(
+  db: Db,
+  actor: MailboxContentActor,
+  input: { mailboxId: string; ids?: readonly string[] | null | undefined },
+): Promise<{ deleted: number; freedBytes: number; keptSent: number; remaining: number }> {
+  actor = { ...actor };
+  const ids = input.ids ? [...input.ids] : null;
+  const mailboxId = input.mailboxId;
+  if (actor.agentAccess) throw new MailboxContentError("forbidden");
+  if (
+    typeof mailboxId !== "string" ||
+    !UUID.test(mailboxId) ||
+    (ids !== null &&
+      (ids.length < 1 ||
+        ids.length > MAILBOX_PURGE_BATCH ||
+        ids.some((id) => typeof id !== "string" || !UUID.test(id))))
+  )
+    throw new MailboxContentError("invalid");
+  const items = schema.mailboxItems;
+  const outbox = schema.mailboxOutbox;
+  const sent = sentOutboxRows(items, outbox);
+  return scoped(
+    db,
+    actor,
+    mailboxId,
+    "owner",
+    false,
+    async (tx) => {
+      const trashed = and(
+        eq(items.teamId, actor.teamId),
+        eq(items.mailboxId, mailboxId),
+        isNotNull(items.trashedAt),
+        ids ? inArray(items.id, ids) : undefined,
+      );
+      const candidates = await tx
+        .select({ id: items.id, rawBytes: items.rawBytes })
+        .from(items)
+        .where(and(trashed, sql`not exists (${sent})`))
+        .orderBy(asc(items.trashedAt), asc(items.id))
+        .limit(MAILBOX_PURGE_BATCH)
+        .for("update");
+      if (candidates.length)
+        await tx.delete(items).where(
+          and(
+            trashed,
+            inArray(
+              items.id,
+              candidates.map((row) => row.id),
+            ),
+          ),
+        );
+      const [counts] = await tx
+        .select({
+          kept: sql<number>`count(*) filter (where exists (${sent}))::int`,
+          remaining: sql<number>`count(*) filter (where not exists (${sent}))::int`,
+        })
+        .from(items)
+        .where(trashed);
+      return {
+        deleted: candidates.length,
+        freedBytes: candidates.reduce((sum, row) => sum + Number(row.rawBytes), 0),
+        keptSent: counts?.kept ?? 0,
+        remaining: counts?.remaining ?? 0,
+      };
+    },
+    true,
+  );
+}
+
+/** The outbox rows that make an item a sent message (kept by a purge). */
+function sentOutboxRows(items: typeof schema.mailboxItems, outbox: typeof schema.mailboxOutbox) {
+  return sql`select 1 from ${outbox} where ${outbox.draftId} = ${items.id} and ${outbox.mailboxId} = ${items.mailboxId} and ${outbox.teamId} = ${items.teamId}`;
+}
+
 /** Optimistic revision prevents a stale editor from overwriting another saved draft. No send. */
 export async function saveMailboxDraft(
   db: Db,

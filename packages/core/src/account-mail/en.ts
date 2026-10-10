@@ -360,6 +360,78 @@ export const en = {
     button: "Open billing",
     muted: ["You get this notice once, about 2 days before the trial ends."],
   },
+  "mailbox.usage_near": {
+    subject: "{team}: {title} at {share} of the {plan} plan",
+    body: ["{detail}", "{upgradeLine}"],
+    button: "See usage and plans",
+    muted: ["You get this notice once per billing month for each limit of the plan."],
+    extra: {
+      title_outboundRecipients: "recipients sent",
+      title_outboundBytes: "sent mail",
+      title_inboundDeliveries: "messages received",
+      title_inboundBytes: "received mail",
+      title_storageBytes: "storage",
+      outboundRecipients:
+        "{team} has sent to {used} of the {limit} recipients included this billing month. At the limit, new sends are refused until the month renews on {date}.",
+      outboundBytes:
+        "{team} has sent {used} of the {limit} of mail included this billing month. At the limit, new sends are refused until the month renews on {date}.",
+      inboundDeliveries:
+        "{team} has received {used} of the {limit} messages included this billing month. A little past the limit, receiving pauses until the month renews on {date}, and senders get a bounce.",
+      inboundBytes:
+        "{team} has received {used} of the {limit} of mail included this billing month. A little past the limit, receiving pauses until the month renews on {date}, and senders get a bounce.",
+      storageBytes:
+        "{team}'s mailboxes use {used} of the {limit} of storage in the plan. When it is full, receiving pauses and new drafts are refused; stored mail stays readable.",
+      upgrade:
+        "To get more now, move to the {next} plan in Mail; the difference is charged at once.",
+      largest: "Equipe is the largest plan. Write to suporte@mepmail.dev if your team needs more.",
+    },
+  },
+  "mailbox.usage_reached": {
+    subject: "{team}: {title} limit reached on the {plan} plan",
+    body: ["{detail}", "{upgradeLine}"],
+    button: "See usage and plans",
+    muted: ["You get this notice once per billing month for each limit of the plan."],
+    extra: {
+      title_outboundRecipients: "recipients sent",
+      title_outboundBytes: "sent mail",
+      title_inboundDeliveries: "messages received",
+      title_inboundBytes: "received mail",
+      title_storageBytes: "storage",
+      outboundRecipients:
+        "{team} has sent to all {limit} recipients included this billing month. New sends are refused until the month renews on {date}.",
+      outboundBytes:
+        "{team} has sent all {limit} of mail included this billing month. New sends are refused until the month renews on {date}.",
+      inboundDeliveries:
+        "{team} has received the {limit} messages included this billing month ({used} so far). A little past the limit, receiving pauses until the month renews on {date}, and senders get a bounce.",
+      inboundBytes:
+        "{team} has received the {limit} of mail included this billing month ({used} so far). A little past the limit, receiving pauses until the month renews on {date}, and senders get a bounce.",
+      storageBytes:
+        "{team}'s mailboxes use all {limit} of storage in the plan. Receiving is paused and new drafts are refused; stored mail stays readable.",
+      upgrade:
+        "To get more now, move to the {next} plan in Mail; the difference is charged at once.",
+      largest: "Equipe is the largest plan. Write to suporte@mepmail.dev if your team needs more.",
+    },
+  },
+  "mailbox.receiving_paused": {
+    subject: "{team}: Mail receiving is paused",
+    body: [
+      "Since {since}, mail sent to {team}'s addresses is returned to the sender (mailbox unavailable) and not stored, because {reason}.",
+      "{resume} {upgradeLine}",
+    ],
+    button: "See usage and plans",
+    muted: ["Mail received before the pause is kept and stays readable."],
+    extra: {
+      reason_inbound_deliveries:
+        "the messages received this billing month passed the {plan} plan's limit",
+      reason_inbound_bytes: "the mail received this billing month passed the {plan} plan's limit",
+      reason_storage: "the {plan} plan's storage is full",
+      resumePeriod: "Receiving starts again by itself when the billing month renews on {date}.",
+      resumeStorage: "Receiving starts again by itself once storage is below the limit.",
+      upgrade:
+        "To receive again now, move to the {next} plan in Mail; the difference is charged at once.",
+      largest: "Equipe is the largest plan. Write to suporte@mepmail.dev if your team needs more.",
+    },
+  },
 } as const satisfies Record<AccountMailKind, AccountMailEntry>;
 
 /** Sentences several kinds share, filled by the builders. */

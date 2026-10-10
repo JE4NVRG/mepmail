@@ -88,6 +88,7 @@ import { drainWebhookEndpoint } from "./handlers/deliver-webhook.js";
 import { runInstanceProbes } from "./handlers/instance-probes.js";
 import { warnExpiringMailboxAgentKeys } from "./handlers/mailbox-agent-key-expiry.js";
 import { runMailboxCapacity } from "./handlers/mailbox-capacity.js";
+import { warnMailboxPlanUsage } from "./handlers/mailbox-plan-alerts.js";
 import { reconcileMailboxReceivingHolds } from "./handlers/mailbox-receiving-holds.js";
 import { runMailboxReprice } from "./handlers/mailbox-reprice.js";
 import { runMailboxSchedules } from "./handlers/mailbox-scheduling.js";
@@ -516,6 +517,11 @@ await queue.scheduleCrons({
       if (keys.sent > 0) console.log(`notifications.sweep: agentKeysExpiring=${keys.sent}`);
       const trials = await warnEndingMailboxTrials(db, { mailer, appBaseUrl: env.APP_BASE_URL });
       if (trials.sent > 0) console.log(`notifications.sweep: trialsEnding=${trials.sent}`);
+      const plans = await warnMailboxPlanUsage(db, { mailer, appBaseUrl: env.APP_BASE_URL });
+      if (plans.near || plans.reached || plans.paused)
+        console.log(
+          `notifications.sweep: mailboxPlans near=${plans.near} reached=${plans.reached} paused=${plans.paused}`,
+        );
     }
   },
   "platform.breaker": async () => {

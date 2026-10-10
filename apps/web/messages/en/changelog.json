@@ -23,6 +23,22 @@
   },
   "releases": [
     {
+      "version": "0.109",
+      "date": "2026-10-10",
+      "title": "Plan limit emails, and Delete forever in Mail",
+      "summary": "Team owners on a Mail plan now get an email at 80% and at 100% of each limit and when receiving pauses, and the trash can be emptied to free storage.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "An email at 80% and another at 100% of each plan limit (recipients and mail sent, messages and mail received, storage), once per billing month, with the renewal date and the next plan.",
+            "An email when receiving pauses, with the reason and when it starts again by itself; mail received before the pause is kept.",
+            "Empty trash, Delete forever on a message and on a selection in the trash: it frees storage at once, and a paused receiving starts again within a minute once storage fits. Sent messages stay; copies in backups go within 30 days."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.108",
       "date": "2026-10-10",
       "title": "Open pages tell you when a new version is out",

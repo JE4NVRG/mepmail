@@ -35,7 +35,8 @@
     "itemFolderChanged": "Moved a message between folders",
     "folderCreated": "Created a folder",
     "folderRenamed": "Renamed a folder",
-    "folderArchived": "Removed a folder while preserving its messages"
+    "folderArchived": "Removed a folder while preserving its messages",
+    "trashEmptied": "Deleted messages from trash for good"
   },
   "folders": {
     "inbox": "Inbox",

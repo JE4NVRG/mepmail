@@ -31,6 +31,10 @@ const eventSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("mailbox.draft_saved"), itemId: z.uuid(), revision }).strict(),
   z.object({ action: z.literal("mailbox.item_trashed"), itemId: z.uuid(), revision }).strict(),
   z.object({ action: z.literal("mailbox.item_restored"), itemId: z.uuid(), revision }).strict(),
+  // "Excluir para sempre": how many messages left the trash for good (one purge batch).
+  z
+    .object({ action: z.literal("mailbox.trash_emptied"), count: z.number().int().min(1).max(200) })
+    .strict(),
   z.object({ action: z.literal("mailbox.item_starred"), itemId: z.uuid(), revision }).strict(),
   z.object({ action: z.literal("mailbox.item_unstarred"), itemId: z.uuid(), revision }).strict(),
   z.object({ action: z.literal("mailbox.item_archived"), itemId: z.uuid(), revision }).strict(),
@@ -255,13 +259,15 @@ export async function listMailboxActivity(
             },
             ...(event.action === "mailbox.items_listed"
               ? { folder: event.folder, count: event.count }
-              : "itemId" in event
-                ? {
-                    itemId: event.itemId,
-                    revision: event.revision,
-                    ...("folderId" in event ? { folderId: event.folderId } : {}),
-                  }
-                : { folderId: event.folderId, revision: event.revision }),
+              : event.action === "mailbox.trash_emptied"
+                ? { count: event.count }
+                : "itemId" in event
+                  ? {
+                      itemId: event.itemId,
+                      revision: event.revision,
+                      ...("folderId" in event ? { folderId: event.folderId } : {}),
+                    }
+                  : { folderId: event.folderId, revision: event.revision }),
           },
         ];
       });

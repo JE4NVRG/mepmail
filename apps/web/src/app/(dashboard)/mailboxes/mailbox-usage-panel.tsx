@@ -192,6 +192,7 @@ function PlanUsage({ plan, detailed }: { plan: MailboxPlanUsage; detailed: boole
                 {t(`level.${level}`, {
                   date: metric.periodEndsAt ? shortDate(metric.periodEndsAt) : "",
                 })}
+                {name === "storageBytes" ? ` ${t("storageTrashHint")}` : null}
               </small>
             ) : null}
           </div>

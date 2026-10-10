@@ -28,6 +28,7 @@ import {
   MailboxRegistryError,
   MailboxServiceError,
   mailboxServiceState,
+  purgeMailboxTrash,
   queueMailboxDraft,
   removeMailboxAlias,
   reorderMailboxFolders,
@@ -926,6 +927,36 @@ export const mailboxesRouter = router({
                 itemId: result.id,
                 revision: result.revision,
               },
+            );
+          return result;
+        }),
+      ),
+    ),
+  /** "Excluir para sempre" / "Esvaziar lixeira": owner only; sent messages stay (outbox). */
+  purgeTrash: enabled
+    .input(
+      z
+        .object({
+          mailboxId: z.uuid(),
+          // MAILBOX_PURGE_BATCH in core; a literal keeps module load free of core values.
+          ids: z.array(z.uuid()).min(1).max(200).optional(),
+        })
+        .strict(),
+    )
+    .mutation(({ ctx, input }) =>
+      call(() =>
+        ctx.db.transaction(async (transaction) => {
+          const db = transaction as unknown as Db;
+          const result = await purgeMailboxTrash(db, actor(ctx), input);
+          if (result.deleted)
+            await appendMailboxActivity(
+              db,
+              {
+                teamId: ctx.teamId,
+                mailboxId: input.mailboxId,
+                actor: { kind: "user", userId: ctx.session.user.id },
+              },
+              { action: "mailbox.trash_emptied", count: result.deleted },
             );
           return result;
         }),
