@@ -135,5 +135,10 @@
     "privacyLink": "Ler a política de privacidade",
     "save": "Salvar preferências",
     "unknown": "Nenhuma permissão de publicidade foi dada."
+  },
+  "versionNotice": {
+    "text": "Saiu uma nova versão do MepMail.",
+    "reload": "Recarregar",
+    "dismiss": "Dispensar"
   }
 }

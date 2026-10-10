@@ -23,6 +23,20 @@
   },
   "releases": [
     {
+      "version": "0.108",
+      "date": "2026-10-10",
+      "title": "Open pages tell you when a new version is out",
+      "summary": "Correio and the dashboard now notice a new MepMail release while they stay open, also in the Windows app kept in the tray, and offer to reload.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A notice, A new version of MepMail is available, with Reload, appears when the page was opened before a release; nothing reloads by itself, so a draft is never lost."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.107",
       "date": "2026-10-10",
       "title": "Get the Windows app on the Microsoft Store",

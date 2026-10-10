@@ -28,6 +28,20 @@
   },
   "releases": [
     {
+      "version": "0.108",
+      "date": "2026-10-10",
+      "title": "Páginas abertas avisam quando sai uma nova versão",
+      "summary": "O Correio e o painel agora percebem uma nova versão do MepMail enquanto ficam abertos, inclusive no app para Windows que fica na bandeja, e oferecem recarregar.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Um aviso, Saiu uma nova versão do MepMail, com Recarregar, aparece quando a página foi aberta antes de uma versão nova; nada recarrega sozinho, então nenhum rascunho se perde."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.107",
       "date": "2026-10-10",
       "title": "Instale o app para Windows pela Microsoft Store",

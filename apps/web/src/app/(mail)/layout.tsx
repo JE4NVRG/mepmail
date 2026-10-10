@@ -5,6 +5,7 @@ import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { SupportViewBanner } from "@/components/support-view-banner";
 import { TeamStandingBanner } from "@/components/team-standing-banner";
 import { ToastHost } from "@/components/toast";
+import { VersionNotice } from "@/components/version-notice";
 import { CORREIO_PREFS_PREPAINT_SCRIPT } from "@/lib/mailbox-preferences-prepaint";
 import { postAuthNext, withNext } from "@/lib/nav";
 import { getAuth } from "@/server/auth";
@@ -50,6 +51,7 @@ export default async function MailLayout({ children }: { children: React.ReactNo
       <main style={{ flex: 1, minWidth: 0 }}>{children}</main>
       <ConfirmDialogHost />
       <ToastHost />
+      <VersionNotice revision={process.env.MILLIONSEND_REVISION ?? null} />
     </div>
   );
 }

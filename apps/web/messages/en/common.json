@@ -135,5 +135,10 @@
     "privacyLink": "Read our privacy policy",
     "save": "Save preferences",
     "unknown": "No advertising permission has been given."
+  },
+  "versionNotice": {
+    "text": "A new version of MepMail is available.",
+    "reload": "Reload",
+    "dismiss": "Dismiss"
   }
 }

@@ -12,6 +12,7 @@ import { SupportLauncher } from "@/components/support-launcher";
 import { SupportViewBanner } from "@/components/support-view-banner";
 import { TeamStandingBanner } from "@/components/team-standing-banner";
 import { ToastHost } from "@/components/toast";
+import { VersionNotice } from "@/components/version-notice";
 import { postAuthNext, withNext } from "@/lib/nav";
 import { syncAccountMailLocale } from "@/server/account-locale";
 import { getAuth } from "@/server/auth";
@@ -73,6 +74,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       {/* The dashboard raises toasts too (a refused mutation under a support
           view, the Support access card); without a host they are dropped. */}
       <ToastHost />
+      <VersionNotice revision={process.env.MILLIONSEND_REVISION ?? null} />
     </AppShell>
   );
 }
