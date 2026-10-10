@@ -37,11 +37,17 @@ agentes custam o mesmo.
   recebidos: 512 MiB, 1,5 GiB e 3 GiB por mês.
 - **O recebimento pausa** depois do limite de recebidas mais 10% de margem, ou com o
   armazenamento cheio. Os remetentes recebem então uma devolução permanente de
-  "caixa indisponível" (5.1.1) e nada é guardado. O recebimento volta no mês de
-  cobrança seguinte ou após um upgrade (só com upgrade, se o armazenamento estiver
-  cheio). O que foi aceito antes da pausa é sempre guardado.
+  "caixa indisponível" (5.1.1) e nada é guardado. O recebimento volta sozinho no
+  mês de cobrança seguinte, após um upgrade ou, se o armazenamento estava cheio, em
+  até um minuto depois de liberar espaço. O que foi aceito antes da pausa é sempre
+  guardado.
 - **Com o armazenamento cheio**, leitura, busca, download de anexos e a API continuam
-  funcionando; novos rascunhos e envios são recusados até haver espaço.
+  funcionando; novos rascunhos e envios são recusados até haver espaço. Libere com
+  **Esvaziar lixeira**, ou **Excluir para sempre** nas mensagens da lixeira (as
+  enviadas ficam; as cópias nos backups somem em até 30 dias), ou passe para um plano
+  maior.
+- **E-mails:** os donos da equipe recebem um e-mail aos 80% e aos 100% de cada limite,
+  uma vez por mês de cobrança, e quando o recebimento pausa.
 - **Teste grátis:** a primeira compra começa com 7 dias grátis; o cartão é
   obrigatório. Durante o teste, a equipe envia para no máximo 50 destinatários por
   dia e 200 no total.

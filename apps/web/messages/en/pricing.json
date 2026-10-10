@@ -125,6 +125,6 @@
     "planMailboxes": "{count, plural, one {# mailbox} other {# mailboxes}}",
     "planInbound": "{count, number} messages received a month",
     "planLocal": "In Brazil, charged in reais: {price} a month",
-    "noteLimits": "Limits renew every billing month and nothing is charged beyond the plan. Sending stops at the plan's limit; receiving pauses past the limit plus a 10% margin, or with storage full, until the next month or an upgrade. Stored mail stays readable."
+    "noteLimits": "Limits renew every billing month and nothing is charged beyond the plan. Sending stops at the plan's limit; receiving pauses past the limit plus a 10% margin, or with storage full, until the next month, an upgrade or, for storage, emptying the trash. Stored mail stays readable, and owners get an email at 80% and 100% of each limit."
   }
 }

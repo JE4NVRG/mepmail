@@ -125,6 +125,6 @@
     "planMailboxes": "{count, plural, one {# caixa} other {# caixas}}",
     "planInbound": "{count, number} mensagens recebidas por mês",
     "planLocal": "No Brasil, cobrado em reais: {price} por mês",
-    "noteLimits": "Os limites renovam a cada mês de cobrança e nada é cobrado além do plano. O envio para no limite do plano; o recebimento pausa depois do limite mais 10% de margem, ou com o armazenamento cheio, até o mês seguinte ou um upgrade. As mensagens guardadas continuam legíveis."
+    "noteLimits": "Os limites renovam a cada mês de cobrança e nada é cobrado além do plano. O envio para no limite do plano; o recebimento pausa depois do limite mais 10% de margem, ou com o armazenamento cheio, até o mês seguinte, um upgrade ou, no armazenamento, esvaziar a lixeira. As mensagens guardadas continuam legíveis, e os donos recebem um e-mail aos 80% e aos 100% de cada limite."
   }
 }

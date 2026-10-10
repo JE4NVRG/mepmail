@@ -37,11 +37,15 @@ agents cost the same.
   the bytes received: 512 MiB, 1.5 GiB and 3 GiB a month.
 - **Receiving pauses** past the received limit plus a 10% margin, or when storage
   is full. Senders then get a permanent "mailbox unavailable" bounce (5.1.1) and
-  nothing is stored. Receiving resumes on the next billing month or after an
-  upgrade (only an upgrade, when storage is full). Mail accepted before the pause
-  is always stored.
+  nothing is stored. Receiving resumes by itself on the next billing month,
+  after an upgrade or, when storage was full, within a minute of freeing space.
+  Mail accepted before the pause is always stored.
 - **With storage full**, reading, search, attachment downloads and the API keep
-  working; new drafts and sends are refused until space is available.
+  working; new drafts and sends are refused until space is available. Free it
+  with **Empty trash**, or **Delete forever** on messages in the trash (sent
+  messages stay; copies in backups go within 30 days), or move to a larger plan.
+- **Emails:** team owners get an email at 80% and at 100% of each limit, once per
+  billing month, and when receiving pauses.
 - **Free trial:** a first purchase starts with 7 days free; the card is required.
   During the trial a team sends to at most 50 recipients a day and 200 in total.
 - Contracts bought before these plans keep their price and terms.
