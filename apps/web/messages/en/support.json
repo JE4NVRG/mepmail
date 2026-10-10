@@ -170,5 +170,12 @@
     "privacy": "The chat cannot access your account. Never send a password, code or API key.",
     "email": "Contact by email",
     "docs": "Read the documentation"
+  },
+  "chatWindow": {
+    "title": "MepMail support",
+    "body": "Chat with us here. If you are signed in, we already know which account and organization this is about.",
+    "loading": "Opening the chat…",
+    "error": "We could not open the chat right now. Write to jean@mepmail.dev.",
+    "email": "Prefer email? jean@mepmail.dev"
   }
 }

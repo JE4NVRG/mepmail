@@ -8,7 +8,7 @@ afterEach(() => {
 
 describe("Elozi support document policy", () => {
   it.each(["production", "development"])(
-    "confines script/connect to /support in %s",
+    "confines script/connect to /support and its chat window in %s",
     async (env) => {
       vi.stubEnv("NODE_ENV", env);
       vi.stubEnv("NEXT_PUBLIC_META_PIXEL_ENABLED", "true");
@@ -22,7 +22,11 @@ describe("Elozi support document policy", () => {
         `script-src 'self' 'unsafe-inline'${env === "development" ? " 'unsafe-eval'" : ""} https://challenges.cloudflare.com https://umami.je4ndev.com https://elozi.je4ndev.com`,
         "connect-src 'self' https://umami.je4ndev.com ipc: http://ipc.localhost https://ipc.localhost https://elozi.je4ndev.com",
       ]);
-      for (const rule of rules.filter((rule) => rule.source !== "/support")) {
+      const window = rules.find((rule) => rule.source === "/support/chat");
+      expect(window?.headers).toEqual(support?.headers);
+      for (const rule of rules.filter(
+        (rule) => rule.source !== "/support" && rule.source !== "/support/chat",
+      )) {
         expect(JSON.stringify(rule)).not.toContain("elozi");
       }
       expect(base?.headers.find((h) => h.key === "Permissions-Policy")?.value).toBe(

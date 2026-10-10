@@ -1,0 +1,56 @@
+.launcher {
+  position: fixed;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: var(--ms-z-popover, 500);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px 0 14px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  background: var(--ms-panel-raised);
+  color: var(--ms-bone);
+  box-shadow: 0 10px 30px #0007;
+  font: 600 13px var(--ms-font-sans);
+  cursor: pointer;
+  transition: border-color var(--ms-dur-fast) var(--ms-ease);
+}
+
+.launcher:hover {
+  border-color: var(--ms-violet-border);
+}
+
+.launcher:focus-visible {
+  outline: none;
+  box-shadow: var(--ms-focus-ring);
+}
+
+.launcher svg {
+  width: 18px;
+  height: 18px;
+  color: var(--ms-violet);
+}
+
+/* Phones: just the icon, so it never covers a row's actions. */
+@media (max-width: 620px) {
+  .launcher {
+    right: max(14px, env(safe-area-inset-right));
+    bottom: max(14px, env(safe-area-inset-bottom));
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .label {
+    display: none;
+  }
+}
+
+@media print {
+  .launcher {
+    display: none;
+  }
+}

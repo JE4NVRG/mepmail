@@ -23,6 +23,21 @@
   },
   "releases": [
     {
+      "version": "0.90",
+      "date": "2026-10-10",
+      "title": "Support one click away in the dashboard",
+      "summary": "A “Support” button on every dashboard page opens the chat in its own window. Once identification is on, support already knows which account and organization the conversation is about.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Floating “Support” button on dashboard pages and in the sidebar, opening the support chat in its own window.",
+            "Verified identity in the chat: when you are signed in, support sees your name, email, organization, plan and mailbox count, with no billing data or email content."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.89",
       "date": "2026-10-10",
       "title": "Correio app for Windows",

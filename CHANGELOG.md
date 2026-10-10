@@ -7,6 +7,24 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.90] - 2026-10-10
+
+### Added
+
+- Dashboard `SupportLauncher` (and the sidebar Support link) open
+  `/support/chat` in its own small window (`lib/support-chat.ts`); a
+  blocked popup falls back to the same tab. The Elozi widget still runs only
+  on /support and /support/chat, whose CSP allows it: never on dashboard
+  documents.
+- Verified chat identity (Elozi contract 0.51.16): `GET /api/support/identity`
+  (same-origin, signed-in, no-store) signs an HS256 JWT with the `kid` header
+  from `ELOZI_IDENTITY_SECRET` (literal UTF-8) and `ELOZI_IDENTITY_KID`: iss
+  https://mepmail.dev, aud elozi:webchat:<channel>, sub, email,
+  email_verified, name, locale, exp = iat + 600, unique jti, and ctx
+  {teamId, teamName, plan, mailboxes}. 404 until the key is configured, so the
+  chat keeps the visitor flow. /support and /support/chat pass
+  `getIdentityToken` to the widget when signed in.
+
 ## [0.89] - 2026-10-10
 
 ### Added

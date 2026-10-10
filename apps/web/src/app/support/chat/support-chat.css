@@ -1,0 +1,31 @@
+/* The small support window: a quiet backdrop for the Elozi chat panel. */
+.support-chat-window {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  padding: 24px 20px;
+  background: var(--ms-ground);
+  color: var(--ms-muted);
+  font: 14px / 1.55 var(--ms-font-sans);
+}
+
+.support-chat-window h1 {
+  margin: 0 0 6px;
+  color: var(--ms-bone);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.support-chat-window p {
+  margin: 0 0 10px;
+  max-width: 340px;
+}
+
+.support-chat-window .support-chat-status {
+  min-height: 1.5em;
+}
+
+.support-chat-window a {
+  color: var(--ms-bone);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

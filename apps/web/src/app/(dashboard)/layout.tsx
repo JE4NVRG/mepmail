@@ -8,6 +8,7 @@ import { DeliverabilityBanner } from "@/components/deliverability-banner";
 import { EventsHealthBanner } from "@/components/events-health-banner";
 import { RegionBreakerBanner } from "@/components/region-breaker-banner";
 import { SendingPausedBanner } from "@/components/sending-paused-banner";
+import { SupportLauncher } from "@/components/support-launcher";
 import { SupportViewBanner } from "@/components/support-view-banner";
 import { TeamStandingBanner } from "@/components/team-standing-banner";
 import { ToastHost } from "@/components/toast";
@@ -66,6 +67,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </main>
       <ConfirmDialogHost />
+      {/* The identified support chat, one click from every page (not while an
+          operator is viewing someone else's team). */}
+      {view ? null : <SupportLauncher />}
       {/* The dashboard raises toasts too (a refused mutation under a support
           view, the Support access card); without a host they are dropped. */}
       <ToastHost />

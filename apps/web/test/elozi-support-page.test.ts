@@ -22,6 +22,8 @@ vi.mock("next-intl/server", () => ({
   },
 }));
 
+vi.mock("@/server/auth", () => ({ hasSession: async () => false }));
+
 const { default: SupportPage } = await import("@/app/support/page");
 
 describe("localized support page", () => {

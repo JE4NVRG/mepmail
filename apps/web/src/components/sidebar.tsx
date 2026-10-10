@@ -13,6 +13,7 @@ import { authClient } from "@/lib/auth-client";
 import { DOCS_URL } from "@/lib/docs-links";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { isActive, navItemsWithConsole } from "@/lib/nav";
+import { openSupportChat } from "@/lib/support-chat";
 import { applyTheme, currentTheme, type Theme } from "@/lib/theme";
 import { useTRPC } from "@/lib/trpc";
 import styles from "./app-shell.module.css";
@@ -316,8 +317,17 @@ export function Sidebar({
           ))}
         </section>
         <section className={styles.navResources} aria-label={t("products.resources")}>
-          {/* Document navigation: the /support policy loads the chat, which opens on #chat. */}
-          <a href="/support#chat">
+          {/* The identified chat window; the href stays a document navigation to
+              /support (whose policy loads the chat) for a middle click. */}
+          {/* biome-ignore lint/a11y/useValidAnchor: a real link on purpose; the click only upgrades it to the chat window. */}
+          <a
+            href="/support#chat"
+            onClick={(event) => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+              event.preventDefault();
+              openSupportChat();
+            }}
+          >
             <svg
               width="16"
               height="16"

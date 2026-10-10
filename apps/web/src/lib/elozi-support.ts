@@ -12,8 +12,33 @@ export type EloziSupportConfig = { tenantId: string; channelId: string };
 export type EloziSupportStatus = "loading" | "opened" | "error";
 type WidgetHandle = { open: () => void; destroy: () => void };
 type WidgetModule = {
-  createWebchatWidget: (options: EloziSupportConfig & { apiOrigin: string }) => WidgetHandle;
+  createWebchatWidget: (
+    options: EloziSupportConfig & {
+      apiOrigin: string;
+      getIdentityToken?: () => Promise<string | null>;
+    },
+  ) => WidgetHandle;
 };
+
+/** Where a signed-in page asks for the chat's verified identity (same origin, cookie session). */
+export const ELOZI_IDENTITY_ENDPOINT = "/api/support/identity";
+
+/** The widget's identity callback: a short-lived token, or null for the visitor flow. */
+export async function fetchEloziIdentityToken(
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | null> {
+  try {
+    const response = await fetchImpl(ELOZI_IDENTITY_ENDPOINT, {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { token?: unknown };
+    return typeof body.token === "string" ? body.token : null;
+  } catch {
+    return null;
+  }
+}
 
 export function resolveEloziSupportChannel(
   channel: EloziSupportChannel = eloziSupportChannel,
@@ -30,11 +55,16 @@ async function loadWidget(): Promise<WidgetModule> {
   return import(/* webpackIgnore: true */ ELOZI_SUPPORT_MODULE);
 }
 
-/** Visitor capabilities remain in the widget closure; no account identity is passed. */
+/**
+ * Visitor capabilities remain in the widget closure. With `identity`, a
+ * signed-in person's chat is verified: the widget asks for a short-lived token
+ * when it opens and keeps it in memory only.
+ */
 export function createEloziSupportSession(
   config: EloziSupportConfig,
   onStatus: (status: EloziSupportStatus) => void,
   load: () => Promise<WidgetModule> = loadWidget,
+  identity?: () => Promise<string | null>,
 ) {
   const validConfig = resolveEloziSupportChannel({ enabled: true, ...config });
   let disposed = false;
@@ -53,6 +83,7 @@ export function createEloziSupportSession(
           apiOrigin: ELOZI_SUPPORT_ORIGIN,
           tenantId: validConfig.tenantId,
           channelId: validConfig.channelId,
+          ...(identity ? { getIdentityToken: identity } : {}),
         });
       }
       widget.open();

@@ -5,6 +5,8 @@ import { PublicFooter, PublicHeader, type PublicSiteLabels } from "@/components/
 import { DOCS_URL } from "@/lib/docs-links";
 import { resolveEloziSupportChannel } from "@/lib/elozi-support";
 import { legalLinks } from "@/lib/legal-links";
+import { hasSession } from "@/server/auth";
+import { eloziIdentityKey } from "@/server/support-identity";
 import "../landing.css";
 import "./support.css";
 
@@ -47,6 +49,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function SupportPage() {
   const t = await getTranslations("support");
   const l = await getTranslations("landing");
+  // Signed in, with the channel key configured: the chat opens verified.
+  const identified = !!eloziIdentityKey() && (await hasSession());
   const site = {
     skip: l("skip"),
     brandAria: l("brandAria"),
@@ -89,6 +93,7 @@ export default async function SupportPage() {
             <EloziSupport
               config={resolveEloziSupportChannel()}
               labels={t.raw("assistant") as EloziSupportLabels}
+              identified={identified}
             />
           </div>
         </section>

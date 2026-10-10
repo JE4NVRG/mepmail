@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.90",
+      "date": "2026-10-10",
+      "title": "Suporte a um clique no painel",
+      "summary": "Um botão “Suporte” em todas as telas do painel abre o chat numa janela própria. Quando a identificação estiver ativa, o atendimento já sabe de qual conta e organização é a conversa.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Botão “Suporte” flutuante nas telas do painel e no menu lateral, abrindo o chat do suporte numa janela própria.",
+            "Identificação verificada no chat: com você logado, o suporte vê seu nome, e-mail, organização, plano e número de caixas, sem dados de cobrança nem conteúdo de e-mails."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.89",
       "date": "2026-10-10",
       "title": "App do Correio para Windows",

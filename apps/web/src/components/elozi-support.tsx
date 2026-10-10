@@ -6,6 +6,7 @@ import {
   createEloziSupportSession,
   type EloziSupportConfig,
   type EloziSupportStatus,
+  fetchEloziIdentityToken,
 } from "@/lib/elozi-support";
 
 export type EloziSupportLabels = {
@@ -27,15 +28,23 @@ export type EloziSupportLabels = {
 export function EloziSupport({
   config,
   labels,
+  identified = false,
 }: {
   config: EloziSupportConfig | null;
   labels: EloziSupportLabels;
+  /** A signed-in person with the channel key configured: the chat is verified. */
+  identified?: boolean;
 }) {
   const [status, setStatus] = useState<EloziSupportStatus | null>(null);
   const session = useRef<ReturnType<typeof createEloziSupportSession> | null>(null);
   useEffect(() => {
     if (!config) return;
-    const current = createEloziSupportSession(config, setStatus);
+    const current = createEloziSupportSession(
+      config,
+      setStatus,
+      undefined,
+      identified ? () => fetchEloziIdentityToken() : undefined,
+    );
     session.current = current;
     // The dashboard's Support link lands on /support#chat: open the chat once.
     if (window.location.hash === "#chat") {
@@ -46,7 +55,7 @@ export function EloziSupport({
       current.destroy();
       session.current = null;
     };
-  }, [config]);
+  }, [config, identified]);
 
   return (
     <aside className="gtm-support-assistance" aria-labelledby="support-assistance-title">

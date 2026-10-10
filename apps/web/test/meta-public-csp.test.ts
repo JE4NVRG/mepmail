@@ -17,7 +17,7 @@ async function headers(enabled: string, pixel = "1418150576403119") {
 describe("public Meta Content Security Policy", () => {
   it.each(["", "false", "1"])("retains the existing policy for disabled flag %s", async (flag) => {
     const rules = await headers(flag);
-    expect(rules).toHaveLength(2);
+    expect(rules).toHaveLength(3);
     expect(JSON.stringify(rules)).not.toContain("facebook");
   });
 
@@ -27,6 +27,7 @@ describe("public Meta Content Security Policy", () => {
       expect(rules.map((rule) => rule.source)).toEqual([
         "/:path*",
         "/support",
+        "/support/chat",
         "/",
         "/pricing",
         "/correio",
@@ -58,7 +59,7 @@ describe("public Meta Content Security Policy", () => {
     }
   });
   it("rejects a malformed dataset and never broadens private paths", async () => {
-    expect(await headers("true", "bad; https://untrusted.invalid")).toHaveLength(2);
+    expect(await headers("true", "bad; https://untrusted.invalid")).toHaveLength(3);
   });
 
   it("overrides only public offer documents, retaining the other protections", async () => {
@@ -66,6 +67,7 @@ describe("public Meta Content Security Policy", () => {
     expect(rules.map((rule) => rule.source)).toEqual([
       "/:path*",
       "/support",
+      "/support/chat",
       "/",
       "/pricing",
       "/correio",

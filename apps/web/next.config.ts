@@ -122,6 +122,11 @@ const config: NextConfig = {
         source: "/support",
         headers: [{ key: "Content-Security-Policy", value: supportContentSecurityPolicy }],
       },
+      // The chat window the dashboard's Support button opens: the same policy.
+      {
+        source: "/support/chat",
+        headers: [{ key: "Content-Security-Policy", value: supportContentSecurityPolicy }],
+      },
       ...(publicMetaEnabled || publicGoogleEnabled
         ? // Mirrors META_PUBLIC_PATHS in src/lib/meta-public-events.ts.
           ["/", "/pricing", "/correio", "/alternatives/resend", "/integrations"].map((source) => ({
