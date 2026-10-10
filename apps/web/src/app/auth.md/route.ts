@@ -143,7 +143,7 @@ are audience-bound to the MCP resource and are not accepted on the REST API.
 | <https://docs.mepmail.dev> | Human-facing documentation |
 
 Human support, if you need to escalate to your operator:
-<mailto:jean@mepmail.dev>.
+<mailto:suporte@mepmail.dev>.
 `;
 
 export function GET(): Response {

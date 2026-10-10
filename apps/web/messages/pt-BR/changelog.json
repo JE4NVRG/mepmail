@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.100",
+      "date": "2026-10-10",
+      "title": "Uma caixa só para o suporte: suporte@mepmail.dev",
+      "summary": "Dúvidas de suporte agora vão para suporte@mepmail.dev. O Leo, agente de suporte do MepMail, prepara cada resposta e o Jean revisa antes do envio.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "A página de suporte, a alternativa ao chat, a home, os preços, as integrações e o guia para agentes (auth.md) apontam para suporte@mepmail.dev.",
+            "Cobrança, reembolso, privacidade e relatos de segurança continuam indo direto para jean@mepmail.dev, como dizem os termos e a página de segurança."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.99",
       "date": "2026-10-10",
       "title": "Um webhook quando chega e-mail numa caixa de agente",

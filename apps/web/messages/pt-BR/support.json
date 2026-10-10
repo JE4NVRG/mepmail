@@ -14,7 +14,7 @@
       "Relatos de abuso são tratados",
       "Docs · changelog · novidades"
     ],
-    "ctaEmail": "Escrever para jean@mepmail.dev",
+    "ctaEmail": "Escrever para suporte@mepmail.dev",
     "ctaDocs": "Abrir a documentação"
   },
   "channels": {
@@ -24,7 +24,7 @@
     "items": [
       {
         "name": "Suporte por e-mail",
-        "kind": "jean@mepmail.dev",
+        "kind": "suporte@mepmail.dev",
         "body": "Melhor para dúvidas de conta, cobrança e entregabilidade que a documentação não responde.",
         "bullets": [
           "O atendimento humano não tem prazo de resposta garantido.",
@@ -32,8 +32,8 @@
         ],
         "links": [
           {
-            "label": "jean@mepmail.dev",
-            "href": "mailto:jean@mepmail.dev"
+            "label": "suporte@mepmail.dev",
+            "href": "mailto:suporte@mepmail.dev"
           }
         ]
       },
@@ -143,10 +143,10 @@
       },
       {
         "q": "Como reportar abuso ou spam?",
-        "a": "Escreva para jean@mepmail.dev com o id da mensagem ou os cabeçalhos. Agimos sobre relatos de abuso, e envios que geram reclamações podem ser pausados ou a conta suspensa.",
+        "a": "Escreva para suporte@mepmail.dev com o id da mensagem ou os cabeçalhos. Agimos sobre relatos de abuso, e envios que geram reclamações podem ser pausados ou a conta suspensa.",
         "link": {
-          "label": "jean@mepmail.dev",
-          "href": "mailto:jean@mepmail.dev"
+          "label": "suporte@mepmail.dev",
+          "href": "mailto:suporte@mepmail.dev"
         }
       }
     ]
@@ -154,7 +154,7 @@
   "close": {
     "title": "Nada aqui respondeu?",
     "body": "Mande o e-mail da conta e o que você esperava que acontecesse — isso normalmente basta para uma resposta concreta.",
-    "cta": "Escrever para jean@mepmail.dev"
+    "cta": "Escrever para suporte@mepmail.dev"
   },
   "assistant": {
     "eyebrow": "Chat de suporte",
@@ -175,7 +175,7 @@
     "title": "Suporte MepMail",
     "body": "Converse com a gente por aqui. Se você estiver logado, já sabemos de qual conta e organização é o atendimento.",
     "loading": "Abrindo o chat…",
-    "error": "Não conseguimos abrir o chat agora. Escreva para jean@mepmail.dev.",
-    "email": "Prefere e-mail? jean@mepmail.dev"
+    "error": "Não conseguimos abrir o chat agora. Escreva para suporte@mepmail.dev.",
+    "email": "Prefere e-mail? suporte@mepmail.dev"
   }
 }

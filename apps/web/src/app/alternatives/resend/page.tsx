@@ -12,7 +12,7 @@ import { formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricin
 import { legalLinks } from "@/lib/legal-links";
 import "../../landing.css";
 
-const contact = "mailto:jean@mepmail.dev";
+const contact = "mailto:suporte@mepmail.dev";
 const canonical = "/alternatives/resend";
 
 export async function generateMetadata(): Promise<Metadata> {

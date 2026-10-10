@@ -10,7 +10,7 @@ import { eloziIdentityKey } from "@/server/support-identity";
 import "../landing.css";
 import "./support.css";
 
-const contact = "mailto:jean@mepmail.dev";
+const contact = "mailto:suporte@mepmail.dev";
 const canonical = "/support";
 
 type SupportChannel = {
@@ -81,7 +81,7 @@ export default async function SupportPage() {
                 ))}
               </ul>
               <div className="gtm-actions">
-                <a className="ms-btn ms-btn-primary gtm-action" href="mailto:jean@mepmail.dev">
+                <a className="ms-btn ms-btn-primary gtm-action" href="mailto:suporte@mepmail.dev">
                   {t("hero.ctaEmail")}
                 </a>
                 <a className="ms-btn ms-btn-secondary gtm-action" href={DOCS_URL}>
@@ -159,7 +159,7 @@ export default async function SupportPage() {
           <div className="gtm-container">
             <h2>{t("close.title")}</h2>
             <p>{t("close.body")}</p>
-            <a className="ms-btn ms-btn-primary gtm-action" href="mailto:jean@mepmail.dev">
+            <a className="ms-btn ms-btn-primary gtm-action" href="mailto:suporte@mepmail.dev">
               {t("close.cta")}
             </a>
           </div>

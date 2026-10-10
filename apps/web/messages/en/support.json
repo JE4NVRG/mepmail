@@ -14,7 +14,7 @@
       "Abuse reports acted on",
       "Docs · changelog · updates"
     ],
-    "ctaEmail": "Email jean@mepmail.dev",
+    "ctaEmail": "Email suporte@mepmail.dev",
     "ctaDocs": "Open the docs"
   },
   "channels": {
@@ -24,7 +24,7 @@
     "items": [
       {
         "name": "Email support",
-        "kind": "jean@mepmail.dev",
+        "kind": "suporte@mepmail.dev",
         "body": "Best for account, billing and deliverability questions the docs do not answer.",
         "bullets": [
           "Human support has no guaranteed response time.",
@@ -32,8 +32,8 @@
         ],
         "links": [
           {
-            "label": "jean@mepmail.dev",
-            "href": "mailto:jean@mepmail.dev"
+            "label": "suporte@mepmail.dev",
+            "href": "mailto:suporte@mepmail.dev"
           }
         ]
       },
@@ -143,10 +143,10 @@
       },
       {
         "q": "How do I report abuse or spam?",
-        "a": "Email jean@mepmail.dev with the message id or the headers. We act on abuse reports, and sending that generates complaints can be paused or the account suspended.",
+        "a": "Email suporte@mepmail.dev with the message id or the headers. We act on abuse reports, and sending that generates complaints can be paused or the account suspended.",
         "link": {
-          "label": "jean@mepmail.dev",
-          "href": "mailto:jean@mepmail.dev"
+          "label": "suporte@mepmail.dev",
+          "href": "mailto:suporte@mepmail.dev"
         }
       }
     ]
@@ -154,7 +154,7 @@
   "close": {
     "title": "Nothing here answered it?",
     "body": "Send the account email and what you expected to happen — that is usually enough to get a concrete answer.",
-    "cta": "Email jean@mepmail.dev"
+    "cta": "Email suporte@mepmail.dev"
   },
   "assistant": {
     "eyebrow": "Support chat",
@@ -175,7 +175,7 @@
     "title": "MepMail support",
     "body": "Chat with us here. If you are signed in, we already know which account and organization this is about.",
     "loading": "Opening the chat…",
-    "error": "We could not open the chat right now. Write to jean@mepmail.dev.",
-    "email": "Prefer email? jean@mepmail.dev"
+    "error": "We could not open the chat right now. Write to suporte@mepmail.dev.",
+    "email": "Prefer email? suporte@mepmail.dev"
   }
 }

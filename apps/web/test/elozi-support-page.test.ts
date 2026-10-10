@@ -37,7 +37,7 @@ describe("localized support page", () => {
     expect(html).toContain("gtm-support-hero");
     expect(html.match(/<details>/g)).toHaveLength(copy.faq.items.length);
     // Every contact on the page reaches the owner directly.
-    expect(html).toContain('href="mailto:jean@mepmail.dev"');
+    expect(html).toContain('href="mailto:suporte@mepmail.dev"');
     expect(html).not.toContain("@je4ndev.com");
     expect(html).toContain('href="/updates"');
     // The widget loads only after a click: no script in the server HTML.

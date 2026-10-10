@@ -24,7 +24,7 @@ import "./landing-calc.css";
 import "./landing.css";
 import "./landing-cro.css";
 
-const contact = "mailto:jean@mepmail.dev";
+const contact = "mailto:suporte@mepmail.dev";
 const cellKeys = ["MepMail", "Resend", "SendGrid", "Postmark", "Mailgun", "vantagem"] as const;
 const stackSlugs = HOME_STACK_LOGOS.map((logo) => logo.slug);
 const proOffer = PLAN_RUNGS.find((rung) => rung.key === "pro_100k");

@@ -23,6 +23,21 @@
   },
   "releases": [
     {
+      "version": "0.100",
+      "date": "2026-10-10",
+      "title": "A dedicated support inbox: suporte@mepmail.dev",
+      "summary": "Support questions now go to suporte@mepmail.dev. Leo, MepMail's support agent, prepares each reply and Jean reviews it before it is sent.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "The support page, the chat fallback, the home, pricing and integrations pages and the agent guide (auth.md) point to suporte@mepmail.dev.",
+            "Billing, refunds, privacy and security reports still go straight to jean@mepmail.dev, as the terms and the security page say."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.99",
       "date": "2026-10-10",
       "title": "A webhook when mail reaches an agent mailbox",

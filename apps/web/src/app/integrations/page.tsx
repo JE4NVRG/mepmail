@@ -11,7 +11,7 @@ import { legalLinks } from "@/lib/legal-links";
 import { STACK_SLUGS } from "@/lib/stack-logos";
 import "../landing.css";
 
-const contact = "mailto:jean@mepmail.dev";
+const contact = "mailto:suporte@mepmail.dev";
 const canonical = "/integrations";
 
 /**

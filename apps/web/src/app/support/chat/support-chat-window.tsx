@@ -45,7 +45,7 @@ export function SupportChatWindow({
       <p className="support-chat-status" role="status" aria-live="polite">
         {status === "loading" ? labels.loading : status === "error" ? labels.error : ""}
       </p>
-      <a href="mailto:jean@mepmail.dev">{labels.email}</a>
+      <a href="mailto:suporte@mepmail.dev">{labels.email}</a>
     </main>
   );
 }
