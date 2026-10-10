@@ -165,6 +165,21 @@
   font-variant-numeric: tabular-nums;
 }
 
+.quietCount {
+  flex: none;
+  margin-left: auto;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: var(--ms-r-pill);
+  background: color-mix(in srgb, var(--ms-bone) 9%, transparent);
+  color: var(--ms-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .showAll {
   justify-self: start;
   padding: 4px 10px;
@@ -290,6 +305,7 @@
   :global(html[data-rail="collapsed"]) .rail {
     width: 56px;
   }
+  :global(html[data-rail="collapsed"]) .rail .quietCount,
   :global(html[data-rail="collapsed"]) .rail .label,
   :global(html[data-rail="collapsed"]) .rail .sectionHeader,
   :global(html[data-rail="collapsed"]) .rail .groupHeader,
@@ -337,6 +353,7 @@
   :global(html:not([data-rail="expanded"])) .rail {
     width: 56px;
   }
+  :global(html:not([data-rail="expanded"])) .rail .quietCount,
   :global(html:not([data-rail="expanded"])) .rail .label,
   :global(html:not([data-rail="expanded"])) .rail .sectionHeader,
   :global(html:not([data-rail="expanded"])) .rail .groupHeader,

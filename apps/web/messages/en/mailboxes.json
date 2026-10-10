@@ -482,7 +482,8 @@
       "undo": "Undo the last action",
       "help": "Show these shortcuts",
       "newFolder": "New folder",
-      "moveTo": "Move to a folder"
+      "moveTo": "Move to a folder",
+      "snooze": "Snooze"
     }
   },
   "usage": {
@@ -826,7 +827,8 @@
       "yesterday": "Yesterday",
       "week": "Last 7 days",
       "month": "This month",
-      "older": "Older"
+      "older": "Older",
+      "pinned": "Pinned"
     }
   },
   "rail": {
@@ -840,10 +842,78 @@
     "showFewer": "Show fewer",
     "more": "More",
     "collapse": "Collapse the sidebar",
-    "expand": "Expand the sidebar"
+    "expand": "Expand the sidebar",
+    "waiting": "{count} waiting"
   },
   "account": {
     "menu": "Account and preferences",
     "preferences": "Preferences"
+  },
+  "snoozed": "Snoozed",
+  "scheduled": "Scheduled",
+  "followups": "Follow-ups",
+  "timing": {
+    "snooze": "Snooze",
+    "unsnooze": "Bring back now",
+    "snoozedUntil": "Snoozed until {time}",
+    "snoozedNotice": "Snoozed until {time}.",
+    "unsnoozed": "Back in the Inbox.",
+    "snoozedBadge": "Back {time}",
+    "pin": "Pin to the top",
+    "unpin": "Unpin",
+    "pinned": "Pinned to the top of the Inbox.",
+    "unpinned": "Unpinned.",
+    "sendLater": "Send later",
+    "scheduledFor": "Scheduled to send {time}",
+    "scheduledNotice": "Scheduled to send {time}.",
+    "scheduledBadge": "Sends {time}",
+    "cancelSchedule": "Cancel schedule",
+    "scheduleCancelled": "Schedule cancelled.",
+    "sendFailed": "The scheduled send did not go out: {reason}",
+    "sendFailedBadge": "Not sent",
+    "failures": {
+      "forbidden": "you no longer own this mailbox.",
+      "not_entitled": "the Correio license or plan is not active.",
+      "conflict": "the draft changed or is already sending.",
+      "invalid": "check the sender and the recipients.",
+      "not_found": "the draft no longer exists."
+    },
+    "followUp": "Remind me if no reply",
+    "followUpClear": "Cancel reminder",
+    "followUpDone": "Mark done",
+    "followUpNotice": "We will remind you {time} if nobody replies.",
+    "followUpCleared": "Reminder cleared.",
+    "remindAt": "Reminder {time} if nobody replies",
+    "noReply": "No reply since {time}",
+    "noReplyBadge": "No reply",
+    "pickTime": "Pick a date and time…",
+    "confirm": "Confirm",
+    "back": "Back",
+    "invalidTime": "Pick a time from one minute to one year from now.",
+    "presets": {
+      "laterToday": "Later today",
+      "tonight": "This evening",
+      "tomorrowMorning": "Tomorrow morning",
+      "tomorrowAfternoon": "Tomorrow afternoon",
+      "weekend": "This weekend",
+      "nextWeek": "Next week",
+      "inOneDay": "In 1 day",
+      "inThreeDays": "In 3 days",
+      "inOneWeek": "In 1 week"
+    },
+    "empty": {
+      "snoozed": {
+        "title": "Nothing snoozed",
+        "body": "Snooze a message (B) and it comes back to the Inbox when you choose."
+      },
+      "scheduled": {
+        "title": "Nothing scheduled",
+        "body": "Drafts set to send later wait here until their time."
+      },
+      "followups": {
+        "title": "No follow-ups due",
+        "body": "Sent messages you asked to be reminded about show up here if nobody replies."
+      }
+    }
   }
 }

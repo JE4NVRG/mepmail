@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  countMailboxSchedules,
   countMailboxViews,
   countUnreadMailboxItems,
   getMailboxOutboundSummary,
@@ -290,6 +291,8 @@ export async function getMailboxThread(
 const LIST_DEFAULT = 50;
 const LIST_MAX = 100;
 /** Opaque to clients: "<order time in epoch µs>.<item id>", base64url. */
+/** Views of the owner's own organizing: snoozed, pinned, sending later, waiting for a reply. */
+const ORGANIZING_VIEWS = ["snoozed", "pinned", "scheduled", "followups"];
 export function encodeMailboxListCursor(position: MailboxListPosition) {
   return Buffer.from(`${position.at}.${position.id}`, "utf8").toString("base64url");
 }
@@ -328,7 +331,11 @@ export async function getMailboxContentList(
       | "trash"
       | "favorites"
       | "archive"
-      | "custom";
+      | "custom"
+      | "snoozed"
+      | "pinned"
+      | "scheduled"
+      | "followups";
     customFolderId?: string | undefined;
     mailboxKind?: "person" | "agent" | undefined;
     cursor?: string | undefined;
@@ -342,7 +349,11 @@ export async function getMailboxContentList(
   if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > LIST_MAX)
     throw new MailboxContentError("invalid");
   const before = input.cursor === undefined ? undefined : decodeMailboxListCursor(input.cursor);
-  if (actor.agentAccess && ["spam", "quarantine", "trash", "archive"].includes(input.folder))
+  // The owner's own organizing views (snoozed, pinned, scheduled, follow-ups) are not for agents.
+  if (
+    actor.agentAccess &&
+    ["spam", "quarantine", "trash", "archive", ...ORGANIZING_VIEWS].includes(input.folder)
+  )
     throw new MailboxContentError("forbidden");
   if (
     (input.folder === "custom" && (!input.mailboxId || !input.customFolderId)) ||
@@ -365,9 +376,9 @@ export async function getMailboxContentList(
   if (input.mailboxId && !readable.length) throw new MailboxContentError("forbidden");
   const kind = ["trash", "favorites", "archive", "custom"].includes(input.folder)
     ? undefined
-    : input.folder === "drafts"
+    : input.folder === "drafts" || input.folder === "scheduled"
       ? "draft"
-      : input.folder === "sent"
+      : input.folder === "sent" || input.folder === "followups"
         ? "sent"
         : "inbox";
   const metadata = [];
@@ -385,12 +396,25 @@ export async function getMailboxContentList(
         ...(input.folder === "custom" ? { folderId: input.customFolderId!, safeOnly: true } : {}),
         ...(input.folder === "archive" ? { archived: true, safeOnly: true } : {}),
         // Filed and archived messages leave the ordinary views (agents see them all).
-        ...(!actor.agentAccess && ["inbox", "drafts", "sent"].includes(input.folder)
+        ...(!actor.agentAccess && ["inbox", "drafts", "sent", "pinned"].includes(input.folder)
           ? { folderId: null, archived: false }
           : {}),
         ...(kind === "inbox"
-          ? { deliveryFolder: input.folder as "inbox" | "spam" | "quarantine" }
+          ? {
+              deliveryFolder: (["snoozed", "pinned"].includes(input.folder)
+                ? "inbox"
+                : input.folder) as "inbox" | "spam" | "quarantine",
+            }
           : {}),
+        // A snoozed message leaves every view but Snoozed (and Trash) until it is due.
+        ...(input.folder === "snoozed"
+          ? { snoozed: true }
+          : input.folder === "trash"
+            ? {}
+            : { snoozed: false }),
+        ...(input.folder === "pinned" ? { pinned: true } : {}),
+        ...(input.folder === "scheduled" ? { scheduled: true } : {}),
+        ...(input.folder === "followups" ? { followUp: true } : {}),
       },
       {
         ...(before ? { before } : {}),
@@ -438,6 +462,12 @@ export async function getMailboxContentList(
     seenAt: Date | null;
     archivedAt: Date | null;
     folderId: string | null;
+    snoozedUntil: Date | null;
+    pinnedAt: Date | null;
+    sendAt: Date | null;
+    sendFailure: (typeof schema.mailboxItems.$inferSelect)["sendFailure"];
+    remindAt: Date | null;
+    remindedAt: Date | null;
     inboundAssessment: (typeof schema.mailboxItems.$inferSelect)["inboundAssessment"];
     sentBy: { kind: "human" | "agent"; label: string | null } | null;
     sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null;
@@ -513,6 +543,12 @@ export async function getMailboxContentList(
       seenAt: item.seenAt,
       archivedAt: item.archivedAt,
       folderId: item.folderId,
+      snoozedUntil: item.snoozedUntil,
+      pinnedAt: item.pinnedAt,
+      sendAt: item.sendAt,
+      sendFailure: item.sendFailure,
+      remindAt: item.remindAt,
+      remindedAt: item.remindedAt,
       inboundAssessment: item.inboundAssessment,
       sentBy: item.sentBy,
       sendStatus: item.sendStatus,
@@ -612,6 +648,27 @@ async function railMailboxes(db: Db, actor: MailboxContentActor, mailboxId: stri
   );
   if (mailboxId && !readable.length) throw new MailboxContentError("forbidden");
   return { boxes: readable.slice(0, 20), mailboxesTruncated: readable.length > 20 };
+}
+
+/**
+ * How many messages wait in Snoozed, Scheduled and Follow-ups across the rail's
+ * mailboxes (one, or every mailbox the actor owns), for the rail's counts.
+ */
+export async function getMailboxScheduleCounts(
+  db: Db,
+  actor: MailboxContentActor,
+  input: { mailboxId: string | null },
+) {
+  actor = { ...actor };
+  const { boxes } = await railMailboxes(db, actor, input.mailboxId);
+  const total = { snoozed: 0, scheduled: 0, followUps: 0 };
+  for (const box of boxes) {
+    const counts = await countMailboxSchedules(db, actor, box.id);
+    total.snoozed += counts.snoozed;
+    total.scheduled += counts.scheduled;
+    total.followUps += counts.followUps;
+  }
+  return total;
 }
 
 /**

@@ -28,6 +28,31 @@
   },
   "releases": [
     {
+      "version": "0.84",
+      "date": "2026-10-09",
+      "title": "Adiar, fixar e enviar depois",
+      "summary": "O Correio ganhou adiar mensagens, fixar no topo da Entrada, enviar depois e lembrete quando ninguém responde. Com o seu consentimento de publicidade, o cadastro concluído passa a contar nos anúncios.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Adiar: a mensagem sai da Entrada e volta ao topo na hora escolhida, pela tecla B, por sugestões rápidas ou em “Escolher data e hora…”.",
+            "Fixar no topo: as mensagens fixadas ficam na seção “Fixadas”, no alto da Entrada.",
+            "Enviar depois, ao lado de Enviar, com cancelamento até a hora marcada. Na hora do envio conferimos de novo a licença, o plano, o assento e o domínio.",
+            "“Lembrar se não responderem” nas mensagens enviadas: sem resposta até a data, a conversa volta para a Entrada.",
+            "Pastas Adiadas, Lembretes e Agendadas no menu lateral, com contagem, e selos nas linhas."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Com o consentimento de publicidade, o cadastro concluído também é informado à Meta e ao Google, só com os identificadores dos cookies deles, sem e-mail nem nome. Retirar o consentimento cancela o que ainda não foi enviado, e a política de privacidade descreve isso.",
+            "O consentimento dado nas páginas do Correio, da alternativa ao Resend e de integrações vale para os eventos de compra, como já valia na página inicial e em Preços."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.83",
       "date": "2026-10-09",
       "title": "Mover para, com busca",

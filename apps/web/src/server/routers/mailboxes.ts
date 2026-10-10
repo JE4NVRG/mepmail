@@ -96,6 +96,7 @@ import {
 } from "../mailboxes";
 import { getQueue } from "../queue";
 import { protectedProcedure, router, teamProcedure } from "../trpc";
+import { mailboxSchedulingRouter } from "./mailbox-scheduling";
 
 const enabled = teamProcedure.use(async ({ ctx, next }) => {
   if (
@@ -777,6 +778,10 @@ export const mailboxesRouter = router({
           "favorites",
           "archive",
           "custom",
+          "snoozed",
+          "pinned",
+          "scheduled",
+          "followups",
         ]),
         customFolderId: z.uuid().optional(),
         mailboxKind: z.enum(["person", "agent"]).optional(),
@@ -787,6 +792,7 @@ export const mailboxesRouter = router({
       }),
     )
     .query(({ ctx, input }) => call(() => getMailboxContentList(ctx.db, actor(ctx), input))),
+  scheduling: mailboxSchedulingRouter,
   preferences: router({
     get: enabled.query(({ ctx }) => getMailboxPreferences(ctx.db, ctx.session.user.id)),
     // Only the changed fields; returns the full object with server defaults.

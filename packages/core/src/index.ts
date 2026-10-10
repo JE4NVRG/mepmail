@@ -488,6 +488,26 @@ export {
   withMailboxRegistryAdmin,
 } from "./mailbox-registry.js";
 export {
+  claimDueMailboxSends,
+  completeMailboxSend,
+  countMailboxSchedules,
+  failMailboxSend,
+  MAILBOX_SCHEDULE_MAX_MS,
+  MAILBOX_SCHEDULE_MIN_MS,
+  MAILBOX_SEND_CLAIM_STALE_MS,
+  type MailboxDueSend,
+  type MailboxScheduleCounts,
+  type MailboxScheduledSendFailure,
+  mailboxScheduleDto,
+  mailboxScheduledSendFailure,
+  markDueMailboxFollowUps,
+  pinMailboxItem,
+  scheduleMailboxSend,
+  setMailboxFollowUp,
+  snoozeMailboxItem,
+  wakeSnoozedMailboxItems,
+} from "./mailbox-scheduling.js";
+export {
   assertMailboxStorage,
   lockMailboxService,
   MailboxServiceError,

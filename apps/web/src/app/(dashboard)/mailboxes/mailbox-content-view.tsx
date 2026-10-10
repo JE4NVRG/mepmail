@@ -51,12 +51,14 @@ import {
 } from "@/lib/mailbox-recipients";
 import { MAILBOX_SHORTCUTS, mailboxShortcut } from "@/lib/mailbox-shortcuts";
 import { mailboxSignatureText } from "@/lib/mailbox-signature";
+import { mailboxTimeLabel } from "@/lib/mailbox-time";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import { MailboxMoveMenu, type MailboxMoveMenuHandle } from "./mailbox-move-menu";
 import { MailboxRecipientField } from "./mailbox-recipient-field";
 import { MailboxRichBody } from "./mailbox-rich-body";
+import { MailboxTimeMenu, type MailboxTimeMenuHandle } from "./mailbox-time-menu";
 import { MailboxViewMenu } from "./mailbox-view-menu";
 import styles from "./mailboxes.module.css";
 
@@ -860,6 +862,16 @@ export function MailboxContentView({
   );
   const archiveMutation = useMutation(trpc.mailboxes.setArchive.mutationOptions({ retry: false }));
   const seenMutation = useMutation(trpc.mailboxes.setSeen.mutationOptions({ retry: false }));
+  const snoozeMutation = useMutation(
+    trpc.mailboxes.scheduling.snooze.mutationOptions({ retry: false }),
+  );
+  const pinMutation = useMutation(trpc.mailboxes.scheduling.pin.mutationOptions({ retry: false }));
+  const sendLaterMutation = useMutation(
+    trpc.mailboxes.scheduling.sendLater.mutationOptions({ retry: false }),
+  );
+  const followUpMutation = useMutation(
+    trpc.mailboxes.scheduling.followUp.mutationOptions({ retry: false }),
+  );
   // Read state shows at once; the server write and the refetch catch up behind it.
   const [seenOverride, setSeenOverride] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState("");
@@ -896,6 +908,8 @@ export function MailboxContentView({
   // "Move to" in the reader and in the bulk bar; V opens whichever applies.
   const moveMenu = useRef<MailboxMoveMenuHandle>(null);
   const bulkMoveMenu = useRef<MailboxMoveMenuHandle>(null);
+  // "Snooze" in the reader; B opens it.
+  const snoozeMenu = useRef<MailboxTimeMenuHandle>(null);
   // Unread mail that arrived while the list was scrolled down: a chip offers the way back up.
   const [freshCount, setFreshCount] = useState(0);
   const listBody = useRef<HTMLDivElement>(null);
@@ -987,22 +1001,39 @@ export function MailboxContentView({
   );
   const mailboxesTruncated = listing.data?.pages.some((page) => page.mailboxesTruncated) ?? false;
   const readable = boxes.filter((b) => b.canRead && b.status === "planned");
-  const rows =
-    listedItems?.filter((i) => {
-      if (
-        unreadOnly &&
-        !(
-          i.kind === "inbox" &&
-          !mailboxContentBlocked(i) &&
-          (i.seenAt === null || (selection?.id === i.id && selection.mailboxId === i.mailboxId))
-        )
+  const pinnedListing = useQuery(
+    trpc.mailboxes.items.queryOptions(
+      {
+        mailboxId: listMailboxId,
+        folder: "pinned",
+        ...(mailboxKind ? { mailboxKind } : {}),
+      },
+      { enabled: folder === "inbox", retry: false, refetchInterval: 60000 },
+    ),
+  );
+  type ListedItem = NonNullable<typeof listedItems>[number];
+  const keepRow = (i: ListedItem) => {
+    if (
+      unreadOnly &&
+      !(
+        i.kind === "inbox" &&
+        !mailboxContentBlocked(i) &&
+        (i.seenAt === null || (selection?.id === i.id && selection.mailboxId === i.mailboxId))
       )
-        return false;
-      const searchable = mailboxContentBlocked(i)
-        ? `${i.address} ${i.mailboxLabel}`
-        : `${i.subject ?? ""} ${i.from ?? ""} ${i.fromName ?? ""} ${i.to?.join(" ") ?? ""} ${i.snippet ?? ""} ${i.address}`;
-      return searchable.toLowerCase().includes(search.toLowerCase().trim());
-    }) ?? [];
+    )
+      return false;
+    const searchable = mailboxContentBlocked(i)
+      ? `${i.address} ${i.mailboxLabel}`
+      : `${i.subject ?? ""} ${i.from ?? ""} ${i.fromName ?? ""} ${i.to?.join(" ") ?? ""} ${i.snippet ?? ""} ${i.address}`;
+    return searchable.toLowerCase().includes(search.toLowerCase().trim());
+  };
+  // The inbox shows its pinned messages first, under their own heading, and only there.
+  const pinnedRows = folder === "inbox" ? (pinnedListing.data?.items ?? []).filter(keepRow) : [];
+  const pinnedKeys = new Set(pinnedRows.map((i) => `${i.mailboxId}:${i.id}`));
+  const rows = [
+    ...pinnedRows,
+    ...(listedItems?.filter((i) => !pinnedKeys.has(`${i.mailboxId}:${i.id}`) && keepRow(i)) ?? []),
+  ];
   const selectedBox = readable.find((b) => b.id === selection?.mailboxId);
   // Warms the folder list "Move to" opens with, as soon as a message is open.
   useQuery(
@@ -1130,6 +1161,87 @@ export function MailboxContentView({
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.items.queryKey() });
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.item.queryKey() });
     await queries.invalidateQueries({ queryKey: trpc.mailboxes.unreadCounts.queryKey() });
+    await queries.invalidateQueries({ queryKey: trpc.mailboxes.scheduling.counts.queryKey() });
+  }
+  const conflictOr = (cause: unknown, fallback: string) =>
+    t(
+      (cause as { data?: { code?: string } })?.data?.code === "CONFLICT"
+        ? "organization.conflict"
+        : fallback,
+    );
+  /** One timing change on the open message, with its notice and, where it makes sense, undo. */
+  async function changeTiming(
+    run: (ref: { mailboxId: string; id: string; expectedRevision: number }) => Promise<{
+      revision: number;
+    }>,
+    message: string,
+    inverse:
+      | ((ref: { mailboxId: string; id: string; expectedRevision: number }) => Promise<unknown>)
+      | null,
+    leave: boolean,
+  ) {
+    if (!item || moving.current) return;
+    const ref = { mailboxId: item.mailboxId, id: item.id };
+    moving.current = true;
+    setNotice("");
+    try {
+      const done = await run({ ...ref, expectedRevision: item.revision });
+      if (!mounted.current) return;
+      if (leave) select(null);
+      setNotice(message);
+      if (inverse) offerUndo(message, [() => inverse({ ...ref, expectedRevision: done.revision })]);
+    } catch (cause) {
+      if (mounted.current) setNotice(conflictOr(cause, "organization.error"));
+    } finally {
+      moving.current = false;
+      if (mounted.current) void refresh();
+    }
+  }
+  const timeLabel = (value: Date) => mailboxTimeLabel(value, new Date(), locale);
+  function changeSnooze(until: Date | null) {
+    // It comes back unread: drop what this session remembers of reading it.
+    if (until && item) {
+      const key = rowKey(item);
+      setSeenOverride((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+    }
+    void changeTiming(
+      (ref) => snoozeMutation.mutateAsync({ ...ref, until }),
+      until ? t("timing.snoozedNotice", { time: timeLabel(until) }) : t("timing.unsnoozed"),
+      until ? (ref) => snoozeMutation.mutateAsync({ ...ref, until: null }) : null,
+      until !== null,
+    );
+  }
+  function changePin(pinned: boolean) {
+    void changeTiming(
+      (ref) => pinMutation.mutateAsync({ ...ref, pinned }),
+      t(pinned ? "timing.pinned" : "timing.unpinned"),
+      (ref) => pinMutation.mutateAsync({ ...ref, pinned: !pinned }),
+      false,
+    );
+  }
+  function changeSendLater(sendAt: Date | null) {
+    void changeTiming(
+      (ref) => sendLaterMutation.mutateAsync({ ...ref, sendAt }),
+      sendAt
+        ? t("timing.scheduledNotice", { time: timeLabel(sendAt) })
+        : t("timing.scheduleCancelled"),
+      sendAt ? (ref) => sendLaterMutation.mutateAsync({ ...ref, sendAt: null }) : null,
+      false,
+    );
+  }
+  function changeFollowUp(remindAt: Date | null) {
+    void changeTiming(
+      (ref) => followUpMutation.mutateAsync({ ...ref, remindAt }),
+      remindAt
+        ? t("timing.followUpNotice", { time: timeLabel(remindAt) })
+        : t("timing.followUpCleared"),
+      null,
+      false,
+    );
   }
   const sendKey = item ? `${item.mailboxId}:${item.id}:${item.revision}` : null;
   const sendState = item?.sendStatus ?? (sendKey ? sendStates[sendKey] : undefined);
@@ -1883,6 +1995,12 @@ export function MailboxContentView({
       case "newFolder":
         if (onNewFolder) run(onNewFolder);
         return;
+      case "snooze":
+        if (canOrganizeItem && item?.kind === "inbox" && snoozeMenu.current) {
+          const menu = snoozeMenu.current;
+          run(() => menu.open());
+        }
+        return;
       case "moveTo":
         if (checkedRows.length && bulkMoveMenu.current) {
           const menu = bulkMoveMenu.current;
@@ -2211,12 +2329,13 @@ export function MailboxContentView({
                 <div className={styles.messageRows}>
                   {rows.map((row, index) => {
                     const blocked = mailboxContentBlocked(row);
-                    const section = mailboxDateSection(row.date, now);
-                    const previous = rows[index - 1];
+                    const sectionAt = (at: number) =>
+                      at < pinnedRows.length
+                        ? "pinned"
+                        : mailboxDateSection(rows[at]?.date ?? row.date, now);
+                    const section = sectionAt(index);
                     const heading =
-                      !previous || mailboxDateSection(previous.date, now) !== section
-                        ? section
-                        : null;
+                      index === 0 || sectionAt(index - 1) !== section ? section : null;
                     const avatarAddress = blocked
                       ? row.address
                       : row.kind === "inbox"
@@ -2240,7 +2359,11 @@ export function MailboxContentView({
                       blocked ||
                       !!rowApproval ||
                       (!!row.approvalRequested && !row.sendStatus) ||
-                      !!row.sendStatus;
+                      !!row.sendStatus ||
+                      !!row.snoozedUntil ||
+                      !!row.sendAt ||
+                      (!!row.sendFailure && !row.sendStatus) ||
+                      !!row.remindedAt;
                     return (
                       <Fragment key={rowKey(row)}>
                         {heading ? (
@@ -2375,6 +2498,28 @@ export function MailboxContentView({
                                   {!blocked && row.sendStatus ? (
                                     <span>{t(`deliveryStatus.${row.sendStatus}`)}</span>
                                   ) : null}
+                                  {!blocked && row.snoozedUntil ? (
+                                    <span>
+                                      {t("timing.snoozedBadge", {
+                                        time: timeLabel(row.snoozedUntil),
+                                      })}
+                                    </span>
+                                  ) : null}
+                                  {!blocked && row.sendAt && !row.sendStatus ? (
+                                    <span>
+                                      {t("timing.scheduledBadge", { time: timeLabel(row.sendAt) })}
+                                    </span>
+                                  ) : null}
+                                  {!blocked && row.sendFailure && !row.sendAt && !row.sendStatus ? (
+                                    <span className={styles.warningBadge}>
+                                      {t("timing.sendFailedBadge")}
+                                    </span>
+                                  ) : null}
+                                  {!blocked && row.remindedAt ? (
+                                    <span className={styles.warningBadge}>
+                                      {t("timing.noReplyBadge")}
+                                    </span>
+                                  ) : null}
                                 </div>
                               ) : null}
                               {showRowAddress ? (
@@ -2436,7 +2581,11 @@ export function MailboxContentView({
                                   ? "sentEmptyTitle"
                                   : folder === "drafts"
                                     ? "draftsEmptyTitle"
-                                    : "inboxEmptyTitle",
+                                    : folder === "snoozed" ||
+                                        folder === "scheduled" ||
+                                        folder === "followups"
+                                      ? `timing.empty.${folder}.title`
+                                      : "inboxEmptyTitle",
                     )}
                   </h3>
                   <p>
@@ -2455,7 +2604,11 @@ export function MailboxContentView({
                                   ? "sentEmptyBody"
                                   : folder === "drafts"
                                     ? "draftsEmptyBody"
-                                    : "inboxEmptyBody",
+                                    : folder === "snoozed" ||
+                                        folder === "scheduled" ||
+                                        folder === "followups"
+                                      ? `timing.empty.${folder}.body`
+                                      : "inboxEmptyBody",
                     )}
                   </p>
                   {search ? (
@@ -2537,14 +2690,27 @@ export function MailboxContentView({
                         <span className={styles.narrowHidden}>{t("forward")}</span>
                       </button>
                     ) : selectedBox?.canSend && deliveryReady ? (
-                      <button
-                        type="button"
-                        className="ms-btn ms-btn-primary"
-                        disabled={!canSubmitDraft || sendMutation.isPending}
-                        onClick={() => void submitDraft()}
-                      >
-                        {t(sendState === "requesting" ? "sending" : "send")}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-primary"
+                          disabled={!canSubmitDraft || sendMutation.isPending}
+                          onClick={() => void submitDraft()}
+                        >
+                          {t(sendState === "requesting" ? "sending" : "send")}
+                        </button>
+                        {!sendState ? (
+                          <MailboxTimeMenu
+                            kind="sendLater"
+                            current={item.sendAt}
+                            label={t("timing.sendLater")}
+                            clearLabel={t("timing.cancelSchedule")}
+                            icon={<MailboxFolderIcon name="scheduled" />}
+                            disabled={!canSubmitDraft || sendLaterMutation.isPending}
+                            onPick={changeSendLater}
+                          />
+                        ) : null}
+                      </>
                     ) : null}
                   </div>
                 ) : null}
@@ -2561,6 +2727,42 @@ export function MailboxContentView({
                   >
                     <MailboxFolderIcon name={item.archivedAt ? "inbox" : "archive"} />
                   </button>
+                ) : null}
+                {canOrganizeItem && item && item.kind === "inbox" ? (
+                  <>
+                    <MailboxTimeMenu
+                      ref={snoozeMenu}
+                      kind="snooze"
+                      current={item.snoozedUntil}
+                      label={t("timing.snooze")}
+                      clearLabel={t("timing.unsnooze")}
+                      icon={<MailboxFolderIcon name="snoozed" />}
+                      disabled={snoozeMutation.isPending || bulkBusy}
+                      onPick={changeSnooze}
+                    />
+                    <button
+                      type="button"
+                      className={`ms-btn ms-btn-ghost ${styles.iconAction}`}
+                      aria-pressed={!!item.pinnedAt}
+                      aria-label={t(item.pinnedAt ? "timing.unpin" : "timing.pin")}
+                      title={t(item.pinnedAt ? "timing.unpin" : "timing.pin")}
+                      disabled={pinMutation.isPending || bulkBusy}
+                      onClick={() => changePin(!item.pinnedAt)}
+                    >
+                      <MailboxFolderIcon name="pin" filled={!!item.pinnedAt} />
+                    </button>
+                  </>
+                ) : null}
+                {isOwner && item && item.kind === "sent" && !item.trashedAt ? (
+                  <MailboxTimeMenu
+                    kind="followUp"
+                    current={item.remindAt ?? item.remindedAt}
+                    label={t("timing.followUp")}
+                    clearLabel={t(item.remindedAt ? "timing.followUpDone" : "timing.followUpClear")}
+                    icon={<MailboxFolderIcon name="followups" />}
+                    disabled={followUpMutation.isPending}
+                    onPick={changeFollowUp}
+                  />
                 ) : null}
                 {isOwner && item && selectedRow && item.kind === "inbox" && !blockedRow ? (
                   <button
@@ -2683,6 +2885,77 @@ export function MailboxContentView({
                 <article className={styles.message}>
                   {item.trashedAt ? (
                     <p className={styles.contentNotice}>{t("trashMessageHelp")}</p>
+                  ) : null}
+                  {item.snoozedUntil ? (
+                    <p className={styles.timingNotice}>
+                      <MailboxFolderIcon name="snoozed" />
+                      <span>
+                        {t("timing.snoozedUntil", { time: timeLabel(item.snoozedUntil) })}
+                      </span>
+                      {isOwner ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-ghost ms-btn-sm"
+                          onClick={() => changeSnooze(null)}
+                        >
+                          {t("timing.unsnooze")}
+                        </button>
+                      ) : null}
+                    </p>
+                  ) : null}
+                  {item.kind === "draft" && item.sendAt && !sendState ? (
+                    <p className={styles.timingNotice}>
+                      <MailboxFolderIcon name="scheduled" />
+                      <span>{t("timing.scheduledFor", { time: timeLabel(item.sendAt) })}</span>
+                      {isOwner ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-ghost ms-btn-sm"
+                          onClick={() => changeSendLater(null)}
+                        >
+                          {t("timing.cancelSchedule")}
+                        </button>
+                      ) : null}
+                    </p>
+                  ) : null}
+                  {item.kind === "draft" && item.sendFailure && !item.sendAt && !sendState ? (
+                    <p className={styles.timingNotice} data-tone="warn" role="status">
+                      <MailboxFolderIcon name="scheduled" />
+                      <span>
+                        {t("timing.sendFailed", {
+                          reason: t(`timing.failures.${item.sendFailure}`),
+                        })}
+                      </span>
+                    </p>
+                  ) : null}
+                  {item.kind === "sent" && item.remindedAt ? (
+                    <p className={styles.timingNotice} data-tone="warn">
+                      <MailboxFolderIcon name="followups" />
+                      <span>{t("timing.noReply", { time: timeLabel(item.createdAt) })}</span>
+                      {isOwner ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-ghost ms-btn-sm"
+                          onClick={() => changeFollowUp(null)}
+                        >
+                          {t("timing.followUpDone")}
+                        </button>
+                      ) : null}
+                    </p>
+                  ) : item.kind === "sent" && item.remindAt ? (
+                    <p className={styles.timingNotice}>
+                      <MailboxFolderIcon name="followups" />
+                      <span>{t("timing.remindAt", { time: timeLabel(item.remindAt) })}</span>
+                      {isOwner ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-ghost ms-btn-sm"
+                          onClick={() => changeFollowUp(null)}
+                        >
+                          {t("timing.followUpClear")}
+                        </button>
+                      ) : null}
+                    </p>
                   ) : null}
                   {item.kind === "inbox" && item.deliveryFolder === "spam" ? (
                     <SafetyNotice assessment={item.inboundAssessment} quarantined={false} />

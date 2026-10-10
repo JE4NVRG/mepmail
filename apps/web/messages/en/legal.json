@@ -120,7 +120,7 @@
           "Sending data: sending domains, contacts you upload, suppressions, and message metadata (recipient, subject, status, events).",
           "Message content: the HTML/text you send, stored encrypted at rest, processed to deliver the message.",
           "Technical data: IP address, user agent, session cookies and application logs.",
-          "Optional advertising measurement: public pages visited, Meta and Google cookie and click identifiers, clicks to create an account, and paid-plan checkout and initial-purchase events with their value and currency. We do not send names, email addresses, phone numbers, contacts, recipients, or message content for this purpose."
+          "Optional advertising measurement: public pages visited, Meta and Google cookie and click identifiers, clicks to create an account, the completed sign-up, and paid-plan checkout and initial-purchase events with their value and currency. We do not send names, email addresses, phone numbers, contacts, recipients, or message content for this purpose."
         ]
       },
       {
@@ -143,7 +143,7 @@
         "title": "5. Subprocessors",
         "body": [
           "We use a deliberately short list of providers to run the service:",
-          "If you allow advertising measurement, Meta and Google receive the optional events described in this policy: Meta through its Pixel and purchase events, Google through Google Analytics on public pages and the initial paid-plan purchase, which our server sends with the Google Analytics cookie identifier, the plan and the amount. These connections also provide your IP address and browser information. Each company processes this data under its own privacy policy. We do not turn on Google signals or ad personalization, and measurement is not required to use MepMail."
+          "If you allow advertising measurement, Meta and Google receive the optional events described in this policy: Meta through its Pixel and its completed sign-up and purchase events, Google through Google Analytics on public pages and its completed sign-up and initial paid-plan purchase events, which our server sends with the Meta and Google Analytics cookie identifiers and, for a purchase, the plan and the amount. These connections also provide your IP address and browser information. Each company processes this data under its own privacy policy. We do not turn on Google signals or ad personalization, and measurement is not required to use MepMail."
         ],
         "list": [
           "Amazon Web Services (Amazon SES) — email delivery and event notifications. Message content and metadata pass through it for delivery.",

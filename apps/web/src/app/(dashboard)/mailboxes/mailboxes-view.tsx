@@ -504,6 +504,17 @@ export function MailboxesView({
   const archiveFolderMutation = useMutation(
     trpc.mailboxes.archiveFolder.mutationOptions({ retry: false }),
   );
+  // Snoozed, scheduled and due follow-ups for the rail: the selected mailbox or every own one.
+  const scheduleCounts = useQuery(
+    trpc.mailboxes.scheduling.counts.queryOptions(
+      { mailboxId: selected?.canRead && selected.status === "planned" ? selected.id : null },
+      {
+        enabled: mayUseMail && !!registry.data && layout === "app",
+        refetchInterval: 60000,
+        retry: false,
+      },
+    ),
+  );
   const unreadCounts = useQuery(
     trpc.mailboxes.unreadCounts.queryOptions(undefined, {
       enabled: mayUseMail && !!registry.data,
@@ -937,6 +948,7 @@ export function MailboxesView({
       folder={folder}
       unread={unreadCounts.data?.counts ?? {}}
       inboxUnread={inboxUnread}
+      schedules={scheduleCounts.data ?? null}
       expanded={railOpen}
       onClose={() => setRailOpen(false)}
       onSelectBox={(id) => {

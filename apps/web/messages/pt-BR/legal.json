@@ -120,7 +120,7 @@
           "Dados de envio: domínios de envio, contatos que você cadastra, supressões e metadados das mensagens (destinatário, assunto, status, eventos).",
           "Conteúdo das mensagens: o HTML/texto que você envia, armazenado criptografado em repouso e processado para entregar a mensagem.",
           "Dados técnicos: endereço IP, user agent, cookies de sessão e logs da aplicação.",
-          "Mensuração opcional de publicidade: páginas públicas visitadas, identificadores de cookies e de cliques da Meta e do Google, cliques para criar conta e eventos de início de checkout e compra inicial de plano pago, com valor e moeda. Não enviamos nomes, e-mails, telefones, contatos, destinatários ou conteúdo de mensagens para esse fim."
+          "Mensuração opcional de publicidade: páginas públicas visitadas, identificadores de cookies e de cliques da Meta e do Google, cliques para criar conta, a conclusão do cadastro e eventos de início de checkout e compra inicial de plano pago, com valor e moeda. Não enviamos nomes, e-mails, telefones, contatos, destinatários ou conteúdo de mensagens para esse fim."
         ]
       },
       {
@@ -143,7 +143,7 @@
         "title": "5. Subprocessadores",
         "body": [
           "Usamos uma lista deliberadamente curta de provedores para operar o serviço:",
-          "Se você permitir a mensuração de publicidade, a Meta e o Google recebem os eventos opcionais descritos nesta política: a Meta pelo Pixel e pelos eventos de compra, o Google pelo Google Analytics nas páginas públicas e pela compra inicial de plano pago, que o nosso servidor envia com o identificador do cookie do Google Analytics, o plano e o valor. Essas conexões também informam o endereço IP e informações do navegador. Cada empresa trata esses dados conforme a sua própria política de privacidade. Não ativamos os sinais do Google nem a personalização de anúncios, e a mensuração não é necessária para usar o MepMail."
+          "Se você permitir a mensuração de publicidade, a Meta e o Google recebem os eventos opcionais descritos nesta política: a Meta pelo Pixel e pelos eventos de cadastro concluído e de compra, o Google pelo Google Analytics nas páginas públicas e pelos eventos de cadastro concluído e de compra inicial de plano pago, que o nosso servidor envia com os identificadores dos cookies da Meta e do Google Analytics e, na compra, o plano e o valor. Essas conexões também informam o endereço IP e informações do navegador. Cada empresa trata esses dados conforme a sua própria política de privacidade. Não ativamos os sinais do Google nem a personalização de anúncios, e a mensuração não é necessária para usar o MepMail."
         ],
         "list": [
           "Amazon Web Services (Amazon SES) — entrega de e-mails e notificações de eventos. Conteúdo e metadados das mensagens passam por ele para a entrega.",

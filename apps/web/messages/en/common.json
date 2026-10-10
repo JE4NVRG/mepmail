@@ -119,7 +119,7 @@
   "sourceDownload": "Download the corresponding source of this version for free",
   "advertising": {
     "title": "Advertising preferences",
-    "body": "With your permission, we use Meta and Google Analytics to measure visits to public pages, clicks to create an account, and paid-plan purchases. Essential cookies keep working if you decline. You can change your choice at any time.",
+    "body": "With your permission, we use Meta and Google Analytics to measure visits to public pages, sign-ups, and paid-plan purchases. Essential cookies keep working if you decline. You can change your choice at any time.",
     "accept": "Allow advertising measurement",
     "deny": "Decline optional measurement",
     "settings": "Advertising preferences",

@@ -139,3 +139,15 @@
     outline-offset: -2px;
   }
 }
+
+/* "Pick a date and time" inside the timing menus. */
+.pickForm {
+  display: grid;
+  gap: 8px;
+  padding: 4px 2px 2px;
+}
+.pickActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}

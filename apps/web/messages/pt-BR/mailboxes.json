@@ -482,7 +482,8 @@
       "undo": "Desfazer a última ação",
       "help": "Mostrar estes atalhos",
       "newFolder": "Nova pasta",
-      "moveTo": "Mover para uma pasta"
+      "moveTo": "Mover para uma pasta",
+      "snooze": "Adiar"
     }
   },
   "usage": {
@@ -826,7 +827,8 @@
       "yesterday": "Ontem",
       "week": "Últimos 7 dias",
       "month": "Este mês",
-      "older": "Mais antigas"
+      "older": "Mais antigas",
+      "pinned": "Fixadas"
     }
   },
   "rail": {
@@ -840,10 +842,78 @@
     "showFewer": "Mostrar menos",
     "more": "Mais",
     "collapse": "Recolher a barra lateral",
-    "expand": "Expandir a barra lateral"
+    "expand": "Expandir a barra lateral",
+    "waiting": "{count} aguardando"
   },
   "account": {
     "menu": "Conta e preferências",
     "preferences": "Preferências"
+  },
+  "snoozed": "Adiadas",
+  "scheduled": "Agendadas",
+  "followups": "Lembretes",
+  "timing": {
+    "snooze": "Adiar",
+    "unsnooze": "Trazer de volta agora",
+    "snoozedUntil": "Adiada até {time}",
+    "snoozedNotice": "Adiada até {time}.",
+    "unsnoozed": "De volta na Entrada.",
+    "snoozedBadge": "Volta {time}",
+    "pin": "Fixar no topo",
+    "unpin": "Desafixar",
+    "pinned": "Fixada no topo da Entrada.",
+    "unpinned": "Desafixada.",
+    "sendLater": "Enviar depois",
+    "scheduledFor": "Envio agendado para {time}",
+    "scheduledNotice": "Envio agendado para {time}.",
+    "scheduledBadge": "Envia {time}",
+    "cancelSchedule": "Cancelar agendamento",
+    "scheduleCancelled": "Agendamento cancelado.",
+    "sendFailed": "O envio agendado não saiu: {reason}",
+    "sendFailedBadge": "Não enviado",
+    "failures": {
+      "forbidden": "você não é mais responsável por esta caixa.",
+      "not_entitled": "a licença ou o plano do Correio não está ativo.",
+      "conflict": "o rascunho mudou ou já está sendo enviado.",
+      "invalid": "confira o remetente e os destinatários.",
+      "not_found": "o rascunho não existe mais."
+    },
+    "followUp": "Lembrar se não responderem",
+    "followUpClear": "Cancelar lembrete",
+    "followUpDone": "Concluir",
+    "followUpNotice": "Vamos lembrar você {time} se ninguém responder.",
+    "followUpCleared": "Lembrete concluído.",
+    "remindAt": "Lembrete {time} se ninguém responder",
+    "noReply": "Sem resposta desde {time}",
+    "noReplyBadge": "Sem resposta",
+    "pickTime": "Escolher data e hora…",
+    "confirm": "Confirmar",
+    "back": "Voltar",
+    "invalidTime": "Escolha um horário entre 1 minuto e 1 ano a partir de agora.",
+    "presets": {
+      "laterToday": "Mais tarde hoje",
+      "tonight": "Hoje à noite",
+      "tomorrowMorning": "Amanhã de manhã",
+      "tomorrowAfternoon": "Amanhã à tarde",
+      "weekend": "Neste fim de semana",
+      "nextWeek": "Próxima semana",
+      "inOneDay": "Em 1 dia",
+      "inThreeDays": "Em 3 dias",
+      "inOneWeek": "Em 1 semana"
+    },
+    "empty": {
+      "snoozed": {
+        "title": "Nada adiado",
+        "body": "Adie uma mensagem (B) e ela volta para a Entrada na hora que você escolher."
+      },
+      "scheduled": {
+        "title": "Nada agendado",
+        "body": "Rascunhos marcados para enviar depois esperam aqui até a hora."
+      },
+      "followups": {
+        "title": "Nenhum lembrete vencido",
+        "body": "Mensagens enviadas com lembrete aparecem aqui se ninguém responder."
+      }
+    }
   }
 }

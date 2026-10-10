@@ -24,7 +24,16 @@ import {
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import styles from "./mailbox-rail.module.css";
 
-const PRIMARY: MailboxFolder[] = ["inbox", "favorites", "drafts", "sent", "archive"];
+const PRIMARY: MailboxFolder[] = [
+  "inbox",
+  "favorites",
+  "snoozed",
+  "followups",
+  "drafts",
+  "scheduled",
+  "sent",
+  "archive",
+];
 const MORE: MailboxFolder[] = ["spam", "quarantine"];
 const DROPPABLE = new Set<MailboxFolder>(["inbox", "favorites", "archive", "spam", "trash"]);
 
@@ -43,6 +52,7 @@ export function MailboxRail({
   folder,
   unread,
   inboxUnread,
+  schedules,
   expanded,
   onClose,
   onSelectBox,
@@ -61,6 +71,8 @@ export function MailboxRail({
   folder: MailboxFolder;
   unread: Record<string, number>;
   inboxUnread: number;
+  /** Waiting in Snoozed, Scheduled and Follow-ups. */
+  schedules: { snoozed: number; scheduled: number; followUps: number } | null;
   /** The phone drawer is open. */
   expanded: boolean;
   onClose: () => void;
@@ -141,6 +153,13 @@ export function MailboxRail({
         {count > 999 ? "999+" : count}
       </span>
     ) : null;
+  // A count that informs without asking for attention (no violet).
+  const quiet = (count: number) =>
+    count > 0 ? (
+      <span className={styles.quietCount} role="img" aria-label={t("rail.waiting", { count })}>
+        {count > 999 ? "999+" : count}
+      </span>
+    ) : null;
   const folderButton = (entry: MailboxFolder) => (
     <button
       type="button"
@@ -154,6 +173,9 @@ export function MailboxRail({
       <MailboxFolderIcon name={entry} />
       <span className={styles.label}>{t(entry)}</span>
       {entry === "inbox" ? pill(inboxUnread) : null}
+      {entry === "snoozed" ? quiet(schedules?.snoozed ?? 0) : null}
+      {entry === "scheduled" ? quiet(schedules?.scheduled ?? 0) : null}
+      {entry === "followups" ? pill(schedules?.followUps ?? 0) : null}
     </button>
   );
 

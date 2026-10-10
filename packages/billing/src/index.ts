@@ -2,6 +2,7 @@ export {
   ADVERTISING_CONSENT_COOKIE,
   ADVERTISING_CONSENT_MAX_AGE,
   ADVERTISING_POLICY_VERSION,
+  ADVERTISING_PUBLIC_PATHS,
   advertisingCookie,
   consentSameOrigin,
   decodeConsentProof,
@@ -102,6 +103,11 @@ export {
   type SendCheckoutResult,
 } from "./send-checkout.js";
 export { resolveSendBillingContract, verifiedSendBillingContract } from "./send-contract.js";
+export {
+  dispatchSignupConversions,
+  recordSignupConversions,
+  type SignupAdvertising,
+} from "./signup-advertising.js";
 export {
   type BillingStripe,
   createStripe,

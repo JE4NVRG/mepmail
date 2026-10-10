@@ -26,6 +26,7 @@ import {
   saveAdvertisingConsent,
 } from "../src/meta-advertising.js";
 import type { MetaConversionConfig, MetaFetch } from "../src/meta-conversions.js";
+import { dispatchSignupConversions, recordSignupConversions } from "../src/signup-advertising.js";
 import type { BillingStripe } from "../src/stripe.js";
 
 type Attempt = typeof schema.sendCheckoutAttempts.$inferSelect;
@@ -113,6 +114,23 @@ CREATE TABLE google_conversion_outbox (
  CHECK (value_minor > 0 AND attempts >= 0),
  CHECK ((status = 'leased') = (lease_until IS NOT NULL))
 );
+CREATE TABLE signup_conversion_outbox (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id text NOT NULL,
+ vendor text NOT NULL CHECK (vendor IN ('meta','google')),
+ event_id uuid NOT NULL DEFAULT gen_random_uuid(),
+ consent_receipt_id uuid NOT NULL REFERENCES advertising_consent_receipts(id) ON DELETE RESTRICT,
+ source_url text, fbp text, fbc text, client_id text, session_id text,
+ event_time timestamptz NOT NULL,
+ status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','leased','sent','cancelled','dead')),
+ attempts integer NOT NULL DEFAULT 0, next_attempt_at timestamptz NOT NULL DEFAULT now(),
+ lease_until timestamptz, expires_at timestamptz NOT NULL, last_failure text,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE (user_id, vendor),
+ CHECK ((status = 'leased') = (lease_until IS NOT NULL)),
+ CHECK (status NOT IN ('pending','leased') OR (
+   (vendor = 'meta' AND source_url IS NOT NULL AND (fbp IS NOT NULL OR fbc IS NOT NULL) AND client_id IS NULL AND session_id IS NULL)
+   OR (vendor = 'google' AND client_id ~ '^[0-9]{1,20}\\.[0-9]{1,20}$' AND fbp IS NULL AND fbc IS NULL)))
+);
 `;
 
 beforeAll(async () => {
@@ -122,7 +140,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await client.exec(
-    "TRUNCATE google_conversion_outbox, google_checkout_contexts, meta_conversion_outbox, meta_checkout_contexts, advertising_consent_receipts, send_checkout_attempts CASCADE",
+    "TRUNCATE signup_conversion_outbox, google_conversion_outbox, google_checkout_contexts, meta_conversion_outbox, meta_checkout_contexts, advertising_consent_receipts, send_checkout_attempts CASCADE",
   );
 });
 afterAll(async () => {
@@ -1023,5 +1041,113 @@ describe("Google Analytics purchase measurement (server side)", () => {
       await dispatchGoogleConversions(db, { enabled: false }, { fetch, now: () => now }),
     ).toEqual({ considered: 0, sent: 0 });
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("finished sign-ups for Meta and GA4 (server side)", () => {
+  const signups = schema.signupConversionOutbox;
+  const userId = "signup-user";
+  const cookies = `_fbp=${fbp}; _fbc=${fbc}; ${gaCookies}`;
+  async function consent(granted = true, owner: string | null = null) {
+    return (
+      await saveAdvertisingConsent(
+        db,
+        {
+          granted,
+          proof: null,
+          userId: owner,
+          sourceUrl: "https://mepmail.dev/correio?utm_source=ig",
+        },
+        capturedAt,
+      )
+    ).proof;
+  }
+  const record = (proof: Awaited<ReturnType<typeof consent>> | null, cookieHeader = cookies) =>
+    recordSignupConversions(db, userId, { meta: config, google, proof, cookieHeader }, now);
+
+  it("queues one event per vendor from an accepted consent given on any public page, and claims it", async () => {
+    const proof = await consent();
+    expect(await record(proof)).toEqual(["meta", "google"]);
+    // Once per person and vendor, however often the hook runs.
+    expect(await record(proof)).toEqual([]);
+    const rows = await db.select().from(signups);
+    expect(rows.map((r) => [r.vendor, r.sourceUrl, r.fbp, r.fbc, r.clientId, r.sessionId])).toEqual(
+      expect.arrayContaining([
+        ["meta", "https://mepmail.dev/correio", fbp, fbc, null, null],
+        ["google", null, null, null, "1234567890.1790996395", "1790996390"],
+      ]),
+    );
+    const [receipt] = await db
+      .select({ userId: schema.advertisingConsentReceipts.userId })
+      .from(schema.advertisingConsentReceipts)
+      .where(eq(schema.advertisingConsentReceipts.id, proof.id));
+    expect(receipt?.userId).toBe(userId);
+  });
+
+  it("queues nothing without consent, for someone else's consent, or without browser ids", async () => {
+    expect(await record(null)).toEqual([]);
+    expect(await record(await consent(false))).toEqual([]);
+    expect(await record(await consent(true, "someone-else"))).toEqual([]);
+    expect(await record(await consent(), "")).toEqual([]);
+    expect(await db.select().from(signups)).toEqual([]);
+  });
+
+  it("sends CompleteRegistration and sign_up with browser ids only, then erases them", async () => {
+    await record(await consent());
+    const metaFetch = acceptingFetch();
+    const googleFetch = acceptingGoogle();
+    const result = await dispatchSignupConversions(
+      db,
+      { meta: config, google },
+      { metaTransport: { fetch: metaFetch }, googleFetch, now: () => now },
+    );
+    expect(result).toEqual({ considered: 2, sent: 2 });
+    const metaBody = JSON.parse(String(metaFetch.mock.calls[0]?.[1]?.body));
+    expect(metaBody.data[0]).toMatchObject({
+      event_name: "CompleteRegistration",
+      event_source_url: "https://mepmail.dev/correio",
+      user_data: { fbp, fbc },
+    });
+    expect(metaBody.data[0].custom_data).toBeUndefined();
+    const googleBody = JSON.parse(String(googleFetch.mock.calls[0]?.[1]?.body));
+    expect(googleBody).toMatchObject({
+      client_id: "1234567890.1790996395",
+      events: [{ name: "sign_up", params: { session_id: "1790996390" } }],
+    });
+    expect(JSON.stringify([metaBody, googleBody])).not.toContain(userId);
+    const rows = await db.select().from(signups);
+    expect(rows.every((r) => r.status === "sent" && !r.fbp && !r.fbc && !r.clientId)).toBe(true);
+    // Nothing left to send.
+    expect(
+      await dispatchSignupConversions(
+        db,
+        { meta: config, google },
+        { metaTransport: { fetch: metaFetch }, googleFetch, now: () => now },
+      ),
+    ).toEqual({ considered: 0, sent: 0 });
+  });
+
+  it("a withdrawn consent cancels what is pending and erases the browser ids", async () => {
+    const proof = await consent();
+    await record(proof);
+    await saveAdvertisingConsent(
+      db,
+      { granted: false, proof, userId, sourceUrl: "https://mepmail.dev/" },
+      now,
+    );
+    const rows = await db.select().from(signups);
+    expect(rows.map((r) => [r.status, r.lastFailure, r.fbp, r.clientId])).toEqual([
+      ["cancelled", "consent_withdrawn", null, null],
+      ["cancelled", "consent_withdrawn", null, null],
+    ]);
+    const metaFetch = acceptingFetch();
+    expect(
+      await dispatchSignupConversions(
+        db,
+        { meta: config, google },
+        { metaTransport: { fetch: metaFetch }, googleFetch: acceptingGoogle(), now: () => now },
+      ),
+    ).toEqual({ considered: 0, sent: 0 });
+    expect(metaFetch).not.toHaveBeenCalled();
   });
 });

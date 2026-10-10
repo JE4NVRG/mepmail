@@ -198,6 +198,9 @@ export const CRON_JOBS = {
   // Daily: the seven-day disclosure of break-glass content access — the
   // team's audit row and its owners' notice. No-op with none due.
   "safety.reveal_notices": "40 4 * * *",
+  // Every minute: the Correio clock — snoozed messages come back, follow-ups
+  // with no reply come due and scheduled sends go out on time.
+  "mailbox.schedules": "* * * * *",
 } as const;
 
 export type CronJobName = keyof typeof CRON_JOBS;

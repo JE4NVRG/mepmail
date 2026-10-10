@@ -31,6 +31,7 @@ import { attributionProps, emitFunnel, recordSignupAttribution } from "./funnel"
 import { localeFromHeaders } from "./locale";
 import { getActiveMembership, listMemberships } from "./membership";
 import { enqueueRecipientErase } from "./queue";
+import { recordSignupAdvertising } from "./signup-advertising";
 import { notifySignupAlert } from "./signup-alert";
 import {
   buildMcpConnectedEmail,
@@ -248,6 +249,8 @@ export function createAuth(
    * the verification it is measuring.
    */
   const trackSignup = async (user: { id: string }, requestHeaders: Headers | undefined) => {
+    // Independent of the funnel below: its own transaction, its own failure.
+    await recordSignupAdvertising(db, user.id, requestHeaders);
     try {
       const attribution = await recordSignupAttribution(
         db,

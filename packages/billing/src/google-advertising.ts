@@ -19,7 +19,7 @@ export interface GoogleConversionConfig {
   measurementId?: string;
   apiSecret?: string;
 }
-type ConfiguredGoogle = Required<GoogleConversionConfig>;
+export type ConfiguredGoogle = Required<GoogleConversionConfig>;
 
 export function googleConversionConfigured(
   config: GoogleConversionConfig | undefined,
@@ -218,9 +218,32 @@ export function buildGooglePurchase(
   };
 }
 
+/** A finished sign-up for GA4 (`sign_up`): the browser's GA ids and nothing about the account. */
+export function buildGoogleSignUp(row: {
+  clientId: string;
+  sessionId: string | null;
+  eventTime: Date;
+}) {
+  return {
+    client_id: row.clientId,
+    timestamp_micros: row.eventTime.getTime() * 1000,
+    non_personalized_ads: true,
+    consent: { ad_user_data: "GRANTED", ad_personalization: "DENIED" },
+    events: [
+      {
+        name: "sign_up",
+        params: {
+          engagement_time_msec: 1,
+          ...(row.sessionId ? { session_id: row.sessionId } : {}),
+        },
+      },
+    ],
+  };
+}
+
 /** The URL carries the API secret: it is never logged or returned. */
 export async function sendGooglePurchase(
-  body: ReturnType<typeof buildGooglePurchase>,
+  body: ReturnType<typeof buildGooglePurchase> | ReturnType<typeof buildGoogleSignUp>,
   config: ConfiguredGoogle,
   fetcher: GoogleFetch,
 ): Promise<GoogleDeliveryOutcome> {

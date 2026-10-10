@@ -2692,3 +2692,29 @@
 .accountPanel a:global(.ms-menu-item) > span {
   margin-left: auto;
 }
+
+/* Snoozed, scheduled, follow-up: one quiet line above the message. */
+.timingNotice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  background: color-mix(in srgb, var(--ms-panel-raised) 50%, transparent);
+  color: var(--ms-muted);
+  font-size: 12px;
+}
+.timingNotice > svg {
+  flex: none;
+}
+.timingNotice > span {
+  flex: 1;
+  min-width: 0;
+}
+.timingNotice[data-tone="warn"] {
+  color: var(--ms-warn);
+  border-color: var(--ms-warn-border);
+  background: var(--ms-warn-bg);
+}

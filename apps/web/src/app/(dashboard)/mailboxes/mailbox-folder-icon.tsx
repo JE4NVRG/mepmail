@@ -18,7 +18,8 @@ type MailboxIconName =
   | "settings"
   | "monitor"
   | "sun"
-  | "moon";
+  | "moon"
+  | "pin";
 
 export function MailboxFolderIcon({
   name,
@@ -39,6 +40,9 @@ export function MailboxFolderIcon({
     trash: "M3 6h18 M9 6V3h6v3 M5 6l1 15h12l1-15 M10 10v7 M14 10v7",
     custom: "M3 6h7l2 3h9v12H3z M3 6V3h7l2 3h9v3",
     archive: "M3 4h18v4H3z M5 8v12h14V8 M10 12h4",
+    snoozed: "M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16z M12 9v4l2.5 2.5 M5 3 2 6 M19 3l3 3",
+    scheduled: "m3 3 18 9-18 9 4-9z M7 12h6 M17 15v3l2 1",
+    followups: "M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9 M13.7 21a2 2 0 0 1-3.4 0",
     refresh: "M20 7a9 9 0 1 0 1 8 M20 3v5h-5",
     restore: "M4 4v6h6 M4 10a8 8 0 1 1 1 8",
     attachment:
@@ -58,6 +62,7 @@ export function MailboxFolderIcon({
     monitor: "M3 4h18v12H3z M8 20h8 M12 16v4",
     sun: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M12 2v2 M12 20v2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M2 12h2 M20 12h2 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4",
     moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
+    pin: "M9 3h6l-1 7 4 3H6l4-3z M12 13v8",
   };
   return (
     <svg

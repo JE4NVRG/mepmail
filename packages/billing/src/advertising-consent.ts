@@ -93,12 +93,26 @@ export function consentSameOrigin(request: Request, trustedOrigin: string): bool
   }
 }
 
+/**
+ * The public offer documents that load the Pixel and the Google tag after consent:
+ * the same set as META_PUBLIC_PATHS in apps/web/src/lib/meta-public-events.ts (a
+ * web test keeps them equal). Consent given on any of them carries its page as the
+ * events' source; an ad that lands on /correio must not lose its conversions.
+ */
+export const ADVERTISING_PUBLIC_PATHS: readonly string[] = [
+  "/",
+  "/pricing",
+  "/correio",
+  "/alternatives/resend",
+  "/integrations",
+];
+
 export function publicAdvertisingSource(value: string | null): string | null {
   if (!value) return null;
   try {
     const url = new URL(value);
     return url.origin === "https://mepmail.dev" &&
-      ["/", "/pricing"].includes(url.pathname) &&
+      ADVERTISING_PUBLIC_PATHS.includes(url.pathname) &&
       !url.username &&
       !url.password
       ? `${url.origin}${url.pathname}`

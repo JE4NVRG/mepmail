@@ -1,3 +1,5 @@
+import { ADVERTISING_PUBLIC_PATHS } from "./advertising-consent.js";
+
 export type MetaConversionMode = "production" | "test";
 
 export interface MetaConversionConfig {
@@ -30,10 +32,12 @@ export type MetaConversionEvent = MetaConversionBase &
   (
     | { eventName: "Purchase"; amountPaidMinor: number; currency: string }
     | { eventName: "InitiateCheckout"; amountPaidMinor?: number; currency?: string }
+    /** A finished sign-up: no value, no account or contact data, only the browser ids. */
+    | { eventName: "CompleteRegistration"; amountPaidMinor?: undefined; currency?: undefined }
   );
 
 export interface MetaServerEvent {
-  event_name: "InitiateCheckout" | "Purchase";
+  event_name: "InitiateCheckout" | "Purchase" | "CompleteRegistration";
   event_id: string;
   event_time: number;
   action_source: "website";
@@ -91,8 +95,7 @@ const fbpFormat = /^fb\.\d{1,2}\.[1-9]\d{12}\.\d{1,20}$/;
 const fbcFormat = /^fb\.\d{1,2}\.[1-9]\d{12}\.[A-Za-z0-9_-]{1,500}$/;
 const publicSources = new Set([
   "https://mepmail.dev",
-  "https://mepmail.dev/",
-  "https://mepmail.dev/pricing",
+  ...ADVERTISING_PUBLIC_PATHS.map((path) => `https://mepmail.dev${path}`),
 ]);
 
 /** No default API version, credentials, automatic request enrichment, or browser Pixel. */
@@ -143,8 +146,17 @@ export function buildMetaConversionPayload(event: MetaConversionEvent): MetaConv
   if (event.consent === "withdrawn") return reject("consent_withdrawn");
   if (event.consent === "denied") return reject("consent_denied");
   if (event.consent !== "granted") return reject("consent_required");
-  if (event.eventName !== "Purchase" && event.eventName !== "InitiateCheckout")
+  if (
+    event.eventName !== "Purchase" &&
+    event.eventName !== "InitiateCheckout" &&
+    event.eventName !== "CompleteRegistration"
+  )
     return reject("invalid_event");
+  if (
+    event.eventName === "CompleteRegistration" &&
+    (event.amountPaidMinor !== undefined || event.currency !== undefined)
+  )
+    return reject("invalid_amount");
   if (typeof event.eventId !== "string" || !uuidV4.test(event.eventId))
     return reject("invalid_event_id");
   if (

@@ -7,6 +7,38 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.84] - 2026-10-09
+
+Correio stage 2 (from the desktop session): snooze, pin, send later and
+follow-up reminders; plus completed sign-up conversions for the ads.
+
+### Added
+
+- Mailbox migration 0022: snooze, pin, scheduled send and follow-up columns
+  on `mailbox_items`, with per-kind checks and partial indexes; `listOrder`
+  is the single ordering source for the list, the cursor and thread grouping.
+- `mailbox-scheduling` (core, web router, worker handler) and the per-minute
+  `mailbox.schedules` cron: snoozed items resurface, due follow-ups come back,
+  and scheduled drafts are admitted through `queueMailboxDraft` as the person
+  who scheduled them, so ownership, license, plan, seat and verified domain
+  are checked at send time. New item views: snoozed, pinned, scheduled,
+  followups (not available to agent keys).
+- Snooze menu (B), pin to top, send later, "remind me if no reply", and the
+  Snoozed / Follow-ups / Scheduled folders in the inbox UI.
+- Main migration 0052 `signup_conversion_outbox`: with an accepted
+  advertising consent, a completed sign-up queues one Meta CAPI
+  `CompleteRegistration` (fbp/fbc only) and one GA4 Measurement Protocol
+  `sign_up` (the `_ga` client id), dispatched by `webhooks.reconcile` with
+  backoff; identifiers are erased once sent, dead or cancelled, and a consent
+  withdrawal cancels pending rows.
+
+### Changed
+
+- Consent receipts from `/correio`, `/alternatives/resend` and
+  `/integrations` are valid event sources (`ADVERTISING_PUBLIC_PATHS`), so
+  those landing pages no longer drop their server-side purchase events.
+- Privacy policy and consent banner copy name the completed sign-up event.
+
 ## [0.83] - 2026-10-09
 
 New inbox cut 1E (from the desktop session): Move to.

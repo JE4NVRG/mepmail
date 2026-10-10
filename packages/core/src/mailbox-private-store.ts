@@ -72,6 +72,13 @@ function summary(item: Item) {
     seenAt: item.seenAt,
     archivedAt: item.archivedAt,
     folderId: item.folderId,
+    snoozedUntil: item.snoozedUntil,
+    resurfacedAt: item.resurfacedAt,
+    pinnedAt: item.pinnedAt,
+    sendAt: item.sendAt,
+    sendFailure: item.sendFailure,
+    remindAt: item.remindAt,
+    remindedAt: item.remindedAt,
     revision: item.revision,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
@@ -412,6 +419,14 @@ export interface MailboxListFilter {
   safeOnly?: boolean;
   /** true: the Archive view; false: views that archived items leave. */
   archived?: boolean;
+  /** true: the Snoozed view (still snoozed now); false: views a snoozed item leaves. */
+  snoozed?: boolean;
+  /** true: pinned items only. */
+  pinned?: boolean;
+  /** true: drafts waiting to be sent later. */
+  scheduled?: boolean;
+  /** true: sent messages whose follow-up came due with no reply in their conversation. */
+  followUp?: boolean;
 }
 /** A position in a listing: the row's order time in epoch microseconds, then its id. */
 export interface MailboxListPosition {
@@ -422,11 +437,24 @@ const LIST_POSITION_AT = /^[0-9]{1,17}$/;
 const LIST_POSITION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 type ItemColumns = typeof schema.mailboxItems;
 
-/** Arrival time; a draft by its last edit, the order every listing shows. */
+/**
+ * Arrival time (or when a snoozed message came back); a draft by its last edit.
+ * The order every listing shows, its cursor and the conversation grouping all
+ * read this one expression.
+ */
 function listOrder(items: ItemColumns, kind: MailboxListFilter["kind"]) {
+  const arrival = sql`coalesce(${items.resurfacedAt}, ${items.createdAt})`;
   if (kind === "draft") return sql`${items.updatedAt}`;
-  if (kind) return sql`${items.createdAt}`;
-  return sql`(case when ${items.kind} = 'draft' then ${items.updatedAt} else ${items.createdAt} end)`;
+  if (kind) return arrival;
+  return sql`(case when ${items.kind} = 'draft' then ${items.updatedAt} else ${arrival} end)`;
+}
+/** Snoozed right now: it counts again on its own once the time passes. */
+const snoozedNow = (items: ItemColumns) =>
+  sql`(${items.snoozedUntil} is not null and ${items.snoozedUntil} > now())`;
+/** A received message in the same conversation, after this one was sent. */
+function replyAfter(items: ItemColumns) {
+  const reply = alias(schema.mailboxItems, "follow_up_reply");
+  return sql`exists (select 1 from ${schema.mailboxItems} ${reply} where ${reply.mailboxId} = ${items.mailboxId} and ${reply.teamId} = ${items.teamId} and ${reply.kind} = 'inbox' and ${reply.trashedAt} is null and ${items.threadKey} is not null and ${reply.threadKey} = ${items.threadKey} and ${reply.createdAt} > ${items.createdAt})`;
 }
 function listConditions(
   items: ItemColumns,
@@ -455,6 +483,14 @@ function listConditions(
         : []),
     ...(filter?.safeOnly ? [eq(items.deliveryFolder, "inbox")] : []),
     ...(actor.agentAccess ? [eq(items.deliveryFolder, "inbox")] : []),
+    ...(filter?.snoozed === true
+      ? [snoozedNow(items)]
+      : filter?.snoozed === false
+        ? [sql`not ${snoozedNow(items)}`]
+        : []),
+    ...(filter?.pinned ? [isNotNull(items.pinnedAt)] : []),
+    ...(filter?.scheduled ? [isNotNull(items.sendAt)] : []),
+    ...(filter?.followUp ? [isNotNull(items.remindedAt), sql`not ${replyAfter(items)}`] : []),
   ];
 }
 /** Exact to the microsecond: integer arithmetic, no float round trip. */
@@ -518,6 +554,12 @@ export async function listMailboxItems(
         seenAt: items.seenAt,
         archivedAt: items.archivedAt,
         folderId: items.folderId,
+        snoozedUntil: items.snoozedUntil,
+        pinnedAt: items.pinnedAt,
+        sendAt: items.sendAt,
+        sendFailure: items.sendFailure,
+        remindAt: items.remindAt,
+        remindedAt: items.remindedAt,
         threadKey: items.threadKey,
         revision: items.revision,
         createdAt: items.createdAt,
@@ -563,6 +605,7 @@ export async function countUnreadMailboxItems(
           isNull(schema.mailboxItems.trashedAt),
           isNull(schema.mailboxItems.archivedAt),
           isNull(schema.mailboxItems.folderId),
+          sql`not ${snoozedNow(schema.mailboxItems)}`,
         ),
       );
     return row?.count ?? 0;
@@ -607,6 +650,8 @@ export async function countMailboxViews(
           eq(items.mailboxId, mailboxId),
           eq(items.teamId, actor.teamId),
           isNull(items.trashedAt),
+          // Snoozed messages leave every view until they come back.
+          sql`not ${snoozedNow(items)}`,
         ),
       )
       .groupBy(

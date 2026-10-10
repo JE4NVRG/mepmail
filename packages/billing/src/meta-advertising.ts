@@ -25,6 +25,28 @@ const contexts = schema.metaCheckoutContexts;
 const outbox = schema.metaConversionOutbox;
 const googleOutbox = schema.googleConversionOutbox;
 const googleContexts = schema.googleCheckoutContexts;
+const signups = schema.signupConversionOutbox;
+
+/** Pending sign-up events of this consent never leave, and their browser ids go. */
+async function withdrawSignups(tx: Db, consentReceiptId: string) {
+  await tx
+    .update(signups)
+    .set({
+      status: "cancelled",
+      leaseUntil: null,
+      lastFailure: "consent_withdrawn",
+      fbp: null,
+      fbc: null,
+      clientId: null,
+      sessionId: null,
+    })
+    .where(
+      and(
+        eq(signups.consentReceiptId, consentReceiptId),
+        inArray(signups.status, ["pending", "leased"]),
+      ),
+    );
+}
 type Attempt = typeof schema.sendCheckoutAttempts.$inferSelect;
 type Receipt = typeof receipts.$inferSelect;
 type Context = typeof contexts.$inferSelect;
@@ -121,6 +143,7 @@ export async function saveAdvertisingConsent(
           ),
         );
       await tx.delete(googleContexts).where(eq(googleContexts.consentReceiptId, previous.id));
+      await withdrawSignups(tx, previous.id);
       return {
         proof: input.proof!,
         state: "denied" as const,
@@ -174,6 +197,7 @@ export async function saveAdvertisingConsent(
           ),
         );
       await tx.delete(googleContexts).where(eq(googleContexts.consentReceiptId, previous.id));
+      await withdrawSignups(tx, previous.id);
     }
     const proof = newConsentProof(now);
     await tx.insert(receipts).values({

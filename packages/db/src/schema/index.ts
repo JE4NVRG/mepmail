@@ -32,6 +32,7 @@ export * from "./monitor.js";
 export * from "./region-breakers.js";
 export * from "./segments.js";
 export * from "./send-checkouts.js";
+export * from "./signup-conversions.js";
 export * from "./stripe-events.js";
 export * from "./support-view.js";
 export * from "./suppressions.js";

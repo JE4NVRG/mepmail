@@ -3,6 +3,7 @@ import {
   createStripe,
   dispatchGoogleConversions,
   dispatchMetaConversions,
+  dispatchSignupConversions,
   isLiveKey,
   purgeStripeEvents,
   readGoogleConversionConfig,
@@ -84,6 +85,7 @@ import { drainWebhookEndpoint } from "./handlers/deliver-webhook.js";
 import { runInstanceProbes } from "./handlers/instance-probes.js";
 import { warnExpiringMailboxAgentKeys } from "./handlers/mailbox-agent-key-expiry.js";
 import { runMailboxCapacity } from "./handlers/mailbox-capacity.js";
+import { runMailboxSchedules } from "./handlers/mailbox-scheduling.js";
 import { runMonitorHealth } from "./handlers/monitor-health.js";
 import { reportPlanMove, sweepNotifications } from "./handlers/notify.js";
 import { runPlatformBreaker } from "./handlers/platform-breaker.js";
@@ -442,6 +444,19 @@ await queue.scheduleCrons({
       fetch: (url, request) => fetch(url, request),
     });
     if (google.sent > 0) console.log(`google conversions: sent=${google.sent}`);
+    // Finished sign-ups (Meta CompleteRegistration, GA4 sign_up) queued by the web app.
+    const signups = await dispatchSignupConversions(
+      db,
+      {
+        meta: readMetaConversionConfig(process.env),
+        google: readGoogleConversionConfig(process.env),
+      },
+      {
+        metaTransport: { fetch: (url, request) => fetch(url, request) },
+        googleFetch: (url, request) => fetch(url, request),
+      },
+    );
+    if (signups.sent > 0) console.log(`signup conversions: sent=${signups.sent}`);
   },
   "broadcasts.reconcile": async () => {
     const requeued = await reconcileStalledBroadcasts(db, {
@@ -528,6 +543,23 @@ await queue.scheduleCrons({
     if (result.lost > 0 || result.degraded) {
       console.warn(
         `monitor.health: samples1h=${result.samples} unjudged=${result.unjudged} lost=${result.lost} degraded=${result.degraded}`,
+      );
+    }
+  },
+  "mailbox.schedules": async () => {
+    // The mailbox tables exist only where the mailbox schema was applied.
+    if (!mailboxRegistryEnabled) return;
+    const result = await runMailboxSchedules(db, {
+      keyring,
+      mime: mailboxWorkerMime,
+      transportEnabled: mailboxTransportEnabled,
+      enqueue: async (outboxId) => {
+        await queue.send("mailbox.send", { outboxId }, { dedupeKey: outboxId });
+      },
+    });
+    if (Object.values(result).some((count) => count > 0)) {
+      console.log(
+        `mailbox.schedules: woken=${result.woken} followUps=${result.followUps} sent=${result.sent} failed=${result.failed} deferred=${result.deferred}`,
       );
     }
   },

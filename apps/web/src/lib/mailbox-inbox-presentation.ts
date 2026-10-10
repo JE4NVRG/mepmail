@@ -7,7 +7,10 @@ export type MailboxFolder =
   | "trash"
   | "favorites"
   | "archive"
-  | "custom";
+  | "custom"
+  | "snoozed"
+  | "scheduled"
+  | "followups";
 export type MailboxKindFilter = "all" | "person" | "agent";
 
 type Safety = {
