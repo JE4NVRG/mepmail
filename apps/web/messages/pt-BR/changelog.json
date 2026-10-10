@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.85",
+      "date": "2026-10-10",
+      "title": "Aviso de cookies mais discreto",
+      "summary": "O aviso de cookies de publicidade ficou menor: uma frase, o link da política e duas escolhas do mesmo tamanho, sem cobrir a página.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Aviso de cookies compacto no canto da tela, com “Recusar” e “Aceitar” lado a lado e do mesmo tamanho; no celular ele fica numa faixa fina no rodapé.",
+            "As preferências completas continuam em “Preferências de publicidade”, no rodapé do site."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.84",
       "date": "2026-10-09",
       "title": "Adiar, fixar e enviar depois",

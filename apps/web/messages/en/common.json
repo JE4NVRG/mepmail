@@ -120,8 +120,11 @@
   "advertising": {
     "title": "Advertising preferences",
     "body": "With your permission, we use Meta and Google Analytics to measure visits to public pages, sign-ups, and paid-plan purchases. Essential cookies keep working if you decline. You can change your choice at any time.",
-    "accept": "Allow advertising measurement",
-    "deny": "Decline optional measurement",
+    "bannerTitle": "Advertising cookies.",
+    "bannerBody": "With your permission, Meta and Google measure visits, sign-ups and purchases that come from our ads. Essential cookies always work.",
+    "privacyShort": "Privacy policy",
+    "accept": "Accept",
+    "deny": "Decline",
     "settings": "Advertising preferences",
     "withdraw": "Withdraw permission",
     "close": "Close",

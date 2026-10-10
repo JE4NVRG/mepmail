@@ -120,8 +120,11 @@
   "advertising": {
     "title": "Preferências de publicidade",
     "body": "Com sua permissão, usamos a Meta e o Google Analytics para medir visitas às páginas públicas, cadastros e compras de planos pagos. Os cookies essenciais continuam funcionando se você recusar. Você pode mudar sua escolha a qualquer momento.",
-    "accept": "Permitir mensuração de publicidade",
-    "deny": "Recusar mensuração opcional",
+    "bannerTitle": "Cookies de publicidade.",
+    "bannerBody": "Com sua permissão, a Meta e o Google medem visitas, cadastros e compras que vêm dos nossos anúncios. Os cookies essenciais funcionam sempre.",
+    "privacyShort": "Política de privacidade",
+    "accept": "Aceitar",
+    "deny": "Recusar",
     "settings": "Preferências de publicidade",
     "withdraw": "Retirar permissão",
     "close": "Fechar",

@@ -1,32 +1,74 @@
-.banner,
-.dialog {
-  box-sizing: border-box;
-  background: var(--ms-panel, #0c0c0d);
-  color: var(--ms-bone, #f4f1ea);
-  border: 1px solid var(--ms-line-strong, #2a2a2e);
-  border-radius: 18px;
-  padding: 24px;
-  font-family: var(--ms-font-sans, sans-serif);
-  font-size: 14px;
-  line-height: 1.6;
-  box-shadow: var(--ms-shadow-card, 0 12px 40px #0005);
-  overflow: auto;
-}
-
+/* First-visit banner: a compact card in the corner, one sentence and two
+   equal choices. Refusing is exactly as easy and as visible as accepting. */
 .banner {
   position: fixed;
   right: max(20px, env(safe-area-inset-right));
   bottom: max(20px, env(safe-area-inset-bottom));
-  left: max(20px, env(safe-area-inset-left));
   z-index: var(--ms-z-popover, 500);
-  max-width: 560px;
-  max-height: calc(100dvh - 40px);
-  margin-left: auto;
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - 40px));
+  padding: 16px;
+  background: color-mix(in srgb, var(--ms-panel, #0c0c0d) 94%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  color: var(--ms-bone, #f4f1ea);
+  border: 1px solid var(--ms-line-strong, #2a2a2e);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px #0009;
+  font: 13px / 1.55 var(--ms-font-sans, sans-serif);
+  animation: banner-in 260ms var(--ms-ease, ease-out) both;
 }
 
+.bannerText {
+  margin: 0;
+  color: var(--ms-muted, #918f89);
+  text-wrap: pretty;
+}
+
+.bannerText strong {
+  color: var(--ms-bone, #f4f1ea);
+  font-weight: 600;
+}
+
+.inlineLink {
+  color: var(--ms-bone, #f4f1ea);
+  white-space: nowrap;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--ms-line-strong, #2a2a2e);
+}
+
+.inlineLink:hover {
+  text-decoration-color: currentColor;
+}
+
+.bannerError {
+  margin: 10px 0 0;
+  color: var(--ms-danger, #ff8b94);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@keyframes banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* Settings dialog, opened from "Preferências de publicidade" in the footer. */
 .dialog {
-  width: min(560px, calc(100vw - 32px));
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
+  padding: 22px;
+  overflow: auto;
+  background: var(--ms-panel, #0c0c0d);
+  color: var(--ms-bone, #f4f1ea);
+  border: 1px solid var(--ms-line-strong, #2a2a2e);
+  border-radius: 16px;
+  box-shadow: var(--ms-shadow-card, 0 12px 40px #0005);
+  font: 14px / 1.6 var(--ms-font-sans, sans-serif);
 }
 
 .dialog::backdrop {
@@ -38,7 +80,7 @@
 .dialogHeader {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .heading {
@@ -52,38 +94,29 @@
 .icon {
   display: grid;
   place-items: center;
-  flex: 0 0 42px;
-  height: 42px;
-  border-radius: 12px;
+  flex: 0 0 36px;
+  height: 36px;
+  border-radius: 10px;
   border: 1px solid var(--ms-violet-border, #33264a);
   background: var(--ms-violet-bg, #1c1527);
   color: var(--ms-violet, #c0a8e1);
 }
 
 .icon svg {
-  width: 23px;
-  height: 23px;
-}
-
-.brand {
-  display: block;
-  margin-bottom: 2px;
-  color: var(--ms-muted, #918f89);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.03em;
+  width: 20px;
+  height: 20px;
 }
 
 .heading h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: -0.02em;
 }
 
 .description {
-  margin: 20px 0 10px;
+  margin: 16px 0 10px;
   color: var(--ms-muted, #918f89);
 }
 
@@ -111,7 +144,7 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin: 18px 0 0;
+  margin: 16px 0 0;
   padding: 10px 12px;
   background: var(--ms-panel-raised, #131316);
   border: 1px solid var(--ms-line, #1f1f22);
@@ -128,6 +161,10 @@
   background: currentColor;
 }
 
+.status[data-state="accepted"] {
+  color: var(--ms-success, #7ed3a4);
+}
+
 .status[data-state="error"] {
   color: var(--ms-danger, #ff8b94);
 }
@@ -136,12 +173,13 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 18px;
 }
 
 .actions .choice {
+  justify-content: center;
   height: auto;
-  min-height: 44px;
+  min-height: 40px;
   padding: 10px 14px;
   font-size: 13px;
   line-height: 1.4;
@@ -149,11 +187,21 @@
   text-wrap: balance;
 }
 
+.banner .actions {
+  margin-top: 14px;
+  gap: 8px;
+}
+
+.banner .choice {
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
 .close {
   display: grid;
   place-items: center;
-  flex: 0 0 44px;
-  height: 44px;
+  flex: 0 0 36px;
+  height: 36px;
   padding: 0;
   border: 1px solid var(--ms-line-strong, #2a2a2e);
   border-radius: 10px;
@@ -167,8 +215,8 @@
 }
 
 .close svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .settings {
@@ -185,77 +233,47 @@
 
 .settings:focus-visible,
 .policy:focus-visible,
+.inlineLink:focus-visible,
 .close:focus-visible {
   outline: 2px solid var(--ms-violet, #c0a8e1);
-  outline-offset: 4px;
+  outline-offset: 3px;
 }
 
-@media (max-width: 480px) {
-  .banner,
-  .dialog {
-    padding: 20px;
-    border-radius: 14px;
-  }
-
+@media (prefers-reduced-motion: reduce) {
   .banner {
-    right: max(12px, env(safe-area-inset-right));
-    bottom: max(12px, env(safe-area-inset-bottom));
-    left: max(12px, env(safe-area-inset-left));
-    max-height: calc(100dvh - 24px);
+    animation: none;
   }
+}
 
-  .heading {
-    gap: 10px;
-  }
-
-  .heading h2 {
-    font-size: 17px;
-  }
-
-  .actions {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
-  /* The first-visit banner sits over the hero: keep it to about a third of a
-     phone screen. Its status line only says "no choice yet" (an error still
-     shows), the brand label repeats the logo, and the two choices fit side
-     by side. */
+/* Phones: a strip along the bottom edge that leaves the hero and its
+   buttons visible; the choices keep a 44px touch target. */
+@media (max-width: 560px) {
   .banner {
-    padding: 16px;
-  }
-
-  .banner .icon {
-    flex-basis: 34px;
-    height: 34px;
-    border-radius: 10px;
-  }
-
-  .banner .icon svg {
-    width: 19px;
-    height: 19px;
-  }
-
-  .banner .brand {
-    display: none;
-  }
-
-  .banner .heading h2 {
-    font-size: 16px;
-  }
-
-  .banner .description {
-    margin: 12px 0 6px;
-    font-size: 13px;
-    line-height: 1.5;
-  }
-
-  .banner .status[data-state="unknown"] {
-    display: none;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    left: max(10px, env(safe-area-inset-left));
+    width: auto;
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 12.5px;
   }
 
   .banner .actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: 14px;
+    margin-top: 12px;
+  }
+
+  .banner .choice,
+  .actions .choice,
+  .close {
+    min-height: 44px;
+  }
+
+  .close {
+    flex-basis: 44px;
+  }
+
+  .dialog {
+    padding: 18px;
+    border-radius: 14px;
   }
 }

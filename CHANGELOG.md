@@ -7,6 +7,16 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.85] - 2026-10-10
+
+### Changed
+
+- Advertising consent banner: a compact corner card (400 px, a thin bottom
+  strip on phones) with one sentence, the privacy link inline and two
+  equally sized choices ("Decline" / "Accept"); the brand label and the
+  "no choice yet" status line are gone. The settings dialog keeps the full
+  text and the current state. Consent policy version unchanged (ads-v2).
+
 ## [0.84] - 2026-10-09
 
 Correio stage 2 (from the desktop session): snooze, pin, send later and

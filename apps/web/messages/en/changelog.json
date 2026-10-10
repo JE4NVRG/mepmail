@@ -23,6 +23,21 @@
   },
   "releases": [
     {
+      "version": "0.85",
+      "date": "2026-10-10",
+      "title": "A quieter cookie notice",
+      "summary": "The advertising cookie notice is smaller: one sentence, the policy link and two equally sized choices, without covering the page.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Compact cookie notice in the corner, with “Decline” and “Accept” side by side at the same size; on phones it is a thin strip along the bottom.",
+            "The full preferences are still under “Advertising preferences” in the site footer."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.84",
       "date": "2026-10-09",
       "title": "Snooze, pin and send later",

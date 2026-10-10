@@ -209,10 +209,7 @@ export function AdvertisingConsent() {
           <path d="m8.5 12 2.3 2.3 4.7-4.7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
-      <div>
-        <span className={styles.brand}>MepMail</span>
-        <h2 id={id}>{t("title")}</h2>
-      </div>
+      <h2 id={id}>{t("title")}</h2>
     </div>
   );
   const details = (descriptionId?: string) => (
@@ -251,9 +248,21 @@ export function AdvertisingConsent() {
   return (
     <>
       {publicPage && (consent.state === "unknown" || consent.error) && !open ? (
+        // First visit: one sentence and two equal choices; the full text and the
+        // current state live in the settings dialog.
         <aside className={styles.banner} aria-label={t("title")}>
-          {heading()}
-          {details()}
+          <p className={styles.bannerText}>
+            <strong>{t("bannerTitle")}</strong> {t("bannerBody")}{" "}
+            <a className={styles.inlineLink} href="/privacy">
+              {t("privacyShort")}
+            </a>
+          </p>
+          {consent.error ? (
+            <p className={styles.bannerError} role="status">
+              {t("error")}
+            </p>
+          ) : null}
+          {controls}
         </aside>
       ) : null}
       <dialog
