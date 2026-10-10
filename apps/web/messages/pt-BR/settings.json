@@ -455,6 +455,7 @@
       "api_key_renamed": "Renomeou chave de API",
       "domain_created": "Adicionou domínio",
       "domain_verified": "Verificou domínio",
+      "domain_dns_configured": "Configurou o DNS do domínio na Cloudflare",
       "domain_deleted": "Excluiu domínio",
       "webhook_created": "Criou webhook",
       "webhook_updated": "Atualizou webhook",

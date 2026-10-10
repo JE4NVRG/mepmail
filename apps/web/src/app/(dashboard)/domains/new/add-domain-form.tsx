@@ -21,6 +21,7 @@ import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { trpcErrorCode } from "@/lib/trpc-error";
 import { AwsCredentialsBanner } from "../aws-credentials-banner";
+import { CloudflareSetup } from "../cloudflare-setup";
 import { regionFlag, regionName } from "../regions";
 import { TrackingSetup } from "../tracking-setup";
 
@@ -188,6 +189,9 @@ function DnsRecordsStep({ id }: { id: string }) {
               ? t("new.recordsTitleProvider", { provider: provider.name })
               : t("new.recordsTitle")}
           </h2>
+          {provider?.name === "Cloudflare" && domain.isSuccess ? (
+            <CloudflareSetup id={id} domainName={domain.data.name} />
+          ) : null}
 
           {records.isError ? (
             <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 20 }}>

@@ -455,6 +455,7 @@
       "api_key_renamed": "Renamed API key",
       "domain_created": "Added domain",
       "domain_verified": "Verified domain",
+      "domain_dns_configured": "Configured domain DNS at Cloudflare",
       "domain_deleted": "Deleted domain",
       "webhook_created": "Created webhook",
       "webhook_updated": "Updated webhook",

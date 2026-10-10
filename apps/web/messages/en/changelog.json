@@ -23,6 +23,28 @@
   },
   "releases": [
     {
+      "version": "0.87",
+      "date": "2026-10-10",
+      "title": "Automatic DNS at Cloudflare",
+      "summary": "Domains on Cloudflare now set themselves up: paste a token that only touches DNS and MepMail creates the records and starts verification.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "“Set up at Cloudflare” on the domain page and when adding a domain: a link opens token creation with the right permissions, and MepMail creates DKIM, MAIL FROM, SPF and, when missing, DMARC.",
+            "Nothing you already have is overwritten: a different SPF, DMARC or MX stays as it is and is marked for you to review.",
+            "The token is used for that setup only and is not saved; the action shows in the team audit log."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "The Correio list got faster still in mailboxes with many HTML messages."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.86",
       "date": "2026-10-10",
       "title": "A faster Correio",

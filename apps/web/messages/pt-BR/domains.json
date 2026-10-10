@@ -214,5 +214,38 @@
     "dnsSubtitle": "Adicione este CNAME no seu provedor de DNS e verifique-o. Até resolver, os links rastreados ainda não são servidos.",
     "dnsPending": "Adicione um subdomínio acima para obter o registro DNS.",
     "done": "Concluído"
+  },
+  "cloudflare": {
+    "title": "Configurar automaticamente na Cloudflare",
+    "body": "Seu DNS está na Cloudflare. Com um token que só mexe no DNS, criamos os registros deste domínio para você.",
+    "open": "Configurar na Cloudflare",
+    "step1": "Crie um token na Cloudflare",
+    "step1Hint": "A página abre com as permissões certas (Zona: ler, DNS: editar). Em “Recursos da zona”, escolha só {domain} e clique em criar.",
+    "createToken": "Criar token na Cloudflare",
+    "step2": "Cole o token aqui",
+    "tokenPlaceholder": "Token da API da Cloudflare",
+    "submit": "Criar registros",
+    "submitting": "Criando registros…",
+    "privacy": "Usamos o token só agora, para criar os registros; ele não fica salvo. Depois, você pode apagá-lo na Cloudflare.",
+    "cancel": "Cancelar",
+    "doneTitle": "Registros configurados na zona {zone}",
+    "doneBody": "A verificação já começou e costuma levar poucos minutos. Esta página confere sozinha.",
+    "conflictHelp": "Os itens marcados já tinham outro valor, e preferimos não mexer. Ajuste-os na Cloudflare com os valores da tabela abaixo.",
+    "outcome": {
+      "created": "Criado",
+      "updated": "Atualizado",
+      "unchanged": "Já estava certo",
+      "conflict": "Já existe outro, mantido",
+      "failed": "Não foi possível criar"
+    },
+    "errors": {
+      "invalid": "Isso não parece um token da Cloudflare. Copie o token inteiro, sem espaços.",
+      "rejected": "A Cloudflare não aceitou esse token. Confira se copiou o token inteiro e se ele está ativo.",
+      "forbidden": "O token não tem permissão para editar o DNS deste domínio. Crie um com Zona: ler e DNS: editar.",
+      "zone_not_found": "Não encontramos {domain} nas zonas que esse token acessa. Confira se o domínio está nessa conta da Cloudflare e incluído no token.",
+      "unreachable": "Não conseguimos falar com a Cloudflare agora. Tente de novo em instantes.",
+      "unexpected": "A Cloudflare respondeu de um jeito inesperado. Tente de novo ou adicione os registros manualmente.",
+      "rate": "Muitas tentativas em pouco tempo. Tente de novo daqui a uma hora."
+    }
   }
 }

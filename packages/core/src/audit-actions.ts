@@ -25,6 +25,7 @@ export const AUDIT_ACTIONS = [
   "api_key.renamed",
   "domain.created",
   "domain.verified",
+  "domain.dns_configured",
   "domain.deleted",
   "mailbox.created",
   "mailbox.updated",

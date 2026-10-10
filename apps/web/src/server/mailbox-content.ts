@@ -28,6 +28,7 @@ import {
 } from "../../../../packages/core/src/mailbox-message-id";
 import { pilotImageMetadata } from "../../../../packages/core/src/mailbox-pilot-images";
 import { mailboxSignature } from "../lib/mailbox-compose-signature";
+import { mailboxHtmlPreviewText } from "../lib/mailbox-html-preview";
 import { mailboxPreview } from "../lib/mailbox-inbox-presentation";
 import { mailboxDraftHtml, mailboxSignatureText } from "../lib/mailbox-signature";
 import { getKeyring } from "./keyring";
@@ -127,14 +128,33 @@ async function runLimited<T, R>(
   );
   return results;
 }
+/**
+ * The list parse: the same limits as parse(), without converting HTML to text,
+ * which costs several times the rest of the parse on an HTML-only message.
+ */
+async function parseForList(raw: Buffer) {
+  if (!raw.length || raw.length > MAX_MIME) throw new MailboxContentError("invalid");
+  const mime = await simpleParser(raw, {
+    skipImageLinks: true,
+    skipTextToHtml: true,
+    skipHtmlToText: true,
+  });
+  if (
+    mime.attachments.length > MAX_ATTACHMENTS ||
+    mime.attachments.some((a) => a.content.length > MAX_ATTACHMENT)
+  )
+    throw new MailboxContentError("invalid");
+  return mime;
+}
 /** What a list row shows: no HTML projection, image probing or reply lookups. */
-function listDto(mime: Awaited<ReturnType<typeof parse>>) {
+function listDto(mime: Awaited<ReturnType<typeof parseForList>>) {
   return {
     subject: mime.subject ?? "",
     from: mime.from?.value[0]?.address ?? "",
     fromName: mime.from?.value[0]?.name ?? "",
     to: addresses(mime.to),
-    text: mime.text ?? "",
+    // An HTML-only message gets a cheap preview from the start of its markup.
+    text: mime.text || mailboxHtmlPreviewText(mime.html),
     date: mime.date && !Number.isNaN(mime.date.getTime()) ? mime.date : null,
     attachmentCount: mime.attachments.length,
   };
@@ -315,13 +335,13 @@ async function listRowContents(
   const byMailbox = new Map<string, string[]>();
   for (const row of rows)
     byMailbox.set(row.mailboxId, [...(byMailbox.get(row.mailboxId) ?? []), row.id]);
-  await runLimited([...byMailbox], 4, async ([mailboxId, ids]) => {
+  await runLimited([...byMailbox], 8, async ([mailboxId, ids]) => {
     const parsed = await withMailboxItems(db, getKeyring(), actor, { mailboxId, ids }, (items) =>
       runLimited(items, 8, async (item) => ({
         id: item.id,
         kind: item.kind,
         revision: item.revision,
-        ...listDto(await parse(item.raw)),
+        ...listDto(await parseForList(item.raw)),
       })),
     );
     const draftIds = parsed.filter((item) => item.kind === "draft").map((item) => item.id);
@@ -504,7 +524,7 @@ export async function getMailboxContentList(
         : "inbox";
   const metadata = [];
   const mailboxesTruncated = readable.length > 20;
-  const pages = await runLimited(readable.slice(0, 20), 4, async (box) => ({
+  const pages = await runLimited(readable.slice(0, 20), 8, async (box) => ({
     box,
     // One extra row per box tells whether anything follows this page.
     rows: await listMailboxItems(
@@ -602,7 +622,7 @@ export async function getMailboxContentList(
   }[] = [];
   // Messages per conversation, counted inside each listed mailbox.
   const threadStates = new Map<string, { count: number; unread: number }>();
-  await runLimited([...new Set(shown.map((row) => row.mailboxId))], 4, async (mailboxId) => {
+  await runLimited([...new Set(shown.map((row) => row.mailboxId))], 8, async (mailboxId) => {
     const states = await summarizeMailboxThreads(
       db,
       actor,

@@ -43,9 +43,14 @@ import { and, count, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { recordAudit } from "../audit";
-import { withMailboxDomainDeletion } from "../mailboxes";
 import { resolveBaseUrl } from "../auth";
-import { adminProcedure, router, teamProcedure } from "../trpc";
+import {
+  applyCloudflareRecords,
+  CLOUDFLARE_TOKEN,
+  type CloudflareDesiredRecord,
+} from "../cloudflare-dns";
+import { withMailboxDomainDeletion } from "../mailboxes";
+import { type AuthSession, adminProcedure, router, teamProcedure } from "../trpc";
 
 // Lowercase registrable hostname with at least two labels; SES identities are
 // registered exactly as typed, so uppercase is rejected instead of normalized.
@@ -61,7 +66,12 @@ export interface DomainsSesDeps {
   resolveNs(name: string): Promise<string[]>;
   /** Live per-record DNS lookups; omitted falls back to node:dns/promises. */
   dns?: DnsResolver;
+  /** Cloudflare API calls for "Configurar na Cloudflare"; omitted uses global fetch. */
+  cloudflareFetch?: typeof fetch;
 }
+
+/** Cloudflare setups per hour, per team (each run is about 15 API calls). */
+const CLOUDFLARE_SETUP_LIMIT_PER_HOUR = 10;
 
 const regionClients = new Map<string, SesIdentityClient>();
 
@@ -175,6 +185,57 @@ export function createDomainsRouter(deps: DomainsSesDeps = defaultSesDeps) {
   // team so one tenant cannot burn the account's CreateEmailIdentity
   // throttle for everyone.
   const createLimited = createFixedWindowLimiter(DOMAIN_CREATE_LIMIT_PER_HOUR, 3_600_000);
+  const cloudflareLimited = createFixedWindowLimiter(CLOUDFLARE_SETUP_LIMIT_PER_HOUR, 3_600_000);
+
+  async function runVerification(
+    ctx: { db: Db; session: AuthSession; teamId: string },
+    domain: typeof schema.domains.$inferSelect,
+  ) {
+    const resolver = deps.dns ?? nodeDnsResolver;
+    // The shared source of truth the worker cron also runs: SES status + live
+    // DNS folded into the strict stored status the send gate keys off.
+    const result = await computeDomainVerification(
+      deps.clientForRegion(domain.region),
+      resolver,
+      domain,
+    );
+    const { status, liveDns, verification } = result;
+    // The branded tracking CNAME never gates status, so computeDomainVerification
+    // omits it — live-check it here so its row badge still reflects real DNS.
+    let trackingResolved = false;
+    const cname = trackingCname(domain);
+    if (cname) {
+      const [live] = await checkDnsRecords([cname], resolver);
+      liveDns.push({ ...cname, status: live ?? "missing" });
+      trackingResolved = live === "found";
+    }
+    const now = new Date();
+    await ctx.db
+      .update(schema.domains)
+      .set({
+        status,
+        lastCheckedAt: now,
+        ...verificationDbPatch(result, now),
+        ...(status === "verified" && !domain.verifiedAt ? { verifiedAt: now } : {}),
+      })
+      .where(and(eq(schema.domains.id, domain.id), eq(schema.domains.teamId, ctx.teamId)));
+    if (trackingResolved) await clearTrackingClock(ctx.db, domain);
+    if (status === "verified" && domain.status !== "verified") {
+      await recordAudit(ctx, {
+        action: "domain.verified",
+        target: { type: "domain", id: domain.id },
+        metadata: { name: domain.name },
+      });
+    }
+    return {
+      status,
+      dkimStatus: verification.dkimStatus,
+      mailFromStatus: verification.mailFromStatus,
+      verifiedForSending: verification.verifiedForSending,
+      liveDns,
+    };
+  }
+
   return router({
     list: teamProcedure.query(async ({ ctx }) => {
       const rows = await ctx.db
@@ -404,50 +465,73 @@ export function createDomainsRouter(deps: DomainsSesDeps = defaultSesDeps) {
 
     verify: adminProcedure.input(z.object({ id: z.uuid() })).mutation(async ({ ctx, input }) => {
       const domain = await requireDomain(ctx.db, ctx.teamId, input.id);
-      const resolver = deps.dns ?? nodeDnsResolver;
-      // The shared source of truth the worker cron also runs: SES status + live
-      // DNS folded into the strict stored status the send gate keys off.
-      const result = await computeDomainVerification(
-        deps.clientForRegion(domain.region),
-        resolver,
-        domain,
-      );
-      const { status, liveDns, verification } = result;
-      // The branded tracking CNAME never gates status, so computeDomainVerification
-      // omits it — live-check it here so its row badge still reflects real DNS.
-      let trackingResolved = false;
-      const cname = trackingCname(domain);
-      if (cname) {
-        const [live] = await checkDnsRecords([cname], resolver);
-        liveDns.push({ ...cname, status: live ?? "missing" });
-        trackingResolved = live === "found";
-      }
-      const now = new Date();
-      await ctx.db
-        .update(schema.domains)
-        .set({
-          status,
-          lastCheckedAt: now,
-          ...verificationDbPatch(result, now),
-          ...(status === "verified" && !domain.verifiedAt ? { verifiedAt: now } : {}),
-        })
-        .where(and(eq(schema.domains.id, domain.id), eq(schema.domains.teamId, ctx.teamId)));
-      if (trackingResolved) await clearTrackingClock(ctx.db, domain);
-      if (status === "verified" && domain.status !== "verified") {
-        await recordAudit(ctx, {
-          action: "domain.verified",
-          target: { type: "domain", id: domain.id },
-          metadata: { name: domain.name },
-        });
-      }
-      return {
-        status,
-        dkimStatus: verification.dkimStatus,
-        mailFromStatus: verification.mailFromStatus,
-        verifiedForSending: verification.verifiedForSending,
-        liveDns,
-      };
+      return runVerification(ctx, domain);
     }),
+
+    /**
+     * "Configurar na Cloudflare": writes the domain's records with a token the
+     * person pastes (see cloudflare-dns.ts for what may be written where), then
+     * runs the same check as "Check DNS". The token is used for this request
+     * only and never stored, logged or returned.
+     */
+    cloudflareSetup: adminProcedure
+      .input(
+        z.object({
+          id: z.uuid(),
+          token: z
+            .string()
+            .trim()
+            .refine((v) => CLOUDFLARE_TOKEN.test(v), "invalid token"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const domain = await requireDomain(ctx.db, ctx.teamId, input.id);
+        if (cloudflareLimited(ctx.teamId)) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many setups" });
+        }
+        const resolver = deps.dns ?? nodeDnsResolver;
+        const apex = registrableDomain(domain.name);
+        // DMARC is the person's policy: written only where none applies yet,
+        // not even one inherited from the organizational domain.
+        const dmarc = await lookupDmarc(domain.name, apex, resolver);
+        const tracking = trackingCname(domain);
+        const records: CloudflareDesiredRecord[] = dnsChecklist({
+          domain,
+          verification: null,
+          tracking,
+        }).flatMap((row): CloudflareDesiredRecord[] => {
+          const base = { type: row.type, name: row.name, value: row.value };
+          if (row.group === "verification")
+            return domain.dkimPublicKey ? [{ ...base, type: "TXT", policy: "own" }] : [];
+          if (row.group === "sending")
+            return row.type === "MX"
+              ? [{ ...base, type: "MX", priority: row.priority ?? 10, policy: "mailFromMx" }]
+              : [{ ...base, type: "TXT", policy: "spf" }];
+          if (row.group === "dmarc")
+            return dmarc.status === "missing"
+              ? [{ ...base, type: "TXT", policy: "createOnly" }]
+              : [];
+          if (row.group === "tracking") return [{ ...base, type: "CNAME", policy: "cname" }];
+          return [];
+        });
+        const setup = await applyCloudflareRecords(
+          { token: input.token, domain: domain.name, apex, records },
+          deps.cloudflareFetch ? { fetch: deps.cloudflareFetch } : {},
+        );
+        if (!setup.ok) return { ok: false as const, reason: setup.reason };
+        const written = setup.records.filter(
+          (record) => record.outcome === "created" || record.outcome === "updated",
+        ).length;
+        if (written > 0) {
+          await recordAudit(ctx, {
+            action: "domain.dns_configured",
+            target: { type: "domain", id: domain.id },
+            metadata: { name: domain.name, provider: "cloudflare", written },
+          });
+        }
+        const check = await runVerification(ctx, domain);
+        return { ok: true as const, zone: setup.zone, records: setup.records, check };
+      }),
 
     updateConfiguration: adminProcedure
       .input(

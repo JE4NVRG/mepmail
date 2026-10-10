@@ -214,5 +214,38 @@
     "dnsSubtitle": "Add this CNAME at your DNS provider and verify it. Until it resolves, tracked links are not served yet.",
     "dnsPending": "Add a subdomain above to get its DNS record.",
     "done": "Done"
+  },
+  "cloudflare": {
+    "title": "Set it up automatically at Cloudflare",
+    "body": "Your DNS is at Cloudflare. With a token that only touches DNS, we create this domain's records for you.",
+    "open": "Set up at Cloudflare",
+    "step1": "Create a token at Cloudflare",
+    "step1Hint": "The page opens with the right permissions (Zone: Read, DNS: Edit). Under “Zone Resources”, pick only {domain}, then create it.",
+    "createToken": "Create a Cloudflare token",
+    "step2": "Paste the token here",
+    "tokenPlaceholder": "Cloudflare API token",
+    "submit": "Create records",
+    "submitting": "Creating records…",
+    "privacy": "We use the token only now, to create the records; it is not saved. Afterwards you can delete it at Cloudflare.",
+    "cancel": "Cancel",
+    "doneTitle": "Records set up in the {zone} zone",
+    "doneBody": "Verification has started and usually takes a few minutes. This page checks on its own.",
+    "conflictHelp": "The marked items already had another value, and we chose not to touch them. Fix them at Cloudflare with the values in the table below.",
+    "outcome": {
+      "created": "Created",
+      "updated": "Updated",
+      "unchanged": "Already correct",
+      "conflict": "Another one exists, kept",
+      "failed": "Could not create"
+    },
+    "errors": {
+      "invalid": "This does not look like a Cloudflare token. Copy the whole token, without spaces.",
+      "rejected": "Cloudflare did not accept this token. Check that you copied all of it and that it is active.",
+      "forbidden": "The token cannot edit this domain's DNS. Create one with Zone: Read and DNS: Edit.",
+      "zone_not_found": "We could not find {domain} in the zones this token can reach. Check that the domain is in this Cloudflare account and included in the token.",
+      "unreachable": "We could not reach Cloudflare right now. Try again in a moment.",
+      "unexpected": "Cloudflare answered in an unexpected way. Try again or add the records by hand.",
+      "rate": "Too many attempts in a short time. Try again in an hour."
+    }
   }
 }

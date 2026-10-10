@@ -28,6 +28,28 @@
   },
   "releases": [
     {
+      "version": "0.87",
+      "date": "2026-10-10",
+      "title": "DNS automático na Cloudflare",
+      "summary": "Domínios na Cloudflare agora se configuram sozinhos: cole um token que só mexe no DNS e o MepMail cria os registros e começa a verificação.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "“Configurar na Cloudflare” na página do domínio e ao adicionar um domínio: um link abre a criação do token com as permissões certas, e o MepMail cria DKIM, MAIL FROM, SPF e, se faltar, DMARC.",
+            "Nada que você já tenha é sobrescrito: um SPF, DMARC ou MX diferente fica como está e aparece marcado para você revisar.",
+            "O token é usado só nessa configuração e não fica salvo; a ação aparece no registro de auditoria da equipe."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "A lista do Correio ficou ainda mais rápida em caixas com muitas mensagens em HTML."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.86",
       "date": "2026-10-10",
       "title": "Correio mais rápido",

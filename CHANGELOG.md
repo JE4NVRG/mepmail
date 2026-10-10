@@ -7,6 +7,30 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.87] - 2026-10-10
+
+### Added
+
+- `domains.cloudflareSetup` (admin, 10 runs per team per hour) and the
+  "Set up at Cloudflare" card on the domain page and the add-domain records
+  step, shown when the nameservers are Cloudflare's. The person creates a
+  token from Cloudflare's documented template link (Zone: Read, DNS: Edit)
+  and pastes it; `server/cloudflare-dns.ts` finds the zone (walking up to the
+  registrable domain) and writes the records, then the same verification as
+  Check DNS runs. The token is used for that request only: never stored,
+  logged or returned.
+- Write policy per record: our DKIM selector and a MAIL FROM MX pointing at
+  SES in another region may be replaced; a different SPF, CNAME or MX is
+  reported as a conflict and left alone; DMARC is created only when none
+  applies (own or inherited). The apex MX is never touched.
+- Audit action `domain.dns_configured` (provider, records written).
+
+### Changed
+
+- Correio list (from the desktop session): parsing without html-to-text and
+  a cheap preview from the HTML markup (`lib/mailbox-html-preview.ts`);
+  per-mailbox concurrency 4 to 8. The reader is unchanged.
+
 ## [0.86] - 2026-10-10
 
 Correio performance cut (from the desktop session). Measured in production

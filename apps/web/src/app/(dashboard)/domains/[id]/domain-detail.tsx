@@ -27,6 +27,7 @@ import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { isLoopbackUrl } from "@/lib/url";
 import { zoneRelativeName } from "@/lib/zone";
+import { CloudflareSetup } from "../cloudflare-setup";
 import { type DomainStatus, DomainStatusBadge, displayDomainStatus } from "../domain-status";
 import { RegionLabel } from "../region-label";
 import { useTrackingToggle } from "../use-tracking-toggle";
@@ -862,6 +863,9 @@ export function DomainDetail({ id }: { id: string }) {
                 ? t("detail.recordsHeading", { provider: provider.name })
                 : t("detail.recordsHeadingGeneric")}
             </h2>
+          ) : null}
+          {status !== "verified" && provider?.name === "Cloudflare" ? (
+            <CloudflareSetup id={id} domainName={data.name} onConfigured={runCheck} />
           ) : null}
 
           {records.isError ? (
