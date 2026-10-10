@@ -23,6 +23,28 @@
   },
   "releases": [
     {
+      "version": "0.98",
+      "date": "2026-10-10",
+      "title": "New mail shows up the moment it arrives",
+      "summary": "Correio no longer waits for its next check: a new message appears in the open list and in the unread count as soon as it is received, with a notice while you are writing.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Live updates: a message received now refreshes the unread count and the top of the open folder at once, in the browser and in the Windows app.",
+            "A notice for new mail in any folder: inside the app, a toast with the sender and subject and an Open button, plus a line above the composer while you write; outside it, a desktop notification (or the browser's, once you allow it)."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "History imports stay quiet: messages brought in from another account never trigger notices.",
+            "The backup check for new mail runs every 15 seconds instead of 30 when the live connection is unavailable."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.97",
       "date": "2026-10-10",
       "title": "Bring your old email into Correio",

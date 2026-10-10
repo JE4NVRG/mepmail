@@ -538,7 +538,10 @@
       "license": "Licença e uso",
       "appearance": "Preferências"
     },
-    "backShort": "Voltar"
+    "backShort": "Voltar",
+    "newMailToast": "Novo e-mail de {sender}: {subject}",
+    "open": "Abrir",
+    "dismiss": "Fechar aviso"
   },
   "archive": "Arquivo",
   "archiveEmptyTitle": "Nada arquivado",

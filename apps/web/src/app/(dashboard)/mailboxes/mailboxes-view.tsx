@@ -19,7 +19,8 @@ import {
   mailboxFolderOrderAfterMove,
   mailboxFolderTint,
 } from "@/lib/mailbox-inbox-presentation";
-import { newMailNotices, rememberUnread } from "@/lib/mailbox-new-mail";
+import { MAILBOX_NEW_MAIL_EVENT, useMailboxLive } from "@/lib/mailbox-live";
+import { type NewMailNotice, newMailNotices, rememberUnread } from "@/lib/mailbox-new-mail";
 import { noticesWanted } from "@/lib/mailbox-notifications";
 import { applyCorreioTheme, useCorreioPrefs } from "@/lib/mailbox-preferences";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
@@ -521,7 +522,7 @@ export function MailboxesView({
   const unreadCounts = useQuery(
     trpc.mailboxes.unreadCounts.queryOptions(undefined, {
       enabled: mayUseMail && !!registry.data,
-      refetchInterval: 30000,
+      refetchInterval: 15000,
       // The title, the desktop tray badge and the new-mail notice read these
       // counts, so they keep coming while the window is hidden or in the tray.
       refetchIntervalInBackground: true,
@@ -540,11 +541,11 @@ export function MailboxesView({
     // The desktop shell shows the same title on its window; a no-op elsewhere.
     void setNativeTitle(document.title);
   }, [inboxUnread]);
-  // More unread mail than the last count, in the desktop app: native toasts
-  // naming the sender and subject of what arrived (lib/mailbox-new-mail). The
-  // top of the inbox is read once at start so mail already there is never
-  // announced. In a browser the inbox list raises its own per-message notices
-  // (the bell), so nothing is shown from here.
+  // More unread mail than the last count: the sender and subject of what
+  // arrived (lib/mailbox-new-mail). While the Correio is in use it shows inside
+  // it (a toast, and a line in the composer); otherwise as the system's
+  // notices (desktop app, or the browser's with permission). The top of the
+  // inbox is read once at start so mail already there is never announced.
   const trpcClient = useTRPCClient();
   const smartInbox = useRef(prefs.smartInbox);
   smartInbox.current = prefs.smartInbox;
@@ -552,19 +553,36 @@ export function MailboxesView({
   const imports = useQuery(
     trpc.mailboxes.migration.importJobs.queryOptions(
       { mailboxId: null },
-      { enabled: isDesktop(), retry: false, refetchInterval: 30_000 },
+      { enabled: mayUseMail, retry: false, refetchInterval: 30_000 },
     ),
   );
   const importing = useRef(false);
   importing.current = importRunning(imports.data);
   const lastUnread = useRef<number | null>(null);
   const announced = useRef<Set<string> | null>(null);
+  // Live updates: an arrival refreshes the counts at once (polling stays as the net).
+  useMailboxLive(mayUseMail && !!registry.data, () => {
+    void unreadCounts.refetch();
+  });
+  // "Abrir" on a notice: the message in the Inbox of all boxes.
+  const openArrival = useRef((row: { mailboxId: string; id: string }) => {
+    setMailboxKind("all");
+    select(null);
+    setFolder("inbox");
+    selectItem(row);
+  });
+  openArrival.current = (row) => {
+    setMailboxKind("all");
+    select(null);
+    setFolder("inbox");
+    selectItem(row);
+  };
   useEffect(() => {
     if (!unreadCounts.data) return;
     const total = Object.values(unreadCounts.data.counts).reduce((sum, n) => sum + n, 0);
     const previous = lastUnread.current;
     lastUnread.current = total;
-    if (!isDesktop() || !noticesWanted(true) || importing.current) return;
+    if (importing.current) return;
     const inboxTop = () =>
       trpcClient.mailboxes.items.query({ mailboxId: null, folder: "inbox", limit: 10 });
     if (announced.current === null) {
@@ -576,7 +594,10 @@ export function MailboxesView({
     }
     if (previous === null || total <= previous) return;
     const notified = announced.current;
-    const fallback = { title: t("title"), body: t("app.newMail", { count: total - previous }) };
+    const fallback: NewMailNotice = {
+      title: t("title"),
+      body: t("app.newMail", { count: total - previous }),
+    };
     void inboxTop()
       .then((page) =>
         newMailNotices(
@@ -597,9 +618,51 @@ export function MailboxesView({
       )
       .catch(() => [fallback])
       .then((notices) => {
-        for (const notice of notices) void notifyDesktop(notice.title, notice.body);
+        if (!notices.length) return;
+        const inUse = document.visibilityState === "visible" && document.hasFocus();
+        if (inUse) {
+          const first = notices[0]!;
+          window.dispatchEvent(new CustomEvent(MAILBOX_NEW_MAIL_EVENT, { detail: first }));
+          toast(
+            first.row
+              ? t("app.newMailToast", { sender: first.title, subject: first.body })
+              : first.body,
+            "info",
+            first.row && layout === "app"
+              ? {
+                  action: {
+                    label: t("app.open"),
+                    run: () => openArrival.current(first.row!),
+                  },
+                }
+              : {},
+          );
+          return;
+        }
+        if (isDesktop()) {
+          if (noticesWanted(true))
+            for (const notice of notices) void notifyDesktop(notice.title, notice.body);
+          return;
+        }
+        if (
+          !noticesWanted(false) ||
+          typeof Notification === "undefined" ||
+          Notification.permission !== "granted"
+        )
+          return;
+        for (const notice of notices) {
+          const shown = new Notification(notice.title, {
+            body: notice.body,
+            ...(notice.row ? { tag: `${notice.row.mailboxId}:${notice.row.id}` } : {}),
+          });
+          shown.onclick = () => {
+            window.focus();
+            if (notice.row && layout === "app") openArrival.current(notice.row);
+            shown.close();
+          };
+        }
       });
-  }, [unreadCounts.data, t, trpcClient]);
+  }, [unreadCounts.data, t, trpcClient, layout]);
   useEffect(
     () => () => {
       if (baseTitle.current) document.title = baseTitle.current;

@@ -34,7 +34,7 @@ describe("newMailNotices", () => {
         fallback,
         quiet,
       ),
-    ).toEqual([{ title: "Pessoa a", body: "Assunto a" }]);
+    ).toEqual([{ title: "Pessoa a", body: "Assunto a", row: { mailboxId: "box", id: "a" } }]);
     // Quiet rows count as announced: they never come back later.
     expect(notified.has("box:ci")).toBe(true);
     expect(
@@ -52,8 +52,9 @@ describe("newMailNotices", () => {
       row("read", { seenAt: new Date() }),
     ];
     expect(newMailNotices(rows, notified, labels, fallback)).toEqual([
-      { title: "Pessoa a", body: "Assunto a" },
-      { title: "b@example.com", body: "(sem assunto)" },
+      // Each names its message, so the notice can open it.
+      { title: "Pessoa a", body: "Assunto a", row: { mailboxId: "box", id: "a" } },
+      { title: "b@example.com", body: "(sem assunto)", row: { mailboxId: "box", id: "b" } },
     ]);
     expect(newMailNotices(rows, notified, labels, fallback)).toEqual([fallback]);
   });

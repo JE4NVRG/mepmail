@@ -16,7 +16,12 @@ export type NewMailRow = {
   category?: "person" | "notification" | "newsletter" | null;
 };
 
-export type NewMailNotice = { title: string; body: string };
+export type NewMailNotice = {
+  title: string;
+  body: string;
+  /** The message, when the notice names one (to open it from the notice). */
+  row?: { mailboxId: string; id: string };
+};
 
 export type NewMailLabels = {
   /** The title when a message has no sender to show. */
@@ -62,6 +67,7 @@ export function newMailNotices(
     return fresh.map((row) => ({
       title: sender(row) || labels.fallbackTitle,
       body: row.subject.trim() || labels.noSubject,
+      row: { mailboxId: row.mailboxId, id: row.id },
     }));
   const listed = fresh
     .slice(0, EACH)

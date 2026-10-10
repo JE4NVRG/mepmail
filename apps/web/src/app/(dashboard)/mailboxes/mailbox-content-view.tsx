@@ -17,13 +17,12 @@ import {
 } from "react";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { toast } from "@/components/toast";
-import { htmlDropsWork, isDesktop } from "@/lib/desktop-bridge";
+import { htmlDropsWork } from "@/lib/desktop-bridge";
 import {
   initialMailboxText,
   mailboxSignature,
   replaceMailboxSignature,
 } from "@/lib/mailbox-compose-signature";
-import { importRunning } from "@/lib/mailbox-import";
 import {
   type MailboxFolder,
   mailboxContentBlocked,
@@ -39,6 +38,8 @@ import {
   mailboxDateSection,
   mailboxInitials,
 } from "@/lib/mailbox-list-presentation";
+import { MAILBOX_ARRIVAL_EVENT, MAILBOX_NEW_MAIL_EVENT } from "@/lib/mailbox-live";
+import type { NewMailNotice } from "@/lib/mailbox-new-mail";
 import {
   newUnreadArrivals,
   readNoticePreference,
@@ -403,6 +404,14 @@ function DraftDialog({
   const [error, setError] = useState("");
   const mutation = useMutation(trpc.mailboxes.saveDraft.mutationOptions());
   const busy = saving || mutation.isPending || loadingFiles;
+  // Mail that arrives while writing: one line under the title (mailboxes-view
+  // announces it), until dismissed or replaced by the next one.
+  const [arrived, setArrived] = useState<NewMailNotice | null>(null);
+  useEffect(() => {
+    const onNewMail = (event: Event) => setArrived((event as CustomEvent<NewMailNotice>).detail);
+    window.addEventListener(MAILBOX_NEW_MAIL_EVENT, onNewMail);
+    return () => window.removeEventListener(MAILBOX_NEW_MAIL_EVENT, onNewMail);
+  }, []);
   useEffect(() => {
     active.current = true;
     dialog.current?.showModal();
@@ -504,6 +513,23 @@ function DraftDialog({
           ×
         </button>
       </header>
+      {arrived ? (
+        <p className={styles.composerArrival} role="status">
+          <span>
+            {arrived.row
+              ? t("app.newMailToast", { sender: arrived.title, subject: arrived.body })
+              : arrived.body}
+          </span>
+          <button
+            type="button"
+            className="ms-btn ms-btn-ghost"
+            aria-label={t("app.dismiss")}
+            onClick={() => setArrived(null)}
+          >
+            ×
+          </button>
+        </p>
+      ) : null}
       <form
         className={styles.composerForm}
         onSubmit={async (e) => {
@@ -1026,13 +1052,6 @@ export function MailboxContentView({
   const listBody = useRef<HTMLDivElement>(null);
   // Browser notices for new mail while Correio sits in another tab (opt-in).
   const [noticesOn, setNoticesOn] = useState(false);
-  // A history import brings old mail in (see the notice effect below).
-  const imports = useQuery(
-    trpc.mailboxes.migration.importJobs.queryOptions(
-      { mailboxId: null },
-      { enabled: noticesOn, retry: false, refetchInterval: 30_000 },
-    ),
-  );
   const knownRows = useRef<Set<string> | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   // One window listener reads the current render through this ref.
@@ -1108,10 +1127,14 @@ export function MailboxContentView({
       if (document.visibilityState === "visible") void poll();
     };
     document.addEventListener("visibilitychange", onVisible);
+    // A live arrival (lib/mailbox-live): the head of the list now, not at the next tick.
+    const onArrival = () => void poll();
+    window.addEventListener(MAILBOX_ARRIVAL_EVENT, onArrival);
     return () => {
       stopped = true;
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener(MAILBOX_ARRIVAL_EVENT, onArrival);
     };
   }, [listMailboxId, folder, mailboxKind, customFolderId, queries, trpc, trpcClient]);
   // Every page so far, in order; "Carregar mais" appends the next one.
@@ -2243,35 +2266,8 @@ export function MailboxContentView({
     knownRows.current = known;
     if (arrivals.length && (listBody.current?.scrollTop ?? 0) > 80)
       setFreshCount((count) => count + arrivals.length);
-    // The desktop app announces new mail itself (mailboxes-view, by sender and
-    // subject, from any folder); these per-message notices are the browser's.
-    // A history import brings old mail in: no notices while it runs.
-    if (
-      isDesktop() ||
-      !noticesOn ||
-      importRunning(imports.data) ||
-      !arrivals.length ||
-      typeof Notification === "undefined" ||
-      Notification.permission !== "granted" ||
-      document.visibilityState !== "hidden"
-    )
-      return;
-    // With the caixa inteligente on, only people ring (as in the desktop app).
-    const loud = prefs.smartInbox
-      ? arrivals.filter((row) => row.category !== "notification" && row.category !== "newsletter")
-      : arrivals;
-    for (const row of loud.slice(0, 3)) {
-      const notice = new Notification(row.fromName || row.from || t("notices.newMail"), {
-        body: row.subject || t("noSubject"),
-        tag: `${row.mailboxId}:${row.id}`,
-      });
-      notice.onclick = () => {
-        window.focus();
-        select({ mailboxId: row.mailboxId, id: row.id });
-        notice.close();
-      };
-    }
-  }, [listed, folder, noticesOn, select, t, prefs.smartInbox, imports.data]);
+    // New-mail notices (system and in-app) come from mailboxes-view, for every folder.
+  }, [listed, folder]);
   async function toggleNotices() {
     if (typeof Notification === "undefined") {
       setNotice(t("notices.unsupported"));

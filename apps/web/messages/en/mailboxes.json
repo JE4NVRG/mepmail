@@ -538,7 +538,10 @@
       "license": "License and usage",
       "appearance": "Preferences"
     },
-    "backShort": "Back"
+    "backShort": "Back",
+    "newMailToast": "New email from {sender}: {subject}",
+    "open": "Open",
+    "dismiss": "Dismiss"
   },
   "archive": "Archive",
   "archiveEmptyTitle": "Nothing archived",

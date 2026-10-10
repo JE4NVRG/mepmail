@@ -2906,3 +2906,21 @@
   font-size: var(--ms-fs-ui);
   font-weight: 600;
 }
+/* A message that arrived while writing: one line under the composer's title. */
+.composerArrival {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 8px 6px 14px;
+  border-bottom: 1px solid var(--ms-violet-border);
+  background: var(--ms-panel-raised);
+  font-size: var(--ms-fs-label);
+}
+.composerArrival span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

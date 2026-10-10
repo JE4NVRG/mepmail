@@ -28,6 +28,28 @@
   },
   "releases": [
     {
+      "version": "0.98",
+      "date": "2026-10-10",
+      "title": "E-mail novo aparece na hora em que chega",
+      "summary": "O Correio não espera mais a próxima verificação: uma mensagem nova aparece na lista aberta e no contador de não lidas assim que é recebida, com aviso mesmo enquanto você escreve.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Atualização em tempo real: uma mensagem recebida agora atualiza na hora o contador de não lidas e o topo da pasta aberta, no navegador e no app para Windows.",
+            "Aviso de e-mail novo em qualquer pasta: com o app em uso, um aviso com remetente, assunto e o botão Abrir, além de uma linha acima do compositor enquanto você escreve; fora dele, uma notificação do sistema (ou do navegador, depois que você permitir)."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "A importação de histórico fica em silêncio: mensagens trazidas de outra conta nunca disparam aviso.",
+            "Se a conexão em tempo real cair, a verificação de reserva passa a rodar a cada 15 segundos, em vez de 30."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.97",
       "date": "2026-10-10",
       "title": "Traga seu e-mail antigo para o Correio",
