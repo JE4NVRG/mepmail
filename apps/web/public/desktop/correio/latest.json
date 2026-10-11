@@ -6,6 +6,18 @@
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITmxUOUkyb1FLcmdWNlNHdzAxMFhqeENzNkFrVXdRYWhNKyt6YU4yTHF3VFVGM0x1RFVjTlorNnZ6aDJGRWdZaXZiZ1ZhMzFUa2NwRFo3Sjg0UjJ0NkF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjYyODI2CWZpbGU6TWVwTWFpbCBDb3JyZWlvXzEuMC4xX3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjAuMQpaZ3BFZEloQ1gyWFdRK1BYS3k2dldWOFNZamFjblVMQ0h2bW9IUk1hRFEvK05WSmhaTllITWtyOFNBT1RCWlNOOWJDOC9Qb3ZpRTgwT2FWZldIRXdBZz09Cg==",
       "url": "https://mepmail.dev/desktop/correio/MepMail_1.0.1_x64-setup.exe"
+    },
+    "linux-x86_64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITnVLVWg3QWlncEpvUGpqNmgwbUJabGZ2K2FKSzR4dWJ3MlRCeGlVWWdTbG1ncDk0S3pYQzV2TmVCVjdyTDNhSk93Ukk2NnJjbk9UTmkwNllzK3ZKRFFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjc3MjM1CWZpbGU6TWVwTWFpbF8xLjAuMV9hbWQ2NC5BcHBJbWFnZQl2ZXJzaW9uOjEuMC4xCjZuNEhIaGRMZThkWTZ0Vldoc21jL0xlQzMrZnB1ZXJrTU8zeUtOcEd4TGFGclluK1QyMjVqaHhwanE2UjRUT3F4Mm9UeUxhcldRNnhOSUJUMTRkS0NBPT0K",
+      "url": "https://github.com/JE4NVRG/mepmail/releases/download/desktop-v1.0.1/MepMail_1.0.1_amd64.AppImage"
+    },
+    "linux-x86_64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITnBpZU45T3lDVTFMMmpRUTRycmFOUTZRZVFuaXVHakloZ1VrVjVyM09UUDVjOThvbXRiNmNFVjAyV2RGMjZ5cFN1ZUxUK3hreDBTeHN1OGg5TDcxMWc4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjc3MjM1CWZpbGU6TWVwTWFpbF8xLjAuMV9hbWQ2NC5kZWIJdmVyc2lvbjoxLjAuMQowMEc2WUw5Q29aRVdnM0REY3JEOVZFazZaZFR6SUNkQjFUb3NMYXVyNUFaYjZCVUgya1RhZ0xrcFl2OHlJd3kzcThLWmV1UWkwZXl1enlkRGZvRjFEdz09Cg==",
+      "url": "https://github.com/JE4NVRG/mepmail/releases/download/desktop-v1.0.1/MepMail_1.0.1_amd64.deb"
+    },
+    "linux-x86_64-rpm": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITm5iZXIwckpWMGFwOTJ3VmxLTkUyNm9nRkhoYS9jOUFGQUFHZ0VDenFlSHVZZXFveTczL2U3RXhhMlF0ZW1SQmNlQmgzL1hETWtqYjFHZHg3YXp3TVFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjc3MjM1CWZpbGU6TWVwTWFpbC0xLjAuMS0xLng4Nl82NC5ycG0JdmVyc2lvbjoxLjAuMQpleHd4WmxvOWRxa2ZGWW9xaDgwSThGVFFFckdsTGxnV1dIZ2xSSGxYM2xMbm9RcVVLWXNWVHVvYnRxTGV2Nlh2QXJZODdTRk12NFAvbVNDN1pnRGtEQT09Cg==",
+      "url": "https://github.com/JE4NVRG/mepmail/releases/download/desktop-v1.0.1/MepMail-1.0.1-1.x86_64.rpm"
     }
   }
 }

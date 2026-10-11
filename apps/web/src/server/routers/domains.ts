@@ -106,7 +106,12 @@ const defaultSesDeps: DomainsSesDeps = {
  */
 const NS_PROVIDERS: readonly (readonly [suffix: string, name: string, url?: string])[] = [
   ["cloudflare.com", "Cloudflare", "https://dash.cloudflare.com"],
-  ["registro.br", "Registro.br", "https://registro.br/painel/"],
+  // Registro.br zones answer from a.auto.dns.br, b.auto.dns.br or *.sec.dns.br.
+  [".dns.br", "Registro.br", "https://registro.br/painel/"],
+  // Hostinger's default (ns1/ns2.dns-parking.com) and its own name servers.
+  ["dns-parking.com", "Hostinger", "https://hpanel.hostinger.com/domains"],
+  ["hostinger.com", "Hostinger", "https://hpanel.hostinger.com/domains"],
+  ["registrar-servers.com", "Namecheap", "https://ap.www.namecheap.com/domains/list/"],
   ["awsdns", "Route 53", "https://console.aws.amazon.com/route53/"],
   ["domaincontrol.com", "GoDaddy", "https://dcc.godaddy.com"],
   ["vercel-dns.com", "Vercel", "https://vercel.com/domains"],

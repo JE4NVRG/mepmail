@@ -32,7 +32,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "io-
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 futures-util = "0.3"
 # Agent keys live in the Windows credential vault, never in config files.
-keyring = { version = "3", features = ["windows-native"] }
+# Linux: the Secret Service (GNOME Keyring, KWallet) over D-Bus, persistent across logins.
+keyring = { version = "3", features = ["windows-native", "sync-secret-service", "crypto-rust"] }
 
 [features]
 # The Microsoft Store build (MSIX, apps/desktop/msix): no self-updater, the

@@ -399,12 +399,15 @@ describe("durable private Correio transport contracts with captured provider", (
     const second = await queue(item.id);
     expect(second.id).toBe(accepted.id);
     expect(second.duplicate).toBe(true);
-    await saveMailboxDraft(db, keys, owner(), {
-      mailboxId,
-      id: item.id,
-      expectedRevision: 1,
-      raw: fixture(undefined, undefined, "later edit"),
-    });
+    // A submitted draft stays as sent: a later edit would be a second send.
+    await expect(
+      saveMailboxDraft(db, keys, owner(), {
+        mailboxId,
+        id: item.id,
+        expectedRevision: 1,
+        raw: fixture(undefined, undefined, "later edit"),
+      }),
+    ).rejects.toMatchObject({ code: "conflict" });
     const capture = vi.fn<MailboxOutboxSender["send"]>(async (input) => {
       expect((await outbox(input.outboxId)).status).toBe("sending");
       expect(input.raw.equals(original)).toBe(true);
@@ -590,16 +593,12 @@ describe("durable private Correio transport contracts with captured provider", (
     await queue(item.id);
     expect((await queue(item.id)).duplicate).toBe(true);
     await expect(receive()).rejects.toMatchObject({ code: "quota" });
+    // The draft and its pending snapshot fill the space: any new draft is over it.
     await expect(
       saveMailboxDraft(db, keys, owner(), {
         mailboxId,
-        id: item.id,
-        expectedRevision: 1,
-        raw: fixture(
-          undefined,
-          undefined,
-          "a much longer replacement body that exceeds the complete reserved space",
-        ),
+        expectedRevision: 0,
+        raw: fixture(undefined, undefined, "a new draft that needs space the snapshot holds"),
       }),
     ).rejects.toMatchObject({ code: "quota" });
   });

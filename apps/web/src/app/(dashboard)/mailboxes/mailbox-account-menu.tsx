@@ -8,15 +8,16 @@ import { useDismiss } from "@/components/popover-menu";
 import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
 import { isDesktop } from "@/lib/desktop-bridge";
-import { WINDOWS_STORE_URL } from "@/lib/desktop-download";
+import { desktopAppFor, LINUX_DOWNLOAD_URL, WINDOWS_STORE_URL } from "@/lib/desktop-download";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import type { CorreioPrefs } from "@/lib/mailbox-preferences";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import styles from "./mailboxes.module.css";
 
-/** The desktop app is Windows-only for now: offer it in a Windows browser. */
-function offersWindowsApp() {
-  return !isDesktop() && typeof navigator !== "undefined" && /Windows/.test(navigator.userAgent);
+/** The desktop app for this browser: the Store in Windows, the downloads page in Linux. */
+function offeredDesktopApp() {
+  if (typeof navigator === "undefined") return null;
+  return desktopAppFor(navigator.userAgent, isDesktop());
 }
 
 const THEMES = [
@@ -28,7 +29,7 @@ const THEMES = [
 /**
  * The account menu on the Correio bar: the theme (system, light or dark, saved
  * to the person's preferences), the language, shortcuts, preferences, support,
- * the Windows app download (in a Windows browser), the way back to the
+ * the desktop app download (in a Windows or Linux browser), the way back to the
  * dashboard (not in the desktop app) and signing out.
  */
 export function MailboxAccountMenu({
@@ -82,6 +83,8 @@ export function MailboxAccountMenu({
     window.location.assign("/login");
   }
   const email = session?.user.email;
+  // Read while the panel renders: it only renders open, in the browser.
+  const desktopApp = open ? offeredDesktopApp() : null;
 
   return (
     <div className={styles.accountMenu}>
@@ -188,16 +191,16 @@ export function MailboxAccountMenu({
             {t("app.support")}
             <span aria-hidden="true">↗</span>
           </button>
-          {offersWindowsApp() ? (
+          {desktopApp ? (
             <a
               role="menuitem"
               className="ms-menu-item"
-              href={WINDOWS_STORE_URL}
+              href={desktopApp === "windows" ? WINDOWS_STORE_URL : LINUX_DOWNLOAD_URL}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setOpen(false)}
             >
-              {t("app.windowsApp")}
+              {t(desktopApp === "windows" ? "app.windowsApp" : "app.linuxApp")}
               <span aria-hidden="true">↗</span>
             </a>
           ) : null}

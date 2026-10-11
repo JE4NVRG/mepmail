@@ -20,10 +20,13 @@ type Outcome = "created" | "updated" | "unchanged" | "conflict" | "failed";
 export function CloudflareSetup({
   id,
   domainName,
+  onOpen,
   onConfigured,
 }: {
   id: string;
   domainName: string;
+  /** Called when the person opens the token form. */
+  onOpen?: () => void;
   /** Called after records were written and the server ran a DNS check. */
   onConfigured?: () => void;
 }) {
@@ -92,7 +95,10 @@ export function CloudflareSetup({
           <button
             type="button"
             className={`ms-btn ms-btn-primary ${styles.openButton}`}
-            onClick={() => setOpen(true)}
+            onClick={() => {
+              setOpen(true);
+              onOpen?.();
+            }}
           >
             {t("open")}
           </button>

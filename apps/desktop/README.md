@@ -203,6 +203,50 @@ Testing an MSIX before submitting needs Windows Developer Mode (then
 a Store submission to a private audience. The Windows App Certification Kit
 (`appcert.exe`) needs an elevated prompt.
 
+## Linux (AppImage, .deb, .rpm)
+
+Built locally in Docker (`linux/Dockerfile`, Ubuntu 22.04, so the AppImage's
+glibc floor is old enough for current distributions); nothing runs on the VPS.
+
+```bash
+docker build -t mepmail-desktop-linux:22.04 linux
+MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD:/src:ro" -v mepmail-desktop-linux-cache:/cache \
+  -v "$PWD/linux-out:/out" -v "$USERPROFILE/.tauri/mepmail-correio-updater.key:/keys/updater.key:ro" \
+  -e TAURI_SIGNING_PRIVATE_KEY=/keys/updater.key -e TAURI_SIGNING_PRIVATE_KEY_PASSWORD= \
+  mepmail-desktop-linux:22.04 bash /src/linux/build.sh
+```
+
+`linux/build.sh` copies the sources into the container, keeps Cargo's
+registry and target in the `mepmail-desktop-linux-cache` volume, and writes
+`MepMail_<v>_amd64.AppImage`, `MepMail_<v>_amd64.deb`,
+`MepMail-<v>-1.x86_64.rpm` and their `.sig` files to `/out` (without the key
+it skips the signatures). On Linux the product is named "MepMail" (menu
+entry, package `mep-mail`, command `mepmail`); Windows keeps
+"MepMail Correio" inside for its existing installs.
+
+What differs on Linux: the tray is an AppIndicator; agent keys go to the
+Secret Service keyring (GNOME Keyring, KWallet); the AppImage registers
+`mepmail://` itself on start, the packages declare it in their menu entry;
+agent configs point at the AppImage path (`APPIMAGE`) or `/usr/bin/mepmail`.
+Updates: the AppImage replaces itself like the Windows installer (idle in the
+tray, on quit, or from the tray); a .deb or .rpm installs through dpkg/rpm
+with the system password, so only from the tray item, never on its own.
+
+Publishing: the files are assets of the GitHub release `desktop-v<version>`
+(the AppImage carries WebKitGTK, about 80 MB, too big for the web image), and
+`latest.json` gets `linux-x86_64-appimage`, `-deb` and `-rpm` entries with
+those URLs and the `.sig` contents. The download page is
+`apps/web/src/app/desktop/correio/linux` (stable links `/linux/deb`, `/rpm`,
+`/appimage`); its test checks the entries. latest.json has one version for
+every platform: release Windows and Linux together, or a Windows app would
+"update" to its own installer again.
+
+Smoke test: install the .deb with apt in a clean `ubuntu:24.04` container, run
+it under Xvfb with a D-Bus session, screenshot, launch it a second time (it
+must hand over to the first and exit), then run the AppImage with
+`APPIMAGE_EXTRACT_AND_RUN=1` and check `xdg-mime query default
+x-scheme-handler/mepmail`.
+
 ## First-run checklist
 
 - The window opens on the splash, then on the Correio sign-in or inbox.

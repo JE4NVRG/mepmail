@@ -23,6 +23,32 @@
   },
   "releases": [
     {
+      "version": "0.111",
+      "date": "2026-10-10",
+      "title": "MepMail app for Linux",
+      "summary": "The Mail desktop app now runs on Linux too: .deb, .rpm and AppImage, with tray, unread counter and automatic updates.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "MepMail app for Linux: .deb, .rpm and AppImage, with tray, unread counter and automatic updates. Download it at mepmail.dev/desktop/correio/linux."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "The home and the Mail page now start with email on your own domain, for you and your agents in the same mailbox, without hosting."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Mail: a draft that is already being sent can no longer be saved as a new version from another tab or by an agent, so it cannot turn into a second email. A refused send can still be corrected and sent."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.109",
       "date": "2026-10-10",
       "title": "Plan limit emails, and Delete forever in Mail",
@@ -256,9 +282,7 @@
         },
         {
           "kind": "changed",
-          "items": [
-            "New-mail notices stay quiet while an import is running."
-          ]
+          "items": ["New-mail notices stay quiet while an import is running."]
         }
       ]
     },
@@ -435,9 +459,7 @@
         },
         {
           "kind": "changed",
-          "items": [
-            "The Correio list got faster still in mailboxes with many HTML messages."
-          ]
+          "items": ["The Correio list got faster still in mailboxes with many HTML messages."]
         }
       ]
     },
@@ -514,9 +536,7 @@
         },
         {
           "kind": "fixed",
-          "items": [
-            "Dragging or bulk-moving to a folder also works in the all-mailboxes view."
-          ]
+          "items": ["Dragging or bulk-moving to a folder also works in the all-mailboxes view."]
         }
       ]
     },

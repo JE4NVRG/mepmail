@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { PublicFooter, PublicHeader, type PublicSiteLabels } from "@/components/site-chrome";
-import { WINDOWS_INSTALLER_URL, WINDOWS_STORE_URL } from "@/lib/desktop-download";
+import {
+  LINUX_DOWNLOAD_URL,
+  WINDOWS_INSTALLER_URL,
+  WINDOWS_STORE_URL,
+} from "@/lib/desktop-download";
 import { legalLinks } from "@/lib/legal-links";
+import { titlePhrases } from "@/lib/title-phrases";
 import { AgentDemo, type AgentDemoLabels } from "./agent-demo";
 import { LaunchPlanPreview } from "./launch-plan-preview";
 import "../landing.css";
@@ -70,7 +75,11 @@ export default async function CorreioPage() {
             <div className="correio-hero-copy">
               <p className="correio-eyebrow">{t("hero.eyebrow")}</p>
               <h1 id="correio-title">
-                {t("hero.title")}
+                {titlePhrases(t("hero.title")).map((phrase) => (
+                  <span className="correio-title-line" key={phrase}>
+                    {phrase}
+                  </span>
+                ))}
                 <span className="correio-title-end">{t("hero.titleEnd")}</span>
               </h1>
               <p className="correio-lead">{t("hero.lead")}</p>
@@ -79,7 +88,7 @@ export default async function CorreioPage() {
                   {t("hero.primary")} <span aria-hidden="true">→</span>
                 </a>
                 <a className="ms-btn ms-btn-secondary correio-action" href="/pricing">
-                  {t("hero.secondary")}
+                  {t(standaloneOpen ? "release.heroSecondary" : "hero.secondary")}
                 </a>
               </div>
               <p className="correio-note correio-hero-note">
@@ -87,7 +96,7 @@ export default async function CorreioPage() {
               </p>
               <p className="correio-status">{t(mailOpen ? "release.heroStatus" : "hero.status")}</p>
               {/* The Store copy is signed by Microsoft and updated by the Store; the direct
-                  installer stays for PCs where the Store is blocked. */}
+                  installer stays for PCs where the Store is blocked. Linux has its own page. */}
               <div className="correio-windows-links">
                 <a
                   className="correio-text-link"
@@ -102,6 +111,9 @@ export default async function CorreioPage() {
                   href={WINDOWS_INSTALLER_URL}
                 >
                   {t("plans.windowsInstaller")}
+                </a>
+                <a className="correio-text-link correio-text-link-quiet" href={LINUX_DOWNLOAD_URL}>
+                  {t("plans.linux")}
                 </a>
               </div>
             </div>

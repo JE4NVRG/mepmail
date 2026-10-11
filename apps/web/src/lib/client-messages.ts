@@ -2,6 +2,7 @@
 export const SERVER_ONLY_NAMESPACES = new Set([
   "alternatives",
   "changelog",
+  "desktop",
   "integrations",
   "legal",
   "pricing",

@@ -19,6 +19,10 @@
 //!
 //! Visible windows get one notification and the tray item instead.
 //! "Check for updates" (tray) asks in a dialog, right after the click.
+//!
+//! On Linux the AppImage replaces itself the same way. A .deb or .rpm copy
+//! installs through dpkg or rpm and the system asks for a password, so it
+//! installs only from the tray item, never on its own.
 
 use std::{
     sync::{
@@ -117,6 +121,13 @@ fn pt() -> bool {
     is_portuguese()
 }
 
+/// A package-managed Linux copy (.deb, .rpm): installing asks for the system
+/// password, so only someone at the tray starts it.
+fn asks_password() -> bool {
+    use tauri::utils::{config::BundleType, platform::bundle_type};
+    cfg!(target_os = "linux") && matches!(bundle_type(), Some(BundleType::Deb | BundleType::Rpm))
+}
+
 /// The tray item label: "Check for updates", or "Restart to update (x.y.z)"
 /// once a version is downloaded.
 pub fn tray_label(ready: Option<&str>) -> String {
@@ -145,6 +156,23 @@ fn notes_paragraph(body: Option<&str>) -> String {
 
 fn offer_text(update: &Update) -> String {
     let notes = notes_paragraph(update.body.as_deref());
+    if asks_password() {
+        return if pt() {
+            format!(
+                "A versão {} do MepMail está disponível (você tem a {}).{notes}
+
+Atualizar agora pede a senha do sistema, instala e abre o MepMail de novo. Depois: pelo ícone na bandeja, Reiniciar para atualizar.",
+                update.version, update.current_version
+            )
+        } else {
+            format!(
+                "MepMail {} is available (you have {}).{notes}
+
+Update now asks for your system password, installs and opens MepMail again. Later: tray icon, Restart to update.",
+                update.version, update.current_version
+            )
+        };
+    }
     if pt() {
         format!(
             "A versão {} do MepMail está disponível (você tem a {}).{notes}\n\nAtualizar agora fecha o MepMail e abre de novo em alguns segundos. Depois: ela instala quando você sair do MepMail.",
@@ -189,6 +217,19 @@ fn install_failed_text(error: &str) -> String {
 }
 
 fn ready_notice(version: &str) -> (String, String) {
+    if asks_password() {
+        return if pt() {
+            (
+                format!("MepMail {version} está pronto"),
+                "Para instalar: ícone na bandeja, Reiniciar para atualizar. O sistema pede sua senha.".to_string(),
+            )
+        } else {
+            (
+                format!("MepMail {version} is ready"),
+                "To install: tray icon, Restart to update. The system asks for your password.".to_string(),
+            )
+        };
+    }
     if pt() {
         (
             format!("MepMail {version} está pronto"),
@@ -275,16 +316,23 @@ fn idle_in_tray<R: Runtime>(handle: &AppHandle<R>, state: &UpdateState) -> bool 
     started_hidden && !visible && !used
 }
 
-/// Runs the installer from memory. On success this does not return: the
+/// Runs the installer from memory. On Windows success does not return: the
 /// installer replaces the app and the process exits (and, with `restart`,
 /// the installer starts the new version with this run's arguments, so an
-/// app started with `--minimized` comes back hidden).
-fn install(ready: Ready, restart: bool) -> Result<(), String> {
+/// app started with `--minimized` comes back hidden). On Linux the new
+/// AppImage or package is in place when this returns and the old version is
+/// still running: `restart` starts the new one with the same arguments.
+fn install<R: Runtime>(handle: &AppHandle<R>, ready: Ready, restart: bool) -> Result<(), String> {
     ready
         .update
         .restart_after_install(restart)
         .install(&ready.bytes)
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    if restart && cfg!(target_os = "linux") {
+        note(handle, "installed, restarting");
+        handle.restart();
+    }
+    Ok(())
 }
 
 fn mark_ready<R: Runtime>(handle: &AppHandle<R>, state: &UpdateState, version: &str) {
@@ -348,10 +396,10 @@ async fn background<R: Runtime>(handle: AppHandle<R>) {
             }
         }
     }
-    if idle_in_tray(&handle, &state) {
+    if !asks_password() && idle_in_tray(&handle, &state) {
         if let Some(ready) = state.ready.lock().ok().and_then(|mut ready| ready.take()) {
             note(&handle, "installing while idle in the tray");
-            if let Err(error) = install(ready, true) {
+            if let Err(error) = install(&handle, ready, true) {
                 note(&handle, &format!("update install failed: {error}"));
             }
             return;
@@ -371,7 +419,7 @@ async fn from_tray<R: Runtime>(handle: AppHandle<R>) {
         return;
     };
     if let Some(ready) = state.ready.lock().ok().and_then(|mut ready| ready.take()) {
-        if let Err(error) = install(ready, true) {
+        if let Err(error) = install(&handle, ready, true) {
             note(&handle, &format!("update install failed: {error}"));
             tray::set_updates_label(&handle, &tray_label(None));
             tray::set_tooltip(&handle, "MepMail");
@@ -431,7 +479,7 @@ async fn from_tray<R: Runtime>(handle: AppHandle<R>) {
     };
     let ready = Ready { update, bytes };
     if accepted {
-        if let Err(error) = install(ready, true) {
+        if let Err(error) = install(&handle, ready, true) {
             note(&handle, &format!("update install failed: {error}"));
             tell(
                 &handle,
@@ -462,12 +510,12 @@ pub fn on_exit<R: Runtime>(handle: &AppHandle<R>) {
     let Some(state) = handle.try_state::<UpdateState>() else {
         return;
     };
-    if state.busy.load(Ordering::SeqCst) {
+    if state.busy.load(Ordering::SeqCst) || asks_password() {
         return;
     }
     if let Some(ready) = state.ready.lock().ok().and_then(|mut ready| ready.take()) {
         note(handle, "installing on exit");
-        if let Err(error) = install(ready, false) {
+        if let Err(error) = install(handle, ready, false) {
             note(handle, &format!("update install on exit failed: {error}"));
         }
     }

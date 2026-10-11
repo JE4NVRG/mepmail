@@ -1,14 +1,14 @@
 {
   "meta": {
-    "title": "Correio: caixas de e-mail para agentes de IA | MepMail",
-    "description": "Dê ao seu agente de IA uma caixa de e-mail no seu domínio. Ele lê, rascunha e responde por MCP, e você aprova antes de enviar. Planos a partir de US$ 2,90 por mês (R$ 14,90 no Brasil), com 7 dias grátis."
+    "title": "Correio: e-mail no seu domínio para você e seus agentes de IA | MepMail",
+    "description": "E-mail no seu domínio sem hospedagem. Você e seu agente de IA na mesma caixa: ele lê e rascunha por MCP, e você revisa e assume quando quiser. Planos a partir de US$ 2,90 por mês (R$ 14,90 no Brasil), com 7 dias grátis."
   },
   "hero": {
-    "eyebrow": "Correio · caixas de e-mail para agentes de IA",
+    "eyebrow": "Correio · e-mail no seu domínio, para você e seus agentes",
     "status": "Prévia de lançamento · acesso fechado",
-    "title": "Um e-mail da sua empresa.",
-    "titleEnd": "Para você e seu agente.",
-    "lead": "Receba contatos, converse com clientes e dê ao seu agente um endereço próprio. Você acompanha as mensagens e decide o que ele pode fazer.",
+    "title": "Seu domínio. Seu e-mail. Seus agentes.",
+    "titleEnd": "Tudo no mesmo lugar.",
+    "lead": "Comprou um domínio? Tenha e-mail nele sem contratar hospedagem. Use no navegador ou nos apps para Windows e Linux e conecte agentes às caixas que escolher: você e seu agente na mesma caixa.",
     "primary": "Ver como funciona",
     "secondary": "Conhecer planos de Envio",
     "note": "Correio pago à parte. Acesso inicial exclusivo aos assinantes anteriores elegíveis; a nova oferta está nesta prévia.",
@@ -146,7 +146,8 @@
       "cta": "Assinar o Correio"
     },
     "windows": "Instalar o app para Windows pela Microsoft Store",
-    "windowsInstaller": "ou baixe o instalador"
+    "windowsInstaller": "ou baixe o instalador",
+    "linux": "App para Linux (.deb, .rpm, AppImage)"
   },
   "comparison": {
     "caption": "O que muda entre as duas modalidades",
@@ -266,6 +267,7 @@
   "release": {
     "heroNote": "Planos do Correio a partir de US$ 2,90 por mês (R$ 14,90 no Brasil): Solo com 1 caixa, Duo com 3 ou Equipe com 10, com 7 dias grátis. Com ou sem Envio. Contrate pelo painel.",
     "heroStatus": "Aberto a todos, com ou sem plano de Envio",
+    "heroSecondary": "Ver planos e preços",
     "setupFirstTitle": "Escolha como assinar",
     "setupFirst": "Escolha Solo (1 caixa, US$ 2,90 por mês), Duo (3, US$ 5,90) ou Equipe (10, US$ 12,90); no Brasil, R$ 14,90, R$ 29,90 ou R$ 64,90. As caixas dividem armazenamento, envios e mensagens recebidas do plano, com até 3 domínios. Não é preciso ter Envio, e os contratos existentes são preservados.",
     "restStatus": "Disponível para caixas ativadas",
@@ -300,8 +302,8 @@
   },
   "og": {
     "badge": "Novo · Correio",
-    "title": "Caixas de e-mail para seus agentes de IA",
-    "body": "Eles leem, rascunham e respondem por MCP. Você aprova antes de enviar.",
+    "title": "Seu domínio. Seu e-mail. Seus agentes.",
+    "body": "Você e seu agente de IA na mesma caixa, no seu domínio, sem hospedagem.",
     "price": "A partir de {price} por mês"
   }
 }

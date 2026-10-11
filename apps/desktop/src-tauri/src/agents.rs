@@ -110,12 +110,22 @@ pub async fn store_agent_key<R: Runtime>(
     let token = token.trim().to_string();
     valid_token(&token)?;
     let message = if is_portuguese() {
+        let vault = if cfg!(windows) {
+            "no Cofre do Windows"
+        } else {
+            "no chaveiro do sistema"
+        };
         format!(
-            "A página do Correio quer guardar uma chave de agente neste computador, no Cofre do Windows, para a caixa {mailbox_id}. Agentes configurados aqui vão usá-la para ler e escrever nessa caixa.\n\nPermitir?"
+            "A página do Correio quer guardar uma chave de agente neste computador, {vault}, para a caixa {mailbox_id}. Agentes configurados aqui vão usá-la para ler e escrever nessa caixa.\n\nPermitir?"
         )
     } else {
+        let vault = if cfg!(windows) {
+            "in the Windows credential vault"
+        } else {
+            "in the system keyring"
+        };
         format!(
-            "The Correio page wants to keep an agent key on this computer, in the Windows credential vault, for mailbox {mailbox_id}. Agents configured here will use it to read and write that mailbox.\n\nAllow?"
+            "The Correio page wants to keep an agent key on this computer, {vault}, for mailbox {mailbox_id}. Agents configured here will use it to read and write that mailbox.\n\nAllow?"
         )
     };
     if !confirm(&app, message) {
@@ -149,6 +159,14 @@ pub fn forget_agent_key(mailbox_id: String) -> Result<(), String> {
 /// update; the package's execution alias (AppxManifest.xml) is the stable
 /// name for it.
 fn bridge_command() -> Result<String, String> {
+    // An AppImage runs from a mount point that changes on every start; the
+    // .AppImage file itself (APPIMAGE) is the stable command.
+    #[cfg(target_os = "linux")]
+    if let Some(appimage) = std::env::var_os("APPIMAGE") {
+        return appimage
+            .into_string()
+            .map_err(|_| "appimage_path".to_string());
+    }
     let exe = std::env::current_exe().map_err(|error| error.to_string())?;
     let exe = exe.to_str().ok_or("exe_path".to_string())?.to_string();
     if !is_packaged_path(&exe) {
@@ -183,6 +201,30 @@ fn env_dir(name: &str) -> Result<PathBuf, String> {
     std::env::var_os(name)
         .map(PathBuf::from)
         .ok_or_else(|| format!("missing_{}", name.to_lowercase()))
+}
+
+/// The user's home folder (%USERPROFILE% on Windows, $HOME elsewhere).
+fn home_dir() -> Result<PathBuf, String> {
+    if cfg!(windows) {
+        env_dir("USERPROFILE")
+    } else {
+        env_dir("HOME")
+    }
+}
+
+/// Where desktop apps keep their settings: %APPDATA% on Windows,
+/// $XDG_CONFIG_HOME (or ~/.config) on Linux, Application Support on macOS.
+fn config_dir() -> Result<PathBuf, String> {
+    if cfg!(windows) {
+        return env_dir("APPDATA");
+    }
+    if cfg!(target_os = "macos") {
+        return Ok(home_dir()?.join("Library").join("Application Support"));
+    }
+    match std::env::var_os("XDG_CONFIG_HOME").filter(|value| !value.is_empty()) {
+        Some(dir) => Ok(PathBuf::from(dir)),
+        None => Ok(home_dir()?.join(".config")),
+    }
 }
 
 /// Merges `mcpServers[name]` into a JSON config file, creating it if needed.
@@ -290,7 +332,7 @@ pub async fn install_agent<R: Runtime>(
     }
     let detail = match target.as_str() {
         "claude-desktop" => write_json_server(
-            env_dir("APPDATA")?
+            config_dir()?
                 .join("Claude")
                 .join("claude_desktop_config.json"),
             &name,
@@ -298,7 +340,7 @@ pub async fn install_agent<R: Runtime>(
             &args,
         )?,
         "cursor" => write_json_server(
-            env_dir("USERPROFILE")?.join(".cursor").join("mcp.json"),
+            home_dir()?.join(".cursor").join("mcp.json"),
             &name,
             &command,
             &args,

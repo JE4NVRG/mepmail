@@ -1,7 +1,9 @@
 {
   "meta": {
     "title": "MepMail: Envie e-mails. Continue construindo.",
-    "description": "Notificações, recibos e campanhas por API, SMTP ou agentes de IA. Controle seus envios em um só painel. Comece grátis, sem cartão."
+    "description": "Notificações, recibos e campanhas por API, SMTP ou agentes de IA. Controle seus envios em um só painel. Comece grátis, sem cartão.",
+    "domainTitle": "MepMail: seu domínio, seu e-mail, seus agentes",
+    "domainDescription": "E-mail no seu domínio sem hospedagem, para você e seus agentes de IA na mesma caixa. Planos a partir de US$ 2,90 por mês (R$ 14,90 no Brasil), com 7 dias grátis. E envio por API, SMTP e MCP para o seu produto."
   },
   "skip": "Pular para o conteúdo",
   "brandAria": "MepMail início",
@@ -28,7 +30,8 @@
   },
   "announce": {
     "text": "Seus agentes de IA enviam e-mail com o MCP oficial do MepMail",
-    "correio": "Novo: caixas de e-mail para seus agentes de IA, com o Correio"
+    "correio": "Novo: caixas de e-mail para seus agentes de IA, com o Correio",
+    "windows": "Novo: o app do Correio para Windows e Linux"
   },
   "lang": {
     "aria": "Idioma da página"
@@ -54,6 +57,45 @@
       "caption": "Uma base URL e o SDK que você já usa envia pelo MepMail."
     },
     "launchOffer": "{volume} entregas/mês por {price} recorrentes. US$ 20 só na primeira mensalidade elegível."
+  },
+  "domainHero": {
+    "eyebrow": "E-mail no seu domínio · para você e seus agentes",
+    "title": "Seu domínio. Seu e-mail. Seus agentes. Tudo no mesmo lugar.",
+    "lead": "Comprou um domínio? Tenha e-mail nele sem contratar hospedagem. Use no dia a dia e conecte agentes às caixas que escolher.",
+    "cta": "Criar e-mail no meu domínio",
+    "secondary": "Ver como funciona",
+    "note": "Planos a partir de {price} por mês (R$ 14,90 no Brasil), com 7 dias grátis.",
+    "sendLink": "Procura a API de envio? Conheça o Envio"
+  },
+  "story": {
+    "eyebrow": "Como funciona",
+    "title": "Do domínio que você comprou à caixa com o seu agente.",
+    "lead": "Sem hospedagem de site e sem servidor de e-mail para manter. Você e seu agente usam a mesma caixa, no seu domínio.",
+    "steps": [
+      {
+        "title": "Você comprou um domínio",
+        "body": "Na Cloudflare, no Registro.br ou em qualquer registrador. Não precisa de hospedagem."
+      },
+      {
+        "title": "Liga no MepMail",
+        "body": "Adicione o domínio e publique os registros DNS que mostramos. Com um token da Cloudflare, o MepMail grava os registros para você."
+      },
+      {
+        "title": "Usa a caixa no dia a dia",
+        "body": "Leia, responda e organize suas mensagens no navegador ou nos apps para Windows e Linux, com o endereço do seu domínio."
+      },
+      {
+        "title": "Conecta o seu agente",
+        "body": "Dê ao agente uma caixa, como suporte@, e conecte Claude, Cursor ou outro agente pelo MCP. Você escolhe se ele lê, rascunha ou envia."
+      },
+      {
+        "title": "Acompanha e assume",
+        "body": "Os rascunhos e envios do agente ficam na mesma caixa que você usa. Revise, envie ou responda você mesmo a qualquer momento."
+      }
+    ]
+  },
+  "sendBridge": {
+    "eyebrow": "Envio · e-mails do seu produto"
   },
   "stack": {
     "eyebrow": "Funciona com a sua stack",

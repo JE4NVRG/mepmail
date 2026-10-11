@@ -5,6 +5,10 @@
 //! icon (1 to 9, then "9+"); the Store build uses the package's own taskbar
 //! badge, which Windows draws, and falls back to the overlay.
 
+// The taskbar overlay is a Windows feature; elsewhere the drawing helpers sit unused
+// and the tray tooltip and notices carry the count.
+#![cfg_attr(not(windows), allow(dead_code, unused_imports))]
+
 use std::time::Duration;
 
 use tauri::{image::Image, AppHandle, Manager, Runtime, WebviewWindow};
@@ -142,6 +146,10 @@ fn tooltip(unread: u32) -> String {
     }
 }
 
+#[cfg(not(windows))]
+fn set_overlay<R: Runtime>(_window: &WebviewWindow<R>, _unread: u32) {}
+
+#[cfg(windows)]
 fn set_overlay<R: Runtime>(window: &WebviewWindow<R>, unread: u32) {
     if unread == 0 {
         let _ = window.set_overlay_icon(None);

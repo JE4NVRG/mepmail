@@ -444,6 +444,34 @@ export function MailboxesView({
   const [folderEditor, setFolderEditor] = useState<FolderEditorState | null>(null);
   const [mailboxKind, setMailboxKind] = useState<MailboxKindFilter>("all");
   const [dialog, setDialog] = useState<"new" | "edit" | "receiving" | null>(null);
+  // Onboarding links here with ?new=1&domain=<id>&local=<part>: the new-mailbox
+  // dialog opens on that address once the options are in, and the link leaves
+  // the address bar so a reload does not open it again.
+  const newMailboxLink = useRef<{ domainId?: string; local?: string; pending: boolean } | null>(
+    null,
+  );
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") !== "1") return;
+    newMailboxLink.current = {
+      pending: true,
+      ...(params.get("domain") ? { domainId: params.get("domain") as string } : {}),
+      ...(params.get("local") ? { local: params.get("local") as string } : {}),
+    };
+    for (const key of ["new", "domain", "local"]) params.delete(key);
+    const query = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+    );
+  }, []);
+  useEffect(() => {
+    const link = newMailboxLink.current;
+    if (!link?.pending || !options.data || registry.data?.canManage !== true) return;
+    link.pending = false;
+    setDialog("new");
+  }, [options.data, registry.data?.canManage]);
   const [licenseOpenRequest, openLicense] = useState(0);
   const [licenseOfferId, setLicenseOfferId] = useState<string | null>(null);
   const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
@@ -1224,9 +1252,15 @@ export function MailboxesView({
       {registry.data?.canManage && dialog === "new" && options.data ? (
         <MailboxSetupDialog
           options={options.data}
-          close={() => setDialog(null)}
+          initialDomainId={newMailboxLink.current?.domainId}
+          initialLocal={newMailboxLink.current?.local}
+          close={() => {
+            newMailboxLink.current = null;
+            setDialog(null);
+          }}
           changed={changed}
           reviewLicense={(offerId) => {
+            newMailboxLink.current = null;
             setDialog(null);
             setLicenseOfferId(offerId ?? null);
             openLicense((request) => request + 1);

@@ -109,6 +109,10 @@ vi.mock("@tanstack/react-query", () => ({
   }),
   useQueryClient: () => ({ invalidateQueries: hooks.invalidateQueries }),
 }));
+// The domain-first flow above the API quickstart has its own test
+// (onboarding-domain-first.test.ts); here only the quickstart renders.
+vi.mock("@/app/onboarding/domain-first", () => ({ DomainFirst: () => null }));
+vi.mock("@/app/onboarding/onboarding-track", () => ({ useOnboardingTrack: () => () => {} }));
 vi.mock("@/components/turnstile", () => ({
   useTurnstile: () => ({ getToken: hooks.getToken, slot: null }),
 }));

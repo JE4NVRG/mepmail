@@ -8,6 +8,102 @@
     "submit": "Criar time",
     "error": "Falha ao criar o time. Tente de novo."
   },
+  "domainFirst": {
+    "title": "Vamos colocar o e-mail no seu domínio",
+    "subtitle": "Seu domínio. Seu e-mail. Seus agentes. Tudo no mesmo lugar. São 4 passos, e dá para pular qualquer um.",
+    "skip": "Pular por enquanto",
+    "help": "Precisa de ajuda? Fale com a gente",
+    "domain": {
+      "title": "Qual é o seu domínio?",
+      "body": "O e-mail funciona no domínio que você já tem; não precisa de hospedagem.",
+      "label": "Seu domínio",
+      "placeholder": "suaempresa.com.br",
+      "hint": "Só o domínio, sem www nem https.",
+      "invalid": "Isso não parece um domínio. Exemplo: suaempresa.com.br",
+      "submit": "Continuar",
+      "skipped": "Pulado por enquanto. Quando quiser, é só voltar aqui.",
+      "resume": "Adicionar meu domínio"
+    },
+    "dns": {
+      "title": "Publique os registros no DNS",
+      "body": "Alguns registros no DNS provam que o domínio é seu e fazem o e-mail sair com segurança.",
+      "locked": "Depois que você informar o domínio.",
+      "detected": "O DNS de {domain} está na {provider}.",
+      "unknown": "Não reconhecemos onde está o DNS de {domain}. Escolha abaixo ou siga o guia geral.",
+      "manual": "Prefiro adicionar à mão",
+      "where": "Onde você gerencia o DNS do domínio?",
+      "open": "Abrir {provider}",
+      "records": "Registros para adicionar",
+      "verify": "Verificar agora",
+      "verifying": "Verificando…",
+      "pending": "Ainda não encontramos todos os registros. Depois de salvar, o DNS leva de alguns minutos a uma hora para aparecer; seguimos conferindo sozinhos.",
+      "failed": "A verificação de {domain} expirou. Confira os registros e clique em Verificar agora de novo.",
+      "verified": "{domain} verificado: o e-mail já pode sair do seu domínio.",
+      "later": "Verifico depois",
+      "skipped": "Verificação adiada. Os registros continuam em Domínios."
+    },
+    "guides": {
+      "registrobr": {
+        "name": "Registro.br",
+        "steps": [
+          "Entre em registro.br e abra o domínio.",
+          "Em DNS, clique em Configurar zona DNS e use Nova entrada para cada registro.",
+          "Se o domínio usa servidores DNS de outra empresa (a hospedagem do site, por exemplo), os registros vão no painel dela."
+        ]
+      },
+      "hostinger": {
+        "name": "Hostinger",
+        "steps": [
+          "No hPanel, abra Domínios e escolha o domínio.",
+          "Entre em DNS / Nameservers.",
+          "Em Gerenciar registros DNS, escolha o tipo e copie o Nome e o Valor de cada linha abaixo."
+        ]
+      },
+      "godaddy": {
+        "name": "GoDaddy",
+        "steps": [
+          "Em Meus produtos, encontre o domínio e clique em DNS.",
+          "Clique em Adicionar novo registro.",
+          "Escolha o tipo e copie o Nome e o Valor de cada linha abaixo."
+        ]
+      },
+      "namecheap": {
+        "name": "Namecheap",
+        "steps": [
+          "Em Domain List, clique em Manage ao lado do domínio.",
+          "Abra a aba Advanced DNS e use Add New Record.",
+          "Copie o Host e o Value de cada linha abaixo. Para o registro MX, escolha Custom MX em Mail Settings."
+        ]
+      },
+      "other": {
+        "name": "Outro",
+        "steps": [
+          "Abra o painel onde o DNS do domínio é gerenciado: normalmente onde você comprou o domínio ou contratou a hospedagem.",
+          "Procure Zona DNS, Registros DNS ou Gerenciar DNS.",
+          "Adicione cada linha abaixo. Se o campo Nome já mostra o domínio ao lado, digite só a parte antes dele."
+        ]
+      }
+    },
+    "mailbox": {
+      "title": "Crie sua primeira caixa",
+      "body": "Crie um endereço no seu domínio, como {address}, e leia tudo no Correio.",
+      "locked": "Depois que o domínio estiver no DNS.",
+      "cta": "Criar {address}",
+      "done": "Você já tem caixa no Correio.",
+      "open": "Abrir o Correio",
+      "skipped": "Caixa adiada. Ela fica no Correio quando você quiser."
+    },
+    "agent": {
+      "title": "Conecte um agente (opcional)",
+      "body": "Dê a um agente de IA (Claude, Codex, Cursor e outros) acesso à caixa pelo MCP, com uma chave que você revoga quando quiser.",
+      "locked": "Depois da primeira caixa.",
+      "cta": "Conectar um agente"
+    },
+    "api": {
+      "title": "Prefere começar pela API?",
+      "body": "Envie um e-mail de teste e pegue uma chave de API. Dá para fazer agora, mesmo sem domínio."
+    }
+  },
   "title": "Envie seu primeiro e-mail",
   "subtitle": "Teste a entrega e prepare sua integração com a API.",
   "demo": {

@@ -1,6 +1,7 @@
 import { PLAN_RUNGS } from "@millionsend/core";
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
+import { Fragment } from "react";
 import { IntegrationTabs } from "@/components/integration-tabs";
 import { type CalcLabels, LandingCalculator } from "@/components/landing-calculator";
 import { LandingMotion } from "@/components/landing-motion";
@@ -19,6 +20,7 @@ import { formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricin
 import { CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
+import { titlePhrases } from "@/lib/title-phrases";
 import { AgentDemo, type AgentDemoLabels } from "./correio/agent-demo";
 import "./landing-calc.css";
 import "./landing.css";
@@ -51,17 +53,29 @@ const API_EXAMPLE = `curl https://api.mepmail.dev/emails \\
   }'`;
 
 type FaqItem = { q: string; a: string };
+type StoryStep = { title: string; body: string };
+
+/** Correio is sold on its own: the home then leads with the domain email. */
+function standaloneMailOpen(): boolean {
+  return (
+    process.env.MAILBOX_EARLY_ACCESS_OPEN === "true" &&
+    process.env.MAILBOX_STANDALONE_OPEN === "true"
+  );
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("landing");
+  const domain = standaloneMailOpen();
+  const title = t(domain ? "meta.domainTitle" : "meta.title");
+  const description = t(domain ? "meta.domainDescription" : "meta.description");
   return {
-    title: { absolute: t("meta.title") },
-    description: t("meta.description"),
+    title: { absolute: title },
+    description,
     alternates: { canonical: "/" },
     robots: { index: true, follow: true },
     openGraph: {
-      title: t("meta.title"),
-      description: t("meta.description"),
+      title,
+      description,
       type: "website",
       images: [{ url: "/og.jpg", width: 1280, height: 640, alt: "MepMail" }],
     },
@@ -76,7 +90,7 @@ export default async function RootPage() {
   // The Correio section and announcement follow the same switch as /correio.
   const mailOpen = process.env.MAILBOX_EARLY_ACCESS_OPEN === "true";
   // Open to every team, Correio starts at its smallest plan; otherwise at the add-on.
-  const standaloneOpen = mailOpen && process.env.MAILBOX_STANDALONE_OPEN === "true";
+  const standaloneOpen = standaloneMailOpen();
   const mailFrom = formatUsd(
     (standaloneOpen
       ? CORREIO_FROM_CENTS
@@ -122,6 +136,23 @@ export default async function RootPage() {
   const calc = t.raw("calc") as CalcLabels;
   const mcpPoints = t.raw("mcp.points") as string[];
   const correioPoints = t.raw("correio.points") as string[];
+  const story = t.raw("story.steps") as StoryStep[];
+  const sendOffer = proOffer && (
+    <p className="cro-offer">
+      {t(launchOfferEnabled ? "hero.launchOffer" : "hero.offer", {
+        volume: new Intl.NumberFormat(locale).format(proOffer.included),
+        price: formatUsd(
+          (launchOfferEnabled ? LAUNCH_OFFER.sending.monthlyCents : proOffer.priceCents) / 100,
+          locale,
+        ),
+      })}
+      {/* A no-break space keeps the arrow on the sentence's last line. */}
+      {"\u00a0"}
+      <a href="#planos" aria-label={t("nav.plans")}>
+        ↗
+      </a>
+    </p>
+  );
 
   return (
     <div className="gtm cro">
@@ -133,54 +164,135 @@ export default async function RootPage() {
         banner={
           <a className="gtm-announce" href={mailOpen ? "/correio" : "#mcp"}>
             <span className="gtm-announce-dot" aria-hidden="true" />
-            <span>{t(mailOpen ? "announce.correio" : "announce.text")}</span>
+            <span>
+              {t(
+                standaloneOpen
+                  ? "announce.windows"
+                  : mailOpen
+                    ? "announce.correio"
+                    : "announce.text",
+              )}
+            </span>
             <span aria-hidden="true">→</span>
           </a>
         }
       />
       <main id="conteudo">
-        <section className="gtm-section gtm-hero">
-          <div className="gtm-container gtm-hero-grid">
-            <div className="gtm-hero-copy">
-              <p className="gtm-eyebrow">{t("hero.eyebrow")}</p>
-              <h1>{t("hero.title")}</h1>
-              <p className="gtm-lead">{t("hero.lead")}</p>
-              <div className="gtm-actions">
-                <SignupLink label={t("hero.ctaSignup")} />
-                <a className="ms-btn ms-btn-secondary gtm-action" href="#product">
-                  {t("hero.ctaPlans")}
-                </a>
+        {standaloneOpen ? (
+          <>
+            <section className="gtm-section gtm-hero cro-domain-hero">
+              <div className="gtm-container gtm-hero-grid">
+                <div className="gtm-hero-copy">
+                  <p className="gtm-eyebrow">{t("domainHero.eyebrow")}</p>
+                  <h1>
+                    {titlePhrases(t("domainHero.title")).map((phrase, index, all) => (
+                      <Fragment key={phrase}>
+                        {index > 0 ? " " : null}
+                        <span
+                          className={
+                            index === all.length - 1 ? "cro-phrase cro-phrase-end" : "cro-phrase"
+                          }
+                        >
+                          {phrase}
+                        </span>
+                      </Fragment>
+                    ))}
+                  </h1>
+                  <p className="gtm-lead">{t("domainHero.lead")}</p>
+                  <div className="gtm-actions">
+                    <SignupLink label={t("domainHero.cta")} />
+                    <a className="ms-btn ms-btn-secondary gtm-action" href="#correio">
+                      {t("domainHero.secondary")}
+                    </a>
+                  </div>
+                  <p className="gtm-note">{t("domainHero.note", { price: mailFrom })}</p>
+                  <p className="cro-domain-send">
+                    <a href="#envio">
+                      {t("domainHero.sendLink")} <span aria-hidden="true">↓</span>
+                    </a>
+                  </p>
+                </div>
+                <AgentDemo labels={mail.raw("demo") as AgentDemoLabels} compact />
               </div>
-              <p className="gtm-note">{t("hero.note")}</p>
-              {proOffer && (
-                <p className="cro-offer">
-                  {t(launchOfferEnabled ? "hero.launchOffer" : "hero.offer", {
-                    volume: new Intl.NumberFormat(locale).format(proOffer.included),
-                    price: formatUsd(
-                      (launchOfferEnabled
-                        ? LAUNCH_OFFER.sending.monthlyCents
-                        : proOffer.priceCents) / 100,
-                      locale,
-                    ),
-                  })}
-                  {/* A no-break space keeps the arrow on the sentence's last line. */}
-                  {"\u00a0"}
-                  <a href="#planos" aria-label={t("nav.plans")}>
-                    ↗
+            </section>
+
+            <section
+              className="gtm-section gtm-alt cro-story"
+              id="correio"
+              aria-labelledby="home-story-title"
+            >
+              <div className="gtm-container">
+                <p className="gtm-eyebrow">{t("story.eyebrow")}</p>
+                <h2 id="home-story-title">{t("story.title")}</h2>
+                <p className="cro-story-lead">{t("story.lead")}</p>
+                <ol className="cro-story-steps">
+                  {story.map((step, index) => (
+                    <li key={step.title}>
+                      <span className="cro-story-number" aria-hidden="true">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <h3>{step.title}</h3>
+                      <p>{step.body}</p>
+                    </li>
+                  ))}
+                </ol>
+                <p className="cro-correio-price">{t("correio.price", { price: mailFrom })}</p>
+                <div className="gtm-actions">
+                  <SignupLink label={t("domainHero.cta")} />
+                  <a className="ms-btn ms-btn-secondary gtm-action" href="/correio">
+                    {t("correio.cta")} <span aria-hidden="true">→</span>
                   </a>
-                </p>
-              )}
-            </div>
-            <figure className="cro-hero-proof">
-              <div className="cro-proof-label">
-                <span aria-hidden="true" />
-                MepMail / templates
+                  <a className="ms-btn ms-btn-secondary gtm-action" href="/pricing#correio">
+                    {t("correio.pricing")}
+                  </a>
+                </div>
               </div>
-              <PublicStarterGallery compact />
-              <figcaption>{t("productProof.caption")}</figcaption>
-            </figure>
-          </div>
-        </section>
+            </section>
+
+            {/* Send keeps its own pitch, right under the Correio story. */}
+            <section className="gtm-section cro-send-bridge" id="envio">
+              <div className="gtm-container">
+                <p className="gtm-eyebrow">{t("sendBridge.eyebrow")}</p>
+                <h2>{t("hero.title")}</h2>
+                <p className="gtm-lead">{t("hero.lead")}</p>
+                <div className="gtm-actions">
+                  <SignupLink label={t("hero.ctaSignup")} />
+                  <a className="ms-btn ms-btn-secondary gtm-action" href="#product">
+                    {t("hero.ctaPlans")}
+                  </a>
+                </div>
+                <p className="gtm-note">{t("hero.note")}</p>
+                {sendOffer}
+              </div>
+            </section>
+          </>
+        ) : (
+          <section className="gtm-section gtm-hero">
+            <div className="gtm-container gtm-hero-grid">
+              <div className="gtm-hero-copy">
+                <p className="gtm-eyebrow">{t("hero.eyebrow")}</p>
+                <h1>{t("hero.title")}</h1>
+                <p className="gtm-lead">{t("hero.lead")}</p>
+                <div className="gtm-actions">
+                  <SignupLink label={t("hero.ctaSignup")} />
+                  <a className="ms-btn ms-btn-secondary gtm-action" href="#product">
+                    {t("hero.ctaPlans")}
+                  </a>
+                </div>
+                <p className="gtm-note">{t("hero.note")}</p>
+                {sendOffer}
+              </div>
+              <figure className="cro-hero-proof">
+                <div className="cro-proof-label">
+                  <span aria-hidden="true" />
+                  MepMail / templates
+                </div>
+                <PublicStarterGallery compact />
+                <figcaption>{t("productProof.caption")}</figcaption>
+              </figure>
+            </div>
+          </section>
+        )}
 
         <section className="gtm-stack" aria-label={t("stack.aria")}>
           <div className="gtm-container gtm-stack-inner">
@@ -298,7 +410,7 @@ export default async function RootPage() {
           </div>
         </section>
 
-        {mailOpen ? (
+        {mailOpen && !standaloneOpen ? (
           <section
             className="gtm-section cro-correio"
             id="correio"

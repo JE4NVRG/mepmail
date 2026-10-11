@@ -1190,7 +1190,10 @@ function sentOutboxRows(items: typeof schema.mailboxItems, outbox: typeof schema
   return sql`select 1 from ${outbox} where ${outbox.draftId} = ${items.id} and ${outbox.mailboxId} = ${items.mailboxId} and ${outbox.teamId} = ${items.teamId}`;
 }
 
-/** Optimistic revision prevents a stale editor from overwriting another saved draft. No send. */
+/**
+ * Optimistic revision prevents a stale editor from overwriting another saved draft. No send.
+ * A draft already submitted stays as sent: a new revision of it would be a second send.
+ */
 export async function saveMailboxDraft(
   db: Db,
   keyring: Keyring,
@@ -1218,7 +1221,9 @@ export async function saveMailboxDraft(
           eq(schema.mailboxItems.mailboxId, input.mailboxId),
           eq(schema.mailboxItems.teamId, actor.teamId),
         ),
-      );
+      )
+      // The send admission locks this row too: a save and a send of it never interleave.
+      .for("update");
     if (input.id && !previous) throw new MailboxContentError("not_found");
     if (
       previous &&
@@ -1227,6 +1232,23 @@ export async function saveMailboxDraft(
         previous.trashedAt !== null)
     )
       throw new MailboxContentError("conflict");
+    if (previous) {
+      // Queued, sending, unknown or accepted: another tab or an agent rewriting it
+      // would open a second send. A refused (failed) send can be corrected and sent.
+      const [submitted] = await tx
+        .select({ id: schema.mailboxOutbox.id })
+        .from(schema.mailboxOutbox)
+        .where(
+          and(
+            eq(schema.mailboxOutbox.teamId, actor.teamId),
+            eq(schema.mailboxOutbox.mailboxId, input.mailboxId),
+            eq(schema.mailboxOutbox.draftId, previous.id),
+            ne(schema.mailboxOutbox.status, "failed"),
+          ),
+        )
+        .limit(1);
+      if (submitted) throw new MailboxContentError("conflict");
+    }
     const plan = await lockMailboxService(tx, actor.teamId);
     await assertMailboxStorage(
       tx,

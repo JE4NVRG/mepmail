@@ -38,10 +38,14 @@ fn open<R: Runtime>(handle: &AppHandle<R>, url: &Url) {
 }
 
 pub fn install<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
-    // The installer registers the scheme; a debug build registers it itself.
-    #[cfg(debug_assertions)]
-    if let Err(error) = app.deep_link().register_all() {
-        eprintln!("mepmail-correio: deep link registration: {error}");
+    // The installer registers the scheme (on Linux the .deb/.rpm menu entry
+    // declares it); a debug build registers it itself, and so does an
+    // AppImage, which has no installer.
+    #[cfg(any(debug_assertions, target_os = "linux"))]
+    if cfg!(debug_assertions) || std::env::var_os("APPIMAGE").is_some() {
+        if let Err(error) = app.deep_link().register_all() {
+            eprintln!("mepmail-correio: deep link registration: {error}");
+        }
     }
     let handle = app.handle().clone();
     app.deep_link().on_open_url(move |event| {

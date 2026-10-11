@@ -30,12 +30,17 @@ export function MailboxSetupDialog({
   changed,
   reviewLicense,
   existingMailbox,
+  initialDomainId,
+  initialLocal,
 }: {
   options: Options;
   close: () => void;
   changed: (id: string) => Promise<void>;
   reviewLicense: (offerId?: string) => void;
   existingMailbox?: { id: string; address: string; domainId: string; kind: "person" | "agent" };
+  /** A new mailbox suggested elsewhere (onboarding): the domain and local part to start from. */
+  initialDomainId?: string | undefined;
+  initialLocal?: string | undefined;
 }) {
   const t = useTranslations("mailboxes.setup");
   const mailboxT = useTranslations("mailboxes");
@@ -55,11 +60,12 @@ export function MailboxSetupDialog({
   const [step, setStep] = useState(0);
   const [domainId, setDomainId] = useState(
     existingMailbox?.domainId ??
+      options.domains.find((domain) => domain.id === initialDomainId)?.id ??
       options.domains.find((domain) => domain.status === "verified")?.id ??
       options.domains[0]?.id ??
       "",
   );
-  const [local, setLocal] = useState("");
+  const [local, setLocal] = useState(initialLocal ?? "");
   const [label, setLabel] = useState("");
   const [kind, setKind] = useState<"person" | "agent">(existingMailbox?.kind ?? "person");
   const [ownerId, setOwnerId] = useState(options.currentUserId);

@@ -1,14 +1,14 @@
 {
   "meta": {
-    "title": "Mail: email inboxes for AI agents | MepMail",
-    "description": "Give your AI agent an email inbox on your domain. It reads, drafts and replies over MCP, and you approve before it sends. Plans from US$ 2.90 a month, with 7 days free."
+    "title": "Mail: email on your domain for you and your AI agents | MepMail",
+    "description": "Email on your domain, no hosting. You and your AI agent in the same mailbox: it reads and drafts over MCP, and you review and take over whenever you want. Plans from US$ 2.90 a month, with 7 days free."
   },
   "hero": {
-    "eyebrow": "MepMail Mail · email inboxes for AI agents",
+    "eyebrow": "MepMail Mail · email on your domain, for you and your agents",
     "status": "Launch preview · closed access",
-    "title": "An email from your company.",
-    "titleEnd": "For you and your agent.",
-    "lead": "Receive inquiries, talk to customers and give your agent its own address. Follow the messages and decide what it can do.",
+    "title": "Your domain. Your email. Your agents.",
+    "titleEnd": "All in one place.",
+    "lead": "Bought a domain? Get email on it without paying for hosting. Use it in the browser or the Windows and Linux apps, and connect agents to the mailboxes you choose: you and your agent in the same mailbox.",
     "primary": "See how it works",
     "secondary": "Explore Send plans",
     "note": "Mail is paid separately. Initial access is exclusive to eligible earlier subscribers; this preview presents the new offer.",
@@ -146,7 +146,8 @@
       "cta": "Subscribe to Mail"
     },
     "windows": "Get the Windows app on the Microsoft Store",
-    "windowsInstaller": "or download the installer"
+    "windowsInstaller": "or download the installer",
+    "linux": "Linux app (.deb, .rpm, AppImage)"
   },
   "comparison": {
     "caption": "What changes between the two options",
@@ -266,6 +267,7 @@
   "release": {
     "heroNote": "Mail plans from US$ 2.90 a month: Solo with 1 mailbox, Duo with 3 or Equipe with 10, with 7 days free. With or without Send. Subscribe from the dashboard.",
     "heroStatus": "Open to everyone, with or without a Send plan",
+    "heroSecondary": "See plans and prices",
     "setupFirstTitle": "Choose how to subscribe",
     "setupFirst": "Choose Solo (1 mailbox, US$ 2.90 a month), Duo (3, US$ 5.90) or Equipe (10, US$ 12.90); in Brazil, R$ 14.90, R$ 29.90 or R$ 64.90. The mailboxes share the plan's storage, sends and received messages, with up to 3 domains. Send is not needed, and existing contracts are preserved.",
     "restStatus": "Available for activated mailboxes",
@@ -300,8 +302,8 @@
   },
   "og": {
     "badge": "New · Mail",
-    "title": "Email inboxes for your AI agents",
-    "body": "They read, draft and reply over MCP. You approve before anything is sent.",
+    "title": "Your domain. Your email. Your agents.",
+    "body": "You and your AI agent in the same mailbox, on your domain, without hosting.",
     "price": "From {price} a month"
   }
 }

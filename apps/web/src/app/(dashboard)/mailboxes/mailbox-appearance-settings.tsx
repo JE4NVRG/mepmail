@@ -6,7 +6,12 @@ import { type ReactNode, useEffect, useId, useState } from "react";
 import { Select } from "@/components/select";
 import { Switch } from "@/components/switch";
 import { isDesktop } from "@/lib/desktop-bridge";
-import { WINDOWS_STORE_URL } from "@/lib/desktop-download";
+import {
+  type DesktopAppPlatform,
+  desktopAppFor,
+  LINUX_DOWNLOAD_URL,
+  WINDOWS_STORE_URL,
+} from "@/lib/desktop-download";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { noticesWanted, writeNoticePreference } from "@/lib/mailbox-notifications";
 import type { CorreioPrefs } from "@/lib/mailbox-preferences";
@@ -20,11 +25,6 @@ import styles from "./mailboxes.module.css";
 const START_FOLDERS = ["inbox", "favorites", "drafts", "sent", "archive", "trash"] as const;
 
 type GuideTab = "boxes" | "agents" | "migration";
-
-/** The desktop app is Windows-only for now: offer it in a Windows browser. */
-function offersWindowsApp() {
-  return !isDesktop() && typeof navigator !== "undefined" && /Windows/.test(navigator.userAgent);
-}
 
 type NoticeState = "on" | "off" | "blocked" | "unsupported";
 
@@ -65,10 +65,10 @@ export function MailboxAppearanceSettings({
   const id = useId();
   const desktop = isDesktop();
   const [notices, setNotices] = useState<NoticeState>("off");
-  const [windowsApp, setWindowsApp] = useState(false);
+  const [desktopApp, setDesktopApp] = useState<DesktopAppPlatform | null>(null);
   useEffect(() => {
     setNotices(readNoticeState());
-    setWindowsApp(offersWindowsApp());
+    setDesktopApp(desktopAppFor(navigator.userAgent, isDesktop()));
   }, []);
 
   // Quick replies are edited line by line and saved when a line loses focus.
@@ -145,12 +145,17 @@ export function MailboxAppearanceSettings({
     { key: "mailbox", label: t("guideMailbox"), run: () => openTab("boxes") },
     { key: "migrate", label: t("guideMigrate"), run: () => openTab("migration") },
     { key: "agent", label: t("guideAgent"), run: () => openTab("agents") },
-    ...(windowsApp
+    ...(desktopApp
       ? [
           {
-            key: "windows",
-            label: t("guideWindows"),
-            run: () => window.open(WINDOWS_STORE_URL, "_blank", "noopener,noreferrer"),
+            key: desktopApp,
+            label: t(desktopApp === "windows" ? "guideWindows" : "guideLinux"),
+            run: () =>
+              window.open(
+                desktopApp === "windows" ? WINDOWS_STORE_URL : LINUX_DOWNLOAD_URL,
+                "_blank",
+                "noopener,noreferrer",
+              ),
           },
         ]
       : []),

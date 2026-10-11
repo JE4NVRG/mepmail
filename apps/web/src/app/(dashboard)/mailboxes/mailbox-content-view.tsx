@@ -74,6 +74,7 @@ import {
   holdSend,
   setHeldSendHandlers,
   subscribeHeldSend,
+  takeInterruptedSend,
   undoHeldSend,
 } from "@/lib/mailbox-undo-send";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
@@ -109,6 +110,23 @@ function replyAllCopies(source: Item, own: string, to: string[]) {
 }
 /** "waiting": Send was pressed and the undo-send wait has not ended yet. */
 type SendState = "waiting" | "requesting" | Outputs["queueDraft"]["status"];
+
+/** The notice for a send this page started, by its state. */
+function sendStateMessage(state: SendState) {
+  return state === "waiting"
+    ? "undoSend.waitingDraft"
+    : state === "requesting"
+      ? "sending"
+      : state === "unknown"
+        ? "sendUnknown"
+        : state === "failed"
+          ? "sendFailed"
+          : state === "accepted"
+            ? "sendAccepted"
+            : state === "sending"
+              ? "sendProcessing"
+              : "sendQueued";
+}
 /** Largest attachment the composer sends (server: mailbox-content MAX_ATTACHMENT). */
 const SEND_ATTACHMENT_BYTES = 256 * 1024;
 /** The server render never has a send waiting. */
@@ -980,6 +998,7 @@ export function MailboxContentView({
   const sending = useRef<string | null>(null);
   const attempted = useRef(new Set<string>());
   const [sendStates, setSendStates] = useState<Record<string, SendState>>({});
+  const [checkingSend, setCheckingSend] = useState(false);
   // Desfazer envio: Send waits the preferred seconds before the message
   // reaches the server, with "Desfazer" in a toast and on the open draft. The
   // waiting send lives in mailbox-undo-send, so it survives this view
@@ -2300,7 +2319,10 @@ export function MailboxContentView({
   /** After "Desfazer": nothing was sent; the draft opens again to be changed. */
   function afterUndoSend(send: HeldSend) {
     toast(t("undoSend.cancelled"), "info");
-    const { mailboxId, id } = send.revision;
+    openDraftAgain(send.revision.mailboxId, send.revision.id);
+  }
+  /** Rascunhos, that draft selected, and its composer open again. */
+  function openDraftAgain(mailboxId: string, id: string) {
     if (!(folder === "drafts" && selection?.mailboxId === mailboxId && selection.id === id)) {
       changeFolder("drafts");
       select({ mailboxId, id });
@@ -2315,15 +2337,51 @@ export function MailboxContentView({
         // The draft stays in Rascunhos; opening it is one click away.
       });
   }
+  /**
+   * A page that closed during the undo wait sent nothing: said once on the
+   * next visit, with the draft one click away. Silent when another tab sent
+   * that draft meanwhile, or when it is gone.
+   */
+  function reportInterruptedSend() {
+    const interrupted = takeInterruptedSend();
+    if (!interrupted) return;
+    const { mailboxId, id } = interrupted.revision;
+    void queries
+      .fetchQuery(trpc.mailboxes.item.queryOptions({ mailboxId, id }, { staleTime: 0 }))
+      .then((draft) => {
+        if (!mounted.current || draft.kind !== "draft" || draft.sendStatus) return;
+        toast(t("undoSend.interrupted", { subject: draft.subject || t("noSubject") }), "info", {
+          action: {
+            label: t("undoSend.openDraft"),
+            run: () => sendActions.current.openDraft(mailboxId, id),
+          },
+          durationMs: 20_000,
+        });
+      })
+      .catch(() => {
+        // The draft itself is safe in Rascunhos; only the notice is skipped.
+      });
+  }
   // The view that mounted last delivers and answers "Desfazer", through this
   // ref so the timer and the toast always reach its latest render.
-  const sendActions = useRef({ deliver: deliverHeld, undone: afterUndoSend });
-  sendActions.current = { deliver: deliverHeld, undone: afterUndoSend };
+  const sendActions = useRef({
+    deliver: deliverHeld,
+    undone: afterUndoSend,
+    openDraft: openDraftAgain,
+    reportInterrupted: reportInterruptedSend,
+  });
+  sendActions.current = {
+    deliver: deliverHeld,
+    undone: afterUndoSend,
+    openDraft: openDraftAgain,
+    reportInterrupted: reportInterruptedSend,
+  };
   useEffect(() => {
     setHeldSendHandlers({
       deliver: (revision) => sendActions.current.deliver(revision),
       undone: (send) => sendActions.current.undone(send),
     });
+    sendActions.current.reportInterrupted();
   }, []);
   // While a send waits: leaving the page asks first, and the open draft counts down.
   const heldKey = held?.key;
@@ -2337,6 +2395,49 @@ export function MailboxContentView({
       clearInterval(tick);
     };
   }, [heldKey]);
+  /**
+   * What the server has for a send this page could not confirm. A state stored
+   * for the revision means the server registered the send, and that state
+   * shows. A draft at that revision with no state means nothing reached the
+   * server: Enviar is free again (a repeat of the same revision gets the same
+   * outbox anyway). Unreadable: the send stays "not confirmed".
+   */
+  async function reconcileSend(revision: HeldRevision, key: string) {
+    const fresh = await queries
+      .fetchQuery(
+        trpc.mailboxes.item.queryOptions(
+          { mailboxId: revision.mailboxId, id: revision.id },
+          { staleTime: 0 },
+        ),
+      )
+      .catch(() => null);
+    if (!mounted.current) return;
+    const stored = fresh?.sendStatus;
+    if (stored) {
+      setSendStates((states) => ({ ...states, [key]: stored }));
+      setNotice(t(sendStateMessage(stored)));
+      return;
+    }
+    if (fresh?.kind === "draft" && fresh.revision === revision.expectedRevision) {
+      attempted.current.delete(key);
+      setSendStates(({ [key]: _unsent, ...rest }) => rest);
+      setNotice(t("sendNotReached"));
+      return;
+    }
+    setSendStates((states) => ({ ...states, [key]: "unknown" }));
+    setNotice(t("sendUnknown"));
+  }
+  /** "Verificar estado" on a send not confirmed yet: reads it again, never sends. */
+  async function checkSend(revision: HeldRevision) {
+    if (checkingSend) return;
+    setCheckingSend(true);
+    try {
+      await reconcileSend(revision, heldSendKey(revision));
+      void refresh();
+    } finally {
+      if (mounted.current) setCheckingSend(false);
+    }
+  }
   /** One send of one exact saved revision, now. */
   async function deliverRevision(revision: {
     mailboxId: string;
@@ -2353,19 +2454,7 @@ export function MailboxContentView({
       const result = await sendMutation.mutateAsync(revision);
       if (!mounted.current) return;
       setSendStates((states) => ({ ...states, [key]: result.status }));
-      setNotice(
-        t(
-          result.status === "unknown"
-            ? "sendUnknown"
-            : result.status === "failed"
-              ? "sendFailed"
-              : result.status === "accepted"
-                ? "sendAccepted"
-                : result.status === "sending"
-                  ? "sendProcessing"
-                  : "sendQueued",
-        ),
-      );
+      setNotice(t(sendStateMessage(result.status)));
     } catch (cause) {
       const code = (cause as { data?: { code?: string } })?.data?.code;
       // The plan's limit for this period (recipients, bytes sent or storage):
@@ -2395,10 +2484,14 @@ export function MailboxContentView({
         return;
       }
       if (!mounted.current) return;
-      setSendStates((states) => ({ ...states, [key]: "unknown" }));
-      setNotice(t(code === "FORBIDDEN" ? "accessLost" : "sendUnknown"));
-      if (code === "FORBIDDEN")
+      if (code === "FORBIDDEN") {
+        setSendStates((states) => ({ ...states, [key]: "unknown" }));
+        setNotice(t("accessLost"));
         void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
+        return;
+      }
+      // No answer (the network dropped, a timeout): ask the server what it has.
+      await reconcileSend(revision, key);
     } finally {
       sending.current = null;
       if (mounted.current) void refresh();
@@ -3740,20 +3833,27 @@ export function MailboxContentView({
                       </button>
                     </p>
                   ) : item.kind === "draft" && sendState ? (
-                    <p className={styles.contentNotice} role="status">
-                      {t(
-                        sendState === "requesting"
-                          ? "sending"
-                          : sendState === "unknown"
-                            ? "sendUnknown"
-                            : sendState === "failed"
-                              ? "sendFailed"
-                              : sendState === "accepted"
-                                ? "sendAccepted"
-                                : sendState === "sending"
-                                  ? "sendProcessing"
-                                  : "sendQueued",
-                      )}
+                    <p className={styles.contentNotice}>
+                      <span role="status">{t(sendStateMessage(sendState))}</span>
+                      {sendState === "unknown" ? (
+                        <>
+                          {" "}
+                          <button
+                            type="button"
+                            className={`ms-btn ms-btn-ghost ${styles.undoAction}`}
+                            disabled={checkingSend}
+                            onClick={() =>
+                              void checkSend({
+                                mailboxId: item.mailboxId,
+                                id: item.id,
+                                expectedRevision: item.revision,
+                              })
+                            }
+                          >
+                            {t(checkingSend ? "checkingSendStatus" : "checkSendStatus")}
+                          </button>
+                        </>
+                      ) : null}
                     </p>
                   ) : null}
                   {item.kind === "sent" || (item.kind === "draft" && item.outboundSummary) ? (

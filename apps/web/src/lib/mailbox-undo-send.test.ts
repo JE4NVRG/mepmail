@@ -5,6 +5,7 @@ import {
   releaseHeldSend,
   setHeldSendHandlers,
   subscribeHeldSend,
+  takeInterruptedSend,
   undoHeldSend,
 } from "./mailbox-undo-send";
 
@@ -69,5 +70,56 @@ describe("undo send", () => {
     vi.advanceTimersByTime(10_000);
     expect(later).toHaveBeenCalledExactlyOnceWith(draft("a"));
     expect(deliver).not.toHaveBeenCalled();
+  });
+});
+
+describe("a page closed during the wait", () => {
+  const store = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => void store.set(key, value),
+    removeItem: (key: string) => void store.delete(key),
+  };
+  beforeEach(() => {
+    vi.useFakeTimers();
+    store.clear();
+    vi.stubGlobal("window", { sessionStorage: storage, localStorage: storage });
+    setHeldSendHandlers({ deliver: vi.fn(), undone: vi.fn() });
+  });
+  afterEach(() => {
+    undoHeldSend();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("is reported once on the next visit, not while the send still waits in this page", () => {
+    const send = holdSend(draft("a"), 10_000, 1_000);
+    // A remount of the inbox during the wait: the send is still here.
+    expect(takeInterruptedSend(2_000)).toBeNull();
+    expect(store.get("mepmail.correio.heldSend")).toBe(JSON.stringify(send));
+    // A reload drops this page's state (here: the undo) but not the stored marker.
+    undoHeldSend();
+    store.set("mepmail.correio.heldSend", JSON.stringify(send));
+    expect(takeInterruptedSend(5_000)).toEqual(send);
+    expect(takeInterruptedSend(5_000)).toBeNull();
+  });
+
+  it("leaves nothing to report once the send went or was undone", () => {
+    holdSend(draft("a"), 10_000);
+    vi.advanceTimersByTime(10_000);
+    expect(takeInterruptedSend()).toBeNull();
+    holdSend(draft("b"), 10_000);
+    undoHeldSend();
+    expect(takeInterruptedSend()).toBeNull();
+  });
+
+  it("ignores a leftover from the day before and a broken marker", () => {
+    store.set(
+      "mepmail.correio.heldSend",
+      JSON.stringify({ key: "box:a:1", revision: draft("a"), deadline: 0 }),
+    );
+    expect(takeInterruptedSend(25 * 60 * 60 * 1000)).toBeNull();
+    store.set("mepmail.correio.heldSend", "{");
+    expect(takeInterruptedSend()).toBeNull();
   });
 });

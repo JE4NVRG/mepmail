@@ -47,7 +47,7 @@ vi.mock("@/components/public-starter-gallery", () => ({ PublicStarterGallery: ()
 vi.mock("@/components/stack-logos", () => ({ StackLogoRow: () => null }));
 vi.mock("@/components/code-demo", () => ({ CodeDemo: () => null }));
 
-const { default: Home } = await import("../src/app/page");
+const { default: Home, generateMetadata: homeMetadata } = await import("../src/app/page");
 const { default: Pricing, generateMetadata: pricingMetadata } = await import(
   "../src/app/pricing/page"
 );
@@ -134,6 +134,47 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(page).toContain(pricing.title);
       expect(page).toContain(small);
       expect(page).toContain(large);
+    });
+
+    it("leads the home with the domain email, its five steps, then Send, while Mail sells on its own", async () => {
+      current.locale = locale;
+      const copy = messages(locale).landing;
+      vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
+      vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");
+      const home = await render(Home);
+      const headings = home.match(/<h1[\s>][\s\S]*?<\/h1>/g) ?? [];
+      expect(headings).toHaveLength(1);
+      // The title renders as whole sentences, with a non-breaking hyphen in "e-mail".
+      const title = (headings[0] ?? "").replace(/<[^>]+>/g, "");
+      expect(title).not.toMatch(/\p{L}-\p{L}/u);
+      expect(title.replace(/‑/g, "-")).toBe(copy.domainHero.title);
+      expect(home).toContain(locale === "en" ? "US$ 2.90" : "US$ 2,90");
+      expect(home).toContain(messages(locale).correio.demo.awaiting);
+      // The five steps, in order, between the story's anchor and Send's.
+      const story = home.slice(home.indexOf('id="correio"'), home.indexOf('id="envio"'));
+      expect(story.match(/<li[\s>]/g)).toHaveLength(5);
+      const positions = copy.story.steps.map((step) => story.indexOf(step.title));
+      expect(positions.every((at) => at > 0)).toBe(true);
+      expect(positions).toEqual([...positions].sort((a, b) => a - b));
+      expect(story).toContain('href="/correio"');
+      expect(story).toContain('href="/pricing#correio"');
+      // Send keeps its own pitch and every section after the story.
+      expect(home).toContain('href="#envio"');
+      expect(home.indexOf('id="envio"')).toBeLessThan(home.indexOf('id="product"'));
+      expect(home).toContain(copy.hero.title);
+      expect(home).toContain(copy.hero.note);
+      for (const id of ["product", "mcp", "planos", "comparativo", "como-funciona"])
+        expect(home).toContain(`id="${id}"`);
+      // The story takes the add-on card's place: one #correio, no card title.
+      expect(home.match(/id="correio"/g)).toHaveLength(1);
+      expect(home).not.toContain(copy.correio.title);
+      expect((await homeMetadata()).title).toEqual({ absolute: copy.meta.domainTitle });
+
+      vi.stubEnv("MAILBOX_STANDALONE_OPEN", "false");
+      const earlier = await render(Home);
+      expect(earlier).not.toContain(copy.domainHero.title);
+      expect(earlier).not.toContain('id="envio"');
+      expect((await homeMetadata()).title).toEqual({ absolute: copy.meta.title });
     });
 
     it("holds Mail presentation closed by default, independent of registry availability", async () => {

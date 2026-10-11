@@ -1,0 +1,244 @@
+/* The domain-first onboarding: four numbered steps, the active one open,
+   finished ones checked, later ones dimmed until their turn. */
+.flow {
+  display: grid;
+  gap: 20px;
+}
+.intro h1 {
+  margin: 0;
+  font-size: var(--ms-fs-h1);
+}
+.intro p {
+  margin: 6px 0 0;
+  max-width: 680px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ms-muted);
+}
+.steps {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.step {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.marker {
+  flex: none;
+  width: 30px;
+  padding-top: 22px;
+  text-align: center;
+  font-family: var(--ms-font-mono);
+  font-size: 11px;
+  color: var(--ms-bone);
+}
+.step[data-state="done"] .marker {
+  color: var(--ms-success);
+  font-size: 14px;
+}
+.step[data-state="locked"] .marker,
+.step[data-state="skipped"] .marker {
+  color: var(--ms-faint);
+}
+.card {
+  flex: 1;
+  min-width: 0;
+  padding: 20px 22px;
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-card);
+}
+.step[data-state="active"] .card {
+  border-color: var(--ms-line-strong);
+}
+.step[data-state="locked"] .card {
+  opacity: 0.55;
+  padding-block: 14px;
+}
+.card h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ms-bone);
+}
+.step[data-state="locked"] .card h2,
+.step[data-state="skipped"] .card h2 {
+  font-size: 15px;
+}
+.body {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ms-muted);
+}
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 0;
+  font-size: 13.5px;
+  color: var(--ms-bone);
+  overflow-wrap: anywhere;
+}
+.domainForm {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+  max-width: 560px;
+}
+.domainForm label {
+  font-size: var(--ms-fs-label);
+  color: var(--ms-muted);
+}
+.inputRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.inputRow input {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.hint,
+.error,
+.detected,
+.status {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ms-muted);
+}
+.error {
+  color: var(--ms-danger);
+}
+.detected {
+  margin-top: 14px;
+  font-size: 13.5px;
+  color: var(--ms-bone);
+}
+.status {
+  margin-top: 16px;
+  font-size: 13px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+}
+.skip {
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ms-muted);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.skip:hover,
+.help:hover {
+  color: var(--ms-bone);
+}
+.help {
+  font-size: 13px;
+  color: var(--ms-muted);
+}
+.guide {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  min-width: 0;
+}
+.guide > a {
+  justify-self: start;
+}
+/* Grid items size to their content by default: let the records tables
+   scroll inside their own box instead of widening the page on a phone. */
+.guide > *,
+.guide > * > * {
+  min-width: 0;
+}
+.registrars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.registrars legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: var(--ms-fs-label);
+  color: var(--ms-muted);
+}
+.registrar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--ms-muted);
+  background: var(--ms-inset);
+  border: 1px solid var(--ms-line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.registrar input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.registrar[data-selected="true"] {
+  color: var(--ms-bone);
+  border-color: var(--ms-bone);
+}
+.registrar:has(input:focus-visible) {
+  outline: 2px solid var(--ms-violet);
+  outline-offset: 2px;
+}
+.guideSteps {
+  margin: 0;
+  padding-left: 20px;
+  max-width: 680px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ms-bone);
+}
+.guideSteps li + li {
+  margin-top: 4px;
+}
+.recordsLabel {
+  margin: 8px 0 0;
+  font-size: var(--ms-fs-label);
+  color: var(--ms-muted);
+}
+.manual {
+  margin-top: 16px;
+}
+.manual summary {
+  font-size: 13px;
+  color: var(--ms-muted);
+  cursor: pointer;
+}
+@media (max-width: 620px) {
+  .step {
+    gap: 8px;
+  }
+  .marker {
+    width: 22px;
+  }
+  .card {
+    padding: 16px;
+  }
+}

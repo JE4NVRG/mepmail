@@ -1,7 +1,9 @@
 {
   "meta": {
     "title": "MepMail: Send emails. Keep building.",
-    "description": "Notifications, receipts and campaigns through API, SMTP or AI agents. Manage your sending in one dashboard. Start free, no credit card."
+    "description": "Notifications, receipts and campaigns through API, SMTP or AI agents. Manage your sending in one dashboard. Start free, no credit card.",
+    "domainTitle": "MepMail: your domain, your email, your agents",
+    "domainDescription": "Email on your domain without hosting, for you and your AI agents in the same mailbox. Plans from US$ 2.90 a month, with 7 days free. Plus sending by API, SMTP and MCP for your product."
   },
   "skip": "Skip to content",
   "brandAria": "MepMail home",
@@ -28,7 +30,8 @@
   },
   "announce": {
     "text": "Your AI agents send email with the official MepMail MCP",
-    "correio": "New: email inboxes for your AI agents, with MepMail Mail"
+    "correio": "New: email inboxes for your AI agents, with MepMail Mail",
+    "windows": "New: the MepMail Mail app for Windows and Linux"
   },
   "lang": {
     "aria": "Page language"
@@ -54,6 +57,45 @@
       "caption": "One base URL and the SDK you already use sends through MepMail."
     },
     "launchOffer": "{volume} deliveries/month for a recurring {price}. US$ 20 only for the first eligible monthly bill."
+  },
+  "domainHero": {
+    "eyebrow": "Email on your domain · for you and your agents",
+    "title": "Your domain. Your email. Your agents. All in one place.",
+    "lead": "Bought a domain? Get email on it without paying for hosting. Use it every day and connect agents to the mailboxes you choose.",
+    "cta": "Create email on my domain",
+    "secondary": "See how it works",
+    "note": "Plans from {price} a month, with 7 days free.",
+    "sendLink": "Looking for the sending API? Meet Send"
+  },
+  "story": {
+    "eyebrow": "How it works",
+    "title": "From the domain you bought to a mailbox with your agent.",
+    "lead": "No website hosting and no mail server to look after. You and your agent use the same mailbox, on your domain.",
+    "steps": [
+      {
+        "title": "You bought a domain",
+        "body": "At Cloudflare, GoDaddy or any registrar. No hosting needed."
+      },
+      {
+        "title": "Connect it to MepMail",
+        "body": "Add the domain and publish the DNS records we show. With a Cloudflare token, MepMail writes them for you."
+      },
+      {
+        "title": "Use the mailbox every day",
+        "body": "Read, reply and organize your mail in the browser or the Windows and Linux apps, from your domain's address."
+      },
+      {
+        "title": "Connect your agent",
+        "body": "Give the agent a mailbox, like support@, and connect Claude, Cursor or another agent over MCP. You choose whether it reads, drafts or sends."
+      },
+      {
+        "title": "Follow along and take over",
+        "body": "The agent's drafts and sends stay in the same mailbox you use. Review, send or reply yourself at any time."
+      }
+    ]
+  },
+  "sendBridge": {
+    "eyebrow": "Send · email from your product"
   },
   "stack": {
     "eyebrow": "Works with your stack",

@@ -11,7 +11,7 @@ import {
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createDomainsRouter, type DomainsSesDeps } from "@/server/routers/domains";
+import { createDomainsRouter, type DomainsSesDeps, providerFromNs } from "@/server/routers/domains";
 import { type Context, createCallerFactory, router } from "@/server/trpc";
 
 let db: Db;
@@ -789,6 +789,29 @@ describe("domains.records", () => {
     for (const record of records.filter((r) => r.group !== "dmarc")) {
       expect(record.status).toBe("verified");
     }
+  });
+});
+
+describe("providerFromNs", () => {
+  it("names the providers the onboarding guides cover, from their real name servers", () => {
+    const cases: [string[], string | null][] = [
+      [["a.auto.dns.br", "b.auto.dns.br"], "Registro.br"],
+      [["c.sec.dns.br."], "Registro.br"],
+      [["ns1.dns-parking.com", "ns2.dns-parking.com"], "Hostinger"],
+      [["ns1.hostinger.com"], "Hostinger"],
+      [["dns1.registrar-servers.com"], "Namecheap"],
+      [["ns51.domaincontrol.com"], "GoDaddy"],
+      [["ada.ns.cloudflare.com"], "Cloudflare"],
+      [["ns1.example-hosting.net"], null],
+    ];
+    for (const [hosts, name] of cases)
+      expect(providerFromNs(hosts)?.name ?? null, hosts[0]).toBe(name);
+    expect(providerFromNs(["ns1.dns-parking.com"])?.url).toBe(
+      "https://hpanel.hostinger.com/domains",
+    );
+    expect(providerFromNs(["dns2.registrar-servers.com"])?.url).toBe(
+      "https://ap.www.namecheap.com/domains/list/",
+    );
   });
 });
 

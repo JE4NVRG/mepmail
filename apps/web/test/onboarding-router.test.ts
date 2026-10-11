@@ -249,6 +249,69 @@ describe("onboarding.sendFirstEmail", () => {
   });
 });
 
+describe("onboarding.track", () => {
+  it("records each step once per team, with the first detail, even without a collector", async () => {
+    const teamId = await createTeam(db, "team-a");
+    const other = await createTeam(db, "team-b");
+    const c = caller(teamId);
+    expect(await c.onboarding.track({ step: "domain_viewed" })).toEqual({ ok: true });
+    expect(await c.onboarding.track({ step: "dns_provider", detail: "registrobr" })).toEqual({
+      ok: true,
+    });
+    // A repeat is harmless and keeps the first record.
+    expect(await c.onboarding.track({ step: "dns_provider", detail: "cloudflare" })).toEqual({
+      ok: true,
+    });
+    await caller(other).onboarding.track({ step: "domain_viewed" });
+
+    const rows = await db
+      .select({
+        name: schema.funnelEvents.name,
+        dedupeKey: schema.funnelEvents.dedupeKey,
+        teamId: schema.funnelEvents.teamId,
+        props: schema.funnelEvents.props,
+      })
+      .from(schema.funnelEvents)
+      .where(eq(schema.funnelEvents.teamId, teamId));
+    expect(rows.sort((a, b) => a.dedupeKey.localeCompare(b.dedupeKey))).toEqual([
+      {
+        name: "onboarding_step",
+        dedupeKey: `onboarding:${teamId}:dns_provider`,
+        teamId,
+        props: { step: "dns_provider", detail: "registrobr" },
+      },
+      {
+        name: "onboarding_step",
+        dedupeKey: `onboarding:${teamId}:domain_viewed`,
+        teamId,
+        props: { step: "domain_viewed" },
+      },
+    ]);
+  });
+
+  it("refuses an unknown step or a free-text detail", async () => {
+    const c = caller(await createTeam(db, "team-a"));
+    await expect(
+      // @ts-expect-error: not a step of the funnel.
+      c.onboarding.track({ step: "anything" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(
+      c.onboarding.track({ step: "guide_opened", detail: "Ada <ada@example.com>" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("answers ok: false instead of an error when the write fails", async () => {
+    const teamId = await createTeam(db, "team-a");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(db, "insert").mockImplementation(() => {
+      throw new Error("db down");
+    });
+    expect(await caller(teamId).onboarding.track({ step: "verify_clicked" })).toEqual({
+      ok: false,
+    });
+  });
+});
+
 describe("buildOnboardingEmail", () => {
   it("uses the requested language and MepMail links without claiming inbox placement", () => {
     for (const locale of ["en", "pt-BR"] as const) {

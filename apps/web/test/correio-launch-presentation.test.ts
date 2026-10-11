@@ -215,6 +215,7 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
       // The Microsoft Store first; the direct installer stays as the alternative.
       { href: "https://apps.microsoft.com/detail/9nhpx6qrf0pb", text: expect.any(String) },
       { href: "/desktop/correio/windows", text: expect.any(String) },
+      { href: "/desktop/correio/linux", text: expect.any(String) },
     ]);
     expect(links(hero).every((link) => link.text.length > 0)).toBe(true);
     expect(html).toContain('id="como-funciona"');
@@ -283,6 +284,7 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
           "/integrations",
           "/mail",
           "/desktop/correio/windows",
+          "/desktop/correio/linux",
           "https://apps.microsoft.com/detail/9nhpx6qrf0pb",
         ].includes(link.href) || link.href.startsWith(`${expected.docsPrefix}/`),
       ).toBe(true);

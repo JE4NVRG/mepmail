@@ -16,6 +16,8 @@ import { MIGRATE_DOCS_URL } from "@/lib/docs-links";
 import { formatDayTime, formatUtcTimestamp, maskApiKey } from "@/lib/format";
 import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
+import { DomainFirst } from "./domain-first";
+import { useOnboardingTrack } from "./onboarding-track";
 import {
   onboardingSnippet,
   SNIPPET_HLJS,
@@ -153,20 +155,49 @@ function StampRow({ children, at }: { children: React.ReactNode; at?: Date | str
   );
 }
 
-export function OnboardingSteps({
-  userEmail,
-  apiUrl,
-  showInstanceHint,
-  turnstileSiteKey,
-}: {
+type OnboardingStepsProps = {
   userEmail: string;
   apiUrl: string;
   /** Instance settings exist only on self-host; cloud hides the pointer. */
   showInstanceHint: boolean;
   /** Set when the instance verifies a Turnstile token on the send. */
   turnstileSiteKey: string | null;
-}) {
+};
+
+/**
+ * The post-team onboarding: the domain-first flow leads (domain, DNS, first
+ * mailbox, agent); the API quickstart follows for people who start from code.
+ */
+export function OnboardingSteps(props: OnboardingStepsProps) {
+  const t = useTranslations("onboarding.domainFirst");
+  return (
+    <div>
+      <DomainFirst userEmail={props.userEmail} />
+      <section
+        aria-label={t("api.title")}
+        style={{ marginTop: 56, paddingTop: 32, borderTop: "1px solid var(--ms-line)" }}
+      >
+        <p className="ms-microlabel" style={{ margin: 0 }}>
+          {t("api.title")}
+        </p>
+        <p style={{ margin: "6px 0 24px", fontSize: 13.5, color: "var(--ms-muted)" }}>
+          {t("api.body")}
+        </p>
+        <ApiQuickstart {...props} />
+      </section>
+    </div>
+  );
+}
+
+/** Test send, API key and snippet: the first email sent from code. */
+function ApiQuickstart({
+  userEmail,
+  apiUrl,
+  showInstanceHint,
+  turnstileSiteKey,
+}: OnboardingStepsProps) {
   const t = useTranslations("onboarding");
+  const track = useOnboardingTrack();
   const locale = useLocale();
   const mailLocale = locale === "pt-BR" ? "pt-BR" : "en";
   const trpc = useTRPC();
@@ -433,9 +464,9 @@ export function OnboardingSteps({
   if (readUnavailable) {
     return (
       <div>
-        <h1 className="ms-display" style={{ fontSize: "var(--ms-fs-h1)", margin: 0 }}>
+        <h2 className="ms-display" style={{ fontSize: "var(--ms-fs-h2)", margin: 0 }}>
           {t("attempt.readUnavailableTitle")}
-        </h1>
+        </h2>
         <p role="alert" style={{ marginTop: 16, color: "var(--ms-muted)" }}>
           {t("attempt.readUnavailable")}
         </p>
@@ -467,9 +498,9 @@ export function OnboardingSteps({
   if (loading) {
     return (
       <div>
-        <h1 className="ms-display" style={{ fontSize: "var(--ms-fs-h1)", margin: 0 }}>
+        <h2 className="ms-display" style={{ fontSize: "var(--ms-fs-h2)", margin: 0 }}>
           {t("title")}
-        </h1>
+        </h2>
         <div style={{ marginTop: 32, display: "grid", gap: 20 }}>
           <Skeleton width="100%" height={132} radius="var(--ms-r-card)" />
           <Skeleton width="100%" height={320} radius="var(--ms-r-card)" />
@@ -611,6 +642,7 @@ export function OnboardingSteps({
           className="ms-btn ms-btn-primary"
           disabled={verifying || sendFirst.isPending || deliveryState === "in-flight"}
           onClick={async () => {
+            track("api_opened");
             setCaptchaFailed(false);
             setVerifying(true);
             try {
@@ -652,7 +684,7 @@ export function OnboardingSteps({
 
   return (
     <div style={{ overflow: "hidden" }}>
-      <h1 className="ms-display" style={{ fontSize: "var(--ms-fs-h1)", margin: 0 }}>
+      <h2 className="ms-display" style={{ fontSize: "var(--ms-fs-h2)", margin: 0 }}>
         {success
           ? t("success.title")
           : deliveryState === "in-flight"
@@ -660,7 +692,7 @@ export function OnboardingSteps({
             : deliveryState === "failed"
               ? t("attempt.failedTitle")
               : t("title")}
-      </h1>
+      </h2>
       <div style={{ fontSize: 14, color: "var(--ms-muted)", marginTop: 6 }}>
         {success
           ? t("success.subtitle")
@@ -765,7 +797,10 @@ export function OnboardingSteps({
                     className="ms-btn ms-btn-primary"
                     style={{ marginTop: 16 }}
                     disabled={createKey.isPending}
-                    onClick={() => createKey.mutate({ name: t("step1.keyName") })}
+                    onClick={() => {
+                      track("api_opened");
+                      createKey.mutate({ name: t("step1.keyName") });
+                    }}
                   >
                     <BtnSpinner on={createKey.isPending} />
                     {t("step1.cta")}

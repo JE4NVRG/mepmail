@@ -17,7 +17,58 @@ export const ONBOARDING_SEND_LIMITS = [
   { windowMs: 24 * 60 * 60 * 1000, max: 20 },
 ] as const;
 
+/** Steps of the domain-first onboarding the funnel counts, once per team each. */
+export const ONBOARDING_STEPS = [
+  "domain_viewed",
+  "domain_added",
+  "dns_provider",
+  "cloudflare_opened",
+  "cloudflare_configured",
+  "guide_opened",
+  "verify_clicked",
+  "domain_verified",
+  "mailbox_clicked",
+  "agent_clicked",
+  "api_opened",
+  "skip_domain",
+  "skip_dns",
+  "skip_mailbox",
+] as const;
+
 export const onboardingRouter = router({
+  /**
+   * The domain-first onboarding funnel: one ledger row per team and step, the first
+   * with its detail (a DNS provider, a registrar). Written even without an analytics
+   * collector, unlike emitFunnelEvent. Best-effort: a failed write answers ok: false.
+   */
+  track: teamProcedure
+    .input(
+      z.object({
+        step: z.enum(ONBOARDING_STEPS),
+        detail: z
+          .string()
+          .regex(/^[a-z0-9_.-]{1,40}$/)
+          .optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await ctx.db
+          .insert(schema.funnelEvents)
+          .values({
+            name: "onboarding_step",
+            dedupeKey: `onboarding:${ctx.teamId}:${input.step}`,
+            teamId: ctx.teamId,
+            props: input.detail ? { step: input.step, detail: input.detail } : { step: input.step },
+          })
+          .onConflictDoNothing();
+        return { ok: true };
+      } catch (error) {
+        console.warn(`onboarding.track ${input.step}: ${String(error)}`);
+        return { ok: false };
+      }
+    }),
+
   /**
    * The onboarding "Send email" button: ONBOARDING_EMAIL_FROM to the signed-in
    * member's own inbox, through the same accept pipeline as the API so the

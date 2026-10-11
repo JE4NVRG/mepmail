@@ -8,6 +8,102 @@
     "submit": "Create team",
     "error": "Team creation failed. Try again."
   },
+  "domainFirst": {
+    "title": "Let's put email on your domain",
+    "subtitle": "Your domain. Your email. Your agents. All in one place. Four steps, and you can skip any of them.",
+    "skip": "Skip for now",
+    "help": "Need help? Talk to us",
+    "domain": {
+      "title": "What is your domain?",
+      "body": "Email works on the domain you already have; no hosting needed.",
+      "label": "Your domain",
+      "placeholder": "yourcompany.com",
+      "hint": "Just the domain, no www or https.",
+      "invalid": "That does not look like a domain. Example: yourcompany.com",
+      "submit": "Continue",
+      "skipped": "Skipped for now. Come back here whenever you like.",
+      "resume": "Add my domain"
+    },
+    "dns": {
+      "title": "Publish the DNS records",
+      "body": "A few DNS records prove the domain is yours and let email leave it securely.",
+      "locked": "Once you enter your domain.",
+      "detected": "DNS for {domain} is at {provider}.",
+      "unknown": "We could not tell where DNS for {domain} lives. Pick it below or follow the general guide.",
+      "manual": "I'd rather add them by hand",
+      "where": "Where do you manage the domain's DNS?",
+      "open": "Open {provider}",
+      "records": "Records to add",
+      "verify": "Verify now",
+      "verifying": "Verifying…",
+      "pending": "We have not found every record yet. After you save them, DNS takes a few minutes to an hour to show up; we keep checking on our own.",
+      "failed": "Verification of {domain} timed out. Check the records and click Verify now again.",
+      "verified": "{domain} is verified: email can leave your domain now.",
+      "later": "I'll verify later",
+      "skipped": "Verification put off. The records stay in Domains."
+    },
+    "guides": {
+      "registrobr": {
+        "name": "Registro.br",
+        "steps": [
+          "Sign in at registro.br and open the domain.",
+          "Under DNS, click Configurar zona DNS and use Nova entrada for each record.",
+          "If the domain uses another company's DNS servers (your site's host, for example), the records go in that company's panel."
+        ]
+      },
+      "hostinger": {
+        "name": "Hostinger",
+        "steps": [
+          "In hPanel, open Domains and pick the domain.",
+          "Go to DNS / Nameservers.",
+          "Under Manage DNS records, pick the type and copy the Name and Value of each row below."
+        ]
+      },
+      "godaddy": {
+        "name": "GoDaddy",
+        "steps": [
+          "In My Products, find the domain and click DNS.",
+          "Click Add New Record.",
+          "Pick the type and copy the Name and Value of each row below."
+        ]
+      },
+      "namecheap": {
+        "name": "Namecheap",
+        "steps": [
+          "In Domain List, click Manage next to the domain.",
+          "Open the Advanced DNS tab and use Add New Record.",
+          "Copy the Host and Value of each row below. For the MX record, choose Custom MX under Mail Settings."
+        ]
+      },
+      "other": {
+        "name": "Other",
+        "steps": [
+          "Open the panel where the domain's DNS is managed: usually where you bought the domain or your hosting.",
+          "Look for DNS Zone, DNS Records or Manage DNS.",
+          "Add each row below. If the Name field already shows the domain next to it, type only the part before it."
+        ]
+      }
+    },
+    "mailbox": {
+      "title": "Create your first mailbox",
+      "body": "Create an address on your domain, such as {address}, and read everything in Correio.",
+      "locked": "Once the domain is in DNS.",
+      "cta": "Create {address}",
+      "done": "You already have a mailbox in Correio.",
+      "open": "Open Correio",
+      "skipped": "Mailbox put off. It is in Correio whenever you want it."
+    },
+    "agent": {
+      "title": "Connect an agent (optional)",
+      "body": "Give an AI agent (Claude, Codex, Cursor and others) access to the mailbox over MCP, with a key you can revoke any time.",
+      "locked": "After your first mailbox.",
+      "cta": "Connect an agent"
+    },
+    "api": {
+      "title": "Rather start with the API?",
+      "body": "Send a test email and get an API key. You can do it now, even without a domain."
+    }
+  },
   "title": "Send your first email",
   "subtitle": "Test delivery and prepare your own API integration.",
   "demo": {

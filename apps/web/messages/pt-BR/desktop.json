@@ -1,0 +1,48 @@
+{
+  "linux": {
+    "meta": {
+      "title": "MepMail para Linux: Correio no desktop (.deb, .rpm, AppImage)",
+      "description": "Baixe o app do MepMail para Linux: Correio numa janela própria, com bandeja, contador de não lidas, links mepmail:// e ponte para agentes de IA."
+    },
+    "eyebrow": "App para Linux",
+    "title": "MepMail no <highlight>Linux</highlight>",
+    "lead": "O Correio numa janela própria, com ícone na bandeja, contador de não lidas, links mepmail:// e a ponte para seus agentes de IA. Escolha o pacote da sua distribuição.",
+    "note": "Versão {version} · 64 bits (x86_64) · código aberto (AGPL-3.0)",
+    "commandLabel": "No terminal, na pasta do download",
+    "updatesLabel": "Atualizações",
+    "packages": {
+      "deb": {
+        "kind": "Ubuntu, Debian, Mint, Pop!_OS",
+        "name": "Pacote .deb",
+        "body": "Instala pelo gerenciador de pacotes e aparece no menu de aplicativos.",
+        "command": "sudo apt install ./{file}",
+        "updates": "o app avisa quando há versão nova e instala pela bandeja, com a senha do sistema.",
+        "download": "Baixar .deb"
+      },
+      "rpm": {
+        "kind": "Fedora, openSUSE, RHEL",
+        "name": "Pacote .rpm",
+        "body": "Instala pelo gerenciador de pacotes e aparece no menu de aplicativos.",
+        "command": "sudo dnf install ./{file}",
+        "updates": "o app avisa quando há versão nova e instala pela bandeja, com a senha do sistema.",
+        "download": "Baixar .rpm"
+      },
+      "appimage": {
+        "kind": "Qualquer distribuição",
+        "name": "AppImage",
+        "body": "Um arquivo só, sem instalar nada. Leva o próprio WebKitGTK, por isso é maior (cerca de 80 MB).",
+        "command": "chmod +x {file} && ./{file}",
+        "updates": "o arquivo se atualiza sozinho, sem pedir senha.",
+        "download": "Baixar AppImage"
+      }
+    },
+    "tipsTitle": "Bom saber",
+    "tips": [
+      "O ícone na bandeja usa AppIndicator. No GNOME sem a extensão AppIndicator (o Ubuntu já traz), o app funciona normalmente, só sem o ícone.",
+      "As chaves dos agentes ficam no chaveiro do sistema (GNOME Keyring ou KWallet), nunca em arquivo de texto.",
+      "Iniciar com o sistema e Manter na bandeja ao fechar ficam no menu do ícone da bandeja."
+    ],
+    "windows": "No Windows, o app está na Microsoft Store.",
+    "source": "Código-fonte do app no GitHub"
+  }
+}

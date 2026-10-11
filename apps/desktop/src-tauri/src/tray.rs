@@ -66,14 +66,22 @@ fn strings() -> Strings {
     if is_portuguese() {
         Strings {
             open: "Abrir MepMail",
-            autostart: "Iniciar com o Windows",
+            autostart: if cfg!(windows) {
+                "Iniciar com o Windows"
+            } else {
+                "Iniciar com o sistema"
+            },
             keep_in_tray: "Manter na bandeja ao fechar",
             quit: "Sair",
         }
     } else {
         Strings {
             open: "Open MepMail",
-            autostart: "Start with Windows",
+            autostart: if cfg!(windows) {
+                "Start with Windows"
+            } else {
+                "Start with the system"
+            },
             keep_in_tray: "Keep in the tray on close",
             quit: "Quit",
         }

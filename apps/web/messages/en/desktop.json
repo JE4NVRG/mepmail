@@ -1,0 +1,48 @@
+{
+  "linux": {
+    "meta": {
+      "title": "MepMail for Linux: Correio on the desktop (.deb, .rpm, AppImage)",
+      "description": "Download the MepMail app for Linux: Correio in its own window, with a tray icon, unread count, mepmail:// links and a bridge for AI agents."
+    },
+    "eyebrow": "Linux app",
+    "title": "MepMail on <highlight>Linux</highlight>",
+    "lead": "Correio in its own window, with a tray icon, unread count, mepmail:// links and the bridge for your AI agents. Pick the package for your distribution.",
+    "note": "Version {version} · 64-bit (x86_64) · open source (AGPL-3.0)",
+    "commandLabel": "In a terminal, in the download folder",
+    "updatesLabel": "Updates",
+    "packages": {
+      "deb": {
+        "kind": "Ubuntu, Debian, Mint, Pop!_OS",
+        "name": ".deb package",
+        "body": "Installs through the package manager and shows up in the app menu.",
+        "command": "sudo apt install ./{file}",
+        "updates": "the app tells you about a new version and installs it from the tray, with your system password.",
+        "download": "Download .deb"
+      },
+      "rpm": {
+        "kind": "Fedora, openSUSE, RHEL",
+        "name": ".rpm package",
+        "body": "Installs through the package manager and shows up in the app menu.",
+        "command": "sudo dnf install ./{file}",
+        "updates": "the app tells you about a new version and installs it from the tray, with your system password.",
+        "download": "Download .rpm"
+      },
+      "appimage": {
+        "kind": "Any distribution",
+        "name": "AppImage",
+        "body": "One file, nothing to install. It carries its own WebKitGTK, so it is bigger (about 80 MB).",
+        "command": "chmod +x {file} && ./{file}",
+        "updates": "the file updates itself, no password needed.",
+        "download": "Download AppImage"
+      }
+    },
+    "tipsTitle": "Good to know",
+    "tips": [
+      "The tray icon uses AppIndicator. On GNOME without the AppIndicator extension (Ubuntu ships it), the app works the same, just without the icon.",
+      "Agent keys live in the system keyring (GNOME Keyring or KWallet), never in a text file.",
+      "Start with the system and Keep in tray on close are in the tray icon's menu."
+    ],
+    "windows": "On Windows, the app is in the Microsoft Store.",
+    "source": "The app's source code on GitHub"
+  }
+}

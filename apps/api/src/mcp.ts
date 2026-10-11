@@ -1485,7 +1485,7 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
     "mail:draft",
     {
       description:
-        "Send a saved draft exactly as it is at the given revision. When you allowed this app to send without asking, it goes out now; otherwise this asks you (the mailbox owner) to approve it: you are emailed and send it from the dashboard (status awaiting_approval). Sending cannot be undone; do not retry when the outcome is unknown, read the drafts folder first.",
+        "Send a saved draft exactly as it is at the given revision. When you allowed this app to send without asking, it goes out now; otherwise this asks you (the mailbox owner) to approve it: you are emailed and send it from the dashboard (status awaiting_approval). Sending cannot be undone. When the outcome is unknown, call this again with the same id and revision: it returns that send's status and never sends twice; a submitted draft can no longer be edited.",
       inputSchema: z.object({
         id: z.uuid().describe("Draft id"),
         expected_revision: z

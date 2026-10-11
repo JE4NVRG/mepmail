@@ -5,3 +5,4 @@ src-tauri/gen/schemas
 # /fixture-mail harness: local-only, regenerated per submission.
 msix/listing/screenshots
 msix/listing/store-shots.mjs
+linux-out/

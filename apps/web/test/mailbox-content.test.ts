@@ -1191,15 +1191,17 @@ describe("session-authenticated mailbox content", () => {
     });
     const otherDraft = await as().saveDraft(draft({ mailboxId: agentId }));
     expect((await as().item({ mailboxId: agentId, id: otherDraft.id })).outboundSummary).toBeNull();
-    const changed = await as().saveDraft(
-      draft({
-        id: row.draftId,
-        sourceItemId: row.draftId,
-        expectedRevision: row.draftRevision,
-        text: "New version, not this send",
-      }),
-    );
-    expect((await as().item({ mailboxId, id: changed.id })).outboundSummary).toBeNull();
+    // The submitted draft cannot become a new version: that would be a second send.
+    await expect(
+      as().saveDraft(
+        draft({
+          id: row.draftId,
+          sourceItemId: row.draftId,
+          expectedRevision: row.draftRevision,
+          text: "New version, not this send",
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
     expect((await as().item({ mailboxId, id: row.id })).outboundSummary).toEqual(
       sent.outboundSummary,
     );

@@ -28,6 +28,32 @@
   },
   "releases": [
     {
+      "version": "0.111",
+      "date": "2026-10-10",
+      "title": "App do MepMail para Linux",
+      "summary": "O app do Correio agora roda também no Linux: .deb, .rpm e AppImage, com bandeja, contador e atualização automática.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "App do MepMail para Linux: .deb, .rpm e AppImage, com bandeja, contador e atualização automática. Baixe em mepmail.dev/desktop/correio/linux."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "A home e a página do Correio agora começam pelo e-mail no seu domínio, para você e seus agentes na mesma caixa, sem hospedagem."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Correio: um rascunho que já está sendo enviado não pode mais ser salvo como nova versão em outra aba ou por um agente, então não vira um segundo e-mail. Um envio recusado continua podendo ser corrigido e enviado."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.109",
       "date": "2026-10-10",
       "title": "E-mails de limite do plano e Excluir para sempre no Correio",

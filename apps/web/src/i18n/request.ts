@@ -22,6 +22,7 @@ const NAMESPACES = [
   "landing",
   "integrations",
   "correio",
+  "desktop",
   "changelog",
   "security",
   "support",

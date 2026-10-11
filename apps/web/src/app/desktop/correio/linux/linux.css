@@ -1,0 +1,45 @@
+/* The Linux downloads page: the landing's cards, plus the install command,
+   the update line and the file name under each download button. */
+.linux-tips h2 {
+  margin: 0;
+}
+.linux-packages .gtm-integration h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.linux-command {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.linux-command p {
+  color: var(--ms-muted);
+  font-size: 13px;
+}
+.linux-command .gtm-demo-code {
+  padding: 12px 14px;
+  background: var(--ms-panel-raised);
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.linux-updates {
+  font-size: 14px;
+}
+.linux-packages .gtm-integration .linux-download {
+  align-self: flex-start;
+  margin-top: auto;
+}
+.linux-file {
+  color: var(--ms-muted);
+  font-family: var(--ms-font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.linux-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-top: 24px;
+}
