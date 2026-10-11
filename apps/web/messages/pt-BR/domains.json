@@ -245,7 +245,16 @@
       "zone_not_found": "Não encontramos {domain} nas zonas que esse token acessa. Confira se o domínio está nessa conta da Cloudflare e incluído no token.",
       "unreachable": "Não conseguimos falar com a Cloudflare agora. Tente de novo em instantes.",
       "unexpected": "A Cloudflare respondeu de um jeito inesperado. Tente de novo ou adicione os registros manualmente.",
-      "rate": "Muitas tentativas em pouco tempo. Tente de novo daqui a uma hora."
+      "rate": "Muitas tentativas em pouco tempo. Tente de novo daqui a uma hora.",
+      "receiving_unavailable": "O recebimento ainda não está disponível na região deste domínio."
+    },
+    "receiving": {
+      "title": "Configurar o recebimento na Cloudflare",
+      "body": "Com um token que só mexe no DNS, criamos o registro MX deste domínio. Se já existir um MX, nada é trocado.",
+      "submit": "Criar o registro MX",
+      "submitting": "Criando o registro MX…",
+      "doneBody": "Conferindo o recebimento agora. O DNS pode levar alguns minutos para aparecer.",
+      "conflictHelp": "Este domínio já recebe e-mail em outro serviço, e não trocamos o MX dele. Veja abaixo como apontar o recebimento para o Correio."
     }
   }
 }

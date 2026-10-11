@@ -15,16 +15,20 @@ type Outcome = "created" | "updated" | "unchanged" | "conflict" | "failed";
  * "Configurar na Cloudflare": the person creates a DNS-only token from a
  * pre-filled Cloudflare link, pastes it, and the server writes this domain's
  * records. The token lives in this input until submit and is cleared right
- * after; the server never stores it.
+ * after; the server never stores it. `records="receiving"` writes only the
+ * Correio MX, and only where the name has no MX yet.
  */
 export function CloudflareSetup({
   id,
   domainName,
+  records = "sending",
   onOpen,
   onConfigured,
 }: {
   id: string;
   domainName: string;
+  /** The sending records (default) or the receiving MX of a Correio domain. */
+  records?: "sending" | "receiving";
   /** Called when the person opens the token form. */
   onOpen?: () => void;
   /** Called after records were written and the server ran a DNS check. */
@@ -49,6 +53,10 @@ export function CloudflareSetup({
   );
   const trimmed = token.trim();
   const valid = CLOUDFLARE_TOKEN.test(trimmed);
+  const receiving = records === "receiving";
+  // The receiving card says what it writes in its own words; the rest is shared.
+  const text = (key: "title" | "body" | "submit" | "submitting" | "doneBody" | "conflictHelp") =>
+    receiving ? t(`receiving.${key}`) : t(key);
   const result = setup.data;
   const errorKey = setup.error
     ? trpcErrorCode(setup.error) === "TOO_MANY_REQUESTS"
@@ -65,7 +73,7 @@ export function CloudflareSetup({
 
   const submit = () => {
     if (!valid || setup.isPending) return;
-    setup.mutate({ id, token: trimmed });
+    setup.mutate({ id, token: trimmed, records });
     // The token is not needed after this request: drop it from the page.
     setToken("");
   };
@@ -88,8 +96,8 @@ export function CloudflareSetup({
           </svg>
         </span>
         <div className={styles.headText}>
-          <h3 id={`${inputId}-title`}>{t("title")}</h3>
-          <p>{t("body")}</p>
+          <h3 id={`${inputId}-title`}>{text("title")}</h3>
+          <p>{text("body")}</p>
         </div>
         {!open && !result?.ok ? (
           <button
@@ -105,14 +113,10 @@ export function CloudflareSetup({
         ) : null}
       </div>
 
+      {/* A div, not a form: the card also sits inside the new-mailbox dialog's
+          form, and a nested form would submit that one instead. */}
       {open && !result?.ok ? (
-        <form
-          className={styles.form}
-          onSubmit={(event) => {
-            event.preventDefault();
-            submit();
-          }}
-        >
+        <div className={styles.form}>
           <ol className={styles.steps}>
             <li>
               <span className={styles.stepTitle}>{t("step1")}</span>
@@ -140,15 +144,21 @@ export function CloudflareSetup({
                   placeholder={t("tokenPlaceholder")}
                   value={token}
                   onChange={(event) => setToken(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
+                    event.preventDefault();
+                    submit();
+                  }}
                   aria-invalid={trimmed !== "" && !valid}
                 />
                 <button
-                  type="submit"
+                  type="button"
                   className="ms-btn ms-btn-primary"
                   disabled={!valid || setup.isPending}
+                  onClick={submit}
                 >
                   <BtnSpinner on={setup.isPending} />
-                  {setup.isPending ? t("submitting") : t("submit")}
+                  {setup.isPending ? text("submitting") : text("submit")}
                 </button>
               </div>
               {trimmed !== "" && !valid ? (
@@ -165,7 +175,7 @@ export function CloudflareSetup({
           <button type="button" className={styles.cancel} onClick={() => setOpen(false)}>
             {t("cancel")}
           </button>
-        </form>
+        </div>
       ) : null}
 
       {result?.ok ? (
@@ -182,7 +192,7 @@ export function CloudflareSetup({
               </li>
             ))}
           </ul>
-          <p className={styles.hint}>{conflicts > 0 ? t("conflictHelp") : t("doneBody")}</p>
+          <p className={styles.hint}>{conflicts > 0 ? text("conflictHelp") : text("doneBody")}</p>
         </div>
       ) : null}
     </section>

@@ -274,7 +274,11 @@ export function MailboxSetupDialog({
                 {t("mxDestination")} <code className={styles.mxHost}>{receiving.mxHost}</code>
               </p>
             ) : null}
-            {receiving.state === "needs_mx" && domainId ? (
+            {/* Kept while a recheck runs, so what the guide just did (the
+                Cloudflare card's result) stays on screen. */}
+            {(receiving.state === "needs_mx" ||
+              (receivingQuery.isFetching && receivingQuery.data?.state === "needs_mx")) &&
+            domainId ? (
               <MailboxDnsGuidePanel
                 domainId={domainId}
                 checking={receivingQuery.isFetching}

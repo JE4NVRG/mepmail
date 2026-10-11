@@ -245,7 +245,16 @@
       "zone_not_found": "We could not find {domain} in the zones this token can reach. Check that the domain is in this Cloudflare account and included in the token.",
       "unreachable": "We could not reach Cloudflare right now. Try again in a moment.",
       "unexpected": "Cloudflare answered in an unexpected way. Try again or add the records by hand.",
-      "rate": "Too many attempts in a short time. Try again in an hour."
+      "rate": "Too many attempts in a short time. Try again in an hour.",
+      "receiving_unavailable": "Receiving is not available in this domain's region yet."
+    },
+    "receiving": {
+      "title": "Set up receiving on Cloudflare",
+      "body": "With a token that only touches DNS, we create this domain's MX record. If an MX already exists, nothing is changed.",
+      "submit": "Create the MX record",
+      "submitting": "Creating the MX record…",
+      "doneBody": "Checking receiving now. DNS can take a few minutes to show up.",
+      "conflictHelp": "This domain already receives mail at another service, and we did not change its MX. See below how to point receiving at Correio."
     }
   }
 }

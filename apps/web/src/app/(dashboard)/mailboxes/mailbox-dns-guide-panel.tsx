@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useId, useState } from "react";
+import { CloudflareSetup } from "@/app/(dashboard)/domains/cloudflare-setup";
 import { useTRPC } from "@/lib/trpc";
 import styles from "./mailbox-setup-dialog.module.css";
 
@@ -20,6 +21,7 @@ const PROVIDER_DASHBOARD: Record<string, string | undefined> = {
  * The receiving (MX) assistant shown while a domain still needs its MX: the
  * DNS host we detected, the one record to add with copy buttons, steps for
  * that host, and a warning when the domain already receives mail elsewhere.
+ * On Cloudflare, with no other MX in the way, one click writes the record.
  */
 export function MailboxDnsGuidePanel({
   domainId,
@@ -84,6 +86,17 @@ export function MailboxDnsGuidePanel({
     <section className={styles.dnsGuide} aria-labelledby={`${id}-title`}>
       <h4 id={`${id}-title`}>{t("title")}</h4>
       <p>{t(`provider.${data.provider}`, values)}</p>
+      {data.provider === "cloudflare" && !foreign.length ? (
+        <CloudflareSetup
+          id={domainId}
+          domainName={data.domain}
+          records="receiving"
+          onConfigured={() => {
+            void guide.refetch();
+            onRecheck();
+          }}
+        />
+      ) : null}
       {foreign.length ? (
         <p className={styles.dnsWarning}>
           {data.otherProvider

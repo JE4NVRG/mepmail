@@ -34,6 +34,12 @@
       "summary": "Excluir, arquivar e marcar como spam não esperam mais o servidor antes da próxima mensagem, a próxima mensagem abre sozinha, as ações em lote rodam em paralelo e os alertas de mensagem nova chegam antes.",
       "changes": [
         {
+          "kind": "added",
+          "items": [
+            "Recebimento do Correio pela Cloudflare: na criação da caixa, um token só de DNS cria o registro MX do domínio. Quando o domínio já recebe e-mail em outro serviço, o MX dele nunca é alterado."
+          ]
+        },
+        {
           "kind": "changed",
           "items": [
             "Excluir, arquivar e spam agem em cada mensagem separadamente: a próxima pode sair enquanto o servidor ainda responde à primeira.",

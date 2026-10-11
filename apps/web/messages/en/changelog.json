@@ -29,6 +29,12 @@
       "summary": "Deleting, archiving and marking spam no longer wait for the server before the next message, the next message opens by itself, bulk actions run in parallel and new-mail alerts arrive sooner.",
       "changes": [
         {
+          "kind": "added",
+          "items": [
+            "Correio receiving on Cloudflare: in the new mailbox setup, a DNS-only token creates the domain's MX record. Where the domain already receives mail at another service, its MX is never changed."
+          ]
+        },
+        {
           "kind": "changed",
           "items": [
             "Delete, archive and spam act on each message on its own: the next one can be removed while the server is still answering the first.",
