@@ -8,6 +8,7 @@ import {
   listMailboxItems,
   listMailboxRegistry,
   listMailboxThread,
+  MAILBOX_RICH_FORMAT_HEADER,
   type MailboxContentActor,
   MailboxContentError,
   type MailboxListPosition,
@@ -41,8 +42,10 @@ import { mailboxPreview } from "../lib/mailbox-inbox-presentation";
 import { decodeMailboxListSummary, encodeMailboxListSummary } from "../lib/mailbox-list-summary";
 import { mailboxDraftHtml, mailboxSignatureText } from "../lib/mailbox-signature";
 import { getKeyring } from "./keyring";
+import { MAILBOX_COMPOSE_HTML_MAX, sanitizeMailboxComposeHtml } from "./mailbox-compose-html";
 import { projectMailboxHtml } from "./mailbox-html";
 import { mailboxSenderHmacKey } from "./mailbox-sender-key";
+import { timedStage } from "./procedure-timings";
 import { publicStorageOrigin, publicStoragePrefix } from "./storage";
 
 // Reading: what receipt and import keep (up to 25 MiB a message).
@@ -126,6 +129,8 @@ function dto(mime: Awaited<ReturnType<typeof parse>>) {
     fromName: mime.from?.value[0]?.name ?? "",
     to: addresses(mime.to),
     cc: addresses(mime.cc),
+    // Only the sender's own copies keep a Bcc header (drafts and Sent).
+    bcc: addresses(mime.bcc),
     replyTo: mime.replyTo?.value[0]?.address ?? mime.from?.value[0]?.address ?? "",
     text: mime.text ?? "",
     hasHtmlBody: typeof mime.html === "string" && mime.html.length > 0,
@@ -277,6 +282,13 @@ export async function getMailboxContent(
         messageId: mailboxMessageId(mime.messageId),
         replyTo: item.kind === "sent" ? addresses(mime.to).join(", ") : metadata.replyTo,
         replyIds: item.kind === "inbox" ? mailboxReplyIds(mime) : [],
+        // The formatting the person wrote, to reopen in the editor (null: plain text).
+        draftHtml:
+          item.kind === "draft" &&
+          mime.headers.get(MAILBOX_RICH_FORMAT_HEADER.toLowerCase()) === "rich" &&
+          typeof mime.html === "string"
+            ? sanitizeMailboxComposeHtml(mime.html)
+            : null,
       };
     },
   );
@@ -611,7 +623,9 @@ export async function getMailboxContentList(
     if (!folders.some((folder) => folder.id === input.customFolderId))
       throw new MailboxContentError("not_found");
   }
-  const registry = await listMailboxRegistry(db, actor);
+  const registry = await timedStage("mailboxes.items:registry", () =>
+    listMailboxRegistry(db, actor),
+  );
   const readable = registry.mailboxes.filter(
     (b) =>
       b.canRead &&
@@ -629,47 +643,49 @@ export async function getMailboxContentList(
         : "inbox";
   const metadata: MailboxListMetadata[] = [];
   const mailboxesTruncated = readable.length > 20;
-  const pages = await runLimited(readable.slice(0, 20), 8, async (box) => ({
-    box,
-    // One extra row per box tells whether anything follows this page.
-    rows: await listMailboxItems(
-      db,
-      actor,
-      box.id,
-      {
-        ...(kind ? { kind } : {}),
-        trashed: input.folder === "trash",
-        ...(input.folder === "favorites" ? { starred: true, safeOnly: true } : {}),
-        ...(input.folder === "custom" ? { folderId: input.customFolderId!, safeOnly: true } : {}),
-        ...(input.folder === "archive" ? { archived: true, safeOnly: true } : {}),
-        // Filed and archived messages leave the ordinary views (agents see them all).
-        ...(!actor.agentAccess && ["inbox", "drafts", "sent", "pinned"].includes(input.folder)
-          ? { folderId: null, archived: false }
-          : {}),
-        ...(kind === "inbox"
-          ? {
-              deliveryFolder: (["snoozed", "pinned"].includes(input.folder)
-                ? "inbox"
-                : input.folder) as "inbox" | "spam" | "quarantine",
-            }
-          : {}),
-        // A snoozed message leaves every view but Snoozed (and Trash) until it is due.
-        ...(input.folder === "snoozed"
-          ? { snoozed: true }
-          : input.folder === "trash"
-            ? {}
-            : { snoozed: false }),
-        ...(input.folder === "pinned" ? { pinned: true } : {}),
-        ...(input.folder === "scheduled" ? { scheduled: true } : {}),
-        ...(input.folder === "followups" ? { followUp: true } : {}),
-      },
-      {
-        ...(before ? { before } : {}),
-        limit: pageSize + 1,
-        latestPerThread: input.groupByThread === true,
-      },
-    ),
-  }));
+  const pages = await timedStage("mailboxes.items:list", () =>
+    runLimited(readable.slice(0, 20), 8, async (box) => ({
+      box,
+      // One extra row per box tells whether anything follows this page.
+      rows: await listMailboxItems(
+        db,
+        actor,
+        box.id,
+        {
+          ...(kind ? { kind } : {}),
+          trashed: input.folder === "trash",
+          ...(input.folder === "favorites" ? { starred: true, safeOnly: true } : {}),
+          ...(input.folder === "custom" ? { folderId: input.customFolderId!, safeOnly: true } : {}),
+          ...(input.folder === "archive" ? { archived: true, safeOnly: true } : {}),
+          // Filed and archived messages leave the ordinary views (agents see them all).
+          ...(!actor.agentAccess && ["inbox", "drafts", "sent", "pinned"].includes(input.folder)
+            ? { folderId: null, archived: false }
+            : {}),
+          ...(kind === "inbox"
+            ? {
+                deliveryFolder: (["snoozed", "pinned"].includes(input.folder)
+                  ? "inbox"
+                  : input.folder) as "inbox" | "spam" | "quarantine",
+              }
+            : {}),
+          // A snoozed message leaves every view but Snoozed (and Trash) until it is due.
+          ...(input.folder === "snoozed"
+            ? { snoozed: true }
+            : input.folder === "trash"
+              ? {}
+              : { snoozed: false }),
+          ...(input.folder === "pinned" ? { pinned: true } : {}),
+          ...(input.folder === "scheduled" ? { scheduled: true } : {}),
+          ...(input.folder === "followups" ? { followUp: true } : {}),
+        },
+        {
+          ...(before ? { before } : {}),
+          limit: pageSize + 1,
+          latestPerThread: input.groupByThread === true,
+        },
+      ),
+    })),
+  );
   for (const { box, rows } of pages)
     for (const row of rows)
       if (!kind || row.kind === kind)
@@ -689,7 +705,9 @@ export async function getMailboxContentList(
   const last = shown.at(-1);
   const nextCursor = more && last ? encodeMailboxListCursor(position(last)) : null;
   const limited = mailboxesTruncated || nextCursor !== null;
-  const rows = await buildMailboxListRows(db, actor, shown);
+  const rows = await timedStage("mailboxes.items:rows", () =>
+    buildMailboxListRows(db, actor, shown),
+  );
   return { items: rows, limited, mailboxesTruncated, nextCursor };
 }
 
@@ -744,21 +762,25 @@ export async function buildMailboxListRows(
   }[] = [];
   // Messages per conversation, counted inside each listed mailbox.
   const threadStates = new Map<string, { count: number; unread: number }>();
-  await runLimited([...new Set(shown.map((row) => row.mailboxId))], 8, async (mailboxId) => {
-    const states = await summarizeMailboxThreads(
-      db,
-      actor,
-      mailboxId,
-      shown.filter((row) => row.mailboxId === mailboxId).map((row) => row.threadKey),
-    );
-    for (const [key, state] of states) threadStates.set(`${mailboxId}:${key}`, state);
-  });
+  await timedStage("mailboxes.rows:threads", () =>
+    runLimited([...new Set(shown.map((row) => row.mailboxId))], 8, async (mailboxId) => {
+      const states = await summarizeMailboxThreads(
+        db,
+        actor,
+        mailboxId,
+        shown.filter((row) => row.mailboxId === mailboxId).map((row) => row.threadKey),
+      );
+      for (const [key, state] of states) threadStates.set(`${mailboxId}:${key}`, state);
+    }),
+  );
   const blockedRow = (row: (typeof shown)[number]) =>
     row.deliveryFolder === "quarantine" || row.inboundAssessment?.decision === "quarantine";
-  const contents = await listRowContents(
-    db,
-    actor,
-    shown.filter((row) => !blockedRow(row)),
+  const contents = await timedStage("mailboxes.rows:summaries", () =>
+    listRowContents(
+      db,
+      actor,
+      shown.filter((row) => !blockedRow(row)),
+    ),
   );
   // Without a conversation (or outside one, e.g. a draft) a row stands for itself.
   const threadState = (row: {
@@ -837,17 +859,21 @@ export async function buildMailboxListRows(
       threadUnread: thread.unread,
     });
   }
-  const requests = await draftApprovalRequests(db, actor.teamId, items);
+  const requests = await timedStage("mailboxes.rows:approvals", () =>
+    draftApprovalRequests(db, actor.teamId, items),
+  );
   const withRequests = items.map((item) => ({
     ...item,
     // An agent without the send permission asked the owner to send this revision.
     approvalRequested: requests.get(`${item.id}:${item.revision}`) ?? null,
   }));
-  return withMailboxContentAccess(
-    db,
-    actor,
-    items.map((item) => item.mailboxId),
-    async () => withRequests,
+  return timedStage("mailboxes.rows:access", () =>
+    withMailboxContentAccess(
+      db,
+      actor,
+      items.map((item) => item.mailboxId),
+      async () => withRequests,
+    ),
   );
 }
 
@@ -893,8 +919,11 @@ export interface MailboxDraftInput {
   mode?: "reply" | "forward" | undefined;
   to: string[];
   cc?: string[] | undefined;
+  bcc?: string[] | undefined;
   subject: string;
   text: string;
+  /** The person's formatting (sent with `text`); omitted for a plain text draft. */
+  html?: string | undefined;
   retainedAttachments: number[];
   uploads: { filename: string; base64: string }[];
 }
@@ -909,8 +938,13 @@ export async function getMailboxUnreadCounts(db: Db, actor: MailboxContentActor)
   const readable = registry.mailboxes
     .filter((box) => box.canRead && box.status === "planned")
     .slice(0, 20);
+  // One scoped read per mailbox, four at a time so a 20-box team never takes the
+  // whole pool: the cost is round trips, not counting.
+  const unread = await runLimited(readable, 4, (box) => countUnreadMailboxItems(db, actor, box.id));
   const counts: Record<string, number> = {};
-  for (const box of readable) counts[box.id] = await countUnreadMailboxItems(db, actor, box.id);
+  readable.forEach((box, i) => {
+    counts[box.id] = unread[i]!;
+  });
   return { counts };
 }
 
@@ -940,8 +974,9 @@ export async function getMailboxScheduleCounts(
   actor = { ...actor };
   const { boxes } = await railMailboxes(db, actor, input.mailboxId);
   const total = { snoozed: 0, scheduled: 0, followUps: 0 };
-  for (const box of boxes) {
-    const counts = await countMailboxSchedules(db, actor, box.id);
+  for (const counts of await runLimited(boxes, 4, (box) =>
+    countMailboxSchedules(db, actor, box.id),
+  )) {
     total.snoozed += counts.snoozed;
     total.scheduled += counts.scheduled;
     total.followUps += counts.followUps;
@@ -961,10 +996,11 @@ export async function getMailboxRailFolders(
 ) {
   actor = { ...actor };
   const { boxes } = await railMailboxes(db, actor, input.mailboxId);
-  const folders = [];
-  for (const box of boxes)
-    folders.push(...(await listMailboxFolders(db, actor, { mailboxId: box.id })));
-  return folders;
+  // Each mailbox's folders in parallel; flattened in mailbox order, as before.
+  const perBox = await runLimited(boxes, 4, (box) =>
+    listMailboxFolders(db, actor, { mailboxId: box.id }),
+  );
+  return perBox.flat();
 }
 
 /**
@@ -1002,6 +1038,7 @@ export async function saveMailboxContentDraft(
     ...input,
     to: [...input.to],
     ...(input.cc ? { cc: [...input.cc] } : {}),
+    ...(input.bcc ? { bcc: [...input.bcc] } : {}),
     retainedAttachments: [...input.retainedAttachments],
     uploads: input.uploads.map((upload) => ({ ...upload })),
   };
@@ -1011,8 +1048,12 @@ export async function saveMailboxContentDraft(
   );
   if (!box) throw new MailboxContentError("forbidden");
   const cc = input.cc ?? [];
-  // Sending counts To and Cc together against the same 20-recipient cap.
-  if (input.to.length + cc.length > 20) throw new MailboxContentError("invalid");
+  const bcc = input.bcc ?? [];
+  // Sending counts To, Cc and Bcc together against the same 20-recipient cap.
+  if (input.to.length + cc.length + bcc.length > 20) throw new MailboxContentError("invalid");
+  if (input.html !== undefined && input.html.length > MAILBOX_COMPOSE_HTML_MAX)
+    throw new MailboxContentError("invalid");
+  const rich = input.html ? sanitizeMailboxComposeHtml(input.html) || null : null;
   const signature = { profile: box.signatureProfile, text: box.signatureText };
   const footer = mailboxSignature(mailboxSignatureText(signature));
   // Agents write plain text through the API; their mailbox's signature is
@@ -1105,11 +1146,14 @@ export async function saveMailboxContentDraft(
     from: box.address,
     to: input.to,
     ...(cc.length ? { cc } : {}),
+    // Bcc stays on the sealed draft (and Sent copy); the sender strips it from what leaves.
+    ...(bcc.length ? { bcc, keepBcc: true } : {}),
     subject: input.subject,
     text,
-    // The same words as HTML, with the mailbox's signature formatted where the
-    // composer placed it. Rebuilt from the text on every save.
-    html: mailboxDraftHtml(text, signature),
+    // The person's own formatting, sanitized; otherwise the same words as HTML, with
+    // the mailbox's signature formatted where the composer placed it.
+    html: rich ?? mailboxDraftHtml(text, signature),
+    ...(rich ? { headers: { [MAILBOX_RICH_FORMAT_HEADER]: "rich" } } : {}),
     messageId: input.id ? originalId : `<${randomUUID()}@${box.address.split("@")[1]}>`,
     inReplyTo:
       mode === "forward"

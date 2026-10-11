@@ -460,6 +460,10 @@ export {
   requestMailboxReceivingHold,
 } from "./mailbox-plan-usage.js";
 export {
+  MAILBOX_RICH_FORMAT_HEADER,
+  stripMailboxPrivateHeaders,
+} from "./mailbox-private-headers.js";
+export {
   countMailboxThreads,
   countMailboxViews,
   countUnreadMailboxItems,

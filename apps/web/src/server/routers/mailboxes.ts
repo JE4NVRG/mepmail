@@ -1000,11 +1000,14 @@ export const mailboxesRouter = router({
         mode: z.enum(["reply", "forward"]).optional(),
         to: z.array(z.email().max(254)).max(20),
         cc: z.array(z.email().max(254)).max(20).optional(),
+        bcc: z.array(z.email().max(254)).max(20).optional(),
         subject: z
           .string()
           .max(998)
           .regex(/^[^\r\n]*$/),
         text: z.string().max(262144),
+        // Only when the person formatted the body; sanitized on the server.
+        html: z.string().max(262144).optional(),
         retainedAttachments: z.array(z.number().int().min(0).max(9)).max(10),
         uploads: z
           .array(

@@ -11,6 +11,7 @@ const input = z
     mode: z.enum(["reply", "forward"]).optional(),
     to: z.array(z.email().max(254)).min(1).max(20),
     cc: z.array(z.email().max(254)).max(19).optional(),
+    bcc: z.array(z.email().max(254)).max(19).optional(),
     subject: z
       .string()
       .max(998)

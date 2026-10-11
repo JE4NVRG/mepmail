@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 /**
  * Live updates for the Correio: one EventSource to /api/mailboxes/events
@@ -13,6 +13,34 @@ export const MAILBOX_ARRIVAL_EVENT = "mepmail:arrival";
 export const MAILBOX_NEW_MAIL_EVENT = "mepmail:new-mail";
 
 const BATCH_MS = 400;
+
+/**
+ * Whether the live stream is up. While it is, arrivals come through it and
+ * the polls are only a safety net, so they slow down (each list poll costs the
+ * server one decryption per message); when it drops, they speed up again.
+ */
+let connected = false;
+const statusListeners = new Set<() => void>();
+function setConnected(value: boolean) {
+  if (connected === value) return;
+  connected = value;
+  for (const listener of statusListeners) listener();
+}
+const subscribeStatus = (listener: () => void) => {
+  statusListeners.add(listener);
+  return () => statusListeners.delete(listener);
+};
+export function useMailboxLiveConnected(): boolean {
+  return useSyncExternalStore(
+    subscribeStatus,
+    () => connected,
+    () => false,
+  );
+}
+/** A safety-net poll interval: `fallbackMs` without the stream, a minute with it. */
+export function livePollMs(live: boolean, fallbackMs: number): number {
+  return live ? Math.max(fallbackMs, 60_000) : fallbackMs;
+}
 
 /** The mailbox id an "arrival" event carries, or null. */
 export function arrivalMailboxId(data: string): string | null {
@@ -42,7 +70,9 @@ export function useMailboxLive(enabled: boolean, onArrival: (mailboxIds: string[
     // The stream renews itself every few minutes and after a network blip;
     // whatever arrived in that gap is read on reconnect, not at the next poll.
     let opened = false;
+    source.addEventListener("error", () => setConnected(false));
     source.addEventListener("open", () => {
+      setConnected(true);
       if (opened) {
         handler.current([]);
         window.dispatchEvent(
@@ -59,6 +89,7 @@ export function useMailboxLive(enabled: boolean, onArrival: (mailboxIds: string[
     });
     return () => {
       source.close();
+      setConnected(false);
       if (timer) clearTimeout(timer);
     };
   }, [enabled]);

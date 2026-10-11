@@ -95,6 +95,27 @@ describe("private Mail runtime adapters", () => {
     });
     expect(provider.send).toHaveBeenCalledTimes(1);
   });
+  it("sends Bcc in the envelope only: the header and the format marker never leave", async () => {
+    const sealed = Buffer.from(
+      "From: person@example.invalid\r\nTo: recipient@example.invalid\r\nBcc: hidden@example.invalid\r\nX-MepMail-Format: rich\r\nSubject: Fixture\r\n\r\nPrivate body",
+    );
+    await createMailboxSesSender(database(), {
+      configurationSets,
+      throttle: vi.fn().mockResolvedValue(undefined),
+      checkRecipients: vi.fn().mockResolvedValue(true),
+      clientFactory,
+    }).send({ ...input, raw: sealed, bcc: ["hidden@example.invalid"] });
+    const sent = provider.inputs[0] as {
+      Content: { Raw: { Data: Buffer } };
+      Destination: { BccAddresses: string[] };
+    };
+    expect(sent.Content.Raw.Data.toString()).toBe(
+      "From: person@example.invalid\r\nTo: recipient@example.invalid\r\nSubject: Fixture\r\n\r\nPrivate body",
+    );
+    expect(sent.Destination.BccAddresses).toEqual(["hidden@example.invalid"]);
+    // The sealed copy the outbox keeps is untouched.
+    expect(sealed.toString()).toContain("Bcc: hidden@example.invalid");
+  });
   it("reserves distinct To/Cc/Bcc recipients before one immutable provider request", async () => {
     const original = Buffer.from(input.raw);
     const mutable = {

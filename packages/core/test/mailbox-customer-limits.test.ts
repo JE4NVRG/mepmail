@@ -410,7 +410,7 @@ describe("finite Correio customer outbound allowances", () => {
     }
   });
 
-  it("refuses unsupported Bcc before reserving any annual recipient allowance", async () => {
+  it("counts Bcc recipients against the annual allowance like To and Cc", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
       vi.setSystemTime(annualStart);
@@ -419,20 +419,20 @@ describe("finite Correio customer outbound allowances", () => {
         `From: ${f.person.address}\r\nTo: first@example.invalid\r\nCc: second@example.invalid\r\nBcc: hidden@example.invalid\r\n\r\nFixture`,
       );
       const item = await draft(f, f.person, 1, raw);
-      await expect(
-        queueMailboxDraft(
-          db,
-          keys,
-          f.actor,
-          {
-            mailboxId: f.person.id,
-            id: item.id,
-            expectedRevision: item.revision,
-          },
-          mime,
-        ),
-      ).rejects.toMatchObject({ code: "invalid" });
-      expect((await usage(f, f.person)).charged).toBe(0);
+      const queued = await queueMailboxDraft(
+        db,
+        keys,
+        f.actor,
+        {
+          mailboxId: f.person.id,
+          id: item.id,
+          expectedRevision: item.revision,
+        },
+        mime,
+      );
+      expect(queued.status).toBe("queued");
+      // To, Cc and Bcc: three distinct recipients reserved.
+      expect((await usage(f, f.person)).charged).toBe(3);
     } finally {
       vi.useRealTimers();
     }

@@ -164,7 +164,10 @@ inbox message UUID; the server preserves its reply references. To edit an
 existing draft, supply its `id`, the same ID as `sourceItemId`, and its latest
 `expectedRevision`. A conflict requires reloading the draft before editing.
 
-Recipient lists contain 1–20 addresses. Drafts from this API take up to 10 attachments,
+`to` takes 1–20 addresses. Optional `cc` and `bcc` add copies and blind copies, with
+To, Cc and Bcc together at most 20. Blind copies receive the message without the other
+recipients seeing them: the Bcc header stays only on the saved draft and the Sent copy,
+and each Bcc recipient counts against the outbound allowance like To and Cc. Drafts from this API take up to 10 attachments,
 each at most 256 KiB, and a final MIME message at most 1 MiB. An upload is
 `{ "filename": "note.txt", "base64": "..." }`; retained attachments use the indexes
 from the source message. Empty arrays are still required when there are none.

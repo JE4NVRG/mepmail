@@ -39,7 +39,13 @@ import {
   mailboxDateSection,
   mailboxInitials,
 } from "@/lib/mailbox-list-presentation";
-import { MAILBOX_ARRIVAL_EVENT, MAILBOX_NEW_MAIL_EVENT } from "@/lib/mailbox-live";
+import {
+  livePollMs,
+  MAILBOX_ARRIVAL_EVENT,
+  MAILBOX_NEW_MAIL_EVENT,
+  useMailboxLiveConnected,
+} from "@/lib/mailbox-live";
+import { MAILTO_PARAM, type MailtoPrefill, parseMailto } from "@/lib/mailbox-mailto";
 import type { NewMailNotice } from "@/lib/mailbox-new-mail";
 import {
   newUnreadArrivals,
@@ -60,8 +66,6 @@ import {
   customFolderOf,
   isSearchResultFolder,
   SEARCH_DEBOUNCE_MS,
-  SEARCH_QUERY_KEY,
-  searchMailboxes,
   serverSearchTerm,
 } from "@/lib/mailbox-search";
 import { MAILBOX_SHORTCUTS, mailboxShortcut } from "@/lib/mailbox-shortcuts";
@@ -93,6 +97,7 @@ import { MailboxInviteCard } from "./mailbox-invite-card";
 import { MailboxMoveMenu, type MailboxMoveMenuHandle } from "./mailbox-move-menu";
 import { MailboxRecipientField } from "./mailbox-recipient-field";
 import { MailboxRichBody } from "./mailbox-rich-body";
+import { MailboxRichEditor, type RichEditorHandle } from "./mailbox-rich-editor";
 import { MailboxSenderBar } from "./mailbox-sender-bar";
 import { MailboxSmartTabs } from "./mailbox-smart-tabs";
 import { MailboxTimeMenu, type MailboxTimeMenuHandle } from "./mailbox-time-menu";
@@ -307,6 +312,7 @@ function DraftDialog({
   current,
   send,
   quickReply,
+  prefill,
 }: {
   boxes: Box[];
   mailboxId: string;
@@ -314,6 +320,8 @@ function DraftDialog({
   mode: ComposeMode;
   /** A quick reply picked in the reader: it starts the reply, above the signature. */
   quickReply?: string | undefined;
+  /** A mailto: link's fields for a new message (no source). */
+  prefill?: MailtoPrefill | undefined;
   deliveryReady: boolean;
   close: () => void;
   saved: (item: Outputs["saveDraft"]) => Promise<void>;
@@ -329,7 +337,12 @@ function DraftDialog({
   const dialog = useRef<HTMLDialogElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const recipientInput = useRef<HTMLInputElement>(null);
-  const messageInput = useRef<HTMLTextAreaElement>(null);
+  const messageInput = useRef<RichEditorHandle>(null);
+  // The formatted body: HTML goes with the text only when there is formatting.
+  const [richHtml, setRichHtml] = useState<string | null>(
+    source?.kind === "draft" ? (source.draftHtml ?? null) : null,
+  );
+  const [formatted, setFormatted] = useState(source?.kind === "draft" && !!source.draftHtml);
   const boxId = mailboxId;
   const sender = boxes.find((box) => box.id === boxId);
   const canSend = !!send && deliveryReady && sender?.canSend === true;
@@ -344,7 +357,7 @@ function DraftDialog({
         : mode === "forward"
           ? []
           : splitRecipients(source.replyTo)
-      : [],
+      : (prefill?.to ?? []),
   );
   const [cc, setCc] = useState<string[]>(
     source
@@ -353,10 +366,17 @@ function DraftDialog({
         : mode === "replyAll"
           ? replyAllCopies(source, sender?.address ?? "", splitRecipients(source.replyTo))
           : []
-      : [],
+      : (prefill?.cc ?? []),
   );
   const [showCc, setShowCc] = useState(cc.length > 0);
   const ccInput = useRef<HTMLInputElement>(null);
+  // Cco: copies nobody else sees. Kept with the draft and in Sent; only the
+  // envelope carries them when the message goes.
+  const [bcc, setBcc] = useState<string[]>(
+    source?.kind === "draft" ? (source.bcc ?? []) : source ? [] : (prefill?.bcc ?? []),
+  );
+  const [showBcc, setShowBcc] = useState(bcc.length > 0);
+  const bccInput = useRef<HTMLInputElement>(null);
   // Suggestions come from what this person already uses: recipients typed on
   // this browser, people they sent to and people who wrote to them.
   const sentList = useQuery(
@@ -404,7 +424,7 @@ function DraftDialog({
           : /^re:/i.test(source.subject)
             ? source.subject
             : `Re: ${source.subject}`
-      : "",
+      : (prefill?.subject ?? ""),
   );
   const [text, setText] = useState(() => {
     if (source && source.kind !== "draft" && mode !== "forward") {
@@ -441,7 +461,7 @@ function DraftDialog({
                 .map((line) => `> ${line}`)
                 .join("\n"),
             })
-          : "",
+          : (prefill?.body ?? ""),
       source?.kind === "draft" ? "" : senderSignature,
       source?.kind !== "draft" && mode === "forward",
     );
@@ -476,20 +496,27 @@ function DraftDialog({
   useEffect(() => {
     active.current = true;
     dialog.current?.showModal();
-    (source && mode !== "forward" ? messageInput.current : recipientInput.current)?.focus();
-    // The cursor waits at the top of a reply, or right after a quick reply.
-    const start = source && mode !== "forward" ? (quickReply?.trim().length ?? 0) : 0;
-    if (source?.kind !== "draft") messageInput.current?.setSelectionRange(start, start);
+    // A reply puts the cursor in the editor (it focuses itself once it
+    // mounts); a new message or a forward starts at the recipients.
+    if (!(source && mode !== "forward")) recipientInput.current?.focus();
     return () => {
       active.current = false;
     };
-  }, [mode, source, quickReply]);
+  }, [mode, source]);
+  // Another sender's signature replaces the last one; the editor gets the new
+  // body as plain text (formatting is redone after a sender change).
+  const latestText = useRef(text);
+  latestText.current = text;
   useEffect(() => {
     if (source) return;
     const next = senderSignature;
     const previous = previousSignature.current;
-    setText((value) => replaceMailboxSignature(value, previous, next));
+    if (next === previous) return;
+    const updated = replaceMailboxSignature(latestText.current, previous, next);
     previousSignature.current = next;
+    if (updated === latestText.current) return;
+    setText(updated);
+    messageInput.current?.setText(updated);
   }, [senderSignature, source]);
   const allowed = boxes.some(
     (b) => b.id === boxId && b.canRead && b.canDraft && b.status === "planned",
@@ -599,13 +626,21 @@ function DraftDialog({
           const sendNow =
             canSend && (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "send";
           const copies = showCc ? cc : [];
-          const invalid = [...to, ...copies].find((address) => !isRecipientAddress(address));
+          const hidden = showBcc ? bcc : [];
+          const invalid = [...to, ...copies, ...hidden].find(
+            (address) => !isRecipientAddress(address),
+          );
           if (invalid) {
             setError(t("invalidRecipient", { address: invalid }));
-            (to.includes(invalid) ? recipientInput : ccInput).current?.focus();
+            (to.includes(invalid)
+              ? recipientInput
+              : copies.includes(invalid)
+                ? ccInput
+                : bccInput
+            ).current?.focus();
             return;
           }
-          if (to.length + copies.length > 20) {
+          if (to.length + copies.length + hidden.length > 20) {
             setError(t("recipientLimit"));
             return;
           }
@@ -621,13 +656,15 @@ function DraftDialog({
               mode: source?.kind === "draft" ? undefined : mode === "forward" ? "forward" : "reply",
               to,
               ...(copies.length ? { cc: copies } : {}),
+              ...(hidden.length ? { bcc: hidden } : {}),
               subject,
               text,
+              ...(formatted && richHtml ? { html: richHtml } : {}),
               retainedAttachments: retained,
               uploads: uploads.map(({ filename, base64 }) => ({ filename, base64 })),
             });
             rememberRecipients(
-              [...to, ...copies],
+              [...to, ...copies, ...hidden],
               new Map(contacts.map((contact) => [contact.address.toLowerCase(), contact.name])),
             );
             if (!active.current || !current()) return;
@@ -694,18 +731,35 @@ function DraftDialog({
                 autoFocus={!source || mode === "forward"}
                 text={recipientText}
                 action={
-                  showCc ? null : (
-                    <button
-                      type="button"
-                      className={styles.ccToggle}
-                      title={t("addCc")}
-                      onClick={() => {
-                        setShowCc(true);
-                        requestAnimationFrame(() => ccInput.current?.focus());
-                      }}
-                    >
-                      {t("addCcShort")}
-                    </button>
+                  showCc && showBcc ? null : (
+                    <span className={styles.ccToggles}>
+                      {showCc ? null : (
+                        <button
+                          type="button"
+                          className={styles.ccToggle}
+                          title={t("addCc")}
+                          onClick={() => {
+                            setShowCc(true);
+                            requestAnimationFrame(() => ccInput.current?.focus());
+                          }}
+                        >
+                          {t("addCcShort")}
+                        </button>
+                      )}
+                      {showBcc ? null : (
+                        <button
+                          type="button"
+                          className={styles.ccToggle}
+                          title={t("addBcc")}
+                          onClick={() => {
+                            setShowBcc(true);
+                            requestAnimationFrame(() => bccInput.current?.focus());
+                          }}
+                        >
+                          {t("addBccShort")}
+                        </button>
+                      )}
+                    </span>
                   )
                 }
               />
@@ -723,6 +777,20 @@ function DraftDialog({
                   text={recipientText}
                 />
               ) : null}
+              {showBcc ? (
+                <MailboxRecipientField
+                  label={t("bcc")}
+                  values={bcc}
+                  onChange={(next) => {
+                    setBcc(next);
+                    setError("");
+                  }}
+                  contacts={contacts}
+                  placeholder={t("composeRecipientsPlaceholder")}
+                  inputRef={bccInput}
+                  text={recipientText}
+                />
+              ) : null}
             </div>
             <label>
               {t("subject")}
@@ -733,18 +801,41 @@ function DraftDialog({
                 maxLength={998}
               />
             </label>
-            <label>
-              {t("message")}
-              <textarea
+            <div className={styles.composerBodyField}>
+              <span className={styles.composerBodyLabel}>{t("message")}</span>
+              <MailboxRichEditor
                 ref={messageInput}
-                className="ms-input"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                maxLength={262144}
-                rows={7}
-                autoFocus={!!source && mode !== "forward"}
+                initialText={text}
+                initialHtml={richHtml}
+                onChange={(value) => {
+                  setText(value.text);
+                  setRichHtml(value.html);
+                  setFormatted(value.formatted);
+                }}
+                disabled={busy || !allowed}
+                placeholder={t("composeBodyPlaceholder")}
+                ariaLabel={t("message")}
+                labels={{
+                  toolbar: t("format.toolbar"),
+                  bold: t("format.bold"),
+                  italic: t("format.italic"),
+                  link: t("format.link"),
+                  linkAddress: t("format.linkAddress"),
+                  linkApply: t("format.linkApply"),
+                  linkRemove: t("format.linkRemove"),
+                  bulletList: t("format.bulletList"),
+                  orderedList: t("format.orderedList"),
+                  quote: t("format.quote"),
+                }}
+                autoFocus={
+                  source && mode !== "forward"
+                    ? source.kind !== "draft" && quickReply?.trim()
+                      ? "firstLineEnd"
+                      : "start"
+                    : undefined
+                }
               />
-            </label>
+            </div>
             <div className={styles.composerUpload}>
               <button
                 type="button"
@@ -1042,6 +1133,7 @@ export function MailboxContentView({
     source: Item | null;
     mode: ComposeMode;
     quickReply?: string;
+    prefill?: MailtoPrefill;
   } | null>(null);
   const composerSequence = useRef(0);
   const composerSession = useRef<number | null>(null);
@@ -1154,6 +1246,7 @@ export function MailboxContentView({
   const reader = useRef<HTMLElement>(null);
   const rowButtons = useRef(new Map<string, HTMLButtonElement>());
   const trpcClient = useTRPCClient();
+  const live = useMailboxLiveConnected();
   const listMailboxId = selected?.id ?? null;
   const listing = useInfiniteQuery(
     trpc.mailboxes.items.infiniteQueryOptions(
@@ -1213,7 +1306,7 @@ export function MailboxContentView({
         running = false;
       }
     }
-    const timer = setInterval(() => void poll(), 15000);
+    const timer = setInterval(() => void poll(), livePollMs(live, 15000));
     const onVisible = () => {
       if (document.visibilityState === "visible") void poll();
     };
@@ -1227,7 +1320,7 @@ export function MailboxContentView({
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener(MAILBOX_ARRIVAL_EVENT, onArrival);
     };
-  }, [listMailboxId, folder, mailboxKind, customFolderId, queries, trpc, trpcClient]);
+  }, [listMailboxId, folder, mailboxKind, customFolderId, queries, trpc, trpcClient, live]);
   // Every page so far, in order; "Carregar mais" appends the next one.
   const listedItems = useMemo(
     () => listing.data?.pages.flatMap((page) => page.items),
@@ -1259,22 +1352,17 @@ export function MailboxContentView({
   // Server search: every folder of the mailboxes in scope (not the trash or
   // spam), beyond the rows loaded here. Until it answers, and whenever it
   // cannot (an older server), the local filter below is what shows.
-  const found = useInfiniteQuery({
-    queryKey: [SEARCH_QUERY_KEY, listMailboxId, searchTerm],
-    enabled: searchTerm !== null,
-    initialPageParam: null as string | null,
-    queryFn: ({ pageParam }) =>
-      searchMailboxes<ListedItem>(trpcClient, {
-        query: searchTerm ?? "",
-        mailboxId: listMailboxId,
-        folder: "all",
-        limit: 50,
-        ...(pageParam ? { cursor: pageParam } : {}),
-      }),
-    getNextPageParam: (page) => page.nextCursor ?? undefined,
-    retry: false,
-    staleTime: 30_000,
-  });
+  const found = useInfiniteQuery(
+    trpc.mailboxes.search.infiniteQueryOptions(
+      { query: searchTerm ?? "", mailboxId: listMailboxId, folder: "all", limit: 50 },
+      {
+        enabled: searchTerm !== null,
+        getNextPageParam: (page) => page.nextCursor ?? undefined,
+        retry: false,
+        staleTime: 30_000,
+      },
+    ),
+  );
   const searching = searchTerm !== null && found.isSuccess && !found.data.pages[0]?.tooShort;
   const searchFolders = useQuery(
     trpc.mailboxes.folders.queryOptions(
@@ -1394,7 +1482,16 @@ export function MailboxContentView({
       // A message read a moment ago, or prefetched on hover, opens at once.
       gcTime: 2 * 60_000,
       staleTime: 10_000,
-      refetchInterval: 15000,
+      // A send in progress is followed closely; anything else is a safety net.
+      refetchInterval: (query) => {
+        const open = query.state.data;
+        return open?.kind === "draft" &&
+          (open.sendStatus === "queued" ||
+            open.sendStatus === "sending" ||
+            open.sendStatus === "unknown")
+          ? 5000
+          : livePollMs(live, 15000);
+      },
     }),
   );
   const item = visibleItem && !detail.isError ? detail.data : null;
@@ -1418,11 +1515,54 @@ export function MailboxContentView({
     source: Item | null,
     mode: ComposeMode = "reply",
     quickReply?: string,
+    prefill?: MailtoPrefill,
   ) {
     const session = ++composerSequence.current;
     composerSession.current = session;
-    compose({ session, mailboxId, source, mode, ...(quickReply ? { quickReply } : {}) });
+    compose({
+      session,
+      mailboxId,
+      source,
+      mode,
+      ...(quickReply ? { quickReply } : {}),
+      ...(prefill ? { prefill } : {}),
+    });
   }
+  /** A mailto: link: a new message from the open mailbox (or the first writable one). */
+  function composeMailto(href: string) {
+    const prefill = parseMailto(href);
+    const from = (
+      selected && writable.some((box) => box.id === selected.id) ? selected : writable[0]
+    )?.id;
+    if (!prefill || !from) return false;
+    openComposer(from, null, "reply", undefined, prefill);
+    return true;
+  }
+  // /mail?mailto=<link> (a browser or the desktop app handing over an email
+  // link): the composer opens with it once the writable mailboxes are known,
+  // and the link leaves the address bar so a reload does not open it again.
+  const pendingMailto = useRef<string | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const link = params.get(MAILTO_PARAM);
+    if (!link) return;
+    pendingMailto.current = link;
+    params.delete(MAILTO_PARAM);
+    const query = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+    );
+  }, []);
+  // Runs on every render until the link is used: cheap, and it waits for the
+  // mailboxes without tracking each value the composer needs.
+  useEffect(() => {
+    const link = pendingMailto.current;
+    if (!link || !writable.length) return;
+    pendingMailto.current = null;
+    composeMailto(link);
+  });
   const closeComposer = useCallback((session: number) => {
     if (composerSession.current !== session) return;
     composerSession.current = null;
@@ -1525,7 +1665,7 @@ export function MailboxContentView({
       queries.invalidateQueries({ queryKey: trpc.mailboxes.item.queryKey() }),
       queries.invalidateQueries({ queryKey: trpc.mailboxes.unreadCounts.queryKey() }),
       queries.invalidateQueries({ queryKey: trpc.mailboxes.scheduling.counts.queryKey() }),
-      queries.invalidateQueries({ queryKey: [SEARCH_QUERY_KEY] }),
+      queries.invalidateQueries({ queryKey: trpc.mailboxes.search.pathKey() }),
     ]);
   }
   const conflictOr = (cause: unknown, fallback: string) =>
@@ -4017,6 +4157,9 @@ export function MailboxContentView({
                     externalImages={item.externalImages}
                     trustedImageOrigin={item.trustedImageOrigin}
                     sender={item.kind === "inbox" ? item.from : ""}
+                    onMailto={(href) => {
+                      if (!composeMailto(href)) window.open(href, "_blank", "noopener");
+                    }}
                   />
                   {item.attachments.length ? (
                     <section aria-label={t("attachments")} className={styles.attachments}>
@@ -4065,6 +4208,7 @@ export function MailboxContentView({
           source={composer.source}
           mode={composer.mode}
           quickReply={composer.quickReply}
+          prefill={composer.prefill}
           deliveryReady={deliveryReady}
           current={() => composerSession.current === composer.session}
           close={() => closeComposer(composer.session)}

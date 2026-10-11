@@ -167,7 +167,10 @@ com o UUID da mensagem recebida; o servidor preserva as referências da resposta
 Para editar um rascunho existente, informe seu `id`, o mesmo ID em `sourceItemId`
 e a última `expectedRevision`. Um conflito exige recarregar antes de editar.
 
-A lista aceita 1–20 destinatários. Rascunhos desta API aceitam até 10 anexos, cada um com
+`to` aceita 1–20 endereços. Os campos opcionais `cc` e `bcc` acrescentam cópias e cópias
+ocultas, com To, Cc e Cco somando no máximo 20. A cópia oculta recebe a mensagem sem que
+os outros destinatários a vejam: o cabeçalho Bcc fica só no rascunho salvo e na cópia de
+Enviados, e cada destinatário em Cco conta na franquia de envio como To e Cc. Rascunhos desta API aceitam até 10 anexos, cada um com
 no máximo 256 KiB, e mensagem MIME final de até 1 MiB. Um upload usa
 `{ "filename": "nota.txt", "base64": "..." }`; anexos preservados usam os índices
 da mensagem de origem. As duas listas vazias continuam obrigatórias sem anexos.

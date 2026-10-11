@@ -1,0 +1,113 @@
+/* The composer's formatted body: a slim toolbar over the editing area, in the
+   same frame the plain textarea used. */
+.editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  background: var(--ms-inset);
+}
+.editor:focus-within {
+  border-color: var(--ms-line-strong);
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--ms-line);
+}
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ms-muted);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.tool svg {
+  width: 16px;
+  height: 16px;
+}
+.tool:hover:not(:disabled),
+.tool[aria-pressed="true"] {
+  color: var(--ms-bone);
+  background: var(--ms-panel-raised);
+}
+.tool:focus-visible {
+  outline: 2px solid var(--ms-violet);
+  outline-offset: 1px;
+}
+.tool:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--ms-line);
+}
+.linkRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ms-line);
+}
+.linkLabel {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 220px;
+  font-size: 12px;
+  color: var(--ms-muted);
+}
+.body {
+  flex: 1;
+  min-height: 180px;
+  padding: 10px 12px;
+  overflow-y: auto;
+  font-size: var(--ms-fs-ui);
+  line-height: 1.55;
+  color: var(--ms-bone);
+  outline: none;
+  overflow-wrap: anywhere;
+}
+.body p {
+  margin: 0 0 0.6em;
+}
+.body ul,
+.body ol {
+  margin: 0 0 0.6em;
+  padding-left: 1.4em;
+}
+.body blockquote {
+  margin: 0 0 0.6em;
+  padding-left: 12px;
+  color: var(--ms-muted);
+  border-left: 2px solid var(--ms-line-strong);
+}
+.body a {
+  color: var(--ms-violet);
+  text-decoration: underline;
+}
+.body :global(p.is-editor-empty:first-child::before) {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--ms-faint);
+  pointer-events: none;
+}
+.editor[data-disabled] .body {
+  opacity: 0.6;
+}

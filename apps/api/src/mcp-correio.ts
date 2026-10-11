@@ -164,11 +164,14 @@ function buildCorreioServer(origin: string, token: string): McpServer {
         "Create or update a plain-text draft in a mailbox without sending it; the draft is written from that mailbox's address. The mailbox signature is added at the end, once, and the message also goes out formatted. A new draft takes expected_revision 0; editing one needs its id and current revision (a stale revision is refused, re-read the draft). To answer or pass on a received message, give its id as source_item_id with mode reply or forward. Attachments are not supported here.",
       inputSchema: z.object({
         to: z.array(z.email().max(254)).min(1).max(20).describe("Recipient addresses"),
-        cc: z
+        cc: z.array(z.email().max(254)).max(19).optional().describe("Copy (Cc) addresses"),
+        bcc: z
           .array(z.email().max(254))
           .max(19)
           .optional()
-          .describe("Copy (Cc) addresses; To and Cc together count up to 20"),
+          .describe(
+            "Blind copy (Bcc) addresses: they receive the message, and no other recipient sees them; To, Cc and Bcc together count up to 20",
+          ),
         subject: z
           .string()
           .max(998)
@@ -203,6 +206,7 @@ function buildCorreioServer(origin: string, token: string): McpServer {
           ...(args.mode ? { mode: args.mode } : {}),
           to: args.to,
           ...(args.cc?.length ? { cc: args.cc } : {}),
+          ...(args.bcc?.length ? { bcc: args.bcc } : {}),
           subject: args.subject,
           text: args.text,
           retainedAttachments: [],

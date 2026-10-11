@@ -3127,3 +3127,20 @@
     background: Highlight;
   }
 }
+
+/* The composer's "+ Cc" and "+ Cco" side by side, and its formatted body. */
+.ccToggles {
+  display: inline-flex;
+  gap: 4px;
+}
+.composerBodyField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  flex: 1;
+}
+.composerBodyLabel {
+  font-size: var(--ms-fs-label);
+  color: var(--ms-muted);
+}

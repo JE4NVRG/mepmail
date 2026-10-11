@@ -19,7 +19,12 @@ import {
   mailboxFolderOrderAfterMove,
   mailboxFolderTint,
 } from "@/lib/mailbox-inbox-presentation";
-import { MAILBOX_NEW_MAIL_EVENT, useMailboxLive } from "@/lib/mailbox-live";
+import {
+  livePollMs,
+  MAILBOX_NEW_MAIL_EVENT,
+  useMailboxLive,
+  useMailboxLiveConnected,
+} from "@/lib/mailbox-live";
 import { type NewMailNotice, newMailNotices, rememberUnread } from "@/lib/mailbox-new-mail";
 import { noticesWanted } from "@/lib/mailbox-notifications";
 import { MAILBOX_OPEN_LICENSE_EVENT } from "@/lib/mailbox-plans";
@@ -426,10 +431,11 @@ export function MailboxesView({
   );
   const systemLicense =
     !service.isPending && !service.isError && service.data?.licenseKind === "system";
+  const live = useMailboxLiveConnected();
   const registry = useQuery(
     trpc.mailboxes.list.queryOptions(undefined, {
       enabled: mayUseMail,
-      refetchInterval: 15000,
+      refetchInterval: livePollMs(live, 15000),
       retry: (count, error) =>
         (error as { data?: { code?: string } }).data?.code !== "NOT_FOUND" && count < 3,
     }),
@@ -571,7 +577,7 @@ export function MailboxesView({
   const unreadCounts = useQuery(
     trpc.mailboxes.unreadCounts.queryOptions(undefined, {
       enabled: mayUseMail && !!registry.data,
-      refetchInterval: 15000,
+      refetchInterval: livePollMs(live, 15000),
       // The title, the desktop tray badge and the new-mail notice read these
       // counts, so they keep coming while the window is hidden or in the tray.
       refetchIntervalInBackground: true,

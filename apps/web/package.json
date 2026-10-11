@@ -23,6 +23,11 @@
     "@millionsend/queue": "workspace:*",
     "@millionsend/ses": "workspace:*",
     "@tanstack/react-query": "^5.102.8",
+    "@tiptap/extension-link": "2.27.2",
+    "@tiptap/extension-placeholder": "2.27.2",
+    "@tiptap/pm": "2.27.2",
+    "@tiptap/react": "2.27.2",
+    "@tiptap/starter-kit": "2.27.2",
     "@trpc/client": "^11.18.0",
     "@trpc/server": "^11.18.0",
     "@trpc/tanstack-react-query": "^11.18.0",
@@ -37,10 +42,10 @@
     "nodemailer": "10.0.3",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "sanitize-html": "2.18.0",
     "simple-icons": "^16.30.0",
     "superjson": "^2.2.6",
-    "zod": "^4.6.3",
-    "sanitize-html": "2.18.0"
+    "zod": "^4.6.3"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.16",
@@ -50,9 +55,9 @@
     "@types/nodemailer": "8.0.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/sanitize-html": "2.16.2",
     "stripe": "^22.6.2",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.0",
-    "@types/sanitize-html": "2.16.2"
+    "vitest": "^5.0.0"
   }
 }

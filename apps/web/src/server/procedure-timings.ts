@@ -14,6 +14,22 @@ export function timedProcedure(path: string): boolean {
   return path.startsWith(TIMED_PREFIX);
 }
 
+/**
+ * Times one stage inside a procedure into the same window, e.g. "mailboxes.items:list",
+ * so a slow procedure can be split before anything is changed. Returns what `work` returns.
+ */
+export async function timedStage<T>(name: string, work: () => Promise<T>): Promise<T> {
+  const started = performance.now();
+  let ok = false;
+  try {
+    const result = await work();
+    ok = true;
+    return result;
+  } finally {
+    recordProcedureTiming(name, performance.now() - started, ok);
+  }
+}
+
 export function recordProcedureTiming(path: string, ms: number, ok: boolean): void {
   if (!logging) {
     logging = true;

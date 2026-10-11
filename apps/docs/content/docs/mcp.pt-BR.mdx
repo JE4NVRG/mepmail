@@ -312,7 +312,7 @@ cobre as duas ferramentas de `broadcasts:read`. Ferramentas marcadas com
 | `mailbox_read_message` | `mail:read` | Lê uma mensagem: cabeçalhos, texto e metadados dos anexos. |
 | `create_mailbox` | `mailboxes:write` | **admin** Cria uma caixa do Correio num domínio verificado, usando uma vaga que a licença já tem (nunca compra). |
 | `create_mailbox_agent_key` | `mailboxes:write` | **admin** Cria uma chave de agente de leitura/rascunho para uma caixa sua, com a URL do MCP do Correio; o envio só é liberado no painel. |
-| `mailbox_save_draft` | `mail:draft` | Cria ou edita um rascunho em texto puro numa dessas caixas, sem enviar. |
+| `mailbox_save_draft` | `mail:draft` | Cria ou edita um rascunho em texto puro numa dessas caixas, com Para, Cc e Cco (20 no total), sem enviar. |
 | `mailbox_send_draft` | `mail:draft` | Envia um rascunho salvo; sem `mail:send`, pede sua aprovação antes. |
 
 ## Resultados das ferramentas

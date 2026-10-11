@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { Select } from "@/components/select";
 import { Switch } from "@/components/switch";
+import { toast } from "@/components/toast";
 import { isDesktop } from "@/lib/desktop-bridge";
 import {
   type DesktopAppPlatform,
@@ -13,6 +14,7 @@ import {
   WINDOWS_STORE_URL,
 } from "@/lib/desktop-download";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
+import { canOfferMailtoHandler, registerMailtoHandler } from "@/lib/mailbox-mailto";
 import { noticesWanted, writeNoticePreference } from "@/lib/mailbox-notifications";
 import type { CorreioPrefs } from "@/lib/mailbox-preferences";
 import {
@@ -66,9 +68,12 @@ export function MailboxAppearanceSettings({
   const desktop = isDesktop();
   const [notices, setNotices] = useState<NoticeState>("off");
   const [desktopApp, setDesktopApp] = useState<DesktopAppPlatform | null>(null);
+  // Browsers that let a site open email links (Chrome, Edge, Firefox); not the desktop app.
+  const [mailtoOffer, setMailtoOffer] = useState(false);
   useEffect(() => {
     setNotices(readNoticeState());
     setDesktopApp(desktopAppFor(navigator.userAgent, isDesktop()));
+    setMailtoOffer(!isDesktop() && canOfferMailtoHandler());
   }, []);
 
   // Quick replies are edited line by line and saved when a line loses focus.
@@ -156,6 +161,16 @@ export function MailboxAppearanceSettings({
                 "_blank",
                 "noopener,noreferrer",
               ),
+          },
+        ]
+      : []),
+    ...(mailtoOffer
+      ? [
+          {
+            key: "mailto",
+            label: t("guideMailto"),
+            run: () =>
+              toast(t(registerMailtoHandler() ? "mailtoAsked" : "mailtoUnavailable"), "info"),
           },
         ]
       : []),

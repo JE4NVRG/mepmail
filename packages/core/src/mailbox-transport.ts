@@ -500,10 +500,9 @@ async function envelope(adapter: MailboxTransportMimeAdapter, raw: Buffer, outbo
     (a) => !to.includes(a) && !cc.includes(a),
   );
   const count = to.length + cc.length + bcc.length;
-  // The pilot composer has no Bcc contract. Passing a raw Bcc header through
-  // could expose hidden recipients, so require explicit future stripping support.
-  if (outbound && (!to.length || count > MAX_RECIPIENTS || bcc.length))
-    throw new MailboxContentError("invalid");
+  // Bcc travels in the envelope only: the provider adapter removes the header from the
+  // bytes it sends (stripMailboxPrivateHeaders), while the sealed copies keep it.
+  if (outbound && (!to.length || count > MAX_RECIPIENTS)) throw new MailboxContentError("invalid");
   return { from, to, cc, bcc, count };
 }
 function outboxDto(row: Outbox, duplicate: boolean) {

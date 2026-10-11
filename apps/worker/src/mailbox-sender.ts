@@ -5,6 +5,7 @@ import {
   MailboxSendDeferredError,
   MailboxSendRejectedError,
   type MailboxTransportMimeAdapter,
+  stripMailboxPrivateHeaders,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { associateTenantResources, ensureTenant, type SesTenantClient } from "@millionsend/ses";
@@ -211,10 +212,11 @@ export function createMailboxSesSender(
   }
   return {
     async send(input) {
-      // Capture the same MIME/envelope whose recipient permits are reserved below.
+      // Capture the same MIME/envelope whose recipient permits are reserved below. Bcc
+      // and the format marker stay on the sealed copies and never leave (SES or relay).
       input = {
         ...input,
-        raw: Buffer.from(input.raw),
+        raw: stripMailboxPrivateHeaders(Buffer.from(input.raw)),
         to: [...input.to],
         cc: [...input.cc],
         bcc: [...input.bcc],

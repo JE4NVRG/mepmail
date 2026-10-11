@@ -307,7 +307,7 @@ and admins.
 | `mailbox_read_message` | `mail:read` | Read one message: headers, text and attachment metadata. |
 | `create_mailbox` | `mailboxes:write` | **admin** Create a Correio mailbox on a verified domain, using a seat the license already has (never a purchase). |
 | `create_mailbox_agent_key` | `mailboxes:write` | **admin** Create a read/draft agent key for a mailbox you own, with the Correio MCP URL; send is granted only in the dashboard. |
-| `mailbox_save_draft` | `mail:draft` | Create or edit a plain-text draft in one of those mailboxes, without sending. |
+| `mailbox_save_draft` | `mail:draft` | Create or edit a plain-text draft in one of those mailboxes, with To, Cc and Bcc (20 in all), without sending. |
 | `mailbox_send_draft` | `mail:draft` | Send a saved draft; without `mail:send` it asks you to approve it first. |
 
 ## Tool results

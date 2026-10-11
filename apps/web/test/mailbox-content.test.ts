@@ -1525,6 +1525,73 @@ describe("session-authenticated mailbox content", () => {
       (await as().saveDraft(draft({ to: many(14, "to"), cc: many(6, "cc") }))).id,
     ).toBeTruthy();
   });
+  it("keeps Bcc on the sealed draft and the reader, and hands it to the sender as envelope only", async () => {
+    const saved = await as().saveDraft(
+      draft({ cc: ["copy@example.invalid"], bcc: ["hidden@example.invalid"] }),
+    );
+    const mime = await simpleParser(
+      (await readMailboxItem(db, keys, actor(), { mailboxId, id: saved.id })).raw,
+    );
+    const bcc = Array.isArray(mime.bcc) ? mime.bcc : mime.bcc ? [mime.bcc] : [];
+    expect(bcc.flatMap((v) => v.value).map((v) => v.address)).toEqual(["hidden@example.invalid"]);
+    const detail = await as().item({ mailboxId, id: saved.id });
+    expect(detail.bcc).toEqual(["hidden@example.invalid"]);
+    expect(detail.cc).toEqual(["copy@example.invalid"]);
+    // A plain draft has no Bcc and no formatting of its own.
+    const plain = await as().item({ mailboxId, id: (await as().saveDraft(draft())).id });
+    expect(plain.bcc).toEqual([]);
+    expect(plain.draftHtml).toBeNull();
+    // To, Cc and Bcc share one 20-recipient cap.
+    const many = (n: number, at: string) =>
+      Array.from({ length: n }, (_, i) => `r${i}@${at}.invalid`);
+    await expect(
+      as().saveDraft(draft({ to: many(10, "to"), cc: many(5, "cc"), bcc: many(6, "bcc") })),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    // Sending: the hidden person is in the envelope; the provider adapter strips the header.
+    const { sender } = await submittedSent({ bcc: ["hidden@example.invalid"] });
+    const call = (sender.mock.calls[0] as unknown as [{ to: string[]; bcc: string[] }])[0];
+    expect(call.to).toEqual(["reply@example.invalid"]);
+    expect(call.bcc).toEqual(["hidden@example.invalid"]);
+  });
+  it("seals the person's formatting sanitized, reopens it as draftHtml, and keeps the text part", async () => {
+    const saved = await as().saveDraft(
+      draft({
+        text: "Olá mundo\n\nVeja o site",
+        html: '<p>Olá <strong>mundo</strong></p><p onclick="x()">Veja <a href="https://mepmail.dev/" target="_blank">o site</a></p><script>alert(1)</script><img src="https://t.invalid/p.gif"><a href="javascript:alert(1)">x</a>',
+      }),
+    );
+    const mime = await simpleParser(
+      (await readMailboxItem(db, keys, actor(), { mailboxId, id: saved.id })).raw,
+    );
+    expect(mime.text?.trim()).toBe("Olá mundo\n\nVeja o site");
+    expect(mime.headers.get("x-mepmail-format")).toBe("rich");
+    const html = String(mime.html);
+    expect(html).toContain("<strong>mundo</strong>");
+    expect(html).toContain('<a href="https://mepmail.dev/" rel="noopener noreferrer">o site</a>');
+    for (const banned of ["<script", "onclick", "<img", "javascript:", "target="])
+      expect(html).not.toContain(banned);
+    const detail = await as().item({ mailboxId, id: saved.id });
+    expect(detail.draftHtml).toBe(
+      '<p>Olá <strong>mundo</strong></p><p>Veja <a href="https://mepmail.dev/" rel="noopener noreferrer">o site</a></p><a rel="noopener noreferrer">x</a>',
+    );
+    // Saving again without html goes back to the plain draft, built from the text.
+    const again = await as().saveDraft(
+      draft({
+        id: saved.id,
+        sourceItemId: saved.id,
+        expectedRevision: saved.revision,
+        text: "Só texto",
+      }),
+    );
+    const back = await as().item({ mailboxId, id: again.id });
+    expect(back.draftHtml).toBeNull();
+    // Formatting that sanitizes to nothing is a plain draft too.
+    const empty = await as().saveDraft(draft({ html: "<script>x</script>" }));
+    expect((await as().item({ mailboxId, id: empty.id })).draftHtml).toBeNull();
+    await expect(as().saveDraft(draft({ html: "x".repeat(262145) }))).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+  });
   it("adds the mailbox signature to agent drafts once, formatted in the HTML part", async () => {
     await updateMailboxSignature(db, actor(), {
       mailboxId,

@@ -1434,11 +1434,14 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
         "Create or update a plain-text draft in one of those mailboxes without sending it; it is written from that mailbox's address with its signature added once. A new draft takes expected_revision 0; editing one needs its id and current revision (a stale revision is refused: re-read it). To answer or pass on a received message, give its id as source_item_id with mode reply or forward.",
       inputSchema: z.object({
         to: z.array(z.email().max(254)).min(1).max(20).describe("Recipient addresses"),
-        cc: z
+        cc: z.array(z.email().max(254)).max(19).optional().describe("Copy (Cc) addresses"),
+        bcc: z
           .array(z.email().max(254))
           .max(19)
           .optional()
-          .describe("Copy (Cc) addresses; To and Cc together count up to 20"),
+          .describe(
+            "Blind copy (Bcc) addresses: they receive the message, and no other recipient sees them; To, Cc and Bcc together count up to 20",
+          ),
         subject: z
           .string()
           .max(998)
@@ -1472,6 +1475,7 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
           ...(a.mode ? { mode: a.mode } : {}),
           to: a.to,
           ...(a.cc?.length ? { cc: a.cc } : {}),
+          ...(a.bcc?.length ? { bcc: a.bcc } : {}),
           subject: a.subject,
           text: a.text,
           retainedAttachments: [],

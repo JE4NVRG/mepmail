@@ -8,7 +8,12 @@
     "title": "What <highlight>shipped</highlight>, release by release.",
     "lead": "MepMail is built in the open. Here is every recent release, newest first — what changed for you, dated the day it shipped. The raw history lives in the repository's CHANGELOG.md.",
     "note": "The beta is open and self-serve: create a free account, no card required.",
-    "badges": ["Open beta · self-serve", "Dated releases", "EN + PT-BR", "Backed by CHANGELOG.md"],
+    "badges": [
+      "Open beta · self-serve",
+      "Dated releases",
+      "EN + PT-BR",
+      "Backed by CHANGELOG.md"
+    ],
     "ctaDocs": "Read the docs"
   },
   "feed": {
@@ -22,6 +27,30 @@
     }
   },
   "releases": [
+    {
+      "version": "0.114",
+      "date": "2026-10-11",
+      "title": "Formatted mail, Bcc and mailto links",
+      "summary": "Write with bold, italics, lists, links and quotes, add blind copies, and open mailto: links straight in Mail's composer. The folder rail counts load faster.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "The composer formats text: bold, italics, bulleted and numbered lists, quotes and links. A formatted draft reopens as you left it, and every message still carries a plain-text part.",
+            "Bcc next to Cc. Blind copies receive the message and no other recipient sees them; To, Cc and Bcc share the 20-recipient limit.",
+            "mailto: links open the composer with the recipients, subject and body filled in, from a message or from the browser once MepMail is set as the handler in Appearance.",
+            "Agents can add bcc to mailbox_save_draft (hosted MCP) and to the drafts API."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Unread, Snoozed, Scheduled and Follow-up counts and the folder list load several mailboxes at once instead of one after another.",
+            "With live updates connected, Mail checks for changes less often in the background."
+          ]
+        }
+      ]
+    },
     {
       "version": "0.113",
       "date": "2026-10-11",
@@ -61,7 +90,9 @@
         },
         {
           "kind": "fixed",
-          "items": ["An open draft shows its send status once, not twice."]
+          "items": [
+            "An open draft shows its send status once, not twice."
+          ]
         }
       ]
     },
@@ -325,7 +356,9 @@
         },
         {
           "kind": "changed",
-          "items": ["New-mail notices stay quiet while an import is running."]
+          "items": [
+            "New-mail notices stay quiet while an import is running."
+          ]
         }
       ]
     },
@@ -502,7 +535,9 @@
         },
         {
           "kind": "changed",
-          "items": ["The Correio list got faster still in mailboxes with many HTML messages."]
+          "items": [
+            "The Correio list got faster still in mailboxes with many HTML messages."
+          ]
         }
       ]
     },
@@ -579,7 +614,9 @@
         },
         {
           "kind": "fixed",
-          "items": ["Dragging or bulk-moving to a folder also works in the all-mailboxes view."]
+          "items": [
+            "Dragging or bulk-moving to a folder also works in the all-mailboxes view."
+          ]
         }
       ]
     },
@@ -812,7 +849,9 @@
         },
         {
           "kind": "fixed",
-          "items": ["The conversation count sits on the sender's line."]
+          "items": [
+            "The conversation count sits on the sender's line."
+          ]
         }
       ]
     },
@@ -846,7 +885,9 @@
         },
         {
           "kind": "changed",
-          "items": ["Moving a message to the trash keeps you in the folder you were in."]
+          "items": [
+            "Moving a message to the trash keeps you in the folder you were in."
+          ]
         }
       ]
     },

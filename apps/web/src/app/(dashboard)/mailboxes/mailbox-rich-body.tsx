@@ -32,6 +32,7 @@ export function MailboxRichBody({
   externalImages,
   trustedImageOrigin = null,
   sender = "",
+  onMailto,
 }: {
   text: string;
   html: string | null;
@@ -41,8 +42,12 @@ export function MailboxRichBody({
   trustedImageOrigin?: string | null;
   /** The From address: images can be shown for its domain from now on. */
   sender?: string;
+  /** A mailto: link clicked in the message: written here instead of in another app. */
+  onMailto?: ((href: string) => void) | undefined;
 }) {
   const t = useTranslations("mailboxes");
+  const mailtoHandler = useRef(onMailto);
+  mailtoHandler.current = onMailto;
   const [formatted, setFormatted] = useState(!!html);
   // A sender's address often changes per message (no-reply-<token>@mail.example);
   // its domain is what the person recognises and trusts.
@@ -73,8 +78,20 @@ export function MailboxRichBody({
       const height = Math.max(page.scrollHeight, element.contentDocument?.body?.scrollHeight ?? 0);
       if (height > 0) setFrameHeight(Math.min(height + 2, MAX_FRAME_HEIGHT));
     };
+    // Same origin (never scripts): this page can hear a click on a mailto: link.
+    const clicked = (event: MouseEvent) => {
+      const link = (event.target as Element | null)?.closest?.("a[href]");
+      const href = link?.getAttribute("href") ?? "";
+      if (!/^mailto:/i.test(href) || !mailtoHandler.current) return;
+      event.preventDefault();
+      mailtoHandler.current(href);
+    };
+    let listening: Document | null = null;
     const loaded = () => {
       measure();
+      listening?.removeEventListener("click", clicked);
+      listening = element.contentDocument;
+      listening?.addEventListener("click", clicked);
       observer?.disconnect();
       const content = element.contentDocument?.body;
       if (content && typeof ResizeObserver !== "undefined") {
@@ -87,6 +104,7 @@ export function MailboxRichBody({
     if (element.contentDocument?.readyState === "complete") loaded();
     return () => {
       element.removeEventListener("load", loaded);
+      listening?.removeEventListener("click", clicked);
       observer?.disconnect();
     };
   }, [formatted]);

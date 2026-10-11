@@ -28,6 +28,30 @@
   },
   "releases": [
     {
+      "version": "0.114",
+      "date": "2026-10-11",
+      "title": "E-mail formatado, Cco e links mailto",
+      "summary": "Escreva com negrito, itálico, listas, links e citações, acrescente cópias ocultas e abra links mailto: direto no compositor do Correio. As contagens da barra de pastas carregam mais rápido.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "O compositor formata o texto: negrito, itálico, listas com marcadores e numeradas, citações e links. Um rascunho formatado reabre como você deixou, e toda mensagem continua levando uma parte em texto puro.",
+            "Cco ao lado do Cc. A cópia oculta recebe a mensagem sem que os outros destinatários a vejam; Para, Cc e Cco dividem o limite de 20 destinatários.",
+            "Links mailto: abrem o compositor com destinatários, assunto e corpo preenchidos, a partir de uma mensagem ou do navegador, depois que o MepMail for escolhido em Aparência.",
+            "Agentes podem usar bcc no mailbox_save_draft (MCP hospedado) e na API de rascunhos."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "As contagens de não lidas, Adiadas, Agendadas e Acompanhamentos e a lista de pastas carregam várias caixas ao mesmo tempo, em vez de uma depois da outra.",
+            "Com as atualizações ao vivo conectadas, o Correio consulta mudanças em segundo plano com menos frequência."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.113",
       "date": "2026-10-11",
       "title": "Busca em todo o Correio",
@@ -66,7 +90,9 @@
         },
         {
           "kind": "fixed",
-          "items": ["Um rascunho aberto mostra o estado do envio uma vez só, não duas."]
+          "items": [
+            "Um rascunho aberto mostra o estado do envio uma vez só, não duas."
+          ]
         }
       ]
     },
@@ -823,7 +849,9 @@
         },
         {
           "kind": "fixed",
-          "items": ["O número de mensagens da conversa fica na mesma linha do remetente."]
+          "items": [
+            "O número de mensagens da conversa fica na mesma linha do remetente."
+          ]
         }
       ]
     },
@@ -857,7 +885,9 @@
         },
         {
           "kind": "changed",
-          "items": ["Mandar uma mensagem para a lixeira mantém você na pasta em que estava."]
+          "items": [
+            "Mandar uma mensagem para a lixeira mantém você na pasta em que estava."
+          ]
         }
       ]
     },
