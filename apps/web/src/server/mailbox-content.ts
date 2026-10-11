@@ -550,6 +550,13 @@ const newerFirst = (a: MailboxListPosition, b: MailboxListPosition) => {
   return at > 0n ? 1 : at < 0n ? -1 : a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
 };
 
+/** A listed row's metadata with its mailbox, before content is read. */
+export type MailboxListMetadata = Awaited<ReturnType<typeof listMailboxItems>>[number] & {
+  address: string;
+  mailboxLabel: string;
+  mailboxKind: "person" | "agent";
+};
+
 /**
  * Unified view, one page at a time; every decrypted row rechecks live mailbox
  * access. `cursor` continues after the previous page's last row, `nextCursor`
@@ -620,7 +627,7 @@ export async function getMailboxContentList(
       : input.folder === "sent" || input.folder === "followups"
         ? "sent"
         : "inbox";
-  const metadata = [];
+  const metadata: MailboxListMetadata[] = [];
   const mailboxesTruncated = readable.length > 20;
   const pages = await runLimited(readable.slice(0, 20), 8, async (box) => ({
     box,
@@ -682,6 +689,20 @@ export async function getMailboxContentList(
   const last = shown.at(-1);
   const nextCursor = more && last ? encodeMailboxListCursor(position(last)) : null;
   const limited = mailboxesTruncated || nextCursor !== null;
+  const rows = await buildMailboxListRows(db, actor, shown);
+  return { items: rows, limited, mailboxesTruncated, nextCursor };
+}
+
+/**
+ * One listing page's rows as items returns them: content from the list summaries (or
+ * the message), conversation counts, withheld quarantined rows, the agents' approval
+ * requests and a final live access check. Shared by items and search.
+ */
+export async function buildMailboxListRows(
+  db: Db,
+  actor: MailboxContentActor,
+  shown: MailboxListMetadata[],
+) {
   const items: {
     id: string;
     mailboxId: string;
@@ -826,7 +847,7 @@ export async function getMailboxContentList(
     db,
     actor,
     items.map((item) => item.mailboxId),
-    async () => ({ items: withRequests, limited, mailboxesTruncated, nextCursor }),
+    async () => withRequests,
   );
 }
 

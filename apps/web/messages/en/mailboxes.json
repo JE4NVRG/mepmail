@@ -159,6 +159,14 @@
   "sentEmptyBody": "Your sent messages will appear here when sending is active.",
   "searchEmptyBody": "Try another term or clear the search to see your messages.",
   "clearSearch": "Clear search",
+  "serverSearch": {
+    "searching": "Searching every folder…",
+    "results": "{count, plural, =0 {Nothing in your folders} one {# result across folders} other {# results across folders}}",
+    "resultsMore": "{count, number}+ results across folders",
+    "tooShort": "Use words of 2 letters or more.",
+    "localOnly": "Full search did not answer just now; showing only the loaded messages.",
+    "hint": "Tip: from:, to:, subject:, has:attachment, before:2026-10-01, after:, \"exact phrase\". Trash and Spam are left out."
+  },
   "viewDrafts": "View drafts",
   "downloadFile": "Download {name}",
   "readingPane": "Message reader",
@@ -944,7 +952,9 @@
     "smartInbox": "Smart inbox",
     "smartInboxHint": "Splits the Inbox into People, Notifications and Newsletters. Anyone you have written to or approved always stays in People.",
     "askNewSenders": "Ask about new senders",
-    "askNewSendersHint": "On a first message from someone you have never written to, Correio asks whether to approve or block them. Blocked senders go straight to Spam."
+    "askNewSendersHint": "On a first message from someone you have never written to, Correio asks whether to approve or block them. Blocked senders go straight to Spam.",
+    "openNextAfterRemove": "Open the next message after archiving or deleting",
+    "openNextAfterRemoveHint": "When you archive or delete the open message, the next one in the list opens. Turned off, the reader closes and you are back at the list."
   },
   "coach": {
     "text": "J and K move, E archives, S stars, ? shows every shortcut.",

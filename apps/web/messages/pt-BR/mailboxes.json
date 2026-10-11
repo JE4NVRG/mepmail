@@ -159,6 +159,14 @@
   "sentEmptyBody": "Quando o envio estiver ativo, suas mensagens enviadas aparecerão aqui.",
   "searchEmptyBody": "Tente outro termo ou limpe a busca para ver suas mensagens.",
   "clearSearch": "Limpar busca",
+  "serverSearch": {
+    "searching": "Buscando em todas as pastas…",
+    "results": "{count, plural, =0 {Nada nas pastas} one {# resultado em todas as pastas} other {# resultados em todas as pastas}}",
+    "resultsMore": "{count, number}+ resultados em todas as pastas",
+    "tooShort": "Use palavras com 2 letras ou mais.",
+    "localOnly": "A busca completa não respondeu agora; mostrando só as mensagens carregadas.",
+    "hint": "Dica: de:, para:, assunto:, tem:anexo, antes:2026-10-01, depois:, \"frase exata\". Lixeira e Spam ficam de fora."
+  },
   "viewDrafts": "Ver rascunhos",
   "downloadFile": "Baixar {name}",
   "readingPane": "Leitura da mensagem",
@@ -944,7 +952,9 @@
     "smartInbox": "Caixa inteligente",
     "smartInboxHint": "Separa a Entrada em Pessoas, Notificações e Newsletters. Quem você já respondeu ou aprovou fica sempre em Pessoas.",
     "askNewSenders": "Perguntar sobre remetentes novos",
-    "askNewSendersHint": "Na primeira mensagem de alguém para quem você nunca escreveu, o Correio pergunta se aprova ou bloqueia. Bloqueados vão direto para o Spam."
+    "askNewSendersHint": "Na primeira mensagem de alguém para quem você nunca escreveu, o Correio pergunta se aprova ou bloqueia. Bloqueados vão direto para o Spam.",
+    "openNextAfterRemove": "Abrir a próxima depois de arquivar ou excluir",
+    "openNextAfterRemoveHint": "Ao arquivar ou excluir a mensagem aberta, a seguinte da lista abre sozinha. Desligado, a leitura fecha e você volta à lista."
   },
   "coach": {
     "text": "J e K navegam, E arquiva, S favorita, ? mostra todos os atalhos.",

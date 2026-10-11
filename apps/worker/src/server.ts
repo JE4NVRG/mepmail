@@ -25,6 +25,7 @@ import {
 import {
   checkMailboxRecipientBlocks,
   committedDailyVolume,
+  deriveMailboxSearchKey,
   deriveMailboxSenderKey,
   deriveSamplingKey,
   deriveTrackingKey,
@@ -33,6 +34,7 @@ import {
   failQueuedMailboxOutbox,
   getInstanceSettings,
   hashRecipient,
+  indexMailboxSearch,
   type MonitorDeps,
   monitorSettingsReader,
   pacingHorizonDays,
@@ -107,6 +109,7 @@ import { createRegionSendControls } from "./handlers/ses-regions.js";
 import { createCustomerSmtpRelay, createSmtpFallback } from "./handlers/smtp-fallback.js";
 import { syncTenants } from "./handlers/tenants.js";
 import { createMailboxIngress, parseMailboxInboundConfiguration } from "./mailbox-ingress.js";
+import { readMailboxSearchDocument } from "./mailbox-search-document.js";
 import {
   createMailboxSesSender,
   mailboxWorkerMime,
@@ -136,6 +139,8 @@ const failover =
   parseSesFailover(process.env.SES_FAILOVER_REGION, process.env.SES_FAILOVER_DOMAINS) ?? undefined;
 if (failover)
   console.log(`SES failover: ${failover.region} for ${[...failover.domains].join(", ")}`);
+// The Correio search index key (blind tokens per team), derived like the sender key.
+const mailboxSearchKey = deriveMailboxSearchKey(Buffer.from(env.MASTER_ENCRYPTION_KEY, "base64"));
 // Receipt stages in one aggregate line every 10 minutes (SES->stored, queue wait, processing).
 const receiptTimings = new TimingWindow();
 startTimingLog(receiptTimings, "[worker] timings 10m", 10 * 60_000);
@@ -622,6 +627,25 @@ await queue.scheduleCrons({
     if (holds.paused || holds.resumed || holds.failed)
       console.log(
         `mailbox.receiving: paused=${holds.paused} resumed=${holds.resumed} failed=${holds.failed}`,
+      );
+  },
+  "mailbox.search_index": async () => {
+    if (!mailboxRegistryEnabled) return;
+    // A batch per minute, newest first, inside the minute: fresh mail is searchable within
+    // a minute and older mail is backfilled over the following runs.
+    const result = await indexMailboxSearch(
+      db,
+      keyring,
+      mailboxSearchKey,
+      readMailboxSearchDocument,
+      {
+        limit: 300,
+        deadline: Date.now() + 40_000,
+      },
+    );
+    if (result.indexed || result.quarantined || result.unreadable)
+      console.log(
+        `mailbox.search_index: indexed=${result.indexed} quarantined=${result.quarantined} unreadable=${result.unreadable} remaining=${result.remaining}`,
       );
   },
   "events.health": async () => {

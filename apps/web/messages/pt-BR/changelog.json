@@ -28,6 +28,22 @@
   },
   "releases": [
     {
+      "version": "0.113",
+      "date": "2026-10-11",
+      "title": "Busca em todo o Correio",
+      "summary": "A busca agora olha todas as pastas de uma vez, no assunto, remetente, destinatários, corpo e nomes de anexo, com operadores e frases exatas. As mensagens continuam seladas: o índice guarda tokens com chave, nunca texto.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A busca do Correio cobre todas as pastas de uma vez (menos Lixeira e Spam) e cada resultado mostra a pasta; palavras do assunto, do remetente e dos destinatários também casam pelo começo.",
+            "Operadores: de:, para:, assunto:, tem:anexo, antes: e depois: (um dia), e \"frase exata\"; em inglês, from:, to:, subject:, has:attachment, before: e after:.",
+            "Opção em Aparência para abrir a próxima mensagem depois de arquivar ou excluir, ou voltar para a lista."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.112",
       "date": "2026-10-11",
       "title": "Correio mais rápido: exclua e siga sem esperar",

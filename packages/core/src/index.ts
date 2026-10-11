@@ -529,6 +529,22 @@ export {
   snoozeMailboxItem,
   wakeSnoozedMailboxItems,
 } from "./mailbox-scheduling.js";
+export {
+  deriveMailboxSearchKey,
+  findMailboxSearchMatches,
+  indexMailboxSearch,
+  MAILBOX_SEARCH_KEY_VERSION,
+  type MailboxSearchDocument,
+  type MailboxSearchFolder,
+  type MailboxSearchPosition,
+  type MailboxSearchQuery,
+  mailboxSearchDocumentTokens,
+  mailboxSearchPhraseText,
+  mailboxSearchQueryEmpty,
+  mailboxSearchQueryTokens,
+  mailboxSearchTerms,
+  parseMailboxSearchQuery,
+} from "./mailbox-search.js";
 export { deriveMailboxSenderKey } from "./mailbox-senders.js";
 export {
   assertMailboxStorage,

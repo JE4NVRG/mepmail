@@ -97,6 +97,7 @@ import {
   setMailboxPreferences,
 } from "../mailbox-preferences";
 import { mailboxReceivingDeps } from "../mailbox-receiving";
+import { searchMailboxContent } from "../mailbox-search";
 import { mailboxTransportMime } from "../mailbox-transport";
 import { getMailboxUsage } from "../mailbox-usage";
 import {
@@ -861,6 +862,33 @@ export const mailboxesRouter = router({
       }),
     )
     .query(({ ctx, input }) => call(() => getMailboxContentList(ctx.db, actor(ctx), input))),
+  // Correio search: the rows items returns, plus each one's folder (mailbox-search.ts).
+  search: enabled
+    .input(
+      z
+        .object({
+          query: z.string().min(1).max(200),
+          mailboxId: z.uuid().nullable(),
+          folder: z
+            .enum([
+              "all",
+              "inbox",
+              "drafts",
+              "sent",
+              "archive",
+              "trash",
+              "spam",
+              "favorites",
+              "custom",
+            ])
+            .default("all"),
+          customFolderId: z.uuid().optional(),
+          cursor: z.string().min(1).max(80).optional(),
+          limit: z.number().int().min(1).max(50).optional(),
+        })
+        .strict(),
+    )
+    .query(({ ctx, input }) => call(() => searchMailboxContent(ctx.db, actor(ctx), input))),
   scheduling: mailboxSchedulingRouter,
   senders: mailboxSendersRouter,
   preferences: router({

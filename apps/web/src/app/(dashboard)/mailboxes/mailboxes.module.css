@@ -1227,6 +1227,33 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+/* Where a search result lives (Entrada, Enviados, a folder of yours). */
+.rowFolder {
+  align-self: flex-start;
+  justify-self: start;
+  width: fit-content;
+  margin-top: 4px;
+  padding: 1px 7px;
+  font-size: 11px;
+  color: var(--ms-muted);
+  border: 1px solid var(--ms-line);
+  border-radius: 999px;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Under the search field: searching, how many results, how to search. */
+.searchStatus {
+  margin: 0;
+  padding: 0 2px 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ms-bone);
+}
+.searchHint {
+  color: var(--ms-muted);
+}
 .messageRows .rowBadges {
   margin: 6px 0 0;
 }

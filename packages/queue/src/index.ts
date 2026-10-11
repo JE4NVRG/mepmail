@@ -201,6 +201,9 @@ export const CRON_JOBS = {
   // Every minute: the Correio clock — snoozed messages come back, follow-ups
   // with no reply come due and scheduled sends go out on time.
   "mailbox.schedules": "* * * * *",
+  // Every minute: the Correio search index takes in new mail and saved drafts, and
+  // backfills older mail a batch at a time. No-op once everything is indexed.
+  "mailbox.search_index": "* * * * *",
 } as const;
 
 export type CronJobName = keyof typeof CRON_JOBS;

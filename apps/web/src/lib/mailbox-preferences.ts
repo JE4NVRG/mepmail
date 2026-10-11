@@ -35,6 +35,7 @@ const FIELDS = {
   quickReplies: quickRepliesSchema,
   smartInbox: z.boolean(),
   askNewSenders: z.boolean(),
+  openNextAfterRemove: z.boolean(),
 };
 
 export type CorreioPrefs = {
@@ -55,6 +56,8 @@ export type CorreioPrefs = {
   smartInbox: boolean;
   /** Aprovação de remetentes: ask on a first message from someone unanswered. */
   askNewSenders: boolean;
+  /** After archiving or trashing the open message, open the next one (else the empty reader). */
+  openNextAfterRemove: boolean;
 };
 
 export const CORREIO_PREF_DEFAULTS: CorreioPrefs = {
@@ -71,6 +74,7 @@ export const CORREIO_PREF_DEFAULTS: CorreioPrefs = {
   quickReplies: null,
   smartInbox: true,
   askNewSenders: true,
+  openNextAfterRemove: true,
 };
 
 type Field = keyof CorreioPrefs;

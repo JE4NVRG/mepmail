@@ -211,6 +211,13 @@
       "when": 1791730800029,
       "tag": "0029_mailbox_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791730800030,
+      "tag": "0030_mailbox_search",
+      "breakpoints": true
     }
   ]
 }

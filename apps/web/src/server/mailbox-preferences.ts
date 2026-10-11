@@ -28,6 +28,8 @@ const FIELDS = {
   quickReplies: quickRepliesSchema,
   smartInbox: z.boolean(),
   askNewSenders: z.boolean(),
+  /** After archiving or deleting the open message, open the next one (or go back to the list). */
+  openNextAfterRemove: z.boolean(),
 };
 type Field = keyof typeof FIELDS;
 export type MailboxPreferences = { [K in Field]: z.output<(typeof FIELDS)[K]> };
@@ -46,6 +48,7 @@ export const MAILBOX_PREFERENCE_DEFAULTS: MailboxPreferences = {
   quickReplies: null,
   smartInbox: true,
   askNewSenders: true,
+  openNextAfterRemove: true,
 };
 
 /** A rejected change, naming the field so the UI can point at it. */

@@ -56,6 +56,14 @@ import {
   rememberRecipients,
   splitRecipients,
 } from "@/lib/mailbox-recipients";
+import {
+  customFolderOf,
+  isSearchResultFolder,
+  SEARCH_DEBOUNCE_MS,
+  SEARCH_QUERY_KEY,
+  searchMailboxes,
+  serverSearchTerm,
+} from "@/lib/mailbox-search";
 import { MAILBOX_SHORTCUTS, mailboxShortcut } from "@/lib/mailbox-shortcuts";
 import { mailboxSignatureText } from "@/lib/mailbox-signature";
 import {
@@ -1015,6 +1023,17 @@ export function MailboxContentView({
   // Read state shows at once; the server write and the refetch catch up behind it.
   const [seenOverride, setSeenOverride] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState("");
+  // What the server is asked: the search after typing pauses (two characters or more).
+  const [searchTerm, setSearchTerm] = useState<string | null>(null);
+  useEffect(() => {
+    const next = serverSearchTerm(search);
+    if (next === null) {
+      setSearchTerm(null);
+      return undefined;
+    }
+    const timer = setTimeout(() => setSearchTerm(next), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [search]);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [composer, compose] = useState<{
@@ -1237,6 +1256,38 @@ export function MailboxContentView({
     });
   }, [listedItems]);
   type ListedItem = NonNullable<typeof listedItems>[number];
+  // Server search: every folder of the mailboxes in scope (not the trash or
+  // spam), beyond the rows loaded here. Until it answers, and whenever it
+  // cannot (an older server), the local filter below is what shows.
+  const found = useInfiniteQuery({
+    queryKey: [SEARCH_QUERY_KEY, listMailboxId, searchTerm],
+    enabled: searchTerm !== null,
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) =>
+      searchMailboxes<ListedItem>(trpcClient, {
+        query: searchTerm ?? "",
+        mailboxId: listMailboxId,
+        folder: "all",
+        limit: 50,
+        ...(pageParam ? { cursor: pageParam } : {}),
+      }),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const searching = searchTerm !== null && found.isSuccess && !found.data.pages[0]?.tooShort;
+  const searchFolders = useQuery(
+    trpc.mailboxes.folders.queryOptions(
+      { mailboxId: null },
+      { enabled: searching, staleTime: 60_000, retry: false },
+    ),
+  );
+  /** Where a search result lives, named for its row. */
+  const resultFolder = (folder: string | undefined) => {
+    if (isSearchResultFolder(folder)) return t(folder);
+    const id = customFolderOf(folder);
+    return id ? (searchFolders.data?.find((entry) => entry.id === id)?.name ?? null) : null;
+  };
   const keepRow = (i: ListedItem) => {
     if (departing.has(`${i.mailboxId}:${i.id}`)) return false;
     if (
@@ -1254,7 +1305,8 @@ export function MailboxContentView({
     return searchable.toLowerCase().includes(search.toLowerCase().trim());
   };
   // The inbox shows its pinned messages first, under their own heading, and only there.
-  const pinnedRows = folder === "inbox" ? (pinnedListing.data?.items ?? []).filter(keepRow) : [];
+  const pinnedRows =
+    folder === "inbox" && !searching ? (pinnedListing.data?.items ?? []).filter(keepRow) : [];
   const pinnedKeys = new Set(pinnedRows.map((i) => `${i.mailboxId}:${i.id}`));
   // A sender answered here and now (Aprovar, "Mover para Pessoas") moves every
   // one of their rows at once, before the list reads the answer back.
@@ -1268,23 +1320,36 @@ export function MailboxContentView({
     pile === "all" ||
     rowPile(pileRow(i), knownPeople) === pile ||
     (selection?.id === i.id && selection.mailboxId === i.mailboxId);
-  const rows = [
-    ...pinnedRows,
-    ...(listedItems?.filter(
-      (i) => !pinnedKeys.has(`${i.mailboxId}:${i.id}`) && keepRow(i) && inPile(i),
-    ) ?? []),
-  ];
+  const rows = searching
+    ? found.data.pages
+        .flatMap((page) => page.items)
+        .filter((i) => !departing.has(`${i.mailboxId}:${i.id}`))
+    : [
+        ...pinnedRows,
+        ...(listedItems?.filter(
+          (i) => !pinnedKeys.has(`${i.mailboxId}:${i.id}`) && keepRow(i) && inPile(i),
+        ) ?? []),
+      ];
+  // "Carregar mais" and J at the end of the list follow whatever the list shows.
+  const pager = searching
+    ? {
+        hasNextPage: found.hasNextPage,
+        isFetchingNextPage: found.isFetchingNextPage,
+        fetchNextPage: found.fetchNextPage,
+      }
+    : listing;
   /**
    * The open message is leaving this view (archived, trashed, marked spam):
    * the next one in the list opens, so clearing the inbox is one key per
    * message, as in Spark and Gmail. The previous one when it was the last;
-   * the empty reader when it was the only one.
+   * the empty reader when it was the only one, or when the person turned
+   * this off in Preferências (back to the list).
    */
   function leaveOpenRow(key: string) {
     const index = rows.findIndex((row) => rowKey(row) === key);
     const free = (row: Row) => rowKey(row) !== key && !departing.has(rowKey(row));
     const next =
-      index >= 0
+      prefs.openNextAfterRemove && index >= 0
         ? (rows.slice(index + 1).find(free) ?? rows.slice(0, index).reverse().find(free))
         : undefined;
     if (next) openRow(next);
@@ -1460,6 +1525,7 @@ export function MailboxContentView({
       queries.invalidateQueries({ queryKey: trpc.mailboxes.item.queryKey() }),
       queries.invalidateQueries({ queryKey: trpc.mailboxes.unreadCounts.queryKey() }),
       queries.invalidateQueries({ queryKey: trpc.mailboxes.scheduling.counts.queryKey() }),
+      queries.invalidateQueries({ queryKey: [SEARCH_QUERY_KEY] }),
     ]);
   }
   const conflictOr = (cause: unknown, fallback: string) =>
@@ -2613,8 +2679,8 @@ export function MailboxContentView({
       case "next": {
         const row = rows[index + 1];
         if (row) run(() => openRow(row));
-        else if (listing.hasNextPage && !listing.isFetchingNextPage)
-          run(() => void listing.fetchNextPage());
+        else if (pager.hasNextPage && !pager.isFetchingNextPage)
+          run(() => void pager.fetchNextPage());
         return;
       }
       case "previous": {
@@ -2833,10 +2899,35 @@ export function MailboxContentView({
                   className="ms-input"
                   aria-label={t("searchMessages")}
                   placeholder={t("searchMessages")}
+                  title={t("serverSearch.hint")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape" && search) {
+                      e.stopPropagation();
+                      setSearch("");
+                    }
+                  }}
                 />
               </div>
+              {searchTerm !== null ? (
+                <p className={styles.searchStatus} role="status">
+                  {found.isError
+                    ? t("serverSearch.localOnly")
+                    : searching
+                      ? t(pager.hasNextPage ? "serverSearch.resultsMore" : "serverSearch.results", {
+                          count: rows.length,
+                        })
+                      : found.data?.pages[0]?.tooShort
+                        ? t("serverSearch.tooShort")
+                        : t("serverSearch.searching")}{" "}
+                  {/* How to search, while it looks and when nothing matched; the
+                      field's tooltip keeps it at hand the rest of the time. */}
+                  {(!searching && found.isFetching) || (searching && rows.length === 0) ? (
+                    <span className={styles.searchHint}>{t("serverSearch.hint")}</span>
+                  ) : null}
+                </p>
+              ) : null}
               {prefs.showShortcutHints ? (
                 <p className={styles.coachStrip} role="note">
                   <span>{t("coach.text")}</span>
@@ -3260,6 +3351,11 @@ export function MailboxContentView({
                                   {row.address}
                                 </small>
                               ) : null}
+                              {searching && resultFolder((row as { folder?: string }).folder) ? (
+                                <small className={styles.rowFolder}>
+                                  {resultFolder((row as { folder?: string }).folder)}
+                                </small>
+                              ) : null}
                             </span>
                           </button>
                           {rowOrganizable ? (
@@ -3282,15 +3378,15 @@ export function MailboxContentView({
                       </Fragment>
                     );
                   })}
-                  {listing.hasNextPage ? (
+                  {pager.hasNextPage ? (
                     <div className={styles.loadMore}>
                       <button
                         type="button"
                         className="ms-btn ms-btn-ghost"
-                        disabled={listing.isFetchingNextPage}
-                        onClick={() => void listing.fetchNextPage()}
+                        disabled={pager.isFetchingNextPage}
+                        onClick={() => void pager.fetchNextPage()}
                       >
-                        {t(listing.isFetchingNextPage ? "list.loadingMore" : "list.loadMore")}
+                        {t(pager.isFetchingNextPage ? "list.loadingMore" : "list.loadMore")}
                       </button>
                     </div>
                   ) : null}

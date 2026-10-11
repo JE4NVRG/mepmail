@@ -387,6 +387,16 @@ export function MailboxAppearanceSettings({
           />
         </div>
         <div className={styles.appearanceRow}>
+          <span id={`${id}-next`}>{t("openNextAfterRemove")}</span>
+          <Switch
+            checked={prefs.openNextAfterRemove}
+            disabled={false}
+            ariaLabel={t("openNextAfterRemove")}
+            onChange={(checked) => setPref({ openNextAfterRemove: checked })}
+          />
+        </div>
+        <p className={styles.hint}>{t("openNextAfterRemoveHint")}</p>
+        <div className={styles.appearanceRow}>
           <label htmlFor={`${id}-start`}>{t("startFolder")}</label>
           <Select
             id={`${id}-start`}

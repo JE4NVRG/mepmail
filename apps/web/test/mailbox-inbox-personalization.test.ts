@@ -271,6 +271,17 @@ describe("folder color and order", () => {
 });
 
 describe("inbox preferences", () => {
+  it("opens the next message after a removal unless the person turns it off", async () => {
+    expect((await as().preferences.get()).openNextAfterRemove).toBe(true);
+    expect((await as().preferences.set({ openNextAfterRemove: false })).openNextAfterRemove).toBe(
+      false,
+    );
+    expect((await as().preferences.get()).openNextAfterRemove).toBe(false);
+    await expect(as().preferences.set({ openNextAfterRemove: "yes" })).rejects.toMatchObject({
+      message: "invalid_preference:openNextAfterRemove",
+    });
+  });
+
   it("fills defaults, merges partial changes per person and names the invalid field", async () => {
     expect(await as().preferences.get()).toEqual({
       ...MAILBOX_PREFERENCE_DEFAULTS,

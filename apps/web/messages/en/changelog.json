@@ -23,6 +23,22 @@
   },
   "releases": [
     {
+      "version": "0.113",
+      "date": "2026-10-11",
+      "title": "Search all of Mail",
+      "summary": "Search now looks through every folder at once, in the subject, sender, recipients, body and attachment names, with operators and exact phrases. Mail stays sealed: the index holds keyed tokens, never text.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Search in Mail covers every folder at once (Trash and Spam aside) and each result shows its folder; words in the subject, sender and recipients also match by their start.",
+            "Operators: from:, to:, subject:, has:attachment, before: and after: (a day), and \"exact phrase\"; in Portuguese, de:, para:, assunto:, tem:anexo, antes: and depois:.",
+            "An Appearance setting to open the next message after archiving or deleting, or to go back to the list."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.112",
       "date": "2026-10-11",
       "title": "Faster Mail: delete and move on without waiting",
