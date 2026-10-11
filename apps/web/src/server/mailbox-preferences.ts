@@ -42,7 +42,7 @@ export const MAILBOX_PREFERENCE_DEFAULTS: MailboxPreferences = {
   groupByThread: true,
   startFolder: "inbox",
   showAvatars: true,
-  markSeenAfterMs: 1500,
+  markSeenAfterMs: 0,
   showShortcutHints: true,
   undoSendSeconds: 10,
   quickReplies: null,

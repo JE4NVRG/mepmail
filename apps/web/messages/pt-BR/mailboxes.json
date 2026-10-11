@@ -163,6 +163,8 @@
     "searching": "Buscando em todas as pastas…",
     "results": "{count, plural, =0 {Nada nas pastas} one {# resultado em todas as pastas} other {# resultados em todas as pastas}}",
     "resultsMore": "{count, number}+ resultados em todas as pastas",
+    "everywhere": "Buscar em todas as caixas",
+    "onlyHere": "Só em {mailbox}",
     "tooShort": "Use palavras com 2 letras ou mais.",
     "localOnly": "A busca completa não respondeu agora; mostrando só as mensagens carregadas.",
     "hint": "Dica: de:, para:, assunto:, tem:anexo, antes:2026-10-01, depois:, \"frase exata\". Lixeira e Spam ficam de fora."
@@ -496,6 +498,7 @@
       "star": "Favoritar",
       "unread": "Marcar como não lida",
       "search": "Buscar mensagens",
+      "searchEverywhere": "Buscar em todas as caixas",
       "undo": "Desfazer a última ação",
       "help": "Mostrar estes atalhos",
       "newFolder": "Nova pasta",
@@ -1210,5 +1213,14 @@
     "shortcuts": "Atalhos do teclado",
     "docs": "Central de ajuda",
     "support": "Falar com o suporte"
+  },
+  "composer": {
+    "minimize": "Minimizar",
+    "restore": "Voltar para a mensagem",
+    "discardTitle": "Descartar esta mensagem?",
+    "discardBody": "O que você escreveu será perdido. Para guardar, use Salvar rascunho.",
+    "keep": "Continuar escrevendo",
+    "discard": "Descartar",
+    "busy": "Você já está escrevendo uma mensagem: envie, salve ou feche antes de abrir outra."
   }
 }

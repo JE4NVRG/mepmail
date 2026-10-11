@@ -119,5 +119,26 @@
     "body": "Add the MCP server {url} to your client (Claude Code, Claude Desktop, Cursor, VS Code). It opens the browser: you sign in, tick the mailboxes the agent may use and allow it. To revoke, use Revoke below or Connected apps.",
     "copy": "Copy the Claude Code command",
     "copied": "Copied"
-  }
+  },
+  "desktop": {
+    "title": "Connect on this computer",
+    "body": "One click sets the agent up to use this mailbox through the MepMail app. The key stays in the system's credential vault, never in a config file. The system asks you to confirm each step.",
+    "working": "Setting up {client}…",
+    "ok": "Done: {client} is set up. Quit and reopen {client} to see the MepMail tools.",
+    "cancelled": "Cancelled: nothing was changed.",
+    "notInstalled": "{client} was not found on this computer.",
+    "failed": "Could not set up {client}: {detail}"
+  },
+  "live": {
+    "waiting": "Waiting for the agent to use the key… it shows here as soon as it connects.",
+    "connected": "Connected: the agent used this key {when}."
+  },
+  "revokeConfirm": "Revoke “{label}”? The agent loses access right away.",
+  "revokeKeep": "Keep",
+  "kind": {
+    "team": "Team credential",
+    "oauth": "OAuth app"
+  },
+  "revokeConfirmCredential": "Revoke all of “{label}”? The agent loses access to every mailbox of this credential, not only this one.",
+  "quota": "This mailbox already has 25 active keys. Revoke one you no longer use to create another."
 }

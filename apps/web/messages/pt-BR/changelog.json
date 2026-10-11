@@ -28,6 +28,37 @@
   },
   "releases": [
     {
+      "version": "0.122",
+      "date": "2026-10-11",
+      "title": "Busca em todas as caixas, compositor no canto, lido sai de Não lidos",
+      "summary": "O Correio busca em todas as suas caixas de uma vez, o compositor fica num canto e pode ser minimizado, a mensagem aberta deixa de contar como não lida na hora, e a tela de agentes separa chaves da caixa de credenciais de time e de apps.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Busca em todas as suas caixas, também pelo Ctrl+K.",
+            "O compositor abre num canto, em vez de uma janela em tela cheia, pode ser minimizado enquanto você lê e pergunta antes de descartar um rascunho.",
+            "No app desktop, “Conectar neste computador” configura o Claude Desktop, o Cursor, o Claude Code ou o Codex com uma chave de agente nova, e a chave mostra “Conectado” sozinha quando o agente a usa."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Abrir uma mensagem já a marca como lida por padrão, então ela sai do filtro Não lidos enquanto você avança. Dá para escolher um tempo, ou manual, nas configurações do Correio.",
+            "As chaves de agente de uma caixa agora marcam credenciais de time e apps OAuth. Revogar uma dessas revoga a credencial inteira, em todas as caixas, e a confirmação avisa.",
+            "Criar uma chave numa caixa que já tem 25 chaves ativas agora diz isso, em vez de um erro genérico.",
+            "A tela de e-mail abre mais rápido: o editor de texto é baixado à parte, depois da página, e a lista da caixa de entrada é pedida junto com a lista de caixas."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Revogar pelo diálogo de uma caixa não deixa mais uma credencial de time ou um app OAuth revogado pela metade."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.121",
       "date": "2026-10-11",
       "title": "A página do domínio diz como corrigir o SPF",

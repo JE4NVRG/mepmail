@@ -587,6 +587,19 @@ export function MailboxesView({
       retry: false,
     }),
   );
+  // The inbox list starts loading with the page, beside the mailbox registry,
+  // instead of after it (the same query the list then reads from the cache).
+  const warmedInbox = useRef(false);
+  useEffect(() => {
+    if (warmedInbox.current || !mayUseMail || layout !== "app") return;
+    warmedInbox.current = true;
+    void queries.prefetchInfiniteQuery(
+      trpc.mailboxes.items.infiniteQueryOptions(
+        { mailboxId: null, folder: "inbox", mailboxKind: undefined },
+        { getNextPageParam: (page) => page.nextCursor, retry: false, staleTime: 15_000 },
+      ),
+    );
+  }, [mayUseMail, layout, queries, trpc]);
   const inboxUnread = (selected ? [selected] : scopedBoxes).reduce(
     (total, box) => total + (unreadCounts.data?.counts[box.id] ?? 0),
     0,

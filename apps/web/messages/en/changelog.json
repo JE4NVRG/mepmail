@@ -28,6 +28,37 @@
   },
   "releases": [
     {
+      "version": "0.122",
+      "date": "2026-10-11",
+      "title": "Search every mailbox, write in a corner, read mail leaves Unread",
+      "summary": "Correio searches all your mailboxes at once, the composer sits in a corner you can minimize, opened mail stops counting as unread right away, and the agents screen tells mailbox keys apart from team and app credentials.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Search across all your mailboxes, also from Ctrl+K.",
+            "The composer opens in a corner instead of a full-screen window, can be minimized while you read, and asks before it discards a draft.",
+            "In the desktop app, “Connect on this computer” sets up Claude Desktop, Cursor, Claude Code or Codex with a new agent key, and the key shows “Connected” on its own once the agent uses it."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Opening a message marks it as read at once by default, so it leaves the Unread filter as you go. You can still choose a delay, or manual, in the Correio settings.",
+            "The agent keys of a mailbox now mark team credentials and OAuth apps. Revoking one of those revokes the whole credential, on every mailbox, and the confirmation says so.",
+            "Creating a key on a mailbox that already has 25 active keys says so, instead of a generic error.",
+            "The mail screen loads faster: the text editor downloads separately, after the page, and the inbox list is requested together with the mailbox list."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Revoking from a single mailbox no longer leaves a team credential or an OAuth app half revoked."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.121",
       "date": "2026-10-11",
       "title": "The domain page says how to fix SPF",

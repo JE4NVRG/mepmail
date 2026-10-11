@@ -437,6 +437,8 @@ export async function listMailboxAgentKeys(
         revokedAt: schema.mailboxAgentKeys.revokedAt,
         lastUsedAt: schema.mailboxAgentKeys.lastUsedAt,
         lastSentAt: lastAgentSendSql,
+        groupId: schema.mailboxAgentKeys.groupId,
+        oauthClientId: schema.mailboxAgentKeys.oauthClientId,
       })
       .from(schema.mailboxAgentKeys)
       .where(
@@ -447,11 +449,23 @@ export async function listMailboxAgentKeys(
       )
       .orderBy(desc(schema.mailboxAgentKeys.createdAt), desc(schema.mailboxAgentKeys.id))
       .limit(100);
-    return keys;
+    // A team credential (mmt_) or an OAuth app reaches this mailbox through one row of a
+    // wider credential. It is listed here so the person sees every agent with access,
+    // but it is revoked whole, by credentialId, under Agents (never one row from here).
+    return keys.map(({ groupId, oauthClientId, ...key }) => ({
+      ...key,
+      kind: oauthClientId ? ("oauth" as const) : groupId ? ("team" as const) : ("mailbox" as const),
+      credentialId: groupId ?? key.id,
+      oauthClientId,
+    }));
   });
 }
 
-/** Team -> membership -> credential -> mailbox; revocation remains possible while suspended. */
+/**
+ * Team -> membership -> credential -> mailbox; revocation remains possible while suspended.
+ * Only a mailbox key (mmb_): a row of a team or OAuth credential is not_found here, so the
+ * per-mailbox dialog can never leave a wider credential half revoked.
+ */
 export async function revokeMailboxAgentKey(
   db: Db,
   actor: MailboxAgentOwnerActor,
@@ -471,6 +485,7 @@ export async function revokeMailboxAgentKey(
           eq(schema.mailboxAgentKeys.id, input.id),
           eq(schema.mailboxAgentKeys.teamId, actor.teamId),
           eq(schema.mailboxAgentKeys.mailboxId, input.mailboxId),
+          isNull(schema.mailboxAgentKeys.groupId),
         ),
       )
       .for("update");

@@ -2,6 +2,7 @@
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
+import dynamic from "next/dynamic";
 import { useLocale, useTranslations } from "next-intl";
 import {
   type CSSProperties,
@@ -98,7 +99,7 @@ import { MailboxInviteCard } from "./mailbox-invite-card";
 import { MailboxMoveMenu, type MailboxMoveMenuHandle } from "./mailbox-move-menu";
 import { MailboxRecipientField } from "./mailbox-recipient-field";
 import { MailboxRichBody } from "./mailbox-rich-body";
-import { MailboxRichEditor, type RichEditorHandle } from "./mailbox-rich-editor";
+import type { RichEditorHandle } from "./mailbox-rich-editor";
 import { MailboxSenderBar } from "./mailbox-sender-bar";
 import { MailboxSmartTabs } from "./mailbox-smart-tabs";
 import { MailboxTimeMenu, type MailboxTimeMenuHandle } from "./mailbox-time-menu";
@@ -148,6 +149,17 @@ const noHeldSend = () => null;
 
 /** Requests a bulk action keeps in flight at once (one at a time made 20 rows take 20 round trips). */
 const BULK_CONCURRENCY = 6;
+// The editor (TipTap/ProseMirror, about a quarter of the page's JavaScript)
+// loads with the first composer, or when the inbox is idle, not with the page.
+const loadRichEditor = () => import("./mailbox-rich-editor");
+const MailboxRichEditor = dynamic(
+  () => loadRichEditor().then((module) => module.MailboxRichEditor),
+  {
+    ssr: false,
+    loading: () => <div className={styles.editorLoading} aria-hidden="true" />,
+  },
+);
+
 /** Messages one setSeenMany call takes (server: MAILBOX_SEEN_BATCH). */
 const MAILBOX_SEEN_BATCH = 200;
 
@@ -302,6 +314,9 @@ function Attachment({ item, attachment }: { item: Item; attachment: Item["attach
   );
 }
 
+/** What the inbox may ask the open composer: has the person changed it, and to come back. */
+type ComposerHandle = { dirty: () => boolean; restore: () => void };
+
 function DraftDialog({
   boxes,
   mailboxId,
@@ -316,7 +331,10 @@ function DraftDialog({
   send,
   quickReply,
   prefill,
+  handle,
 }: {
+  /** Filled while mounted, for the inbox (another message to write while this one is open). */
+  handle?: { current: ComposerHandle | null };
   boxes: Box[];
   mailboxId: string;
   source: Item | null;
@@ -486,6 +504,43 @@ function DraftDialog({
   const submitting = useRef(false);
   const active = useRef(true);
   const [error, setError] = useState("");
+  // A wide window keeps the inbox usable while writing: the composer docks at
+  // the bottom right, not modal, and minimizes to its title bar. A narrow one
+  // gets the full-screen modal it always had.
+  const [docked] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 900px)").matches,
+  );
+  const [minimized, setMinimized] = useState(false);
+  // Closing after a change asks first: typing anywhere in the form, other
+  // recipients or attachments than it opened with.
+  const typed = useRef(false);
+  const opened = useRef({ to, cc, bcc, retained: retained.length });
+  const isDirty = () => {
+    const first = opened.current;
+    const same = (a: string[], b: string[]) =>
+      a.length === b.length && a.every((value, index) => value === b[index]);
+    return (
+      typed.current ||
+      !same(first.to, to) ||
+      !same(first.cc, cc) ||
+      !same(first.bcc, bcc) ||
+      first.retained !== retained.length ||
+      uploads.length > 0
+    );
+  };
+  useEffect(() => {
+    if (!handle) return;
+    handle.current = {
+      dirty: isDirty,
+      restore: () => {
+        setMinimized(false);
+        messageInput.current?.focus();
+      },
+    };
+    return () => {
+      handle.current = null;
+    };
+  });
   const mutation = useMutation(trpc.mailboxes.saveDraft.mutationOptions());
   const busy = saving || mutation.isPending || loadingFiles;
   // Mail that arrives while writing: one line under the title (mailboxes-view
@@ -498,14 +553,15 @@ function DraftDialog({
   }, []);
   useEffect(() => {
     active.current = true;
-    dialog.current?.showModal();
+    if (docked) dialog.current?.show();
+    else dialog.current?.showModal();
     // A reply puts the cursor in the editor (it focuses itself once it
     // mounts); a new message or a forward starts at the recipients.
     if (!(source && mode !== "forward")) recipientInput.current?.focus();
     return () => {
       active.current = false;
     };
-  }, [mode, source]);
+  }, [mode, source, docked]);
   // Another sender's signature replaces the last one; the editor gets the new
   // body as plain text (formatting is redone after a sender change).
   const latestText = useRef(text);
@@ -564,46 +620,137 @@ function DraftDialog({
       loadFiles(false);
     }
   }
+  // "Descartar esta mensagem?" lives inside the composer: the full-screen one
+  // is modal, and a page dialog would open behind it.
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const discardButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (confirmingDiscard) discardButton.current?.focus();
+  }, [confirmingDiscard]);
   function dismiss() {
-    if (!submitting.current && !loadingFiles && current()) close();
+    if (submitting.current || loadingFiles || !current()) return;
+    if (isDirty()) {
+      setMinimized(false);
+      setConfirmingDiscard(true);
+      return;
+    }
+    close();
   }
+  const title = t(
+    source?.kind === "draft"
+      ? "editDraft"
+      : source
+        ? mode === "forward"
+          ? "forwardDraft"
+          : "replyDraft"
+        : "newDraft",
+  );
+  const dialogClass = [
+    styles.dialog,
+    styles.composer,
+    docked ? styles.composerDocked : "",
+    minimized ? styles.composerMinimized : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
     <dialog
       ref={dialog}
-      className={`${styles.dialog} ${styles.composer}`}
+      className={dialogClass}
       aria-labelledby="draft-title"
-      onClose={dismiss}
       onCancel={(e) => {
-        if (submitting.current || loadingFiles) e.preventDefault();
+        // Esc never throws the message away on its own: a docked composer
+        // minimizes; the full-screen one asks when there is something to lose.
+        e.preventDefault();
+        if (confirmingDiscard) setConfirmingDiscard(false);
+        else if (docked) setMinimized(true);
+        else dismiss();
+      }}
+      onKeyDown={(e) => {
+        // The editor marks Esc as handled (it selects the parent node); inner
+        // fields that use Esc themselves stop it before it gets here.
+        if (e.key === "Escape" && docked) {
+          e.preventDefault();
+          if (confirmingDiscard) setConfirmingDiscard(false);
+          else setMinimized(true);
+        }
       }}
     >
       <header className={`${styles.dialogHeader} ${styles.composerHeader}`}>
-        <div className={styles.composerHeading}>
-          <h2 id="draft-title">
-            {t(
-              source?.kind === "draft"
-                ? "editDraft"
-                : source
-                  ? mode === "forward"
-                    ? "forwardDraft"
-                    : "replyDraft"
-                  : "newDraft",
-            )}
-          </h2>
-          <p className={styles.composerSender}>
-            <span>{t("from")}</span> <strong>{sender?.address}</strong>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="ms-btn ms-btn-ghost"
-          aria-label={t("close")}
-          disabled={busy}
-          onClick={dismiss}
-        >
-          ×
-        </button>
+        {minimized ? (
+          <button
+            type="button"
+            className={styles.composerRestore}
+            title={t("composer.restore")}
+            onClick={() => {
+              setMinimized(false);
+              messageInput.current?.focus();
+            }}
+          >
+            <strong id="draft-title">{title}</strong>
+            <span>{subject.trim() || to.join(", ") || sender?.address}</span>
+          </button>
+        ) : (
+          <div className={styles.composerHeading}>
+            <h2 id="draft-title">{title}</h2>
+            <p className={styles.composerSender}>
+              <span>{t("from")}</span> <strong>{sender?.address}</strong>
+            </p>
+          </div>
+        )}
+        <span className={styles.composerHeaderActions}>
+          {docked ? (
+            <button
+              type="button"
+              className="ms-btn ms-btn-ghost"
+              aria-label={t(minimized ? "composer.restore" : "composer.minimize")}
+              title={t(minimized ? "composer.restore" : "composer.minimize")}
+              aria-expanded={!minimized}
+              onClick={() => setMinimized((value) => !value)}
+            >
+              {minimized ? "▴" : "–"}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="ms-btn ms-btn-ghost"
+            aria-label={t("close")}
+            disabled={busy}
+            onClick={dismiss}
+          >
+            ×
+          </button>
+        </span>
       </header>
+      {confirmingDiscard ? (
+        <div role="alert" className={styles.composerConfirm}>
+          <p>
+            <strong>{t("composer.discardTitle")}</strong> {t("composer.discardBody")}
+          </p>
+          <span>
+            <button
+              type="button"
+              className="ms-btn ms-btn-sm"
+              onClick={() => {
+                setConfirmingDiscard(false);
+                messageInput.current?.focus();
+              }}
+            >
+              {t("composer.keep")}
+            </button>
+            <button
+              ref={discardButton}
+              type="button"
+              className={`ms-btn ms-btn-sm ${styles.composerDiscard}`}
+              onClick={() => {
+                if (!submitting.current && current()) close();
+              }}
+            >
+              {t("composer.discard")}
+            </button>
+          </span>
+        </div>
+      ) : null}
       {arrived ? (
         <p className={styles.composerArrival} role="status">
           <span>
@@ -623,6 +770,9 @@ function DraftDialog({
       ) : null}
       <form
         className={styles.composerForm}
+        onInput={() => {
+          typed.current = true;
+        }}
         onSubmit={async (e) => {
           e.preventDefault();
           if (submitting.current || loadingFiles || !allowed || !current()) return;
@@ -1120,6 +1270,23 @@ export function MailboxContentView({
   // Read state shows at once; the server write and the refetch catch up behind it.
   const [seenOverride, setSeenOverride] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState("");
+  // Inside one mailbox the search covers it; "Buscar em todas as caixas" (or
+  // Ctrl+K) widens it to every mailbox until the field is cleared.
+  const [searchEverywhere, setSearchEverywhere] = useState(false);
+  // Once the inbox has painted and the browser is idle, the editor's code comes
+  // down too, so the first "Escrever" opens at once.
+  useEffect(() => {
+    const warm = () => void loadRichEditor();
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(warm, { timeout: 5000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = window.setTimeout(warm, 3000);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!search.trim()) setSearchEverywhere(false);
+  }, [search]);
   // What the server is asked: the search after typing pauses (two characters or more).
   const [searchTerm, setSearchTerm] = useState<string | null>(null);
   useEffect(() => {
@@ -1360,7 +1527,12 @@ export function MailboxContentView({
   // cannot (an older server), the local filter below is what shows.
   const found = useInfiniteQuery(
     trpc.mailboxes.search.infiniteQueryOptions(
-      { query: searchTerm ?? "", mailboxId: listMailboxId, folder: "all", limit: 50 },
+      {
+        query: searchTerm ?? "",
+        mailboxId: searchEverywhere ? null : listMailboxId,
+        folder: "all",
+        limit: 50,
+      },
       {
         enabled: searchTerm !== null,
         getNextPageParam: (page) => page.nextCursor ?? undefined,
@@ -1519,6 +1691,8 @@ export function MailboxContentView({
     (cause) => (cause as { data?: { code?: string } } | null)?.data?.code === "FORBIDDEN",
   );
   const composerAllowed = !!composer && writable.some((b) => b.id === composer.mailboxId);
+  // The open composer, while it is mounted (one message is written at a time).
+  const composerHandle = useRef<ComposerHandle | null>(null);
   function openComposer(
     mailboxId: string,
     source: Item | null,
@@ -1526,6 +1700,12 @@ export function MailboxContentView({
     quickReply?: string,
     prefill?: MailtoPrefill,
   ) {
+    // Writing something already: that message comes back instead of being replaced.
+    if (composerSession.current !== null && composerHandle.current?.dirty()) {
+      composerHandle.current.restore();
+      setNotice(t("composer.busy"));
+      return;
+    }
     const session = ++composerSequence.current;
     composerSession.current = session;
     compose({
@@ -2847,14 +3027,30 @@ export function MailboxContentView({
   const now = new Date();
   const listDate = (value: Date) => mailboxListDate(value, now, locale);
   // Which mailbox a row belongs to matters only when rows of several are mixed.
-  const showRowAddress = !selected && readable.length > 1;
+  const showRowAddress = (!selected || (searching && searchEverywhere)) && readable.length > 1;
   const canCompose = writable.length > 0 && (!selected || selected.canDraft);
   const newDraft = () => openComposer(selected?.id ?? writable[0]!.id, null);
   const folderTitle =
     folder === "custom" ? (customFolderName ?? t("organization.folders")) : t(folder);
   shortcut.current = (event) => {
+    // Ctrl+K (⌘K): search every mailbox from anywhere but the composer.
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      !event.altKey &&
+      event.key.toLowerCase() === "k" &&
+      !(event.target as Element | null)?.closest?.("dialog") &&
+      !shortcutsOpen
+    ) {
+      event.preventDefault();
+      if (selected) setSearchEverywhere(true);
+      searchInput.current?.focus();
+      searchInput.current?.select();
+      return;
+    }
     const action = mailboxShortcut(event, event.target);
-    if (!action || composer || shortcutsOpen) return;
+    // The docked composer leaves the inbox's keys working outside it (keys typed
+    // inside it, or in the full-screen one, never reach here as shortcuts).
+    if (!action || shortcutsOpen) return;
     const run = (act: () => void) => {
       event.preventDefault();
       act();
@@ -3109,6 +3305,20 @@ export function MailboxContentView({
                         : t("serverSearch.searching")}{" "}
                   {/* How to search, while it looks and when nothing matched; the
                       field's tooltip keeps it at hand the rest of the time. */}
+                  {selected && readable.length > 1 ? (
+                    <button
+                      type="button"
+                      className={`ms-btn ms-btn-ghost ms-btn-sm ${styles.searchScope}`}
+                      aria-pressed={searchEverywhere}
+                      onClick={() => setSearchEverywhere((value) => !value)}
+                    >
+                      {searchEverywhere
+                        ? t("serverSearch.onlyHere", {
+                            mailbox: selected.label || selected.address,
+                          })
+                        : t("serverSearch.everywhere")}
+                    </button>
+                  ) : null}{" "}
                   {(!searching && found.isFetching) || (searching && rows.length === 0) ? (
                     <span className={styles.searchHint}>{t("serverSearch.hint")}</span>
                   ) : null}
@@ -4262,6 +4472,7 @@ export function MailboxContentView({
       {composer && composerAllowed ? (
         <DraftDialog
           key={composer.session}
+          handle={composerHandle}
           boxes={boxes}
           mailboxId={composer.mailboxId}
           source={composer.source}

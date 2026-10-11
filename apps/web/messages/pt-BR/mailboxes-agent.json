@@ -119,5 +119,26 @@
     "body": "Adicione o servidor MCP {url} no seu cliente (Claude Code, Claude Desktop, Cursor, VS Code). Ele abre o navegador: você entra, marca as caixas que o agente pode usar e permite. Para revogar, use Revogar aqui embaixo ou Apps conectados.",
     "copy": "Copiar comando do Claude Code",
     "copied": "Copiado"
-  }
+  },
+  "desktop": {
+    "title": "Conectar neste computador",
+    "body": "Um clique configura o agente para usar esta caixa pelo app do MepMail. A chave fica no cofre de senhas do sistema, sem senha em arquivo de configuração. O sistema pede sua confirmação em cada passo.",
+    "working": "Configurando o {client}…",
+    "ok": "Pronto: {client} configurado. Feche e abra o {client} para ver as ferramentas do MepMail.",
+    "cancelled": "Cancelado: nada foi alterado.",
+    "notInstalled": "O {client} não foi encontrado neste computador.",
+    "failed": "Não deu para configurar o {client}: {detail}"
+  },
+  "live": {
+    "waiting": "Aguardando o agente usar a chave… assim que ele conectar, aparece aqui.",
+    "connected": "Conectado: o agente usou esta chave {when}."
+  },
+  "revokeConfirm": "Revogar “{label}”? O agente perde o acesso na hora.",
+  "revokeKeep": "Manter",
+  "kind": {
+    "team": "Credencial de time",
+    "oauth": "App OAuth"
+  },
+  "revokeConfirmCredential": "Revogar “{label}” inteira? O agente perde o acesso a todas as caixas dessa credencial, não só a esta.",
+  "quota": "Esta caixa já tem 25 chaves ativas. Revogue uma que não usa mais para criar outra."
 }

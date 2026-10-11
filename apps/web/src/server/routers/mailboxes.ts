@@ -146,6 +146,8 @@ async function call<T>(run: () => Promise<T>): Promise<T> {
               : error.code === "not_found"
                 ? "NOT_FOUND"
                 : "FORBIDDEN",
+        // The UI tells a full key quota ("quota") apart from other refusals.
+        message: error.code,
       });
     if (error instanceof MailboxServiceError)
       throw new TRPCError({

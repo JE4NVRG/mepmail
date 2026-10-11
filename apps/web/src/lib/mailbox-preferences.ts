@@ -68,7 +68,8 @@ export const CORREIO_PREF_DEFAULTS: CorreioPrefs = {
   groupByThread: true,
   startFolder: "inbox",
   showAvatars: true,
-  markSeenAfterMs: 1500,
+  // A message opened is read at once, as in Spark and Gmail (the wait is a choice).
+  markSeenAfterMs: 0,
   showShortcutHints: true,
   undoSendSeconds: 10,
   quickReplies: null,

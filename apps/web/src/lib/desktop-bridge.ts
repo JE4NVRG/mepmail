@@ -58,6 +58,45 @@ function ipc(): TauriInternals | null {
   return internals && typeof internals.invoke === "function" ? internals : null;
 }
 
+/** Agents the desktop app can configure itself (apps/desktop/src-tauri/src/agents.rs). */
+export const DESKTOP_AGENT_TARGETS = ["claude-desktop", "cursor", "claude-code", "codex"] as const;
+export type DesktopAgentTarget = (typeof DESKTOP_AGENT_TARGETS)[number];
+export type DesktopAgentResult =
+  | { ok: true; detail: string }
+  | { ok: false; reason: "cancelled" | "not_installed" | "unavailable" | "failed"; detail: string };
+
+/** Whether this page may configure agents on the computer (the shell, with a mailbox key). */
+export function canConnectAgentHere(token: string): boolean {
+  return ipc() !== null && token.startsWith("mmb_");
+}
+
+/**
+ * One click to connect an agent: the shell keeps the mailbox key in the
+ * system's credential vault and writes the agent's MCP entry pointing at its
+ * own executable (no key in any file). Each step shows a native "Permitir?";
+ * a refusal comes back as "cancelled".
+ */
+export async function connectAgentHere(
+  target: DesktopAgentTarget,
+  mailboxId: string,
+  token: string,
+): Promise<DesktopAgentResult> {
+  const internals = ipc();
+  if (!internals) return { ok: false, reason: "unavailable", detail: "" };
+  try {
+    await internals.invoke("store_agent_key", { mailboxId, token });
+    const result = (await internals.invoke("install_agent", { target, mailboxId })) as {
+      detail?: unknown;
+    } | null;
+    return { ok: true, detail: typeof result?.detail === "string" ? result.detail : "" };
+  } catch (error) {
+    const detail = typeof error === "string" ? error : error instanceof Error ? error.message : "";
+    if (detail === "cancelled") return { ok: false, reason: "cancelled", detail };
+    if (detail === "not_installed") return { ok: false, reason: "not_installed", detail };
+    return { ok: false, reason: "failed", detail: detail.slice(0, 200) };
+  }
+}
+
 /**
  * Mirrors a title into the native window (the tab title does not reach it).
  * Resolves false outside the shell or when the shell refuses the command.

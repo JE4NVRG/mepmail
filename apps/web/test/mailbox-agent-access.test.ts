@@ -249,7 +249,15 @@ describe("mailbox agent credentials", () => {
       "revokedAt",
       "lastUsedAt",
       "lastSentAt",
+      "kind",
+      "credentialId",
+      "oauthClientId",
     ]);
+    expect(listed[0]).toMatchObject({
+      kind: "mailbox",
+      credentialId: first.id,
+      oauthClientId: null,
+    });
     expect(first).not.toHaveProperty("keyHash");
     expect(await bridge(first.token)).toEqual({
       actor: { ...owner(), agentAccess: true },
@@ -568,6 +576,44 @@ describe("agent credential health", () => {
     expect(
       await listExpiringMailboxAgentCredentials(db, { now: new Date(), within: 7 * day }),
     ).toEqual([]);
+  });
+});
+
+describe("per-mailbox listing of wider credentials", () => {
+  it("marks team and OAuth rows and never revokes one row of them from the mailbox", async () => {
+    const own = await mint({ label: "Own" });
+    const team = await createMailboxTeamAgentKey(db, owner(), {
+      label: "Sage",
+      mailboxIds: [mailboxId, personId],
+    });
+    await grantMailboxOAuthClient(db, owner(), {
+      clientId: "client-claude",
+      clientName: "Claude",
+      mailboxIds: [mailboxId],
+    });
+    const listed = await listMailboxAgentKeys(db, owner(), mailboxId);
+    const mailbox = listed.find((key) => key.kind === "mailbox");
+    const shared = listed.find((key) => key.kind === "team");
+    const oauth = listed.find((key) => key.kind === "oauth");
+    expect(listed).toHaveLength(3);
+    expect(mailbox).toMatchObject({ id: own.id, credentialId: own.id, oauthClientId: null });
+    expect(shared).toMatchObject({ credentialId: team.id, oauthClientId: null });
+    expect(oauth).toMatchObject({ label: "Claude (OAuth)", oauthClientId: "client-claude" });
+    expect(oauth?.credentialId).not.toBe(oauth?.id);
+
+    for (const row of [shared!, oauth!]) {
+      const revoke = revokeMailboxAgentKey(db, owner(), { mailboxId, id: row.id });
+      await expect(revoke).rejects.toMatchObject({ code: "not_found" });
+    }
+    // Both wider credentials still reach the mailbox; the team one on every mailbox.
+    const k = schema.mailboxAgentKeys;
+    const rows = await db.select({ groupId: k.groupId, revokedAt: k.revokedAt }).from(k);
+    const wider = rows.filter((row) => row.groupId !== null);
+    expect(wider).toHaveLength(3);
+    expect(wider.every((row) => row.revokedAt === null)).toBe(true);
+    await revokeMailboxAgentKey(db, owner(), { mailboxId, id: own.id });
+    const after = await listMailboxAgentKeys(db, owner(), mailboxId);
+    expect(after.find((key) => key.id === own.id)?.revokedAt).toBeInstanceOf(Date);
   });
 });
 

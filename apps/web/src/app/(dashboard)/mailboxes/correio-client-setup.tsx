@@ -2,12 +2,19 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { useFormatter, useNow, useTranslations } from "next-intl";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   CORREIO_MCP_CLIENTS,
   type CorreioMcpClient,
   correioClientSnippet,
 } from "@/lib/correio-mcp-clients";
+import {
+  canConnectAgentHere,
+  connectAgentHere,
+  DESKTOP_AGENT_TARGETS,
+  type DesktopAgentResult,
+  type DesktopAgentTarget,
+} from "@/lib/desktop-bridge";
 import { useTRPC } from "@/lib/trpc";
 import styles from "./mailbox-agent-keys.module.css";
 
@@ -18,22 +25,79 @@ type Props = {
   disabled: boolean;
   /** The dialog's own clipboard handler, so copy feedback stays in one place. */
   onCopy: (text: string) => Promise<void>;
+  /** The key's mailbox: inside the desktop app it can configure agents in one click. */
+  mailboxId?: string | undefined;
 };
 
 /**
  * Beside a new agent key: the setup for each MCP client (pick one, copy it)
  * and a live connection test against the public Correio endpoint.
  */
-export function CorreioClientSetup({ url, token, hint, disabled, onCopy }: Props) {
+export function CorreioClientSetup({ url, token, hint, disabled, onCopy, mailboxId }: Props) {
   const t = useTranslations("mailboxes-agent");
   const trpc = useTRPC();
   const id = useId();
+  // Read after hydration: the shell marks the page on load.
+  const [here, setHere] = useState(false);
+  useEffect(() => setHere(!!mailboxId && canConnectAgentHere(token)), [mailboxId, token]);
+  const [connecting, setConnecting] = useState<DesktopAgentTarget | null>(null);
+  const [connected, setConnected] = useState<{
+    target: DesktopAgentTarget;
+    result: DesktopAgentResult;
+  } | null>(null);
+  async function connect(target: DesktopAgentTarget) {
+    if (!mailboxId || connecting) return;
+    setConnecting(target);
+    setConnected(null);
+    const result = await connectAgentHere(target, mailboxId, token);
+    setConnected({ target, result });
+    setConnecting(null);
+  }
   const [client, setClient] = useState<CorreioMcpClient>("claude-code");
   const test = useMutation(trpc.mailboxes.testAgentConnection.mutationOptions({ gcTime: 0 }));
   const snippet = correioClientSnippet(client, url, token);
   const result = test.data;
   return (
     <div className={styles.mcpSetup}>
+      {here ? (
+        <div className={styles.desktopConnect}>
+          <h3>{t("desktop.title")}</h3>
+          <p>{t("desktop.body")}</p>
+          <div className={styles.actions}>
+            {DESKTOP_AGENT_TARGETS.map((target) => (
+              <button
+                key={target}
+                type="button"
+                className="ms-btn"
+                disabled={disabled || connecting !== null}
+                onClick={() => void connect(target)}
+              >
+                {connecting === target
+                  ? t("desktop.working", { client: t(`clients.${target}`) })
+                  : t(`clients.${target}`)}
+              </button>
+            ))}
+          </div>
+          {connected ? (
+            <p
+              className={styles.testResult}
+              role={connected.result.ok ? "status" : "alert"}
+              data-ok={connected.result.ok}
+            >
+              {connected.result.ok
+                ? t("desktop.ok", { client: t(`clients.${connected.target}`) })
+                : connected.result.reason === "cancelled"
+                  ? t("desktop.cancelled")
+                  : connected.result.reason === "not_installed"
+                    ? t("desktop.notInstalled", { client: t(`clients.${connected.target}`) })
+                    : t("desktop.failed", {
+                        client: t(`clients.${connected.target}`),
+                        detail: connected.result.detail,
+                      })}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <h3>{t("mcpTitle")}</h3>
       <p id={`${id}-hint`}>{hint}</p>
       <fieldset className={styles.clients} aria-label={t("clients.label")}>

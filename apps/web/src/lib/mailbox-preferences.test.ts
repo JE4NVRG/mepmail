@@ -35,7 +35,7 @@ describe("completeCorreioPrefs", () => {
 
   it("accepts null for the manual mark-as-read mode", () => {
     expect(completeCorreioPrefs({ markSeenAfterMs: null }).markSeenAfterMs).toBeNull();
-    expect(completeCorreioPrefs({ markSeenAfterMs: 1000 }).markSeenAfterMs).toBe(1500);
+    expect(completeCorreioPrefs({ markSeenAfterMs: 1000 }).markSeenAfterMs).toBe(0);
   });
 });
 

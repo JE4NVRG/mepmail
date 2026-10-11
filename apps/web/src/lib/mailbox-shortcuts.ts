@@ -12,6 +12,7 @@ export type MailboxShortcut =
   | "forward"
   | "compose"
   | "search"
+  | "searchEverywhere"
   | "help"
   | "undo"
   | "newFolder"
@@ -56,6 +57,7 @@ export const MAILBOX_SHORTCUTS: { key: string; action: MailboxShortcut }[] = [
   { key: "Z", action: "undo" },
   { key: "Shift+N", action: "newFolder" },
   { key: "/", action: "search" },
+  { key: "Ctrl+K", action: "searchEverywhere" },
   { key: "?", action: "help" },
 ];
 

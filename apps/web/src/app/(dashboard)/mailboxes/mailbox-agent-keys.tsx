@@ -49,15 +49,26 @@ function AgentKeysSession({ mailbox, onClose, mcpUrl }: Props) {
   const [copying, setCopying] = useState(false);
   const [working, setWorking] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  // "Revogar?" answered in the row itself (this dialog is modal).
+  const [confirmingRevoke, setConfirmingRevoke] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const input = { mailboxId: mailbox.id };
   const listing = useQuery(
-    trpc.mailboxes.agentKeys.queryOptions(input, { staleTime: 0, gcTime: 0 }),
+    trpc.mailboxes.agentKeys.queryOptions(input, {
+      staleTime: 0,
+      gcTime: 0,
+      // While a new key is on screen, its first use shows up here on its own.
+      refetchInterval: secret ? 5000 : false,
+    }),
   );
   const revoke = useMutation(trpc.mailboxes.revokeAgentKey.mutationOptions({ gcTime: 0 }));
+  // A team credential or an OAuth app is revoked whole, in every mailbox it reaches.
+  const revokeCredential = useMutation(
+    trpc.mailboxes.revokeTeamAgentKey.mutationOptions({ gcTime: 0 }),
+  );
   const resetRevoke = revoke.reset;
-  const busy = working || revoke.isPending;
+  const busy = working || revoke.isPending || revokeCredential.isPending;
 
   useEffect(() => {
     active.current = true;
@@ -140,21 +151,24 @@ function AgentKeysSession({ mailbox, onClose, mcpUrl }: Props) {
       } catch {
         if (active.current) setError(t("refreshError"));
       }
-    } catch {
-      if (active.current) setError(t("error"));
+    } catch (cause) {
+      if (active.current)
+        setError(t((cause as { message?: string })?.message === "quota" ? "quota" : "error"));
     } finally {
       if (active.current) setWorking(false);
     }
   }
 
-  async function revokeKey(keyId: string) {
+  async function revokeKey(key: { id: string; kind: string; credentialId: string }) {
+    const keyId = key.id;
     if (busy) return;
     setError("");
     setNotice("");
     setRevokingId(keyId);
     setWorking(true);
     try {
-      await revoke.mutateAsync({ ...input, id: keyId });
+      if (key.kind === "mailbox") await revoke.mutateAsync({ ...input, id: keyId });
+      else await revokeCredential.mutateAsync({ id: key.credentialId });
       if (!active.current) return;
       const refreshed = await refreshKeys();
       if (!refreshed.data?.some((key) => key.id === keyId && key.revokedAt != null)) {
@@ -284,6 +298,16 @@ function AgentKeysSession({ mailbox, onClose, mcpUrl }: Props) {
               {t("copySuccess")}
             </p>
           )}
+          {(() => {
+            const used = listing.data?.find((key) => key.id === secret.id)?.lastUsedAt ?? null;
+            return (
+              <p className={styles.liveUse} role="status" data-used={used !== null}>
+                {used
+                  ? t("live.connected", { when: format.relativeTime(used) })
+                  : t("live.waiting")}
+              </p>
+            );
+          })()}
           {mcpUrl ? (
             <CorreioClientSetup
               url={mcpUrl}
@@ -291,6 +315,7 @@ function AgentKeysSession({ mailbox, onClose, mcpUrl }: Props) {
               hint={t("mcpHint")}
               disabled={busy || copying}
               onCopy={(text) => copyToken(text)}
+              mailboxId={mailbox.id}
             />
           ) : null}
         </section>
@@ -411,6 +436,9 @@ function AgentKeysSession({ mailbox, onClose, mcpUrl }: Props) {
                     <div className={styles.keyHeading}>
                       <strong>{key.label}</strong>
                       <span className={styles.badge}>{t(status)}</span>
+                      {key.kind !== "mailbox" ? (
+                        <span className={styles.badge}>{t(`kind.${key.kind}`)}</span>
+                      ) : null}
                     </div>
                     <AgentKeyHealth
                       expiresAt={key.expiresAt}
@@ -438,15 +466,44 @@ function AgentKeysSession({ mailbox, onClose, mcpUrl }: Props) {
                         : t("noExpiration")}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className="ms-btn ms-btn-ghost"
-                    disabled={busy || key.revokedAt !== null}
-                    aria-label={t("revokeLabel", { label: key.label })}
-                    onClick={() => void revokeKey(key.id)}
-                  >
-                    {revokingId === key.id ? t("revoking") : t("revoke")}
-                  </button>
+                  {confirmingRevoke === key.id ? (
+                    <div className={styles.revokeConfirm}>
+                      <p>
+                        {t(key.kind === "mailbox" ? "revokeConfirm" : "revokeConfirmCredential", {
+                          label: key.label,
+                        })}
+                      </p>
+                      <button
+                        type="button"
+                        className="ms-btn"
+                        disabled={busy}
+                        onClick={() => setConfirmingRevoke(null)}
+                      >
+                        {t("revokeKeep")}
+                      </button>
+                      <button
+                        type="button"
+                        className={`ms-btn ${styles.revokeYes}`}
+                        disabled={busy}
+                        onClick={() => {
+                          setConfirmingRevoke(null);
+                          void revokeKey(key);
+                        }}
+                      >
+                        {t("revoke")}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="ms-btn ms-btn-ghost"
+                      disabled={busy || key.revokedAt !== null}
+                      aria-label={t("revokeLabel", { label: key.label })}
+                      onClick={() => setConfirmingRevoke(key.id)}
+                    >
+                      {revokingId === key.id ? t("revoking") : t("revoke")}
+                    </button>
+                  )}
                 </li>
               );
             })}
