@@ -1,6 +1,6 @@
 {
   "name": "@mepmail/mcp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "mcpName": "io.github.JE4NVRG/mepmail",
   "description": "MepMail MCP server for local clients (stdio): send and inspect transactional email, and read and answer Correio mailboxes, from Claude, Cursor and any MCP client. MepMail's API is compatible with the Resend wire protocol.",
   "license": "MIT",
