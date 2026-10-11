@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.121",
+      "date": "2026-10-11",
+      "title": "A página do domínio diz como corrigir o SPF",
+      "summary": "Quando a linha de SPF de um domínio não confere, a página agora diz o que mudar, em vez de só mostrar o que o DNS responde.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Um SPF que já existe sem o Amazon SES pede para acrescentar include:amazonses.com a ele, em vez de criar um segundo registro.",
+            "Dois registros SPF no mesmo nome pedem para juntar tudo num só, porque os destinatários tratam dois como quebrado."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.120",
       "date": "2026-10-11",
       "title": "Domínios verificam com os seus próprios includes de SPF",

@@ -154,6 +154,8 @@
       "verified": "Verified"
     },
     "mismatchFound": "DNS answers with:\n{found}",
+    "spfMergeHint": "There is already an SPF record on this name:\n{found}\nAdd include:amazonses.com to that record instead of creating a second one: a name can have only one v=spf1 record.",
+    "spfDuplicateHint": "This name has more than one SPF record:\n{found}\nMerge them into one v=spf1 record that also has include:amazonses.com. With two, receivers treat SPF as broken.",
     "proxiedHint": "This name answers with addresses instead of the CNAME:\n{found}\nOn Cloudflare that is the orange cloud (proxied). Switch the record to DNS only.",
     "dnsOnly": "DNS only",
     "dnsOnlyHint": "On Cloudflare, keep the proxy off for this record (grey cloud, \"DNS only\"). A proxied CNAME answers with Cloudflare's addresses instead of this target, and TLS for this host is served by MepMail.",

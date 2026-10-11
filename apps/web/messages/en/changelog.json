@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.121",
+      "date": "2026-10-11",
+      "title": "The domain page says how to fix SPF",
+      "summary": "When the SPF row of a domain does not match, the page now says what to change instead of only showing what DNS answers.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "An SPF record that exists without Amazon SES asks you to add include:amazonses.com to it, rather than create a second record.",
+            "Two SPF records on the same name ask you to merge them into one, since receivers treat two as broken."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.120",
       "date": "2026-10-11",
       "title": "Domains verify with your own SPF includes",

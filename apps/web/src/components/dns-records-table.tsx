@@ -128,6 +128,15 @@ function RecordsTable({
 }
 
 /**
+ * The SPF answers of a divergent SPF row: one means "add SES to it", two or more
+ * mean "merge them" (a name may carry only one v=spf1 record).
+ */
+function spfAnswers(record: { type: string; value: string; found?: string | undefined }): string[] {
+  if (record.type !== "TXT" || !/v=spf1/i.test(record.value) || !record.found) return [];
+  return record.found.split("\n").filter((line) => /^v=spf1(\s|$)/i.test(line.trim()));
+}
+
+/**
  * The grouped DNS-record tables (Domain verification / Enable sending / DMARC)
  * shared by the domain-detail page and the add-domain wizard's step 02.
  * The Name pill shows and copies the zone-relative name (what a DNS
@@ -228,12 +237,19 @@ export function DnsRecordsTable({
                                 : record.live === "mismatch" && record.found
                                   ? record.type === "CNAME" && answersWithAddresses(record.found)
                                     ? t("detail.proxiedHint", { found: record.found })
-                                    : t("detail.mismatchFound", {
-                                        found: record.found
-                                          .split("\n")
-                                          .map(abbreviateDkim)
-                                          .join("\n"),
-                                      })
+                                    : spfAnswers(record).length
+                                      ? t(
+                                          spfAnswers(record).length > 1
+                                            ? "detail.spfDuplicateHint"
+                                            : "detail.spfMergeHint",
+                                          { found: record.found },
+                                        )
+                                      : t("detail.mismatchFound", {
+                                          found: record.found
+                                            .split("\n")
+                                            .map(abbreviateDkim)
+                                            .join("\n"),
+                                        })
                                   : status === "pending" && record.live === "found"
                                     ? t("detail.foundAwaitingProvider")
                                     : undefined
