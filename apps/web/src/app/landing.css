@@ -1599,6 +1599,14 @@
   }
 }
 @media (max-width: 879px) {
+  .gtm-nav-actions:has(.gtm-nav-download) {
+    flex-wrap: wrap;
+  }
+  .gtm-nav-download {
+    flex: 1 1 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
   .gtm-nav-download-label {
     display: none;
   }
