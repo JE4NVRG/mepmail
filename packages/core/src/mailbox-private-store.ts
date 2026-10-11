@@ -11,6 +11,7 @@ import {
   ne,
   notExists,
   or,
+  type SQL,
   sql,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -208,6 +209,86 @@ async function scoped<T>(
       if (!team || team.suspendedAt) throw new MailboxServiceError("not_entitled");
       const plan = requireMailboxOperationalPlan(entitlement);
       await requireMailboxSeat(tx, actor.teamId, mailboxId, plan);
+    }
+    return operation(tx);
+  });
+}
+
+/**
+ * Mailboxes one authorized read may span: a page of list or search results
+ * holds at most 50 rows, so never more distinct mailboxes than that.
+ */
+const MAX_READ_MAILBOXES = 50;
+
+/**
+ * Read access to several mailboxes under one transaction: the checks and lock
+ * order of `scoped` for a read (team, membership, the mailboxes by id, their
+ * grants), in four queries however many mailboxes there are. All or nothing:
+ * one mailbox the actor may not read refuses the whole call.
+ */
+async function scopedRead<T>(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxIds: readonly string[],
+  operation: (tx: Db) => Promise<T>,
+): Promise<T> {
+  if (actor.supportView) throw new MailboxContentError("forbidden");
+  const ids = [...new Set(mailboxIds)].sort();
+  if (ids.length > MAX_READ_MAILBOXES) throw new MailboxContentError("invalid");
+  if (!ids.length) return operation(db);
+  return db.transaction(async (transaction) => {
+    const tx = transaction as unknown as Db;
+    await tx
+      .select({ id: schema.teams.id })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, actor.teamId))
+      .for("share");
+    const [member] = await tx
+      .select({ id: schema.teamMembers.id })
+      .from(schema.teamMembers)
+      .where(
+        and(
+          eq(schema.teamMembers.teamId, actor.teamId),
+          eq(schema.teamMembers.userId, actor.userId),
+        ),
+      )
+      .for("share");
+    if (!member) throw new MailboxContentError("forbidden");
+    // Rows lock in id order, so two multi-mailbox reads never wait on each other in a cycle.
+    const boxes = await tx
+      .select({
+        id: schema.mailboxes.id,
+        status: schema.mailboxes.status,
+        ownerUserId: schema.mailboxes.ownerUserId,
+        ownerMembershipId: schema.mailboxes.ownerMembershipId,
+      })
+      .from(schema.mailboxes)
+      .where(and(inArray(schema.mailboxes.id, ids), eq(schema.mailboxes.teamId, actor.teamId)))
+      .orderBy(asc(schema.mailboxes.id))
+      .for("share");
+    if (boxes.length !== ids.length || boxes.some((box) => box.status !== "planned"))
+      throw new MailboxContentError("forbidden");
+    const shared = boxes
+      .filter((box) => !(box.ownerUserId === actor.userId && box.ownerMembershipId === member.id))
+      .map((box) => box.id);
+    if (shared.length) {
+      // Any live grant reads; draft and owner rights are never asked for here.
+      const grants = await tx
+        .select({ mailboxId: schema.mailboxGrants.mailboxId })
+        .from(schema.mailboxGrants)
+        .where(
+          and(
+            inArray(schema.mailboxGrants.mailboxId, shared),
+            eq(schema.mailboxGrants.teamId, actor.teamId),
+            eq(schema.mailboxGrants.userId, actor.userId),
+            eq(schema.mailboxGrants.membershipId, member.id),
+            isNull(schema.mailboxGrants.revokedAt),
+          ),
+        )
+        .orderBy(asc(schema.mailboxGrants.mailboxId))
+        .for("share");
+      const granted = new Set(grants.map((grant) => grant.mailboxId));
+      if (shared.some((id) => !granted.has(id))) throw new MailboxContentError("forbidden");
     }
     return operation(tx);
   });
@@ -476,15 +557,7 @@ export async function withMailboxContentAccess<T>(
   mailboxIds: string[],
   operation: (tx: Db) => Promise<T>,
 ): Promise<T> {
-  actor = { ...actor };
-  const ids = [...new Set(mailboxIds)].sort();
-  if (actor.supportView) throw new MailboxContentError("forbidden");
-  if (ids.length > 20) throw new MailboxContentError("invalid");
-  const visit = (tx: Db, index: number): Promise<T> =>
-    index === ids.length
-      ? operation(tx)
-      : scoped(tx, actor, ids[index]!, "read", false, (locked) => visit(locked, index + 1));
-  return visit(db, 0);
+  return scopedRead(db, { ...actor }, mailboxIds, operation);
 }
 
 /** Keep authorization locks through parsing/DTO or binary response construction. */
@@ -749,14 +822,15 @@ function replyAfter(items: ItemColumns) {
   const reply = alias(schema.mailboxItems, "follow_up_reply");
   return sql`exists (select 1 from ${schema.mailboxItems} ${reply} where ${reply.mailboxId} = ${items.mailboxId} and ${reply.teamId} = ${items.teamId} and ${reply.kind} = 'inbox' and ${reply.trashedAt} is null and ${items.threadKey} is not null and ${reply.threadKey} = ${items.threadKey} and ${reply.createdAt} > ${items.createdAt})`;
 }
+/** `mailbox` picks the listed mailbox(es), e.g. `eq(items.mailboxId, id)`. */
 function listConditions(
   items: ItemColumns,
   actor: MailboxContentActor,
-  mailboxId: string,
+  mailbox: SQL,
   filter: MailboxListFilter | undefined,
 ) {
   return [
-    eq(items.mailboxId, mailboxId),
+    mailbox,
     eq(items.teamId, actor.teamId),
     ...(filter?.kind ? [eq(items.kind, filter.kind)] : []),
     filter?.trashed === true && !actor.agentAccess
@@ -790,6 +864,110 @@ function listConditions(
 const positionTime = (at: string) =>
   sql`(timestamptz 'epoch' + ${at}::bigint * interval '1 microsecond')`;
 
+export interface MailboxListPage {
+  before?: MailboxListPosition;
+  limit?: number;
+  latestPerThread?: boolean;
+}
+/** A listing's page, checked before any query (snapshot: the caller cannot change it in flight). */
+function listPage(
+  actor: MailboxContentActor,
+  filter: MailboxListFilter | undefined,
+  page: MailboxListPage | undefined,
+) {
+  if (actor.agentAccess && filter?.trashed) throw new MailboxContentError("forbidden");
+  const limit = page?.limit ?? 100;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 101)
+    throw new MailboxContentError("invalid");
+  const before = page?.before ? { ...page.before } : undefined;
+  if (before && (!LIST_POSITION_AT.test(before.at) || !LIST_POSITION_ID.test(before.id)))
+    throw new MailboxContentError("invalid");
+  return { limit, before, latestPerThread: page?.latestPerThread === true };
+}
+
+/**
+ * The listing query over one mailbox or several, run inside the caller's
+ * authorized transaction: newest first by the shared order, one page. A
+ * conversation is grouped within its own mailbox.
+ */
+function listedItems(
+  tx: Db,
+  actor: MailboxContentActor,
+  mailboxIds: readonly string[],
+  filter: MailboxListFilter | undefined,
+  { limit, before, latestPerThread }: ReturnType<typeof listPage>,
+) {
+  const items = schema.mailboxItems;
+  const order = listOrder(items, filter?.kind);
+  const newer = alias(schema.mailboxItems, "newer_in_thread");
+  const one = mailboxIds.length === 1 ? mailboxIds[0]! : null;
+  const latest = latestPerThread
+    ? [
+        or(
+          isNull(items.threadKey),
+          notExists(
+            tx
+              .select({ one: sql`1` })
+              .from(newer)
+              .where(
+                and(
+                  ...listConditions(
+                    newer as unknown as ItemColumns,
+                    actor,
+                    one ? eq(newer.mailboxId, one) : eq(newer.mailboxId, items.mailboxId),
+                    filter,
+                  ),
+                  eq(newer.threadKey, items.threadKey),
+                  sql`(${listOrder(newer as unknown as ItemColumns, filter?.kind)}, ${newer.id}) > (${order}, ${items.id})`,
+                ),
+              ),
+          ),
+        ),
+      ]
+    : [];
+  return tx
+    .select({
+      id: items.id,
+      mailboxId: items.mailboxId,
+      kind: items.kind,
+      deliveryFolder: items.deliveryFolder,
+      inboundAssessment: items.inboundAssessment,
+      trashedAt: items.trashedAt,
+      starredAt: items.starredAt,
+      seenAt: items.seenAt,
+      archivedAt: items.archivedAt,
+      folderId: items.folderId,
+      snoozedUntil: items.snoozedUntil,
+      pinnedAt: items.pinnedAt,
+      sendAt: items.sendAt,
+      sendFailure: items.sendFailure,
+      remindAt: items.remindAt,
+      remindedAt: items.remindedAt,
+      threadKey: items.threadKey,
+      revision: items.revision,
+      createdAt: items.createdAt,
+      updatedAt: items.updatedAt,
+      orderAt: sql<string>`(extract(epoch from ${order}) * 1000000)::bigint::text`,
+    })
+    .from(items)
+    .where(
+      and(
+        ...listConditions(
+          items,
+          actor,
+          one ? eq(items.mailboxId, one) : inArray(items.mailboxId, [...mailboxIds]),
+          filter,
+        ),
+        ...(before
+          ? [sql`(${order}, ${items.id}) < (${positionTime(before.at)}, ${before.id}::uuid)`]
+          : []),
+        ...latest,
+      ),
+    )
+    .orderBy(desc(order), desc(items.id))
+    .limit(limit);
+}
+
 /**
  * Bounded metadata listing, newest first. Content is decrypted only by a separate
  * authorized read. `before` continues after a row the caller already showed;
@@ -800,78 +978,37 @@ export async function listMailboxItems(
   actor: MailboxContentActor,
   mailboxId: string,
   filter?: MailboxListFilter,
-  page?: { before?: MailboxListPosition; limit?: number; latestPerThread?: boolean },
+  page?: MailboxListPage,
 ) {
   actor = { ...actor };
   filter = filter ? { ...filter } : undefined;
-  page = page ? { ...page, ...(page.before ? { before: { ...page.before } } : {}) } : undefined;
-  if (actor.agentAccess && filter?.trashed) throw new MailboxContentError("forbidden");
-  const limit = page?.limit ?? 100;
-  if (!Number.isInteger(limit) || limit < 1 || limit > 101)
-    throw new MailboxContentError("invalid");
-  const before = page?.before;
-  if (before && (!LIST_POSITION_AT.test(before.at) || !LIST_POSITION_ID.test(before.id)))
-    throw new MailboxContentError("invalid");
-  const items = schema.mailboxItems;
-  const order = listOrder(items, filter?.kind);
-  return scoped(db, actor, mailboxId, "read", false, async (tx) => {
-    const newer = alias(schema.mailboxItems, "newer_in_thread");
-    const latest = page?.latestPerThread
-      ? [
-          or(
-            isNull(items.threadKey),
-            notExists(
-              tx
-                .select({ one: sql`1` })
-                .from(newer)
-                .where(
-                  and(
-                    ...listConditions(newer as unknown as ItemColumns, actor, mailboxId, filter),
-                    eq(newer.threadKey, items.threadKey),
-                    sql`(${listOrder(newer as unknown as ItemColumns, filter?.kind)}, ${newer.id}) > (${order}, ${items.id})`,
-                  ),
-                ),
-            ),
-          ),
-        ]
-      : [];
-    return tx
-      .select({
-        id: items.id,
-        mailboxId: items.mailboxId,
-        kind: items.kind,
-        deliveryFolder: items.deliveryFolder,
-        inboundAssessment: items.inboundAssessment,
-        trashedAt: items.trashedAt,
-        starredAt: items.starredAt,
-        seenAt: items.seenAt,
-        archivedAt: items.archivedAt,
-        folderId: items.folderId,
-        snoozedUntil: items.snoozedUntil,
-        pinnedAt: items.pinnedAt,
-        sendAt: items.sendAt,
-        sendFailure: items.sendFailure,
-        remindAt: items.remindAt,
-        remindedAt: items.remindedAt,
-        threadKey: items.threadKey,
-        revision: items.revision,
-        createdAt: items.createdAt,
-        updatedAt: items.updatedAt,
-        orderAt: sql<string>`(extract(epoch from ${order}) * 1000000)::bigint::text`,
-      })
-      .from(items)
-      .where(
-        and(
-          ...listConditions(items, actor, mailboxId, filter),
-          ...(before
-            ? [sql`(${order}, ${items.id}) < (${positionTime(before.at)}, ${before.id}::uuid)`]
-            : []),
-          ...latest,
-        ),
-      )
-      .orderBy(desc(order), desc(items.id))
-      .limit(limit);
-  });
+  const checked = listPage(actor, filter, page);
+  return scoped(db, actor, mailboxId, "read", false, (tx) =>
+    listedItems(tx, actor, [mailboxId], filter, checked),
+  );
+}
+
+/**
+ * The same listing over several mailboxes under one authorized read
+ * (`scopedRead`, at most 50): one page across all of them, newest first by
+ * the order each mailbox lists its own, i.e. the page that merging the
+ * per-mailbox listings would give, in a few queries instead of a transaction
+ * per mailbox.
+ */
+export async function listMailboxItemsMany(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxIds: readonly string[],
+  filter?: MailboxListFilter,
+  page?: MailboxListPage,
+) {
+  actor = { ...actor };
+  filter = filter ? { ...filter } : undefined;
+  const ids = [...new Set(mailboxIds)];
+  const checked = listPage(actor, filter, page);
+  return scopedRead(db, actor, ids, async (tx) =>
+    ids.length ? await listedItems(tx, actor, ids, filter, checked) : [],
+  );
 }
 
 /**
@@ -888,21 +1025,46 @@ export async function countUnreadMailboxItems(
     const [row] = await tx
       .select({ count: sql<number>`count(*)::int` })
       .from(schema.mailboxItems)
-      .where(
-        and(
-          eq(schema.mailboxItems.mailboxId, mailboxId),
-          eq(schema.mailboxItems.teamId, actor.teamId),
-          eq(schema.mailboxItems.kind, "inbox"),
-          eq(schema.mailboxItems.deliveryFolder, "inbox"),
-          isNull(schema.mailboxItems.seenAt),
-          isNull(schema.mailboxItems.trashedAt),
-          isNull(schema.mailboxItems.archivedAt),
-          isNull(schema.mailboxItems.folderId),
-          sql`not ${snoozedNow(schema.mailboxItems)}`,
-        ),
-      );
+      .where(unreadInbox(actor, eq(schema.mailboxItems.mailboxId, mailboxId)));
     return row?.count ?? 0;
   });
+}
+
+/** The same count for several mailboxes under one authorized read; 0 where none. */
+export async function countUnreadMailboxItemsMany(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxIds: readonly string[],
+): Promise<Map<string, number>> {
+  actor = { ...actor };
+  const ids = [...new Set(mailboxIds)];
+  return scopedRead(db, actor, ids, async (tx) => {
+    const counts = new Map(ids.map((id) => [id, 0]));
+    if (!ids.length) return counts;
+    const rows = await tx
+      .select({ mailboxId: schema.mailboxItems.mailboxId, count: sql<number>`count(*)::int` })
+      .from(schema.mailboxItems)
+      .where(unreadInbox(actor, inArray(schema.mailboxItems.mailboxId, ids)))
+      .groupBy(schema.mailboxItems.mailboxId);
+    for (const row of rows) counts.set(row.mailboxId, row.count);
+    return counts;
+  });
+}
+
+/** Rows the unread counts take, in the mailbox(es) `mailbox` picks. */
+function unreadInbox(actor: MailboxContentActor, mailbox: SQL) {
+  const items = schema.mailboxItems;
+  return and(
+    mailbox,
+    eq(items.teamId, actor.teamId),
+    eq(items.kind, "inbox"),
+    eq(items.deliveryFolder, "inbox"),
+    isNull(items.seenAt),
+    isNull(items.trashedAt),
+    isNull(items.archivedAt),
+    isNull(items.folderId),
+    sql`not ${snoozedNow(items)}`,
+  );
 }
 
 export interface MailboxViewCount {

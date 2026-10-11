@@ -2,10 +2,10 @@ import { randomUUID } from "node:crypto";
 import {
   countMailboxSchedules,
   countMailboxViews,
-  countUnreadMailboxItems,
+  countUnreadMailboxItemsMany,
   getMailboxOutboundSummary,
   listMailboxFolders,
-  listMailboxItems,
+  listMailboxItemsMany,
   listMailboxRegistry,
   listMailboxThread,
   MAILBOX_RICH_FORMAT_HEADER,
@@ -563,7 +563,7 @@ const newerFirst = (a: MailboxListPosition, b: MailboxListPosition) => {
 };
 
 /** A listed row's metadata with its mailbox, before content is read. */
-export type MailboxListMetadata = Awaited<ReturnType<typeof listMailboxItems>>[number] & {
+export type MailboxListMetadata = Awaited<ReturnType<typeof listMailboxItemsMany>>[number] & {
   address: string;
   mailboxLabel: string;
   mailboxKind: "person" | "agent";
@@ -643,58 +643,61 @@ export async function getMailboxContentList(
         : "inbox";
   const metadata: MailboxListMetadata[] = [];
   const mailboxesTruncated = readable.length > 20;
-  const pages = await timedStage("mailboxes.items:list", () =>
-    runLimited(readable.slice(0, 20), 8, async (box) => ({
-      box,
-      // One extra row per box tells whether anything follows this page.
-      rows: await listMailboxItems(
-        db,
-        actor,
-        box.id,
-        {
-          ...(kind ? { kind } : {}),
-          trashed: input.folder === "trash",
-          ...(input.folder === "favorites" ? { starred: true, safeOnly: true } : {}),
-          ...(input.folder === "custom" ? { folderId: input.customFolderId!, safeOnly: true } : {}),
-          ...(input.folder === "archive" ? { archived: true, safeOnly: true } : {}),
-          // Filed and archived messages leave the ordinary views (agents see them all).
-          ...(!actor.agentAccess && ["inbox", "drafts", "sent", "pinned"].includes(input.folder)
-            ? { folderId: null, archived: false }
-            : {}),
-          ...(kind === "inbox"
-            ? {
-                deliveryFolder: (["snoozed", "pinned"].includes(input.folder)
-                  ? "inbox"
-                  : input.folder) as "inbox" | "spam" | "quarantine",
-              }
-            : {}),
-          // A snoozed message leaves every view but Snoozed (and Trash) until it is due.
-          ...(input.folder === "snoozed"
-            ? { snoozed: true }
-            : input.folder === "trash"
-              ? {}
-              : { snoozed: false }),
-          ...(input.folder === "pinned" ? { pinned: true } : {}),
-          ...(input.folder === "scheduled" ? { scheduled: true } : {}),
-          ...(input.folder === "followups" ? { followUp: true } : {}),
-        },
-        {
-          ...(before ? { before } : {}),
-          limit: pageSize + 1,
-          latestPerThread: input.groupByThread === true,
-        },
-      ),
-    })),
+  const listed = readable.slice(0, 20);
+  const boxes = new Map(listed.map((box) => [box.id, box]));
+  // One authorized read for every listed mailbox (a transaction per mailbox made
+  // the round trips the cost); the store returns one page across them, in the
+  // same order each mailbox lists its own.
+  const listedRows = await timedStage("mailboxes.items:list", () =>
+    listMailboxItemsMany(
+      db,
+      actor,
+      listed.map((box) => box.id),
+      {
+        ...(kind ? { kind } : {}),
+        trashed: input.folder === "trash",
+        ...(input.folder === "favorites" ? { starred: true, safeOnly: true } : {}),
+        ...(input.folder === "custom" ? { folderId: input.customFolderId!, safeOnly: true } : {}),
+        ...(input.folder === "archive" ? { archived: true, safeOnly: true } : {}),
+        // Filed and archived messages leave the ordinary views (agents see them all).
+        ...(!actor.agentAccess && ["inbox", "drafts", "sent", "pinned"].includes(input.folder)
+          ? { folderId: null, archived: false }
+          : {}),
+        ...(kind === "inbox"
+          ? {
+              deliveryFolder: (["snoozed", "pinned"].includes(input.folder)
+                ? "inbox"
+                : input.folder) as "inbox" | "spam" | "quarantine",
+            }
+          : {}),
+        // A snoozed message leaves every view but Snoozed (and Trash) until it is due.
+        ...(input.folder === "snoozed"
+          ? { snoozed: true }
+          : input.folder === "trash"
+            ? {}
+            : { snoozed: false }),
+        ...(input.folder === "pinned" ? { pinned: true } : {}),
+        ...(input.folder === "scheduled" ? { scheduled: true } : {}),
+        ...(input.folder === "followups" ? { followUp: true } : {}),
+      },
+      {
+        ...(before ? { before } : {}),
+        // One extra row tells whether anything follows this page.
+        limit: pageSize + 1,
+        latestPerThread: input.groupByThread === true,
+      },
+    ),
   );
-  for (const { box, rows } of pages)
-    for (const row of rows)
-      if (!kind || row.kind === kind)
-        metadata.push({
-          ...row,
-          address: box.address,
-          mailboxLabel: box.label,
-          mailboxKind: box.kind,
-        });
+  for (const row of listedRows) {
+    const box = boxes.get(row.mailboxId);
+    if (box && (!kind || row.kind === kind))
+      metadata.push({
+        ...row,
+        address: box.address,
+        mailboxLabel: box.label,
+        mailboxKind: box.kind,
+      });
+  }
   // Newest arrival first, like every box's own listing; a draft by its last edit.
   // Starring, filing or archiving never reorders the list. Same key as the store's
   // ORDER BY, so pages across mailboxes never skip or repeat a row.
@@ -938,13 +941,15 @@ export async function getMailboxUnreadCounts(db: Db, actor: MailboxContentActor)
   const readable = registry.mailboxes
     .filter((box) => box.canRead && box.status === "planned")
     .slice(0, 20);
-  // One scoped read per mailbox, four at a time so a 20-box team never takes the
-  // whole pool: the cost is round trips, not counting.
-  const unread = await runLimited(readable, 4, (box) => countUnreadMailboxItems(db, actor, box.id));
+  // One authorized read and one grouped count for every mailbox: the cost was the
+  // round trips of a transaction per mailbox, not the counting.
+  const unread = await countUnreadMailboxItemsMany(
+    db,
+    actor,
+    readable.map((box) => box.id),
+  );
   const counts: Record<string, number> = {};
-  readable.forEach((box, i) => {
-    counts[box.id] = unread[i]!;
-  });
+  for (const box of readable) counts[box.id] = unread.get(box.id) ?? 0;
   return { counts };
 }
 

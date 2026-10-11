@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.116",
+      "date": "2026-10-11",
+      "title": "Pastas abrem com uma única checagem de acesso",
+      "summary": "Listar uma pasta em todas as suas caixas, e contar as não lidas, agora verifica o acesso a todas de uma vez, em vez de caixa por caixa.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Entrada, Enviados, Rascunhos e as outras visões listam todas as caixas numa só leitura do banco, depois de uma só checagem de acesso, em vez de uma por caixa.",
+            "As contagens de não lidas da barra de pastas saem de uma única contagem agrupada."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.115",
       "date": "2026-10-11",
       "title": "Menos consultas de chave ao abrir o Correio",

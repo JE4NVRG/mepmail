@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.116",
+      "date": "2026-10-11",
+      "title": "Folders open with one access check",
+      "summary": "Listing a folder across your mailboxes, and counting unread mail, now checks access to all of them at once instead of mailbox by mailbox.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Inbox, Sent, Drafts and the other views list every mailbox in one database read after one access check, instead of one per mailbox.",
+            "Unread counts for the folder rail come from one grouped count."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.115",
       "date": "2026-10-11",
       "title": "Fewer key lookups when opening Mail",
