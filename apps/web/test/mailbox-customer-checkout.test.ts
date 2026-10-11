@@ -37,9 +37,13 @@ vi.mock("@millionsend/core", async () => {
   const { verifiedSendBillingContract } = await import(
     "../../../packages/core/src/send-billing-contract"
   );
+  // The procedure timing middleware (server/procedure-timings.ts) runs on every call.
+  const { startTimingLog, TimingWindow } = await import("../../../packages/core/src/timing-window");
   class UnusedMailboxError extends Error {}
   return {
     verifiedSendBillingContract,
+    startTimingLog,
+    TimingWindow,
     ...Object.fromEntries(
       [
         "appendMailboxActivity",

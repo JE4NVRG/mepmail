@@ -17,6 +17,7 @@ import {
   isIdentitySharedByOtherDomains,
   isOperatorTeam,
   isReservedSenderDomain,
+  type MailboxReceivingDomain,
   PLAN_DOMAIN_LIMIT,
 } from "@millionsend/core";
 import { registrableDomain } from "@millionsend/core/org-domain";
@@ -50,6 +51,7 @@ import {
   CLOUDFLARE_TOKEN,
   type CloudflareDesiredRecord,
 } from "../cloudflare-dns";
+import { mailboxReceivingDeps } from "../mailbox-receiving";
 import { withMailboxDomainDeletion } from "../mailboxes";
 import { type AuthSession, adminProcedure, router, teamProcedure } from "../trpc";
 
@@ -69,6 +71,8 @@ export interface DomainsSesDeps {
   dns?: DnsResolver;
   /** Cloudflare API calls for "Configurar na Cloudflare"; omitted uses global fetch. */
   cloudflareFetch?: typeof fetch;
+  /** The Correio receiving MX host for a domain, or null where receiving is not offered. */
+  receivingMx?: (domain: MailboxReceivingDomain) => string | null;
 }
 
 /** Cloudflare setups per hour, per team (each run is about 15 API calls). */
@@ -175,6 +179,11 @@ function trackingCname(domain: {
         value: trackingCnameTarget(resolveBaseUrl(env.APP_BASE_URL)),
       }
     : null;
+}
+
+/** SES inbound for the domain's region, where Correio receiving is offered. */
+function defaultReceivingMx(domain: MailboxReceivingDomain): string | null {
+  return mailboxReceivingDeps().configuration(domain)?.mxExchange ?? null;
 }
 
 async function requireDomain(db: Db, teamId: string, id: string) {
@@ -492,12 +501,50 @@ export function createDomainsRouter(deps: DomainsSesDeps = defaultSesDeps) {
             .string()
             .trim()
             .refine((v) => CLOUDFLARE_TOKEN.test(v), "invalid token"),
+          // "receiving": only the Correio MX, created where the name has none.
+          records: z.enum(["sending", "receiving"]).default("sending"),
         }),
       )
       .mutation(async ({ ctx, input }) => {
         const domain = await requireDomain(ctx.db, ctx.teamId, input.id);
         if (cloudflareLimited(ctx.teamId)) {
           throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many setups" });
+        }
+        if (input.records === "receiving") {
+          const exchange = (deps.receivingMx ?? defaultReceivingMx)(domain);
+          if (!exchange) return { ok: false as const, reason: "receiving_unavailable" as const };
+          const setup = await applyCloudflareRecords(
+            {
+              token: input.token,
+              domain: domain.name,
+              apex: registrableDomain(domain.name),
+              records: [
+                {
+                  type: "MX",
+                  name: domain.name,
+                  value: exchange,
+                  priority: 10,
+                  policy: "receivingMx",
+                },
+              ],
+            },
+            deps.cloudflareFetch ? { fetch: deps.cloudflareFetch } : {},
+          );
+          if (!setup.ok) return { ok: false as const, reason: setup.reason };
+          if (setup.records.some((record) => record.outcome === "created")) {
+            await recordAudit(ctx, {
+              action: "domain.dns_configured",
+              target: { type: "domain", id: domain.id },
+              metadata: {
+                name: domain.name,
+                provider: "cloudflare",
+                written: 1,
+                scope: "receiving",
+              },
+            });
+          }
+          // Receiving is checked by the Correio guide (receivingGuide, verifyReceiving).
+          return { ok: true as const, zone: setup.zone, records: setup.records, check: null };
         }
         const resolver = deps.dns ?? nodeDnsResolver;
         const apex = registrableDomain(domain.name);

@@ -275,6 +275,80 @@ describe("applyCloudflareRecords", () => {
     ).toEqual({ ok: false, reason });
   });
 
+  it("creates the Correio MX only where the name has none, and never touches another", async () => {
+    const mx = (value: string, priority = 10): CloudflareDesiredRecord => ({
+      type: "MX",
+      name: "example.com",
+      value,
+      priority,
+      policy: "receivingMx",
+    });
+    const fresh = fakeCloudflare();
+    const created = await applyCloudflareRecords(
+      {
+        token: TOKEN,
+        domain: "example.com",
+        apex: "example.com",
+        records: [mx("inbound-smtp.us-east-1.amazonaws.com")],
+      },
+      { fetch: fresh.fetch },
+    );
+    expect(created).toEqual({
+      ok: true,
+      zone: "example.com",
+      records: [{ type: "MX", name: "example.com", outcome: "created" }],
+    });
+    expect(fresh.records).toMatchObject([
+      {
+        type: "MX",
+        name: "example.com",
+        content: "inbound-smtp.us-east-1.amazonaws.com",
+        priority: 10,
+      },
+    ]);
+    // Ours already, at another priority: left as it is.
+    const ours = fakeCloudflare({
+      records: [
+        {
+          id: "r0",
+          type: "MX",
+          name: "example.com",
+          content: "inbound-smtp.us-east-1.amazonaws.com.",
+          priority: 5,
+        },
+      ],
+    });
+    const kept = await applyCloudflareRecords(
+      {
+        token: TOKEN,
+        domain: "example.com",
+        apex: "example.com",
+        records: [mx("inbound-smtp.us-east-1.amazonaws.com")],
+      },
+      { fetch: ours.fetch },
+    );
+    expect(kept.ok && kept.records[0]?.outcome).toBe("unchanged");
+    // Someone receives here today: a conflict, and nothing is written or removed.
+    const google = fakeCloudflare({
+      records: [
+        { id: "r0", type: "MX", name: "example.com", content: "aspmx.l.google.com", priority: 1 },
+      ],
+    });
+    const refused = await applyCloudflareRecords(
+      {
+        token: TOKEN,
+        domain: "example.com",
+        apex: "example.com",
+        records: [mx("inbound-smtp.us-east-1.amazonaws.com")],
+      },
+      { fetch: google.fetch },
+    );
+    expect(refused.ok && refused.records[0]?.outcome).toBe("conflict");
+    for (const run of [ours, google])
+      expect(run.calls.filter((call) => call.method !== "GET")).toEqual([]);
+    expect(google.records).toHaveLength(1);
+  });
+
   it("stops at the first write the token may not make", async () => {
     const cf = fakeCloudflare({ fail: { match: (m) => m === "POST", status: 403, code: 9109 } });
     expect(
@@ -424,7 +498,7 @@ describe("domains.cloudflareSetup", () => {
       .from(schema.domains)
       .where(eq(schema.domains.id, id));
     expect(String(cf.records[0]?.content)).toContain(String(stored?.key));
-    expect(result.check.status).toBe("pending");
+    expect(result.check?.status).toBe("pending");
     const audits = await db
       .select({ action: schema.auditLog.action, data: schema.auditLog.data })
       .from(schema.auditLog)
@@ -458,5 +532,78 @@ describe("domains.cloudflareSetup", () => {
       name: "_dmarc.example.com",
       outcome: "created",
     });
+  });
+
+  it("with records: receiving writes only the Correio MX, audits it and leaves the check to the guide", async () => {
+    const teamId = await createTeam(db);
+    const cf = fakeCloudflare();
+    const deps: DomainsSesDeps = {
+      clientForRegion: () => ses,
+      resolveNs: async () => [],
+      dns: dns([]),
+      cloudflareFetch: cf.fetch,
+      receivingMx: () => "inbound-smtp.us-east-1.amazonaws.com",
+    };
+    const { id } = await caller(teamId, deps).domains.create({
+      name: "example.com",
+      region: "us-east-1",
+    });
+    const result = await caller(teamId, deps).domains.cloudflareSetup({
+      id,
+      token: TOKEN,
+      records: "receiving",
+    });
+    expect(result).toEqual({
+      ok: true,
+      zone: "example.com",
+      records: [{ type: "MX", name: "example.com", outcome: "created" }],
+      check: null,
+    });
+    // Only the MX: no DKIM, MAIL FROM, SPF or DMARC from this run.
+    expect(cf.records.map((record) => [record.type, record.name])).toEqual([["MX", "example.com"]]);
+    const audits = await db
+      .select({ action: schema.auditLog.action, data: schema.auditLog.data })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.teamId, teamId));
+    expect(audits).toContainEqual({
+      action: "domain.dns_configured",
+      data: { name: "example.com", provider: "cloudflare", written: 1, scope: "receiving" },
+    });
+    // Run again: already there, nothing written, no second audit.
+    const again = await caller(teamId, deps).domains.cloudflareSetup({
+      id,
+      token: TOKEN,
+      records: "receiving",
+    });
+    expect(again.ok && again.records[0]?.outcome).toBe("unchanged");
+    const after = await db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.teamId, teamId));
+    expect(after.filter((row) => row.action === "domain.dns_configured")).toHaveLength(1);
+  });
+
+  it("answers receiving_unavailable where Correio does not receive for the domain's region", async () => {
+    const teamId = await createTeam(db);
+    const cf = fakeCloudflare();
+    const deps: DomainsSesDeps = {
+      clientForRegion: () => ses,
+      resolveNs: async () => [],
+      dns: dns([]),
+      cloudflareFetch: cf.fetch,
+      receivingMx: () => null,
+    };
+    const { id } = await caller(teamId, deps).domains.create({
+      name: "example.com",
+      region: "us-east-1",
+    });
+    expect(
+      await caller(teamId, deps).domains.cloudflareSetup({
+        id,
+        token: TOKEN,
+        records: "receiving",
+      }),
+    ).toEqual({ ok: false, reason: "receiving_unavailable" });
+    expect(cf.calls).toEqual([]);
   });
 });

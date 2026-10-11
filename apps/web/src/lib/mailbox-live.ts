@@ -39,6 +39,18 @@ export function useMailboxLive(enabled: boolean, onArrival: (mailboxIds: string[
       window.dispatchEvent(new CustomEvent(MAILBOX_ARRIVAL_EVENT, { detail: { mailboxIds } }));
     };
     const source = new EventSource("/api/mailboxes/events");
+    // The stream renews itself every few minutes and after a network blip;
+    // whatever arrived in that gap is read on reconnect, not at the next poll.
+    let opened = false;
+    source.addEventListener("open", () => {
+      if (opened) {
+        handler.current([]);
+        window.dispatchEvent(
+          new CustomEvent(MAILBOX_ARRIVAL_EVENT, { detail: { mailboxIds: [] } }),
+        );
+      }
+      opened = true;
+    });
     source.addEventListener("arrival", (event) => {
       const mailboxId = arrivalMailboxId((event as MessageEvent<string>).data);
       if (!mailboxId) return;

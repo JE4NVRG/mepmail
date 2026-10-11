@@ -4,6 +4,7 @@ import {
   type MailboxTransportMimeAdapter,
   parseMailbox,
   receiveMailboxMime,
+  type TimingWindow,
   type WebhookEnqueue,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
@@ -21,6 +22,10 @@ export interface TrustedMailboxNotification {
   topicArn: string;
   snsMessageId: string;
   event: unknown;
+  /** SQS SentTimestamp (ms), for timing only. */
+  queuedAt?: number | undefined;
+  /** SQS ApproximateReceiveCount, for timing only. */
+  receiveCount?: number | undefined;
 }
 
 export class MailboxProviderEventError extends Error {
@@ -67,6 +72,23 @@ export function isMailboxReceipt(event: unknown): boolean {
  * acknowledged. Every recognized but unsafe/unavailable receipt throws, retaining
  * its source for redelivery/DLQ; false is reserved for unrelated SES events.
  */
+/** SES receipt -> stored, SQS wait before this attempt, and this attempt's own time. */
+export function recordReceiptTimings(
+  timings: TimingWindow | undefined,
+  input: TrustedMailboxNotification,
+  sesTimestamp: unknown,
+  started: number,
+) {
+  if (!timings) return;
+  const now = Date.now();
+  const receivedAt = typeof sesTimestamp === "string" ? Date.parse(sesTimestamp) : Number.NaN;
+  if (Number.isFinite(receivedAt)) timings.record("receipt.ses_to_stored", now - receivedAt);
+  if (input.queuedAt !== undefined) timings.record("receipt.queue_wait", started - input.queuedAt);
+  timings.record("receipt.processing", now - started);
+  // A stored redelivery: an earlier attempt failed and waited out the visibility timeout.
+  if ((input.receiveCount ?? 1) > 1) timings.record("receipt.redelivered", now - receivedAt);
+}
+
 export function createMailboxReceiver(options: {
   db: Db;
   keys: Keyring;
@@ -79,12 +101,15 @@ export function createMailboxReceiver(options: {
   senderKey?: Buffer | undefined;
   /** Arms the drains for the mailbox.received rows the receive committed. */
   enqueueWebhook?: WebhookEnqueue | undefined;
+  /** Receipt stages in aggregate (SES->stored, queue wait, processing); no ids. */
+  timings?: TimingWindow | undefined;
 }) {
   const topics = [...options.topics];
   const locations = options.locations.map((location) => ({ ...location }));
   return async (input: TrustedMailboxNotification): Promise<boolean> => {
     if (!isMailboxReceipt(input.event)) return false;
     if (!options.enabled) throw new MailboxProviderEventError("disabled");
+    const started = Date.now();
     const topic = assertMailboxNotificationTopic(input, topics);
     const event = providerRecord(input.event)!;
     const mail = providerRecord(event.mail);
@@ -133,6 +158,7 @@ export function createMailboxReceiver(options: {
       },
       options.mime,
     );
+    recordReceiptTimings(options.timings, input, mail?.timestamp, started);
     // The message is stored: a failed arm only delays the webhook until the reconcile
     // sweep, so it never fails the receipt (a redelivery would write no new rows).
     if (webhooks.length && options.enqueueWebhook)

@@ -7,6 +7,7 @@ import superjson from "superjson";
 import { getAuth } from "./auth";
 import { isInstanceOperator } from "./instance-operator";
 import { ACTIVE_TEAM_COOKIE, getActiveMembership, type SessionRole } from "./membership";
+import { recordProcedureTiming, timedProcedure } from "./procedure-timings";
 import { enqueueEmailSend, enqueueWebhookDeliveries, getQueue } from "./queue";
 import { resolveSupportView, SUPPORT_VIEW_COOKIE } from "./support-view";
 
@@ -155,7 +156,16 @@ const supportViewGuard = t.middleware(async ({ ctx, type, path, next }) => {
   return next();
 });
 
-export const publicProcedure = t.procedure.use(supportViewGuard);
+/** Server time of the Correio procedures, logged in aggregate (procedure-timings.ts). */
+const procedureTiming = t.middleware(async ({ path, next }) => {
+  if (!timedProcedure(path)) return next();
+  const started = performance.now();
+  const result = await next();
+  recordProcedureTiming(path, performance.now() - started, result.ok);
+  return result;
+});
+
+export const publicProcedure = t.procedure.use(procedureTiming).use(supportViewGuard);
 
 export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
   if (!ctx.session) throw new TRPCError({ code: "UNAUTHORIZED" });

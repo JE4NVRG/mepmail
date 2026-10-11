@@ -48,6 +48,8 @@ import {
   regionBulkCounts,
   sendMailboxOutbox,
   sesEventsHealth,
+  startTimingLog,
+  TimingWindow,
 } from "@millionsend/core";
 import { getDb, schema } from "@millionsend/db";
 import {
@@ -134,6 +136,9 @@ const failover =
   parseSesFailover(process.env.SES_FAILOVER_REGION, process.env.SES_FAILOVER_DOMAINS) ?? undefined;
 if (failover)
   console.log(`SES failover: ${failover.region} for ${[...failover.domains].join(", ")}`);
+// Receipt stages in one aggregate line every 10 minutes (SES->stored, queue wait, processing).
+const receiptTimings = new TimingWindow();
+startTimingLog(receiptTimings, "[worker] timings 10m", 10 * 60_000);
 const mailboxIngress = createMailboxIngress({
   db,
   keys: keyring,
@@ -146,6 +151,7 @@ const mailboxIngress = createMailboxIngress({
   senderKey: deriveMailboxSenderKey(Buffer.from(env.MASTER_ENCRYPTION_KEY, "base64")),
   // Called only after boot: enqueueWebhook and the queue are defined further down.
   enqueueWebhook: (deliveries) => enqueueWebhook(deliveries),
+  timings: receiptTimings,
 });
 // Customer mail of the domains an operator verified at a second provider
 // leaves through its relay while SES has paused the account.

@@ -834,6 +834,7 @@ export {
   type TeamStanding,
   teamStandingOf,
 } from "./team-standing.js";
+export { startTimingLog, TimingWindow } from "./timing-window.js";
 export { findTopicOptOuts, isSubscribedToTopic } from "./topics.js";
 export {
   deriveTrackingKey,

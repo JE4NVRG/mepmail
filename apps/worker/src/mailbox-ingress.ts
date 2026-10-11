@@ -1,4 +1,9 @@
-import type { Keyring, MailboxTransportMimeAdapter, WebhookEnqueue } from "@millionsend/core";
+import type {
+  Keyring,
+  MailboxTransportMimeAdapter,
+  TimingWindow,
+  WebhookEnqueue,
+} from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import {
   createMailboxPrivateObjectReader,
@@ -92,6 +97,7 @@ export function createMailboxIngress(options: {
   failover?: SesFailover | undefined;
   senderKey?: Buffer | undefined;
   enqueueWebhook?: WebhookEnqueue | undefined;
+  timings?: TimingWindow | undefined;
 }) {
   const evidence = createMailboxEvidenceHandler({ ...options, topics: options.eventTopics });
   const inbound = options.inbound;

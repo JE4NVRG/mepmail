@@ -27,7 +27,15 @@ export interface SqsPollerDeps {
    * throw retains the receipt for retry/DLQ. It runs before outbound parsing.
    */
   dispatchPrivateMail?:
-    | ((input: { topicArn: string; snsMessageId: string; event: unknown }) => Promise<boolean>)
+    | ((input: {
+        topicArn: string;
+        snsMessageId: string;
+        event: unknown;
+        /** SQS SentTimestamp (ms): when the event entered the queue. */
+        queuedAt?: number | undefined;
+        /** SQS ApproximateReceiveCount: above 1 is a redelivery. */
+        receiveCount?: number | undefined;
+      }) => Promise<boolean>)
     | undefined;
   log?: ((line: string) => void) | undefined;
   /**
@@ -52,6 +60,8 @@ export async function pollSqsOnce(deps: SqsPollerDeps, waitSeconds = 20): Promis
       QueueUrl: deps.queueUrl,
       MaxNumberOfMessages: 10,
       WaitTimeSeconds: waitSeconds,
+      // Timing only: when each event entered the queue and how often it was delivered.
+      MessageSystemAttributeNames: ["SentTimestamp", "ApproximateReceiveCount"],
     }),
   )) as ReceiveMessageCommandOutput;
   const messages: Message[] = received.Messages ?? [];
@@ -78,6 +88,11 @@ export async function pollSqsOnce(deps: SqsPollerDeps, waitSeconds = 20): Promis
     );
   }
   return messages.length;
+}
+
+function numberAttribute(message: Message, name: string): number | undefined {
+  const value = Number(message.Attributes?.[name as keyof NonNullable<Message["Attributes"]>]);
+  return Number.isFinite(value) ? value : undefined;
 }
 
 /** True when the message may be deleted; false retains it for the DLQ redrive. */
@@ -113,6 +128,8 @@ async function processMessage(message: Message, deps: SqsPollerDeps): Promise<bo
       topicArn: parsed.data.TopicArn,
       snsMessageId: parsed.data.MessageId,
       event: inner,
+      queuedAt: numberAttribute(message, "SentTimestamp"),
+      receiveCount: numberAttribute(message, "ApproximateReceiveCount"),
     }))
   )
     return true;

@@ -28,6 +28,27 @@
   },
   "releases": [
     {
+      "version": "0.112",
+      "date": "2026-10-11",
+      "title": "Correio mais rápido: exclua e siga sem esperar",
+      "summary": "Excluir, arquivar e marcar como spam não esperam mais o servidor antes da próxima mensagem, a próxima mensagem abre sozinha, as ações em lote rodam em paralelo e os alertas de mensagem nova chegam antes.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Excluir, arquivar e spam agem em cada mensagem separadamente: a próxima pode sair enquanto o servidor ainda responde à primeira.",
+            "Depois de excluir ou arquivar a mensagem aberta, abre a seguinte da lista (a anterior, quando era a última).",
+            "Excluir, mover, arquivar e desfazer em lote mandam os pedidos em paralelo; uma falha em algumas mensagens não interrompe as outras.",
+            "O alerta de mensagem nova busca a mensagem junto com os contadores, e o que chegou enquanto a conexão ao vivo se renovava é lido assim que ela volta."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": ["Um rascunho aberto mostra o estado do envio uma vez só, não duas."]
+        }
+      ]
+    },
+    {
       "version": "0.111",
       "date": "2026-10-10",
       "title": "App do MepMail para Linux",

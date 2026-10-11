@@ -125,6 +125,42 @@ describe("pollSqsOnce", () => {
     expect(deleted).toEqual(["private-1"]);
   });
 
+  it("asks SQS when each event was queued and passes it, with the delivery count, to private mail", async () => {
+    const requested: unknown[] = [];
+    const seen: unknown[] = [];
+    const deps: SqsPollerDeps = {
+      sqs: {
+        send: async (command) => {
+          if (command instanceof ReceiveMessageCommand) {
+            requested.push(command.input.MessageSystemAttributeNames);
+            return {
+              Messages: [
+                {
+                  MessageId: "private-2",
+                  ReceiptHandle: "private-rh-2",
+                  Body: envelope({ Message: JSON.stringify({ notificationType: "Received" }) }),
+                  Attributes: { SentTimestamp: "1760140800000", ApproximateReceiveCount: "2" },
+                },
+              ],
+            };
+          }
+          return {};
+        },
+      },
+      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/mepmail-events",
+      allowedTopicArns: [TOPIC],
+      enqueueSesEvent: async () => {},
+      dispatchPrivateMail: async (input) => {
+        seen.push(input);
+        return true;
+      },
+      log: () => {},
+    };
+    await pollSqsOnce(deps, 0);
+    expect(requested).toEqual([["SentTimestamp", "ApproximateReceiveCount"]]);
+    expect(seen).toEqual([expect.objectContaining({ queuedAt: 1760140800000, receiveCount: 2 })]);
+  });
+
   it("retains private receipts/evidence while the handler is unavailable or fails", async () => {
     for (const privateEvent of [
       { notificationType: "Received", receipt: { recipients: [] } },

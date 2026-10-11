@@ -56,6 +56,9 @@ type Outputs = inferRouterOutputs<AppRouter>["mailboxes"];
 type Box = Outputs["list"]["mailboxes"][number];
 type Options = Outputs["options"];
 type FolderEntry = Outputs["folders"][number];
+type InboxTopPage = Outputs["items"];
+/** How long an inbox head fetched on an arrival stays good for its notice. */
+const PREFETCH_FRESH_MS = 5000;
 const SETTINGS_TABS = ["appearance", "boxes", "agents", "license", "migration"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 const FOLDER_TINT_CLASS: Record<string, string> = {
@@ -606,8 +609,16 @@ export function MailboxesView({
   importing.current = importRunning(imports.data);
   const lastUnread = useRef<number | null>(null);
   const announced = useRef<Set<string> | null>(null);
+  // The inbox head fetched together with the counts on an arrival: the notice
+  // needs both, so it waits one round trip instead of two. Kept a few seconds.
+  const prefetchedTop = useRef<{ at: number; page: Promise<InboxTopPage> } | null>(null);
   // Live updates: an arrival refreshes the counts at once (polling stays as the net).
   useMailboxLive(mayUseMail && !!registry.data, () => {
+    prefetchedTop.current = {
+      at: Date.now(),
+      page: trpcClient.mailboxes.items.query({ mailboxId: null, folder: "inbox", limit: 10 }),
+    };
+    prefetchedTop.current.page.catch(() => {});
     void unreadCounts.refetch();
   });
   // "Abrir" on a notice: the message in the Inbox of all boxes.
@@ -629,8 +640,13 @@ export function MailboxesView({
     const previous = lastUnread.current;
     lastUnread.current = total;
     if (importing.current) return;
-    const inboxTop = () =>
-      trpcClient.mailboxes.items.query({ mailboxId: null, folder: "inbox", limit: 10 });
+    const inboxTop = () => {
+      const ready = prefetchedTop.current;
+      prefetchedTop.current = null;
+      return ready && Date.now() - ready.at < PREFETCH_FRESH_MS
+        ? ready.page
+        : trpcClient.mailboxes.items.query({ mailboxId: null, folder: "inbox", limit: 10 });
+    };
     if (announced.current === null) {
       const seen = new Set<string>();
       announced.current = seen;

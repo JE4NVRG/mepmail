@@ -131,6 +131,38 @@ function sendStateMessage(state: SendState) {
 const SEND_ATTACHMENT_BYTES = 256 * 1024;
 /** The server render never has a send waiting. */
 const noHeldSend = () => null;
+
+/** Requests a bulk action keeps in flight at once (one at a time made 20 rows take 20 round trips). */
+const BULK_CONCURRENCY = 6;
+
+/**
+ * Runs `run` over the items with at most `limit` in flight; counts what
+ * finished and what failed. Every item is tried, so a failure in the middle
+ * does not leave the rest untouched.
+ */
+async function settleInPool<T>(
+  items: readonly T[],
+  limit: number,
+  run: (item: T) => Promise<unknown>,
+): Promise<{ done: number; failed: number }> {
+  let next = 0;
+  let done = 0;
+  let failed = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const item = items[next] as T;
+      next += 1;
+      try {
+        await run(item);
+        done += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return { done, failed };
+}
 const NIL = "00000000-0000-0000-0000-000000000000";
 function SendResults({
   summary,
@@ -1060,6 +1092,20 @@ export function MailboxContentView({
   // folder) leave the list at once instead of after the server and the list
   // reload answer; a failure brings them back.
   const [departing, setDeparting] = useState<ReadonlySet<string>>(() => new Set());
+  // Rows with an archive, trash or spam request in flight. The lock is per
+  // row: the next message can go while the server answers for the last one.
+  const [inFlight, setInFlight] = useState<ReadonlySet<string>>(() => new Set());
+  const inFlightRef = useRef(new Set<string>());
+  const startFlight = (key: string) => {
+    if (inFlightRef.current.has(key)) return false;
+    inFlightRef.current.add(key);
+    setInFlight(new Set(inFlightRef.current));
+    return true;
+  };
+  const endFlight = (key: string) => {
+    inFlightRef.current.delete(key);
+    if (mounted.current) setInFlight(new Set(inFlightRef.current));
+  };
   const departRows = (keys: string[]) => setDeparting((current) => new Set([...current, ...keys]));
   const returnRows = (keys: string[]) =>
     setDeparting((current) => {
@@ -1228,6 +1274,22 @@ export function MailboxContentView({
       (i) => !pinnedKeys.has(`${i.mailboxId}:${i.id}`) && keepRow(i) && inPile(i),
     ) ?? []),
   ];
+  /**
+   * The open message is leaving this view (archived, trashed, marked spam):
+   * the next one in the list opens, so clearing the inbox is one key per
+   * message, as in Spark and Gmail. The previous one when it was the last;
+   * the empty reader when it was the only one.
+   */
+  function leaveOpenRow(key: string) {
+    const index = rows.findIndex((row) => rowKey(row) === key);
+    const free = (row: Row) => rowKey(row) !== key && !departing.has(rowKey(row));
+    const next =
+      index >= 0
+        ? (rows.slice(index + 1).find(free) ?? rows.slice(0, index).reverse().find(free))
+        : undefined;
+    if (next) openRow(next);
+    else select(null);
+  }
   // A thin pile loads the next pages on its own (a few at most).
   const pileShown = rows.length - pinnedRows.length;
   const pagesLoaded = listing.data?.pages.length ?? 0;
@@ -1378,27 +1440,27 @@ export function MailboxContentView({
     returnRows(offer.keys);
     moving.current = true;
     setNotice("");
-    let done = 0;
     try {
-      for (const step of offer.steps) {
-        await step();
-        done += 1;
-        if (!mounted.current) break;
-      }
-      if (mounted.current) toast(t("organization.undone", { count: done }), "success");
-    } catch {
+      const { done, failed } = await settleInPool(offer.steps, BULK_CONCURRENCY, (step) => step());
       if (mounted.current)
-        toast(t("organization.bulkPartial", { count: done, total: offer.steps.length }), "warn");
+        toast(
+          failed
+            ? t("organization.bulkPartial", { count: done, total: offer.steps.length })
+            : t("organization.undone", { count: done }),
+          failed ? "warn" : "success",
+        );
     } finally {
       moving.current = false;
       if (mounted.current) void refresh();
     }
   }
   async function refresh() {
-    await queries.invalidateQueries({ queryKey: trpc.mailboxes.items.queryKey() });
-    await queries.invalidateQueries({ queryKey: trpc.mailboxes.item.queryKey() });
-    await queries.invalidateQueries({ queryKey: trpc.mailboxes.unreadCounts.queryKey() });
-    await queries.invalidateQueries({ queryKey: trpc.mailboxes.scheduling.counts.queryKey() });
+    await Promise.all([
+      queries.invalidateQueries({ queryKey: trpc.mailboxes.items.queryKey() }),
+      queries.invalidateQueries({ queryKey: trpc.mailboxes.item.queryKey() }),
+      queries.invalidateQueries({ queryKey: trpc.mailboxes.unreadCounts.queryKey() }),
+      queries.invalidateQueries({ queryKey: trpc.mailboxes.scheduling.counts.queryKey() }),
+    ]);
   }
   const conflictOr = (cause: unknown, fallback: string) =>
     t(
@@ -1484,6 +1546,11 @@ export function MailboxContentView({
   const sendState: SendState | null | undefined =
     item?.sendStatus ??
     (sendKey ? (held?.key === sendKey ? "waiting" : sendStates[sendKey]) : undefined);
+  // The open draft already says how its send is going: the bar above the list
+  // stays quiet instead of repeating the same sentence.
+  const draftSendNotice =
+    item?.kind === "draft" && sendState ? t(sendStateMessage(sendState)) : null;
+  const barNotice = notice && notice !== draftSendNotice ? notice : "";
   const deliveryReady = capability.data?.deliveryReady === true;
   const isOwner = !!selectedBox?.ownerActive && selectedBox.ownerUserId === currentUserId;
   const actionItem = item ?? blockedRow;
@@ -1839,26 +1906,17 @@ export function MailboxContentView({
     setNotice("");
     departRows(leaving);
     if (selection && leaving.includes(rowKey(selection))) select(null);
-    let done = 0;
     try {
-      for (const step of plan) {
-        await step();
-        done += 1;
-        if (!mounted.current) break;
-      }
+      const { done, failed } = await settleInPool(plan, BULK_CONCURRENCY, (step) => step());
       if (mounted.current) {
+        // A row that failed comes back with the next read of the list.
+        if (failed) returnRows(leaving);
         setCheckedIds(new Set());
-        const message = t(
-          target.folder === "archive" ? "organization.bulkArchived" : "organization.dropDone",
-          { count: done },
-        );
-        offerUndo(message, reversals, leaving);
-      }
-    } catch {
-      if (mounted.current) {
-        returnRows(leaving);
-        setCheckedIds(new Set());
-        const message = t("organization.bulkPartial", { count: done, total: plan.length });
+        const message = failed
+          ? t("organization.bulkPartial", { count: done, total: plan.length })
+          : t(target.folder === "archive" ? "organization.bulkArchived" : "organization.dropDone", {
+              count: done,
+            });
         offerUndo(message, reversals, leaving);
       }
     } finally {
@@ -1870,17 +1928,17 @@ export function MailboxContentView({
     }
   }
   async function changeArchive(archived: boolean) {
-    if (!item || moving.current) return;
+    if (!item) return;
     const observed = { mailboxId: item.mailboxId, id: item.id, expectedRevision: item.revision };
-    moving.current = true;
-    setNotice("");
     const key = rowKey(observed);
+    if (!startFlight(key)) return;
+    setNotice("");
     departRows([key]);
     if (
       currentSelection.current?.id === observed.id &&
       currentSelection.current.mailboxId === observed.mailboxId
     )
-      select(null);
+      leaveOpenRow(key);
     try {
       const result = await archiveMutation.mutateAsync({ ...observed, archived });
       if (!mounted.current) return;
@@ -1910,7 +1968,7 @@ export function MailboxContentView({
         "danger",
       );
     } finally {
-      moving.current = false;
+      endFlight(key);
       if (mounted.current) void refresh();
     }
   }
@@ -2014,10 +2072,9 @@ export function MailboxContentView({
     const leaving = observed.map(rowKey);
     departRows(leaving);
     if (selection && leaving.includes(rowKey(selection))) select(null);
-    let done = 0;
     const reversals: (() => Promise<unknown>)[] = [];
     try {
-      for (const input of observed) {
+      const { done, failed } = await settleInPool(observed, BULK_CONCURRENCY, async (input) => {
         const result = await trashMutation.mutateAsync(input);
         if (input.trashed)
           reversals.push(() =>
@@ -2028,23 +2085,16 @@ export function MailboxContentView({
               trashed: false,
             }),
           );
-        done += 1;
-        if (!mounted.current) break;
-      }
+      });
       if (mounted.current) {
-        select(null);
+        if (failed) returnRows(leaving);
+        else select(null);
         setCheckedIds(new Set());
-        const message = t(
-          folder === "trash" ? "organization.bulkRestored" : "organization.bulkTrashed",
-          { count: done },
-        );
-        offerUndo(message, reversals, leaving);
-      }
-    } catch {
-      if (mounted.current) {
-        returnRows(leaving);
-        setCheckedIds(new Set());
-        const message = t("organization.bulkPartial", { count: done, total: observed.length });
+        const message = failed
+          ? t("organization.bulkPartial", { count: done, total: observed.length })
+          : t(folder === "trash" ? "organization.bulkRestored" : "organization.bulkTrashed", {
+              count: done,
+            });
         offerUndo(message, reversals, leaving);
       }
     } finally {
@@ -2060,16 +2110,11 @@ export function MailboxContentView({
     // Blocking a sender stays where it is and undoes its answer too.
     options: { stay?: boolean; message?: string; undo?: () => Promise<unknown> } = {},
   ) {
-    if (
-      !item ||
-      moving.current ||
-      !(target === "inbox" ? actions?.canMoveToInbox : actions?.canMoveToSpam)
-    )
-      return;
+    if (!item || !(target === "inbox" ? actions?.canMoveToInbox : actions?.canMoveToSpam)) return;
     const observed = { mailboxId: item.mailboxId, id: item.id, expectedRevision: item.revision };
-    moving.current = true;
-    setNotice("");
     const key = rowKey(observed);
+    if (!startFlight(key)) return;
+    setNotice("");
     departRows([key]);
     try {
       const done = await moveMutation.mutateAsync({ ...observed, folder: target });
@@ -2105,7 +2150,7 @@ export function MailboxContentView({
       const code = (cause as { data?: { code?: string } })?.data?.code;
       toast(t(code === "FORBIDDEN" ? "accessLost" : "safety.moveError"), "danger");
     } finally {
-      moving.current = false;
+      endFlight(key);
       if (mounted.current) void refresh();
     }
   }
@@ -2209,8 +2254,7 @@ export function MailboxContentView({
     deliveryReady &&
     !sendState;
   async function changeTrash(trashed: boolean) {
-    if (!actionItem || moving.current || !(trashed ? actions?.canMoveToTrash : actions?.canRestore))
-      return;
+    if (!actionItem || !(trashed ? actions?.canMoveToTrash : actions?.canRestore)) return;
     const observed = {
       mailboxId: actionItem.mailboxId,
       id: actionItem.id,
@@ -2225,15 +2269,15 @@ export function MailboxContentView({
           : actionItem.kind === "sent"
             ? "sent"
             : actionItem.deliveryFolder;
-    moving.current = true;
-    setNotice("");
     // The row leaves this view now; the server catches up behind it.
     const key = rowKey(observed);
+    if (!startFlight(key)) return;
+    setNotice("");
     departRows([key]);
     const wasOpen = () =>
       currentSelection.current?.id === observed.id &&
       currentSelection.current.mailboxId === observed.mailboxId;
-    if (trashed && wasOpen()) select(null);
+    if (trashed && wasOpen()) leaveOpenRow(key);
     try {
       const result = await trashMutation.mutateAsync({ ...observed, trashed });
       if (!mounted.current) return;
@@ -2274,7 +2318,7 @@ export function MailboxContentView({
         "danger",
       );
     } finally {
-      moving.current = false;
+      endFlight(key);
       if (mounted.current) void refresh();
     }
   }
@@ -2676,10 +2720,10 @@ export function MailboxContentView({
             <MailboxFolderIcon name="custom" />
             <span className={styles.narrowHidden}>{t("organization.boxesAndFolders")}</span>
           </button>
-          {notice ? (
+          {barNotice ? (
             <p role="alert" className={styles.contentNotice}>
-              {notice}
-              {undo && undo.notice === notice ? (
+              {barNotice}
+              {undo && undo.notice === barNotice ? (
                 <button
                   type="button"
                   className={`ms-btn ms-btn-ghost ${styles.undoAction}`}
@@ -3433,7 +3477,7 @@ export function MailboxContentView({
                   <button
                     type="button"
                     className={`ms-btn ms-btn-ghost ${styles.iconAction}`}
-                    disabled={archiveMutation.isPending || bulkBusy}
+                    disabled={bulkBusy || inFlight.has(rowKey(item))}
                     aria-label={t(
                       item.archivedAt ? "organization.unarchive" : "organization.archive",
                     )}
@@ -3537,7 +3581,7 @@ export function MailboxContentView({
                   <button
                     type="button"
                     className={`ms-btn ms-btn-ghost ${styles.iconAction}`}
-                    disabled={moveMutation.isPending}
+                    disabled={!!item && inFlight.has(rowKey(item))}
                     aria-label={t(actions.canMoveToInbox ? "safety.notSpam" : "safety.markSpam")}
                     title={t(actions.canMoveToInbox ? "safety.notSpam" : "safety.markSpam")}
                     onClick={() =>
@@ -3545,7 +3589,7 @@ export function MailboxContentView({
                     }
                   >
                     <MailboxFolderIcon name={actions.canMoveToInbox ? "inbox" : "spam"} />
-                    {moveMutation.isPending ? <span>{t("safety.moving")}</span> : null}
+                    {item && inFlight.has(rowKey(item)) ? <span>{t("safety.moving")}</span> : null}
                   </button>
                 ) : null}
                 {actions?.canMoveToTrash || actions?.canRestore ? (
@@ -3553,9 +3597,8 @@ export function MailboxContentView({
                     type="button"
                     className={`ms-btn ms-btn-ghost ${actions.canRestore ? styles.restoreAction : `${styles.dangerAction} ${styles.iconAction}`}`}
                     disabled={
-                      trashMutation.isPending ||
                       bulkBusy ||
-                      moveMutation.isPending ||
+                      (!!actionItem && inFlight.has(rowKey(actionItem))) ||
                       !!(actionItem?.kind === "draft" && sendState && sendState !== "failed")
                     }
                     aria-label={actions.canRestore ? undefined : t("moveToTrash")}
@@ -3563,7 +3606,7 @@ export function MailboxContentView({
                     onClick={() => void changeTrash(!actions.canRestore)}
                   >
                     <MailboxFolderIcon name={actions.canRestore ? "restore" : "trash"} />
-                    {trashMutation.isPending ? (
+                    {actionItem && inFlight.has(rowKey(actionItem)) ? (
                       <span>{t("movingTrash")}</span>
                     ) : actions.canRestore ? (
                       t("restoreMessage")
@@ -3574,7 +3617,9 @@ export function MailboxContentView({
                   <button
                     type="button"
                     className={`ms-btn ms-btn-ghost ${styles.dangerAction} ${styles.purgeAction}`}
-                    disabled={purgeMutation.isPending || trashMutation.isPending || bulkBusy}
+                    disabled={
+                      purgeMutation.isPending || bulkBusy || inFlight.has(rowKey(actionItem))
+                    }
                     onClick={() =>
                       void purgeForever(
                         [{ mailboxId: actionItem.mailboxId, ids: [actionItem.id] }],

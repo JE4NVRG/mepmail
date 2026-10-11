@@ -23,6 +23,27 @@
   },
   "releases": [
     {
+      "version": "0.112",
+      "date": "2026-10-11",
+      "title": "Faster Mail: delete and move on without waiting",
+      "summary": "Deleting, archiving and marking spam no longer wait for the server before the next message, the next message opens by itself, bulk actions run in parallel and new-mail alerts arrive sooner.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Delete, archive and spam act on each message on its own: the next one can be removed while the server is still answering the first.",
+            "After deleting or archiving the open message, the next one in the list opens (the previous one when it was the last).",
+            "Bulk delete, move, archive and undo send their requests in parallel; a failure on some messages no longer stops the rest.",
+            "A new-message alert fetches that message along with the counters, and anything that arrived while the live connection was renewing is read as soon as it reconnects."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": ["An open draft shows its send status once, not twice."]
+        }
+      ]
+    },
+    {
       "version": "0.111",
       "date": "2026-10-10",
       "title": "MepMail app for Linux",

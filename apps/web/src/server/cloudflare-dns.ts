@@ -7,8 +7,9 @@
  * Each record is written only where it cannot break anything the person
  * already has: our own DKIM selector and MAIL FROM host may be replaced, an
  * SPF or CNAME that differs is reported and left alone, and DMARC is only ever
- * created where none exists. The apex MX (where the person receives mail) is
- * never touched here.
+ * created where none exists. The sending setup never touches the domain's MX
+ * (where the person receives mail); the Correio receiving setup only creates it
+ * where the name has none, and never replaces one.
  */
 
 import { CLOUDFLARE_TOKEN } from "@/lib/cloudflare";
@@ -27,8 +28,17 @@ const TIMEOUT_MS = 10_000;
  * - `spf`: one SPF per name; a different one is a conflict (two would break it).
  * - `createOnly`: DMARC; written only when the name has none.
  * - `cname`: the tracking host; a different target is a conflict.
+ * - `receivingMx`: Correio receiving; created only where the name has no MX. Ours,
+ *   at any priority, stays as it is; any other MX (Google, Purelymail, a host that
+ *   receives today) is a conflict and is never replaced or removed.
  */
-export type CloudflareRecordPolicy = "own" | "mailFromMx" | "spf" | "createOnly" | "cname";
+export type CloudflareRecordPolicy =
+  | "own"
+  | "mailFromMx"
+  | "spf"
+  | "createOnly"
+  | "cname"
+  | "receivingMx";
 
 export interface CloudflareDesiredRecord {
   type: "TXT" | "MX" | "CNAME";
@@ -184,7 +194,9 @@ export async function applyCloudflareRecords(
           const matches = existing.some(
             (entry) =>
               sameContent(record.type, entry.content, record.value) &&
-              (record.type !== "MX" || entry.priority === (record.priority ?? 10)),
+              (record.type !== "MX" ||
+                record.policy === "receivingMx" ||
+                entry.priority === (record.priority ?? 10)),
           );
           if (matches) return "unchanged";
           // Same-name records of the kind this policy may replace or must respect.
