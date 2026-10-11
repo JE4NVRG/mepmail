@@ -106,6 +106,10 @@ describe("mailboxes.search", () => {
     await index();
     const found = await as().search({ query: "propo", mailboxId: null });
     expect(ids(found)).toEqual([proposal.id]);
+    // The inbox reads it as an infinite query, which adds direction: "forward".
+    expect(
+      ids(await as().search({ query: "propo", mailboxId: null, direction: "forward" })),
+    ).toEqual([proposal.id]);
     const listed = (await as().items({ mailboxId: null, folder: "inbox" })).items.find(
       (item) => item.id === proposal.id,
     );

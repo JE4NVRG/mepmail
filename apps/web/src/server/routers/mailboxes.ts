@@ -905,10 +905,14 @@ export const mailboxesRouter = router({
           customFolderId: z.uuid().optional(),
           cursor: z.string().min(1).max(80).optional(),
           limit: z.number().int().min(1).max(50).optional(),
+          // tRPC infinite queries (the Correio's search list) supply this transport field.
+          direction: z.literal("forward").optional(),
         })
         .strict(),
     )
-    .query(({ ctx, input }) => call(() => searchMailboxContent(ctx.db, actor(ctx), input))),
+    .query(({ ctx, input: { direction: _direction, ...input } }) =>
+      call(() => searchMailboxContent(ctx.db, actor(ctx), input)),
+    ),
   scheduling: mailboxSchedulingRouter,
   senders: mailboxSendersRouter,
   preferences: router({

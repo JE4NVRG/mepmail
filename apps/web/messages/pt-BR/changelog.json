@@ -28,6 +28,20 @@
   },
   "releases": [
     {
+      "version": "0.123",
+      "date": "2026-10-11",
+      "title": "A busca do Correio procura em todo o seu e-mail",
+      "summary": "Buscar no Correio agora consulta o servidor, então encontra todas as mensagens da caixa, ou de todas as caixas, e não só as que já estavam na tela.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "A busca completa do Correio era recusada pelo servidor e caía só nas mensagens já carregadas. Agora ela procura na caixa inteira, e “Buscar em todas as caixas” procura em todas."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.122",
       "date": "2026-10-11",
       "title": "Busca em todas as caixas, compositor no canto, lido sai de Não lidos",

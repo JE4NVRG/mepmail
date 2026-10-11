@@ -28,6 +28,20 @@
   },
   "releases": [
     {
+      "version": "0.123",
+      "date": "2026-10-11",
+      "title": "Correio search looks through all your mail",
+      "summary": "Searching in Correio now asks the server, so it finds every matching message in the mailbox, or in all mailboxes, instead of only the ones already on screen.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "The full Correio search was refused by the server and fell back to the messages already loaded. It now searches the whole mailbox, and “Search all mailboxes” searches every one of them."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.122",
       "date": "2026-10-11",
       "title": "Search every mailbox, write in a corner, read mail leaves Unread",
