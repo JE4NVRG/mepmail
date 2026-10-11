@@ -1222,5 +1222,18 @@
     "keep": "Keep writing",
     "discard": "Discard",
     "busy": "You are already writing a message: send, save or close it before opening another."
+  },
+  "translate": {
+    "button": "Translate to {language}",
+    "hint": "Uses the browser's own translator: the message is translated on this computer and never leaves it.",
+    "working": "Translating…",
+    "downloading": "Downloading the browser's translator… {percent}%",
+    "banner": "Translated from {language} by the browser, on this computer.",
+    "originalBanner": "Original in {language}.",
+    "showOriginal": "Show original",
+    "showTranslation": "Show translation",
+    "same": "This message is already in {language}.",
+    "unavailable": "The browser's translator does not translate {from} to {to}.",
+    "failed": "Could not translate right now. Try again."
   }
 }

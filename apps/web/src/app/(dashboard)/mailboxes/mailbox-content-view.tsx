@@ -103,6 +103,7 @@ import type { RichEditorHandle } from "./mailbox-rich-editor";
 import { MailboxSenderBar } from "./mailbox-sender-bar";
 import { MailboxSmartTabs } from "./mailbox-smart-tabs";
 import { MailboxTimeMenu, type MailboxTimeMenuHandle } from "./mailbox-time-menu";
+import { MailboxTranslation } from "./mailbox-translation";
 import { MailboxViewMenu } from "./mailbox-view-menu";
 import styles from "./mailboxes.module.css";
 
@@ -4418,18 +4419,20 @@ export function MailboxContentView({
                       downloadHref={attachmentUrl(item, item.invite.attachmentIndex)}
                     />
                   ) : null}
-                  <MailboxRichBody
-                    key={`${item.id}:${item.revision}`}
-                    text={item.text}
-                    html={item.htmlBody}
-                    externalHtml={item.htmlBodyWithExternalImages}
-                    externalImages={item.externalImages}
-                    trustedImageOrigin={item.trustedImageOrigin}
-                    sender={item.kind === "inbox" ? item.from : ""}
-                    onMailto={(href) => {
-                      if (!composeMailto(href)) window.open(href, "_blank", "noopener");
-                    }}
-                  />
+                  <MailboxTranslation key={`${item.id}:${item.revision}`} text={item.text}>
+                    <MailboxRichBody
+                      key={`${item.id}:${item.revision}`}
+                      text={item.text}
+                      html={item.htmlBody}
+                      externalHtml={item.htmlBodyWithExternalImages}
+                      externalImages={item.externalImages}
+                      trustedImageOrigin={item.trustedImageOrigin}
+                      sender={item.kind === "inbox" ? item.from : ""}
+                      onMailto={(href) => {
+                        if (!composeMailto(href)) window.open(href, "_blank", "noopener");
+                      }}
+                    />
+                  </MailboxTranslation>
                   {item.attachments.length ? (
                     <section aria-label={t("attachments")} className={styles.attachments}>
                       {item.attachments.map((a) => (

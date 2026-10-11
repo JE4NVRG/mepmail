@@ -1222,5 +1222,18 @@
     "keep": "Continuar escrevendo",
     "discard": "Descartar",
     "busy": "Você já está escrevendo uma mensagem: envie, salve ou feche antes de abrir outra."
+  },
+  "translate": {
+    "button": "Traduzir para o {language}",
+    "hint": "Usa o tradutor do próprio navegador: a mensagem é traduzida neste computador e não sai dele.",
+    "working": "Traduzindo…",
+    "downloading": "Baixando o tradutor do navegador… {percent}%",
+    "banner": "Traduzido do {language} pelo navegador, neste computador.",
+    "originalBanner": "Original em {language}.",
+    "showOriginal": "Mostrar original",
+    "showTranslation": "Mostrar tradução",
+    "same": "Esta mensagem já está em {language}.",
+    "unavailable": "O tradutor do navegador não traduz {from} para {to}.",
+    "failed": "Não deu para traduzir agora. Tente de novo."
   }
 }

@@ -3261,3 +3261,24 @@
   font-size: var(--ms-fs-label);
   color: var(--ms-muted);
 }
+
+/* "Traduzir": the browser's own translator, above the message body. */
+.translateBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0 0 10px;
+  color: var(--ms-muted);
+  font-size: 12.5px;
+}
+.translatedBody {
+  color: var(--ms-bone);
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.translatedBody p {
+  margin: 0 0 12px;
+  white-space: pre-line;
+}

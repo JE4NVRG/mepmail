@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.126",
+      "date": "2026-10-11",
+      "title": "Traduza uma mensagem sem ela sair do seu computador",
+      "summary": "Um botão Traduzir no leitor do Correio passa a mensagem para o seu idioma com o tradutor do próprio navegador: sem servidor, sem custo, e o texto não sai do seu computador.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Traduzir no leitor: a mensagem inteira no seu idioma, com “Mostrar original” para voltar. No primeiro uso o navegador pode baixar o modelo do idioma, com o progresso na tela.",
+            "Ele só aparece onde o navegador tem tradutor próprio (Chrome recente no computador) e avisa quando a mensagem já está no seu idioma."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.125",
       "date": "2026-10-11",
       "title": "O Correio abre com a caixa de entrada já na tela",

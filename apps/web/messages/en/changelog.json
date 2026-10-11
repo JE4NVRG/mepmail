@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.126",
+      "date": "2026-10-11",
+      "title": "Translate a message without it leaving your computer",
+      "summary": "A Translate button in the MepMail Mail reader turns a message into your language with the translator built into your browser: no server, no cost, and the text never leaves your computer.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Translate in the reader: the whole message in your language, with “Show original” to switch back. The first use may download the language model, with progress on screen.",
+            "It only appears where the browser has its own translator (recent Chrome on the computer), and it says so when a message is already in your language."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.125",
       "date": "2026-10-11",
       "title": "MepMail Mail opens with your inbox already there",
