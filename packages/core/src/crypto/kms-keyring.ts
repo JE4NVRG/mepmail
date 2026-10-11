@@ -71,6 +71,15 @@ interface UnwrapCacheEntry {
   expiresAt: number;
 }
 
+/** How one unwrap was served: from the cache, by a KMS call, or by joining one in flight. */
+export type KmsUnwrapOutcome = "hit" | "miss" | "joined";
+let unwrapObserver: ((outcome: KmsUnwrapOutcome, ms: number) => void) | undefined;
+
+/** Lets a process time its unwraps (e.g. into its timing log); never sees key material. */
+export function observeKmsUnwraps(observer: (outcome: KmsUnwrapOutcome, ms: number) => void): void {
+  unwrapObserver = observer;
+}
+
 /**
  * Keyring backed by AWS KMS: wrapDek is KMS Encrypt under the configured
  * key; unwrapDek is KMS Decrypt with KeyId pinned to that same key, so a
@@ -87,6 +96,9 @@ export class KmsKeyring implements Keyring {
   // Map insertion order is the LRU order: hits are re-inserted, evictions
   // take the first key.
   readonly #unwrapCache = new Map<string, UnwrapCacheEntry>();
+  // One KMS Decrypt per wrapped DEK at a time: a list page opening many items
+  // sealed under the same DEK waits on the first call instead of repeating it.
+  readonly #unwrapInFlight = new Map<string, Promise<Buffer>>();
 
   constructor(client: KmsDekClient, keyId: string) {
     if (!keyId) throw new Error("KmsKeyring requires a KMS key id");
@@ -168,16 +180,42 @@ export class KmsKeyring implements Keyring {
       .update(contextKey(context))
       .update(wrapped)
       .digest("base64");
+    const started = performance.now();
     const now = Date.now();
     const hit = this.#unwrapCache.get(cacheKey);
     if (hit) {
       this.#unwrapCache.delete(cacheKey);
       if (hit.expiresAt > now) {
         this.#unwrapCache.set(cacheKey, hit);
+        unwrapObserver?.("hit", performance.now() - started);
         return Buffer.from(hit.dek);
       }
       hit.dek.fill(0);
     }
+    const pending = this.#unwrapInFlight.get(cacheKey);
+    if (pending) {
+      const dek = Buffer.from(await pending);
+      unwrapObserver?.("joined", performance.now() - started);
+      return dek;
+    }
+    const call = this.#kmsUnwrap(wrapped, context, cacheKey, now);
+    this.#unwrapInFlight.set(cacheKey, call);
+    try {
+      const dek = Buffer.from(await call);
+      unwrapObserver?.("miss", performance.now() - started);
+      return dek;
+    } finally {
+      this.#unwrapInFlight.delete(cacheKey);
+    }
+  }
+
+  /** The KMS Decrypt behind a miss: caches a copy and resolves to a buffer every awaiter copies. */
+  async #kmsUnwrap(
+    wrapped: Buffer,
+    context: DekContext | undefined,
+    cacheKey: string,
+    now: number,
+  ): Promise<Buffer> {
     const result = await this.#client.decrypt({
       KeyId: this.#keyId,
       CiphertextBlob: wrapped,
@@ -196,6 +234,8 @@ export class KmsKeyring implements Keyring {
       this.#unwrapCache.get(oldestKey)?.dek.fill(0);
       this.#unwrapCache.delete(oldestKey);
     }
+    // Every awaiter copies this buffer in a microtask; scrub it on the next turn.
+    setImmediate(() => dek.fill(0));
     return dek;
   }
 

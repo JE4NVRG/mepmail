@@ -1,4 +1,4 @@
-import { startTimingLog, TimingWindow } from "@millionsend/core";
+import { observeKmsUnwraps, startTimingLog, TimingWindow } from "@millionsend/core";
 
 /**
  * Server time of the Correio procedures (mailboxes.*), one log line every 10 minutes:
@@ -34,6 +34,8 @@ export function recordProcedureTiming(path: string, ms: number, ok: boolean): vo
   if (!logging) {
     logging = true;
     startTimingLog(timings, "[web] timings 10m", WINDOW_MS);
+    // How sealed reads get their keys: cache hit, KMS call, or joined to a call in flight.
+    observeKmsUnwraps((outcome, ms) => timings.record(`kms:unwrap.${outcome}`, ms));
   }
   timings.record(path, ms, ok);
 }

@@ -242,6 +242,8 @@ export {
   KMS_KEY_VERSION,
   type KmsDekClient,
   KmsKeyring,
+  type KmsUnwrapOutcome,
+  observeKmsUnwraps,
 } from "./crypto/kms-keyring.js";
 export {
   broadcastSendSpacingMs,

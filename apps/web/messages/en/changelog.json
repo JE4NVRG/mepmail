@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.115",
+      "date": "2026-10-11",
+      "title": "Fewer key lookups when opening Mail",
+      "summary": "When a folder opens and many messages were sealed with the same key, Mail now asks the key service once instead of once per message.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Opening a folder after a pause makes one key-service request per message key, shared by every message that uses it, instead of one per message.",
+            "Server timing of key lookups (from cache, from the key service, or shared) in the operator's timing log, to tune the next speed work."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.114",
       "date": "2026-10-11",
       "title": "Formatted mail, Bcc and mailto links",

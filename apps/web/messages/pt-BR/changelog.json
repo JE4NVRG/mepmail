@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.115",
+      "date": "2026-10-11",
+      "title": "Menos consultas de chave ao abrir o Correio",
+      "summary": "Quando uma pasta abre e muitas mensagens foram seladas com a mesma chave, o Correio agora consulta o serviço de chaves uma vez só, em vez de uma vez por mensagem.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Abrir uma pasta depois de uma pausa faz uma consulta ao serviço de chaves por chave de mensagem, compartilhada por todas as mensagens que a usam, em vez de uma por mensagem.",
+            "Tempo das consultas de chave (do cache, do serviço de chaves ou compartilhada) no log de tempos da operação, para orientar o próximo ajuste de velocidade."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.114",
       "date": "2026-10-11",
       "title": "E-mail formatado, Cco e links mailto",

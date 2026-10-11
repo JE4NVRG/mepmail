@@ -44,6 +44,7 @@ vi.mock("@millionsend/core", async () => {
     verifiedSendBillingContract,
     startTimingLog,
     TimingWindow,
+    observeKmsUnwraps: () => undefined,
     ...Object.fromEntries(
       [
         "appendMailboxActivity",

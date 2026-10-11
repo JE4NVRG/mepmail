@@ -12,6 +12,8 @@ import {
   KMS_KEY_VERSION,
   type KmsDekClient,
   KmsKeyring,
+  type KmsUnwrapOutcome,
+  observeKmsUnwraps,
   UNWRAP_CACHE_MAX_ENTRIES,
   UNWRAP_CACHE_TTL_MS,
   WRAP_CACHE_MAX_AGE_MS,
@@ -190,6 +192,47 @@ describe("KmsKeyring", () => {
     expect(calls.decrypt).toBe(1);
     vi.advanceTimersByTime(UNWRAP_CACHE_TTL_MS + 1);
     await decryptPayload(encrypted, keyring);
+    expect(calls.decrypt).toBe(2);
+  });
+
+  it("concurrent unwraps of one DEK share a single KMS call, each with its own copy", async () => {
+    const { client, calls } = fakeKms();
+    const keyring = new KmsKeyring(client, KEY_ID);
+    const outcomes: KmsUnwrapOutcome[] = [];
+    observeKmsUnwraps((outcome) => outcomes.push(outcome));
+    const { wrapped } = await keyring.wrapDek(randomBytes(32));
+    const deks = await Promise.all(
+      Array.from({ length: 8 }, () => keyring.unwrapDek(wrapped, KMS_KEY_VERSION)),
+    );
+    expect(calls.decrypt).toBe(1);
+    expect(outcomes.filter((o) => o === "miss")).toHaveLength(1);
+    expect(outcomes.filter((o) => o === "joined")).toHaveLength(7);
+    // Same key, separate buffers: one caller scrubbing its copy never zeroes another's.
+    deks[0]!.fill(0);
+    expect(deks[1]!.equals(Buffer.alloc(32))).toBe(false);
+    expect(new Set(deks.slice(1).map((d) => d.toString("hex"))).size).toBe(1);
+    await keyring.unwrapDek(wrapped, KMS_KEY_VERSION);
+    expect(outcomes.at(-1)).toBe("hit");
+    expect(calls.decrypt).toBe(1);
+  });
+
+  it("a failed shared unwrap fails every waiter and is not cached", async () => {
+    const { client, calls } = fakeKms();
+    const keyring = new KmsKeyring(client, KEY_ID);
+    const { wrapped } = await keyring.wrapDek(randomBytes(32));
+    const decrypt = client.decrypt;
+    client.decrypt = async () => {
+      calls.decrypt += 1;
+      throw new Error("ThrottlingException");
+    };
+    const results = await Promise.allSettled([
+      keyring.unwrapDek(wrapped, KMS_KEY_VERSION),
+      keyring.unwrapDek(wrapped, KMS_KEY_VERSION),
+    ]);
+    expect(results.map((r) => r.status)).toEqual(["rejected", "rejected"]);
+    expect(calls.decrypt).toBe(1);
+    client.decrypt = decrypt;
+    await expect(keyring.unwrapDek(wrapped, KMS_KEY_VERSION)).resolves.toHaveLength(32);
     expect(calls.decrypt).toBe(2);
   });
 
