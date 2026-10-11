@@ -168,6 +168,25 @@ export interface LiveDnsCheck {
   found?: string;
 }
 
+/**
+ * SPF is a policy, not a fixed string: a single `v=spf1` record at the name that
+ * authorizes every include the expected record names is the same authorization, even
+ * with the sender's own includes added (`include:amazonses.com include:other ~all`).
+ * Two SPF records at one name are a permerror (RFC 7208 §4.5) and `+all`/bare `all`
+ * passes everyone, so both stay a mismatch.
+ */
+function spfSatisfies(want: string, answers: string[]): boolean {
+  const required = want
+    .toLowerCase()
+    .split(" ")
+    .filter((term) => term.startsWith("include:"));
+  const spf = answers.filter((answer) => /^v=spf1(\s|$)/i.test(answer));
+  if (!required.length || spf.length !== 1) return false;
+  const terms = spf[0]!.toLowerCase().split(" ");
+  if (terms.includes("+all") || terms.includes("all")) return false;
+  return required.every((include) => terms.includes(include) || terms.includes(`+${include}`));
+}
+
 const mismatch = (answers: string[]): LiveDnsCheck => ({
   status: "mismatch",
   found: answers.join("\n"),
@@ -214,7 +233,11 @@ async function checkOne(record: DnsCheckRecord, resolver: DnsResolver): Promise<
     if (rows.length === 0) return { status: "missing" };
     const want = normTxt(record.value);
     const answers = rows.map((chunks) => normTxt(chunks.join("")));
-    return answers.includes(want) ? { status: "found" } : mismatch(answers);
+    // SPF compares as a policy (one record that authorizes SES); everything else exactly.
+    const found = /^v=spf1(\s|$)/i.test(want)
+      ? spfSatisfies(want, answers)
+      : answers.includes(want);
+    return found ? { status: "found" } : mismatch(answers);
   } catch (err) {
     // Never throw: NXDOMAIN/NODATA read missing, anything else unknown.
     return { status: dnsErrorStatus(err) };

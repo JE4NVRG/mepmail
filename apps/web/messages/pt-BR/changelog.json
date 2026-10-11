@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.120",
+      "date": "2026-10-11",
+      "title": "Domínios verificam com os seus próprios includes de SPF",
+      "summary": "Um domínio de envio cujo SPF já lista outros remetentes agora verifica assim que também incluir o Amazon SES, em vez de esperar um texto idêntico.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "A checagem de SPF lê o registro como política: v=spf1 com include:amazonses.com verifica mesmo ao lado dos seus próprios includes (por exemplo, uma ferramenta de newsletter), com ~all, -all ou ?all.",
+            "Dois registros SPF no mesmo nome, ou um registro que libera todo mundo (+all), continuam aparecendo como errados, porque os destinatários os rejeitam."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.119",
       "date": "2026-10-11",
       "title": "Versão e ajuda na barra de pastas",

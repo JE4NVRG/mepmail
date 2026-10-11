@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.120",
+      "date": "2026-10-11",
+      "title": "Domains verify with your own SPF includes",
+      "summary": "A sending domain whose SPF record already lists other senders now verifies as soon as it also includes Amazon SES, instead of waiting on an exact match.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "The SPF check reads the record as a policy: v=spf1 with include:amazonses.com verifies even next to your own includes (for example a newsletter tool), with ~all, -all or ?all.",
+            "Two SPF records on the same name, or a record that allows everyone (+all), still read as wrong, because receivers reject them."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.119",
       "date": "2026-10-11",
       "title": "Version and help in the folder rail",

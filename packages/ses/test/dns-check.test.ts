@@ -106,6 +106,45 @@ describe("checkDnsRecords", () => {
     ).toEqual([{ status: "found" }]);
   });
 
+  it("accepts an SPF record that authorizes SES among the sender's own includes", async () => {
+    const want = {
+      type: "TXT" as const,
+      name: "send.d.com",
+      value: '"v=spf1 include:amazonses.com ~all"',
+    };
+    const check = async (...records: string[]) =>
+      (
+        await checkDnsRecords([want], {
+          ...empty,
+          resolveTxt: async () => records.map((record) => [record]),
+        })
+      )[0];
+    // The customer's own includes alongside SES: the same authorization.
+    expect(await check("v=spf1 include:amazonses.com include:other.example ~all")).toBe("found");
+    expect(await check("v=spf1 include:amazonses.com -all")).toBe("found");
+    expect(await check("V=SPF1 INCLUDE:AMAZONSES.COM ~ALL")).toBe("found");
+    // A non-SPF TXT beside it does not matter.
+    expect(await check("google-site-verification=x", "v=spf1 include:amazonses.com ?all")).toBe(
+      "found",
+    );
+    // SES not authorized, two SPF records (permerror), or a pass-everything policy.
+    expect(await check("v=spf1 include:other.example ~all")).toBe("mismatch");
+    expect(
+      await check("v=spf1 include:amazonses.com ~all", "v=spf1 include:other.example ~all"),
+    ).toBe("mismatch");
+    expect(await check("v=spf1 include:amazonses.com +all")).toBe("mismatch");
+    expect(await check("v=spf1 include:amazonses.com all")).toBe("mismatch");
+    // A DKIM-shaped expectation keeps its exact match.
+    expect(
+      (
+        await checkDnsRecords([{ type: "TXT", name: "a", value: '"v=DKIM1; k=rsa; p=ABC"' }], {
+          ...empty,
+          resolveTxt: async () => [["v=DKIM1; k=rsa; p=ABC; t=s"]],
+        })
+      )[0],
+    ).toBe("mismatch");
+  });
+
   it("reads an unanswered name as missing", async () => {
     const [status] = await checkDnsRecords([{ type: "TXT", name: "a", value: '"x"' }], empty);
     expect(status).toBe("missing");
