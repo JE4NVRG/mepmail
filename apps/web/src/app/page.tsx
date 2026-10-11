@@ -15,6 +15,11 @@ import {
   SignupLink,
 } from "@/components/site-chrome";
 import { StackLogoRow } from "@/components/stack-logos";
+import {
+  DESKTOP_DOWNLOAD_URL,
+  LINUX_DOWNLOAD_URL,
+  WINDOWS_STORE_URL,
+} from "@/lib/desktop-download";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
 import { formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricing";
 import { CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
@@ -162,7 +167,10 @@ export default async function RootPage() {
         labels={site}
         page="landing"
         banner={
-          <a className="gtm-announce" href={mailOpen ? "/correio" : "#mcp"}>
+          <a
+            className="gtm-announce"
+            href={standaloneOpen ? DESKTOP_DOWNLOAD_URL : mailOpen ? "/correio" : "#mcp"}
+          >
             <span className="gtm-announce-dot" aria-hidden="true" />
             <span>
               {t(
@@ -246,6 +254,16 @@ export default async function RootPage() {
                     {t("correio.pricing")}
                   </a>
                 </div>
+                <p className="cro-desktop">
+                  <span>{t("correio.desktop")}</span>
+                  <a href={WINDOWS_STORE_URL} target="_blank" rel="noopener noreferrer">
+                    Windows <span aria-hidden="true">↗</span>
+                  </a>
+                  <a href={LINUX_DOWNLOAD_URL}>Linux</a>
+                  <a href={DESKTOP_DOWNLOAD_URL}>
+                    {t("correio.desktopAll")} <span aria-hidden="true">→</span>
+                  </a>
+                </p>
               </div>
             </section>
 

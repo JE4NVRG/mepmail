@@ -28,6 +28,27 @@
   },
   "releases": [
     {
+      "version": "0.124",
+      "date": "2026-10-11",
+      "title": "Download the desktop app from anywhere on the site",
+      "summary": "A new /download page gathers the Windows and Linux apps, and the header, the footer and the home page now link to it.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "/download: the Windows app (Microsoft Store, or the self-updating installer) and the Linux packages, with your system first, what the app adds to the browser, and the browser for Mac and phones.",
+            "An “App” link in the site header and “Windows and Linux apps” in the footer."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "The home announcement about the Windows and Linux app now opens the downloads, and the MepMail Mail section links to them."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.123",
       "date": "2026-10-11",
       "title": "Correio search looks through all your mail",

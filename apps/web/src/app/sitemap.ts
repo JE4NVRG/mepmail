@@ -4,7 +4,7 @@ import type { MetadataRoute } from "next";
 export const dynamic = "force-dynamic";
 
 // Public, indexable pages: the landing, the standalone pricing page, the
-// Correio page and its Linux download page (once Mail is open and indexable),
+// Correio page, the desktop downloads and the Linux page (once Mail is open and indexable),
 // the "Resend alternative" comparison, the integrations, security and support
 // pages and the auth entry points (mirrors robots.ts). The dashboard has no public URLs of its own.
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -14,6 +14,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     process.env.MAILBOX_EARLY_ACCESS_OPEN === "true"
       ? [
           { url: `${base}/correio`, changeFrequency: "weekly", priority: 0.9 },
+          { url: `${base}/download`, changeFrequency: "monthly", priority: 0.8 },
           { url: `${base}/desktop/correio/linux`, changeFrequency: "monthly", priority: 0.6 },
         ]
       : [];

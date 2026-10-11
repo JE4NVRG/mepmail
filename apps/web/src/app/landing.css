@@ -1552,3 +1552,57 @@
     gap: 7px;
   }
 }
+
+/* "App" in the header: the desktop downloads (/download). Icon plus a short
+   label on wide screens, the icon alone where the flat nav is tight
+   (880-1199px), and the full sentence inside the mobile panel. */
+.gtm-nav-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  color: var(--ms-bone);
+  font-size: 14px;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+.gtm-nav-download:hover,
+.gtm-nav-download[aria-current="page"] {
+  border-color: color-mix(in srgb, var(--ms-violet) 55%, transparent);
+  background: color-mix(in srgb, var(--ms-violet) 12%, transparent);
+}
+.gtm-nav-download svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.gtm-nav-download-full {
+  display: none;
+}
+@media (min-width: 880px) and (max-width: 1199px) {
+  .gtm-nav-download {
+    padding: 0 10px;
+  }
+  .gtm-nav-download-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+@media (max-width: 879px) {
+  .gtm-nav-download-label {
+    display: none;
+  }
+  .gtm-nav-download-full {
+    display: inline;
+  }
+}

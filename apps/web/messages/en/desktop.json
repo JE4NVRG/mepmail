@@ -44,5 +44,61 @@
     ],
     "windows": "On Windows, the app is in the Microsoft Store.",
     "source": "The app's source code on GitHub"
+  },
+  "hub": {
+    "meta": {
+      "title": "Download the MepMail app for Windows and Linux",
+      "description": "MepMail Mail in its own window on Windows and Linux: tray icon, unread count, default email app, automatic updates and the bridge to your AI agents."
+    },
+    "eyebrow": "Desktop app",
+    "title": "MepMail on your <highlight>computer</highlight>",
+    "lead": "MepMail Mail in its own window, outside the browser: it starts with your system, tells you about new mail and connects your AI agents to the mailbox in one click.",
+    "note": "Version {version} · free app for accounts with MepMail Mail · open source (AGPL-3.0)",
+    "detected": "Recommended for your system",
+    "windows": {
+      "kind": "Windows 10 and 11",
+      "name": "Windows",
+      "body": "From the Microsoft Store: signed by Microsoft, installs with no SmartScreen warning, and the Store keeps it up to date.",
+      "store": "Get it on the Microsoft Store",
+      "installer": "Prefer an installer? Download the .exe",
+      "installerNote": "The direct installer updates itself. Use it when the Store is blocked on your PC."
+    },
+    "linux": {
+      "kind": "Ubuntu, Debian, Fedora and more",
+      "name": "Linux",
+      "body": "The .deb and .rpm packages, or the AppImage that runs without installing. Each comes with its install command and how it updates.",
+      "download": "See the Linux packages"
+    },
+    "featuresTitle": "What the app adds to the browser",
+    "features": [
+      {
+        "title": "Its own window and tray icon",
+        "body": "Starts with your system, stays in the tray when you close it, and remembers its size and position."
+      },
+      {
+        "title": "Unread count",
+        "body": "A dot on the taskbar icon and in the tray shows how many new messages arrived."
+      },
+      {
+        "title": "Default email app",
+        "body": "mailto: links open the MepMail Mail composer with the recipient filled in."
+      },
+      {
+        "title": "AI agents in one click",
+        "body": "Connects Claude Desktop, Cursor, Claude Code or Codex to your mailbox. The key stays in the system vault, never in a text file."
+      },
+      {
+        "title": "Always up to date",
+        "body": "The app loads MepMail Mail from mepmail.dev, so every improvement arrives at once. The app itself updates through the Store or on its own."
+      },
+      {
+        "title": "mepmail:// links",
+        "body": "Shortcuts and automations open a mailbox, a folder or a message straight in the app."
+      }
+    ],
+    "otherTitle": "On a Mac or a phone?",
+    "other": "Use MepMail Mail in the browser at mepmail.dev/mail. It works on any system, with the same account.",
+    "openWeb": "Open MepMail Mail in the browser",
+    "source": "App source code"
   }
 }

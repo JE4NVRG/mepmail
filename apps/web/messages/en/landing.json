@@ -26,7 +26,9 @@
     "signup": "Create account",
     "menu": "Open navigation menu",
     "badge": "Agent-ready",
-    "correioBadge": "New"
+    "correioBadge": "New",
+    "download": "App",
+    "downloadAria": "Download the app for Windows and Linux"
   },
   "announce": {
     "text": "Your AI agents send email with the official MepMail MCP",
@@ -340,7 +342,8 @@
     "ghAria": "Je4nDev on GitHub",
     "rights": "© 2026 MepMail. All rights reserved.",
     "sourceCode": "Source code · AGPL-3.0",
-    "sourceDownload": "Download the corresponding source of this version for free"
+    "sourceDownload": "Download the corresponding source of this version for free",
+    "apps": "Windows and Linux apps"
   },
   "account": {
     "dashboard": "Open dashboard",
@@ -360,6 +363,8 @@
     ],
     "price": "From {price} a month: Solo with 1 mailbox, Duo with 3 or Equipe with 10, with 7 days free.",
     "cta": "Explore Mail",
-    "pricing": "See Mail pricing"
+    "pricing": "See Mail pricing",
+    "desktop": "Also on your computer:",
+    "desktopAll": "See the apps"
   }
 }

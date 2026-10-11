@@ -562,3 +562,18 @@
     font-size: 22px;
   }
 }
+
+/* Under the Correio story: the desktop apps, as a quiet line of links. */
+.cro .cro-story .cro-desktop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 18px;
+  margin: 18px 0 0;
+  color: var(--ms-muted);
+  font-size: 14px;
+}
+.cro .cro-story .cro-desktop a {
+  color: var(--ms-bone);
+}

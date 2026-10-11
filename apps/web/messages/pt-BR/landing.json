@@ -26,7 +26,9 @@
     "signup": "Criar conta",
     "menu": "Abrir menu de navegação",
     "badge": "Agent-ready",
-    "correioBadge": "Novo"
+    "correioBadge": "Novo",
+    "download": "App",
+    "downloadAria": "Baixar o app para Windows e Linux"
   },
   "announce": {
     "text": "Seus agentes de IA enviam e-mail com o MCP oficial do MepMail",
@@ -340,7 +342,8 @@
     "ghAria": "GitHub do Je4nDev",
     "rights": "© 2026 MepMail. Todos os direitos reservados.",
     "sourceCode": "Código-fonte · AGPL-3.0",
-    "sourceDownload": "Baixe gratuitamente o código-fonte correspondente a esta versão"
+    "sourceDownload": "Baixe gratuitamente o código-fonte correspondente a esta versão",
+    "apps": "Apps para Windows e Linux"
   },
   "account": {
     "dashboard": "Abrir painel",
@@ -360,6 +363,8 @@
     ],
     "price": "A partir de {price} por mês (R$ 14,90 no Brasil): Solo com 1 caixa, Duo com 3 ou Equipe com 10, com 7 dias grátis.",
     "cta": "Conhecer o Correio",
-    "pricing": "Ver preços do Correio"
+    "pricing": "Ver preços do Correio",
+    "desktop": "Também no computador:",
+    "desktopAll": "Ver os apps"
   }
 }

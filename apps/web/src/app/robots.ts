@@ -21,6 +21,8 @@ export default function robots(): MetadataRoute.Robots {
         "/?",
         "/pricing",
         "/correio",
+        // The desktop downloads page.
+        "/download",
         // The Linux app's page and its package links; the Windows installer stays out.
         "/desktop/correio/linux",
         "/alternatives",

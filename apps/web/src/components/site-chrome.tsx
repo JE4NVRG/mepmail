@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { DESKTOP_DOWNLOAD_URL } from "@/lib/desktop-download";
 import { newSubscriptionsPaused } from "@/server/new-subscriptions";
 import { AdvertisingSettingsButton } from "./advertising-consent";
 import { LandingLangSwitch } from "./landing-lang-switch";
@@ -24,7 +25,8 @@ export type PublicPage =
   | "correio"
   | "security"
   | "support"
-  | "changelog";
+  | "changelog"
+  | "download";
 
 export interface PublicSiteLabels {
   skip: string;
@@ -42,6 +44,9 @@ export interface PublicSiteLabels {
     docs: string;
     security: string;
     support: string;
+    /** The desktop app (/download): short label, and the full one for screen readers. */
+    download?: string;
+    downloadAria?: string;
     /** Fora da nav principal — seguem vivos no rodapé e nas CTAs. */
     compare: string;
     plans: string;
@@ -75,6 +80,7 @@ export interface PublicSiteLabels {
     sourceDownload: string;
     pricing: string;
     alternatives: string;
+    apps?: string;
   };
 }
 
@@ -175,6 +181,28 @@ export function PublicHeader({
               </a>
             </div>
             <div className="gtm-nav-actions">
+              {labels.nav.download ? (
+                <a
+                  className="gtm-nav-download"
+                  href={DESKTOP_DOWNLOAD_URL}
+                  aria-label={labels.nav.downloadAria}
+                  title={labels.nav.downloadAria}
+                  aria-current={page === "download" ? "page" : undefined}
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <path
+                      d="M8 2v8m0 0L4.75 6.75M8 10l3.25-3.25M3 13h10"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span className="gtm-nav-download-label">{labels.nav.download}</span>
+                  <span className="gtm-nav-download-full">{labels.nav.downloadAria}</span>
+                </a>
+              ) : null}
               <LandingLangSwitch label={labels.langAria} />
             </div>
           </LandingNav>
@@ -226,6 +254,11 @@ export function PublicFooter({
           <a href={anchorHref(page, "#como-funciona")}>{labels.nav.how}</a>
           <a href={anchorHref(page, "#planos")}>{labels.nav.plans}</a>
           {labels.nav.correio ? <a href="/correio">{labels.nav.correio}</a> : null}
+          {labels.footer.apps ? (
+            <a href={DESKTOP_DOWNLOAD_URL} aria-current={page === "download" ? "page" : undefined}>
+              {labels.footer.apps}
+            </a>
+          ) : null}
           <a href="/integrations">{labels.nav.integrations}</a>
           <a href={anchorHref(page, "#mcp")}>{labels.nav.mcp}</a>
           <a href="/changelog" aria-current={page === "changelog" ? "page" : undefined}>

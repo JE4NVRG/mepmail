@@ -44,5 +44,61 @@
     ],
     "windows": "No Windows, o app está na Microsoft Store.",
     "source": "Código-fonte do app no GitHub"
+  },
+  "hub": {
+    "meta": {
+      "title": "Baixar o app MepMail para Windows e Linux",
+      "description": "O Correio do MepMail numa janela própria no Windows e no Linux: bandeja, contador de não lidas, app padrão de e-mail, atualizações automáticas e a ponte para seus agentes de IA."
+    },
+    "eyebrow": "App para computador",
+    "title": "O MepMail no seu <highlight>computador</highlight>",
+    "lead": "O Correio numa janela própria, fora do navegador: abre com o sistema, avisa as mensagens novas e liga seus agentes de IA à caixa com um clique.",
+    "note": "Versão {version} · app grátis para contas com o Correio · código aberto (AGPL-3.0)",
+    "detected": "Recomendado para o seu sistema",
+    "windows": {
+      "kind": "Windows 10 e 11",
+      "name": "Windows",
+      "body": "Pela Microsoft Store: assinado pela Microsoft, instala sem aviso do SmartScreen e a Store mantém atualizado.",
+      "store": "Baixar na Microsoft Store",
+      "installer": "Prefere o instalador? Baixe o .exe",
+      "installerNote": "O instalador direto se atualiza sozinho. Use quando a Store estiver bloqueada no seu PC."
+    },
+    "linux": {
+      "kind": "Ubuntu, Debian, Fedora e outras",
+      "name": "Linux",
+      "body": "Pacotes .deb e .rpm, ou o AppImage que roda sem instalar. Cada um com o comando de instalação e como atualizar.",
+      "download": "Ver os pacotes para Linux"
+    },
+    "featuresTitle": "O que o app faz além do navegador",
+    "features": [
+      {
+        "title": "Janela própria e bandeja",
+        "body": "Abre com o sistema, fica na bandeja ao fechar e lembra o tamanho e a posição da janela."
+      },
+      {
+        "title": "Contador de não lidas",
+        "body": "Um ponto no ícone da barra de tarefas e na bandeja mostra quantas mensagens novas chegaram."
+      },
+      {
+        "title": "App padrão de e-mail",
+        "body": "Links mailto: abrem o compositor do Correio, já com o destinatário preenchido."
+      },
+      {
+        "title": "Agentes de IA com um clique",
+        "body": "Conecta Claude Desktop, Cursor, Claude Code ou Codex à sua caixa. A chave fica no cofre do sistema, nunca em arquivo de texto."
+      },
+      {
+        "title": "Sempre atualizado",
+        "body": "O app carrega o Correio de mepmail.dev, então cada melhoria chega na hora. O próprio app se atualiza pela Store ou sozinho."
+      },
+      {
+        "title": "Links mepmail://",
+        "body": "Atalhos e automações abrem direto uma caixa, uma pasta ou uma mensagem no app."
+      }
+    ],
+    "otherTitle": "No Mac ou no celular?",
+    "other": "Use o Correio no navegador em mepmail.dev/mail. Ele funciona em qualquer sistema, com a mesma conta.",
+    "openWeb": "Abrir o Correio no navegador",
+    "source": "Código-fonte do app"
   }
 }

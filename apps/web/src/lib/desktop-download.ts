@@ -8,6 +8,8 @@
 export const WINDOWS_STORE_URL = "https://apps.microsoft.com/detail/9nhpx6qrf0pb";
 export const WINDOWS_INSTALLER_URL = "/desktop/correio/windows";
 export const LINUX_DOWNLOAD_URL = "/desktop/correio/linux";
+/** The page the whole public site links to: every platform, the visitor's first. */
+export const DESKTOP_DOWNLOAD_URL = "/download";
 
 export type DesktopAppPlatform = "windows" | "linux";
 

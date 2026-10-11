@@ -103,11 +103,13 @@ describe("robots.txt + sitemap.xml agreement", () => {
     expect(has()).toBe(false);
     vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
     const urls = sitemap();
-    // /correio and the Linux app's page.
-    expect(urls).toHaveLength(14);
+    // /correio, the desktop downloads and the Linux app's page.
+    expect(urls).toHaveLength(15);
     expect(has()).toBe(true);
     expect(urls.find((entry) => entry.url.endsWith("/desktop/correio/linux"))?.priority).toBe(0.6);
     expect(isAllowed("/desktop/correio/linux", allowedPaths())).toBe(true);
+    expect(urls.find((entry) => entry.url.endsWith("/download"))?.priority).toBe(0.8);
+    expect(isAllowed("/download", allowedPaths())).toBe(true);
     expect(isAllowed("/desktop/correio/windows", allowedPaths())).toBe(false);
     expect(urls.find((entry) => entry.url.endsWith("/correio"))?.priority).toBe(0.9);
     expect(isAllowed("/correio", allowedPaths())).toBe(true);

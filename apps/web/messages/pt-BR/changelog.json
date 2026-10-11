@@ -28,6 +28,27 @@
   },
   "releases": [
     {
+      "version": "0.124",
+      "date": "2026-10-11",
+      "title": "Baixe o app de qualquer lugar do site",
+      "summary": "Uma página nova, /download, reúne os apps para Windows e Linux, e o cabeçalho, o rodapé e a home agora levam até ela.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "/download: o app para Windows (Microsoft Store, ou o instalador que se atualiza sozinho) e os pacotes para Linux, com o seu sistema primeiro, o que o app acrescenta ao navegador e o navegador para Mac e celular.",
+            "Um link “App” no cabeçalho do site e “Apps para Windows e Linux” no rodapé."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "O anúncio da home sobre o app para Windows e Linux agora abre os downloads, e a seção do Correio leva até eles."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.123",
       "date": "2026-10-11",
       "title": "A busca do Correio procura em todo o seu e-mail",
