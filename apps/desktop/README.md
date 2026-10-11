@@ -186,6 +186,13 @@ changes.
    `plugins.updater.endpoints` (`http://127.0.0.1:<port>/latest.json` plus
    `dangerousInsecureTransportProtocol: true`), install the older one, serve
    the newer one and click "Procurar atualizações".
+5. Retention, once the release is live and verified: `npm run retain`
+   (`--dry-run` to preview) keeps the current version's installer, `.sig`
+   and MSIX and removes `target/debug`, the release build's intermediates,
+   other versions' bundles and MSIX packages, the MSIX layout and the
+   WebView2 profiles of throwaway test identities (`dev.mepmail.correio.*`,
+   never the installed app's). The Linux build drops its bundles from the
+   cache volume itself (`linux/build.sh`).
 
 The installer is not code-signed yet: SmartScreen shows "Windows protected
 your PC" until it builds reputation (More info, Run anyway). A code-signing

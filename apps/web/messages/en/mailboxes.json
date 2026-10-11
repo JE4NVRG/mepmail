@@ -1198,5 +1198,17 @@
     "onlySent": "{count, plural, one {Nothing deleted: the sent message stays as the record of the send.} other {Nothing deleted: the # sent messages stay as the record of the send.}}",
     "empty": "The trash is already empty.",
     "error": "Couldn't delete right now. Some may already be gone; refresh the list and try again."
+  },
+  "help": {
+    "title": "Help",
+    "label": "Help · version {version}",
+    "version": "Version {version}",
+    "versionDate": "Version {version} · {date}",
+    "app": "{platform} app {version}",
+    "appUpdates": "updates itself",
+    "whatsNew": "What's new",
+    "shortcuts": "Keyboard shortcuts",
+    "docs": "Help center",
+    "support": "Contact support"
   }
 }

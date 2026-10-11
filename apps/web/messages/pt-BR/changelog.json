@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.119",
+      "date": "2026-10-11",
+      "title": "Versão e ajuda na barra de pastas",
+      "summary": "A barra de pastas agora mostra em qual versão do MepMail você está e abre um menu de Ajuda com novidades, atalhos do teclado, central de ajuda e suporte.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "O rodapé da barra mostra a versão (aqui, v0.119) no lugar da interrogação; com a barra recolhida, a interrogação continua.",
+            "O menu de Ajuda: versão e data, a versão do app desktop quando você usa ele, Novidades, Atalhos do teclado, Central de ajuda e Falar com o suporte."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.118",
       "date": "2026-10-11",
       "title": "Não lidas que acompanham você",

@@ -1,6 +1,7 @@
 import { getDb } from "@millionsend/db";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { AppReleaseProvider } from "@/components/app-release";
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { SupportViewBanner } from "@/components/support-view-banner";
 import { TeamStandingBanner } from "@/components/team-standing-banner";
@@ -8,6 +9,7 @@ import { ToastHost } from "@/components/toast";
 import { VersionNotice } from "@/components/version-notice";
 import { CORREIO_PREFS_PREPAINT_SCRIPT } from "@/lib/mailbox-preferences-prepaint";
 import { postAuthNext, withNext } from "@/lib/nav";
+import { currentRelease } from "@/server/app-release";
 import { getAuth } from "@/server/auth";
 import { ACTIVE_TEAM_COOKIE, getActiveMembership } from "@/server/membership";
 import { resolveSupportView, SUPPORT_VIEW_COOKIE } from "@/server/support-view";
@@ -48,7 +50,10 @@ export default async function MailLayout({ children }: { children: React.ReactNo
         />
       ) : null}
       <TeamStandingBanner />
-      <main style={{ flex: 1, minWidth: 0 }}>{children}</main>
+      <main style={{ flex: 1, minWidth: 0 }}>
+        {/* The release number and date the Correio shows (rail footer → help menu). */}
+        <AppReleaseProvider release={currentRelease()}>{children}</AppReleaseProvider>
+      </main>
       <ConfirmDialogHost />
       <ToastHost />
       <VersionNotice revision={process.env.MILLIONSEND_REVISION ?? null} />

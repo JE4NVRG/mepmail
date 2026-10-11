@@ -47,4 +47,7 @@ npx tauri build --bundles appimage,deb,rpm --config "$config"
 mkdir -p /out
 find "$bundle/appimage" "$bundle/deb" "$bundle/rpm" -maxdepth 1 -type f \
   \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' -o -name '*.sig' \) -exec cp {} /out/ \;
+# Retention: the bundles now live in /out; the cache keeps only the registry and
+# compiled dependencies, which the next build reuses (~350 MB less per run).
+rm -rf "$bundle"
 ls -la /out

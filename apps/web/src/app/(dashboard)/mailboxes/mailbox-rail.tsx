@@ -22,6 +22,7 @@ import {
   readRailCollapsed,
 } from "@/lib/mailbox-rail";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
+import { MailboxHelpMenu } from "./mailbox-help-menu";
 import styles from "./mailbox-rail.module.css";
 
 const PRIMARY: MailboxFolder[] = [
@@ -348,15 +349,7 @@ export function MailboxRail({
         >
           <MailboxFolderIcon name="settings" />
         </Link>
-        <button
-          type="button"
-          className={styles.toolButton}
-          aria-label={t("shortcuts.title")}
-          title={t("shortcuts.title")}
-          onClick={onShortcuts}
-        >
-          <kbd>?</kbd>
-        </button>
+        <MailboxHelpMenu onShortcuts={onShortcuts} />
         <button
           type="button"
           className={`${styles.toolButton} ${styles.collapseToggle}`}

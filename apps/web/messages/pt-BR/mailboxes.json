@@ -1198,5 +1198,17 @@
     "onlySent": "{count, plural, one {Nada excluído: a mensagem enviada fica como registro do envio.} other {Nada excluído: as # mensagens enviadas ficam como registro do envio.}}",
     "empty": "A lixeira já está vazia.",
     "error": "Não deu para excluir agora. Parte pode já ter saído; atualize a lista e tente de novo."
+  },
+  "help": {
+    "title": "Ajuda",
+    "label": "Ajuda · versão {version}",
+    "version": "Versão {version}",
+    "versionDate": "Versão {version} · {date}",
+    "app": "App para {platform} {version}",
+    "appUpdates": "atualiza sozinho",
+    "whatsNew": "Novidades",
+    "shortcuts": "Atalhos do teclado",
+    "docs": "Central de ajuda",
+    "support": "Falar com o suporte"
   }
 }

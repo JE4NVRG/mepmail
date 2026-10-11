@@ -291,6 +291,44 @@
 .collapseToggle {
   margin-left: auto;
 }
+/* The version where the "?" was; it opens about, what's new, shortcuts, help. */
+.helpMenu {
+  position: relative;
+  display: inline-flex;
+}
+.versionButton {
+  width: auto;
+  min-width: 30px;
+  padding: 0 8px;
+  font: 500 11px var(--ms-font-sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.helpPanel {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 270px;
+}
+.helpAbout {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px 6px;
+  color: var(--ms-muted);
+  font-size: 12px;
+}
+.helpAbout strong {
+  color: var(--ms-bone);
+  font-size: 13px;
+  font-weight: 600;
+}
+.helpKey {
+  padding: 0 5px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 4px;
+  color: var(--ms-muted);
+  font: 600 11px var(--ms-font-sans);
+}
 
 .item:focus-visible,
 .groupHeader:focus-visible,

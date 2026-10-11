@@ -11,6 +11,7 @@
     "build:exe": "tauri build --no-bundle",
     "icons": "tauri icon ../web/public/logo/mepmail-favicon.svg -o src-tauri/icons",
     "info": "tauri info",
+    "retain": "node scripts/retain.mjs",
     "tauri": "tauri"
   },
   "devDependencies": {

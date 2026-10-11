@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.119",
+      "date": "2026-10-11",
+      "title": "Version and help in the folder rail",
+      "summary": "The folder rail now shows which MepMail version you are on, and opens a Help menu with what's new, keyboard shortcuts, the help center and support.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "The rail footer shows the version (v0.119 here) instead of a question mark; the collapsed rail keeps the question mark.",
+            "Its Help menu: the version and date, the desktop app's version when you use it, What's new, Keyboard shortcuts, Help center and Talk to support."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.118",
       "date": "2026-10-11",
       "title": "Unread that keeps up with you",
