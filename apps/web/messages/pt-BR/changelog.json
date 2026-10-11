@@ -28,6 +28,29 @@
   },
   "releases": [
     {
+      "version": "0.118",
+      "date": "2026-10-11",
+      "title": "Não lidas que acompanham você",
+      "summary": "Com Não lidas ligado, a mensagem sai da lista assim que você passa para a próxima, as contagens caem na hora e um clique marca a visão inteira como lida.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Marcar como lidas no cabeçalho da lista: todas as não lidas da visão (pilha, filtro e busca aplicados) de uma vez, com Desfazer."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Com Não lidas ligado, a mensagem lida sai da lista quando você abre a próxima ou volta; J, K e a próxima ao sair caem na próxima não lida.",
+            "As contagens de não lidas da barra de pastas e do título da aba caem no momento em que a mensagem é lida.",
+            "Marcar muitas mensagens como lidas ou não lidas é uma só requisição para até 200 mensagens, em vez de uma por mensagem.",
+            "Marcar uma mensagem como não lida, ou desfazer Marcar como lidas, não mostra mais aviso de mensagem nova."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.117",
       "date": "2026-10-11",
       "title": "App desktop 1.0.2: MepMail como seu app de e-mail",

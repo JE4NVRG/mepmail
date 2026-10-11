@@ -28,6 +28,29 @@
   },
   "releases": [
     {
+      "version": "0.118",
+      "date": "2026-10-11",
+      "title": "Unread that keeps up with you",
+      "summary": "With Unread on, a message leaves the list as soon as you move on from it, the counts drop at once, and one click marks the whole view as read.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Mark as read in the list header: every unread message in the view (pile, filter and search applied) in one step, with Undo."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "With Unread on, a message you read leaves the list when you open the next one or go back; J and K and the next-after-leaving step land on the next unread message.",
+            "Unread counts in the folder rail and the tab title drop the moment a message is read.",
+            "Marking many messages read or unread is one request for up to 200 messages instead of one per message.",
+            "Marking a message unread, or undoing Mark as read, no longer shows a new-mail notice."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.117",
       "date": "2026-10-11",
       "title": "Desktop app 1.0.2: MepMail as your email app",

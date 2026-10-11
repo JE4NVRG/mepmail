@@ -427,6 +427,8 @@
     "markedUnread": "Mensagem marcada como não lida.",
     "bulkMarkedRead": "{count, plural, one {# mensagem marcada como lida} other {# mensagens marcadas como lidas}}.",
     "bulkMarkedUnread": "{count, plural, one {# mensagem marcada como não lida} other {# mensagens marcadas como não lidas}}.",
+    "markAllRead": "Marcar como lidas",
+    "markAllReadLabel": "{count, plural, one {Marcar # mensagem como lida} other {Marcar # mensagens como lidas}}",
     "bulkArchived": "{count, plural, one {# mensagem arquivada} other {# mensagens arquivadas}}.",
     "dropDone": "{count, plural, one {# mensagem movida} other {# mensagens movidas}}.",
     "dropNone": "Essas mensagens já estão aí ou não podem ir para essa pasta.",

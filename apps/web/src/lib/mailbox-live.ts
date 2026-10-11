@@ -11,6 +11,11 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 export const MAILBOX_ARRIVAL_EVENT = "mepmail:arrival";
 /** A new message worth showing while the Correio is in use (detail: NewMailNotice). */
 export const MAILBOX_NEW_MAIL_EVENT = "mepmail:new-mail";
+/**
+ * Messages the person just marked unread here (detail: "mailboxId:id" keys):
+ * the unread count grows, but they are not new mail to announce.
+ */
+export const MAILBOX_MARKED_UNREAD_EVENT = "mepmail:marked-unread";
 
 const BATCH_MS = 400;
 

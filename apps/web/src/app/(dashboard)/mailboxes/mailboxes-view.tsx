@@ -21,6 +21,7 @@ import {
 } from "@/lib/mailbox-inbox-presentation";
 import {
   livePollMs,
+  MAILBOX_MARKED_UNREAD_EVENT,
   MAILBOX_NEW_MAIL_EVENT,
   useMailboxLive,
   useMailboxLiveConnected,
@@ -64,6 +65,8 @@ type FolderEntry = Outputs["folders"][number];
 type InboxTopPage = Outputs["items"];
 /** How long an inbox head fetched on an arrival stays good for its notice. */
 const PREFETCH_FRESH_MS = 5000;
+/** How long a "marked unread here" keeps the counts' rise from reading as new mail. */
+const MARKED_UNREAD_MS = 15_000;
 const SETTINGS_TABS = ["appearance", "boxes", "agents", "license", "migration"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 const FOLDER_TINT_CLASS: Record<string, string> = {
@@ -627,6 +630,24 @@ export function MailboxesView({
     prefetchedTop.current.page.catch(() => {});
     void unreadCounts.refetch();
   });
+  // Marked unread by the person (Desfazer on "lidas", "Marcar como não lida"):
+  // the count grows, but these were seen already and are not announced.
+  const markedUnread = useRef({ count: 0, until: 0 });
+  useEffect(() => {
+    const onMarkedUnread = (event: Event) => {
+      const keys = (event as CustomEvent<string[]>).detail;
+      if (!Array.isArray(keys)) return;
+      for (const key of keys) announced.current?.add(key);
+      // The rise these cause in the next counts is not an arrival either.
+      markedUnread.current = {
+        count:
+          (Date.now() < markedUnread.current.until ? markedUnread.current.count : 0) + keys.length,
+        until: Date.now() + MARKED_UNREAD_MS,
+      };
+    };
+    window.addEventListener(MAILBOX_MARKED_UNREAD_EVENT, onMarkedUnread);
+    return () => window.removeEventListener(MAILBOX_MARKED_UNREAD_EVENT, onMarkedUnread);
+  }, []);
   // "Abrir" on a notice: the message in the Inbox of all boxes.
   const openArrival = useRef((row: { mailboxId: string; id: string }) => {
     setMailboxKind("all");
@@ -661,10 +682,18 @@ export function MailboxesView({
         .catch(() => {});
     }
     if (previous === null || total <= previous) return;
+    let arrivals = total - previous;
+    const marked = markedUnread.current;
+    if (marked.count && Date.now() < marked.until) {
+      const absorbed = Math.min(marked.count, arrivals);
+      marked.count -= absorbed;
+      arrivals -= absorbed;
+      if (!arrivals) return;
+    }
     const notified = announced.current;
     const fallback: NewMailNotice = {
       title: t("title"),
-      body: t("app.newMail", { count: total - previous }),
+      body: t("app.newMail", { count: arrivals }),
     };
     void inboxTop()
       .then((page) =>

@@ -1786,6 +1786,39 @@ describe("session-authenticated mailbox content", () => {
       .where(eq(schema.mailboxItems.id, item.id));
     expect(retained).toMatchObject({ revision: 1, starredAt: null });
   });
+  it("marks many messages read or unread in one call and skips what does not apply", async () => {
+    const a = await imported("fixture:many-a");
+    const b = await imported("fixture:many-b");
+    const sent = await as().saveDraft(draft());
+    expect((await as().unreadCounts()).counts[mailboxId]).toBe(2);
+    const items = [a, b, sent].map((row) => ({ mailboxId, id: row.id }));
+    const read = await as().setSeenMany({ items, seen: true });
+    expect(read.changed).toBe(2);
+    expect(read.items.map((row) => row.id).sort()).toEqual([a.id, b.id].sort());
+    expect((await as().unreadCounts()).counts[mailboxId]).toBe(0);
+    // Already in that state: nothing changes, nothing is refused.
+    expect((await as().setSeenMany({ items, seen: true })).changed).toBe(0);
+    expect(
+      (await as().setSeenMany({ items: [{ mailboxId, id: b.id }], seen: false })).changed,
+    ).toBe(1);
+    expect((await as().unreadCounts()).counts[mailboxId]).toBe(1);
+    const tooMany = Array.from({ length: 201 }, () => ({ mailboxId, id: randomUUID() }));
+    await expect(as().setSeenMany({ items: tooMany, seen: true })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+    await expect(as().setSeenMany({ items: [], seen: true })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+    await expect(
+      as("owner", { session: null }).setSeenMany({ items, seen: true }),
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(
+      as("owner", { supportView: { grantId: "support", expiresAt: new Date() } }).setSeenMany({
+        items,
+        seen: true,
+      }),
+    ).rejects.toThrow();
+  });
   it("keeps the content feature off and refuses unauthenticated/support router calls", async () => {
     const a = await imported();
     vi.stubEnv("MAILBOX_REGISTRY_ENABLED", "0");

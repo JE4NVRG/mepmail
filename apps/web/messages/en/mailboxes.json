@@ -427,6 +427,8 @@
     "markedUnread": "Message marked as unread.",
     "bulkMarkedRead": "{count, plural, one {# message marked as read} other {# messages marked as read}}.",
     "bulkMarkedUnread": "{count, plural, one {# message marked as unread} other {# messages marked as unread}}.",
+    "markAllRead": "Mark as read",
+    "markAllReadLabel": "{count, plural, one {Mark # message as read} other {Mark # messages as read}}",
     "bulkArchived": "{count, plural, one {# message archived} other {# messages archived}}.",
     "dropDone": "{count, plural, one {# message moved} other {# messages moved}}.",
     "dropNone": "Those messages are already there or can't go to that folder.",

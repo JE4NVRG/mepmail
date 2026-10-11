@@ -16,6 +16,7 @@ import {
   type MailboxListFilter,
   type MailboxListPage,
   saveMailboxDraft,
+  setMailboxItemsSeenMany,
   withMailboxContentAccess,
 } from "../src/mailbox-private-store.js";
 import {
@@ -396,5 +397,121 @@ describe("withMailboxContentAccess over several mailboxes", () => {
     await expect(
       withMailboxContentAccess(db, delegate(), [charlie, alpha], async () => "leaked"),
     ).rejects.toMatchObject({ code: "forbidden" });
+  });
+});
+
+describe("setMailboxItemsSeenMany", () => {
+  const rowsOf = async (mailboxId: string) =>
+    db
+      .select({
+        mailboxId: schema.mailboxItems.mailboxId,
+        id: schema.mailboxItems.id,
+        kind: schema.mailboxItems.kind,
+        seenAt: schema.mailboxItems.seenAt,
+        sourceId: schema.mailboxItems.sourceId,
+      })
+      .from(schema.mailboxItems)
+      .where(eq(schema.mailboxItems.mailboxId, mailboxId));
+  const ref = (row: { mailboxId: string; id: string }) => ({
+    mailboxId: row.mailboxId,
+    id: row.id,
+  });
+
+  it("marks received mail read across mailboxes in one call and skips what it does not apply to", async () => {
+    const all = [...(await rowsOf(alpha)), ...(await rowsOf(bravo)), ...(await rowsOf(charlie))];
+    const at = new Date("2026-10-11T12:00:00Z");
+    const result = await setMailboxItemsSeenMany(
+      db,
+      owner(),
+      { items: all.map(ref), seen: true },
+      at,
+    );
+    // Unread received: a1 a3 a4 a5, b1 b2 b3, c1 (a2 and c2 were read; sent and the draft never count).
+    expect(result.changed).toBe(8);
+    expect(result.items.every((item) => item.seenAt?.getTime() === at.getTime())).toBe(true);
+    for (const id of [alpha, bravo, charlie])
+      expect(await countUnreadMailboxItems(db, owner(), id)).toBe(0);
+    const after = [...(await rowsOf(alpha)), ...(await rowsOf(bravo)), ...(await rowsOf(charlie))];
+    expect(after.filter((row) => row.kind !== "inbox").every((row) => row.seenAt === null)).toBe(
+      true,
+    );
+    // Already read: nothing changes the second time.
+    expect(
+      (await setMailboxItemsSeenMany(db, owner(), { items: all.map(ref), seen: true })).changed,
+    ).toBe(0);
+    // And back to unread, only the received ones.
+    const back = await setMailboxItemsSeenMany(db, owner(), { items: all.map(ref), seen: false });
+    expect(back.changed).toBe(10);
+    expect(back.items.every((item) => item.seenAt === null)).toBe(true);
+    // a1, a2, a3 and a5 (a4 stays archived, out of the Inbox count).
+    expect(await countUnreadMailboxItems(db, owner(), alpha)).toBe(4);
+  });
+
+  it("leaves quarantined mail and pairs that name the wrong mailbox alone", async () => {
+    const [a1, a2] = (await rowsOf(alpha)).filter((row) => row.kind === "inbox");
+    await db
+      .update(schema.mailboxItems)
+      .set({
+        deliveryFolder: "quarantine",
+        inboundAssessment: sql`'{"version":1,"decision":"quarantine","verdicts":{},"dmarcPolicy":null,"reasons":[]}'::jsonb`,
+      })
+      .where(eq(schema.mailboxItems.id, a1!.id));
+    const result = await setMailboxItemsSeenMany(db, owner(), {
+      items: [ref(a1!), { mailboxId: bravo, id: a2!.id }],
+      seen: true,
+    });
+    expect(result.changed).toBe(0);
+  });
+
+  it("is the owner's alone, like organizing one message", async () => {
+    const [b1] = await rowsOf(bravo);
+    const items = [ref(b1!)];
+    await grantMailboxRegistry(db, owner(), {
+      mailboxId: bravo,
+      userId: "delegate",
+      permission: "draft",
+    });
+    for (const actor of [
+      delegate(),
+      { ...owner(), agentAccess: true },
+      { ...owner(), supportView: true },
+      { teamId: foreignTeamId, userId: "outsider" },
+    ])
+      await expect(setMailboxItemsSeenMany(db, actor, { items, seen: true })).rejects.toMatchObject(
+        { code: "forbidden" },
+      );
+    const [f] = await db
+      .select({ id: schema.mailboxItems.id })
+      .from(schema.mailboxItems)
+      .where(eq(schema.mailboxItems.mailboxId, alpha));
+    await expect(
+      setMailboxItemsSeenMany(db, owner(), {
+        items: [
+          { mailboxId: alpha, id: f!.id },
+          { mailboxId: foreign, id: randomUUID() },
+        ],
+        seen: true,
+      }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+  });
+
+  it("checks its input before touching anything", async () => {
+    const one = { mailboxId: alpha, id: randomUUID() };
+    for (const input of [
+      { items: [], seen: true },
+      {
+        items: Array.from({ length: 201 }, () => ({ mailboxId: alpha, id: randomUUID() })),
+        seen: true,
+      },
+      { items: [{ mailboxId: "x", id: randomUUID() }], seen: true },
+      { items: [one], seen: "yes" as unknown as boolean },
+    ])
+      await expect(setMailboxItemsSeenMany(db, owner(), input)).rejects.toMatchObject({
+        code: "invalid",
+      });
+    // Unknown ids in owned mailboxes are simply not there.
+    expect((await setMailboxItemsSeenMany(db, owner(), { items: [one], seen: true })).changed).toBe(
+      0,
+    );
   });
 });

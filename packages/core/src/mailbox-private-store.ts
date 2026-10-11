@@ -221,18 +221,21 @@ async function scoped<T>(
 const MAX_READ_MAILBOXES = 50;
 
 /**
- * Read access to several mailboxes under one transaction: the checks and lock
- * order of `scoped` for a read (team, membership, the mailboxes by id, their
- * grants), in four queries however many mailboxes there are. All or nothing:
- * one mailbox the actor may not read refuses the whole call.
+ * Access to several mailboxes under one transaction: the checks and lock order
+ * of `scoped` (team, membership, the mailboxes by id, their grants), in four
+ * queries however many mailboxes there are. All or nothing: one mailbox the
+ * actor may not use refuses the whole call. "read" is `scoped`'s read; "organize"
+ * is `withMailboxOrganizationAccess` (a human owner, the mailboxes locked for update).
  */
-async function scopedRead<T>(
+async function scopedMany<T>(
   db: Db,
   actor: MailboxContentActor,
   mailboxIds: readonly string[],
+  mode: "read" | "organize",
   operation: (tx: Db) => Promise<T>,
 ): Promise<T> {
   if (actor.supportView) throw new MailboxContentError("forbidden");
+  if (mode === "organize" && actor.agentAccess) throw new MailboxContentError("forbidden");
   const ids = [...new Set(mailboxIds)].sort();
   if (ids.length > MAX_READ_MAILBOXES) throw new MailboxContentError("invalid");
   if (!ids.length) return operation(db);
@@ -254,8 +257,8 @@ async function scopedRead<T>(
       )
       .for("share");
     if (!member) throw new MailboxContentError("forbidden");
-    // Rows lock in id order, so two multi-mailbox reads never wait on each other in a cycle.
-    const boxes = await tx
+    // Rows lock in id order, so two multi-mailbox calls never wait on each other in a cycle.
+    const query = tx
       .select({
         id: schema.mailboxes.id,
         status: schema.mailboxes.status,
@@ -264,13 +267,15 @@ async function scopedRead<T>(
       })
       .from(schema.mailboxes)
       .where(and(inArray(schema.mailboxes.id, ids), eq(schema.mailboxes.teamId, actor.teamId)))
-      .orderBy(asc(schema.mailboxes.id))
-      .for("share");
+      .orderBy(asc(schema.mailboxes.id));
+    const boxes = await (mode === "organize" ? query.for("update") : query.for("share"));
     if (boxes.length !== ids.length || boxes.some((box) => box.status !== "planned"))
       throw new MailboxContentError("forbidden");
     const shared = boxes
       .filter((box) => !(box.ownerUserId === actor.userId && box.ownerMembershipId === member.id))
       .map((box) => box.id);
+    // Organizing is the owner's alone; a grant never covers it.
+    if (shared.length && mode === "organize") throw new MailboxContentError("forbidden");
     if (shared.length) {
       // Any live grant reads; draft and owner rights are never asked for here.
       const grants = await tx
@@ -293,6 +298,12 @@ async function scopedRead<T>(
     return operation(tx);
   });
 }
+const scopedRead = <T>(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxIds: readonly string[],
+  operation: (tx: Db) => Promise<T>,
+) => scopedMany(db, actor, mailboxIds, "read", operation);
 
 /** Trusted server-side send admission. The session actor must own the box now;
  * readers and draft delegates cannot enqueue a message. Keep locks through capture.
@@ -1049,6 +1060,66 @@ export async function countUnreadMailboxItemsMany(
     for (const row of rows) counts.set(row.mailboxId, row.count);
     return counts;
   });
+}
+
+/** Messages one call may mark read or unread ("Marcar todas como lidas" sends a view's worth). */
+export const MAILBOX_SEEN_BATCH = 200;
+/**
+ * Marks several received messages read (or unread) in one transaction: the
+ * human owner of every mailbox involved (`scopedMany` "organize"), one UPDATE.
+ * Rows read state does not apply to (drafts, sent, quarantined) and rows
+ * already in that state are left as they are; the result lists what changed.
+ */
+export async function setMailboxItemsSeenMany(
+  db: Db,
+  actor: MailboxContentActor,
+  input: { items: { mailboxId: string; id: string }[]; seen: boolean },
+  now = new Date(),
+): Promise<{ changed: number; items: { mailboxId: string; id: string; seenAt: Date | null }[] }> {
+  actor = { ...actor };
+  const seen = input.seen;
+  if (typeof seen !== "boolean" || !Array.isArray(input.items))
+    throw new MailboxContentError("invalid");
+  const pairs = new Map<string, { mailboxId: string; id: string }>();
+  for (const item of input.items) {
+    if (!item || !UUID.test(item.mailboxId) || !UUID.test(item.id))
+      throw new MailboxContentError("invalid");
+    pairs.set(`${item.mailboxId}:${item.id}`.toLowerCase(), {
+      mailboxId: item.mailboxId.toLowerCase(),
+      id: item.id.toLowerCase(),
+    });
+  }
+  if (!pairs.size || pairs.size > MAILBOX_SEEN_BATCH) throw new MailboxContentError("invalid");
+  if (!(now instanceof Date) || Number.isNaN(now.getTime()))
+    throw new MailboxContentError("invalid");
+  const targets = [...pairs.values()];
+  const items = schema.mailboxItems;
+  return scopedMany(
+    db,
+    actor,
+    targets.map((target) => target.mailboxId),
+    "organize",
+    async (tx) => {
+      const updated = await tx
+        .update(items)
+        .set({ seenAt: seen ? now : null })
+        .where(
+          and(
+            eq(items.teamId, actor.teamId),
+            sql`(${items.mailboxId}, ${items.id}) in (${sql.join(
+              targets.map((target) => sql`(${target.mailboxId}::uuid, ${target.id}::uuid)`),
+              sql`, `,
+            )})`,
+            eq(items.kind, "inbox"),
+            ne(items.deliveryFolder, "quarantine"),
+            sql`coalesce(${items.inboundAssessment}->>'decision', '') <> 'quarantine'`,
+            seen ? isNull(items.seenAt) : isNotNull(items.seenAt),
+          ),
+        )
+        .returning({ mailboxId: items.mailboxId, id: items.id, seenAt: items.seenAt });
+      return { changed: updated.length, items: updated };
+    },
+  );
 }
 
 /** Rows the unread counts take, in the mailbox(es) `mailbox` picks. */

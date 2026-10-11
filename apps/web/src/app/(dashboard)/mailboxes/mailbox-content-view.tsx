@@ -42,6 +42,7 @@ import {
 import {
   livePollMs,
   MAILBOX_ARRIVAL_EVENT,
+  MAILBOX_MARKED_UNREAD_EVENT,
   MAILBOX_NEW_MAIL_EVENT,
   useMailboxLiveConnected,
 } from "@/lib/mailbox-live";
@@ -147,6 +148,8 @@ const noHeldSend = () => null;
 
 /** Requests a bulk action keeps in flight at once (one at a time made 20 rows take 20 round trips). */
 const BULK_CONCURRENCY = 6;
+/** Messages one setSeenMany call takes (server: MAILBOX_SEEN_BATCH). */
+const MAILBOX_SEEN_BATCH = 200;
 
 /**
  * Runs `run` over the items with at most `limit` in flight; counts what
@@ -1094,6 +1097,9 @@ export function MailboxContentView({
   );
   const archiveMutation = useMutation(trpc.mailboxes.setArchive.mutationOptions({ retry: false }));
   const seenMutation = useMutation(trpc.mailboxes.setSeen.mutationOptions({ retry: false }));
+  const seenManyMutation = useMutation(
+    trpc.mailboxes.setSeenMany.mutationOptions({ retry: false }),
+  );
   const senderMutation = useMutation(
     trpc.mailboxes.senders.decide.mutationOptions({ retry: false }),
   );
@@ -1378,12 +1384,15 @@ export function MailboxContentView({
   };
   const keepRow = (i: ListedItem) => {
     if (departing.has(`${i.mailboxId}:${i.id}`)) return false;
+    // "Não lidas" follows what this session marked read at once, not the next
+    // listing; the open message stays until another one opens.
     if (
       unreadOnly &&
       !(
         i.kind === "inbox" &&
         !mailboxContentBlocked(i) &&
-        (i.seenAt === null || (selection?.id === i.id && selection.mailboxId === i.mailboxId))
+        (!(seenOverride[`${i.mailboxId}:${i.id}`] ?? i.seenAt !== null) ||
+          (selection?.id === i.id && selection.mailboxId === i.mailboxId))
       )
     )
       return false;
@@ -1932,45 +1941,77 @@ export function MailboxContentView({
       if (mounted.current) void changeSeen([row], true, false);
     }, delay);
   }
+  /**
+   * Marks rows read or unread: the list, its filter and the counts follow at
+   * once (seenOverride); one message goes by setSeen, several by setSeenMany,
+   * MAILBOX_SEEN_BATCH a call instead of one round trip each.
+   */
   async function changeSeen(targets: Row[], seen: boolean, announce = true) {
     const eligible = targets.filter(
-      (row) => row.kind === "inbox" && !mailboxContentBlocked(row) && ownsBox(row.mailboxId),
+      (row) =>
+        row.kind === "inbox" &&
+        !mailboxContentBlocked(row) &&
+        ownsBox(row.mailboxId) &&
+        isUnread(row) === seen,
     );
     if (!eligible.length) return;
-    const flip = (value: boolean) =>
+    const flip = (rows: Row[], value: boolean) =>
       setSeenOverride((current) => {
         const next = { ...current };
-        for (const row of eligible) next[rowKey(row)] = value;
+        for (const row of rows) next[rowKey(row)] = value;
         return next;
       });
-    flip(seen);
-    let done = 0;
-    try {
-      for (const row of eligible) {
-        await seenMutation.mutateAsync({ mailboxId: row.mailboxId, id: row.id, seen });
-        done += 1;
-        if (!mounted.current) return;
+    // Mail turned unread again here must not come back as "new mail" notices.
+    const send = async (rows: Row[], value: boolean) => {
+      if (!value)
+        window.dispatchEvent(
+          new CustomEvent(MAILBOX_MARKED_UNREAD_EVENT, { detail: rows.map(rowKey) }),
+        );
+      if (rows.length === 1) {
+        const [row] = rows as [Row];
+        await seenMutation.mutateAsync({ mailboxId: row.mailboxId, id: row.id, seen: value });
+        return;
       }
+      for (let start = 0; start < rows.length; start += MAILBOX_SEEN_BATCH)
+        await seenManyMutation.mutateAsync({
+          items: rows
+            .slice(start, start + MAILBOX_SEEN_BATCH)
+            .map((row) => ({ mailboxId: row.mailboxId, id: row.id })),
+          seen: value,
+        });
+    };
+    const settle = () => {
+      void queries.invalidateQueries({ queryKey: trpc.mailboxes.unreadCounts.queryKey() });
+      // Named folders show their own unread counts.
+      void queries.invalidateQueries({ queryKey: trpc.mailboxes.folders.queryKey() });
+    };
+    flip(eligible, seen);
+    try {
+      await send(eligible, seen);
+      if (!mounted.current) return;
       if (announce) {
         const message = t(seen ? "organization.bulkMarkedRead" : "organization.bulkMarkedUnread", {
-          count: done,
+          count: eligible.length,
         });
         setNotice(message);
-        offerUndo(
-          message,
-          eligible.slice(0, done).map((row) => async () => {
-            setSeenOverride((current) => ({ ...current, [rowKey(row)]: !seen }));
-            await seenMutation.mutateAsync({ mailboxId: row.mailboxId, id: row.id, seen: !seen });
-          }),
-        );
+        offerUndo(message, [
+          async () => {
+            flip(eligible, !seen);
+            try {
+              await send(eligible, !seen);
+            } finally {
+              settle();
+            }
+          },
+        ]);
       }
     } catch {
       if (!mounted.current) return;
-      flip(!seen);
+      flip(eligible, !seen);
       setNotice(t("organization.error"));
     } finally {
       if (mounted.current) {
-        void queries.invalidateQueries({ queryKey: trpc.mailboxes.unreadCounts.queryKey() });
+        settle();
         if (announce) setCheckedIds(new Set());
       }
     }
@@ -2787,6 +2828,11 @@ export function MailboxContentView({
         !mailboxContentBlocked(i) &&
         !(seenOverride[rowKey(i)] ?? i.seenAt !== null),
     ).length ?? 0;
+  // "Marcar como lidas": the unread messages this view shows (pile, filter and
+  // search applied) that this person may organize.
+  const markable = ["drafts", "sent", "scheduled", "trash"].includes(folder)
+    ? []
+    : rows.filter((row) => isUnread(row) && ownsBox(row.mailboxId));
   const piles = smartOn
     ? pileCounts(
         // Rows on their way out (archived, deleted...) leave the counts at once too.
@@ -3236,6 +3282,19 @@ export function MailboxContentView({
                           {t("organization.unreadFilter", {
                             count: piles && pile !== "all" ? piles[pile].unread : unreadTotal,
                           })}
+                        </button>
+                      ) : null}
+                      {markable.length ? (
+                        <button
+                          type="button"
+                          className={`ms-btn ms-btn-ghost ${styles.unreadFilter}`}
+                          aria-label={t("organization.markAllReadLabel", {
+                            count: markable.length,
+                          })}
+                          title={t("organization.markAllReadLabel", { count: markable.length })}
+                          onClick={() => void changeSeen(markable, true)}
+                        >
+                          {t("organization.markAllRead")}
                         </button>
                       ) : null}
                       <span className={styles.messageCount}>

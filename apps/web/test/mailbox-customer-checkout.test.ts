@@ -45,6 +45,8 @@ vi.mock("@millionsend/core", async () => {
     startTimingLog,
     TimingWindow,
     observeKmsUnwraps: () => undefined,
+    // The router's schemas read this at import time.
+    MAILBOX_SEEN_BATCH: 200,
     ...Object.fromEntries(
       [
         "appendMailboxActivity",

@@ -23,6 +23,7 @@ import {
   listMailboxRegistry,
   listMailboxTeamAgentKeys,
   MAILBOX_FOLDER_COLORS,
+  MAILBOX_SEEN_BATCH,
   MailboxAgentAccessError,
   MailboxContentError,
   MailboxRegistryError,
@@ -40,6 +41,7 @@ import {
   setMailboxItemFolder,
   setMailboxItemSeen,
   setMailboxItemStar,
+  setMailboxItemsSeenMany,
   setMailboxItemTrash,
   updateMailboxFolder,
   updateMailboxRegistry,
@@ -798,6 +800,22 @@ export const mailboxesRouter = router({
   setSeen: enabled
     .input(z.object({ mailboxId: z.uuid(), id: z.uuid(), seen: z.boolean() }).strict())
     .mutation(({ ctx, input }) => call(() => setMailboxItemSeen(ctx.db, actor(ctx), input))),
+  // "Marcar todas como lidas" and bulk read/unread: one authorized update for up to
+  // MAILBOX_SEEN_BATCH messages across the owner's mailboxes; rows it does not apply to
+  // (drafts, sent, quarantine, already in that state) are skipped, not refused.
+  setSeenMany: enabled
+    .input(
+      z
+        .object({
+          items: z
+            .array(z.object({ mailboxId: z.uuid(), id: z.uuid() }).strict())
+            .min(1)
+            .max(MAILBOX_SEEN_BATCH),
+          seen: z.boolean(),
+        })
+        .strict(),
+    )
+    .mutation(({ ctx, input }) => call(() => setMailboxItemsSeenMany(ctx.db, actor(ctx), input))),
   unreadCounts: enabled.query(({ ctx }) => call(() => getMailboxUnreadCounts(ctx.db, actor(ctx)))),
   setItemFolder: enabled
     .input(
