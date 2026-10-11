@@ -1,6 +1,6 @@
-//! The tray icon: open the window, start with Windows, keep in the tray on
-//! close, check for updates (not in the Store build, which the Store
-//! updates), quit. The unread badge updates its tooltip.
+//! The tray icon: open the window, reload it, start with Windows, keep in
+//! the tray on close, check for updates (not in the Store build, which the
+//! Store updates), quit. The unread badge updates its tooltip.
 
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
@@ -12,7 +12,7 @@ use tauri_plugin_autostart::ManagerExt;
 
 #[cfg(not(feature = "store"))]
 use crate::update;
-use crate::{is_portuguese, settings, show_main};
+use crate::{is_portuguese, settings, show_main, MAIN_WINDOW};
 
 pub struct TrayHandle<R: Runtime>(pub TrayIcon<R>);
 
@@ -57,6 +57,7 @@ fn toggle_autostart<R: Runtime>(handle: &AppHandle<R>) -> bool {
 
 struct Strings {
     open: &'static str,
+    reload: &'static str,
     autostart: &'static str,
     keep_in_tray: &'static str,
     quit: &'static str,
@@ -66,6 +67,7 @@ fn strings() -> Strings {
     if is_portuguese() {
         Strings {
             open: "Abrir MepMail",
+            reload: "Recarregar",
             autostart: if cfg!(windows) {
                 "Iniciar com o Windows"
             } else {
@@ -77,6 +79,7 @@ fn strings() -> Strings {
     } else {
         Strings {
             open: "Open MepMail",
+            reload: "Reload",
             autostart: if cfg!(windows) {
                 "Start with Windows"
             } else {
@@ -95,6 +98,7 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     let keep_in_tray = settings::current(handle).keep_in_tray;
 
     let open = MenuItem::with_id(app, "open", strings.open, true, None::<&str>)?;
+    let reload = MenuItem::with_id(app, "reload", strings.reload, true, None::<&str>)?;
     let autostart = CheckMenuItem::with_id(
         app,
         "autostart",
@@ -117,8 +121,9 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     #[cfg(not(feature = "store"))]
     let updates = MenuItem::with_id(app, "updates", update::tray_label(None), true, None::<&str>)?;
     #[cfg(not(feature = "store"))]
-    let items: [&dyn tauri::menu::IsMenuItem<R>; 7] = [
+    let items: [&dyn tauri::menu::IsMenuItem<R>; 8] = [
         &open,
+        &reload,
         &separator_top,
         &autostart,
         &keep,
@@ -127,8 +132,9 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
         &quit,
     ];
     #[cfg(feature = "store")]
-    let items: [&dyn tauri::menu::IsMenuItem<R>; 6] = [
+    let items: [&dyn tauri::menu::IsMenuItem<R>; 7] = [
         &open,
+        &reload,
         &separator_top,
         &autostart,
         &keep,
@@ -145,6 +151,14 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
         .tooltip("MepMail")
         .on_menu_event(move |handle, event| match event.id.as_ref() {
             "open" => show_main(handle),
+            // A page that hangs or went blank after a network drop comes back
+            // without quitting the app.
+            "reload" => {
+                if let Some(window) = handle.get_webview_window(MAIN_WINDOW) {
+                    let _ = window.reload();
+                }
+                show_main(handle);
+            }
             "autostart" => {
                 // Off the menu callback: the StartupTask answers asynchronously.
                 let handle = handle.clone();

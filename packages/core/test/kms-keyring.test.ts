@@ -236,6 +236,21 @@ describe("KmsKeyring", () => {
     expect(calls.decrypt).toBe(2);
   });
 
+  it("unwrap cache TTL is absolute: a hit never extends a cached DEK's lifetime", async () => {
+    vi.useFakeTimers();
+    const { client, calls } = fakeKms();
+    const keyring = new KmsKeyring(client, KEY_ID);
+    const { wrapped } = await keyring.wrapDek(randomBytes(32));
+    await keyring.unwrapDek(wrapped, KMS_KEY_VERSION);
+    vi.advanceTimersByTime(UNWRAP_CACHE_TTL_MS - 1000);
+    await keyring.unwrapDek(wrapped, KMS_KEY_VERSION);
+    expect(calls.decrypt).toBe(1);
+    vi.advanceTimersByTime(2000);
+    await keyring.unwrapDek(wrapped, KMS_KEY_VERSION);
+    expect(calls.decrypt).toBe(2);
+    expect(UNWRAP_CACHE_TTL_MS).toBe(60 * 60 * 1000);
+  });
+
   it("unwrap cache evicts the least recently used entry at capacity", async () => {
     const { client, calls } = fakeKms();
     const keyring = new KmsKeyring(client, KEY_ID);

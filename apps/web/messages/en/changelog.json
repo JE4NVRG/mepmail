@@ -28,6 +28,28 @@
   },
   "releases": [
     {
+      "version": "0.117",
+      "date": "2026-10-11",
+      "title": "Desktop app 1.0.2: MepMail as your email app",
+      "summary": "The desktop app can be your default email app on Windows and Linux, so mailto: links open MepMail's composer, and the tray menu gains Reload. Folders reopened within the hour skip re-fetching their keys.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Desktop 1.0.2 for Windows and Linux: MepMail registers as an email app for mailto: links (choose it in Default apps), opening the composer with the recipients, subject and body filled in.",
+            "Reload in the desktop tray menu.",
+            "Installed apps update themselves to 1.0.2; the Windows installer and the Linux AppImage, .deb and .rpm are on the download page."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Message keys a folder already opened stay in the server's memory for up to an hour instead of ten minutes, so reopening it skips the key service."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.116",
       "date": "2026-10-11",
       "title": "Folders open with one access check",

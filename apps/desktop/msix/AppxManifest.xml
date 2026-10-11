@@ -57,6 +57,13 @@
             <uap:DisplayName>MepMail</uap:DisplayName>
           </uap:Protocol>
         </uap:Extension>
+        <!-- Email links: MepMail is offered in Default apps for MAILTO; the
+             person chooses it there. The link arrives as an argument. -->
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="mailto">
+            <uap:DisplayName>MepMail</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
         <!-- Stable command for agent configs (the MCP bridge), see agents.rs. -->
         <uap3:Extension Category="windows.appExecutionAlias" Executable="mepmail-correio.exe" EntryPoint="Windows.FullTrustApplication">
           <uap3:AppExecutionAlias>

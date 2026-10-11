@@ -112,7 +112,7 @@ fn open_outside<R: Runtime>(handle: &AppHandle<R>, url: Url) {
         return;
     }
     let handle = handle.clone();
-    let _ = tauri::async_runtime::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         if let Err(error) = handle.opener().open_url(url.as_str(), None::<&str>) {
             eprintln!("mepmail-correio: could not open {url} outside: {error}");
         }
@@ -122,7 +122,7 @@ fn open_outside<R: Runtime>(handle: &AppHandle<R>, url: Url) {
 /// Loads `url` in the main window, off the webview callback that asked for it.
 pub(crate) fn navigate_main<R: Runtime>(handle: &AppHandle<R>, url: Url) {
     let handle = handle.clone();
-    let _ = tauri::async_runtime::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         if let Some(window) = handle.get_webview_window(MAIN_WINDOW) {
             if let Err(error) = window.navigate(url) {
                 eprintln!("mepmail-correio: could not navigate the main window: {error}");
@@ -202,6 +202,11 @@ fn build_main_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
             if navigation_allowed(url) {
                 return true;
             }
+            // A mail link inside the app is written here, not in another app.
+            if let Some(target) = deeplink::mailto_route(url.as_str()) {
+                navigate_main(&navigation_handle, target);
+                return false;
+            }
             open_outside(&navigation_handle, url.clone());
             false
         })
@@ -269,8 +274,11 @@ pub fn run() {
         // Registered first, as its documentation asks: a second launch only
         // focuses the running window (and hands its deep link over).
         builder = builder
-            .plugin(tauri_plugin_single_instance::init(|handle, _args, _cwd| {
-                show_main(handle);
+            .plugin(tauri_plugin_single_instance::init(|handle, args, _cwd| {
+                // A mailto: link opened while the app runs reaches it here.
+                if !deeplink::open_mailto_args(handle, args) {
+                    show_main(handle);
+                }
             }))
             .plugin(
                 // Placement only: visibility is the shell's call (see
@@ -324,6 +332,8 @@ pub fn run() {
             {
                 tray::build(app)?;
                 deeplink::install(app)?;
+                // Started by a mailto: link (MepMail as the default mail app).
+                deeplink::open_mailto_args(app.handle(), std::env::args().skip(1));
                 badge::watch(app.handle().clone());
                 #[cfg(not(feature = "store"))]
                 update::start(app.handle().clone());

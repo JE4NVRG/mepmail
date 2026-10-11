@@ -15,6 +15,9 @@ mkdir -p /cache/registry && ln -sfn /cache/registry "$CARGO_HOME/registry"
 
 # Linux has no older install to keep in place, so the menu entry, package and
 # command carry the product's name (Windows keeps "MepMail Correio" inside).
+# linux/mepmail.desktop passes the link to the app (%u) and lists MepMail for
+# mepmail:// and mailto: links, which the desktop offers as a default app; the
+# AppImage registers only mepmail:// itself (see src/deeplink.rs).
 updater=true
 if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
   # Without the key a release build cannot write updater signatures.
@@ -27,7 +30,11 @@ config=$(cat <<JSON
   "bundle": {
     "createUpdaterArtifacts": $updater,
     "shortDescription": "Email for people and their agents",
-    "longDescription": "Correio, the MepMail inbox for people and their agents, as a desktop app."
+    "longDescription": "Correio, the MepMail inbox for people and their agents, as a desktop app.",
+    "linux": {
+      "deb": { "desktopTemplate": "../linux/mepmail.desktop" },
+      "rpm": { "desktopTemplate": "../linux/mepmail.desktop" }
+    }
   }
 }
 JSON

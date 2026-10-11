@@ -179,7 +179,7 @@ fn apply<R: Runtime>(handle: &AppHandle<R>, window: &WebviewWindow<R>, unread: u
 
 /// Polls the window title every few seconds and applies changes only.
 pub fn watch<R: Runtime>(handle: AppHandle<R>) {
-    let _ = tauri::async_runtime::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let mut last: Option<u32> = None;
         loop {
             tokio::time::sleep(Duration::from_secs(3)).await;

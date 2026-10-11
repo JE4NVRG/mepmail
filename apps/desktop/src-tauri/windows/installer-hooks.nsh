@@ -16,8 +16,30 @@
   ${EndIf}
 !macroend
 
+; Email links (mailto:): MepMail is offered in Settings > Default apps for
+; MAILTO. Windows lets the person choose it there; it never takes over email
+; links on its own. The link reaches the app as its first argument.
+!ifndef MEPMAIL_MAILTO_PROGID
+  !define MEPMAIL_MAILTO_PROGID "MepMail.mailto"
+!endif
+!ifndef MEPMAIL_CLIENT_KEY
+  !define MEPMAIL_CLIENT_KEY "Software\Clients\Mail\MepMail"
+!endif
+!macro MEPMAIL_REGISTER_MAILTO
+  WriteRegStr SHCTX "Software\Classes\${MEPMAIL_MAILTO_PROGID}" "" "URL:MailTo Protocol"
+  WriteRegStr SHCTX "Software\Classes\${MEPMAIL_MAILTO_PROGID}" "URL Protocol" ""
+  WriteRegStr SHCTX "Software\Classes\${MEPMAIL_MAILTO_PROGID}\DefaultIcon" "" "$INSTDIR\${MAINBINARYNAME}.exe,0"
+  WriteRegStr SHCTX "Software\Classes\${MEPMAIL_MAILTO_PROGID}\shell\open\command" "" '"$INSTDIR\${MAINBINARYNAME}.exe" "%1"'
+  WriteRegStr SHCTX "${MEPMAIL_CLIENT_KEY}" "" "${MEPMAIL_DISPLAYNAME}"
+  WriteRegStr SHCTX "${MEPMAIL_CLIENT_KEY}\Capabilities" "ApplicationName" "${MEPMAIL_DISPLAYNAME}"
+  WriteRegStr SHCTX "${MEPMAIL_CLIENT_KEY}\Capabilities" "ApplicationDescription" "Correio: email on your own domain, for people and their agents."
+  WriteRegStr SHCTX "${MEPMAIL_CLIENT_KEY}\Capabilities\URLAssociations" "mailto" "${MEPMAIL_MAILTO_PROGID}"
+  WriteRegStr SHCTX "Software\RegisteredApplications" "${MEPMAIL_DISPLAYNAME}" "${MEPMAIL_CLIENT_KEY}\Capabilities"
+!macroend
+
 !macro NSIS_HOOK_POSTINSTALL
   WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${MEPMAIL_DISPLAYNAME}"
+  !insertmacro MEPMAIL_REGISTER_MAILTO
   ; The Start menu shortcut exists by now; so does the desktop one in silent
   ; and passive installs (the updater's). An update without shortcuts leaves
   ; the renamed ones alone.
@@ -31,9 +53,13 @@ Function .onGUIEnd
   !insertmacro MEPMAIL_RENAME_SHORTCUT "$DESKTOP"
 FunctionEnd
 
-; Uninstalling removes the renamed shortcuts too (an update keeps them).
+; Uninstalling removes the renamed shortcuts and the email-link entry too
+; (an update keeps them).
 !macro NSIS_HOOK_POSTUNINSTALL
   ${If} $UpdateMode <> 1
+    DeleteRegKey SHCTX "Software\Classes\${MEPMAIL_MAILTO_PROGID}"
+    DeleteRegKey SHCTX "${MEPMAIL_CLIENT_KEY}"
+    DeleteRegValue SHCTX "Software\RegisteredApplications" "${MEPMAIL_DISPLAYNAME}"
     !insertmacro IsShortcutTarget "$SMPROGRAMS\${MEPMAIL_DISPLAYNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
     Pop $0
     ${If} $0 = 1

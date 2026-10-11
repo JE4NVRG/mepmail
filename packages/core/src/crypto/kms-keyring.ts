@@ -50,10 +50,13 @@ export const WRAP_CACHE_MAX_AGE_MS = 5 * 60 * 1000;
 export const WRAP_CACHE_MAX_USES = 500;
 
 // Unwrap-side LRU: dashboard reads and webhook deliveries re-open the same
-// wrapped DEKs in bursts. 256 × 32-byte keys is negligible memory; the TTL
-// bounds how long decryption keeps working after KMS-side key revocation.
+// wrapped DEKs in bursts. 1024 × 32-byte keys is negligible memory. The TTL is
+// absolute, counted from the KMS call (a hit never extends it), and bounds how
+// long a running process keeps opening DEKs it already saw after a KMS-side key
+// revocation: 60 minutes, so a folder reopened within the hour skips the
+// ~300 ms KMS round trip from the VPS to us-east-1.
 export const UNWRAP_CACHE_MAX_ENTRIES = 1024;
-export const UNWRAP_CACHE_TTL_MS = 10 * 60 * 1000;
+export const UNWRAP_CACHE_TTL_MS = 60 * 60 * 1000;
 
 interface DekPair {
   dek: Buffer;

@@ -17,8 +17,9 @@ WebView2. The same shell is the base for macOS, Linux, iOS and Android.
   myaccount.google.com; never a `.google.com` suffix, so a Docs or Meet link
   in an email opens outside). Everything else opens in the system browser:
   Stripe Checkout, the docs, links inside emails, `target="_blank"`.
-  `mailto:` links go to the system mail client for now; `cursor://` (the
-  dashboard's "Open in Cursor") is the only other scheme handed to the OS.
+  `mailto:` links open the Correio composer since 1.0.2 (see below);
+  `cursor://` (the dashboard's "Open in Cursor") is the only other scheme
+  handed to the OS.
 - The window appears once the splash has painted (a 3 s safety net shows it
   regardless); the window-state plugin restores placement, never visibility.
 - Every page gets `window.__MEPMAIL_DESKTOP__ = { app, version, platform }`
@@ -87,6 +88,28 @@ WebView2. The same shell is the base for macOS, Linux, iOS and Android.
   Windows through a `StartupTask`, native toasts under the package identity,
   and the `mepmail-correio` alias that agent integrations call. See
   "Microsoft Store (MSIX)" below.
+
+## What 1.0.2 adds
+
+- MepMail as the default email app. `mailto:` links open the Correio
+  composer with the link's recipients, subject and body
+  (`/mail?mailto=<link>`; the web app parses it, see
+  `apps/web/src/lib/mailbox-mailto.ts`). A link clicked inside the app, one
+  passed on the command line and one handed to a running instance by a
+  second launch all go the same way (`src/deeplink.rs`, `mailto_route`).
+  Where the app is offered:
+  - Windows installer: `windows/installer-hooks.nsh` registers the
+    `MepMail.mailto` ProgID and the `Software\Clients\Mail\MepMail`
+    capabilities in `RegisteredApplications`, so MepMail appears under
+    Settings > Apps > Default apps > Email. Windows lets only the user pick
+    the default; the uninstaller removes the three entries (an update keeps
+    them).
+  - Microsoft Store: a `windows.protocol` extension for `mailto` in
+    `msix/AppxManifest.xml`.
+  - Linux .deb and .rpm: the menu entry (`linux/mepmail.desktop`) lists
+    `x-scheme-handler/mailto`; the AppImage does not claim it.
+- Tray item "Recarregar" / "Reload": reloads the page and shows the window,
+  for a page stuck after the network came back.
 
 ## Layout
 
@@ -226,7 +249,8 @@ entry, package `mep-mail`, command `mepmail`); Windows keeps
 
 What differs on Linux: the tray is an AppIndicator; agent keys go to the
 Secret Service keyring (GNOME Keyring, KWallet); the AppImage registers
-`mepmail://` itself on start, the packages declare it in their menu entry;
+`mepmail://` itself on start, the packages declare it and `mailto:` in their
+menu entry (`linux/mepmail.desktop`);
 agent configs point at the AppImage path (`APPIMAGE`) or `/usr/bin/mepmail`.
 Updates: the AppImage replaces itself like the Windows installer (idle in the
 tray, on quit, or from the tray); a .deb or .rpm installs through dpkg/rpm

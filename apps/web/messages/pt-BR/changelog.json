@@ -28,6 +28,28 @@
   },
   "releases": [
     {
+      "version": "0.117",
+      "date": "2026-10-11",
+      "title": "App desktop 1.0.2: MepMail como seu app de e-mail",
+      "summary": "O app desktop pode ser o seu app de e-mail padrão no Windows e no Linux, então links mailto: abrem o compositor do MepMail, e o menu da bandeja ganha Recarregar. Pastas reabertas dentro de uma hora não buscam as chaves de novo.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Desktop 1.0.2 para Windows e Linux: o MepMail se registra como app de e-mail para links mailto: (escolha em Apps padrão) e abre o compositor com destinatários, assunto e corpo preenchidos.",
+            "Recarregar no menu da bandeja do app desktop.",
+            "Os apps instalados se atualizam sozinhos para a 1.0.2; o instalador do Windows e o AppImage, .deb e .rpm do Linux estão na página de download."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "As chaves de mensagens de uma pasta já aberta ficam na memória do servidor por até uma hora, em vez de dez minutos, então reabrir a pasta dispensa o serviço de chaves."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.116",
       "date": "2026-10-11",
       "title": "Pastas abrem com uma única checagem de acesso",

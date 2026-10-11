@@ -226,7 +226,8 @@ fn ready_notice(version: &str) -> (String, String) {
         } else {
             (
                 format!("MepMail {version} is ready"),
-                "To install: tray icon, Restart to update. The system asks for your password.".to_string(),
+                "To install: tray icon, Restart to update. The system asks for your password."
+                    .to_string(),
             )
         };
     }
