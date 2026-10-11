@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.125",
+      "date": "2026-10-11",
+      "title": "MepMail Mail opens with your inbox already there",
+      "summary": "The mail page now arrives with your mailboxes, preferences, unread counts and the first page of the Inbox, so the inbox shows up without waiting for another round trip.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "The server reads what MepMail Mail shows first while it renders the page. If any of it takes longer than a moment, the page goes out without it and your browser asks for it as before.",
+            "The import status is checked every 5 minutes while no import is running, and every 30 seconds during one. Starting or resuming an import refreshes it at once."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.124",
       "date": "2026-10-11",
       "title": "Download the desktop app from anywhere on the site",

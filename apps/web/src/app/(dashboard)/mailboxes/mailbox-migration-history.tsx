@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
 import { useId, useMemo, useState } from "react";
 import {
@@ -14,7 +14,7 @@ import {
 import type { MigrationSource, TeamMailbox } from "@/lib/mailbox-migration";
 import type { MigrationApi } from "@/lib/mailbox-migration-api";
 import { MAILBOX_FOLDERS_MAX } from "@/lib/mailbox-move";
-import { useTRPCClient } from "@/lib/trpc";
+import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import styles from "./mailbox-migration.module.css";
 
 const TARGETS: ImportTarget[] = ["inbox", "sent", "archive", "folder"];
@@ -62,6 +62,12 @@ export function MailboxMigrationHistory({
   const t = useTranslations("mailboxes.migration.history");
   const format = useFormatter();
   const client = useTRPCClient();
+  const trpc = useTRPC();
+  const queries = useQueryClient();
+  // The inbox holds new-mail notices while an import runs (old mail raises the
+  // unread count): it learns of this import now, not at its next slow poll.
+  const announceImport = () =>
+    void queries.invalidateQueries({ queryKey: trpc.mailboxes.migration.importJobs.pathKey() });
   const id = useId();
   const owned = useMemo(
     () => mailboxes.filter((box) => box.ownerUserId === currentUserId),
@@ -176,6 +182,7 @@ export function MailboxMigrationHistory({
       });
       setPassword("");
       setJobId(started.jobId);
+      announceImport();
     } catch (cause) {
       setStartError(
         cause instanceof Error && cause.message === "folders" ? "folders" : startFailure(cause),
@@ -194,6 +201,7 @@ export function MailboxMigrationHistory({
       const resumed = await api.importResume(current.jobId, password);
       setPassword("");
       setJobId(resumed.jobId);
+      announceImport();
       await job.refetch();
     } catch (cause) {
       setStartError(startFailure(cause));

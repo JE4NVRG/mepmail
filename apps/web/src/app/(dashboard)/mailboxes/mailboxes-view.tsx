@@ -624,7 +624,13 @@ export function MailboxesView({
   const imports = useQuery(
     trpc.mailboxes.migration.importJobs.queryOptions(
       { mailboxId: null },
-      { enabled: mayUseMail, retry: false, refetchInterval: 30_000 },
+      {
+        enabled: mayUseMail,
+        retry: false,
+        // Every 30 s while an import runs; otherwise only now and then (starting
+        // or resuming one in Preferências refreshes this at once).
+        refetchInterval: (query) => (importRunning(query.state.data) ? 30_000 : 300_000),
+      },
     ),
   );
   const importing = useRef(false);

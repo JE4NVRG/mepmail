@@ -28,6 +28,21 @@
   },
   "releases": [
     {
+      "version": "0.125",
+      "date": "2026-10-11",
+      "title": "O Correio abre com a caixa de entrada já na tela",
+      "summary": "A página de e-mail agora chega com as suas caixas, preferências, contadores de não lidas e a primeira página da Entrada, então a caixa aparece sem esperar mais uma ida e volta.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "O servidor lê o que o Correio mostra primeiro enquanto monta a página. Se algo demorar mais que um instante, a página sai sem isso e o navegador pede como antes.",
+            "O estado das importações é consultado a cada 5 minutos quando nenhuma está rodando, e a cada 30 segundos durante uma. Começar ou retomar uma importação atualiza na hora."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.124",
       "date": "2026-10-11",
       "title": "Baixe o app de qualquer lugar do site",
