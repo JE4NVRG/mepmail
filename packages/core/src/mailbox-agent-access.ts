@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
 import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { hashApiKey, verifyApiKey } from "./api-keys.js";
@@ -25,7 +25,13 @@ export interface MailboxAgentAccessContext {
 }
 export class MailboxAgentAccessError extends Error {
   constructor(
-    public readonly code: "forbidden" | "not_found" | "invalid" | "quota" | "mailbox_required",
+    public readonly code:
+      | "forbidden"
+      | "not_found"
+      | "invalid"
+      | "quota"
+      | "mailbox_required"
+      | "conflict",
   ) {
     super(code);
   }
@@ -647,9 +653,12 @@ export async function listMailboxTeamAgentKeys(db: Db, actor: MailboxAgentOwnerA
         lastSentAt: Date | null;
         /** Minted by an OAuth consent for this MCP client (no secret was ever shown). */
         oauthClientId: string | null;
+        /** Edits name it (expectedVersion), so two editors never overwrite each other. */
+        version: string;
         mailboxes: { mailboxId: string; address: string; isDefault: boolean; revoked: boolean }[];
       }
     >();
+    const live = new Map<string, TeamKeyVersionRow[]>();
     for (const row of rows) {
       const id = row.groupId as string;
       const group = groups.get(id) ?? {
@@ -662,8 +671,19 @@ export async function listMailboxTeamAgentKeys(db: Db, actor: MailboxAgentOwnerA
         lastUsedAt: null,
         lastSentAt: null,
         oauthClientId: row.oauthClientId,
+        version: "",
         mailboxes: [],
       };
+      if (!row.revokedAt) {
+        // Name, scopes and expiry come from a live row: an edit leaves removed
+        // mailboxes' rows with the values they had.
+        if (!live.has(id)) {
+          group.label = row.label;
+          group.scopes = [...row.scopes];
+          group.expiresAt = row.expiresAt;
+        }
+        live.set(id, [...(live.get(id) ?? []), row]);
+      }
       // The credential is revoked only when every one of its mailboxes is.
       if (!row.revokedAt) group.revokedAt = null;
       group.lastUsedAt = latest(group.lastUsedAt, row.lastUsedAt);
@@ -676,7 +696,228 @@ export async function listMailboxTeamAgentKeys(db: Db, actor: MailboxAgentOwnerA
       });
       groups.set(id, group);
     }
+    for (const group of groups.values()) group.version = teamKeyVersion(live.get(group.id) ?? []);
     return [...groups.values()];
+  });
+}
+
+interface TeamKeyVersionRow {
+  mailboxId: string;
+  label: string;
+  scopes: readonly string[];
+  isDefault: boolean;
+  expiresAt: Date | null;
+}
+
+/** The live state of a team credential, as a short digest: mailboxes, scopes, name, default, expiry. */
+function teamKeyVersion(rows: readonly TeamKeyVersionRow[]): string {
+  const state = [...rows]
+    .sort((a, b) => (a.mailboxId < b.mailboxId ? -1 : a.mailboxId > b.mailboxId ? 1 : 0))
+    .map(
+      (row) =>
+        `${row.mailboxId}|${[...row.scopes].sort().join(",")}|${row.label}|${row.isDefault}|${row.expiresAt?.toISOString() ?? ""}`,
+    )
+    .join(";");
+  return createHash("sha256").update(state).digest("hex").slice(0, 16);
+}
+
+/** What one edit of a team credential changed, for the audit trail (no secret, no content). */
+export interface MailboxTeamAgentKeyChange {
+  added: string[];
+  removed: string[];
+  scopes: { before: MailboxAgentScope[]; after: MailboxAgentScope[] } | null;
+  label: boolean;
+  defaultMailboxId: { before: string | null; after: string | null } | null;
+  expiresAt: { before: string | null; after: string | null } | null;
+}
+
+/**
+ * Edits a team credential in place: its name, mailboxes, default, scopes and expiry,
+ * keeping the same secret (or OAuth grant), so the agent's client needs no change.
+ * Only the person who minted it, under their current membership: an added mailbox
+ * must be theirs and active, and gets a row with the same secret; a removed one is
+ * revoked at once (a send it queued then fails authorization before the provider is
+ * called, as for any revocation). Scopes and expiry apply to every live row alike,
+ * and queued agent sends are re-checked against them at send time. The default is
+ * cleared when its mailbox is removed. `expectedVersion` (from the list) must match
+ * the live state, so concurrent edits never overwrite each other.
+ */
+export async function updateMailboxTeamAgentKey(
+  db: Db,
+  actor: MailboxAgentOwnerActor,
+  input: {
+    id: string;
+    expectedVersion: string;
+    label?: string | undefined;
+    mailboxIds?: string[] | undefined;
+    scopes?: MailboxAgentScope[] | undefined;
+    defaultMailboxId?: string | null | undefined;
+    expiresAt?: Date | null | undefined;
+  },
+  now = new Date(),
+) {
+  actor = { ...actor };
+  input = { ...input, ...(input.mailboxIds ? { mailboxIds: [...input.mailboxIds] } : {}) };
+  if (
+    typeof input.id !== "string" ||
+    !UUID.test(input.id) ||
+    typeof input.expectedVersion !== "string" ||
+    !/^[a-f0-9]{16}$/.test(input.expectedVersion)
+  )
+    throw new MailboxAgentAccessError("invalid");
+  if (
+    input.mailboxIds !== undefined &&
+    (!Array.isArray(input.mailboxIds) ||
+      !input.mailboxIds.length ||
+      input.mailboxIds.length > MAX_TEAM_MAILBOXES ||
+      input.mailboxIds.some((id) => typeof id !== "string" || !UUID.test(id)) ||
+      new Set(input.mailboxIds).size !== input.mailboxIds.length)
+  )
+    throw new MailboxAgentAccessError("invalid");
+  if (
+    input.defaultMailboxId !== undefined &&
+    input.defaultMailboxId !== null &&
+    (typeof input.defaultMailboxId !== "string" || !UUID.test(input.defaultMailboxId))
+  )
+    throw new MailboxAgentAccessError("invalid");
+  return db.transaction(async (transaction) => {
+    const tx = transaction as unknown as Db;
+    const memberId = await ownerMember(tx, actor, true);
+    const k = schema.mailboxAgentKeys;
+    const mine = and(
+      eq(k.groupId, input.id),
+      eq(k.teamId, actor.teamId),
+      eq(k.ownerUserId, actor.userId),
+    );
+    // Discover the mailboxes involved, then lock every namespace in one order (the same as
+    // minting) before re-reading the credential's rows for update.
+    const discovered = await tx.select({ mailboxId: k.mailboxId }).from(k).where(mine);
+    if (!discovered.length) throw new MailboxAgentAccessError("not_found");
+    const touched = [
+      ...new Set([...discovered.map((row) => row.mailboxId), ...(input.mailboxIds ?? [])]),
+    ].sort();
+    for (const id of touched) await credentialNamespace(tx, id);
+    const rows = await tx.select().from(k).where(mine).orderBy(asc(k.mailboxId)).for("update");
+    const live = rows.filter((row) => !row.revokedAt && (!row.expiresAt || row.expiresAt > now));
+    const first = live[0];
+    // A revoked or expired credential is not edited back to life.
+    if (!first) throw new MailboxAgentAccessError("not_found");
+    // Rows minted under an earlier membership stay unusable; an edit never revives them.
+    if (live.some((row) => row.ownerMembershipId !== memberId))
+      throw new MailboxAgentAccessError("forbidden");
+    if (teamKeyVersion(live) !== input.expectedVersion)
+      throw new MailboxAgentAccessError("conflict");
+    const before = {
+      label: first.label,
+      scopes: [...first.scopes] as MailboxAgentScope[],
+      expiresAt: first.expiresAt,
+      defaultMailboxId: live.find((row) => row.isDefault)?.mailboxId ?? null,
+    };
+    const fields = credentialFields({
+      label: input.label ?? before.label,
+      scopes: input.scopes ? [...input.scopes] : before.scopes,
+      expiresAt: input.expiresAt === undefined ? before.expiresAt : input.expiresAt,
+    });
+    const wanted = input.mailboxIds ?? live.map((row) => row.mailboxId);
+    const liveIds = new Set(live.map((row) => row.mailboxId));
+    const added = wanted.filter((id) => !liveIds.has(id)).sort();
+    const removed = [...liveIds].filter((id) => !wanted.includes(id)).sort();
+    let defaultMailboxId =
+      input.defaultMailboxId === undefined ? before.defaultMailboxId : input.defaultMailboxId;
+    if (defaultMailboxId !== null && !wanted.includes(defaultMailboxId)) {
+      // Naming a default outside the set is an error; losing it to a removal clears it.
+      if (input.defaultMailboxId !== undefined) throw new MailboxAgentAccessError("invalid");
+      defaultMailboxId = null;
+    }
+    for (const id of added) {
+      const box = await ownedBox(tx, actor, id, memberId, true);
+      if (box.status !== "planned") throw new MailboxAgentAccessError("forbidden");
+      if ((await activeKeysOn(tx, actor.teamId, box.id)) >= MAX_ACTIVE_KEYS_PER_MAILBOX)
+        throw new MailboxAgentAccessError("quota");
+    }
+    if (removed.length)
+      await tx
+        .update(k)
+        .set({ revokedAt: now, isDefault: false })
+        .where(and(mine, inArray(k.mailboxId, removed), isNull(k.revokedAt)));
+    const shared = { label: fields.label, scopes: [...fields.scopes], expiresAt: fields.expiresAt };
+    for (const id of added) {
+      const old = rows.find((row) => row.mailboxId === id);
+      // One row per mailbox and credential: a mailbox it held before comes back on that row.
+      if (old)
+        await tx
+          .update(k)
+          .set({
+            ...shared,
+            revokedAt: null,
+            ownerMembershipId: memberId,
+            isDefault: id === defaultMailboxId,
+          })
+          .where(eq(k.id, old.id));
+      else
+        await tx.insert(k).values({
+          id: randomUUID(),
+          teamId: actor.teamId,
+          mailboxId: id,
+          ownerUserId: actor.userId,
+          ownerMembershipId: memberId,
+          keyHash: first.keyHash,
+          groupId: input.id,
+          oauthClientId: first.oauthClientId,
+          ...shared,
+          isDefault: id === defaultMailboxId,
+        });
+    }
+    const kept = wanted.filter((id) => liveIds.has(id));
+    if (kept.length)
+      await tx
+        .update(k)
+        .set(shared)
+        .where(and(mine, inArray(k.mailboxId, kept), isNull(k.revokedAt)));
+    // The default flag moves last, so the set never holds two defaults on the way.
+    await tx
+      .update(k)
+      .set({ isDefault: false })
+      .where(and(mine, isNull(k.revokedAt), eq(k.isDefault, true)));
+    if (defaultMailboxId)
+      await tx
+        .update(k)
+        .set({ isDefault: true })
+        .where(and(mine, eq(k.mailboxId, defaultMailboxId), isNull(k.revokedAt)));
+    const after = await tx
+      .select()
+      .from(k)
+      .where(and(mine, isNull(k.revokedAt)))
+      .orderBy(asc(k.mailboxId));
+    const same = (a: readonly string[], b: readonly string[]) =>
+      [...a].sort().join(",") === [...b].sort().join(",");
+    const iso = (date: Date | null) => date?.toISOString() ?? null;
+    const change: MailboxTeamAgentKeyChange = {
+      added,
+      removed,
+      scopes: same(before.scopes, fields.scopes)
+        ? null
+        : { before: before.scopes, after: [...fields.scopes] },
+      label: before.label !== fields.label,
+      defaultMailboxId:
+        before.defaultMailboxId === defaultMailboxId
+          ? null
+          : { before: before.defaultMailboxId, after: defaultMailboxId },
+      expiresAt:
+        iso(before.expiresAt) === iso(fields.expiresAt)
+          ? null
+          : { before: iso(before.expiresAt), after: iso(fields.expiresAt) },
+    };
+    return {
+      id: input.id,
+      label: fields.label,
+      scopes: [...fields.scopes],
+      expiresAt: fields.expiresAt,
+      defaultMailboxId,
+      mailboxIds: after.map((row) => row.mailboxId),
+      version: teamKeyVersion(after),
+      change,
+    };
   });
 }
 

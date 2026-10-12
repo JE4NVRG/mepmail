@@ -615,6 +615,11 @@ export async function getMailboxContentList(
     cursor?: string | undefined;
     limit?: number | undefined;
     groupByThread?: boolean | undefined;
+    /** Received and not opened by the owner (agent listings). */
+    unread?: boolean | undefined;
+    /** Order-time window (arrival; a draft's last edit), applied before the page. */
+    after?: Date | undefined;
+    before?: Date | undefined;
   },
 ) {
   actor = { ...actor };
@@ -695,6 +700,9 @@ export async function getMailboxContentList(
         ...(input.folder === "pinned" ? { pinned: true } : {}),
         ...(input.folder === "scheduled" ? { scheduled: true } : {}),
         ...(input.folder === "followups" ? { followUp: true } : {}),
+        ...(input.unread ? { unread: true } : {}),
+        ...(input.after ? { after: input.after } : {}),
+        ...(input.before ? { before: input.before } : {}),
       },
       {
         ...(before ? { before } : {}),

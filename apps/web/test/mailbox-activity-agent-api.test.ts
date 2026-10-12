@@ -126,6 +126,10 @@ describe("transaction-bound agent activity at REST boundaries", () => {
       expect(await response.json()).toEqual({
         items: [privateItem, { ...privateItem, id: keyId }],
         limited: true,
+        // Additive since 0.137: the page contract (no more pages here).
+        nextCursor: null,
+        hasMore: false,
+        mode: "list",
       });
       // No MepMail-Mailbox header: no mailbox is named.
       expect(h.access).toHaveBeenCalledExactlyOnceWith(

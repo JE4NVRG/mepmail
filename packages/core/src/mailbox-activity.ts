@@ -24,7 +24,8 @@ const eventSchema = z.discriminatedUnion("action", [
     .object({
       action: z.literal("mailbox.items_listed"),
       folder: z.enum(["inbox", "drafts", "sent"]),
-      count: z.number().int().min(0).max(50),
+      // A listing page holds up to 100 rows (the agent API's limit).
+      count: z.number().int().min(0).max(100),
     })
     .strict(),
   z.object({ action: z.literal("mailbox.item_read"), itemId: z.uuid(), revision }).strict(),

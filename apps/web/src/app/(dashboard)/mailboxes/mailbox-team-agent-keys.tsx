@@ -1,9 +1,13 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { TRPCClientError } from "@trpc/client";
+import type { inferRouterOutputs } from "@trpc/server";
 import { useFormatter, useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { localMinute, teamAgentKeyChanges } from "@/lib/mailbox-team-agent-edit";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
+import type { AppRouter } from "@/server/routers";
 import { AgentKeyHealth, CorreioClientSetup, ExpiryPresets } from "./correio-client-setup";
 import styles from "./mailbox-agent-keys.module.css";
 import registryStyles from "./mailboxes.module.css";
@@ -17,9 +21,14 @@ type Props = {
 };
 type Scope = "read" | "draft" | "send";
 type Secret = { id: string; token: string };
+type TeamKey = inferRouterOutputs<AppRouter>["mailboxes"]["teamAgentKeys"][number];
+type UpdateInput = Parameters<
+  ReturnType<typeof useTRPCClient>["mailboxes"]["updateTeamAgentKey"]["mutate"]
+>[0];
 
-function localMinute(date: Date): string {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+/** The mailboxes a credential reaches now (its revoked rows left out). */
+function liveMailboxes(key: TeamKey) {
+  return key.mailboxes.filter((box) => !box.revoked);
 }
 
 /**
@@ -54,12 +63,15 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Editing one listed credential: the same form, saved in place (same token or grant).
+  const [editing, setEditing] = useState<TeamKey | null>(null);
   const listing = useQuery(
     trpc.mailboxes.teamAgentKeys.queryOptions(undefined, { staleTime: 0, gcTime: 0 }),
   );
   const revoke = useMutation(trpc.mailboxes.revokeTeamAgentKey.mutationOptions({ gcTime: 0 }));
+  const update = useMutation(trpc.mailboxes.updateTeamAgentKey.mutationOptions({ gcTime: 0 }));
   const resetRevoke = revoke.reset;
-  const busy = working || revoke.isPending;
+  const busy = working || revoke.isPending || update.isPending;
 
   useEffect(() => {
     active.current = true;
@@ -94,7 +106,110 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
       exact: true,
       refetchType: "none",
     });
+    // The Agentes panel behind this dialog lists the same credentials.
+    void queries.invalidateQueries({ queryKey: trpc.mailboxAgents.overview.queryKey() });
     return listing.refetch({ throwOnError: true });
+  }
+
+  /** The form as a new credential starts: every mailbox, read + drafts, no expiry. */
+  function resetForm() {
+    setLabel("");
+    setSelected(mailboxes.map((box) => box.id));
+    setDefaultId("");
+    setDraft(true);
+    setSend(false);
+    setExpiry("");
+    setMinimumExpiry(localMinute(new Date(Date.now() + 60_000)));
+  }
+
+  /** The form filled with a credential as it is now on the server. */
+  function startEdit(key: TeamKey) {
+    const live = liveMailboxes(key);
+    setEditing(key);
+    setSecret(null);
+    setConfirmingRevoke(null);
+    setError("");
+    setNotice("");
+    setLabel(key.label);
+    setSelected(live.map((box) => box.mailboxId));
+    setDefaultId(live.find((box) => box.isDefault)?.mailboxId ?? "");
+    setDraft(key.scopes.includes("draft"));
+    setSend(key.scopes.includes("send"));
+    setExpiry(key.expiresAt ? localMinute(key.expiresAt) : "");
+    setMinimumExpiry(localMinute(new Date(Date.now() + 60_000)));
+    dialog.current?.scrollTo({ top: 0 });
+    labelInput.current?.focus();
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+    setError("");
+    resetForm();
+  }
+
+  async function saveEdit(key: TeamKey, scopes: Scope[]) {
+    const changes = teamAgentKeyChanges(key, {
+      label,
+      mailboxIds: selected,
+      scopes,
+      defaultMailboxId: defaultId,
+      expiry,
+    });
+    if (!Object.keys(changes).length) {
+      setEditing(null);
+      resetForm();
+      setNotice(t("team.edit.unchanged"));
+      return;
+    }
+    const input: UpdateInput = { id: key.id, expectedVersion: key.version, ...changes };
+    setWorking(true);
+    try {
+      await update.mutateAsync(input);
+    } catch (cause) {
+      if (!active.current) return;
+      const code = cause instanceof TRPCClientError ? cause.data?.code : null;
+      if (code === "CONFLICT") {
+        // Someone else saved first: show what is there now and let the person redo it.
+        try {
+          const refreshed = await refreshKeys();
+          const fresh = refreshed.data?.find((row) => row.id === key.id && row.revokedAt === null);
+          if (fresh && active.current) startEdit(fresh);
+          else if (active.current) cancelEdit();
+        } catch {
+          // The message below still applies; the list shows its own error.
+        }
+        if (active.current) setError(t("team.edit.conflict"));
+      } else if (code === "NOT_FOUND") {
+        if (active.current) cancelEdit();
+        void refreshKeys().catch(() => undefined);
+        if (active.current) setError(t("team.edit.gone"));
+      } else if (code === "FORBIDDEN") {
+        setError(t("team.edit.forbidden"));
+      } else if (
+        code === "PRECONDITION_FAILED" &&
+        cause instanceof Error &&
+        /quota/.test(cause.message)
+      ) {
+        setError(t("team.edit.quota"));
+      } else if (code === "BAD_REQUEST") {
+        setError(t("team.edit.invalid"));
+      } else {
+        setError(t("error"));
+      }
+      return;
+    } finally {
+      update.reset();
+      if (active.current) setWorking(false);
+    }
+    if (!active.current) return;
+    setEditing(null);
+    resetForm();
+    try {
+      await refreshKeys();
+      if (active.current) setNotice(t("team.edit.saved"));
+    } catch {
+      if (active.current) setError(t("team.edit.savedRefreshError"));
+    }
   }
 
   function toggle(mailboxId: string, on: boolean) {
@@ -123,6 +238,10 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
     }
     if (!label.trim()) {
       labelInput.current?.focus();
+      return;
+    }
+    if (editing) {
+      await saveEdit(editing, scopes);
       return;
     }
     setWorking(true);
@@ -169,6 +288,7 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
         throw new Error("Revocation not confirmed");
       if (!active.current) return;
       setSecret((value) => (value?.id === keyId ? null : value));
+      if (editing?.id === keyId) cancelEdit();
       setNotice(t("revokeSuccess"));
     } catch {
       if (active.current) setError(t("error"));
@@ -301,7 +421,12 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
         </section>
       ) : (
         <form className={styles.form} onSubmit={(event) => void createKey(event)}>
-          <h3>{t("createTitle")}</h3>
+          <h3>{editing ? t("team.edit.title", { label: editing.label }) : t("createTitle")}</h3>
+          {editing ? (
+            <p className={styles.description}>
+              {t(editing.oauthClientId ? "team.edit.hintOauth" : "team.edit.hint")}
+            </p>
+          ) : null}
           <fieldset
             className={styles.fields}
             disabled={busy || listing.isPending || listing.isError}
@@ -336,6 +461,25 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
                   </span>
                 </label>
               ))}
+              {/* Reached now but no longer offered (suspended, being deleted): only removable. */}
+              {editing
+                ? liveMailboxes(editing)
+                    .filter((box) => !mailboxes.some((own) => own.id === box.mailboxId))
+                    .map((box) => (
+                      <label key={box.mailboxId} className={styles.scope}>
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(box.mailboxId)}
+                          disabled={!selected.includes(box.mailboxId)}
+                          onChange={(event) => toggle(box.mailboxId, event.target.checked)}
+                        />
+                        <span>
+                          <strong>{box.address}</strong>
+                          <small>{t("team.edit.unavailableBox")}</small>
+                        </span>
+                      </label>
+                    ))
+                : null}
             </fieldset>
             <label className={styles.field} htmlFor={`${id}-default`}>
               <span>{t("team.default")}</span>
@@ -402,12 +546,23 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
             </label>
             <ExpiryPresets onPick={(date) => setExpiry(date ? localMinute(date) : "")} />
             <div className={styles.actions}>
+              {editing ? (
+                <button type="button" className="ms-btn" onClick={cancelEdit}>
+                  {t("team.edit.cancel")}
+                </button>
+              ) : null}
               <button
                 type="submit"
                 className="ms-btn ms-btn-primary"
                 disabled={!label.trim() || !selected.length}
               >
-                {working && revokingId === null ? t("creating") : t("create")}
+                {editing
+                  ? working && revokingId === null
+                    ? t("team.edit.saving")
+                    : t("team.edit.save")
+                  : working && revokingId === null
+                    ? t("creating")
+                    : t("create")}
               </button>
             </div>
           </fieldset>
@@ -511,15 +666,28 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
                       </button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      className="ms-btn ms-btn-ghost"
-                      disabled={busy || key.revokedAt !== null}
-                      aria-label={t("revokeLabel", { label: key.label })}
-                      onClick={() => setConfirmingRevoke(key.id)}
-                    >
-                      {revokingId === key.id ? t("revoking") : t("revoke")}
-                    </button>
+                    <div className={styles.keyActions}>
+                      {status === "active" && key.version ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-ghost"
+                          disabled={busy || editing?.id === key.id}
+                          aria-label={t("team.edit.label", { label: key.label })}
+                          onClick={() => startEdit(key)}
+                        >
+                          {t("team.edit.action")}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="ms-btn ms-btn-ghost"
+                        disabled={busy || key.revokedAt !== null}
+                        aria-label={t("revokeLabel", { label: key.label })}
+                        onClick={() => setConfirmingRevoke(key.id)}
+                      >
+                        {revokingId === key.id ? t("revoking") : t("revoke")}
+                      </button>
+                    </div>
                   )}
                 </li>
               );

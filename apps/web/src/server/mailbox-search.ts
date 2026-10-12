@@ -25,6 +25,8 @@ import { mailboxSearchKey } from "./mailbox-search-key";
 
 const SEARCH_DEFAULT = 25;
 const SEARCH_MAX = 50;
+/** The folders an agent may search: the same ones it may list. */
+const AGENT_FOLDERS: readonly MailboxSearchFolder[] = ["inbox", "drafts", "sent"];
 /** Candidates read per round when a phrase must be checked, and rounds per page. */
 const PHRASE_BATCH = 100;
 const PHRASE_ROUNDS = 4;
@@ -82,7 +84,10 @@ async function withPhrases<T extends { id: string; mailboxId: string }>(
  * folder, newest first, a page at a time. Words match in any field (header words also
  * by their start), operators narrow the field, and quoted phrases are checked on the
  * decrypted candidates. Only mailboxes the caller can read are searched, and every row
- * is read with live access, as in a listing.
+ * is read with live access, as in a listing. An agent (actor.agentAccess, from the bearer
+ * adapter) searches the one mailbox its credential reached, in inbox, drafts or sent;
+ * its received inbox includes filed and archived mail, as its listing does, and phrases
+ * are checked with the same agent actor.
  */
 export async function searchMailboxContent(
   db: Db,
@@ -94,11 +99,23 @@ export async function searchMailboxContent(
     customFolderId?: string | undefined;
     cursor?: string | undefined;
     limit?: number | undefined;
+    /** Received and not opened by the owner. */
+    unread?: boolean | undefined;
+    /** Arrival window, combined with depois:/antes: in the query (the narrower wins). */
+    after?: Date | undefined;
+    before?: Date | undefined;
   },
 ) {
   actor = { ...actor };
   input = { ...input };
-  if (actor.agentAccess) throw new MailboxContentError("forbidden");
+  if (
+    actor.agentAccess &&
+    (!input.mailboxId || !AGENT_FOLDERS.includes(input.folder ?? ("all" as MailboxSearchFolder)))
+  )
+    throw new MailboxContentError("forbidden");
+  for (const date of [input.after, input.before])
+    if (date !== undefined && !(date instanceof Date && Number.isFinite(date.getTime())))
+      throw new MailboxContentError("invalid");
   const key = mailboxSearchKey();
   if (!key) throw new MailboxContentError("forbidden");
   const pageSize = input.limit ?? SEARCH_DEFAULT;
@@ -127,6 +144,14 @@ export async function searchMailboxContent(
   if (input.mailboxId && !readable.length) throw new MailboxContentError("forbidden");
   const boxes = new Map(readable.map((box) => [box.id, box]));
   const groups = mailboxSearchQueryTokens(key, actor.teamId, query);
+  const after = [query.after, input.after ?? null]
+    .filter((d): d is Date => d !== null)
+    .reduce<Date | null>((a, d) => (!a || d > a ? d : a), null);
+  const before = [query.before, input.before ?? null]
+    .filter((d): d is Date => d !== null)
+    .reduce<Date | null>((a, d) => (!a || d < a ? d : a), null);
+  // An agent's inbox is every safe received message (its listing shows filed and archived ones).
+  const agentInbox = actor.agentAccess && folder === "inbox";
   const phrased = query.phrases.length > 0;
   const batch = phrased ? PHRASE_BATCH : pageSize + 1;
   const found: MailboxListMetadata[] = [];
@@ -137,12 +162,14 @@ export async function searchMailboxContent(
       teamId: actor.teamId,
       mailboxIds: [...boxes.keys()],
       groups,
-      folder,
+      folder: agentInbox ? "all" : folder,
       customFolderId: input.customFolderId,
-      after: query.after,
-      before: query.before,
+      after,
+      before,
       position,
       limit: batch,
+      ...(agentInbox ? { kind: "inbox" as const } : {}),
+      ...(input.unread ? { unread: true } : {}),
     });
     const accepted = phrased ? await withPhrases(db, actor, rows, query.phrases) : rows;
     for (const row of accepted) {

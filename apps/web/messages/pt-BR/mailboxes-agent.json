@@ -62,7 +62,26 @@
     "mailboxCount": "{count, plural, =0 {nenhuma caixa ativa} one {# caixa} other {# caixas}}",
     "defaultBadge": "padrão",
     "mcpHint": "Agentes que falam MCP usam estas caixas como ferramentas: em cada ferramenta o agente informa a caixa pelo endereço, e mailbox_list_accounts mostra quais estão liberadas. Escolha o cliente, copie e cole; o texto já leva esta chave, então guarde-o com o mesmo cuidado.",
-    "oauthBadge": "conectado por OAuth"
+    "oauthBadge": "conectado por OAuth",
+    "edit": {
+      "action": "Editar",
+      "label": "Editar a credencial {label}",
+      "title": "Editar \"{label}\"",
+      "hint": "O agente continua com o mesmo token, sem trocar nada nele. Caixas que você tirar perdem o acesso na hora, e envios do agente que ainda estavam na fila dessas caixas não saem. Sem \"Enviar sem aprovação\", os próximos envios esperam a sua aprovação.",
+      "hintOauth": "O app continua conectado por OAuth, sem precisar autorizar de novo. Caixas que você tirar perdem o acesso na hora, e envios do agente que ainda estavam na fila dessas caixas não saem. Sem \"Enviar sem aprovação\", os próximos envios esperam a sua aprovação.",
+      "save": "Salvar alterações",
+      "saving": "Salvando…",
+      "cancel": "Cancelar edição",
+      "saved": "Credencial atualizada. O agente continua com o mesmo token.",
+      "savedRefreshError": "A credencial foi atualizada, mas não foi possível recarregar a lista. Feche e abra de novo para ver.",
+      "unchanged": "Nada foi alterado.",
+      "conflict": "Alguém alterou esta credencial enquanto você editava. Recarregamos o que vale agora: revise e salve de novo.",
+      "gone": "Esta credencial foi revogada ou expirou e não pode mais ser editada.",
+      "forbidden": "Uma das caixas escolhidas não é sua ou está suspensa. Desmarque-a e salve de novo.",
+      "quota": "Uma das caixas que você adicionou já tem 25 credenciais de agente. Revogue alguma nela antes de adicioná-la.",
+      "invalid": "Confira a validade (precisa ser no futuro) e a caixa padrão (precisa estar marcada).",
+      "unavailableBox": "Indisponível agora (suspensa ou sendo excluída). Você só pode tirá-la."
+    }
   },
   "clients": {
     "label": "Cliente MCP",

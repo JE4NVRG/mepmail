@@ -206,7 +206,7 @@ describe("private mailbox activity", () => {
     const invalid = [
       { action: "content.revealed", itemId: randomUUID(), revision: 1 },
       { action: "mailbox.items_listed", folder: "quarantine", count: 1 },
-      { action: "mailbox.items_listed", folder: "inbox", count: 51 },
+      { action: "mailbox.items_listed", folder: "inbox", count: 101 },
       { action: "mailbox.items_listed", folder: "sent", count: -1 },
       { action: "mailbox.item_read", itemId: "bad", revision: 1 },
       { action: "mailbox.draft_saved", itemId: randomUUID(), revision: 0 },

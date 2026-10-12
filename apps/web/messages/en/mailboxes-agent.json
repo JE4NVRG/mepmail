@@ -62,7 +62,26 @@
     "mailboxCount": "{count, plural, =0 {no active mailbox} one {# mailbox} other {# mailboxes}}",
     "defaultBadge": "default",
     "mcpHint": "Agents that speak MCP use these mailboxes as tools: each tool names the mailbox by address, and mailbox_list_accounts shows which ones are open. Pick the client, copy and paste; the text carries this key, so keep it just as safe.",
-    "oauthBadge": "connected over OAuth"
+    "oauthBadge": "connected over OAuth",
+    "edit": {
+      "action": "Edit",
+      "label": "Edit the credential {label}",
+      "title": "Edit \"{label}\"",
+      "hint": "The agent keeps the same token; nothing changes on its side. Mailboxes you remove lose access at once, and the agent's sends still queued from them don't go out. Without \"Send without approval\", its next sends wait for your approval.",
+      "hintOauth": "The app stays connected over OAuth; no new authorization needed. Mailboxes you remove lose access at once, and the agent's sends still queued from them don't go out. Without \"Send without approval\", its next sends wait for your approval.",
+      "save": "Save changes",
+      "saving": "Saving…",
+      "cancel": "Cancel editing",
+      "saved": "Credential updated. The agent keeps the same token.",
+      "savedRefreshError": "The credential was updated, but the list couldn't be reloaded. Close and reopen to see it.",
+      "unchanged": "Nothing changed.",
+      "conflict": "Someone changed this credential while you were editing. We reloaded what applies now: review it and save again.",
+      "gone": "This credential was revoked or expired and can no longer be edited.",
+      "forbidden": "One of the chosen mailboxes isn't yours or is suspended. Untick it and save again.",
+      "quota": "One of the mailboxes you added already has 25 agent credentials. Revoke one there before adding it.",
+      "invalid": "Check the expiry (it must be in the future) and the default mailbox (it must be ticked).",
+      "unavailableBox": "Unavailable now (suspended or being deleted). You can only remove it."
+    }
   },
   "clients": {
     "label": "MCP client",

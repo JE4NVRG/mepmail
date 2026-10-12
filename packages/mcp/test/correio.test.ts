@@ -82,6 +82,44 @@ describe("Correio tools in the local MCP", () => {
     );
   });
 
+  it("pages and filters on the server: cursor, limit, search and time window reach the API", async () => {
+    const { tools, calls } = setup(() =>
+      json({ items: [], nextCursor: "c2.sig", hasMore: true, mode: "search" }),
+    );
+    const list = tools.get("mailbox_list_messages")!;
+    const result = payload(
+      await list.cb({
+        folder: "inbox",
+        mailbox: "jean@je4ndev.com",
+        limit: 20,
+        cursor: "c1.sig",
+        query: 'pedido "nota fiscal"',
+        from: "healthchecks.io",
+        subject: "down",
+        unread: true,
+        after: "2026-10-01",
+        before: "2026-10-12T00:00:00Z",
+      }),
+    );
+    const url = new URL(calls[0]!.url);
+    expect(url.pathname).toBe("/api/mailbox-agent/items");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      folder: "inbox",
+      limit: "20",
+      cursor: "c1.sig",
+      q: 'pedido "nota fiscal"',
+      from: "healthchecks.io",
+      subject: "down",
+      unread: "true",
+      after: "2026-10-01",
+      before: "2026-10-12T00:00:00Z",
+    });
+    expect(result.untrusted_data).toMatchObject({ nextCursor: "c2.sig", hasMore: true });
+    // An old call with no new argument is the same request as before.
+    await list.cb({ folder: "inbox" });
+    expect(calls[1]!.url).toBe("https://mepmail.dev/api/mailbox-agent/items?folder=inbox");
+  });
+
   it("wraps content as untrusted data and explains refusals", async () => {
     const { tools } = setup((url) =>
       url.endsWith("/send")

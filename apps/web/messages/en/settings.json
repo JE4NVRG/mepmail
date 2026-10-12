@@ -521,6 +521,7 @@
       "mailbox_agent_key_revoked": "Revoked a mailbox agent key",
       "mailbox_team_agent_key_created": "Created a multi-mailbox agent key",
       "mailbox_team_agent_key_revoked": "Revoked a multi-mailbox agent key",
+      "mailbox_team_agent_key_updated": "Edited a multi-mailbox agent key (mailboxes, permissions, name or expiry)",
       "mailbox_app_password_created": "Created an app password",
       "mailbox_app_password_revoked": "Revoked an app password",
       "mailbox_send_queued": "Sent a message from a mailbox",

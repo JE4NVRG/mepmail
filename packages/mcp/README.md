@@ -101,7 +101,18 @@ Correio mailboxes (with `MEPMAIL_MAIL_TOKEN`, same five tools as the hosted
 - `mailbox_list_accounts` — the mailboxes the key reaches, with permissions
   and the default one.
 - `mailbox_list_messages`, `mailbox_read_message` — inbox, drafts and sent;
-  pass `mailbox` with a team credential.
+  pass `mailbox` with a team credential. Listing is one page at a time, newest
+  first: pass the returned `nextCursor` as `cursor` until `hasMore` is false
+  (a cursor only works for the same mailbox, folder and filters). Filters run on
+  the server before the page is cut: `query` (words, "quoted phrases", `de:`/`from:`,
+  `para:`/`to:`, `assunto:`/`subject:`, `tem:anexo`, `depois:`/`antes:`), `from`,
+  `subject`, `unread`, `after`, `before`; `limit` up to 100 (50 when searching).
+  Mail that arrives while paging comes before the first page, so start over to see
+  it. A short or empty page never proves a message is absent from the mailbox, and
+  search reads an index that can lag about a minute behind new mail. Dates: a
+  listing's `after`/`before` use the order time (arrival, or when a snoozed message
+  came back; a draft's last edit), a search uses the arrival time, and a search
+  also finds snoozed messages, which the listing leaves out until they return.
 - `mailbox_save_draft` — new draft, edit, reply or forward, from that
   mailbox's address and signature.
 - `mailbox_send_draft` — sends with the send permission; otherwise the owner

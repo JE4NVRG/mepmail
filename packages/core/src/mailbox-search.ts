@@ -406,6 +406,10 @@ export async function findMailboxSearchMatches(
     before?: Date | null;
     position?: MailboxSearchPosition | undefined;
     limit: number;
+    /** Only this kind of message (agents: a received inbox includes filed and archived mail). */
+    kind?: "inbox" | "draft" | "sent" | undefined;
+    /** Only received messages the owner has not opened. */
+    unread?: boolean | undefined;
   },
 ) {
   const items = schema.mailboxItems;
@@ -461,6 +465,8 @@ export async function findMailboxSearchMatches(
     ...(input.groups.length ? [sql`${index.mailboxId} in ${boxes}`] : []),
     ...(input.after ? [sql`${items.createdAt} >= ${input.after.toISOString()}::timestamptz`] : []),
     ...(input.before ? [sql`${items.createdAt} < ${input.before.toISOString()}::timestamptz`] : []),
+    ...(input.kind ? [sql`${items.kind} = ${input.kind}`] : []),
+    ...(input.unread ? [sql`${items.kind} = 'inbox'`, sql`${items.seenAt} is null`] : []),
     ...(input.position
       ? [
           sql`(${order}, ${items.id}) < (timestamptz 'epoch' + ${input.position.at}::bigint * interval '1 microsecond', ${input.position.id}::uuid)`,

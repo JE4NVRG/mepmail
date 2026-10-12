@@ -48,6 +48,7 @@ import {
   updateMailboxFolder,
   updateMailboxRegistry,
   updateMailboxSignature,
+  updateMailboxTeamAgentKey,
   withMailboxRegistryAdmin,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
@@ -148,7 +149,9 @@ async function call<T>(run: () => Promise<T>): Promise<T> {
               ? "BAD_REQUEST"
               : error.code === "not_found"
                 ? "NOT_FOUND"
-                : "FORBIDDEN",
+                : error.code === "conflict"
+                  ? "CONFLICT"
+                  : "FORBIDDEN",
         // The UI tells a full key quota ("quota") apart from other refusals.
         message: error.code,
       });
@@ -597,6 +600,38 @@ export const mailboxesRouter = router({
   testAgentConnection: enabled
     .input(z.object({ token: z.string().min(1).max(300) }))
     .mutation(({ input }) => testCorreioConnection(`${apiBaseUrl()}/mcp/correio`, input.token)),
+  /**
+   * Edits a team credential in place (same secret or OAuth grant): name, mailboxes,
+   * default, scopes, expiry. `expectedVersion` comes from teamAgentKeys; a stale one is
+   * CONFLICT. The audit row records what changed, never a secret.
+   */
+  updateTeamAgentKey: enabled
+    .input(
+      z
+        .object({
+          id: z.uuid(),
+          expectedVersion: z.string().regex(/^[a-f0-9]{16}$/),
+          label: z.string().min(1).max(80).optional(),
+          mailboxIds: z.array(z.uuid()).min(1).max(20).optional(),
+          scopes: z
+            .array(z.enum(["read", "draft", "send"]))
+            .min(1)
+            .max(3)
+            .optional(),
+          defaultMailboxId: z.uuid().nullable().optional(),
+          expiresAt: z.date().nullable().optional(),
+        })
+        .strict(),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const key = await call(() => updateMailboxTeamAgentKey(ctx.db, actor(ctx), input));
+      await recordAudit(ctx, {
+        action: "mailbox.team_agent_key_updated",
+        target: { type: "mailbox_team_agent_key", id: key.id },
+        metadata: { ...key.change },
+      });
+      return key;
+    }),
   revokeTeamAgentKey: enabled.input(z.object({ id: z.uuid() })).mutation(async ({ ctx, input }) => {
     const key = await call(() => revokeMailboxTeamAgentKey(ctx.db, actor(ctx), input));
     await recordAudit(ctx, {

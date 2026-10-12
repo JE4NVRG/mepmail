@@ -344,3 +344,20 @@
   border-color: var(--ms-danger);
   color: var(--ms-danger);
 }
+
+/* A credential row's Editar + Revogar. */
+.keyActions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+@media (max-width: 520px) {
+  .keyActions {
+    justify-content: flex-start;
+  }
+  .keyActions > button {
+    min-height: 40px;
+  }
+}

@@ -819,6 +819,12 @@ export interface MailboxListFilter {
   scheduled?: boolean;
   /** true: sent messages whose follow-up came due with no reply in their conversation. */
   followUp?: boolean;
+  /** true: received messages the owner has not opened (seenAt null); agents' reads never set it. */
+  unread?: boolean;
+  /** At or after this time, by the listing's own order time (arrival; a draft's last edit). */
+  after?: Date;
+  /** Strictly before this time, by the same order time. */
+  before?: Date;
 }
 /** A position in a listing: the row's order time in epoch microseconds, then its id. */
 export interface MailboxListPosition {
@@ -884,6 +890,14 @@ function listConditions(
     ...(filter?.pinned ? [isNotNull(items.pinnedAt)] : []),
     ...(filter?.scheduled ? [isNotNull(items.sendAt)] : []),
     ...(filter?.followUp ? [isNotNull(items.remindedAt), sql`not ${replyAfter(items)}`] : []),
+    ...(filter?.unread ? [eq(items.kind, "inbox"), isNull(items.seenAt)] : []),
+    // The same order expression as the listing and its cursor, so a page never skips a row.
+    ...(filter?.after
+      ? [sql`${listOrder(items, filter.kind)} >= ${filter.after.toISOString()}::timestamptz`]
+      : []),
+    ...(filter?.before
+      ? [sql`${listOrder(items, filter.kind)} < ${filter.before.toISOString()}::timestamptz`]
+      : []),
   ];
 }
 /** Exact to the microsecond: integer arithmetic, no float round trip. */
@@ -902,6 +916,9 @@ function listPage(
   page: MailboxListPage | undefined,
 ) {
   if (actor.agentAccess && filter?.trashed) throw new MailboxContentError("forbidden");
+  for (const date of [filter?.after, filter?.before])
+    if (date !== undefined && !(date instanceof Date && Number.isFinite(date.getTime())))
+      throw new MailboxContentError("invalid");
   const limit = page?.limit ?? 100;
   if (!Number.isInteger(limit) || limit < 1 || limit > 101)
     throw new MailboxContentError("invalid");

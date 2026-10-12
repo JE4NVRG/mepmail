@@ -8,6 +8,33 @@ import {
 import type { Env } from "./app.js";
 import { normalizeMcpResponseConnection } from "./mcp-response.js";
 
+/** A day or an ISO time with its offset, as the agent API accepts them. */
+const DAY_OR_TIME = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2}))?$/;
+
+/** The agent API listing URL for mailbox_list_messages' arguments. */
+export function mailboxListPath(args: {
+  folder: string;
+  limit?: number | undefined;
+  cursor?: string | undefined;
+  query?: string | undefined;
+  from?: string | undefined;
+  subject?: string | undefined;
+  unread?: boolean | undefined;
+  after?: string | undefined;
+  before?: string | undefined;
+}): string {
+  const params = new URLSearchParams({ folder: args.folder });
+  if (args.limit !== undefined) params.set("limit", String(args.limit));
+  if (args.cursor) params.set("cursor", args.cursor);
+  if (args.query) params.set("q", args.query);
+  if (args.from) params.set("from", args.from);
+  if (args.subject) params.set("subject", args.subject);
+  if (args.unread) params.set("unread", "true");
+  if (args.after) params.set("after", args.after);
+  if (args.before) params.set("before", args.before);
+  return `/api/mailbox-agent/items?${params.toString()}`;
+}
+
 /**
  * Correio over MCP (Streamable HTTP at /mcp/correio): mailboxes as tools. The
  * credential is a mailbox agent key (mmb_…, one mailbox) or a team credential
@@ -128,18 +155,59 @@ function buildCorreioServer(origin: string, token: string): McpServer {
     "mailbox_list_messages",
     {
       description:
-        "List the newest messages (up to 50) in a mailbox: inbox, drafts or sent. Each item has its id, revision, subject, sender, recipients, snippet and date; quarantined messages show as blocked with no content. A short list does not prove a message is absent.",
+        'List or search one page of messages in a mailbox (inbox, drafts or sent), newest first. Each item has its id, revision, subject, sender, recipients, snippet and date; quarantined messages never appear and blocked content is withheld. Pages: pass the returned nextCursor as `cursor` (same mailbox, folder and filters) until hasMore is false; a cursor from another call is refused. Filters run on the server before the page is cut: `query` (words, "quoted phrases", de:/from:, para:/to:, assunto:/subject:, tem:anexo, depois:/antes: YYYY-MM-DD), `from`, `subject`, `unread`, `after` and `before`; with query, from or subject it searches the mailbox index (at most 50 per page; mail newer than about a minute may not be indexed yet). Messages that arrive while paging come before the first page: start again without a cursor to see them. A short or empty page never proves a message is absent from the mailbox: keep paging until hasMore is false, and widen the filters before concluding it is not there.',
       inputSchema: z.object({
         folder: z
           .enum(["inbox", "drafts", "sent"])
           .default("inbox")
           .describe("Which folder to list"),
         mailbox,
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe(
+            "Messages per page: default 50 (25 when searching), at most 100 (50 when searching)",
+          ),
+        cursor: z
+          .string()
+          .min(1)
+          .max(256)
+          .optional()
+          .describe("nextCursor from the previous page of this same listing"),
+        query: z
+          .string()
+          .min(1)
+          .max(200)
+          .optional()
+          .describe("Search words, quoted phrases and operators"),
+        from: z
+          .string()
+          .min(1)
+          .max(254)
+          .optional()
+          .describe("Sender address, domain or name words"),
+        subject: z.string().min(1).max(200).optional().describe("Words of the subject"),
+        unread: z
+          .boolean()
+          .optional()
+          .describe("Only received messages the mailbox owner has not opened yet"),
+        after: z
+          .string()
+          .regex(DAY_OR_TIME)
+          .optional()
+          .describe("Only messages from this day (YYYY-MM-DD) or ISO time on"),
+        before: z
+          .string()
+          .regex(DAY_OR_TIME)
+          .optional()
+          .describe("Only messages before this day (YYYY-MM-DD) or ISO time"),
       }),
       annotations: { readOnlyHint: true },
     },
-    async ({ folder, mailbox: box }) =>
-      api("GET", `/api/mailbox-agent/items?folder=${folder}`, undefined, box),
+    async ({ mailbox: box, ...args }) => api("GET", mailboxListPath(args), undefined, box),
   );
 
   server.registerTool(

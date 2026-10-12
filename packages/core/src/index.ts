@@ -413,10 +413,12 @@ export {
   type MailboxAgentScope,
   type MailboxOAuthCredential,
   type MailboxSelector,
+  type MailboxTeamAgentKeyChange,
   parseMailboxSelector,
   revokeMailboxAgentKey,
   revokeMailboxOAuthClient,
   revokeMailboxTeamAgentKey,
+  updateMailboxTeamAgentKey,
   withMailboxAgentAccess,
 } from "./mailbox-agent-access.js";
 export {

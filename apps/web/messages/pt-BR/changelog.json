@@ -24,6 +24,34 @@
   },
   "releases": [
     {
+      "version": "0.137",
+      "date": "2026-10-12",
+      "title": "Edite o acesso dos agentes; o MCP percorre a caixa inteira",
+      "summary": "Mude as caixas, a caixa padrão, as permissões e a validade de um agente sem trocar a credencial. Pelo MCP, o agente lê a caixa em páginas até o fim e busca por remetente, assunto, período e não lidas.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Correio → Configurações → Agentes → Editar: nome, caixas, caixa padrão, Rascunhos, Enviar sem aprovação e validade. O agente continua com o mesmo token; uma caixa removida perde o acesso na hora.",
+            "MCP e API do agente: listagem em páginas com cursor (nextCursor e hasMore) até o fim da caixa, e busca por palavras, remetente, assunto, período e não lidas, filtrada no servidor antes da página."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Duas edições ao mesmo tempo não se sobrescrevem: quem salvar por último é avisado para revisar.",
+            "Um envio que o agente já tinha na fila não sai se a caixa ou a permissão de envio forem retiradas."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "A listagem do agente com mais de 50 mensagens por página voltava erro."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.136",
       "date": "2026-10-12",
       "title": "Regras automáticas no Correio",

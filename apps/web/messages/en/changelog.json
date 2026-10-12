@@ -24,6 +24,34 @@
   },
   "releases": [
     {
+      "version": "0.137",
+      "date": "2026-10-12",
+      "title": "Edit your agents' access; MCP walks the whole mailbox",
+      "summary": "Change an agent's mailboxes, default mailbox, permissions and expiry without replacing its credential. Over MCP, the agent reads a mailbox page by page to the end and searches by sender, subject, period and unread.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Mail → Settings → Agents → Edit: name, mailboxes, default mailbox, Drafts, Send without approval and expiry. The agent keeps the same token; a removed mailbox loses access at once.",
+            "MCP and agent API: paged listing with a cursor (nextCursor and hasMore) to the end of the mailbox, and search by words, sender, subject, period and unread, filtered on the server before the page."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Two edits at the same time never overwrite each other: whoever saves last is asked to review.",
+            "A send the agent already queued does not go out once the mailbox or the send permission is taken away."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Agent listings with more than 50 messages per page returned an error."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.136",
       "date": "2026-10-12",
       "title": "Automatic rules in Mail",
