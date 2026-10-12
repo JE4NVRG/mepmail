@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from "next-intl";
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import enAuth from "../messages/en/auth.json";
@@ -16,7 +16,7 @@ vi.mock("@/lib/trpc", () => ({
 }));
 vi.mock("@/lib/auth-client", () => ({ authClient: { oauth2: { consent: vi.fn() } } }));
 vi.mock("@/components/auth/auth-screen", () => ({
-  AuthScreen: ({ children }: { children: unknown }) => createElement("main", null, children),
+  AuthScreen: ({ children }: { children?: ReactNode }) => createElement("main", null, children),
 }));
 vi.mock("next/link", () => ({ default: "a" }));
 
@@ -25,10 +25,11 @@ const { ConsentForm } = await import("../src/app/oauth/consent/consent-form");
 const TEAM = "00000000-0000-4000-8000-0000000000aa";
 function render(locale: "en" | "pt-BR") {
   return renderToStaticMarkup(
-    createElement(
-      NextIntlClientProvider,
-      { locale, messages: { auth: locale === "en" ? enAuth : ptAuth } },
-      createElement(ConsentForm, {
+    createElement(NextIntlClientProvider, {
+      locale,
+      messages: { auth: locale === "en" ? enAuth : ptAuth },
+      // biome-ignore lint/correctness/noChildrenProp: next-intl requires children in its props type.
+      children: createElement(ConsentForm, {
         app: {
           clientId: "client-agent",
           name: "Hermes Agent",
@@ -48,7 +49,7 @@ function render(locale: "en" | "pt-BR") {
           ],
         },
       }),
-    ),
+    }),
   );
 }
 
