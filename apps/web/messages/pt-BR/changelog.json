@@ -24,6 +24,20 @@
   },
   "releases": [
     {
+      "version": "0.130",
+      "date": "2026-10-12",
+      "title": "Quando a AWS pausa um cliente, o MepMail segura esse cliente",
+      "summary": "Cada cliente envia pelo próprio tenant da SES. Quando a SES pausa um tenant pela reputação, o MepMail agora percebe em até 15 minutos e coloca aquele time em revisão: os e-mails dele esperam em vez de falhar um a um, e todos os outros clientes seguem enviando.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Uma verificação a cada 15 minutos lê o estado do tenant SES de cada time. Um tenant pausado pela SES coloca o time em revisão (motivo: reputação): os e-mails aceitos ficam na fila, o operador é avisado e libera quando a causa estiver resolvida."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.129",
       "date": "2026-10-12",
       "title": "Receitas: quatro integrações executadas de ponta a ponta",

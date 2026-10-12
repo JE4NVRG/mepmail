@@ -4,6 +4,7 @@ import {
   deleteTenant,
   disassociateIdentity,
   ensureTenant,
+  getTenantSendingStatus,
   type SesTenantClient,
 } from "../src/tenants.js";
 
@@ -122,5 +123,33 @@ describe("disassociateIdentity / deleteTenant", () => {
         tenantName: "team-1",
       }),
     ).rejects.toMatchObject({ name: "BadRequestException" });
+  });
+});
+
+describe("getTenantSendingStatus", () => {
+  const client = (reply: unknown) => ({
+    async send() {
+      if (reply instanceof Error) throw reply;
+      return reply;
+    },
+  });
+  it("reads SES's sending status, and null when the tenant is not there", async () => {
+    expect(
+      await getTenantSendingStatus(client({ Tenant: { SendingStatus: "DISABLED" } }), {
+        tenantName: "t",
+      }),
+    ).toBe("DISABLED");
+    expect(
+      await getTenantSendingStatus(client({ Tenant: { SendingStatus: "REINSTATED" } }), {
+        tenantName: "t",
+      }),
+    ).toBe("REINSTATED");
+    expect(await getTenantSendingStatus(client({ Tenant: {} }), { tenantName: "t" })).toBeNull();
+    const missing = Object.assign(new Error("no"), { name: "NotFoundException" });
+    expect(await getTenantSendingStatus(client(missing), { tenantName: "t" })).toBeNull();
+    const throttled = Object.assign(new Error("slow"), { name: "TooManyRequestsException" });
+    await expect(getTenantSendingStatus(client(throttled), { tenantName: "t" })).rejects.toThrow(
+      "slow",
+    );
   });
 });

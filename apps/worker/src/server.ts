@@ -107,7 +107,7 @@ import { finalizeBroadcast, sendBroadcast } from "./handlers/send-broadcast.js";
 import { failQueuedEmail, sendEmail } from "./handlers/send-email.js";
 import { createRegionSendControls } from "./handlers/ses-regions.js";
 import { createCustomerSmtpRelay, createSmtpFallback } from "./handlers/smtp-fallback.js";
-import { syncTenants } from "./handlers/tenants.js";
+import { syncTenants, watchTenants } from "./handlers/tenants.js";
 import { createMailboxIngress, parseMailboxInboundConfiguration } from "./mailbox-ingress.js";
 import { readMailboxSearchDocument } from "./mailbox-search-document.js";
 import {
@@ -684,6 +684,14 @@ await queue.scheduleCrons({
     });
     if (result.associated > 0 || result.failed > 0) {
       console.log(`tenants.sync: associated=${result.associated} failed=${result.failed}`);
+    }
+  },
+  "tenants.watch": async () => {
+    const result = await watchTenants(db, { clientForRegion, enabled: sesTenantsEnabled() });
+    if (result.held > 0 || result.failed > 0) {
+      console.log(
+        `tenants.watch: checked=${result.checked} held=${result.held} failed=${result.failed}`,
+      );
     }
   },
   "domains.reap": async () => {

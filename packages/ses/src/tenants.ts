@@ -32,6 +32,26 @@ export interface SesTenantClient {
 
 const errorName = (error: unknown): string | undefined => (error as { name?: string }).name;
 
+/**
+ * Whether SES lets the tenant send: ENABLED, DISABLED (SES paused it on its reputation
+ * policy) or REINSTATED. Null when the tenant does not exist in that region.
+ */
+export async function getTenantSendingStatus(
+  client: SesTenantClient,
+  params: { tenantName: string },
+): Promise<"ENABLED" | "DISABLED" | "REINSTATED" | null> {
+  try {
+    const out = (await client.send(
+      new GetTenantCommand({ TenantName: params.tenantName }),
+    )) as GetTenantCommandOutput;
+    const status = out.Tenant?.SendingStatus;
+    return status === "ENABLED" || status === "DISABLED" || status === "REINSTATED" ? status : null;
+  } catch (error) {
+    if (errorName(error) === "NotFoundException") return null;
+    throw error;
+  }
+}
+
 /** Account id is the 5th segment of any SES ARN: arn:aws:ses:<region>:<account>:… */
 function accountIdFromArn(arn: string | undefined): string {
   const accountId = arn?.split(":")[4];

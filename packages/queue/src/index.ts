@@ -176,6 +176,8 @@ export const CRON_JOBS = {
   // Hourly: associate domains with their team's SES tenant where the create-time
   // association is missing (pre-tenant rows, or a failed AWS call).
   "tenants.sync": "17 * * * *",
+  // Every 15 min: hold for review a team whose SES tenant SES itself paused.
+  "tenants.watch": "7-59/15 * * * *",
   // Hourly (cloud only): drop never-verified domains past SES's 72h DKIM
   // search window, freeing the (name, region) slot an unverified add would
   // otherwise squat forever. Offset from the other hourly sweeps.

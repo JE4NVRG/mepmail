@@ -24,6 +24,20 @@
   },
   "releases": [
     {
+      "version": "0.130",
+      "date": "2026-10-12",
+      "title": "When AWS pauses one customer, MepMail holds that customer",
+      "summary": "Every customer sends through its own SES tenant. When SES pauses a tenant for its reputation, MepMail now notices within 15 minutes and holds that team for review, so its mail waits instead of failing one message at a time, while every other customer keeps sending.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A 15-minute check reads each team's SES tenant status. A tenant SES paused puts the team on hold for review (reason: reputation): accepted mail parks, the operator is told, and an operator releases it once the cause is fixed."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.129",
       "date": "2026-10-12",
       "title": "Recipes: four integrations, run end to end",

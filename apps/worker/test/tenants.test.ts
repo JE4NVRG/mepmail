@@ -4,7 +4,7 @@ import type { SesIdentityClient } from "@millionsend/ses";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq, isNotNull } from "drizzle-orm";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { syncTenants } from "../src/handlers/tenants.js";
+import { syncTenants, watchTenants } from "../src/handlers/tenants.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -176,3 +176,72 @@ it("does nothing when tenants are disabled", async () => {
   });
   expect(calls).toEqual([]);
 });
+
+function tenantStatusSes(statusFor: Record<string, string | Error>) {
+  const asked: string[] = [];
+  const client: SesIdentityClient = {
+    async send(command) {
+      const input = (command as unknown as { input: Record<string, unknown> }).input;
+      if (command.constructor.name !== "GetTenantCommand") return {};
+      const name = String(input.TenantName);
+      asked.push(name);
+      const status = statusFor[name];
+      if (status instanceof Error) throw status;
+      return { Tenant: { TenantName: name, SendingStatus: status ?? "ENABLED" } };
+    },
+  };
+  return { client, asked };
+}
+
+it("holds for review a team whose SES tenant SES paused, and leaves sending tenants alone", async () => {
+  const paused = await createTeam(db, "paused");
+  const fine = await insertTeamWithTenant("fine");
+  const broken = await insertTeamWithTenant("broken");
+  await insertDomain(paused, "paused.dev");
+  await db
+    .update(schema.domains)
+    .set({ sesTenantAssociatedAt: new Date() })
+    .where(eq(schema.domains.teamId, paused));
+  const { client, asked } = tenantStatusSes({
+    [paused]: "DISABLED",
+    [broken]: Object.assign(new Error("throttled"), { name: "TooManyRequestsException" }),
+  });
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+  const result = await watchTenants(db, { clientForRegion: () => client, enabled: true });
+  expect(result).toEqual({ checked: 2, held: 1, failed: 1 });
+  expect(asked.sort()).toEqual([broken, fine, paused].sort());
+  const [held] = await db
+    .select({ at: schema.teams.sendReviewAt, reason: schema.teams.sendReviewReason })
+    .from(schema.teams)
+    .where(eq(schema.teams.id, paused));
+  expect(held?.reason).toBe("reputation");
+  expect(held?.at).toBeInstanceOf(Date);
+  const [ok] = await db
+    .select({ at: schema.teams.sendReviewAt })
+    .from(schema.teams)
+    .where(eq(schema.teams.id, fine));
+  expect(ok?.at).toBeNull();
+
+  // Already held: not asked again; off: nothing at all.
+  const again = tenantStatusSes({});
+  await watchTenants(db, { clientForRegion: () => again.client, enabled: true });
+  expect(again.asked).not.toContain(paused);
+  const off = tenantStatusSes({});
+  expect(await watchTenants(db, { clientForRegion: () => off.client, enabled: false })).toEqual({
+    checked: 0,
+    held: 0,
+    failed: 0,
+  });
+  expect(off.asked).toEqual([]);
+});
+
+async function insertTeamWithTenant(slug: string) {
+  const teamId = await createTeam(db, slug);
+  await insertDomain(teamId, `${slug}.dev`);
+  await db
+    .update(schema.domains)
+    .set({ sesTenantAssociatedAt: new Date() })
+    .where(eq(schema.domains.teamId, teamId));
+  return teamId;
+}

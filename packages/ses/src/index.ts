@@ -124,6 +124,7 @@ export {
   deleteTenant,
   disassociateIdentity,
   ensureTenant,
+  getTenantSendingStatus,
   provisionDomainTenant,
   type SesTenantClient,
   type TenantCommand,

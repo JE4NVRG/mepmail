@@ -1,7 +1,11 @@
-import { associateDomainTenant } from "@millionsend/core";
+import { associateDomainTenant, holdTeamForReview } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { provisionDomainTenant, type SesIdentityClient } from "@millionsend/ses";
+import {
+  getTenantSendingStatus,
+  provisionDomainTenant,
+  type SesIdentityClient,
+} from "@millionsend/ses";
 import { and, asc, eq, isNull, ne, or, sql } from "drizzle-orm";
 
 export interface SyncTenantsDeps {
@@ -67,4 +71,66 @@ export async function syncTenants(
     if (ok) associated += 1;
   }
   return { associated, failed: pending.length - associated };
+}
+
+export interface WatchTenantsDeps {
+  clientForRegion: (region: string) => SesIdentityClient;
+  enabled: boolean;
+  now?: Date;
+}
+
+/**
+ * Every 15 minutes: SES pauses a tenant by itself when the tenant's reputation policy
+ * finds a problem (bounces, complaints, trust and safety signals), and only that
+ * customer stops while the account keeps sending. MepMail mirrors it at once: the
+ * team is held for review (reason "reputation"), so its accepted mail parks instead of
+ * failing at SES one message at a time, and the safety sweep writes the audit row and
+ * tells the operator. Releasing stays an operator decision, as for every review hold.
+ * Suspended, system and already-held teams are skipped; one team's failure never
+ * blocks the rest.
+ */
+export async function watchTenants(
+  db: Db,
+  deps: WatchTenantsDeps,
+): Promise<{ checked: number; held: number; failed: number }> {
+  const result = { checked: 0, held: 0, failed: 0 };
+  if (!deps.enabled) return result;
+  const d = schema.domains;
+  const t = schema.teams;
+  const pairs = await db
+    .selectDistinct({ teamId: d.teamId, region: d.region })
+    .from(d)
+    .innerJoin(t, eq(t.id, d.teamId))
+    .where(
+      and(
+        sql`${d.sesTenantAssociatedAt} is not null`,
+        isNull(t.suspendedAt),
+        isNull(t.sendReviewAt),
+        ne(t.plan, "system"),
+      ),
+    )
+    .orderBy(asc(d.teamId), asc(d.region));
+  for (const pair of pairs) {
+    try {
+      const status = await getTenantSendingStatus(deps.clientForRegion(pair.region), {
+        tenantName: pair.teamId,
+      });
+      result.checked += 1;
+      if (status !== "DISABLED") continue;
+      const held = await holdTeamForReview(db, {
+        teamId: pair.teamId,
+        reason: "reputation",
+        note: `SES paused this team's sending tenant in ${pair.region}.`,
+        ...(deps.now ? { now: deps.now } : {}),
+      });
+      if (held) result.held += 1;
+    } catch (err) {
+      result.failed += 1;
+      console.warn(
+        `tenants.watch: ${pair.teamId.slice(0, 8)} ${pair.region} not checked`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+  return result;
 }
