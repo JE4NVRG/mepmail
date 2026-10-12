@@ -15,49 +15,55 @@ import { createSmtpServer } from "./smtp.js";
 // listener starts.
 const keyring = createKeyringFromEnv(env);
 
-// The relay is an email.send producer, so the queue is unconditional.
+// The relay and the Correio's submission both produce sends, so the queue is unconditional.
 const queue = await Queue.start(env.DATABASE_URL);
 
-const certPath = env.SMTP_TLS_CERT_PATH;
-const keyPath = env.SMTP_TLS_KEY_PATH;
-if (!certPath && !env.SMTP_ALLOW_INSECURE_AUTH) {
-  throw new Error(
-    "SMTP requires TLS; set SMTP_TLS_CERT_PATH and SMTP_TLS_KEY_PATH, or explicitly set SMTP_ALLOW_INSECURE_AUTH=true only on a trusted private network",
-  );
-}
-
-const server = createSmtpServer({
-  db: getDb(),
-  keyring,
-  isCloud: env.IS_CLOUD,
-  enqueueEmailSend: async (emailId, opts) => {
-    await queue.send(
-      "email.send",
-      { emailId },
-      {
-        dedupeKey: emailId,
-        priority: EMAIL_SEND_PRIORITY.transactional,
-        ...(opts?.startAfter ? { startAfter: opts.startAfter } : {}),
-      },
+// The customers' SMTP relay (SMTP_PORT, 2587 in production). SMTP_RELAY_ENABLED="0" leaves
+// it to another service: in production the Correio's mail-app servers (submission and
+// IMAP, below) run in a container of their own, so a bug there can never take the relay
+// down with it. Unset, everything runs here as before.
+if (process.env.SMTP_RELAY_ENABLED !== "0") {
+  const certPath = env.SMTP_TLS_CERT_PATH;
+  const keyPath = env.SMTP_TLS_KEY_PATH;
+  if (!certPath && !env.SMTP_ALLOW_INSECURE_AUTH) {
+    throw new Error(
+      "SMTP requires TLS; set SMTP_TLS_CERT_PATH and SMTP_TLS_KEY_PATH, or explicitly set SMTP_ALLOW_INSECURE_AUTH=true only on a trusted private network",
     );
-  },
-  // A relay send is the team's send like any other: the funnel's activation
-  // step is claimed here too (a no-op wherever UMAMI_ENDPOINT/UMAMI_WEBSITE_ID
-  // are not set explicitly — umamiFunnel has no default).
-  funnel: { ...umamiFunnel(), hostname: appHostname() },
-  ...(certPath && keyPath
-    ? { tls: { cert: readFileSync(certPath), key: readFileSync(keyPath) } }
-    : {}),
-  allowInsecureAuth: env.SMTP_ALLOW_INSECURE_AUTH,
-});
+  }
 
-server.on("error", (err) => {
-  console.error("smtp server error", err);
-});
+  const server = createSmtpServer({
+    db: getDb(),
+    keyring,
+    isCloud: env.IS_CLOUD,
+    enqueueEmailSend: async (emailId, opts) => {
+      await queue.send(
+        "email.send",
+        { emailId },
+        {
+          dedupeKey: emailId,
+          priority: EMAIL_SEND_PRIORITY.transactional,
+          ...(opts?.startAfter ? { startAfter: opts.startAfter } : {}),
+        },
+      );
+    },
+    // A relay send is the team's send like any other: the funnel's activation
+    // step is claimed here too (a no-op wherever UMAMI_ENDPOINT/UMAMI_WEBSITE_ID
+    // are not set explicitly — umamiFunnel has no default).
+    funnel: { ...umamiFunnel(), hostname: appHostname() },
+    ...(certPath && keyPath
+      ? { tls: { cert: readFileSync(certPath), key: readFileSync(keyPath) } }
+      : {}),
+    allowInsecureAuth: env.SMTP_ALLOW_INSECURE_AUTH,
+  });
 
-server.listen(env.SMTP_PORT, () => {
-  console.log(`mepmail smtp listening on :${env.SMTP_PORT}`);
-});
+  server.on("error", (err) => {
+    console.error("smtp server error", err);
+  });
+
+  server.listen(env.SMTP_PORT, () => {
+    console.log(`mepmail smtp listening on :${env.SMTP_PORT}`);
+  });
+}
 
 // One process serves the relay, submission and IMAP: a promise someone forgot to handle
 // is logged, never allowed to take the customers' relay down with it.
