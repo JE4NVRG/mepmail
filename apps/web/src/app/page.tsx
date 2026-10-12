@@ -26,6 +26,7 @@ import { CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
 import { titlePhrases } from "@/lib/title-phrases";
+import { publicPageUrls } from "@/server/public-seo";
 import { AgentDemo, type AgentDemoLabels } from "./correio/agent-demo";
 import "./landing-calc.css";
 import "./landing.css";
@@ -69,6 +70,7 @@ function standaloneMailOpen(): boolean {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seo = await publicPageUrls("/");
   const t = await getTranslations("landing");
   const domain = standaloneMailOpen();
   const title = t(domain ? "meta.domainTitle" : "meta.title");
@@ -76,12 +78,14 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: { absolute: title },
     description,
-    alternates: { canonical: "/" },
+    alternates: seo.alternates,
     robots: { index: true, follow: true },
     openGraph: {
       title,
       description,
       type: "website",
+      url: seo.url,
+      locale: seo.ogLocale,
       images: [{ url: "/og.jpg", width: 1280, height: 640, alt: "MepMail" }],
     },
   };

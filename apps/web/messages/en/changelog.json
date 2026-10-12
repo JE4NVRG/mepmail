@@ -24,6 +24,22 @@
   },
   "releases": [
     {
+      "version": "0.132",
+      "date": "2026-10-12",
+      "title": "The Portuguese site is findable on Google",
+      "summary": "The public pages in Portuguese now have their own address (?lang=pt-BR), so Google can index them and show MepMail in Portuguese to people searching from Brazil.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "Search engines send neither a cookie nor a browser language, so they only ever saw the English site. Every public page now also exists in Portuguese at ?lang=pt-BR, with its own canonical.",
+            "Every public page declares both versions (hreflang en, pt-BR and x-default), and the sitemap lists each page in both languages.",
+            "The PT/EN switch still remembers your choice; on an address with ?lang= it changes the address too."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.131",
       "date": "2026-10-12",
       "title": "Delete a mailbox, with 30 days to change your mind",

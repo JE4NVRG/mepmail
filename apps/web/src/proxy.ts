@@ -6,6 +6,8 @@ import {
   attributionCookieValue,
   shouldReplaceAttribution,
 } from "@/lib/attribution";
+import { isAppLocale } from "@/lib/locale-cookie";
+import { LANG_PARAM, URL_LOCALE_HEADER } from "@/lib/public-locale-url";
 
 /** Paths the hosted unsubscribe flow needs; nothing else answers on its host. */
 const UNSUBSCRIBE_HOST_PATHS = ["/unsubscribe/", "/logo/", "/_next/", "/favicon.ico"];
@@ -30,6 +32,10 @@ function routeByHost(request: NextRequest): NextResponse {
   const requestHeaders = new Headers(request.headers);
   // Overwrite caller input: only this request URL determines the return target.
   requestHeaders.set("x-mepmail-next", request.nextUrl.pathname + request.nextUrl.search);
+  // Same for the language a public URL names (?lang=pt-BR): it outranks the cookie.
+  requestHeaders.delete(URL_LOCALE_HEADER);
+  const urlLocale = request.nextUrl.searchParams.get(LANG_PARAM);
+  if (isAppLocale(urlLocale)) requestHeaders.set(URL_LOCALE_HEADER, urlLocale);
   const next = () => NextResponse.next({ request: { headers: requestHeaders } });
   const own = env.UNSUBSCRIBE_BASE_URL;
   if (!own) return next();

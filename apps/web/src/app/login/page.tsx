@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { AuthForm } from "@/components/auth/auth-form";
 import { enabledSocialProviders, hasSession } from "@/server/auth";
+import { publicPageUrls } from "@/server/public-seo";
 import { accountMailDelayed } from "@/server/ses-pause";
 import { passwordRecoveryEnabled } from "@/server/system-mail";
 
@@ -25,10 +26,11 @@ export default async function LoginPage() {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seo = await publicPageUrls("/login");
   const t = await getTranslations("auth");
   return {
     title: t("login.submit"),
-    alternates: { canonical: "/login" },
+    alternates: seo.alternates,
     robots: { index: true, follow: true },
   };
 }

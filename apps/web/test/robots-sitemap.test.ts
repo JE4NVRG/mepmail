@@ -85,14 +85,14 @@ describe("robots.txt + sitemap.xml agreement", () => {
     const urls = sitemap();
     // 6 URLs from the SEO fix + the three public pages added with /pricing,
     // /alternatives/resend and /integrations, plus the two institutional pages
-    // (/security and /support) and /changelog.
-    expect(urls).toHaveLength(12);
+    // (/security and /support) and /changelog; each in English and in Portuguese.
+    expect(urls).toHaveLength(24);
 
     for (const entry of urls) {
-      const { pathname } = new URL(entry.url as string);
+      const { pathname, search } = new URL(entry.url as string);
       expect(
-        isAllowed(pathname, allow),
-        `${pathname} is advertised but not allowed by robots.txt`,
+        isAllowed(pathname + search, allow),
+        `${pathname}${search} is advertised but not allowed by robots.txt`,
       ).toBe(true);
     }
   });
@@ -103,8 +103,8 @@ describe("robots.txt + sitemap.xml agreement", () => {
     expect(has()).toBe(false);
     vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
     const urls = sitemap();
-    // /correio, the desktop downloads and the Linux app's page.
-    expect(urls).toHaveLength(15);
+    // /correio, the desktop downloads and the Linux app's page, in both languages.
+    expect(urls).toHaveLength(30);
     expect(has()).toBe(true);
     expect(urls.find((entry) => entry.url.endsWith("/desktop/correio/linux"))?.priority).toBe(0.6);
     expect(isAllowed("/desktop/correio/linux", allowedPaths())).toBe(true);
@@ -114,6 +114,28 @@ describe("robots.txt + sitemap.xml agreement", () => {
     expect(urls.find((entry) => entry.url.endsWith("/correio"))?.priority).toBe(0.9);
     expect(isAllowed("/correio", allowedPaths())).toBe(true);
     expect(isAllowed("/correio/opengraph-image", allowedPaths())).toBe(true);
+  });
+
+  it("lists every page in English and in Portuguese, both with the same hreflang set", () => {
+    // Crawlers send neither the cookie nor Accept-Language: without its own URL the
+    // Portuguese copy was never indexed.
+    const urls = sitemap();
+    const english = urls.filter((entry) => !entry.url.includes("?"));
+    expect(english).toHaveLength(12);
+    for (const entry of english) {
+      const portuguese = `${entry.url}?lang=pt-BR`;
+      const twin = urls.find((other) => other.url === portuguese);
+      expect(twin, portuguese).toBeDefined();
+      const languages = {
+        en: entry.url,
+        "pt-BR": portuguese,
+        "x-default": entry.url,
+      };
+      expect(entry.alternates?.languages).toEqual(languages);
+      expect(twin?.alternates?.languages).toEqual(languages);
+      expect(twin?.priority).toBe(entry.priority);
+    }
+    expect(urls.some((entry) => entry.url === "https://mepmail.dev/?lang=pt-BR")).toBe(true);
   });
 
   it("advertises the institutional pages with their own priority and allows them", () => {

@@ -8,6 +8,7 @@ import {
 } from "@/components/site-chrome";
 import { DOCS_URL } from "@/lib/docs-links";
 import { legalLinks } from "@/lib/legal-links";
+import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
 import "./changelog.css";
 
@@ -24,17 +25,19 @@ type Release = {
 };
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seo = await publicPageUrls(canonical);
   const t = await getTranslations("changelog");
   const description = t("meta.description");
   return {
     title: { absolute: t("meta.title") },
     description,
-    alternates: { canonical },
+    alternates: seo.alternates,
     robots: { index: true, follow: true },
     openGraph: {
       title: t("meta.title"),
       description,
-      url: canonical,
+      url: seo.url,
+      locale: seo.ogLocale,
       type: "website",
       images: [{ url: "/og.jpg", width: 1280, height: 640, alt: "MepMail" }],
     },

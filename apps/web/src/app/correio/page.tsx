@@ -8,6 +8,7 @@ import {
 } from "@/lib/desktop-download";
 import { legalLinks } from "@/lib/legal-links";
 import { titlePhrases } from "@/lib/title-phrases";
+import { publicPageUrls } from "@/server/public-seo";
 import { AgentDemo, type AgentDemoLabels } from "./agent-demo";
 import { LaunchPlanPreview } from "./launch-plan-preview";
 import "../landing.css";
@@ -24,16 +25,18 @@ type FaqItem = { q: string; a: string };
 type ComparisonRow = { label: string; sending: string; combined: string };
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seo = await publicPageUrls(canonical);
   const t = await getTranslations("correio");
   return {
     title: { absolute: t("meta.title") },
     description: t("meta.description"),
-    alternates: { canonical },
+    alternates: seo.alternates,
     robots: { index: earlyAccessOpen(), follow: true },
     openGraph: {
       title: t("meta.title"),
       description: t("meta.description"),
-      url: canonical,
+      url: seo.url,
+      locale: seo.ogLocale,
       type: "website",
       // The share image is ./opengraph-image.tsx, in the visitor's language.
     },

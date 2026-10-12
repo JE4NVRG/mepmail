@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { type LegalDoc, LegalDocument } from "@/components/legal-document";
+import { publicPageUrls } from "@/server/public-seo";
 
 export default async function RefundPage() {
   const t = await getTranslations("legal");
@@ -14,13 +15,14 @@ export default async function RefundPage() {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seo = await publicPageUrls("/refund");
   const t = await getTranslations("legal");
   // Legal pages are real public content (linked from the footer), so they opt
   // back into indexing against the private-by-default robots in layout.tsx.
   return {
     title: t("refund.title"),
     description: t("refund.intro"),
-    alternates: { canonical: "/refund" },
+    alternates: seo.alternates,
     robots: { index: true, follow: true },
   };
 }

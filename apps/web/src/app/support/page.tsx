@@ -6,6 +6,7 @@ import { DOCS_URL } from "@/lib/docs-links";
 import { resolveEloziSupportChannel } from "@/lib/elozi-support";
 import { legalLinks } from "@/lib/legal-links";
 import { hasSession } from "@/server/auth";
+import { publicPageUrls } from "@/server/public-seo";
 import { eloziIdentityKey } from "@/server/support-identity";
 import "../landing.css";
 import "./support.css";
@@ -23,17 +24,19 @@ type SupportChannel = {
 type FaqItem = { q: string; a: string; link: { label: string; href: string } };
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seo = await publicPageUrls(canonical);
   const t = await getTranslations("support");
   const description = t("meta.description");
   return {
     title: { absolute: t("meta.title") },
     description,
-    alternates: { canonical },
+    alternates: seo.alternates,
     robots: { index: true, follow: true },
     openGraph: {
       title: t("meta.title"),
       description,
-      url: canonical,
+      url: seo.url,
+      locale: seo.ogLocale,
       type: "website",
       images: [{ url: "/og.jpg", width: 1280, height: 640, alt: "MepMail" }],
     },

@@ -9,7 +9,13 @@ import ptCorreio from "../messages/pt-BR/correio.json";
 import ptLanding from "../messages/pt-BR/landing.json";
 
 type Locale = "en" | "pt-BR";
-const current = vi.hoisted(() => ({ locale: "en" as Locale }));
+const current = vi.hoisted(() => ({ locale: "en" as Locale, urlLocale: null as Locale | null }));
+
+// The language a URL names (?lang=pt-BR) reaches the page as the proxy's header.
+vi.mock("next/headers", () => ({
+  headers: async () =>
+    new Headers(current.urlLocale ? { "x-mepmail-url-locale": current.urlLocale } : {}),
+}));
 
 // Only shared client chrome is isolated; the page, its sections and real catalogs render.
 vi.mock("@/components/site-chrome", () => ({
@@ -449,7 +455,24 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
       title: copy.meta.title,
       description: copy.meta.description,
       url: "/correio",
+      locale: locale === "pt-BR" ? "pt_BR" : "en_US",
     });
+    // Both languages are announced to search engines, the plain path as x-default.
+    expect(metadata.alternates?.languages).toEqual({
+      en: "/correio",
+      "pt-BR": "/correio?lang=pt-BR",
+      "x-default": "/correio",
+    });
+    // Opened from the URL that names the language, the page is its own canonical.
+    current.urlLocale = locale;
+    try {
+      const named = await generateMetadata();
+      const own = locale === "pt-BR" ? "/correio?lang=pt-BR" : "/correio";
+      expect(named.alternates?.canonical).toBe(own);
+      expect(named.openGraph).toMatchObject({ url: own });
+    } finally {
+      current.urlLocale = null;
+    }
   });
 });
 

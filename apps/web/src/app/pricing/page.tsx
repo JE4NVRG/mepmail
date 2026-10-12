@@ -11,6 +11,7 @@ import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
 import { formatBrl, formatUsd } from "@/lib/landing-pricing";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
+import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
 import "./pricing.css";
 
@@ -20,6 +21,7 @@ const canonical = "/pricing";
 type FaqItem = { q: string; a: string };
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seo = await publicPageUrls(canonical);
   const t = await getTranslations("pricing");
   const description = t(
     process.env.SEND_LAUNCH_OFFER_ENABLED === "true"
@@ -29,12 +31,13 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t("meta.title"),
     description,
-    alternates: { canonical },
+    alternates: seo.alternates,
     robots: { index: true, follow: true },
     openGraph: {
       title: t("meta.title"),
       description,
-      url: canonical,
+      url: seo.url,
+      locale: seo.ogLocale,
       type: "website",
       images: [{ url: "/og.jpg", width: 1280, height: 640, alt: "MepMail" }],
     },

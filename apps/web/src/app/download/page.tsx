@@ -12,6 +12,7 @@ import {
   WINDOWS_STORE_URL,
 } from "@/lib/desktop-download";
 import { legalLinks } from "@/lib/legal-links";
+import { publicPageUrls } from "@/server/public-seo";
 import latest from "../../../public/desktop/correio/latest.json";
 import "../landing.css";
 import "./download.css";
@@ -22,16 +23,18 @@ const SOURCE_URL = "https://github.com/JE4NVRG/mepmail/tree/main/apps/desktop";
 type Feature = { title: string; body: string };
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seo = await publicPageUrls(DESKTOP_DOWNLOAD_URL);
   const t = await getTranslations("desktop.hub");
   return {
     title: { absolute: t("meta.title") },
     description: t("meta.description"),
-    alternates: { canonical: DESKTOP_DOWNLOAD_URL },
+    alternates: seo.alternates,
     robots: { index: true, follow: true },
     openGraph: {
       title: t("meta.title"),
       description: t("meta.description"),
-      url: DESKTOP_DOWNLOAD_URL,
+      url: seo.url,
+      locale: seo.ogLocale,
       type: "website",
       images: [{ url: "/og.jpg", width: 1280, height: 640, alt: "MepMail" }],
     },

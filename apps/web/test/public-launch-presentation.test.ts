@@ -23,6 +23,8 @@ const messages = (locale: Locale) =>
 vi.mock("@millionsend/core", async () => ({
   PLAN_RUNGS: (await import("../../../packages/core/src/plans")).PLAN_RUNGS,
 }));
+// Pages read the language a URL names (?lang=) from the proxy header; none here.
+vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("next-intl/server", () => ({
   getLocale: async () => current.locale,
   getTranslations: async (namespace: "landing" | "pricing" | "alternatives" | "correio") =>

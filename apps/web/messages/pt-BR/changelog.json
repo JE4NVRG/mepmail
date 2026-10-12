@@ -24,6 +24,22 @@
   },
   "releases": [
     {
+      "version": "0.132",
+      "date": "2026-10-12",
+      "title": "Site em português encontrável no Google",
+      "summary": "As páginas públicas em português agora têm endereço próprio (?lang=pt-BR), então o Google pode indexá-las e mostrar o MepMail em português para quem busca no Brasil.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "Os buscadores não mandam cookie nem idioma do navegador e por isso só viam o site em inglês. Cada página pública agora existe também em português, em ?lang=pt-BR, com canonical próprio.",
+            "Todas as páginas públicas declaram as duas versões (hreflang en, pt-BR e x-default), e o sitemap lista cada página nos dois idiomas.",
+            "O seletor PT/EN continua lembrando sua escolha; num endereço com ?lang= ele troca o endereço também."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.131",
       "date": "2026-10-12",
       "title": "Excluir caixa, com 30 dias para voltar atrás",

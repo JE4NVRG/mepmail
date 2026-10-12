@@ -35,3 +35,22 @@ describe("the unsubscribe host", () => {
     expect(proxy(request("https://app.example.com/login")).status).toBe(200);
   });
 });
+
+describe("the language a public URL names", () => {
+  const forwarded = (url: string, headers: Record<string, string> = {}) =>
+    proxy(new NextRequest(url, { headers: { host: new URL(url).host, ...headers } })).headers.get(
+      "x-middleware-request-x-mepmail-url-locale",
+    );
+
+  it("forwards ?lang= to the request config when it is a language we speak", () => {
+    expect(forwarded("https://mepmail.dev/pricing?lang=pt-BR")).toBe("pt-BR");
+    expect(forwarded("https://mepmail.dev/?lang=en")).toBe("en");
+  });
+
+  it("ignores unknown languages and never trusts the header a caller sends", () => {
+    expect(forwarded("https://mepmail.dev/pricing?lang=fr")).toBeNull();
+    expect(
+      forwarded("https://mepmail.dev/pricing", { "x-mepmail-url-locale": "pt-BR" }),
+    ).toBeNull();
+  });
+});

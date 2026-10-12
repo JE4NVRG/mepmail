@@ -9,6 +9,7 @@ import {
 import { StackLogoRow } from "@/components/stack-logos";
 import { legalLinks } from "@/lib/legal-links";
 import { STACK_SLUGS } from "@/lib/stack-logos";
+import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
 import "./integrations.css";
 
@@ -37,17 +38,19 @@ type AccessLabel = "product" | "endpoint" | "credential" | "permissions";
 type Credential = { name: string; where: string; body: string };
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seo = await publicPageUrls(canonical);
   const t = await getTranslations("integrations");
   const description = t("meta.description");
   return {
     title: { absolute: t("meta.title") },
     description,
-    alternates: { canonical },
+    alternates: seo.alternates,
     robots: { index: true, follow: true },
     openGraph: {
       title: t("meta.title"),
       description,
-      url: canonical,
+      url: seo.url,
+      locale: seo.ogLocale,
       type: "website",
       images: [{ url: "/og.jpg", width: 1280, height: 640, alt: "MepMail" }],
     },

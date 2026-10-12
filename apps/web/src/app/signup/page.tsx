@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { AuthForm } from "@/components/auth/auth-form";
 import { enabledSocialProviders, hasSession } from "@/server/auth";
+import { publicPageUrls } from "@/server/public-seo";
 import { accountMailDelayed } from "@/server/ses-pause";
 
 // Server component so the env-derived social-provider flags reach the client
@@ -25,10 +26,11 @@ export default async function SignupPage() {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seo = await publicPageUrls("/signup");
   const t = await getTranslations("auth");
   return {
     title: t("signup.submit"),
-    alternates: { canonical: "/signup" },
+    alternates: seo.alternates,
     robots: { index: true, follow: true },
   };
 }

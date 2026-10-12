@@ -10,23 +10,26 @@ import {
 import { RESEND_PRICING_SOURCE, resendSavings } from "@/lib/alternatives-resend";
 import { formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricing";
 import { legalLinks } from "@/lib/legal-links";
+import { publicPageUrls } from "@/server/public-seo";
 import "../../landing.css";
 
 const contact = "mailto:suporte@mepmail.dev";
 const canonical = "/alternatives/resend";
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seo = await publicPageUrls(canonical);
   const t = await getTranslations("alternatives");
   const description = t("meta.description");
   return {
     title: t("meta.title"),
     description,
-    alternates: { canonical },
+    alternates: seo.alternates,
     robots: { index: true, follow: true },
     openGraph: {
       title: t("meta.title"),
       description,
-      url: canonical,
+      url: seo.url,
+      locale: seo.ogLocale,
       type: "website",
       images: [{ url: "/og.jpg", width: 1280, height: 640, alt: "MepMail" }],
     },
