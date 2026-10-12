@@ -322,8 +322,8 @@
     "navAria": "Rodapé",
     "tagline": "MepMail · E-mail no seu domínio para pessoas e agentes, e envio para a sua aplicação",
     "points": [
-      "Correio: caixas para você, o time e seus agentes",
       "Envio: API, SMTP e MCP sobre o Amazon SES",
+      "Correio: caixas para você, o time e seus agentes",
       "Auto-hospede com Docker, ou deixe com a gente"
     ],
     "cta": "Criar conta grátis",

@@ -322,8 +322,8 @@
     "navAria": "Footer",
     "tagline": "MepMail · Email on your domain for people and agents, plus sending for your app",
     "points": [
-      "Mail: mailboxes for you, your team and your agents",
       "Send: API, SMTP and MCP on Amazon SES",
+      "Mail: mailboxes for you, your team and your agents",
       "Self-host with Docker, or let us run it"
     ],
     "cta": "Create free account",

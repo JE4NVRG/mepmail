@@ -123,10 +123,10 @@ describe.each(["en", "pt-BR"] as const)("billing maintenance notice in %s", (loc
 });
 
 it.each([enCorreio, ptCorreio])(
-  "describes only supported To and Cc recipient deliveries",
+  "counts To, Cc and Bcc recipients, as the outbound transport does",
   (messages) => {
-    expect(messages.preview.recipients).toContain("To");
+    expect(messages.preview.recipients).toMatch(/\b(To|Para)\b/);
     expect(messages.preview.recipients).toContain("Cc");
-    expect(messages.preview.recipients).not.toMatch(/\bBcc\b/i);
+    expect(messages.preview.recipients).toMatch(/\b(Bcc|Cco)\b/);
   },
 );
