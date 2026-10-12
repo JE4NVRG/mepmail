@@ -159,6 +159,7 @@ export default async function CorreioPage() {
 
         <section
           className="correio-section correio-alternate"
+          id="controle"
           aria-labelledby="correio-control-title"
         >
           <div className="gtm-container correio-control-grid">

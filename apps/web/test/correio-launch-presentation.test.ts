@@ -94,8 +94,8 @@ const expectations = {
     legacyPreserved: /Existing US\$ 20 contracts keep their price/,
     authorizedEarlierPlan:
       /earlier accounts authorized for Mail may keep their current Send plan when adding mailboxes/,
-    systemUnlimited:
-      /System[\s\S]*50 GiB per mailbox[\s\S]*no commercial mailbox or delivery limits/i,
+    // The internal license is an operator detail: the public page never names it.
+    internalWording: /\bSystem\b|exempt/i,
     paidSeparately: /Mail is paid separately/,
     sendOnly: "Send only",
     combined: "Send + Mail",
@@ -107,7 +107,7 @@ const expectations = {
     introRestricted:
       /US\$ 20 only for the first monthly Send bill of customers who never paid MepMail; then US\$ 29\/month/,
     mailNoDiscount: /Mail does not receive this discount/,
-    recipientAccounting: /To and Cc count; this is not a limit on distinct contacts/,
+    recipientAccounting: /To, Cc and Bcc count; this is not a limit on distinct contacts/,
     noSubscriptionChange: /does not purchase a plan or change your subscription/,
     rest: "Mail · REST API",
     dedicatedKey: /a key dedicated to the mailbox/,
@@ -136,7 +136,7 @@ const expectations = {
     legacyPreserved: /Contratos antigos de US\$ 20 mantêm o preço/,
     authorizedEarlierPlan:
       /contas anteriores autorizadas para o Correio podem manter o plano atual de Envio ao adicionar caixas/,
-    systemUnlimited: /System[\s\S]*50 GiB por caixa[\s\S]*sem limites comerciais/i,
+    internalWording: /\bSystem\b|isent/i,
     paidSeparately: /Correio é pago à parte/,
     sendOnly: "Só Envio",
     combined: "Envio + Correio",
@@ -148,7 +148,7 @@ const expectations = {
     introRestricted:
       /US\$ 20 só na primeira mensalidade de Envio de quem nunca pagou o MepMail; depois US\$ 29\/mês/,
     mailNoDiscount: /Correio não recebe esse desconto/,
-    recipientAccounting: /To e Cc contam; não é limite de contatos diferentes/,
+    recipientAccounting: /Para, Cc e Cco contam; não é limite de contatos diferentes/,
     noSubscriptionChange: /não contrata um plano nem altera sua assinatura/,
     rest: "Correio · API REST",
     dedicatedKey: /uma chave dedicada à caixa/,
@@ -239,14 +239,14 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
     expect(plans).not.toContain(expected.annualUpfront);
   });
 
-  it("qualifies Mail by the recurring base while preserving old contracts and internal System access", () => {
+  it("qualifies Mail by the recurring base while preserving old contracts, with no internal wording", () => {
     const plansHtml = section(html, "correio-plans-title");
     const plans = textContent(plansHtml);
     expect(plans).toMatch(expected.minimumPlan);
     expect(plans).toMatch(expected.recurringEligibility);
     expect(plans).toMatch(expected.legacyPreserved);
     expect(plans).toMatch(expected.authorizedEarlierPlan);
-    expect(textContent(html)).toMatch(expected.systemUnlimited);
+    expect(textContent(html)).not.toMatch(expected.internalWording);
   });
 
   it("keeps the mailbox REST API distinct from the Send MCP", () => {

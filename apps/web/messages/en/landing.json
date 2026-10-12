@@ -3,13 +3,13 @@
     "title": "MepMail: Send emails. Keep building.",
     "description": "Notifications, receipts and campaigns through API, SMTP or AI agents. Manage your sending in one dashboard. Start free, no credit card.",
     "domainTitle": "MepMail: your domain, your email, your agents",
-    "domainDescription": "Email on your domain without hosting, for you and your AI agents in the same mailbox. Plans from US$ 2.90 a month, with 7 days free. Plus sending by API, SMTP and MCP for your product."
+    "domainDescription": "Email on your domain for you and your AI agents, plus sending by API, SMTP and MCP for your app, in one account. Mail from US$ 2.90 a month, with 7 days free with a card."
   },
   "skip": "Skip to content",
   "brandAria": "MepMail home",
   "navAria": "Main navigation",
   "nav": {
-    "product": "Product",
+    "product": "Send",
     "correio": "Mail",
     "integrations": "Integrations",
     "pricing": "Pricing",
@@ -19,7 +19,7 @@
     "compare": "Compare prices",
     "plans": "Plans",
     "mcp": "MCP",
-    "how": "How it works",
+    "how": "Set up the sending domain",
     "alternatives": "vs Resend",
     "changelog": "Changelog",
     "login": "Sign in",
@@ -63,10 +63,10 @@
   "domainHero": {
     "eyebrow": "Email on your domain · for you and your agents",
     "title": "Your domain. Your email. Your agents. All in one place.",
-    "lead": "Bought a domain? Get email on it without paying for hosting. Use it every day and connect agents to the mailboxes you choose.",
+    "lead": "Your professional email, your app's emails and your agents' mailboxes in one place. One domain, one account and one dashboard, without buying hosting.",
     "cta": "Create email on my domain",
     "secondary": "See how it works",
-    "note": "Plans from {price} a month, with 7 days free.",
+    "note": "Mail from {price} a month, with 7 days free with a card: billing starts when the trial ends unless you cancel before.",
     "sendLink": "Looking for the sending API? Meet Send"
   },
   "story": {
@@ -102,7 +102,7 @@
   "stack": {
     "eyebrow": "Works with your stack",
     "aria": "Integrations and languages that work with MepMail",
-    "note": "The n8n community node, Slack/Discord/Telegram notification channels, the official SDKs the API is drop-in compatible with, Docker for self-hosting and plain cURL. One API key and one verified domain cover all of them.",
+    "note": "The community n8n node, Slack/Discord/Telegram notification channels, the official SDKs the API is drop-in compatible with, Docker to self-host and plain cURL. Each integration uses the right credential: a Send key, a mailbox key or OAuth.",
     "pageCta": "See all integrations"
   },
   "compare": {
@@ -320,11 +320,11 @@
   },
   "footer": {
     "navAria": "Footer",
-    "tagline": "MepMail · Transactional email with assisted onboarding",
+    "tagline": "MepMail · Email on your domain for people and agents, plus sending for your app",
     "points": [
-      "Amazon SES in production",
-      "Self-host with Docker, or let us run it",
-      "Compatible sending flows, guided migration"
+      "Mail: mailboxes for you, your team and your agents",
+      "Send: API, SMTP and MCP on Amazon SES",
+      "Self-host with Docker, or let us run it"
     ],
     "cta": "Create free account",
     "colProduct": "Product",
@@ -361,10 +361,36 @@
       "Connect Claude, Cursor or any agent through the Mail MCP, no code.",
       "You choose what each agent can do: read, draft or send."
     ],
-    "price": "From {price} a month: Solo with 1 mailbox, Duo with 3 or Equipe with 10, with 7 days free.",
+    "price": "From {price} a month: Solo with 1 mailbox, Duo with 3 or Team with 10. 7 days free with a card; cancel before it ends to avoid the charge.",
     "cta": "Explore Mail",
     "pricing": "See Mail pricing",
     "desktop": "Also on your computer:",
     "desktopAll": "See the apps"
+  },
+  "goals": {
+    "eyebrow": "Where to start",
+    "title": "Start with what you need. The rest is already in the same account.",
+    "items": {
+      "mail": {
+        "title": "My professional email",
+        "body": "Mailboxes on your domain for you and your team, in the browser and the Windows and Linux apps. Bring the history from your old provider and switch MX only once the mailboxes are ready.",
+        "fact": "Mail from {price}/month · 7 days free with a card",
+        "cta": "Explore Mail"
+      },
+      "agent": {
+        "title": "Email for my agent",
+        "body": "A mailbox like support@ where the agent reads, drafts and, if you allow it, sends. Without send permission, each reply waits for your approval in the same conversation.",
+        "fact": "Each agent mailbox uses one seat of the Mail plan · connect by MCP, API or n8n",
+        "cta": "See how agents are controlled"
+      },
+      "app": {
+        "title": "My app's emails",
+        "body": "Sign-up, password resets, notifications and campaigns by REST API or SMTP, sent from your verified domain, with logs and a suppression list.",
+        "fact": "Send Free: 100 emails a day, no card",
+        "cta": "Explore Send"
+      }
+    },
+    "both": "Or all three together: the same verified domain serves Mail and Send, and each keeps its own credential and limit.",
+    "bothCta": "See prices by scenario"
   }
 }

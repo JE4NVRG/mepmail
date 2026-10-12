@@ -576,3 +576,56 @@
 .cro .cro-story .cro-desktop a {
   color: var(--ms-bone);
 }
+
+/* "Where to start": three goals, each with its product, price and next step. */
+.cro .cro-goals h2 {
+  max-width: 720px;
+}
+.cro-goals-list {
+  display: grid;
+  gap: 16px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.cro-goal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px;
+  border: 1px solid var(--ms-line);
+  border-radius: 12px;
+  background: var(--ms-panel);
+}
+.cro main .cro-goal h3,
+.cro main .cro-goal p {
+  margin: 0;
+}
+.cro main .cro-goal p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.cro main .cro-goal .cro-goal-fact {
+  color: var(--ms-violet);
+  font-size: 13px;
+}
+.cro-goal-link {
+  margin-top: auto;
+  padding-top: 6px;
+  color: var(--ms-bone);
+  font-size: 14px;
+  font-weight: 600;
+}
+.cro main .cro-goals-both {
+  margin: 20px 0 0;
+  color: var(--ms-muted);
+  font-size: 14px;
+}
+.cro-goals-both a {
+  color: var(--ms-bone);
+}
+@media (min-width: 900px) {
+  .cro-goals-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

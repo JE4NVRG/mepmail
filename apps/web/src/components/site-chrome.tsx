@@ -89,6 +89,14 @@ function anchorHref(page: PublicPage, hash: string): string {
   return page === "landing" ? hash : `/${hash}`;
 }
 
+/** Where "Send" lands on the home: its own section once Correio leads the page. */
+function sendAnchor(): string {
+  return process.env.MAILBOX_EARLY_ACCESS_OPEN === "true" &&
+    process.env.MAILBOX_STANDALONE_OPEN === "true"
+    ? "#envio"
+    : "#product";
+}
+
 /** Documentação oficial do produto (host separado do painel). */
 const DOCS_URL = "https://docs.mepmail.dev";
 
@@ -152,7 +160,7 @@ export function PublicHeader({
           </div>
           <LandingNav label={labels.navAria} menuLabel={labels.nav.menu}>
             <div className="gtm-nav-links">
-              <a href={anchorHref(page, "#product")}>{labels.nav.product}</a>
+              <a href={anchorHref(page, sendAnchor())}>{labels.nav.product}</a>
               {labels.nav.correio ? (
                 <a href="/correio" aria-current={page === "correio" ? "page" : undefined}>
                   {labels.nav.correio}

@@ -1,32 +1,60 @@
 {
   "meta": {
     "title": "Changelog — what shipped in MepMail",
-    "description": "Every recent MepMail release, newest first — what changed for you, and the day it shipped."
+    "description": "Every MepMail release, newest first: what changed for you and the day it shipped."
   },
   "hero": {
     "eyebrow": "Changelog",
     "title": "What <highlight>shipped</highlight>, release by release.",
-    "lead": "MepMail is built in the open. Here is every recent release, newest first — what changed for you, dated the day it shipped. The raw history lives in the repository's CHANGELOG.md.",
-    "note": "The beta is open and self-serve: create a free account, no card required.",
-    "badges": [
-      "Open beta · self-serve",
-      "Dated releases",
-      "EN + PT-BR",
-      "Backed by CHANGELOG.md"
-    ],
+    "lead": "MepMail is built in the open. This is the list of releases, newest first: what changed for you, dated by the day it shipped.",
+    "note": "Create a free account: Send starts with no card.",
+    "badges": ["Dated releases", "EN + PT-BR", "Full history on this page"],
     "ctaDocs": "Read the docs"
   },
   "feed": {
     "eyebrow": "Releases",
     "title": "Recent releases",
-    "body": "The six most recent releases. Older history lives in the repository changelog.",
+    "body": "The {recent, number} most recent releases are open. The {older, number} earlier ones, back to v{first}, are folded right below.",
     "labels": {
       "added": "Added",
       "changed": "Changed",
       "fixed": "Fixed"
-    }
+    },
+    "olderTitle": "Earlier releases ({count, number})"
   },
   "releases": [
+    {
+      "version": "0.127",
+      "date": "2026-10-11",
+      "title": "MepMail explained as one product: Mail, Send and agents",
+      "summary": "The site now presents Mail, agent mailboxes and Send as parts of one account, says which credential each integration uses, shows the Mail trial's card and charge where you decide, and prices common setups.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Home: “Where to start”, with three ways in (my professional email, email for my agent, my app's emails), each with its product, price and next step.",
+            "Pricing: what common setups cost, as sums of the separate plans (no bundle), plus answers on how usage is counted and on using Mail and Send together.",
+            "Integrations: a “which credential to use” section, and each card now lists its product, endpoint, credential and permissions."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Every “7 days free” for Mail now says the trial takes a card and bills when it ends unless you cancel, and pricing lists the trial's sending limits.",
+            "Usage is described the way it is counted: each recipient (To, Cc and Bcc) counts. Mail counts outbound recipients.",
+            "The footer, the default page description, the sign-up panel and the navigation now cover Mail and Send, and the OAuth consent says which sends need your approval.",
+            "The changelog opens the latest 10 releases and folds the earlier ones, instead of promising six."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Removed the claim that one API key covers every integration: Send keys, mailbox keys and OAuth reach different things.",
+            "Removed internal wording about the operator's license from public pages, and Mail actions in the team audit log now show readable labels."
+          ]
+        }
+      ]
+    },
     {
       "version": "0.126",
       "date": "2026-10-11",
@@ -306,9 +334,7 @@
         },
         {
           "kind": "fixed",
-          "items": [
-            "An open draft shows its send status once, not twice."
-          ]
+          "items": ["An open draft shows its send status once, not twice."]
         }
       ]
     },
@@ -572,9 +598,7 @@
         },
         {
           "kind": "changed",
-          "items": [
-            "New-mail notices stay quiet while an import is running."
-          ]
+          "items": ["New-mail notices stay quiet while an import is running."]
         }
       ]
     },
@@ -751,9 +775,7 @@
         },
         {
           "kind": "changed",
-          "items": [
-            "The Correio list got faster still in mailboxes with many HTML messages."
-          ]
+          "items": ["The Correio list got faster still in mailboxes with many HTML messages."]
         }
       ]
     },
@@ -830,9 +852,7 @@
         },
         {
           "kind": "fixed",
-          "items": [
-            "Dragging or bulk-moving to a folder also works in the all-mailboxes view."
-          ]
+          "items": ["Dragging or bulk-moving to a folder also works in the all-mailboxes view."]
         }
       ]
     },
@@ -1065,9 +1085,7 @@
         },
         {
           "kind": "fixed",
-          "items": [
-            "The conversation count sits on the sender's line."
-          ]
+          "items": ["The conversation count sits on the sender's line."]
         }
       ]
     },
@@ -1101,9 +1119,7 @@
         },
         {
           "kind": "changed",
-          "items": [
-            "Moving a message to the trash keeps you in the folder you were in."
-          ]
+          "items": ["Moving a message to the trash keeps you in the folder you were in."]
         }
       ]
     },

@@ -3,13 +3,13 @@
     "title": "MepMail: Envie e-mails. Continue construindo.",
     "description": "Notificações, recibos e campanhas por API, SMTP ou agentes de IA. Controle seus envios em um só painel. Comece grátis, sem cartão.",
     "domainTitle": "MepMail: seu domínio, seu e-mail, seus agentes",
-    "domainDescription": "E-mail no seu domínio sem hospedagem, para você e seus agentes de IA na mesma caixa. Planos a partir de US$ 2,90 por mês (R$ 14,90 no Brasil), com 7 dias grátis. E envio por API, SMTP e MCP para o seu produto."
+    "domainDescription": "E-mail no seu domínio para você e seus agentes de IA, e envio por API, SMTP e MCP para a sua aplicação, na mesma conta. Correio a partir de US$ 2,90 por mês (R$ 14,90 no Brasil), com 7 dias grátis com cartão."
   },
   "skip": "Pular para o conteúdo",
   "brandAria": "MepMail início",
   "navAria": "Navegação principal",
   "nav": {
-    "product": "Produto",
+    "product": "Envio",
     "correio": "Correio",
     "integrations": "Integrações",
     "pricing": "Preços",
@@ -19,7 +19,7 @@
     "compare": "Comparar preços",
     "plans": "Planos",
     "mcp": "MCP",
-    "how": "Como funciona",
+    "how": "Configurar o domínio de envio",
     "alternatives": "vs Resend",
     "changelog": "Changelog",
     "login": "Entrar",
@@ -63,10 +63,10 @@
   "domainHero": {
     "eyebrow": "E-mail no seu domínio · para você e seus agentes",
     "title": "Seu domínio. Seu e-mail. Seus agentes. Tudo no mesmo lugar.",
-    "lead": "Comprou um domínio? Tenha e-mail nele sem contratar hospedagem. Use no dia a dia e conecte agentes às caixas que escolher.",
+    "lead": "Seu e-mail profissional, os e-mails da sua aplicação e as caixas dos seus agentes no mesmo lugar. Um domínio, uma conta e um painel, sem contratar hospedagem.",
     "cta": "Criar e-mail no meu domínio",
     "secondary": "Ver como funciona",
-    "note": "Planos a partir de {price} por mês (R$ 14,90 no Brasil), com 7 dias grátis.",
+    "note": "Correio a partir de {price} por mês (R$ 14,90 no Brasil), com 7 dias grátis com cartão: a cobrança começa no fim do teste, a menos que você cancele antes.",
     "sendLink": "Procura a API de envio? Conheça o Envio"
   },
   "story": {
@@ -102,7 +102,7 @@
   "stack": {
     "eyebrow": "Funciona com a sua stack",
     "aria": "Integrações e linguagens que funcionam com o MepMail",
-    "note": "Node comunitário do n8n, canais de notificação Slack/Discord/Telegram, os SDKs oficiais com os quais a API é compatível por drop-in, Docker para auto-hospedar e cURL puro. Uma API key e um domínio verificado cobrem tudo isso.",
+    "note": "Node comunitário do n8n, canais de notificação Slack/Discord/Telegram, os SDKs oficiais com os quais a API é compatível por drop-in, Docker para auto-hospedar e cURL puro. Cada integração usa a credencial certa: chave de Envio, chave de caixa ou OAuth.",
     "pageCta": "Ver todas as integrações"
   },
   "compare": {
@@ -320,11 +320,11 @@
   },
   "footer": {
     "navAria": "Rodapé",
-    "tagline": "MepMail · E-mail transacional com implantação assistida",
+    "tagline": "MepMail · E-mail no seu domínio para pessoas e agentes, e envio para a sua aplicação",
     "points": [
-      "Amazon SES em produção",
-      "Auto-hospede com Docker, ou deixe com a gente",
-      "Fluxos de envio compatíveis, migração acompanhada"
+      "Correio: caixas para você, o time e seus agentes",
+      "Envio: API, SMTP e MCP sobre o Amazon SES",
+      "Auto-hospede com Docker, ou deixe com a gente"
     ],
     "cta": "Criar conta grátis",
     "colProduct": "Produto",
@@ -361,10 +361,36 @@
       "Conecte Claude, Cursor ou outro agente pelo MCP do Correio, sem código.",
       "Você escolhe o que cada agente pode fazer: ler, rascunhar ou enviar."
     ],
-    "price": "A partir de {price} por mês (R$ 14,90 no Brasil): Solo com 1 caixa, Duo com 3 ou Equipe com 10, com 7 dias grátis.",
+    "price": "A partir de {price} por mês (R$ 14,90 no Brasil): Solo com 1 caixa, Duo com 3 ou Equipe com 10. 7 dias grátis com cartão; cancele antes do fim para não ser cobrado.",
     "cta": "Conhecer o Correio",
     "pricing": "Ver preços do Correio",
     "desktop": "Também no computador:",
     "desktopAll": "Ver os apps"
+  },
+  "goals": {
+    "eyebrow": "Por onde começar",
+    "title": "Comece pelo que você precisa. O resto já está na mesma conta.",
+    "items": {
+      "mail": {
+        "title": "Meu e-mail profissional",
+        "body": "Caixas no seu domínio para você e o time, no navegador e nos apps para Windows e Linux. Traga o histórico do provedor antigo e só troque o MX quando as caixas estiverem prontas.",
+        "fact": "Correio a partir de {price}/mês · 7 dias grátis com cartão",
+        "cta": "Conhecer o Correio"
+      },
+      "agent": {
+        "title": "E-mail para o meu agente",
+        "body": "Uma caixa como suporte@ para o agente ler, rascunhar e, se você permitir, enviar. Sem permissão de envio, cada resposta espera a sua aprovação na mesma conversa.",
+        "fact": "Cada caixa de agente usa uma vaga do plano do Correio · conecte por MCP, API ou n8n",
+        "cta": "Ver o controle do agente"
+      },
+      "app": {
+        "title": "E-mails da minha aplicação",
+        "body": "Cadastro, recuperação de senha, notificações e campanhas por API REST ou SMTP, saindo do seu domínio verificado, com logs e lista de supressão.",
+        "fact": "Envio Free: 100 e-mails por dia, sem cartão",
+        "cta": "Ver o Envio"
+      }
+    },
+    "both": "Ou os três juntos: o mesmo domínio verificado serve ao Correio e ao Envio, e cada frente tem a sua credencial e o seu limite.",
+    "bothCta": "Ver preços por cenário"
   }
 }

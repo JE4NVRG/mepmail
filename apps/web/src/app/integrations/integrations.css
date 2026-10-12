@@ -1,0 +1,66 @@
+/* /integrations: the three credentials, then each card's product, endpoint,
+   credential and permissions as a compact definition list. */
+.integrations-credentials-title {
+  margin: 0 0 8px;
+}
+.integrations-credentials-lead {
+  margin: 0 0 24px;
+  color: var(--ms-muted);
+}
+.integrations-credentials {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.integrations-credentials li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+  border: 1px solid var(--ms-line);
+  border-radius: 12px;
+  background: var(--ms-panel);
+}
+.integrations-credentials h3 {
+  margin: 0;
+  font-family: var(--ms-font-mono);
+  font-size: 15px;
+}
+.integrations-credentials p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.integrations-credentials .integrations-credential-where {
+  color: var(--ms-violet);
+  font-size: 13px;
+}
+@media (min-width: 900px) {
+  .integrations-credentials {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.integration-access {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ms-line);
+  border-radius: 8px;
+  background: var(--ms-panel-raised);
+  font-size: 13px;
+}
+.integration-access div {
+  display: grid;
+  grid-template-columns: minmax(84px, max-content) minmax(0, 1fr);
+  gap: 10px;
+}
+.integration-access dt {
+  color: var(--ms-muted);
+}
+.integration-access dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

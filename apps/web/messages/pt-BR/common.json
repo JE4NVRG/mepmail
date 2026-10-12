@@ -2,7 +2,7 @@
   "appName": "MepMail",
   "meta": {
     "title": "MepMail · A plataforma de e-mail open-source",
-    "description": "API de e-mail open-source compatível com a Resend, sobre AWS SES. Self-host grátis ou nuvem: 100 e-mails por dia grátis, sem cartão. Migre da Resend com duas variáveis de ambiente."
+    "description": "E-mail no seu domínio para pessoas e agentes de IA, e envio por API, SMTP e MCP para a sua aplicação. Open-source, sobre o Amazon SES. O Envio começa grátis, com 100 e-mails por dia e sem cartão."
   },
   "copy": "Copiar",
   "copied": "Copiado",

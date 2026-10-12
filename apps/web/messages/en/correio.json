@@ -129,7 +129,7 @@
     "sending": {
       "label": "For your application",
       "title": "Send only",
-      "body": "New offer: 110,000 deliveries each month for a recurring US$ 29. New customers pay US$ 20 only for the first monthly bill. Send can be used without mailboxes; existing subscriptions are preserved.",
+      "body": "110,000 emails each month for a recurring US$ 29; new customers pay US$ 20 only for the first monthly bill. Send can be used without mailboxes, and existing subscriptions are preserved.",
       "link": "Compare Send plans"
     },
     "mail": {
@@ -199,7 +199,7 @@
     "quantityError": "Use a whole number from 1 to 50.",
     "invalidQuote": "Enter a valid quantity to calculate the total.",
     "mailboxSelection": "{size} GiB Mail",
-    "recipients": "{count, number} outbound deliveries per month, per mailbox. To and Cc count; this is not a limit on distinct contacts.",
+    "recipients": "{count, number} outbound recipients per month, per mailbox. To, Cc and Bcc count; this is not a limit on distinct contacts.",
     "sendingLabel": "Send only",
     "combinedLabel": "Send + Mail",
     "sendingPlan": "{count, number} Send deliveries per month",
@@ -225,7 +225,7 @@
     "items": [
       {
         "q": "Do I need a Send plan to use Mail?",
-        "a": "No. Mail plans work on their own: Solo US$ 2.90 a month with 1 mailbox, Duo US$ 5.90 with 3 or Equipe US$ 12.90 with 10, with 7 days free. Each plan's storage, sends and received messages are shared by its mailboxes, with up to 3 domains. Existing subscriptions keep their terms without automatic migration. The internal System license remains exempt, with 50 GiB per mailbox and no commercial mailbox or delivery limits."
+        "a": "No. Mail plans work on their own: Solo US$ 2.90 a month with 1 mailbox, Duo US$ 5.90 with 3 or Equipe US$ 12.90 with 10, with 7 days free with a card (billing starts when the trial ends unless you cancel before). Each plan's storage, sends and received messages are shared by its mailboxes, with up to 3 domains. Existing subscriptions keep their terms without automatic migration."
       },
       {
         "q": "I bought a domain. Can I create any address now?",
@@ -260,12 +260,12 @@
   "close": {
     "eyebrow": "The next address could be your agent's",
     "title": "Your company talks. You follow.",
-    "body": "Mail is open to everyone. Add mailboxes for you, your team or your agent from the dashboard: plans from US$ 2.90 a month, with 7 days free.",
-    "primary": "Explore Send plans",
+    "body": "Mail is open to everyone. Add mailboxes for you, your team or your agent from the dashboard: plans from US$ 2.90 a month, with 7 days free with a card (billing starts when the trial ends unless you cancel before).",
+    "primary": "See plans and pricing",
     "secondary": "Read the Mail documentation"
   },
   "release": {
-    "heroNote": "Mail plans from US$ 2.90 a month: Solo with 1 mailbox, Duo with 3 or Equipe with 10, with 7 days free. With or without Send. Subscribe from the dashboard.",
+    "heroNote": "Mail plans from US$ 2.90 a month: Solo with 1 mailbox, Duo with 3 or Equipe with 10, with 7 days free with a card (billing starts when the trial ends unless you cancel before). With or without Send. Subscribe from the dashboard.",
     "heroStatus": "Open to everyone, with or without a Send plan",
     "heroSecondary": "See plans and prices",
     "setupFirstTitle": "Choose how to subscribe",

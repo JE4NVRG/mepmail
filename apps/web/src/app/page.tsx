@@ -224,6 +224,47 @@ export default async function RootPage() {
               </div>
             </section>
 
+            {/* Three ways in, one account: each card names its product, price and next step. */}
+            <section
+              className="gtm-section cro-goals"
+              id="objetivos"
+              aria-labelledby="home-goals-title"
+            >
+              <div className="gtm-container">
+                <p className="gtm-eyebrow">{t("goals.eyebrow")}</p>
+                <h2 id="home-goals-title">{t("goals.title")}</h2>
+                <ul className="cro-goals-list">
+                  {(["mail", "agent", "app"] as const).map((goal) => (
+                    <li key={goal} className="cro-goal">
+                      <h3>{t(`goals.items.${goal}.title`)}</h3>
+                      <p>{t(`goals.items.${goal}.body`)}</p>
+                      <p className="cro-goal-fact">
+                        {t(`goals.items.${goal}.fact`, { price: mailFrom })}
+                      </p>
+                      <a
+                        className="cro-goal-link"
+                        href={
+                          goal === "mail"
+                            ? "/correio"
+                            : goal === "agent"
+                              ? "/correio#controle"
+                              : "#envio"
+                        }
+                      >
+                        {t(`goals.items.${goal}.cta`)} <span aria-hidden="true">→</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+                <p className="cro-goals-both">
+                  {t("goals.both")}{" "}
+                  <a href="/pricing#cenarios">
+                    {t("goals.bothCta")} <span aria-hidden="true">→</span>
+                  </a>
+                </p>
+              </div>
+            </section>
+
             <section
               className="gtm-section gtm-alt cro-story"
               id="correio"

@@ -1,32 +1,60 @@
 {
   "meta": {
     "title": "Changelog — o que saiu no MepMail",
-    "description": "Todas as releases recentes do MepMail, mais novas primeiro — o que mudou pra você e o dia em que saiu."
+    "description": "Todas as releases do MepMail, mais novas primeiro: o que mudou para você e o dia em que saiu."
   },
   "hero": {
     "eyebrow": "Changelog",
     "title": "O que <highlight>saiu</highlight>, release a release.",
-    "lead": "O MepMail é construído aberto. Esta é a lista corrida de releases, mais novas primeiro — o que mudou pra você, datado pelo dia em que saiu. O histórico bruto vive no CHANGELOG.md do repositório.",
-    "note": "A beta está aberta e é self-serve: crie uma conta grátis, sem cartão.",
-    "badges": [
-      "Beta aberta · self-serve",
-      "Releases datadas",
-      "EN + PT-BR",
-      "Apoiado no CHANGELOG.md"
-    ],
+    "lead": "O MepMail é construído aberto. Esta é a lista de releases, mais novas primeiro: o que mudou para você, com o dia em que saiu.",
+    "note": "Crie uma conta grátis: o Envio começa sem cartão.",
+    "badges": ["Releases datadas", "EN + PT-BR", "Histórico completo nesta página"],
     "ctaDocs": "Ler a documentação"
   },
   "feed": {
     "eyebrow": "Releases",
     "title": "Releases recentes",
-    "body": "As seis releases mais recentes. O histórico anterior está no changelog do repositório.",
+    "body": "As {recent, number} releases mais recentes aparecem abertas. As {older, number} anteriores, desde a v{first}, ficam logo abaixo.",
     "labels": {
       "added": "Adicionado",
       "changed": "Alterado",
       "fixed": "Corrigido"
-    }
+    },
+    "olderTitle": "Releases anteriores ({count, number})"
   },
   "releases": [
+    {
+      "version": "0.127",
+      "date": "2026-10-11",
+      "title": "O MepMail explicado como um produto só: Correio, Envio e agentes",
+      "summary": "O site agora apresenta o Correio, as caixas de agentes e o Envio como partes da mesma conta, diz qual credencial cada integração usa, mostra o cartão e a cobrança do teste do Correio onde você decide e dá o preço de cenários comuns.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Home: “Por onde começar”, com três entradas (meu e-mail profissional, e-mail para o meu agente, e-mails da minha aplicação), cada uma com produto, preço e próximo passo.",
+            "Preços: quanto custam cenários comuns, como soma dos planos avulsos (sem pacote), e respostas sobre como o uso é contado e sobre usar Correio e Envio juntos.",
+            "Integrações: uma seção “Qual credencial usar”, e cada card agora mostra produto, endpoint, credencial e permissões."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Todo “7 dias grátis” do Correio agora diz que o teste pede cartão e cobra no fim, a menos que você cancele, e os preços mostram os limites de envio do teste.",
+            "O uso é descrito como é contado: cada destinatário (Para, Cc e Cco) conta. No Correio, contam os destinatários de saída.",
+            "O rodapé, a descrição padrão das páginas, o painel de cadastro e a navegação agora cobrem Correio e Envio, e o consentimento OAuth diz quais envios pedem a sua aprovação.",
+            "O changelog abre as 10 releases mais recentes e dobra as anteriores, em vez de prometer seis."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Saiu a promessa de que uma API key cobre todas as integrações: chaves de Envio, chaves de caixa e OAuth alcançam coisas diferentes.",
+            "Saiu a linguagem interna sobre a licença do operador das páginas públicas, e as ações do Correio no log de auditoria do time agora aparecem com rótulos legíveis."
+          ]
+        }
+      ]
+    },
     {
       "version": "0.126",
       "date": "2026-10-11",
@@ -306,9 +334,7 @@
         },
         {
           "kind": "fixed",
-          "items": [
-            "Um rascunho aberto mostra o estado do envio uma vez só, não duas."
-          ]
+          "items": ["Um rascunho aberto mostra o estado do envio uma vez só, não duas."]
         }
       ]
     },
@@ -1065,9 +1091,7 @@
         },
         {
           "kind": "fixed",
-          "items": [
-            "O número de mensagens da conversa fica na mesma linha do remetente."
-          ]
+          "items": ["O número de mensagens da conversa fica na mesma linha do remetente."]
         }
       ]
     },
@@ -1101,9 +1125,7 @@
         },
         {
           "kind": "changed",
-          "items": [
-            "Mandar uma mensagem para a lixeira mantém você na pasta em que estava."
-          ]
+          "items": ["Mandar uma mensagem para a lixeira mantém você na pasta em que estava."]
         }
       ]
     },

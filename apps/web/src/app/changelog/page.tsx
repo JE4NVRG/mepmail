@@ -9,6 +9,7 @@ import {
 import { DOCS_URL } from "@/lib/docs-links";
 import { legalLinks } from "@/lib/legal-links";
 import "../landing.css";
+import "./changelog.css";
 
 const contact = "mailto:suporte@mepmail.dev";
 const canonical = "/changelog";
@@ -40,9 +41,25 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+/** How many releases open on the page before the folded history. */
+const RECENT_RELEASES = 10;
+
+function ReleaseChanges({ release, labels }: { release: Release; labels: Record<string, string> }) {
+  return release.changes.map((change) => (
+    <div key={change.kind}>
+      <h3 className="gtm-subhead">{labels[change.kind] ?? change.kind}</h3>
+      <ul className="gtm-points">
+        {change.items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  ));
+}
+
 /**
  * Página pública /changelog: a lista de releases recentes, mais novas primeiro,
- * reconstruída do histórico do repositório (e espelhada em CHANGELOG.md). A copy
+ * com as últimas abertas e o histórico anterior dobrado logo abaixo. A copy
  * vive no namespace "changelog"; o chrome e o catálogo público vêm de "landing".
  */
 export default async function ChangelogPage() {
@@ -59,6 +76,9 @@ export default async function ChangelogPage() {
   const badges = t.raw("hero.badges") as string[];
   const releases = t.raw("releases") as Release[];
   const labels = t.raw("feed.labels") as Record<string, string>;
+  // The latest releases open on the page; the older ones stay right below, folded.
+  const recent = releases.slice(0, RECENT_RELEASES);
+  const older = releases.slice(RECENT_RELEASES);
 
   return (
     <div className="gtm">
@@ -90,11 +110,17 @@ export default async function ChangelogPage() {
           <div className="gtm-container">
             <p className="gtm-eyebrow">{t("feed.eyebrow")}</p>
             <h2>{t("feed.title")}</h2>
-            <p>{t("feed.body")}</p>
+            <p>
+              {t("feed.body", {
+                recent: recent.length,
+                older: older.length,
+                first: releases.at(-1)?.version ?? "",
+              })}
+            </p>
           </div>
         </section>
 
-        {releases.map((release, index) => (
+        {recent.map((release, index) => (
           <section
             key={release.version}
             className={index % 2 === 0 ? "gtm-section" : "gtm-section gtm-alt"}
@@ -106,19 +132,30 @@ export default async function ChangelogPage() {
                 v{release.version} — {release.title}
               </h2>
               <p>{release.summary}</p>
-              {release.changes.map((change) => (
-                <div key={change.kind}>
-                  <h3 className="gtm-subhead">{labels[change.kind] ?? change.kind}</h3>
-                  <ul className="gtm-points">
-                    {change.items.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+              <ReleaseChanges release={release} labels={labels} />
             </div>
           </section>
         ))}
+
+        {older.length ? (
+          <section className="gtm-section gtm-alt" id="anteriores">
+            <div className="gtm-container">
+              <h2>{t("feed.olderTitle", { count: older.length })}</h2>
+              <div className="gtm-faq changelog-older">
+                {older.map((release) => (
+                  <details key={release.version} id={`v${release.version}`}>
+                    <summary>
+                      v{release.version} — {release.title}{" "}
+                      <span className="changelog-older-date">{release.date}</span>
+                    </summary>
+                    <p>{release.summary}</p>
+                    <ReleaseChanges release={release} labels={labels} />
+                  </details>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className="gtm-section gtm-close">
           <div className="gtm-container">

@@ -1,0 +1,11 @@
+/* The folded history under the latest releases. */
+.changelog-older details > p,
+.changelog-older details .gtm-subhead {
+  margin-top: 12px;
+}
+.changelog-older-date {
+  margin-left: 6px;
+  color: var(--ms-muted);
+  font-size: 13px;
+  font-weight: 400;
+}

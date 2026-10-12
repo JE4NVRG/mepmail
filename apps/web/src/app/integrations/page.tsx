@@ -10,6 +10,7 @@ import { StackLogoRow } from "@/components/stack-logos";
 import { legalLinks } from "@/lib/legal-links";
 import { STACK_SLUGS } from "@/lib/stack-logos";
 import "../landing.css";
+import "./integrations.css";
 
 const contact = "mailto:suporte@mepmail.dev";
 const canonical = "/integrations";
@@ -28,7 +29,12 @@ type IntegrationCard = {
   body: string;
   bullets: string[];
   links: { label: string; href: string }[];
+  /** What the card reaches and with which credential (labels come from accessLabels). */
+  access?: { label: AccessLabel; value: string }[];
 };
+
+type AccessLabel = "product" | "endpoint" | "credential" | "permissions";
+type Credential = { name: string; where: string; body: string };
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("integrations");
@@ -66,6 +72,8 @@ export default async function IntegrationsPage() {
     footer: l.raw("footer"),
   } as PublicSiteLabels;
   const cards = t.raw("cards.items") as IntegrationCard[];
+  const credentials = t.raw("credentials.items") as Credential[];
+  const accessLabels = t.raw("accessLabels") as Record<AccessLabel, string>;
 
   return (
     <div className="gtm">
@@ -88,6 +96,24 @@ export default async function IntegrationsPage() {
           </div>
         </section>
 
+        <section className="gtm-section" aria-labelledby="integrations-credentials-title">
+          <div className="gtm-container">
+            <h2 id="integrations-credentials-title" className="integrations-credentials-title">
+              {t("credentials.title")}
+            </h2>
+            <p className="integrations-credentials-lead">{t("credentials.lead")}</p>
+            <ul className="integrations-credentials">
+              {credentials.map((credential) => (
+                <li key={credential.name}>
+                  <h3>{credential.name}</h3>
+                  <p className="integrations-credential-where">{credential.where}</p>
+                  <p>{credential.body}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
         <section className="gtm-section gtm-alt">
           <div className="gtm-container">
             <div className="gtm-integrations">
@@ -99,6 +125,16 @@ export default async function IntegrationsPage() {
                     <StackLogoRow slugs={card.logos} size={22} className="gtm-integration-mark" />
                   ) : null}
                   <p>{card.body}</p>
+                  {card.access?.length ? (
+                    <dl className="integration-access">
+                      {card.access.map((row) => (
+                        <div key={row.label}>
+                          <dt>{accessLabels[row.label]}</dt>
+                          <dd>{row.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
                   <ul className="gtm-points">
                     {card.bullets.map((bullet) => (
                       <li key={bullet}>{bullet}</li>

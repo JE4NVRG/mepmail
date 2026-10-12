@@ -5,16 +5,16 @@
     "launchDescription": "Send Pro 110K: US$ 29/month; US$ 20 only on the first monthly bill for customers who never paid MepMail, or US$ 290/year upfront. Mail plans start at US$ 2.90 a month, with or without Send."
   },
   "eyebrow": "Pricing",
-  "title": "Pick your volume. <highlight>Pay for what you send.</highlight>",
-  "lead": "Monthly prices in USD, no lock-in. Every plan runs on your own verified domain and includes assisted onboarding. Use the HTTPS API or SMTP relay, whichever fits your stack.",
-  "note": "Starting is free: 100 emails a day, no card. Choose a paid plan in the dashboard when you need more volume.",
+  "title": "Mail by mailbox. <highlight>Send by volume.</highlight>",
+  "lead": "Monthly prices in USD, no lock-in. Mail is priced by a plan of mailboxes on your domain; Send by your app's email volume. Use one, the other or both in the same account, with the same verified domain.",
+  "note": "Send starts free: 100 emails a day, no card. Mail has 7 days free with a card on the team's first plan; billing starts when the trial ends unless you cancel before.",
   "plans": {
     "title": "Every Send plan.",
     "intro": "Regular Send monthly prices. The introductory offer and the Pro 110K annual plan appear below when available. On monthly Pro and Scale, overage comes switched on and can be turned off in Billing."
   },
   "included": {
-    "eyebrow": "Included",
-    "title": "What every plan carries, Free included.",
+    "eyebrow": "Included in Send",
+    "title": "What every Send plan carries, Free included.",
     "body": "Included in every plan. No add-ons needed.",
     "points": [
       "Resend-compatible HTTPS API at api.mepmail.dev. Keep the official SDK and change the base URL.",
@@ -38,6 +38,14 @@
         "a": "Free and Starter have a daily limit (UTC) and no overage: sends keep going up to 50% past it, then wait in a queue for the next day, and new sends are refused only when that queue reaches 3× the daily limit. Annual Pro 110K has a 110,000 monthly allowance with no paid overage. On monthly Pro and Scale, overage comes switched on (you can turn it off in Billing) and is billed per 1,000 at the plan’s rate, up to a safety ceiling of 5× the included volume."
       },
       {
+        "q": "Can I use Mail and Send together?",
+        "a": "Yes, in the same account and on the same verified domain. Mail handles mailboxes for people and agents; Send handles your app's email by API or SMTP. Each has its own credential and limit, and you pay the sum of the plans you pick, with no required bundle. With Mail active, Send Free accepts up to 3 domains."
+      },
+      {
+        "q": "How is usage counted?",
+        "a": "In Send, each recipient (To, Cc and Bcc) of an accepted email counts as one email: a message to 3 people uses 3. Addresses already on your suppression list do not count. If delivery fails later, the send still counts. In Mail, the outbound limit is recipients per month, counting To, Cc and Bcc of each message sent. A send that never left does not count; a bounce after the provider accepted it does. Mail and Send limits are separate: one never uses up the other."
+      },
+      {
         "q": "Is there a contract, and can I change plans later?",
         "a": "Pro 110K offers monthly and a prepaid 12-month annual period. Annual costs US$ 290, without stacking the introductory monthly promotion. Available subscription actions appear in the dashboard; existing contracts are preserved."
       },
@@ -47,7 +55,7 @@
       },
       {
         "q": "Do I need a card to start?",
-        "a": "No card is needed to start on Free. The new Pro 110K offer costs US$ 29/month, with US$ 20 only for eligible new customers’ first monthly bill, or US$ 290/year upfront."
+        "a": "Not on Send Free. Mail has 7 days free with a card on the team's first plan: the first charge happens when the trial ends unless you cancel before, and a reminder arrives 2 days earlier. During the trial, sending from Mail is limited to 50 recipients a day and 200 in total. In Send, the Pro 110K offer costs US$ 29/month, with US$ 20 only on the first month for eligible new customers, or US$ 290/year upfront."
       },
       {
         "q": "What happens above the top plan?",
@@ -63,7 +71,7 @@
   "launch": {
     "eyebrow": "Pro 110K · Send",
     "title": "One monthly allowance. Two ways to pay.",
-    "body": "110,000 Send deliveries each month for your application, campaigns and agents. Choose monthly or annual in the dashboard; introductory eligibility is confirmed before checkout.",
+    "body": "110,000 Send emails a month for your app, campaigns and agents. Pick monthly or yearly in the dashboard; promotion eligibility is confirmed before checkout.",
     "monthTitle": "Monthly",
     "monthIntro": "US$ 20 only for eligible new customers’ first monthly bill. Renewal: US$ 29/month.",
     "monthQuota": "Overage comes switched on for monthly plans and can be turned off in Billing.",
@@ -71,7 +79,7 @@
     "perYear": "/year",
     "yearUpfront": "US$ 290 paid upfront for 12 months: the price of 10 regular monthly fees. The introduction does not stack.",
     "yearQuota": "The 110,000 allowance renews monthly, without an accumulated annual balance. Sending stops at the monthly quota; annual billing does not include metered overage.",
-    "preserved": "Existing contracts keep their prices and limits; there is no automatic migration. System remains exempt.",
+    "preserved": "Existing contracts keep their prices and limits; there is no automatic migration.",
     "mailCta": "Explore Mail",
     "mailAccess": "Mail is paid separately, with or without a Send plan: Solo US$ 2.90, Duo US$ 5.90 or Equipe US$ 12.90 a month."
   },
@@ -79,6 +87,14 @@
     {
       "q": "How does overage work?",
       "a": "Free and Starter have a daily limit (UTC) and no overage: sends keep going up to 50% past it, then wait in a queue for the next day, and new sends are refused only when that queue reaches 3× the daily limit. Annual Pro 110K has a 110,000 monthly allowance with no paid overage. On monthly Pro and Scale, overage comes switched on (you can turn it off in Billing) and is billed per 1,000 at the plan’s rate, up to a safety ceiling of 5× the included volume."
+    },
+    {
+      "q": "Can I use Mail and Send together?",
+      "a": "Yes, in the same account and on the same verified domain. Mail handles mailboxes for people and agents; Send handles your app's email by API or SMTP. Each has its own credential and limit, and you pay the sum of the plans you pick, with no required bundle. With Mail active, Send Free accepts up to 3 domains."
+    },
+    {
+      "q": "How is usage counted?",
+      "a": "In Send, each recipient (To, Cc and Bcc) of an accepted email counts as one email: a message to 3 people uses 3. Addresses already on your suppression list do not count. If delivery fails later, the send still counts. In Mail, the outbound limit is recipients per month, counting To, Cc and Bcc of each message sent. A send that never left does not count; a bounce after the provider accepted it does. Mail and Send limits are separate: one never uses up the other."
     },
     {
       "q": "Is there a contract, and can I change plans later?",
@@ -90,7 +106,7 @@
     },
     {
       "q": "Do I need a card to start?",
-      "a": "No card is needed to start on Free. The new Pro 110K offer costs US$ 29/month, with US$ 20 only for eligible new customers’ first monthly bill, or US$ 290/year upfront."
+      "a": "Not on Send Free. Mail has 7 days free with a card on the team's first plan: the first charge happens when the trial ends unless you cancel before, and a reminder arrives 2 days earlier. During the trial, sending from Mail is limited to 50 recipients a day and 200 in total. In Send, the Pro 110K offer costs US$ 29/month, with US$ 20 only on the first month for eligible new customers, or US$ 290/year upfront."
     },
     {
       "q": "What happens above the top plan?",
@@ -103,10 +119,10 @@
     "body": "An add-on to your paying Send plan: every mailbox has an address on your domain, its own inbox, outbox and permissions. Person or agent, the same price.",
     "perMonth": "/month per mailbox",
     "sharedStorage": "{size} GiB shared by the mailboxes",
-    "sharedSends": "{count, number} outbound deliveries a month, shared",
-    "trial": "7 days free, card required",
+    "sharedSends": "{count, number} outbound recipients a month, shared",
+    "trial": "7 days free with a card; billing starts when the trial ends unless you cancel",
     "storage": "{size} GiB of storage",
-    "sends": "{count, number} outbound deliveries a month",
+    "sends": "{count, number} outbound recipients a month",
     "agents": "Agents connect through the Mail MCP, with optional approval before each send",
     "note": "Requires an active paying Send plan. Each mailbox needs a verified domain and receiving turned on.",
     "noteStandalone": "Upgrade at any time: the difference is charged now. Move to a smaller plan when your usage fits it, with no refund for the current month. Contracts bought before keep their price and terms. Each mailbox needs a verified domain and receiving turned on.",
@@ -125,6 +141,30 @@
     "planMailboxes": "{count, plural, one {# mailbox} other {# mailboxes}}",
     "planInbound": "{count, number} messages received a month",
     "planLocal": "In Brazil, charged in reais: {price} a month",
-    "noteLimits": "Limits renew every billing month and nothing is charged beyond the plan. Sending stops at the plan's limit; receiving pauses past the limit plus a 10% margin, or with storage full, until the next month, an upgrade or, for storage, emptying the trash. Stored mail stays readable, and owners get an email at 80% and 100% of each limit."
+    "noteLimits": "Limits renew every billing month and nothing is charged beyond the plan. Sending stops at the plan's limit; receiving pauses past the limit plus a 10% margin, or with storage full, until the next month, an upgrade or, for storage, emptying the trash. Stored mail stays readable, and owners get an email at 80% and 100% of each limit. During the free trial, sending is limited to 50 recipients a day and 200 in total."
+  },
+  "scenarios": {
+    "eyebrow": "By scenario",
+    "title": "What you will actually pay",
+    "lead": "Sums of the separate plans on this page, with no bundle or discount. Each product keeps its own limit.",
+    "total": "Total a month",
+    "free": "free",
+    "items": {
+      "solo": {
+        "title": "Your professional email",
+        "body": "One mailbox on your domain, in the browser and the Windows and Linux apps. Send Free covers your app's first emails."
+      },
+      "support": {
+        "title": "You, a partner and a support agent",
+        "body": "Three mailboxes: two for people and support@ with an agent that reads and drafts, while each reply waits for your approval."
+      },
+      "saas": {
+        "title": "A product in production, with a team and agents",
+        "body": "Ten mailboxes for the team and the agents, plus the app's volume by API or SMTP."
+      }
+    },
+    "lineCorreio": "Mail {plan}",
+    "lineSendFree": "Send Free (100 emails/day)",
+    "lineSendPro": "Send Pro 110K"
   }
 }

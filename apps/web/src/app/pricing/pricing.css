@@ -1,0 +1,38 @@
+/* /pricing scenarios: each card sums the separate plans it uses. */
+.pricing-scenarios .gtm-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pricing-scenarios .gtm-plan h3,
+.pricing-scenarios .gtm-plan p {
+  margin: 0;
+}
+.pricing-scenario-lines {
+  display: grid;
+  gap: 8px;
+  margin: auto 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--ms-line);
+  font-size: 14px;
+}
+.pricing-scenario-lines div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pricing-scenario-lines dt {
+  color: var(--ms-muted);
+}
+.pricing-scenario-lines dd {
+  margin: 0;
+  white-space: nowrap;
+}
+.pricing-scenario-lines .pricing-scenario-total {
+  padding-top: 8px;
+  border-top: 1px solid var(--ms-line);
+  font-weight: 600;
+}
+.pricing-scenario-lines .pricing-scenario-total dt {
+  color: var(--ms-bone);
+}

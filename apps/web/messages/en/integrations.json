@@ -5,9 +5,9 @@
   },
   "hero": {
     "eyebrow": "Integrations",
-    "title": "Your stack stays. <highlight>Delivery upgrades.</highlight>",
-    "lead": "Connect your workflows, team chat, AI agents and existing apps to MepMail. They all use the same sending pipeline, with verified domains, suppressions, quotas and logs.",
-    "note": "One API key and one verified domain cover everything on this page.",
+    "title": "Your stack stays. <highlight>Your email lives in one place.</highlight>",
+    "lead": "Connect workflows, team chat, AI agents and apps to MepMail. The same verified domains, dashboard and logs, with the right credential for each job.",
+    "note": "Every integration says which credential it uses. A key only reaches what it needs: a Send key cannot read mailboxes, and a mailbox key cannot send broadcasts.",
     "muralLabel": "Works with your stack"
   },
   "cards": {
@@ -18,11 +18,10 @@
         "logos": ["n8n"],
         "body": "Send email and manage contacts, broadcasts, domains and suppressions inside your workflows. Or start a workflow when something happens to your email.",
         "bullets": [
-          "Send, schedule, cancel and batch messages from a workflow node.",
-          "MepMail Trigger subscribes to the events you pick and registers (and removes) its own webhook automatically.",
-          "Correio: start a workflow when mail reaches an agent mailbox, read the message and save a reply draft, sent only after the owner approves when the key has no send permission.",
-          "Payload signatures (Svix / Standard Webhooks) verified out of the box.",
-          "Works with MepMail Cloud or any self-hosted instance. Requires a full access API key."
+          "Send, schedule, cancel and batch send straight from a workflow node.",
+          "The MepMail Trigger subscribes to the events you pick and registers (and removes) its own webhook automatically.",
+          "Mail: start a workflow when email reaches an agent mailbox, read the message and save a reply draft.",
+          "Payload signatures (Svix / Standard Webhooks) verified out of the box."
         ],
         "links": [
           {
@@ -32,6 +31,20 @@
           {
             "label": "GitHub",
             "href": "https://github.com/JE4NVRG/n8n-nodes-mepmail"
+          }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Send and Mail"
+          },
+          {
+            "label": "credential",
+            "value": "MepMail API: a full access Send key (ms_), since the trigger manages its own webhook. MepMail Correio API: a mailbox key (mmb_ or mmt_)."
+          },
+          {
+            "label": "permissions",
+            "value": "In Mail the mailbox key decides: without send permission, the reply waits for the owner's approval."
           }
         ]
       },
@@ -50,21 +63,49 @@
             "label": "Docs: notification channels",
             "href": "https://docs.mepmail.dev/integrations"
           }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Send events (deliveries, bounces, complaints, alerts)"
+          },
+          {
+            "label": "credential",
+            "value": "None: paste the channel URL in Settings → Webhooks."
+          }
         ]
       },
       {
         "name": "AI agents",
         "kind": "MCP server",
         "logos": ["mcp"],
-        "body": "Claude Code, Cursor, VS Code and any Model Context Protocol client send email and manage the platform through the MCP tools, on the same pipeline as the REST API.",
+        "body": "Claude, Cursor, VS Code and any Model Context Protocol client send email and manage the account through the MCP tools, on the same pipeline as the REST API.",
         "bullets": [
-          "Streamable HTTP endpoint at /mcp on your API origin, or the stdio server on npm.",
-          "Verified domains, suppressions, topic opt-outs, quotas and team scoping all apply unchanged."
+          "Verified domains, suppressions, topic opt-outs, quotas and team scope all apply.",
+          "With a Send key, the MCP creates mailboxes and agent keys without reading messages. Connected by OAuth with the mail permissions, it also reads and drafts in the mailboxes you tick."
         ],
         "links": [
           {
             "label": "Docs: MCP",
             "href": "https://docs.mepmail.dev/mcp"
+          }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Send and account management; Mail mailboxes only with the mail permissions"
+          },
+          {
+            "label": "endpoint",
+            "value": "https://api.mepmail.dev/mcp (hosted) or the @mepmail/mcp stdio package"
+          },
+          {
+            "label": "credential",
+            "value": "OAuth when hosted; a Send key (ms_) for local stdio"
+          },
+          {
+            "label": "permissions",
+            "value": "The ones you pick when connecting. Sending through the Send API goes out without approval, like any app's; sending from a mailbox asks for yours."
           }
         ]
       },
@@ -74,9 +115,9 @@
         "logos": ["mcp"],
         "body": "Give the agent its own mailbox on your domain. Through the Mail MCP it lists and reads messages, saves drafts and replies, no code.",
         "bullets": [
-          "Endpoint at https://api.mepmail.dev/mcp/correio with the mailbox key (mmb_).",
-          "Per-key permissions: read, draft and send. Without send, the request waits for your approval.",
-          "The main MCP also creates mailboxes and agent keys, without reading their content."
+          "The agent lists and reads messages, saves drafts and replies in the conversation itself, without code.",
+          "One key per mailbox (mmb_) or one for several of your mailboxes (mmt_). Revoke it any time in Mail.",
+          "Each key's last use and last send show in Mail, and the mailbox history shows every agent action."
         ],
         "links": [
           {
@@ -87,22 +128,53 @@
             "label": "Docs: connect an agent over MCP",
             "href": "https://docs.mepmail.dev/mailboxes#connect-an-agent-over-mcp"
           }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Mail"
+          },
+          {
+            "label": "endpoint",
+            "value": "https://api.mepmail.dev/mcp/correio, or the Mail API at https://mepmail.dev/api/mailbox-agent"
+          },
+          {
+            "label": "credential",
+            "value": "Mailbox key (mmb_ or mmt_), created in Mail → Agents"
+          },
+          {
+            "label": "permissions",
+            "value": "Read, draft and send, per key. Without send, the draft waits for your approval."
+          }
         ]
       },
       {
         "name": "SMTP relay",
         "kind": "Any app",
         "logos": [],
-        "body": "WordPress, WooCommerce, Ghost, Strapi, Supabase or any other application that sends over SMTP can use the relay with your key.",
+        "body": "Ghost, Strapi, Supabase Auth and any app that sends over SMTP use the relay. On WordPress and WooCommerce, a common SMTP plugin bridges it.",
         "bullets": [
-          "Host, port and credentials; TLS required.",
-          "Same domains, suppressions, tracking and logs as the API.",
-          "No plugin to install and nothing to patch."
+          "TLS required (STARTTLS).",
+          "The same domains, suppressions, tracking and logs as the API."
         ],
         "links": [
           {
-            "label": "Docs: SMTP relay",
-            "href": "https://docs.mepmail.dev/self-hosting#smtp-relay"
+            "label": "Set it up in the dashboard",
+            "href": "/settings/smtp"
+          }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Send"
+          },
+          {
+            "label": "endpoint",
+            "value": "smtp.mepmail.dev, port 2587"
+          },
+          {
+            "label": "credential",
+            "value": "Username mepmail; password = a Send key (ms_), ideally sending only"
           }
         ]
       },
@@ -110,7 +182,7 @@
         "name": "Resend SDKs, drop-in",
         "kind": "Migration",
         "logos": ["nodedotjs", "python", "php", "ruby", "go"],
-        "body": "Coming from Resend? Keep the official SDKs. Change the base URL and the key, and your send calls stay exactly as they are.",
+        "body": "Coming from Resend? Keep the official SDKs. Swap the base URL and the key, and your send calls stay the same.",
         "bullets": [
           "Nine languages documented, with the base-URL rules of each SDK (trailing slash included).",
           "The free account moves with one command: npx @mepmail/cli migrate --from resend."
@@ -124,16 +196,30 @@
             "label": "MepMail vs Resend",
             "href": "/alternatives/resend"
           }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Send"
+          },
+          {
+            "label": "endpoint",
+            "value": "https://api.mepmail.dev"
+          },
+          {
+            "label": "credential",
+            "value": "Send key (ms_)"
+          }
         ]
       },
       {
         "name": "CLI and REST API",
         "kind": "Builders",
         "logos": ["curl"],
-        "body": "Scripts, pipelines and back-office tools call the same public API the panel uses: 44 documented endpoints with an interactive reference.",
+        "body": "Scripts, pipelines and internal tools call the same public API the dashboard uses, with 44 documented routes and an interactive reference.",
         "bullets": [
           "@mepmail/cli runs the migration and day-to-day operations from the terminal.",
-          "OpenAPI at docs.mepmail.dev, wire-compatible with the Resend API surface."
+          "OpenAPI at docs.mepmail.dev. Send calls follow Resend's format; management is smaller than theirs (see the comparison)."
         ],
         "links": [
           {
@@ -144,13 +230,54 @@
             "label": "Docs: API reference",
             "href": "https://docs.mepmail.dev/api-reference"
           }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Send and account management"
+          },
+          {
+            "label": "endpoint",
+            "value": "https://api.mepmail.dev"
+          },
+          {
+            "label": "credential",
+            "value": "Send key (ms_): full access for management, or sending only"
+          }
         ]
       }
     ]
   },
   "close": {
-    "title": "Ship with the stack you already run.",
-    "body": "Create the free account, connect the first integration and send a real email today.",
+    "title": "Start with what you need today.",
+    "body": "Create the free account: Send starts with no card, and Mail has 7 days free when you subscribe.",
     "cta": "Create free account"
+  },
+  "credentials": {
+    "title": "Which credential to use",
+    "lead": "There are three kinds, each with the least reach its job needs.",
+    "items": [
+      {
+        "name": "Send key (ms_)",
+        "where": "Dashboard → API keys",
+        "body": "REST API, SMTP relay, Resend SDKs, CLI, the local MCP and the n8n node. Full access or sending only, and optionally limited to one domain. It cannot read or write Mail mailboxes."
+      },
+      {
+        "name": "Mailbox key (mmb_ or mmt_)",
+        "where": "Mail → Agents",
+        "body": "The agent works in one mailbox (mmb_) or several of yours (mmt_), through the Mail MCP, the Mail API or n8n. Each key picks read, draft and send; without send, the draft waits for your approval."
+      },
+      {
+        "name": "OAuth",
+        "where": "On the client's first connection",
+        "body": "The hosted MCP (Claude, ChatGPT and other clients) asks for permissions on a consent screen, with no key to paste. With the mail permissions it reads and drafts only in the mailboxes you tick."
+      }
+    ]
+  },
+  "accessLabels": {
+    "product": "Product",
+    "endpoint": "Endpoint",
+    "credential": "Credential",
+    "permissions": "Permissions"
   }
 }

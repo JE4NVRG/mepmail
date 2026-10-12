@@ -5,9 +5,9 @@
   },
   "hero": {
     "eyebrow": "Integrações",
-    "title": "Sua stack continua. <highlight>A entrega sobe de nível.</highlight>",
-    "lead": "Conecte seus fluxos, chat do time, agentes de IA e aplicações ao MepMail. Todos usam o mesmo fluxo de envio, com domínios verificados, supressões, cotas e logs.",
-    "note": "Uma API key e um domínio verificado cobrem tudo nesta página.",
+    "title": "Sua stack continua. <highlight>O e-mail fica num lugar só.</highlight>",
+    "lead": "Conecte fluxos, o chat do time, agentes de IA e aplicações ao MepMail. Os mesmos domínios verificados, o mesmo painel e os mesmos logs, com a credencial certa para cada tarefa.",
+    "note": "Cada integração diz qual credencial usa. Uma chave só alcança o que precisa: a de Envio não lê caixas, e a de uma caixa não envia campanhas.",
     "muralLabel": "Funciona com a sua stack"
   },
   "cards": {
@@ -20,9 +20,8 @@
         "bullets": [
           "Envie, agende, cancele e envie em lote direto de um node do fluxo.",
           "O MepMail Trigger assina os eventos que você escolher e registra (e remove) o próprio webhook automaticamente.",
-          "Correio: inicie um fluxo quando chega e-mail numa caixa de agente, leia a mensagem e salve um rascunho de resposta, enviado só depois da aprovação do dono quando a chave não tem permissão de envio.",
-          "Assinaturas de payload (Svix / Standard Webhooks) verificadas de fábrica.",
-          "Funciona com o MepMail Cloud ou qualquer instância auto-hospedada. Exige API key de acesso total."
+          "Correio: inicie um fluxo quando chega e-mail numa caixa de agente, leia a mensagem e salve um rascunho de resposta.",
+          "Assinaturas de payload (Svix / Standard Webhooks) verificadas de fábrica."
         ],
         "links": [
           {
@@ -32,6 +31,20 @@
           {
             "label": "GitHub",
             "href": "https://github.com/JE4NVRG/n8n-nodes-mepmail"
+          }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Envio e Correio"
+          },
+          {
+            "label": "credential",
+            "value": "MepMail API: chave de Envio (ms_) com acesso total, porque o trigger gerencia o próprio webhook. MepMail Correio API: chave da caixa (mmb_ ou mmt_)."
+          },
+          {
+            "label": "permissions",
+            "value": "No Correio vale a chave da caixa: sem permissão de envio, a resposta espera a aprovação do dono."
           }
         ]
       },
@@ -50,21 +63,49 @@
             "label": "Docs: canais de notificação",
             "href": "https://docs.mepmail.dev/integrations"
           }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Eventos do Envio (entregas, bounces, reclamações, alertas)"
+          },
+          {
+            "label": "credential",
+            "value": "Nenhuma: você cola a URL do canal em Configurações → Webhooks."
+          }
         ]
       },
       {
         "name": "Agentes de IA",
         "kind": "Servidor MCP",
         "logos": ["mcp"],
-        "body": "Claude Code, Cursor, VS Code e qualquer cliente de Model Context Protocol enviam e-mail e gerenciam a plataforma pelas ferramentas do MCP, no mesmo pipeline da REST API.",
+        "body": "Claude, Cursor, VS Code e qualquer cliente de Model Context Protocol enviam e-mail e gerenciam a conta pelas ferramentas do MCP, no mesmo pipeline da REST API.",
         "bullets": [
-          "Endpoint Streamable HTTP em /mcp na origem da sua API, ou o servidor stdio no npm.",
-          "Domínios verificados, supressões, opt-outs de tópicos, cotas e escopo de time valem igual."
+          "Domínios verificados, supressões, opt-outs de tópicos, cotas e escopo de time valem igual.",
+          "Com uma chave de Envio, o MCP cria caixas e chaves de agente sem ler mensagens. Conectado por OAuth com as permissões de e-mail, ele também lê e rascunha nas caixas que você marcar."
         ],
         "links": [
           {
             "label": "Docs: MCP",
             "href": "https://docs.mepmail.dev/mcp"
+          }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Envio e gestão da conta; caixas do Correio só com as permissões de e-mail"
+          },
+          {
+            "label": "endpoint",
+            "value": "https://api.mepmail.dev/mcp (hospedado) ou o pacote stdio @mepmail/mcp"
+          },
+          {
+            "label": "credential",
+            "value": "OAuth no hospedado; chave de Envio (ms_) no stdio local"
+          },
+          {
+            "label": "permissions",
+            "value": "As que você escolher na conexão. O envio pela API de Envio sai sem aprovação, como o de qualquer aplicação; o envio a partir de uma caixa pede a sua."
           }
         ]
       },
@@ -74,9 +115,9 @@
         "logos": ["mcp"],
         "body": "Dê ao agente uma caixa própria no seu domínio. Pelo MCP do Correio ele lista e lê mensagens, salva rascunhos e responde, sem código.",
         "bullets": [
-          "Endpoint em https://api.mepmail.dev/mcp/correio com a chave da caixa (mmb_).",
-          "Permissões por chave: ler, rascunhar e enviar. Sem envio, o pedido espera a sua aprovação.",
-          "O MCP principal também cria caixas e chaves de agente, sem ler o conteúdo."
+          "O agente lista e lê mensagens, salva rascunhos e responde na própria conversa, sem código.",
+          "Uma chave por caixa (mmb_) ou uma para várias caixas suas (mmt_). Você revoga a qualquer momento no Correio.",
+          "O último uso e o último envio de cada chave aparecem no Correio, e o histórico da caixa mostra cada ação do agente."
         ],
         "links": [
           {
@@ -87,22 +128,53 @@
             "label": "Docs: conecte um agente por MCP",
             "href": "https://docs.mepmail.dev/pt-BR/mailboxes#conecte-um-agente-por-mcp"
           }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Correio"
+          },
+          {
+            "label": "endpoint",
+            "value": "https://api.mepmail.dev/mcp/correio, ou a API do Correio em https://mepmail.dev/api/mailbox-agent"
+          },
+          {
+            "label": "credential",
+            "value": "Chave de caixa (mmb_ ou mmt_), criada em Correio → Agentes"
+          },
+          {
+            "label": "permissions",
+            "value": "Ler, rascunhar e enviar, por chave. Sem envio, o rascunho espera a sua aprovação."
+          }
         ]
       },
       {
         "name": "Relay SMTP",
         "kind": "Qualquer aplicação",
         "logos": [],
-        "body": "WordPress, WooCommerce, Ghost, Strapi, Supabase ou qualquer outra aplicação que envie por SMTP pode usar o relay com a sua chave.",
+        "body": "Ghost, Strapi, Supabase Auth e qualquer aplicação que envie por SMTP usam o relay. No WordPress e no WooCommerce, um plugin de SMTP comum faz a ponte.",
         "bullets": [
-          "Host, porta e credenciais; TLS obrigatório.",
-          "Os mesmos domínios, supressões, tracking e logs da API.",
-          "Nenhum plugin para instalar e nada para modificar no código."
+          "TLS obrigatório (STARTTLS).",
+          "Os mesmos domínios, supressões, tracking e logs da API."
         ],
         "links": [
           {
-            "label": "Docs: relay SMTP",
-            "href": "https://docs.mepmail.dev/self-hosting#smtp-relay"
+            "label": "Configurar no painel",
+            "href": "/settings/smtp"
+          }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Envio"
+          },
+          {
+            "label": "endpoint",
+            "value": "smtp.mepmail.dev, porta 2587"
+          },
+          {
+            "label": "credential",
+            "value": "Usuário mepmail; senha = uma chave de Envio (ms_), de preferência só de envio"
           }
         ]
       },
@@ -110,7 +182,7 @@
         "name": "SDKs do Resend, drop-in",
         "kind": "Migração",
         "logos": ["nodedotjs", "python", "php", "ruby", "go"],
-        "body": "Vindo do Resend? Mantenha os SDKs oficiais. Troque a base URL e a chave, e suas chamadas de envio ficam exatamente como estão.",
+        "body": "Vindo do Resend? Mantenha os SDKs oficiais. Troque a base URL e a chave, e as suas chamadas de envio continuam as mesmas.",
         "bullets": [
           "Nove linguagens documentadas, com as regras de base URL de cada SDK (barra no final incluída).",
           "A conta gratuita se move com um comando: npx @mepmail/cli migrate --from resend."
@@ -124,16 +196,30 @@
             "label": "MepMail vs Resend",
             "href": "/alternatives/resend"
           }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Envio"
+          },
+          {
+            "label": "endpoint",
+            "value": "https://api.mepmail.dev"
+          },
+          {
+            "label": "credential",
+            "value": "Chave de Envio (ms_)"
+          }
         ]
       },
       {
         "name": "CLI e REST API",
         "kind": "Para builders",
         "logos": ["curl"],
-        "body": "Scripts, pipelines e ferramentas internas chamam a mesma API pública que o painel usa: 44 endpoints documentados com referência interativa.",
+        "body": "Scripts, pipelines e ferramentas internas chamam a mesma API pública que o painel usa, com 44 rotas documentadas e referência interativa.",
         "bullets": [
           "O @mepmail/cli roda a migração e as operações do dia a dia pelo terminal.",
-          "OpenAPI em docs.mepmail.dev, wire-compatible com a superfície da API do Resend."
+          "OpenAPI em docs.mepmail.dev. As chamadas de envio seguem o formato do Resend; a gestão é menor que a deles (veja a comparação)."
         ],
         "links": [
           {
@@ -144,13 +230,54 @@
             "label": "Docs: API",
             "href": "https://docs.mepmail.dev/api-reference"
           }
+        ],
+        "access": [
+          {
+            "label": "product",
+            "value": "Envio e gestão da conta"
+          },
+          {
+            "label": "endpoint",
+            "value": "https://api.mepmail.dev"
+          },
+          {
+            "label": "credential",
+            "value": "Chave de Envio (ms_): acesso total para gestão, ou só de envio"
+          }
         ]
       }
     ]
   },
   "close": {
-    "title": "Entregue com a stack que você já roda.",
-    "body": "Crie a conta gratuita, conecte a primeira integração e envie um email de verdade hoje.",
+    "title": "Comece pelo que você precisa hoje.",
+    "body": "Crie a conta grátis: o Envio começa sem cartão, e o Correio tem 7 dias grátis quando você contratar.",
     "cta": "Criar conta gratuita"
+  },
+  "credentials": {
+    "title": "Qual credencial usar",
+    "lead": "São três tipos, cada um com o alcance mínimo para o que faz.",
+    "items": [
+      {
+        "name": "Chave de Envio (ms_)",
+        "where": "Painel → Chaves de API",
+        "body": "API REST, relay SMTP, SDKs do Resend, CLI, MCP local e o node do n8n. Pode ser de acesso total ou só de envio, e restrita a um domínio. Não lê nem escreve nas caixas do Correio."
+      },
+      {
+        "name": "Chave de caixa (mmb_ ou mmt_)",
+        "where": "Correio → Agentes",
+        "body": "O agente trabalha numa caixa (mmb_) ou em várias caixas suas (mmt_), pelo MCP do Correio, pela API do Correio ou pelo n8n. Cada chave escolhe ler, rascunhar e enviar; sem envio, o rascunho espera a sua aprovação."
+      },
+      {
+        "name": "OAuth",
+        "where": "Na primeira conexão do cliente",
+        "body": "O MCP hospedado (Claude, ChatGPT e outros clientes) pede as permissões numa tela de consentimento, sem chave para colar. Com as permissões de e-mail, ele lê e rascunha só nas caixas que você marcar."
+      }
+    ]
+  },
+  "accessLabels": {
+    "product": "Produto",
+    "endpoint": "Endpoint",
+    "credential": "Credencial",
+    "permissions": "Permissões"
   }
 }

@@ -129,7 +129,7 @@
     "sending": {
       "label": "Para sua aplicação",
       "title": "Só Envio",
-      "body": "Nova oferta: 110 mil entregas por mês por US$ 29 recorrentes. Novos clientes pagam US$ 20 só na primeira mensalidade. Você pode usar Envio sem contratar caixas; as assinaturas atuais são preservadas.",
+      "body": "110 mil e-mails por mês por US$ 29 recorrentes; novos clientes pagam US$ 20 só na primeira mensalidade. Você pode usar o Envio sem contratar caixas, e as assinaturas atuais são preservadas.",
       "link": "Comparar planos de Envio"
     },
     "mail": {
@@ -199,7 +199,7 @@
     "quantityError": "Use uma quantidade inteira de 1 a 50.",
     "invalidQuote": "Informe uma quantidade válida para calcular o total.",
     "mailboxSelection": "Correio de {size} GiB",
-    "recipients": "{count, number} entregas de saída por mês, por caixa. To e Cc contam; não é limite de contatos diferentes.",
+    "recipients": "{count, number} destinatários de saída por mês, por caixa. Para, Cc e Cco contam; não é limite de contatos diferentes.",
     "sendingLabel": "Só Envio",
     "combinedLabel": "Envio + Correio",
     "sendingPlan": "{count, number} entregas de Envio por mês",
@@ -225,7 +225,7 @@
     "items": [
       {
         "q": "Preciso de um plano de Envio para usar o Correio?",
-        "a": "Não. Os planos do Correio funcionam sozinhos: Solo US$ 2,90 por mês com 1 caixa, Duo US$ 5,90 com 3 ou Equipe US$ 12,90 com 10 (no Brasil, R$ 14,90, R$ 29,90 e R$ 64,90), com 7 dias grátis. Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios. Assinaturas existentes mantêm as condições, sem migração automática. A licença interna System continua isenta, com 50 GiB por caixa e sem limites comerciais de caixas ou entregas."
+        "a": "Não. Os planos do Correio funcionam sozinhos: Solo US$ 2,90 por mês com 1 caixa, Duo US$ 5,90 com 3 ou Equipe US$ 12,90 com 10 (no Brasil, R$ 14,90, R$ 29,90 e R$ 64,90), com 7 dias grátis com cartão (a cobrança começa no fim do teste, a menos que você cancele antes). Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios. Assinaturas existentes mantêm as condições, sem migração automática."
       },
       {
         "q": "Comprei um domínio. Já posso criar qualquer endereço?",
@@ -260,12 +260,12 @@
   "close": {
     "eyebrow": "O próximo endereço pode ser do seu agente",
     "title": "Sua empresa conversa. Você acompanha.",
-    "body": "O Correio está aberto a todos. Adicione caixas para você, sua equipe ou seu agente pelo painel: planos a partir de US$ 2,90 por mês (R$ 14,90 no Brasil), com 7 dias grátis.",
-    "primary": "Conhecer planos de Envio",
+    "body": "O Correio está aberto a todos. Adicione caixas para você, sua equipe ou seu agente pelo painel: planos a partir de US$ 2,90 por mês (R$ 14,90 no Brasil), com 7 dias grátis com cartão (a cobrança começa no fim do teste, a menos que você cancele antes).",
+    "primary": "Ver planos e preços",
     "secondary": "Ler a documentação do Correio"
   },
   "release": {
-    "heroNote": "Planos do Correio a partir de US$ 2,90 por mês (R$ 14,90 no Brasil): Solo com 1 caixa, Duo com 3 ou Equipe com 10, com 7 dias grátis. Com ou sem Envio. Contrate pelo painel.",
+    "heroNote": "Planos do Correio a partir de US$ 2,90 por mês (R$ 14,90 no Brasil): Solo com 1 caixa, Duo com 3 ou Equipe com 10, com 7 dias grátis com cartão (a cobrança começa no fim do teste, a menos que você cancele antes). Com ou sem Envio. Contrate pelo painel.",
     "heroStatus": "Aberto a todos, com ou sem plano de Envio",
     "heroSecondary": "Ver planos e preços",
     "setupFirstTitle": "Escolha como assinar",

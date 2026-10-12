@@ -5,16 +5,16 @@
     "launchDescription": "Envio Pro 110K: US$ 29/mês; US$ 20 só na primeira mensalidade de quem nunca pagou o MepMail, ou US$ 290/ano antecipados. Os planos do Correio começam em US$ 2,90 por mês, com ou sem Envio."
   },
   "eyebrow": "Preços",
-  "title": "Escolha o volume. <highlight>Pague pelo que envia.</highlight>",
-  "lead": "Preços mensais em USD, sem fidelidade. Todo plano roda no seu domínio verificado e inclui implantação assistida. Use a API HTTPS ou o relay SMTP, conforme sua aplicação.",
-  "note": "Começar é grátis: 100 e-mails por dia, sem cartão. Escolha um plano pago no painel quando precisar de mais volume.",
+  "title": "Correio por caixa. <highlight>Envio por volume.</highlight>",
+  "lead": "Preços mensais em USD, sem fidelidade. O Correio cobra por plano de caixas no seu domínio; o Envio, pelo volume de e-mails da sua aplicação. Use um, o outro ou os dois na mesma conta, com o mesmo domínio verificado.",
+  "note": "O Envio começa grátis: 100 e-mails por dia, sem cartão. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe; a cobrança começa no fim do teste, a menos que você cancele antes.",
   "plans": {
     "title": "Todos os planos de Envio.",
     "intro": "Mensalidades normais de envio. A oferta de entrada e o plano anual Pro 110K aparecem abaixo quando estiverem disponíveis. No Pro e no Scale mensais, o excedente vem ligado e pode ser desligado em Cobrança."
   },
   "included": {
-    "eyebrow": "Incluído",
-    "title": "O que todo plano carrega, Free incluído.",
+    "eyebrow": "Incluído no Envio",
+    "title": "O que todo plano de Envio carrega, Free incluído.",
     "body": "Incluído em todos os planos. Sem adicionais.",
     "points": [
       "API HTTPS compatível com Resend em api.mepmail.dev. Mantenha o SDK oficial e troque a base URL.",
@@ -38,6 +38,14 @@
         "a": "Free e Starter têm limite diário (UTC) e não têm excedente: os envios seguem até 50% acima dele, depois esperam numa fila para o dia seguinte, e novos envios só são recusados quando essa fila chega a 3× o limite diário. O Pro 110K anual tem franquia mensal de 110 mil, sem excedente pago. No Pro e no Scale mensais, o excedente vem ligado (você pode desligar em Cobrança) e é cobrado por 1.000 pela tarifa do plano, até o teto de segurança de 5× o volume incluído."
       },
       {
+        "q": "Posso usar Correio e Envio juntos?",
+        "a": "Sim, na mesma conta e no mesmo domínio verificado. O Correio cuida das caixas de pessoas e agentes; o Envio, dos e-mails da sua aplicação por API ou SMTP. Cada um tem a sua credencial e o seu limite, e você paga a soma dos planos que escolher, sem pacote obrigatório. Com o Correio ativo, o Envio Free aceita até 3 domínios."
+      },
+      {
+        "q": "Como o uso é contado?",
+        "a": "No Envio, cada destinatário (Para, Cc e Cco) de um e-mail aceito conta como um e-mail: uma mensagem para 3 pessoas usa 3. Endereços que já estão na sua lista de supressão não contam. Se a entrega falhar depois, o envio continua contado. No Correio, o limite de saída é de destinatários por mês, contando Para, Cc e Cco de cada mensagem enviada. Um envio que não saiu não conta; um bounce depois que o provedor aceitou, conta. Os limites do Correio e do Envio são separados: um não consome o outro."
+      },
+      {
         "q": "Existe fidelidade e posso trocar de plano depois?",
         "a": "O Pro 110K oferece mensal e anual antecipado de 12 meses. O anual custa US$ 290, sem acumular a promoção da primeira mensalidade. As ações disponíveis para sua assinatura aparecem no painel; contratos atuais são preservados."
       },
@@ -47,7 +55,7 @@
       },
       {
         "q": "Preciso de cartão para começar?",
-        "a": "Não precisa de cartão para começar no Free. A nova oferta Pro 110K custa US$ 29/mês, com US$ 20 apenas na primeira mensalidade de novos clientes elegíveis, ou US$ 290/ano antecipados."
+        "a": "Não no Envio Free. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe: a primeira cobrança acontece no fim do teste, a menos que você cancele antes, e um aviso chega 2 dias antes. Durante o teste, o envio pelo Correio fica em até 50 destinatários por dia e 200 no total. No Envio, a oferta Pro 110K custa US$ 29/mês, com US$ 20 apenas na primeira mensalidade de novos clientes elegíveis, ou US$ 290/ano antecipados."
       },
       {
         "q": "E acima do maior plano?",
@@ -63,7 +71,7 @@
   "launch": {
     "eyebrow": "Pro 110K · Envio",
     "title": "Uma franquia mensal. Duas formas de pagar.",
-    "body": "110 mil entregas de Envio por mês para sua aplicação, campanhas e agentes. Escolha mensal ou anual no painel; a elegibilidade da promoção é confirmada antes do checkout.",
+    "body": "110 mil e-mails de Envio por mês para a sua aplicação, campanhas e agentes. Escolha mensal ou anual no painel; a elegibilidade da promoção é confirmada antes do checkout.",
     "monthTitle": "Mensal",
     "monthIntro": "US$ 20 só na primeira mensalidade de novos clientes elegíveis. Renovação: US$ 29/mês.",
     "monthQuota": "O excedente vem ligado nos planos mensais e pode ser desligado em Cobrança.",
@@ -71,7 +79,7 @@
     "perYear": "/ano",
     "yearUpfront": "US$ 290 pagos antecipadamente para 12 meses: o valor de 10 mensalidades normais. Não acumula a promoção inicial.",
     "yearQuota": "A franquia de 110 mil renova mensalmente, sem saldo anual acumulado. O envio para na cota mensal; o anual não inclui cobrança de excedentes.",
-    "preserved": "Contratos existentes mantêm seus valores e limites; não há migração automática. System continua isento.",
+    "preserved": "Contratos existentes mantêm seus valores e limites; não há migração automática.",
     "mailCta": "Conhecer o Correio",
     "mailAccess": "O Correio é pago à parte, com ou sem plano de Envio: Solo US$ 2,90, Duo US$ 5,90 ou Equipe US$ 12,90 por mês."
   },
@@ -79,6 +87,14 @@
     {
       "q": "Como funciona o excedente?",
       "a": "Free e Starter têm limite diário (UTC) e não têm excedente: os envios seguem até 50% acima dele, depois esperam numa fila para o dia seguinte, e novos envios só são recusados quando essa fila chega a 3× o limite diário. O Pro 110K anual tem franquia mensal de 110 mil, sem excedente pago. No Pro e no Scale mensais, o excedente vem ligado (você pode desligar em Cobrança) e é cobrado por 1.000 pela tarifa do plano, até o teto de segurança de 5× o volume incluído."
+    },
+    {
+      "q": "Posso usar Correio e Envio juntos?",
+      "a": "Sim, na mesma conta e no mesmo domínio verificado. O Correio cuida das caixas de pessoas e agentes; o Envio, dos e-mails da sua aplicação por API ou SMTP. Cada um tem a sua credencial e o seu limite, e você paga a soma dos planos que escolher, sem pacote obrigatório. Com o Correio ativo, o Envio Free aceita até 3 domínios."
+    },
+    {
+      "q": "Como o uso é contado?",
+      "a": "No Envio, cada destinatário (Para, Cc e Cco) de um e-mail aceito conta como um e-mail: uma mensagem para 3 pessoas usa 3. Endereços que já estão na sua lista de supressão não contam. Se a entrega falhar depois, o envio continua contado. No Correio, o limite de saída é de destinatários por mês, contando Para, Cc e Cco de cada mensagem enviada. Um envio que não saiu não conta; um bounce depois que o provedor aceitou, conta. Os limites do Correio e do Envio são separados: um não consome o outro."
     },
     {
       "q": "Existe fidelidade e posso trocar de plano depois?",
@@ -90,7 +106,7 @@
     },
     {
       "q": "Preciso de cartão para começar?",
-      "a": "Não precisa de cartão para começar no Free. A nova oferta Pro 110K custa US$ 29/mês, com US$ 20 apenas na primeira mensalidade de novos clientes elegíveis, ou US$ 290/ano antecipados."
+      "a": "Não no Envio Free. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe: a primeira cobrança acontece no fim do teste, a menos que você cancele antes, e um aviso chega 2 dias antes. Durante o teste, o envio pelo Correio fica em até 50 destinatários por dia e 200 no total. No Envio, a oferta Pro 110K custa US$ 29/mês, com US$ 20 apenas na primeira mensalidade de novos clientes elegíveis, ou US$ 290/ano antecipados."
     },
     {
       "q": "E acima do maior plano?",
@@ -103,10 +119,10 @@
     "body": "Um adicional do seu plano pago de Envio: cada caixa tem endereço no seu domínio, entrada, saída e permissões próprias. Humano ou agente, o mesmo preço.",
     "perMonth": "/mês por caixa",
     "sharedStorage": "{size} GiB divididos entre as caixas",
-    "sharedSends": "{count, number} entregas de saída por mês, divididas",
-    "trial": "7 dias grátis, com cartão",
+    "sharedSends": "{count, number} destinatários de saída por mês, divididos",
+    "trial": "7 dias grátis com cartão; a cobrança começa no fim do teste, a menos que você cancele",
     "storage": "{size} GiB de armazenamento",
-    "sends": "{count, number} entregas de saída por mês",
+    "sends": "{count, number} destinatários de saída por mês",
     "agents": "Agentes conectam pelo MCP do Correio, com aprovação opcional antes de cada envio",
     "note": "Exige um plano pago de Envio ativo. Cada caixa precisa de domínio verificado e do recebimento ativado.",
     "noteStandalone": "Faça upgrade quando quiser: a diferença é cobrada na hora. Mude para um plano menor quando o seu uso couber nele, sem reembolso do mês em curso. Contratos anteriores mantêm preço e condições. Cada caixa precisa de domínio verificado e do recebimento ativado.",
@@ -125,6 +141,30 @@
     "planMailboxes": "{count, plural, one {# caixa} other {# caixas}}",
     "planInbound": "{count, number} mensagens recebidas por mês",
     "planLocal": "No Brasil, cobrado em reais: {price} por mês",
-    "noteLimits": "Os limites renovam a cada mês de cobrança e nada é cobrado além do plano. O envio para no limite do plano; o recebimento pausa depois do limite mais 10% de margem, ou com o armazenamento cheio, até o mês seguinte, um upgrade ou, no armazenamento, esvaziar a lixeira. As mensagens guardadas continuam legíveis, e os donos recebem um e-mail aos 80% e aos 100% de cada limite."
+    "noteLimits": "Os limites renovam a cada mês de cobrança e nada é cobrado além do plano. O envio para no limite do plano; o recebimento pausa depois do limite mais 10% de margem, ou com o armazenamento cheio, até o mês seguinte, um upgrade ou, no armazenamento, esvaziar a lixeira. As mensagens guardadas continuam legíveis, e os donos recebem um e-mail aos 80% e aos 100% de cada limite. No teste grátis, o envio fica em até 50 destinatários por dia e 200 no total."
+  },
+  "scenarios": {
+    "eyebrow": "Por cenário",
+    "title": "Quanto custa o que você vai usar",
+    "lead": "Somas dos planos avulsos desta página, sem pacote nem desconto. Cada frente tem o próprio limite.",
+    "total": "Total por mês",
+    "free": "grátis",
+    "items": {
+      "solo": {
+        "title": "Seu e-mail profissional",
+        "body": "Uma caixa no seu domínio, no navegador e nos apps para Windows e Linux. O Envio Free cobre os primeiros e-mails da sua aplicação."
+      },
+      "support": {
+        "title": "Você, um sócio e um agente de suporte",
+        "body": "Três caixas: duas de pessoas e suporte@ com um agente que lê e rascunha, e cada resposta espera a sua aprovação."
+      },
+      "saas": {
+        "title": "Produto em produção, com time e agentes",
+        "body": "Dez caixas para o time e os agentes, e o volume da aplicação por API ou SMTP."
+      }
+    },
+    "lineCorreio": "Correio {plan}",
+    "lineSendFree": "Envio Free (100 e-mails/dia)",
+    "lineSendPro": "Envio Pro 110K"
   }
 }

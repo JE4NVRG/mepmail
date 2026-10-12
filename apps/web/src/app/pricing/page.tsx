@@ -12,6 +12,7 @@ import { formatBrl, formatUsd } from "@/lib/landing-pricing";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import "../landing.css";
+import "./pricing.css";
 
 const contact = "mailto:suporte@mepmail.dev";
 const canonical = "/pricing";
@@ -78,6 +79,25 @@ export default async function PricingPage() {
   );
   const includedPoints = t.raw("included.points") as string[];
   const faq = t.raw(launchOfferEnabled ? "launchFaq" : "faq.items") as FaqItem[];
+  // Sums of the separate plans shown on this page; no bundle and no discount.
+  const sendProCents = LAUNCH_OFFER.sending.monthlyCents;
+  const scenarios = standaloneOpen
+    ? (
+        [
+          { id: "solo", plan: "solo", sendPro: false },
+          { id: "support", plan: "duo", sendPro: false },
+          ...(launchOfferEnabled ? [{ id: "saas", plan: "equipe", sendPro: true }] : []),
+        ] as const
+      ).map((scenario) => {
+        const plan = correioPlans.find((p) => p.id === scenario.plan);
+        if (!plan) throw new Error(`Unknown Correio plan ${scenario.plan}`);
+        return {
+          ...scenario,
+          correio: plan,
+          totalCents: plan.monthlyCents + (scenario.sendPro ? sendProCents : 0),
+        };
+      })
+    : [];
 
   return (
     <div className="gtm">
@@ -97,6 +117,48 @@ export default async function PricingPage() {
             <p className="gtm-note">{t("note")}</p>
           </div>
         </section>
+
+        {scenarios.length ? (
+          <section className="gtm-section" id="cenarios" aria-labelledby="pricing-scenarios-title">
+            <div className="gtm-container">
+              <p className="gtm-eyebrow">{t("scenarios.eyebrow")}</p>
+              <h2 id="pricing-scenarios-title">{t("scenarios.title")}</h2>
+              <p>{t("scenarios.lead")}</p>
+              <div className="gtm-split gtm-split-three pricing-scenarios">
+                {scenarios.map((scenario) => (
+                  <article className="ms-card gtm-plan" key={scenario.id}>
+                    <h3>{t(`scenarios.items.${scenario.id}.title`)}</h3>
+                    <p>{t(`scenarios.items.${scenario.id}.body`)}</p>
+                    <dl className="pricing-scenario-lines">
+                      <div>
+                        <dt>
+                          {t("scenarios.lineCorreio", {
+                            plan: t(`correio.names.${scenario.correio.id}`),
+                          })}
+                        </dt>
+                        <dd>{formatUsd(scenario.correio.monthlyCents / 100, locale)}</dd>
+                      </div>
+                      <div>
+                        <dt>
+                          {t(scenario.sendPro ? "scenarios.lineSendPro" : "scenarios.lineSendFree")}
+                        </dt>
+                        <dd>
+                          {scenario.sendPro
+                            ? formatUsd(sendProCents / 100, locale)
+                            : t("scenarios.free")}
+                        </dd>
+                      </div>
+                      <div className="pricing-scenario-total">
+                        <dt>{t("scenarios.total")}</dt>
+                        <dd>{formatUsd(scenario.totalCents / 100, locale)}</dd>
+                      </div>
+                    </dl>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className="gtm-section" id="planos">
           <div className="gtm-container">
