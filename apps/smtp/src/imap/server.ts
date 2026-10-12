@@ -113,6 +113,11 @@ export function createMailboxImapServer(deps: MailboxImapDeps): ImapServer {
   const server = new IMAPServer({
     ...(deps.tls ? { key: deps.tls.key, cert: deps.tls.cert } : {}),
     secure: deps.secure ?? false,
+    // imap-core installs its default SNI handler only for servers that are not secure,
+    // yet its TLS-from-the-first-byte path (993) calls one on every connection: answer
+    // with the default context (the keypair above, valid for imap. and smtp.mepmail.dev).
+    SNICallback: (_servername: string, done: (err: Error | null, context?: unknown) => void) =>
+      done(null),
     // Plain loopback (tests) needs neither STARTTLS nor LOGINDISABLED.
     ...(deps.tls ? {} : { disableSTARTTLS: true, ignoreSTARTTLS: true }),
     id: { name: "MepMail", vendor: "MepMail", "support-url": "https://mepmail.dev/support" },
