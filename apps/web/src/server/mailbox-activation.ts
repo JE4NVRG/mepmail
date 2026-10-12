@@ -115,10 +115,15 @@ export async function activateMailboxReceiving(
           }),
     ]);
     const expected = "inbound-smtp.us-east-1.amazonaws.com";
+    // Correio must be the primary MX (every record at the lowest preference); another
+    // provider's MX at a higher preference is a backup and does not stop activation.
+    const lowest = Math.min(...mx.map((x) => x.priority));
     if (
       !identity ||
       !mx.length ||
-      mx.some((x) => x.exchange.toLowerCase().replace(/\.$/, "") !== expected)
+      mx
+        .filter((x) => x.priority === lowest)
+        .some((x) => x.exchange.toLowerCase().replace(/\.$/, "") !== expected)
     )
       return { state: "needs_dns", added: 0 };
     // One executor across Web replicas; preserves the same global SES recipient set.

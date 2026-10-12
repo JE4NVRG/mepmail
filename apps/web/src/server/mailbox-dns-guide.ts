@@ -54,8 +54,18 @@ export interface MailboxDnsGuide {
   nameservers: string[];
   mx: { exchange: string; priority: 10 };
   current: { exchange: string; priority: number; ours: boolean; provider: string | null }[];
-  /** A recognised mailbox provider that receives this domain's mail today, if any. */
+  /**
+   * Who receives first (the lowest MX preference): Correio, another host, a tie between
+   * Correio and another host, or nobody (no MX).
+   */
+  primary: "correio" | "other" | "mixed" | "none";
+  /**
+   * The recognised mailbox provider that receives this domain's mail today: the one at
+   * the primary preference, never a backup MX (null when Correio is the primary).
+   */
   otherProvider: string | null;
+  /** Other hosts at a higher preference: backups that receive only when the primary fails. */
+  backups: { exchange: string; priority: number; provider: string | null }[];
 }
 
 export interface MailboxDnsGuideDeps {
@@ -111,7 +121,15 @@ export async function mailboxDnsGuide(
       };
     })
     .sort((a, b) => a.priority - b.priority || a.exchange.localeCompare(b.exchange));
-  const foreign = current.filter((record) => !record.ours);
+  const lowest = current[0]?.priority;
+  const primaries = current.filter((record) => record.priority === lowest);
+  const primary: MailboxDnsGuide["primary"] = !primaries.length
+    ? "none"
+    : primaries.every((record) => record.ours)
+      ? "correio"
+      : primaries.some((record) => record.ours)
+        ? "mixed"
+        : "other";
   return {
     domain,
     zone,
@@ -120,6 +138,10 @@ export async function mailboxDnsGuide(
     nameservers,
     mx: { exchange: expected, priority: 10 },
     current,
-    otherProvider: foreign.find((record) => record.provider)?.provider ?? null,
+    primary,
+    otherProvider: primaries.find((record) => !record.ours && record.provider)?.provider ?? null,
+    backups: current
+      .filter((record) => record.priority !== lowest && !record.ours)
+      .map(({ exchange, priority, provider }) => ({ exchange, priority, provider })),
   };
 }

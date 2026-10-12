@@ -2,6 +2,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MCP_TOOLS } from "@/app/(dashboard)/settings/mcp/mcp-tools";
+import { correioToolDescriptions } from "../../../packages/mcp/src/correio-tools";
+
+/** Correio tools are registered from the shared definitions: correioTool("name", "scope"). */
+const CORREIO_LINE = /\n\s+correioTool\("([a-z_]+)", "([a-z-]+:[a-z]+)"\);/g;
+const CORREIO_TEXT = correioToolDescriptions("hosted-oauth") as Record<string, string>;
 
 /**
  * The settings → MCP page lists the tools the API's MCP server registers.
@@ -11,9 +16,12 @@ import { MCP_TOOLS } from "@/app/(dashboard)/settings/mcp/mcp-tools";
 describe("MCP tools manifest", () => {
   it("matches the tool registrations in apps/api/src/mcp.ts", () => {
     const source = readFileSync(join(__dirname, "../../api/src/mcp.ts"), "utf8");
-    const registered = [...source.matchAll(/tool\(\s*"([a-z_]+)",\s*"([a-z-]+:[a-z]+)"/g)].map(
-      ([, name, scope]) => ({ name, scope }),
-    );
+    const registered = [
+      ...source.matchAll(/tool\(\s*"([a-z_]+)",\s*"([a-z-]+:[a-z]+)"/g),
+      ...source.matchAll(CORREIO_LINE),
+    ]
+      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+      .map(([, name, scope]) => ({ name, scope }));
     expect(registered.length).toBeGreaterThan(0);
     expect(MCP_TOOLS.map(({ name, scope }) => ({ name, scope }))).toEqual(registered);
   });
@@ -33,10 +41,16 @@ describe("MCP tools manifest", () => {
         ([, name, literal]) => [name ?? "", JSON.parse(literal ?? '""') as string],
       ),
     );
-    const starts = [...source.matchAll(/\n\s+tool\(\n\s+"([a-z0-9_]+)",\n/g)];
+    const starts = [
+      ...source.matchAll(/\n\s+tool\(\n\s+"([a-z0-9_]+)",\n/g),
+      ...source.matchAll(CORREIO_LINE),
+    ].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
     expect(starts.length).toBe(MCP_TOOLS.length);
 
     const described = starts.map((start, index) => {
+      // A shared Correio tool publishes the definitions' own words.
+      if (start[0].includes("correioTool("))
+        return { name: start[1], description: CORREIO_TEXT[start[1] ?? ""] ?? "" };
       const block = source.slice(start.index, starts[index + 1]?.index ?? source.length);
       const literal = /description:\s*(`(?:[^`\\]|\\.)*`|"(?:[^"\\]|\\.)*")/s.exec(block)?.[1];
       expect(literal, `no description literal for ${start[1]}`).toBeTruthy();
@@ -88,6 +102,7 @@ describe("MCP tools manifest", () => {
     // on an "All teams" grant.
     const tools = [
       ...captured(/\n\s+tool\(\n\s*"([a-z0-9_]+)",\n\s*"([a-z0-9:_-]+)",\n/g),
+      ...captured(CORREIO_LINE),
       ...captured(/\n {4}server\.registerTool\(\n\s*"([a-z0-9_]+)",\n/g),
     ];
     expect(

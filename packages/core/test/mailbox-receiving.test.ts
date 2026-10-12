@@ -149,6 +149,7 @@ describe("fresh domain receiving readiness", () => {
       value: f.config.mxExchange,
       priority: 10,
       status: "ready",
+      others: [],
     });
     expect(dto.mailboxes.map((box) => box.receiving_state)).toEqual(["ready", "ready"]);
     expect(JSON.stringify(dto)).not.toMatch(/ruleSetActive|recipients|bucket|topic|credential/);
@@ -190,9 +191,19 @@ describe("fresh domain receiving readiness", () => {
       reason: "mx_conflict",
     },
     {
+      // Another provider is the primary (lower preference): mail goes there first.
+      records: [
+        { exchange: "inbound-smtp.us-east-1.amazonaws.com", priority: 20 },
+        { exchange: "old-provider.example.invalid", priority: 10 },
+      ],
+      status: "conflict",
+      reason: "mx_conflict",
+    },
+    {
+      // A tie at the primary preference splits mail between the two.
       records: [
         { exchange: "inbound-smtp.us-east-1.amazonaws.com", priority: 10 },
-        { exchange: "old-provider.example.invalid", priority: 20 },
+        { exchange: "old-provider.example.invalid", priority: 10 },
       ],
       status: "conflict",
       reason: "mx_conflict",
@@ -214,6 +225,25 @@ describe("fresh domain receiving readiness", () => {
       expect(dto.mailboxes[0]?.receiving_state).toBe("reserved");
     },
   );
+
+  it("is ready when Correio is the primary MX and reports another provider's backup MX", async () => {
+    const f = await fixture();
+    f.deps.resolveMx = vi.fn(async () => [
+      { exchange: "mx2.titan.email", priority: 60 },
+      { exchange: "inbound-smtp.us-east-1.amazonaws.com", priority: 10 },
+      { exchange: "mx1.titan.email.", priority: 50 },
+    ]);
+    const dto = await f.read();
+    expect(dto.receiving_state).toBe("ready");
+    expect(dto.mx.status).toBe("ready");
+    expect(dto.reasons).toContain("mx_backup_other");
+    expect(dto.reasons).not.toContain("mx_conflict");
+    expect(dto.mx.others).toEqual([
+      { exchange: "mx1.titan.email", priority: 50 },
+      { exchange: "mx2.titan.email", priority: 60 },
+    ]);
+    expect(dto.mailboxes[0]?.receiving_state).toBe("ready");
+  });
 
   it("accepts canonical DNS hostname case and trailing dot", async () => {
     const f = await fixture();

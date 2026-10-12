@@ -24,6 +24,30 @@
   },
   "releases": [
     {
+      "version": "0.139",
+      "date": "2026-10-12",
+      "title": "Criar e liberar caixas pelo MCP, sem tentativa e erro",
+      "summary": "O agente confere o que falta antes de criar uma caixa, repete a criação sem duplicar e se dá acesso à caixa nova sem reconectar.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "check_mailbox: antes de criar (ou para diagnosticar), mostra camada por camada o papel de quem pede, a verificação do domínio, se o endereço está livre, licença e assentos, recebimento e o que falta fazer, com a hora da checagem. Comprar assento nunca acontece pelo MCP.",
+            "grant_mailbox_access e revoke_mailbox_access: o app conectado por OAuth adiciona ou tira uma caixa sua do próprio acesso (leitura e rascunho), sem reconectar e sem mexer em outros agentes. Envio sem aprovação continua sendo liberado só por uma pessoa, no painel. Cada mudança fica no registro de auditoria.",
+            "create_mailbox aceita grant_to_this_app para já dar ao app acesso à caixa nova."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "create_mailbox pode ser repetido: o mesmo endereço, dono e tipo devolvem a caixa existente (reconciled) e a colocam no recebimento, nunca uma cópia. A resposta separa cadastrada, recebendo e enviando.",
+            "O recebimento olha o MX primário: um MX de outro provedor com prioridade maior fica como reserva e não bloqueia mais o Correio; a tela de DNS explica isso sem pedir mudança.",
+            "list_mailboxes mostra o estado (ativa, suspensa ou em exclusão) e explica o campo antigo status. As ferramentas do Correio são as mesmas no pacote npm e no MCP hospedado, com a versão em mailbox_list_accounts."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.138",
       "date": "2026-10-12",
       "title": "Anexos no MCP do Correio",

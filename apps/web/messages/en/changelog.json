@@ -24,6 +24,30 @@
   },
   "releases": [
     {
+      "version": "0.139",
+      "date": "2026-10-12",
+      "title": "Create and open mailboxes over MCP, without trial and error",
+      "summary": "An agent checks what a mailbox needs before creating it, repeats a create without duplicates and gives itself access to the new mailbox without reconnecting.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "check_mailbox: before creating (or to diagnose), layer by layer: the requester's role, the domain's verification, whether the address is free, license and seats, receiving and what is left to do, with when it was checked. Seats are never bought over MCP.",
+            "grant_mailbox_access and revoke_mailbox_access: an app connected with OAuth adds one of your mailboxes to its own access (read and draft), or takes it out, without reconnecting and without touching other agents. Sending without approval is still granted only by a person, in the dashboard. Every change is in the audit log.",
+            "create_mailbox takes grant_to_this_app to give the app access to the new mailbox right away."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "create_mailbox is safe to repeat: the same address, owner and kind return the existing mailbox (reconciled) and list it for receiving, never a copy. The answer separates registered, receiving and sending.",
+            "Receiving follows the primary MX: another provider's MX at a higher preference is a backup and no longer blocks Correio; the DNS screen explains it without asking for a change.",
+            "list_mailboxes shows the state (active, suspended or being deleted) and explains the legacy status field. The Correio tools are the same in the npm package and the hosted MCP, with the version in mailbox_list_accounts."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.138",
       "date": "2026-10-12",
       "title": "Attachments in the Mail MCP",

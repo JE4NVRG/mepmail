@@ -1000,6 +1000,122 @@ export async function grantMailboxOAuthClient(
   return { ...credential, oauthClientId: clientId, replaced: previous.length };
 }
 
+/**
+ * An OAuth app adds one mailbox to its own mail grant, or takes one out, without a new
+ * consent: the person who connected it must own the mailbox (an active one), and the
+ * permissions are at most read and draft and at most what the grant already holds.
+ * Sending without approval is never extended here: only a person grants it, in the
+ * dashboard. Other credentials and other apps are never touched. The grant must exist
+ * (the person consented to mail at least once) and keep at least one mailbox.
+ */
+export async function setMailboxOAuthClientAccess(
+  db: Db,
+  actor: MailboxAgentOwnerActor,
+  input: { clientId: string; mailboxId: string; scopes: ("read" | "draft")[] | null },
+  now = new Date(),
+) {
+  actor = { ...actor };
+  if (
+    typeof input.clientId !== "string" ||
+    !OAUTH_CLIENT_ID.test(input.clientId) ||
+    typeof input.mailboxId !== "string" ||
+    !UUID.test(input.mailboxId) ||
+    (input.scopes !== null &&
+      (!Array.isArray(input.scopes) ||
+        !input.scopes.length ||
+        new Set(input.scopes).size !== input.scopes.length ||
+        input.scopes.some((scope) => scope !== "read" && scope !== "draft")))
+  )
+    throw new MailboxAgentAccessError("invalid");
+  // The newest consent (a new consent replaces the previous one).
+  const groupId = await oauthGroupId(db, {
+    teamId: actor.teamId,
+    userId: actor.userId,
+    clientId: input.clientId,
+  });
+  if (!groupId) throw new MailboxAgentAccessError("not_found");
+  return db.transaction(async (transaction) => {
+    const tx = transaction as unknown as Db;
+    const memberId = await ownerMember(tx, actor, input.scopes !== null);
+    const k = schema.mailboxAgentKeys;
+    const mine = and(
+      eq(k.groupId, groupId),
+      eq(k.teamId, actor.teamId),
+      eq(k.ownerUserId, actor.userId),
+      eq(k.oauthClientId, input.clientId),
+    );
+    const discovered = await tx.select({ mailboxId: k.mailboxId }).from(k).where(mine);
+    for (const id of [...new Set([...discovered.map((r) => r.mailboxId), input.mailboxId])].sort())
+      await credentialNamespace(tx, id);
+    const rows = await tx.select().from(k).where(mine).orderBy(asc(k.mailboxId)).for("update");
+    const live = rows.filter((row) => !row.revokedAt && (!row.expiresAt || row.expiresAt > now));
+    const first = live[0];
+    if (!first) throw new MailboxAgentAccessError("not_found");
+    if (live.some((row) => row.ownerMembershipId !== memberId))
+      throw new MailboxAgentAccessError("forbidden");
+    const current = live.find((row) => row.mailboxId === input.mailboxId);
+    if (input.scopes === null) {
+      if (!current) return { groupId, mailboxId: input.mailboxId, changed: false, scopes: null };
+      // The last mailbox goes with the app itself (revoke it), not one call at a time.
+      if (live.length === 1) throw new MailboxAgentAccessError("invalid");
+      await tx
+        .update(k)
+        .set({ revokedAt: now, isDefault: false })
+        .where(and(eq(k.id, current.id), isNull(k.revokedAt)));
+      return { groupId, mailboxId: input.mailboxId, changed: true, scopes: null };
+    }
+    // What the consent granted, across its mailboxes (one may have been narrowed here).
+    const granted = new Set(live.flatMap((row) => row.scopes));
+    if (input.scopes.some((scope) => !granted.has(scope)))
+      throw new MailboxAgentAccessError("forbidden");
+    const scopes = SCOPES.filter((scope) => (input.scopes as string[]).includes(scope));
+    if (current) {
+      if ([...current.scopes].sort().join() === [...scopes].sort().join())
+        return { groupId, mailboxId: input.mailboxId, changed: false, scopes };
+      // Narrowing (or widening up to the grant) on a mailbox the app already reaches.
+      await tx
+        .update(k)
+        .set({ scopes: [...scopes] })
+        .where(eq(k.id, current.id));
+      return { groupId, mailboxId: input.mailboxId, changed: true, scopes };
+    }
+    const box = await ownedBox(tx, actor, input.mailboxId, memberId, true);
+    if (box.status !== "planned" || box.deleteAfter) throw new MailboxAgentAccessError("forbidden");
+    if ((await activeKeysOn(tx, actor.teamId, box.id)) >= MAX_ACTIVE_KEYS_PER_MAILBOX)
+      throw new MailboxAgentAccessError("quota");
+    if (live.length >= MAX_TEAM_MAILBOXES) throw new MailboxAgentAccessError("quota");
+    const old = rows.find((row) => row.mailboxId === input.mailboxId);
+    if (old)
+      await tx
+        .update(k)
+        .set({
+          scopes: [...scopes],
+          revokedAt: null,
+          ownerMembershipId: memberId,
+          label: first.label,
+          expiresAt: first.expiresAt,
+          isDefault: false,
+        })
+        .where(eq(k.id, old.id));
+    else
+      await tx.insert(k).values({
+        id: randomUUID(),
+        teamId: actor.teamId,
+        mailboxId: input.mailboxId,
+        ownerUserId: actor.userId,
+        ownerMembershipId: memberId,
+        label: first.label,
+        scopes: [...scopes],
+        keyHash: first.keyHash,
+        expiresAt: first.expiresAt,
+        groupId,
+        oauthClientId: input.clientId,
+        isDefault: false,
+      });
+    return { groupId, mailboxId: input.mailboxId, changed: true, scopes };
+  });
+}
+
 /** Revokes what earlier consents granted this client over mail (e.g. its OAuth access was revoked). */
 export async function revokeMailboxOAuthClient(
   db: Db,

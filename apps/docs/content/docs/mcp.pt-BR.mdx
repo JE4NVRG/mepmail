@@ -307,12 +307,16 @@ cobre as duas ferramentas de `broadcasts:read`. Ferramentas marcadas com
 | `verify_domain` | `domains:write` | **admin** Reverifica o DNS e a verificação SES de um domínio. |
 | `delete_domain` | `domains:write` | **admin** Remove um domínio e a identidade SES dele. |
 | `list_mailboxes` | `mailboxes:read` | Lista as caixas do Correio da equipe e o que você pode fazer em cada uma. |
+| `check_mailbox` | `mailboxes:read` | Antes de criar uma caixa (ou para diagnosticar uma): papel, verificação do domínio, endereço livre ou ocupado, licença e assentos, recebimento (MX primário, regras de recebimento ao vivo) e as ações que faltam, com quando foi checado. |
 | `mailbox_list_accounts` | `mail:read` | Lista as caixas que você liberou para este cliente no consentimento, com as permissões. |
-| `mailbox_list_messages` | `mail:read` | Lista as mensagens mais novas de uma dessas caixas (entrada, rascunhos ou enviados). |
-| `mailbox_read_message` | `mail:read` | Lê uma mensagem: cabeçalhos, texto e metadados dos anexos. |
+| `mailbox_list_messages` | `mail:read` | Lista ou busca uma página de mensagens numa dessas caixas (entrada, rascunhos ou enviados): `cursor`/`hasMore` até o fim; `query`, `from`, `subject`, `unread`, `after`, `before` filtram no servidor. Página curta não prova que a mensagem não existe. |
+| `mailbox_read_message` | `mail:read` | Lê uma mensagem: cabeçalhos, texto, revisão e metadados dos anexos. |
+| `mailbox_get_attachment` | `mail:read` | Baixa um anexo pelo id, revisão e índice da mensagem: nome, tamanho, sha256 e conteúdo (inline até 512 KiB). |
 | `create_mailbox` | `mailboxes:write` | **admin** Cria uma caixa do Correio num domínio verificado, usando uma vaga que a licença já tem (nunca compra). |
 | `create_mailbox_agent_key` | `mailboxes:write` | **admin** Cria uma chave de agente de leitura/rascunho para uma caixa sua, com a URL do MCP do Correio; o envio só é liberado no painel. |
-| `mailbox_save_draft` | `mail:draft` | Cria ou edita um rascunho em texto puro numa dessas caixas, com Para, Cc e Cco (20 no total), sem enviar. |
+| `grant_mailbox_access` | `mailboxes:write` | **admin** Adiciona uma caixa sua ao acesso de e-mail deste app (leitura/rascunho), sem reconectar; nunca envio sem aprovação. |
+| `revoke_mailbox_access` | `mailboxes:write` | **admin** Tira uma caixa do acesso de e-mail deste app. |
+| `mailbox_save_draft` | `mail:draft` | Cria ou edita um rascunho em texto puro numa dessas caixas, com Para, Cc e Cco (20 no total), sem enviar; `attachments` e `keep_attachments` (10 arquivos, 256 KiB cada). |
 | `mailbox_send_draft` | `mail:draft` | Envia um rascunho salvo; sem `mail:send`, pede sua aprovação antes. |
 
 ## Resultados das ferramentas

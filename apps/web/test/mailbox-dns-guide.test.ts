@@ -31,6 +31,43 @@ describe("mailboxDnsGuide", () => {
     });
   });
 
+  it("names the primary by MX preference: a legacy provider at a higher one is a backup", async () => {
+    // agenciamep.com on 2026-10-12: Correio at 10, Titan left at 50 and 60.
+    const migrated = await mailboxDnsGuide("acme.com.br", MX, {
+      resolveNs,
+      resolveMx: async () => [
+        { exchange: "mx1.titan.email", priority: 50 },
+        { exchange: `${MX}.`, priority: 10 },
+        { exchange: "mx2.titan.email", priority: 60 },
+      ],
+    });
+    expect(migrated).toMatchObject({
+      primary: "correio",
+      otherProvider: null,
+      backups: [
+        { exchange: "mx1.titan.email", priority: 50, provider: "Titan" },
+        { exchange: "mx2.titan.email", priority: 60, provider: "Titan" },
+      ],
+    });
+    // Titan still first: it is the provider receiving today.
+    const before = await mailboxDnsGuide("acme.com.br", MX, {
+      resolveNs,
+      resolveMx: async () => [
+        { exchange: "mx1.titan.email", priority: 10 },
+        { exchange: MX, priority: 20 },
+      ],
+    });
+    expect(before).toMatchObject({ primary: "other", otherProvider: "Titan", backups: [] });
+    const tie = await mailboxDnsGuide("acme.com.br", MX, {
+      resolveNs,
+      resolveMx: async () => [
+        { exchange: "mx1.titan.email", priority: 10 },
+        { exchange: MX, priority: 10 },
+      ],
+    });
+    expect(tie).toMatchObject({ primary: "mixed", otherProvider: "Titan" });
+  });
+
   it("says where mail goes today when the apex already has another provider", async () => {
     const guide = await mailboxDnsGuide("acme.com.br", MX, {
       resolveNs,

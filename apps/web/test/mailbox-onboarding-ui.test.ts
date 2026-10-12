@@ -23,6 +23,8 @@ const fixture = vi.hoisted(() => ({
   service: {} as ReturnType<typeof querySnapshot>,
   receiving: {} as ReturnType<typeof querySnapshot>,
   billing: {} as ReturnType<typeof querySnapshot>,
+  /** The MX guide's answer (undefined: no answer yet, the panel renders nothing). */
+  guide: undefined as unknown,
   buttons: [] as Array<Record<string, unknown>>,
   controls: [] as Array<Record<string, unknown>>,
   forms: [] as Array<Record<string, unknown>>,
@@ -65,7 +67,7 @@ vi.mock("@tanstack/react-query", () => ({
     if (query.kind === "receiving") return fixture.receiving;
     if (query.kind === "billing") return fixture.billing;
     // The MX guide is public-DNS only; with no answer yet it renders nothing.
-    if (query.kind === "receivingGuide") return { data: undefined, isFetching: false };
+    if (query.kind === "receivingGuide") return { data: fixture.guide, isFetching: false };
     throw new Error("Unexpected onboarding query");
   },
   useMutation: (options: { kind: string }) => ({
@@ -329,6 +331,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   fixture.mode = "setup";
   fixture.seeds = {};
+  fixture.guide = undefined;
   fixture.pendingCreate = false;
   fixture.initialOfferId = null;
   fixture.service = { ...querySnapshot(service()), refetch: fixture.serviceRefetch };
@@ -385,6 +388,85 @@ describe.each(["en", "pt-BR"] as const)("mailbox setup in %s", (locale) => {
       expect(text).toContain(t("existingProviderBody"));
     },
   );
+  it("notes another provider's MX kept as a backup once Correio receives first", () => {
+    fixture.receiving.data = {
+      state: "ready",
+      mxHost: "inbound.synthetic.invalid",
+      mx: {
+        status: "ready",
+        value: "inbound.synthetic.invalid",
+        others: [
+          { exchange: "mx1.titan.email", priority: 50 },
+          { exchange: "mx2.titan.email", priority: 60 },
+        ],
+      },
+      reasons: ["mx_backup_other"],
+      mailboxes: [],
+    };
+    const text = plain(render(locale));
+    const t = translate(locale);
+    expect(text).toContain(t("receiving.ready"));
+    expect(text).toContain(t("receivingBackup", { hosts: "mx1.titan.email, mx2.titan.email" }));
+    // Without the reason (Correio alone), no note.
+    fixture.receiving.data = { ...fixture.receiving.data, reasons: [] };
+    expect(plain(render(locale))).not.toContain("mx1.titan.email");
+  });
+  it("tells a backup MX apart from a provider that still receives first", () => {
+    fixture.receiving.data = {
+      state: "needs_mx",
+      mxHost: "inbound.synthetic.invalid",
+      mx: { status: "missing", value: "inbound.synthetic.invalid", others: [] },
+      reasons: ["mx_missing"],
+      mailboxes: [],
+    };
+    const guide = (primary: "correio" | "other") => ({
+      domain: "agencia.example",
+      zone: "agencia.example",
+      recordName: "@",
+      provider: "other",
+      nameservers: ["ns1.host.example"],
+      mx: { exchange: "inbound.synthetic.invalid", priority: 10 },
+      current: [
+        {
+          exchange: "inbound.synthetic.invalid",
+          priority: primary === "correio" ? 10 : 70,
+          ours: true,
+          provider: null,
+        },
+        { exchange: "mx1.titan.email", priority: 50, ours: false, provider: "titan" },
+      ],
+      primary,
+      otherProvider: primary === "correio" ? null : "titan",
+      backups:
+        primary === "correio"
+          ? [{ exchange: "mx1.titan.email", priority: 50, provider: "titan" }]
+          : [],
+    });
+    const dns = createTranslator({
+      locale,
+      messages: messages[locale],
+      namespace: "mailboxes.dnsGuide",
+    });
+    const values = { domain: "agencia.example", zone: "agencia.example", name: "@" };
+    fixture.guide = guide("correio");
+    let text = plain(render(locale));
+    expect(text).toContain(
+      dns("backupOnly", { ...values, hosts: "mx1.titan.email", priority: 50 }),
+    );
+    expect(text).not.toContain(dns("removeOld", { hosts: "mx1.titan.email" }));
+    fixture.guide = guide("other");
+    text = plain(render(locale));
+    expect(text).toContain(
+      dns("currentKnown", {
+        ...values,
+        value: "inbound.synthetic.invalid",
+        nameservers: "ns1.host.example",
+        provider: "titan",
+        hosts: "mx1.titan.email",
+      }),
+    );
+    expect(text).toContain(dns("removeOld", { hosts: "mx1.titan.email" }));
+  });
   it.each(["pending", "fetching", "error", "no_data"] as const)(
     "does not show a cached ready result while %s",
     (state) => {

@@ -303,6 +303,7 @@
     "sendingPending": "O domínio ainda precisa ser verificado antes de enviar. Você pode reservar o endereço agora.",
     "receivingTitle": "Recebimento no seu domínio",
     "receivingBody": "O recebimento depende do DNS (MX) e das regras do domínio. A verificação de envio não confirma essa configuração.",
+    "receivingBackup": "O Correio já recebe primeiro. {hosts} ficam como reserva e só recebem se o Correio estiver fora do ar; retire quando terminar a migração.",
     "reservationBody": "Este passo cadastra a caixa e reserva o endereço. A ativação de envio e recebimento é conferida separadamente, sem trocar seu provedor atual neste cadastro.",
     "reviewLicense": "Revisar licença",
     "retry": "Tentar novamente",
@@ -674,6 +675,7 @@
     },
     "currentKnown": "Hoje o e-mail de {domain} chega pelo {provider} ({hosts}). Trocar o MX leva todo o e-mail de qualquer endereço @{domain} para o Correio, e as caixas no {provider} param de receber. Se ainda usa o {provider}, crie as caixas do Correio num subdomínio (ex.: correio.{domain}) ou migre todas as caixas antes.",
     "currentOther": "Hoje o MX de {domain} aponta para {hosts}. Trocar o MX leva todo o e-mail deste domínio para o Correio. Se esse servidor ainda recebe e-mail que você usa, crie as caixas num subdomínio (ex.: correio.{domain}).",
+    "backupOnly": "O Correio já recebe o e-mail de {domain}. {hosts} ficam como reserva (prioridade {priority}) e só recebem se o Correio estiver fora do ar. Não precisa mexer no DNS agora; retire esses MX quando terminar a migração.",
     "type": "Tipo",
     "name": "Nome",
     "value": "Valor",
@@ -719,7 +721,7 @@
         "3": "Salve e volte aqui para verificar."
       }
     },
-    "removeOld": "Depois de criar o MX do Correio, apague os MX antigos ({hosts}). Com os dois juntos, parte do e-mail continua indo para o servidor antigo e o recebimento não é confirmado.",
+    "removeOld": "Depois de criar o MX do Correio com prioridade 10, apague os MX antigos ({hosts}) ou deixe-os com um número maior (ex.: 50) como reserva enquanto migra. Com o mesmo número de prioridade, parte do e-mail continua indo para o servidor antigo e o recebimento não é confirmado.",
     "openProvider": "Abrir {provider}",
     "checkNow": "Verificar agora",
     "checking": "Verificando…",

@@ -15,6 +15,9 @@ const h = vi.hoisted(() => ({
   activate: vi.fn(),
   access: vi.fn(),
   createAccess: vi.fn(),
+  readiness: vi.fn(),
+  // Each db.select(...).from(...).where(...) resolves to the next queued rows.
+  rows: [] as unknown[][],
 }));
 vi.mock("@millionsend/config", async (original) => ({
   ...(await original<typeof import("@millionsend/config")>()),
@@ -31,10 +34,17 @@ vi.mock("@millionsend/core", async (original) => ({
 }));
 vi.mock("@millionsend/db", async (original) => ({
   ...(await original<typeof import("@millionsend/db")>()),
-  getDb: () => ({ synthetic: "db" }),
+  getDb: () => ({
+    synthetic: "db",
+    select: () => ({ from: () => ({ where: async () => h.rows.shift() ?? [] }) }),
+  }),
 }));
 vi.mock("@/lib/api-base-url", () => ({ apiBaseUrl: () => "https://api.example.test" }));
 vi.mock("@/server/mailbox-activation", () => ({ activateMailboxReceiving: h.activate }));
+vi.mock("@/server/mailbox-readiness", async (original) => ({
+  ...(await original<typeof import("@/server/mailbox-readiness")>()),
+  checkMailboxReadiness: h.readiness,
+}));
 vi.mock("@/server/mailboxes", () => ({
   mailboxActorAccessEnabled: h.access,
   mailboxCreateAccessEnabled: h.createAccess,
@@ -57,6 +67,7 @@ const call = (body: unknown, header: string | null = signInternalActor(key, acto
 
 beforeEach(() => {
   vi.resetAllMocks();
+  h.rows = [];
   h.access.mockResolvedValue(true);
   h.createAccess.mockResolvedValue(true);
 });
@@ -90,12 +101,14 @@ describe("internal mailbox admin", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       can_manage: true,
+      status_note: expect.stringContaining("planned = active"),
       mailboxes: [
         {
           id: "m1",
           address: "agente@acme.dev",
           label: "Agente",
           kind: "agent",
+          state: "active",
           status: "planned",
           domain_id: "d1",
           owned_by_you: true,
@@ -104,7 +117,7 @@ describe("internal mailbox admin", () => {
         },
       ],
     });
-    expect(h.list).toHaveBeenCalledWith({ synthetic: "db" }, actor);
+    expect(h.list).toHaveBeenCalledWith(expect.objectContaining({ synthetic: "db" }), actor);
   });
 
   it("creates a mailbox owned by the actor and starts receiving", async () => {
@@ -115,6 +128,9 @@ describe("internal mailbox admin", () => {
       domainId: "d1",
     });
     h.activate.mockResolvedValue({ state: "needs_dns", added: 0 });
+    h.readiness.mockResolvedValue({ ready: { registered: true, receiving: false, sending: true } });
+    // The domain, then no mailbox and no alias at that address yet.
+    h.rows = [[{ name: "acme.dev" }], [], []];
     const res = await call({
       action: "create",
       domainId: "22222222-2222-4222-8222-222222222222",
@@ -125,7 +141,10 @@ describe("internal mailbox admin", () => {
       id: "m2",
       address: "suporte@acme.dev",
       kind: "agent",
+      created: true,
+      reconciled: false,
       receiving: "needs_dns",
+      readiness: { ready: { registered: true, receiving: false, sending: true } },
     });
     expect(h.create.mock.calls[0]?.[2]).toMatchObject({ ownerUserId: "owner", kind: "agent" });
   });

@@ -274,6 +274,17 @@ export function MailboxSetupDialog({
                 {t("mxDestination")} <code className={styles.mxHost}>{receiving.mxHost}</code>
               </p>
             ) : null}
+            {/* Correio receives first; another provider's MX is left as a backup. */}
+            {/* Older readiness answers (and some test doubles) have no reasons/others. */}
+            {receiving.state !== "needs_mx" &&
+            receivingQuery.data?.reasons?.includes("mx_backup_other") &&
+            receivingQuery.data.mx?.others?.length ? (
+              <p className={styles.hint}>
+                {t("receivingBackup", {
+                  hosts: receivingQuery.data.mx.others.map((record) => record.exchange).join(", "),
+                })}
+              </p>
+            ) : null}
             {/* Kept while a recheck runs, so what the guide just did (the
                 Cloudflare card's result) stays on screen. */}
             {(receiving.state === "needs_mx" ||

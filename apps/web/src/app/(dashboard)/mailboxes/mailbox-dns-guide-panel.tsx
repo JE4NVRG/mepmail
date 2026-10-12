@@ -20,7 +20,8 @@ const PROVIDER_DASHBOARD: Record<string, string | undefined> = {
 /**
  * The receiving (MX) assistant shown while a domain still needs its MX: the
  * DNS host we detected, the one record to add with copy buttons, steps for
- * that host, and a warning when the domain already receives mail elsewhere.
+ * that host, and a warning when the domain already receives mail elsewhere (only a
+ * note when Correio is already first and the other host is just a backup).
  * On Cloudflare, with no other MX in the way, one click writes the record.
  */
 export function MailboxDnsGuidePanel({
@@ -45,6 +46,10 @@ export function MailboxDnsGuidePanel({
   const value = data.provider === "route53" ? `10 ${data.mx.exchange}` : data.mx.exchange;
   const foreign = data.current.filter((record) => !record.ours);
   const hosts = foreign.map((record) => record.exchange).join(", ");
+  // Correio already receives first: other hosts at a higher preference are only backups
+  // (they get mail only while Correio is unreachable), nothing to fix in the DNS.
+  const backupOnly = data.primary === "correio" && data.backups.length > 0;
+  const backupHosts = data.backups.map((record) => record.exchange).join(", ");
   const dashboard = PROVIDER_DASHBOARD[data.provider];
   const values = {
     zone: data.zone,
@@ -97,7 +102,15 @@ export function MailboxDnsGuidePanel({
           }}
         />
       ) : null}
-      {foreign.length ? (
+      {backupOnly ? (
+        <p className={styles.hint}>
+          {t("backupOnly", {
+            ...values,
+            hosts: backupHosts,
+            priority: data.backups[0]?.priority ?? 0,
+          })}
+        </p>
+      ) : foreign.length ? (
         <p className={styles.dnsWarning}>
           {data.otherProvider
             ? t("currentKnown", { ...values, provider: data.otherProvider, hosts })
@@ -115,7 +128,7 @@ export function MailboxDnsGuidePanel({
         {(["1", "2", "3"] as const).map((step) => (
           <li key={step}>{t(`steps.${data.provider}.${step}`, values)}</li>
         ))}
-        {foreign.length ? <li>{t("removeOld", { hosts })}</li> : null}
+        {foreign.length && !backupOnly ? <li>{t("removeOld", { hosts })}</li> : null}
       </ol>
       <div className={styles.successActions}>
         {dashboard ? (

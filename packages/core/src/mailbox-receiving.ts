@@ -14,6 +14,8 @@ export type MailboxReceivingReason =
   | "dns_unavailable"
   | "mx_missing"
   | "mx_conflict"
+  /** Not blocking: Correio is the primary MX and another provider's MX is a backup. */
+  | "mx_backup_other"
   | "provider_unavailable"
   | "provider_stale"
   | "provider_context_mismatch"
@@ -75,6 +77,8 @@ export interface MailboxReceivingReadiness {
     value: string | null;
     priority: 10;
     status: "unknown" | "missing" | "conflict" | "ready";
+    /** The MX records that are not Correio's, by preference (backups when status is ready). */
+    others: { exchange: string; priority: number }[];
   };
   reasons: MailboxReceivingReason[];
   mailboxes: {
@@ -176,6 +180,7 @@ function assessment(
 ): MailboxReceivingReadiness {
   const reasons: MailboxReceivingReason[] = [];
   let mx: MailboxReceivingReadiness["mx"]["status"] = "unknown";
+  let others: { exchange: string; priority: number }[] = [];
   let checkedAt: string | null = null;
   let proofReady = false;
   const recipients = new Set<string>();
@@ -186,21 +191,36 @@ function assessment(
     else if (!dns.value.length) {
       mx = "missing";
       reasons.push("mx_missing");
-    } else if (
-      dns.value.every(
+    } else {
+      // Mail goes to the lowest preference first: Correio must hold every record at the
+      // primary preference. Another provider's MX at a higher value is only a backup,
+      // reported but not blocking (it receives only while Correio is unreachable).
+      const records = dns.value.filter(
         (record) =>
           record &&
           typeof record === "object" &&
-          host(record.exchange) === config.mxExchange &&
+          host(record.exchange) !== null &&
           Number.isInteger(record.priority) &&
           record.priority >= 0 &&
           record.priority <= 65535,
-      )
-    )
-      mx = "ready";
-    else {
-      mx = "conflict";
-      reasons.push("mx_conflict");
+      );
+      const lowest = Math.min(...records.map((record) => record.priority));
+      others = records
+        .filter((record) => host(record.exchange) !== config.mxExchange)
+        .map((record) => ({ exchange: host(record.exchange) ?? "", priority: record.priority }))
+        .sort((a, b) => a.priority - b.priority || a.exchange.localeCompare(b.exchange));
+      if (
+        records.length === dns.value.length &&
+        records
+          .filter((record) => record.priority === lowest)
+          .every((record) => host(record.exchange) === config.mxExchange)
+      ) {
+        mx = "ready";
+        if (others.length) reasons.push("mx_backup_other");
+      } else {
+        mx = "conflict";
+        reasons.push("mx_conflict");
+      }
     }
     const proof = observation.status === "fulfilled" ? observation.value : null;
     if (!proof || typeof proof !== "object") reasons.push("provider_unavailable");
@@ -291,6 +311,7 @@ function assessment(
       value: config?.mxExchange ?? null,
       priority: 10,
       status: mx,
+      others,
     },
     reasons,
     mailboxes: state.boxes.map((box) => {

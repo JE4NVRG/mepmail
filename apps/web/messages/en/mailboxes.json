@@ -303,6 +303,7 @@
     "sendingPending": "This domain must be verified before sending. You can reserve the address now.",
     "receivingTitle": "Receiving on your domain",
     "receivingBody": "Receiving depends on DNS (MX) and domain rules. Sending verification does not confirm this configuration.",
+    "receivingBackup": "MepMail Mail receives first. {hosts} stay as a backup and only receive while MepMail Mail is unreachable; remove them once the move is done.",
     "reservationBody": "This step registers the mailbox and reserves the address. Sending and receiving activation are checked separately; registering does not change your current provider.",
     "reviewLicense": "Review license",
     "retry": "Try again",
@@ -674,6 +675,7 @@
     },
     "currentKnown": "Mail for {domain} arrives through {provider} today ({hosts}). Changing the MX sends all mail for any @{domain} address to MepMail Mail, and the {provider} mailboxes stop receiving. If you still use {provider}, put the MepMail Mail inboxes on a subdomain (e.g. correio.{domain}) or move every mailbox first.",
     "currentOther": "The MX for {domain} points to {hosts} today. Changing it sends all of this domain's mail to MepMail Mail. If that server still receives mail you use, put the mailboxes on a subdomain (e.g. correio.{domain}).",
+    "backupOnly": "MepMail Mail already receives {domain}'s mail. {hosts} stay as a backup (priority {priority}) and only receive while MepMail Mail is unreachable. No DNS change needed now; remove those MX records once the move is done.",
     "type": "Type",
     "name": "Name",
     "value": "Value",
@@ -719,7 +721,7 @@
         "3": "Save and come back here to check."
       }
     },
-    "removeOld": "Once the MepMail MX record exists, delete the old MX records ({hosts}). With both in place, part of the mail keeps going to the old server and receiving is not confirmed.",
+    "removeOld": "Once the MepMail MX record exists with priority 10, delete the old MX records ({hosts}) or give them a higher number (e.g. 50) as a backup while you move. At the same priority, part of the mail keeps going to the old server and receiving is not confirmed.",
     "openProvider": "Open {provider}",
     "checkNow": "Check now",
     "checking": "Checking…",

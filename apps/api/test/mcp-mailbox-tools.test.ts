@@ -124,7 +124,10 @@ const data = (result: { content?: unknown }) =>
 
 it("offers the mailbox tools only for the mailbox scopes", async () => {
   const reader = await connect("mailboxes:read");
-  expect((await reader.listTools()).tools.map((t) => t.name)).toEqual(["list_mailboxes"]);
+  expect((await reader.listTools()).tools.map((t) => t.name)).toEqual([
+    "list_mailboxes",
+    "check_mailbox",
+  ]);
   await reader.close();
   const none = await connect("emails:read");
   expect((await none.listTools()).tools.map((t) => t.name)).not.toContain("list_mailboxes");
@@ -134,9 +137,12 @@ it("offers the mailbox tools only for the mailbox scopes", async () => {
 it("calls the dashboard as the signed-in user and relays its answers", async () => {
   const client = await connect("mailboxes:read mailboxes:write");
   expect((await client.listTools()).tools.map((t) => t.name).sort()).toEqual([
+    "check_mailbox",
     "create_mailbox",
     "create_mailbox_agent_key",
+    "grant_mailbox_access",
     "list_mailboxes",
+    "revoke_mailbox_access",
   ]);
   expect(data(await client.callTool({ name: "list_mailboxes", arguments: {} }))).toEqual({
     can_manage: true,
@@ -168,7 +174,7 @@ it("calls the dashboard as the signed-in user and relays its answers", async () 
   });
   expect(send.isError).toBe(true);
   expect(calls.map((c) => c.body.action)).toEqual(["list", "create", "create_agent_key"]);
-  for (const call of calls) expect(call.actor).toMatchObject({ teamId, userId });
+  for (const call of calls) expect(call.actor).toMatchObject({ teamId, userId, clientId: "c" });
   expect(calls[1]?.body).toEqual({
     action: "create",
     domainId: "00000000-0000-4000-8000-000000000001",
@@ -185,6 +191,7 @@ it("offers the mail tools for the mail scopes and calls the agent API as this us
     "mailbox_list_accounts",
     "mailbox_list_messages",
     "mailbox_read_message",
+    "mailbox_get_attachment",
   ]);
   await reader.close();
   const client = await connect("mail:read mail:draft");
@@ -192,10 +199,13 @@ it("offers the mail tools for the mail scopes and calls the agent API as this us
     "mailbox_list_accounts",
     "mailbox_list_messages",
     "mailbox_read_message",
+    "mailbox_get_attachment",
     "mailbox_save_draft",
     "mailbox_send_draft",
   ]);
   expect(data(await client.callTool({ name: "mailbox_list_accounts", arguments: {} }))).toEqual({
+    // Which tool set this connection serves (CORREIO_TOOLS_VERSION).
+    server: { surface: "hosted-oauth", tools_version: expect.any(String) },
     credential: "team",
     mailboxes: [{ address: "jean@acme.dev", scopes: ["read", "draft"], available: true }],
   });

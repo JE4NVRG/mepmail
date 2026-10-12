@@ -418,6 +418,7 @@ export {
   revokeMailboxAgentKey,
   revokeMailboxOAuthClient,
   revokeMailboxTeamAgentKey,
+  setMailboxOAuthClientAccess,
   updateMailboxTeamAgentKey,
   withMailboxAgentAccess,
 } from "./mailbox-agent-access.js";

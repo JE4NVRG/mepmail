@@ -302,12 +302,16 @@ and admins.
 | `verify_domain` | `domains:write` | **admin** Re-check a domain's DNS and SES verification. |
 | `delete_domain` | `domains:write` | **admin** Remove a domain and its SES identity. |
 | `list_mailboxes` | `mailboxes:read` | List the team's Correio mailboxes and what you may do with each. |
+| `check_mailbox` | `mailboxes:read` | Before creating a mailbox (or to diagnose one): role, domain verification, address free or taken, license and seats, receiving (primary MX, live receipt rules) and the actions left, with when it was checked. |
 | `mailbox_list_accounts` | `mail:read` | List the mailboxes you allowed this client to use at consent, with their permissions. |
-| `mailbox_list_messages` | `mail:read` | List the newest messages in one of those mailboxes (inbox, drafts or sent). |
-| `mailbox_read_message` | `mail:read` | Read one message: headers, text and attachment metadata. |
+| `mailbox_list_messages` | `mail:read` | List or search one page of messages in one of those mailboxes (inbox, drafts or sent): `cursor`/`hasMore` pages to the end; `query`, `from`, `subject`, `unread`, `after`, `before` filter on the server. A short page never proves absence. |
+| `mailbox_read_message` | `mail:read` | Read one message: headers, text, revision and attachment metadata. |
+| `mailbox_get_attachment` | `mail:read` | Get one attachment by message id, revision and index: filename, bytes, sha256 and content (inline up to 512 KiB). |
 | `create_mailbox` | `mailboxes:write` | **admin** Create a Correio mailbox on a verified domain, using a seat the license already has (never a purchase). |
 | `create_mailbox_agent_key` | `mailboxes:write` | **admin** Create a read/draft agent key for a mailbox you own, with the Correio MCP URL; send is granted only in the dashboard. |
-| `mailbox_save_draft` | `mail:draft` | Create or edit a plain-text draft in one of those mailboxes, with To, Cc and Bcc (20 in all), without sending. |
+| `grant_mailbox_access` | `mailboxes:write` | **admin** Add one of your mailboxes to this app's own mail access (read/draft), without reconnecting; never sending without approval. |
+| `revoke_mailbox_access` | `mailboxes:write` | **admin** Take one mailbox out of this app's own mail access. |
+| `mailbox_save_draft` | `mail:draft` | Create or edit a plain-text draft in one of those mailboxes, with To, Cc and Bcc (20 in all), without sending; `attachments` and `keep_attachments` (10 files, 256 KiB each). |
 | `mailbox_send_draft` | `mail:draft` | Send a saved draft; without `mail:send` it asks you to approve it first. |
 
 ## Tool results
