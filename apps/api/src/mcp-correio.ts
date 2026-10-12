@@ -1,4 +1,4 @@
-import type { OpenAPIHono } from "@hono/zod-openapi";
+import { type OpenAPIHono, z } from "@hono/zod-openapi";
 import {
   type AuthInfo,
   type CallToolResult,
@@ -182,7 +182,7 @@ function buildCorreioServer(origin: string, token: string): McpServer {
     download: download as CorreioTransport["download"],
     result: toolResult as CorreioTransport["result"],
   };
-  for (const tool of correioToolDefinitions("hosted-correio", transport))
+  for (const tool of correioToolDefinitions("hosted-correio", transport, z))
     server.registerTool(
       tool.name,
       {

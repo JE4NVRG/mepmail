@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/server";
+import { z } from "zod";
 import {
   CORREIO_TOOL_NAMES,
   type CorreioToolResult,
@@ -160,7 +161,7 @@ export function registerCorreioTools(server: McpServer, options: CorreioOptions)
     download: createCorreioDownloader(options),
     result: toolResult,
   };
-  for (const tool of correioToolDefinitions("npm", transport, {
+  for (const tool of correioToolDefinitions("npm", transport, z, {
     downloadDir: options.downloadDir,
     uploadDir: options.uploadDir,
   }))

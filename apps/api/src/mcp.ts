@@ -908,11 +908,15 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
   // server, the hosted /mcp/correio and the npm package; each correioTool(...) line
   // registers one of them here with its OAuth scope.
   const correio_tools = new Map(
-    correioToolDefinitions("hosted-oauth", {
-      call: mail as CorreioTransport["call"],
-      download: mailDownload,
-      result: correioResult,
-    }).map((definition) => [definition.name, definition]),
+    correioToolDefinitions(
+      "hosted-oauth",
+      {
+        call: mail as CorreioTransport["call"],
+        download: mailDownload,
+        result: correioResult,
+      },
+      z,
+    ).map((definition) => [definition.name, definition]),
   );
   const correioTool = (name: string, scope: McpScope) => {
     const definition = correio_tools.get(name as never);

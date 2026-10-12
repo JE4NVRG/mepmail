@@ -1,4 +1,3 @@
-import { z } from "zod";
 import {
   AttachmentError,
   attachmentFilename,
@@ -20,6 +19,13 @@ import {
  * surface, so a client can tell which deployment it talks to.
  */
 export const CORREIO_TOOLS_VERSION = "2026-10-12.3";
+
+/**
+ * The zod the caller already uses (the package's own, or the API's @hono/zod-openapi
+ * export): this module imports none at runtime, so the API image, which installs no
+ * dependencies for packages/mcp, can load it.
+ */
+type Zod = typeof import("zod").z;
 
 export type CorreioSurface = "npm" | "hosted-correio" | "hosted-oauth";
 
@@ -51,7 +57,7 @@ export interface CorreioToolDefinition {
   /** The permission the tool needs: OAuth maps it to mail:read / mail:draft. */
   access: "read" | "draft" | "send";
   description: string;
-  inputSchema: z.ZodObject;
+  inputSchema: import("zod").ZodObject;
   annotations: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean };
   handler: (args: never) => Promise<CorreioToolResult>;
 }
@@ -126,6 +132,7 @@ export function correioToolDescriptions(
 export function correioToolDefinitions(
   surface: CorreioSurface,
   t: CorreioTransport,
+  z: Zod,
   files: { downloadDir?: string | undefined; uploadDir?: string | undefined } = {},
 ): CorreioToolDefinition[] {
   const text = correioToolDescriptions(surface);
