@@ -178,7 +178,7 @@
     "name": "Name",
     "email": "Email",
     "role": "Role",
-    "pageOf": "Page 1 – {pages} of {total} members",
+    "pageOf": "{total, plural, one {# member} other {# members}}",
     "roles": {
       "owner": "Owner",
       "admin": "Admin",
@@ -221,7 +221,7 @@
       "revoke": "Revoke",
       "actions": "Actions",
       "resendError": "Could not resend: {reason}",
-      "pageOf": "Page 1 – {pages} of {total} invitations",
+      "pageOf": "{total, plural, one {# invitation} other {# invitations}}",
       "revokeTitle": "Revoke invitation",
       "revokeBody": "The link sent to {email} stops working. You can invite them again any time."
     },
@@ -261,18 +261,19 @@
     "pt-BR": "Português (Brasil)"
   },
   "usage": {
-    "sentToday": "Emails sent today",
+    "sentToday": "Sends counted today",
     "resetsMidnightUtc": "Resets at midnight UTC",
     "unlimited": "Unlimited",
     "history": "Daily history",
     "empty": "0 days recorded.",
     "day": "Day (UTC)",
-    "sent": "Sent",
+    "sent": "Counted",
     "delivered": "Delivered",
     "bounced": "Bounced",
     "complained": "Complained",
-    "sentThisPeriod": "Emails sent this period",
-    "renewsOn": "Renews on {date}"
+    "sentThisPeriod": "Sends counted this period",
+    "renewsOn": "Renews on {date}",
+    "countingNote": "Each recipient (To, Cc and Bcc) of an accepted email counts as one send, even if delivery fails later. Addresses already on your suppression list do not count."
   },
   "billing": {
     "plan": "Plan",

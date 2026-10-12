@@ -325,7 +325,7 @@ export function WebhooksView() {
           </Table>
           <ListFooter
             left={t("pageOf", {
-              pages: Math.min(pages, Math.ceil(webhooks.length / pageSize)),
+              shown: Math.min(webhooks.length, pages * pageSize),
               total: webhooks.length,
             })}
             size={pageSize}

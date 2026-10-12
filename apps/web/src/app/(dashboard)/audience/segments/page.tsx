@@ -309,8 +309,8 @@ export default function SegmentsPage() {
           </Table>
           <ListFooter
             left={t("pageOf", {
-              pages: Math.max(1, Math.ceil(shownRows.length / size)),
-              total: nf.format(filteredRows.length),
+              shown: shownRows.length,
+              total: filteredRows.length,
             })}
             size={size}
             onSize={changeSize}

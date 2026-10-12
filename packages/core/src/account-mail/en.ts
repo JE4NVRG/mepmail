@@ -125,8 +125,8 @@ export const en = {
   "broadcast.held": {
     subject: '"{name}" is on hold',
     body: [
-      'Sending from {region} is paused across the platform while bounce and complaint rates settle, so "{name}" waits instead of going out; transactional email keeps flowing.',
-      "It resumes by itself — we re-check every 15 minutes — and you'll get the usual sent report when it's done.",
+      'Broadcasts from {region} are paused across the platform to protect delivery, so "{name}" waits instead of going out; transactional email keeps flowing.',
+      "It resumes by itself once the pause ends — we re-check every 15 minutes — and you'll get the usual sent report when it's done.",
     ],
     button: "Open broadcast",
   },

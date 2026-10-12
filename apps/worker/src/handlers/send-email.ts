@@ -4,6 +4,7 @@ import {
   buildUnsubscribeUrl,
   bumpHourlyUsage,
   CREDENTIAL_MAIL_KINDS,
+  countDistinctRecipients,
   decryptEmailBody,
   type EmailAttachment,
   type EmailBody,
@@ -308,8 +309,9 @@ export async function failQueuedEmail(db: Db, emailId: string, reason: string): 
 /**
  * Park a queued email as queued_quota because SES, not the plan, is out of
  * sends. Hands its reservation back (the drain reserves again on release,
- * one per row, as it does for plan-parked mail) so the two kinds share one
- * drain path. A row that already left "queued" is left alone.
+ * one unit per distinct recipient, as it does for plan-parked mail) so the
+ * two kinds share one drain path. A row that already left "queued" is left
+ * alone.
  */
 async function parkQueued(
   db: Db,
@@ -327,7 +329,15 @@ async function parkQueued(
     // billing period, which the drain will charge again on release. The cap
     // itself is irrelevant here, so the row is read as Cloud reads it.
     const quota = await fetchTeamQuota(txDb, email.teamId, true);
-    if (quota) await releaseQuota(txDb, { teamId: email.teamId, count: 1, quota });
+    if (!quota) return;
+    // As many units as the drain will reserve again (cron.ts drainOne): an email to
+    // N people handed back only 1 and was then charged N again on release.
+    const [row] = await txDb
+      .select({ to: schema.emails.to, cc: schema.emails.cc, bcc: schema.emails.bcc })
+      .from(schema.emails)
+      .where(eq(schema.emails.id, email.id));
+    const count = row ? countDistinctRecipients(row.to, row.cc, row.bcc) : 1;
+    await releaseQuota(txDb, { teamId: email.teamId, count, quota });
   });
   console.warn(`email.send: ${why}, parked ${email.id}`);
 }

@@ -328,8 +328,8 @@ export default function EmailsPage() {
           <EmailsTable rows={items} />
           <ListFooter
             left={t("list.pageOf", {
-              pages: query.data?.pages.length ?? 1,
-              total: nf.format(total),
+              shown: Math.min(items.length, total),
+              total,
             })}
             size={limit}
             onSize={setLimit}

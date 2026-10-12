@@ -134,6 +134,8 @@ describe("agent send without the send permission", () => {
       kind: "mailbox.send_requested",
       locale: "pt-BR",
       values: { agent: "Sage", mailbox: "agente@piloto.mepmail.dev" },
+      // The button opens the draft that waits, in its mailbox.
+      path: `/mail?mailbox=${mailboxId}&item=${itemId}`,
     });
   });
 

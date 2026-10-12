@@ -3,8 +3,8 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
+import { useCallback, useState } from "react";
 import { ContactAvatar } from "@/components/contact-avatar";
 import { CopyChip } from "@/components/copy-chip";
 import { LoadError } from "@/components/load-error";
@@ -66,10 +66,8 @@ export function TopicDetail({ id }: { id: string }) {
   const tAud = useTranslations("audience");
   const tabs = useTranslations("audience.tabs");
   const common = useTranslations("common");
-  const locale = useLocale();
   const trpc = useTRPC();
   const router = useRouter();
-  const nf = useMemo(() => new Intl.NumberFormat(locale), [locale]);
   const { copied, copy } = useCopied();
 
   const [editTarget, setEditTarget] = useState<TopicEditTarget | null>(null);
@@ -339,8 +337,8 @@ export function TopicDetail({ id }: { id: string }) {
             </Table>
             <ListFooter
               left={tAud("contacts.pageOf", {
-                pages: contacts.data?.pages.length ?? 1,
-                total: nf.format(total),
+                shown: Math.min(items.length, total),
+                total,
               })}
               size={limit}
               onSize={setLimit}

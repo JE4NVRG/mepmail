@@ -12,7 +12,7 @@
     "menu": "Ações da chave"
   },
   "neverUsed": "Nunca",
-  "pageOf": "Página 1 – {pages} de {total} chaves de API",
+  "pageOf": "{total, plural, one {# chave de API} other {# chaves de API}}",
   "rename": "Renomear",
   "revoke": "Revogar",
   "scope": {

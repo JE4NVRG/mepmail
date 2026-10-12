@@ -178,7 +178,7 @@
     "name": "Nome",
     "email": "E-mail",
     "role": "Função",
-    "pageOf": "Página 1 – {pages} de {total} membros",
+    "pageOf": "{total, plural, one {# membro} other {# membros}}",
     "roles": {
       "owner": "Proprietário",
       "admin": "Administrador",
@@ -221,7 +221,7 @@
       "revoke": "Revogar",
       "actions": "Ações",
       "resendError": "Não foi possível reenviar: {reason}",
-      "pageOf": "Página 1 – {pages} de {total} convites",
+      "pageOf": "{total, plural, one {# convite} other {# convites}}",
       "revokeTitle": "Revogar convite",
       "revokeBody": "O link enviado para {email} deixa de funcionar. Você pode convidar de novo quando quiser."
     },
@@ -261,18 +261,19 @@
     "pt-BR": "Português (Brasil)"
   },
   "usage": {
-    "sentToday": "E-mails enviados hoje",
+    "sentToday": "Envios contados hoje",
     "resetsMidnightUtc": "Reinicia à meia-noite UTC",
     "unlimited": "Ilimitado",
     "history": "Histórico diário",
     "empty": "0 dias registrados.",
     "day": "Dia (UTC)",
-    "sent": "Enviados",
+    "sent": "Contados",
     "delivered": "Entregues",
     "bounced": "Devolvidos",
     "complained": "Reclamações",
-    "sentThisPeriod": "E-mails enviados neste período",
-    "renewsOn": "Renova em {date}"
+    "sentThisPeriod": "Envios contados neste período",
+    "renewsOn": "Renova em {date}",
+    "countingNote": "Cada destinatário (Para, Cc e Cco) de um e-mail aceito conta um envio, mesmo que a entrega falhe depois. Endereços já na sua lista de supressão não contam."
   },
   "billing": {
     "plan": "Plano",

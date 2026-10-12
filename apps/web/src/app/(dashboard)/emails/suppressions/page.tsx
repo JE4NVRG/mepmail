@@ -274,8 +274,8 @@ export default function SuppressionsPage() {
           </Table>
           <ListFooter
             left={t("suppressions.pageOf", {
-              pages: query.data?.pages.length ?? 1,
-              total: nf.format(total),
+              shown: Math.min(items.length, total),
+              total,
             })}
             size={limit}
             onSize={setLimit}

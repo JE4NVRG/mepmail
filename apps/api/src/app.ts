@@ -2733,13 +2733,12 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
     // gated by it.
     const regionHold = await regionPause(db, domain.region);
     if (regionHold) {
-      const metric = regionHold.reason?.metric === "bounce" ? "hard-bounce" : "complaint";
       return fail(
         403,
         "broadcasts_paused",
         regionHold.manualReason
           ? `Broadcast sending is paused in ${domain.region} by the instance operator. Transactional email is unaffected. Try again later.`
-          : `Broadcast sending is paused in ${domain.region} while the platform's ${metric} rate recovers. Transactional email is unaffected. Try again later.`,
+          : `Broadcast sending is paused in ${domain.region} for a short while to protect delivery. Transactional email is unaffected. Try again later.`,
       );
     }
     // The operator's pause is the team's own hold, transactional mail aside.

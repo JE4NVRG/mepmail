@@ -12,7 +12,7 @@
     "menu": "Key actions"
   },
   "neverUsed": "Never",
-  "pageOf": "Page 1 – {pages} of {total} API keys",
+  "pageOf": "{total, plural, one {# API key} other {# API keys}}",
   "rename": "Rename",
   "revoke": "Revoke",
   "scope": {

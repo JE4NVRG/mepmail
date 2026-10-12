@@ -19,7 +19,7 @@
     "allStatuses": "All statuses",
     "allRegions": "All regions",
     "rowDetails": "Domain details",
-    "pageOf": "Page 1 – {pages} of {total} domains",
+    "pageOf": "{total, plural, one {# domain} other {# domains}}",
     "noMatch": "No domains match the filters.",
     "clearFilters": "Clear filters",
     "columns": {

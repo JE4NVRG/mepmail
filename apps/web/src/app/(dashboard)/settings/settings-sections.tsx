@@ -581,7 +581,7 @@ function PendingInvitations() {
         </p>
       ) : null}
       <ListFooter
-        left={t("invitations.pending.pageOf", { pages: 1, total: invitations.length })}
+        left={t("invitations.pending.pageOf", { total: invitations.length })}
         singlePage
       />
     </div>
@@ -753,7 +753,7 @@ function MembersSection() {
         </p>
       ) : null}
       {members ? (
-        <ListFooter left={t("members.pageOf", { pages: 1, total: members.length })} singlePage />
+        <ListFooter left={t("members.pageOf", { total: members.length })} singlePage />
       ) : null}
       {canManage ? <PendingInvitations /> : null}
       <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} />

@@ -320,10 +320,7 @@ export function DomainsView() {
                 )}
               </Table>
               {domains.isSuccess ? (
-                <ListFooter
-                  left={t("list.pageOf", { pages: 1, total: filtered.length })}
-                  singlePage
-                />
+                <ListFooter left={t("list.pageOf", { total: filtered.length })} singlePage />
               ) : null}
             </>
           )}

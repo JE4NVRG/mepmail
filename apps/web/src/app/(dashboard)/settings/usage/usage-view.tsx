@@ -192,6 +192,9 @@ export function UsageView() {
             limit={limit}
           />
         )}
+        <p style={{ margin: "12px 0 0", color: "var(--ms-muted)", fontSize: 12.5 }}>
+          {t("countingNote")}
+        </p>
       </section>
 
       <section>

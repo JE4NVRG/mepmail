@@ -21,18 +21,18 @@
     "loadMore": "Carregar mais",
     "empty": "Nenhum e-mail ainda.",
     "emptyHint": "Envie seu primeiro e-mail pela API — <code>POST /emails</code>.",
-    "pageOf": "Página 1 – {pages} de {total} e-mails",
-    "pageSize": "{count} itens",
+    "pageOf": "Mostrando {shown, number} de {total, plural, one {# e-mail} other {# e-mails}}",
+    "pageSize": "{count} por vez",
     "noMatch": "Nenhum e-mail corresponde aos filtros.",
     "statusFilter": "Status \"{status}\"",
     "clearFilters": "Limpar filtros",
     "loadError": "Não foi possível carregar os e-mails.",
     "retry": "Tentar novamente",
     "capBanner": {
-      "reached": "Limite diário de {limit} e-mails atingido.",
+      "reached": "Limite diário de {limit} envios atingido: uma margem curta ainda sai, e o que passar dela espera na fila até o dia seguinte.",
       "queued": "{count} e-mails na fila — serão enviados em {duration}.",
       "upgrade": "Faça upgrade para um limite maior →",
-      "reachedMonth": "Cota mensal de {limit} e-mails atingida.",
+      "reachedMonth": "Cota mensal de {limit} envios atingida.",
       "queuedMonth": "{count} e-mails na fila — serão enviados quando o período renovar em {date}, ou assim que o excedente for ativado."
     },
     "allDomains": "Todos os domínios"
@@ -287,8 +287,8 @@
     "clearFilters": "Limpar filtros",
     "loadError": "Não foi possível carregar as supressões.",
     "retry": "Tentar novamente",
-    "pageOf": "Página 1 – {pages} de {total} supressões",
-    "pageSize": "{count} itens",
+    "pageOf": "Mostrando {shown, number} de {total, plural, one {# supressão} other {# supressões}}",
+    "pageSize": "{count} por vez",
     "reason": {
       "hard_bounce": "Bounce",
       "complaint": "Reclamação",

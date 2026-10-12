@@ -24,6 +24,30 @@
   },
   "releases": [
     {
+      "version": "0.128",
+      "date": "2026-10-12",
+      "title": "Lists, usage and holds say what really happens",
+      "summary": "Lists say how many items they show out of how many, usage is labeled as counted sends, a parked email is no longer charged twice, and the broadcast pause notice no longer names internal rates.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "An email to several recipients that was parked (SES out of sends, a pause or a review) handed back one unit and was charged again for every recipient on release. It now hands back as many as it is charged again.",
+            "Lists read “Showing 40 of 388 emails” (or “3 domains”) with correct singular and plural, instead of “Page 1 – 1 of 388 emails”, and the size chooser reads “40 at a time”."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Usage shows “sends counted” and explains that each recipient (To, Cc and Bcc) of an accepted email counts, even if delivery fails later.",
+            "The daily limit banner says a short margin still goes out and the rest waits in the queue for the next day.",
+            "The broadcast pause email and API message say broadcasts are paused to protect delivery, without naming internal rates, and the email no longer implies a manual pause is automatic.",
+            "The email asking you to approve an agent's draft now links to that draft's mailbox and message."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.127",
       "date": "2026-10-11",
       "title": "MepMail explained as one product: Mail, Send and agents",

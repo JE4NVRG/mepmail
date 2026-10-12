@@ -348,9 +348,7 @@ export default function BroadcastDetailPage() {
 function BroadcastEmails({ broadcastId }: { broadcastId: string }) {
   const t = useTranslations("broadcasts");
   const emails = useTranslations("emails");
-  const locale = useLocale();
   const trpc = useTRPC();
-  const nf = useMemo(() => new Intl.NumberFormat(locale), [locale]);
   const query = useInfiniteQuery(
     trpc.emails.list.infiniteQueryOptions(
       { limit: 25, broadcastId },
@@ -368,8 +366,8 @@ function BroadcastEmails({ broadcastId }: { broadcastId: string }) {
       <EmailsTable rows={items} />
       <ListFooter
         left={emails("list.pageOf", {
-          pages: query.data.pages.length,
-          total: nf.format(total),
+          shown: Math.min(items.length, total),
+          total,
         })}
         singlePage={!query.hasNextPage && query.data.pages.length === 1}
         loadMore={

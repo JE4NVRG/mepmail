@@ -1270,7 +1270,11 @@ it("while SES has paused a listed domain's region, its mail leaves from the fail
   expect(relayed.map((p) => p.emailId)).toEqual([both]);
 
   // Home healthy: back to its own region, set and tenant.
-  const healthy = { exhausted: () => false, accountPaused: () => false, refresh: async () => false };
+  const healthy = {
+    exhausted: () => false,
+    accountPaused: () => false,
+    refresh: async () => false,
+  };
   const { ses: homeSes, sends: homeSends } = fakeSes("home-mid");
   const home = await listed.send();
   expect(await sendEmail(db, { ...deps, ses: homeSes, sesQuota: healthy }, { emailId: home })).toBe(
@@ -1750,6 +1754,35 @@ it("parks the email as queued_quota when SES refuses for its daily quota", async
     .where(eq(schema.usageCounters.teamId, teamId));
   // One reservation handed back for the drain to take again.
   expect(counter?.accepted).toBe(4);
+});
+
+it("hands back one unit per distinct recipient when it parks, as the drain charges again", async () => {
+  // To + Cc + Bcc, with one address repeated: 3 distinct recipients, as accept charged.
+  const emailId = await insertEmail({
+    to: ["a@example.com", "b@example.com"],
+    cc: ["b@example.com", "c@example.com"],
+    bcc: ["C@example.com"],
+  });
+  await db
+    .insert(schema.usageCounters)
+    .values({ teamId, day: utcDay(Date.now()), accepted: 5 })
+    .onConflictDoUpdate({
+      target: [schema.usageCounters.teamId, schema.usageCounters.day],
+      set: { accepted: 5 },
+    });
+  const ses: SesSender = {
+    async sendRaw() {
+      throw Object.assign(new Error("Daily message quota exceeded"), {
+        name: "TooManyRequestsException",
+      });
+    },
+  };
+  expect(await sendEmail(db, { keyring, ses }, { emailId })).toBe("parked");
+  const [counter] = await db
+    .select({ accepted: schema.usageCounters.accepted })
+    .from(schema.usageCounters)
+    .where(eq(schema.usageCounters.teamId, teamId));
+  expect(counter?.accepted).toBe(2);
 });
 
 it("a rate refusal with quota headroom stays a retry; the same refusal at the ceiling parks", async () => {

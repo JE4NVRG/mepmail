@@ -24,6 +24,30 @@
   },
   "releases": [
     {
+      "version": "0.128",
+      "date": "2026-10-12",
+      "title": "Listas, uso e pausas dizem o que de fato acontece",
+      "summary": "As listas dizem quantos itens mostram de quantos, o uso aparece como envios contados, um e-mail estacionado não é mais cobrado duas vezes, e o aviso de pausa das campanhas não cita mais taxas internas.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "Um e-mail para vários destinatários que era estacionado (SES sem envios, uma pausa ou uma revisão) devolvia uma unidade e era cobrado de novo por cada destinatário ao sair. Agora ele devolve tantas quantas são cobradas de novo.",
+            "As listas mostram “Mostrando 40 de 388 e-mails” (ou “3 domínios”), com singular e plural certos, em vez de “Página 1 – 1 de 388 e-mails”, e o seletor de tamanho diz “40 por vez”."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "O uso aparece como “envios contados” e explica que cada destinatário (Para, Cc e Cco) de um e-mail aceito conta, mesmo que a entrega falhe depois.",
+            "O aviso de limite diário diz que uma margem curta ainda sai e o resto espera na fila até o dia seguinte.",
+            "O e-mail e a mensagem da API sobre a pausa das campanhas dizem que elas estão pausadas para proteger a entrega, sem citar taxas internas, e o e-mail não trata mais uma pausa manual como automática.",
+            "O e-mail que pede a sua aprovação para um rascunho do agente agora leva à caixa e à mensagem desse rascunho."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.127",
       "date": "2026-10-11",
       "title": "O MepMail explicado como um produto só: Correio, Envio e agentes",

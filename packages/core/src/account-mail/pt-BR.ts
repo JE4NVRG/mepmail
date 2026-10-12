@@ -125,8 +125,8 @@ export const ptBR = {
   "broadcast.held": {
     subject: '"{name}" está em espera',
     body: [
-      'Os envios de {region} estão pausados em toda a plataforma enquanto as taxas de bounce e reclamação se estabilizam, então "{name}" aguarda em vez de sair; e-mails transacionais continuam saindo.',
-      "Ele retoma sozinho — checamos a cada 15 minutos — e você recebe o relatório de envio de sempre ao terminar.",
+      'As campanhas de {region} estão pausadas em toda a plataforma para proteger a entrega, então "{name}" aguarda em vez de sair; e-mails transacionais continuam saindo.',
+      "Ele retoma sozinho quando a pausa terminar — checamos a cada 15 minutos — e você recebe o relatório de envio de sempre ao terminar.",
     ],
     button: "Abrir broadcast",
   },

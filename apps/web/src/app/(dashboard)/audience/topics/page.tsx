@@ -307,7 +307,7 @@ export default function TopicsPage() {
               </Table>
               <ListFooter
                 left={t("pageOf", {
-                  pages: Math.max(1, Math.ceil(shownRows.length / size)),
+                  shown: shownRows.length,
                   total: filteredRows.length,
                 })}
                 size={size}

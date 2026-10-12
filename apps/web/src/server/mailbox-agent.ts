@@ -241,7 +241,9 @@ async function requestMailboxSendApproval(
             to: facts.ownerEmail,
             kind: "mailbox.send_requested",
             locale: await accountLocale(db, accountEmailFrom(), facts.ownerEmail),
-            path: "/mail",
+            // Straight to the draft that waits: the Correio opens ?mailbox=&item= on that
+            // message (older apps ignore the parameters and land on /mail).
+            path: `/mail?mailbox=${encodeURIComponent(facts.mailboxId)}&item=${encodeURIComponent(input.id)}`,
             values: { agent: facts.agent, mailbox: facts.address },
           }),
         );

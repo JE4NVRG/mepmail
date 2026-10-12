@@ -21,18 +21,18 @@
     "loadMore": "Load more",
     "empty": "No emails yet.",
     "emptyHint": "Send your first email through the API — <code>POST /emails</code>.",
-    "pageOf": "Page 1 – {pages} of {total} emails",
-    "pageSize": "{count} items",
+    "pageOf": "Showing {shown, number} of {total, plural, one {# email} other {# emails}}",
+    "pageSize": "{count} at a time",
     "noMatch": "No emails match your filters.",
     "statusFilter": "Status \"{status}\"",
     "clearFilters": "Clear filters",
     "loadError": "Couldn't load emails.",
     "retry": "Retry",
     "capBanner": {
-      "reached": "Today's {limit}-email limit reached.",
+      "reached": "Today's {limit}-send limit reached: a short margin still goes out, and anything past it waits in the queue for the next day.",
       "queued": "{count} emails queued — they'll send in {duration}.",
       "upgrade": "Upgrade for a higher cap →",
-      "reachedMonth": "Monthly quota of {limit} emails reached.",
+      "reachedMonth": "Monthly quota of {limit} sends reached.",
       "queuedMonth": "{count} emails queued — they'll send when the period renews on {date}, or as soon as overage is on."
     },
     "allDomains": "All domains"
@@ -287,8 +287,8 @@
     "clearFilters": "Clear filters",
     "loadError": "Couldn't load suppressions.",
     "retry": "Retry",
-    "pageOf": "Page 1 – {pages} of {total} suppressions",
-    "pageSize": "{count} items",
+    "pageOf": "Showing {shown, number} of {total, plural, one {# suppression} other {# suppressions}}",
+    "pageSize": "{count} at a time",
     "reason": {
       "hard_bounce": "Bounce",
       "complaint": "Complaint",

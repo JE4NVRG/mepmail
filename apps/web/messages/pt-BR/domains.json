@@ -19,7 +19,7 @@
     "allStatuses": "Todos os status",
     "allRegions": "Todas as regiões",
     "rowDetails": "Detalhes do domínio",
-    "pageOf": "Página 1 – {pages} de {total} domínios",
+    "pageOf": "{total, plural, one {# domínio} other {# domínios}}",
     "noMatch": "Nenhum domínio corresponde aos filtros.",
     "clearFilters": "Limpar filtros",
     "columns": {

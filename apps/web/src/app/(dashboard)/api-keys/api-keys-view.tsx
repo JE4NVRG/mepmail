@@ -264,7 +264,7 @@ export function ApiKeysView() {
               ))}
             </tbody>
           </Table>
-          <ListFooter left={t("pageOf", { pages: 1, total: keys.length })} singlePage />
+          <ListFooter left={t("pageOf", { total: keys.length })} singlePage />
         </>
       ) : null}
 

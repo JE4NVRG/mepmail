@@ -16,8 +16,8 @@
   "optInHint": "Não incluído em Todos",
   "eventsCount": "{count, plural, one {# evento} other {# eventos}}",
   "loadMore": "Carregar mais",
-  "pageOf": "Página 1 – {pages} de {total} webhooks",
-  "pageSize": "{count} itens",
+  "pageOf": "Mostrando {shown, number} de {total, plural, one {# webhook} other {# webhooks}}",
+  "pageSize": "{count} por vez",
   "eventGroup": {
     "delivery": "Entrega",
     "engagement": "Engajamento",
