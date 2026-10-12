@@ -86,16 +86,65 @@ describe("OpenAI-compatible judge", () => {
 
   it("maps failures to the judge's error classes", async () => {
     const failing = (status: number) =>
-      createOpenAiJudge({ model: "m", baseUrl: "https://x", apiKey: "k", fetch: async () => reply("{}", status) });
-    await expect(failing(429).judge("b", { signal: signal() })).rejects.toMatchObject({ class: "throttled" });
-    await expect(failing(401).judge("b", { signal: signal() })).rejects.toMatchObject({ class: "no_credentials" });
-    await expect(failing(500).judge("b", { signal: signal() })).rejects.toMatchObject({ class: "upstream" });
-    const keyless = createOpenAiJudge({ model: "m", baseUrl: "https://x", fetch: async () => reply("{}") });
+      createOpenAiJudge({
+        model: "m",
+        baseUrl: "https://x",
+        apiKey: "k",
+        fetch: async () => reply("{}", status),
+      });
+    await expect(failing(429).judge("b", { signal: signal() })).rejects.toMatchObject({
+      class: "throttled",
+    });
+    await expect(failing(401).judge("b", { signal: signal() })).rejects.toMatchObject({
+      class: "no_credentials",
+    });
+    await expect(failing(500).judge("b", { signal: signal() })).rejects.toMatchObject({
+      class: "upstream",
+    });
+    // A gateway out of credits answers 400 with the reason in the body: that is the operator's key.
+    const broke = createOpenAiJudge({
+      model: "m",
+      baseUrl: "https://x",
+      apiKey: "k",
+      fetch: async () =>
+        reply(
+          '{"error":{"message":"You have insufficient credits to make this request.","type":"invalid_request_error"}}',
+          400,
+        ),
+    });
+    await expect(broke.judge("b", { signal: signal() })).rejects.toMatchObject({
+      class: "no_credentials",
+    });
+    await expect(failing(400).judge("b", { signal: signal() })).rejects.toMatchObject({
+      class: "upstream",
+    });
+    await expect(failing(402).judge("b", { signal: signal() })).rejects.toMatchObject({
+      class: "no_credentials",
+    });
+    const keyless = createOpenAiJudge({
+      model: "m",
+      baseUrl: "https://x",
+      fetch: async () => reply("{}"),
+    });
     await expect(keyless.judge("b", { signal: signal() })).rejects.toBeInstanceOf(JudgeError);
-    const prose = createOpenAiJudge({ model: "m", baseUrl: "https://x", apiKey: "k", fetch: async () => reply("I think it is fine.") });
-    await expect(prose.judge("b", { signal: signal() })).rejects.toMatchObject({ class: "parse_error" });
-    const noAbuseKey = createOpenAiJudge({ model: "m", baseUrl: "https://x", apiKey: "k", fetch: async () => reply('{"category":"clean"}') });
-    await expect(noAbuseKey.judge("b", { signal: signal() })).rejects.toMatchObject({ class: "parse_error" });
+    const prose = createOpenAiJudge({
+      model: "m",
+      baseUrl: "https://x",
+      apiKey: "k",
+      fetch: async () => reply("I think it is fine."),
+    });
+    await expect(prose.judge("b", { signal: signal() })).rejects.toMatchObject({
+      class: "parse_error",
+    });
+    const noAbuseKey = createOpenAiJudge({
+      model: "m",
+      baseUrl: "https://x",
+      apiKey: "k",
+      fetch: async () => reply('{"category":"clean"}'),
+    });
+    await expect(noAbuseKey.judge("b", { signal: signal() })).rejects.toMatchObject({
+      class: "parse_error",
+    });
     expect(() => parseJudgeContent("[1,2]")).toThrow(JudgeError);
   });
 

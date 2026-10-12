@@ -246,6 +246,17 @@ export const ptBR = {
       "Enviado ao operador da instância no máximo a cada seis horas enquanto a parcela ficar acima de 20%.",
     ],
   },
+  "monitor.stalled": {
+    subject: "Monitor de conteúdo: o juiz falhou nas últimas {count} amostras ({error})",
+    body: [
+      "As {count} amostras mais recentes voltaram sem julgamento ({provider} · {model}); a última falhou com {error}. Uma hora tranquila sorteia amostras de menos para a parcela por hora perceber, então este aviso conta as amostras mais recentes. O envio não é afetado: uma amostra sem julgamento não muda risco, não abre sinalização e não retém e-mail, mas nenhum conteúdo novo está sendo julgado.",
+      "no_credentials quer dizer que o provedor recusou a chave ou os créditos acabaram; upstream e timeout apontam para o provedor, parse_error para as respostas do modelo. O cartão Saúde do console mostra a parcela sem julgamento.",
+    ],
+    button: "Abrir console",
+    muted: [
+      "Enviado ao operador da instância no máximo a cada seis horas enquanto o juiz continuar falhando.",
+    ],
+  },
   "review.held": {
     subject: "Envio retido para revisão: {team}",
     body: [

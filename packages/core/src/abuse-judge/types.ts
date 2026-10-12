@@ -50,6 +50,27 @@ export class JudgeError extends Error {
   }
 }
 
+/**
+ * The class of a judge answer that was not OK. Gateways that ran out of credits often
+ * answer 400 with the reason in the body (commandcode.ai: "insufficient credits"), so the
+ * body is read too: an account that cannot pay is a credentials problem for the operator,
+ * not a passing upstream fault.
+ */
+export function judgeStatusClass(
+  status: number,
+  body = "",
+): "throttled" | "no_credentials" | "upstream" {
+  if (status === 429 || status === 529) return "throttled";
+  if (status === 401 || status === 402 || status === 403) return "no_credentials";
+  if (
+    /insufficient[_ ]?(credits?|quota|balance|funds)|out of credits|credit balance|billing|payment required/i.test(
+      body.slice(0, 2000),
+    )
+  )
+    return "no_credentials";
+  return "upstream";
+}
+
 /** The class of any error a judge call threw: its own, an abort, or an upstream fault. */
 export function judgeErrorClass(err: unknown): JudgeErrorClass {
   if (err instanceof JudgeError) return err.class;

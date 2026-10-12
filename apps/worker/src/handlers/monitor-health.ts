@@ -1,4 +1,9 @@
-import { markLostSamples, monitorHealth, recordProbes } from "@millionsend/core";
+import {
+  MONITOR_STALL_STREAK,
+  markLostSamples,
+  monitorHealth,
+  recordProbes,
+} from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { mailOperator, type SystemMailer } from "../system-mail.js";
 
@@ -26,14 +31,26 @@ export const MONITOR_DEGRADED_MAIL_INTERVAL_MS = 6 * 3600_000;
 export async function runMonitorHealth(
   db: Db,
   deps: MonitorHealthDeps,
-): Promise<{ samples: number; unjudged: number; lost: number; degraded: boolean }> {
+): Promise<{
+  samples: number;
+  unjudged: number;
+  lost: number;
+  degraded: boolean;
+  stalled: boolean;
+}> {
   const now = deps.now ?? new Date();
-  if (!deps.judge) return { samples: 0, unjudged: 0, lost: 0, degraded: false };
+  if (!deps.judge) return { samples: 0, unjudged: 0, lost: 0, degraded: false, stalled: false };
   const lost = await markLostSamples(db, now);
   const health = await monitorHealth(db, now);
-  const degraded =
+  const hourly =
     health.samples >= MONITOR_DEGRADED_MIN_SAMPLES &&
     (health.unjudgedRate ?? 0) > MONITOR_DEGRADED_RATE;
+  // A judge that keeps failing at low volume, or whose key or credits are refused, is
+  // just as degraded: the hourly share alone needs 20 samples in an hour to see it.
+  const stalled =
+    health.unjudgedStreak >= MONITOR_STALL_STREAK ||
+    (health.unjudgedStreak > 0 && health.lastErrorClass === "no_credentials");
+  const degraded = hourly || stalled;
   await recordProbes(
     db,
     [
@@ -50,23 +67,38 @@ export async function runMonitorHealth(
   ) {
     deps.state.degradedMailedAt = now;
     try {
-      await mailOperator(
-        db,
-        deps.mailer,
-        "monitor.degraded",
-        "/console",
-        {
-          rate: `${Math.round((health.unjudgedRate ?? 0) * 100)}%`,
-          unjudged: String(health.unjudged),
-          samples: String(health.samples),
-          provider: deps.judge.provider,
-          model: deps.judge.model,
-        },
-        deps.appBaseUrl,
-      );
+      if (hourly)
+        await mailOperator(
+          db,
+          deps.mailer,
+          "monitor.degraded",
+          "/console",
+          {
+            rate: `${Math.round((health.unjudgedRate ?? 0) * 100)}%`,
+            unjudged: String(health.unjudged),
+            samples: String(health.samples),
+            provider: deps.judge.provider,
+            model: deps.judge.model,
+          },
+          deps.appBaseUrl,
+        );
+      else
+        await mailOperator(
+          db,
+          deps.mailer,
+          "monitor.stalled",
+          "/console",
+          {
+            count: String(health.unjudgedStreak),
+            error: health.lastErrorClass ?? "upstream",
+            provider: deps.judge.provider,
+            model: deps.judge.model,
+          },
+          deps.appBaseUrl,
+        );
     } catch (err) {
       console.error("monitor.health: operator mail failed", err);
     }
   }
-  return { samples: health.samples, unjudged: health.unjudged, lost, degraded };
+  return { samples: health.samples, unjudged: health.unjudged, lost, degraded, stalled };
 }

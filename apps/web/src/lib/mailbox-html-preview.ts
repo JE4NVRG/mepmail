@@ -65,10 +65,40 @@ export function mailboxHtmlPreviewText(html: string | false | undefined | null):
   const text = html
     .slice(0, HEAD)
     .replace(/<!--[\s\S]*?(?:-->|$)/g, " ")
-    .replace(/<(head|style|script|title|noscript)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, " ")
+    .replace(/<head\b[\s\S]*?(?:<\/head\s*>|(?=<body\b)|$)/gi, " ")
+    .replace(/<(style|script|title|noscript)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, " ")
     .replace(/<[^>]*>/g, " ")
     .replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z][a-z0-9]{1,31});/gi, decodeEntity)
     .replace(/\s+/g, " ")
     .trim();
   return text.length > LONGEST ? text.slice(0, LONGEST) : text;
+}
+
+/**
+ * The whole HTML body as plain text, for a message whose text/plain part is missing or
+ * blank (agents and the plain-text view read this). Comments (Outlook's [if mso] blocks),
+ * the head, scripts and styles go; links keep their URL as "text (url)"; block ends become
+ * line breaks; every entity is decoded once, in a single pass, so "&amp;lt;" stays "&lt;".
+ */
+export function mailboxHtmlText(html: string | false | undefined | null): string {
+  if (!html) return "";
+  return (
+    html
+      .replace(/<!--[\s\S]*?(?:-->|$)/g, "")
+      // </head> is optional in HTML: the head also ends where <body starts.
+      .replace(/<head\b[\s\S]*?(?:<\/head\s*>|(?=<body\b)|$)/gi, "")
+      .replace(/<(style|script|title|noscript)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, "")
+      .replace(
+        /<a\b[^>]*\bhref=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi,
+        (_m, href: string, inner: string) => `${inner.replace(/<[^>]+>/g, "")} (${href})`,
+      )
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|h[1-6]|li|tr|table|pre|blockquote)>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z][a-z0-9]{1,31});/gi, decodeEntity)
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
 }

@@ -5,6 +5,7 @@ import {
   composeJudgeVerdict,
   JudgeError,
   type JudgeVerdict,
+  judgeStatusClass,
 } from "@millionsend/core";
 import type { FetchLike } from "./typesafe.js";
 
@@ -31,7 +32,9 @@ function questionLines(): string {
         .join("; ");
       return `- "${key}": one of ${options}. ${q.instructions}`;
     }
-    const meaning = q.criteria ? ` True means: ${q.criteria.true} False means: ${q.criteria.false}` : "";
+    const meaning = q.criteria
+      ? ` True means: ${q.criteria.true} False means: ${q.criteria.false}`
+      : "";
     return `- "${key}": probability from 0 to 1 that the answer is yes. ${q.instructions}${meaning}`;
   }).join("\n");
 }
@@ -70,10 +73,11 @@ export function foldOpenAiAnswers(raw: Record<string, unknown>): Record<string, 
         : typeof value === "boolean"
           ? Number(value)
           : value && typeof value === "object"
-            ? (value as { noul?: unknown; probability?: unknown }).noul ??
-              (value as { probability?: unknown }).probability
+            ? ((value as { noul?: unknown; probability?: unknown }).noul ??
+              (value as { probability?: unknown }).probability)
             : undefined;
-    if (typeof n === "number" && Number.isFinite(n)) answers[key] = { type: "noul", noul: clamp01(n) };
+    if (typeof n === "number" && Number.isFinite(n))
+      answers[key] = { type: "noul", noul: clamp01(n) };
   }
   return answers;
 }
@@ -94,12 +98,6 @@ export function parseJudgeContent(content: string): Record<string, unknown> {
     throw new JudgeError("parse_error", "reply is not a JSON object");
   }
   return parsed as Record<string, unknown>;
-}
-
-function classForStatus(status: number): "throttled" | "no_credentials" | "upstream" {
-  if (status === 429 || status === 529) return "throttled";
-  if (status === 401 || status === 402 || status === 403) return "no_credentials";
-  return "upstream";
 }
 
 export function createOpenAiJudge(opts: {
@@ -142,7 +140,8 @@ export function createOpenAiJudge(opts: {
         throw new JudgeError("upstream", "judge request failed", { cause: err });
       }
       if (!res.ok) {
-        throw new JudgeError(classForStatus(res.status), `judge answered ${res.status}`);
+        const detail = await res.text().catch(() => "");
+        throw new JudgeError(judgeStatusClass(res.status, detail), `judge answered ${res.status}`);
       }
       let json: { choices?: { message?: { content?: unknown } }[] };
       try {

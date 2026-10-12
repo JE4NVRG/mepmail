@@ -44,13 +44,15 @@ async function seed(
 }
 
 it("writes nothing while the judge is off", async () => {
-  await seed(5, "unjudged");
+  // Older than the judged samples below, so the newest finished samples are judged ones.
+  await seed(5, "unjudged", new Date(NOW.getTime() - 30 * 60_000));
   const state = { degradedMailedAt: null };
   expect(await runMonitorHealth(db, { judge: null, mailer, state, now: NOW })).toEqual({
     samples: 0,
     unjudged: 0,
     lost: 0,
     degraded: false,
+    stalled: false,
   });
   expect(await db.select().from(schema.instanceProbes)).toEqual([]);
 });

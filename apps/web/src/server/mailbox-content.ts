@@ -36,7 +36,7 @@ import {
 } from "../../../../packages/core/src/mailbox-senders";
 import { type MailboxCategory, mailboxCategory } from "../lib/mailbox-category";
 import { mailboxSignature } from "../lib/mailbox-compose-signature";
-import { mailboxHtmlPreviewText } from "../lib/mailbox-html-preview";
+import { mailboxHtmlPreviewText, mailboxHtmlText } from "../lib/mailbox-html-preview";
 import { type MailboxInvite, parseMailboxInvite } from "../lib/mailbox-ics";
 import { mailboxPreview } from "../lib/mailbox-inbox-presentation";
 import { decodeMailboxListSummary, encodeMailboxListSummary } from "../lib/mailbox-list-summary";
@@ -132,7 +132,10 @@ function dto(mime: Awaited<ReturnType<typeof parse>>) {
     // Only the sender's own copies keep a Bcc header (drafts and Sent).
     bcc: addresses(mime.bcc),
     replyTo: mime.replyTo?.value[0]?.address ?? mime.from?.value[0]?.address ?? "",
-    text: mime.text ?? "",
+    // A blank text/plain part next to the HTML one leaves mailparser's text empty (it only
+    // derives text when there is no text part): read the HTML instead, for agents and the
+    // plain-text view alike.
+    text: mime.text?.trim() ? mime.text : mailboxHtmlText(mime.html),
     hasHtmlBody: typeof mime.html === "string" && mime.html.length > 0,
     ...projectMailboxHtml(mime.html, mime.attachments, {
       trustedImagePrefix: publicStoragePrefix(),
@@ -191,7 +194,7 @@ function listDto(mime: Awaited<ReturnType<typeof parseForList>>) {
     fromName: mime.from?.value[0]?.name ?? "",
     to: addresses(mime.to),
     // An HTML-only message gets a cheap preview from the start of its markup.
-    text: mime.text || mailboxHtmlPreviewText(mime.html),
+    text: mime.text?.trim() ? mime.text : mailboxHtmlPreviewText(mime.html),
     date: mime.date && !Number.isNaN(mime.date.getTime()) ? mime.date : null,
     attachmentCount: mime.attachments.length,
     // The smart inbox pile (people, notifications, newsletters), from the headers.

@@ -24,6 +24,21 @@
   },
   "releases": [
     {
+      "version": "0.140",
+      "date": "2026-10-12",
+      "title": "Mail with a blank text part is now readable",
+      "summary": "Messages that arrive with an empty plain-text part beside the formatted one now have text in the plain view and for agents.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "Some mail clients send an empty plain-text part with the formatted one: the Plain text tab said there was no text version and agents (MCP and API) read an empty body. The text now comes from the formatted part, with accents and symbols decoded.",
+            "The list preview also uses the formatted part when the text is only whitespace."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.139",
       "date": "2026-10-12",
       "title": "Create and open mailboxes over MCP, without trial and error",

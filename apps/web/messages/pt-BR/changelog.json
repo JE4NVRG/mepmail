@@ -24,6 +24,21 @@
   },
   "releases": [
     {
+      "version": "0.140",
+      "date": "2026-10-12",
+      "title": "E-mails com texto vazio agora são lidos",
+      "summary": "Mensagens que chegam com a versão em texto vazia ao lado da formatada passam a ter texto na leitura simples e para os agentes.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "Alguns clientes de e-mail mandam a versão em texto vazia junto da formatada: a aba Texto simples mostrava \"sem versão em texto\" e os agentes (MCP e API) liam o corpo vazio. Agora o texto vem da versão formatada, com acentos e símbolos corretos.",
+            "A prévia na lista também usa a versão formatada quando o texto só tem espaços."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.139",
       "date": "2026-10-12",
       "title": "Criar e liberar caixas pelo MCP, sem tentativa e erro",

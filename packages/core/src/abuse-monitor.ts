@@ -40,6 +40,13 @@ export const MONITOR_ALERT_INTERVAL_MS = DAY_MS;
 export const MONITOR_SAMPLE_RETENTION_DAYS = 90;
 /** A pending sample older than this had its job lost; pg-boss's last retry lands well inside it. */
 export const MONITOR_LOST_AFTER_MS = 3 * 3600_000;
+/**
+ * A judge that failed this many of the newest samples in a row is stalled, whatever the
+ * hour's volume: a quiet instance draws too few samples for the hourly share to notice.
+ */
+export const MONITOR_STALL_STREAK = 5;
+/** How far back the stall check looks for the newest finished samples. */
+export const MONITOR_STALL_LOOKBACK_MS = 7 * DAY_MS;
 
 /**
  * The insight checks whose failure is an anomaly for the draw: the ones that
@@ -635,7 +642,15 @@ export async function clearMonitorOverride(
 export async function monitorHealth(
   db: Db,
   now: Date = new Date(),
-): Promise<{ samples: number; unjudged: number; unjudgedRate: number | null }> {
+): Promise<{
+  samples: number;
+  unjudged: number;
+  unjudgedRate: number | null;
+  /** Unjudged samples in a row among the newest finished ones (at most MONITOR_STALL_STREAK). */
+  unjudgedStreak: number;
+  /** Why the newest finished sample went unjudged, or null when it was judged. */
+  lastErrorClass: string | null;
+}> {
   const [row] = await db
     .select({
       samples: sql<number>`count(*)::int`,
@@ -645,7 +660,30 @@ export async function monitorHealth(
     .where(gte(ms.createdAt, new Date(now.getTime() - 3600_000)));
   const samples = row?.samples ?? 0;
   const unjudged = row?.unjudged ?? 0;
-  return { samples, unjudged, unjudgedRate: samples > 0 ? unjudged / samples : null };
+  // Retention purging a body first is not the judge failing, so it ends a streak.
+  const newest = await db
+    .select({ status: ms.status, errorClass: ms.errorClass })
+    .from(ms)
+    .where(
+      and(
+        inArray(ms.status, ["judged", "unjudged"]),
+        gte(ms.createdAt, new Date(now.getTime() - MONITOR_STALL_LOOKBACK_MS)),
+      ),
+    )
+    .orderBy(desc(ms.createdAt), desc(ms.id))
+    .limit(MONITOR_STALL_STREAK);
+  let unjudgedStreak = 0;
+  for (const sample of newest) {
+    if (sample.status !== "unjudged" || sample.errorClass === "body_purged") break;
+    unjudgedStreak++;
+  }
+  return {
+    samples,
+    unjudged,
+    unjudgedRate: samples > 0 ? unjudged / samples : null,
+    unjudgedStreak,
+    lastErrorClass: newest[0]?.status === "unjudged" ? (newest[0].errorClass ?? "upstream") : null,
+  };
 }
 
 /** Pending samples whose job never came back are unjudged, not lost in a count. */

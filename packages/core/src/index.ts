@@ -26,6 +26,7 @@ export {
   type JudgeProvider,
   type JudgeVerdict,
   judgeErrorClass,
+  judgeStatusClass,
 } from "./abuse-judge/types.js";
 export {
   activeOverride,
@@ -48,6 +49,7 @@ export {
   MONITOR_PROBATION_DAYS,
   MONITOR_RISK_HALF_LIFE_MS,
   MONITOR_SAMPLE_RETENTION_DAYS,
+  MONITOR_STALL_STREAK,
   MONITOR_TIERS,
   MONITOR_TRUSTED_CLEAN_DAYS,
   MONITOR_TRUSTED_DAYS,

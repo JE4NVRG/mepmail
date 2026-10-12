@@ -6,6 +6,7 @@ import {
   JudgeError,
   type JudgeVerdict,
   judgeState,
+  judgeStatusClass,
 } from "@millionsend/core";
 
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
@@ -15,12 +16,6 @@ function throwIfAbort(err: unknown): void {
   if (name === "AbortError" || name === "TimeoutError") {
     throw new JudgeError("timeout", "judge call timed out", { cause: err });
   }
-}
-
-function classForStatus(status: number): "throttled" | "no_credentials" | "upstream" {
-  if (status === 429 || status === 529) return "throttled";
-  if (status === 401 || status === 403) return "no_credentials";
-  return "upstream";
 }
 
 /** TypeSafe System One: typed questions in, composed verdict out. No chat, no JSON parse of prose. */
@@ -54,7 +49,8 @@ export function createTypesafeJudge(
         throw new JudgeError("upstream", "judge request failed", { cause: err });
       }
       if (!res.ok) {
-        throw new JudgeError(classForStatus(res.status), `judge answered ${res.status}`);
+        const detail = await res.text().catch(() => "");
+        throw new JudgeError(judgeStatusClass(res.status, detail), `judge answered ${res.status}`);
       }
       let json: { answers?: unknown; model?: unknown };
       try {

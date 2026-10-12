@@ -595,6 +595,27 @@ describe("session-authenticated mailbox content", () => {
     const plain = await imported();
     expect((await as().item({ mailboxId, id: plain.id })).invite).toBeNull();
   });
+  it("reads the HTML as text when the message's text/plain part is blank", async () => {
+    // A real support email had an empty text/plain part beside the HTML one; agents read "".
+    const raw = Buffer.from(
+      `From: Cliente <cliente@example.invalid>\r\nTo: person@content.invalid\r\nSubject: help me\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=b\r\n\r\n--b\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n\r\n--b\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><head><title>T&iacute;tulo</title><style>p{}</style></head><body><!--[if mso]>x<![endif]--><div>Ol&aacute;, n&atilde;o consigo &#8212; my account is <b>locked</b>.</div><pre>Sending is under review &amp; held; &amp;lt;b&amp;gt; stays text</pre></body></html>\r\n--b--\r\n`,
+    );
+    const a = await imported("blank-text", mailboxId, raw);
+    const item = await as().item({ mailboxId, id: a.id });
+    expect(item.text).toContain("Olá, não consigo — my account is locked.");
+    expect(item.text).toContain("Sending is under review & held; &lt;b&gt; stays text");
+    expect(item.text).not.toMatch(/Título|\[if mso\]|p\{\}/);
+    expect(item.text.startsWith("Olá")).toBe(true);
+    // An unclosed head ends where the body starts, so the body is never lost with it.
+    const headless = Buffer.from(
+      `From: Cliente <cliente@example.invalid>\r\nTo: person@content.invalid\r\nSubject: sem head\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=b\r\n\r\n--b\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n \r\n--b\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><head><meta charset=utf-8><title>T</title><body><p>Ol&aacute;, tudo bem?</p>\r\n--b--\r\n`,
+    );
+    const h = await imported("headless", mailboxId, headless);
+    expect((await as().item({ mailboxId, id: h.id })).text).toBe("Olá, tudo bem?");
+    // A message with real text keeps it as it is.
+    const plain = await imported();
+    expect((await as().item({ mailboxId, id: plain.id })).text).toContain("Private body");
+  });
   it("sorts rows into the smart inbox piles from their headers, the same from the summary", async () => {
     const message = (from: string, headers: string) =>
       Buffer.from(

@@ -246,6 +246,17 @@ export const en = {
       "Sent to the instance operator at most once every six hours while the share stays over 20%.",
     ],
   },
+  "monitor.stalled": {
+    subject: "Content monitor: the judge failed the last {count} samples ({error})",
+    body: [
+      "The newest {count} samples came back unjudged ({provider} · {model}); the latest failed with {error}. A quiet hour draws too few samples for the hourly share to notice, so this counts the newest samples instead. Sending is unaffected: an unjudged sample changes no risk, opens no flag and holds no mail, but no new content is being judged.",
+      "no_credentials means the provider refused the key or its credits ran out; upstream and timeout point at the provider, parse_error at the model's answers. The console's Health card charts the unjudged share.",
+    ],
+    button: "Open console",
+    muted: [
+      "Sent to the instance operator at most once every six hours while the judge keeps failing.",
+    ],
+  },
   "review.held": {
     subject: "Sending held for review: {team}",
     body: [
