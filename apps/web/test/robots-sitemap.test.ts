@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import robots from "../src/app/robots";
 import sitemap from "../src/app/sitemap";
+import { INDEXNOW_KEY } from "../src/lib/indexnow";
 
 // Regression guard for the SEO incident of 2026-09-28: robots.ts had
 // `Disallow: /` with no `/sitemap.xml` exception, so Google could not fetch the
@@ -136,6 +139,13 @@ describe("robots.txt + sitemap.xml agreement", () => {
       expect(twin?.priority).toBe(entry.priority);
     }
     expect(urls.some((entry) => entry.url === "https://mepmail.dev/?lang=pt-BR")).toBe(true);
+  });
+
+  it("serves the IndexNow key file and lets crawlers fetch it", () => {
+    const file = fileURLToPath(new URL(`../public/${INDEXNOW_KEY}.txt`, import.meta.url));
+    expect(readFileSync(file, "utf8")).toBe(INDEXNOW_KEY);
+    expect(INDEXNOW_KEY).toMatch(/^[0-9a-f]{32}$/);
+    expect(isAllowed(`/${INDEXNOW_KEY}.txt`, allowedPaths())).toBe(true);
   });
 
   it("advertises the institutional pages with their own priority and allows them", () => {

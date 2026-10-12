@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Integrações: n8n, Slack, Discord, Telegram, MCP e SMTP",
-    "description": "O MepMail se encaixa na sua stack: node comunitário do n8n, canais de notificação Slack/Discord/Telegram, servidor MCP e caixas de e-mail para agentes de IA, relay SMTP, CLI e API compatível com a do Resend."
+    "description": "Integre o MepMail com n8n, Slack, Discord, Telegram, MCP e SMTP: notificações, caixas de e-mail para agentes de IA e API compatível com a do Resend."
   },
   "hero": {
     "eyebrow": "Integrações",

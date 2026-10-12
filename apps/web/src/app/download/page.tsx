@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import { PublicFooter, PublicHeader, type PublicSiteLabels } from "@/components/site-chrome";
+import { StructuredData } from "@/components/structured-data";
 import {
   DESKTOP_DOWNLOAD_URL,
   type DesktopAppPlatform,
@@ -12,6 +13,7 @@ import {
   WINDOWS_STORE_URL,
 } from "@/lib/desktop-download";
 import { legalLinks } from "@/lib/legal-links";
+import { desktopAppJsonLd, siteBaseUrl } from "@/lib/structured-data";
 import { publicPageUrls } from "@/server/public-seo";
 import latest from "../../../public/desktop/correio/latest.json";
 import "../landing.css";
@@ -113,6 +115,16 @@ export default async function DownloadPage() {
 
   return (
     <div className="gtm">
+      <StructuredData
+        graph={[
+          desktopAppJsonLd(
+            siteBaseUrl(),
+            `${siteBaseUrl()}${(await publicPageUrls(DESKTOP_DOWNLOAD_URL)).url}`,
+            t("meta.description"),
+            latest.version,
+          ),
+        ]}
+      />
       <PublicHeader labels={site} page="download" />
       <main id="conteudo">
         <section className="gtm-section gtm-hero">

@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Security at MepMail — EU hosting, sealed content, self-hosting",
-    "description": "MepMail Cloud runs in Germany, ships as AGPL open source and can be self-hosted. Message bodies and attachments sealed at rest, HTTPS with HSTS and an origin-restricted CSP, scrypt passwords and hashed API keys, per-team isolation, verified backups, DKIM/SPF/DMARC — with the full subprocessor list, the compliance roadmap and the enterprise FAQ."
+    "description": "MepMail Cloud in Germany, AGPL open source and self-hostable: content sealed at rest, HTTPS with HSTS, per-team isolation and DKIM/SPF/DMARC."
   },
   "hero": {
     "eyebrow": "Security",

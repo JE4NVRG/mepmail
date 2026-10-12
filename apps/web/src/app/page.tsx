@@ -15,6 +15,7 @@ import {
   SignupLink,
 } from "@/components/site-chrome";
 import { StackLogoRow } from "@/components/stack-logos";
+import { StructuredData } from "@/components/structured-data";
 import {
   DESKTOP_DOWNLOAD_URL,
   LINUX_DOWNLOAD_URL,
@@ -25,6 +26,7 @@ import { formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricin
 import { CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
+import { faqJsonLd, organizationJsonLd, siteBaseUrl, websiteJsonLd } from "@/lib/structured-data";
 import { titlePhrases } from "@/lib/title-phrases";
 import { publicPageUrls } from "@/server/public-seo";
 import { AgentDemo, type AgentDemoLabels } from "./correio/agent-demo";
@@ -142,6 +144,7 @@ export default async function RootPage() {
   const columns = t.raw("compare.columns") as string[];
   const steps = t.raw("how.items") as string[];
   const faq = t.raw("faq.items") as FaqItem[];
+  const base = siteBaseUrl();
   const calc = t.raw("calc") as CalcLabels;
   const mcpPoints = t.raw("mcp.points") as string[];
   const correioPoints = t.raw("correio.points") as string[];
@@ -165,6 +168,9 @@ export default async function RootPage() {
 
   return (
     <div className="gtm cro">
+      <StructuredData
+        graph={[organizationJsonLd(base), websiteJsonLd(base, locale), faqJsonLd(faq)]}
+      />
       <ArrivalTracker />
       <LandingMotion />
       <PublicHeader

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { INDEXNOW_KEY } from "@/lib/indexnow";
 
 // Resolve APP_BASE_URL when requested, including after a domain migration.
 export const dynamic = "force-dynamic";
@@ -51,6 +52,8 @@ export default function robots(): MetadataRoute.Robots {
         "/llms.txt",
         "/auth.md",
         "/.well-known/",
+        // The IndexNow key file, which proves our URL announcements come from this host.
+        `/${INDEXNOW_KEY}.txt`,
       ],
       disallow: "/",
     },

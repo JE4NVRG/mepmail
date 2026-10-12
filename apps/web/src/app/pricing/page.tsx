@@ -7,10 +7,12 @@ import {
   type PublicSiteLabels,
   SignupLink,
 } from "@/components/site-chrome";
+import { StructuredData } from "@/components/structured-data";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
 import { formatBrl, formatUsd } from "@/lib/landing-pricing";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
+import { faqJsonLd } from "@/lib/structured-data";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
 import "./pricing.css";
@@ -104,6 +106,7 @@ export default async function PricingPage() {
 
   return (
     <div className="gtm">
+      <StructuredData graph={[faqJsonLd(faq)]} />
       <PublicHeader labels={site} page="pricing" />
       <main id="conteudo">
         <section className="gtm-section gtm-alt">

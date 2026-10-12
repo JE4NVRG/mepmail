@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { PublicFooter, PublicHeader, type PublicSiteLabels } from "@/components/site-chrome";
+import { StructuredData } from "@/components/structured-data";
 import {
   LINUX_DOWNLOAD_URL,
   WINDOWS_INSTALLER_URL,
   WINDOWS_STORE_URL,
 } from "@/lib/desktop-download";
 import { legalLinks } from "@/lib/legal-links";
+import { correioJsonLd, faqJsonLd, siteBaseUrl } from "@/lib/structured-data";
 import { titlePhrases } from "@/lib/title-phrases";
 import { publicPageUrls } from "@/server/public-seo";
 import { AgentDemo, type AgentDemoLabels } from "./agent-demo";
@@ -68,9 +70,24 @@ export default async function CorreioPage() {
   const mailOpen = earlyAccessOpen();
   // Correio on its own, without an Envio plan (checkout stays server-gated).
   const standaloneOpen = mailOpen && process.env.MAILBOX_STANDALONE_OPEN === "true";
+  const base = siteBaseUrl();
+  // The product and its price are described only once Mail is open; the FAQ always.
+  const graph = [
+    ...(mailOpen
+      ? [
+          correioJsonLd(
+            base,
+            `${base}${(await publicPageUrls(canonical)).url}`,
+            t("meta.description"),
+          ),
+        ]
+      : []),
+    faqJsonLd(faq),
+  ];
 
   return (
     <div className="gtm correio">
+      <StructuredData graph={graph} />
       <PublicHeader labels={site} page="correio" />
       <main id="conteudo">
         <section className="correio-hero" aria-labelledby="correio-title">
