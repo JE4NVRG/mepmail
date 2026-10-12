@@ -1,0 +1,46 @@
+{
+  "action": "Usar em outro app de e-mail",
+  "title": "Usar em outro app de e-mail",
+  "close": "Fechar",
+  "loading": "Carregando…",
+  "soon": "Em breve: Outlook, Apple Mail, Thunderbird e o app do Gmail com esta caixa.",
+  "intro": "Leia e envie os e-mails de {address} no Outlook, no Apple Mail, no Thunderbird ou no app do Gmail. Crie uma senha de app para cada aplicativo e use os dados abaixo.",
+  "settings": {
+    "imap": "Receber (IMAP)",
+    "smtp": "Enviar (SMTP)",
+    "user": "Usuário",
+    "password": "Senha",
+    "passwordValue": "a senha de app que você criar aqui",
+    "port": "porta {port}",
+    "alternate": "ou porta {port} com STARTTLS"
+  },
+  "gmail": "No Gmail do computador não dá para adicionar outra conta; use o app do Gmail no celular, em Adicionar conta → Outra.",
+  "made": {
+    "title": "Senha de app para {label}",
+    "copy": "Copiar",
+    "copied": "Copiada",
+    "once": "Ela aparece só agora. Cole no app de e-mail; se perder, revogue e crie outra."
+  },
+  "create": {
+    "label": "Nome do app",
+    "placeholder": "Ex.: Outlook do notebook",
+    "submit": "Criar senha de app",
+    "creating": "Criando…"
+  },
+  "list": {
+    "title": "Senhas de app desta caixa",
+    "empty": "Nenhuma senha de app ainda.",
+    "meta": "criada em {created} · termina em {hint}",
+    "used": "último uso em {date}",
+    "unused": "nunca usada",
+    "revoke": "Revogar",
+    "keep": "Manter",
+    "confirm": "O app que usa esta senha para de acessar a caixa."
+  },
+  "errors": {
+    "quota": "Esta caixa já tem {limit} senhas de app. Revogue uma para criar outra.",
+    "agent": "Caixas de agente usam chaves de agente, não senhas de app.",
+    "owner": "Só o dono da caixa cria e revoga senhas de app.",
+    "generic": "Não deu para concluir agora. Tente de novo."
+  }
+}

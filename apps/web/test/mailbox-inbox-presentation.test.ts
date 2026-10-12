@@ -345,4 +345,14 @@ describe("mailbox inbox presentation safety", () => {
       key: "approval.agentUnnamed",
     });
   });
+
+  it("names the agent that wrote a draft the person approved", () => {
+    expect(mailboxSendApproval({ kind: "human", label: null, draftedBy: "Sage" })).toEqual({
+      key: "approval.draftedByAgent",
+      label: "Sage",
+    });
+    expect(mailboxSendApproval({ kind: "human", label: null, draftedBy: null })).toEqual({
+      key: "approval.human",
+    });
+  });
 });

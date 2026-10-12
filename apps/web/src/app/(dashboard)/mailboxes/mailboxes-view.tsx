@@ -32,11 +32,15 @@ import { MAILBOX_OPEN_LICENSE_EVENT } from "@/lib/mailbox-plans";
 import { applyCorreioTheme, useCorreioPrefs } from "@/lib/mailbox-preferences";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
+import { CorreioOffline } from "./correio-offline";
 import { MailboxAccountMenu } from "./mailbox-account-menu";
 import { MailboxActivityDialog } from "./mailbox-activity";
 import { MailboxAgentKeysDialog } from "./mailbox-agent-keys";
+import { MailboxAgentsPanel } from "./mailbox-agents-panel";
+import { MailboxAgentsPending } from "./mailbox-agents-pending";
 import { MailboxAliasesSection } from "./mailbox-aliases-section";
 import { MailboxAppearanceSettings } from "./mailbox-appearance-settings";
+import { MailboxClientsDialog } from "./mailbox-clients-dialog";
 import {
   MAIL_DRAG_TYPE,
   MailboxContentView,
@@ -423,6 +427,7 @@ export function MailboxesView({
   const t = useTranslations("mailboxes");
   const locale = useLocale();
   const tActivity = useTranslations("mailboxes-activity");
+  const tClients = useTranslations("mailboxes-clients");
   const tAgent = useTranslations("mailboxes-agent");
   const { data: session } = authClient.useSession();
   const trpc = useTRPC();
@@ -485,6 +490,40 @@ export function MailboxesView({
       `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
     );
   }, []);
+  // ?mailbox=<id>&item=<id> (the approval e-mail, the agents panel): open that message.
+  const itemLink = useRef<{ mailboxId: string; id: string } | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mailboxId = params.get("mailbox");
+    const id = params.get("item");
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!mailboxId || !id || !uuid.test(mailboxId) || !uuid.test(id)) return;
+    itemLink.current = { mailboxId, id };
+    params.delete("mailbox");
+    params.delete("item");
+    const query = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+    );
+  }, []);
+  useEffect(() => {
+    const link = itemLink.current;
+    if (!link || !registry.data) return;
+    itemLink.current = null;
+    if (!registry.data.mailboxes.some((box) => box.id === link.mailboxId && box.canRead)) return;
+    // Its folder comes from what it is (a draft waits in Rascunhos).
+    void queries.fetchQuery(trpc.mailboxes.item.queryOptions(link)).then(
+      (item) => {
+        setMailboxKind("all");
+        select(link.mailboxId);
+        setFolder(item.kind === "draft" ? "drafts" : item.kind === "sent" ? "sent" : "inbox");
+        selectItem(link);
+      },
+      () => undefined,
+    );
+  }, [registry.data, queries, trpc]);
   useEffect(() => {
     const link = newMailboxLink.current;
     if (!link?.pending || !options.data || registry.data?.canManage !== true) return;
@@ -496,6 +535,9 @@ export function MailboxesView({
   const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
   const [teamAgentDialog, setTeamAgentDialog] = useState(false);
   const [signatureDialogId, setSignatureDialogId] = useState<string | null>(null);
+  // "Usar em outro app de e-mail": app passwords for IMAP/SMTP (owner, person mailbox).
+  const [clientsDialogId, setClientsDialogId] = useState<string | null>(null);
+  const clientAccess = useQuery(trpc.mailboxClients.settings.queryOptions());
   const [activityDialogId, setActivityDialogId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("appearance");
   // "Fazer upgrade" and "Ver planos" anywhere in the Correio open the license
@@ -1110,6 +1152,12 @@ export function MailboxesView({
         ...(registry.data?.canManage || ownsBox(selected)
           ? [{ label: t("signature.action"), onSelect: () => setSignatureDialogId(selected.id) }]
           : []),
+        ...(ownsBox(selected) &&
+        selected.kind === "person" &&
+        selected.status === "planned" &&
+        clientAccess.data?.open
+          ? [{ label: tClients("action"), onSelect: () => setClientsDialogId(selected.id) }]
+          : []),
         ...(registry.data?.canManage
           ? [
               null,
@@ -1216,7 +1264,12 @@ export function MailboxesView({
       boxesMenu={boxesMenu}
       boxMenu={boxMenu}
       folders={foldersSection}
-      usage={<MailboxUsagePanel mailboxId={selected?.id ?? null} />}
+      usage={
+        <>
+          <MailboxAgentsPending />
+          <MailboxUsagePanel mailboxId={selected?.id ?? null} />
+        </>
+      }
       onShortcuts={() => setShortcutsOpen(true)}
     />
   );
@@ -1392,6 +1445,13 @@ export function MailboxesView({
           mcpUrl={correioMcpUrl}
         />
       ) : null}
+      {clientsDialogId && boxes.some((box) => box.id === clientsDialogId) ? (
+        <MailboxClientsDialog
+          key={clientsDialogId}
+          mailbox={boxes.find((box) => box.id === clientsDialogId)!}
+          close={() => setClientsDialogId(null)}
+        />
+      ) : null}
       {signatureBox ? (
         <MailboxSignatureDialog
           key={signatureBox.id}
@@ -1457,6 +1517,8 @@ export function MailboxesView({
       </header>
       {layout === "app" ? (
         <>
+          {/* Desktop app: reading without internet (a no-op in browsers). */}
+          <CorreioOffline userId={session?.user.id ?? null} />
           <MailboxReceivingBanner enabled={mayUseMail && !!registry.data} />
           {licenseOpenRequest > 0 || (service.data && !service.data.active) ? (
             <div className={styles.appLicense}>
@@ -1584,6 +1646,7 @@ export function MailboxesView({
             </section>
           ) : settingsTab === "agents" ? (
             <section className={styles.settingsSection} aria-label={t("app.tabs.agents")}>
+              <MailboxAgentsPanel />
               <p className={styles.hint}>{t("app.agentsHint")}</p>
               {correioMcpUrl && teamAgentBoxes.length ? (
                 <OAuthConnectCallout url={correioMcpUrl.replace(/\/correio$/, "")} />

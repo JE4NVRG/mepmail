@@ -649,7 +649,7 @@
   "removeRecipient": "Remove {address}",
   "invalidRecipientShort": "Invalid address",
   "invalidRecipient": "Fix the address in red: {address}",
-  "recipientLimit": "Up to 20 recipients across To and Cc.",
+  "recipientLimit": "Up to 20 recipients across To, Cc and Bcc.",
   "recipientSuggestions": "Suggested contacts",
   "replyQuote": "On {date}, {sender} wrote:\n{text}",
   "dnsGuide": {

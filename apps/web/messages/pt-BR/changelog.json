@@ -24,6 +24,30 @@
   },
   "releases": [
     {
+      "version": "0.133",
+      "date": "2026-10-12",
+      "title": "Painel de agentes no Correio e leitura offline no app",
+      "summary": "A aba Agentes reúne o que espera sua aprovação, quem tem acesso e o que cada agente fez. O app do MepMail para computador passa a guardar uma cópia para ler sem internet.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Agentes → Aguardando aprovação: os rascunhos que os agentes prepararam, com Para, Cc e Cco, para aprovar ou descartar. O número de pendentes aparece na barra lateral.",
+            "Agentes com acesso: escopos, caixas e último uso de cada chave, com revogação confirmada; e a atividade recente de cada agente.",
+            "No app para computador, Preferências → Leitura offline guarda uma cópia das mensagens recentes neste computador. Sair da conta apaga essa cópia."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Mensagens enviadas por agente mostram \"Escrito pelo agente X · aprovado por você\".",
+            "O link do e-mail de aprovação abre direto no rascunho.",
+            "O limite de destinatários conta Para, Cc e Cco, e o texto agora diz isso."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.132",
       "date": "2026-10-12",
       "title": "Site em português encontrável no Google",

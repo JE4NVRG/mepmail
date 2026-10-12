@@ -1,0 +1,20 @@
+/* "Sem conexão": the Correio is showing its saved copy (desktop app). */
+.banner {
+  align-items: center;
+  background: var(--ms-surface-2, rgba(255, 255, 255, 0.05));
+  border-bottom: 1px solid var(--ms-line);
+  color: var(--ms-bone);
+  display: flex;
+  font-size: 12.5px;
+  gap: 8px;
+  justify-content: center;
+  padding: 6px 16px;
+  text-align: center;
+}
+.dot {
+  background: var(--ms-warn, #d9a441);
+  border-radius: 50%;
+  flex: none;
+  height: 8px;
+  width: 8px;
+}

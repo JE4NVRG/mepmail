@@ -1,0 +1,8 @@
+{
+  "banner": "No connection. Showing the copy saved {time}; actions and sends wait for the internet to come back.",
+  "bannerNoCopy": "No connection. Actions and sends wait for the internet to come back.",
+  "title": "Read without internet",
+  "switch": "Keep a copy of the mail on this computer",
+  "hintOn": "The app keeps the lists, the messages you opened and the 30 newest in the inbox, to read without internet. The copy stays on this computer only and is deleted when you sign out.",
+  "hintOff": "Nothing is kept on this computer. Without internet, the Correio does not open."
+}

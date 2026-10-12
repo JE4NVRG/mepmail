@@ -1314,7 +1314,9 @@ it("defers the fan-out while the sender domain's region is held by the platform 
   expect(await sendBroadcast(db, deps, { broadcastId })).toBe("deferred");
   expect(rescheduled).toHaveLength(2);
   expect(mail.sends.map((s) => s.subject)).toEqual(['"launch" is on hold']);
-  expect(mail.sends[0]?.text).toContain("Sending from us-east-1 is paused");
+  // Cause-neutral since 0.128: the notice names the region, never the breaker metric.
+  expect(mail.sends[0]?.text).toContain("Broadcasts from us-east-1 are paused across the platform");
+  expect(mail.sends[0]?.text).not.toMatch(/bounce|complaint/i);
   expect(mail.sends[0]?.text).toContain(`${BASE_URL}/broadcasts/${broadcastId}`);
   expect(enqueued).toEqual([]);
   const [row] = await db

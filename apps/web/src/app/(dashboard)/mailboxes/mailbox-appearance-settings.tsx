@@ -22,6 +22,7 @@ import {
   QUICK_REPLY_LIMITS,
   UNDO_SEND_CHOICES,
 } from "@/lib/mailbox-quick-replies";
+import { CorreioOfflineSetting } from "./correio-offline";
 import styles from "./mailboxes.module.css";
 
 const START_FOLDERS = ["inbox", "favorites", "drafts", "sent", "archive", "trash"] as const;
@@ -242,6 +243,8 @@ export function MailboxAppearanceSettings({
               : t(desktop ? "notifyDesktopHint" : "notifyBrowserHint")}
         </p>
       </section>
+
+      <CorreioOfflineSetting />
 
       <section className={styles.appearanceGroup} aria-labelledby={`${id}-sending`}>
         <h3 id={`${id}-sending`}>{t("sending")}</h3>

@@ -140,5 +140,55 @@
     "oauth": "OAuth app"
   },
   "revokeConfirmCredential": "Revoke all of “{label}”? The agent loses access to every mailbox of this credential, not only this one.",
-  "quota": "This mailbox already has 25 active keys. Revoke one you no longer use to create another."
+  "quota": "This mailbox already has 25 active keys. Revoke one you no longer use to create another.",
+  "panel": {
+    "draftedBy": "Written by agent {label} · approved by you",
+    "loading": "Loading agents…",
+    "error": "Could not load the agents right now.",
+    "retry": "Try again",
+    "keep": "Keep",
+    "changed": "The draft changed since the request. The list was refreshed.",
+    "approvals": {
+      "title": "Waiting for your approval",
+      "empty": "Nothing waiting for you. When an agent without the send permission asks, it shows here.",
+      "asked": "{agent} asked to send from {mailbox} · {date}",
+      "noSubject": "(no subject)",
+      "to": "To",
+      "bcc": "Bcc",
+      "send": "Send",
+      "open": "Open",
+      "discard": "Discard",
+      "confirm": "{count, plural, one {Send to # recipient?} other {Send to # recipients?}}",
+      "discardConfirm": "The draft goes to Trash and is not sent.",
+      "sent": "Send approved. It is going out now.",
+      "discarded": "Draft discarded."
+    },
+    "agents": {
+      "title": "Agents with access",
+      "connect": "Connect an agent",
+      "empty": "No agents connected to your mailboxes.",
+      "kind": {
+        "mailbox": "Mailbox key",
+        "team": "Multi-mailbox credential",
+        "oauth": "Connected app (OAuth)"
+      },
+      "scope": {
+        "read": "Reads",
+        "draft": "Writes drafts",
+        "send": "Sends"
+      },
+      "used": "last used {date}",
+      "unused": "not used yet",
+      "sent": "last sent {date}",
+      "sendsAlone": "sends on its own",
+      "asksYou": "asks for your approval to send",
+      "revoke": "Revoke",
+      "revokeConfirm": "{count, plural, one {The agent loses access to this mailbox at once.} other {The agent loses access to the # mailboxes at once.}}",
+      "revoked": "{agent} no longer has access."
+    },
+    "activity": {
+      "title": "What the agents did",
+      "empty": "No agent activity yet."
+    }
+  }
 }

@@ -24,6 +24,30 @@
   },
   "releases": [
     {
+      "version": "0.133",
+      "date": "2026-10-12",
+      "title": "An agents panel in Mail, and offline reading in the app",
+      "summary": "The Agents tab brings together what awaits your approval, who has access and what each agent did. The MepMail desktop app can keep a copy to read without internet.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Agents → Awaiting approval: drafts your agents prepared, with To, Cc and Bcc, to approve or discard. The pending count shows in the sidebar.",
+            "Agents with access: scopes, mailboxes and last use of each key, with a confirmed revoke; plus each agent's recent activity.",
+            "In the desktop app, Preferences → Offline reading keeps a copy of recent messages on this computer. Signing out erases that copy."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Messages sent by an agent show \"Written by agent X · approved by you\".",
+            "The link in the approval email opens the draft directly.",
+            "The recipient limit counts To, Cc and Bcc, and the copy now says so."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.132",
       "date": "2026-10-12",
       "title": "The Portuguese site is findable on Google",

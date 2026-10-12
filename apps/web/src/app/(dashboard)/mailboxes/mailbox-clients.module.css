@@ -1,0 +1,126 @@
+/* "Usar em outro app de e-mail": app passwords and the IMAP/SMTP settings. */
+.intro {
+  color: var(--ms-bone);
+  font-size: 13.5px;
+  line-height: 1.55;
+  margin: 0 0 14px;
+}
+.settings {
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 0 0 8px;
+  width: 100%;
+}
+.settings th,
+.settings td {
+  border-top: 1px solid var(--ms-line);
+  padding: 8px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.settings th {
+  color: var(--ms-muted);
+  font-weight: 500;
+  white-space: nowrap;
+  width: 1%;
+}
+.settings code,
+.password code {
+  font-family: var(--ms-font-mono, ui-monospace, monospace);
+  overflow-wrap: anywhere;
+}
+.alt {
+  color: var(--ms-muted);
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+}
+.made {
+  background: var(--ms-surface-2, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--ms-line);
+  border-radius: 10px;
+  margin: 16px 0 8px;
+  padding: 12px 14px;
+}
+.made h3 {
+  font-size: 13.5px;
+  margin: 0 0 8px;
+}
+.password {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 6px;
+}
+.password code {
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+.create {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0 6px;
+}
+.create label {
+  display: grid;
+  flex: 1 1 220px;
+  font-size: 12.5px;
+  gap: 6px;
+}
+.list {
+  border-top: 1px solid var(--ms-line);
+  margin-top: 20px;
+  padding-top: 14px;
+}
+.list h3 {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+.list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.list li {
+  align-items: center;
+  border-bottom: 1px solid var(--ms-line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+.list li > span:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.list small {
+  color: var(--ms-muted);
+  font-size: 12px;
+}
+.confirm {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.revoke {
+  background: var(--ms-danger);
+  border: 1px solid var(--ms-danger);
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+}
+.revoke:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}

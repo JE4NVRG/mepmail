@@ -140,5 +140,55 @@
     "oauth": "App OAuth"
   },
   "revokeConfirmCredential": "Revogar “{label}” inteira? O agente perde o acesso a todas as caixas dessa credencial, não só a esta.",
-  "quota": "Esta caixa já tem 25 chaves ativas. Revogue uma que não usa mais para criar outra."
+  "quota": "Esta caixa já tem 25 chaves ativas. Revogue uma que não usa mais para criar outra.",
+  "panel": {
+    "draftedBy": "Escrito pelo agente {label} · aprovado por você",
+    "loading": "Carregando os agentes…",
+    "error": "Não deu para carregar os agentes agora.",
+    "retry": "Tentar de novo",
+    "keep": "Manter",
+    "changed": "O rascunho mudou desde o pedido. A lista foi atualizada.",
+    "approvals": {
+      "title": "Aguardando sua aprovação",
+      "empty": "Nenhum envio esperando por você. Quando um agente sem permissão de envio pedir, aparece aqui.",
+      "asked": "{agent} pediu para enviar de {mailbox} · {date}",
+      "noSubject": "(sem assunto)",
+      "to": "Para",
+      "bcc": "Cco",
+      "send": "Enviar",
+      "open": "Abrir",
+      "discard": "Descartar",
+      "confirm": "{count, plural, one {Enviar para # destinatário?} other {Enviar para # destinatários?}}",
+      "discardConfirm": "O rascunho vai para a Lixeira e não é enviado.",
+      "sent": "Envio aprovado. Está saindo agora.",
+      "discarded": "Rascunho descartado."
+    },
+    "agents": {
+      "title": "Agentes com acesso",
+      "connect": "Conectar agente",
+      "empty": "Nenhum agente conectado às suas caixas.",
+      "kind": {
+        "mailbox": "Chave da caixa",
+        "team": "Credencial de várias caixas",
+        "oauth": "App conectado (OAuth)"
+      },
+      "scope": {
+        "read": "Lê",
+        "draft": "Escreve rascunhos",
+        "send": "Envia"
+      },
+      "used": "último uso {date}",
+      "unused": "ainda não usado",
+      "sent": "último envio {date}",
+      "sendsAlone": "envia sozinho",
+      "asksYou": "pede sua aprovação para enviar",
+      "revoke": "Revogar",
+      "revokeConfirm": "{count, plural, one {O agente perde o acesso a esta caixa na hora.} other {O agente perde o acesso às # caixas na hora.}}",
+      "revoked": "{agent} não tem mais acesso."
+    },
+    "activity": {
+      "title": "O que os agentes fizeram",
+      "empty": "Nenhuma atividade de agente ainda."
+    }
+  }
 }

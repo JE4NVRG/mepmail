@@ -7,6 +7,7 @@ import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useDismiss } from "@/components/popover-menu";
 import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
+import { clearCorreioOffline } from "@/lib/correio-offline";
 import { isDesktop } from "@/lib/desktop-bridge";
 import { desktopAppFor, LINUX_DOWNLOAD_URL, WINDOWS_STORE_URL } from "@/lib/desktop-download";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
@@ -78,6 +79,8 @@ export function MailboxAccountMenu({
     items[(at + step + items.length) % items.length]?.focus({ preventScroll: true });
   }
   async function signOut() {
+    // The copy kept for reading offline (desktop app) leaves with the session.
+    await clearCorreioOffline();
     await authClient.signOut();
     // Private query cache must not survive a change of authenticated account.
     window.location.assign("/login");

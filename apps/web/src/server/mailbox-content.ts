@@ -231,6 +231,7 @@ function acceptedSent(db: Db, actor: MailboxContentActor, mailboxId: string, mat
       messageId: schema.mailboxOutbox.providerRfcMessageId,
       approvalKind: schema.mailboxOutbox.approvalKind,
       agentLabel: schema.mailboxAgentKeys.label,
+      draftId: schema.mailboxOutbox.draftId,
     })
     .from(schema.mailboxOutbox)
     .innerJoin(
@@ -297,7 +298,8 @@ export async function getMailboxContent(
   let transportMessageId: string | null = null;
   let replyToSentItemId: string | null = null;
   let sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null = null;
-  let sentBy: { kind: "human" | "agent"; label: string | null } | null = null;
+  let sentBy: { kind: "human" | "agent"; label: string | null; draftedBy?: string | null } | null =
+    null;
   let outboxId: string | null = null;
   if (content.kind === "sent") {
     const [sent] = await acceptedSent(
@@ -310,9 +312,15 @@ export async function getMailboxContent(
     if (sent) {
       outboxId = sent.id;
       sendStatus = "accepted";
+      const drafted =
+        sent.approvalKind === "human"
+          ? await draftedByAgents(db, actor.teamId, [sent.draftId])
+          : null;
       sentBy = {
         kind: sent.approvalKind,
         label: sent.approvalKind === "agent" ? sent.agentLabel : null,
+        // Only when an agent wrote it: other answers keep their exact shape.
+        ...(drafted?.get(sent.draftId) ? { draftedBy: drafted.get(sent.draftId) as string } : {}),
       };
     }
   } else if (replyIds.length) {
@@ -376,7 +384,7 @@ async function listRowContents(
   rows: { id: string; mailboxId: string }[],
 ) {
   type Content = ReturnType<typeof listDto> & {
-    sentBy: { kind: "human" | "agent"; label: string | null } | null;
+    sentBy: { kind: "human" | "agent"; label: string | null; draftedBy?: string | null } | null;
     sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null;
     outboundSummary: MailboxOutboundSummary | null;
     senderDecision: "allow" | "block" | "none" | null;
@@ -462,6 +470,11 @@ async function listRowContents(
     const sent = sentIds.length
       ? await acceptedSent(db, actor, mailboxId, inArray(schema.mailboxOutbox.id, sentIds))
       : [];
+    const drafted = await draftedByAgents(
+      db,
+      actor.teamId,
+      sent.filter((entry) => entry.approvalKind === "human").map((entry) => entry.draftId),
+    );
     // Aprovação de remetentes: the owner's answer for each received row's
     // sender ("none" when there is none yet; null when screening is off).
     const senderHmac = mailboxSenderHmacKey();
@@ -484,6 +497,9 @@ async function listRowContents(
           sentBy = {
             kind: match.approvalKind,
             label: match.approvalKind === "agent" ? match.agentLabel : null,
+            ...(drafted.get(match.draftId)
+              ? { draftedBy: drafted.get(match.draftId) as string }
+              : {}),
           };
         }
       } else if (kind === "draft") {
@@ -754,7 +770,7 @@ export async function buildMailboxListRows(
     remindAt: Date | null;
     remindedAt: Date | null;
     inboundAssessment: (typeof schema.mailboxItems.$inferSelect)["inboundAssessment"];
-    sentBy: { kind: "human" | "agent"; label: string | null } | null;
+    sentBy: { kind: "human" | "agent"; label: string | null; draftedBy?: string | null } | null;
     sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null;
     outboundSummary: MailboxOutboundSummary | null;
     senderDecision: "allow" | "block" | "none" | null;
@@ -881,6 +897,38 @@ export async function buildMailboxListRows(
 }
 
 /** Approval requests recorded for these drafts, keyed by id and revision, with the agent's label. */
+/**
+ * Who wrote a draft that a person then approved: the agent that asked them to send it
+ * ("Escrito pelo agente X · aprovado por você"), by its current key label.
+ */
+async function draftedByAgents(
+  db: Db,
+  teamId: string,
+  draftIds: readonly string[],
+): Promise<Map<string, string | null>> {
+  const found = new Map<string, string | null>();
+  if (!draftIds.length) return found;
+  const rows = await db
+    .select({ data: schema.auditLog.data, label: schema.mailboxAgentKeys.label })
+    .from(schema.auditLog)
+    .leftJoin(
+      schema.mailboxAgentKeys,
+      sql`${schema.mailboxAgentKeys.id}::text = ${schema.auditLog.data}->>'keyId'`,
+    )
+    .where(
+      and(
+        eq(schema.auditLog.teamId, teamId),
+        eq(schema.auditLog.action, "mailbox.send_requested"),
+        inArray(sql<string>`${schema.auditLog.data}->>'itemId'`, [...draftIds]),
+      ),
+    );
+  for (const row of rows) {
+    const itemId = (row.data as { itemId?: string } | null)?.itemId;
+    if (itemId) found.set(itemId, row.label ?? null);
+  }
+  return found;
+}
+
 async function draftApprovalRequests(
   db: Db,
   teamId: string,

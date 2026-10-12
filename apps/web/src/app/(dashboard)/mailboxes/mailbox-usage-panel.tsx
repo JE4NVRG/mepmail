@@ -76,8 +76,8 @@ export function useMailboxUpgradeOffer(planId: string | null | undefined): strin
 
 /**
  * Receiving paused by the plan (the team passed its inbound quota + 10 %, or
- * its storage is full): new mail bounces to the sender until the next
- * period, or an upgrade (the only way out for storage).
+ * its storage is full): new mail bounces to the sender until the next period
+ * or an upgrade; for storage, also until space is freed (emptying Lixeira).
  */
 export function MailboxReceivingNotice({
   plan,

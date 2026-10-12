@@ -8,7 +8,7 @@ import styles from "./mailbox-activity.module.css";
 import registryStyles from "./mailboxes.module.css";
 
 type Props = { mailbox: { id: string; address: string }; close: () => void };
-const ACTION_KEYS = {
+export const ACTIVITY_ACTION_KEYS = {
   "mailbox.items_listed": "actions.itemsListed",
   "mailbox.item_read": "actions.itemRead",
   "mailbox.draft_saved": "actions.draftSaved",
@@ -199,7 +199,7 @@ function ActivitySession({ mailbox, close }: Props) {
                       <span className={styles.actorKind}>{t(`actors.${item.actor.kind}`)}</span>
                     ) : null}
                   </div>
-                  <p className={styles.action}>{t(ACTION_KEYS[item.action])}</p>
+                  <p className={styles.action}>{t(ACTIVITY_ACTION_KEYS[item.action])}</p>
                   <div className={styles.eventDetails}>
                     <time dateTime={item.createdAt.toISOString()}>
                       {format.dateTime(item.createdAt, { dateStyle: "medium", timeStyle: "short" })}

@@ -649,7 +649,7 @@
   "removeRecipient": "Remover {address}",
   "invalidRecipientShort": "Endereço inválido",
   "invalidRecipient": "Corrija o endereço em vermelho: {address}",
-  "recipientLimit": "Até 20 destinatários somando Para e Cc.",
+  "recipientLimit": "Até 20 destinatários somando Para, Cc e Cco.",
   "recipientSuggestions": "Contatos sugeridos",
   "replyQuote": "Em {date}, {sender} escreveu:\n{text}",
   "dnsGuide": {

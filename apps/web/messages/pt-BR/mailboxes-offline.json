@@ -1,0 +1,8 @@
+{
+  "banner": "Sem conexão. Mostrando a cópia salva em {time}; ações e envios esperam a internet voltar.",
+  "bannerNoCopy": "Sem conexão. Ações e envios esperam a internet voltar.",
+  "title": "Ler sem internet",
+  "switch": "Guardar uma cópia dos e-mails neste computador",
+  "hintOn": "O app guarda as listas, as mensagens que você abriu e as 30 mais recentes da Entrada, para ler sem internet. A cópia fica só neste computador e é apagada quando você sai da conta.",
+  "hintOff": "Nada é guardado neste computador. Sem internet, o Correio não abre."
+}

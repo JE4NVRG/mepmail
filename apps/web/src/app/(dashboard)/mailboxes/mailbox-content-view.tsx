@@ -1231,6 +1231,12 @@ export function MailboxContentView({
   onNewFolder?: (() => void) | undefined;
 }) {
   const t = useTranslations("mailboxes");
+  const tAgent = useTranslations("mailboxes-agent");
+  // "Aprovado por…" badges; a person sending what an agent wrote names both.
+  const approvalText = (approval: NonNullable<ReturnType<typeof mailboxSendApproval>>) =>
+    approval.key === "approval.draftedByAgent"
+      ? tAgent("panel.draftedBy", { label: approval.label })
+      : t(approval.key, { label: "label" in approval ? approval.label : "" });
   const locale = useLocale();
   const trpc = useTRPC();
   const queries = useQueryClient();
@@ -3718,11 +3724,7 @@ export function MailboxContentView({
                                     <span className={styles.warningBadge}>{t("quarantine")}</span>
                                   ) : null}
                                   {!blocked && rowApproval ? (
-                                    <span>
-                                      {t(rowApproval.key, {
-                                        label: "label" in rowApproval ? rowApproval.label : "",
-                                      })}
-                                    </span>
+                                    <span>{approvalText(rowApproval)}</span>
                                   ) : null}
                                   {!blocked && row.approvalRequested && !row.sendStatus ? (
                                     <span className={styles.warningBadge}>
@@ -4336,11 +4338,7 @@ export function MailboxContentView({
                     <small>{date(item.date ?? item.updatedAt)}</small>
                   </header>
                   <div className={styles.messageBadges}>
-                    {approval ? (
-                      <span>
-                        {t(approval.key, { label: "label" in approval ? approval.label : "" })}
-                      </span>
-                    ) : null}
+                    {approval ? <span>{approvalText(approval)}</span> : null}
                     {item.kind === "sent" && selectedRow?.sendStatus ? (
                       <span>{t(`deliveryStatus.${selectedRow.sendStatus}`)}</span>
                     ) : null}

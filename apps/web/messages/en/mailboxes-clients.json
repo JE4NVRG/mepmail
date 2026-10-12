@@ -1,0 +1,46 @@
+{
+  "action": "Use in another mail app",
+  "title": "Use in another mail app",
+  "close": "Close",
+  "loading": "Loading…",
+  "soon": "Coming soon: Outlook, Apple Mail, Thunderbird and the Gmail app with this mailbox.",
+  "intro": "Read and send {address}'s mail in Outlook, Apple Mail, Thunderbird or the Gmail app. Create an app password for each app and use the settings below.",
+  "settings": {
+    "imap": "Incoming (IMAP)",
+    "smtp": "Outgoing (SMTP)",
+    "user": "Username",
+    "password": "Password",
+    "passwordValue": "the app password you create here",
+    "port": "port {port}",
+    "alternate": "or port {port} with STARTTLS"
+  },
+  "gmail": "Gmail on the web cannot add another account; use the Gmail app on your phone, under Add account → Other.",
+  "made": {
+    "title": "App password for {label}",
+    "copy": "Copy",
+    "copied": "Copied",
+    "once": "It is shown only now. Paste it into the mail app; if you lose it, revoke it and create another."
+  },
+  "create": {
+    "label": "App name",
+    "placeholder": "E.g. Outlook on the laptop",
+    "submit": "Create app password",
+    "creating": "Creating…"
+  },
+  "list": {
+    "title": "This mailbox's app passwords",
+    "empty": "No app passwords yet.",
+    "meta": "created {created} · ends in {hint}",
+    "used": "last used {date}",
+    "unused": "never used",
+    "revoke": "Revoke",
+    "keep": "Keep",
+    "confirm": "The app using this password loses access to the mailbox."
+  },
+  "errors": {
+    "quota": "This mailbox already has {limit} app passwords. Revoke one to create another.",
+    "agent": "Agent mailboxes use agent keys, not app passwords.",
+    "owner": "Only the mailbox's owner creates and revokes app passwords.",
+    "generic": "Could not finish right now. Try again."
+  }
+}

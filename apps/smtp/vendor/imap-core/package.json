@@ -1,0 +1,7 @@
+{
+  "name": "imap-core",
+  "version": "1.46.1",
+  "private": true,
+  "type": "commonjs",
+  "license": "EUPL-1.2"
+}

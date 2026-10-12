@@ -39,6 +39,8 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
   const secretHeading = useRef<HTMLHeadingElement>(null);
   const active = useRef(true);
   const [label, setLabel] = useState("");
+  // Revoking a credential cuts every mailbox it reaches: asked once more, inline.
+  const [confirmingRevoke, setConfirmingRevoke] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>(() => mailboxes.map((box) => box.id));
   const [defaultId, setDefaultId] = useState("");
   const [draft, setDraft] = useState(true);
@@ -485,15 +487,40 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
                         : t("noExpiration")}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className="ms-btn ms-btn-ghost"
-                    disabled={busy || key.revokedAt !== null}
-                    aria-label={t("revokeLabel", { label: key.label })}
-                    onClick={() => void revokeKey(key.id)}
-                  >
-                    {revokingId === key.id ? t("revoking") : t("revoke")}
-                  </button>
+                  {confirmingRevoke === key.id ? (
+                    <div className={styles.revokeConfirm}>
+                      <p>{t("revokeConfirmCredential", { label: key.label })}</p>
+                      <button
+                        type="button"
+                        className="ms-btn"
+                        disabled={busy}
+                        onClick={() => setConfirmingRevoke(null)}
+                      >
+                        {t("revokeKeep")}
+                      </button>
+                      <button
+                        type="button"
+                        className={`ms-btn ${styles.revokeYes}`}
+                        disabled={busy}
+                        onClick={() => {
+                          setConfirmingRevoke(null);
+                          void revokeKey(key.id);
+                        }}
+                      >
+                        {t("revoke")}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="ms-btn ms-btn-ghost"
+                      disabled={busy || key.revokedAt !== null}
+                      aria-label={t("revokeLabel", { label: key.label })}
+                      onClick={() => setConfirmingRevoke(key.id)}
+                    >
+                      {revokingId === key.id ? t("revoking") : t("revoke")}
+                    </button>
+                  )}
                 </li>
               );
             })}

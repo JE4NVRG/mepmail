@@ -19,6 +19,7 @@ export * from "./instance-settings.js";
 export * from "./mailbox-agent-keys.js";
 export * from "./mailbox-aliases.js";
 export * from "./mailbox-checkouts.js";
+export * from "./mailbox-client-access.js";
 export * from "./mailbox-customer-requests.js";
 export * from "./mailbox-folders.js";
 export * from "./mailbox-import-jobs.js";

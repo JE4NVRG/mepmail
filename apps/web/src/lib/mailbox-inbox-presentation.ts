@@ -69,10 +69,16 @@ export function mailboxPrimaryParticipant(
 
 /** This identifies approval of the send, never authorship of its text. */
 export function mailboxSendApproval(
-  sentBy: { kind: "human" | "agent"; label: string | null } | null,
+  sentBy: { kind: "human" | "agent"; label: string | null; draftedBy?: string | null } | null,
 ) {
   if (!sentBy) return null;
-  if (sentBy.kind === "human") return { key: "approval.human" as const };
+  if (sentBy.kind === "human") {
+    // A person sent what an agent wrote and asked them to send: both are named.
+    const author = sentBy.draftedBy?.trim();
+    return author
+      ? { key: "approval.draftedByAgent" as const, label: author }
+      : { key: "approval.human" as const };
+  }
   const label = sentBy.label?.trim();
   return label
     ? { key: "approval.agent" as const, label }

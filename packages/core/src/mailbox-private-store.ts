@@ -561,6 +561,21 @@ export async function readMailboxItem(
   return withMailboxItem(db, keyring, actor, input, async (item) => item);
 }
 
+/**
+ * The mailbox's own owner only (no grants, no agents): what app passwords and mail-client
+ * access (IMAP/SMTP) are for. `change` also requires the operational plan and the seat.
+ */
+export async function withMailboxOwnerAccess<T>(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxId: string,
+  operation: (tx: Db) => Promise<T>,
+  change = false,
+): Promise<T> {
+  if (actor.agentAccess) throw new MailboxContentError("forbidden");
+  return scoped(db, { ...actor }, mailboxId, "owner", change, operation);
+}
+
 /** Authorize a completed aggregate under one transaction before returning private DTOs. */
 export async function withMailboxContentAccess<T>(
   db: Db,

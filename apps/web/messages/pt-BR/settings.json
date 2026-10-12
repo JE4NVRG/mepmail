@@ -521,6 +521,8 @@
       "mailbox_agent_key_revoked": "Revogou chave de agente de uma caixa",
       "mailbox_team_agent_key_created": "Criou chave de agente para várias caixas",
       "mailbox_team_agent_key_revoked": "Revogou chave de agente de várias caixas",
+      "mailbox_app_password_created": "Criou uma senha de app",
+      "mailbox_app_password_revoked": "Revogou uma senha de app",
       "mailbox_send_queued": "Enviou uma mensagem de uma caixa",
       "mailbox_license_granted": "Liberou uma caixa no plano",
       "mailbox_license_revoked": "Tirou uma caixa do plano"

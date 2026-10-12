@@ -37,6 +37,8 @@ const NAMESPACES = [
   "logs",
   "mailboxes",
   "mailboxes-agent",
+  "mailboxes-clients",
+  "mailboxes-offline",
   "mailboxes-activity",
   "mailboxes-service",
   "merge-fields",

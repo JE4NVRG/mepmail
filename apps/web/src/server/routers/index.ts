@@ -10,6 +10,8 @@ import { domainsRouter } from "./domains";
 import { emailRouter } from "./email";
 import { emailsRouter } from "./emails";
 import { logsRouter } from "./logs";
+import { mailboxAgentsRouter } from "./mailbox-agents";
+import { mailboxClientsRouter } from "./mailbox-clients";
 import { mailboxesRouter } from "./mailboxes";
 import { metricsRouter } from "./metrics";
 import { onboardingRouter } from "./onboarding";
@@ -35,6 +37,8 @@ export const appRouter = router({
   apiKeys: apiKeysRouter,
   logs: logsRouter,
   mailboxes: mailboxesRouter,
+  mailboxAgents: mailboxAgentsRouter,
+  mailboxClients: mailboxClientsRouter,
   metrics: metricsRouter,
   onboarding: onboardingRouter,
   segments: segmentsRouter,
