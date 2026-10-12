@@ -1,4 +1,8 @@
-import { MailboxAgentAccessError, MailboxContentError } from "@millionsend/core";
+import {
+  MailboxAgentAccessError,
+  MailboxContentError,
+  MailboxRecipientBlockedError,
+} from "@millionsend/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
@@ -106,6 +110,18 @@ describe("restricted mailbox agent send endpoint", () => {
     vi.stubEnv("MAILBOX_REGISTRY_ENABLED", "0");
     expect((await POST(request())).status).toBe(404);
     expect(h.queueDraft).not.toHaveBeenCalled();
+    expect(h.enqueue).not.toHaveBeenCalled();
+  });
+  it("names the recipients a hard bounce or complaint blocked, and enqueues nothing", async () => {
+    h.queueDraft.mockRejectedValueOnce(
+      new MailboxRecipientBlockedError(["blocked@example.invalid"]),
+    );
+    const res = await POST(request());
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({
+      error: "recipient_blocked",
+      recipients: ["blocked@example.invalid"],
+    });
     expect(h.enqueue).not.toHaveBeenCalled();
   });
   it("returns conflicts safely and retries an enqueue failure without changing durable approval", async () => {

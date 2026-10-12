@@ -1,4 +1,8 @@
-import { recordSupportViewRead, type WebhookEnqueue } from "@millionsend/core";
+import {
+  MailboxRecipientBlockedError,
+  recordSupportViewRead,
+  type WebhookEnqueue,
+} from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { getDb } from "@millionsend/db";
 import { initTRPC, TRPCError } from "@trpc/server";
@@ -125,7 +129,15 @@ export async function createContext({ headers }: { headers: Headers }): Promise<
   return { ...shared, teamId: membership?.teamId ?? null, role: membership?.role ?? null };
 }
 
-const t = initTRPC.context<Context>().create({ transformer: superjson });
+const t = initTRPC.context<Context>().create({
+  transformer: superjson,
+  // A send refused for recipients that bounced or complained names them, for the owner.
+  errorFormatter({ shape, error }) {
+    return error.cause instanceof MailboxRecipientBlockedError
+      ? { ...shape, data: { ...shape.data, blockedRecipients: error.cause.recipients } }
+      : shape;
+  },
+});
 
 export const router = t.router;
 export const createCallerFactory = t.createCallerFactory;

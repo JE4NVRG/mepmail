@@ -227,28 +227,47 @@ function approvedHashes(teamId: string, recipients: readonly string[], count: nu
 /** Admission/pre-provider check only. A database failure throws so callers can
  * defer before the provider call; it must never imply permission to send.
  */
-export async function checkMailboxRecipientBlocks(
+/**
+ * A send refused because some recipients bounced hard or complained before: still a
+ * "forbidden" content error for every existing caller, carrying the blocked addresses
+ * (the sender's own recipients) so the owner and the agent can be told which.
+ */
+export class MailboxRecipientBlockedError extends MailboxContentError {
+  readonly reason = "recipient_blocked" as const;
+  constructor(readonly recipients: string[]) {
+    super("forbidden");
+  }
+}
+
+/** The recipients of this list that the team's earlier hard bounces or complaints block. */
+export async function mailboxBlockedRecipients(
   db: Db,
   input: { teamId: string; recipients: readonly string[] },
-): Promise<boolean> {
+): Promise<string[]> {
   const teamId = input.teamId;
   const recipients = [...input.recipients];
   if (!recipients.length || recipients.length > MAX_RECIPIENTS)
     throw new MailboxContentError("invalid");
-  const hashes = [
-    ...new Set(recipients.map((recipient) => mailboxRecipientHash(teamId, recipient))),
-  ];
-  const [blocked] = await db
+  const byHash = new Map(
+    recipients.map((recipient) => [mailboxRecipientHash(teamId, recipient), recipient] as const),
+  );
+  const rows = await db
     .select({ recipientHash: mailboxRecipientBlocks.recipientHash })
     .from(mailboxRecipientBlocks)
     .where(
       and(
         eq(mailboxRecipientBlocks.teamId, teamId),
-        inArray(mailboxRecipientBlocks.recipientHash, hashes),
+        inArray(mailboxRecipientBlocks.recipientHash, [...byHash.keys()]),
       ),
-    )
-    .limit(1);
-  return !blocked;
+    );
+  return rows.map((row) => byHash.get(row.recipientHash)).filter((r): r is string => !!r);
+}
+
+export async function checkMailboxRecipientBlocks(
+  db: Db,
+  input: { teamId: string; recipients: readonly string[] },
+): Promise<boolean> {
+  return (await mailboxBlockedRecipients(db, input)).length === 0;
 }
 
 function copyOutboundEvidence(value: MailboxOutboundEvidence): MailboxOutboundEvidence {
@@ -933,8 +952,8 @@ async function queueAuthorizedMailboxDraft(
   if (parsed.from !== box!.address) throw new MailboxContentError("invalid");
   const recipients = [...parsed.to, ...parsed.cc, ...parsed.bcc];
   const recipientHashes = approvedHashes(actor.teamId, recipients, parsed.count);
-  if (!(await checkMailboxRecipientBlocks(tx, { teamId: actor.teamId, recipients })))
-    throw new MailboxContentError("forbidden");
+  const blocked = await mailboxBlockedRecipients(tx, { teamId: actor.teamId, recipients });
+  if (blocked.length) throw new MailboxRecipientBlockedError(blocked);
   const plan = await lockMailboxService(tx, actor.teamId, now);
   if (!plan.unlimitedOutbound) {
     // A "team" quota is shared: every mailbox of the team draws on one allowance.
@@ -1250,8 +1269,8 @@ export async function sendMailboxOutbox(
         JSON.stringify(checkedHashes(row!.recipientHashes)) !== JSON.stringify(recipientHashes)
       )
         throw new MailboxContentError("conflict");
-      if (!(await checkMailboxRecipientBlocks(tx, { teamId: row!.teamId, recipients })))
-        throw new MailboxContentError("forbidden");
+      const blocked = await mailboxBlockedRecipients(tx, { teamId: row!.teamId, recipients });
+      if (blocked.length) throw new MailboxRecipientBlockedError(blocked);
       // Time can advance during decryption/parsing even while credential rows are locked.
       if (credentialExpiresAt && credentialExpiresAt.getTime() <= Date.now())
         throw new MailboxAgentAccessError("forbidden");

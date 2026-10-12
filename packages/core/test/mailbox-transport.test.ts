@@ -14,6 +14,7 @@ import {
   getMailboxOutboundSummary,
   type MailboxOutboundEvidence,
   type MailboxTransportMimeAdapter,
+  mailboxBlockedRecipients,
   mailboxRecipientHash,
   queueMailboxDraft,
   sendMailboxOutbox,
@@ -280,6 +281,15 @@ describe("private Correio outbound outcomes", () => {
     });
     expect(send).not.toHaveBeenCalled();
     await expect(f.queued()).rejects.toThrow("forbidden");
+    // The refusal says why and names the blocked recipient, for the owner and the agent.
+    await expect(f.queued()).rejects.toMatchObject({
+      code: "forbidden",
+      reason: "recipient_blocked",
+      recipients: [f.recipients[0]],
+    });
+    expect(
+      await mailboxBlockedRecipients(db, { teamId: f.teamId, recipients: f.recipients }),
+    ).toEqual([f.recipients[0]]);
     const [other] = await db
       .insert(schema.teams)
       .values({ name: "Other", slug: randomUUID() })

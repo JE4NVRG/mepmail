@@ -26,6 +26,7 @@ import {
   MAILBOX_SEEN_BATCH,
   MailboxAgentAccessError,
   MailboxContentError,
+  MailboxRecipientBlockedError,
   MailboxRegistryError,
   MailboxServiceError,
   mailboxServiceState,
@@ -160,6 +161,10 @@ async function call<T>(run: () => Promise<T>): Promise<T> {
         code: error.code === "invalid" ? "BAD_REQUEST" : "PRECONDITION_FAILED",
         message: error.code,
       });
+    // Which recipients bounced or complained before travels in the error's data
+    // (blockedRecipients, see trpc.ts): the owner sending to them may see them.
+    if (error instanceof MailboxRecipientBlockedError)
+      throw new TRPCError({ code: "FORBIDDEN", message: "recipient_blocked", cause: error });
     if (error instanceof MailboxRegistryError || error instanceof MailboxContentError)
       throw new TRPCError({
         code: {

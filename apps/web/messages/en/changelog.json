@@ -24,6 +24,20 @@
   },
   "releases": [
     {
+      "version": "0.142",
+      "date": "2026-10-12",
+      "title": "A refused send names the blocked recipients",
+      "summary": "When a recipient bounced hard or complained before, a refused send now says so and which addresses, to you and to agents.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "A Correio send to someone who hard-bounced or complained before was refused as \"access denied\". The refusal now says recipient_blocked and lists the blocked addresses; agents over MCP and the API get the same reason."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.141",
       "date": "2026-10-12",
       "title": "Agents see that you approved their send",

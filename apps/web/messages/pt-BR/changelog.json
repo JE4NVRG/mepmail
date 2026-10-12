@@ -24,6 +24,20 @@
   },
   "releases": [
     {
+      "version": "0.142",
+      "date": "2026-10-12",
+      "title": "Envio recusado diz quais destinatários estão bloqueados",
+      "summary": "Quando um destinatário já deu bounce ou reclamou, a recusa do envio agora diz isso e quais endereços, para você e para os agentes.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Um envio do Correio para quem já deu hard bounce ou marcou spam era recusado como \"acesso negado\". Agora a recusa diz recipient_blocked e lista os endereços bloqueados; agentes pelo MCP e pela API recebem o mesmo motivo."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.141",
       "date": "2026-10-12",
       "title": "O agente vê quando você aprovou o envio",

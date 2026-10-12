@@ -10,6 +10,7 @@ import {
   type MailboxAgentCredential,
   type MailboxAgentScope,
   MailboxContentError,
+  MailboxRecipientBlockedError,
   type MailboxSelector,
   MailboxServiceError,
   parseMailboxSelector,
@@ -384,6 +385,12 @@ async function mailboxAgentBearerRequest<T>(
       );
     if (error instanceof MailboxAgentAccessError && error.code === "invalid")
       return Response.json({ error: "invalid" }, { status: 400, headers: MAILBOX_AGENT_HEADERS });
+    // The agent put these recipients in the draft itself; it learns which ones are blocked.
+    if (error instanceof MailboxRecipientBlockedError)
+      return Response.json(
+        { error: "recipient_blocked", recipients: error.recipients },
+        { status: 403, headers: MAILBOX_AGENT_HEADERS },
+      );
     const status =
       error instanceof MailboxAgentAccessError
         ? 403
