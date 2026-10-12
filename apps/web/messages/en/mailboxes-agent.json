@@ -180,7 +180,16 @@
       "confirm": "{count, plural, one {Send to # recipient?} other {Send to # recipients?}}",
       "discardConfirm": "The draft goes to Trash and is not sent.",
       "sent": "Send approved. It is going out now.",
-      "discarded": "Draft discarded."
+      "discarded": "Draft discarded.",
+      "errors": {
+        "recipientBlocked": "Not sent: one of the recipients is blocked because an earlier message to them bounced (address doesn't exist or refused it). Open the draft, remove that recipient and send again.",
+        "recipientBlockedNamed": "Not sent: {recipients} is blocked because an earlier message bounced (address doesn't exist or refused it). Open the draft, remove that recipient and send again.",
+        "quota": "Not sent: the plan reached this period's limit. The draft is kept.",
+        "trialLimit": "Not sent: the free trial reached its sending limit for now. The draft is kept.",
+        "unavailable": "Not sent: MepMail Mail sending is unavailable right now. Try again in a few minutes.",
+        "forbidden": "Not sent: this mailbox can't send right now (domain not verified, mailbox suspended or access changed).",
+        "generic": "Not sent. Nothing went out; try again."
+      }
     },
     "agents": {
       "title": "Agents with access",

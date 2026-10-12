@@ -1186,6 +1186,8 @@
     "download": "Download invite (.ics)"
   },
   "trialLimit": "The free trial reached its sending limit for now (up to 50 recipients a day and 200 in total). Nothing was sent and the draft is still saved; the limit lifts once the first invoice is paid.",
+  "recipientBlocked": "Not sent: one of the recipients is blocked because an earlier message to them bounced (address doesn't exist or refused it). Remove that recipient and send again; the draft is kept.",
+  "recipientBlockedNamed": "Not sent: {recipients} is blocked because an earlier message bounced (address doesn't exist or refused it). Remove that recipient and send again; the draft is kept.",
   "attachmentsLeftBehind": "{count, plural, one {This attachment stays behind because it is over 256 KB, the sending limit: {names}.} other {These attachments stay behind because they are over 256 KB, the sending limit: {names}.}}",
   "planQuota": "The plan reached this period's limit (recipients or data sent, or storage). Nothing was sent and the draft is still saved.",
   "viewPlans": "See plans",

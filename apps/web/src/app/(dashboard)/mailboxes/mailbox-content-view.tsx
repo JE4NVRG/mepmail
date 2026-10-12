@@ -2966,6 +2966,26 @@ export function MailboxContentView({
           });
         return;
       }
+      // A recipient whose earlier mail bounced for good: nothing went out, the draft
+      // stays to be fixed (that recipient removed) and sent again.
+      if (code === "FORBIDDEN" && /recipient_blocked/.test((cause as Error)?.message ?? "")) {
+        attempted.current.delete(key);
+        const blocked = (cause as { data?: { blockedRecipients?: unknown } })?.data
+          ?.blockedRecipients;
+        const named = Array.isArray(blocked) ? blocked.filter((v) => typeof v === "string") : [];
+        toast(
+          named.length
+            ? t("recipientBlockedNamed", { recipients: named.join(", ") })
+            : t("recipientBlocked"),
+          "danger",
+        );
+        if (mounted.current)
+          setSendStates((states) => {
+            const { [key]: _blocked, ...rest } = states;
+            return rest;
+          });
+        return;
+      }
       if (!mounted.current) return;
       if (code === "FORBIDDEN") {
         setSendStates((states) => ({ ...states, [key]: "unknown" }));

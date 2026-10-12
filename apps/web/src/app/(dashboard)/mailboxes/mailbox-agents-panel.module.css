@@ -169,3 +169,14 @@
 .pending:hover {
   border-color: var(--ms-accent, #bd9aff);
 }
+
+/* Why an approved send did not go out (blocked recipient, plan limit…). */
+.sendError {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--ms-danger);
+  border-radius: var(--ms-r-input);
+  color: var(--ms-danger);
+  font-size: var(--ms-fs-label);
+  line-height: 1.5;
+}

@@ -63,9 +63,8 @@ export function ConsentForm({
   const [granted, setGranted] = useState(
     () => new Set(scopes.filter((scope) => scope !== MAIL_SEND)),
   );
-  const [boxes, setBoxes] = useState<Set<string>>(
-    () => new Set((mailboxes[defaultTeamId ?? teams[0]?.teamId ?? ""] ?? []).map((box) => box.id)),
-  );
+  // Nothing is pre-ticked: the person names each mailbox this app may use.
+  const [boxes, setBoxes] = useState<Set<string>>(() => new Set());
   const [pending, setPending] = useState<"allow" | "deny" | null>(null);
   const [failed, setFailed] = useState(false);
   const appName = app?.name || t("unknownApp");
@@ -185,7 +184,7 @@ export function ConsentForm({
               value={teamId}
               onChange={(next) => {
                 setTeamId(next);
-                setBoxes(new Set((mailboxes[next] ?? []).map((box) => box.id)));
+                setBoxes(new Set());
               }}
               options={[
                 ...teams.map((team) => ({ value: team.teamId, label: team.teamName })),
@@ -236,6 +235,29 @@ export function ConsentForm({
             style={{ border: 0, padding: 0, margin: 0 }}
           >
             <legend className="ms-microlabel">{t("mailboxes")}</legend>
+            <span style={{ fontSize: "var(--ms-fs-micro)", color: "var(--ms-faint)" }}>
+              {t("mailboxesChoose")}
+            </span>
+            {teamBoxes.length > 1 ? (
+              <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="ms-btn ms-btn-ghost ms-btn-sm"
+                  disabled={pending !== null || teamBoxes.every((box) => boxes.has(box.id))}
+                  onClick={() => setBoxes(new Set(teamBoxes.map((box) => box.id)))}
+                >
+                  {t("mailboxesAll")}
+                </button>
+                <button
+                  type="button"
+                  className="ms-btn ms-btn-ghost ms-btn-sm"
+                  disabled={pending !== null || !teamBoxes.some((box) => boxes.has(box.id))}
+                  onClick={() => setBoxes(new Set())}
+                >
+                  {t("mailboxesNone")}
+                </button>
+              </div>
+            ) : null}
             <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
               {teamBoxes.map((box) => (
                 <label
@@ -272,6 +294,15 @@ export function ConsentForm({
             <span style={{ fontSize: "var(--ms-fs-micro)", color: "var(--ms-faint)" }}>
               {t(granted.has(MAIL_SEND) ? "mailboxesSendNote" : "mailboxesNote")}
             </span>
+            {/* Why Allow is disabled: mail permissions ticked, no mailbox chosen. */}
+            {!teamBoxes.some((box) => boxes.has(box.id)) ? (
+              <span
+                role="status"
+                style={{ fontSize: "var(--ms-fs-micro)", color: "var(--ms-warn, var(--ms-faint))" }}
+              >
+                {t("mailboxesPick")}
+              </span>
+            ) : null}
           </fieldset>
         ) : null}
         {failed ? (

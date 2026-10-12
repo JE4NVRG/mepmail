@@ -40,6 +40,8 @@ export function MailboxAgentsPanel({
     trpc.mailboxes.revokeTeamAgentKey.mutationOptions({ gcTime: 0 }),
   );
   const [confirming, setConfirming] = useState<string | null>(null);
+  // Why the last approval of a card did not go out, shown on that card.
+  const [sendError, setSendError] = useState<{ itemId: string; message: string } | null>(null);
   const busy =
     send.isPending || discard.isPending || revokeKey.isPending || revokeCredential.isPending;
   const when = (value: Date | string) =>
@@ -51,6 +53,37 @@ export function MailboxAgentsPanel({
   const failed = (cause: unknown) => {
     const code = (cause as { data?: { code?: string } })?.data?.code;
     toast(t(code === "CONFLICT" ? "changed" : "error"), "warn");
+    void refresh();
+  };
+  /** An approval the server refused: nothing went out; say why on the card. */
+  const sendFailed = (itemId: string, cause: unknown) => {
+    const code = (cause as { data?: { code?: string } })?.data?.code;
+    const reason = cause instanceof Error ? cause.message : "";
+    if (code === "CONFLICT") {
+      failed(cause);
+      return;
+    }
+    const key =
+      code === "FORBIDDEN" && /recipient_blocked/.test(reason)
+        ? "recipientBlocked"
+        : code === "PRECONDITION_FAILED" && reason === "quota"
+          ? "quota"
+          : code === "PRECONDITION_FAILED" && reason === "trial_limit"
+            ? "trialLimit"
+            : code === "PRECONDITION_FAILED" && reason === "mailbox_transport_unavailable"
+              ? "unavailable"
+              : code === "FORBIDDEN"
+                ? "forbidden"
+                : "generic";
+    // The server names the blocked addresses (data.blockedRecipients) when it can.
+    const blocked = (cause as { data?: { blockedRecipients?: unknown } })?.data?.blockedRecipients;
+    const named = Array.isArray(blocked) ? blocked.filter((v) => typeof v === "string") : [];
+    const message =
+      key === "recipientBlocked" && named.length
+        ? t("approvals.errors.recipientBlockedNamed", { recipients: named.join(", ") })
+        : t(`approvals.errors.${key}`);
+    setSendError({ itemId, message });
+    toast(message, "danger");
     void refresh();
   };
   const data = overview.data;
@@ -117,6 +150,11 @@ export function MailboxAgentsPanel({
                     ) : null}
                   </dl>
                   {item.preview ? <p className={own.preview}>{item.preview}</p> : null}
+                  {sendError?.itemId === item.itemId ? (
+                    <p className={own.sendError} role="alert">
+                      {sendError.message}
+                    </p>
+                  ) : null}
                   {confirming === key ? (
                     <div className={own.actions}>
                       <span>{t("approvals.confirm", { count: recipients })}</span>
@@ -133,6 +171,7 @@ export function MailboxAgentsPanel({
                         className="ms-btn ms-btn-primary ms-btn-sm"
                         disabled={busy}
                         onClick={async () => {
+                          setSendError(null);
                           try {
                             await send.mutateAsync({
                               mailboxId: item.mailboxId,
@@ -143,7 +182,8 @@ export function MailboxAgentsPanel({
                             toast(t("approvals.sent"));
                             await refresh();
                           } catch (cause) {
-                            failed(cause);
+                            setConfirming(null);
+                            sendFailed(item.itemId, cause);
                           }
                         }}
                       >
