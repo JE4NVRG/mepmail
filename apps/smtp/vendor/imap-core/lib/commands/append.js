@@ -193,7 +193,14 @@ module.exports = {
                 });
             }
 
-            let code = typeof success === 'string' ? success.toUpperCase() : 'APPENDUID ' + info.uidValidity + ' ' + info.uid;
+            // MepMail: APPENDUID only when the handler knows the new UID (UIDPLUS is optional;
+            // a mail just sent over SMTP whose copy is recognised has none of its own).
+            let code =
+                typeof success === 'string'
+                    ? success.toUpperCase()
+                    : info && info.uidValidity && info.uid
+                      ? 'APPENDUID ' + info.uidValidity + ' ' + info.uid
+                      : undefined;
 
             logdata._response = success;
             this._server.loggelf(logdata);

@@ -251,6 +251,37 @@ describe("IMAP with an app password", () => {
     }
   });
 
+  it("answers OK to the copy of a mail just sent (no APPENDUID) and keeps serving", async () => {
+    // 2026-10-12: Outlook saved its Sent copy right after sending over SMTP; the answer had
+    // no APPENDUID info, imap-core threw and the whole process (relay included) went down.
+    const justSent = createMailboxImapServer({
+      db,
+      keyring,
+      passwordKey,
+      recentlySent: () => true,
+    });
+    await new Promise<void>((resolve) => justSent.listen(0, "127.0.0.1", resolve));
+    const justSentPort = (justSent.server.address() as AddressInfo).port;
+    try {
+      const client = await TestImapClient.open(justSentPort);
+      expect((await client.send(`LOGIN jean@box.test "${password}"`)).status).toMatch(/OK/);
+      const append = await client.send(
+        "APPEND Sent (\\Seen)",
+        mime("saida", "Enviada pelo Outlook"),
+      );
+      expect(append.status).toMatch(/^T\d+ OK/);
+      expect(append.status).not.toMatch(/APPENDUID/);
+      // The same connection and a new one still get answers.
+      expect((await client.send("NOOP")).status).toMatch(/OK/);
+      const other = await TestImapClient.open(justSentPort);
+      expect((await other.send(`LOGIN jean@box.test "${password}"`)).status).toMatch(/OK/);
+      other.close();
+      client.close();
+    } finally {
+      await new Promise<void>((resolve) => justSent.close(() => resolve()));
+    }
+  });
+
   it("ends a session when its password is revoked", async () => {
     const client = await signedIn();
     await db.update(schema.mailboxAppPasswords).set({ revokedAt: new Date() });

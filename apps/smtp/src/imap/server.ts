@@ -158,11 +158,20 @@ export function createMailboxImapServer(deps: MailboxImapDeps): ImapServer {
     callback: (err: Error | null, ...result: unknown[]) => void,
     map: (value: T) => unknown[],
   ) => {
+    // imap-core's callbacks write the answer; one that throws must never become an
+    // unhandled rejection: this process also serves the SMTP relay and submission.
+    const answer = (...args: [Error | null, ...unknown[]]) => {
+      try {
+        callback(...args);
+      } catch (error) {
+        console.error("imap callback error", error);
+      }
+    };
     promise.then(
-      (value) => callback(null, ...map(value)),
+      (value) => answer(null, ...map(value)),
       (err: unknown) => {
         if (!(err instanceof Error && "response" in err)) console.error("imap handler error", err);
-        callback(err instanceof Error ? err : new Error(String(err)));
+        answer(err instanceof Error ? err : new Error(String(err)));
       },
     );
   };
@@ -690,6 +699,8 @@ export function createMailboxImapServer(deps: MailboxImapDeps): ImapServer {
             recentlySent: (key) => deps.recentlySent?.(c.identity.mailboxId, key) ?? false,
           },
         );
+        // A copy of mail this process just sent: nothing is added, and there may be no UID
+        // yet (the send is still going out). OK without APPENDUID is valid.
         if (!added) return { code: true as const, info: undefined };
         const dest = await destinationUids(c, folder.key, [added.itemId]);
         if (flags.some((f) => f.toLowerCase() === "\\flagged")) {

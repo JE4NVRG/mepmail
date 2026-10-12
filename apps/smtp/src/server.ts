@@ -59,6 +59,12 @@ server.listen(env.SMTP_PORT, () => {
   console.log(`mepmail smtp listening on :${env.SMTP_PORT}`);
 });
 
+// One process serves the relay, submission and IMAP: a promise someone forgot to handle
+// is logged, never allowed to take the customers' relay down with it.
+process.on("unhandledRejection", (reason) => {
+  console.error("smtp process: unhandled rejection", reason);
+});
+
 // Correio in mail clients (specs/correio-imap-smtp.md): submission with an app password,
 // TLS from the first byte and STARTTLS (the host maps 465 and 587 onto these ports). Off
 // unless MAILBOX_SUBMISSION_ENABLED=1 with its own keypair for smtp.mepmail.dev.

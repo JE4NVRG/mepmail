@@ -23,4 +23,6 @@ Changes from upstream:
 - `lib/tls-options.js`: upstream's built-in default key and certificate (publicly known)
   are removed, so there is no TLS without the caller's keypair (fail closed), and the
   minimum TLS version is 1.2 instead of 1.0.
+- `lib/commands/append.js`: answers OK without APPENDUID when the handler gives no new UID
+  (upstream read `info.uidValidity` unconditionally and threw).
 - `test/` is left out.
