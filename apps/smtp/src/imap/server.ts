@@ -111,7 +111,8 @@ export function createMailboxImapServer(deps: MailboxImapDeps): ImapServer {
   const fail = (key: string) => failures.set(key, [...(failures.get(key) ?? []), now()]);
 
   const server = new IMAPServer({
-    ...(deps.tls ? { key: deps.tls.key, cert: deps.tls.cert } : {}),
+    // TLS 1.2 or later only (the vendored defaults carry no keypair: no handshake without ours).
+    ...(deps.tls ? { key: deps.tls.key, cert: deps.tls.cert, minVersion: "TLSv1.2" } : {}),
     secure: deps.secure ?? false,
     // imap-core installs its default SNI handler only for servers that are not secure,
     // yet its TLS-from-the-first-byte path (993) calls one on every connection: answer

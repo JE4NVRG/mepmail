@@ -16,11 +16,19 @@ import { router, teamProcedure } from "../trpc";
 /**
  * The Correio in other mail apps (specs/correio-imap-smtp.md): the mailbox owner's app
  * passwords and the server settings to type into Outlook, Apple Mail, Thunderbird or the
- * Gmail app. Offered only once the IMAP/SMTP servers are live
- * (MAILBOX_CLIENT_ACCESS_OPEN=1) and the deployment has a master key.
+ * Gmail app. Offered once the IMAP/SMTP servers are live: to every team with
+ * MAILBOX_CLIENT_ACCESS_OPEN=1, before that only to the pilot teams listed in
+ * MAILBOX_CLIENT_ACCESS_TEAM_IDS; never without a master key.
  */
-export function mailboxClientAccessOpen() {
-  return process.env.MAILBOX_CLIENT_ACCESS_OPEN === "1" && mailboxAppPasswordKey() !== null;
+export function mailboxClientAccessOpen(teamId: string) {
+  if (mailboxAppPasswordKey() === null) return false;
+  if (process.env.MAILBOX_CLIENT_ACCESS_OPEN === "1") return true;
+  // Pilot: only these teams see it until it opens to everyone (comma-separated ids).
+  return (process.env.MAILBOX_CLIENT_ACCESS_TEAM_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .includes(teamId);
 }
 
 const settings = () => ({
@@ -40,7 +48,7 @@ const settings = () => ({
 });
 
 const open = teamProcedure.use(async ({ ctx, next }) => {
-  if (!mailboxClientAccessOpen()) throw new TRPCError({ code: "NOT_FOUND" });
+  if (!mailboxClientAccessOpen(ctx.teamId)) throw new TRPCError({ code: "NOT_FOUND" });
   if (
     !(await mailboxActorAccessEnabled(ctx.db, { teamId: ctx.teamId, userId: ctx.session.user.id }))
   )
@@ -102,7 +110,10 @@ async function call<T>(run: () => Promise<T>): Promise<T> {
 
 export const mailboxClientsRouter = router({
   /** Whether to show "Usar em outro app de e-mail" at all, and what to type there. */
-  settings: teamProcedure.query(() => ({ open: mailboxClientAccessOpen(), ...settings() })),
+  settings: teamProcedure.query(({ ctx }) => ({
+    open: mailboxClientAccessOpen(ctx.teamId),
+    ...settings(),
+  })),
   appPasswords: open
     .input(z.object({ mailboxId: z.uuid() }).strict())
     .query(async ({ ctx, input }) =>

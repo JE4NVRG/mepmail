@@ -58,8 +58,12 @@ async function connectRaw(port: number) {
   return raw;
 }
 
-async function startTls(socket: net.Socket, servername: string) {
-  const secure = tls.connect({ socket, servername, ca: keypair.cert });
+async function startTls(
+  socket: net.Socket,
+  servername: string,
+  options: tls.ConnectionOptions = {},
+) {
+  const secure = tls.connect({ socket, servername, ca: keypair.cert, ...options });
   await new Promise<void>((resolve, reject) => {
     secure.once("secureConnect", resolve);
     secure.once("error", reject);
@@ -98,6 +102,8 @@ beforeAll(async () => {
     });
   for (const secure of [true, false]) {
     const server = submission(secure);
+    // Refused handshakes (the TLS 1.1 check) are reported here, as server.ts logs them.
+    server.on("error", () => {});
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const port = (server.server.address() as AddressInfo).port;
     if (secure) tlsPort = port;
@@ -108,6 +114,13 @@ beforeAll(async () => {
 afterAll(async () => {
   for (const server of servers) await new Promise<void>((resolve) => server.close(() => resolve()));
 });
+
+/** A client that would settle for TLS 1.1 (security level 0 so the client side allows it). */
+const tls11 = {
+  maxVersion: "TLSv1.1",
+  minVersion: "TLSv1",
+  ciphers: "DEFAULT:@SECLEVEL=0",
+} as const;
 
 describe("behind the host's proxy, with real TLS", () => {
   it("IMAP on 993 answers after the PROXY line and TLS from the first byte", async () => {
@@ -142,5 +155,21 @@ describe("behind the host's proxy, with real TLS", () => {
     secure.write("EHLO client.example\r\n");
     expect(await until(secure, /^250 /m)).toMatch(/AUTH PLAIN LOGIN/);
     secure.destroy();
+  });
+
+  it("refuses TLS older than 1.2 on 993, 465 and 587", async () => {
+    await expect(startTls(await connectRaw(imapPort), "localhost", tls11)).rejects.toThrow();
+    await expect(startTls(await connectRaw(tlsPort), "localhost", tls11)).rejects.toThrow();
+    const raw = await connectRaw(starttlsPort);
+    await until(raw, /^220 /m);
+    raw.write("EHLO client.example\r\n");
+    await until(raw, /^250 /m);
+    raw.write("STARTTLS\r\n");
+    await until(raw, /^220 /m);
+    await expect(startTls(raw, "localhost", tls11)).rejects.toThrow();
+    // And what a mail app gets: TLS 1.2 or 1.3.
+    const modern = await startTls(await connectRaw(imapPort), "localhost");
+    expect(["TLSv1.2", "TLSv1.3"]).toContain(modern.getProtocol());
+    modern.destroy();
   });
 });

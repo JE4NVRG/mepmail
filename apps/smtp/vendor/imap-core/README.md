@@ -20,4 +20,7 @@ Changes from upstream:
   `lib/imap-server.js`, `lib/imap-command.js`, `lib/commands/id.js`, `lib/commands/store.js`).
 - `lib/imap-tools.js`: `options.disabledCapabilities` leaves capabilities out of the
   CAPABILITY response (MepMail leaves out CONDSTORE and QUOTA).
+- `lib/tls-options.js`: upstream's built-in default key and certificate (publicly known)
+  are removed, so there is no TLS without the caller's keypair (fail closed), and the
+  minimum TLS version is 1.2 instead of 1.0.
 - `test/` is left out.

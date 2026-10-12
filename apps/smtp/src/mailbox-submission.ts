@@ -174,7 +174,12 @@ export function createMailboxSubmissionServer(deps: MailboxSubmissionDeps): SMTP
   const fail = (key: string) => failures.set(key, [...(failures.get(key) ?? []), now()]);
   return new SMTPServer({
     ...(deps.tls
-      ? { key: deps.tls.key, cert: deps.tls.cert, secure: deps.secure ?? false }
+      ? {
+          key: deps.tls.key,
+          cert: deps.tls.cert,
+          secure: deps.secure ?? false,
+          minVersion: "TLSv1.2",
+        }
       : { hideSTARTTLS: true, allowInsecureAuth: deps.allowInsecureAuth ?? false }),
     ...(deps.proxyProtocol ? { useProxy: true } : {}),
     name: "smtp.mepmail.dev",
