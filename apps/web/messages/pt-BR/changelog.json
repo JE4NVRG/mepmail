@@ -24,6 +24,20 @@
   },
   "releases": [
     {
+      "version": "0.141",
+      "date": "2026-10-12",
+      "title": "O agente vê quando você aprovou o envio",
+      "summary": "Depois que você aprova e envia um rascunho de agente, o mailbox_send_draft passa a devolver o status real do envio.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "Um agente sem permissão de envio que chamava mailbox_send_draft de novo, depois da sua aprovação, recebia \"aguardando aprovação\". Agora recebe o status do envio (na fila, enviando, aceito ou falhou), sem pedir de novo."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.140",
       "date": "2026-10-12",
       "title": "E-mails com texto vazio agora são lidos",

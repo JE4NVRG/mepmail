@@ -112,6 +112,8 @@ describe("agent send without the send permission", () => {
     h.answers.push(
       [{ label: "Sage", scopes: ["read", "draft"] }],
       [{ kind: "draft", revision: 3, trashedAt: null }],
+      // No send of this revision yet.
+      [],
       [],
       [{ address: "agente@piloto.mepmail.dev", ownerEmail: "dono@example.com" }],
     );
@@ -139,10 +141,42 @@ describe("agent send without the send permission", () => {
     });
   });
 
+  it("reports the owner's send once that revision went out, not a new request", async () => {
+    h.answers.push(
+      [{ label: "Sage", scopes: ["read", "draft"] }],
+      [{ kind: "draft", revision: 3, trashedAt: null }],
+      [
+        {
+          id: "out-1",
+          mailboxId,
+          draftId: itemId,
+          draftRevision: 3,
+          status: "accepted",
+          recipientCount: 1,
+          acceptedAt: "2026-10-12T22:12:10.000Z",
+          errorCode: null,
+        },
+      ],
+    );
+    const res = await send();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      status: "accepted",
+      id: "out-1",
+      draftId: itemId,
+      draftRevision: 3,
+      duplicate: true,
+    });
+    expect(h.audit).not.toHaveBeenCalled();
+    expect(h.mail).not.toHaveBeenCalled();
+  });
+
   it("answers a repeated request as a duplicate, without a second record or notice", async () => {
     h.answers.push(
       [{ label: "Sage", scopes: ["read", "draft"] }],
       [{ kind: "draft", revision: 3, trashedAt: null }],
+      // No send of this revision yet.
+      [],
       [{ id: 1 }],
       [{ address: "agente@piloto.mepmail.dev", ownerEmail: "dono@example.com" }],
     );
@@ -157,6 +191,8 @@ describe("agent send without the send permission", () => {
     h.answers.push(
       [{ label: "Sage", scopes: ["read", "draft"] }],
       [{ kind: "draft", revision: 3, trashedAt: null }],
+      // No send of this revision yet.
+      [],
       [],
       [{ address: "suporte@mepmail.dev", ownerEmail: "dono@example.com" }],
     );

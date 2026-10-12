@@ -208,6 +208,30 @@ async function requestMailboxSendApproval(
       if (!item || item.kind !== "draft" || item.trashedAt)
         throw new MailboxContentError("not_found");
       if (item.revision !== input.expectedRevision) throw new MailboxContentError("conflict");
+      // Once the owner sent this revision, asking again reports that send (queued,
+      // sending, accepted, unknown or failed), never a new approval request.
+      const [submitted] = await context.db
+        .select({
+          id: schema.mailboxOutbox.id,
+          mailboxId: schema.mailboxOutbox.mailboxId,
+          draftId: schema.mailboxOutbox.draftId,
+          draftRevision: schema.mailboxOutbox.draftRevision,
+          status: schema.mailboxOutbox.status,
+          recipientCount: schema.mailboxOutbox.recipientCount,
+          acceptedAt: schema.mailboxOutbox.acceptedAt,
+          errorCode: schema.mailboxOutbox.errorCode,
+        })
+        .from(schema.mailboxOutbox)
+        .where(
+          and(
+            eq(schema.mailboxOutbox.teamId, context.actor.teamId),
+            eq(schema.mailboxOutbox.mailboxId, context.mailboxId),
+            eq(schema.mailboxOutbox.draftId, input.id),
+            eq(schema.mailboxOutbox.draftRevision, input.expectedRevision),
+          ),
+        )
+        .limit(1);
+      if (submitted) return { submitted };
       const [prior] = await context.db
         .select({ id: schema.auditLog.id })
         .from(schema.auditLog)
@@ -248,6 +272,7 @@ async function requestMailboxSendApproval(
     mailbox,
   );
   if (!facts) return null;
+  if ("submitted" in facts) return { ...facts.submitted, duplicate: true };
   if (!facts.duplicate && facts.ownerEmail && facts.address) {
     // Best-effort notice, outside the authorization transaction.
     try {

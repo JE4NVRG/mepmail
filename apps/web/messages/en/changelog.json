@@ -24,6 +24,20 @@
   },
   "releases": [
     {
+      "version": "0.141",
+      "date": "2026-10-12",
+      "title": "Agents see that you approved their send",
+      "summary": "After you approve and send an agent's draft, mailbox_send_draft returns that send's real status.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "An agent without the send permission that called mailbox_send_draft again after your approval was told \"awaiting approval\". It now gets the send's status (queued, sending, accepted or failed) and never asks again."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.140",
       "date": "2026-10-12",
       "title": "Mail with a blank text part is now readable",
