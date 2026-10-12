@@ -55,8 +55,10 @@ agents cost the same.
 1. Select the organization and domain in the dashboard.
 2. Open **Mail**, confirm the license period and available seats, then create a
    person or agent mailbox with a current owner.
-3. Wait for the operator to confirm domain and transport readiness before moving
-   existing email traffic. Creating a mailbox does not change your domain's MX.
+3. Before moving your existing email, create every mailbox and alias the domain
+   receives and only then switch MX; then turn receiving on in
+   **Mail → Receiving**, which checks the MX. Creating a mailbox does not change
+   the domain's MX.
 4. For an agent, select the mailbox, open **Agent access** and create a key for it. The
    owner selects read, draft and, optionally, send permissions. Store the key
    privately when it appears; it is displayed once.
@@ -69,7 +71,7 @@ not provide access to this mailbox API.
 
 When subscription management is enabled for your deployment and contract,
 organization owners and admins can use the controls in the Mail dashboard.
-If they are unavailable, consult the installation operator; do not start another
+If they are unavailable, contact support (suporte@mepmail.dev) or, on your own installation, its operator; do not start another
 purchase to work around unavailable controls.
 
 - **Change plan:** a larger plan applies at once and charges the prorated
@@ -85,7 +87,7 @@ purchase to work around unavailable controls.
   period end and removes a scheduled future reduction. Use **Resume renewal**
   before that date when the option is available.
 - **Pending or unconfirmed:** use **Refresh status** to check the same operation.
-  If it remains unresolved, consult the operator; do not start another charge
+  If it remains unresolved, contact support or your installation's operator; do not start another charge
   or subscription to work around it.
 
 Stored messages are preserved; reading and export still require current mailbox
@@ -131,8 +133,13 @@ const { items, limited } = await response.json();
 ```
 
 The key selects one mailbox; the caller does not supply a team or mailbox ID.
-Use `folder=inbox`, `drafts` or `sent` to list messages. The list returns up to 50
-items and a `limited` flag; this API currently has no pagination cursor. To read
+Use `folder=inbox`, `drafts` or `sent` to list messages, newest first. The list
+returns up to `limit` items (default 50, at most 100), a `limited` flag and
+`nextCursor`: pass it as `cursor` for the next page. A team key (`mmt_`) covers
+several of your mailboxes: list them with `GET /api/mailbox-agent/mailboxes` and
+name the mailbox on each call with the `MepMail-Mailbox` header (id or address),
+unless the key has a default; see the recipe
+[One agent, several mailboxes](/recipes#one-agent-several-mailboxes). To read
 a message's content and attachment metadata, use
 `GET /api/mailbox-agent/items?id=<message UUID>` with the same read permission.
 The response does not include attachment file contents.
@@ -189,7 +196,7 @@ revision:
 A `202` response means the request was admitted to the outbox. Repeating the same
 draft revision can return the existing outbox with `duplicate: true` and `200`;
 it does not create a new message. Admission and provider acceptance do not prove
-delivery. An `unknown` result requires operator investigation; do not create
+delivery. An `unknown` result needs investigation: contact support or the operator; do not create
 another draft or automate a resend to work around it.
 
 ### Owner approval
@@ -213,7 +220,7 @@ person in the loop: create the agent key without the send permission.
 | `404` | Confirm the deployment feature is enabled and the requested message exists. |
 | `409` | Reload the draft and confirm the current license, storage and outbound allowance. |
 | `413` | Reduce the request size or attachments. |
-| `503` | Preserve the saved draft and consult the operator; do not assume a send was discarded. |
+| `503` | Preserve the saved draft and contact support or the operator; do not assume a send was discarded. |
 
 Revoke a lost key from the mailbox panel. Ownership and membership changes are
 checked again by the server; copying a key to another agent does not grant a

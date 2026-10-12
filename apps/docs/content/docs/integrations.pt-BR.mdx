@@ -3,9 +3,11 @@ title: Integrações
 description: n8n, Slack, Discord, Telegram, MCP, o relay SMTP e a API — como o MepMail se encaixa nas ferramentas que você já roda.
 ---
 
-O MepMail é um pipeline de envio com várias portas. Tudo nesta página usa os
-mesmos domínios, API keys, supressões, cotas e logs da REST API — não existe
-um segundo sistema para manter sincronizado.
+O MepMail tem várias portas para os mesmos domínios, supressões, cotas e logs da
+REST API, sem um segundo sistema para manter sincronizado. Cada porta usa a
+credencial do que faz: chave de Envio (`ms_`) para API, SMTP e o node do n8n;
+chave de caixa (`mmb_` ou `mmt_`) para agentes no Correio; OAuth no MCP
+hospedado. As [receitas](/pt-BR/recipes) mostram cada caminho de ponta a ponta.
 
 ## n8n
 
@@ -54,16 +56,25 @@ os eventos que o time acompanha — `email.bounced`, `email.complained`,
 ## Servidor MCP
 
 Agentes de IA — Claude Code, Cursor, VS Code, qualquer cliente MCP — operam a
-plataforma por 22 ferramentas, no mesmo pipeline. Veja
+plataforma pelas ferramentas do MCP, no mesmo pipeline. Veja
 [Servidor MCP](/pt-BR/mcp) para o endpoint Streamable HTTP em `/mcp` e o
 pacote stdio no npm.
 
 ## Relay SMTP
 
-Qualquer aplicação que fale SMTP — WordPress, WooCommerce, Ghost, Strapi,
-Supabase, stacks antigas — envia pelo relay com host, porta e credenciais (TLS
-obrigatório). Os mesmos domínios, supressões, tracking e logs da API. Veja
-[Auto-hospedagem → Relay SMTP](/pt-BR/self-hosting#relay-smtp).
+Qualquer aplicação que fale SMTP — Ghost, Strapi, Supabase Auth, stacks antigas,
+e WordPress ou WooCommerce por um plugin de SMTP comum — envia pelo relay. Os
+mesmos domínios, supressões, tracking e logs da API.
+
+| Configuração | MepMail Cloud |
+| --- | --- |
+| Host | `smtp.mepmail.dev` |
+| Porta | `2587` (STARTTLS, TLS obrigatório) |
+| Usuário | `mepmail` |
+| Senha | uma chave de Envio (`ms_...`), de preferência só de envio |
+
+O painel mostra os mesmos valores em **Configurações → SMTP**. Numa instalação
+própria, veja [Auto-hospedagem → Relay SMTP](/pt-BR/self-hosting#relay-smtp).
 
 ## SDKs e migração drop-in
 

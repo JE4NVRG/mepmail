@@ -24,6 +24,28 @@
   },
   "releases": [
     {
+      "version": "0.129",
+      "date": "2026-10-12",
+      "title": "Receitas: quatro integrações executadas de ponta a ponta",
+      "summary": "As docs ganham quatro receitas, cada uma com produto, credencial, eventos, erros e as respostas que obtivemos rodando em produção: agente de suporte com aprovação humana, triagem sem envio, um agente em várias caixas e notificações de SaaS.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "docs.mepmail.dev/pt-BR/recipes: agente de suporte que rascunha respostas e espera a aprovação do dono, triagem só de leitura, chave mmt_ em várias caixas com o cabeçalho MepMail-Mailbox, e notificações de recuperação de senha pela API de Envio com chave de idempotência."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "As docs da API do Correio descrevem a paginação (limit até 100 e nextCursor), as chaves de equipe e a ordem da migração: criar todas as caixas e apelidos, trocar o MX e então ativar o recebimento.",
+            "As docs de integrações mostram o relay SMTP da nuvem (smtp.mepmail.dev, porta 2587, usuário mepmail, uma chave de Envio como senha) e dizem qual credencial cada integração usa.",
+            "A skill para agentes descreve os planos próprios do Correio e as chaves mmt_."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.128",
       "date": "2026-10-12",
       "title": "Listas, uso e pausas dizem o que de fato acontece",

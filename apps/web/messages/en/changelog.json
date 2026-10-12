@@ -24,6 +24,28 @@
   },
   "releases": [
     {
+      "version": "0.129",
+      "date": "2026-10-12",
+      "title": "Recipes: four integrations, run end to end",
+      "summary": "The docs gain four recipes, each with its product, credential, events, errors and the responses we got running it in production: a support agent with human approval, triage without send, one agent over several mailboxes, and SaaS notifications.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "docs.mepmail.dev/recipes: a support agent that drafts replies and waits for the owner's approval, read-only triage, an mmt_ key over several mailboxes with the MepMail-Mailbox header, and password-reset notifications through the Send API with an idempotency key."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "The Mail API docs describe its pagination (limit up to 100 and nextCursor) and team keys, and the migration order: create every mailbox and alias, switch MX, then turn receiving on.",
+            "The integrations docs list the cloud SMTP relay (smtp.mepmail.dev, port 2587, username mepmail, a Send key as the password) and say which credential each integration uses.",
+            "The agent skill describes Mail's own plans and the mmt_ keys."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.128",
       "date": "2026-10-12",
       "title": "Lists, usage and holds say what really happens",

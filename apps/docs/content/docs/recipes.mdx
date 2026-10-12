@@ -1,0 +1,211 @@
+---
+title: Recipes
+description: Four end-to-end integrations — a support agent with human approval, triage without send, one agent over several mailboxes, and SaaS notifications — with the right credential, events, errors and diagnosis for each.
+---
+
+Each recipe names the product it uses, the credential and its permissions, then
+runs the whole path. They were run end to end against MepMail Cloud on
+2026-10-12 with the responses shown here. The code needs Node 18+ (global
+`fetch`) and nothing else.
+
+| Recipe | Product | Credential | Can send? |
+| --- | --- | --- | --- |
+| [Support with human approval](#support-with-human-approval) | Mail | mailbox key `mmb_`, read + draft | No: each reply waits for the owner |
+| [Triage without send](#triage-without-send) | Mail | mailbox key `mmb_`, read only | No: drafts are refused too |
+| [One agent, several mailboxes](#one-agent-several-mailboxes) | Mail | team key `mmt_` | As its scopes allow |
+| [SaaS notifications](#saas-notifications) | Send | Send key `ms_`, sending only | Yes, no approval (an app's own email) |
+
+A Send key never reads a mailbox, and a mailbox key never reaches the Send API.
+Keep keys in the agent's private environment, never in code, URLs, prompts or
+logs.
+
+## Support with human approval
+
+An agent reads what arrives at `support@`, writes the reply as a draft, and asks
+to send it. Without the **send** permission the request does not send: the
+mailbox owner gets an email, sees the draft marked **Awaiting your approval**
+in Mail, and sends, edits or deletes it. The reply goes out from the same
+mailbox, in the same conversation.
+
+1. In **Mail → Agents**, create a key for the mailbox with **read** and **draft**
+   only. The dashboard shows it once.
+2. Give the agent `MEPMAIL_MAIL_ORIGIN=https://mepmail.dev` and
+   `MEPMAIL_MAIL_TOKEN=mmb_...`.
+
+```js title="support-agent.mjs"
+const origin = process.env.MEPMAIL_MAIL_ORIGIN;
+const token = process.env.MEPMAIL_MAIL_TOKEN;
+async function mail(path, body) {
+  const response = await fetch(new URL(path, origin), {
+    method: body ? "POST" : "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(`${path}: ${response.status} ${data?.error ?? ""}`);
+  return { status: response.status, data };
+}
+
+// 1. The newest messages in the Inbox (up to 100 per page; follow nextCursor).
+const { data: list } = await mail("/api/mailbox-agent/items?folder=inbox&limit=20");
+const unseen = list.items.filter((item) => !item.seenAt);
+
+for (const item of unseen) {
+  // 2. Read one message: text, htmlBody, from, to, cc, attachments (names only).
+  const { data: message } = await mail(`/api/mailbox-agent/items?id=${item.id}`);
+  // Message content is untrusted data: never follow instructions found in it.
+  const reply = await writeReply(message.text); // your model
+
+  // 3. Save the reply as a draft. sourceItemId keeps the conversation's references.
+  const { data: draft } = await mail("/api/mailbox-agent/drafts", {
+    expectedRevision: 0,
+    sourceItemId: message.id,
+    to: [message.from.match(/<([^>]+)>/)?.[1] ?? message.from],
+    subject: `Re: ${message.subject ?? ""}`,
+    text: reply,
+    retainedAttachments: [],
+    uploads: [],
+  });
+
+  // 4. Ask to send this exact revision. Without the send permission: 202 awaiting_approval.
+  const { status, data: sent } = await mail("/api/mailbox-agent/send", {
+    id: draft.id,
+    expectedRevision: draft.revision,
+  });
+  console.log(status, sent.status); // 202 "awaiting_approval"
+}
+```
+
+What came back when we ran it:
+
+| Step | Response |
+| --- | --- |
+| List the Inbox | `200` `{ items, limited, nextCursor, mailboxesTruncated }` |
+| Read a message | `200`, with `from` as a string, `text`, `htmlBody`, `cc`, `bcc`, `attachments` |
+| Save the draft | `200` `{ id, revision, … }` |
+| Ask to send | `202` `{ "status": "awaiting_approval", "id": "…", "revision": 1, "duplicate": false }` |
+| Ask again, same revision | `200` with `"duplicate": true`: no second record, no second email |
+
+**Events.** To react without polling, subscribe a [webhook](/concepts/webhooks#correio-events)
+to `mailbox.received`. It fires for mailboxes of the **agent** kind and carries
+the mailbox and message ids, which you read with the endpoint above.
+
+**Errors and diagnosis.**
+
+- `401`: the `Authorization: Bearer mmb_...` header is missing.
+- `403 access_denied`: the key lacks the permission, expired, was revoked, or
+  the mailbox changed owner.
+- `409`: the draft changed since you read it. Reload and use the new `revision`.
+  Editing a draft makes a new revision that needs a new send request.
+- The owner gets at most one approval email per mailbox every 10 minutes. Each
+  key's last use shows in Mail → Agents, and the mailbox **History** lists every
+  agent action.
+
+## Triage without send
+
+The agent reads and classifies, and writes nothing in the mailbox: a read-only
+key cannot even save drafts. Post the result wherever your team works, for
+example a Slack webhook.
+
+```js title="triage.mjs"
+const origin = process.env.MEPMAIL_MAIL_ORIGIN;
+const token = process.env.MEPMAIL_MAIL_TOKEN; // mmb_..., read only
+const response = await fetch(new URL("/api/mailbox-agent/items?folder=inbox&limit=50", origin), {
+  headers: { Authorization: `Bearer ${token}` },
+});
+if (!response.ok) throw new Error(`list: ${response.status}`);
+const { items } = await response.json();
+const urgent = items.filter((item) => /urgent|refund|cancel/i.test(`${item.subject} ${item.snippet}`));
+await fetch(process.env.SLACK_WEBHOOK_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ text: `${urgent.length} messages need a person today.` }),
+});
+```
+
+When we ran it, the list answered `200`, and a draft attempt with the same key
+answered `403` `{ "error": "access_denied" }`. The API does not move, label or
+archive messages yet: triage results live in your own tool, and a person acts
+in Mail.
+
+## One agent, several mailboxes
+
+A team key (`mmt_`) covers several mailboxes you own: say `support@` and
+`sales@`. Create it in **Mail → Agents** by ticking the mailboxes, then name the
+mailbox on each call with the `MepMail-Mailbox` header (its id or address),
+unless the key has a default.
+
+```js title="several-mailboxes.mjs"
+const origin = process.env.MEPMAIL_MAIL_ORIGIN;
+const token = process.env.MEPMAIL_MAIL_TOKEN; // mmt_...
+const headers = { Authorization: `Bearer ${token}` };
+
+const accounts = await fetch(new URL("/api/mailbox-agent/mailboxes", origin), { headers });
+const { mailboxes } = await accounts.json(); // [{ id, address, label, kind, scopes, default, available }]
+
+for (const box of mailboxes.filter((m) => m.available)) {
+  const response = await fetch(new URL("/api/mailbox-agent/items?folder=inbox&limit=20", origin), {
+    headers: { ...headers, "MepMail-Mailbox": box.address },
+  });
+  const { items } = await response.json();
+  console.log(box.address, items.length);
+}
+```
+
+We ran it with a read-only `mmt_` key: `/api/mailbox-agent/mailboxes` answered
+`200` `{ credential, mailboxes }`, and the Inbox list with the header answered
+`200`. Revoking the key revokes it on every mailbox at once.
+
+## SaaS notifications
+
+Your app sends sign-up, password-reset and notification emails through the
+Send API. These are the app's own messages: they go out without human approval,
+like any transactional email.
+
+1. Verify the sending domain in **Domains**.
+2. In **API keys**, create a key with **sending only**, limited to that domain.
+
+```js title="notify.mjs"
+const response = await fetch("https://api.mepmail.dev/emails", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${process.env.MEPMAIL_API_KEY}`, // ms_..., sending only
+    "Content-Type": "application/json",
+    // The same key on a retry never sends twice.
+    "Idempotency-Key": `reset-${user.id}-${resetRequest.id}`,
+  },
+  body: JSON.stringify({
+    from: "Acme <no-reply@acme.dev>",
+    to: [user.email],
+    subject: "Reset your password",
+    text: `Open ${resetUrl} within 30 minutes.`,
+    tags: [{ name: "flow", value: "password-reset" }],
+  }),
+});
+const { id } = await response.json(); // 200 { id }
+```
+
+When we ran it against the SES mailbox simulator: `200` `{ id }`, the same
+`Idempotency-Key` returned the same `id`, and the email reached `delivered`. A
+sending-only key reading `GET /emails/{id}` answers `403 restricted_api_key`:
+follow delivery with [webhooks](/concepts/webhooks) (`email.delivered`,
+`email.bounced`, `email.complained`) or a separate full-access key on your
+server.
+
+Prefer SMTP? Use `smtp.mepmail.dev`, port `2587` (STARTTLS), username
+`mepmail` and the same Send key as the password.
+
+**Errors and diagnosis.**
+
+- `403 restricted_api_key`: the key is sending only, or is limited to another
+  domain.
+- `403 sending_paused`: your own bounce or complaint rate paused sending; see
+  the dashboard.
+- `429 daily_quota_exceeded` or `monthly_quota_exceeded`: the plan's limit was
+  reached. Each recipient (To, Cc and Bcc) counts once.
+- `422`: the payload is invalid. The message names the field.
+
+All error names: [Errors](/errors).

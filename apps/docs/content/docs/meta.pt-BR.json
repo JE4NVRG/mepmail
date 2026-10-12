@@ -6,6 +6,7 @@
     "self-hosting",
     "billing",
     "mailboxes",
+    "recipes",
     "errors",
     "rate-limits",
     "concepts",

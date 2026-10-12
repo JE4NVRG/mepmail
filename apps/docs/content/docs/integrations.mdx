@@ -3,9 +3,11 @@ title: Integrations
 description: n8n, Slack, Discord, Telegram, MCP, the SMTP relay and the API — how MepMail fits the tools you already run.
 ---
 
-MepMail is one sending pipeline with several doors. Everything on this page
-rides the same domains, API keys, suppressions, quotas and logs as the REST
-API — there is no second system to keep in sync.
+MepMail has several doors onto the same domains, suppressions, quotas and logs
+as the REST API, with no second system to keep in sync. Each door uses the
+credential for its job: a Send key (`ms_`) for the API, SMTP and the n8n node; a
+mailbox key (`mmb_` or `mmt_`) for agents in Mail; OAuth on the hosted MCP. The
+[recipes](/recipes) walk each path end to end.
 
 ## n8n
 
@@ -52,15 +54,24 @@ cares about — `email.bounced`, `email.complained`, `quota.reached`,
 ## MCP server
 
 AI agents — Claude Code, Cursor, VS Code, any MCP client — operate the
-platform through 22 tools on the same pipeline. See [MCP server](/mcp) for the
+platform through the MCP tools on the same pipeline. See [MCP server](/mcp) for the
 Streamable HTTP endpoint at `/mcp` and the stdio package on npm.
 
 ## SMTP relay
 
-Any application that speaks SMTP — WordPress, WooCommerce, Ghost, Strapi,
-Supabase, older stacks — sends through the relay with host, port and
-credentials (TLS required). Same domains, suppressions, tracking and logs as
-the API. See [Self-hosting → SMTP relay](/self-hosting#smtp-relay).
+Any application that speaks SMTP — Ghost, Strapi, Supabase Auth, older stacks,
+and WordPress or WooCommerce through a common SMTP plugin — sends through the
+relay. Same domains, suppressions, tracking and logs as the API.
+
+| Setting | MepMail Cloud |
+| --- | --- |
+| Host | `smtp.mepmail.dev` |
+| Port | `2587` (STARTTLS, TLS required) |
+| Username | `mepmail` |
+| Password | a Send key (`ms_...`), ideally sending only |
+
+The dashboard shows the same values in **Settings → SMTP**. On your own
+installation, see [Self-hosting → SMTP relay](/self-hosting#smtp-relay).
 
 ## SDKs and drop-in migration
 

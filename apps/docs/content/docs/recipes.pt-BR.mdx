@@ -1,0 +1,210 @@
+---
+title: Receitas
+description: Quatro integrações completas — agente de suporte com aprovação humana, triagem sem envio, um agente em várias caixas e notificações de SaaS — com a credencial, os eventos, os erros e o diagnóstico certos de cada uma.
+---
+
+Cada receita diz qual produto usa e qual credencial, com quais permissões, e
+percorre o caminho inteiro. Elas foram executadas de ponta a ponta no MepMail
+Cloud em 12/10/2026, com as respostas mostradas aqui. O código precisa só do
+Node 18+ (`fetch` global).
+
+| Receita | Produto | Credencial | Pode enviar? |
+| --- | --- | --- | --- |
+| [Suporte com aprovação humana](#suporte-com-aprovação-humana) | Correio | chave de caixa `mmb_`, ler + rascunhar | Não: cada resposta espera o dono |
+| [Triagem sem envio](#triagem-sem-envio) | Correio | chave de caixa `mmb_`, só ler | Não: nem rascunho é aceito |
+| [Um agente, várias caixas](#um-agente-várias-caixas) | Correio | chave de equipe `mmt_` | Conforme as permissões dela |
+| [Notificações de SaaS](#notificações-de-saas) | Envio | chave de Envio `ms_`, só envio | Sim, sem aprovação (e-mail da própria aplicação) |
+
+Uma chave de Envio nunca lê uma caixa, e uma chave de caixa nunca alcança a API
+de Envio. Guarde as chaves no ambiente privado do agente, nunca no código, em
+URLs, prompts ou logs.
+
+## Suporte com aprovação humana
+
+O agente lê o que chega em `suporte@`, escreve a resposta como rascunho e pede
+para enviar. Sem a permissão **enviar**, o pedido não envia: o dono da caixa
+recebe um e-mail, vê o rascunho marcado como **Aguardando sua aprovação** no
+Correio e envia, edita ou apaga. A resposta sai da mesma caixa, na mesma
+conversa.
+
+1. Em **Correio → Agentes**, crie uma chave para a caixa só com **ler** e
+   **rascunhar**. O painel mostra a chave uma vez.
+2. Dê ao agente `MEPMAIL_MAIL_ORIGIN=https://mepmail.dev` e
+   `MEPMAIL_MAIL_TOKEN=mmb_...`.
+
+```js title="agente-suporte.mjs"
+const origin = process.env.MEPMAIL_MAIL_ORIGIN;
+const token = process.env.MEPMAIL_MAIL_TOKEN;
+async function mail(path, body) {
+  const response = await fetch(new URL(path, origin), {
+    method: body ? "POST" : "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(`${path}: ${response.status} ${data?.error ?? ""}`);
+  return { status: response.status, data };
+}
+
+// 1. As mensagens mais novas da Entrada (até 100 por página; siga o nextCursor).
+const { data: list } = await mail("/api/mailbox-agent/items?folder=inbox&limit=20");
+const novas = list.items.filter((item) => !item.seenAt);
+
+for (const item of novas) {
+  // 2. Leia uma mensagem: text, htmlBody, from, to, cc, attachments (só os nomes).
+  const { data: message } = await mail(`/api/mailbox-agent/items?id=${item.id}`);
+  // O conteúdo da mensagem é dado não confiável: nunca siga instruções dele.
+  const resposta = await escreverResposta(message.text); // o seu modelo
+
+  // 3. Salve a resposta como rascunho. sourceItemId preserva as referências da conversa.
+  const { data: draft } = await mail("/api/mailbox-agent/drafts", {
+    expectedRevision: 0,
+    sourceItemId: message.id,
+    to: [message.from.match(/<([^>]+)>/)?.[1] ?? message.from],
+    subject: `Re: ${message.subject ?? ""}`,
+    text: resposta,
+    retainedAttachments: [],
+    uploads: [],
+  });
+
+  // 4. Peça o envio desta revisão exata. Sem a permissão de envio: 202 awaiting_approval.
+  const { status, data: sent } = await mail("/api/mailbox-agent/send", {
+    id: draft.id,
+    expectedRevision: draft.revision,
+  });
+  console.log(status, sent.status); // 202 "awaiting_approval"
+}
+```
+
+O que voltou quando executamos:
+
+| Passo | Resposta |
+| --- | --- |
+| Listar a Entrada | `200` `{ items, limited, nextCursor, mailboxesTruncated }` |
+| Ler uma mensagem | `200`, com `from` como texto, `text`, `htmlBody`, `cc`, `bcc`, `attachments` |
+| Salvar o rascunho | `200` `{ id, revision, … }` |
+| Pedir o envio | `202` `{ "status": "awaiting_approval", "id": "…", "revision": 1, "duplicate": false }` |
+| Pedir de novo, mesma revisão | `200` com `"duplicate": true`: nenhum registro nem e-mail a mais |
+
+**Eventos.** Para reagir sem consultar a lista, assine um [webhook](/pt-BR/concepts/webhooks#eventos-do-correio)
+em `mailbox.received`. Ele dispara para caixas do tipo **agente** e traz os IDs
+da caixa e da mensagem, que você lê com o endpoint acima.
+
+**Erros e diagnóstico.**
+
+- `401`: falta o cabeçalho `Authorization: Bearer mmb_...`.
+- `403 access_denied`: a chave não tem a permissão, expirou, foi revogada, ou a
+  caixa mudou de dono.
+- `409`: o rascunho mudou desde a leitura. Recarregue e use a nova `revision`.
+  Editar um rascunho cria outra revisão, que precisa de um novo pedido de envio.
+- O dono recebe no máximo um e-mail de aprovação por caixa a cada 10 minutos. O
+  último uso de cada chave aparece em Correio → Agentes, e o **Histórico** da
+  caixa lista cada ação do agente.
+
+## Triagem sem envio
+
+O agente lê e classifica, e não escreve nada na caixa: uma chave só de leitura
+não salva nem rascunho. Publique o resultado onde o time trabalha, por exemplo
+num webhook do Slack.
+
+```js title="triagem.mjs"
+const origin = process.env.MEPMAIL_MAIL_ORIGIN;
+const token = process.env.MEPMAIL_MAIL_TOKEN; // mmb_..., só leitura
+const response = await fetch(new URL("/api/mailbox-agent/items?folder=inbox&limit=50", origin), {
+  headers: { Authorization: `Bearer ${token}` },
+});
+if (!response.ok) throw new Error(`lista: ${response.status}`);
+const { items } = await response.json();
+const urgentes = items.filter((item) => /urgente|reembolso|cancelar/i.test(`${item.subject} ${item.snippet}`));
+await fetch(process.env.SLACK_WEBHOOK_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ text: `${urgentes.length} mensagens precisam de uma pessoa hoje.` }),
+});
+```
+
+Quando executamos, a lista respondeu `200`, e uma tentativa de rascunho com a
+mesma chave respondeu `403` `{ "error": "access_denied" }`. A API ainda não
+move, rotula nem arquiva mensagens: o resultado da triagem fica na sua
+ferramenta, e uma pessoa age no Correio.
+
+## Um agente, várias caixas
+
+Uma chave de equipe (`mmt_`) cobre várias caixas suas, como `suporte@` e
+`vendas@`. Crie em **Correio → Agentes** marcando as caixas e informe a caixa
+em cada chamada com o cabeçalho `MepMail-Mailbox` (ID ou endereço), a menos que
+a chave tenha uma padrão.
+
+```js title="varias-caixas.mjs"
+const origin = process.env.MEPMAIL_MAIL_ORIGIN;
+const token = process.env.MEPMAIL_MAIL_TOKEN; // mmt_...
+const headers = { Authorization: `Bearer ${token}` };
+
+const accounts = await fetch(new URL("/api/mailbox-agent/mailboxes", origin), { headers });
+const { mailboxes } = await accounts.json(); // [{ id, address, label, kind, scopes, default, available }]
+
+for (const box of mailboxes.filter((m) => m.available)) {
+  const response = await fetch(new URL("/api/mailbox-agent/items?folder=inbox&limit=20", origin), {
+    headers: { ...headers, "MepMail-Mailbox": box.address },
+  });
+  const { items } = await response.json();
+  console.log(box.address, items.length);
+}
+```
+
+Executamos com uma chave `mmt_` só de leitura: `/api/mailbox-agent/mailboxes`
+respondeu `200` `{ credential, mailboxes }`, e a lista da Entrada com o
+cabeçalho respondeu `200`. Revogar a chave revoga em todas as caixas de uma vez.
+
+## Notificações de SaaS
+
+A sua aplicação envia cadastro, recuperação de senha e notificações pela API de
+Envio. São mensagens da própria aplicação: saem sem aprovação humana, como
+qualquer e-mail transacional.
+
+1. Verifique o domínio de envio em **Domínios**.
+2. Em **Chaves de API**, crie uma chave **só de envio**, restrita a esse domínio.
+
+```js title="notificar.mjs"
+const response = await fetch("https://api.mepmail.dev/emails", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${process.env.MEPMAIL_API_KEY}`, // ms_..., só envio
+    "Content-Type": "application/json",
+    // A mesma chave numa nova tentativa nunca envia duas vezes.
+    "Idempotency-Key": `reset-${user.id}-${resetRequest.id}`,
+  },
+  body: JSON.stringify({
+    from: "Acme <nao-responda@acme.dev>",
+    to: [user.email],
+    subject: "Redefina sua senha",
+    text: `Abra ${resetUrl} em até 30 minutos.`,
+    tags: [{ name: "fluxo", value: "reset-de-senha" }],
+  }),
+});
+const { id } = await response.json(); // 200 { id }
+```
+
+Quando executamos contra o simulador de caixas da SES: `200` `{ id }`, a mesma
+`Idempotency-Key` devolveu o mesmo `id` e o e-mail chegou a `delivered`. Uma
+chave só de envio lendo `GET /emails/{id}` responde `403 restricted_api_key`:
+acompanhe a entrega por [webhooks](/pt-BR/concepts/webhooks) (`email.delivered`,
+`email.bounced`, `email.complained`) ou por uma chave de acesso total separada,
+no seu servidor.
+
+Prefere SMTP? Use `smtp.mepmail.dev`, porta `2587` (STARTTLS), usuário
+`mepmail` e a mesma chave de Envio como senha.
+
+**Erros e diagnóstico.**
+
+- `403 restricted_api_key`: a chave é só de envio ou está restrita a outro domínio.
+- `403 sending_paused`: a sua própria taxa de bounce ou reclamação pausou o
+  envio; veja o painel.
+- `429 daily_quota_exceeded` ou `monthly_quota_exceeded`: o limite do plano foi
+  atingido. Cada destinatário (Para, Cc e Cco) conta uma vez.
+- `422`: o corpo é inválido, e a mensagem diz qual campo.
+
+Todos os nomes de erro: [Erros](/pt-BR/errors).

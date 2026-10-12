@@ -58,8 +58,10 @@ agentes custam o mesmo.
 1. Selecione a organização e o domínio no painel.
 2. Abra **Correio**, confira o período da licença e as unidades disponíveis e
    crie uma caixa de pessoa ou agente com um dono atual.
-3. Aguarde a confirmação de domínio e transporte pelo operador antes de mover
-   seu e-mail existente. Criar uma caixa não altera o MX do domínio.
+3. Antes de mover seu e-mail existente, crie todas as caixas e apelidos que o
+   domínio recebe e só então troque o MX; depois ative o recebimento em
+   **Correio → Recebimento**, que confere o MX. Criar uma caixa não altera o MX
+   do domínio.
 4. Para um agente, selecione a caixa, abra **Acesso de agentes** e crie uma chave. O dono
    escolhe leitura, rascunho e, opcionalmente, envio. Guarde a chave em local
    privado quando ela aparecer; o segredo é exibido uma vez.
@@ -87,7 +89,7 @@ não inicie outra compra para contornar controles indisponíveis.
   indicado e remove uma redução futura programada. Use **Retomar renovação**
   antes dessa data quando a opção estiver disponível.
 - **Pendente ou sem confirmação:** use **Atualizar status** para consultar a mesma
-  operação. Se continuar sem resolução, consulte o operador; não abra outra
+  operação. Se continuar sem resolução, fale com o suporte (suporte@mepmail.dev) ou, numa instalação própria, com o operador; não abra outra
   cobrança ou assinatura para contornar o estado.
 
 As mensagens armazenadas são preservadas; leitura e exportação continuam
@@ -134,8 +136,14 @@ const { items, limited } = await response.json();
 ```
 
 A chave seleciona uma caixa; a chamada não informa equipe nem ID da caixa.
-Use `folder=inbox`, `drafts` ou `sent` para listar mensagens. A lista retorna até
-50 itens e o indicador `limited`; esta API ainda não tem cursor de paginação.
+Use `folder=inbox`, `drafts` ou `sent` para listar mensagens, as mais novas primeiro.
+A lista retorna até `limit` itens (padrão 50, máximo 100), o indicador `limited` e
+`nextCursor`: passe-o em `cursor` para a página seguinte.
+
+Uma chave de equipe (`mmt_`) cobre várias caixas suas: liste-as em
+`GET /api/mailbox-agent/mailboxes` e informe a caixa em cada chamada com o
+cabeçalho `MepMail-Mailbox` (ID ou endereço), a menos que a chave tenha uma
+padrão. Veja a receita [Um agente, várias caixas](/pt-BR/recipes#um-agente-várias-caixas).
 Para ler o conteúdo de uma mensagem e os metadados dos anexos, use
 `GET /api/mailbox-agent/items?id=<UUID da mensagem>` com a mesma permissão de leitura.
 A resposta não inclui o conteúdo dos arquivos anexados.
@@ -192,7 +200,7 @@ revisão exata:
 Uma resposta `202` significa que o pedido entrou na outbox. Repetir a mesma
 revisão pode retornar a outbox existente com `duplicate: true` e `200`; isso não
 cria outra mensagem. Admissão e aceite do provedor não comprovam entrega. Um
-resultado `unknown` exige investigação pelo operador; não crie outro rascunho
+resultado `unknown` exige investigação: fale com o suporte ou com o operador; não crie outro rascunho
 nem automatize um reenvio para contornar esse estado.
 
 ### Aprovação do dono
@@ -216,7 +224,7 @@ mantém uma pessoa no circuito: crie a chave do agente sem a permissão de envio
 | `404` | Confirme que o recurso está habilitado e que a mensagem existe. |
 | `409` | Recarregue o rascunho e confira licença, armazenamento e franquia de envio. |
 | `413` | Reduza o tamanho do pedido ou dos anexos. |
-| `503` | Preserve o rascunho e consulte o operador; não suponha que o envio foi descartado. |
+| `503` | Preserve o rascunho e fale com o suporte ou com o operador; não suponha que o envio foi descartado. |
 
 Revogue uma chave perdida pelo painel da caixa. Mudanças de dono e membership
 são conferidas novamente pelo servidor; copiar uma chave para outro agente não
