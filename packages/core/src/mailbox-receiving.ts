@@ -6,7 +6,7 @@ import {
   mailboxDomainLock,
   withMailboxRegistryAdmin,
 } from "./mailbox-registry.js";
-import { mailboxServiceEntitlement } from "./mailbox-service.js";
+import { mailboxHoldsSeat, mailboxServiceEntitlement } from "./mailbox-service.js";
 
 export type MailboxReceivingState = "unknown" | "needs_mx" | "needs_activation" | "ready";
 export type MailboxReceivingReason =
@@ -114,7 +114,7 @@ async function snapshot(db: Db, actor: MailboxRegistryActor, domainId: string) {
   const allocation = db
     .select({ id: schema.mailboxes.id })
     .from(schema.mailboxes)
-    .where(eq(schema.mailboxes.teamId, actor.teamId))
+    .where(and(eq(schema.mailboxes.teamId, actor.teamId), mailboxHoldsSeat()))
     .orderBy(asc(schema.mailboxes.createdAt), asc(schema.mailboxes.id));
   const licensed =
     service.resourcePolicyActive && service.plan

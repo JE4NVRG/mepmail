@@ -1235,5 +1235,28 @@
     "same": "This message is already in {language}.",
     "unavailable": "The browser's translator does not translate {from} to {to}.",
     "failed": "Could not translate right now. Try again."
+  },
+  "deletion": {
+    "tag": "Being deleted",
+    "heroBody": "This mailbox will be erased on {date}. An admin can restore it until then.",
+    "open": "Delete mailbox…",
+    "title": "Delete mailbox",
+    "explain": "{address} stops receiving and sending now, disappears for the people and agents with access, and frees its seat in the plan.",
+    "grace": "You have 30 days to restore it. After that, its messages, folders, aliases and agent keys are erased for good and the address is free to use again. System backups expire within 4 weeks after that.",
+    "seats": "If you pay for extra mailboxes and will not use this seat, lower the quantity in Plan.",
+    "confirmLabel": "Type {address} to confirm",
+    "confirm": "Delete mailbox",
+    "deleting": "Deleting…",
+    "cancel": "Cancel",
+    "requested": "Mailbox deleted. You can restore it until {date}.",
+    "pendingTitle": "Mailbox being deleted",
+    "pending": "This mailbox will be erased on {date}. Until then, restoring brings everything back as it was: messages, folders, aliases and access.",
+    "restore": "Restore mailbox",
+    "restoring": "Restoring…",
+    "restored": "Mailbox restored.",
+    "quota": "There is no free seat in the plan to restore this mailbox. Delete another mailbox or upgrade the plan.",
+    "expired": "The time to restore has ended and the mailbox is being erased.",
+    "mismatch": "The address you typed does not match.",
+    "error": "Could not finish right now. Try again."
   }
 }

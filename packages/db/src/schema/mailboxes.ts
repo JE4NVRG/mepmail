@@ -55,6 +55,15 @@ export const mailboxes = pgTable(
       onDelete: "set null",
     }),
     status: text("status").$type<"planned" | "suspended">().notNull().default("planned"),
+    // Excluir caixa (mailbox-drizzle 0031): suspended, out of the seat count and restorable
+    // until deleteAfter; then the worker erases it. statusBeforeDeletion is what a restore
+    // puts back.
+    deletionRequestedAt: timestamp("deletion_requested_at", { withTimezone: true }),
+    deletionRequestedBy: text("deletion_requested_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    deleteAfter: timestamp("delete_after", { withTimezone: true }),
+    statusBeforeDeletion: text("status_before_deletion").$type<"planned" | "suspended">(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -67,8 +76,13 @@ export const mailboxes = pgTable(
       foreignColumns: [domains.id, domains.teamId],
     }).onDelete("restrict"),
     index("mailboxes_team_created_idx").on(t.teamId, t.createdAt),
+    index("mailboxes_delete_after_idx").on(t.deleteAfter).where(sql`${t.deleteAfter} is not null`),
     check("mailboxes_kind_check", sql`${t.kind} in ('person', 'agent')`),
     check("mailboxes_status_check", sql`${t.status} in ('planned', 'suspended')`),
+    check(
+      "mailboxes_deletion_check",
+      sql`(${t.deletionRequestedAt} is null) = (${t.deleteAfter} is null) and (${t.deleteAfter} is null) = (${t.statusBeforeDeletion} is null) and (${t.deleteAfter} is null or (${t.status} = 'suspended' and ${t.statusBeforeDeletion} in ('planned', 'suspended') and ${t.deleteAfter} > ${t.deletionRequestedAt}))`,
+    ),
     check("mailboxes_signature_text_check", sql`char_length(${t.signatureText}) <= 4000`),
     check(
       "mailboxes_signature_profile_check",

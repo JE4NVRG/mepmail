@@ -1,7 +1,11 @@
 import { type Db, schema } from "@millionsend/db";
 import { and, asc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { lockMailboxAgentKeysForOwnerChange } from "./mailbox-agent-access.js";
-import { mailboxServiceEntitlement, reserveMailboxSeat } from "./mailbox-service.js";
+import {
+  mailboxHoldsSeat,
+  mailboxServiceEntitlement,
+  reserveMailboxSeat,
+} from "./mailbox-service.js";
 
 export class MailboxRegistryError extends Error {
   constructor(public readonly code: "forbidden" | "not_found" | "invalid" | "conflict") {
@@ -88,7 +92,7 @@ export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
   const allocation = db
     .select({ id: schema.mailboxes.id })
     .from(schema.mailboxes)
-    .where(eq(schema.mailboxes.teamId, actor.teamId))
+    .where(and(eq(schema.mailboxes.teamId, actor.teamId), mailboxHoldsSeat()))
     .orderBy(asc(schema.mailboxes.createdAt), asc(schema.mailboxes.id));
   const licensed =
     service.resourcePolicyActive && service.plan
@@ -108,6 +112,8 @@ export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
       ownerMembershipId: schema.mailboxes.ownerMembershipId,
       memberId: schema.teamMembers.id,
       status: schema.mailboxes.status,
+      // Being deleted: restorable until deleteAfter (Excluir caixa).
+      deleteAfter: schema.mailboxes.deleteAfter,
       createdAt: schema.mailboxes.createdAt,
       role: schema.teamMembers.role,
       permission: schema.mailboxGrants.permission,
@@ -263,7 +269,9 @@ export async function updateMailboxRegistry(
       actor.teamId,
       input.id,
     );
-    await box(tx as unknown as Db, actor, input.id);
+    // A mailbox being deleted is only restored or erased (mailbox-deletion.ts).
+    if ((await box(tx as unknown as Db, actor, input.id)).deleteAfter)
+      throw new MailboxRegistryError("conflict");
     await invalidate(input.ownerUserId, ownerMembershipId);
     const [row] = await tx
       .update(schema.mailboxes)

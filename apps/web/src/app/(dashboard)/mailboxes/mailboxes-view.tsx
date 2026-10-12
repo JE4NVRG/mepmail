@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { type DragEvent, useEffect, useRef, useState } from "react";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { NavGlyph } from "@/components/icons/nav-icons";
@@ -44,6 +44,7 @@ import {
   type MailboxDropTarget,
   ShortcutsDialog,
 } from "./mailbox-content-view";
+import { deletionDate, MailboxDeletionSection } from "./mailbox-deletion-section";
 import { MailboxFolderDialog } from "./mailbox-folder-dialog";
 import { type FolderEditorState, MailboxFolderEditor } from "./mailbox-folder-editor";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
@@ -117,6 +118,8 @@ function RegistryDialog({
   const grant = useMutation(trpc.mailboxes.grant.mutationOptions());
   const revoke = useMutation(trpc.mailboxes.revoke.mutationOptions());
   const busy = create.isPending || update.isPending || grant.isPending || revoke.isPending;
+  // Being deleted: only "Restaurar caixa" (below) applies until it is restored.
+  const deleting = !!mailbox?.deleteAfter;
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
@@ -176,7 +179,7 @@ function RegistryDialog({
           }
         }}
       >
-        <fieldset disabled={busy} className={styles.fields}>
+        <fieldset disabled={busy || deleting} className={styles.fields}>
           <label>
             {t("name")}
             <input
@@ -288,20 +291,20 @@ function RegistryDialog({
           <button
             type="submit"
             className="ms-btn ms-btn-primary"
-            disabled={busy || (!mailbox && !options.domains.length)}
+            disabled={busy || deleting || (!mailbox && !options.domains.length)}
           >
             {t(busy ? "saving" : mailbox ? "save" : "create")}
           </button>
         </footer>
       </form>
-      {mailbox ? (
+      {mailbox && !deleting ? (
         <div className={styles.dialogFooter}>
           <button type="button" className="ms-btn" disabled={busy} onClick={openReceiving}>
             {t("setup.checkReceiving")}
           </button>
         </div>
       ) : null}
-      {mailbox ? (
+      {mailbox && !deleting ? (
         <section className={styles.access}>
           <h3>{t("access")}</h3>
           <p className={styles.hint}>{t("accessHint")}</p>
@@ -397,6 +400,9 @@ function RegistryDialog({
         </section>
       ) : null}
       {mailbox && mailbox.status === "planned" ? <MailboxAliasesSection mailbox={mailbox} /> : null}
+      {mailbox ? (
+        <MailboxDeletionSection mailbox={mailbox} changed={changed} close={close} />
+      ) : null}
     </dialog>
   );
 }
@@ -415,6 +421,7 @@ export function MailboxesView({
   layout?: "app" | "settings";
 } = {}) {
   const t = useTranslations("mailboxes");
+  const locale = useLocale();
   const tActivity = useTranslations("mailboxes-activity");
   const tAgent = useTranslations("mailboxes-agent");
   const { data: session } = authClient.useSession();
@@ -1269,8 +1276,16 @@ export function MailboxesView({
                 {selected ? (
                   <>
                     <p className={styles.address}>{selected.address}</p>
-                    <span className={styles.tag}>{t(selected.status)}</span>
-                    <p>{t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}</p>
+                    <span className={styles.tag}>
+                      {selected.deleteAfter ? t("deletion.tag") : t(selected.status)}
+                    </span>
+                    <p>
+                      {selected.deleteAfter
+                        ? t("deletion.heroBody", {
+                            date: deletionDate(selected.deleteAfter, locale),
+                          })
+                        : t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}
+                    </p>
                     {!selected.ownerActive ? (
                       <p className={styles.hint}>{t("ownerMissing")}</p>
                     ) : null}

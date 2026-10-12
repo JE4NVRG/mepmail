@@ -5,6 +5,7 @@ import {
   MailboxRegistryError,
   mailboxAliasAddresses,
   mailboxDomainLock,
+  mailboxHoldsSeat,
   mailboxServiceEntitlement,
   withMailboxRegistryAdmin,
 } from "@millionsend/core";
@@ -60,7 +61,7 @@ export async function activateMailboxReceiving(
     const allocation = tx
       .select({ id: schema.mailboxes.id })
       .from(schema.mailboxes)
-      .where(eq(schema.mailboxes.teamId, actor.teamId))
+      .where(and(eq(schema.mailboxes.teamId, actor.teamId), mailboxHoldsSeat()))
       .orderBy(asc(schema.mailboxes.createdAt), asc(schema.mailboxes.id));
     const licensed = new Set(
       (await (service.unlimitedSeats ? allocation : allocation.limit(service.plan.seats))).map(

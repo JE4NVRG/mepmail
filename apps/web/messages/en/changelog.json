@@ -24,6 +24,22 @@
   },
   "releases": [
     {
+      "version": "0.131",
+      "date": "2026-10-12",
+      "title": "Delete a mailbox, with 30 days to change your mind",
+      "summary": "Team owners and admins can now delete a mailbox by typing its address. It stops receiving and sending at once and frees its seat in the plan; for 30 days it can be restored, and after that its mail is erased and the address is free again.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Manage mailbox → Delete mailbox: type the address to confirm. The mailbox is suspended right away, leaves SES receiving, and stops counting as a seat.",
+            "Restore within 30 days, as long as the plan has a free seat. After that, a worker erases its messages, folders and send records, then the mailbox itself, freeing the address and its aliases. System backups expire within 4 weeks after that.",
+            "The team audit log records each deletion and restore."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.130",
       "date": "2026-10-12",
       "title": "When AWS pauses one customer, MepMail holds that customer",

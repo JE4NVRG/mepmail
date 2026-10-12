@@ -428,6 +428,15 @@ export {
   removeMailboxAlias,
 } from "./mailbox-aliases.js";
 export {
+  dueMailboxDeletions,
+  MAILBOX_DELETION_GRACE_MS,
+  type MailboxDeletionDue,
+  type MailboxPurgeOutcome,
+  purgeMailboxDeletion,
+  requestMailboxDeletion,
+  restoreMailboxDeletion,
+} from "./mailbox-deletion.js";
+export {
   assessMailboxReceipt,
   type MailboxInboundAssessment,
   type MailboxSafetyReason,
@@ -567,6 +576,7 @@ export {
   MAILBOX_TRIAL_GLOBAL_DAILY_RECIPIENTS,
   MAILBOX_TRIAL_TOTAL_RECIPIENTS,
   MailboxServiceError,
+  mailboxHoldsSeat,
   mailboxServiceActive,
   mailboxServiceEntitlement,
   mailboxServiceState,

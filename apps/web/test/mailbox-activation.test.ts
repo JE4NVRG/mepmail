@@ -5,6 +5,7 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as activation from "@/server/mailbox-activation";
+import * as deletion from "@/server/mailbox-deletion";
 import { mailboxReceivingDeps } from "@/server/mailbox-receiving";
 import { mailboxesRouter } from "@/server/routers/mailboxes";
 import { type Context, createCallerFactory, router } from "@/server/trpc";
@@ -13,6 +14,7 @@ import {
   type MailboxProvisioningClient,
   mailboxProtectedRuleSha256,
 } from "../../../packages/ses/src/mailbox-provisioning";
+import { runMailboxDeletions } from "../../worker/src/handlers/mailbox-deletions";
 import { reconcileMailboxReceivingHolds } from "../../worker/src/handlers/mailbox-receiving-holds";
 import { seedMailboxTestService } from "./mailbox-service-fixture";
 
@@ -78,6 +80,7 @@ const inbound = JSON.stringify({
   ],
 });
 const actualActivate = activation.activateMailboxReceiving;
+const actualWithdraw = deletion.withdrawMailboxReceiving;
 const extension = fileURLToPath(new URL("../../../packages/db/mailbox-drizzle/", import.meta.url));
 const caller = createCallerFactory(router({ mailboxes: mailboxesRouter }));
 const owner = "activation_fixture_owner",
@@ -513,6 +516,58 @@ describe("receiving holds of a plan out of inbound allowance", () => {
     expect(await reconcile()).toEqual({ paused: 0, resumed: 1, failed: 0 });
     expect(currentRule.Recipients).toEqual(
       [...addresses, "reservado@regra-01.mepmail.invalid"].sort(),
+    );
+  });
+});
+
+describe("Excluir caixa", () => {
+  it("takes a deleted mailbox out of SES at once, puts it back on restore and erases it after 30 days", async () => {
+    vi.spyOn(deletion, "withdrawMailboxReceiving").mockImplementation((database, addresses) =>
+      actualWithdraw(database, addresses, { configuration: config, client: () => client }),
+    );
+    await verify();
+    const address = `second@${domainName}`;
+    expect(currentRule.Recipients).toContain(address);
+    await expect(as(member).requestDelete({ id: second, address })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    await expect(
+      as().requestDelete({ id: second, address: `first@${domainName}` }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    const deleted = await as().requestDelete({ id: second, address });
+    expect(deleted.deleteAfter.getTime()).toBeGreaterThan(Date.now() + 29 * 86_400_000);
+    expect(currentRule.Recipients).not.toContain(address);
+    expect(currentRule.Recipients).toContain(`first@${domainName}`);
+    const listed = await as().list();
+    expect(listed.mailboxes.find((box) => box.id === second)).toMatchObject({
+      status: "suspended",
+      canRead: false,
+    });
+
+    // Restoring puts it back in SES with the domain's other mailboxes.
+    await expect(as().restoreDelete({ id: second })).resolves.toMatchObject({
+      status: "planned",
+      receiving: "confirmed",
+    });
+    expect(currentRule.Recipients).toContain(address);
+
+    // Deleted again and past its deadline, with the request's SES call lost: the worker
+    // takes the address out before it erases the mailbox.
+    await as().requestDelete({ id: second, address });
+    currentRule.Recipients = [...(currentRule.Recipients ?? []), address].sort();
+    await db.execute(
+      sql`update mailboxes set deletion_requested_at = now() - interval '31 days', delete_after = now() - interval '1 minute' where id = ${second}`,
+    );
+    expect(await runMailboxDeletions(db, { configuration: config, client: () => client })).toEqual({
+      erased: 1,
+      partial: 0,
+      waiting: 0,
+      failed: 0,
+    });
+    expect(currentRule.Recipients).not.toContain(address);
+    expect(await db.select().from(schema.mailboxes).where(eq(schema.mailboxes.id, second))).toEqual(
+      [],
     );
   });
 });

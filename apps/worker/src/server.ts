@@ -92,6 +92,7 @@ import { drainWebhookEndpoint } from "./handlers/deliver-webhook.js";
 import { runInstanceProbes } from "./handlers/instance-probes.js";
 import { warnExpiringMailboxAgentKeys } from "./handlers/mailbox-agent-key-expiry.js";
 import { runMailboxCapacity } from "./handlers/mailbox-capacity.js";
+import { runMailboxDeletions } from "./handlers/mailbox-deletions.js";
 import { warnMailboxPlanUsage } from "./handlers/mailbox-plan-alerts.js";
 import { reconcileMailboxReceivingHolds } from "./handlers/mailbox-receiving-holds.js";
 import { runMailboxReprice } from "./handlers/mailbox-reprice.js";
@@ -627,6 +628,18 @@ await queue.scheduleCrons({
     if (holds.paused || holds.resumed || holds.failed)
       console.log(
         `mailbox.receiving: paused=${holds.paused} resumed=${holds.resumed} failed=${holds.failed}`,
+      );
+    // Mailboxes deleted 30 days ago (Excluir caixa) are erased, a batch per minute.
+    const deletions = await runMailboxDeletions(db, {
+      configuration: process.env.MAILBOX_RECEIVING_PROVISIONING_CONFIG,
+      credentials:
+        env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
+          ? { accessKeyId: env.AWS_ACCESS_KEY_ID, secretAccessKey: env.AWS_SECRET_ACCESS_KEY }
+          : {},
+    });
+    if (Object.values(deletions).some((count) => count > 0))
+      console.log(
+        `mailbox.deletions: erased=${deletions.erased} partial=${deletions.partial} waiting=${deletions.waiting} failed=${deletions.failed}`,
       );
   },
   "mailbox.search_index": async () => {

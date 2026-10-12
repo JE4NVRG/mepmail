@@ -33,6 +33,8 @@ import {
   queueMailboxDraft,
   removeMailboxAlias,
   reorderMailboxFolders,
+  requestMailboxDeletion,
+  restoreMailboxDeletion,
   revokeMailboxAgentKey,
   revokeMailboxRegistry,
   revokeMailboxTeamAgentKey,
@@ -76,6 +78,7 @@ import {
   getMailboxUnreadCounts,
   saveMailboxContentDraft,
 } from "../mailbox-content";
+import { withdrawMailboxReceiving } from "../mailbox-deletion";
 import { mailboxDnsGuide } from "../mailbox-dns-guide";
 import {
   cancelMailboxImport,
@@ -1197,6 +1200,41 @@ export const mailboxesRouter = router({
         metadata: { userId: input.userId, permission: input.permission },
       });
       return { id: row.id };
+    }),
+  // Excluir caixa: a team admin types the address; the mailbox is suspended, frees its
+  // seat and leaves SES now, and can be restored for 30 days before the worker erases it.
+  requestDelete: enabled
+    .input(z.object({ id: z.uuid(), address: z.string().min(3).max(254) }).strict())
+    .mutation(async ({ ctx, input }) => {
+      const result = await call(() => requestMailboxDeletion(ctx.db, actor(ctx), input));
+      await recordAudit(ctx, {
+        action: "mailbox.deletion_requested",
+        target: { type: "mailbox", id: result.id },
+        metadata: { deleteAfter: result.deleteAfter.toISOString() },
+      });
+      await withdrawMailboxReceiving(ctx.db, result.addresses);
+      return { id: result.id, deleteAfter: result.deleteAfter };
+    }),
+  restoreDelete: enabled
+    .input(z.object({ id: z.uuid() }).strict())
+    .mutation(async ({ ctx, input }) => {
+      const row = await call(() => restoreMailboxDeletion(ctx.db, actor(ctx), input.id));
+      await recordAudit(ctx, {
+        action: "mailbox.deletion_restored",
+        target: { type: "mailbox", id: row.id },
+      });
+      // Back in SES with the domain's other mailboxes, where the domain already receives.
+      let receiving: string = "unknown";
+      if (row.status === "planned")
+        try {
+          receiving = (await activateMailboxReceiving(ctx.db, actor(ctx), row.domainId)).state;
+        } catch (error) {
+          console.warn(
+            "restored mailbox receiving deferred",
+            error instanceof Error ? error.message : error,
+          );
+        }
+      return { id: row.id, status: row.status, receiving };
     }),
   revoke: enabled.input(z.object({ id: z.uuid() })).mutation(async ({ ctx, input }) => {
     const row = await call(() => revokeMailboxRegistry(ctx.db, actor(ctx), input.id));

@@ -218,6 +218,13 @@
       "when": 1791730800030,
       "tag": "0030_mailbox_search",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791730800031,
+      "tag": "0031_mailbox_deletion",
+      "breakpoints": true
     }
   ]
 }

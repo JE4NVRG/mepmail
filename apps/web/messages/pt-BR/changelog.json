@@ -24,6 +24,22 @@
   },
   "releases": [
     {
+      "version": "0.131",
+      "date": "2026-10-12",
+      "title": "Excluir caixa, com 30 dias para voltar atrás",
+      "summary": "Donos e admins do time agora podem excluir uma caixa digitando o endereço. Ela para de receber e enviar na hora e libera a vaga do plano; por 30 dias dá para restaurar, e depois disso as mensagens são apagadas e o endereço fica livre de novo.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Gerenciar caixa → Excluir caixa: digite o endereço para confirmar. A caixa é suspensa na hora, sai do recebimento da SES e deixa de contar como vaga.",
+            "Restaure em até 30 dias, desde que o plano tenha uma vaga livre. Depois disso, um worker apaga as mensagens, as pastas e os registros de envio, e por fim a caixa, liberando o endereço e os apelidos. As cópias de segurança do sistema expiram em até 4 semanas depois disso.",
+            "O log de auditoria do time registra cada exclusão e restauração."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.130",
       "date": "2026-10-12",
       "title": "Quando a AWS pausa um cliente, o MepMail segura esse cliente",

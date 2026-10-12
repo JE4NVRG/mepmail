@@ -3,6 +3,7 @@ import {
   MAILBOX_TRIAL_DAILY_RECIPIENTS,
   MAILBOX_TRIAL_TOTAL_RECIPIENTS,
   MailboxContentError,
+  mailboxHoldsSeat,
   mailboxInboundPauseAt,
   mailboxPlanUsage,
   mailboxServiceEntitlement,
@@ -151,10 +152,11 @@ type Plan = NonNullable<Awaited<ReturnType<typeof mailboxServiceEntitlement>>["p
 async function planUsage(db: Db, plan: Plan, period: { start: Date; end: Date }, active: boolean) {
   const code = plan.planCode as PlanCode;
   const used = await mailboxPlanUsage(db, plan.teamId, period.start);
+  // Seats in use: a mailbox being deleted no longer holds one.
   const [boxes] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.mailboxes)
-    .where(eq(schema.mailboxes.teamId, plan.teamId));
+    .where(and(eq(schema.mailboxes.teamId, plan.teamId), mailboxHoldsSeat()));
   const [hold] = await db
     .select()
     .from(schema.mailboxReceivingHolds)

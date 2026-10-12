@@ -1235,5 +1235,28 @@
     "same": "Esta mensagem já está em {language}.",
     "unavailable": "O tradutor do navegador não traduz {from} para {to}.",
     "failed": "Não deu para traduzir agora. Tente de novo."
+  },
+  "deletion": {
+    "tag": "Em exclusão",
+    "heroBody": "Esta caixa será apagada em {date}. Um administrador pode restaurá-la até lá.",
+    "open": "Excluir caixa…",
+    "title": "Excluir caixa",
+    "explain": "{address} para de receber e de enviar agora, some para as pessoas e agentes com acesso e libera a vaga no plano.",
+    "grace": "Você tem 30 dias para restaurar. Depois disso, as mensagens, pastas, apelidos e chaves de agente são apagados de vez e o endereço fica livre para usar de novo. As cópias de segurança do sistema expiram em até 4 semanas depois disso.",
+    "seats": "Se você paga caixas extras e não vai usar essa vaga, reduza a quantidade em Plano.",
+    "confirmLabel": "Digite {address} para confirmar",
+    "confirm": "Excluir caixa",
+    "deleting": "Excluindo…",
+    "cancel": "Cancelar",
+    "requested": "Caixa excluída. Dá para restaurar até {date}.",
+    "pendingTitle": "Caixa em exclusão",
+    "pending": "Esta caixa será apagada em {date}. Até lá, restaurar devolve tudo como estava: mensagens, pastas, apelidos e acessos.",
+    "restore": "Restaurar caixa",
+    "restoring": "Restaurando…",
+    "restored": "Caixa restaurada.",
+    "quota": "Não há vaga livre no plano para restaurar esta caixa. Exclua outra caixa ou aumente o plano.",
+    "expired": "O prazo para restaurar acabou e a caixa está sendo apagada.",
+    "mismatch": "O endereço digitado não confere.",
+    "error": "Não deu para concluir agora. Tente de novo."
   }
 }

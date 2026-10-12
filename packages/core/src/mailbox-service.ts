@@ -1,5 +1,5 @@
 import { type Db, schema } from "@millionsend/db";
-import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { monthlyBillingUsagePeriod } from "./billing-usage-period.js";
 
 export class MailboxServiceError extends Error {
@@ -221,6 +221,14 @@ export function requireMailboxOperationalPlan(
   };
 }
 
+/**
+ * Mailboxes that hold a seat: all of the team's but those being deleted (Excluir caixa),
+ * which stop counting the moment deletion is asked and count again only if restored.
+ */
+export function mailboxHoldsSeat() {
+  return isNull(schema.mailboxes.deleteAfter);
+}
+
 /** Public plan/usage DTO contains neither customer IDs nor provider credentials. */
 export async function mailboxServiceState(db: Db, teamId: string) {
   const entitlement = await mailboxServiceEntitlement(db, teamId);
@@ -228,7 +236,7 @@ export async function mailboxServiceState(db: Db, teamId: string) {
   const [usage] = await db
     .select({ boxes: sql<number>`count(*)::int` })
     .from(schema.mailboxes)
-    .where(eq(schema.mailboxes.teamId, teamId));
+    .where(and(eq(schema.mailboxes.teamId, teamId), mailboxHoldsSeat()));
   return {
     active: entitlement.active,
     licenseKind: entitlement.licenseKind,
@@ -281,7 +289,7 @@ export async function reserveMailboxSeat(db: Db, teamId: string) {
   const [usage] = await db
     .select({ boxes: sql<number>`count(*)::int` })
     .from(schema.mailboxes)
-    .where(eq(schema.mailboxes.teamId, teamId));
+    .where(and(eq(schema.mailboxes.teamId, teamId), mailboxHoldsSeat()));
   if ((usage?.boxes ?? 0) >= plan.seats) throw new MailboxServiceError("quota");
   return entitlement;
 }
@@ -307,7 +315,7 @@ export async function requireMailboxSeat(
   const licensed = await db
     .select({ id: schema.mailboxes.id })
     .from(schema.mailboxes)
-    .where(eq(schema.mailboxes.teamId, teamId))
+    .where(and(eq(schema.mailboxes.teamId, teamId), mailboxHoldsSeat()))
     .orderBy(asc(schema.mailboxes.createdAt), asc(schema.mailboxes.id))
     .limit(plan.seats);
   if (!licensed.some((b) => b.id === mailboxId)) throw new MailboxServiceError("not_entitled");
