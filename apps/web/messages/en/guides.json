@@ -1,0 +1,222 @@
+{
+  "index": {
+    "meta": {
+      "title": "Email guides: your own domain, SPF, DKIM and DMARC",
+      "description": "Practical guides to business email on your own domain, setting up SPF, DKIM and DMARC, and sending transactional email from your app."
+    },
+    "eyebrow": "Guides",
+    "title": "Email guides",
+    "lead": "Step by step to put your company's email on your own domain and get your messages into the inbox.",
+    "read": "Read the guide"
+  },
+  "updated": "Updated {date}",
+  "faqTitle": "Frequently asked questions",
+  "related": "More guides",
+  "items": {
+    "custom-domain-email": {
+      "meta": {
+        "title": "How to set up business email on your own domain",
+        "description": "Step by step to professional email on your domain: the DNS records, mailboxes for the team and switching providers without losing mail."
+      },
+      "card": "What you need, the DNS records and how to switch providers without losing mail.",
+      "eyebrow": "Guide · Business email",
+      "title": "How to set up business email on your own domain",
+      "lead": "An address like you@yourcompany.com earns more trust than a free webmail account, and it stays yours if you change providers. This guide covers the whole path: what you need, the DNS records and how to switch without losing mail.",
+      "sections": [
+        {
+          "title": "What you need",
+          "body": [
+            "A registered domain, for example at GoDaddy, Namecheap, Hostinger or Cloudflare, and access to its DNS settings.",
+            "A service that receives and sends email for your domain. In MepMail that is Mail: mailboxes on your domain, with no server to install or maintain."
+          ]
+        },
+        {
+          "title": "Step by step",
+          "steps": [
+            "Create your MepMail account and add your domain in the dashboard.",
+            "Publish the DNS records the dashboard shows: a DKIM TXT (mepmail._domainkey), the MX and SPF of the bounce subdomain and, to receive, the domain's MX. If your DNS is on Cloudflare, MepMail can create the records with a DNS-only token, without overwriting existing ones.",
+            "Wait for verification. The dashboard checks each record live and shows what is missing; it usually takes minutes to a few hours.",
+            "Create the mailboxes: one per person or for an AI agent. Plans go from 1 to 10 mailboxes.",
+            "Once the MX points to MepMail, turn receiving on in Mail → Receiving. The dashboard checks the MX before it switches on.",
+            "Read and reply in the browser or in the MepMail app for Windows and Linux."
+          ]
+        },
+        {
+          "title": "Already on another provider? Switch without losing mail",
+          "body": [
+            "First create every mailbox and alias the domain receives, and only then change the MX. That way no message is left without a destination during the switch.",
+            "Then bring the old account's history over: Mail imports your messages over IMAP."
+          ]
+        },
+        {
+          "title": "What it costs",
+          "body": [
+            "In MepMail, Mail starts at US$ 2.90 a month on the Solo plan, with 1 mailbox. Duo has 3 mailboxes for US$ 5.90 and Equipe has 10 for US$ 12.90.",
+            "Your first purchase starts with 7 days free (a card is required), and nothing is charged beyond the plan."
+          ]
+        },
+        {
+          "title": "What about AI agents?",
+          "body": [
+            "A mailbox can belong to a person or to an agent. The agent reads and drafts over MCP or the API, only with the permissions you grant, and sending can wait for your approval."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Do I need a mail server?",
+          "a": "No. MepMail receives, stores and sends for you; on your side there are only the domain's DNS records."
+        },
+        {
+          "q": "How long does it take to work?",
+          "a": "Records usually apply within minutes; some DNS providers take a few hours. The dashboard shows each record's status meanwhile."
+        },
+        {
+          "q": "Will I lose email when I switch providers?",
+          "a": "Not if you create the mailboxes before pointing the MX. Messages already at the old provider can be imported over IMAP."
+        },
+        {
+          "q": "Does it work on my phone?",
+          "a": "Yes, in the browser. The installed app is for Windows and Linux."
+        }
+      ],
+      "cta": {
+        "title": "Your email on your domain, from US$ 2.90 a month",
+        "body": "Try it for 7 days and set up your domain with the dashboard's step by step.",
+        "button": "Create account"
+      }
+    },
+    "email-authentication": {
+      "meta": {
+        "title": "SPF, DKIM and DMARC: what they are and how to set them up",
+        "description": "Understand SPF, DKIM and DMARC, the records that get your email into the inbox, and how to set them up in your domain's DNS."
+      },
+      "card": "The three records that tell providers the email is really yours, and how to publish each one.",
+      "eyebrow": "Guide · Deliverability",
+      "title": "SPF, DKIM and DMARC: what they are and how to set them up",
+      "lead": "Three DNS records tell Gmail, Outlook and other providers that a message with your domain really came from you. Without them, your email tends to land in spam or get rejected.",
+      "sections": [
+        {
+          "title": "Why it matters",
+          "body": [
+            "Since 2024, Gmail and Yahoo require every sender to authenticate the domain with SPF or DKIM. Bulk senders (more than 5,000 messages a day to Gmail accounts) need all three: SPF, DKIM and DMARC.",
+            "Beyond delivery, these records protect your brand: they make it harder for anyone to send fake email in your domain's name."
+          ]
+        },
+        {
+          "title": "SPF: who may send for your domain",
+          "body": [
+            "SPF is a TXT record listing the servers allowed to send for the domain. Each domain name should have a single SPF record; if you use more than one service, merge their includes into one record.",
+            "In MepMail, SPF lives on the bounce subdomain (MAIL FROM), which the dashboard creates and shows next to its MX."
+          ]
+        },
+        {
+          "title": "DKIM: the signature on every message",
+          "body": [
+            "DKIM signs each message with a private key; the public key sits in a TXT record in your DNS, and the receiving provider checks the signature.",
+            "In MepMail, new domains use a single TXT at mepmail._domainkey, shown in the dashboard when you add the domain."
+          ]
+        },
+        {
+          "title": "DMARC: what to do when something fails",
+          "body": [
+            "DMARC is a TXT at _dmarc.yourdomain.com. It tells providers what to do with messages that pass neither SPF nor DKIM aligned with the sender's domain, and where to send reports.",
+            "Start by monitoring, with v=DMARC1; p=none; rua=mailto:dmarc@yourdomain.com, read the reports for a few weeks, then move to p=quarantine and, if you like, p=reject."
+          ]
+        },
+        {
+          "title": "How to check",
+          "body": [
+            "The MepMail dashboard resolves each record live and shows, line by line, what is fine and what is missing, including the DMARC inherited from the parent domain when you send from a subdomain.",
+            "To check a delivered message, open the original in Gmail (Show original): spf=pass, dkim=pass and dmarc=pass mean you are all set."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Can I have two SPF records?",
+          "a": "No. Two SPF records on the same name invalidate both; merge the services into a single record."
+        },
+        {
+          "q": "Will DMARC with p=reject block my email?",
+          "a": "Only messages that fail aligned authentication. That is why the safe path is to start with p=none and raise the policy after reading the reports."
+        },
+        {
+          "q": "Do I need this if I only receive email?",
+          "a": "Yes, it is recommended: SPF and DMARC make it harder for others to spoof your domain."
+        }
+      ],
+      "cta": {
+        "title": "Set up your domain with live verification",
+        "body": "MepMail shows every missing record and checks your DNS while you publish.",
+        "button": "Create account"
+      }
+    },
+    "transactional-email": {
+      "meta": {
+        "title": "Transactional email: what it is and how to send it from your app",
+        "description": "What transactional email is (sign-up, password, receipt), why to keep it apart from marketing and how to send it by API or SMTP without spam."
+      },
+      "card": "Sign-up, password and receipt: how it differs from marketing and how to send it by API or SMTP.",
+      "eyebrow": "Guide · Sending",
+      "title": "Transactional email: what it is and how to send it from your app",
+      "lead": "Transactional email is what your app sends because the user did something: created an account, asked for a new password, bought. It has to arrive fast and in the inbox.",
+      "sections": [
+        {
+          "title": "Examples",
+          "body": [
+            "Sign-up confirmation, password reset, verification code, receipt, shipping notice and account alerts."
+          ]
+        },
+        {
+          "title": "Transactional is not marketing",
+          "body": [
+            "Newsletters and promotions depend on consent and need an easy unsubscribe. Transactional email is expected by the user, so it has its own rules and reputation.",
+            "Keep the two apart, for example with different senders or subdomains, so a poorly received campaign does not hurt your password email."
+          ]
+        },
+        {
+          "title": "How to send: API or SMTP",
+          "body": [
+            "With the HTTP API you get each message's id, can use an idempotency key so nothing goes out twice, and follow delivery, bounces and complaints through webhooks. The MepMail API is compatible with the Resend SDK.",
+            "With SMTP, any system that already speaks SMTP works, from WordPress to an ERP: in MepMail the relay is smtp.mepmail.dev, on port 2587 with STARTTLS."
+          ]
+        },
+        {
+          "title": "Good practices",
+          "steps": [
+            "Authenticate the domain with SPF, DKIM and DMARC.",
+            "Use one idempotency key per message, so a retry never sends twice.",
+            "Respect bounces and complaints: stop sending to addresses that bounced permanently.",
+            "Keep marketing out of the transactional flow."
+          ]
+        },
+        {
+          "title": "What it costs",
+          "body": [
+            "In MepMail, Send is free up to 100 emails a day, no card. Pro sends 110,000 emails a month for US$ 29."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Can I use Gmail's SMTP in my app?",
+          "a": "Personal accounts have low daily limits and are not made for apps; a sending service gives you deliverability, logs and webhooks."
+        },
+        {
+          "q": "API or SMTP, which one?",
+          "a": "The API when you write the code: message id, idempotency and webhooks. SMTP when the system already has an SMTP server field."
+        },
+        {
+          "q": "Do I need my own domain?",
+          "a": "Yes. The authenticated domain is what gets the message into the inbox."
+        }
+      ],
+      "cta": {
+        "title": "Start sending for free",
+        "body": "100 emails a day with no card, by API, SMTP or MCP.",
+        "button": "Create free account"
+      }
+    }
+  }
+}

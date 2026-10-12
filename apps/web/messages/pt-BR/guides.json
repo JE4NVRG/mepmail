@@ -1,0 +1,222 @@
+{
+  "index": {
+    "meta": {
+      "title": "Guias de e-mail: domínio próprio, SPF, DKIM e DMARC",
+      "description": "Guias práticos para ter e-mail profissional no seu domínio, configurar SPF, DKIM e DMARC e enviar e-mail transacional pela sua aplicação."
+    },
+    "eyebrow": "Guias",
+    "title": "Guias de e-mail",
+    "lead": "Passo a passo para colocar o e-mail da sua empresa no seu domínio e fazer suas mensagens chegarem na caixa de entrada.",
+    "read": "Ler o guia"
+  },
+  "updated": "Atualizado em {date}",
+  "faqTitle": "Perguntas frequentes",
+  "related": "Outros guias",
+  "items": {
+    "custom-domain-email": {
+      "meta": {
+        "title": "Como criar e-mail profissional com domínio próprio",
+        "description": "Passo a passo para ter e-mail corporativo no seu domínio: registros de DNS, caixas para a equipe e migração sem perder mensagens."
+      },
+      "card": "O que você precisa, os registros de DNS e como trocar de provedor sem perder mensagens.",
+      "eyebrow": "Guia · E-mail profissional",
+      "title": "Como criar e-mail profissional com domínio próprio",
+      "lead": "Um endereço como voce@suaempresa.com.br passa mais confiança que um Gmail e continua seu se você trocar de provedor. Este guia mostra o caminho completo: o que você precisa, os registros de DNS e como mudar sem perder mensagens.",
+      "sections": [
+        {
+          "title": "O que você precisa",
+          "body": [
+            "Um domínio registrado, por exemplo no Registro.br, na GoDaddy, na Hostinger ou no Cloudflare, e acesso ao painel de DNS dele.",
+            "Um serviço que receba e envie e-mail pelo seu domínio. No MepMail, isso é o Correio: caixas no seu domínio, sem servidor para instalar ou manter."
+          ]
+        },
+        {
+          "title": "Passo a passo",
+          "steps": [
+            "Crie sua conta no MepMail e adicione o seu domínio no painel.",
+            "Publique os registros de DNS que o painel mostra: um TXT de DKIM (mepmail._domainkey), o MX e o SPF do subdomínio de retorno e, para receber, o MX do domínio. Se o seu DNS está no Cloudflare, o MepMail pode criar os registros com um token só de DNS, sem sobrescrever os que já existem.",
+            "Espere a verificação. O painel confere cada registro ao vivo e mostra o que falta; costuma levar de minutos a algumas horas.",
+            "Crie as caixas: uma para cada pessoa ou para um agente de IA. Os planos vão de 1 a 10 caixas.",
+            "Depois de apontar o MX, ative o recebimento em Correio → Recebimento. O painel confere o MX antes de ligar.",
+            "Leia e responda pelo navegador ou pelo app do MepMail para Windows e Linux."
+          ]
+        },
+        {
+          "title": "Já tem e-mail em outro provedor? Troque sem perder mensagens",
+          "body": [
+            "Crie primeiro todas as caixas e os apelidos que o domínio recebe e só então troque o MX. Assim nenhuma mensagem fica sem destino durante a troca.",
+            "Depois, traga o histórico da conta antiga: o Correio importa as mensagens por IMAP."
+          ]
+        },
+        {
+          "title": "Quanto custa",
+          "body": [
+            "No MepMail, o Correio começa em R$ 14,90 por mês no Brasil (US$ 2,90) no plano Solo, com 1 caixa. O Duo tem 3 caixas por R$ 29,90 e o Equipe tem 10 por R$ 64,90.",
+            "A primeira compra começa com 7 dias grátis (o cartão é obrigatório), e nada é cobrado além do plano."
+          ]
+        },
+        {
+          "title": "E os agentes de IA?",
+          "body": [
+            "Uma caixa pode ser de uma pessoa ou de um agente. O agente lê e prepara rascunhos por MCP ou pela API, só com as permissões que você der, e o envio pode esperar a sua aprovação."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Preciso de um servidor de e-mail?",
+          "a": "Não. O MepMail recebe, guarda e envia por você; do seu lado, só os registros de DNS do domínio."
+        },
+        {
+          "q": "Quanto tempo demora para funcionar?",
+          "a": "Os registros costumam valer em minutos; alguns provedores de DNS levam algumas horas. O painel mostra o estado de cada registro enquanto isso."
+        },
+        {
+          "q": "Vou perder e-mails ao trocar de provedor?",
+          "a": "Não, se você criar as caixas antes de apontar o MX. As mensagens que já estão no provedor antigo podem ser importadas por IMAP."
+        },
+        {
+          "q": "Funciona no celular?",
+          "a": "Sim, pelo navegador. O app instalado é para Windows e Linux."
+        }
+      ],
+      "cta": {
+        "title": "Seu e-mail no seu domínio, a partir de R$ 14,90 por mês",
+        "body": "Teste por 7 dias e configure o domínio com o passo a passo do painel.",
+        "button": "Criar conta"
+      }
+    },
+    "email-authentication": {
+      "meta": {
+        "title": "SPF, DKIM e DMARC: o que são e como configurar",
+        "description": "Entenda SPF, DKIM e DMARC, os registros que fazem seu e-mail chegar na caixa de entrada, e como configurá-los no DNS do seu domínio."
+      },
+      "card": "Os três registros que dizem aos provedores que o e-mail é mesmo seu, e como publicar cada um.",
+      "eyebrow": "Guia · Entregabilidade",
+      "title": "SPF, DKIM e DMARC: o que são e como configurar",
+      "lead": "Três registros de DNS dizem ao Gmail, ao Outlook e aos outros provedores que uma mensagem com o seu domínio saiu mesmo de você. Sem eles, seu e-mail tende a cair no spam ou ser recusado.",
+      "sections": [
+        {
+          "title": "Por que isso importa",
+          "body": [
+            "Desde 2024, Gmail e Yahoo exigem que todo remetente autentique o domínio com SPF ou DKIM. Quem envia em volume (mais de 5.000 mensagens por dia para contas Gmail) precisa dos três: SPF, DKIM e DMARC.",
+            "Além da entrega, esses registros protegem a sua marca: dificultam que alguém envie e-mail falso em nome do seu domínio."
+          ]
+        },
+        {
+          "title": "SPF: quem pode enviar pelo seu domínio",
+          "body": [
+            "O SPF é um registro TXT que lista os servidores autorizados a enviar pelo domínio. Cada nome de domínio deve ter um único registro SPF; se você usa mais de um serviço, junte os includes num registro só.",
+            "No MepMail, o SPF fica no subdomínio de retorno (MAIL FROM), que o painel cria e mostra junto com o MX dele."
+          ]
+        },
+        {
+          "title": "DKIM: a assinatura de cada mensagem",
+          "body": [
+            "O DKIM assina cada mensagem com uma chave privada; a chave pública fica num registro TXT no seu DNS, e o provedor de destino confere a assinatura.",
+            "No MepMail, novos domínios usam um único TXT em mepmail._domainkey, mostrado no painel na hora de adicionar o domínio."
+          ]
+        },
+        {
+          "title": "DMARC: o que fazer quando algo falha",
+          "body": [
+            "O DMARC é um TXT em _dmarc.seudominio.com.br. Ele diz aos provedores o que fazer com mensagens que não passam no SPF nem no DKIM alinhados ao domínio do remetente, e para onde mandar os relatórios.",
+            "Comece monitorando, com v=DMARC1; p=none; rua=mailto:dmarc@seudominio.com.br, leia os relatórios por algumas semanas e depois suba para p=quarantine e, se quiser, p=reject."
+          ]
+        },
+        {
+          "title": "Como conferir",
+          "body": [
+            "O painel do MepMail resolve cada registro ao vivo e mostra, por linha, o que está ok e o que falta, inclusive o DMARC herdado do domínio pai quando você envia por um subdomínio.",
+            "Para conferir uma mensagem já entregue, abra o original no Gmail (Mostrar original): spf=pass, dkim=pass e dmarc=pass indicam que está tudo certo."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Posso ter dois registros SPF?",
+          "a": "Não. Dois registros SPF no mesmo nome invalidam os dois; junte os serviços num único registro."
+        },
+        {
+          "q": "O DMARC com p=reject vai bloquear meus e-mails?",
+          "a": "Só os que falham na autenticação alinhada. Por isso o caminho seguro é começar com p=none e subir a política depois de ler os relatórios."
+        },
+        {
+          "q": "Preciso disso se eu só recebo e-mail?",
+          "a": "Sim, é recomendado: SPF e DMARC dificultam que outras pessoas falsifiquem o seu domínio."
+        }
+      ],
+      "cta": {
+        "title": "Configure seu domínio com verificação ao vivo",
+        "body": "O MepMail mostra cada registro que falta e confere o DNS enquanto você publica.",
+        "button": "Criar conta"
+      }
+    },
+    "transactional-email": {
+      "meta": {
+        "title": "E-mail transacional: o que é e como enviar pela sua aplicação",
+        "description": "O que é e-mail transacional (cadastro, senha, recibo), por que separar do marketing e como enviar por API ou SMTP sem cair no spam."
+      },
+      "card": "Cadastro, senha e recibo: o que muda em relação ao marketing e como enviar por API ou SMTP.",
+      "eyebrow": "Guia · Envio",
+      "title": "E-mail transacional: o que é e como enviar pela sua aplicação",
+      "lead": "E-mail transacional é o que a sua aplicação envia porque o usuário fez alguma coisa: criou a conta, pediu outra senha, comprou. Ele precisa chegar rápido e na caixa de entrada.",
+      "sections": [
+        {
+          "title": "Exemplos",
+          "body": [
+            "Confirmação de cadastro, redefinição de senha, código de verificação, recibo, aviso de envio e alertas da conta."
+          ]
+        },
+        {
+          "title": "Transacional não é marketing",
+          "body": [
+            "Newsletter e promoção dependem de consentimento e precisam de descadastro fácil. O transacional é esperado pelo usuário, e por isso tem regras e reputação próprias.",
+            "Mantenha os dois separados, por exemplo com remetentes ou subdomínios diferentes, para que uma campanha mal recebida não atrapalhe o e-mail de senha."
+          ]
+        },
+        {
+          "title": "Como enviar: API ou SMTP",
+          "body": [
+            "Pela API HTTP você recebe o id de cada mensagem, pode usar chave de idempotência para não enviar em dobro e acompanha entrega, devolução e reclamação por webhooks. A API do MepMail é compatível com o SDK do Resend.",
+            "Pelo SMTP, qualquer sistema que já fala SMTP funciona, de WordPress a ERP: no MepMail, o relay é smtp.mepmail.dev, na porta 2587 com STARTTLS."
+          ]
+        },
+        {
+          "title": "Boas práticas",
+          "steps": [
+            "Autentique o domínio com SPF, DKIM e DMARC.",
+            "Use uma chave de idempotência por mensagem, para que um retry não envie duas vezes.",
+            "Respeite devoluções e reclamações: não volte a enviar para endereços que devolveram em definitivo.",
+            "Não misture marketing no fluxo transacional."
+          ]
+        },
+        {
+          "title": "Quanto custa",
+          "body": [
+            "No MepMail, o Envio é grátis até 100 e-mails por dia, sem cartão. O Pro envia 110 mil e-mails por mês por US$ 29."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Posso usar o SMTP do Gmail na minha aplicação?",
+          "a": "Contas pessoais têm limite diário baixo e não foram feitas para aplicações; um serviço de envio dá entregabilidade, logs e webhooks."
+        },
+        {
+          "q": "API ou SMTP, qual escolher?",
+          "a": "API quando você escreve o código: id da mensagem, idempotência e webhooks. SMTP quando o sistema já tem campo de servidor SMTP."
+        },
+        {
+          "q": "Preciso de um domínio próprio?",
+          "a": "Sim. É o domínio autenticado que faz a mensagem chegar na caixa de entrada."
+        }
+      ],
+      "cta": {
+        "title": "Comece a enviar grátis",
+        "body": "100 e-mails por dia sem cartão, por API, SMTP ou MCP.",
+        "button": "Criar conta grátis"
+      }
+    }
+  }
+}

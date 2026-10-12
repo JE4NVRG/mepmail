@@ -26,7 +26,8 @@ export type PublicPage =
   | "security"
   | "support"
   | "changelog"
-  | "download";
+  | "download"
+  | "guides";
 
 export interface PublicSiteLabels {
   skip: string;
@@ -81,6 +82,7 @@ export interface PublicSiteLabels {
     pricing: string;
     alternatives: string;
     apps?: string;
+    guides?: string;
   };
 }
 
@@ -284,6 +286,11 @@ export function PublicFooter({
           <a href="/pricing">{labels.footer.pricing}</a>
           <a href={anchorHref(page, "#comparativo")}>{labels.nav.compare}</a>
           <a href="/alternatives/resend">{labels.footer.alternatives}</a>
+          {labels.footer.guides ? (
+            <a href="/guides" aria-current={page === "guides" ? "page" : undefined}>
+              {labels.footer.guides}
+            </a>
+          ) : null}
         </nav>
         <nav className="gtm-footer-col" aria-label={labels.footer.colAccount}>
           <h3>{labels.footer.colAccount}</h3>

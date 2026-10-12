@@ -1,0 +1,61 @@
+/* Public guides (/guides): a readable column on the landing's tokens. */
+.guide-article {
+  max-width: 820px;
+}
+.guide-updated {
+  color: var(--ms-muted, var(--ms-bone));
+  font-size: 14px;
+  opacity: 0.8;
+}
+.guide-part + .guide-part {
+  margin-top: 40px;
+}
+.guide-part h2 {
+  font-size: 24px;
+  margin-bottom: 16px;
+}
+.guide-steps {
+  margin: 0 0 24px;
+  padding-left: 24px;
+  max-width: 760px;
+}
+.guide-steps li {
+  margin-bottom: 12px;
+  padding-left: 4px;
+}
+.guide-steps li::marker {
+  color: var(--ms-violet);
+  font-weight: 700;
+}
+.guide-related {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+.guide-related li {
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 12px;
+  padding: 20px;
+  background: var(--ms-ground);
+}
+.guide-related li > a:first-child {
+  color: var(--ms-bone);
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.guide-related li > a:first-child:hover {
+  color: var(--ms-violet);
+}
+.guide-related p {
+  margin: 8px 0 0;
+}
+.guide-read {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--ms-violet);
+  font-weight: 600;
+  text-decoration: none;
+}

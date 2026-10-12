@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { GUIDE_SLUGS, guidePath } from "@/lib/guides";
 import { languageAlternates, localizedPath } from "@/lib/public-locale-url";
 
 // Resolve APP_BASE_URL when requested, rather than freezing it at build time.
@@ -31,6 +32,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/security`, changeFrequency: "yearly", priority: 0.7 },
     { url: `${base}/support`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/changelog`, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${base}/guides`, changeFrequency: "monthly", priority: 0.6 },
+    ...GUIDE_SLUGS.map((slug) => ({
+      url: `${base}${guidePath(slug)}`,
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    })),
     { url: `${base}/signup`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/login`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${base}/terms`, changeFrequency: "yearly", priority: 0.4 },

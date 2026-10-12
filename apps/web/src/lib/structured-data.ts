@@ -86,6 +86,32 @@ export function desktopAppJsonLd(
   };
 }
 
+/** A guide: headline, description, its own URL and the editorial date. */
+export function articleJsonLd(
+  base: string,
+  page: {
+    url: string;
+    headline: string;
+    description: string;
+    dateModified: string;
+    locale: string;
+  },
+): JsonLd {
+  return {
+    "@type": "Article",
+    headline: page.headline,
+    description: page.description,
+    url: page.url,
+    mainEntityOfPage: page.url,
+    inLanguage: page.locale,
+    datePublished: page.dateModified,
+    dateModified: page.dateModified,
+    author: { "@id": organizationId(base) },
+    publisher: { "@id": organizationId(base) },
+    image: `${base}/og.jpg`,
+  };
+}
+
 export function faqJsonLd(items: readonly { q: string; a: string }[]): JsonLd {
   return {
     "@type": "FAQPage",

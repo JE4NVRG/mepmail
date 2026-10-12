@@ -27,6 +27,8 @@ export default function robots(): MetadataRoute.Robots {
         // The Linux app's page and its package links; the Windows installer stays out.
         "/desktop/correio/linux",
         "/alternatives",
+        // The public how-to guides (lib/guides.ts).
+        "/guides",
         "/integrations",
         "/security",
         "/support",

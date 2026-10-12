@@ -88,8 +88,9 @@ describe("robots.txt + sitemap.xml agreement", () => {
     const urls = sitemap();
     // 6 URLs from the SEO fix + the three public pages added with /pricing,
     // /alternatives/resend and /integrations, plus the two institutional pages
-    // (/security and /support) and /changelog; each in English and in Portuguese.
-    expect(urls).toHaveLength(24);
+    // (/security and /support), /changelog and the guides (index + 3); each in English and
+    // in Portuguese.
+    expect(urls).toHaveLength(32);
 
     for (const entry of urls) {
       const { pathname, search } = new URL(entry.url as string);
@@ -107,7 +108,7 @@ describe("robots.txt + sitemap.xml agreement", () => {
     vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
     const urls = sitemap();
     // /correio, the desktop downloads and the Linux app's page, in both languages.
-    expect(urls).toHaveLength(30);
+    expect(urls).toHaveLength(38);
     expect(has()).toBe(true);
     expect(urls.find((entry) => entry.url.endsWith("/desktop/correio/linux"))?.priority).toBe(0.6);
     expect(isAllowed("/desktop/correio/linux", allowedPaths())).toBe(true);
@@ -124,7 +125,7 @@ describe("robots.txt + sitemap.xml agreement", () => {
     // Portuguese copy was never indexed.
     const urls = sitemap();
     const english = urls.filter((entry) => !entry.url.includes("?"));
-    expect(english).toHaveLength(12);
+    expect(english).toHaveLength(16);
     for (const entry of english) {
       const portuguese = `${entry.url}?lang=pt-BR`;
       const twin = urls.find((other) => other.url === portuguese);
