@@ -1,5 +1,6 @@
-import { telegramSignupAlert } from "@millionsend/config";
+import { notificationsEmailFrom, signupAlertEmail, telegramSignupAlert } from "@millionsend/config";
 import type { SignupAttribution } from "@millionsend/core";
+import { defaultSystemMailDeps, type SystemMailDeps, sendAccountMail } from "./system-mail";
 
 /**
  * One Telegram message per new account, so the operator learns about a sign-up
@@ -11,6 +12,8 @@ import type { SignupAttribution } from "@millionsend/core";
  * configured nothing is sent (a self-host has no chat to notify), and every
  * failure — an unreachable Bot API, a revoked token, a wrong chat id — is
  * logged and dropped. An alert may never fail the sign-up it reports.
+ * SIGNUP_ALERT_EMAIL sends the same text by e-mail to an operator mailbox,
+ * on its own: either channel works without the other.
  */
 
 /**
@@ -87,6 +90,13 @@ export function originLabel(attribution: SignupAttribution | null): string {
   return parts.join(" · ");
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c,
+  );
+}
+
 /** The message body, pure so it can be asserted in tests. */
 export function signupAlertMessage(params: {
   email: string;
@@ -118,15 +128,31 @@ export function notifySignupAlert(
   user: { email: string; name?: string | null },
   attribution: SignupAttribution | null,
   locale: string,
+  mail: SystemMailDeps = defaultSystemMailDeps,
 ): void {
   const target = telegramSignupAlert();
-  if (!target) return;
+  const mailTo = signupAlertEmail();
+  const from = notificationsEmailFrom();
+  if (!target && !(mailTo && from)) return;
   const text = signupAlertMessage({
     email: user.email,
     name: user.name ?? null,
     attribution,
     locale,
   });
+  if (mailTo && from)
+    sendAccountMail(
+      {
+        from,
+        to: mailTo,
+        subject: `MepMail: novo cadastro ${user.email}`,
+        text,
+        html: `<pre style="font:14px/1.5 system-ui,sans-serif;white-space:pre-wrap">${escapeHtml(text)}</pre>`,
+        kind: "signup.alert",
+      },
+      mail,
+    );
+  if (!target) return;
   const body: Record<string, unknown> = {
     chat_id: target.chatId,
     text,

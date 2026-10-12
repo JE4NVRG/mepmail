@@ -55,6 +55,7 @@ import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import { MailboxMigration } from "./mailbox-migration";
 import { MailboxOffer } from "./mailbox-offer";
 import { MailboxRail } from "./mailbox-rail";
+import { MailboxRules } from "./mailbox-rules";
 import { MailboxSenderDecisions } from "./mailbox-sender-decisions";
 import { MailboxServicePanel } from "./mailbox-service-panel";
 import { MailboxSetupDialog } from "./mailbox-setup-dialog";
@@ -601,6 +602,16 @@ export function MailboxesView({
   // Preferências → remetentes: only an owner answers for a mailbox.
   const senderBoxes = boxes
     .filter((box) => box.ownerActive && box.ownerUserId === session?.user.id && box.canRead)
+    .map((box) => ({ id: box.id, label: box.label, address: box.address }));
+  // Preferências → regras automáticas: an owner's mailboxes that receive mail.
+  const ruleBoxes = boxes
+    .filter(
+      (box) =>
+        box.ownerActive &&
+        box.ownerUserId === session?.user.id &&
+        box.canRead &&
+        box.status === "planned",
+    )
     .map((box) => ({ id: box.id, label: box.label, address: box.address }));
   // The unified view shows the folders of every own mailbox, grouped by mailbox.
   const unifiedFolders = useQuery(
@@ -1559,6 +1570,11 @@ export function MailboxesView({
                       boxes={senderBoxes}
                       preferredId={selected?.id ?? null}
                     />
+                  ) : null
+                }
+                rules={
+                  ruleBoxes.length ? (
+                    <MailboxRules boxes={ruleBoxes} preferredId={selected?.id ?? null} />
                   ) : null
                 }
               />

@@ -40,6 +40,7 @@ const NAMESPACES = [
   "mailboxes-agent",
   "mailboxes-clients",
   "mailboxes-offline",
+  "mailboxes-rules",
   "mailboxes-activity",
   "mailboxes-service",
   "merge-fields",

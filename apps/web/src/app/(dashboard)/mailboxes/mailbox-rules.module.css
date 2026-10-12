@@ -1,0 +1,174 @@
+/* Regras automáticas: the dialog (inside mailboxes.module.css's .dialog) and the list. */
+.form {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.help {
+  margin: 0;
+  color: var(--ms-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.box {
+  margin: 0;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-label);
+  overflow-wrap: anywhere;
+}
+.box strong {
+  color: var(--ms-bone);
+  font-weight: 500;
+}
+.group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.group legend {
+  margin-bottom: 10px;
+  padding: 0;
+  color: var(--ms-bone);
+  font-size: var(--ms-fs-ui);
+  font-weight: 600;
+}
+.choices {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.choice {
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  font-size: var(--ms-fs-ui);
+  cursor: pointer;
+}
+.choice:has(input:checked) {
+  border-color: var(--ms-line-strong);
+  background: var(--ms-panel-raised);
+}
+.choice:has(input:disabled) {
+  opacity: 0.55;
+  cursor: default;
+}
+.choice input {
+  flex: none;
+  margin: 3px 0 0;
+  accent-color: var(--ms-violet, currentColor);
+}
+.choice span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.choice strong {
+  font-weight: 500;
+}
+.choice small {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-label);
+}
+.picker {
+  min-width: 0;
+}
+.flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.flags .choice {
+  flex: 1 1 160px;
+}
+.existing {
+  min-height: 20px;
+}
+
+/* Preferências → Regras automáticas. */
+.rules {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.rulesBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  font-size: 13px;
+}
+.rulesTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.rulesTools input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+}
+.ruleText {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.match {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ms-fs-ui);
+}
+.summary {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-label);
+  overflow-wrap: anywhere;
+}
+.warning {
+  color: var(--ms-warn, var(--ms-danger));
+}
+.rowAction {
+  flex: none;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.showMore {
+  justify-self: start;
+}
+
+/* "Criar regra" beside the open message's sender. */
+.fromAction {
+  min-height: 24px;
+  margin-left: 8px;
+  padding: 0 8px;
+  font-size: 11px;
+  vertical-align: baseline;
+}

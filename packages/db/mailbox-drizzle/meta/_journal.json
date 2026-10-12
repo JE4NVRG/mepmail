@@ -232,6 +232,13 @@
       "when": 1791730800032,
       "tag": "0032_mailbox_client_access",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791730800033,
+      "tag": "0033_mailbox_rules",
+      "breakpoints": true
     }
   ]
 }

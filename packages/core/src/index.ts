@@ -530,6 +530,14 @@ export {
   withMailboxRegistryAdmin,
 } from "./mailbox-registry.js";
 export {
+  deriveMailboxRuleKey,
+  MAILBOX_RULES_MAX,
+  type MailboxRuleAction,
+  type MailboxRuleInput,
+  type MailboxRuleMatchKind,
+  type MailboxRuleView,
+} from "./mailbox-rules.js";
+export {
   claimDueMailboxSends,
   completeMailboxSend,
   countMailboxSchedules,

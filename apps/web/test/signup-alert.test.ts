@@ -106,6 +106,32 @@ describe("notifySignupAlert", () => {
     expect(String(body.text)).toContain("React Brasil");
   });
 
+  it("e-mails the same alert to SIGNUP_ALERT_EMAIL on its own, from the notifications sender", async () => {
+    vi.stubEnv("SIGNUP_ALERT_EMAIL", "alertas@example.com");
+    vi.stubEnv("NOTIFICATIONS_EMAIL_FROM", "MepMail <notices@example.com>");
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const send = vi.fn(async () => {});
+    notifySignupAlert({ email: "ada@example.com", name: "<Ada>" }, attribution(), "pt-BR", {
+      send,
+    });
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    const [message] = send.mock.calls[0] as unknown as [
+      { from: string; to: string; subject: string; text: string; html: string; kind: string },
+    ];
+    expect(message).toMatchObject({
+      from: "MepMail <notices@example.com>",
+      to: "alertas@example.com",
+      subject: "MepMail: novo cadastro ada@example.com",
+      kind: "signup.alert",
+    });
+    expect(message.text).toContain("React Brasil");
+    expect(message.html).toContain("&lt;Ada&gt;");
+    expect(message.html).not.toContain("<Ada>");
+    // No Telegram pair configured: no Bot API call.
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("never rejects when the Bot API refuses", async () => {
     vi.stubEnv("TELEGRAM_BOT_TOKEN", "123456:TEST-TOKEN-VALUE-000000000000000000000");
     vi.stubEnv("TELEGRAM_CHAT_ID", "42");

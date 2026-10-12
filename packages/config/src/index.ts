@@ -34,6 +34,7 @@ export {
   SES_TRANSACTIONAL_RESERVE_MIN,
   servedRegions,
   sesTenantsEnabled,
+  signupAlertEmail,
   signupOpen,
   supportViewEnabled,
   telegramSignupAlert,

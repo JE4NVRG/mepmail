@@ -24,6 +24,29 @@
   },
   "releases": [
     {
+      "version": "0.136",
+      "date": "2026-10-12",
+      "title": "Automatic rules in Mail",
+      "summary": "Choose where mail from a sender or a domain goes: a folder, the Archive or another mailbox of yours, already read if you like. Handy for keeping notices, reports and newsletters out of the Inbox.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Create rule, next to the sender in the open message: for this sender or for any address at the domain (subdomains included).",
+            "Destinations: a folder of the mailbox, the Archive or another mailbox of yours, with mark as read and star. Optionally it also applies to messages already in the Inbox.",
+            "Preferences → Appearance → Automatic rules lists each mailbox's rules, to edit or delete."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Spam, quarantine and blocked senders are never moved by a rule. Another mailbox receives only while it is yours.",
+            "Each rule's sender or domain is encrypted, like message content."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.133",
       "date": "2026-10-12",
       "title": "An agents panel in Mail, and offline reading in the app",

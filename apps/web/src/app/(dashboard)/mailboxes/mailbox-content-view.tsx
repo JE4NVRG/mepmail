@@ -100,6 +100,8 @@ import { MailboxMoveMenu, type MailboxMoveMenuHandle } from "./mailbox-move-menu
 import { MailboxRecipientField } from "./mailbox-recipient-field";
 import { MailboxRichBody } from "./mailbox-rich-body";
 import type { RichEditorHandle } from "./mailbox-rich-editor";
+import { MailboxRuleDialog } from "./mailbox-rules";
+import rulesStyles from "./mailbox-rules.module.css";
 import { MailboxSenderBar } from "./mailbox-sender-bar";
 import { MailboxSmartTabs } from "./mailbox-smart-tabs";
 import { MailboxTimeMenu, type MailboxTimeMenuHandle } from "./mailbox-time-menu";
@@ -1232,6 +1234,7 @@ export function MailboxContentView({
 }) {
   const t = useTranslations("mailboxes");
   const tAgent = useTranslations("mailboxes-agent");
+  const tRules = useTranslations("mailboxes-rules");
   // "Aprovado por…" badges; a person sending what an agent wrote names both.
   const approvalText = (approval: NonNullable<ReturnType<typeof mailboxSendApproval>>) =>
     approval.key === "approval.draftedByAgent"
@@ -1352,6 +1355,8 @@ export function MailboxContentView({
     () => knownPeopleFrom(sentForPeople.data?.items ?? []),
     [sentForPeople.data],
   );
+  // "Criar regra" from the open message's sender (Regras automáticas).
+  const [ruleFrom, setRuleFrom] = useState<{ mailboxId: string; from: string } | null>(null);
   // "Expandir leitura": the open message takes the list's place too. The
   // choice is remembered on this device.
   const [wideReader, setWideReader] = useState(false);
@@ -4327,6 +4332,21 @@ export function MailboxContentView({
                           <dd>
                             {item.fromName ? `${item.fromName} · ` : ""}
                             {item.from}
+                            {isOwner &&
+                            item.kind === "inbox" &&
+                            item.from.includes("@") &&
+                            selectedBox?.status === "planned" ? (
+                              <button
+                                type="button"
+                                className={`ms-btn ms-btn-ghost ${rulesStyles.fromAction}`}
+                                title={tRules("createFor", { address: item.from })}
+                                onClick={() =>
+                                  setRuleFrom({ mailboxId: item.mailboxId, from: item.from })
+                                }
+                              >
+                                {tRules("create")}
+                              </button>
+                            ) : null}
                           </dd>
                         </div>
                         <div>
@@ -4508,6 +4528,23 @@ export function MailboxContentView({
               expectedRevision: saved.revision,
             })
           }
+        />
+      ) : null}
+      {ruleFrom ? (
+        <MailboxRuleDialog
+          mailboxId={ruleFrom.mailboxId}
+          from={ruleFrom.from}
+          boxes={boxes
+            .filter(
+              (box) =>
+                box.ownerActive &&
+                box.ownerUserId === currentUserId &&
+                box.canRead &&
+                box.status === "planned",
+            )
+            .map((box) => ({ id: box.id, label: box.label, address: box.address }))}
+          close={() => setRuleFrom(null)}
+          saved={() => void refresh()}
         />
       ) : null}
     </>

@@ -52,6 +52,7 @@ export function MailboxAppearanceSettings({
   openShortcuts,
   openTab,
   senders,
+  rules,
 }: {
   prefs: CorreioPrefs;
   setPref: (patch: Partial<CorreioPrefs>) => void;
@@ -60,9 +61,12 @@ export function MailboxAppearanceSettings({
   openTab: (tab: GuideTab) => void;
   /** "Remetentes aprovados e bloqueados", for a person who owns a mailbox. */
   senders?: ReactNode;
+  /** Preferências → Regras automáticas (the owner's mailboxes). */
+  rules?: ReactNode;
 }) {
   const t = useTranslations("mailboxes.appearance");
   const common = useTranslations("mailboxes");
+  const tRules = useTranslations("mailboxes-rules");
   const locale = useLocale();
   const router = useRouter();
   const id = useId();
@@ -473,6 +477,13 @@ export function MailboxAppearanceSettings({
         <section className={styles.appearanceGroup} aria-labelledby={`${id}-senderList`}>
           <h3 id={`${id}-senderList`}>{common("senders.listTitle")}</h3>
           {senders}
+        </section>
+      ) : null}
+
+      {rules ? (
+        <section className={styles.appearanceGroup} aria-labelledby={`${id}-rules`}>
+          <h3 id={`${id}-rules`}>{tRules("listTitle")}</h3>
+          {rules}
         </section>
       ) : null}
 

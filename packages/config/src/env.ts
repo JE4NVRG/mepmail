@@ -390,6 +390,9 @@ export const env = createEnv({
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     TELEGRAM_CHAT_ID: z.string().optional(),
     TELEGRAM_MESSAGE_THREAD_ID: z.coerce.number().int().positive().optional(),
+    // The same alert by e-mail, from the notifications sender, to an operator
+    // mailbox (an alerts box), independent of the Telegram pair.
+    SIGNUP_ALERT_EMAIL: emailAddress.optional(),
 
     // Sender for system emails (password reset), as `Name <user@domain>` or a
     // bare address; its domain must be a verified identity in this instance's
@@ -607,6 +610,12 @@ export function telegramSignupAlert(e: Env = env): {
     chatId: e.TELEGRAM_CHAT_ID,
     threadId: Number.isInteger(numeric) && numeric > 0 ? numeric : null,
   };
+}
+
+/** The operator mailbox signup alerts are e-mailed to, or null when unset. */
+export function signupAlertEmail(e: Env = env): string | null {
+  const to = e.SIGNUP_ALERT_EMAIL?.trim();
+  return to && emailAddress.safeParse(to).success ? to : null;
 }
 
 /**

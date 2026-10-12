@@ -39,6 +39,12 @@ import {
   MailboxContentError,
   withMailboxWriteAccess,
 } from "./mailbox-private-store.js";
+import {
+  deriveMailboxRuleKey,
+  type MailboxRuleAction,
+  mailboxRuleFor,
+  mailboxRuleTargetUsable,
+} from "./mailbox-rules.js";
 import { isMailboxSenderBlocked } from "./mailbox-senders.js";
 import {
   assertMailboxStorage,
@@ -562,6 +568,11 @@ export async function receiveMailboxMime(
   const from =
     assessment?.decision !== "quarantine" ? (await envelope(mime, input.raw, false)).from : null;
   const sourceId = `ingress:${hash(input.sourceId)}`;
+  // Regras automáticas file mail bound for the inbox, and only with the sender key.
+  const ruleKey =
+    input.senderKey && from && (assessment?.decision ?? "inbox") === "inbox"
+      ? deriveMailboxRuleKey(input.senderKey)
+      : null;
   return db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
     // Each RCPT resolves to one mailbox, by its own address or by an alias of it;
@@ -581,7 +592,47 @@ export async function receiveMailboxMime(
     for (const alias of aliased)
       if (!resolved.has(alias.address)) resolved.set(alias.address, alias.mailboxId);
     if (resolved.size !== recipients.length) throw new MailboxContentError("not_found");
-    const targets = [...new Set(resolved.values())];
+    // A rule of an addressed mailbox may deliver the message to another mailbox of the
+    // same owner instead: one hop, never for a sender the owner blocked in the first one,
+    // and only while that mailbox is active on a verified domain.
+    const rules = new Map<string, MailboxRuleAction | null>();
+    const redirected = new Map<string, MailboxRuleAction>();
+    const delivery = new Map<string, string>();
+    for (const id of new Set(resolved.values())) {
+      let target = id;
+      if (ruleKey && from) {
+        const rule = await mailboxRuleFor(tx, ruleKey, { mailboxId: id, from });
+        rules.set(id, rule);
+        if (
+          rule?.targetMailboxId &&
+          !(await isMailboxSenderBlocked(tx, input.senderKey!, {
+            teamId: rule.teamId,
+            mailboxId: id,
+            address: from,
+          })) &&
+          (await mailboxRuleTargetUsable(tx, {
+            teamId: rule.teamId,
+            mailboxId: id,
+            targetMailboxId: rule.targetMailboxId,
+          }))
+        ) {
+          target = rule.targetMailboxId;
+          const earlier = redirected.get(target);
+          redirected.set(
+            target,
+            earlier
+              ? {
+                  ...rule,
+                  markRead: rule.markRead || earlier.markRead,
+                  star: rule.star || earlier.star,
+                }
+              : rule,
+          );
+        }
+      }
+      delivery.set(id, target);
+    }
+    const targets = [...new Set(delivery.values())];
     const boxes = await tx
       .select({
         id: schema.mailboxes.id,
@@ -668,12 +719,28 @@ export async function receiveMailboxMime(
         binding({ teamId: box.teamId, mailboxId: box.id, id }),
       );
       const folder = blocked ? "spam" : (assessment?.decision ?? "inbox");
+      // The mailbox's own rule files it in a folder or the Archive (a redirected message
+      // takes no second hop); read and star come from either rule.
+      const own =
+        folder === "inbox" && ruleKey && from
+          ? rules.has(box.id)
+            ? rules.get(box.id)
+            : await mailboxRuleFor(tx, ruleKey, { mailboxId: box.id, from })
+          : null;
+      const via = folder === "inbox" ? redirected.get(box.id) : undefined;
+      const filed = {
+        ...(own?.folderId ? { folderId: own.folderId } : {}),
+        ...(own?.archive ? { archivedAt: now } : {}),
+        ...(own?.markRead || via?.markRead ? { seenAt: now } : {}),
+        ...(own?.star || via?.star ? { starredAt: now } : {}),
+      };
       await tx.insert(schema.mailboxItems).values({
         id,
         teamId: box.teamId,
         mailboxId: box.id,
         kind: "inbox",
         deliveryFolder: folder,
+        ...filed,
         inboundAssessment: assessment,
         sourceId,
         rawBytes: input.raw.length,

@@ -24,6 +24,29 @@
   },
   "releases": [
     {
+      "version": "0.136",
+      "date": "2026-10-12",
+      "title": "Regras automáticas no Correio",
+      "summary": "Escolha para onde vai o que chega de um remetente ou de um domínio: uma pasta, o Arquivo ou outra caixa sua, já lido se quiser. Bom para tirar avisos, relatórios e newsletters da Entrada.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Criar regra, ao lado do remetente na mensagem aberta: para este remetente ou para qualquer endereço do domínio (inclui subdomínios).",
+            "Destinos: uma pasta da caixa, o Arquivo ou outra caixa sua, com marcar como lida e estrela. Opcionalmente, aplica também às mensagens que já estão na Entrada.",
+            "Preferências → Aparência → Regras automáticas lista as regras de cada caixa, para editar ou excluir."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "Spam, quarentena e remetentes bloqueados nunca são movidos por uma regra. Outra caixa só recebe enquanto for sua.",
+            "O remetente ou domínio de cada regra fica criptografado, como o conteúdo das mensagens."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.133",
       "date": "2026-10-12",
       "title": "Painel de agentes no Correio e leitura offline no app",
