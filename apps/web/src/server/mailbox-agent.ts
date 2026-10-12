@@ -63,6 +63,30 @@ export async function mailboxAgentRequest(
   );
 }
 
+/** An agent call whose operation builds its own Response (attachment bytes, not JSON). */
+export async function mailboxAgentResponseRequest(
+  request: Request,
+  scope: MailboxAgentScope,
+  run: (context: Parameters<Parameters<typeof withMailboxAgentAccess>[3]>[0]) => Promise<Response>,
+) {
+  return mailboxAgentBearerRequest(
+    request,
+    (token) =>
+      withMailboxAgentAccess(
+        getDb(),
+        token,
+        scope,
+        async (context) => {
+          if (!(await mailboxActorAccessEnabled(context.db, context.actor)))
+            throw new MailboxAgentAccessError("forbidden");
+          return run(context);
+        },
+        mailboxSelector(request),
+      ),
+    (response) => response,
+  );
+}
+
 /** Any bearer-authenticated agent call that needs the raw credential (account listing). */
 export function mailboxAgentTokenRequest<T>(
   request: Request,

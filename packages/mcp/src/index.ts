@@ -55,7 +55,14 @@ serveStdio(() => {
     { capabilities: { tools: {} }, ...(mailToken ? { instructions: CORREIO_INSTRUCTIONS } : {}) },
   );
   if (client) registerTools(server, client);
-  if (mailToken) registerCorreioTools(server, { token: mailToken, origin: mailOrigin });
+  if (mailToken)
+    registerCorreioTools(server, {
+      token: mailToken,
+      origin: mailOrigin,
+      // Attachments: where files are saved, and the only folder files may be attached from.
+      downloadDir: process.env.MEPMAIL_MAIL_DOWNLOAD_DIR?.trim() || undefined,
+      uploadDir: process.env.MEPMAIL_MAIL_UPLOAD_DIR?.trim() || undefined,
+    });
   return server;
 });
 

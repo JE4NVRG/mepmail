@@ -24,6 +24,34 @@
   },
   "releases": [
     {
+      "version": "0.138",
+      "date": "2026-10-12",
+      "title": "Anexos no MCP do Correio",
+      "summary": "Agentes leem, baixam, anexam e encaminham arquivos pelo MCP, com as mesmas permissões e limites da caixa.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "mailbox_get_attachment: baixa um anexo pelo id e pela revisão da mensagem, com nome, tamanho e hash SHA-256. O pacote local salva numa pasta escolhida por você; o MCP hospedado devolve arquivos de até 512 KiB.",
+            "mailbox_save_draft aceita anexos novos e escolhe quais manter ao editar um rascunho ou encaminhar uma mensagem (até 10 arquivos, 256 KiB cada)."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "O pacote local só lê arquivos da pasta que você configurar (MEPMAIL_MAIL_UPLOAD_DIR), nunca de um caminho sugerido por um e-mail.",
+            "Ao editar um rascunho ou encaminhar, os anexos ficam por padrão; nenhum some sem o agente pedir."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Editar um rascunho existente pelo MCP era recusado."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.137",
       "date": "2026-10-12",
       "title": "Edite o acesso dos agentes; o MCP percorre a caixa inteira",

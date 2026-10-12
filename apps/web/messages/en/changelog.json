@@ -24,6 +24,34 @@
   },
   "releases": [
     {
+      "version": "0.138",
+      "date": "2026-10-12",
+      "title": "Attachments in the Mail MCP",
+      "summary": "Agents read, download, attach and forward files over MCP, with the mailbox's own permissions and limits.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "mailbox_get_attachment: downloads an attachment by the message id and revision, with name, size and SHA-256 hash. The local package saves it to a folder you choose; the hosted MCP returns files up to 512 KiB.",
+            "mailbox_save_draft takes new attachments and picks which to keep when editing a draft or forwarding a message (up to 10 files, 256 KiB each)."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "The local package reads files only from the folder you set (MEPMAIL_MAIL_UPLOAD_DIR), never from a path an email suggests.",
+            "When editing a draft or forwarding, attachments stay by default; none disappears unless the agent asks."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Editing an existing draft over MCP was refused."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.137",
       "date": "2026-10-12",
       "title": "Edit your agents' access; MCP walks the whole mailbox",

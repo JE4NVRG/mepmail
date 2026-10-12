@@ -93,6 +93,7 @@ it("lists the mailbox tools and forwards each call with the agent key", async ()
   const client = await connect(KEY);
   const { tools } = await client.listTools();
   expect(tools.map((t) => t.name).sort()).toEqual([
+    "mailbox_get_attachment",
     "mailbox_list_accounts",
     "mailbox_list_messages",
     "mailbox_read_message",

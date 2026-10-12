@@ -113,8 +113,18 @@ Correio mailboxes (with `MEPMAIL_MAIL_TOKEN`, same five tools as the hosted
   listing's `after`/`before` use the order time (arrival, or when a snoozed message
   came back; a draft's last edit), a search uses the arrival time, and a search
   also finds snoozed messages, which the listing leaves out until they return.
+- `mailbox_get_attachment` — one attachment by message id, revision and index
+  (from `mailbox_read_message`): filename, bytes and sha256. With
+  `MEPMAIL_MAIL_DOWNLOAD_DIR` set the file is saved there (never overwriting);
+  otherwise it comes back as `content_base64`, up to 512 KiB.
 - `mailbox_save_draft` — new draft, edit, reply or forward, from that
-  mailbox's address and signature.
+  mailbox's address and signature. `attachments` adds files as
+  `{ filename, content_base64 }`, or `{ path }` for a file inside
+  `MEPMAIL_MAIL_UPLOAD_DIR` (no other local path is ever read); `keep_attachments`
+  picks the files to keep from the edited draft or the forwarded message (by
+  default all of them; a reply keeps none). Limits: 10 files, 256 KiB each, about
+  700 KiB in all. Files travel only inside the draft request, so nothing is left
+  behind when a draft is abandoned.
 - `mailbox_send_draft` — sends with the send permission; otherwise the owner
   gets an approval request (`awaiting_approval`).
 
