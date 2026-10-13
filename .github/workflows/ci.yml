@@ -1,4 +1,7 @@
 name: ci
+# A dispatched candidate check is named after its commit, so the release script can find
+# it; every other run keeps GitHub's default title.
+run-name: ${{ inputs.sha && format('candidate {0}', inputs.sha) || '' }}
 
 on:
   push:
@@ -43,7 +46,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
+      # --continue: one run reports every package's failures, not just the first one.
+      - run: pnpm exec turbo run test --continue
       - name: Migrations are up to date with the schema
         run: |
           pnpm db:generate
