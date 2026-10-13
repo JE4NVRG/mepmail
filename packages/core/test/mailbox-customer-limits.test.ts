@@ -285,6 +285,8 @@ describe("finite Correio customer outbound allowances", () => {
         vi.useRealTimers();
       }
     },
+    // Filling the whole allowance twice on PGlite takes ~80s on a 2-core CI runner.
+    240_000,
   );
 
   it.each(["month", null] as const)(
