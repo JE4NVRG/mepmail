@@ -48,10 +48,10 @@ jobs:
       - run: pnpm typecheck
       # --continue: one run reports every package's failures, not just the first one.
       - run: pnpm exec turbo run test --continue
-      - name: Migrations are up to date with the schema
-        run: |
-          pnpm db:generate
-          git diff --exit-code -- packages/db/drizzle
+      # Not a drizzle-kit snapshot diff: hand-written migrations and Correio's own chain
+      # keep no snapshot. The test suites above apply both chains to a real database.
+      - name: Migration journals match their files
+        run: node scripts/check-migration-journals.mjs
 
   # Whole-history secret scan with the pinned gitleaks image (the GitHub
   # action needs a license key for organization repos; the CLI does not).
