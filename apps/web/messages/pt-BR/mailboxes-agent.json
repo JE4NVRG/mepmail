@@ -182,13 +182,14 @@
       "sent": "Envio aprovado. Está saindo agora.",
       "discarded": "Rascunho descartado.",
       "errors": {
-        "recipientBlocked": "Não foi enviado: um dos destinatários está bloqueado porque um envio anterior para ele voltou (endereço inexistente ou recusado). Abra o rascunho, tire esse destinatário e envie de novo.",
-        "recipientBlockedNamed": "Não foi enviado: {recipients} está bloqueado porque um envio anterior voltou (endereço inexistente ou recusado). Abra o rascunho, tire esse destinatário e envie de novo.",
+        "recipientBlocked": "Não foi enviado: um dos destinatários está bloqueado porque um envio anterior voltou (endereço inexistente ou recusado) ou foi marcado como spam por quem recebeu. Abra o rascunho, tire esse destinatário e envie de novo.",
+        "recipientBlockedNamed": "Não foi enviado: {count, plural, one {{recipients} está bloqueado} other {{recipients} estão bloqueados}} porque um envio anterior voltou (endereço inexistente ou recusado) ou foi marcado como spam por quem recebeu.",
         "quota": "Não foi enviado: o plano chegou ao limite deste período. O rascunho continua guardado.",
         "trialLimit": "Não foi enviado: o teste grátis chegou ao limite de envio por agora. O rascunho continua guardado.",
         "unavailable": "Não foi enviado: o envio do Correio está indisponível agora. Tente de novo em alguns minutos.",
         "forbidden": "Não foi enviado: esta caixa não pode enviar agora (domínio não verificado, caixa suspensa ou acesso alterado).",
-        "generic": "Não foi enviado. Nada saiu; tente de novo."
+        "generic": "Não foi enviado. Nada saiu; tente de novo.",
+        "unblockedAll": "Destinatários desbloqueados. Já pode enviar de novo."
       }
     },
     "agents": {

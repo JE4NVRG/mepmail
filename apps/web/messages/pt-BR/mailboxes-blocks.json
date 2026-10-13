@@ -1,0 +1,22 @@
+{
+  "title": "Destinatários bloqueados",
+  "hint": "Um envio para estes endereços voltou ou foi marcado como spam, e o Correio parou de enviar para eles em toda a equipe para proteger a reputação dos seus domínios.",
+  "checking": "{address}: verificando…",
+  "checkError": "{address}: não deu para verificar o bloqueio agora.",
+  "adminOnly": "{address} está bloqueado. Só o dono ou um administrador da equipe pode desbloquear.",
+  "notBlocked": "{address} não está mais bloqueado. Já pode enviar.",
+  "complaint": "{address} marcou um e-mail como spam. Esse bloqueio não pode ser retirado: tire o endereço desta mensagem.",
+  "bounced": "{address}: um envio voltou em {date} (endereço inexistente ou recusado).",
+  "bouncedUndated": "{address}: um envio voltou (endereço inexistente ou recusado).",
+  "unblock": "Desbloquear",
+  "unblockLabel": "Desbloquear {address}",
+  "unblocking": "Desbloqueando…",
+  "keep": "Manter bloqueado",
+  "confirm": "Desbloquear {address}? Só faça isso se tiver certeza de que o endereço existe agora ou voltou a funcionar (por exemplo, um erro de digitação corrigido ou uma caixa recriada). Outra devolução prejudica a entrega de todos os e-mails dos seus domínios.",
+  "unblocked": "{address} desbloqueado.",
+  "sesPending": "O provedor de envio ainda tem esse endereço na lista de devoluções dele; os próximos envios podem ser descartados até a equipe MepMail concluir a liberação.",
+  "sendAgain": "Pronto: volte ao rascunho e envie de novo.",
+  "forbidden": "Não foi possível desbloquear: só o dono ou um administrador da equipe pode, e um endereço marcado como spam não pode ser desbloqueado.",
+  "invalid": "Esse endereço não parece válido.",
+  "error": "Não foi possível desbloquear agora. Tente de novo."
+}

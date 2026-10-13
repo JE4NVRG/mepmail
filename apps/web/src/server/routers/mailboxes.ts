@@ -15,6 +15,7 @@ import {
   createMailboxRegistry,
   createMailboxTeamAgentKey,
   getMailboxReceivingReadiness,
+  getMailboxRecipientBlock,
   grantMailboxOAuthClient,
   grantMailboxRegistry,
   listMailboxActivity,
@@ -106,6 +107,7 @@ import {
 import { mailboxReceivingDeps } from "../mailbox-receiving";
 import { searchMailboxContent } from "../mailbox-search";
 import { mailboxTransportMime } from "../mailbox-transport";
+import { unblockMailboxRecipientEverywhere } from "../mailbox-unblock";
 import { getMailboxUsage } from "../mailbox-usage";
 import {
   mailboxActorAccessEnabled,
@@ -645,6 +647,16 @@ export const mailboxesRouter = router({
     });
     return key;
   }),
+  // A recipient whose earlier mail hard-bounced or complained: blocks are kept by hash, so
+  // they are read and lifted by the address (team owners and admins; see core).
+  recipientBlock: enabled
+    .input(z.object({ address: z.string().min(3).max(254) }).strict())
+    .query(({ ctx, input }) => call(() => getMailboxRecipientBlock(ctx.db, actor(ctx), input))),
+  unblockRecipient: enabled
+    .input(z.object({ address: z.string().min(3).max(254) }).strict())
+    .mutation(({ ctx, input }) =>
+      call(() => unblockMailboxRecipientEverywhere(ctx.db, actor(ctx), input)),
+    ),
   queueDraft: enabled
     .input(
       z.object({

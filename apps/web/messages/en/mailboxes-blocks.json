@@ -1,0 +1,22 @@
+{
+  "title": "Blocked recipients",
+  "hint": "A message to these addresses bounced or was marked as spam, so Mail stopped sending to them across the team to protect your domains' reputation.",
+  "checking": "{address}: checking…",
+  "checkError": "{address}: couldn't check the block right now.",
+  "adminOnly": "{address} is blocked. Only the team owner or an admin can unblock it.",
+  "notBlocked": "{address} is no longer blocked. You can send now.",
+  "complaint": "{address} marked a message as spam. That block can't be lifted: remove the address from this message.",
+  "bounced": "{address}: a message bounced on {date} (address doesn't exist or refused it).",
+  "bouncedUndated": "{address}: a message bounced (address doesn't exist or refused it).",
+  "unblock": "Unblock",
+  "unblockLabel": "Unblock {address}",
+  "unblocking": "Unblocking…",
+  "keep": "Keep blocked",
+  "confirm": "Unblock {address}? Only do this if you're sure the address exists now or works again (for example, a typo fixed or a mailbox recreated). Another bounce hurts delivery of every message from your domains.",
+  "unblocked": "{address} unblocked.",
+  "sesPending": "The sending provider still has this address on its bounce list; the next messages may be dropped until the MepMail team finishes lifting it.",
+  "sendAgain": "Done: go back to the draft and send again.",
+  "forbidden": "Couldn't unblock: only the team owner or an admin can, and an address marked as spam can't be unblocked.",
+  "invalid": "That address doesn't look valid.",
+  "error": "Couldn't unblock right now. Try again."
+}

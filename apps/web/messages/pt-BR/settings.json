@@ -522,6 +522,7 @@
       "mailbox_team_agent_key_created": "Criou chave de agente para várias caixas",
       "mailbox_team_agent_key_revoked": "Revogou chave de agente de várias caixas",
       "mailbox_team_agent_key_updated": "Editou chave de agente de várias caixas (caixas, permissões, nome ou validade)",
+      "mailbox_recipient_unblocked": "Desbloqueou um destinatário após um bounce, para o Correio voltar a enviar para ele",
       "mailbox_app_password_created": "Criou uma senha de app",
       "mailbox_app_password_revoked": "Revogou uma senha de app",
       "mailbox_send_queued": "Enviou uma mensagem de uma caixa",

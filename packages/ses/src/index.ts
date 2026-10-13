@@ -120,6 +120,12 @@ export {
   verifySnsMessage,
 } from "./sns-verify.js";
 export {
+  createSesSuppressionClient,
+  removeSesBounceSuppression,
+  type SesSuppressionClient,
+  type SesSuppressionRemoval,
+} from "./suppression.js";
+export {
   associateTenantResources,
   deleteTenant,
   disassociateIdentity,

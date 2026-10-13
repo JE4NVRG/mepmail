@@ -8,6 +8,7 @@ import { toast } from "@/components/toast";
 import { useTRPC } from "@/lib/trpc";
 import { ACTIVITY_ACTION_KEYS } from "./mailbox-activity";
 import own from "./mailbox-agents-panel.module.css";
+import { MailboxBlockedRecipients } from "./mailbox-recipient-unblock";
 import styles from "./mailboxes.module.css";
 
 /**
@@ -41,7 +42,14 @@ export function MailboxAgentsPanel({
   );
   const [confirming, setConfirming] = useState<string | null>(null);
   // Why the last approval of a card did not go out, shown on that card.
-  const [sendError, setSendError] = useState<{ itemId: string; message: string } | null>(null);
+  const [sendError, setSendError] = useState<{
+    itemId: string;
+    message: string;
+    /** Addresses the send was refused for (recipient_blocked), each one liftable. */
+    blocked: string[];
+    /** Those already unblocked here (their rows stay, with any provider warning). */
+    lifted: string[];
+  } | null>(null);
   const busy =
     send.isPending || discard.isPending || revokeKey.isPending || revokeCredential.isPending;
   const when = (value: Date | string) =>
@@ -80,9 +88,17 @@ export function MailboxAgentsPanel({
     const named = Array.isArray(blocked) ? blocked.filter((v) => typeof v === "string") : [];
     const message =
       key === "recipientBlocked" && named.length
-        ? t("approvals.errors.recipientBlockedNamed", { recipients: named.join(", ") })
+        ? t("approvals.errors.recipientBlockedNamed", {
+            recipients: named.join(", "),
+            count: named.length,
+          })
         : t(`approvals.errors.${key}`);
-    setSendError({ itemId, message });
+    setSendError({
+      itemId,
+      message,
+      blocked: key === "recipientBlocked" ? named : [],
+      lifted: [],
+    });
     toast(message, "danger");
     void refresh();
   };
@@ -151,9 +167,32 @@ export function MailboxAgentsPanel({
                   </dl>
                   {item.preview ? <p className={own.preview}>{item.preview}</p> : null}
                   {sendError?.itemId === item.itemId ? (
-                    <p className={own.sendError} role="alert">
-                      {sendError.message}
-                    </p>
+                    <div
+                      className={own.sendError}
+                      role={
+                        sendError.blocked.length &&
+                        sendError.blocked.every((value) => sendError.lifted.includes(value))
+                          ? "status"
+                          : "alert"
+                      }
+                    >
+                      <p>
+                        {sendError.blocked.length &&
+                        sendError.blocked.every((value) => sendError.lifted.includes(value))
+                          ? t("approvals.errors.unblockedAll")
+                          : sendError.message}
+                      </p>
+                      <MailboxBlockedRecipients
+                        addresses={sendError.blocked}
+                        onUnblocked={(address) => {
+                          const lifted = [...new Set([...sendError.lifted, address])];
+                          // Every blocked recipient lifted: Enviar works again.
+                          if (sendError.blocked.every((value) => lifted.includes(value)))
+                            toast(t("approvals.errors.unblockedAll"));
+                          setSendError({ ...sendError, lifted });
+                        }}
+                      />
+                    </div>
                   ) : null}
                   {confirming === key ? (
                     <div className={own.actions}>

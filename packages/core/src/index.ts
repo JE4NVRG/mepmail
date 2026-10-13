@@ -521,6 +521,11 @@ export {
   type MailboxReceivingState,
 } from "./mailbox-receiving.js";
 export {
+  getMailboxRecipientBlock,
+  type MailboxRecipientBlockState,
+  unblockMailboxRecipient,
+} from "./mailbox-recipient-blocks.js";
+export {
   assertMailboxSignatureEditor,
   createMailboxRegistry,
   grantMailboxRegistry,

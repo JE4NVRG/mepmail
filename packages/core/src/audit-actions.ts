@@ -63,6 +63,7 @@ export const AUDIT_ACTIONS = [
   "mailbox.team_agent_key_created",
   "mailbox.team_agent_key_revoked",
   "mailbox.team_agent_key_updated",
+  "mailbox.recipient_unblocked",
   "mailbox.send_queued",
   "mailbox.send_approved",
   "mailbox.send_requested",

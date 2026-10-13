@@ -24,6 +24,27 @@
   },
   "releases": [
     {
+      "version": "0.143",
+      "date": "2026-10-13",
+      "title": "Desbloqueie um destinatário depois de um bounce",
+      "summary": "Quando um envio voltou porque o endereço não existia ou recusou, o dono ou um admin pode desbloquear esse destinatário e enviar de novo.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Desbloquear destinatário: no aviso de envio recusado, cada endereço bloqueado por bounce tem um botão para desbloquear, com confirmação. Só o dono ou um admin da equipe; fica no registro de auditoria.",
+            "Quem marcou como spam continua bloqueado: esse pedido da pessoa não é desfeito."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "@mepmail/mcp 0.3.1 no npm: as mesmas ferramentas do Correio do MCP hospedado, com a versão em mailbox_list_accounts."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.142",
       "date": "2026-10-12",
       "title": "Envio recusado diz quais destinatários estão bloqueados",

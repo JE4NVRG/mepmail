@@ -77,6 +77,15 @@ async function readRegistry(): Promise<RegistryTool[]> {
     });
   }
 
+  // The Correio tools are defined once (packages/mcp/src/correio-tools.ts) and each is
+  // registered by a `correioTool("name", "scope");` line with its mail scope.
+  for (const call of source.matchAll(/\n\s+correioTool\("([a-z0-9_]+)", "([a-z0-9:_-]+)"\);/g)) {
+    const name = call[1];
+    const scope = call[2];
+    if (name === undefined || scope === undefined) continue;
+    registry.push({ name, scope, admin: false });
+  }
+
   // list_teams: no scope of its own — it exists only on an all-teams grant.
   for (const name of captures(source, /\n {4}server\.registerTool\(\n\s*"([a-z0-9_]+)",\n/g)) {
     registry.push({ name, scope: null, admin: false });

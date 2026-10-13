@@ -24,6 +24,27 @@
   },
   "releases": [
     {
+      "version": "0.143",
+      "date": "2026-10-13",
+      "title": "Unblock a recipient after a bounce",
+      "summary": "When a send bounced because the address did not exist or refused it, the owner or an admin can unblock that recipient and send again.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Unblock a recipient: in a refused-send notice, each address blocked by a bounce has an unblock button, with a confirmation. Team owners and admins only; it is in the audit log.",
+            "Someone who marked the mail as spam stays blocked: that request is never undone."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "@mepmail/mcp 0.3.1 on npm: the same Correio tools as the hosted MCP, with the version in mailbox_list_accounts."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.142",
       "date": "2026-10-12",
       "title": "A refused send names the blocked recipients",

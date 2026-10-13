@@ -180,3 +180,6 @@
   font-size: var(--ms-fs-label);
   line-height: 1.5;
 }
+.sendError p {
+  margin: 0;
+}

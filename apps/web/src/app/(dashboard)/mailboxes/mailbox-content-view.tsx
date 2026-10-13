@@ -98,6 +98,7 @@ import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import { MailboxInviteCard } from "./mailbox-invite-card";
 import { MailboxMoveMenu, type MailboxMoveMenuHandle } from "./mailbox-move-menu";
 import { MailboxRecipientField } from "./mailbox-recipient-field";
+import { MailboxBlockedRecipientsDialog } from "./mailbox-recipient-unblock";
 import { MailboxRichBody } from "./mailbox-rich-body";
 import type { RichEditorHandle } from "./mailbox-rich-editor";
 import { MailboxRuleDialog } from "./mailbox-rules";
@@ -1355,6 +1356,8 @@ export function MailboxContentView({
     () => knownPeopleFrom(sentForPeople.data?.items ?? []),
     [sentForPeople.data],
   );
+  // Recipients a send was refused for, opened from the toast's "Desbloquear".
+  const [blockedRecipients, setBlockedRecipients] = useState<string[] | null>(null);
   // "Criar regra" from the open message's sender (Regras automáticas).
   const [ruleFrom, setRuleFrom] = useState<{ mailboxId: string; from: string } | null>(null);
   // "Expandir leitura": the open message takes the list's place too. The
@@ -2975,9 +2978,12 @@ export function MailboxContentView({
         const named = Array.isArray(blocked) ? blocked.filter((v) => typeof v === "string") : [];
         toast(
           named.length
-            ? t("recipientBlockedNamed", { recipients: named.join(", ") })
+            ? t("recipientBlockedNamed", { recipients: named.join(", "), count: named.length })
             : t("recipientBlocked"),
           "danger",
+          named.length
+            ? { action: { label: t("unblockRecipients"), run: () => setBlockedRecipients(named) } }
+            : {},
         );
         if (mounted.current)
           setSendStates((states) => {
@@ -4548,6 +4554,12 @@ export function MailboxContentView({
               expectedRevision: saved.revision,
             })
           }
+        />
+      ) : null}
+      {blockedRecipients ? (
+        <MailboxBlockedRecipientsDialog
+          addresses={blockedRecipients}
+          close={() => setBlockedRecipients(null)}
         />
       ) : null}
       {ruleFrom ? (

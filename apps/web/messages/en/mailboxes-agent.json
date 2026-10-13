@@ -182,13 +182,14 @@
       "sent": "Send approved. It is going out now.",
       "discarded": "Draft discarded.",
       "errors": {
-        "recipientBlocked": "Not sent: one of the recipients is blocked because an earlier message to them bounced (address doesn't exist or refused it). Open the draft, remove that recipient and send again.",
-        "recipientBlockedNamed": "Not sent: {recipients} is blocked because an earlier message bounced (address doesn't exist or refused it). Open the draft, remove that recipient and send again.",
+        "recipientBlocked": "Not sent: one of the recipients is blocked because an earlier message bounced (address doesn't exist or refused it) or was marked as spam by the person. Open the draft, remove that recipient and send again.",
+        "recipientBlockedNamed": "Not sent: {count, plural, one {{recipients} is blocked} other {{recipients} are blocked}} because an earlier message bounced (address doesn't exist or refused it) or was marked as spam by the person.",
         "quota": "Not sent: the plan reached this period's limit. The draft is kept.",
         "trialLimit": "Not sent: the free trial reached its sending limit for now. The draft is kept.",
         "unavailable": "Not sent: MepMail Mail sending is unavailable right now. Try again in a few minutes.",
         "forbidden": "Not sent: this mailbox can't send right now (domain not verified, mailbox suspended or access changed).",
-        "generic": "Not sent. Nothing went out; try again."
+        "generic": "Not sent. Nothing went out; try again.",
+        "unblockedAll": "Recipients unblocked. You can send again."
       }
     },
     "agents": {

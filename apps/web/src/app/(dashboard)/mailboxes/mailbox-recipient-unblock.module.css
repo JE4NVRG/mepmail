@@ -1,0 +1,38 @@
+/* Destinatários bloqueados: why each one is blocked and "Desbloquear". */
+.list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.recipient {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  font-size: var(--ms-fs-label);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.recipient p {
+  margin: 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.warning {
+  color: var(--ms-warn);
+}
+.error {
+  color: var(--ms-danger);
+}
+.hint {
+  margin: 0 0 4px;
+  color: var(--ms-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
