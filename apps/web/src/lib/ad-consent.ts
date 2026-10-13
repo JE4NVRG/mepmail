@@ -80,6 +80,9 @@ export function createAdConsentStore(request: typeof fetch) {
           const state = await responseState(
             await request("/api/advertising-consent", {
               method: "POST",
+              // The site sends Referrer-Policy: no-referrer; the receipt's source page is
+              // this request's Referer, so this one same-origin POST carries it.
+              referrerPolicy: "same-origin",
               credentials: "same-origin",
               cache: "no-store",
               headers: { "Content-Type": "application/json" },

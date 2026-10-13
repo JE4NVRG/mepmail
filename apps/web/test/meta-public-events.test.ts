@@ -41,6 +41,22 @@ describe("server advertising consent", () => {
     await store.read();
     expect(store.getSnapshot()).toMatchObject({ state: "unknown", error: true });
   });
+  it("sends the choice with its same-origin Referer, the receipt's source page", async () => {
+    const request = vi.fn().mockResolvedValue(receipt("accepted"));
+    await createAdConsentStore(request).choose(true);
+    // The site-wide Referrer-Policy is no-referrer: only this POST opts into a Referer.
+    expect(request).toHaveBeenCalledWith("/api/advertising-consent", {
+      method: "POST",
+      referrerPolicy: "same-origin",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ granted: true, policyVersion: AD_POLICY_VERSION }),
+    });
+    const read = vi.fn().mockResolvedValue(receipt("accepted"));
+    await createAdConsentStore(read).read();
+    expect(read.mock.calls[0]?.[1]).not.toHaveProperty("referrerPolicy");
+  });
   it("never activates while acceptance is pending or failed", async () => {
     const pending = deferred<Response>();
     const store = createAdConsentStore(vi.fn().mockReturnValue(pending.promise));
