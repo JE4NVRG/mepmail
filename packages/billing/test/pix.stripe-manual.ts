@@ -183,10 +183,7 @@ async function main() {
     const renewalSession = await waitPaid(renewalUrl);
     const renewal = await readPixPayment(stripe, renewalSession, false);
     if (typeof renewal === "string") throw new Error(`renewal ${renewal}`);
-    check(
-      (await settlePixInvoice(stripe, open[0]!.id, renewal)) === "paid",
-      "renewal paid by Pix",
-    );
+    check((await settlePixInvoice(stripe, open[0]!.id, renewal)) === "paid", "renewal paid by Pix");
     check(
       (await settlePixInvoice(stripe, open[0]!.id, renewal)) === "paid",
       "a retried renewal event changes nothing",
