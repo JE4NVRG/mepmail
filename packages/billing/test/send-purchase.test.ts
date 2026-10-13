@@ -483,9 +483,18 @@ describe("initial Send acquisition classifier", () => {
     const unpaid = fixture();
     unpaid.session.payment_status = "unpaid";
     const foreign = fixture();
-    foreign.invoice.currency = "brl";
+    foreign.invoice.currency = "eur";
     for (const input of [zero, negative, failed, open, unpaid, foreign])
       expect(confirmedInitialSendPurchase(input)).toBeNull();
+  });
+
+  it("keeps a purchase paid in reais in reais (the prices' BRL option in Brazil)", () => {
+    const brl = fixture();
+    brl.invoice.currency = "brl";
+    expect(confirmedInitialSendPurchase(brl)).toMatchObject({
+      currency: "brl",
+      amountPaidMinor: brl.invoice.amount_paid,
+    });
   });
 
   it("requires the same Customer and live/test mode across Invoice, Subscription and Session", () => {

@@ -154,7 +154,7 @@ export async function recordGooglePurchase(
       transactionId: facts.stripeInvoiceId,
       rung: attempt.rung,
       valueMinor: facts.amountPaidMinor,
-      currency: "USD",
+      currency: facts.currency.toUpperCase(),
       eventTime: facts.paidAt,
       nextAttemptAt: now,
       expiresAt: new Date(facts.paidAt.getTime() + DELIVERY_MS),

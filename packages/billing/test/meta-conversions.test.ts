@@ -255,10 +255,21 @@ describe("Meta consented payload", () => {
     },
   );
 
-  it.each(["BRL", "usd", "", undefined])("does not convert or invent currency: %s", (currency) => {
-    expect(buildMetaConversionPayload(event({ currency }))).toEqual({
-      status: "rejected",
-      reason: "invalid_currency",
+  it.each(["EUR", "brl", "usd", "", undefined])(
+    "does not convert or invent currency: %s",
+    (currency) => {
+      expect(buildMetaConversionPayload(event({ currency }))).toEqual({
+        status: "rejected",
+        reason: "invalid_currency",
+      });
+    },
+  );
+
+  it("reports a Brazilian purchase in reais, with the paid amount as is", () => {
+    const built = buildMetaConversionPayload(event({ currency: "BRL", amountPaidMinor: 14900 }));
+    expect(built.status === "built" && built.payload.custom_data).toEqual({
+      value: 149,
+      currency: "BRL",
     });
   });
 

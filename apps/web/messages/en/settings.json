@@ -323,7 +323,9 @@
       "comboSendStep": "Step 1 · Send checkout: {amount}",
       "comboMailStep": "Step 2 · Mail checkout: {amount} {per}",
       "comboRenewal": "Then {amount} {per} for Send + Mail.",
-      "comboContinue": "Continue: pay for Send (1 of 2)"
+      "comboContinue": "Continue: pay for Send (1 of 2)",
+      "brlMonth": "In Brazil, charged in reais: {first} the first month, then {renewal} a month.",
+      "brlYear": "In Brazil, charged in reais: {total} a year."
     },
     "capPerDay": "{n} emails / day",
     "capPerMonth": "{n} emails / month",
@@ -388,7 +390,8 @@
       "skip": "Not now",
       "close": "Close"
     },
-    "upgradePaymentPending": "We could not charge the difference for {plan} yet, so your plan has not changed. Check or update your card under Manage and try again; the upgrade applies as soon as the payment goes through."
+    "upgradePaymentPending": "We could not charge the difference for {plan} yet, so your plan has not changed. Check or update your card under Manage and try again; the upgrade applies as soon as the payment goes through.",
+    "localPrice": "In Brazil: {price}"
   },
   "mcp": {
     "title": "MCP server",

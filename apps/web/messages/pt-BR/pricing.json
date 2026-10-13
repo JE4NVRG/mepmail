@@ -81,7 +81,9 @@
     "yearQuota": "A franquia de 110 mil renova mensalmente, sem saldo anual acumulado. O envio para na cota mensal; o anual não inclui cobrança de excedentes.",
     "preserved": "Contratos existentes mantêm seus valores e limites; não há migração automática.",
     "mailCta": "Conhecer o Correio",
-    "mailAccess": "O Correio é pago à parte, com ou sem plano de Envio: Solo US$ 2,90, Duo US$ 5,90 ou Equipe US$ 12,90 por mês."
+    "mailAccess": "O Correio é pago à parte, com ou sem plano de Envio: Solo US$ 2,90, Duo US$ 5,90 ou Equipe US$ 12,90 por mês.",
+    "monthLocal": "No Brasil, cobrado em reais: {first} no 1º mês, depois {price} por mês.",
+    "yearLocal": "No Brasil, cobrado em reais: {price} por ano."
   },
   "launchFaq": [
     {

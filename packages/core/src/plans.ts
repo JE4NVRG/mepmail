@@ -55,6 +55,12 @@ export interface PlanRung {
   priceCents: number;
   /** Cents per 1,000 emails past `included`; null where sends stop at the cap. */
   overageCentsPer1k: number | null;
+  /**
+   * The same rung in reais, charged in Brazil through the price's BRL currency option
+   * (Jean, 2026-10-13: about R$5 per dollar, rounded to end in 9). Display only here.
+   */
+  brlPriceCents: number;
+  brlOverageCentsPer1k: number | null;
 }
 
 /**
@@ -74,6 +80,8 @@ export const PLAN_RUNGS = [
     period: "day",
     priceCents: 0,
     overageCentsPer1k: null,
+    brlPriceCents: 0,
+    brlOverageCentsPer1k: null,
   },
   {
     key: "starter",
@@ -82,6 +90,8 @@ export const PLAN_RUNGS = [
     period: "day",
     priceCents: 900,
     overageCentsPer1k: null,
+    brlPriceCents: 4_900,
+    brlOverageCentsPer1k: null,
   },
   {
     key: "pro_100k",
@@ -90,6 +100,8 @@ export const PLAN_RUNGS = [
     period: "month",
     priceCents: 2_000,
     overageCentsPer1k: 35,
+    brlPriceCents: 9_900,
+    brlOverageCentsPer1k: 175,
   },
   {
     key: "pro_200k",
@@ -98,6 +110,8 @@ export const PLAN_RUNGS = [
     period: "month",
     priceCents: 5_500,
     overageCentsPer1k: 32,
+    brlPriceCents: 27_900,
+    brlOverageCentsPer1k: 160,
   },
   {
     key: "scale_500k",
@@ -106,6 +120,8 @@ export const PLAN_RUNGS = [
     period: "month",
     priceCents: 12_900,
     overageCentsPer1k: 29,
+    brlPriceCents: 64_900,
+    brlOverageCentsPer1k: 145,
   },
   {
     key: "scale_1m",
@@ -114,6 +130,8 @@ export const PLAN_RUNGS = [
     period: "month",
     priceCents: 23_900,
     overageCentsPer1k: 26,
+    brlPriceCents: 119_900,
+    brlOverageCentsPer1k: 130,
   },
   {
     key: "scale_1_5m",
@@ -122,6 +140,8 @@ export const PLAN_RUNGS = [
     period: "month",
     priceCents: 34_900,
     overageCentsPer1k: 24,
+    brlPriceCents: 174_900,
+    brlOverageCentsPer1k: 120,
   },
   {
     key: "scale_2_5m",
@@ -130,6 +150,8 @@ export const PLAN_RUNGS = [
     period: "month",
     priceCents: 54_900,
     overageCentsPer1k: 22,
+    brlPriceCents: 274_900,
+    brlOverageCentsPer1k: 110,
   },
 ] as const satisfies readonly PlanRung[];
 

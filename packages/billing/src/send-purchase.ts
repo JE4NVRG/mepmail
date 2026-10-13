@@ -25,7 +25,8 @@ export interface SendPurchaseFacts {
   stripeSubscriptionId: string;
   stripeSessionId: string;
   amountPaidMinor: number;
-  currency: "usd";
+  /** Brazil pays the same prices in reais (their BRL currency option). */
+  currency: "usd" | "brl";
   paidAt: Date;
 }
 export type SendInvoiceFacts = Omit<SendPurchaseFacts, "stripeSessionId">;
@@ -61,7 +62,7 @@ export function initialSendInvoiceFacts(input: {
   if (
     v.status !== "paid" ||
     v.billing_reason !== "subscription_create" ||
-    v.currency !== "usd" ||
+    (v.currency !== "usd" && v.currency !== "brl") ||
     !Number.isSafeInteger(v.amount_paid) ||
     v.amount_paid <= 0 ||
     v.amount_paid > 2_147_483_647 ||
@@ -127,7 +128,7 @@ export function initialSendInvoiceFacts(input: {
     stripeInvoiceId: v.id,
     stripeSubscriptionId: s.id,
     amountPaidMinor: v.amount_paid,
-    currency: "usd",
+    currency: v.currency as "usd" | "brl",
     paidAt: new Date(v.status_transitions.paid_at * 1000),
   };
 }

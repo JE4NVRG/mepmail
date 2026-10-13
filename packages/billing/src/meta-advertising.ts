@@ -619,7 +619,7 @@ export async function dispatchMetaConversions(
           ? {
               eventName: "Purchase" as const,
               amountPaidMinor: row.amountPaidMinor ?? 0,
-              currency: "USD",
+              currency: (row.currency ?? "").toUpperCase(),
             }
           : { eventName: "InitiateCheckout" as const }),
       };

@@ -24,6 +24,21 @@
   },
   "releases": [
     {
+      "version": "0.147",
+      "date": "2026-10-13",
+      "title": "Envio em reais no Brasil",
+      "summary": "Quem assina o Envio no Brasil paga em reais, no cartão nacional: Envios 110K por R$ 149 por mês, com R$ 99 no primeiro mês.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Preços do Envio em reais no Brasil: Starter R$ 49, Envios 110K R$ 149 por mês ou R$ 1.490 por ano, Pro 220K R$ 279 e Scale de R$ 649 a R$ 2.749. O excedente vai de R$ 1,75 a R$ 1,10 por mil e-mails.",
+            "Cobrança e Preços mostram o valor em reais ao lado do valor em dólar."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.146",
       "date": "2026-10-13",
       "title": "Consentimento mais claro e recebimento com data e fonte",

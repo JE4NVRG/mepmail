@@ -195,6 +195,12 @@ export default async function PricingPage() {
                   </p>
                   <p>{t("launch.monthIntro")}</p>
                   <p className="gtm-note">{t("launch.monthQuota")}</p>
+                  <p className="gtm-note">
+                    {t("launch.monthLocal", {
+                      first: formatBrl(LAUNCH_OFFER.sending.brlFirstMonthlyCents / 100, locale),
+                      price: formatBrl(LAUNCH_OFFER.sending.brlMonthlyCents / 100, locale),
+                    })}
+                  </p>
                 </article>
                 <article className="ms-card gtm-plan">
                   <h3>{t("launch.yearTitle")}</h3>
@@ -207,6 +213,15 @@ export default async function PricingPage() {
                   </p>
                   <p>{t("launch.yearUpfront")}</p>
                   <p className="gtm-note">{t("launch.yearQuota")}</p>
+                  <p className="gtm-note">
+                    {t("launch.yearLocal", {
+                      price: formatBrl(
+                        (LAUNCH_OFFER.sending.brlMonthlyCents * LAUNCH_OFFER.annualChargedMonths) /
+                          100,
+                        locale,
+                      ),
+                    })}
+                  </p>
                 </article>
               </div>
               <p className="gtm-note">{t("launch.preserved")}</p>

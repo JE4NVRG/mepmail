@@ -1,7 +1,14 @@
 /** Approved launch presentation, separate from the existing billing catalog. */
 export const LAUNCH_OFFER = {
   currency: "USD",
-  sending: { monthlyCents: 2900, firstMonthlyCents: 2000, monthlyRecipientDeliveries: 110_000 },
+  sending: {
+    monthlyCents: 2900,
+    firstMonthlyCents: 2000,
+    monthlyRecipientDeliveries: 110_000,
+    /** In Brazil the same offer is charged in reais (the prices' BRL currency option). */
+    brlMonthlyCents: 14_900,
+    brlFirstMonthlyCents: 9_900,
+  },
   annualChargedMonths: 10,
   annualServiceMonths: 12,
   previewMailboxQuantity: { min: 1, max: 50 },

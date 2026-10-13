@@ -24,6 +24,21 @@
   },
   "releases": [
     {
+      "version": "0.147",
+      "date": "2026-10-13",
+      "title": "Send in reais in Brazil",
+      "summary": "Send bought in Brazil is charged in reais, on a local card: Envios 110K for R$ 149 a month, R$ 99 the first month.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Send prices in reais in Brazil: Starter R$ 49, Envios 110K R$ 149 a month or R$ 1,490 a year, Pro 220K R$ 279 and Scale from R$ 649 to R$ 2,749. Overage runs from R$ 1.75 to R$ 1.10 per thousand emails.",
+            "Billing and Pricing show the price in reais next to the dollar price."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.146",
       "date": "2026-10-13",
       "title": "Clearer consent, and receiving with its time and source",

@@ -323,7 +323,9 @@
       "comboSendStep": "Passo 1 · Pagamento do Envio: {amount}",
       "comboMailStep": "Passo 2 · Pagamento do Correio: {amount} {per}",
       "comboRenewal": "Depois, {amount} {per} por Envio + Correio.",
-      "comboContinue": "Continuar: pagar o Envio (1 de 2)"
+      "comboContinue": "Continuar: pagar o Envio (1 de 2)",
+      "brlMonth": "No Brasil, cobrado em reais: {first} no 1º mês, depois {renewal} por mês.",
+      "brlYear": "No Brasil, cobrado em reais: {total} por ano."
     },
     "capPerDay": "{n} e-mails / dia",
     "capPerMonth": "{n} e-mails / mês",
@@ -388,7 +390,8 @@
       "skip": "Agora não",
       "close": "Fechar"
     },
-    "upgradePaymentPending": "Ainda não conseguimos cobrar a diferença do {plan}, então seu plano não mudou. Confira ou atualize o cartão em Gerenciar e tente de novo; o upgrade vale assim que o pagamento for aprovado."
+    "upgradePaymentPending": "Ainda não conseguimos cobrar a diferença do {plan}, então seu plano não mudou. Confira ou atualize o cartão em Gerenciar e tente de novo; o upgrade vale assim que o pagamento for aprovado.",
+    "localPrice": "No Brasil: {price}"
   },
   "mcp": {
     "title": "Servidor MCP",

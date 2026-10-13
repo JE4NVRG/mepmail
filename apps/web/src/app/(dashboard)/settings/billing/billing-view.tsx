@@ -21,6 +21,7 @@ import { BtnSpinner } from "@/components/spinner";
 import { Switch } from "@/components/switch";
 import { WarnCard } from "@/components/warn-card";
 import { formatDay, formatDayTime, formatUsd } from "@/lib/format";
+import { formatBrl } from "@/lib/landing-pricing";
 import {
   clearLaunchComboIntent,
   type LaunchComboIntent,
@@ -219,6 +220,9 @@ export function BillingView({
 
   const fmt = new Intl.NumberFormat(locale);
   const usd = (cents: number) => formatUsd(cents, locale);
+  // In Brazil Stripe charges the BRL currency option of the same price: show it next to USD.
+  const inBrazil = locale === "pt-BR";
+  const brl = (cents: number) => formatBrl(cents / 100, locale);
 
   const rungLabel = (key: PlanRungKey) => {
     const r = PLAN_RUNGS.find((x) => x.key === key);
@@ -652,6 +656,27 @@ export function BillingView({
                     renewal: usd(newOffer.monthlyCents),
                   })}
             </p>
+            {inBrazil ? (
+              <p
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  margin: "0 0 10px",
+                  color: "var(--ms-bone)",
+                }}
+              >
+                {launchInterval === "year"
+                  ? t("launch.brlYear", {
+                      total: brl(
+                        LAUNCH_OFFER.sending.brlMonthlyCents * LAUNCH_OFFER.annualChargedMonths,
+                      ),
+                    })
+                  : t("launch.brlMonth", {
+                      first: brl(LAUNCH_OFFER.sending.brlFirstMonthlyCents),
+                      renewal: brl(LAUNCH_OFFER.sending.brlMonthlyCents),
+                    })}
+              </p>
+            ) : null}
             {launchInterval === "year" ? (
               <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ms-muted)" }}>
                 {t("launch.annualHardCap")}
@@ -939,6 +964,20 @@ export function BillingView({
                       )}
                     </span>
                   </div>
+                  {inBrazil && r.brlPriceCents > 0 ? (
+                    <div className="ms-plan-per" style={{ marginTop: 2 }}>
+                      {t("localPrice", {
+                        price: brl(
+                          newOffer && r.key === newOffer.rung
+                            ? launchInterval === "year"
+                              ? LAUNCH_OFFER.sending.brlMonthlyCents *
+                                LAUNCH_OFFER.annualChargedMonths
+                              : LAUNCH_OFFER.sending.brlMonthlyCents
+                            : r.brlPriceCents,
+                        ),
+                      })}
+                    </div>
+                  ) : null}
                   <div className="ms-plan-cap">
                     <span className="ms-digits">{fmt.format(r.included)}</span>
                     <span className="ms-plan-per">

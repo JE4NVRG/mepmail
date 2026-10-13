@@ -81,7 +81,9 @@
     "yearQuota": "The 110,000 allowance renews monthly, without an accumulated annual balance. Sending stops at the monthly quota; annual billing does not include metered overage.",
     "preserved": "Existing contracts keep their prices and limits; there is no automatic migration.",
     "mailCta": "Explore Mail",
-    "mailAccess": "Mail is paid separately, with or without a Send plan: Solo US$ 2.90, Duo US$ 5.90 or Equipe US$ 12.90 a month."
+    "mailAccess": "Mail is paid separately, with or without a Send plan: Solo US$ 2.90, Duo US$ 5.90 or Equipe US$ 12.90 a month.",
+    "monthLocal": "In Brazil, charged in reais: {first} the first month, then {price} a month.",
+    "yearLocal": "In Brazil, charged in reais: {price} a year."
   },
   "launchFaq": [
     {

@@ -644,6 +644,20 @@ describe("RAM advertising consent and durable outbox", () => {
     });
   });
 
+  it("sends a purchase paid in reais in reais: the paid amount, never converted", async () => {
+    const f = await fixture(null);
+    f.invoice.currency = "brl";
+    await purchase(f);
+    expect((await rows())[0]).toMatchObject({ currency: "brl", amountPaidMinor: 1_243 });
+    await due();
+    const fetch = acceptingFetch();
+    expect(
+      await dispatchMetaConversions(db, config, { ...provider(f), fetch, now: () => now }),
+    ).toEqual({ considered: 1, sent: 1 });
+    const body = JSON.parse(required(fetch.mock.calls[0])[1].body);
+    expect(body.data[0].custom_data).toEqual({ value: 12.43, currency: "BRL" });
+  });
+
   it("keeps ambiguous or failed readonly Session resolution waiting without a provider POST", async () => {
     const f = await fixture(null);
     await purchase(f);
@@ -943,6 +957,15 @@ describe("Google Analytics purchase measurement (server side)", () => {
       clientId: "1234567890.1790996395",
       sessionId: "1790996390",
     });
+  });
+
+  it("queues a purchase paid in reais with its own currency", async () => {
+    const f = await googleFixture();
+    f.invoice.currency = "brl";
+    await googlePurchase(f);
+    expect(await db.select().from(googleOutbox)).toMatchObject([
+      { valueMinor: 1_243, currency: "BRL", status: "pending" },
+    ]);
   });
 
   it("queues one purchase for the initial invoice and sends only allowlisted fields", async () => {

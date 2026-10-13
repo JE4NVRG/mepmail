@@ -43,7 +43,7 @@ export interface MetaServerEvent {
   action_source: "website";
   event_source_url: string;
   user_data: MetaConversionMatching;
-  custom_data?: { value: number; currency: "USD" };
+  custom_data?: { value: number; currency: "USD" | "BRL" };
 }
 
 export type MetaConversionRejection =
@@ -187,13 +187,15 @@ export function buildMetaConversionPayload(event: MetaConversionEvent): MetaConv
     event.amountPaidMinor !== undefined ||
     event.currency !== undefined
   ) {
-    if (event.currency !== "USD") return reject("invalid_currency");
+    // The paid invoice's own currency: dollars, or reais in Brazil.
+    const currency = event.currency;
+    if (currency !== "USD" && currency !== "BRL") return reject("invalid_currency");
     const cents = event.amountPaidMinor;
     if (typeof cents !== "number" || !Number.isSafeInteger(cents) || cents <= 0)
       return reject("invalid_amount");
     const value = cents / 100;
     if (Math.round(value * 100) !== cents) return reject("invalid_amount");
-    customData = { value, currency: "USD" };
+    customData = { value, currency };
   }
 
   return {
