@@ -103,6 +103,7 @@ import type { RichEditorHandle } from "./mailbox-rich-editor";
 import { MailboxRuleDialog } from "./mailbox-rules";
 import rulesStyles from "./mailbox-rules.module.css";
 import { MailboxSenderBar } from "./mailbox-sender-bar";
+import { MailboxSenderLogo } from "./mailbox-sender-logo";
 import { MailboxSmartTabs } from "./mailbox-smart-tabs";
 import { MailboxTimeMenu, type MailboxTimeMenuHandle } from "./mailbox-time-menu";
 import { MailboxTranslation } from "./mailbox-translation";
@@ -3701,6 +3702,7 @@ export function MailboxContentView({
                                 }
                               >
                                 {blocked ? "!" : mailboxInitials(avatarName, avatarAddress)}
+                                <MailboxSenderLogo token={blocked ? null : row.senderPicture} />
                               </span>
                             ) : null}
                             <span className={styles.rowBody}>
@@ -4350,6 +4352,7 @@ export function MailboxContentView({
                     <div className={styles.senderDetails}>
                       <span className={styles.senderAvatar} aria-hidden="true">
                         {(item.fromName || item.from || "M").charAt(0).toUpperCase()}
+                        <MailboxSenderLogo token={item.senderPicture} />
                       </span>
                       <dl>
                         <div>

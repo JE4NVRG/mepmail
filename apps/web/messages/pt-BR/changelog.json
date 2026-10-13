@@ -24,6 +24,21 @@
   },
   "releases": [
     {
+      "version": "0.150",
+      "date": "2026-10-13",
+      "title": "Logos de remetente no Correio",
+      "summary": "A lista e a leitura do Correio mostram o logo da marca ou a foto de quem enviou, só em e-mail autêntico.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Logo da marca (BIMI) ou ícone do site para e-mails que passaram no DMARC. E-mail falsificado nunca ganha o logo de outra marca.",
+            "Foto do Gravatar para remetentes pessoais. Quem busca a foto é o MepMail, então o Gravatar não vê quem está lendo."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.149",
       "date": "2026-10-13",
       "title": "Pix no Envio e no Correio",

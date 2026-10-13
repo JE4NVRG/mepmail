@@ -24,6 +24,21 @@
   },
   "releases": [
     {
+      "version": "0.150",
+      "date": "2026-10-13",
+      "title": "Sender logos in Correio",
+      "summary": "The Correio list and reader show the brand's logo or the sender's picture, only on authentic email.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "The brand's logo (BIMI) or its website icon for mail that passed DMARC. A spoofed email never gets another brand's logo.",
+            "Gravatar pictures for personal senders. MepMail fetches them, so Gravatar never sees who is reading."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.149",
       "date": "2026-10-13",
       "title": "Pix for Send and Correio",

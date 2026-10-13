@@ -1434,6 +1434,8 @@
   gap: 12px;
 }
 .senderAvatar {
+  position: relative;
+  overflow: hidden;
   display: grid;
   place-items: center;
   width: 36px;
@@ -2741,6 +2743,8 @@
   min-width: 0;
 }
 .messageRows .rowAvatar {
+  position: relative;
+  overflow: hidden;
   display: grid;
   place-items: center;
   flex: none;

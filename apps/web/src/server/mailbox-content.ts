@@ -45,6 +45,7 @@ import { getKeyring } from "./keyring";
 import { MAILBOX_COMPOSE_HTML_MAX, sanitizeMailboxComposeHtml } from "./mailbox-compose-html";
 import { projectMailboxHtml } from "./mailbox-html";
 import { mailboxSenderHmacKey } from "./mailbox-sender-key";
+import { senderPictureToken } from "./mailbox-sender-picture";
 import { timedStage } from "./procedure-timings";
 import { publicStorageOrigin, publicStoragePrefix } from "./storage";
 
@@ -289,6 +290,13 @@ export async function getMailboxContent(
         replyRecipients:
           item.kind === "sent" ? addresses(mime.to) : metadata.replyTo ? [metadata.replyTo] : [],
         replyIds: item.kind === "inbox" ? mailboxReplyIds(mime) : [],
+        senderPicture: actor.agentAccess
+          ? null
+          : senderPictureToken({
+              kind: item.kind,
+              from: metadata.from,
+              inboundAssessment: item.inboundAssessment,
+            }),
         // The formatting the person wrote, to reopen in the editor (null: plain text).
         draftHtml:
           item.kind === "draft" &&
@@ -792,6 +800,8 @@ export async function buildMailboxListRows(
     threadKey: string | null;
     threadCount: number;
     threadUnread: number;
+    /** Signed picture token (logo/Gravatar) for received mail that passed DMARC; never for agents. */
+    senderPicture: string | null;
   }[] = [];
   // Messages per conversation, counted inside each listed mailbox.
   const threadStates = new Map<string, { count: number; unread: number }>();
@@ -846,6 +856,7 @@ export async function buildMailboxListRows(
         threadKey: null,
         threadCount: 1,
         threadUnread: 0,
+        senderPicture: null,
       });
       continue;
     }
@@ -890,6 +901,13 @@ export async function buildMailboxListRows(
       threadKey: row.threadKey,
       threadCount: thread.count,
       threadUnread: thread.unread,
+      senderPicture: actor.agentAccess
+        ? null
+        : senderPictureToken({
+            kind: row.kind,
+            from: item.from,
+            inboundAssessment: row.inboundAssessment,
+          }),
     });
   }
   const requests = await timedStage("mailboxes.rows:approvals", () =>
