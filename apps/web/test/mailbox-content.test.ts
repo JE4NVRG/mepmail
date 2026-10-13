@@ -732,6 +732,22 @@ describe("session-authenticated mailbox content", () => {
     );
     expect((await as().items({ mailboxId: null, folder: "sent" })).items).toHaveLength(0);
   });
+  it("keeps a sent reply's Reply-To as the sender's, not the replied message's (Sage 10-13)", async () => {
+    // The replied message asks for replies to reply@; the answer is written from this mailbox.
+    const received = await imported();
+    expect(await as().item({ mailboxId, id: received.id })).toMatchObject({
+      replyTo: "reply@example.invalid",
+      replyRecipients: ["reply@example.invalid"],
+    });
+    const { row, raw } = await submittedSent({ sourceItemId: received.id });
+    const header = (await simpleParser(raw)).replyTo?.value[0]?.address ?? null;
+    const sent = await as().item({ mailboxId, id: row.id });
+    expect(sent.kind).toBe("sent");
+    // Draft, Sent copy and the message that goes out name the same Reply-To.
+    expect(sent.replyTo).toBe(header ?? "person@content.invalid");
+    expect(sent.replyTo).toBe("person@content.invalid");
+    expect(sent.replyRecipients).toEqual(["reply@example.invalid"]);
+  });
   it("threads a follow-up to Sent with its observed final alias and blocks a pending alias instead of using submitted MIME headers", async () => {
     const { row, raw, sender } = await submittedSent({
       to: ["first@example.invalid", "second@example.invalid"],
@@ -744,7 +760,9 @@ describe("session-authenticated mailbox content", () => {
       messageId: captured.messageId,
       transportMessageId: null,
       replyToSentItemId: null,
-      replyTo: "first@example.invalid, second@example.invalid",
+      // The Sent copy's own Reply-To is its sender; a reply from it goes to the recipients.
+      replyTo: "person@content.invalid",
+      replyRecipients: ["first@example.invalid", "second@example.invalid"],
     });
     await expect(as().saveDraft(draft({ sourceItemId: row.id }))).rejects.toMatchObject({
       code: "CONFLICT",
@@ -754,7 +772,7 @@ describe("session-authenticated mailbox content", () => {
     const sentDetail = await as().item({ mailboxId, id: row.id });
     expect(sentDetail.transportMessageId).toBe(alias);
     const saved = await as().saveDraft(
-      draft({ sourceItemId: row.id, to: sentDetail.replyTo.split(", "), retainedAttachments: [0] }),
+      draft({ sourceItemId: row.id, to: sentDetail.replyRecipients, retainedAttachments: [0] }),
     );
     const reply = await simpleParser(
       (await readMailboxItem(db, keys, actor(), { mailboxId, id: saved.id })).raw,

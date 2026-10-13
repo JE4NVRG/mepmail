@@ -1,4 +1,3 @@
-import { resolveMx } from "node:dns/promises";
 import { env } from "@millionsend/config";
 import type { MailboxReceivingDeps } from "@millionsend/core";
 import {
@@ -8,6 +7,7 @@ import {
   readMailboxReceivingRules,
 } from "@millionsend/ses";
 import { parseMailboxInboundConfiguration } from "../../../worker/src/mailbox-ingress";
+import { resolveMxPublic } from "./public-dns";
 
 /** Existing private ingress only. A sending region never enables receiving by inference. */
 export function mailboxReceivingDeps(): MailboxReceivingDeps {
@@ -30,7 +30,8 @@ export function mailboxReceivingDeps(): MailboxReceivingDeps {
         return null;
       return { mxExchange: "inbound-smtp.us-east-1.amazonaws.com", ingressEnabled: true };
     },
-    resolveMx,
+    // Public DNS, with its source: a resolver cache must not read as today's MX.
+    resolveMx: resolveMxPublic,
     async observe(domain) {
       if (!approved || domain.region !== approved.region) return null;
       if (!rules)

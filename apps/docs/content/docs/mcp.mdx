@@ -224,6 +224,45 @@ approval and waits in the dashboard.
 - Message subjects, bodies and senders are third-party content: tool
   results mark them as untrusted data.
 
+### Install with read and drafts, or with direct sending
+
+The consent screen keeps three things apart:
+- what the app **asks for**;
+- what you **tick**;
+- what clicking **Allow** actually grants, summed up under *When you click Allow, the app will have*.
+
+**Read and drafts (start here).** Tick the mailboxes and leave **Direct sending (optional)** unticked. The summary reads *Direct sending: no*. The agent reads and writes drafts. `mailbox_send_draft` then emails you to approve each send.
+
+**Direct sending.** Also tick **Direct sending (optional)**. The summary reads *Direct sending: yes*. The agent then sends from the ticked mailboxes without asking. Grant it only to an agent you would let send unreviewed.
+
+Ticking mailboxes never turns direct sending on by itself.
+
+To check what was granted:
+- **Settings → Connected apps** marks the grant *Direct sending* or *Mail, no direct sending*.
+- `mailbox_list_accounts` lists each mailbox with its permissions.
+
+To change the choice, authorize again: a new consent replaces the previous one.
+
+### Troubleshooting: a client set up on the old host
+
+**Symptom.** A client first connected through `mepmail.je4ndev.com` works for about an hour after each sign-in, then asks you to sign in again. Signing in again does not stop it.
+
+**Cause.**
+- The client still stores the authorization-server metadata it fetched back then, with issuer `https://mepmail.je4ndev.com`.
+- Today the issuer is `https://mepmail.dev`, and both hosts serve that same metadata.
+- A client that checks the issuer, as it should, will not keep a refresh token issued under a different issuer than the one it stored. It falls back to the hour-long access token.
+- Re-authorizing reuses the stored metadata, so it changes nothing.
+
+**Fix, once:**
+1. Run `curl -s https://mepmail.dev/.well-known/oauth-authorization-server` and confirm it shows `"issuer": "https://mepmail.dev"`. Compare it with the issuer in the client's stored MepMail OAuth metadata.
+2. If the stored one still names `mepmail.je4ndev.com`, delete only the client's cached MepMail OAuth metadata and its stored MepMail tokens. Leave the client's issuer check on.
+3. Connect again to `https://api.mepmail.dev/mcp`. The client rediscovers the metadata from the server's `resource_metadata` and signs you in once.
+4. Confirm it after the access token expires: the client refreshes without asking you.
+
+**Cache or token endpoint?**
+- A stale cache never reaches MepMail: the client drops the refresh token locally.
+- A refresh that does reach the token endpoint and gets `invalid_grant` means the grant was revoked or expired. Look at **Connected apps**; signing in again repeatedly will not help.
+
 ## Tools
 
 Each tool requires a permission (OAuth scope). Clients only see the tools

@@ -150,7 +150,11 @@ describe("fresh domain receiving readiness", () => {
       priority: 10,
       status: "ready",
       others: [],
+      // A plain answer names no source; its time is when it was read.
+      checkedAt: f.now.toISOString(),
+      source: null,
     });
+    expect(dto.delivery).toEqual({ lastReceivedAt: null });
     expect(dto.mailboxes.map((box) => box.receiving_state)).toEqual(["ready", "ready"]);
     expect(JSON.stringify(dto)).not.toMatch(/ruleSetActive|recipients|bucket|topic|credential/);
     const [box] = await db
@@ -163,6 +167,42 @@ describe("fresh domain receiving readiness", () => {
       .from(schema.domains)
       .where(eq(schema.domains.id, f.domain.id));
     expect(required(domain).status).toBe("verified");
+  });
+
+  it("reports the DNS answer's time and source apart from mail that actually arrived", async () => {
+    const f = await fixture({ count: 1 });
+    f.deps.resolveMx = vi.fn(async () => ({
+      records: [{ exchange: "mx.old-provider.example", priority: 10 }],
+      source: "public DNS (1.1.1.1, 8.8.8.8)",
+    }));
+    const box = required(f.boxes[0]);
+    const item = (sourceId: string, createdAt: Date) => ({
+      teamId: f.actor.teamId,
+      mailboxId: box.id,
+      kind: "inbox" as const,
+      sourceId,
+      // Envelope-shaped placeholders: readiness never opens the content.
+      rawBytes: 1,
+      ciphertext: Buffer.alloc(17),
+      iv: Buffer.alloc(12),
+      wrappedDek: Buffer.alloc(1),
+      keyVersion: 2_000_000,
+      createdAt,
+    });
+    const received = new Date(f.now.getTime() - 3_600_000);
+    await db.insert(schema.mailboxItems).values([
+      item("ses-s3:delivered", received),
+      // An import is not a delivery, however recent.
+      item("imap:import:1", new Date(f.now.getTime() - 60_000)),
+    ]);
+    const dto = await f.read();
+    expect(dto.mx).toMatchObject({
+      status: "conflict",
+      checkedAt: f.now.toISOString(),
+      source: "public DNS (1.1.1.1, 8.8.8.8)",
+    });
+    expect(dto.receiving_state).toBe("needs_mx");
+    expect(dto.delivery).toEqual({ lastReceivedAt: received.toISOString() });
   });
 
   it("keeps reservation possible before DNS or receiving configuration exists", async () => {

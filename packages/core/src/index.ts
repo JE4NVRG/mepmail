@@ -513,6 +513,8 @@ export {
 } from "./mailbox-private-store.js";
 export {
   getMailboxReceivingReadiness,
+  type MailboxMxAnswer,
+  type MailboxMxRecord,
   type MailboxReceivingDeps,
   type MailboxReceivingDomain,
   type MailboxReceivingObservation,

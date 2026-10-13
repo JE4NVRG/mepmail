@@ -24,6 +24,28 @@
   },
   "releases": [
     {
+      "version": "0.146",
+      "date": "2026-10-13",
+      "title": "Consentimento mais claro e recebimento com data e fonte",
+      "summary": "Ao conectar um app, você vê o que ele pede, o que você marcou e o que vai conceder. O recebimento separa a resposta do DNS das mensagens que de fato chegaram.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Consentimento OAuth: o envio direto (mail:send) tem um bloco próprio, desmarcado, e um resumo mostra o que o app terá ao clicar em Permitir, inclusive \"Envio direto: sim/não\" e o que foi pedido e não concedido.",
+            "Aplicativos conectados mostra se o app tem envio direto ou só Correio sem envio direto.",
+            "Recebimento: o MX é consultado em DNS público (1.1.1.1 e 8.8.8.8), com hora e fonte, e a última mensagem recebida aparece à parte. check_mailbox traz as camadas dns, provider e delivery separadas."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Enviados: o replyTo de uma mensagem enviada agora é o Reply-To dela, igual ao que o destinatário recebe. Quem recebe uma resposta escrita a partir de Enviados vem em replyRecipients."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.143",
       "date": "2026-10-13",
       "title": "Desbloqueie um destinatário depois de um bounce",

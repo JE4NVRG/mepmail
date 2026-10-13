@@ -1,5 +1,5 @@
 import { type Db, schema } from "@millionsend/db";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, like, max } from "drizzle-orm";
 import {
   type MailboxRegistryActor,
   MailboxRegistryError,
@@ -53,13 +53,19 @@ export interface MailboxReceivingObservation {
   notificationReady: boolean;
   recipients: readonly string[];
 }
+export type MailboxMxRecord = { exchange: string; priority: number };
+/** A lookup that names where its answer came from (which resolvers), for the DTO. */
+export interface MailboxMxAnswer {
+  records: readonly MailboxMxRecord[];
+  source: string;
+}
 export interface MailboxReceivingDeps {
   configuration(domain: Readonly<MailboxReceivingDomain>): {
     /** Explicit receiving endpoint; never inferred from MAIL FROM or send verification. */
     mxExchange: string;
     ingressEnabled: boolean;
   } | null;
-  resolveMx(name: string): Promise<readonly { exchange: string; priority: number }[]>;
+  resolveMx(name: string): Promise<readonly MailboxMxRecord[] | MailboxMxAnswer>;
   observe(domain: Readonly<MailboxReceivingDomain>): Promise<MailboxReceivingObservation | null>;
   now?: () => Date;
   /** Freshness is bounded to one minute; defaults to thirty seconds. */
@@ -70,6 +76,7 @@ export interface MailboxReceivingReadiness {
   domainName: string;
   region: string;
   receiving_state: MailboxReceivingState;
+  /** When the provider's receipt rule and identity were read (the live provider check). */
   checkedAt: string | null;
   mx: {
     type: "MX";
@@ -79,7 +86,15 @@ export interface MailboxReceivingReadiness {
     status: "unknown" | "missing" | "conflict" | "ready";
     /** The MX records that are not Correio's, by preference (backups when status is ready). */
     others: { exchange: string; priority: number }[];
+    /** When this DNS answer was read, and from which resolvers: a diagnosis, not delivery. */
+    checkedAt: string | null;
+    source: string | null;
   };
+  /**
+   * Mail actually received for this domain's mailboxes through the receiving pipeline
+   * (imports excluded): observed delivery, independent of the DNS answer above.
+   */
+  delivery: { lastReceivedAt: string | null };
   reasons: MailboxReceivingReason[];
   mailboxes: {
     id: string;
@@ -312,7 +327,10 @@ function assessment(
       priority: 10,
       status: mx,
       others,
+      checkedAt: null,
+      source: null,
     },
+    delivery: { lastReceivedAt: null },
     reasons,
     mailboxes: state.boxes.map((box) => {
       const boxReasons = [...reasons];
@@ -354,9 +372,19 @@ export async function getMailboxReceivingReadiness(
     throw new MailboxRegistryError("invalid");
   const before = await withMailboxRegistryAdmin(db, actor, (tx) => snapshot(tx, actor, domainId));
   const config = configured(deps, before.domain);
+  let dnsAt: Date | null = null;
+  let dnsSource: string | null = null;
   const [dns, proof] = config
     ? await Promise.allSettled([
-        Promise.resolve().then(() => deps.resolveMx(before.domain.name)),
+        Promise.resolve()
+          .then(() => deps.resolveMx(before.domain.name))
+          .then((answer) => {
+            dnsAt = deps.now?.() ?? new Date();
+            if (Array.isArray(answer)) return answer as readonly MailboxMxRecord[];
+            const named = answer as MailboxMxAnswer;
+            dnsSource = typeof named?.source === "string" ? named.source.slice(0, 120) : null;
+            return named?.records;
+          }),
         Promise.resolve().then(() => deps.observe(Object.freeze({ ...before.domain }))),
       ])
     : ([
@@ -372,6 +400,33 @@ export async function getMailboxReceivingReadiness(
     const changed =
       JSON.stringify(before) !== JSON.stringify(current) ||
       JSON.stringify(config) !== JSON.stringify(nextConfig);
-    return assessment(current, changed ? null : config, dns, proof, now, maxAgeMs, changed);
+    const result = assessment(current, changed ? null : config, dns, proof, now, maxAgeMs, changed);
+    const at = dnsAt as Date | null;
+    result.mx.checkedAt =
+      dns.status === "fulfilled" && at && Number.isFinite(at.getTime()) ? at.toISOString() : null;
+    result.mx.source = result.mx.checkedAt ? dnsSource : null;
+    // Received through the receiving pipeline (ses-s3 sources), never an import's.
+    const [latest] = await tx
+      .select({ at: max(schema.mailboxItems.createdAt) })
+      .from(schema.mailboxItems)
+      .innerJoin(
+        schema.mailboxes,
+        and(
+          eq(schema.mailboxes.id, schema.mailboxItems.mailboxId),
+          eq(schema.mailboxes.teamId, schema.mailboxItems.teamId),
+        ),
+      )
+      .where(
+        and(
+          eq(schema.mailboxItems.teamId, actor.teamId),
+          eq(schema.mailboxes.domainId, domainId),
+          eq(schema.mailboxItems.kind, "inbox"),
+          like(schema.mailboxItems.sourceId, "ses-s3:%"),
+        ),
+      );
+    result.delivery = {
+      lastReceivedAt: latest?.at ? new Date(latest.at).toISOString() : null,
+    };
+    return result;
   });
 }

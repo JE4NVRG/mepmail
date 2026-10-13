@@ -1,4 +1,3 @@
-import { resolveMx } from "node:dns/promises";
 import { env } from "@millionsend/config";
 import {
   type MailboxRegistryActor,
@@ -19,11 +18,12 @@ import {
   parseMailboxProvisioningConfiguration,
 } from "../../../../packages/ses/src/mailbox-provisioning";
 import { parseMailboxInboundConfiguration } from "../../../worker/src/mailbox-ingress";
+import { resolveMxRecords } from "./public-dns";
 
 interface ActivationDependencies {
   configuration?: string | undefined;
   inbound?: string | undefined;
-  resolveMx?: typeof resolveMx;
+  resolveMx?: (name: string) => Promise<{ exchange: string; priority: number }[]>;
   identity?: (domain: string) => Promise<boolean>;
   client?: () => MailboxProvisioningClient;
 }
@@ -105,7 +105,7 @@ export async function activateMailboxReceiving(
     if (recipients.some((x) => x.split("@")[1] !== domain.name.toLowerCase()))
       throw new MailboxRegistryError("invalid");
     const [mx, identity] = await Promise.all([
-      (deps.resolveMx ?? resolveMx)(domain.name),
+      (deps.resolveMx ?? resolveMxRecords)(domain.name),
       deps.identity
         ? deps.identity(domain.name)
         : mailboxReceivingIdentityVerified({

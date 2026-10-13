@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState } from "react";
 import { DOCS_URL } from "@/lib/docs-links";
+import { formatDayTime } from "@/lib/format";
 import { isMailboxBundle, mailboxPlanMinimumSeats } from "@/lib/mailbox-plan-terms";
 import {
   formatMailboxPrice,
@@ -282,6 +283,27 @@ export function MailboxSetupDialog({
               <p className={styles.hint}>
                 {t("receivingBackup", {
                   hosts: receivingQuery.data.mx.others.map((record) => record.exchange).join(", "),
+                })}
+              </p>
+            ) : null}
+            {/* When and from where this was read, apart from mail that actually arrived:
+                a resolver cache right after an MX change is not today's outage. */}
+            {receivingQuery.data?.mx?.checkedAt ? (
+              <p className={styles.hint}>
+                {t("receivingCheckedVia", {
+                  time: formatDayTime(receivingQuery.data.mx.checkedAt, locale),
+                  source: t(
+                    receivingQuery.data.mx.source?.startsWith("public")
+                      ? "receivingSourcePublic"
+                      : "receivingSourceServer",
+                  ),
+                })}
+              </p>
+            ) : null}
+            {receivingQuery.data?.delivery?.lastReceivedAt ? (
+              <p className={styles.hint}>
+                {t("receivingLastDelivery", {
+                  time: formatDayTime(receivingQuery.data.delivery.lastReceivedAt, locale),
                 })}
               </p>
             ) : null}

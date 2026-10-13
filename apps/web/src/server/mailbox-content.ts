@@ -284,7 +284,10 @@ export async function getMailboxContent(
         ...metadata,
         // Captured MIME ID; for Sent this is not a claim about SES's final ID.
         messageId: mailboxMessageId(mime.messageId),
-        replyTo: item.kind === "sent" ? addresses(mime.to).join(", ") : metadata.replyTo,
+        // replyTo is the message's own Reply-To (or From) in every folder. Where a reply
+        // written from this view goes is replyRecipients: a Sent message's recipients.
+        replyRecipients:
+          item.kind === "sent" ? addresses(mime.to) : metadata.replyTo ? [metadata.replyTo] : [],
         replyIds: item.kind === "inbox" ? mailboxReplyIds(mime) : [],
         // The formatting the person wrote, to reopen in the editor (null: plain text).
         draftHtml:

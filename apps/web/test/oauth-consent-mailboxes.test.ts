@@ -68,4 +68,25 @@ describe.each(["en", "pt-BR"] as const)("OAuth consent mailboxes (%s)", (locale)
     // Allow is disabled until a mailbox is chosen.
     expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled/);
   });
+  it("keeps requested, ticked and granted apart; direct sending is its own opt-in", () => {
+    const html = render(locale);
+    expect(html).toContain(consent.permissions);
+    expect(html).toContain(consent.permissionsNote);
+    // Direct sending sits in its own block, unticked, and says mailboxes do not turn it on.
+    expect(html).toContain(consent.send.title);
+    expect(html).toContain(consent.send.note);
+    const sendLabel = consent.scopes.mail_send;
+    const sendInput = html
+      .slice(0, html.indexOf(sendLabel))
+      .match(/<input[^>]*>/g)
+      ?.at(-1);
+    expect(sendInput).not.toMatch(/checked/);
+    // What Allow would grant now: no mailbox ticked, so no mail access and no direct sending.
+    expect(html).toContain(consent.summary.title);
+    expect(html).toContain(consent.summary.sendOff);
+    expect(html).toContain(consent.summary.pickMailbox);
+    expect(html).not.toContain(consent.summary.nothing);
+    expect(html).not.toContain(consent.summary.sendOn);
+    expect(html).toContain(consent.summary.declined.replace("{list}", sendLabel));
+  });
 });

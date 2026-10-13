@@ -427,6 +427,8 @@
     "you": "você",
     "allTeams": "Todos os times",
     "scopesCount": "{count, plural, one {# permissão} other {# permissões}}",
+    "directSend": "Envio direto",
+    "mailNoSend": "Correio sem envio direto",
     "revoke": "Revogar acesso",
     "revokeAllTeamsForbidden": "Esta autorização também cobre times que você não administra. Só quem a concedeu pode revogá-la.",
     "revokeConfirm": {

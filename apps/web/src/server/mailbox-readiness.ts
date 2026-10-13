@@ -191,9 +191,34 @@ export async function checkMailboxReadiness(
         reasons: dto.reasons,
         mx: { correio_host: dto.mx.value, status: dto.mx.status, others: dto.mx.others },
         mailbox: box ? { state: box.receiving_state, reasons: box.reasons } : null,
-        verified_with: "public MX lookup + the provider's live receipt rule and identity",
+        // Three separate layers, each with when and from where it was read: what DNS
+        // answers, what the provider is set to do, and mail that actually arrived.
+        dns: {
+          mx_status: dto.mx.status,
+          checked_at: dto.mx.checkedAt,
+          source: dto.mx.source,
+        },
+        provider: {
+          checked_at: dto.checkedAt,
+          source: "the provider's live receipt rule and receiving identity",
+        },
+        delivery: {
+          last_received_at: dto.delivery.lastReceivedAt,
+          source: "messages Correio received for this domain's mailboxes (imports excluded)",
+        },
+        verified_with: `${dto.mx.source ?? "DNS"} + the provider's live receipt rule and identity`,
         checked_at: dto.checkedAt ?? now.toISOString(),
       };
+      // DNS answers can lag (resolver caches right after an MX change); arrived mail cannot.
+      const lastReceived = dto.delivery.lastReceivedAt
+        ? new Date(dto.delivery.lastReceivedAt).getTime()
+        : null;
+      if (
+        dto.mx.status !== "ready" &&
+        lastReceived !== null &&
+        now.getTime() - lastReceived < 2 * 86_400_000
+      )
+        receiving.delivery_note = `Mail reached this domain at ${dto.delivery.lastReceivedAt}, although this DNS answer (${dto.mx.source ?? "DNS"}, ${dto.mx.checkedAt ?? "now"}) is ${dto.mx.status}. Right after an MX change, resolvers may still hold the old record: check again later before changing anything.`;
       for (const reason of dto.reasons) {
         const text = RECEIVING_ACTIONS[reason]?.(
           domain.name,

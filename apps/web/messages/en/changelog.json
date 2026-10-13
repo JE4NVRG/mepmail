@@ -24,6 +24,28 @@
   },
   "releases": [
     {
+      "version": "0.146",
+      "date": "2026-10-13",
+      "title": "Clearer consent, and receiving with its time and source",
+      "summary": "When you connect an app you see what it asks for, what you ticked and what Allow grants. Receiving keeps the DNS answer apart from mail that actually arrived.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "OAuth consent: direct sending (mail:send) has its own unticked block, and a summary shows what the app will have when you click Allow, including \"Direct sending: yes/no\" and what was asked for and not granted.",
+            "Connected apps shows whether an app has direct sending or Mail without direct sending.",
+            "Receiving: the MX is read from public DNS (1.1.1.1 and 8.8.8.8) with its time and source, and the last message received shows apart. check_mailbox returns the dns, provider and delivery layers separately."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Sent: a sent message's replyTo is now its own Reply-To, the same one the recipient gets. Who a reply written from Sent goes to is in replyRecipients."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.143",
       "date": "2026-10-13",
       "title": "Unblock a recipient after a bounce",

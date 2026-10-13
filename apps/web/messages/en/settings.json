@@ -427,6 +427,8 @@
     "you": "you",
     "allTeams": "All teams",
     "scopesCount": "{count, plural, one {# permission} other {# permissions}}",
+    "directSend": "Direct sending",
+    "mailNoSend": "Mail, no direct sending",
     "revoke": "Revoke access",
     "revokeAllTeamsForbidden": "This grant also covers teams you do not administer. Only its holder can revoke it.",
     "revokeConfirm": {

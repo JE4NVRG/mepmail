@@ -89,6 +89,14 @@ export function ConnectedAppsView() {
                       {grant.allTeams ? (
                         <span className="ms-badge ms-badge-neutral">{t("allTeams")}</span>
                       ) : null}
+                      {/* What was granted, not asked for: direct sending is its own opt-in. */}
+                      {grant.scopes.includes("mail:send") ? (
+                        <span className="ms-badge ms-badge-warn">{t("directSend")}</span>
+                      ) : grant.scopes.some(
+                          (scope) => scope === "mail:read" || scope === "mail:draft",
+                        ) ? (
+                        <span className="ms-badge ms-badge-neutral">{t("mailNoSend")}</span>
+                      ) : null}
                       <Tooltip inline text={grant.scopes.join("\n")}>
                         <span className="ms-chip">
                           {t("scopesCount", { count: grant.scopes.length })}

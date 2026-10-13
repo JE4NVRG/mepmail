@@ -1,4 +1,5 @@
-import { resolveMx, resolveNs } from "node:dns/promises";
+import { resolveNs } from "node:dns/promises";
+import { resolveMxRecords } from "./public-dns";
 
 /**
  * The receiving (MX) guide beside a Correio domain: which DNS host serves the
@@ -107,7 +108,7 @@ export async function mailboxDnsGuide(
   const domain = normal(domainName);
   const expected = normal(expectedMx);
   const { zone, nameservers } = await zoneOf(domain, deps.resolveNs ?? resolveNs);
-  const records = await (deps.resolveMx ?? resolveMx)(domain).catch(
+  const records = await (deps.resolveMx ?? resolveMxRecords)(domain).catch(
     () => [] as { exchange: string; priority: number }[],
   );
   const current = records

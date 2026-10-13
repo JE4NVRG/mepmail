@@ -81,6 +81,16 @@ export function ConsentForm({
   ).filter((scope) => !MAIL_SCOPES.includes(scope) || teamBoxes.length > 0);
   const mailWanted = visible.some((scope) => MAIL_SCOPES.includes(scope) && granted.has(scope));
   const nothingGranted = visible.every((scope) => scope === OFFLINE_ACCESS || !granted.has(scope));
+  // Requested (what the app asks), selected (what is ticked) and granted (what Allow records,
+  // the same rule decide() applies): mail only reaches the mailboxes ticked below.
+  const chosenBoxes = teamBoxes.filter((box) => boxes.has(box.id));
+  const mailEffective = mailWanted && chosenBoxes.length > 0;
+  const effective = visible.filter(
+    (scope) => granted.has(scope) && (mailEffective || !MAIL_SCOPES.includes(scope)),
+  );
+  const declined = visible.filter((scope) => !granted.has(scope));
+  const sendOffered = visible.includes(MAIL_SEND);
+  const scopeLabel = (scope: string) => t(`scopes.${scope.replace(":", "_")}`);
 
   function toggle(scope: string) {
     setGranted((prev) => {
@@ -205,30 +215,70 @@ export function ConsentForm({
         </div>
         <div className={`ms-field ${styles.field}`}>
           <span className="ms-microlabel">{t("permissions")}</span>
+          <span
+            style={{ display: "block", fontSize: "var(--ms-fs-micro)", color: "var(--ms-faint)" }}
+          >
+            {t("permissionsNote")}
+          </span>
           <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-            {visible.map((scope) => (
-              <label
-                key={scope}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  fontSize: "var(--ms-fs-label)",
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  className="ms-checkbox"
-                  checked={granted.has(scope)}
-                  onChange={() => toggle(scope)}
-                  disabled={pending !== null}
-                />
-                {t(`scopes.${scope.replace(":", "_")}`)}
-              </label>
-            ))}
+            {visible
+              .filter((scope) => scope !== MAIL_SEND)
+              .map((scope) => (
+                <label
+                  key={scope}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: "var(--ms-fs-label)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    className="ms-checkbox"
+                    checked={granted.has(scope)}
+                    onChange={() => toggle(scope)}
+                    disabled={pending !== null}
+                  />
+                  {scopeLabel(scope)}
+                </label>
+              ))}
           </div>
         </div>
+        {sendOffered ? (
+          // Direct sending is its own opt-in, never pre-ticked: ticking mailboxes does not turn it on.
+          <div className={`ms-field ${styles.field}`}>
+            <span className="ms-microlabel">{t("send.title")}</span>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: "var(--ms-fs-label)",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                className="ms-checkbox"
+                checked={granted.has(MAIL_SEND)}
+                onChange={() => toggle(MAIL_SEND)}
+                disabled={pending !== null}
+              />
+              {scopeLabel(MAIL_SEND)}
+            </label>
+            <span
+              style={{
+                display: "block",
+                fontSize: "var(--ms-fs-micro)",
+                color: "var(--ms-faint)",
+              }}
+            >
+              {t("send.note")}
+            </span>
+          </div>
+        ) : null}
         {mailWanted ? (
           <fieldset
             className={`ms-field ${styles.field}`}
@@ -305,6 +355,55 @@ export function ConsentForm({
             ) : null}
           </fieldset>
         ) : null}
+        <div
+          className={`ms-field ${styles.field}`}
+          role="status"
+          aria-live="polite"
+          style={{
+            display: "grid",
+            gap: 4,
+            padding: "10px 12px",
+            border: "1px solid var(--ms-line, var(--ms-border))",
+            borderRadius: 10,
+          }}
+        >
+          <span className="ms-microlabel">{t("summary.title")}</span>
+          {effective.length > 0 ? (
+            <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: "var(--ms-fs-label)" }}>
+              {effective
+                .filter((scope) => scope !== MAIL_SEND)
+                .map((scope) => (
+                  <li key={scope}>{scopeLabel(scope)}</li>
+                ))}
+            </ul>
+          ) : mailWanted ? null : (
+            <span style={{ fontSize: "var(--ms-fs-label)" }}>{t("summary.nothing")}</span>
+          )}
+          {mailWanted && !mailEffective ? (
+            <span style={{ fontSize: "var(--ms-fs-label)" }}>{t("summary.pickMailbox")}</span>
+          ) : null}
+          {mailEffective ? (
+            <span style={{ fontSize: "var(--ms-fs-label)", overflowWrap: "anywhere" }}>
+              {t("summary.mailboxes", {
+                count: chosenBoxes.length,
+                list: chosenBoxes.map((box) => box.address).join(", "),
+              })}
+            </span>
+          ) : null}
+          {mailEffective || sendOffered ? (
+            <strong style={{ fontSize: "var(--ms-fs-label)" }}>
+              {t(mailEffective && granted.has(MAIL_SEND) ? "summary.sendOn" : "summary.sendOff")}
+            </strong>
+          ) : null}
+          {declined.length > 0 ? (
+            <span style={{ fontSize: "var(--ms-fs-micro)", color: "var(--ms-faint)" }}>
+              {t("summary.declined", { list: declined.map(scopeLabel).join("; ") })}
+            </span>
+          ) : null}
+          <span style={{ fontSize: "var(--ms-fs-micro)", color: "var(--ms-faint)" }}>
+            {t("summary.after")}
+          </span>
+        </div>
         {failed ? (
           <p className={styles.error} role="alert">
             {t("error")}

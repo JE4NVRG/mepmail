@@ -62,7 +62,6 @@ import {
   mailboxContacts,
   readRecentRecipients,
   rememberRecipients,
-  splitRecipients,
 } from "@/lib/mailbox-recipients";
 import {
   customFolderOf,
@@ -381,7 +380,7 @@ function DraftDialog({
         ? source.to
         : mode === "forward"
           ? []
-          : splitRecipients(source.replyTo)
+          : source.replyRecipients
       : (prefill?.to ?? []),
   );
   const [cc, setCc] = useState<string[]>(
@@ -389,7 +388,7 @@ function DraftDialog({
       ? source.kind === "draft"
         ? source.cc
         : mode === "replyAll"
-          ? replyAllCopies(source, sender?.address ?? "", splitRecipients(source.replyTo))
+          ? replyAllCopies(source, sender?.address ?? "", source.replyRecipients)
           : []
       : (prefill?.cc ?? []),
   );
