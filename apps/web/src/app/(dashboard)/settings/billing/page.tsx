@@ -19,7 +19,8 @@ export default async function BillingPage({
   const t = await getTranslations("settings");
   const params = await searchParams;
   const raw = params.checkout;
-  const checkout = raw === "success" || raw === "cancel" ? raw : null;
+  // Back from a Pix Checkout: like a card return, the plan starts once Stripe confirms it.
+  const checkout = raw === "success" || raw === "pix" ? "success" : raw === "cancel" ? raw : null;
   // Arriving from the Correio offer preselects the Send + Mail combo; nothing is bought here.
   const requestedMail = params.correio === "1";
   return (

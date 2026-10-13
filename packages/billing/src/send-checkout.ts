@@ -16,6 +16,18 @@ import {
   recordMetaCheckout,
 } from "./meta-advertising.js";
 import {
+  createPixCheckoutSession,
+  PIX_COLLECTION,
+  PIX_COLLECTION_METADATA_KEY,
+  PIX_DAYS_UNTIL_DUE,
+  PIX_SESSION_METADATA_KEY,
+  type PixPayment,
+  type PixStripe,
+  pixAmountForPrice,
+  refundPixPayment,
+  settlePixInvoice,
+} from "./pix.js";
+import {
   effectiveOverageRate,
   overageLookupKey,
   resolvePriceId,
@@ -632,4 +644,220 @@ export async function beginSendCheckout(
     if (error instanceof SendCheckoutError) throw error;
     throw new SendCheckoutError("unknown");
   }
+}
+
+/** The intro coupon's discount in reais, or null when it has no BRL amount. */
+async function introCouponBrl(stripe: BillingStripe, coupon: string): Promise<number | null> {
+  if (!stripe.coupons) return null;
+  const found = await stripe.coupons.retrieve(coupon, { expand: ["currency_options"] });
+  const amount = found.currency_options?.brl?.amount_off;
+  return found.valid && Number.isSafeInteger(amount) && (amount as number) > 0
+    ? (amount as number)
+    : null;
+}
+
+/** What a first Pix for this Send purchase is: prices, intro coupon and the amount in reais. */
+async function sendPixTerms(
+  deps: SendCheckoutDeps,
+  pix: PixStripe,
+  customer: string,
+  rungKey: PlanRungKey,
+  interval: "month" | "year",
+) {
+  const rung = rungByKey(rungKey);
+  const launch = deps.launchOfferEnabled === true && rungKey === "pro_100k";
+  if ((interval === "year" && !launch) || rung.priceCents <= 0)
+    throw new SendCheckoutError("invalid");
+  const launchPrice = launch
+    ? await resolveSendLaunchPrice(deps.stripe, interval, deps.livemode)
+    : null;
+  const price = launchPrice
+    ? launchPrice.id
+    : await resolvePriceId(deps.stripe, rungLookupKey(rung));
+  const overage =
+    rung.period === "month" && interval === "month"
+      ? await resolvePriceId(deps.stripe, overageLookupKey(rung))
+      : null;
+  const priced = await pixAmountForPrice(pix, price, 1);
+  if (!priced) throw new SendCheckoutError("invalid");
+  let coupon: string | null = null;
+  let discount = 0;
+  if (launchPrice && interval === "month" && (await qualifiesForIntro(deps, customer))) {
+    coupon = await verifySendIntroCoupon(
+      deps.stripe,
+      idOf(launchPrice.product) ?? "",
+      deps.livemode,
+    );
+    const brl = await introCouponBrl(deps.stripe, coupon);
+    if (brl === null) throw new SendCheckoutError("invalid");
+    discount = brl;
+  }
+  const amount = priced.amount - discount;
+  if (amount <= 0) throw new SendCheckoutError("invalid");
+  return { price, overage, coupon, amount, product: priced.product };
+}
+
+/**
+ * Send paid by Pix (see pix.ts): a one-time Pix Checkout in reais for the first period, the
+ * intro coupon included when the team qualifies. Nothing is granted here; the webhook starts
+ * the send_invoice subscription once the Pix is paid.
+ */
+export async function beginSendPixCheckout(
+  deps: SendCheckoutDeps,
+  pix: PixStripe,
+  input: SendCheckoutInput,
+): Promise<{ url: string }> {
+  if (typeof deps.livemode !== "boolean" || !input.userId) throw new SendCheckoutError("invalid");
+  const interval = input.interval ?? "month";
+  if (interval !== "month" && interval !== "year") throw new SendCheckoutError("invalid");
+  const customer = await ensureCustomer(deps, input);
+  const terms = await deps.db.transaction(async (transaction) => {
+    const tx = transaction as unknown as Db;
+    const team = await currentTeam(tx, input);
+    if (team.stripeCustomerId !== customer) throw new SendCheckoutError("conflict");
+    await noOtherSubscription(deps, customer);
+    return sendPixTerms(deps, pix, customer, input.rung, interval);
+  });
+  const url = await createPixCheckoutSession(pix, {
+    kind: "send_start",
+    teamId: input.team.id,
+    customerId: customer,
+    amount: terms.amount,
+    product: terms.product,
+    priceId: terms.price,
+    quantity: 1,
+    interval,
+    ...(terms.overage ? { overagePriceId: terms.overage } : {}),
+    ...(terms.coupon ? { coupon: terms.coupon } : {}),
+    successUrl: input.successUrl,
+    cancelUrl: input.cancelUrl,
+    idempotencyKey: `pix-send:${input.team.id}:${randomUUID()}`,
+  });
+  return { url };
+}
+
+/**
+ * Closes the team's open card Checkout for Send, so a Pix and a card never both start a plan.
+ * "completed" when Stripe already took that payment (the card is the purchase then).
+ */
+async function closeOpenSendCheckout(
+  db: Db,
+  stripe: BillingStripe,
+  teamId: string,
+): Promise<"none" | "closed" | "completed"> {
+  const open = await db
+    .select()
+    .from(schema.sendCheckoutAttempts)
+    .where(
+      and(
+        eq(schema.sendCheckoutAttempts.teamId, teamId),
+        ne(schema.sendCheckoutAttempts.status, "resolved"),
+      ),
+    )
+    .for("update");
+  let state: "none" | "closed" | "completed" = "none";
+  for (const attempt of open) {
+    if (attempt.stripeSessionId) {
+      const sessions = stripe.checkout.sessions as typeof stripe.checkout.sessions & {
+        expire?: (id: string) => Promise<Stripe.Checkout.Session>;
+      };
+      if (!sessions.retrieve) throw new SendCheckoutError("unknown");
+      let session = await sessions.retrieve(attempt.stripeSessionId);
+      if (session.status === "open" && sessions.expire) {
+        // Stripe refuses to expire a session that was just paid; read it again then.
+        await sessions.expire(session.id).catch(() => null);
+        session = await sessions.retrieve(attempt.stripeSessionId);
+      }
+      if (session.status === "complete") state = "completed";
+      else if (session.status !== "expired") throw new SendCheckoutError("pending");
+    }
+    await db
+      .update(schema.sendCheckoutAttempts)
+      .set({ status: "resolved", resolvedAt: new Date(), leaseToken: null, leaseUntil: null })
+      .where(eq(schema.sendCheckoutAttempts.id, attempt.id));
+    if (state !== "completed") state = "closed";
+  }
+  return state;
+}
+
+/**
+ * Starts the Send plan a paid first Pix bought: a send_invoice subscription in reais (base,
+ * metered overage on monthly plans, the intro coupon) whose first invoice this payment
+ * settles. Idempotent per Checkout session; refunds the Pix when the team cannot take it.
+ */
+export async function fulfillSendPixStart(
+  db: Db,
+  deps: Pick<SendCheckoutDeps, "stripe" | "livemode">,
+  pix: PixStripe,
+  payment: PixPayment,
+  log: (message: string) => void,
+): Promise<"fulfilled" | "refunded"> {
+  await lockCustomer(db, payment.customerId);
+  const refund = async (reason: string) => {
+    await refundPixPayment(pix, payment, reason);
+    log(`pix ${payment.sessionId}: refunded (${reason})`);
+    return "refunded" as const;
+  };
+  const [team] = await db
+    .select()
+    .from(schema.teams)
+    .where(eq(schema.teams.stripeCustomerId, payment.customerId));
+  if (!team || team.id !== payment.teamId) return refund("team");
+  const listed = await pix.subscriptions.list({
+    customer: payment.customerId,
+    status: "all",
+    limit: 100,
+  });
+  let sub =
+    listed.data.find((s) => s.metadata?.[PIX_SESSION_METADATA_KEY] === payment.sessionId) ?? null;
+  if (!sub) {
+    if (team.plan === "system" || team.suspendedAt || OCCUPIED.has(team.planStatus))
+      return refund("team");
+    if (!payment.priceId || payment.quantity !== 1 || !payment.interval) return refund("terms");
+    const card = await closeOpenSendCheckout(db, deps.stripe, team.id);
+    if (card === "completed") return refund("occupied");
+    try {
+      await noOtherSubscription({ ...deps, db }, payment.customerId);
+    } catch (error) {
+      if (error instanceof SendCheckoutError && error.code === "subscription_exists")
+        return refund("occupied");
+      throw error;
+    }
+    const priced = await pixAmountForPrice(pix, payment.priceId, 1);
+    const discount = payment.coupon ? await introCouponBrl(deps.stripe, payment.coupon) : 0;
+    if (!priced || discount === null || priced.amount - discount !== payment.amount)
+      return refund("amount");
+    sub = await pix.subscriptions.create(
+      {
+        customer: payment.customerId,
+        currency: "brl",
+        collection_method: "send_invoice",
+        days_until_due: PIX_DAYS_UNTIL_DUE,
+        // Card only on the invoice page: boleto is never offered.
+        payment_settings: { payment_method_types: ["card"] },
+        items: [
+          { price: payment.priceId, quantity: 1 },
+          ...(payment.overagePriceId ? [{ price: payment.overagePriceId }] : []),
+        ],
+        ...(payment.coupon ? { discounts: [{ coupon: payment.coupon }] } : {}),
+        metadata: {
+          team_id: team.id,
+          mepmail_send_interval: payment.interval,
+          ...(payment.coupon ? { mepmail_send_intro: "first_invoice_900" } : {}),
+          [PIX_COLLECTION_METADATA_KEY]: PIX_COLLECTION,
+          [PIX_SESSION_METADATA_KEY]: payment.sessionId,
+        },
+      },
+      { idempotencyKey: `pix-send-start:${payment.sessionId}` },
+    );
+  }
+  const invoiceId = idOf(sub.latest_invoice);
+  if (!invoiceId) throw new SendCheckoutError("pending");
+  if ((await settlePixInvoice(pix, invoiceId, payment)) === "paid") return "fulfilled";
+  // The first invoice is not this payment's amount: undo the start and give the Pix back.
+  if (!["canceled", "incomplete_expired"].includes(sub.status))
+    await pix.subscriptions.cancel(sub.id, { invoice_now: false, prorate: false });
+  const invoice = await pix.invoices.retrieve(invoiceId);
+  if (invoice.status === "open") await pix.invoices.voidInvoice(invoiceId);
+  return refund("invoice");
 }

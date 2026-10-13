@@ -617,6 +617,9 @@ describe("billing router", () => {
       hasCustomer: false,
       hasLiveSubscription: false,
       newSubscriptionsPaused: false,
+      // Pix stays closed until PIX_PAYMENTS_OPEN=true.
+      pixAvailable: false,
+      paidByPix: false,
       billingInterval: null,
       launchOffer: null,
     });
@@ -662,6 +665,29 @@ describe("billing router", () => {
       code: "FORBIDDEN",
     });
     await expect(member.billing.portal()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(member.billing.pixCheckout({ rung: "pro_100k" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("Send by Pix stays closed until PIX_PAYMENTS_OPEN, and never starts a second plan", async () => {
+    const fresh = await createTeam(db, "pix-buyer");
+    await seedBuyer(fresh);
+    await expect(
+      callerFor(fresh, "owner").billing.pixCheckout({ rung: "pro_100k" }),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: "pix_unavailable" });
+    vi.stubEnv("PIX_PAYMENTS_OPEN", "true");
+    expect(await callerFor(fresh, "member").billing.status()).toMatchObject({
+      pixAvailable: true,
+      paidByPix: false,
+    });
+    const subscribed = await subscribedTeam("pro_200k", { overage: true });
+    expect(await callerFor(subscribed, "member").billing.status()).toMatchObject({
+      pixAvailable: false,
+    });
+    await expect(
+      callerFor(subscribed, "owner").billing.pixCheckout({ rung: "pro_100k" }),
+    ).rejects.toMatchObject({ message: "SEND_CHECKOUT_SUBSCRIPTION_EXISTS" });
   });
 
   it("checkout creates the customer once, stores it, and sells the rung's price with its metered item", async () => {

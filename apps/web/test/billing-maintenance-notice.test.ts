@@ -35,6 +35,7 @@ vi.mock("@/lib/trpc", () => {
       billing: {
         status: { ...operation, queryOptions: () => ({ status: true }) },
         checkout: operation,
+        pixCheckout: operation,
         portal: operation,
         changePlan: operation,
         setOverage: operation,
@@ -97,13 +98,14 @@ describe.each(["en", "pt-BR"] as const)("billing maintenance notice in %s", (loc
     h.locale = locale;
   });
   const messages = locale === "en" ? enSettings : ptSettings;
-  it.each(["checkout", "portal", "changePlan", "setOverage"])(
+  const planMutations = ["checkout", "pixCheckout", "portal", "changePlan", "setOverage"];
+  it.each(planMutations)(
     "renders the specific accessible notice for paused %s without exposing provider payloads",
     (operation) => {
-      h.failedIndex = ["checkout", "portal", "changePlan", "setOverage"].indexOf(operation);
+      h.failedIndex = planMutations.indexOf(operation);
       const html = render();
-      // The four plan mutations, then the open Pix invoices' payment (rendered after them).
-      expect(h.mutationIndex).toBe(5);
+      // The five plan mutations, then the open Pix invoices' payment (rendered after them).
+      expect(h.mutationIndex).toBe(6);
       expect(html).toContain('role="alert"');
       expect(html).toContain(messages.billing.billingPaused);
       expect(html).not.toContain(messages.billing.error);

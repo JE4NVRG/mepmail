@@ -6,6 +6,7 @@ import type Stripe from "stripe";
 import type { BillingDeps } from "./checkout.js";
 import { isMailboxSubscription } from "./mailbox.js";
 import { reportOverage } from "./overage.js";
+import { isPixSubscription, PixBillingError } from "./pix.js";
 import {
   overageLookupKey,
   pendingRungOf,
@@ -157,6 +158,13 @@ export async function applySubscription(
   if (!entitled && team.stripeSubscriptionId && team.stripeSubscriptionId !== sub.id) return;
 
   const { base, overage: existingOverage } = subscriptionItems(sub);
+  // Paid by Pix (pix.ts: send_invoice, mepmail_collection=pix): an overdue invoice has no
+  // card to retry, so past due is a lapsed plan, not the card's dunning grace.
+  const pixLapsed =
+    sub.status === "past_due" &&
+    sub.collection_method === "send_invoice" &&
+    sub.metadata?.mepmail_collection === "pix";
+  const dunning = sub.status === "past_due" && !pixLapsed;
   const previousContract = verifiedSendBillingContract(team.sendBillingContract, {
     teamId: team.id,
     customerId: customerId as string,
@@ -165,7 +173,7 @@ export async function applySubscription(
     financialPeriodEnd: team.currentPeriodEnd,
   });
   if (
-    sub.status === "past_due" &&
+    dunning &&
     (base?.price.recurring?.interval === "year" || previousContract?.billingInterval === "year")
   ) {
     // Failed annual renewal must not mint another paid year from Stripe's
@@ -253,14 +261,14 @@ export async function applySubscription(
         }
       }
     }
-  } else if (sub.status === "past_due") {
+  } else if (dunning) {
     plan = team.plan;
     planQuota = team.planQuota;
   } else {
     plan = "free";
     planQuota = null;
   }
-  const overageItemId = entitled || sub.status === "past_due" ? (overage?.id ?? null) : null;
+  const overageItemId = entitled || dunning ? (overage?.id ?? null) : null;
   // The metered item is going (subscription ended, item removed elsewhere):
   // what it has not billed yet must reach the meter while the row still
   // names the item, inside Stripe's draft window for the closing period.
@@ -274,15 +282,17 @@ export async function applySubscription(
     effectiveItems.push(overage);
   const effectiveSubscription = { ...sub, items: { ...sub.items, data: effectiveItems } };
   const resolved = rungFromSubscription(effectiveSubscription);
-  sendBillingContract = resolveSendBillingContract(effectiveSubscription, {
-    teamId: team.id,
-    customerId: customerId as string,
-  });
+  sendBillingContract = pixLapsed
+    ? null
+    : resolveSendBillingContract(effectiveSubscription, {
+        teamId: team.id,
+        customerId: customerId as string,
+      });
   const included = Number(base?.price.metadata?.included_emails);
   const start = stamp(base?.current_period_start);
   const end = stamp(base?.current_period_end);
   const valid =
-    (entitled || sub.status === "past_due") &&
+    (entitled || dunning) &&
     base &&
     overage &&
     effectiveItems.length === 2 &&
@@ -467,6 +477,8 @@ export async function changeRung(
   const rung = rungByKey(input.rung);
   if (rung.priceCents <= 0) throw new Error(`rung ${input.rung} is not for sale`);
   const { customerId, sub } = await liveSubscription(deps, input.teamId);
+  // A Pix plan has no card for the proration charge: a new rung is a new purchase.
+  if (isPixSubscription(sub)) throw new PixBillingError("unavailable");
   const { base, overage } = subscriptionItems(sub);
   if (!base) throw new Error(`subscription ${sub.id} has no plan item`);
   const current = rungFromPrice(base.price);

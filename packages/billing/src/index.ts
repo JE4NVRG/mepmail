@@ -134,6 +134,7 @@ export {
 } from "./prices.js";
 export {
   beginSendCheckout,
+  beginSendPixCheckout,
   SEND_CHECKOUT_METADATA_KEY,
   type SendCheckoutDeps,
   SendCheckoutError,

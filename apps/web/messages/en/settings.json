@@ -282,7 +282,9 @@
       "pay": "Pay with Pix",
       "askAdmin": "Ask a team admin to pay it.",
       "error": "Pix could not be opened right now. Please try again in a moment.",
-      "paid": "Pix received. Thank you!"
+      "paid": "Pix received. Thank you!",
+      "startNote": "With Pix you pay one period at a time, in reais: each renewal sends an invoice to pay with Pix within 5 days. Nothing is charged automatically.",
+      "changeHint": "Plan paid with Pix: to switch, cancel under Manage (it takes effect at the end of the period) and choose the new plan afterwards. Need to switch now? Write to suporte@mepmail.dev."
     },
     "plan": "Plan",
     "loadFailed": "We could not load your billing right now.",

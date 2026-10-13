@@ -4,12 +4,14 @@ import {
   type BillingStripe,
   beginPixInvoicePayment,
   beginSendCheckout,
+  beginSendPixCheckout,
   changeRung,
   createPortalSession,
   decodeConsentProof,
   googleConversionConfigured,
   hasLiveSubscription,
   isLiveKey,
+  isPixSubscription,
   metaConversionConfigured,
   openPixInvoices,
   PixBillingError,
@@ -44,7 +46,7 @@ import { z } from "zod";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { recordAudit } from "../audit";
 import { resolveBaseUrl } from "../auth";
-import { getPixStripe, getStripe, mailPlanMove } from "../billing";
+import { getPixStripe, getStripe, mailPlanMove, pixPaymentsOpen } from "../billing";
 import { emitFunnel } from "../funnel";
 import { newSubscriptionsPaused } from "../new-subscriptions";
 import { getQueue } from "../queue";
@@ -170,6 +172,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         live && team.plan !== "system" ? "pending_confirmation" : "none";
       let effectiveRung = null;
       let effectiveInterval: "month" | "year" | null = null;
+      let paidByPix = false;
       if (team.plan !== "free" && team.plan !== "system" && team.stripeSubscriptionId) {
         try {
           const subscription = await deps
@@ -198,6 +201,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
               base.current_period_start * 1000 ===
                 new Date(contract.financialPeriodStart).getTime() &&
               base.current_period_end * 1000 === new Date(contract.financialPeriodEnd).getTime());
+          paidByPix = isPixSubscription(subscription);
           if (resolved && bound && consistent && (interval === "month" || interval === "year")) {
             effectiveRung = resolved;
             effectiveInterval = interval === "year" ? "year" : "month";
@@ -247,6 +251,10 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         hasCustomer: team.stripeCustomerId !== null,
         hasLiveSubscription: live,
         newSubscriptionsPaused: newSubscriptionsPaused(),
+        /** A new plan can also be paid by Pix, in reais (billing.pixCheckout). */
+        pixAvailable: pixPaymentsOpen() && !live && team.plan !== "system",
+        /** The plan is paid by Pix, invoice by invoice: its rung changes by a new purchase. */
+        paidByPix,
         billingInterval: contract?.billingInterval ?? effectiveInterval,
         launchOffer:
           launchOfferEnabled() && !live && team.plan !== "system"
@@ -339,6 +347,85 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
       }),
 
     /**
+     * The first period of a Send plan paid by Pix (billing pix.ts): a one-time Pix Checkout
+     * in reais. Nothing is granted here; the webhook starts the plan once the Pix is paid.
+     */
+    pixCheckout: billingMutationProcedure
+      .input(
+        z.object({ rung: paidRung, interval: z.enum(["month", "year"]).default("month") }).strict(),
+      )
+      .mutation(async ({ ctx, input }) => {
+        requireCloud();
+        if (!pixPaymentsOpen())
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pix_unavailable" });
+        if (newSubscriptionsPaused()) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "SEND_CHECKOUT_PAUSED" });
+        }
+        const team = await loadTeam(ctx.db, ctx.teamId);
+        assertBillable(team);
+        if (hasLiveSubscription(team.planStatus)) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "SEND_CHECKOUT_SUBSCRIPTION_EXISTS",
+          });
+        }
+        const offerEnabled = launchOfferEnabled();
+        if (input.interval === "year" && (!offerEnabled || input.rung !== "pro_100k")) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "SEND_CHECKOUT_INVALID" });
+        }
+        let checkout: { url: string };
+        try {
+          checkout = await beginSendPixCheckout(
+            {
+              db: ctx.db,
+              stripe: deps.stripe(),
+              livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
+              launchOfferEnabled: offerEnabled,
+            },
+            getPixStripe(),
+            {
+              team,
+              userId: ctx.session.user.id,
+              rung: input.rung,
+              interval: input.interval,
+              email: ctx.session.user.email,
+              successUrl: `${billingPageUrl()}?checkout=pix`,
+              cancelUrl: billingPageUrl(),
+            },
+          );
+        } catch (error) {
+          if (error instanceof PixBillingError)
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pix_unavailable" });
+          if (!(error instanceof SendCheckoutError)) throw error;
+          const code =
+            error.code === "forbidden"
+              ? "FORBIDDEN"
+              : error.code === "not_found"
+                ? "NOT_FOUND"
+                : error.code === "invalid"
+                  ? "BAD_REQUEST"
+                  : error.code === "subscription_exists"
+                    ? "PRECONDITION_FAILED"
+                    : "CONFLICT";
+          throw new TRPCError({ code, message: `SEND_CHECKOUT_${error.code.toUpperCase()}` });
+        }
+        let url: URL;
+        try {
+          url = new URL(checkout.url);
+        } catch {
+          throw new TRPCError({ code: "CONFLICT", message: "SEND_CHECKOUT_PENDING" });
+        }
+        if (url.protocol !== "https:" || url.hostname !== "checkout.stripe.com" || url.port)
+          throw new TRPCError({ code: "CONFLICT", message: "SEND_CHECKOUT_PENDING" });
+        await recordAudit(ctx, {
+          action: "billing.checkout_started",
+          target: { type: "team", id: ctx.teamId },
+          metadata: { rung: input.rung, interval: input.interval, method: "pix" },
+        });
+        return { url: url.href };
+      }),
+
+    /**
      * Moves a live subscription to another rung with Stripe prorations. The
      * portal cannot switch plans on a subscription carrying a metered item,
      * so every plan change happens here.
@@ -355,7 +442,11 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         const change = await changeRung(
           { db: ctx.db, stripe: deps.stripe() },
           { teamId: ctx.teamId, rung: input.rung },
-        );
+        ).catch((error: unknown) => {
+          if (error instanceof PixBillingError)
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "SEND_PIX_PLAN_CHANGE" });
+          throw error;
+        });
         await recordAudit(ctx, {
           action: "billing.plan_changed",
           target: { type: "team", id: ctx.teamId },

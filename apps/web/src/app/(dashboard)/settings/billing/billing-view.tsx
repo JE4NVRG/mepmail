@@ -197,6 +197,7 @@ export function BillingView({
   const [plansOpen, setPlansOpen] = useState(intent !== null);
   const [changed, setChanged] = useState<{ rung: PlanRungKey; result: RungChange } | null>(null);
   const startCheckout = useMutation(trpc.billing.checkout.mutationOptions(redirect));
+  const startPix = useMutation(trpc.billing.pixCheckout.mutationOptions(redirect));
   const openPortal = useMutation(trpc.billing.portal.mutationOptions(redirect));
   const changePlan = useMutation(
     trpc.billing.changePlan.mutationOptions({
@@ -211,7 +212,7 @@ export function BillingView({
     }),
   );
   const setOverage = useMutation(trpc.billing.setOverage.mutationOptions(refresh));
-  const mutations = [startCheckout, openPortal, changePlan, setOverage];
+  const mutations = [startCheckout, startPix, openPortal, changePlan, setOverage];
   const busy = mutations.some((m) => m.isPending);
   const failed = mutations.some((m) => m.isError);
   const billingPaused = mutations.some(
@@ -361,8 +362,12 @@ export function BillingView({
       : null;
   const comboPer = t(launchInterval === "year" ? "launch.perYear" : "perMonth");
   const showComboStep = !!comboIntent && (hasLiveSubscription || checkout === "success");
+  const paidByPix = status.data.paidByPix;
   const subscriptionChangesUnavailable =
-    hasLiveSubscription && (billingInterval === "year" || subscriptionState !== "confirmed");
+    hasLiveSubscription &&
+    (billingInterval === "year" || subscriptionState !== "confirmed" || paidByPix);
+  // Pix in reais for a new plan (billing.pixCheckout), next to the card.
+  const pixOffer = inBrazil && status.data.pixAvailable && !hasLiveSubscription && !salesPaused;
   const salePrice = (r: PlanRung) =>
     newOffer && r.key === newOffer.rung
       ? launchInterval === "year"
@@ -858,7 +863,44 @@ export function BillingView({
               <BtnSpinner on={startCheckout.isPending} />
               {t(comboOn ? "launch.comboContinue" : "launch.continue")}
             </button>
-          ) : (
+          ) : null}
+          {canManage && pixOffer ? (
+            <>
+              <button
+                type="button"
+                className="ms-btn ms-btn-secondary"
+                style={{ marginLeft: 10 }}
+                disabled={busy || (comboOn && comboSeatCount === null)}
+                onClick={() => {
+                  if (comboOn && comboSeatCount !== null && teamId) {
+                    saveLaunchComboIntent({
+                      teamId,
+                      tier: comboTier,
+                      seats: comboSeatCount,
+                      interval: launchInterval,
+                    });
+                  } else {
+                    clearLaunchComboIntent();
+                  }
+                  startPix.mutate({ rung: newOffer.rung, interval: launchInterval });
+                }}
+              >
+                <BtnSpinner on={startPix.isPending} />
+                {t("pix.pay")}
+              </button>
+              <p
+                style={{
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: "var(--ms-muted)",
+                  margin: "12px 0 0",
+                }}
+              >
+                {t("pix.startNote")}
+              </p>
+            </>
+          ) : null}
+          {canManage ? null : (
             <p style={{ color: "var(--ms-muted)", fontSize: 14 }}>{t("readOnly")}</p>
           )}
         </Card>
@@ -1010,38 +1052,60 @@ export function BillingView({
                           {t("current")}
                         </button>
                       ) : forSale ? (
-                        <button
-                          type="button"
-                          className={`ms-btn ${active ? "ms-btn-primary" : "ms-btn-secondary"}`}
-                          disabled={busy || subscriptionChangesUnavailable || salesPaused}
-                          onClick={() =>
-                            subscriptionChangesUnavailable || salesPaused
-                              ? undefined
-                              : hasLiveSubscription
-                                ? changePlan.mutate({ rung: r.key })
-                                : startCheckout.mutate({
-                                    rung: r.key,
-                                    interval:
-                                      newOffer && r.key === newOffer.rung
-                                        ? launchInterval
-                                        : "month",
-                                  })
-                          }
-                        >
-                          <BtnSpinner
-                            on={
-                              (startCheckout.isPending &&
-                                startCheckout.variables?.rung === r.key) ||
-                              (changePlan.isPending && changePlan.variables?.rung === r.key)
+                        <>
+                          <button
+                            type="button"
+                            className={`ms-btn ${active ? "ms-btn-primary" : "ms-btn-secondary"}`}
+                            disabled={busy || subscriptionChangesUnavailable || salesPaused}
+                            onClick={() =>
+                              subscriptionChangesUnavailable || salesPaused
+                                ? undefined
+                                : hasLiveSubscription
+                                  ? changePlan.mutate({ rung: r.key })
+                                  : startCheckout.mutate({
+                                      rung: r.key,
+                                      interval:
+                                        newOffer && r.key === newOffer.rung
+                                          ? launchInterval
+                                          : "month",
+                                    })
                             }
-                          />
-                          {hasLiveSubscription
-                            ? status.data.effectiveRung &&
-                              r.priceCents < status.data.effectiveRung.priceCents
-                              ? t("switchAtPeriodEnd")
-                              : t("switch")
-                            : t("choose")}
-                        </button>
+                          >
+                            <BtnSpinner
+                              on={
+                                (startCheckout.isPending &&
+                                  startCheckout.variables?.rung === r.key) ||
+                                (changePlan.isPending && changePlan.variables?.rung === r.key)
+                              }
+                            />
+                            {hasLiveSubscription
+                              ? status.data.effectiveRung &&
+                                r.priceCents < status.data.effectiveRung.priceCents
+                                ? t("switchAtPeriodEnd")
+                                : t("switch")
+                              : t("choose")}
+                          </button>
+                          {pixOffer ? (
+                            <button
+                              type="button"
+                              className="ms-btn ms-btn-secondary"
+                              style={{ marginTop: 8 }}
+                              disabled={busy}
+                              onClick={() =>
+                                startPix.mutate({
+                                  rung: r.key,
+                                  interval:
+                                    newOffer && r.key === newOffer.rung ? launchInterval : "month",
+                                })
+                              }
+                            >
+                              <BtnSpinner
+                                on={startPix.isPending && startPix.variables?.rung === r.key}
+                              />
+                              {t("pix.pay")}
+                            </button>
+                          ) : null}
+                        </>
                       ) : p === "free" && canManage && hasLiveSubscription ? (
                         <p style={{ margin: 0, fontSize: 12, color: "var(--ms-muted)" }}>
                           {t("freeHint")}
@@ -1062,7 +1126,18 @@ export function BillingView({
                 textAlign: "center",
               }}
             >
-              {t("changeHint")}
+              {t(paidByPix ? "pix.changeHint" : "changeHint")}
+            </p>
+          ) : pixOffer ? (
+            <p
+              style={{
+                margin: "14px 0 0",
+                fontSize: 12.5,
+                color: "var(--ms-muted)",
+                textAlign: "center",
+              }}
+            >
+              {t("pix.startNote")}
             </p>
           ) : null}
         </div>

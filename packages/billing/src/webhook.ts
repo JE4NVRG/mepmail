@@ -19,6 +19,7 @@ import {
   settlePixInvoice,
 } from "./pix.js";
 import { SUBSCRIPTION_EXPAND } from "./prices.js";
+import { fulfillSendPixStart } from "./send-checkout.js";
 import { applySubscription, idOf, lockCustomer } from "./subscription.js";
 
 export interface WebhookDeps extends BillingDeps {
@@ -244,6 +245,10 @@ async function settlePixCheckout(
   const payment = await readPixPayment(deps.pixStripe, sessionId, deps.livemode);
   if (payment === "pending") return log(`pix ${sessionId}: not paid yet`);
   if (payment === "invalid") return log(`pix ${sessionId}: not a MepMail Pix payment`);
+  if (payment.kind === "send_start") {
+    const outcome = await fulfillSendPixStart(db, deps, deps.pixStripe, payment, log);
+    return log(`pix ${sessionId}: ${outcome}`);
+  }
   if (payment.kind === "mailbox_start") {
     const outcome = await fulfillMailboxPixStart(
       db,

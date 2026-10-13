@@ -15,6 +15,9 @@ export const PIX_SESSION_METADATA_KEY = "mepmail_pix_session";
 const PIX_PRICE_METADATA_KEY = "mepmail_pix_price";
 const PIX_QUANTITY_METADATA_KEY = "mepmail_pix_quantity";
 const PIX_INVOICE_METADATA_KEY = "mepmail_pix_invoice";
+const PIX_OVERAGE_METADATA_KEY = "mepmail_pix_overage";
+const PIX_COUPON_METADATA_KEY = "mepmail_pix_coupon";
+const PIX_INTERVAL_METADATA_KEY = "mepmail_pix_interval";
 /** Days a Pix-collected renewal invoice stays payable before the plan falls past due. */
 export const PIX_DAYS_UNTIL_DUE = 5;
 /** Stripe's Pix limits: R$ 0,50 to R$ 3.000 per payment. */
@@ -25,7 +28,7 @@ const PIX_QR_SECONDS = 3600;
 const PIX_CHECKOUT_SECONDS = 3600;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type PixPurchaseKind = "mailbox_start" | "invoice";
+export type PixPurchaseKind = "mailbox_start" | "send_start" | "invoice";
 
 /** The Stripe calls Pix makes. The real client satisfies it structurally; tests pass a fake. */
 export interface PixStripe {
@@ -141,9 +144,13 @@ export interface PixCheckoutInput {
   cancelUrl: string;
   /** Stripe idempotency key: the same intent never opens two Pix payments. */
   idempotencyKey: string;
-  /** mailbox_start: the plan price and quantity the subscription is created with. */
+  /** mailbox_start / send_start: the plan price and quantity the subscription is created with. */
   priceId?: string;
   quantity?: number;
+  /** send_start: the metered overage price, the first-invoice coupon and the interval. */
+  overagePriceId?: string;
+  coupon?: string;
+  interval?: "month" | "year";
   /** invoice: the open invoice this payment settles. */
   invoiceId?: string;
 }
@@ -159,7 +166,7 @@ export async function createPixCheckoutSession(
     !Number.isSafeInteger(input.amount) ||
     input.amount < PIX_MIN_AMOUNT ||
     input.amount > PIX_MAX_AMOUNT ||
-    (input.kind === "mailbox_start" &&
+    ((input.kind === "mailbox_start" || input.kind === "send_start") &&
       (!input.priceId ||
         !Number.isSafeInteger(input.quantity) ||
         (input.quantity as number) < 1 ||
@@ -177,6 +184,9 @@ export async function createPixCheckoutSession(
         }
       : {}),
     ...(input.invoiceId ? { [PIX_INVOICE_METADATA_KEY]: input.invoiceId } : {}),
+    ...(input.overagePriceId ? { [PIX_OVERAGE_METADATA_KEY]: input.overagePriceId } : {}),
+    ...(input.coupon ? { [PIX_COUPON_METADATA_KEY]: input.coupon } : {}),
+    ...(input.interval ? { [PIX_INTERVAL_METADATA_KEY]: input.interval } : {}),
   };
   const session = await stripe.checkout.sessions.create(
     {
@@ -215,6 +225,9 @@ export interface PixPayment {
   priceId: string | null;
   quantity: number | null;
   invoiceId: string | null;
+  overagePriceId: string | null;
+  coupon: string | null;
+  interval: "month" | "year" | null;
 }
 
 /** The Pix session an event is about, before verification; null for every other event. */
@@ -247,7 +260,7 @@ export async function readPixPayment(
     session.mode !== "payment" ||
     session.livemode !== livemode ||
     session.currency !== "brl" ||
-    (kind !== "mailbox_start" && kind !== "invoice") ||
+    (kind !== "mailbox_start" && kind !== "send_start" && kind !== "invoice") ||
     !customerId ||
     !UUID.test(teamId) ||
     !Number.isSafeInteger(session.amount_total) ||
@@ -266,6 +279,14 @@ export async function readPixPayment(
     priceId: session.metadata?.[PIX_PRICE_METADATA_KEY] ?? null,
     quantity: Number.isSafeInteger(quantity) && quantity > 0 ? quantity : null,
     invoiceId: session.metadata?.[PIX_INVOICE_METADATA_KEY] ?? null,
+    overagePriceId: session.metadata?.[PIX_OVERAGE_METADATA_KEY] ?? null,
+    coupon: session.metadata?.[PIX_COUPON_METADATA_KEY] ?? null,
+    interval:
+      session.metadata?.[PIX_INTERVAL_METADATA_KEY] === "year"
+        ? "year"
+        : session.metadata?.[PIX_INTERVAL_METADATA_KEY] === "month"
+          ? "month"
+          : null,
   };
 }
 

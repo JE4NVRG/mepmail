@@ -282,7 +282,9 @@
       "pay": "Pagar com Pix",
       "askAdmin": "Peça a um administrador da equipe para pagar.",
       "error": "Não foi possível abrir o Pix agora. Tente de novo em instantes.",
-      "paid": "Pix recebido. Obrigado!"
+      "paid": "Pix recebido. Obrigado!",
+      "startNote": "Com Pix você paga um período por vez, em reais: a cada renovação chega uma fatura para pagar com Pix em até 5 dias. Nada é cobrado automaticamente.",
+      "changeHint": "Plano pago com Pix: para trocar, cancele em Gerenciar (vale no fim do período) e escolha o novo plano depois. Precisa trocar já? Escreva para suporte@mepmail.dev."
     },
     "plan": "Plano",
     "loadFailed": "Não conseguimos carregar sua cobrança agora.",

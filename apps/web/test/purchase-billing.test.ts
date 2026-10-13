@@ -44,6 +44,7 @@ vi.mock("@/lib/trpc", () => {
       billing: {
         status: { queryOptions: () => ({ fixture: "status" }), queryFilter: () => ({}) },
         checkout: operation,
+        pixCheckout: operation,
         portal: operation,
         changePlan: operation,
         setOverage: operation,
