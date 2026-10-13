@@ -13,6 +13,8 @@ import {
   isMailboxSubscription,
   isStandaloneMailboxPrice,
   MAILBOX_CUSTOMER_METADATA_KEY,
+  MAILBOX_SERVICE,
+  MAILBOX_SERVICE_METADATA_KEY,
   type MailboxBillingStripe,
   type MailboxCatalog,
   type MailboxPriceTerms,
@@ -27,6 +29,18 @@ import {
 } from "./mailbox.js";
 import { hasPaidSendingPlanForMailbox } from "./mailbox-addon.js";
 import { mailboxTrialDays } from "./mailbox-trial-eligibility.js";
+import {
+  createPixCheckoutSession,
+  PIX_COLLECTION,
+  PIX_COLLECTION_METADATA_KEY,
+  PIX_DAYS_UNTIL_DUE,
+  PIX_SESSION_METADATA_KEY,
+  type PixPayment,
+  type PixStripe,
+  pixAmountForPrice,
+  refundPixPayment,
+  settlePixInvoice,
+} from "./pix.js";
 import type { BillingStripe } from "./stripe.js";
 import { idOf, lockCustomer } from "./subscription.js";
 
@@ -1214,4 +1228,194 @@ export async function beginMailboxCheckout(
     : Math.max(input.seats, mailboxIncludedSeats(terms));
   await ensureMailboxCustomer(deps, catalog, { ...input, seats });
   return purchase(deps, catalog, terms, { ...input, seats });
+}
+
+/**
+ * A plan bought by Pix (see pix.ts): a one-time Pix Checkout for the first month. Only
+ * the monthly plans sell this way, without a trial (a trial needs a card on file). An
+ * unpaid card Checkout is left first, as "Escolher outro plano" does; nothing is granted
+ * here — the webhook starts the subscription once the Pix is paid.
+ */
+export async function beginMailboxPixCheckout(
+  deps: MailboxPurchaseDeps,
+  pix: PixStripe,
+  catalog: MailboxCatalog | null,
+  input: Omit<BeginMailboxCheckoutInput, "seats" | "automaticTax">,
+): Promise<{ url: string }> {
+  const terms = mailboxCheckoutTerms(catalog);
+  if (!catalog || !terms) throw new MailboxLifecycleError("unavailable");
+  if (!terms.planCode || terms.interval !== "month") throw new MailboxLifecycleError("unavailable");
+  if (!safeUrl(input.successUrl) || !safeUrl(input.cancelUrl))
+    throw new MailboxLifecycleError("invalid");
+  const seats = mailboxIncludedSeats(terms);
+  await ensureMailboxCustomer(deps, catalog, { ...input, seats });
+  if ((await abandonMailboxCheckout(deps, input)).state === "completed")
+    throw new MailboxLifecycleError("subscription_exists");
+  const customerId = await deps.db.transaction(async (tx) => {
+    const db = tx as unknown as Db;
+    const team = await purchaseTeam(
+      db,
+      { ...input, seats },
+      deps.requirePaidSendingPlan,
+      deps.earlyAccessCohort,
+      isStandaloneMailboxPrice(catalog, terms.priceId),
+    );
+    await assertNoSubscription(db, deps.stripe, catalog, team.id, team.customerId);
+    return team.customerId;
+  });
+  const quantity = mailboxStripeQuantity(terms, seats);
+  const priced = await pixAmountForPrice(pix, terms.priceId, quantity);
+  if (!priced) throw new MailboxLifecycleError("unavailable");
+  const url = await createPixCheckoutSession(pix, {
+    kind: "mailbox_start",
+    teamId: input.teamId,
+    customerId,
+    amount: priced.amount,
+    product: priced.product,
+    priceId: terms.priceId,
+    quantity,
+    successUrl: input.successUrl,
+    cancelUrl: input.cancelUrl,
+    idempotencyKey: `pix-mailbox:${input.teamId}:${randomUUID()}`,
+  });
+  return { url };
+}
+
+/**
+ * Starts the Correio plan a paid first Pix bought: a send_invoice subscription in reais
+ * whose first invoice this payment settles. Idempotent per Checkout session. When the
+ * team cannot take it (another subscription won the race, the terms changed, the team
+ * was suspended), the Pix is refunded instead. Runs inside the webhook transaction.
+ */
+export async function fulfillMailboxPixStart(
+  db: Db,
+  stripe: MailboxBillingStripe,
+  pix: PixStripe,
+  catalog: MailboxCatalog | null,
+  payment: PixPayment,
+  log: (message: string) => void,
+): Promise<"fulfilled" | "refunded"> {
+  await lockCustomer(db, payment.customerId);
+  const refund = async (reason: string) => {
+    await refundPixPayment(pix, payment, reason);
+    log(`pix ${payment.sessionId}: refunded (${reason})`);
+    return "refunded" as const;
+  };
+  const [team] = await db
+    .select({ id: schema.teams.id, plan: schema.teams.plan, suspendedAt: schema.teams.suspendedAt })
+    .from(schema.teams)
+    .where(eq(schema.teams.stripeCustomerId, payment.customerId));
+  if (!team || team.id !== payment.teamId) return refund("team");
+  let sub = await pixStartedSubscription(pix, payment);
+  if (!sub) {
+    if (team.plan === "system" || team.suspendedAt) return refund("team");
+    const terms = catalog?.prices.find((p) => p.priceId === payment.priceId);
+    if (!catalog || !terms?.planCode || terms.interval !== "month" || payment.quantity !== 1)
+      return refund("terms");
+    const priced = await pixAmountForPrice(pix, terms.priceId, payment.quantity);
+    if (!priced || priced.amount !== payment.amount) return refund("amount");
+    // A card Checkout left open is closed now, or, if it was paid, it is the purchase.
+    const card = await closeOpenMailboxCheckout(db, stripe, team.id);
+    if (card === "completed") return refund("occupied");
+    try {
+      await assertNoSubscription(db, stripe, catalog, team.id, payment.customerId);
+    } catch (error) {
+      if (error instanceof MailboxLifecycleError && error.code === "subscription_exists")
+        return refund("occupied");
+      throw error;
+    }
+    sub = await pix.subscriptions.create(
+      {
+        customer: payment.customerId,
+        items: [{ price: terms.priceId, quantity: 1 }],
+        currency: "brl",
+        collection_method: "send_invoice",
+        days_until_due: PIX_DAYS_UNTIL_DUE,
+        // Card only on the invoice page: boleto is never offered.
+        payment_settings: { payment_method_types: ["card"] },
+        metadata: {
+          [MAILBOX_SERVICE_METADATA_KEY]: MAILBOX_SERVICE,
+          team_id: team.id,
+          [PIX_COLLECTION_METADATA_KEY]: PIX_COLLECTION,
+          [PIX_SESSION_METADATA_KEY]: payment.sessionId,
+        },
+      },
+      { idempotencyKey: `pix-start:${payment.sessionId}` },
+    );
+  }
+  const invoiceId = idOf(sub.latest_invoice);
+  if (!invoiceId) throw new MailboxLifecycleError("pending");
+  if ((await settlePixInvoice(pix, invoiceId, payment)) === "paid") return "fulfilled";
+  // The first invoice is not this payment's amount: undo the start and give the Pix back.
+  if (!["canceled", "incomplete_expired"].includes(sub.status))
+    await pix.subscriptions.cancel(sub.id, { invoice_now: false, prorate: false });
+  const invoice = await pix.invoices.retrieve(invoiceId);
+  if (invoice.status === "open") await pix.invoices.voidInvoice(invoiceId);
+  return refund("invoice");
+}
+
+/** The subscription a Pix Checkout already started, found by the session it carries. */
+async function pixStartedSubscription(pix: PixStripe, payment: PixPayment) {
+  const page = await pix.subscriptions.list({
+    customer: payment.customerId,
+    status: "all",
+    limit: 100,
+  });
+  return (
+    page.data.find((sub) => sub.metadata?.[PIX_SESSION_METADATA_KEY] === payment.sessionId) ?? null
+  );
+}
+
+/**
+ * Closes the team's open card Checkout for Correio, as abandonMailboxCheckout does, but
+ * from the webhook (no member): "completed" when Stripe already took that payment.
+ */
+async function closeOpenMailboxCheckout(
+  db: Db,
+  stripe: MailboxBillingStripe,
+  teamId: string,
+): Promise<"none" | "closed" | "completed"> {
+  const [lease] = await db
+    .select()
+    .from(schema.mailboxCheckouts)
+    .where(
+      and(
+        eq(schema.mailboxCheckouts.teamId, teamId),
+        inArray(schema.mailboxCheckouts.status, [...OPEN_CHECKOUTS]),
+      ),
+    )
+    .for("update");
+  if (!lease) return "none";
+  const close = async (status: "expired" | "completed", session?: Stripe.Checkout.Session) => {
+    await db
+      .update(schema.mailboxCheckouts)
+      .set({
+        status,
+        ...(session ? { stripeSessionId: session.id } : {}),
+        ...(status === "completed" && session
+          ? { stripeSubscriptionId: idOf(session.subscription) }
+          : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.mailboxCheckouts.id, lease.id));
+  };
+  if (lease.status === "prepared" && !lease.stripeSessionId) {
+    await close("expired");
+    return "closed";
+  }
+  const readback = () => recoverMailboxCheckoutSession(stripe, lease);
+  let session = await readback();
+  if (session?.status === "open" && stripe.checkout.sessions.expire) {
+    await stripe.checkout.sessions.expire(session.id).catch(() => null);
+    session = await readback();
+  }
+  // Unreadable or still open: the event is retried, and the Pix is never doubled up.
+  if (!session || (session.status !== "complete" && session.status !== "expired"))
+    throw new MailboxLifecycleError("pending");
+  if (session.status === "complete") {
+    await close("completed", session);
+    return "completed";
+  }
+  await close("expired", session);
+  return "closed";
 }

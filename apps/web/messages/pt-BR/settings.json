@@ -276,6 +276,14 @@
     "countingNote": "Cada destinatário (Para, Cc e Cco) de um e-mail aceito conta um envio, mesmo que a entrega falhe depois. Endereços já na sua lista de supressão não contam."
   },
   "billing": {
+    "pix": {
+      "open": "Fatura de {amount} disponível para pagar com Pix, até {date}.",
+      "openMailbox": "A fatura do Correio deste mês ({amount}) está disponível: pague com Pix até {date} para seguir recebendo e-mails.",
+      "pay": "Pagar com Pix",
+      "askAdmin": "Peça a um administrador da equipe para pagar.",
+      "error": "Não foi possível abrir o Pix agora. Tente de novo em instantes.",
+      "paid": "Pix recebido. Obrigado!"
+    },
     "plan": "Plano",
     "loadFailed": "Não conseguimos carregar sua cobrança agora.",
     "retry": "Tentar de novo",

@@ -32,6 +32,7 @@ export const ACCOUNT_MAIL_KINDS = [
   "billing.cancel_scheduled",
   "billing.cancel_reminder",
   "billing.downgraded",
+  "billing.pix_invoice",
   "team.broadcasts_paused",
   "team.suspended",
   "team.reinstated",

@@ -1,5 +1,6 @@
 import { SQSClient } from "@aws-sdk/client-sqs";
 import {
+  createPixStripe,
   createStripe,
   dispatchGoogleConversions,
   dispatchMetaConversions,
@@ -100,6 +101,7 @@ import { runMailboxSchedules } from "./handlers/mailbox-scheduling.js";
 import { warnEndingMailboxTrials } from "./handlers/mailbox-trial-ending.js";
 import { runMonitorHealth } from "./handlers/monitor-health.js";
 import { reportPlanMove, sweepNotifications } from "./handlers/notify.js";
+import { remindPixInvoices } from "./handlers/pix-invoices.js";
 import { runPlatformBreaker } from "./handlers/platform-breaker.js";
 import { processSesEvent } from "./handlers/process-ses-event.js";
 import { runRevealNotices } from "./handlers/reveal-notices.js";
@@ -183,6 +185,8 @@ const mailboxSes = mailboxTransportEnabled
 // out earlier on EMAIL_RETENTION_DAYS. Read here until it joins the env schema.
 const metadataRetentionDays = env.EMAIL_METADATA_RETENTION_DAYS;
 const stripe = env.IS_CLOUD && env.STRIPE_SECRET_KEY ? createStripe(env.STRIPE_SECRET_KEY) : null;
+const pixStripe =
+  env.IS_CLOUD && env.STRIPE_SECRET_KEY ? createPixStripe(env.STRIPE_SECRET_KEY) : null;
 const masterKeyBytes = Buffer.from(env.MASTER_ENCRYPTION_KEY, "base64");
 const unsubscribeSecretKey = deriveUnsubscribeKey(masterKeyBytes);
 // App-layer tracking signs tokens with an HKDF-derived key; defaultBaseUrl is
@@ -524,6 +528,19 @@ await queue.scheduleCrons({
       appBaseUrl: env.APP_BASE_URL,
     });
     if (result.sent > 0) console.log(`notifications.sweep: sent=${result.sent}`);
+    // A Stripe outage must not stop the other notices: Pix reminders retry next sweep.
+    if (pixStripe) {
+      try {
+        const pix = await remindPixInvoices(db, {
+          mailer,
+          stripe: pixStripe,
+          appBaseUrl: env.APP_BASE_URL,
+        });
+        if (pix.sent > 0) console.log(`notifications.sweep: pixInvoices=${pix.sent}`);
+      } catch (err) {
+        console.error("notifications.sweep: Pix invoice reminders skipped", err);
+      }
+    }
     if (mailboxRegistryEnabled) {
       const keys = await warnExpiringMailboxAgentKeys(db, { mailer, appBaseUrl: env.APP_BASE_URL });
       if (keys.sent > 0) console.log(`notifications.sweep: agentKeysExpiring=${keys.sent}`);

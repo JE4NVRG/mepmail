@@ -252,6 +252,8 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
     expect(await as().mailboxes.billing()).toEqual({
       canManage: true,
       canPurchase: true,
+      // Pix stays closed until PIX_PAYMENTS_OPEN, and this offer is not a plan in reais.
+      pixAvailable: false,
       audience: "with_sending",
       sendingPlanRequired: false,
       earlyAccessRequired: false,

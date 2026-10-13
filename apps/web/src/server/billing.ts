@@ -1,4 +1,9 @@
-import { type BillingStripe, createStripe } from "@millionsend/billing";
+import {
+  type BillingStripe,
+  createPixStripe,
+  createStripe,
+  type PixStripe,
+} from "@millionsend/billing";
 import { accountEmailFrom, env, notificationsEmailFrom } from "@millionsend/config";
 import {
   claimNotification,
@@ -21,6 +26,22 @@ let client: BillingStripe | undefined;
 export function getStripe(): BillingStripe {
   client ??= createStripe(env.STRIPE_SECRET_KEY ?? "");
   return client;
+}
+
+let pixClient: PixStripe | undefined;
+
+/** The same key's client for the Pix calls (@millionsend/billing pix.ts). */
+export function getPixStripe(): PixStripe {
+  pixClient ??= createPixStripe(env.STRIPE_SECRET_KEY ?? "");
+  return pixClient;
+}
+
+/**
+ * Pix at checkout (PIX_PAYMENTS_OPEN=true), once Pix is active on the Stripe account.
+ * Off, a Pix already paid is still settled by the webhook; only new Pix stop.
+ */
+export function pixPaymentsOpen(): boolean {
+  return env.IS_CLOUD && process.env.PIX_PAYMENTS_OPEN === "true";
 }
 
 /** The team's billing columns, from which a send derives its cap (teamQuota). */

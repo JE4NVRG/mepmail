@@ -28,7 +28,11 @@ vi.mock("@millionsend/billing", () => ({
   },
   recoverMailboxCheckoutSession: vi.fn(),
 }));
-vi.mock("@/server/billing", () => ({ getStripe: runtime.getStripe }));
+vi.mock("@/server/billing", () => ({
+  getStripe: runtime.getStripe,
+  getPixStripe: () => ({}),
+  pixPaymentsOpen: () => false,
+}));
 
 // Synthetic operator terms; these are not an approved public price or allowance.
 const price = {

@@ -29,7 +29,11 @@ vi.mock("@millionsend/config", () => ({
   isCloudDeployment: () => true,
 }));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
-vi.mock("@/server/billing", () => ({ getStripe: vi.fn() }));
+vi.mock("@/server/billing", () => ({
+  getStripe: vi.fn(),
+  getPixStripe: vi.fn(),
+  pixPaymentsOpen: () => false,
+}));
 vi.mock("@/server/auth", () => ({ getAuth: vi.fn(), resolveBaseUrl: (url: string) => url }));
 vi.mock("@/server/audit", () => ({ recordAudit: vi.fn() }));
 vi.mock("@/server/mailbox-content", () => ({

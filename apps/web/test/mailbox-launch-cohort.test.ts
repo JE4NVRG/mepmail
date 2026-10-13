@@ -24,7 +24,11 @@ vi.mock("@millionsend/config", () => ({
   },
   isCloudDeployment: () => true,
 }));
-vi.mock("@/server/billing", () => ({ getStripe: vi.fn() }));
+vi.mock("@/server/billing", () => ({
+  getStripe: vi.fn(),
+  getPixStripe: vi.fn(),
+  pixPaymentsOpen: () => false,
+}));
 // Caller contexts are supplied directly; no framework cookie/header request is made.
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 vi.mock("@/server/auth", () => ({ getAuth: vi.fn(), resolveBaseUrl: (url: string) => url }));

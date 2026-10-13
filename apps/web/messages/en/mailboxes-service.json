@@ -71,6 +71,10 @@
   "total": "Total for {count, number} mailboxes",
   "checkoutTerms": "Review the final amount and terms in Stripe's secure checkout before confirming.",
   "subscribe": "Continue to subscription",
+  "pix": {
+    "pay": "Pay with Pix",
+    "hint": "With Pix you pay month by month, with no automatic renewal: the first month now, by QR code; then we email you when each month's invoice is ready (5 days to pay)."
+  },
   "retryCheckout": "Check pending purchase",
   "opening": "Checking purchase…",
   "pendingBody": "The purchase is pending confirmation. Check again with the same quantity. If it remains pending, it requires assistance; do not start another purchase.",

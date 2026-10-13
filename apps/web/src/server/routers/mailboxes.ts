@@ -1,9 +1,11 @@
 import {
   abandonMailboxCheckout,
   beginMailboxCheckout,
+  beginMailboxPixCheckout,
   changeMailboxPlan,
   MailboxLifecycleError,
   manageMailboxSubscription,
+  PixBillingError,
 } from "@millionsend/billing";
 import { env } from "@millionsend/config";
 import {
@@ -60,6 +62,7 @@ import { z } from "zod";
 import { apiBaseUrl } from "@/lib/api-base-url";
 import { recordAudit } from "../audit";
 import { resolveBaseUrl } from "../auth";
+import { getPixStripe } from "../billing";
 import { testCorreioConnection } from "../correio-connection-test";
 import { getKeyring } from "../keyring";
 import { cursorSchema } from "../keyset";
@@ -491,6 +494,61 @@ export const mailboxesRouter = router({
         url.port
       )
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
+      return { url: url.href };
+    }),
+  /**
+   * The first month of a plan paid by Pix (billing pix.ts): a one-time Pix Checkout in
+   * reais. Nothing is granted here; the webhook starts the subscription once it is paid.
+   */
+  pixCheckout: enabled
+    .input(
+      z
+        .object({
+          offerId: z
+            .string()
+            .regex(/^mbo_[A-Za-z0-9_-]{43}$/)
+            .optional(),
+        })
+        .strict(),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const presentation = await call(() => mailboxBillingPresentation(ctx.db, actor(ctx)));
+      if (presentation.availability === "forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!presentation.canPurchase || !presentation.pixAvailable)
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pix_unavailable" });
+      const catalog = mailboxBillingCatalogForOffer(input.offerId, presentation.audience);
+      if (!catalog)
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "mailbox_billing_unavailable",
+        });
+      const billingUrl = `${resolveBaseUrl(env.APP_BASE_URL)}/mailboxes`;
+      const checkout = await call(() =>
+        beginMailboxPixCheckout(mailboxPurchaseDeps(ctx.db), getPixStripe(), catalog, {
+          teamId: ctx.teamId,
+          userId: ctx.session.user.id,
+          successUrl: `${billingUrl}?checkout=pix`,
+          cancelUrl: billingUrl,
+        }),
+      ).catch((error: unknown) => {
+        if (error instanceof TRPCError) throw error;
+        if (error instanceof PixBillingError)
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pix_unavailable" });
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
+      });
+      let url: URL;
+      try {
+        url = new URL(checkout.url);
+      } catch {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
+      }
+      if (url.protocol !== "https:" || url.hostname !== "checkout.stripe.com" || url.port)
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pending" });
+      await recordAudit(ctx, {
+        action: "billing.checkout_started",
+        target: { type: "team", id: ctx.teamId },
+        metadata: { service: "mailbox", method: "pix" },
+      });
       return { url: url.href };
     }),
   agentKeys: enabled

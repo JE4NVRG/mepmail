@@ -91,6 +91,7 @@ vi.mock("@/lib/trpc", () => ({
         "billing",
         "create",
         "checkout",
+        "pixCheckout",
         "manage",
         "verifyReceiving",
         "changePlan",

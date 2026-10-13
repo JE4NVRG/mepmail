@@ -80,6 +80,7 @@ export function MailboxServicePanel({
     trpc.mailboxes.billing.queryOptions(undefined, { retry: false, enabled: !systemIdentified }),
   );
   const checkout = useMutation(trpc.mailboxes.checkout.mutationOptions());
+  const pixCheckout = useMutation(trpc.mailboxes.pixCheckout.mutationOptions());
   const management = useMutation(trpc.mailboxes.manage.mutationOptions());
   const changePlan = useMutation(trpc.mailboxes.changePlan.mutationOptions());
   const abandon = useMutation(trpc.mailboxes.abandonCheckout.mutationOptions());
@@ -211,7 +212,8 @@ export function MailboxServicePanel({
     if (returnChecked.current) return;
     returnChecked.current = true;
     const url = new URL(window.location.href);
-    if (url.searchParams.get("checkout") !== "success") return;
+    const returnedFrom = url.searchParams.get("checkout");
+    if (returnedFrom !== "success" && returnedFrom !== "pix") return;
     setReturned(true);
     void refresh();
     url.searchParams.delete("checkout");
@@ -1099,6 +1101,39 @@ export function MailboxServicePanel({
                               ? t("startTrial", { days: offer.trialDays })
                               : t("subscribe")}
                       </button>
+                      {planPurchase && billing.data?.pixAvailable ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-secondary"
+                          disabled={
+                            checkout.isPending ||
+                            pixCheckout.isPending ||
+                            refreshing ||
+                            abandon.isPending
+                          }
+                          onClick={async () => {
+                            setFailure(null);
+                            try {
+                              const result = await pixCheckout.mutateAsync(
+                                selection.offerId ? { offerId: selection.offerId } : {},
+                              );
+                              if (!alive.current) return;
+                              const url = safeMailboxCheckoutUrl(result.url);
+                              if (!url) {
+                                setFailure("pending");
+                                return;
+                              }
+                              window.location.assign(url);
+                            } catch (error) {
+                              if (!alive.current) return;
+                              setFailure(mailboxCheckoutFailure(error));
+                              void refresh();
+                            }
+                          }}
+                        >
+                          {pixCheckout.isPending ? t("opening") : t("pix.pay")}
+                        </button>
+                      ) : null}
                       {canAbandon && (pending || lockedSeats !== null) ? (
                         <button
                           type="button"
@@ -1110,6 +1145,9 @@ export function MailboxServicePanel({
                         </button>
                       ) : null}
                     </div>
+                    {planPurchase && billing.data?.pixAvailable ? (
+                      <p className={styles.hint}>{t("pix.hint")}</p>
+                    ) : null}
                     {abandonNotice ? <p role={abandonNotice.tone}>{abandonNotice.text}</p> : null}
                   </fieldset>
                 </form>

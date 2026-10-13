@@ -2,6 +2,7 @@ import {
   ADVERTISING_CONSENT_COOKIE,
   advertisingCookie,
   type BillingStripe,
+  beginPixInvoicePayment,
   beginSendCheckout,
   changeRung,
   createPortalSession,
@@ -10,6 +11,8 @@ import {
   hasLiveSubscription,
   isLiveKey,
   metaConversionConfigured,
+  openPixInvoices,
+  PixBillingError,
   readGoogleConversionConfig,
   readMetaConversionConfig,
   rungFromSubscription,
@@ -41,7 +44,7 @@ import { z } from "zod";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { recordAudit } from "../audit";
 import { resolveBaseUrl } from "../auth";
-import { getStripe, mailPlanMove } from "../billing";
+import { getPixStripe, getStripe, mailPlanMove } from "../billing";
 import { emitFunnel } from "../funnel";
 import { newSubscriptionsPaused } from "../new-subscriptions";
 import { getQueue } from "../queue";
@@ -395,6 +398,49 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         return { enabled: input.enabled };
       }),
 
+    /**
+     * Open invoices of a plan paid by Pix, month by month (billing pix.ts), each payable
+     * by its own Pix. Renewals stay payable even when new Pix purchases are closed.
+     */
+    pixInvoices: teamProcedure.query(async ({ ctx }) => {
+      requireCloud();
+      const team = await loadTeam(ctx.db, ctx.teamId);
+      if (!team.stripeCustomerId || team.plan === "system") return [];
+      try {
+        return await openPixInvoices(getPixStripe(), team.stripeCustomerId);
+      } catch (error) {
+        console.error("billing: open Pix invoices unavailable", error);
+        return [];
+      }
+    }),
+    payPixInvoice: billingMutationProcedure
+      .input(z.object({ invoiceId: z.string().regex(/^in_[A-Za-z0-9_]{1,255}$/) }).strict())
+      .mutation(async ({ ctx, input }) => {
+        requireCloud();
+        const team = await loadTeam(ctx.db, ctx.teamId);
+        assertBillable(team);
+        if (!team.stripeCustomerId) throw new TRPCError({ code: "PRECONDITION_FAILED" });
+        const url = await beginPixInvoicePayment(getPixStripe(), {
+          teamId: ctx.teamId,
+          customerId: team.stripeCustomerId,
+          invoiceId: input.invoiceId,
+          successUrl: `${billingPageUrl()}?pix=paid`,
+          cancelUrl: billingPageUrl(),
+        }).catch((error: unknown) => {
+          if (error instanceof PixBillingError)
+            throw new TRPCError({
+              code: error.code === "not_found" ? "NOT_FOUND" : "PRECONDITION_FAILED",
+              message: `pix_${error.code}`,
+            });
+          throw error;
+        });
+        await recordAudit(ctx, {
+          action: "billing.checkout_started",
+          target: { type: "team", id: ctx.teamId },
+          metadata: { method: "pix", invoiceId: input.invoiceId },
+        });
+        return { url };
+      }),
     portal: billingMutationProcedure.mutation(async ({ ctx }) => {
       requireCloud();
       const team = await loadTeam(ctx.db, ctx.teamId);

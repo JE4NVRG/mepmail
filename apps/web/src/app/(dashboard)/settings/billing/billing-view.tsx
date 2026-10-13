@@ -38,6 +38,7 @@ import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { QuotaRow } from "../usage/usage-view";
 import { LaunchComboMailStep } from "./launch-combo-step";
+import { PixInvoices } from "./pix-invoices";
 
 const PLANS = ["free", "starter", "pro", "scale"] as const satisfies readonly Plan[];
 /* The slider's stops are the rungs themselves; a daily cap sits on the monthly axis as thirty days of it. */
@@ -133,11 +134,14 @@ export function BillingView({
   checkout,
   requestedRung = null,
   requestedMail = false,
+  pixReturned = false,
 }: {
   checkout: "success" | "cancel" | null;
   requestedRung?: PlanRungKey | null;
   /** From the Correio offer: preselect the Mail step of the launch combo. */
   requestedMail?: boolean;
+  /** Back from paying an invoice by Pix (?pix=paid). */
+  pixReturned?: boolean;
 }) {
   const t = useTranslations("settings.billing");
   const planName = useTranslations("settings.plans");
@@ -389,6 +393,7 @@ export function BillingView({
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
       {notice}
+      <PixInvoices canManage={canManage} returned={pixReturned} />
 
       {showComboStep && comboIntent ? (
         <LaunchComboMailStep

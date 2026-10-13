@@ -276,6 +276,14 @@
     "countingNote": "Each recipient (To, Cc and Bcc) of an accepted email counts as one send, even if delivery fails later. Addresses already on your suppression list do not count."
   },
   "billing": {
+    "pix": {
+      "open": "An invoice of {amount} is ready to pay with Pix, by {date}.",
+      "openMailbox": "This month's Correio invoice ({amount}) is ready: pay it with Pix by {date} to keep receiving email.",
+      "pay": "Pay with Pix",
+      "askAdmin": "Ask a team admin to pay it.",
+      "error": "Pix could not be opened right now. Please try again in a moment.",
+      "paid": "Pix received. Thank you!"
+    },
     "plan": "Plan",
     "loadFailed": "We could not load your billing right now.",
     "retry": "Try again",

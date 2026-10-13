@@ -20,7 +20,7 @@ import {
   mailboxLaunchCohortOpen,
 } from "../../../../packages/core/src/mailbox-launch-cohort";
 import { mailboxManagementRequests } from "../../../../packages/db/src/schema/mailbox-management-requests";
-import { getStripe } from "./billing";
+import { getStripe, pixPaymentsOpen } from "./billing";
 import { mailboxEarlyAccessCohort, mailboxStandaloneOpen } from "./mailboxes";
 import { newSubscriptionsPaused } from "./new-subscriptions";
 
@@ -442,6 +442,19 @@ export async function mailboxBillingPresentation(
   return {
     canManage,
     canPurchase: availability === "available",
+    /**
+     * The plan can also be paid by Pix, month by month (mailboxes.pixCheckout): a monthly
+     * plan priced in reais, with Pix open on the deployment.
+     */
+    pixAvailable:
+      availability === "available" &&
+      pixPaymentsOpen() &&
+      offers.some(
+        (entry) =>
+          entry.plan !== null &&
+          entry.interval === "month" &&
+          entry.localCurrency?.currency === "brl",
+      ),
     /** Which price list this team buys from; checkout resolves offers within it only. */
     audience,
     sendingPlanRequired,

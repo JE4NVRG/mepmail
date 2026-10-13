@@ -8,7 +8,11 @@ import { BillingView } from "./billing-view";
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ checkout?: string | string[]; correio?: string | string[] }>;
+  searchParams: Promise<{
+    checkout?: string | string[];
+    correio?: string | string[];
+    pix?: string | string[];
+  }>;
 }) {
   // Billing does not exist on self-host: not forbidden, absent.
   if (!env.IS_CLOUD) notFound();
@@ -22,7 +26,11 @@ export default async function BillingPage({
     <>
       <PageHeader title={t("tabs.billing")} />
       <SettingsTabs />
-      <BillingView checkout={checkout} requestedMail={requestedMail} />
+      <BillingView
+        checkout={checkout}
+        requestedMail={requestedMail}
+        pixReturned={params.pix === "paid"}
+      />
     </>
   );
 }

@@ -6,11 +6,18 @@ import { mailboxManagementRequests } from "../../db/src/schema/mailbox-managemen
 import type { BillingDeps } from "./checkout.js";
 import { type GoogleConversionConfig, recordGooglePurchase } from "./google-advertising.js";
 import { isMailboxSubscription, type MailboxCatalog } from "./mailbox.js";
-import { applyMailboxSubscription } from "./mailbox-lifecycle.js";
+import { applyMailboxSubscription, fulfillMailboxPixStart } from "./mailbox-lifecycle.js";
 import { claimMailboxTrial } from "./mailbox-trial.js";
 import { recordMetaPurchase } from "./meta-advertising.js";
 import type { MetaConversionConfig } from "./meta-conversions.js";
 import { screenPaymentRisk } from "./payment-risk.js";
+import {
+  type PixStripe,
+  pixSessionOf,
+  readPixPayment,
+  refundPixPayment,
+  settlePixInvoice,
+} from "./pix.js";
 import { SUBSCRIPTION_EXPAND } from "./prices.js";
 import { applySubscription, idOf, lockCustomer } from "./subscription.js";
 
@@ -22,6 +29,8 @@ export interface WebhookDeps extends BillingDeps {
   googleConversionConfig?: GoogleConversionConfig;
   /** Presence opts into the independent Mail ledger. Null closes paid Mail access. */
   mailboxCatalog?: MailboxCatalog | null;
+  /** Settles Pix payments (pix.ts); absent, a paid Pix is only logged. */
+  pixStripe?: PixStripe;
   /**
    * Runs after the transaction commits, once per event that was newly
    * recorded and acted on — the same dedupe the ledger applies, so a
@@ -102,6 +111,16 @@ export async function handleWebhook(
       .onConflictDoNothing()
       .returning({ id: schema.stripeEvents.id });
     if (inserted.length === 0) return null;
+
+    // A Pix payment is a one-time Checkout: it settles an invoice or starts a plan, and the
+    // subscription events that follow are applied below like any other.
+    const pixSession = pixSessionOf(event);
+    if (pixSession) {
+      await settlePixCheckout(tx as unknown as Db, deps, pixSession, (m) =>
+        log(`stripe webhook ${event.id}: ${m}`),
+      );
+      return null;
+    }
 
     const ref = subscriptionRef(event);
     if (!ref?.subscriptionId) return null;
@@ -212,6 +231,37 @@ export async function handleWebhook(
     }
   }
   return 200;
+}
+
+/** Acts on a paid Pix Checkout, read back from Stripe; a retried event changes nothing. */
+async function settlePixCheckout(
+  db: Db,
+  deps: WebhookDeps,
+  sessionId: string,
+  log: (message: string) => void,
+): Promise<void> {
+  if (!deps.pixStripe) return log(`pix ${sessionId}: Pix is not configured`);
+  const payment = await readPixPayment(deps.pixStripe, sessionId, deps.livemode);
+  if (payment === "pending") return log(`pix ${sessionId}: not paid yet`);
+  if (payment === "invalid") return log(`pix ${sessionId}: not a MepMail Pix payment`);
+  if (payment.kind === "mailbox_start") {
+    const outcome = await fulfillMailboxPixStart(
+      db,
+      deps.stripe,
+      deps.pixStripe,
+      deps.mailboxCatalog ?? null,
+      payment,
+      log,
+    );
+    return log(`pix ${sessionId}: ${outcome}`);
+  }
+  await lockCustomer(db, payment.customerId);
+  const settled = payment.invoiceId
+    ? await settlePixInvoice(deps.pixStripe, payment.invoiceId, payment)
+    : "mismatch";
+  if (settled === "paid") return log(`pix ${sessionId}: invoice ${payment.invoiceId} paid`);
+  await refundPixPayment(deps.pixStripe, payment, "invoice");
+  log(`pix ${sessionId}: refunded (invoice ${payment.invoiceId} not payable)`);
 }
 
 /** Drops dedupe rows past the retention window; returns how many. */

@@ -60,6 +60,8 @@ export {
   type BeginMailboxCheckoutInput,
   type BeginMailboxCheckoutResult,
   beginMailboxCheckout,
+  beginMailboxPixCheckout,
+  fulfillMailboxPixStart,
   type MailboxApplyResult,
   type MailboxCheckoutLease,
   type MailboxCustomerRecoveryDeps,
@@ -106,6 +108,16 @@ export {
 } from "./meta-conversions.js";
 export { type OverageReport, reportOverage } from "./overage.js";
 export { screenPaymentRisk } from "./payment-risk.js";
+export {
+  beginPixInvoicePayment,
+  createPixStripe,
+  isPixInvoice,
+  isPixSubscription,
+  openPixInvoices,
+  PIX_DAYS_UNTIL_DUE,
+  PixBillingError,
+  type PixStripe,
+} from "./pix.js";
 export {
   METER_EVENT_NAME,
   overageLookupKey,

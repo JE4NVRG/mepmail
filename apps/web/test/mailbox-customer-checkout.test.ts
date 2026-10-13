@@ -30,7 +30,11 @@ vi.mock("@millionsend/billing", () => ({
   manageMailboxSubscription: vi.fn(),
   recoverMailboxCheckoutSession: vi.fn(),
 }));
-vi.mock("@/server/billing", () => ({ getStripe: runtime.getStripe }));
+vi.mock("@/server/billing", () => ({
+  getStripe: runtime.getStripe,
+  getPixStripe: () => ({}),
+  pixPaymentsOpen: () => false,
+}));
 // Checkout does not touch private content, keys, queues or registry mutations.
 // Keep its actual router, middleware, catalog resolver and membership presentation.
 vi.mock("@millionsend/core", async () => {

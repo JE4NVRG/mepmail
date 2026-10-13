@@ -183,6 +183,14 @@ export const ptBR = {
     ],
     button: "Abrir cobrança",
   },
+  "billing.pix_invoice": {
+    subject: "{team}: fatura do {service} de {amount}, pague com Pix até {date}",
+    body: [
+      "A fatura deste mês do {service} de {team} está disponível: {amount}, com vencimento em {date}.",
+      "Pague com Pix em Cobrança: leva um minuto no app do seu banco. Se ficar em aberto depois de {date}, o {service} pausa até o pagamento.",
+    ],
+    button: "Pagar com Pix",
+  },
   "team.broadcasts_paused": {
     subject: "Broadcasts pausados para {team}",
     body: [

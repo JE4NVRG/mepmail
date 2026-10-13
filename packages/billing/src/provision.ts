@@ -64,6 +64,7 @@ export const SAAS_BUSINESS_TAX_CODE = "txcd_10103001";
  */
 export const WEBHOOK_EVENTS = [
   "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.deleted",

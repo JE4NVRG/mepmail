@@ -456,6 +456,7 @@ describe("provision", () => {
     expect(upgraded.webhook).toEqual({ id: first.webhook?.id });
     expect(webhook).toMatchObject(identity);
     expect([...webhook.enabled_events].sort()).toEqual([
+      "checkout.session.async_payment_succeeded",
       "checkout.session.completed",
       "customer.subscription.created",
       "customer.subscription.deleted",
@@ -471,12 +472,13 @@ describe("provision", () => {
     expect(state.webhooks).toHaveLength(1);
   });
 
-  it("keeps an existing seven-event webhook idempotent regardless of event order", async () => {
+  it("keeps an existing eight-event webhook idempotent regardless of event order", async () => {
     const { stripe, state } = fakeStripe();
     await provision(stripe, opts({ portal: false }));
     const webhook = state.webhooks[0];
     if (!webhook) throw new Error("Missing webhook");
     webhook.enabled_events = [
+      "checkout.session.async_payment_succeeded",
       "invoice.payment_succeeded",
       "invoice.payment_failed",
       "invoice.paid",

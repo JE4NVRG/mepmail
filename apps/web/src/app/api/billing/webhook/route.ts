@@ -28,7 +28,7 @@ import {
 import { type Db, getDb, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import { appBaseUrl } from "@/lib/api-base-url";
-import { BILLING_PATH, getStripe, mailPlanMove } from "@/server/billing";
+import { BILLING_PATH, getPixStripe, getStripe, mailPlanMove } from "@/server/billing";
 import { emitFunnel } from "@/server/funnel";
 import { mailboxBillingCatalog } from "@/server/mailbox-billing";
 import { mailboxRegistryEnabled } from "@/server/mailboxes";
@@ -57,6 +57,7 @@ export async function POST(request: Request) {
     advertisingConfig: readMetaConversionConfig(process.env),
     googleConversionConfig: readGoogleConversionConfig(process.env),
     ...(mailboxRegistryEnabled() ? { mailboxCatalog: mailboxBillingCatalog() } : {}),
+    pixStripe: getPixStripe(),
     // Only for an event that was newly applied, so a redelivery stays silent;
     // keyed by the Stripe event id, so a recurring invoice is one payment each.
     afterApply: (applied) => {

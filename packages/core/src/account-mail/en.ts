@@ -183,6 +183,14 @@ export const en = {
     ],
     button: "Open billing",
   },
+  "billing.pix_invoice": {
+    subject: "{team}: {service} invoice of {amount}, pay with Pix by {date}",
+    body: [
+      "This month's {service} invoice for {team} is ready: {amount}, due on {date}.",
+      "Pay it with Pix from Billing: it takes a minute in your bank's app. If it is still open after {date}, {service} pauses until it is paid.",
+    ],
+    button: "Pay with Pix",
+  },
   "team.broadcasts_paused": {
     subject: "Broadcasts paused for {team}",
     body: [

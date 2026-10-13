@@ -71,6 +71,10 @@
   "total": "Total para {count, number} caixas",
   "checkoutTerms": "Confira o valor final e as condições no checkout seguro da Stripe antes de confirmar.",
   "subscribe": "Continuar para assinatura",
+  "pix": {
+    "pay": "Pagar com Pix",
+    "hint": "No Pix você paga mês a mês, sem renovação automática: o primeiro mês agora, pelo QR; depois avisamos por e-mail quando a fatura do mês estiver disponível (5 dias para pagar)."
+  },
   "retryCheckout": "Consultar compra pendente",
   "opening": "Consultando compra…",
   "pendingBody": "A compra está pendente de confirmação. Tente consultar novamente com a mesma quantidade. Se continuar pendente, ela precisa ser resolvida por atendimento; não inicie outra compra.",
