@@ -280,6 +280,7 @@
       "open": "Fatura de {amount} disponível para pagar com Pix, até {date}.",
       "openMailbox": "A fatura do Correio deste mês ({amount}) está disponível: pague com Pix até {date} para seguir recebendo e-mails.",
       "pay": "Pagar com Pix",
+      "start": "Pagar com Pix",
       "askAdmin": "Peça a um administrador da equipe para pagar.",
       "error": "Não foi possível abrir o Pix agora. Tente de novo em instantes.",
       "paid": "Pix recebido. Obrigado!",

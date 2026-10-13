@@ -24,6 +24,27 @@
   },
   "releases": [
     {
+      "version": "0.149",
+      "date": "2026-10-13",
+      "title": "Pix for Send and Correio",
+      "summary": "In Brazil, Send and Correio can be paid with Pix, in reais. Each renewal arrives as an invoice to pay with Pix within 5 days.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "A Pay with Pix button next to the card, in Billing and in Correio. For Send, the first month of Envios 110K is R$ 99.",
+            "Open invoices show in Billing with the Pix ready to pay, and an email goes out when the invoice is issued and the day before it is due."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Correio receiving shows again when the last message actually reached the domain."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.147",
       "date": "2026-10-13",
       "title": "Send in reais in Brazil",

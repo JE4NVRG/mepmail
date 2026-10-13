@@ -366,8 +366,9 @@ export function BillingView({
   const subscriptionChangesUnavailable =
     hasLiveSubscription &&
     (billingInterval === "year" || subscriptionState !== "confirmed" || paidByPix);
-  // Pix in reais for a new plan (billing.pixCheckout), next to the card.
-  const pixOffer = inBrazil && status.data.pixAvailable && !hasLiveSubscription && !salesPaused;
+  // Pix in reais for a new plan (billing.pixCheckout), next to the card. Not gated on the
+  // locale: many Brazilian accounts browse in English, and Pix itself only works for them.
+  const pixOffer = status.data.pixAvailable && !hasLiveSubscription && !salesPaused;
   const salePrice = (r: PlanRung) =>
     newOffer && r.key === newOffer.rung
       ? launchInterval === "year"
@@ -886,7 +887,7 @@ export function BillingView({
                 }}
               >
                 <BtnSpinner on={startPix.isPending} />
-                {t("pix.pay")}
+                {t("pix.start")}
               </button>
               <p
                 style={{
@@ -1102,7 +1103,7 @@ export function BillingView({
                               <BtnSpinner
                                 on={startPix.isPending && startPix.variables?.rung === r.key}
                               />
-                              {t("pix.pay")}
+                              {t("pix.start")}
                             </button>
                           ) : null}
                         </>

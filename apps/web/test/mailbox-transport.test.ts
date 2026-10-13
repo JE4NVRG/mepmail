@@ -23,6 +23,7 @@ import {
   setMailboxDeliveryFolder,
   setMailboxItemTrash,
 } from "../../../packages/core/src/mailbox-private-store.js";
+import { MAILBOX_DELIVERY_SOURCE_PREFIX } from "../../../packages/core/src/mailbox-receiving.js";
 import {
   createMailboxRegistry,
   grantMailboxRegistry,
@@ -233,6 +234,8 @@ describe("durable private Correio transport contracts with captured provider", (
       revision: 2,
       inboundAssessment: input.assessment,
     });
+    // Receiving readiness counts deliveries by this prefix (mailbox-receiving.ts).
+    expect(before?.sourceId?.startsWith(MAILBOX_DELIVERY_SOURCE_PREFIX)).toBe(true);
     expect((await receiveMailboxMime(db, keys, input, mimeAdapter)).items).toEqual([
       { id, mailboxId, duplicate: true },
     ]);

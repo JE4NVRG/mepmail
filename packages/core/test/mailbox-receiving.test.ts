@@ -191,7 +191,7 @@ describe("fresh domain receiving readiness", () => {
     });
     const received = new Date(f.now.getTime() - 3_600_000);
     await db.insert(schema.mailboxItems).values([
-      item("ses-s3:delivered", received),
+      item("ingress:delivered", received),
       // An import is not a delivery, however recent.
       item("imap:import:1", new Date(f.now.getTime() - 60_000)),
     ]);

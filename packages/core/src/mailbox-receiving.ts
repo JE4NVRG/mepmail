@@ -361,6 +361,12 @@ function assessment(
  * External lookups occur outside DB locks; authority and the snapshot are
  * rechecked afterwards before any result is returned.
  */
+/**
+ * The sourceId prefix receiveMailboxMime (mailbox-transport.ts) gives every message the
+ * receiving pipeline delivered. Delivery evidence counts only these.
+ */
+export const MAILBOX_DELIVERY_SOURCE_PREFIX = "ingress:";
+
 export async function getMailboxReceivingReadiness(
   db: Db,
   actor: MailboxRegistryActor,
@@ -405,7 +411,8 @@ export async function getMailboxReceivingReadiness(
     result.mx.checkedAt =
       dns.status === "fulfilled" && at && Number.isFinite(at.getTime()) ? at.toISOString() : null;
     result.mx.source = result.mx.checkedAt ? dnsSource : null;
-    // Received through the receiving pipeline (ses-s3 sources), never an import's.
+    // Received through the receiving pipeline (receiveMailboxMime's ingress: sources), never an
+    // import's (imap:) or a draft's.
     const [latest] = await tx
       .select({ at: max(schema.mailboxItems.createdAt) })
       .from(schema.mailboxItems)
@@ -421,7 +428,7 @@ export async function getMailboxReceivingReadiness(
           eq(schema.mailboxItems.teamId, actor.teamId),
           eq(schema.mailboxes.domainId, domainId),
           eq(schema.mailboxItems.kind, "inbox"),
-          like(schema.mailboxItems.sourceId, "ses-s3:%"),
+          like(schema.mailboxItems.sourceId, `${MAILBOX_DELIVERY_SOURCE_PREFIX}%`),
         ),
       );
     result.delivery = {

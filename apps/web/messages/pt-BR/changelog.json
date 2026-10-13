@@ -24,6 +24,27 @@
   },
   "releases": [
     {
+      "version": "0.149",
+      "date": "2026-10-13",
+      "title": "Pix no Envio e no Correio",
+      "summary": "No Brasil, dá para assinar o Envio e o Correio pagando com Pix, em reais. Cada renovação chega como uma fatura para pagar com Pix em até 5 dias.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "Botão Pagar com Pix ao lado do cartão, em Cobrança e no Correio. No Envio, o primeiro mês do Envios 110K sai R$ 99.",
+            "Faturas em aberto aparecem em Cobrança com o Pix pronto para pagar, e um e-mail avisa quando a fatura sai e na véspera do vencimento."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "O recebimento do Correio volta a mostrar a data da última mensagem que chegou de fato ao domínio."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.147",
       "date": "2026-10-13",
       "title": "Envio em reais no Brasil",
