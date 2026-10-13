@@ -71,6 +71,8 @@ export async function addMailboxAlias(
       );
     if (!box) throw new MailboxRegistryError("not_found");
     if (box.status !== "planned") throw new MailboxRegistryError("forbidden");
+    // A connected external account (no team domain) has no aliases.
+    if (!box.domainId) throw new MailboxRegistryError("invalid");
     await mailboxDomainLock(tx, box.domainId);
     const [domain] = await tx
       .select({ name: schema.domains.name })

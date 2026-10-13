@@ -239,6 +239,13 @@
       "when": 1791730800033,
       "tag": "0033_mailbox_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791730800034,
+      "tag": "0034_mailbox_external_accounts",
+      "breakpoints": true
     }
   ]
 }

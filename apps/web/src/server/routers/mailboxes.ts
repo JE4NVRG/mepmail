@@ -1335,7 +1335,8 @@ export const mailboxesRouter = router({
       });
       // Back in SES with the domain's other mailboxes, where the domain already receives.
       let receiving: string = "unknown";
-      if (row.status === "planned")
+      // A connected external account (no team domain) never receives through SES.
+      if (row.status === "planned" && row.domainId)
         try {
           receiving = (await activateMailboxReceiving(ctx.db, actor(ctx), row.domainId)).state;
         } catch (error) {

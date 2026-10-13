@@ -3,7 +3,16 @@ import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { monthlyBillingUsagePeriod } from "./billing-usage-period.js";
 
 export class MailboxServiceError extends Error {
-  constructor(public readonly code: "not_entitled" | "quota" | "invalid" | "trial_limit") {
+  constructor(
+    public readonly code:
+      | "not_entitled"
+      | "quota"
+      | "invalid"
+      | "trial_limit"
+      // Contas externas (0034): a connected account's own storage cap or send rate.
+      | "external_storage"
+      | "external_send_rate",
+  ) {
     super(code);
   }
 }
@@ -226,7 +235,8 @@ export function requireMailboxOperationalPlan(
  * which stop counting the moment deletion is asked and count again only if restored.
  */
 export function mailboxHoldsSeat() {
-  return isNull(schema.mailboxes.deleteAfter);
+  // A connected external account (0034) is free: it never takes or counts as a seat.
+  return and(isNull(schema.mailboxes.deleteAfter), eq(schema.mailboxes.origin, "domain"));
 }
 
 /** Public plan/usage DTO contains neither customer IDs nor provider credentials. */

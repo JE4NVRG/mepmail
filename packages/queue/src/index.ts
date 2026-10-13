@@ -23,6 +23,9 @@ export interface JobPayloads {
   // The content monitor's judge call for one pending sample; the sample row
   // names the email, the job carries nothing else.
   "abuse.judge": { sampleId: string };
+  // One sync round of a connected external account (Gmail/iCloud/IMAP): grouped by the
+  // mailbox, so one account never has two IMAP sessions at once.
+  "mailbox.external_sync": { mailboxId: string };
 }
 
 /** ParsedSesEvent with occurredAt as ISO string (JSON-safe). */
@@ -106,6 +109,7 @@ const JOB_QUEUES = [
   "webhook.drain",
   "recipient.erase",
   "abuse.judge",
+  "mailbox.external_sync",
 ] as const;
 // Compile-time check that every JobPayloads key is listed above.
 const _everyJobQueueListed: Record<Exclude<JobName, (typeof JOB_QUEUES)[number]>, never> = {};
@@ -206,6 +210,8 @@ export const CRON_JOBS = {
   // Every minute: the Correio search index takes in new mail and saved drafts, and
   // backfills older mail a batch at a time. No-op once everything is indexed.
   "mailbox.search_index": "* * * * *",
+  // Every minute: connected external accounts whose sync is due get a round queued.
+  "mailbox.external_due": "* * * * *",
 } as const;
 
 export type CronJobName = keyof typeof CRON_JOBS;

@@ -25,6 +25,7 @@ import {
 } from "@millionsend/config";
 import {
   checkMailboxRecipientBlocks,
+  claimDueMailboxExternalAccounts,
   committedDailyVolume,
   deriveMailboxSearchKey,
   deriveMailboxSenderKey,
@@ -94,6 +95,7 @@ import { runInstanceProbes } from "./handlers/instance-probes.js";
 import { warnExpiringMailboxAgentKeys } from "./handlers/mailbox-agent-key-expiry.js";
 import { runMailboxCapacity } from "./handlers/mailbox-capacity.js";
 import { runMailboxDeletions } from "./handlers/mailbox-deletions.js";
+import { syncMailboxExternalAccount } from "./handlers/mailbox-external-sync.js";
 import { warnMailboxPlanUsage } from "./handlers/mailbox-plan-alerts.js";
 import { reconcileMailboxReceivingHolds } from "./handlers/mailbox-receiving-holds.js";
 import { runMailboxReprice } from "./handlers/mailbox-reprice.js";
@@ -111,6 +113,7 @@ import { failQueuedEmail, sendEmail } from "./handlers/send-email.js";
 import { createRegionSendControls } from "./handlers/ses-regions.js";
 import { createCustomerSmtpRelay, createSmtpFallback } from "./handlers/smtp-fallback.js";
 import { syncTenants, watchTenants } from "./handlers/tenants.js";
+import { createMailboxExternalAwareSender } from "./mailbox-external-sender.js";
 import { createMailboxIngress, parseMailboxInboundConfiguration } from "./mailbox-ingress.js";
 import { readMailboxSearchDocument } from "./mailbox-search-document.js";
 import {
@@ -142,6 +145,10 @@ const failover =
   parseSesFailover(process.env.SES_FAILOVER_REGION, process.env.SES_FAILOVER_DOMAINS) ?? undefined;
 if (failover)
   console.log(`SES failover: ${failover.region} for ${[...failover.domains].join(", ")}`);
+// Contas externas: blocked senders and rules apply to what a connected account fetches.
+const mailboxExternalSenderKey = deriveMailboxSenderKey(
+  Buffer.from(env.MASTER_ENCRYPTION_KEY, "base64"),
+);
 // The Correio search index key (blind tokens per team), derived like the sender key.
 const mailboxSearchKey = deriveMailboxSearchKey(Buffer.from(env.MASTER_ENCRYPTION_KEY, "base64"));
 // Receipt stages in one aggregate line every 10 minutes (SES->stored, queue wait, processing).
@@ -678,6 +685,17 @@ await queue.scheduleCrons({
         `mailbox.search_index: indexed=${result.indexed} quarantined=${result.quarantined} unreadable=${result.unreadable} remaining=${result.remaining}`,
       );
   },
+  "mailbox.external_due": async () => {
+    if (!mailboxRegistryEnabled) return;
+    // Accounts whose round is due, claimed for a lease so a slow round is never doubled.
+    const due = await claimDueMailboxExternalAccounts(db, 50);
+    for (const mailboxId of due)
+      await queue.send(
+        "mailbox.external_sync",
+        { mailboxId },
+        { dedupeKey: mailboxId, group: mailboxId },
+      );
+  },
   "events.health": async () => {
     // No topic allowlist = ingestion disabled on purpose; nothing to judge.
     if (!env.SNS_TOPIC_ARNS?.length) return;
@@ -777,14 +795,26 @@ await queue.workDeadLetter("abuse.judge", async ({ sampleId }) => {
   console.error(`abuse.judge: dead-lettered sample ${sampleId}`);
 });
 
-if (mailboxSes) {
+// Sends from connected external accounts leave through the person's own SMTP, so the
+// worker runs with the Correio registry even where SES sending is off.
+const mailboxSender =
+  mailboxSes || mailboxRegistryEnabled
+    ? createMailboxExternalAwareSender(db, keyring, mailboxSes ?? null)
+    : null;
+if (mailboxSender) {
   await queue.workDeadLetter("mailbox.send", async ({ outboxId }) => {
     await failQueuedMailboxOutbox(db, outboxId);
   });
   await queue.work(
     "mailbox.send",
     async ({ outboxId }) => {
-      const result = await sendMailboxOutbox(db, keyring, outboxId, mailboxSes, mailboxWorkerMime);
+      const result = await sendMailboxOutbox(
+        db,
+        keyring,
+        outboxId,
+        mailboxSender,
+        mailboxWorkerMime,
+      );
       if (result.status === "queued")
         await queue.send(
           "mailbox.send",
@@ -935,6 +965,20 @@ await queue.work(
   // so a stalled receiver holds one of these lanes for at most a budget
   // before its successor queues behind everyone else's.
   { concurrency: 8, batchSize: 1, groupConcurrency: 1 },
+);
+
+// One round per connected external account at a time (group = mailbox).
+await queue.work(
+  "mailbox.external_sync",
+  async ({ mailboxId }) => {
+    const result = await syncMailboxExternalAccount(db, keyring, mailboxId, {
+      mime: mailboxWorkerMime,
+      senderKey: mailboxExternalSenderKey,
+    });
+    if (result === "auth_failed" || result === "error")
+      console.warn(`mailbox.external_sync: ${mailboxId.slice(0, 8)} ${result}`);
+  },
+  { concurrency: 4, batchSize: 1, groupConcurrency: 1 },
 );
 
 // Erasure scans a team's whole history; it runs here so the request that

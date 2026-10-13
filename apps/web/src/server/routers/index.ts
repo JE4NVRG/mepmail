@@ -12,6 +12,7 @@ import { emailsRouter } from "./emails";
 import { logsRouter } from "./logs";
 import { mailboxAgentsRouter } from "./mailbox-agents";
 import { mailboxClientsRouter } from "./mailbox-clients";
+import { mailboxExternalRouter } from "./mailbox-external";
 import { mailboxRulesRouter } from "./mailbox-rules";
 import { mailboxesRouter } from "./mailboxes";
 import { metricsRouter } from "./metrics";
@@ -40,6 +41,7 @@ export const appRouter = router({
   mailboxes: mailboxesRouter,
   mailboxAgents: mailboxAgentsRouter,
   mailboxClients: mailboxClientsRouter,
+  mailboxExternal: mailboxExternalRouter,
   mailboxRules: mailboxRulesRouter,
   metrics: metricsRouter,
   onboarding: onboardingRouter,

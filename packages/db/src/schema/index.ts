@@ -21,6 +21,7 @@ export * from "./mailbox-aliases.js";
 export * from "./mailbox-checkouts.js";
 export * from "./mailbox-client-access.js";
 export * from "./mailbox-customer-requests.js";
+export * from "./mailbox-external-accounts.js";
 export * from "./mailbox-folders.js";
 export * from "./mailbox-import-jobs.js";
 export * from "./mailbox-items.js";

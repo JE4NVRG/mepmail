@@ -541,6 +541,9 @@
       "mailbox_recipient_unblocked": "Desbloqueou um destinatário após um bounce, para o Correio voltar a enviar para ele",
       "mailbox_app_password_created": "Criou uma senha de app",
       "mailbox_app_password_revoked": "Revogou uma senha de app",
+      "mailbox_external_connected": "Conectou uma conta de e-mail externa (Gmail, iCloud, Yahoo ou IMAP) ao Correio",
+      "mailbox_external_password_replaced": "Trocou a senha de app de uma conta externa conectada",
+      "mailbox_external_disconnected": "Desconectou uma conta externa do Correio",
       "mailbox_send_queued": "Enviou uma mensagem de uma caixa",
       "mailbox_license_granted": "Liberou uma caixa no plano",
       "mailbox_license_revoked": "Tirou uma caixa do plano"

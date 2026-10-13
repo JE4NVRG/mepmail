@@ -103,6 +103,7 @@ export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
     .select({
       id: schema.mailboxes.id,
       domainId: schema.mailboxes.domainId,
+      origin: schema.mailboxes.origin,
       address: schema.mailboxes.address,
       label: schema.mailboxes.label,
       signatureText: schema.mailboxes.signatureText,
@@ -140,7 +141,11 @@ export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
       and(
         eq(schema.mailboxes.teamId, actor.teamId),
         or(
-          inArray(schema.teamMembers.role, ["owner", "admin"]),
+          // A connected external account is its owner's own: admins do not list it.
+          and(
+            inArray(schema.teamMembers.role, ["owner", "admin"]),
+            eq(schema.mailboxes.origin, "domain"),
+          ),
           and(
             eq(schema.mailboxes.ownerUserId, actor.userId),
             eq(schema.mailboxes.ownerMembershipId, schema.teamMembers.id),
@@ -160,9 +165,16 @@ export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
         ...row,
         ownerActive: !!ownerMembershipId,
         canRead: row.status === "planned" && (owned || !!permission),
+        // An external account is free (no seat): its owner always writes and sends.
         canDraft:
-          row.status === "planned" && licensedIds.has(row.id) && (owned || permission === "draft"),
-        canSend: row.status === "planned" && licensedIds.has(row.id) && owned,
+          row.status === "planned" &&
+          (row.origin === "external"
+            ? owned
+            : licensedIds.has(row.id) && (owned || permission === "draft")),
+        canSend:
+          row.status === "planned" &&
+          owned &&
+          (row.origin === "external" || licensedIds.has(row.id)),
         deliveryReady: false as const,
       };
     }),

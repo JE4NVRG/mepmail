@@ -240,7 +240,7 @@ export async function POST(request: Request) {
       };
       let reconciled = await reconcile();
       if (reconciled && "refusal" in reconciled) return reconciled.refusal;
-      let row: { id: string; address: string; kind: string; domainId: string };
+      let row: { id: string; address: string; kind: string; domainId: string | null };
       let created = false;
       if (reconciled?.box) row = reconciled.box;
       else {

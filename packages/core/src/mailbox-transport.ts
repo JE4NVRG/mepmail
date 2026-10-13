@@ -23,6 +23,11 @@ import {
   withMailboxAgentQueuedSendAccess,
 } from "./mailbox-agent-access.js";
 import {
+  assertMailboxExternalSendRate,
+  assertMailboxExternalStorage,
+  mailboxExternalUsagePeriod,
+} from "./mailbox-external-limits.js";
+import {
   type MailboxInboundAssessment,
   validateMailboxInboundAssessment,
 } from "./mailbox-inbound-safety.js";
@@ -599,7 +604,10 @@ export async function receiveMailboxMime(
     const direct = await tx
       .select({ id: schema.mailboxes.id, address: schema.mailboxes.address })
       .from(schema.mailboxes)
-      .where(inArray(schema.mailboxes.address, recipients));
+      // Mail that reaches SES is for a Correio address, never a connected account's.
+      .where(
+        and(inArray(schema.mailboxes.address, recipients), eq(schema.mailboxes.origin, "domain")),
+      );
     const aliased = await tx
       .select({
         mailboxId: schema.mailboxAliases.mailboxId,
@@ -682,7 +690,12 @@ export async function receiveMailboxMime(
         .from(schema.mailboxes)
         .where(and(eq(schema.mailboxes.id, box.id), eq(schema.mailboxes.teamId, box.teamId)))
         .for("update");
-      if (!current || current.status !== "planned" || current.address !== box.address)
+      if (
+        !current ||
+        current.status !== "planned" ||
+        current.address !== box.address ||
+        !current.domainId
+      )
         throw new MailboxContentError("forbidden");
       const [domain] = await tx
         .select({ status: schema.domains.status })
@@ -941,12 +954,16 @@ async function queueAuthorizedMailboxDraft(
     draft.trashedAt !== null
   )
     throw new MailboxContentError("conflict");
-  const [domain] = await tx
-    .select({ status: schema.domains.status })
-    .from(schema.domains)
-    .where(and(eq(schema.domains.id, box!.domainId), eq(schema.domains.teamId, actor.teamId)))
-    .for("share");
-  if (domain?.status !== "verified") throw new MailboxContentError("forbidden");
+  // A connected external account sends through its own provider: no team domain to verify.
+  const external = box!.origin === "external";
+  if (!external) {
+    const [domain] = await tx
+      .select({ status: schema.domains.status })
+      .from(schema.domains)
+      .where(and(eq(schema.domains.id, box!.domainId!), eq(schema.domains.teamId, actor.teamId)))
+      .for("share");
+    if (domain?.status !== "verified") throw new MailboxContentError("forbidden");
+  }
   const raw = await open(draft, keys);
   const parsed = await envelope(mime, raw, true);
   if (parsed.from !== box!.address) throw new MailboxContentError("invalid");
@@ -954,31 +971,41 @@ async function queueAuthorizedMailboxDraft(
   const recipientHashes = approvedHashes(actor.teamId, recipients, parsed.count);
   const blocked = await mailboxBlockedRecipients(tx, { teamId: actor.teamId, recipients });
   if (blocked.length) throw new MailboxRecipientBlockedError(blocked);
-  const plan = await lockMailboxService(tx, actor.teamId, now);
-  if (!plan.unlimitedOutbound) {
-    // A "team" quota is shared: every mailbox of the team draws on one allowance.
-    const [usage] = await tx
-      .select({ recipients: sql<string>`coalesce(sum(${mailboxOutbox.recipientCount}),0)::text` })
-      .from(mailboxOutbox)
-      .where(
-        and(
-          plan.quotaScope === "team" ? undefined : eq(mailboxOutbox.mailboxId, input.mailboxId),
-          eq(mailboxOutbox.teamId, actor.teamId),
-          eq(mailboxOutbox.periodStart, plan.usagePeriod.start),
-          ne(mailboxOutbox.status, "failed"),
-        ),
-      );
-    if (
-      BigInt(usage?.recipients ?? "0") + BigInt(parsed.count) >
-      BigInt(plan.includedOutboundPerMailbox)
-    )
-      throw new MailboxServiceError("quota");
-    // A plan also caps the MIME bytes it sends: each recipient is a copy SES bills.
-    await assertMailboxOutboundBytes(tx, plan, plan.usagePeriod.start, raw.length, parsed.count);
-    // A free trial sends a little, from verified domains only (checked above), until paid.
-    await assertMailboxTrialSending(tx, plan, parsed.count, now);
+  // Contas externas are free: no plan, period quota or SES byte cap (their mail leaves
+  // through the person's own SMTP); their own send rate and storage cap apply instead.
+  let usagePeriod: { start: Date; end: Date };
+  if (external) {
+    await assertMailboxExternalSendRate(tx, input.mailboxId, parsed.count, now);
+    await assertMailboxExternalStorage(tx, input.mailboxId, raw.length);
+    usagePeriod = mailboxExternalUsagePeriod(now);
+  } else {
+    const plan = await lockMailboxService(tx, actor.teamId, now);
+    if (!plan.unlimitedOutbound) {
+      // A "team" quota is shared: every mailbox of the team draws on one allowance.
+      const [usage] = await tx
+        .select({ recipients: sql<string>`coalesce(sum(${mailboxOutbox.recipientCount}),0)::text` })
+        .from(mailboxOutbox)
+        .where(
+          and(
+            plan.quotaScope === "team" ? undefined : eq(mailboxOutbox.mailboxId, input.mailboxId),
+            eq(mailboxOutbox.teamId, actor.teamId),
+            eq(mailboxOutbox.periodStart, plan.usagePeriod.start),
+            ne(mailboxOutbox.status, "failed"),
+          ),
+        );
+      if (
+        BigInt(usage?.recipients ?? "0") + BigInt(parsed.count) >
+        BigInt(plan.includedOutboundPerMailbox)
+      )
+        throw new MailboxServiceError("quota");
+      // A plan also caps the MIME bytes it sends: each recipient is a copy SES bills.
+      await assertMailboxOutboundBytes(tx, plan, plan.usagePeriod.start, raw.length, parsed.count);
+      // A free trial sends a little, from verified domains only (checked above), until paid.
+      await assertMailboxTrialSending(tx, plan, parsed.count, now);
+    }
+    await assertMailboxStorage(tx, actor.teamId, input.mailboxId, raw.length, plan);
+    usagePeriod = plan.usagePeriod;
   }
-  await assertMailboxStorage(tx, actor.teamId, input.mailboxId, raw.length, plan);
   const id = randomUUID();
   const sealed = await encryptPayload(
     raw,
@@ -1001,8 +1028,8 @@ async function queueAuthorizedMailboxDraft(
       agentKeyId: approval.agentKeyId,
       recipientCount: parsed.count,
       recipientHashes,
-      periodStart: plan.usagePeriod.start,
-      periodEnd: plan.usagePeriod.end,
+      periodStart: usagePeriod.start,
+      periodEnd: usagePeriod.end,
       rawBytes: raw.length,
       rawSha256: hash(raw),
       ...mailboxThreadKeys(raw),
@@ -1234,29 +1261,33 @@ export async function sendMailboxOutbox(
           raw: Buffer.alloc(0),
           parsed: { from: "", to: [], cc: [], bcc: [], count: 0 },
         };
-      const plan = await lockMailboxService(tx, row!.teamId, now);
-      // The captured counter key survives a monthly boundary and a deferred retry.
-      // Revalidate it against the still-current financial term, never move it to now.
-      const reservedPeriod = plan.unlimitedOutbound
-        ? null
-        : mailboxSubscriptionUsagePeriod(plan, row.periodStart);
-      if (
-        !plan.unlimitedOutbound &&
-        (!reservedPeriod ||
-          row.periodStart.getTime() !== reservedPeriod.start.getTime() ||
-          row.periodEnd.getTime() !== reservedPeriod.end.getTime())
-      )
-        throw new MailboxReservationExpiredError();
       const [box] = await tx
         .select()
         .from(schema.mailboxes)
         .where(eq(schema.mailboxes.id, row!.mailboxId));
-      const [domain] = await tx
-        .select({ status: schema.domains.status })
-        .from(schema.domains)
-        .where(and(eq(schema.domains.id, box!.domainId), eq(schema.domains.teamId, row!.teamId)))
-        .for("share");
-      if (domain?.status !== "verified") throw new MailboxContentError("forbidden");
+      // A connected external account has no plan period or team domain: its admission
+      // already counted its own send rate.
+      if (box?.origin !== "external") {
+        const plan = await lockMailboxService(tx, row!.teamId, now);
+        // The captured counter key survives a monthly boundary and a deferred retry.
+        // Revalidate it against the still-current financial term, never move it to now.
+        const reservedPeriod = plan.unlimitedOutbound
+          ? null
+          : mailboxSubscriptionUsagePeriod(plan, row.periodStart);
+        if (
+          !plan.unlimitedOutbound &&
+          (!reservedPeriod ||
+            row.periodStart.getTime() !== reservedPeriod.start.getTime() ||
+            row.periodEnd.getTime() !== reservedPeriod.end.getTime())
+        )
+          throw new MailboxReservationExpiredError();
+        const [domain] = await tx
+          .select({ status: schema.domains.status })
+          .from(schema.domains)
+          .where(and(eq(schema.domains.id, box!.domainId!), eq(schema.domains.teamId, row!.teamId)))
+          .for("share");
+        if (domain?.status !== "verified") throw new MailboxContentError("forbidden");
+      }
       const raw = await open(row!, keys);
       if (hash(raw) !== row!.rawSha256) throw new MailboxContentError("invalid");
       const parsed = await envelope(mime, raw, true);

@@ -79,7 +79,7 @@ export async function restoreMailboxDeletion(
   db: Db,
   actor: MailboxRegistryActor,
   id: string,
-): Promise<{ id: string; domainId: string; status: "planned" | "suspended" }> {
+): Promise<{ id: string; domainId: string | null; status: "planned" | "suspended" }> {
   return withMailboxRegistryAdmin(db, actor, async (tx) => {
     // Lock order as in creation: membership (above), service, then the mailbox.
     const service = await mailboxServiceEntitlement(tx, actor.teamId, true);

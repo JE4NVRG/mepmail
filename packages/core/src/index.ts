@@ -442,6 +442,47 @@ export {
   restoreMailboxDeletion,
 } from "./mailbox-deletion.js";
 export {
+  claimDueMailboxExternalAccounts,
+  createMailboxExternalAccount,
+  disconnectMailboxExternalAccount,
+  finishMailboxExternalSync,
+  getMailboxExternalAccount,
+  heldMailboxExternalTeams,
+  MAILBOX_EXTERNAL_SYNC_EVERY_MS,
+  MailboxExternalError,
+  type MailboxExternalErrorCode,
+  type MailboxExternalServersInput,
+  mailboxExternalSourceId,
+  markMailboxExternalAuthFailed,
+  openMailboxExternalAccount,
+  receiveExternalMailboxMime,
+  replaceMailboxExternalSecret,
+  requestMailboxExternalSync,
+} from "./mailbox-external-accounts.js";
+export {
+  assertMailboxExternalSendRate,
+  assertMailboxExternalStorage,
+  mailboxExternalLimits,
+  mailboxExternalUsagePeriod,
+  mailboxIsExternal,
+} from "./mailbox-external-limits.js";
+export {
+  MAILBOX_EXTERNAL_PRESETS,
+  type MailboxExternalPreset,
+  type MailboxExternalPresetId,
+  mailboxExternalPresetFor,
+} from "./mailbox-external-providers.js";
+export {
+  ImapError,
+  type ImapExamined,
+  type ImapFailure,
+  type ImapImportSession,
+  type ImapMessage,
+  openImap,
+  publicAddress,
+  resolveImapEndpoint,
+} from "./mailbox-imap-client.js";
+export {
   assessMailboxReceipt,
   type MailboxInboundAssessment,
   type MailboxSafetyReason,

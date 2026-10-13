@@ -21,6 +21,7 @@ import {
   encryptPayload,
 } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
+import { assertMailboxExternalStorage, mailboxIsExternal } from "./mailbox-external-limits.js";
 import type { MailboxRegistryActor } from "./mailbox-registry.js";
 import {
   assertMailboxStorage,
@@ -147,6 +148,16 @@ async function open(item: Item, keyring: Keyring) {
  * Revocation/suspension and member deletion wait for an authorized read to finish;
  * later requests see the new permission. Admin role alone never unlocks content.
  */
+/** Storage for one write: the plan's for a Correio mailbox, its own cap for an external account. */
+async function assertBoxStorage(tx: Db, teamId: string, mailboxId: string, delta: number) {
+  if (await mailboxIsExternal(tx, mailboxId)) {
+    await assertMailboxExternalStorage(tx, mailboxId, delta);
+    return;
+  }
+  const plan = await lockMailboxService(tx, teamId);
+  await assertMailboxStorage(tx, teamId, mailboxId, delta, plan);
+}
+
 async function scoped<T>(
   db: Db,
   actor: MailboxContentActor,
@@ -207,8 +218,11 @@ async function scoped<T>(
     }
     if (change) {
       if (!team || team.suspendedAt) throw new MailboxServiceError("not_entitled");
-      const plan = requireMailboxOperationalPlan(entitlement);
-      await requireMailboxSeat(tx, actor.teamId, mailboxId, plan);
+      // A connected external account is free: no plan or seat (its own limits apply).
+      if (mailbox.origin !== "external") {
+        const plan = requireMailboxOperationalPlan(entitlement);
+        await requireMailboxSeat(tx, actor.teamId, mailboxId, plan);
+      }
     }
     return operation(tx);
   });
@@ -409,8 +423,7 @@ export async function importMailboxMime(
       if (!folder) throw new MailboxContentError("invalid");
     }
     const id = randomUUID();
-    const plan = await lockMailboxService(tx, actor.teamId);
-    await assertMailboxStorage(tx, actor.teamId, input.mailboxId, raw.length, plan);
+    await assertBoxStorage(tx, actor.teamId, input.mailboxId, raw.length);
     const sealed = await encryptPayload(
       raw,
       keyring,
@@ -1514,13 +1527,11 @@ export async function saveMailboxDraft(
         .limit(1);
       if (submitted) throw new MailboxContentError("conflict");
     }
-    const plan = await lockMailboxService(tx, actor.teamId);
-    await assertMailboxStorage(
+    await assertBoxStorage(
       tx,
       actor.teamId,
       input.mailboxId,
       raw.length - (previous?.rawBytes ?? 0),
-      plan,
     );
     const sealed = await encryptPayload(
       raw,

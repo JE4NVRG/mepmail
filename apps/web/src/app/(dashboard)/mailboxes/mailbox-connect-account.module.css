@@ -1,0 +1,119 @@
+/* Conectar outra conta (inside mailboxes.module.css's .dialog). */
+.form {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.hint {
+  margin: 0;
+  color: var(--ms-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--ms-fs-label);
+  color: var(--ms-muted);
+}
+.field small {
+  color: var(--ms-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+.providers legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-label);
+}
+.providers button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ms-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.providers button[aria-pressed="true"] {
+  border-color: var(--ms-bone);
+  background: var(--ms-bone);
+  color: var(--ms-void);
+}
+.providers button:focus-visible {
+  outline: none;
+  box-shadow: var(--ms-focus-ring);
+}
+.steps {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-input);
+  background: var(--ms-panel-raised);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.steps p {
+  margin: 0;
+}
+.steps a {
+  justify-self: start;
+  color: var(--ms-bone);
+}
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ms-warn-border);
+  border-radius: var(--ms-r-input);
+  background: var(--ms-warn-bg);
+  color: var(--ms-warn);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.servers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 140px;
+  gap: 8px;
+}
+@media (max-width: 560px) {
+  .servers {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.advancedToggle {
+  justify-self: start;
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+/* Configurações → Caixas: an external account's sync state and actions. */
+.status {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.inline input {
+  flex: 1 1 220px;
+  min-width: 0;
+}

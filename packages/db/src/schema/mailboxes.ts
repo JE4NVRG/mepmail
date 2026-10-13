@@ -41,9 +41,10 @@ export const mailboxes = pgTable(
     teamId: uuid("team_id")
       .notNull()
       .references(() => teams.id, { onDelete: "cascade" }),
-    domainId: uuid("domain_id")
-      .notNull()
-      .references(() => domains.id, { onDelete: "restrict" }),
+    // Null only for an external account (origin 'external', mailbox-drizzle 0034).
+    domainId: uuid("domain_id").references(() => domains.id, { onDelete: "restrict" }),
+    /** 'domain': a Correio address on a team domain; 'external': a connected Gmail/iCloud/IMAP account. */
+    origin: text("origin").$type<"domain" | "external">().notNull().default("domain"),
     address: text("address").notNull(),
     label: text("label").notNull(),
     signatureText: text("signature_text").notNull().default(""),
@@ -68,7 +69,11 @@ export const mailboxes = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("mailboxes_address_idx").on(t.address),
+    // A Correio address is unique everywhere; a connected account only within its team.
+    uniqueIndex("mailboxes_address_idx").on(t.address).where(sql`${t.origin} = 'domain'`),
+    uniqueIndex("mailboxes_external_address_idx")
+      .on(t.teamId, t.address)
+      .where(sql`${t.origin} = 'external'`),
     unique("mailboxes_id_team_unique").on(t.id, t.teamId),
     foreignKey({
       name: "mailboxes_domain_team_fk",
@@ -78,6 +83,10 @@ export const mailboxes = pgTable(
     index("mailboxes_team_created_idx").on(t.teamId, t.createdAt),
     index("mailboxes_delete_after_idx").on(t.deleteAfter).where(sql`${t.deleteAfter} is not null`),
     check("mailboxes_kind_check", sql`${t.kind} in ('person', 'agent')`),
+    check(
+      "mailboxes_origin_check",
+      sql`${t.origin} in ('domain', 'external') and (${t.origin} = 'domain') = (${t.domainId} is not null)`,
+    ),
     check("mailboxes_status_check", sql`${t.status} in ('planned', 'suspended')`),
     check(
       "mailboxes_deletion_check",

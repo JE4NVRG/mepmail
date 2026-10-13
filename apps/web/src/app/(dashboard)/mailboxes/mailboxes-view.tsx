@@ -42,6 +42,10 @@ import { MailboxAliasesSection } from "./mailbox-aliases-section";
 import { MailboxAppearanceSettings } from "./mailbox-appearance-settings";
 import { MailboxClientsDialog } from "./mailbox-clients-dialog";
 import {
+  MailboxConnectAccountDialog,
+  type MailboxConnectAccountError,
+} from "./mailbox-connect-account-dialog";
+import {
   MAIL_DRAG_TYPE,
   MailboxContentView,
   type MailboxDropHandler,
@@ -49,6 +53,7 @@ import {
   ShortcutsDialog,
 } from "./mailbox-content-view";
 import { deletionDate, MailboxDeletionSection } from "./mailbox-deletion-section";
+import { MailboxExternalStatus } from "./mailbox-external-status";
 import { MailboxFolderDialog } from "./mailbox-folder-dialog";
 import { type FolderEditorState, MailboxFolderEditor } from "./mailbox-folder-editor";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
@@ -430,6 +435,7 @@ export function MailboxesView({
   const tActivity = useTranslations("mailboxes-activity");
   const tClients = useTranslations("mailboxes-clients");
   const tAgent = useTranslations("mailboxes-agent");
+  const tExternal = useTranslations("mailboxes-external");
   const { data: session } = authClient.useSession();
   const trpc = useTRPC();
   const queries = useQueryClient();
@@ -455,6 +461,19 @@ export function MailboxesView({
       retry: (count, error) =>
         (error as { data?: { code?: string } }).data?.code !== "NOT_FOUND" && count < 3,
     }),
+  );
+  // Contas externas: offered to the pilot teams, then to everyone (MAILBOX_EXTERNAL_OPEN).
+  const externalAvailable = useQuery(
+    trpc.mailboxExternal.available.queryOptions(undefined, {
+      enabled: mayUseMail,
+      staleTime: 5 * 60_000,
+      retry: false,
+    }),
+  );
+  const canConnectExternal = externalAvailable.data?.open === true;
+  const [connectOpen, setConnectOpen] = useState(false);
+  const connectExternal = useMutation(
+    trpc.mailboxExternal.connect.mutationOptions({ retry: false }),
   );
   const options = useQuery(
     trpc.mailboxes.options.queryOptions(undefined, { enabled: registry.data?.canManage === true }),
@@ -1142,15 +1161,20 @@ export function MailboxesView({
     );
   };
   // The rail's "···" beside CAIXAS: mailbox management, for admins.
-  const boxesMenu: (PopoverMenuItem | null)[] = registry.data?.canManage
-    ? [
-        { label: t("new"), disabled: !options.data, onSelect: () => setDialog("new") },
-        {
-          label: t("rail.manageBoxes"),
-          onSelect: () => router.push("/mail/settings?tab=boxes"),
-        },
-      ]
-    : [];
+  const boxesMenu: (PopoverMenuItem | null)[] = [
+    ...(canConnectExternal
+      ? [{ label: tExternal("action"), onSelect: () => setConnectOpen(true) }]
+      : []),
+    ...(registry.data?.canManage
+      ? [
+          { label: t("new"), disabled: !options.data, onSelect: () => setDialog("new") },
+          {
+            label: t("rail.manageBoxes"),
+            onSelect: () => router.push("/mail/settings?tab=boxes"),
+          },
+        ]
+      : []),
+  ];
   // The selected mailbox's own actions, beside its name in the rail.
   const boxMenu: (PopoverMenuItem | null)[] = selected
     ? [
@@ -1381,6 +1405,11 @@ export function MailboxesView({
                         {t("createFirst")}
                       </button>
                     ) : null}
+                    {canConnectExternal ? (
+                      <button type="button" className="ms-btn" onClick={() => setConnectOpen(true)}>
+                        {tExternal("action")}
+                      </button>
+                    ) : null}
                   </>
                 )}
               </div>
@@ -1426,10 +1455,37 @@ export function MailboxesView({
           openReceiving={() => setDialog("receiving")}
         />
       ) : null}
-      {registry.data?.canManage && dialog === "receiving" && options.data && selected ? (
+      {connectOpen ? (
+        <MailboxConnectAccountDialog
+          close={() => setConnectOpen(false)}
+          connect={async (input): Promise<MailboxConnectAccountError | null> => {
+            try {
+              const created = await connectExternal.mutateAsync(input);
+              await queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
+              toast(tExternal("connected", { address: input.address }), "success");
+              selectMailbox(created.mailboxId);
+              return null;
+            } catch (cause) {
+              const error = cause as { data?: { code?: string }; message?: string };
+              const code = error.data?.code;
+              const reason = error.message ?? "";
+              if (
+                code === "BAD_REQUEST" &&
+                /^(imap|smtp)_|invalid_server|provider_unavailable/.test(reason)
+              )
+                return reason as MailboxConnectAccountError;
+              if (code === "CONFLICT") return "conflict";
+              if (code === "PRECONDITION_FAILED" && reason === "limit") return "limit";
+              if (code === "FORBIDDEN") return "forbidden";
+              return "generic";
+            }
+          }}
+        />
+      ) : null}
+      {registry.data?.canManage && dialog === "receiving" && options.data && selected?.domainId ? (
         <MailboxSetupDialog
           key={`receiving-${selected.id}`}
-          existingMailbox={selected}
+          existingMailbox={{ ...selected, domainId: selected.domainId }}
           options={options.data}
           close={() => setDialog(null)}
           changed={changed}
@@ -1582,16 +1638,23 @@ export function MailboxesView({
           ) : settingsTab === "boxes" ? (
             <section className={styles.settingsSection} aria-label={t("app.tabs.boxes")}>
               <p className={styles.hint}>{t("app.boxesHint")}</p>
-              {registry.data?.canManage ? (
+              {registry.data?.canManage || canConnectExternal ? (
                 <div className={styles.settingsRowActions}>
-                  <button
-                    type="button"
-                    className="ms-btn ms-btn-primary"
-                    disabled={!options.data}
-                    onClick={() => setDialog("new")}
-                  >
-                    + {t("new")}
-                  </button>
+                  {registry.data?.canManage ? (
+                    <button
+                      type="button"
+                      className="ms-btn ms-btn-primary"
+                      disabled={!options.data}
+                      onClick={() => setDialog("new")}
+                    >
+                      + {t("new")}
+                    </button>
+                  ) : null}
+                  {canConnectExternal ? (
+                    <button type="button" className="ms-btn" onClick={() => setConnectOpen(true)}>
+                      + {tExternal("action")}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
               {registry.data?.canManage && options.data && !options.data.domains.length ? (
@@ -1607,8 +1670,13 @@ export function MailboxesView({
                         <strong>{box.label}</strong>
                         <span>{box.address}</span>
                         <small>
-                          {t(`scope.${box.kind}`)} · {t(box.status)}
+                          {box.origin === "external"
+                            ? tExternal("badge")
+                            : `${t(`scope.${box.kind}`)} · ${t(box.status)}`}
                         </small>
+                        {box.origin === "external" && box.ownerUserId === session?.user.id ? (
+                          <MailboxExternalStatus mailboxId={box.id} address={box.address} />
+                        ) : null}
                       </div>
                       {registry.data?.canManage ||
                       (box.ownerActive && box.ownerUserId === session?.user.id) ? (
@@ -1620,7 +1688,7 @@ export function MailboxesView({
                           >
                             {t("signature.action")}
                           </button>
-                          {registry.data?.canManage ? (
+                          {registry.data?.canManage && box.origin !== "external" ? (
                             <>
                               <button
                                 type="button"
