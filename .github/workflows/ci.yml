@@ -5,6 +5,14 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  # A release candidate (a commit not yet on main) is checked here before it ships:
+  # the maintainer pushes it to a candidates ref and runs this with its sha.
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit to check (defaults to the selected ref)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -16,14 +24,17 @@ env:
 # A newer push supersedes a PR's run, but never an in-flight publish on main:
 # cancelling one would leave the moving tags pointing at an older build.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ inputs.sha || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.sha }}
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -42,23 +53,25 @@ jobs:
   # action needs a license key for organization repos; the CLI does not).
   secrets:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.sha }}
           fetch-depth: 0
       - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git --config /repo/.gitleaks.toml --no-banner --redact --exit-code 1 /repo
 
-  # Images publish only from a green check on main or a version tag, so a
-  # tag a deployment tracks can never point at a build the tests rejected.
-  # main → :edge (moving head); version tags → :1.2.3, :1.2 and :latest
-  # (metadata-action adds :latest to semver tags by itself).
+  # Images publish only from a green check on a version tag, so a tag a
+  # deployment tracks can never point at a build the tests rejected. Version
+  # tags → :1.2.3, :1.2 and :latest (metadata-action adds :latest to semver
+  # tags by itself). Pushes to main are checked but publish no image.
   #
   # Each platform builds on its own native runner — the Next.js build under
   # QEMU emulation was the whole cost of a multi-arch build — and pushes by
   # digest only; publish then stitches the digests into one tag per image.
   build:
     needs: [check, secrets]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     strategy:
       fail-fast: false
       matrix:
