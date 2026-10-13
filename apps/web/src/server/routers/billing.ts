@@ -381,6 +381,8 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
               stripe: deps.stripe(),
               livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
               launchOfferEnabled: offerEnabled,
+              // The same consent-gated ad context as a card Checkout: the Pix's Purchase.
+              ...(await checkoutAdvertising()),
             },
             getPixStripe(),
             {

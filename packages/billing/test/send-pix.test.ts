@@ -1,8 +1,16 @@
 import { type Db, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { GoogleConversionConfig } from "../src/google-advertising.js";
 import {
+  dispatchMetaConversions,
+  recordMetaPurchase,
+  saveAdvertisingConsent,
+} from "../src/meta-advertising.js";
+import type { MetaConversionConfig, MetaFetch } from "../src/meta-conversions.js";
+import {
+  beginPixInvoicePayment,
   isPixSubscription,
   PIX_SESSION_METADATA_KEY,
   type PixPayment,
@@ -64,6 +72,24 @@ function pixFake() {
       ...price(id.replace(/^price_/, ""), { metered: id.endsWith("_overage") }),
       livemode: false,
     } as Stripe.Price);
+  /** The PaymentIntent of a paid session, as Stripe would return it; tests may override fields. */
+  const paymentIntentOverrides: Record<string, Partial<Stripe.PaymentIntent>> = {};
+  const paymentIntentOf = async (id: string) => {
+    const session = Object.values(sessions).find((s) => s.payment_intent === id);
+    if (!session) throw new Error(`No such payment_intent: ${id}`);
+    return {
+      id,
+      object: "payment_intent",
+      livemode: false,
+      status: "succeeded",
+      currency: "brl",
+      amount: session.amount_total,
+      amount_received: session.amount_total,
+      customer: session.customer,
+      metadata: session.metadata,
+      ...paymentIntentOverrides[id],
+    } as unknown as Stripe.PaymentIntent;
+  };
   const client: PixStripe = {
     prices: {
       retrieve: async (id) =>
@@ -151,7 +177,22 @@ function pixFake() {
           created: PERIOD_START,
           due_date: PERIOD_START + 5 * 86_400,
           parent: { subscription_details: { subscription: id, metadata: params.metadata } },
-          lines: { data: [] },
+          billing_reason: "subscription_create",
+          livemode: false,
+          amount_paid: 0,
+          status_transitions: { paid_at: null },
+          lines: {
+            has_more: false,
+            data: (params.items ?? []).map((entry) => ({
+              pricing: {
+                price_details: {
+                  price: entry.price,
+                  product: priceObject(entry.price ?? "").product,
+                },
+              },
+              parent: { subscription_item_details: { proration: false } },
+            })),
+          },
         } as unknown as Stripe.Invoice;
         f.state.subscriptions[id] = sub;
         created.set(options?.idempotencyKey ?? "", sub);
@@ -188,7 +229,12 @@ function pixFake() {
         const found = invoice(id);
         if (found.status !== "open") throw new Error("Invoice is not open");
         found.status = "paid";
+        found.amount_paid = found.amount_remaining;
         found.amount_remaining = 0;
+        found.status_transitions = {
+          ...found.status_transitions,
+          paid_at: Math.floor(Date.now() / 1000),
+        };
         return found;
       },
       voidInvoice: async (id) => {
@@ -197,6 +243,9 @@ function pixFake() {
         found.status = "void";
         return found;
       },
+    },
+    paymentIntents: {
+      retrieve: async (id) => paymentIntentOf(id),
     },
     refunds: {
       create: async (params) => {
@@ -218,6 +267,7 @@ function pixFake() {
     invoices,
     calls,
     pay,
+    paymentIntentOverrides,
     billFirstInvoice: (amount: number) => {
       firstInvoiceAmount = amount;
     },
@@ -426,7 +476,9 @@ describe("Send paid by Pix", () => {
     for (const session of f.sessions.values()) session.status = "complete";
     expect(await fulfill(payment)).toBe("refunded");
     expect(pix.calls.refunds).toEqual(["occupied"]);
-    const attempts = await f.db.select().from(schema.sendCheckoutAttempts);
+    const attempts = (await f.db.select().from(schema.sendCheckoutAttempts)).filter(
+      (a) => a.parameters.method !== "pix",
+    );
     expect(attempts.map((a) => a.status)).toEqual(["resolved"]);
   });
 
@@ -445,7 +497,9 @@ describe("Send paid by Pix", () => {
     };
     expect(await fulfill(payment)).toBe("fulfilled");
     expect(expired).toEqual(["cs_1"]);
-    const attempts = await f.db.select().from(schema.sendCheckoutAttempts);
+    const attempts = (await f.db.select().from(schema.sendCheckoutAttempts)).filter(
+      (a) => a.parameters.method !== "pix",
+    );
     expect(attempts.map((a) => a.status)).toEqual(["resolved"]);
   });
 
@@ -523,5 +577,236 @@ describe("Send paid by Pix", () => {
       changeRung({ db: f.db, stripe: f.stripe }, { teamId: f.input.team.id, rung: "pro_200k" }),
     ).rejects.toMatchObject({ code: "unavailable" });
     expect(f.state.updates).toEqual([]);
+  });
+});
+
+describe("the first Send purchase paid by Pix, for advertising", () => {
+  const meta: MetaConversionConfig = {
+    enabled: true,
+    datasetId: "123456789",
+    accessToken: "offline-private-token",
+    graphVersion: "v23.0",
+    mode: "production",
+  };
+  const google: GoogleConversionConfig = {
+    enabled: true,
+    measurementId: "G-3624E08M6J",
+    apiSecret: "synthetic_secret_value",
+  };
+  const cookies =
+    "_fbp=fb.1.1790996395000.123456789; _ga=GA1.1.1234567890.1790996395; _ga_3624E08M6J=GS2.1.s1790996390$o1$g1$t1790996399$j0$l0$h0";
+  type Proof = Awaited<ReturnType<typeof saveAdvertisingConsent>>["proof"];
+  const consent = (granted = true, proof: Proof | null = null) =>
+    saveAdvertisingConsent(f.db, {
+      granted,
+      proof,
+      userId: f.input.userId,
+      sourceUrl: "https://mepmail.dev/pricing?lang=pt-BR",
+    });
+  const withAds = (proof: Proof) => ({
+    ...deps(),
+    advertising: { config: meta, proof, cookieHeader: cookies },
+    googleAdvertising: { config: google, proof, cookieHeader: cookies },
+  });
+  const openPix = async (proof: Proof, interval: "month" | "year" = "month") => {
+    await beginSendPixCheckout(withAds(proof), pix.client, { ...f.input, interval });
+    return Object.keys(pix.sessions).at(-1)!;
+  };
+  const payAndRead = async (sessionId: string) => {
+    pix.pay(sessionId);
+    const payment = await readPixPayment(pix.client, sessionId, false);
+    if (typeof payment === "string") throw new Error(payment);
+    return payment;
+  };
+  const fulfillWithAds = (payment: PixPayment) =>
+    f.db.transaction((tx) =>
+      fulfillSendPixStart(
+        tx as unknown as Db,
+        { ...f.deps, advertisingConfig: meta, googleConversionConfig: google },
+        pix.client,
+        payment,
+        log,
+      ),
+    );
+  const metaRows = () => f.db.select().from(schema.metaConversionOutbox);
+  const googleRows = () => f.db.select().from(schema.googleConversionOutbox);
+
+  it("records one Purchase of R$ 99 in reais for Meta and Google once the first Pix is settled", async () => {
+    const saved = await consent();
+    const sessionId = await openPix(saved.proof);
+    const [attempt] = await f.db.select().from(schema.sendCheckoutAttempts);
+    expect(attempt).toMatchObject({ status: "resolved", rung: "pro_100k", stripeSessionId: null });
+    expect(attempt?.parameters).toMatchObject({ method: "pix" });
+    expect(pix.sessions[sessionId]?.metadata).toMatchObject({ mepmail_pix_attempt: attempt?.id });
+    const [context] = await f.db.select().from(schema.metaCheckoutContexts);
+    expect(context).toMatchObject({ attemptId: attempt?.id, eligible: true });
+    // A QR code, an open Checkout or a Pix not yet paid is no purchase.
+    expect(await readPixPayment(pix.client, sessionId, false)).toBe("pending");
+    expect(await metaRows()).toEqual([]);
+
+    const payment = await payAndRead(sessionId);
+    expect(payment.attemptId).toBe(attempt?.id);
+    expect(await fulfillWithAds(payment)).toBe("fulfilled");
+    const [purchase] = await metaRows();
+    expect(purchase).toMatchObject({
+      eventName: "Purchase",
+      status: "pending",
+      attemptId: attempt?.id,
+      stripeSessionId: sessionId,
+      stripeInvoiceId: "in_send_pix_1",
+      stripeSubscriptionId: "sub_send_pix_1",
+      amountPaidMinor: 9_900,
+      currency: "brl",
+    });
+    expect(await googleRows()).toMatchObject([
+      { transactionId: "in_send_pix_1", valueMinor: 9_900, currency: "BRL", rung: "pro_100k" },
+    ]);
+    expect(f.state.subscriptions.sub_send_pix_1?.metadata).toMatchObject({
+      mepmail_send_checkout: attempt?.id,
+    });
+    const [bound] = await f.db.select().from(schema.sendCheckoutAttempts);
+    expect(bound?.stripeSessionId).toBe(sessionId);
+
+    // A redelivered event or a replayed fulfilment adds nothing.
+    expect(await fulfillWithAds(payment)).toBe("fulfilled");
+    expect(await metaRows()).toHaveLength(1);
+    expect(await googleRows()).toHaveLength(1);
+
+    // What leaves for Meta is the amount actually paid, in BRL: R$ 99, not the R$ 149 renewal.
+    const fetch = vi.fn<MetaFetch>(async () => ({
+      status: 200,
+      json: async () => ({ events_received: 1 }),
+    }));
+    expect(await dispatchMetaConversions(f.db, meta, { fetch, stripe: f.stripe })).toEqual({
+      considered: 1,
+      sent: 1,
+    });
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(body.data[0]).toMatchObject({
+      event_name: "Purchase",
+      event_id: purchase?.eventId,
+      custom_data: { value: 99, currency: "BRL" },
+    });
+  });
+
+  it("records the year paid by Pix at its full R$ 1.490", async () => {
+    const saved = await consent();
+    const payment = await payAndRead(await openPix(saved.proof, "year"));
+    await fulfillWithAds(payment);
+    expect(await metaRows()).toMatchObject([{ amountPaidMinor: 149_000, currency: "brl" }]);
+  });
+
+  it("records nothing without advertising consent, and the plan still starts", async () => {
+    await beginSendPixCheckout(deps(), pix.client, f.input);
+    const payment = await payAndRead(Object.keys(pix.sessions).at(-1)!);
+    expect(await fulfillWithAds(payment)).toBe("fulfilled");
+    expect(await metaRows()).toEqual([]);
+    expect(await googleRows()).toEqual([]);
+  });
+
+  it("records nothing when consent is withdrawn before the Pix is paid", async () => {
+    const saved = await consent();
+    const sessionId = await openPix(saved.proof);
+    await consent(false, saved.proof);
+    await fulfillWithAds(await payAndRead(sessionId));
+    expect(await metaRows()).toEqual([]);
+    expect(await googleRows()).toEqual([]);
+  });
+
+  it("cancels a recorded Purchase when consent is withdrawn before it is sent", async () => {
+    const saved = await consent();
+    await fulfillWithAds(await payAndRead(await openPix(saved.proof)));
+    await consent(false, saved.proof);
+    expect(await metaRows()).toMatchObject([
+      { status: "cancelled", lastFailure: "consent_withdrawn" },
+    ]);
+    expect(await googleRows()).toMatchObject([{ status: "cancelled" }]);
+  });
+
+  it.each([
+    ["a different amount", { amount: 14_900, amount_received: 14_900 }],
+    ["a payment still processing", { status: "processing" }],
+    ["another currency", { currency: "usd" }],
+    ["another customer", { customer: "cus_someone_else" }],
+  ])("records nothing when the PaymentIntent shows %s", async (_label, override) => {
+    const saved = await consent();
+    const sessionId = await openPix(saved.proof);
+    pix.paymentIntentOverrides[`pi_${sessionId}`] = override as Partial<Stripe.PaymentIntent>;
+    expect(await fulfillWithAds(await payAndRead(sessionId))).toBe("fulfilled");
+    expect(await metaRows()).toEqual([]);
+    expect(await googleRows()).toEqual([]);
+  });
+
+  it("never counts a renewal paid by Pix as a new acquisition", async () => {
+    const saved = await consent();
+    await fulfillWithAds(await payAndRead(await openPix(saved.proof)));
+    pix.invoices.in_send_pix_renewal = {
+      ...pix.invoices.in_send_pix_1!,
+      id: "in_send_pix_renewal",
+      status: "open",
+      billing_reason: "subscription_cycle",
+      amount_remaining: 14_900,
+      amount_paid: 0,
+      metadata: {},
+    } as Stripe.Invoice;
+    await beginPixInvoicePayment(pix.client, {
+      teamId: f.input.team.id,
+      customerId: "cus_1",
+      invoiceId: "in_send_pix_renewal",
+      successUrl: "https://app/ok",
+      cancelUrl: "https://app/back",
+    });
+    const renewal = Object.keys(pix.sessions).at(-1)!;
+    pix.pay(renewal);
+    const payload = JSON.stringify({
+      id: "evt_pix_renewal",
+      object: "event",
+      type: "checkout.session.completed",
+      livemode: false,
+      data: {
+        object: {
+          id: renewal,
+          object: "checkout.session",
+          mode: "payment",
+          metadata: pix.sessions[renewal]?.metadata,
+        },
+      },
+    });
+    await handleWebhook(
+      payload,
+      webhooks.generateTestHeaderString({ payload, secret: "whsec_pix" }),
+      {
+        db: f.db,
+        stripe: f.stripe,
+        webhookSecret: "whsec_pix",
+        livemode: false,
+        pixStripe: pix.client,
+        advertisingConfig: meta,
+        googleConversionConfig: google,
+        log,
+      },
+    );
+    expect(pix.invoices.in_send_pix_renewal?.status).toBe("paid");
+    expect(await metaRows()).toHaveLength(1);
+    expect(await googleRows()).toHaveLength(1);
+  });
+
+  it("keeps the card invoice path off a Pix plan", async () => {
+    const saved = await consent();
+    await fulfillWithAds(await payAndRead(await openPix(saved.proof)));
+    await f.db.delete(schema.metaConversionOutbox);
+    await recordMetaPurchase(
+      f.db,
+      {
+        id: "evt_card_path",
+        type: "invoice.payment_succeeded",
+        livemode: false,
+        data: { object: pix.invoices.in_send_pix_1 },
+      } as unknown as Stripe.Event,
+      f.state.subscriptions.sub_send_pix_1!,
+      false,
+      meta,
+    );
+    expect(await metaRows()).toEqual([]);
   });
 });

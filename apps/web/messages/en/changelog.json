@@ -24,6 +24,20 @@
   },
   "releases": [
     {
+      "version": "0.152",
+      "date": "2026-10-13",
+      "title": "Pix purchases measured at the amount paid",
+      "summary": "The first Send subscription paid by Pix is now measured as a purchase for ads, at the amount actually paid in reais, and only with your consent.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "The first Send purchase paid by Pix is recorded once, after Stripe confirms the payment, at the amount paid (R$ 99 in the offer's first month). Renewals, pending Pix and Correio never count as a new purchase."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.150",
       "date": "2026-10-13",
       "title": "Sender logos in Correio",

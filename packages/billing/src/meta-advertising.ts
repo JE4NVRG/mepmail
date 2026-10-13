@@ -17,7 +17,12 @@ import {
   metaConversionConfigured,
   sendMetaConversion,
 } from "./meta-conversions.js";
-import { confirmedInitialSendPurchase, initialSendInvoiceFacts } from "./send-purchase.js";
+import { isPixSubscription } from "./pix.js";
+import {
+  confirmedInitialSendPurchase,
+  initialSendInvoiceFacts,
+  type SendPurchaseFacts,
+} from "./send-purchase.js";
 import type { BillingStripe } from "./stripe.js";
 
 const receipts = schema.advertisingConsentReceipts;
@@ -389,6 +394,9 @@ export async function recordMetaPurchase(
 ) {
   if (!config || !metaConversionConfigured(config) || event.type !== "invoice.payment_succeeded")
     return;
+  // A Pix plan's first invoice is paid out of band; its Purchase is recorded from the
+  // verified Pix payment (recordMetaPixPurchase), never from an invoice event.
+  if (isPixSubscription(subscription)) return;
   const attemptId = subscription.metadata?.mepmail_send_checkout;
   if (
     !attemptId ||
@@ -437,6 +445,49 @@ export async function recordMetaPurchase(
       eventTime: facts.paidAt,
       status: "waiting",
       confirmation: selectedConfirmation(event.type, invoice, subscription),
+      expiresAt: new Date(facts.paidAt.getTime() + DELIVERY_MS),
+    })
+    .onConflictDoNothing();
+}
+
+/**
+ * The Purchase of a Send plan whose first period was paid by Pix: called by the Pix
+ * fulfilment, inside the webhook transaction, with facts it already confirmed from
+ * canonical Stripe readbacks (initialSendPixFacts). Same consent, context and delivery
+ * window as a card purchase; one row per invoice and per subscription, so a redelivered
+ * event or a replayed fulfilment adds nothing. Ready to send: the Session is known.
+ */
+export async function recordMetaPixPurchase(
+  tx: Db,
+  attempt: Attempt,
+  facts: SendPurchaseFacts,
+  config: MetaConversionConfig | undefined,
+  now = new Date(),
+) {
+  if (!config || !metaConversionConfigured(config)) return;
+  if (!["pro_100k", "pro_200k"].includes(attempt.rung)) return;
+  if (facts.paidAt > now || facts.paidAt.getTime() + DELIVERY_MS <= now.getTime()) return;
+  const captured = await checkoutContext(tx, attempt, now);
+  if (
+    !captured ||
+    Math.floor(captured.context.capturedAt.getTime() / 1000) >
+      Math.floor(facts.paidAt.getTime() / 1000)
+  )
+    return;
+  await tx
+    .insert(outbox)
+    .values({
+      eventName: "Purchase",
+      attemptId: attempt.id,
+      consentReceiptId: captured.receipt.id,
+      livemode: attempt.livemode,
+      stripeSessionId: facts.stripeSessionId,
+      stripeInvoiceId: facts.stripeInvoiceId,
+      stripeSubscriptionId: facts.stripeSubscriptionId,
+      amountPaidMinor: facts.amountPaidMinor,
+      currency: facts.currency,
+      eventTime: facts.paidAt,
+      status: "pending",
       expiresAt: new Date(facts.paidAt.getTime() + DELIVERY_MS),
     })
     .onConflictDoNothing();

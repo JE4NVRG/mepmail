@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import { isPixSubscription, PIX_SESSION_METADATA_KEY, type PixPayment } from "./pix.js";
 
 export interface SendPurchaseAttempt {
   id: string;
@@ -172,4 +173,64 @@ export function confirmedInitialSendPurchase(input: {
   )
     return null;
   return { ...facts, stripeSessionId: c.id };
+}
+
+/**
+ * The first Send purchase paid by Pix (send_start), from canonical Stripe readbacks only:
+ * the paid Checkout (readPixPayment), its PaymentIntent, and the subscription and first
+ * invoice this payment settled out of band. Never the QR, a pending Pix, a renewal
+ * (kind "invoice"), or a Correio plan. The value is what the invoice says was paid: the
+ * intro month is R$ 99, not the R$ 149 renewal.
+ */
+export function initialSendPixFacts(input: {
+  payment: PixPayment;
+  paymentIntent: Stripe.PaymentIntent;
+  invoice: Stripe.Invoice;
+  subscription: Stripe.Subscription;
+  attempt: SendPurchaseAttempt & { teamId: string };
+  livemode: boolean;
+  /** Google measures every paid Send rung; Meta keeps its two Pro rungs. */
+  anyRung?: boolean;
+}): SendPurchaseFacts | null {
+  const { payment: p, paymentIntent: pi, invoice: v, subscription: s, attempt: a } = input;
+  if (
+    p.kind !== "send_start" ||
+    p.attemptId !== a.id ||
+    p.teamId !== a.teamId ||
+    p.customerId !== a.stripeCustomerId ||
+    a.livemode !== input.livemode ||
+    a.parameters.method !== "pix" ||
+    (a.stripeSessionId !== null && a.stripeSessionId !== p.sessionId)
+  )
+    return null;
+  // The PaymentIntent is the money that moved: succeeded, in reais, this customer, this amount.
+  if (
+    pi.id !== p.paymentIntentId ||
+    pi.livemode !== input.livemode ||
+    pi.status !== "succeeded" ||
+    pi.currency !== "brl" ||
+    pi.amount !== p.amount ||
+    (pi.amount_received ?? pi.amount) !== p.amount ||
+    id(pi.customer) !== a.stripeCustomerId
+  )
+    return null;
+  if (
+    !isPixSubscription(s) ||
+    s.metadata?.[PIX_SESSION_METADATA_KEY] !== p.sessionId ||
+    v.metadata?.[PIX_SESSION_METADATA_KEY] !== p.sessionId ||
+    v.metadata?.mepmail_pix_payment !== p.paymentIntentId ||
+    v.collection_method !== "send_invoice" ||
+    v.currency !== "brl" ||
+    v.amount_paid !== p.amount
+  )
+    return null;
+  const facts = initialSendInvoiceFacts({
+    type: "invoice.payment_succeeded",
+    invoice: v,
+    subscription: s,
+    attempt: a,
+    mailbox: false,
+    anyRung: input.anyRung ?? false,
+  });
+  return facts ? { ...facts, stripeSessionId: p.sessionId } : null;
 }

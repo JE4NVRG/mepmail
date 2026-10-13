@@ -73,6 +73,24 @@ function pixFake(subscriptions: Record<string, Stripe.Subscription>, brl: number
     if (!found) throw new Error(`No such invoice: ${id}`);
     return found;
   };
+  /** The PaymentIntent of a paid session, as Stripe would return it; tests may override fields. */
+  const paymentIntentOverrides: Record<string, Partial<Stripe.PaymentIntent>> = {};
+  const paymentIntentOf = async (id: string) => {
+    const session = Object.values(sessions).find((s) => s.payment_intent === id);
+    if (!session) throw new Error(`No such payment_intent: ${id}`);
+    return {
+      id,
+      object: "payment_intent",
+      livemode: false,
+      status: "succeeded",
+      currency: "brl",
+      amount: session.amount_total,
+      amount_received: session.amount_total,
+      customer: session.customer,
+      metadata: session.metadata,
+      ...paymentIntentOverrides[id],
+    } as unknown as Stripe.PaymentIntent;
+  };
   const pix: PixStripe = {
     prices: {
       retrieve: async (id) =>
@@ -226,6 +244,9 @@ function pixFake(subscriptions: Record<string, Stripe.Subscription>, brl: number
         found.status = "void";
         return found;
       },
+    },
+    paymentIntents: {
+      retrieve: async (id) => paymentIntentOf(id),
     },
     refunds: {
       create: async (params, options) => {

@@ -3,7 +3,8 @@ import { and, eq, inArray, lte, or } from "drizzle-orm";
 import type Stripe from "stripe";
 import { advertisingCookie, type ConsentProof } from "./advertising-consent.js";
 import { accepted, proofMatches, receiptFor } from "./meta-advertising.js";
-import { initialSendInvoiceFacts } from "./send-purchase.js";
+import { isPixSubscription } from "./pix.js";
+import { initialSendInvoiceFacts, type SendPurchaseFacts } from "./send-purchase.js";
 
 const contexts = schema.googleCheckoutContexts;
 const outbox = schema.googleConversionOutbox;
@@ -114,6 +115,8 @@ export async function recordGooglePurchase(
   now = new Date(),
 ) {
   if (!googleConversionConfigured(config) || event.type !== "invoice.payment_succeeded") return;
+  // Pix-paid plans are recorded from the verified Pix payment (recordGooglePixPurchase).
+  if (isPixSubscription(subscription)) return;
   const attemptId = subscription.metadata?.mepmail_send_checkout;
   if (!attemptId || !UUID.test(attemptId)) return;
   const [attempt] = await tx
@@ -140,6 +143,41 @@ export async function recordGooglePurchase(
   if (!context || context.expiresAt <= now) return;
   const receipt = await receiptFor(tx, context.consentReceiptId, true);
   // Unix second precision: an invoice predating this intent/consent is never attributed later.
+  if (
+    !accepted(receipt, now) ||
+    receipt.userId !== attempt.createdBy ||
+    Math.floor(context.capturedAt.getTime() / 1000) > Math.floor(facts.paidAt.getTime() / 1000)
+  )
+    return;
+  await tx
+    .insert(outbox)
+    .values({
+      attemptId: attempt.id,
+      consentReceiptId: receipt.id,
+      transactionId: facts.stripeInvoiceId,
+      rung: attempt.rung,
+      valueMinor: facts.amountPaidMinor,
+      currency: facts.currency.toUpperCase(),
+      eventTime: facts.paidAt,
+      nextAttemptAt: now,
+      expiresAt: new Date(facts.paidAt.getTime() + DELIVERY_MS),
+    })
+    .onConflictDoNothing();
+}
+
+/** The Purchase of a Send plan whose first period was paid by Pix (see recordMetaPixPurchase). */
+export async function recordGooglePixPurchase(
+  tx: Db,
+  attempt: Attempt,
+  facts: SendPurchaseFacts,
+  config: GoogleConversionConfig | undefined,
+  now = new Date(),
+) {
+  if (!googleConversionConfigured(config)) return;
+  if (facts.paidAt > now || facts.paidAt.getTime() + DELIVERY_MS <= now.getTime()) return;
+  const [context] = await tx.select().from(contexts).where(eq(contexts.attemptId, attempt.id));
+  if (!context || context.expiresAt <= now) return;
+  const receipt = await receiptFor(tx, context.consentReceiptId, true);
   if (
     !accepted(receipt, now) ||
     receipt.userId !== attempt.createdBy ||

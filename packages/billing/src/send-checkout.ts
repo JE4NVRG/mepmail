@@ -3,7 +3,12 @@ import { type PlanRungKey, rungByKey } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { and, eq, ne, sql } from "drizzle-orm";
 import type Stripe from "stripe";
-import { type GoogleCheckoutAdvertising, prepareGoogleCheckout } from "./google-advertising.js";
+import {
+  type GoogleCheckoutAdvertising,
+  type GoogleConversionConfig,
+  prepareGoogleCheckout,
+  recordGooglePixPurchase,
+} from "./google-advertising.js";
 import {
   isMailboxSubscription,
   MAILBOX_CUSTOMER_METADATA_KEY,
@@ -14,7 +19,9 @@ import {
   type MetaCheckoutAdvertising,
   prepareMetaCheckout,
   recordMetaCheckout,
+  recordMetaPixPurchase,
 } from "./meta-advertising.js";
+import type { MetaConversionConfig } from "./meta-conversions.js";
 import {
   createPixCheckoutSession,
   PIX_COLLECTION,
@@ -33,12 +40,14 @@ import {
   resolvePriceId,
   rungFromPrice,
   rungLookupKey,
+  SUBSCRIPTION_EXPAND,
 } from "./prices.js";
 import {
   resolveSendLaunchPrice,
   SEND_LAUNCH_OFFER,
   verifySendIntroCoupon,
 } from "./send-launch-offer.js";
+import { initialSendPixFacts } from "./send-purchase.js";
 import type { BillingStripe } from "./stripe.js";
 import { idOf, lockCustomer } from "./subscription.js";
 
@@ -711,12 +720,44 @@ export async function beginSendPixCheckout(
   const interval = input.interval ?? "month";
   if (interval !== "month" && interval !== "year") throw new SendCheckoutError("invalid");
   const customer = await ensureCustomer(deps, input);
+  const attemptId = randomUUID();
   const terms = await deps.db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
     const team = await currentTeam(tx, input);
     if (team.stripeCustomerId !== customer) throw new SendCheckoutError("conflict");
     await noOtherSubscription(deps, customer);
-    return sendPixTerms(deps, pix, customer, input.rung, interval);
+    const terms = await sendPixTerms(deps, pix, customer, input.rung, interval);
+    // The durable intent of this Pix purchase: the anchor of its advertising context, like a
+    // card attempt. Created resolved: a Pix never holds the card Checkout's lease, and the
+    // card paths only ever read unresolved attempts.
+    const at = await now(tx);
+    const [attempt] = await tx
+      .insert(schema.sendCheckoutAttempts)
+      .values({
+        id: attemptId,
+        teamId: team.id,
+        createdBy: input.userId,
+        status: "resolved",
+        resolvedAt: at,
+        rung: input.rung,
+        livemode: deps.livemode,
+        stripeCustomerId: customer,
+        idempotencyKey: `pix-send:${team.id}:${attemptId}`,
+        parameters: {
+          method: "pix",
+          client_reference_id: team.id,
+          mepmail_send_interval: interval,
+          line_items: [
+            { price: terms.price, quantity: 1 },
+            ...(terms.overage ? [{ price: terms.overage }] : []),
+          ],
+        },
+      })
+      .returning();
+    if (!attempt) throw new SendCheckoutError("unknown");
+    await prepareMetaCheckout(tx, attempt, deps.advertising, at);
+    await prepareGoogleCheckout(tx, attempt, deps.googleAdvertising, at);
+    return terms;
   });
   const url = await createPixCheckoutSession(pix, {
     kind: "send_start",
@@ -729,9 +770,10 @@ export async function beginSendPixCheckout(
     interval,
     ...(terms.overage ? { overagePriceId: terms.overage } : {}),
     ...(terms.coupon ? { coupon: terms.coupon } : {}),
+    attemptId,
     successUrl: input.successUrl,
     cancelUrl: input.cancelUrl,
-    idempotencyKey: `pix-send:${input.team.id}:${randomUUID()}`,
+    idempotencyKey: `pix-send:${input.team.id}:${attemptId}`,
   });
   return { url };
 }
@@ -787,7 +829,7 @@ async function closeOpenSendCheckout(
  */
 export async function fulfillSendPixStart(
   db: Db,
-  deps: Pick<SendCheckoutDeps, "stripe" | "livemode">,
+  deps: PixPurchaseDeps,
   pix: PixStripe,
   payment: PixPayment,
   log: (message: string) => void,
@@ -803,6 +845,30 @@ export async function fulfillSendPixStart(
     .from(schema.teams)
     .where(eq(schema.teams.stripeCustomerId, payment.customerId));
   if (!team || team.id !== payment.teamId) return refund("team");
+  // The attempt this Pix was opened under (beginSendPixCheckout), when it is this team's.
+  const [found] = payment.attemptId
+    ? await db
+        .select()
+        .from(schema.sendCheckoutAttempts)
+        .where(eq(schema.sendCheckoutAttempts.id, payment.attemptId))
+        .for("update")
+    : [];
+  const attempt =
+    found &&
+    found.teamId === team.id &&
+    found.stripeCustomerId === payment.customerId &&
+    found.livemode === deps.livemode &&
+    found.parameters?.method === "pix" &&
+    (found.stripeSessionId === null || found.stripeSessionId === payment.sessionId)
+      ? found
+      : null;
+  if (attempt && attempt.stripeSessionId === null) {
+    await db
+      .update(schema.sendCheckoutAttempts)
+      .set({ stripeSessionId: payment.sessionId, updatedAt: await now(db) })
+      .where(eq(schema.sendCheckoutAttempts.id, attempt.id));
+    attempt.stripeSessionId = payment.sessionId;
+  }
   const listed = await pix.subscriptions.list({
     customer: payment.customerId,
     status: "all",
@@ -846,6 +912,7 @@ export async function fulfillSendPixStart(
           ...(payment.coupon ? { mepmail_send_intro: "first_invoice_900" } : {}),
           [PIX_COLLECTION_METADATA_KEY]: PIX_COLLECTION,
           [PIX_SESSION_METADATA_KEY]: payment.sessionId,
+          ...(attempt ? { [SEND_CHECKOUT_METADATA_KEY]: attempt.id } : {}),
         },
       },
       { idempotencyKey: `pix-send-start:${payment.sessionId}` },
@@ -853,11 +920,51 @@ export async function fulfillSendPixStart(
   }
   const invoiceId = idOf(sub.latest_invoice);
   if (!invoiceId) throw new SendCheckoutError("pending");
-  if ((await settlePixInvoice(pix, invoiceId, payment)) === "paid") return "fulfilled";
+  if ((await settlePixInvoice(pix, invoiceId, payment)) === "paid") {
+    if (attempt)
+      await recordSendPixPurchase(db, deps, pix, payment, attempt, sub.id, invoiceId, log);
+    return "fulfilled";
+  }
   // The first invoice is not this payment's amount: undo the start and give the Pix back.
   if (!["canceled", "incomplete_expired"].includes(sub.status))
     await pix.subscriptions.cancel(sub.id, { invoice_now: false, prorate: false });
   const invoice = await pix.invoices.retrieve(invoiceId);
   if (invoice.status === "open") await pix.invoices.voidInvoice(invoiceId);
   return refund("invoice");
+}
+
+/** What a Pix fulfilment needs from the webhook: Stripe, the mode and the ad configs. */
+type PixPurchaseDeps = Pick<SendCheckoutDeps, "stripe" | "livemode"> & {
+  advertisingConfig?: MetaConversionConfig;
+  googleConversionConfig?: GoogleConversionConfig;
+};
+
+/**
+ * The first purchase a paid Pix made, for Meta and Google: re-read from Stripe (the
+ * PaymentIntent, the invoice this payment just settled, the subscription it started) and
+ * recorded only when every link holds (initialSendPixFacts). A failed read throws, so the
+ * webhook is redelivered and the idempotent fulfilment records it then.
+ */
+async function recordSendPixPurchase(
+  db: Db,
+  deps: PixPurchaseDeps,
+  pix: PixStripe,
+  payment: PixPayment,
+  attempt: Attempt,
+  subscriptionId: string,
+  invoiceId: string,
+  log: (message: string) => void,
+) {
+  if (!deps.advertisingConfig && !deps.googleConversionConfig) return;
+  const [paymentIntent, invoice, subscription] = await Promise.all([
+    pix.paymentIntents.retrieve(payment.paymentIntentId),
+    pix.invoices.retrieve(invoiceId),
+    deps.stripe.subscriptions.retrieve(subscriptionId, { expand: SUBSCRIPTION_EXPAND }),
+  ]);
+  const read = { payment, paymentIntent, invoice, subscription, attempt, livemode: deps.livemode };
+  const meta = initialSendPixFacts(read);
+  if (meta) await recordMetaPixPurchase(db, attempt, meta, deps.advertisingConfig);
+  const google = initialSendPixFacts({ ...read, anyRung: true });
+  if (google) await recordGooglePixPurchase(db, attempt, google, deps.googleConversionConfig);
+  if (!google) log(`pix ${payment.sessionId}: purchase not confirmed for advertising`);
 }

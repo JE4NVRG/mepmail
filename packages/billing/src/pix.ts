@@ -18,6 +18,8 @@ const PIX_INVOICE_METADATA_KEY = "mepmail_pix_invoice";
 const PIX_OVERAGE_METADATA_KEY = "mepmail_pix_overage";
 const PIX_COUPON_METADATA_KEY = "mepmail_pix_coupon";
 const PIX_INTERVAL_METADATA_KEY = "mepmail_pix_interval";
+/** send_start: the Send checkout attempt (advertising context) this payment belongs to. */
+const PIX_ATTEMPT_METADATA_KEY = "mepmail_pix_attempt";
 /** Days a Pix-collected renewal invoice stays payable before the plan falls past due. */
 export const PIX_DAYS_UNTIL_DUE = 5;
 /** Stripe's Pix limits: R$ 0,50 to R$ 3.000 per payment. */
@@ -74,6 +76,12 @@ export interface PixStripe {
       params: Stripe.RefundCreateParams,
       options?: Stripe.RequestOptions,
     ): Promise<Stripe.Refund>;
+  };
+  paymentIntents: {
+    retrieve(
+      id: string,
+      params?: Stripe.PaymentIntentRetrieveParams,
+    ): Promise<Stripe.PaymentIntent>;
   };
 }
 
@@ -151,6 +159,8 @@ export interface PixCheckoutInput {
   overagePriceId?: string;
   coupon?: string;
   interval?: "month" | "year";
+  /** send_start: the Send checkout attempt holding the advertising context. */
+  attemptId?: string;
   /** invoice: the open invoice this payment settles. */
   invoiceId?: string;
 }
@@ -171,7 +181,8 @@ export async function createPixCheckoutSession(
         !Number.isSafeInteger(input.quantity) ||
         (input.quantity as number) < 1 ||
         input.invoiceId)) ||
-    (input.kind === "invoice" && (!input.invoiceId || input.priceId))
+    (input.kind === "invoice" && (!input.invoiceId || input.priceId)) ||
+    (input.attemptId !== undefined && (input.kind !== "send_start" || !UUID.test(input.attemptId)))
   )
     throw new PixBillingError("invalid");
   const metadata: Record<string, string> = {
@@ -187,6 +198,7 @@ export async function createPixCheckoutSession(
     ...(input.overagePriceId ? { [PIX_OVERAGE_METADATA_KEY]: input.overagePriceId } : {}),
     ...(input.coupon ? { [PIX_COUPON_METADATA_KEY]: input.coupon } : {}),
     ...(input.interval ? { [PIX_INTERVAL_METADATA_KEY]: input.interval } : {}),
+    ...(input.attemptId ? { [PIX_ATTEMPT_METADATA_KEY]: input.attemptId } : {}),
   };
   const session = await stripe.checkout.sessions.create(
     {
@@ -228,6 +240,8 @@ export interface PixPayment {
   overagePriceId: string | null;
   coupon: string | null;
   interval: "month" | "year" | null;
+  /** send_start: the Send checkout attempt it was opened under (null before 0.152). */
+  attemptId: string | null;
 }
 
 /** The Pix session an event is about, before verification; null for every other event. */
@@ -287,6 +301,10 @@ export async function readPixPayment(
         : session.metadata?.[PIX_INTERVAL_METADATA_KEY] === "month"
           ? "month"
           : null,
+    attemptId:
+      kind === "send_start" && UUID.test(session.metadata?.[PIX_ATTEMPT_METADATA_KEY] ?? "")
+        ? (session.metadata?.[PIX_ATTEMPT_METADATA_KEY] as string)
+        : null,
   };
 }
 

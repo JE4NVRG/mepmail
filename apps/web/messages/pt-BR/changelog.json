@@ -24,6 +24,20 @@
   },
   "releases": [
     {
+      "version": "0.152",
+      "date": "2026-10-13",
+      "title": "Compra por Pix medida com o valor pago",
+      "summary": "A primeira assinatura do Envio paga por Pix passa a ser medida como compra nos anúncios, com o valor realmente pago em reais e só com o seu consentimento.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "A primeira compra do Envio paga por Pix é registrada uma vez, depois que a Stripe confirma o pagamento, com o valor pago (R$ 99 no primeiro mês da oferta). Renovações, Pix pendentes e o Correio não contam como compra nova."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.150",
       "date": "2026-10-13",
       "title": "Logos de remetente no Correio",
