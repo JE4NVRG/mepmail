@@ -68,6 +68,7 @@ export function parseMailboxInboundConfiguration(
         typeof item.prefix !== "string" ||
         !item.prefix.endsWith("/") ||
         Buffer.byteLength(item.prefix) > 512 ||
+        // biome-ignore lint/suspicious/noControlCharactersInRegex: a storage prefix must not carry control characters.
         /[\u0000-\u001f\u007f\\]/.test(item.prefix) ||
         item.prefix.startsWith("/") ||
         item.prefix.split("/").some((part) => part === "." || part === "..") ||

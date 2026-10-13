@@ -22,8 +22,7 @@ export function AuthArt() {
       ) : null}
       <span className={styles.mailMeta}>{t("art.subject")}</span>
       <span className={styles.mailHello}>
-        {t("art.hello")}{" "}
-        {name ?? <span className={styles.mailChip}>FIRST_NAME</span>}
+        {t("art.hello")} {name ?? <span className={styles.mailChip}>FIRST_NAME</span>}
       </span>
       <span className={styles.mailLine}>{t("art.line1")}</span>
       <span className={styles.mailLine}>{t("art.line2")}</span>
@@ -35,7 +34,12 @@ export function AuthArt() {
       <div className={styles.artFrame} role="img" aria-label={t("artAlt")}>
         <div className={styles.artStage} aria-hidden="true">
           {card()}
-          <svg className={styles.mailLinks} viewBox="0 0 60 200" preserveAspectRatio="none">
+          <svg
+            className={styles.mailLinks}
+            viewBox="0 0 60 200"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
             <path d="M0 100 C 30 100, 30 52, 60 52" vectorEffect="non-scaling-stroke" />
             <path d="M0 100 C 30 100, 30 148, 60 148" vectorEffect="non-scaling-stroke" />
           </svg>

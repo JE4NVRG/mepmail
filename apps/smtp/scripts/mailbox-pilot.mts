@@ -1,11 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MailboxPilotError, type MailboxActor } from "../../../packages/core/src/mailbox-pilot.js";
 import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
+import { type MailboxActor, MailboxPilotError } from "../../../packages/core/src/mailbox-pilot.js";
 import { pilotImageMetadata } from "../../../packages/core/src/mailbox-pilot-images.js";
 import { agent, human, openPilot, seedPilot } from "../test/mailbox-pilot-fixture.js";
 
@@ -214,7 +214,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       const name =
-        attachment.filename.replaceAll(/[\/\\\r\n\x00-\x1f]/g, "_").slice(0, 128) || "anexo";
+        attachment.filename.replaceAll(/[/\\\r\n\x00-\x1f]/g, "_").slice(0, 128) || "anexo";
       res.setHeader("Content-Type", "application/octet-stream");
       res.setHeader(
         "Content-Disposition",

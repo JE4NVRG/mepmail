@@ -6,7 +6,15 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/dist", "!**/.next", "!**/drizzle/meta", "!apps/smtp/vendor"]
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/.next",
+      "!**/drizzle/meta",
+      "!apps/smtp/vendor",
+      "!apps/web/public/desktop",
+      "!scripts/mailbox-launch-distdir.cjs"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -41,6 +49,43 @@
           "suspicious": {
             "noControlCharactersInRegex": "off"
           }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/public/**/*.svg"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noSvgWithoutTitle": "off"
+          },
+          "correctness": {
+            "noUnknownProperty": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/smtp/scripts/**"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useButtonType": "off",
+            "useValidAnchor": "off",
+            "useSemanticElements": "off"
+          },
+          "suspicious": {
+            "noControlCharactersInRegex": "off",
+            "useIterableCallbackReturn": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/docs/src/app/global.css"],
+      "css": {
+        "parser": {
+          "tailwindDirectives": true
         }
       }
     }

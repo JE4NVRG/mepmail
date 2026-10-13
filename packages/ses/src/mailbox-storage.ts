@@ -33,6 +33,7 @@ function safeKey(value: string) {
   return (
     value.length > 0 &&
     Buffer.byteLength(value) <= 1024 &&
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: object keys must not carry control characters.
     !/[\u0000-\u001f\u007f\\]/.test(value) &&
     !value.startsWith("/") &&
     !value.split("/").some((part) => part === "." || part === "..")

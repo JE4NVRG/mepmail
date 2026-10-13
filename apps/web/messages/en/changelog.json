@@ -133,9 +133,7 @@
         },
         {
           "kind": "fixed",
-          "items": [
-            "Editing an existing draft over MCP was refused."
-          ]
+          "items": ["Editing an existing draft over MCP was refused."]
         }
       ]
     },
@@ -161,9 +159,7 @@
         },
         {
           "kind": "fixed",
-          "items": [
-            "Agent listings with more than 50 messages per page returned an error."
-          ]
+          "items": ["Agent listings with more than 50 messages per page returned an error."]
         }
       ]
     },

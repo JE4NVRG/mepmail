@@ -12,7 +12,9 @@ import { useTRPC } from "@/lib/trpc";
 export function SendingPausedBanner() {
   const t = useTranslations("common.sendingPaused");
   const trpc = useTRPC();
-  const { data } = useQuery(trpc.system.sendingPaused.queryOptions(undefined, { staleTime: 60_000 }));
+  const { data } = useQuery(
+    trpc.system.sendingPaused.queryOptions(undefined, { staleTime: 60_000 }),
+  );
   if (!data) return null;
   return <NoticeStrip tone="warn" text={t("text")} />;
 }

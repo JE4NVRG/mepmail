@@ -10,15 +10,15 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
 import {
   grantInternalMailboxLicense,
-  revokeInternalMailboxLicense,
   type InternalMailboxGrant,
+  revokeInternalMailboxLicense,
 } from "../../../packages/core/src/mailbox-internal-license.js";
-import { createMailboxRegistry } from "../../../packages/core/src/mailbox-registry.js";
 import {
   importMailboxMime,
   readMailboxItem,
   saveMailboxDraft,
 } from "../../../packages/core/src/mailbox-private-store.js";
+import { createMailboxRegistry } from "../../../packages/core/src/mailbox-registry.js";
 import { mailboxServiceState } from "../../../packages/core/src/mailbox-service.js";
 import {
   queueMailboxDraft,

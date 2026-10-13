@@ -1,9 +1,9 @@
 import {
-  DeleteMessageBatchCommand,
-  ReceiveMessageCommand,
+  type DeleteMessageBatchCommand,
   type Message,
+  ReceiveMessageCommand,
 } from "@aws-sdk/client-sqs";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { pollSqsOnce } from "../src/sqs-poller.js";
 
 const TOPIC = "arn:aws:sns:us-east-1:123456789012:mepmail-events";

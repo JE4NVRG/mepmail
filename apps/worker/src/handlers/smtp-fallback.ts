@@ -20,7 +20,8 @@ export interface SmtpTransport {
 export function createSmtpFallback(url: string, transport?: SmtpTransport): SesSender {
   const parsed = new URL(url);
   const envelopeFrom = decodeURIComponent(parsed.username);
-  if (!envelopeFrom.includes("@")) throw new Error("SMTP_FALLBACK_URL user must be a mailbox address");
+  if (!envelopeFrom.includes("@"))
+    throw new Error("SMTP_FALLBACK_URL user must be a mailbox address");
   return smtpSender(transport ?? createTransport(url), "smtp-fallback:", () => envelopeFrom);
 }
 

@@ -3,10 +3,10 @@ import { and, asc, eq } from "drizzle-orm";
 import type Stripe from "stripe";
 import {
   isMailboxSubscription,
-  mailboxCheckoutSessionMatches,
-  recoverMailboxCheckoutSession,
   type MailboxBillingStripe,
   type MailboxCheckoutReadbackInput,
+  mailboxCheckoutSessionMatches,
+  recoverMailboxCheckoutSession,
 } from "./mailbox.js";
 import type { BillingStripe } from "./stripe.js";
 import { idOf, lockCustomer } from "./subscription.js";

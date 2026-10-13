@@ -88,9 +88,7 @@ it("keeps the hold and its flag once the counters are fixed, until an operator r
     cleared: 0,
     reviews: 0,
   });
-  expect(await flagsOf(noisy)).toMatchObject([
-    { status: "open", reason: "review", openedAt: NOW },
-  ]);
+  expect(await flagsOf(noisy)).toMatchObject([{ status: "open", reason: "review", openedAt: NOW }]);
   expect(
     (await db.select().from(schema.teamStandings)).find((s) => s.teamId === noisy),
   ).toMatchObject({ guardrail: "ok", complaintRate7d: 0, computedAt: later });

@@ -1,11 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
 import {
-  MailboxPilot,
   type MailboxActor,
+  MailboxPilot,
   type PilotMailbox,
 } from "../../../packages/core/src/mailbox-pilot.js";
-import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
 import { mailboxPilotMime } from "../src/mailbox-pilot-mime.js";
 
 export const human: MailboxActor = { teamId: "pilot-team", principalId: "pilot-human" };

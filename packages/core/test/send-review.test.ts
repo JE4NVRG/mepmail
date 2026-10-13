@@ -9,11 +9,11 @@ import { EnvKeyring } from "../src/crypto/keyring.js";
 import type { QuotaTeamRow } from "../src/plans.js";
 import {
   abuseProneTld,
+  CONTENT_HOLD_SCORE,
   disguisedWord,
   findDisguise,
   findImpersonation,
   foldText,
-  CONTENT_HOLD_SCORE,
   holdOnContentVerdict,
   holdReputationRuns,
   holdTeamForReview,
@@ -349,9 +349,9 @@ describe("new sender patterns", () => {
     ).toBe(false);
     const system = await youngTeam("system-site");
     await db.update(schema.teams).set({ plan: "system" }).where(eq(schema.teams.id, system));
-    expect(
-      await screenNewSender(db, { teamId: system, from: "a@sys.site", recipients: 500 }),
-    ).toBe(false);
+    expect(await screenNewSender(db, { teamId: system, from: "a@sys.site", recipients: 500 })).toBe(
+      false,
+    );
   });
 
   it("holds every send of a team whose guardrail paused, unless released this week", async () => {
@@ -428,7 +428,11 @@ describe("content verdict hold", () => {
   it("holds a young team on a near-certain verdict, even one an operator released", async () => {
     const teamId = await aged("content-young", 2);
     expect(
-      await holdOnContentVerdict(db, { teamId, score: CONTENT_HOLD_SCORE - 1, categories: ["scam"] }),
+      await holdOnContentVerdict(db, {
+        teamId,
+        score: CONTENT_HOLD_SCORE - 1,
+        categories: ["scam"],
+      }),
     ).toBe(false);
     await db
       .update(schema.teams)

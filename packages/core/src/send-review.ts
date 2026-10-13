@@ -557,7 +557,8 @@ async function newSenderFinding(
 ): Promise<string | null> {
   const address = senderAddress(input.from);
   const tld = abuseProneTld(address);
-  if (tld) return `Sending domain of ${address} is under .${tld}, a TLD abuse feeds rank as mostly malicious`;
+  if (tld)
+    return `Sending domain of ${address} is under .${tld}, a TLD abuse feeds rank as mostly malicious`;
   const recent = await db
     .selectDistinct({ address: sql<string>`${storedSenderAddress}` })
     .from(schema.emails)

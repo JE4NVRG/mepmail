@@ -133,9 +133,7 @@
         },
         {
           "kind": "fixed",
-          "items": [
-            "Editar um rascunho existente pelo MCP era recusado."
-          ]
+          "items": ["Editar um rascunho existente pelo MCP era recusado."]
         }
       ]
     },
@@ -161,9 +159,7 @@
         },
         {
           "kind": "fixed",
-          "items": [
-            "A listagem do agente com mais de 50 mensagens por página voltava erro."
-          ]
+          "items": ["A listagem do agente com mais de 50 mensagens por página voltava erro."]
         }
       ]
     },

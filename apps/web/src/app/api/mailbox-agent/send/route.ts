@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { mailboxAgentSendRequest, MAILBOX_AGENT_HEADERS } from "@/server/mailbox-agent";
+import { MAILBOX_AGENT_HEADERS, mailboxAgentSendRequest } from "@/server/mailbox-agent";
 
 const input = z
   .object({

@@ -27,7 +27,9 @@ describe("authentication illustration", () => {
     }
     expect(text).toMatch(/Ana[\s\S]*Sam/);
     expect(tree.find((node) => node.type === "figcaption")?.props.children).toBe("artCaption");
-    expect(tree.some((node) => ["video", "button", "img", "picture"].includes(String(node.type)))).toBe(false);
+    expect(
+      tree.some((node) => ["video", "button", "img", "picture"].includes(String(node.type))),
+    ).toBe(false);
   });
 
   it("needs no asset, video or playback code", () => {
