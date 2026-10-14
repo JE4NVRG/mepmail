@@ -31,7 +31,67 @@ export type MailboxConnectAccountError =
   | "conflict"
   | "limit"
   | "forbidden"
-  | "generic";
+  | "generic"
+  // From the Microsoft/Google sign-in, when it comes back to the Correio with an error.
+  | "cancelled"
+  | "expired"
+  | "unavailable"
+  | "oauth_failed"
+  | "oauth_incomplete"
+  | "other_account"
+  | "smtp_login_microsoft";
+
+export type MailboxConnectOAuth = { microsoft: boolean; google: boolean };
+
+/** The sign-in that connects an account without an app password (server route). */
+export function mailboxConnectOAuthHref(
+  provider: "microsoft" | "google",
+  options: { returnTo?: "/mail" | "/onboarding"; hint?: string } = {},
+) {
+  const params = new URLSearchParams({ return: options.returnTo ?? "/mail" });
+  const hint = options.hint?.trim().toLowerCase();
+  if (hint && EMAIL.test(hint)) params.set("hint", hint);
+  return `/api/mailboxes/external/oauth/${provider}/start?${params}`;
+}
+
+function MicrosoftMark() {
+  return (
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 21 21">
+      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+    </svg>
+  );
+}
+
+function GoogleMark() {
+  return (
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 48 48">
+      <path
+        fill="#FFC107"
+        d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.4-.4-3.5z"
+      />
+      <path
+        fill="#FF3D00"
+        d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"
+      />
+      <path
+        fill="#4CAF50"
+        d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"
+      />
+      <path
+        fill="#1976D2"
+        d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"
+      />
+    </svg>
+  );
+}
+
+/** The provider's mark on its sign-in button (brand colours, as each provider asks). */
+export function MailboxOAuthMark({ provider }: { provider: "microsoft" | "google" }) {
+  return provider === "microsoft" ? <MicrosoftMark /> : <GoogleMark />;
+}
 
 const ORDER: MailboxExternalPresetId[] = ["gmail", "icloud", "yahoo", "zoho", "outlook", "imap"];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -45,9 +105,18 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function MailboxConnectAccountDialog({
   close,
   connect,
+  oauth,
+  returnTo = "/mail",
+  initialError = null,
 }: {
   close: () => void;
   connect: (input: MailboxConnectAccountInput) => Promise<MailboxConnectAccountError | null>;
+  /** Which "Entrar com…" sign-ins the server offers (none: app passwords only). */
+  oauth?: MailboxConnectOAuth | undefined;
+  /** Where the sign-in comes back to (onboarding reuses this dialog). */
+  returnTo?: "/mail" | "/onboarding";
+  /** A sign-in that came back with an error opens the dialog showing it. */
+  initialError?: MailboxConnectAccountError | null;
 }) {
   const t = useTranslations("mailboxes-external");
   const common = useTranslations("mailboxes");
@@ -64,7 +133,7 @@ export function MailboxConnectAccountDialog({
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState<465 | 587>(465);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<MailboxConnectAccountError | null>(null);
+  const [error, setError] = useState<MailboxConnectAccountError | null>(initialError);
 
   useEffect(() => {
     dialog.current?.showModal();
@@ -130,6 +199,32 @@ export function MailboxConnectAccountDialog({
       </header>
       <form className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
         <p className={styles.hint}>{t("intro")}</p>
+        {oauth?.microsoft || oauth?.google ? (
+          <div className={styles.oauth}>
+            {oauth.microsoft ? (
+              <a
+                className={`ms-btn ${styles.oauthButton}`}
+                href={mailboxConnectOAuthHref("microsoft", { returnTo, hint: address })}
+              >
+                <MicrosoftMark />
+                {t("oauth.microsoft")}
+              </a>
+            ) : null}
+            {oauth.google ? (
+              <a
+                className={`ms-btn ${styles.oauthButton}`}
+                href={mailboxConnectOAuthHref("google", { returnTo, hint: address })}
+              >
+                <GoogleMark />
+                {t("oauth.google")}
+              </a>
+            ) : null}
+            <p className={styles.hint}>{t("oauth.hint")}</p>
+            <p className={styles.oauthOr}>
+              <span>{t("oauth.or")}</span>
+            </p>
+          </div>
+        ) : null}
         <label className={styles.field}>
           <span>{t("address")}</span>
           <input
@@ -163,7 +258,20 @@ export function MailboxConnectAccountDialog({
         </fieldset>
 
         {!preset.available ? (
-          <p className={styles.notice}>{t("outlookSoon")}</p>
+          provider === "outlook" && oauth?.microsoft ? (
+            <div className={styles.steps}>
+              <p>{t("oauth.outlook")}</p>
+              <a
+                className={`ms-btn ${styles.oauthButton}`}
+                href={mailboxConnectOAuthHref("microsoft", { returnTo, hint: address })}
+              >
+                <MicrosoftMark />
+                {t("oauth.microsoft")}
+              </a>
+            </div>
+          ) : (
+            <p className={styles.notice}>{t("outlookSoon")}</p>
+          )
         ) : (
           <>
             <div className={styles.steps}>

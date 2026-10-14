@@ -117,3 +117,89 @@
   flex: 1 1 220px;
   min-width: 0;
 }
+
+/* "Entrar com a Microsoft / o Google": above the app-password form, then "ou". */
+.oauth {
+  display: grid;
+  gap: 8px;
+}
+.oauthButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 10px;
+  background: var(--ms-panel-raised);
+  color: var(--ms-bone);
+  font-weight: 500;
+  text-decoration: none;
+}
+.oauthButton:hover,
+.oauthButton:focus-visible {
+  border-color: var(--ms-bone);
+  background: var(--ms-panel-raised);
+  color: var(--ms-bone);
+}
+.oauthOr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--ms-muted);
+}
+.oauthOr::before,
+.oauthOr::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--ms-line);
+}
+
+/* The Correio's first run: start from the address one already has. */
+.welcome {
+  box-sizing: border-box;
+  display: grid;
+  gap: 14px;
+  width: min(460px, 100%);
+  margin: 0 auto;
+  padding: 40px 20px;
+  text-align: center;
+}
+.welcome h2 {
+  margin: 0;
+  font-size: var(--ms-fs-section);
+  letter-spacing: -0.02em;
+}
+.welcome > p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ms-muted);
+}
+.welcomeActions {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+.welcomePoints {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--ms-muted);
+}
+.welcomePoints li::before {
+  content: "✓ ";
+  color: var(--ms-violet);
+}
+.welcomeDomain {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--ms-muted);
+}

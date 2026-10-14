@@ -24,6 +24,22 @@
   },
   "releases": [
     {
+      "version": "0.154",
+      "date": "2026-10-14",
+      "title": "Correio on your phone",
+      "summary": "The Correio now fits a phone screen and answers to touch: a floating compose button, a reply bar while reading, and swipe to archive.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "On a phone, Compose floats over the list, and an open message shows one row of actions with a reply bar at the bottom.",
+            "Touch gestures: swipe a message to archive it (with Undo), press and hold or tap the picture to select, and pull down to refresh.",
+            "Keyboard tips and the checkbox column stay out of the way on touch screens."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.153",
       "date": "2026-10-13",
       "title": "Prices in reais for Brazil",

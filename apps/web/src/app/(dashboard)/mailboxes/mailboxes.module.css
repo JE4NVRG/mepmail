@@ -3334,3 +3334,220 @@
   cursor: not-allowed;
   opacity: 0.45;
 }
+
+/* Phones and touch screens: a finger swipes a row to archive it, holds it (or taps its
+   picture) to select, and pulls the list down to refresh. Compose floats under the
+   thumb and the replies sit in a bar at the bottom of the reader. */
+.pullIndicator {
+  display: none;
+}
+@media (hover: none) and (pointer: coarse) {
+  /* Keyboard tips mean nothing without a keyboard. */
+  .coachStrip {
+    display: none;
+  }
+  /* Selecting starts from a row; the bar's checkbox shows while something is selected. */
+  .selectionToolbar:not([data-active]) > label {
+    display: none;
+  }
+  .rowQuickActions {
+    display: none;
+  }
+  .messageRows .messageRowOpen {
+    padding-left: 14px;
+  }
+  :global(html[data-avatars="off"]) .messageRows[data-selecting] .rowQuickActions {
+    display: flex;
+  }
+  :global(html[data-avatars="off"]) .messageRows[data-selecting] .messageRowOpen {
+    padding-left: 4px;
+  }
+  .messageRows .rowAvatar[data-checked] {
+    background: var(--ms-violet);
+    color: transparent;
+  }
+  .messageRows .rowAvatar[data-checked] > * {
+    display: none;
+  }
+  .messageRows .rowAvatar[data-checked]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 13px;
+    height: 7px;
+    border: solid #fff;
+    border-width: 0 0 2.5px 2.5px;
+    transform: translateY(-2px) rotate(-45deg);
+  }
+  .messageRow:has(.rowAvatar[data-checked]) {
+    background: var(--ms-panel-raised);
+  }
+
+  /* Swipe: the row slides with the finger over a band that shows what letting go does. */
+  .messageRow {
+    touch-action: pan-y;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .messageRow[data-swiping] > * {
+    transform: translateX(var(--swipe-x, 0px));
+    background: var(--ms-void);
+  }
+  .messageRow[data-settling] > * {
+    transition: transform 180ms ease-out;
+  }
+  .messageRow[data-swiping]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='4' rx='1'/%3E%3Cpath d='M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4'/%3E%3C/svg%3E")
+      no-repeat left 22px center / 22px;
+    background-color: color-mix(in srgb, var(--ms-violet) 40%, var(--ms-void));
+  }
+  .messageRow[data-swiping="left"]::before {
+    background-position: right 22px center;
+  }
+  .messageRow[data-armed]::before {
+    background-color: var(--ms-violet);
+  }
+
+  /* Pull to refresh: the indicator opens above the first row as the list is pulled. */
+  .pullIndicator {
+    display: grid;
+    place-items: center;
+    height: var(--pull, 0px);
+    overflow: hidden;
+    color: var(--ms-muted);
+    transition: height 160ms ease-out;
+  }
+  .listBody[data-pull="pulling"] .pullIndicator,
+  .listBody[data-pull="armed"] .pullIndicator {
+    transition: none;
+  }
+  .listBody[data-pull="armed"] .pullIndicator,
+  .listBody[data-pull="refreshing"] .pullIndicator {
+    color: var(--ms-violet);
+  }
+  .listBody[data-pull="armed"] .pullIndicator svg {
+    transform: rotate(180deg);
+    transition: transform 160ms ease-out;
+  }
+  .listBody[data-pull="refreshing"] .pullIndicator svg {
+    animation: pullSpin 0.8s linear infinite;
+  }
+}
+@keyframes pullSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@container (max-width: 620px) {
+  /* Compose floats over the list, as on every phone mail app; reading hides it. */
+  .contentToolbar .composeButton {
+    position: fixed;
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    z-index: 20;
+    min-height: 54px;
+    padding: 0 20px;
+    border-radius: 16px;
+    font-size: 14px;
+    box-shadow: 0 10px 28px rgb(0 0 0 / 0.35);
+  }
+  .contentWorkspace:has(.contentDetail[data-reading="true"]) .composeButton {
+    display: none;
+  }
+  /* Reading takes the whole screen: the list's bar steps aside (a notice still shows). */
+  .contentWorkspace:has(.contentDetail[data-reading="true"])
+  .contentToolbar:not(:has(.contentNotice)) {
+    display: none;
+  }
+  .contentWorkspace:has(.contentDetail[data-reading="true"])
+    .contentToolbar
+    > :not(.contentNotice) {
+    display: none;
+  }
+  .messageRows {
+    padding-bottom: 84px;
+  }
+
+  /* The reader: one row of actions on top (sideways scroll if it ever overflows) and
+     the replies in a bar under the thumb. */
+  .contentDetail .detailTop {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 0;
+    padding: 4px 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .contentDetail .detailTop::-webkit-scrollbar {
+    display: none;
+  }
+  .contentDetail .detailTop > .mobileBack {
+    margin-right: auto;
+    min-width: 44px;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .backLabel {
+    display: none;
+  }
+  .contentDetail .organizationActions {
+    order: 0;
+    flex: none;
+    gap: 0;
+  }
+  .contentDetail .detailTop .iconAction,
+  .contentDetail .detailTop .starButton {
+    min-width: 42px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .contentDetail .replyActions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 15;
+    display: flex;
+    gap: 4px;
+    width: auto;
+    margin: 0;
+    padding: 6px calc(8px + env(safe-area-inset-right, 0px))
+      calc(6px + env(safe-area-inset-bottom, 0px)) calc(8px + env(safe-area-inset-left, 0px));
+    background: var(--ms-panel);
+    border-top: 1px solid var(--ms-line);
+  }
+  .contentDetail .replyActions > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .contentDetail .replyActions > button {
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    min-height: 52px;
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+  .contentDetail .replyActions .narrowHidden {
+    display: inline;
+  }
+  .contentDetail:has(.replyActions) {
+    padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+  }
+}
+/* A notice (toast) at the bottom lifts what floats there: compose, the reply bar's room. */
+@media (max-width: 620px) {
+  :global(body):has(:global(.ms-toast)) .contentToolbar .composeButton {
+    bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  }
+  :global(body):has(.contentDetail[data-reading="true"] .replyActions) :global(.ms-toast) {
+    margin-bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+  }
+}

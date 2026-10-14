@@ -106,6 +106,7 @@ import { MailboxSenderBar } from "./mailbox-sender-bar";
 import { MailboxSenderLogo } from "./mailbox-sender-logo";
 import { MailboxSmartTabs } from "./mailbox-smart-tabs";
 import { MailboxTimeMenu, type MailboxTimeMenuHandle } from "./mailbox-time-menu";
+import { usePullToRefresh, useRowGestures, useTouchInput } from "./mailbox-touch";
 import { MailboxTranslation } from "./mailbox-translation";
 import { MailboxViewMenu } from "./mailbox-view-menu";
 import styles from "./mailboxes.module.css";
@@ -2008,6 +2009,41 @@ export function MailboxContentView({
       : null;
   const organizationScope = `${folder}:${customFolderId ?? ""}:${selected?.id ?? ""}:${mailboxKind ?? ""}`;
   const previousOrganizationScope = useRef(organizationScope);
+  // On a phone: a row swiped sideways is archived (back to the Inbox from Arquivo), a long
+  // press or a tap on its picture selects it, and while anything is selected a tap selects.
+  const touch = useTouchInput();
+  const touchSelecting = touch && checkedRows.length > 0;
+  const toggleChecked = (key: string) =>
+    setCheckedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const swipeTarget = (key: string) => {
+    const row = movableRows.find((entry) => rowKey(entry) === key);
+    return row &&
+      folder !== "trash" &&
+      row.kind !== "draft" &&
+      !row.trashedAt &&
+      row.deliveryFolder === "inbox" &&
+      !mailboxContentBlocked(row)
+      ? row
+      : null;
+  };
+  const rowGestures = useRowGestures({
+    enabled: touch && !bulkBusy,
+    canSwipe: (key) => !!swipeTarget(key),
+    onSwipe: (key) => {
+      const row = swipeTarget(key);
+      if (row)
+        void organizeRows([row], row.archivedAt ? { folder: "inbox" } : { folder: "archive" });
+    },
+    onLongPress: (key) => {
+      if (movableRows.some((entry) => rowKey(entry) === key)) toggleChecked(key);
+    },
+  });
+  usePullToRefresh(listBody, { enabled: touch, onRefresh: refresh });
   useEffect(() => {
     if (previousOrganizationScope.current !== organizationScope) {
       previousOrganizationScope.current = organizationScope;
@@ -3227,7 +3263,11 @@ export function MailboxContentView({
               </button>
             ) : null}
             {canCompose ? (
-              <button type="button" className="ms-btn ms-btn-primary" onClick={newDraft}>
+              <button
+                type="button"
+                className={`ms-btn ms-btn-primary ${styles.composeButton}`}
+                onClick={newDraft}
+              >
                 <MailboxFolderIcon name="drafts" /> {t("compose")}
               </button>
             ) : null}
@@ -3570,6 +3610,11 @@ export function MailboxContentView({
                 if (freshCount && event.currentTarget.scrollTop < 40) setFreshCount(0);
               }}
             >
+              {touch ? (
+                <div className={styles.pullIndicator} aria-hidden="true">
+                  <MailboxFolderIcon name="refresh" />
+                </div>
+              ) : null}
               {freshCount ? (
                 <button
                   type="button"
@@ -3594,7 +3639,17 @@ export function MailboxContentView({
                   {t("loading")}
                 </p>
               ) : rows.length ? (
-                <div className={styles.messageRows}>
+                // biome-ignore lint/a11y/noStaticElementInteractions: swiping or holding a row is a touch shortcut; archiving and selecting stay reachable as buttons and checkboxes.
+                <div
+                  className={styles.messageRows}
+                  data-selecting={touchSelecting || undefined}
+                  onPointerDown={rowGestures.onPointerDown}
+                  onPointerMove={rowGestures.onPointerMove}
+                  onPointerUp={rowGestures.onPointerUp}
+                  onPointerCancel={rowGestures.onPointerCancel}
+                  onClickCapture={rowGestures.onClickCapture}
+                  onContextMenu={touch ? rowGestures.onContextMenu : undefined}
+                >
                   {rows.map((row, index) => {
                     const blocked = mailboxContentBlocked(row);
                     const sectionAt = (at: number) =>
@@ -3640,6 +3695,7 @@ export function MailboxContentView({
                         {/* biome-ignore lint/a11y/noStaticElementInteractions: dragging a row is a pointer shortcut; every move it makes is also a keyboard-reachable button (row checkbox, bulk and reader actions). */}
                         <div
                           className={styles.messageRow}
+                          data-row-key={rowKey(row)}
                           data-unread={unread || undefined}
                           draggable={draggableRow && htmlDropsWork()}
                           onDragStart={(event) => {
@@ -3686,7 +3742,16 @@ export function MailboxContentView({
                             aria-pressed={
                               selection?.id === row.id && selection?.mailboxId === row.mailboxId
                             }
-                            onClick={() => openRow(row)}
+                            onClick={(event) => {
+                              if (
+                                touch &&
+                                (touchSelecting ||
+                                  (event.target as Element).closest("[data-row-avatar]")) &&
+                                movableRows.some((entry) => rowKey(entry) === rowKey(row))
+                              )
+                                toggleChecked(rowKey(row));
+                              else openRow(row);
+                            }}
                             onPointerEnter={() => hoverRow(row)}
                             onPointerLeave={leaveRow}
                             onFocus={() => prefetchRow(row)}
@@ -3694,6 +3759,8 @@ export function MailboxContentView({
                             {prefs.showAvatars ? (
                               <span
                                 className={styles.rowAvatar}
+                                data-row-avatar
+                                data-checked={checkedIds.has(rowKey(row)) || undefined}
                                 aria-hidden="true"
                                 style={
                                   {
@@ -3942,9 +4009,10 @@ export function MailboxContentView({
                 <button
                   type="button"
                   className={`ms-btn ms-btn-ghost ${styles.mobileBack}`}
+                  aria-label={t("back")}
                   onClick={backToList}
                 >
-                  ← {t("back")}
+                  ← <span className={styles.backLabel}>{t("back")}</span>
                 </button>
                 {item || blockedRow || !(selectedBox ?? selected) ? null : (
                   <span title={selectedBox?.address ?? selected?.address}>

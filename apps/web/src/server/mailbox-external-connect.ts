@@ -88,14 +88,21 @@ async function smtpAddress(host: string): Promise<string> {
   return answers[0]!.address;
 }
 
-/** IMAP LOGIN, then SMTP AUTH; throws the first door that stays shut. */
+/**
+ * IMAP LOGIN, then SMTP AUTH; throws the first door that stays shut. An app password signs
+ * in as typed; an OAuth access token (from "Entrar com a Microsoft/o Google") uses XOAUTH2.
+ */
 export async function checkMailboxExternalAccount(
   servers: MailboxExternalServers,
-  password: string,
+  credential: string | { accessToken: string },
 ): Promise<void> {
+  const login =
+    typeof credential === "string"
+      ? { password: credential }
+      : { accessToken: credential.accessToken };
   try {
     const session = await openImap(
-      { host: servers.imapHost, port: 993, username: servers.username, password },
+      { host: servers.imapHost, port: 993, username: servers.username, ...login },
       { timeoutMs: 15_000 },
     );
     await session.logout();
@@ -116,7 +123,10 @@ export async function checkMailboxExternalAccount(
     port: servers.smtpPort,
     secure: servers.smtpSecurity === "tls",
     requireTLS: servers.smtpSecurity === "starttls",
-    auth: { user: servers.username, pass: password },
+    auth:
+      "accessToken" in login
+        ? { type: "OAuth2", user: servers.username, accessToken: login.accessToken }
+        : { user: servers.username, pass: login.password },
     tls: { servername: servers.smtpHost, minVersion: "TLSv1.2", rejectUnauthorized: true },
     connectionTimeout: 15_000,
     greetingTimeout: 15_000,

@@ -4,6 +4,7 @@ import {
   getMailboxExternalAccount,
   MailboxExternalError,
   MailboxServiceError,
+  mailboxExternalOAuthAvailable,
   replaceMailboxExternalSecret,
   requestMailboxExternalSync,
 } from "@millionsend/core";
@@ -83,7 +84,12 @@ const servers = {
 };
 
 export const mailboxExternalRouter = router({
-  available: teamProcedure.query(({ ctx }) => ({ open: mailboxExternalOpen(ctx.teamId) })),
+  available: teamProcedure.query(({ ctx }) => {
+    const open = mailboxExternalOpen(ctx.teamId);
+    // "Entrar com a Microsoft / o Google" only where accounts may be connected at all.
+    const oauth = mailboxExternalOAuthAvailable();
+    return { open, oauth: { microsoft: open && oauth.microsoft, google: open && oauth.google } };
+  }),
   connect: open
     .input(
       z

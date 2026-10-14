@@ -24,6 +24,22 @@
   },
   "releases": [
     {
+      "version": "0.154",
+      "date": "2026-10-14",
+      "title": "Correio no celular",
+      "summary": "O Correio agora cabe na tela do celular e responde ao toque: botão de escrever flutuante, barra de resposta na leitura e deslizar para arquivar.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "No celular, o botão Escrever flutua sobre a lista, e a mensagem aberta mostra uma linha de ações com a barra de resposta embaixo.",
+            "Gestos de toque: deslize uma mensagem para arquivar (com Desfazer), segure ou toque na foto para selecionar, e puxe para baixo para atualizar.",
+            "As dicas de teclado e a coluna de seleção saem do caminho em telas de toque."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.153",
       "date": "2026-10-13",
       "title": "Preços em reais para o Brasil",

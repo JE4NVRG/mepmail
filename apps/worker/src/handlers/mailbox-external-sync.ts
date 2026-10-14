@@ -3,8 +3,10 @@ import {
   heldMailboxExternalTeams,
   ImapError,
   type Keyring,
+  MailboxExternalOAuthError,
   MailboxServiceError,
   type MailboxTransportMimeAdapter,
+  mailboxExternalCredential,
   mailboxExternalSourceId,
   openImap,
   openMailboxExternalAccount,
@@ -34,6 +36,8 @@ export async function syncMailboxExternalAccount(
     mime: MailboxTransportMimeAdapter;
     senderKey?: Buffer;
     open?: typeof openImap;
+    /** How the account signs in (tests pass a fake; OAuth accounts refresh a token). */
+    credential?: typeof mailboxExternalCredential;
     now?: () => Date;
   },
 ): Promise<"done" | "more" | "held" | "auth_failed" | "error" | "gone"> {
@@ -50,11 +54,23 @@ export async function syncMailboxExternalAccount(
   }
   let session: Awaited<ReturnType<typeof openImap>>;
   try {
+    // An OAuth account trades its refresh token for an access token first (XOAUTH2).
+    const credential = await (deps.credential ?? mailboxExternalCredential)(db, keyring, account);
     session = await (deps.open ?? openImap)(
-      { host: account.imapHost, port: 993, username: account.username, password: account.secret },
+      { host: account.imapHost, port: 993, username: account.username, ...credential },
       { timeoutMs: 60_000, maxLiteralBytes: MAX_MESSAGE_BYTES },
     );
   } catch (error) {
+    if (error instanceof MailboxExternalOAuthError) {
+      // A refused grant waits for the person to sign in again; anything else retries.
+      const refused = error.reason === "invalid_grant" || error.reason === "unconfigured";
+      await finishMailboxExternalSync(db, mailboxId, {
+        ok: false,
+        status: refused ? "auth_failed" : "error",
+        error: refused ? "oauth_refused" : "oauth_unavailable",
+      });
+      return refused ? "auth_failed" : "error";
+    }
     const reason = error instanceof ImapError ? error.reason : "network";
     await finishMailboxExternalSync(db, mailboxId, {
       ok: false,

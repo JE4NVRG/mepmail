@@ -44,7 +44,14 @@
     "conflict": "That account is already connected on this team, or the address is already a Mail mailbox.",
     "forbidden": "You can't connect accounts on this team.",
     "generic": "Couldn't connect right now. Try again.",
-    "limit": "You've connected the most external accounts allowed (3). Disconnect one to connect another."
+    "limit": "You've connected the most external accounts allowed (3). Disconnect one to connect another.",
+    "cancelled": "The sign-in was cancelled. Try again whenever you like.",
+    "expired": "The sign-in took too long or was opened in another tab. Start again here.",
+    "unavailable": "Connecting accounts isn't available right now.",
+    "oauth_failed": "The provider didn't finish the sign-in. Try again in a moment.",
+    "oauth_incomplete": "The provider didn't grant access to the mailbox. On the consent screen, allow every permission asked.",
+    "other_account": "You signed in with a different account. Sign in with this mailbox's address.",
+    "smtp_login_microsoft": "Microsoft allowed reading, but sending (SMTP) is off for this account. For work or school accounts, an admin must turn on \"Authenticated SMTP\"."
   },
   "status": {
     "loading": "Checking the account…",
@@ -70,7 +77,38 @@
       "imap_network": "Couldn't reach the IMAP server right now.",
       "smtp_network": "Couldn't reach the SMTP server right now.",
       "generic": "Couldn't save right now. Try again."
+    },
+    "oauthRefused": {
+      "microsoft": "Microsoft asked you to sign in again (access was revoked, expired, or the password changed).",
+      "google": "Google asked you to sign in again (access was revoked, expired, or the password changed)."
+    },
+    "oauthConnected": {
+      "microsoft": "Connected with the Microsoft sign-in.",
+      "google": "Connected with the Google sign-in."
+    },
+    "signInAgain": {
+      "microsoft": "Sign in again with Microsoft",
+      "google": "Sign in again with Google"
     }
   },
-  "badge": "External account"
+  "badge": "External account",
+  "oauth": {
+    "microsoft": "Continue with Microsoft",
+    "google": "Continue with Google",
+    "hint": "No app password: you approve it on the provider's site and can remove access anytime.",
+    "or": "or connect with an app password",
+    "outlook": "Hotmail, Outlook.com and Microsoft 365 connect with the Microsoft sign-in.",
+    "connected": "Account connected. Messages from the last 30 days are arriving.",
+    "reconnected": "Done: the account is syncing again."
+  },
+  "welcome": {
+    "title": "Start with the email you already have",
+    "body": "Connect your Outlook, Hotmail, Gmail, iCloud or Yahoo and read and reply to everything here, next to your agents. Replies go out through that account, with your address.",
+    "appPassword": "Gmail, iCloud, Yahoo or other (app password)",
+    "pointFree": "Free, no plan and no DNS changes",
+    "pointPrivate": "Only you see this mailbox; the password stays encrypted",
+    "pointProvider": "Nothing is deleted or marked read at the provider",
+    "domain": "Have your own domain?",
+    "createDomain": "Create a mailbox on my domain"
+  }
 }

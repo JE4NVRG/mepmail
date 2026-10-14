@@ -452,6 +452,7 @@ export {
   MailboxExternalError,
   type MailboxExternalErrorCode,
   type MailboxExternalServersInput,
+  mailboxExternalCredential,
   mailboxExternalSourceId,
   markMailboxExternalAuthFailed,
   openMailboxExternalAccount,
@@ -466,6 +467,22 @@ export {
   mailboxExternalUsagePeriod,
   mailboxIsExternal,
 } from "./mailbox-external-limits.js";
+export {
+  exchangeMailboxExternalOAuthCode,
+  MailboxExternalOAuthError,
+  type MailboxExternalOAuthFailure,
+  type MailboxExternalOAuthGrant,
+  type MailboxExternalOAuthProvider,
+  mailboxExternalOAuthAuth,
+  mailboxExternalOAuthAuthorizeUrl,
+  mailboxExternalOAuthAvailable,
+  mailboxExternalOAuthPkce,
+  mailboxExternalOAuthProviderOf,
+  mailboxExternalOAuthSecret,
+  mailboxExternalOAuthServers,
+  readMailboxExternalOAuthSecret,
+  refreshMailboxExternalOAuthToken,
+} from "./mailbox-external-oauth.js";
 export {
   MAILBOX_EXTERNAL_PRESETS,
   type MailboxExternalPreset,

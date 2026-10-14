@@ -54,6 +54,7 @@ import {
 } from "./mailbox-content-view";
 import { deletionDate, MailboxDeletionSection } from "./mailbox-deletion-section";
 import { MailboxExternalStatus } from "./mailbox-external-status";
+import { MailboxFirstRun } from "./mailbox-first-run";
 import { MailboxFolderDialog } from "./mailbox-folder-dialog";
 import { type FolderEditorState, MailboxFolderEditor } from "./mailbox-folder-editor";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
@@ -472,6 +473,7 @@ export function MailboxesView({
   );
   const canConnectExternal = externalAvailable.data?.open === true;
   const [connectOpen, setConnectOpen] = useState(false);
+  const [connectError, setConnectError] = useState<MailboxConnectAccountError | null>(null);
   const connectExternal = useMutation(
     trpc.mailboxExternal.connect.mutationOptions({ retry: false }),
   );
@@ -922,6 +924,56 @@ export function MailboxesView({
     setFolderDialog(null);
     if (folder === "custom") setFolder("inbox");
   }
+  // Back from "Entrar com a Microsoft / o Google" (?external=…): say how it went, open the
+  // new account, or reopen the dialog with the reason; the address bar is cleaned at once.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, on arrival.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const outcome = params.get("external");
+    if (!outcome) return;
+    const mailboxId = params.get("mailbox");
+    const reason = params.get("reason") ?? "";
+    const provider = params.get("provider");
+    for (const name of ["external", "mailbox", "reason", "provider"]) params.delete(name);
+    const query = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+    );
+    if ((outcome === "connected" || outcome === "reconnected") && mailboxId) {
+      toast(tExternal(`oauth.${outcome}`), "success");
+      void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
+      setMailboxKind("all");
+      selectMailbox(mailboxId);
+      return;
+    }
+    if (outcome !== "error") return;
+    const known: MailboxConnectAccountError[] = [
+      "cancelled",
+      "expired",
+      "unavailable",
+      "provider_unavailable",
+      "oauth_failed",
+      "oauth_incomplete",
+      "other_account",
+      "conflict",
+      "limit",
+      "forbidden",
+      "imap_login",
+      "imap_network",
+      "smtp_login",
+      "smtp_network",
+      "invalid_server",
+    ];
+    const error = known.includes(reason as MailboxConnectAccountError)
+      ? (reason as MailboxConnectAccountError)
+      : "generic";
+    setConnectError(
+      error === "smtp_login" && provider === "microsoft" ? "smtp_login_microsoft" : error,
+    );
+    setConnectOpen(true);
+  }, []);
   function chooseFolder(next: MailboxFolder, id: string | null = null) {
     setRailOpen(false);
     selectItem(null);
@@ -1355,64 +1407,79 @@ export function MailboxesView({
               </button>
             </div>
             <div className={styles.registryState}>
-              <div className={styles.hero}>
-                <NavGlyph name="emails" hovered={false} />
-                <h2>
-                  {selected?.label ??
-                    t(mailboxKind === "all" ? "emptyTitle" : `scope.empty.${mailboxKind}.title`)}
-                </h2>
-                {selected ? (
-                  <>
-                    <p className={styles.address}>{selected.address}</p>
-                    <span className={styles.tag}>
-                      {selected.deleteAfter ? t("deletion.tag") : t(selected.status)}
-                    </span>
-                    <p>
-                      {selected.deleteAfter
-                        ? t("deletion.heroBody", {
-                            date: deletionDate(selected.deleteAfter, locale),
-                          })
-                        : t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}
-                    </p>
-                    {!selected.ownerActive ? (
-                      <p className={styles.hint}>{t("ownerMissing")}</p>
-                    ) : null}
-                    {!selected.canRead ? (
-                      <p className={styles.hint}>{t("managementOnly")}</p>
-                    ) : null}
-                    {registry.data?.canManage ? (
-                      <button
-                        type="button"
-                        className="ms-btn"
-                        disabled={!options.data}
-                        onClick={() => setDialog("edit")}
-                      >
-                        {t("manage")}
-                      </button>
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    <p>
-                      {t(mailboxKind === "all" ? "emptyBody" : `scope.empty.${mailboxKind}.body`)}
-                    </p>
-                    {registry.data?.canManage && options.data ? (
-                      <button
-                        type="button"
-                        className="ms-btn ms-btn-primary"
-                        onClick={() => setDialog("new")}
-                      >
-                        {t("createFirst")}
-                      </button>
-                    ) : null}
-                    {canConnectExternal ? (
-                      <button type="button" className="ms-btn" onClick={() => setConnectOpen(true)}>
-                        {tExternal("action")}
-                      </button>
-                    ) : null}
-                  </>
-                )}
-              </div>
+              {/* First run with nothing here yet: start from the address one already has. */}
+              {!selected && mailboxKind === "all" && !boxes.length && canConnectExternal ? (
+                <MailboxFirstRun
+                  oauth={externalAvailable.data?.oauth}
+                  connect={() => setConnectOpen(true)}
+                  create={
+                    registry.data?.canManage && options.data ? () => setDialog("new") : undefined
+                  }
+                />
+              ) : (
+                <div className={styles.hero}>
+                  <NavGlyph name="emails" hovered={false} />
+                  <h2>
+                    {selected?.label ??
+                      t(mailboxKind === "all" ? "emptyTitle" : `scope.empty.${mailboxKind}.title`)}
+                  </h2>
+                  {selected ? (
+                    <>
+                      <p className={styles.address}>{selected.address}</p>
+                      <span className={styles.tag}>
+                        {selected.deleteAfter ? t("deletion.tag") : t(selected.status)}
+                      </span>
+                      <p>
+                        {selected.deleteAfter
+                          ? t("deletion.heroBody", {
+                              date: deletionDate(selected.deleteAfter, locale),
+                            })
+                          : t(selected.status === "suspended" ? "pausedBody" : "preparingBody")}
+                      </p>
+                      {!selected.ownerActive ? (
+                        <p className={styles.hint}>{t("ownerMissing")}</p>
+                      ) : null}
+                      {!selected.canRead ? (
+                        <p className={styles.hint}>{t("managementOnly")}</p>
+                      ) : null}
+                      {registry.data?.canManage ? (
+                        <button
+                          type="button"
+                          className="ms-btn"
+                          disabled={!options.data}
+                          onClick={() => setDialog("edit")}
+                        >
+                          {t("manage")}
+                        </button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        {t(mailboxKind === "all" ? "emptyBody" : `scope.empty.${mailboxKind}.body`)}
+                      </p>
+                      {registry.data?.canManage && options.data ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-primary"
+                          onClick={() => setDialog("new")}
+                        >
+                          {t("createFirst")}
+                        </button>
+                      ) : null}
+                      {canConnectExternal ? (
+                        <button
+                          type="button"
+                          className="ms-btn"
+                          onClick={() => setConnectOpen(true)}
+                        >
+                          {tExternal("action")}
+                        </button>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1457,7 +1524,12 @@ export function MailboxesView({
       ) : null}
       {connectOpen ? (
         <MailboxConnectAccountDialog
-          close={() => setConnectOpen(false)}
+          oauth={externalAvailable.data?.oauth}
+          initialError={connectError}
+          close={() => {
+            setConnectOpen(false);
+            setConnectError(null);
+          }}
           connect={async (input): Promise<MailboxConnectAccountError | null> => {
             try {
               const created = await connectExternal.mutateAsync(input);

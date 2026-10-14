@@ -4,6 +4,13 @@ import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
 import { decryptPayload, encryptPayload } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
 import { assertMailboxExternalStorage, mailboxExternalLimits } from "./mailbox-external-limits.js";
+import {
+  MailboxExternalOAuthError,
+  mailboxExternalOAuthProviderOf,
+  mailboxExternalOAuthSecret,
+  readMailboxExternalOAuthSecret,
+  refreshMailboxExternalOAuthToken,
+} from "./mailbox-external-oauth.js";
 import type { MailboxExternalPresetId } from "./mailbox-external-providers.js";
 import { MailboxContentError } from "./mailbox-private-store.js";
 import { deriveMailboxRuleKey, mailboxRuleFor } from "./mailbox-rules.js";
@@ -42,6 +49,8 @@ interface Actor {
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** An app password, or an OAuth refresh token in its JSON wrapper (Microsoft's run long). */
+const SECRET_MAX = 4000;
 /** Between rounds for one account; the cron picks accounts whose time has come. */
 export const MAILBOX_EXTERNAL_SYNC_EVERY_MS = 2 * 60_000;
 /** How long a claimed round may run before another worker may take the account. */
@@ -95,13 +104,20 @@ export async function createMailboxExternalAccount(
   db: Db,
   keyring: Keyring,
   actor: Actor,
-  input: { address: string; label: string; servers: MailboxExternalServersInput; secret: string },
+  input: {
+    address: string;
+    label: string;
+    servers: MailboxExternalServersInput;
+    secret: string;
+    /** How the secret signs in: an app password (default) or an OAuth refresh token. */
+    auth?: "password" | "oauth_google" | "oauth_microsoft";
+  },
 ): Promise<{ mailboxId: string }> {
   const address = input.address.trim().toLowerCase();
   const label = input.label.trim();
   if (!EMAIL.test(address) || address.length > 254 || !label || label.length > 80)
     throw new MailboxExternalError("invalid");
-  if (!input.secret || input.secret.length > 2048) throw new MailboxExternalError("invalid");
+  if (!input.secret || input.secret.length > SECRET_MAX) throw new MailboxExternalError("invalid");
   return db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
     const member = await teamMember(tx, actor);
@@ -152,6 +168,7 @@ export async function createMailboxExternalAccount(
       mailboxId: box.id,
       teamId: actor.teamId,
       provider: input.servers.provider,
+      auth: input.auth ?? "password",
       imapHost: input.servers.imapHost,
       imapPort: 993,
       smtpHost: input.servers.smtpHost,
@@ -214,7 +231,7 @@ export async function replaceMailboxExternalSecret(
   actor: Actor,
   input: { mailboxId: string; secret: string },
 ) {
-  if (!input.secret || input.secret.length > 2048) throw new MailboxExternalError("invalid");
+  if (!input.secret || input.secret.length > SECRET_MAX) throw new MailboxExternalError("invalid");
   await db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
     await ownedAccount(tx, actor, input.mailboxId, true);
@@ -333,6 +350,7 @@ export async function openMailboxExternalAccount(db: Db, keyring: Keyring, mailb
     ownerUserId: row.ownerUserId,
     mailboxStatus: row.status,
     provider: row.account.provider,
+    auth: row.account.auth,
     imapHost: row.account.imapHost,
     smtpHost: row.account.smtpHost,
     smtpPort: row.account.smtpPort as 465 | 587,
@@ -341,6 +359,52 @@ export async function openMailboxExternalAccount(db: Db, keyring: Keyring, mailb
     syncState: row.account.syncState,
     secret,
   };
+}
+
+/** Access tokens this process holds, per account, tied to the refresh token they came from. */
+const accessTokens = new Map<string, { token: string; expiresAt: number; refresh: string }>();
+
+/**
+ * What IMAP and SMTP sign in with: the app password, or for an OAuth account a short
+ * access token (kept in memory until two minutes before it expires). A refresh token the
+ * provider rotates is sealed again at once. A refused grant throws
+ * MailboxExternalOAuthError("invalid_grant"): the person must sign in again.
+ */
+export async function mailboxExternalCredential(
+  db: Db,
+  keyring: Keyring,
+  account: { mailboxId: string; teamId: string; auth: string; secret: string },
+  refresh = refreshMailboxExternalOAuthToken,
+  now = Date.now,
+): Promise<{ password: string } | { accessToken: string }> {
+  const provider = mailboxExternalOAuthProviderOf(account.auth);
+  if (!provider) return { password: account.secret };
+  const stored = readMailboxExternalOAuthSecret(account.secret);
+  if (!stored) throw new MailboxExternalOAuthError("invalid_grant", "unreadable");
+  const cached = accessTokens.get(account.mailboxId);
+  if (cached && cached.refresh === stored && cached.expiresAt - now() > 120_000)
+    return { accessToken: cached.token };
+  const fresh = await refresh(provider, stored);
+  if (fresh.refreshToken !== stored)
+    await db
+      .update(schema.mailboxExternalAccounts)
+      .set({
+        ...(await sealSecret(
+          keyring,
+          account.teamId,
+          account.mailboxId,
+          mailboxExternalOAuthSecret(fresh.refreshToken),
+        )),
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.mailboxExternalAccounts.mailboxId, account.mailboxId));
+  if (accessTokens.size >= 5000) accessTokens.clear();
+  accessTokens.set(account.mailboxId, {
+    token: fresh.accessToken,
+    expiresAt: fresh.expiresAt.getTime(),
+    refresh: fresh.refreshToken,
+  });
+  return { accessToken: fresh.accessToken };
 }
 
 /** The end of a round: where the INBOX stands, how it went, and when to come back. */

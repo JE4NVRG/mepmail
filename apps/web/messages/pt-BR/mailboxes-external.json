@@ -44,7 +44,14 @@
     "conflict": "Essa conta já está conectada nesta equipe, ou o endereço já é uma caixa do Correio.",
     "forbidden": "Você não pode conectar contas nesta equipe.",
     "generic": "Não foi possível conectar agora. Tente de novo.",
-    "limit": "Você já conectou o máximo de contas externas (3). Desconecte uma para conectar outra."
+    "limit": "Você já conectou o máximo de contas externas (3). Desconecte uma para conectar outra.",
+    "cancelled": "O login foi cancelado. Quando quiser, tente de novo.",
+    "expired": "O login demorou demais ou foi aberto em outra aba. Comece de novo por aqui.",
+    "unavailable": "Conectar contas não está disponível agora.",
+    "oauth_failed": "O provedor não concluiu o login. Tente de novo em instantes.",
+    "oauth_incomplete": "O provedor não liberou o acesso ao e-mail. Na tela de autorização, marque todas as permissões pedidas.",
+    "other_account": "Você entrou com outra conta. Entre com o mesmo endereço desta caixa.",
+    "smtp_login_microsoft": "A Microsoft liberou a leitura, mas o envio (SMTP) está desligado para esta conta. Em contas de trabalho ou escola, o administrador precisa liberar o \"SMTP autenticado\"."
   },
   "status": {
     "loading": "Verificando a conta…",
@@ -70,7 +77,38 @@
       "imap_network": "Não deu para falar com o servidor IMAP agora.",
       "smtp_network": "Não deu para falar com o servidor SMTP agora.",
       "generic": "Não foi possível salvar agora. Tente de novo."
+    },
+    "oauthRefused": {
+      "microsoft": "A Microsoft pediu para você entrar de novo (o acesso foi revogado, expirou ou a senha mudou).",
+      "google": "O Google pediu para você entrar de novo (o acesso foi revogado, expirou ou a senha mudou)."
+    },
+    "oauthConnected": {
+      "microsoft": "Conectada com o login da Microsoft.",
+      "google": "Conectada com o login do Google."
+    },
+    "signInAgain": {
+      "microsoft": "Entrar de novo com a Microsoft",
+      "google": "Entrar de novo com o Google"
     }
   },
-  "badge": "Conta externa"
+  "badge": "Conta externa",
+  "oauth": {
+    "microsoft": "Entrar com a Microsoft",
+    "google": "Entrar com o Google",
+    "hint": "Sem senha de app: você autoriza no site do provedor e pode tirar o acesso quando quiser.",
+    "or": "ou conecte com uma senha de app",
+    "outlook": "Hotmail, Outlook.com e Microsoft 365 entram com o login da Microsoft.",
+    "connected": "Conta conectada. As mensagens dos últimos 30 dias estão chegando.",
+    "reconnected": "Pronto: a conta voltou a sincronizar."
+  },
+  "welcome": {
+    "title": "Comece pelo e-mail que você já tem",
+    "body": "Conecte seu Outlook, Hotmail, Gmail, iCloud ou Yahoo e leia e responda tudo aqui, ao lado dos seus agentes. As respostas saem pela própria conta, com o seu endereço.",
+    "appPassword": "Gmail, iCloud, Yahoo ou outro (senha de app)",
+    "pointFree": "Grátis, sem plano e sem mexer em DNS",
+    "pointPrivate": "Só você vê esta caixa; a senha fica criptografada",
+    "pointProvider": "No provedor nada é apagado nem marcado como lido",
+    "domain": "Tem um domínio próprio?",
+    "createDomain": "Criar caixa no meu domínio"
+  }
 }

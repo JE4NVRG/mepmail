@@ -1,9 +1,11 @@
 import { lookup } from "node:dns/promises";
 import {
   type Keyring,
+  MailboxExternalOAuthError,
   type MailboxOutboxSender,
   MailboxSendDeferredError,
   MailboxSendRejectedError,
+  mailboxExternalCredential,
   markMailboxExternalAuthFailed,
   openMailboxExternalAccount,
   publicAddress,
@@ -25,6 +27,7 @@ export function createMailboxExternalAwareSender(
   db: Db,
   keyring: Keyring,
   ses: MailboxOutboxSender | null,
+  credentialFor: typeof mailboxExternalCredential = mailboxExternalCredential,
 ): MailboxOutboxSender {
   return {
     async send(input) {
@@ -50,12 +53,29 @@ export function createMailboxExternalAwareSender(
         if (error instanceof MailboxSendRejectedError) throw error;
         throw new MailboxSendDeferredError();
       }
+      // An OAuth account sends with a fresh access token (XOAUTH2); a refused grant stops it.
+      let credential: Awaited<ReturnType<typeof mailboxExternalCredential>>;
+      try {
+        credential = await credentialFor(db, keyring, account);
+      } catch (error) {
+        if (
+          error instanceof MailboxExternalOAuthError &&
+          (error.reason === "invalid_grant" || error.reason === "unconfigured")
+        ) {
+          await markMailboxExternalAuthFailed(db, input.mailboxId, "oauth_refused");
+          throw new MailboxSendRejectedError();
+        }
+        throw new MailboxSendDeferredError();
+      }
       const transport = nodemailer.createTransport({
         host: address,
         port: account.smtpPort,
         secure: account.smtpSecurity === "tls",
         requireTLS: account.smtpSecurity === "starttls",
-        auth: { user: account.username, pass: account.secret },
+        auth:
+          "accessToken" in credential
+            ? { type: "OAuth2", user: account.username, accessToken: credential.accessToken }
+            : { user: account.username, pass: credential.password },
         tls: { servername: account.smtpHost, minVersion: "TLSv1.2", rejectUnauthorized: true },
         connectionTimeout: 20_000,
         greetingTimeout: 20_000,
