@@ -348,6 +348,42 @@ describe("tool listing", () => {
     await client.close();
   });
 
+  it("gives every tool a title and all three hints, as the Claude and ChatGPT directories read them", async () => {
+    const client = await connect(await mintToken());
+    const tools = (await client.listTools()).tools;
+    expect(tools.length).toBeGreaterThan(50);
+    for (const tool of tools) {
+      expect(tool.title, tool.name).toMatch(/^[A-Z][A-Za-z ]+$/);
+      expect(tool.annotations?.title, tool.name).toBe(tool.title);
+      for (const hint of ["readOnlyHint", "destructiveHint", "openWorldHint"] as const)
+        expect(typeof tool.annotations?.[hint], `${tool.name} ${hint}`).toBe("boolean");
+      // A read-only tool is never destructive.
+      if (tool.annotations?.readOnlyHint) expect(tool.annotations.destructiveHint).toBe(false);
+    }
+    const hints = (name: string) => {
+      const tool = tools.find((t) => t.name === name);
+      return [
+        tool?.title,
+        tool?.annotations?.readOnlyHint,
+        tool?.annotations?.destructiveHint,
+        tool?.annotations?.openWorldHint,
+      ];
+    };
+    expect(hints("list_emails")).toEqual(["List emails", true, false, false]);
+    expect(hints("get_email_insights")).toEqual(["Get email insights", true, false, false]);
+    // Sends cannot be recalled and reach outside recipients: Claude asks before each one.
+    expect(hints("send_email")).toEqual(["Send email", false, true, true]);
+    expect(hints("send_email_batch")).toEqual(["Send email batch", false, true, true]);
+    expect(hints("send_broadcast")).toEqual(["Send broadcast", false, true, true]);
+    expect(hints("mailbox_send_draft")).toEqual(["Send mailbox draft", false, true, true]);
+    expect(hints("create_webhook")).toEqual(["Create webhook", false, false, true]);
+    expect(hints("create_contact")).toEqual(["Create contact", false, false, false]);
+    expect(hints("delete_domain")).toEqual(["Delete domain", false, true, false]);
+    expect(hints("create_api_key")).toEqual(["Create API key", false, false, false]);
+    expect(hints("mailbox_list_accounts")).toEqual(["List Correio mailboxes", true, false, false]);
+    await client.close();
+  });
+
   it("lists read-only tools first and hides tools outside the token's scopes", async () => {
     const full = await connect(await mintToken());
     const names = (await full.listTools()).tools.map((t) => t.name);
@@ -1070,5 +1106,29 @@ describe("static server card", () => {
     const card = JSON.parse(body) as { tools: unknown[]; capabilities: { tools: unknown } };
     expect(card.tools.length).toBeGreaterThan(50);
     expect(card.capabilities.tools).toEqual({ listChanged: false });
+  });
+});
+
+describe("ChatGPT domain challenge", () => {
+  const path = "/.well-known/openai-apps-challenge";
+  afterAll(() => {
+    delete process.env.OPENAI_APPS_CHALLENGE;
+  });
+
+  it("serves the pending token alone, as plain text, on the MCP host", async () => {
+    process.env.OPENAI_APPS_CHALLENGE = " oa-challenge-0123456789abcdef \n";
+    const res = await app.request(path);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/plain");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await res.text()).toBe("oa-challenge-0123456789abcdef");
+  });
+
+  it("answers 404 when no challenge is pending or the value is not a token", async () => {
+    for (const value of [undefined, "", "short", "has space inside the token", "x".repeat(600)]) {
+      if (value === undefined) delete process.env.OPENAI_APPS_CHALLENGE;
+      else process.env.OPENAI_APPS_CHALLENGE = value;
+      expect((await app.request(path)).status, String(value)).toBe(404);
+    }
   });
 });

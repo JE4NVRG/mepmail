@@ -287,6 +287,59 @@ const UNTRUSTED_NOTICE =
  * Every tool result, success or error, is one JSON text block in this
  * envelope so an agent can tell tenant-authored strings from tool output.
  */
+/** The ChatGPT plugin portal's domain challenge, when one is pending (OPENAI_APPS_CHALLENGE). */
+export function openAiAppsChallenge(env: NodeJS.ProcessEnv = process.env): string | null {
+  const token = env.OPENAI_APPS_CHALLENGE?.trim();
+  return token && /^[\x21-\x7e]{8,512}$/.test(token) ? token : null;
+}
+
+/** Titles that read better than the tool name in words (the Correio tools lead with "mailbox"). */
+const TOOL_TITLES: Record<string, string> = {
+  mailbox_list_accounts: "List Correio mailboxes",
+  mailbox_list_messages: "List mailbox messages",
+  mailbox_read_message: "Read mailbox message",
+  mailbox_get_attachment: "Get mailbox attachment",
+  mailbox_save_draft: "Save mailbox draft",
+  mailbox_send_draft: "Send mailbox draft",
+};
+
+/** Every tool's display title (the Claude and ChatGPT directories require one). */
+export function toolTitle(name: string): string {
+  const title = TOOL_TITLES[name];
+  if (title) return title;
+  const words = name.split("_").map((word) => (word === "api" ? "API" : word));
+  const [first = "", ...rest] = words;
+  return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(" ");
+}
+
+/** Sends that reach recipients outside the account: they cannot be recalled. */
+const IRREVERSIBLE_SEND_TOOLS = new Set(["send_email", "send_email_batch", "send_broadcast"]);
+/** Tools whose effect reaches arbitrary outside destinations: mail recipients, webhook URLs. */
+const OPEN_WORLD_TOOLS = new Set([
+  ...IRREVERSIBLE_SEND_TOOLS,
+  "mailbox_send_draft",
+  "create_webhook",
+  "update_webhook",
+]);
+
+/**
+ * All three hints as explicit booleans, as both directories read them: reads are read-only
+ * (Claude runs them without a prompt), deletes and the sends are destructive (Claude always
+ * asks first), and only what reaches outside the team's own account is open-world.
+ */
+export function toolAnnotations(
+  name: string,
+  cfg: { readOnly?: boolean; destructive?: boolean },
+): { title: string; readOnlyHint: boolean; destructiveHint: boolean; openWorldHint: boolean } {
+  const readOnly = cfg.readOnly === true;
+  return {
+    title: toolTitle(name),
+    readOnlyHint: readOnly,
+    destructiveHint: !readOnly && (cfg.destructive === true || IRREVERSIBLE_SEND_TOOLS.has(name)),
+    openWorldHint: OPEN_WORLD_TOOLS.has(name),
+  };
+}
+
 function toolResult(data: unknown, ok = true): CallToolResult {
   return {
     content: [
@@ -388,13 +441,12 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
     server.registerTool(
       name,
       {
+        title: toolTitle(name),
         description: cfg.description,
         inputSchema: (teams
           ? cfg.inputSchema.extend({ team_id: teamIdArg })
           : cfg.inputSchema) as unknown as S,
-        annotations: cfg.readOnly
-          ? { readOnlyHint: true }
-          : { destructiveHint: cfg.destructive === true },
+        annotations: toolAnnotations(name, cfg),
       },
       // The conditional ToolCallback type cannot resolve for an unbound
       // generic; the cast is sound because args were validated against
@@ -438,10 +490,11 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
     server.registerTool(
       "list_teams",
       {
+        title: toolTitle("list_teams"),
         description:
           "List the teams this all-teams connection can act in. Pass a team's id as team_id to any other tool; the first team listed is the default when team_id is omitted.",
         inputSchema: z.object({}),
-        annotations: { readOnlyHint: true },
+        annotations: toolAnnotations("list_teams", { readOnly: true }),
       },
       () =>
         toolResult(
@@ -1605,6 +1658,13 @@ export function registerMcp(app: OpenAPIHono<Env>, deps: ApiDeps, appBaseUrl: st
   app.get("/.well-known/mcp/server-card.json", (c) =>
     c.body(mcpServerCardBody(), 200, { "content-type": MCP_SERVER_CARD_CONTENT_TYPE }),
   );
+  // ChatGPT's plugin portal proves we own the MCP host: it hands out a challenge token, to be
+  // served as plain text, alone, at this path. The token is public by design; it comes from
+  // the environment so a submission never waits on a release.
+  app.get("/.well-known/openai-apps-challenge", (c) => {
+    const token = openAiAppsChallenge();
+    return token ? c.text(token, 200, { "cache-control": "no-store" }) : c.text("Not Found", 404);
+  });
   // Origin is not validated: auth is an explicit bearer (never cookies), so a
   // DNS-rebound page holds no credential — the same reasoning behind the REST
   // API's wildcard CORS.
