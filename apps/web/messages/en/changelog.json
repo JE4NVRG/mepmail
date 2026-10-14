@@ -24,6 +24,21 @@
   },
   "releases": [
     {
+      "version": "0.154.1",
+      "date": "2026-10-14",
+      "title": "Correio on your phone's home screen",
+      "summary": "Add the Correio to your phone's home screen and open it like an app, full screen and straight on the inbox, with no app store.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "On a phone's browser, the account menu has \"App no celular\": the steps for iPhone (Safari Share, Add to Home Screen) and Android (Chrome menu, Install app), or a one-tap install where the browser offers it.",
+            "The home-screen icon opens the Correio on the inbox, in full screen."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.154",
       "date": "2026-10-14",
       "title": "Correio on your phone",

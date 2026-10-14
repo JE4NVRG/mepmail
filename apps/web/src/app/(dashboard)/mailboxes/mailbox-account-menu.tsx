@@ -12,7 +12,9 @@ import { isDesktop } from "@/lib/desktop-bridge";
 import { desktopAppFor, LINUX_DOWNLOAD_URL, WINDOWS_STORE_URL } from "@/lib/desktop-download";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import type { CorreioPrefs } from "@/lib/mailbox-preferences";
+import { type PhoneAppPlatform, phoneAppFor, runningStandalone } from "@/lib/phone-app";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
+import { MailboxPhoneAppDialog } from "./mailbox-phone-app";
 import styles from "./mailboxes.module.css";
 
 /** The desktop app for this browser: the Store in Windows, the downloads page in Linux. */
@@ -88,6 +90,11 @@ export function MailboxAccountMenu({
   const email = session?.user.email;
   // Read while the panel renders: it only renders open, in the browser.
   const desktopApp = open ? offeredDesktopApp() : null;
+  // On a phone's browser (not the home-screen app, not the desktop shell): "App no celular".
+  const phoneApp = open
+    ? phoneAppFor(navigator.userAgent, runningStandalone() || isDesktop())
+    : null;
+  const [phoneDialog, setPhoneDialog] = useState<PhoneAppPlatform | null>(null);
 
   return (
     <div className={styles.accountMenu}>
@@ -194,6 +201,19 @@ export function MailboxAccountMenu({
             {t("app.support")}
             <span aria-hidden="true">↗</span>
           </button>
+          {phoneApp ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="ms-menu-item"
+              onClick={() => {
+                setOpen(false);
+                setPhoneDialog(phoneApp);
+              }}
+            >
+              {t("app.phoneApp")}
+            </button>
+          ) : null}
           {desktopApp ? (
             <a
               role="menuitem"
@@ -227,6 +247,9 @@ export function MailboxAccountMenu({
             {tCommon("signOut")}
           </button>
         </div>
+      ) : null}
+      {phoneDialog ? (
+        <MailboxPhoneAppDialog platform={phoneDialog} close={() => setPhoneDialog(null)} />
       ) : null}
     </div>
   );

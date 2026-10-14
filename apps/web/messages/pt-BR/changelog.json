@@ -24,6 +24,21 @@
   },
   "releases": [
     {
+      "version": "0.154.1",
+      "date": "2026-10-14",
+      "title": "Correio na tela inicial do celular",
+      "summary": "Coloque o Correio na tela inicial do celular e abra como um app, em tela cheia e direto na caixa de entrada, sem loja de aplicativos.",
+      "changes": [
+        {
+          "kind": "added",
+          "items": [
+            "No navegador do celular, o menu da conta tem \"App no celular\": os passos no iPhone (Compartilhar no Safari, Adicionar à Tela de Início) e no Android (menu do Chrome, Instalar app), ou a instalação com um toque quando o navegador oferece.",
+            "O ícone da tela inicial abre o Correio na caixa de entrada, em tela cheia."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.154",
       "date": "2026-10-14",
       "title": "Correio no celular",

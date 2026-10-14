@@ -594,7 +594,21 @@
     "backShort": "Back",
     "newMailToast": "New email from {sender}: {subject}",
     "open": "Open",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "phoneApp": "App on your phone",
+    "phone": {
+      "title": "Correio on your phone's home screen",
+      "intro": "No store and nothing heavy to install: the Correio becomes an icon on your home screen, opens full screen right on the inbox and updates itself.",
+      "install": "Install the Correio",
+      "ios1": "Open mepmail.dev/mail in Safari (Apple's browser).",
+      "ios2": "Tap Share (the square with the up arrow) and choose \"Add to Home Screen\".",
+      "ios3": "Keep the name \"Correio\" and tap Add. The icon shows up on your home screen.",
+      "android1": "Open mepmail.dev/mail in Chrome.",
+      "android2": "Tap the ⋮ menu (top corner) and choose \"Install app\" or \"Add to Home screen\".",
+      "android3": "Confirm. The Correio shows up with your apps and opens full screen.",
+      "note": "You stay signed in and everything works as on the site. Store apps (Google Play and the App Store) come later.",
+      "done": "Got it"
+    }
   },
   "archive": "Archive",
   "archiveEmptyTitle": "Nothing archived",

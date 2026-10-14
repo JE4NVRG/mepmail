@@ -594,7 +594,21 @@
     "backShort": "Voltar",
     "newMailToast": "Novo e-mail de {sender}: {subject}",
     "open": "Abrir",
-    "dismiss": "Fechar aviso"
+    "dismiss": "Fechar aviso",
+    "phoneApp": "App no celular",
+    "phone": {
+      "title": "Correio na tela inicial do celular",
+      "intro": "Sem loja e sem instalar nada pesado: o Correio vira um ícone na tela inicial, abre em tela cheia direto na caixa de entrada e se atualiza sozinho.",
+      "install": "Instalar o Correio",
+      "ios1": "Abra mepmail.dev/mail no Safari (o navegador da Apple).",
+      "ios2": "Toque em Compartilhar (o quadrado com a seta para cima) e escolha \"Adicionar à Tela de Início\".",
+      "ios3": "Confirme o nome \"Correio\" e toque em Adicionar. O ícone aparece na tela inicial.",
+      "android1": "Abra mepmail.dev/mail no Chrome.",
+      "android2": "Toque no menu ⋮ (canto de cima) e escolha \"Instalar app\" ou \"Adicionar à tela inicial\".",
+      "android3": "Confirme. O Correio aparece com os seus apps e abre em tela cheia.",
+      "note": "Você continua conectado e tudo fica igual ao site. Os apps nas lojas (Google Play e App Store) vêm depois.",
+      "done": "Entendi"
+    }
   },
   "archive": "Arquivo",
   "archiveEmptyTitle": "Nada arquivado",

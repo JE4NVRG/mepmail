@@ -3551,3 +3551,13 @@
     margin-bottom: calc(52px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* "App no celular": the steps to add the Correio to the home screen. */
+.phoneSteps {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.55;
+}

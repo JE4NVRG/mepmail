@@ -2,9 +2,10 @@ import { HydrationBoundary } from "@tanstack/react-query";
 import { headers } from "next/headers";
 import { MailboxesView } from "@/app/(dashboard)/mailboxes/mailboxes-view";
 import { apiBaseUrl } from "@/lib/api-base-url";
+import { CORREIO_APP_METADATA } from "@/lib/correio-app-metadata";
 import { prefetchMailPage } from "@/server/mail-page-prefetch";
 
-export const metadata = { title: "Correio" };
+export const metadata = CORREIO_APP_METADATA;
 
 // The page carries mailbox content: it is rendered per request and never cached.
 export const dynamic = "force-dynamic";
