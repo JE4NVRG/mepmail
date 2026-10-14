@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "dev.mepmail.correio",
+      "sha256_cert_fingerprints": [
+        "EC:9F:95:0B:2E:B9:C0:DD:E6:12:27:9A:83:F2:A7:27:02:42:33:99:92:79:73:BF:68:CD:52:67:42:14:60:5C",
+        "A4:5F:F5:0A:EA:E6:83:83:05:2C:C1:F0:CB:66:0A:33:70:36:EC:F7:DB:B4:ED:5E:22:EF:3A:9D:6A:9E:13:DD"
+      ]
+    }
+  }
+]
