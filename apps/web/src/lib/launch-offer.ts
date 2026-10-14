@@ -62,6 +62,10 @@ export type LaunchBillingPeriod = "month" | "year";
 export type LaunchMailboxTierId = (typeof LAUNCH_OFFER.mailboxes)[number]["id"];
 export type LaunchMailboxPlan = (typeof LAUNCH_OFFER.mailboxes)[number];
 export type CorreioPlan = (typeof LAUNCH_OFFER.correioPlans)[number];
+/** The smallest Correio plan in reais (Brazil's price list). */
+export const CORREIO_FROM_BRL_CENTS = Math.min(
+  ...LAUNCH_OFFER.correioPlans.map((plan) => plan.brlMonthlyCents),
+);
 /** The smallest Correio plan price, for "from" claims. */
 export const CORREIO_FROM_CENTS = Math.min(
   ...LAUNCH_OFFER.correioPlans.map((plan) => plan.monthlyCents),

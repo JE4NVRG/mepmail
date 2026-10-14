@@ -166,7 +166,7 @@ const expectations = {
     agentFragment: "conecte-um-agente-por-mcp",
     docsPrefix: "https://docs.mepmail.dev/pt-BR",
     plansPrices:
-      /Solo: 1 caixa por US\$ 2,90 por mês \(R\$ 14,90\)\. Duo: 3 caixas por US\$ 5,90 \(R\$ 29,90\)\. Equipe: 10 caixas por US\$ 12,90 \(R\$ 64,90\)/,
+      /Solo: 1 caixa por R\$ 14,90 por mês\. Duo: 3 caixas por R\$ 29,90\. Equipe: 10 caixas por R\$ 64,90\. No cartão ou no Pix\./,
     plansNoSending: /O Correio não exige plano de Envio/,
     plansBilling: "Plano de Envio + um plano do Correio",
   },
@@ -480,12 +480,14 @@ describe.each(["en", "pt-BR"] as const)("Correio sold without Envio in %s", (loc
   afterEach(() => vi.unstubAllEnvs());
   it("adds the standalone plan, priced and linked to sign-up, only when its flag is on", async () => {
     vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
+    // Portuguese readers get Brazil's price list in reais (Pix or card).
+    const equipe = locale === "pt-BR" ? /R\$ 64,90/ : /US\$ 12\.90/;
     const closed = section(await render(locale), "correio-plans-title");
-    expect(closed).not.toMatch(/12[.,]90/);
+    expect(closed).not.toMatch(equipe);
     vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");
     const html = await render(locale);
     const plansHtml = section(html, "correio-plans-title");
-    expect(textContent(plansHtml)).toMatch(/US\$ 12[.,]90/);
+    expect(textContent(plansHtml)).toMatch(equipe);
     expect(links(plansHtml).map((link) => link.href)).toContain("/signup?next=/mail");
     expect(html).not.toMatch(/<form\b/);
   });

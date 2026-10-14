@@ -22,8 +22,8 @@ import {
   WINDOWS_STORE_URL,
 } from "@/lib/desktop-download";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
-import { formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricing";
-import { CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
+import { formatBrlPrice, formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricing";
+import { CORREIO_FROM_BRL_CENTS, CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
 import { faqJsonLd, organizationJsonLd, siteBaseUrl, websiteJsonLd } from "@/lib/structured-data";
@@ -102,12 +102,17 @@ export default async function RootPage() {
   const mailOpen = process.env.MAILBOX_EARLY_ACCESS_OPEN === "true";
   // Open to every team, Correio starts at its smallest plan; otherwise at the add-on.
   const standaloneOpen = standaloneMailOpen();
-  const mailFrom = formatUsd(
-    (standaloneOpen
-      ? CORREIO_FROM_CENTS
-      : Math.min(...LAUNCH_OFFER.mailboxes.map((box) => box.monthlyCents))) / 100,
-    locale,
-  );
+  // Portuguese readers are Brazil's audience: they see the reais price list (Pix or card).
+  const brazil = locale === "pt-BR";
+  const mailFrom =
+    brazil && standaloneOpen
+      ? formatBrlPrice(CORREIO_FROM_BRL_CENTS, locale)
+      : formatUsd(
+          (standaloneOpen
+            ? CORREIO_FROM_CENTS
+            : Math.min(...LAUNCH_OFFER.mailboxes.map((box) => box.monthlyCents))) / 100,
+          locale,
+        );
   const priceRows = priceRowsForOffer(launchOfferEnabled);
   const comparison = priceRows.map((row) => [
     formatVolume(row.volume, locale),
@@ -139,6 +144,7 @@ export default async function RootPage() {
     t.raw("plans.items") as PlanCopy[],
     launchOfferEnabled,
     t("plans.launchPriceNote"),
+    brazil ? "brl" : "usd",
   );
   const points = t.raw("structure.points") as string[];
   const columns = t.raw("compare.columns") as string[];
@@ -153,10 +159,15 @@ export default async function RootPage() {
     <p className="cro-offer">
       {t(launchOfferEnabled ? "hero.launchOffer" : "hero.offer", {
         volume: new Intl.NumberFormat(locale).format(proOffer.included),
-        price: formatUsd(
-          (launchOfferEnabled ? LAUNCH_OFFER.sending.monthlyCents : proOffer.priceCents) / 100,
-          locale,
-        ),
+        price: brazil
+          ? formatBrlPrice(
+              launchOfferEnabled ? LAUNCH_OFFER.sending.brlMonthlyCents : proOffer.brlPriceCents,
+              locale,
+            )
+          : formatUsd(
+              (launchOfferEnabled ? LAUNCH_OFFER.sending.monthlyCents : proOffer.priceCents) / 100,
+              locale,
+            ),
       })}
       {/* A no-break space keeps the arrow on the sentence's last line. */}
       {"\u00a0"}

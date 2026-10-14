@@ -115,7 +115,7 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(html.match(/class="cro-goal"/g)).toHaveLength(3);
       expect(html).toContain('href="/pricing#cenarios"');
       const body = text(html);
-      expect(body).toMatch(pt ? /7 dias grátis com cartão/ : /7 days free with a card/);
+      expect(body).toMatch(pt ? /cartão \(7 dias grátis/ : /7 days free with a card/);
       expect(body).not.toMatch(pt ? /Uma API key/ : /One API key/);
     });
 
@@ -124,8 +124,8 @@ for (const locale of ["en", "pt-BR"] as const) {
       const html = await render(Pricing);
       expect(html).toContain('id="cenarios"');
       const body = text(html);
-      // Equipe (US$ 12.90) + Envio Pro 110K (US$ 29.00).
-      expect(body).toContain(pt ? "US$ 41,90" : "US$ 41.90");
+      // Equipe + Envio Pro 110K: US$ 12.90 + US$ 29.00, or R$ 64,90 + R$ 149,00 in Brazil.
+      expect(body).toContain(pt ? "R$ 213,90" : "US$ 41.90");
       expect(body).toMatch(pt ? /Como o uso é contado\?/ : /How is usage counted\?/);
       expect(body).toMatch(pt ? /Para, Cc e Cco/ : /To, Cc and Bcc/);
       expect(body).toMatch(

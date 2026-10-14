@@ -9,7 +9,7 @@ import {
 } from "@/components/site-chrome";
 import { StructuredData } from "@/components/structured-data";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
-import { formatBrl, formatUsd } from "@/lib/landing-pricing";
+import { formatBrl, formatBrlPrice, formatUsd } from "@/lib/landing-pricing";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import { faqJsonLd } from "@/lib/structured-data";
@@ -77,15 +77,19 @@ export default async function PricingPage() {
   // Correio on its own, without an Envio plan (checkout stays server-gated).
   const standaloneOpen = mailOpen && process.env.MAILBOX_STANDALONE_OPEN === "true";
   const correioPlans = LAUNCH_OFFER.correioPlans;
+  // Portuguese readers are Brazil's audience: reais first (Pix or card), dollars as a note.
+  const brazil = locale === "pt-BR";
   const allPlans = plansWithCopy(
     l.raw("plans.items") as PlanCopy[],
     launchOfferEnabled,
     l("plans.launchPriceNote"),
+    brazil ? "brl" : "usd",
   );
   const includedPoints = t.raw("included.points") as string[];
   const faq = t.raw(launchOfferEnabled ? "launchFaq" : "faq.items") as FaqItem[];
   // Sums of the separate plans shown on this page; no bundle and no discount.
   const sendProCents = LAUNCH_OFFER.sending.monthlyCents;
+  const sendProBrlCents = LAUNCH_OFFER.sending.brlMonthlyCents;
   const scenarios = standaloneOpen
     ? (
         [
@@ -100,6 +104,7 @@ export default async function PricingPage() {
           ...scenario,
           correio: plan,
           totalCents: plan.monthlyCents + (scenario.sendPro ? sendProCents : 0),
+          totalBrlCents: plan.brlMonthlyCents + (scenario.sendPro ? sendProBrlCents : 0),
         };
       })
     : [];
@@ -142,7 +147,11 @@ export default async function PricingPage() {
                             plan: t(`correio.names.${scenario.correio.id}`),
                           })}
                         </dt>
-                        <dd>{formatUsd(scenario.correio.monthlyCents / 100, locale)}</dd>
+                        <dd>
+                          {brazil
+                            ? formatBrl(scenario.correio.brlMonthlyCents / 100, locale)
+                            : formatUsd(scenario.correio.monthlyCents / 100, locale)}
+                        </dd>
                       </div>
                       <div>
                         <dt>
@@ -150,13 +159,19 @@ export default async function PricingPage() {
                         </dt>
                         <dd>
                           {scenario.sendPro
-                            ? formatUsd(sendProCents / 100, locale)
+                            ? brazil
+                              ? formatBrl(sendProBrlCents / 100, locale)
+                              : formatUsd(sendProCents / 100, locale)
                             : t("scenarios.free")}
                         </dd>
                       </div>
                       <div className="pricing-scenario-total">
                         <dt>{t("scenarios.total")}</dt>
-                        <dd>{formatUsd(scenario.totalCents / 100, locale)}</dd>
+                        <dd>
+                          {brazil
+                            ? formatBrl(scenario.totalBrlCents / 100, locale)
+                            : formatUsd(scenario.totalCents / 100, locale)}
+                        </dd>
                       </div>
                     </dl>
                   </article>
@@ -190,36 +205,56 @@ export default async function PricingPage() {
                 <article className="ms-card gtm-plan">
                   <h3>{t("launch.monthTitle")}</h3>
                   <p className="gtm-price">
-                    {formatUsd(LAUNCH_OFFER.sending.monthlyCents / 100, locale)}
+                    {brazil
+                      ? formatBrlPrice(LAUNCH_OFFER.sending.brlMonthlyCents, locale)
+                      : formatUsd(LAUNCH_OFFER.sending.monthlyCents / 100, locale)}
                     <span>{l("plans.perMonth")}</span>
                   </p>
                   <p>{t("launch.monthIntro")}</p>
                   <p className="gtm-note">{t("launch.monthQuota")}</p>
                   <p className="gtm-note">
-                    {t("launch.monthLocal", {
-                      first: formatBrl(LAUNCH_OFFER.sending.brlFirstMonthlyCents / 100, locale),
-                      price: formatBrl(LAUNCH_OFFER.sending.brlMonthlyCents / 100, locale),
-                    })}
+                    {brazil
+                      ? t("launch.monthLocal", {
+                          first: formatUsd(LAUNCH_OFFER.sending.firstMonthlyCents / 100, locale),
+                          price: formatUsd(LAUNCH_OFFER.sending.monthlyCents / 100, locale),
+                        })
+                      : t("launch.monthLocal", {
+                          first: formatBrl(LAUNCH_OFFER.sending.brlFirstMonthlyCents / 100, locale),
+                          price: formatBrl(LAUNCH_OFFER.sending.brlMonthlyCents / 100, locale),
+                        })}
                   </p>
                 </article>
                 <article className="ms-card gtm-plan">
                   <h3>{t("launch.yearTitle")}</h3>
                   <p className="gtm-price">
-                    {formatUsd(
-                      (LAUNCH_OFFER.sending.monthlyCents * LAUNCH_OFFER.annualChargedMonths) / 100,
-                      locale,
-                    )}
+                    {brazil
+                      ? formatBrlPrice(
+                          LAUNCH_OFFER.sending.brlMonthlyCents * LAUNCH_OFFER.annualChargedMonths,
+                          locale,
+                        )
+                      : formatUsd(
+                          (LAUNCH_OFFER.sending.monthlyCents * LAUNCH_OFFER.annualChargedMonths) /
+                            100,
+                          locale,
+                        )}
                     <span>{t("launch.perYear")}</span>
                   </p>
                   <p>{t("launch.yearUpfront")}</p>
                   <p className="gtm-note">{t("launch.yearQuota")}</p>
                   <p className="gtm-note">
                     {t("launch.yearLocal", {
-                      price: formatBrl(
-                        (LAUNCH_OFFER.sending.brlMonthlyCents * LAUNCH_OFFER.annualChargedMonths) /
-                          100,
-                        locale,
-                      ),
+                      price: brazil
+                        ? formatUsd(
+                            (LAUNCH_OFFER.sending.monthlyCents * LAUNCH_OFFER.annualChargedMonths) /
+                              100,
+                            locale,
+                          )
+                        : formatBrl(
+                            (LAUNCH_OFFER.sending.brlMonthlyCents *
+                              LAUNCH_OFFER.annualChargedMonths) /
+                              100,
+                            locale,
+                          ),
                     })}
                   </p>
                 </article>
@@ -245,7 +280,9 @@ export default async function PricingPage() {
                       <article className="ms-card gtm-plan" key={plan.id}>
                         <h3>{t(`correio.names.${plan.id}`)}</h3>
                         <p className="gtm-price">
-                          {formatUsd(plan.monthlyCents / 100, locale)}
+                          {brazil
+                            ? formatBrlPrice(plan.brlMonthlyCents, locale)
+                            : formatUsd(plan.monthlyCents / 100, locale)}
                           <span>{t("correio.perMonthPlan")}</span>
                         </p>
                         <ul className="gtm-points">
@@ -261,7 +298,9 @@ export default async function PricingPage() {
                           <li>{t("correio.trial")}</li>
                           <li>
                             {t("correio.planLocal", {
-                              price: formatBrl(plan.brlMonthlyCents / 100, locale),
+                              price: brazil
+                                ? formatUsd(plan.monthlyCents / 100, locale)
+                                : formatBrl(plan.brlMonthlyCents / 100, locale),
                             })}
                           </li>
                         </ul>

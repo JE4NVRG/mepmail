@@ -24,6 +24,21 @@
   },
   "releases": [
     {
+      "version": "0.153",
+      "date": "2026-10-13",
+      "title": "Prices in reais for Brazil",
+      "summary": "In Portuguese, the home page, pricing and Correio pages now show the price list in reais first, by card or Pix, with the dollar price as a note.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Portuguese pages show every Send and Correio price in reais (for example, Correio from R$ 14.90 a month), with the dollar amount below for buyers outside Brazil.",
+            "A new question on the home and pricing pages explains paying by Pix: one period at a time, an invoice for each renewal, and the 7-day trial on card only."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.152",
       "date": "2026-10-13",
       "title": "Pix purchases measured at the amount paid",

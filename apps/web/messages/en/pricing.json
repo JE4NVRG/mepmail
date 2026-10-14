@@ -58,6 +58,10 @@
         "a": "Not on Send Free. Mail has 7 days free with a card on the team's first plan: the first charge happens when the trial ends unless you cancel before, and a reminder arrives 2 days earlier. During the trial, sending from Mail is limited to 50 recipients a day and 200 in total. In Send, the Pro 110K offer costs US$ 29/month, with US$ 20 only on the first month for eligible new customers, or US$ 290/year upfront."
       },
       {
+        "q": "Can I pay with Pix?",
+        "a": "Yes, in Brazil. Send and Correio take Pix as well as card, in reais. With Pix you pay one period at a time: each renewal arrives as an invoice to pay with Pix within 5 days, never charged automatically. Correio's 7-day free trial is card only. Boleto is not accepted."
+      },
+      {
         "q": "What happens above the top plan?",
         "a": "The published ladder stops at 2.75M a month. Above that, talk to us: we size the volume with you instead of quoting an enterprise tier we do not publish."
       }
@@ -109,6 +113,10 @@
     {
       "q": "Do I need a card to start?",
       "a": "Not on Send Free. Mail has 7 days free with a card on the team's first plan: the first charge happens when the trial ends unless you cancel before, and a reminder arrives 2 days earlier. During the trial, sending from Mail is limited to 50 recipients a day and 200 in total. In Send, the Pro 110K offer costs US$ 29/month, with US$ 20 only on the first month for eligible new customers, or US$ 290/year upfront."
+    },
+    {
+      "q": "Can I pay with Pix?",
+      "a": "Yes, in Brazil. Send and Correio take Pix as well as card, in reais. With Pix you pay one period at a time: each renewal arrives as an invoice to pay with Pix within 5 days, never charged automatically. Correio's 7-day free trial is card only. Boleto is not accepted."
     },
     {
       "q": "What happens above the top plan?",

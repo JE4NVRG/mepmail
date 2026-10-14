@@ -24,6 +24,21 @@
   },
   "releases": [
     {
+      "version": "0.153",
+      "date": "2026-10-13",
+      "title": "Preços em reais para o Brasil",
+      "summary": "Em português, a página inicial, os preços e o Correio mostram primeiro a tabela em reais, no cartão ou no Pix, com o preço em dólar como observação.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "As páginas em português mostram todos os preços do Envio e do Correio em reais (por exemplo, Correio a partir de R$ 14,90 por mês), com o valor em dólar logo abaixo para quem compra de fora do Brasil.",
+            "Uma pergunta nova na página inicial e nos preços explica o pagamento por Pix: um período por vez, uma fatura a cada renovação e os 7 dias grátis só no cartão."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.152",
       "date": "2026-10-13",
       "title": "Compra por Pix medida com o valor pago",

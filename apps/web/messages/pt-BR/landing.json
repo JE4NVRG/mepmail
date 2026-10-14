@@ -58,7 +58,7 @@
       "responseLabel": "Resposta",
       "caption": "Uma base URL e o SDK que você já usa envia pelo MepMail."
     },
-    "launchOffer": "{volume} entregas/mês por {price} recorrentes. US$ 20 só na primeira mensalidade elegível."
+    "launchOffer": "{volume} entregas/mês por {price} recorrentes. R$ 99 só na primeira mensalidade elegível."
   },
   "domainHero": {
     "eyebrow": "E-mail no seu domínio · para você e seus agentes",
@@ -66,7 +66,7 @@
     "lead": "Seu e-mail profissional, os e-mails da sua aplicação e as caixas dos seus agentes no mesmo lugar. Um domínio, uma conta e um painel, sem contratar hospedagem.",
     "cta": "Criar e-mail no meu domínio",
     "secondary": "Ver como funciona",
-    "note": "Correio a partir de {price} por mês (R$ 14,90 no Brasil), com 7 dias grátis com cartão: a cobrança começa no fim do teste, a menos que você cancele antes.",
+    "note": "Correio a partir de {price} por mês, no cartão (7 dias grátis: a cobrança começa no fim do teste, a menos que você cancele antes) ou no Pix, mês a mês.",
     "sendLink": "Procura a API de envio? Conheça o Envio"
   },
   "story": {
@@ -170,7 +170,7 @@
   "plans": {
     "eyebrow": "Planos",
     "title": "Comece grátis. Cresça por volume.",
-    "intro": "Planos de Envio em USD, com implantação assistida e suporte. Escolha seu volume; a oferta Pro 110K tem uma opção anual quando disponível no painel.",
+    "intro": "Planos de Envio em reais, no cartão ou no Pix, com implantação assistida e suporte. Escolha seu volume; a oferta Pro 110K tem uma opção anual quando disponível no painel.",
     "perMonth": "/mês",
     "limitsLabel": "Workspaces e limites",
     "overageLabel": "Excedente",
@@ -197,42 +197,42 @@
       {
         "volume": "110.000/mês",
         "limits": "25 domínios · 10 workspaces · contatos ilimitados",
-        "overage": "US$ 0,35/1k",
+        "overage": "R$ 1,75/1k",
         "attachment": "5 MB",
         "cta": "Começar no Pro 110K"
       },
       {
         "volume": "220.000/mês",
         "limits": "25 domínios · 10 workspaces · contatos ilimitados",
-        "overage": "US$ 0,32/1k",
+        "overage": "R$ 1,60/1k",
         "attachment": "5 MB",
         "cta": "Começar no Pro 220K"
       },
       {
         "volume": "550.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "US$ 0,29/1k",
+        "overage": "R$ 1,45/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 550K"
       },
       {
         "volume": "1.100.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "US$ 0,26/1k",
+        "overage": "R$ 1,30/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 1.1M"
       },
       {
         "volume": "1.650.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "US$ 0,24/1k",
+        "overage": "R$ 1,20/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 1.65M"
       },
       {
         "volume": "2.750.000/mês",
         "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "US$ 0,22/1k",
+        "overage": "R$ 1,10/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 2.75M"
       }
@@ -249,7 +249,7 @@
       "cta": "Garantir minha vaga"
     },
     "noteAttach": "Limite por e-mail: tamanho total dos anexos após decodificação, não por arquivo.",
-    "launchPriceNote": "Novos clientes elegíveis: US$ 20 só na primeira mensalidade; depois US$ 29/mês. Anual: US$ 290 antecipados, sem acumular a promoção."
+    "launchPriceNote": "Novos clientes elegíveis: R$ 99 só na primeira mensalidade; depois R$ 149/mês. Anual: R$ 1.490 antecipados, sem acumular a promoção."
   },
   "how": {
     "eyebrow": "Seus próximos passos",
@@ -293,7 +293,11 @@
       },
       {
         "q": "Preciso de cartão de crédito para começar?",
-        "a": "Não. O plano Free dispensa cartão: crie sua conta e faça seus primeiros envios sem cadastrar forma de pagamento. Os planos pagos são cobrados mensalmente em USD."
+        "a": "Não. O plano Free dispensa cartão: crie sua conta e faça seus primeiros envios sem cadastrar forma de pagamento. Os planos pagos são cobrados mensalmente em reais, no cartão ou no Pix."
+      },
+      {
+        "q": "Posso pagar com Pix?",
+        "a": "Sim. No Brasil, o Envio e o Correio aceitam Pix, além do cartão, sempre em reais. Com Pix você paga um período por vez: cada renovação chega como uma fatura para pagar com Pix em até 5 dias, sem cobrança automática. Os 7 dias grátis do Correio são só no cartão. Boleto não é aceito."
       },
       {
         "q": "Como funciona o plano Free?",
@@ -362,7 +366,7 @@
       "Conecte Claude, Cursor ou outro agente pelo MCP do Correio, sem código.",
       "Você escolhe o que cada agente pode fazer: ler, rascunhar ou enviar."
     ],
-    "price": "A partir de {price} por mês (R$ 14,90 no Brasil): Solo com 1 caixa, Duo com 3 ou Equipe com 10. 7 dias grátis com cartão; cancele antes do fim para não ser cobrado.",
+    "price": "A partir de {price} por mês: Solo com 1 caixa, Duo com 3 ou Equipe com 10. No cartão, 7 dias grátis (cancele antes do fim para não ser cobrado); no Pix, você paga mês a mês.",
     "cta": "Conhecer o Correio",
     "pricing": "Ver preços do Correio",
     "desktop": "Também no computador:",
@@ -375,7 +379,7 @@
       "mail": {
         "title": "Meu e-mail profissional",
         "body": "Caixas no seu domínio para você e o time, no navegador e nos apps para Windows e Linux. Traga o histórico do provedor antigo e só troque o MX quando as caixas estiverem prontas.",
-        "fact": "Correio a partir de {price}/mês · 7 dias grátis com cartão",
+        "fact": "Correio a partir de {price}/mês · cartão (7 dias grátis) ou Pix",
         "cta": "Conhecer o Correio"
       },
       "agent": {

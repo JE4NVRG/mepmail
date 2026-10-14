@@ -296,6 +296,10 @@
         "a": "No. The Free plan needs no card: create your account and send your first emails without adding a payment method. Paid plans are billed monthly in USD."
       },
       {
+        "q": "Can I pay with Pix?",
+        "a": "Yes, in Brazil. Send and Correio take Pix as well as card, in reais. With Pix you pay one period at a time: each renewal arrives as an invoice to pay with Pix within 5 days, never charged automatically. Correio's 7-day free trial is card only. Boleto is not accepted."
+      },
+      {
         "q": "How does the Free plan work?",
         "a": "Anyone can sign up, with no seat limit. Each account sends up to 100 emails per day on the Free plan. For more volume, choose a paid plan in the dashboard or talk to us."
       }

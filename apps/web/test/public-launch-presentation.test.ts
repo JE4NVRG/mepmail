@@ -75,7 +75,8 @@ for (const locale of ["en", "pt-BR"] as const) {
       current.locale = locale;
       vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", "false");
       const html = await render(Pricing);
-      expect(html).toContain("US$ 20");
+      // The legacy Pro rung: US$ 20, or R$ 99 on Brazil's price list.
+      expect(html).toContain(locale === "pt-BR" ? '<p class="gtm-price">R$ 99<span>' : "US$ 20");
       expect(html).not.toContain('id="pro110k"');
       expect((await pricingMetadata()).description).toBe(messages(locale).pricing.meta.description);
     });
@@ -150,7 +151,8 @@ for (const locale of ["en", "pt-BR"] as const) {
       const title = (headings[0] ?? "").replace(/<[^>]+>/g, "");
       expect(title).not.toMatch(/\p{L}-\p{L}/u);
       expect(title.replace(/‑/g, "-")).toBe(copy.domainHero.title);
-      expect(home).toContain(locale === "en" ? "US$ 2.90" : "US$ 2,90");
+      // Portuguese readers get Brazil's price list: the Correio from R$ 14,90.
+      expect(home).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
       expect(home).toContain(messages(locale).correio.demo.awaiting);
       // The five steps, in order, between the story's anchor and Send's.
       const story = home.slice(home.indexOf('id="correio"'), home.indexOf('id="envio"'));

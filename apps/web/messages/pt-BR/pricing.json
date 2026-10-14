@@ -1,12 +1,12 @@
 {
   "meta": {
     "title": "Preços: todos os planos MepMail em uma página",
-    "description": "Preços do MepMail em USD: grátis com 100 e-mails/dia, Pro a partir de US$ 20 para 110.000 e-mails/mês e Scale até 2,75M. Excedente por 1.000 e sem fidelidade.",
-    "launchDescription": "Todos os planos numa página: Correio a partir de R$ 14,90/mês e Envio grátis com 100 e-mails/dia ou Pro com 110 mil e-mails por US$ 29/mês."
+    "description": "Preços do MepMail em reais, no cartão ou no Pix: grátis com 100 e-mails/dia, Pro com 110 mil e-mails por R$ 149/mês (R$ 99 no 1º mês) e Scale até 2,75M. Excedente por mil e sem fidelidade.",
+    "launchDescription": "Todos os planos numa página: Correio a partir de R$ 14,90/mês e Envio grátis com 100 e-mails/dia ou Pro com 110 mil e-mails por R$ 149/mês. Pague com Pix ou cartão."
   },
   "eyebrow": "Preços",
   "title": "Correio por caixa. <highlight>Envio por volume.</highlight>",
-  "lead": "Preços mensais em USD, sem fidelidade. O Correio cobra por plano de caixas no seu domínio; o Envio, pelo volume de e-mails da sua aplicação. Use um, o outro ou os dois na mesma conta, com o mesmo domínio verificado.",
+  "lead": "Preços mensais em reais, sem fidelidade, no cartão ou no Pix. O Correio cobra por plano de caixas no seu domínio; o Envio, pelo volume de e-mails da sua aplicação. Use um, o outro ou os dois na mesma conta, com o mesmo domínio verificado.",
   "note": "O Envio começa grátis: 100 e-mails por dia, sem cartão. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe; a cobrança começa no fim do teste, a menos que você cancele antes.",
   "plans": {
     "title": "Todos os planos de Envio.",
@@ -47,7 +47,7 @@
       },
       {
         "q": "Existe fidelidade e posso trocar de plano depois?",
-        "a": "O Pro 110K oferece mensal e anual antecipado de 12 meses. O anual custa US$ 290, sem acumular a promoção da primeira mensalidade. As ações disponíveis para sua assinatura aparecem no painel; contratos atuais são preservados."
+        "a": "O Pro 110K oferece mensal e anual antecipado de 12 meses. O anual custa R$ 1.490, sem acumular a promoção da primeira mensalidade. As ações disponíveis para sua assinatura aparecem no painel; contratos atuais são preservados."
       },
       {
         "q": "Qual o limite de anexos por mensagem?",
@@ -55,7 +55,11 @@
       },
       {
         "q": "Preciso de cartão para começar?",
-        "a": "Não no Envio Free. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe: a primeira cobrança acontece no fim do teste, a menos que você cancele antes, e um aviso chega 2 dias antes. Durante o teste, o envio pelo Correio fica em até 50 destinatários por dia e 200 no total. No Envio, a oferta Pro 110K custa US$ 29/mês, com US$ 20 apenas na primeira mensalidade de novos clientes elegíveis, ou US$ 290/ano antecipados."
+        "a": "Não no Envio Free. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe: a primeira cobrança acontece no fim do teste, a menos que você cancele antes, e um aviso chega 2 dias antes. Durante o teste, o envio pelo Correio fica em até 50 destinatários por dia e 200 no total. No Envio, a oferta Pro 110K custa R$ 149/mês, com R$ 99 apenas na primeira mensalidade de novos clientes elegíveis, ou R$ 1.490/ano antecipados."
+      },
+      {
+        "q": "Posso pagar com Pix?",
+        "a": "Sim. No Brasil, o Envio e o Correio aceitam Pix, além do cartão, sempre em reais. Com Pix você paga um período por vez: cada renovação chega como uma fatura para pagar com Pix em até 5 dias, sem cobrança automática. Os 7 dias grátis do Correio são só no cartão. Boleto não é aceito."
       },
       {
         "q": "E acima do maior plano?",
@@ -73,17 +77,17 @@
     "title": "Uma franquia mensal. Duas formas de pagar.",
     "body": "110 mil e-mails de Envio por mês para a sua aplicação, campanhas e agentes. Escolha mensal ou anual no painel; a elegibilidade da promoção é confirmada antes do checkout.",
     "monthTitle": "Mensal",
-    "monthIntro": "US$ 20 só na primeira mensalidade de novos clientes elegíveis. Renovação: US$ 29/mês.",
+    "monthIntro": "R$ 99 só na primeira mensalidade de novos clientes elegíveis. Renovação: R$ 149/mês.",
     "monthQuota": "O excedente vem ligado nos planos mensais e pode ser desligado em Cobrança.",
     "yearTitle": "Anual",
     "perYear": "/ano",
-    "yearUpfront": "US$ 290 pagos antecipadamente para 12 meses: o valor de 10 mensalidades normais. Não acumula a promoção inicial.",
+    "yearUpfront": "R$ 1.490 pagos antecipadamente para 12 meses: o valor de 10 mensalidades normais. Não acumula a promoção inicial.",
     "yearQuota": "A franquia de 110 mil renova mensalmente, sem saldo anual acumulado. O envio para na cota mensal; o anual não inclui cobrança de excedentes.",
     "preserved": "Contratos existentes mantêm seus valores e limites; não há migração automática.",
     "mailCta": "Conhecer o Correio",
-    "mailAccess": "O Correio é pago à parte, com ou sem plano de Envio: Solo US$ 2,90, Duo US$ 5,90 ou Equipe US$ 12,90 por mês.",
-    "monthLocal": "No Brasil, cobrado em reais: {first} no 1º mês, depois {price} por mês.",
-    "yearLocal": "No Brasil, cobrado em reais: {price} por ano."
+    "mailAccess": "O Correio é pago à parte, com ou sem plano de Envio: Solo R$ 14,90, Duo R$ 29,90 ou Equipe R$ 64,90 por mês.",
+    "monthLocal": "Fora do Brasil, em dólar: {first} no 1º mês, depois {price} por mês.",
+    "yearLocal": "Fora do Brasil, em dólar: {price} por ano."
   },
   "launchFaq": [
     {
@@ -100,7 +104,7 @@
     },
     {
       "q": "Existe fidelidade e posso trocar de plano depois?",
-      "a": "O Pro 110K oferece mensal e anual antecipado de 12 meses. O anual custa US$ 290, sem acumular a promoção da primeira mensalidade. As ações disponíveis para sua assinatura aparecem no painel; contratos atuais são preservados."
+      "a": "O Pro 110K oferece mensal e anual antecipado de 12 meses. O anual custa R$ 1.490, sem acumular a promoção da primeira mensalidade. As ações disponíveis para sua assinatura aparecem no painel; contratos atuais são preservados."
     },
     {
       "q": "Qual o limite de anexos por mensagem?",
@@ -108,7 +112,11 @@
     },
     {
       "q": "Preciso de cartão para começar?",
-      "a": "Não no Envio Free. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe: a primeira cobrança acontece no fim do teste, a menos que você cancele antes, e um aviso chega 2 dias antes. Durante o teste, o envio pelo Correio fica em até 50 destinatários por dia e 200 no total. No Envio, a oferta Pro 110K custa US$ 29/mês, com US$ 20 apenas na primeira mensalidade de novos clientes elegíveis, ou US$ 290/ano antecipados."
+      "a": "Não no Envio Free. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe: a primeira cobrança acontece no fim do teste, a menos que você cancele antes, e um aviso chega 2 dias antes. Durante o teste, o envio pelo Correio fica em até 50 destinatários por dia e 200 no total. No Envio, a oferta Pro 110K custa R$ 149/mês, com R$ 99 apenas na primeira mensalidade de novos clientes elegíveis, ou R$ 1.490/ano antecipados."
+    },
+    {
+      "q": "Posso pagar com Pix?",
+      "a": "Sim. No Brasil, o Envio e o Correio aceitam Pix, além do cartão, sempre em reais. Com Pix você paga um período por vez: cada renovação chega como uma fatura para pagar com Pix em até 5 dias, sem cobrança automática. Os 7 dias grátis do Correio são só no cartão. Boleto não é aceito."
     },
     {
       "q": "E acima do maior plano?",
@@ -142,7 +150,7 @@
     "perMonthPlan": "/mês",
     "planMailboxes": "{count, plural, one {# caixa} other {# caixas}}",
     "planInbound": "{count, number} mensagens recebidas por mês",
-    "planLocal": "No Brasil, cobrado em reais: {price} por mês",
+    "planLocal": "Fora do Brasil, em dólar: {price} por mês",
     "noteLimits": "Os limites renovam a cada mês de cobrança e nada é cobrado além do plano. O envio para no limite do plano; o recebimento pausa depois do limite mais 10% de margem, ou com o armazenamento cheio, até o mês seguinte, um upgrade ou, no armazenamento, esvaziar a lixeira. As mensagens guardadas continuam legíveis, e os donos recebem um e-mail aos 80% e aos 100% de cada limite. No teste grátis, o envio fica em até 50 destinatários por dia e 200 no total."
   },
   "scenarios": {

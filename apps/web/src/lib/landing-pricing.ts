@@ -108,6 +108,13 @@ export function formatUsd(value: number | null, locale: string): string {
   return `US$ ${formatted}`;
 }
 
+/** A plan price in reais as a headline shows it: "R$ 149", but "R$ 14,90" with cents. */
+export function formatBrlPrice(cents: number, locale: string): string {
+  return cents % 100 === 0
+    ? `R$ ${(cents / 100).toLocaleString(locale)}`
+    : formatBrl(cents / 100, locale);
+}
+
 /** A reais price for Brazil, always with cents ("R$ 14,90"; "R$ 14.90" in en). */
 export function formatBrl(value: number, locale: string): string {
   return `R$ ${value.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

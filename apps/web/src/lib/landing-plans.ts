@@ -6,7 +6,8 @@
  * the same numbers and the same words.
  */
 
-import type { PlanRungKey } from "@millionsend/core/plans";
+import { type PlanRungKey, rungByKey } from "@millionsend/core/plans";
+import { formatBrlPrice } from "./landing-pricing";
 import { LAUNCH_OFFER } from "./launch-offer";
 
 export type PlanTier = "core" | "scale";
@@ -50,13 +51,25 @@ export function plansWithCopy(
   copy: readonly PlanCopy[],
   launchOfferEnabled = false,
   launchPriceNote?: string,
+  /** "brl": the same ladder in reais (Brazil pays its BRL currency option), for pt-BR. */
+  currency: "usd" | "brl" = "usd",
 ): LandingPlan[] {
   return PLANS.map((plan, index) => {
     const localizedCopy = copy[index] ?? EMPTY_PLAN_COPY;
-    if (plan.rung !== "pro_100k" || !launchOfferEnabled) return { ...plan, copy: localizedCopy };
+    const launch = plan.rung === "pro_100k" && launchOfferEnabled;
+    const price =
+      currency === "brl"
+        ? formatBrlPrice(
+            launch ? LAUNCH_OFFER.sending.brlMonthlyCents : rungByKey(plan.rung).brlPriceCents,
+            "pt-BR",
+          )
+        : launch
+          ? `US$ ${LAUNCH_OFFER.sending.monthlyCents / 100}`
+          : plan.price;
+    if (!launch) return { ...plan, price, copy: localizedCopy };
     return {
       ...plan,
-      price: `US$ ${LAUNCH_OFFER.sending.monthlyCents / 100}`,
+      price,
       copy: {
         ...localizedCopy,
         ...(launchPriceNote ? { priceNote: launchPriceNote } : {}),
