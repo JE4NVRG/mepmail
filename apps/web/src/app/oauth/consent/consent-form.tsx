@@ -30,6 +30,20 @@ const ADMIN_ONLY_SCOPES = ["domains:write", "webhooks:write", "api-keys:write"];
  */
 const MAIL_SCOPES = ["mail:read", "mail:draft", "mail:send"];
 const MAIL_SEND = "mail:send";
+/** The most mailboxes one app's credential takes (mailboxes.grantOAuthClient refuses more). */
+export const MAIL_GRANT_MAX_MAILBOXES = 20;
+
+/** Ticks or unticks one mailbox; a tick past the limit is ignored, never sent to be refused. */
+export function toggleMailbox(
+  prev: ReadonlySet<string>,
+  id: string,
+  max: number = MAIL_GRANT_MAX_MAILBOXES,
+): Set<string> {
+  const next = new Set(prev);
+  if (next.has(id)) next.delete(id);
+  else if (next.size < max) next.add(id);
+  return next;
+}
 
 export function ConsentForm({
   app,
@@ -84,6 +98,8 @@ export function ConsentForm({
   // Requested (what the app asks), selected (what is ticked) and granted (what Allow records,
   // the same rule decide() applies): mail only reaches the mailboxes ticked below.
   const chosenBoxes = teamBoxes.filter((box) => boxes.has(box.id));
+  const overLimit = teamBoxes.length > MAIL_GRANT_MAX_MAILBOXES;
+  const atLimit = chosenBoxes.length >= MAIL_GRANT_MAX_MAILBOXES;
   const mailEffective = mailWanted && chosenBoxes.length > 0;
   const effective = visible.filter(
     (scope) => granted.has(scope) && (mailEffective || !MAIL_SCOPES.includes(scope)),
@@ -288,15 +304,26 @@ export function ConsentForm({
             <span style={{ fontSize: "var(--ms-fs-micro)", color: "var(--ms-faint)" }}>
               {t("mailboxesChoose")}
             </span>
+            {overLimit ? (
+              <span style={{ fontSize: "var(--ms-fs-micro)", color: "var(--ms-faint)" }}>
+                {t("mailboxesLimit", { max: MAIL_GRANT_MAX_MAILBOXES })}
+              </span>
+            ) : null}
             {teamBoxes.length > 1 ? (
               <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
                 <button
                   type="button"
                   className="ms-btn ms-btn-ghost ms-btn-sm"
-                  disabled={pending !== null || teamBoxes.every((box) => boxes.has(box.id))}
-                  onClick={() => setBoxes(new Set(teamBoxes.map((box) => box.id)))}
+                  disabled={pending !== null || atLimit || chosenBoxes.length === teamBoxes.length}
+                  onClick={() =>
+                    setBoxes(
+                      new Set(teamBoxes.slice(0, MAIL_GRANT_MAX_MAILBOXES).map((box) => box.id)),
+                    )
+                  }
                 >
-                  {t("mailboxesAll")}
+                  {overLimit
+                    ? t("mailboxesFirst", { max: MAIL_GRANT_MAX_MAILBOXES })
+                    : t("mailboxesAll")}
                 </button>
                 <button
                   type="button"
@@ -325,15 +352,8 @@ export function ConsentForm({
                     type="checkbox"
                     className="ms-checkbox"
                     checked={boxes.has(box.id)}
-                    onChange={() =>
-                      setBoxes((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(box.id)) next.delete(box.id);
-                        else next.add(box.id);
-                        return next;
-                      })
-                    }
-                    disabled={pending !== null}
+                    onChange={() => setBoxes((prev) => toggleMailbox(prev, box.id))}
+                    disabled={pending !== null || (atLimit && !boxes.has(box.id))}
                   />
                   <span>
                     {box.label} <span className="ms-mono">{box.address}</span>
