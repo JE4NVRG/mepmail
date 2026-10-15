@@ -114,6 +114,7 @@ export function MailboxReceivingNotice({
         <button
           type="button"
           className="ms-btn ms-btn-primary"
+          data-purchase=""
           onClick={() => openMailboxLicense(upgradeOffer)}
         >
           {t("upgradeTo", { name: plan.upgrade.name })}
@@ -212,6 +213,7 @@ function PlanUsage({ plan, detailed }: { plan: MailboxPlanUsage; detailed: boole
         <button
           type="button"
           className="ms-btn ms-btn-ghost"
+          data-purchase=""
           onClick={() => openMailboxLicense(upgradeOffer)}
         >
           {t("upgradeTo", { name: plan.upgrade.name })}

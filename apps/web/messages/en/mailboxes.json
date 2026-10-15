@@ -568,7 +568,8 @@
     "requirement": "Mail is an add-on to the paid Send plans, from {price} a month. Eligible new customers pay {first} for the first month of Send.",
     "cta": "Get Send + Mail",
     "learn": "Learn about Mail",
-    "adminOnly": "Ask a team owner or admin to subscribe."
+    "adminOnly": "Ask a team owner or admin to subscribe.",
+    "appUnavailable": "Correio isn't active on this team yet."
   },
   "app": {
     "newMail": "{count, plural, one {# new message} other {# new messages}}",

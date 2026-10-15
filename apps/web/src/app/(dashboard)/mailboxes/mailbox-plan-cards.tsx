@@ -54,7 +54,7 @@ export function MailboxPlanCards({
       interval: common(`interval.${interval}`),
     });
   return (
-    <div className={styles.cards} role="radiogroup" aria-label={label}>
+    <div className={styles.cards} role="radiogroup" aria-label={label} data-purchase="">
       {offers.map((offer) => {
         const checked = offer.offerId === selectedId;
         return (

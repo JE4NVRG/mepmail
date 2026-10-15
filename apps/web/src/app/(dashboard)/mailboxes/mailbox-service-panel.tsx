@@ -554,7 +554,8 @@ export function MailboxServicePanel({
             </button>
           </header>
           {loaded ? (
-            <p className={styles.hint}>
+            // Plan and price wording stays out of the Android app; the system note stays.
+            <p className={styles.hint} data-purchase={systemLicense ? undefined : ""}>
               {systemLicense
                 ? systemT("licenseBody")
                 : planChoices.length || currentPlanCode
@@ -695,13 +696,17 @@ export function MailboxServicePanel({
                   role={failure === "sending_plan_required" ? "alert" : "status"}
                 >
                   <p>{t("sendingPlanRequiredBody")}</p>
-                  <a className="ms-btn ms-btn-primary" href="/settings/billing">
+                  <a className="ms-btn ms-btn-primary" href="/settings/billing" data-purchase="">
                     {t("viewSendingPlans")}
                   </a>
                 </div>
               ) : null}
               {planChange.length ? (
-                <section className={styles.planChange} aria-labelledby={planChangeTitleId}>
+                <section
+                  className={styles.planChange}
+                  aria-labelledby={planChangeTitleId}
+                  data-purchase=""
+                >
                   <h3 className={styles.sectionTitle} id={planChangeTitleId}>
                     {t(currentPlanCode ? "plans.changeTitle" : "plans.migrateTitle")}
                   </h3>
@@ -766,7 +771,7 @@ export function MailboxServicePanel({
               ) : null}
               {manage &&
               (manage.canReconcile || manage.canAdjust || manage.canCancel || manage.canResume) ? (
-                <div className={styles.management}>
+                <div className={styles.management} data-purchase="">
                   {/* Quantity terms belong to the older contracts; a plan changes plan instead. */}
                   {!currentPlanCode ? <p className={styles.hint}>{t("managementTerms")}</p> : null}
                   {manage.canAdjust ? (
@@ -851,6 +856,7 @@ export function MailboxServicePanel({
                 </div>
               ) : offer ? (
                 <form
+                  data-purchase=""
                   onSubmit={async (event) => {
                     event.preventDefault();
                     if (!canPurchase || !validSeats || checkout.isPending) return;
@@ -1153,7 +1159,9 @@ export function MailboxServicePanel({
                 </form>
               ) : null}
               {canPurchase || notice === "existingBody" ? (
-                <p className={styles.hint}>{t("confirmationHint")}</p>
+                <p className={styles.hint} data-purchase="">
+                  {t("confirmationHint")}
+                </p>
               ) : null}
             </>
           )}
