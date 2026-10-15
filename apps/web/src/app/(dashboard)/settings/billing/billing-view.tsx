@@ -37,6 +37,7 @@ import {
 } from "@/lib/launch-offer";
 import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
+import { useInAndroidApp } from "@/lib/use-android-app";
 import { QuotaRow } from "../usage/usage-view";
 import { LaunchComboMailStep } from "./launch-combo-step";
 import { PixInvoices } from "./pix-invoices";
@@ -149,6 +150,8 @@ export function BillingView({
   const usageT = useTranslations("settings.usage");
   const locale = useLocale();
   const trpc = useTRPC();
+  // The Android app shows the plan as it is; nothing is sold there (lib/android-app.ts).
+  const androidApp = useInAndroidApp();
   const queryClient = useQueryClient();
 
   const status = useQuery({
@@ -336,6 +339,29 @@ export function BillingView({
         <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
           {t("systemNotice")}
         </p>
+      </Card>
+    );
+  }
+  // Android app (Google Play payments policy): the current plan and its status only, with no
+  // plan choice, checkout, Pix, invoice payment or billing portal. The server refuses them
+  // too (noPurchaseInAndroidApp).
+  if (androidApp) {
+    return (
+      <Card title={t("plan")}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span
+            className="ms-display"
+            style={{ fontSize: "var(--ms-fs-h1)", color: "var(--ms-bone)", lineHeight: 1 }}
+          >
+            {planLabel(plan, planQuota)}
+          </span>
+          <span
+            className={`ms-badge ms-badge-${STATUS_TONE[planStatus]}`}
+            style={{ position: "relative", top: 1 }}
+          >
+            {t(`status.${planStatus}`)}
+          </span>
+        </div>
       </Card>
     );
   }

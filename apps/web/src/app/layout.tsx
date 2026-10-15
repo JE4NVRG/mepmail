@@ -8,8 +8,10 @@ import { cookies } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { AdvertisingConsent } from "@/components/advertising-consent";
+import { AndroidAppGuard } from "@/components/android-app-guard";
 import { Providers } from "@/components/providers";
 import { UmamiAnalytics } from "@/components/umami-analytics";
+import { ANDROID_APP_INIT_SCRIPT } from "@/lib/android-app";
 import { SERVER_ONLY_NAMESPACES } from "@/lib/client-messages";
 import { THEME_INIT_SCRIPT, THEME_KEY } from "@/lib/theme";
 
@@ -69,10 +71,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="ms">
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static theme bootstrap, no user input */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static Android-app bootstrap (lib/android-app.ts), no user input */}
+        <script dangerouslySetInnerHTML={{ __html: ANDROID_APP_INIT_SCRIPT }} />
         <UmamiAnalytics />
         <NextIntlClientProvider messages={messages}>
           <Providers>
             {children}
+            <AndroidAppGuard />
             <AdvertisingConsent />
           </Providers>
         </NextIntlClientProvider>

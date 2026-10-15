@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createTRPCClient, httpBatchStreamLink } from "@trpc/client";
 import { useState } from "react";
 import superjson from "superjson";
+import { androidAppHeaders } from "@/lib/android-app";
 import { supportSessionLink } from "@/lib/support-session-signal";
 import { TRPCProvider } from "@/lib/trpc";
 import { trpcErrorCode } from "@/lib/trpc-error";
@@ -45,7 +46,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
       // windows that the account changed (lib/support-session-signal.ts).
       links: [
         supportSessionLink,
-        httpBatchStreamLink({ url: "/api/trpc", transformer: superjson }),
+        // The Android app marks its calls: the server refuses purchases from it.
+        httpBatchStreamLink({
+          url: "/api/trpc",
+          transformer: superjson,
+          headers: androidAppHeaders,
+        }),
       ],
     }),
   );

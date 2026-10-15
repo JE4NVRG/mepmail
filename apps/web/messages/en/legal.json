@@ -97,17 +97,18 @@
   },
   "privacy": {
     "title": "Privacy Policy",
-    "updated": "Last updated: October 10, 2026",
-    "intro": "This policy explains what data MepMail collects, how it is used, and the choices you have. We keep it short on purpose: collect little, encrypt the sensitive parts, and name our subprocessors.",
+    "updated": "Last updated: October 14, 2026",
+    "intro": "This policy explains what data MepMail collects, how it is used and what choices you have. It is short on purpose: collect little, encrypt what is sensitive and name the providers.",
     "sections": [
       {
         "title": "1. In short",
         "body": [],
         "list": [
-          "We collect the data needed to operate accounts and billing. Advertising measurement is optional and requires your permission.",
-          "Email content you send is encrypted at rest and is processed only to deliver your messages. We do not read it, sell it or use it to train anything.",
-          "Payments run on Stripe; we never see or store your card number.",
-          "We work with a short list of infrastructure providers, named below.",
+          "We collect the data needed to run the account, Send, Correio and billing. Advertising measurement is optional, depends on your permission and never runs in the Android app.",
+          "The content of emails, sent and received, and attachments are encrypted at rest. We do not sell that content and do not use it to train AI models.",
+          "To protect everyone's delivery, a sample of the emails sent through Send goes through an automated abuse check by an AI provider named below.",
+          "Payments run on Stripe, by card or Pix; we never see or store your card number.",
+          "We work with a short list of providers, named below.",
           "You can export or delete your data at any time."
         ]
       },
@@ -115,76 +116,111 @@
         "title": "2. Data we collect",
         "body": [],
         "list": [
-          "Account: name, email address, password (stored as a hash), team membership.",
-          "Billing: plan, payment status and invoice references. Card data goes directly to Stripe.",
-          "Sending data: sending domains, contacts you upload, suppressions, and message metadata (recipient, subject, status, events).",
-          "Message content: the HTML/text you send, stored encrypted at rest, processed to deliver the message.",
-          "Technical data: IP address, user agent, session cookies and application logs.",
-          "Optional advertising measurement: public pages visited, Meta and Google cookie and click identifiers, clicks to create an account, the completed sign-up, and paid-plan checkout and initial-purchase events with their value and currency. We do not send names, email addresses, phone numbers, contacts, recipients, or message content for this purpose."
+          "Account: name, email, password (stored as a hash) and team membership.",
+          "Billing: plan, payment status and invoice references. Card data goes straight to Stripe; with Pix, Stripe creates and confirms the payment.",
+          "Send: sending domains, the contacts and audiences you add, suppressions, templates, broadcasts and message metadata (recipient, subject, status and delivery events). When you turn tracking on for a domain, also the recipients' open and click events.",
+          "Send message content: the HTML and text you send, encrypted at rest.",
+          "Correio: the received and sent messages, drafts and attachments of your mailboxes, encrypted at rest, plus folders, rules, approved or blocked senders and preferences.",
+          "External accounts you connect (Gmail, Outlook, Hotmail, Microsoft 365 and others): the app password or, when you sign in with Microsoft or Google, only the refresh token, stored encrypted; and copies of that account's Inbox messages.",
+          "Support: the conversations in the support chat and by email. When you are signed in, the chat receives your account's identification (name, email, team, plan and mailbox count).",
+          "Technical data: IP address, user agent, session cookies and application and API request logs, with secrets redacted.",
+          "Optional advertising measurement: public pages visited, Meta and Google cookie and click identifiers, clicks to create an account, the sign-up completion and checkout-start and first paid-plan purchase events, with value and currency. We do not send names, emails, phone numbers, contacts, recipients or message content for this purpose."
         ]
       },
       {
         "title": "3. How we use data",
         "body": [],
         "list": [
-          "To provide the service: authenticate you, send your email through Amazon SES, show delivery events, enforce quotas.",
-          "To bill you and handle refunds.",
-          "To secure the service: detect abuse, spam and unauthorized access, and comply with legal obligations.",
-          "To communicate with you about your account or material service changes."
+          "To provide the service: authenticate you, deliver email through Amazon SES, receive and store Correio email, sync the external accounts you connect, show delivery events and enforce quotas and limits.",
+          "To bill and process refunds.",
+          "To protect the service: detect abuse, spam and phishing, including the automated check of a sample of the emails sent through Send, and prevent unauthorized access; and to meet legal obligations.",
+          "To help you in support.",
+          "To contact you about your account or material changes to the service."
         ]
       },
       {
-        "title": "4. Legal bases",
+        "title": "4. Correio, external accounts and mailbox features",
         "body": [
-          "Where the GDPR applies, we process data to perform our contract with you (running the service), on the basis of our legitimate interest (security and abuse prevention), to comply with legal obligations (billing records), and with your consent where required (non-essential cookies). Under Brazil's LGPD, the corresponding bases apply."
-        ]
-      },
-      {
-        "title": "5. Subprocessors",
-        "body": [
-          "We use a deliberately short list of providers to run the service. Page analytics use Umami, which we host ourselves on the same servers, without cookies or cross-site tracking.",
-          "If you allow advertising measurement, Meta and Google receive the optional events described in this policy: Meta through its Pixel and its completed sign-up and purchase events, Google through Google Analytics on public pages and its completed sign-up and initial paid-plan purchase events, which our server sends with the Meta and Google Analytics cookie identifiers and, for a purchase, the plan and the amount. These connections also provide your IP address and browser information. Each company processes this data under its own privacy policy. We do not turn on Google signals or ad personalization, and measurement is not required to use MepMail."
+          "Your mailboxes' messages are stored encrypted, with per-team keys. Only the people and agents with access to a mailbox read it through MepMail. Our team does not read mailbox content, except with your consent, for security or when the law requires it."
         ],
         "list": [
-          "Contabo GmbH (Germany) — hosting of the application, its database and our self-hosted analytics.",
+          "External accounts: MepMail reads the Inbox of the account you connect without marking, moving or deleting anything at the provider. The first time, it brings the last 30 days of messages (up to 500); then the new ones, every few minutes. Replies leave through the provider's own sending server, with your address. When you disconnect, we delete the copies and the credential; nothing changes at the provider.",
+          "Search: mailbox search uses a blind index. Each word becomes a code (HMAC) under a key of your team, and the index stores no text. The searches you make are not kept as history.",
+          "Translation: the Translate button uses your browser's own translator, on your device. MepMail sends the content to no translation service.",
+          "Sender pictures: to show the sender's logo or picture, our server looks up the BIMI record and the website icon of the sender's domain (for authenticated email only) and Gravatar, with a code (hash) of the sender's address. The lookups leave from our server, so these services do not see who is reading.",
+          "AI agents: if you connect an agent (MCP or API) to a mailbox, it reaches only what you allow, and sends can require your approval. You choose the agent's provider, which handles the data under its own terms."
+        ]
+      },
+      {
+        "title": "5. Google and Microsoft data",
+        "body": [
+          "When you connect a Google (Gmail) or Microsoft (Outlook, Hotmail, Microsoft 365) account, MepMail uses the access granted only to read that account's Inbox and send the messages you write from it, inside Correio. We do not use this data for advertising, do not sell it and do not transfer it to third parties, except to the infrastructure providers needed to run the feature, for security or when the law requires it. No one on our team reads these messages, except with your consent, for security or when the law requires it.",
+          "MepMail's use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.",
+          "You can withdraw the access at any time: disconnect the account in MepMail, or remove the access in your Google or Microsoft account's security settings."
+        ]
+      },
+      {
+        "title": "6. Legal bases",
+        "body": [
+          "Where the GDPR applies, we process data to perform our contract with you (running the service), on the basis of legitimate interest (security and abuse prevention), to meet legal obligations (billing records) and with your consent where required (non-essential cookies and connecting external accounts). Under the LGPD, the corresponding bases apply."
+        ]
+      },
+      {
+        "title": "7. Providers",
+        "body": [
+          "We use a deliberately short list of providers to run the service. Page metrics use Umami, which we host on our own servers, with no cookies and no cross-site tracking.",
+          "If you allow advertising measurement, Meta and Google receive the optional events described in this policy: Meta through the Pixel and the sign-up completion and purchase events, Google through Google Analytics on public pages and the sign-up completion and first paid-plan purchase events, which our server sends with the Meta and Google Analytics cookie identifiers and, for the purchase, the plan and value. These connections also share the IP address and browser information. Each company handles this data under its own privacy policy. We do not turn on Google signals or ad personalization, and measurement is not needed to use MepMail."
+        ],
+        "list": [
+          "Contabo GmbH (Germany) — hosting for the application, the database and our own metrics.",
           "Amazon Web Services (Amazon SES) — email delivery and event notifications. Message content and metadata pass through it for delivery.",
-          "Stripe — payment processing, invoices and receipts.",
-          "Cloudflare — DNS, CDN and network protection in front of our servers, and the Turnstile challenge that can protect sign-in, sign-up and password reset."
+          "Stripe — card and Pix payments, invoices and receipts.",
+          "Cloudflare — DNS, CDN and network protection in front of our servers; the Turnstile challenge that can protect sign-in, sign-up and password reset; and storage of the database backups (R2).",
+          "Command Code (commandcode.ai) — automated abuse check: it receives a sample of the emails already accepted by Send (subject and text) and answers whether they show signs of phishing or spam. It receives no Correio or external-account content.",
+          "Elozi (JE4NDEV's support platform, the same company behind MepMail) — the support chat, with AI assistants and human support.",
+          "Gravatar (Automattic) — receives the code (hash) of a sender's address to show their picture."
         ]
       },
       {
-        "title": "6. Retention",
+        "title": "8. Retention",
         "body": [
-          "Account and sending data are kept while your account is active. After you delete your account, we remove personal data within 30 days, except where retention is required (for example, billing records kept for tax and accounting obligations) or where limited delivery logs are needed for security. Aggregated, non-identifying statistics may be kept.",
-          "You can withdraw advertising permission through the footer link. Withdrawal stops new transmissions and cancels pending events; it does not erase events already received by Meta or Google. We do not send events from before your permission."
+          "Account, sending and Correio data are kept while the account is active. In Correio, a message stays until you delete it: emptying the trash or deleting forever removes it at once, and backup copies expire within 30 days. An external account's copies and its credential are deleted when you disconnect it.",
+          "After an account is deleted, we remove personal data within 30 days, except where retention is required (for example, billing records kept for tax and accounting obligations) or where limited delivery logs are needed for security. Aggregated, non-identifiable statistics may be kept.",
+          "The advertising preference can be withdrawn through the footer link. Withdrawal stops new sends and cancels events still pending; it does not delete events that already reached Meta or Google. We do not send events from before your permission."
         ]
       },
       {
-        "title": "7. Security",
+        "title": "9. Security",
         "body": [
-          "Traffic is encrypted in transit (TLS). Message content is encrypted at rest. Passwords are hashed. Access to production systems is restricted to the operator, and API keys are stored only as hashes with a short prefix for identification."
+          "Traffic is encrypted in transit (TLS). Message content, attachments and external-account credentials are encrypted at rest. Passwords are stored as hashes. Access to production systems is limited to the operator, and API keys are stored only as hashes, with a short prefix for identification."
         ]
       },
       {
-        "title": "8. Your rights",
+        "title": "10. Apps",
         "body": [
-          "Depending on where you live, you can request access, correction, portability, restriction or deletion of your personal data, and object to processing. You can delete your account directly from the dashboard, and you can contact us at jean@mepmail.dev for any privacy request. We respond within 30 days."
+          "The Windows, Linux, macOS and Android apps show the same service as the website and follow this policy. The desktop app can keep a copy of messages for offline reading on the device itself, deleted when you sign out. The Android app shows no purchases and runs no advertising measurement."
         ]
       },
       {
-        "title": "9. International transfers",
+        "title": "11. Your rights",
         "body": [
-          "The application and its database run in Germany (Contabo). Email delivery (Amazon SES) and payments (Stripe) process data in the United States and other countries where these providers operate, and Cloudflare operates worldwide. Transfers rely on the providers' standard contractual clauses and equivalent safeguards."
+          "Depending on where you live, you can ask to access, correct, port, restrict or delete your personal data, and object to processing. You can delete your account directly in the dashboard and reach us at jean@mepmail.dev for any privacy request. We answer within 30 days."
         ]
       },
       {
-        "title": "10. Cookies",
+        "title": "12. International transfers",
         "body": [
-          "Essential cookies maintain your session, language, and advertising preference. Optional Meta cookies, such as _fbp and _fbc, and Google cookies, such as _ga and _gcl_aw, are used only after you allow measurement. The initial state has no permission; declining or withdrawing keeps the service working. Use “Advertising preferences” in the footer to review your choice. Measurement is limited to public offer pages and confirmed checkout and payment events, without dashboard or mailbox content."
+          "The application and database run in Germany (Contabo). Email delivery (Amazon SES), payments (Stripe), the abuse check (Command Code) and the support AI assistants process data in the United States and other countries where these providers operate, and Cloudflare operates worldwide. Transfers rely on these providers' standard contractual clauses and equivalent safeguards."
         ]
       },
       {
-        "title": "11. Changes",
+        "title": "13. Cookies",
+        "body": [
+          "Essential cookies keep the session, the language and your advertising preference. Optional Meta cookies, such as _fbp and _fbc, and Google cookies, such as _ga and _gcl_aw, are used only after you allow measurement. The preference starts without permission; refusing or withdrawing it keeps the service working. The “Advertising preferences” link in the footer lets you review the choice. Measurement is limited to the public offer pages and to confirmed checkout and payment events, with no dashboard or mailbox content. In the Android app there is no advertising measurement, even if the browser has the permission."
+        ]
+      },
+      {
+        "title": "14. Changes",
         "body": [
           "We may update this policy. Material changes are announced by email or on this page before they take effect."
         ]

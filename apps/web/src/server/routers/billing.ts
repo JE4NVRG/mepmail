@@ -50,7 +50,7 @@ import { getPixStripe, getStripe, mailPlanMove, pixPaymentsOpen } from "../billi
 import { emitFunnel } from "../funnel";
 import { newSubscriptionsPaused } from "../new-subscriptions";
 import { getQueue } from "../queue";
-import { adminProcedure, router, teamProcedure } from "../trpc";
+import { adminProcedure, noPurchaseInAndroidApp, router, teamProcedure } from "../trpc";
 
 /** Stripe seam for tests, mirroring SystemSesDeps. */
 export interface BillingDeps {
@@ -144,7 +144,9 @@ async function checkoutAdvertising() {
 
 const launchOfferEnabled = () => process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
 
-const billingMutationProcedure = adminProcedure.use(({ next }) => {
+// Every billing change (checkout, Pix, plan change, invoice payment, portal) is refused in
+// the Android app.
+const billingMutationProcedure = adminProcedure.use(noPurchaseInAndroidApp).use(({ next }) => {
   const paused = process.env.BILLING_MUTATIONS_PAUSED;
   if (paused === "true" || paused === "1") {
     throw new TRPCError({

@@ -12,3 +12,10 @@
 ::selection {
   background: color-mix(in srgb, var(--ms-bone) 30%, transparent);
 }
+
+/* The Android app (lib/android-app.ts): nothing is sold inside it. The init script marks
+   <html> before the first paint, so a purchase surface never flashes. */
+html[data-android-app] [data-purchase],
+html[data-android-app] [data-advertising] {
+  display: none !important;
+}

@@ -97,17 +97,18 @@
   },
   "privacy": {
     "title": "Política de Privacidade",
-    "updated": "Última atualização: 10 de outubro de 2026",
-    "intro": "Esta política explica quais dados o MepMail coleta, como eles são usados e quais escolhas você tem. Ela é curta de propósito: coletar pouco, criptografar o que é sensível e nomear os subprocessadores.",
+    "updated": "Última atualização: 14 de outubro de 2026",
+    "intro": "Esta política explica quais dados o MepMail coleta, como eles são usados e quais escolhas você tem. Ela é curta de propósito: coletar pouco, criptografar o que é sensível e nomear os provedores.",
     "sections": [
       {
         "title": "1. Em resumo",
         "body": [],
         "list": [
-          "Coletamos os dados necessários para operar a conta e a cobrança. A mensuração de publicidade é opcional e depende da sua permissão.",
-          "O conteúdo dos e-mails que você envia é criptografado em repouso e processado apenas para entregar as suas mensagens. Não lemos, não vendemos e não usamos esse conteúdo para treinar nada.",
-          "Os pagamentos rodam no Stripe; nunca vemos nem armazenamos o número do seu cartão.",
-          "Trabalhamos com uma lista curta de provedores de infraestrutura, nomeados abaixo.",
+          "Coletamos os dados necessários para operar a conta, o Envio, o Correio e a cobrança. A mensuração de publicidade é opcional, depende da sua permissão e nunca roda no app Android.",
+          "O conteúdo dos e-mails, enviados e recebidos, e os anexos são criptografados em repouso. Não vendemos esse conteúdo e não o usamos para treinar modelos de IA.",
+          "Para proteger a entrega de todos, uma amostra dos e-mails enviados pelo Envio passa por uma verificação automática de abuso, feita por um provedor de IA nomeado abaixo.",
+          "Os pagamentos rodam no Stripe, no cartão ou no Pix; nunca vemos nem armazenamos o número do seu cartão.",
+          "Trabalhamos com uma lista curta de provedores, nomeados abaixo.",
           "Você pode exportar ou excluir os seus dados a qualquer momento."
         ]
       },
@@ -115,11 +116,14 @@
         "title": "2. Dados que coletamos",
         "body": [],
         "list": [
-          "Conta: nome, e-mail, senha (armazenada como hash), vínculo com o time.",
-          "Cobrança: plano, status de pagamento e referências de fatura. Dados de cartão vão direto para o Stripe.",
-          "Dados de envio: domínios de envio, contatos que você cadastra, supressões e metadados das mensagens (destinatário, assunto, status, eventos).",
-          "Conteúdo das mensagens: o HTML/texto que você envia, armazenado criptografado em repouso e processado para entregar a mensagem.",
-          "Dados técnicos: endereço IP, user agent, cookies de sessão e logs da aplicação.",
+          "Conta: nome, e-mail, senha (armazenada como hash) e vínculo com equipes.",
+          "Cobrança: plano, status de pagamento e referências de fatura. Dados de cartão vão direto para o Stripe; no Pix, o Stripe gera e confirma o pagamento.",
+          "Envio: domínios de envio, contatos e públicos que você cadastra, supressões, modelos, campanhas e metadados das mensagens (destinatário, assunto, status e eventos de entrega). Quando você liga o rastreamento no domínio, também os eventos de abertura e de clique dos destinatários.",
+          "Conteúdo das mensagens do Envio: o HTML e o texto que você envia, criptografados em repouso.",
+          "Correio: as mensagens recebidas e enviadas, os rascunhos e os anexos das suas caixas, criptografados em repouso, além de pastas, regras, remetentes aprovados ou bloqueados e preferências.",
+          "Contas externas que você conecta (Gmail, Outlook, Hotmail, Microsoft 365 e outras): a senha de app ou, quando você entra com a Microsoft ou o Google, somente o token de renovação, guardado criptografado; e cópias das mensagens da Caixa de entrada dessa conta.",
+          "Suporte: as conversas no chat de suporte e por e-mail. Quando você está logado, o chat recebe a identificação da sua conta (nome, e-mail, equipe, plano e número de caixas).",
+          "Dados técnicos: endereço IP, user agent, cookies de sessão e logs da aplicação e das requisições à API, com segredos ocultos.",
           "Mensuração opcional de publicidade: páginas públicas visitadas, identificadores de cookies e de cliques da Meta e do Google, cliques para criar conta, a conclusão do cadastro e eventos de início de checkout e compra inicial de plano pago, com valor e moeda. Não enviamos nomes, e-mails, telefones, contatos, destinatários ou conteúdo de mensagens para esse fim."
         ]
       },
@@ -127,64 +131,96 @@
         "title": "3. Como usamos os dados",
         "body": [],
         "list": [
-          "Para prestar o serviço: autenticar você, enviar os seus e-mails pelo Amazon SES, mostrar eventos de entrega, aplicar cotas.",
+          "Para prestar o serviço: autenticar você, entregar os e-mails pelo Amazon SES, receber e guardar os e-mails do Correio, sincronizar as contas externas que você conecta, mostrar eventos de entrega e aplicar cotas e limites.",
           "Para cobrar e processar reembolsos.",
-          "Para proteger o serviço: detectar abuso, spam e acessos não autorizados, e cumprir obrigações legais.",
+          "Para proteger o serviço: detectar abuso, spam e phishing, inclusive com a verificação automática de uma amostra dos e-mails enviados pelo Envio, e impedir acessos não autorizados; e para cumprir obrigações legais.",
+          "Para atender você no suporte.",
           "Para falar com você sobre a sua conta ou mudanças materiais no serviço."
         ]
       },
       {
-        "title": "4. Bases legais",
+        "title": "4. Correio, contas externas e recursos das caixas",
         "body": [
-          "Onde o GDPR se aplica, tratamos dados para executar o nosso contrato com você (operação do serviço), com base em interesse legítimo (segurança e prevenção de abuso), para cumprir obrigações legais (registros de cobrança) e com o seu consentimento quando exigido (cookies não essenciais). Sob a LGPD, aplicam-se as bases correspondentes."
+          "As mensagens das suas caixas são guardadas criptografadas, com chaves por equipe. Só as pessoas e os agentes com acesso a uma caixa a leem pelo MepMail. A nossa equipe não lê o conteúdo das caixas, salvo com o seu consentimento, para segurança ou quando a lei exigir."
+        ],
+        "list": [
+          "Contas externas: o MepMail lê a Caixa de entrada da conta que você conecta, sem marcar, mover ou apagar nada no provedor. Na primeira vez, traz as mensagens dos últimos 30 dias (até 500); depois, as novas, a cada poucos minutos. As respostas saem pelo servidor de envio do próprio provedor, com o seu endereço. Ao desconectar, apagamos as cópias e a credencial; o que está no provedor não muda.",
+          "Busca: a busca nas caixas usa um índice cego. Cada palavra vira um código (HMAC) com uma chave da sua equipe, e o índice não guarda texto. As buscas que você faz não são guardadas como histórico.",
+          "Tradução: o botão Traduzir usa o tradutor do próprio navegador, no seu aparelho. O MepMail não envia o conteúdo para nenhum serviço de tradução.",
+          "Fotos de remetente: para mostrar o logo ou a foto de quem enviou, o nosso servidor consulta o registro BIMI e o ícone do site do domínio do remetente (só para e-mails autenticados) e o Gravatar, com um código (hash) do endereço do remetente. As consultas saem do nosso servidor, então esses serviços não veem quem está lendo.",
+          "Agentes de IA: se você conectar um agente (MCP ou API) a uma caixa, ele acessa só o que você liberar, e os envios podem exigir a sua aprovação. O provedor do agente é escolhido por você e trata os dados conforme os termos dele."
         ]
       },
       {
-        "title": "5. Subprocessadores",
+        "title": "5. Dados do Google e da Microsoft",
+        "body": [
+          "Quando você conecta uma conta do Google (Gmail) ou da Microsoft (Outlook, Hotmail, Microsoft 365), o MepMail usa o acesso concedido somente para ler a Caixa de entrada dessa conta e enviar as mensagens que você escrever nela, dentro do Correio. Não usamos esses dados para publicidade, não os vendemos e não os transferimos a terceiros, exceto aos provedores de infraestrutura necessários para operar o recurso, para segurança ou quando a lei exigir. Ninguém da nossa equipe lê essas mensagens, salvo com o seu consentimento, para segurança ou quando a lei exigir.",
+          "O uso e a transferência, pelo MepMail, de informações recebidas das APIs do Google para qualquer outro app seguirão a Política de Dados do Usuário dos Serviços de API do Google, incluindo os requisitos de Uso Limitado.",
+          "Você pode retirar o acesso a qualquer momento: desconecte a conta no MepMail ou remova o acesso nas configurações de segurança da sua conta Google ou Microsoft."
+        ]
+      },
+      {
+        "title": "6. Bases legais",
+        "body": [
+          "Onde o GDPR se aplica, tratamos dados para executar o nosso contrato com você (operação do serviço), com base em interesse legítimo (segurança e prevenção de abuso), para cumprir obrigações legais (registros de cobrança) e com o seu consentimento quando exigido (cookies não essenciais e a conexão de contas externas). Sob a LGPD, aplicam-se as bases correspondentes."
+        ]
+      },
+      {
+        "title": "7. Provedores",
         "body": [
           "Usamos uma lista deliberadamente curta de provedores para operar o serviço. As métricas das páginas usam o Umami, que hospedamos nos nossos próprios servidores, sem cookies nem rastreamento entre sites.",
           "Se você permitir a mensuração de publicidade, a Meta e o Google recebem os eventos opcionais descritos nesta política: a Meta pelo Pixel e pelos eventos de cadastro concluído e de compra, o Google pelo Google Analytics nas páginas públicas e pelos eventos de cadastro concluído e de compra inicial de plano pago, que o nosso servidor envia com os identificadores dos cookies da Meta e do Google Analytics e, na compra, o plano e o valor. Essas conexões também informam o endereço IP e informações do navegador. Cada empresa trata esses dados conforme a sua própria política de privacidade. Não ativamos os sinais do Google nem a personalização de anúncios, e a mensuração não é necessária para usar o MepMail."
         ],
         "list": [
           "Contabo GmbH (Alemanha) — hospedagem da aplicação, do banco de dados e das nossas métricas próprias.",
-          "Amazon Web Services (Amazon SES) — entrega de e-mails e notificações de eventos. Conteúdo e metadados das mensagens passam por ele para a entrega.",
-          "Stripe — processamento de pagamentos, faturas e recibos.",
-          "Cloudflare — DNS, CDN e proteção de rede na frente dos nossos servidores, e o desafio Turnstile que pode proteger login, cadastro e redefinição de senha."
+          "Amazon Web Services (Amazon SES) — entrega dos e-mails e notificações de eventos. Conteúdo e metadados das mensagens passam por ele para a entrega.",
+          "Stripe — pagamentos no cartão e no Pix, faturas e recibos.",
+          "Cloudflare — DNS, CDN e proteção de rede na frente dos nossos servidores; o desafio Turnstile que pode proteger login, cadastro e redefinição de senha; e o armazenamento das cópias de segurança do banco de dados (R2).",
+          "Command Code (commandcode.ai) — verificação automática de abuso: recebe uma amostra dos e-mails já aceitos pelo Envio (assunto e texto) e responde se há sinais de phishing ou spam. Não recebe conteúdo do Correio nem das contas externas.",
+          "Elozi (plataforma de atendimento da JE4NDEV, a mesma responsável pelo MepMail) — chat de suporte, com assistentes de IA e atendimento humano.",
+          "Gravatar (Automattic) — recebe o código (hash) do endereço de um remetente para mostrar a foto dele."
         ]
       },
       {
-        "title": "6. Retenção",
+        "title": "8. Retenção",
         "body": [
-          "Dados de conta e de envio são mantidos enquanto a conta estiver ativa. Após a exclusão da conta, removemos os dados pessoais em até 30 dias, exceto quando a retenção for exigida (por exemplo, registros de cobrança guardados por obrigações fiscais e contábeis) ou quando logs limitados de entrega forem necessários para segurança. Estatísticas agregadas e não identificáveis podem ser mantidas.",
+          "Dados de conta, de envio e do Correio são mantidos enquanto a conta estiver ativa. No Correio, uma mensagem fica até você apagá-la: ao esvaziar a lixeira ou excluir para sempre, ela sai na hora, e as cópias de segurança expiram em até 30 dias. As cópias de uma conta externa e a credencial dela são apagadas quando você a desconecta.",
+          "Após a exclusão da conta, removemos os dados pessoais em até 30 dias, exceto quando a retenção for exigida (por exemplo, registros de cobrança guardados por obrigações fiscais e contábeis) ou quando logs limitados de entrega forem necessários para segurança. Estatísticas agregadas e não identificáveis podem ser mantidas.",
           "A preferência de publicidade pode ser retirada pelo link no rodapé. A retirada interrompe novos envios e cancela os eventos ainda pendentes; não apaga eventos que já chegaram à Meta ou ao Google. Não enviamos eventos anteriores à sua permissão."
         ]
       },
       {
-        "title": "7. Segurança",
+        "title": "9. Segurança",
         "body": [
-          "O tráfego é criptografado em trânsito (TLS). O conteúdo das mensagens é criptografado em repouso. Senhas são armazenadas como hash. O acesso a sistemas de produção é restrito ao operador, e chaves de API são armazenadas apenas como hash, com um prefixo curto para identificação."
+          "O tráfego é criptografado em trânsito (TLS). O conteúdo das mensagens, os anexos e as credenciais de contas externas são criptografados em repouso. Senhas são armazenadas como hash. O acesso a sistemas de produção é restrito ao operador, e chaves de API são armazenadas apenas como hash, com um prefixo curto para identificação."
         ]
       },
       {
-        "title": "8. Seus direitos",
+        "title": "10. Apps",
+        "body": [
+          "Os apps para Windows, Linux, macOS e Android mostram o mesmo serviço do site e seguem esta política. O app para computador pode guardar uma cópia das mensagens para leitura sem internet no próprio aparelho, apagada quando você sai da conta. O app Android não mostra compras nem faz mensuração de publicidade."
+        ]
+      },
+      {
+        "title": "11. Seus direitos",
         "body": [
           "Conforme onde você mora, você pode pedir acesso, correção, portabilidade, restrição ou exclusão dos seus dados pessoais, e se opor ao tratamento. Você pode excluir a sua conta direto pelo painel e falar conosco em jean@mepmail.dev para qualquer pedido de privacidade. Respondemos em até 30 dias."
         ]
       },
       {
-        "title": "9. Transferências internacionais",
+        "title": "12. Transferências internacionais",
         "body": [
-          "A aplicação e o banco de dados rodam na Alemanha (Contabo). A entrega de e-mails (Amazon SES) e os pagamentos (Stripe) processam dados nos Estados Unidos e em outros países onde esses provedores operam, e a Cloudflare opera no mundo todo. As transferências se apoiam nas cláusulas contratuais padrão desses provedores e salvaguardas equivalentes."
+          "A aplicação e o banco de dados rodam na Alemanha (Contabo). A entrega de e-mails (Amazon SES), os pagamentos (Stripe), a verificação de abuso (Command Code) e os assistentes de IA do suporte processam dados nos Estados Unidos e em outros países onde esses provedores operam, e a Cloudflare opera no mundo todo. As transferências se apoiam nas cláusulas contratuais padrão desses provedores e salvaguardas equivalentes."
         ]
       },
       {
-        "title": "10. Cookies",
+        "title": "13. Cookies",
         "body": [
-          "Cookies essenciais mantêm a sessão, o idioma e a sua preferência de publicidade. Cookies opcionais da Meta, como _fbp e _fbc, e do Google, como _ga e _gcl_aw, só são usados após permitir a mensuração. A preferência começa sem permissão; recusar ou retirar a permissão mantém o serviço funcionando. O link “Preferências de publicidade” no rodapé permite revisar a escolha. A mensuração é restrita às páginas públicas de oferta e aos eventos de checkout e pagamento confirmados, sem conteúdo do painel ou das caixas."
+          "Cookies essenciais mantêm a sessão, o idioma e a sua preferência de publicidade. Cookies opcionais da Meta, como _fbp e _fbc, e do Google, como _ga e _gcl_aw, só são usados após permitir a mensuração. A preferência começa sem permissão; recusar ou retirar a permissão mantém o serviço funcionando. O link “Preferências de publicidade” no rodapé permite revisar a escolha. A mensuração é restrita às páginas públicas de oferta e aos eventos de checkout e pagamento confirmados, sem conteúdo do painel ou das caixas. No app Android não há mensuração de publicidade, mesmo que o navegador tenha a permissão."
         ]
       },
       {
-        "title": "11. Mudanças",
+        "title": "14. Mudanças",
         "body": [
           "Podemos atualizar esta política. Mudanças materiais são anunciadas por e-mail ou nesta página antes de entrarem em vigor."
         ]

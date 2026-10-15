@@ -8,6 +8,7 @@ import {
 } from "@millionsend/billing";
 import { env } from "@millionsend/config";
 import type { Db } from "@millionsend/db";
+import { isAndroidAppRequest } from "@/lib/android-app";
 
 /**
  * Queues a finished sign-up for Meta (CompleteRegistration) and GA4 (sign_up)
@@ -20,6 +21,9 @@ export async function recordSignupAdvertising(
   userId: string,
   requestHeaders: Headers | undefined,
 ): Promise<void> {
+  // The Android app carries no advertising measurement, even when this browser (whose
+  // cookies Chrome shares with the app) accepted it on the web.
+  if (isAndroidAppRequest(requestHeaders)) return;
   try {
     const cookieHeader = requestHeaders?.get("cookie") ?? null;
     const proof = decodeConsentProof(
