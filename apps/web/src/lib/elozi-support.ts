@@ -21,6 +21,7 @@ type WidgetModule = {
     options: EloziSupportConfig & {
       apiOrigin: string;
       identity: SupportIdentity;
+      requestTimeoutMs: number;
       getIdentityToken: (expected: SupportIdentity) => Promise<string>;
     },
   ) => SaasHandle;
@@ -145,6 +146,7 @@ export function createEloziSupportSession(
           widget = module.createSaasWebchat({
             ...options,
             identity: account.identity,
+            requestTimeoutMs: 15_000,
             // A late callback for an account this window no longer holds is refused
             // here, before and after the request (the server refuses it too: 409/401).
             getIdentityToken: async (expected) => {

@@ -6,6 +6,7 @@ import {
   createEloziSupportSession,
   ELOZI_SUPPORT_ORIGIN,
   resolveEloziSupportChannel,
+  type SupportIdentity,
 } from "@/lib/elozi-support";
 import en from "../messages/en/support.json";
 import pt from "../messages/pt-BR/support.json";
@@ -130,4 +131,65 @@ describe("page-scoped visitor support", () => {
     });
     session.destroy();
   });
+});
+
+describe("identified support request budget", () => {
+  it.each(["signed-out", "account-changed"] as const)(
+    "allows an eleven-second renewal but refuses its late response after %s",
+    async (change) => {
+      vi.useFakeTimers();
+      const identity = { accountId: "team_1", userId: "user_1" };
+      const widget = { open: vi.fn(), destroy: vi.fn(), setAccount: vi.fn(() => true) };
+      let renew: () => Promise<string> = () => Promise.reject(new Error("Widget not mounted"));
+      const module = {
+        createSaasWebchat(options: {
+          identity: SupportIdentity;
+          requestTimeoutMs?: number;
+          getIdentityToken: (expected: SupportIdentity) => Promise<string>;
+        }) {
+          // Model the public widget's timeout contract, using the consumer's supplied budget.
+          renew = () =>
+            new Promise((resolve, reject) => {
+              const timer = setTimeout(
+                () => reject(new Error("Widget identity timeout")),
+                options.requestTimeoutMs ?? 10_000,
+              );
+              options.getIdentityToken(options.identity).then(
+                (token) => {
+                  clearTimeout(timer);
+                  resolve(token);
+                },
+                (error) => {
+                  clearTimeout(timer);
+                  reject(error);
+                },
+              );
+            });
+          return widget;
+        },
+      };
+      const provider = vi.fn(async (expected?: SupportIdentity) => {
+        if (expected) await new Promise((resolve) => setTimeout(resolve, 11_000));
+        return { token: "fresh.identity.token", identity };
+      });
+      const session = createEloziSupportSession(config, vi.fn(), async () => module, provider);
+      try {
+        expect(await session.open()).toBe(true);
+        const renewed = expect(renew()).resolves.toBe("fresh.identity.token");
+        await vi.advanceTimersByTimeAsync(11_000);
+        await renewed;
+        expect(provider).toHaveBeenLastCalledWith(identity);
+
+        const late = expect(renew()).rejects.toThrow("Support identity changed");
+        await vi.advanceTimersByTimeAsync(5_000);
+        session.invalidate(change);
+        expect(widget.setAccount).toHaveBeenLastCalledWith(null);
+        await vi.advanceTimersByTimeAsync(6_000);
+        await late;
+      } finally {
+        session.destroy();
+        vi.useRealTimers();
+      }
+    },
+  );
 });
