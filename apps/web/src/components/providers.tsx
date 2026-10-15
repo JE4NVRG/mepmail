@@ -1,9 +1,10 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createTRPCClient, httpBatchStreamLink } from "@trpc/client";
+import { createTRPCClient } from "@trpc/client";
 import { useState } from "react";
-import superjson from "superjson";
+import { createBrowserTrpcTransport } from "@/lib/browser-trpc-transport";
+import { supportSessionLink } from "@/lib/support-session-signal";
 import { TRPCProvider } from "@/lib/trpc";
 import { trpcErrorCode } from "@/lib/trpc-error";
 import type { AppRouter } from "@/server/routers";
@@ -38,9 +39,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const queryClient = getQueryClient();
   const [trpcClient] = useState(() =>
     createTRPCClient<AppRouter>({
-      // Still batched, but each answer streams back as soon as it is ready, so a
-      // slow query (the Correio list) never holds the folders and counters behind it.
-      links: [httpBatchStreamLink({ url: "/api/trpc", transformer: superjson })],
+      // Mutations finish before headers are sent, so an async team switch can set its
+      // cookie. Queries still stream, keeping slow lists from holding fast counters.
+      // A team switch, a new team or an accepted invitation tells the support chat's
+      // windows that the account changed (lib/support-session-signal.ts).
+      links: [supportSessionLink, createBrowserTrpcTransport()],
     }),
   );
   return (

@@ -6,7 +6,7 @@ import { eloziSupportChannel } from "@/lib/elozi-support";
 import { getActiveMembership } from "./membership";
 
 /**
- * Verified identity for the Elozi support chat (contract 0.51.16): the chat
+ * Verified identity for the Elozi support chat (account/user contract v2): the chat
  * knows who is writing, so Jean answers the right account. The token is signed
  * here and only here; the secret never reaches the browser.
  *
@@ -30,12 +30,21 @@ export function eloziIdentityKey(
 }
 
 export interface EloziIdentityClaims {
+  v: 2;
+  accountId: string;
   sub: string;
   email: string;
   email_verified: boolean;
   name: string;
   locale: "pt-BR" | "en";
-  ctx: { teamId: string; teamName: string; plan: string; mailboxes: number };
+  ctx: {
+    teamId: string;
+    teamName: string;
+    plan: string;
+    mailboxes: number;
+    accountName: string;
+    product: "mepmail";
+  };
 }
 
 const base64url = (value: string | Buffer) => Buffer.from(value).toString("base64url");
@@ -47,6 +56,15 @@ export function signEloziIdentity(
   channelId: string = eloziSupportChannel.channelId,
   now: Date = new Date(),
 ): string {
+  // Do not sign a contradictory account context, even for an internal caller.
+  if (
+    claims.v !== 2 ||
+    !claims.accountId ||
+    !claims.sub ||
+    claims.ctx.teamId !== claims.accountId
+  ) {
+    throw new Error("Invalid support identity scope");
+  }
   const iat = Math.floor(now.getTime() / 1000);
   const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT", kid: key.kid }));
   const payload = base64url(
@@ -79,7 +97,10 @@ export async function supportIdentityClaims(
   preferredTeamId?: string,
 ): Promise<EloziIdentityClaims | null> {
   const membership = await getActiveMembership(db, user.id, preferredTeamId);
-  if (!membership) return null;
+  // An invalid/stale selection must not silently send another team's identity.
+  if (!membership || (preferredTeamId !== undefined && membership.teamId !== preferredTeamId)) {
+    return null;
+  }
   let mailboxes = 0;
   let correio = false;
   const [extension] = await db
@@ -98,6 +119,8 @@ export async function supportIdentityClaims(
     correio = mailboxServiceActive(plan);
   }
   return {
+    v: 2,
+    accountId: membership.teamId,
     sub: user.id,
     email: user.email,
     email_verified: user.emailVerified,
@@ -106,6 +129,8 @@ export async function supportIdentityClaims(
     ctx: {
       teamId: membership.teamId,
       teamName: clip(membership.teamName, 120),
+      accountName: clip(membership.teamName, 120),
+      product: "mepmail",
       plan: `${membership.plan}${correio ? "+correio" : ""}`,
       mailboxes,
     },

@@ -5,8 +5,9 @@ import {
   createEloziSupportSession,
   type EloziSupportConfig,
   type EloziSupportStatus,
-  fetchEloziIdentityToken,
+  fetchEloziIdentity,
 } from "@/lib/elozi-support";
+import { onSupportSessionChange } from "@/lib/support-session-signal";
 
 export type SupportChatWindowLabels = {
   title: string;
@@ -33,10 +34,25 @@ export function SupportChatWindow({
       config,
       setStatus,
       undefined,
-      identified ? () => fetchEloziIdentityToken() : undefined,
+      identified ? (expected) => fetchEloziIdentity(expected) : undefined,
     );
+    const checkAccount = () => {
+      if (!document.hidden) void session.reconcile();
+    };
+    window.addEventListener("focus", checkAccount);
+    document.addEventListener("visibilitychange", checkAccount);
+    // A sign-out or team switch in another window ends this chat's capability at once,
+    // even with the panel closed or this window in the background.
+    const stopListening = onSupportSessionChange((kind) => {
+      session.invalidate(kind);
+    });
     void session.open();
-    return () => session.destroy();
+    return () => {
+      stopListening();
+      window.removeEventListener("focus", checkAccount);
+      document.removeEventListener("visibilitychange", checkAccount);
+      session.destroy();
+    };
   }, [config, identified]);
   return (
     <main className="support-chat-window">
