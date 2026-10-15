@@ -157,6 +157,7 @@ export {
   cancelTeamRenewal,
   cancelTeamSubscription,
   changeRung,
+  RenewalCancelError,
   type RungChange,
   reconcileTeamPlan,
   setOverage,

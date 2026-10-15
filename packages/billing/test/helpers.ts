@@ -131,6 +131,12 @@ export function fakeStripe() {
     listParams: undefined as Stripe.SubscriptionListParams | undefined,
     cancels: [] as string[],
     updates: [] as [string, Stripe.SubscriptionUpdateParams][],
+    /** Stripe's idempotency store: key -> the first request's params and response. */
+    idempotency: new Map<string, { params: string; response: Stripe.Subscription }>(),
+    /** Keys answered from the store (a replay), in order. */
+    replays: [] as string[],
+    /** The next update applies, then its response is lost (a network failure). */
+    loseNextUpdateResponse: false,
     itemCreates: [] as Stripe.SubscriptionItemCreateParams[],
     itemUpdates: [] as [string, Stripe.SubscriptionItemUpdateParams | undefined][],
     itemDeletes: [] as string[],
@@ -209,7 +215,24 @@ export function fakeStripe() {
           .reverse();
         return { data: data.slice(0, params.limit ?? data.length) };
       },
-      async update(id: string, params: Stripe.SubscriptionUpdateParams = {}) {
+      async update(
+        id: string,
+        params: Stripe.SubscriptionUpdateParams = {},
+        options?: Stripe.RequestOptions,
+      ) {
+        // Like Stripe: a key seen before answers with the first response, without applying
+        // anything, whatever changed since; the same key with other params is refused.
+        const key = options?.idempotencyKey;
+        const seen = key ? state.idempotency.get(key) : undefined;
+        if (key && seen) {
+          if (seen.params !== JSON.stringify(params))
+            throw new Error(
+              "Keys for idempotent requests can only be used with the same parameters",
+            );
+          state.calls.push("subscriptions.update (replay)");
+          state.replays.push(key);
+          return structuredClone(seen.response);
+        }
         state.calls.push("subscriptions.update");
         state.updates.push([id, params]);
         const s = sub(id);
@@ -244,6 +267,15 @@ export function fakeStripe() {
           const current = s.items.data[idx];
           if (change.deleted) s.items.data.splice(idx, 1);
           else if (change.price && current) current.price = repriced(current.price, change.price);
+        }
+        if (key)
+          state.idempotency.set(key, {
+            params: JSON.stringify(params),
+            response: structuredClone(s),
+          });
+        if (state.loseNextUpdateResponse) {
+          state.loseNextUpdateResponse = false;
+          throw new Error("network error: the response was lost");
         }
         return s;
       },

@@ -16,6 +16,7 @@ import {
   metaConversionConfigured,
   openPixInvoices,
   PixBillingError,
+  RenewalCancelError,
   readGoogleConversionConfig,
   readMetaConversionConfig,
   rungFromSubscription,
@@ -560,22 +561,34 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
      * and does not renew. Not a purchase, so the Android app can do it too (no portal there:
      * the portal also sells); undoing it is a purchase decision, left to the web's portal.
      * Owner or admin, never paused: stopping a payment must always be possible.
+     * `operationId` is minted per request by the client and reused only by its retries; the
+     * answer is Stripe's current state, so a replayed key never reads as a cancel.
      */
-    cancelRenewal: adminProcedure.mutation(async ({ ctx }) => {
-      requireCloud();
-      const team = await loadTeam(ctx.db, ctx.teamId);
-      assertBillable(team);
-      if (!hasLiveSubscription(team.planStatus) || !team.stripeSubscriptionId)
-        throw new TRPCError({ code: "PRECONDITION_FAILED" });
-      const result = await cancelTeamRenewal({ db: ctx.db, stripe: deps.stripe() }, ctx.teamId);
-      if (!result) throw new TRPCError({ code: "PRECONDITION_FAILED" });
-      await recordAudit(ctx, {
-        action: "billing.renewal_canceled",
-        target: { type: "team", id: ctx.teamId },
-        metadata: { cancelAt: result.cancelAt?.toISOString() ?? null },
-      });
-      return { cancelAt: result.cancelAt };
-    }),
+    cancelRenewal: adminProcedure
+      .input(z.object({ operationId: z.uuid() }).strict())
+      .mutation(async ({ ctx, input }) => {
+        requireCloud();
+        const team = await loadTeam(ctx.db, ctx.teamId);
+        assertBillable(team);
+        if (!hasLiveSubscription(team.planStatus) || !team.stripeSubscriptionId)
+          throw new TRPCError({ code: "PRECONDITION_FAILED" });
+        const result = await cancelTeamRenewal(
+          { db: ctx.db, stripe: deps.stripe() },
+          ctx.teamId,
+          input.operationId,
+        ).catch((error: unknown) => {
+          if (error instanceof RenewalCancelError)
+            throw new TRPCError({ code: "CONFLICT", message: "renewal_not_cancelled" });
+          throw error;
+        });
+        if (!result) throw new TRPCError({ code: "PRECONDITION_FAILED" });
+        await recordAudit(ctx, {
+          action: "billing.renewal_canceled",
+          target: { type: "team", id: ctx.teamId },
+          metadata: { cancelAt: result.cancelAt?.toISOString() ?? null },
+        });
+        return { cancelAt: result.cancelAt };
+      }),
   });
 }
 

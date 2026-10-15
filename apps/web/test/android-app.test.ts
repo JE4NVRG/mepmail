@@ -274,14 +274,23 @@ describe("Android app: nothing is sold there (server)", () => {
       .where(eq(schema.teams.id, teamId));
     billing.cancelRenewal.mockClear();
     const owner = await callers(teamId, "owner");
-    await expect(owner.app.billing.cancelRenewal()).resolves.toEqual({
+    const operationId = "6f1d5b3a-2c4e-4f8a-9b7c-1d2e3f4a5b6c";
+    await expect(owner.app.billing.cancelRenewal({ operationId })).resolves.toEqual({
       cancelAt: new Date("2026-11-14T00:00:00.000Z"),
     });
-    expect(billing.cancelRenewal).toHaveBeenCalledWith(expect.anything(), teamId);
+    expect(billing.cancelRenewal).toHaveBeenCalledWith(expect.anything(), teamId, operationId);
     // A member cannot, on the app or the web: the same rule as every billing change.
     const member = await callers(teamId, "member");
-    await expect(member.app.billing.cancelRenewal()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(member.app.billing.cancelRenewal({ operationId })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
     expect(billing.cancelRenewal).toHaveBeenCalledTimes(1);
+    // Stripe's current state still renews (a replayed answer, say): no success is reported.
+    const { RenewalCancelError } = await import("@millionsend/billing");
+    billing.cancelRenewal.mockRejectedValueOnce(new RenewalCancelError());
+    await expect(
+      owner.app.billing.cancelRenewal({ operationId: "0b8e2f3c-5d6a-4b7c-8d9e-0f1a2b3c4d5e" }),
+    ).rejects.toMatchObject({ code: "CONFLICT", message: "renewal_not_cancelled" });
     // The Correio license: the app may only cancel the renewal; resuming it, changing the
     // quantity or reconciling it are purchases and stay on the web.
     for (const action of ["resume", "quantity", "reconcile"] as const) {

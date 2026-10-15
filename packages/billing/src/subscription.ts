@@ -639,16 +639,35 @@ export async function setOverage(
     .where(eq(schema.teams.id, input.teamId));
 }
 
+/** The renewal was asked to stop, but Stripe's current state still renews: nothing to confirm. */
+export class RenewalCancelError extends Error {
+  constructor() {
+    super("renewal_not_cancelled");
+    this.name = "RenewalCancelError";
+  }
+}
+
+/** One cancel request: a UUID minted per request and reused only by that request's retries. */
+const OPERATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 /**
  * Stops the renewal of the team's Send subscription: it keeps the plan until the end of the
  * period already paid for and then ends (cancel_at_period_end), with no invoice, no refund and
- * no plan offered. The row then follows from the same subscription read the webhook applies.
- * Null without a live Send subscription; calling it again changes nothing.
+ * no plan offered. Null without a live Send subscription.
+ *
+ * `operationId` names this one request. The Stripe idempotency key is built from it, so a retry
+ * of the same request never applies twice, while a later cancel (after a reactivation on the
+ * web, say) is a new operation that Stripe applies instead of replaying the first answer. And
+ * success is read from Stripe's current subscription, never from the update's response, which
+ * a replay would return unchanged.
  */
 export async function cancelTeamRenewal(
   deps: BillingDeps,
   teamId: string,
+  operationId: string,
 ): Promise<{ cancelAt: Date | null } | null> {
+  if (!OPERATION_ID.test(operationId))
+    throw new Error("cancelTeamRenewal: operationId must be a UUID");
   const team = await loadBillingColumns(deps.db, teamId);
   if (!team?.stripeSubscriptionId) return null;
   const sub = await deps.stripe.subscriptions.retrieve(team.stripeSubscriptionId, {
@@ -664,9 +683,13 @@ export async function cancelTeamRenewal(
     await deps.stripe.subscriptions.update(
       sub.id,
       { cancel_at_period_end: true },
-      { idempotencyKey: `send-renewal-cancel:${teamId}:${sub.id}` },
+      { idempotencyKey: `send-renewal-cancel:${sub.id}:${operationId}` },
     );
   }
+  const current = await deps.stripe.subscriptions.retrieve(sub.id, {
+    expand: SUBSCRIPTION_EXPAND,
+  });
+  if (current.cancel_at_period_end !== true) throw new RenewalCancelError();
   await reconcileTeamPlan(deps, teamId);
   const [row] = await deps.db
     .select({ cancelAt: schema.teams.cancelAt })

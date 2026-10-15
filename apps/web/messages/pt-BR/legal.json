@@ -97,7 +97,7 @@
   },
   "privacy": {
     "title": "Política de Privacidade",
-    "updated": "Última atualização: 14 de outubro de 2026",
+    "updated": "Última atualização: 15 de outubro de 2026",
     "intro": "Esta política explica quais dados o MepMail coleta, como eles são usados e quais escolhas você tem. Ela é curta de propósito: coletar pouco, criptografar o que é sensível e nomear os provedores.",
     "sections": [
       {
@@ -168,26 +168,26 @@
       {
         "title": "7. Provedores",
         "body": [
-          "Usamos uma lista deliberadamente curta de provedores para operar o serviço. A maioria trata os dados só em nosso nome. Alguns também os tratam conforme os próprios termos: a Command Code e os provedores que hospedam o modelo dela, o OpenCode e o provedor dos modelos do suporte, o Telegram e o Gravatar; por isso descrevemos cada um abaixo, com o que recebe. As métricas das páginas usam o Umami, que hospedamos nos nossos próprios servidores, sem cookies nem rastreamento entre sites.",
+          "Usamos uma lista deliberadamente curta de provedores para operar o serviço. A maioria trata os dados só em nosso nome. Alguns também os tratam conforme os próprios termos: a Command Code e os provedores que hospedam o modelo dela, o OpenCode e o provedor dos modelos do suporte, e o Gravatar; por isso descrevemos cada um abaixo, com o que recebe. As métricas das páginas usam o Umami, que hospedamos nos nossos próprios servidores, sem cookies nem rastreamento entre sites.",
           "Se você permitir a mensuração de publicidade, a Meta e o Google recebem os eventos opcionais descritos nesta política: a Meta pelo Pixel e pelos eventos de cadastro concluído e de compra, o Google pelo Google Analytics nas páginas públicas e pelos eventos de cadastro concluído e de compra inicial de plano pago, que o nosso servidor envia com os identificadores dos cookies da Meta e do Google Analytics e, na compra, o plano e o valor. Essas conexões também informam o endereço IP e informações do navegador. Cada empresa trata esses dados conforme a sua própria política de privacidade. Não ativamos os sinais do Google nem a personalização de anúncios, e a mensuração não é necessária para usar o MepMail."
         ],
         "list": [
           "Contabo GmbH (Alemanha) — hospedagem da aplicação, do banco de dados, da plataforma de suporte Elozi e das nossas métricas próprias.",
-          "Amazon Web Services (EUA; Irlanda como contingência) — o Amazon SES entrega os e-mails do Envio e do Correio e recebe os e-mails das caixas, com o conteúdo e os metadados das mensagens. A cópia de cada e-mail recebido fica num armazenamento privado e criptografado (Amazon S3), configurado para expirar em 30 dias. As filas de eventos (SQS e SNS) e as chaves de criptografia (KMS) também rodam na AWS.",
+          "Amazon Web Services (EUA; Irlanda como contingência) — o Amazon SES entrega os e-mails do Envio e do Correio e recebe os e-mails das caixas, com o conteúdo e os metadados das mensagens. A cópia de cada e-mail recebido fica num armazenamento privado e criptografado da AWS (Amazon S3), separada da caixa. As filas de eventos (SQS e SNS) e as chaves de criptografia (KMS) também rodam na AWS.",
           "Stripe — pagamentos no cartão e no Pix, faturas e recibos.",
           "Cloudflare — DNS, CDN e proteção de rede na frente dos nossos servidores; o desafio Turnstile que pode proteger login, cadastro e redefinição de senha; e o armazenamento (R2) das cópias de segurança do banco de dados e das imagens que você envia (foto de perfil e logos da equipe e da assinatura, publicadas por link).",
           "Command Code (Langbase, Inc., EUA) — verificação automática de abuso. Recebe uma amostra dos e-mails já aceitos pelo Envio: remetente, endereço de resposta, assunto, texto visível, domínios dos links e nomes dos anexos, além do nome, do plano, da idade e dos domínios verificados da equipe; nunca os destinatários. Responde se há sinais de phishing ou spam com o modelo DeepSeek V4.1 Flash, que a Command Code encaminha a provedores que hospedam o modelo, conforme os termos deles. Segundo a política da Command Code, esse conteúdo pode ficar guardado por até 30 dias para operar e proteger o serviço (não usamos o modo de retenção zero) e não é usado para treinar os modelos dela. Não recebe conteúdo do Correio nem das contas externas.",
           "Elozi (plataforma de atendimento da própria JE4NDEV, responsável pelo MepMail, hospedada nos nossos servidores) — o chat de suporte e o e-mail suporte@mepmail.dev, com assistentes de IA e atendimento humano. As conversas ficam guardadas na Elozi.",
           "Gravatar (Automattic) — recebe o código (hash) do endereço de um remetente para mostrar a foto dele.",
           "OpenCode Go (Anomaly, EUA) — os modelos de IA (DeepSeek) dos assistentes do suporte: recebem as mensagens da conversa ou do e-mail de suporte, a identificação da conta quando você está logado e as imagens que você anexa. O OpenCode declara que não guarda esse conteúdo e o repassa ao provedor do modelo. Para o modelo de texto em uso, publica retenção zero por um acordo renovado todo mês; o modelo que lê imagens não tem prazo publicado.",
-          "Telegram — avisos internos à nossa equipe sobre cada novo cadastro: e-mail, nome, idioma e a origem do cadastro (campanha e página de entrada)."
+          "Telegram — até outubro de 2026, os avisos internos à nossa equipe sobre cada novo cadastro (e-mail, nome, idioma e a origem do cadastro) passavam pelo Telegram. Esse aviso foi desligado e não envia dados novos; os avisos já enviados continuam no chat interno da equipe."
         ]
       },
       {
         "title": "8. Retenção",
         "body": [
           "Os dados da conta e do Correio ficam enquanto a conta estiver ativa. No Envio, o conteúdo das mensagens é apagado 30 dias depois do envio; os metadados (destinatário, assunto, status e eventos) e os logs das requisições à API também saem em 30 dias, e ficam só contadores e resultados agregados. Os resultados da verificação de abuso (nota e motivo, sem o conteúdo) ficam 90 dias.",
-          "No Correio, as mensagens recebidas e os rascunhos ficam até você apagá-los: ao esvaziar a lixeira ou excluir para sempre, eles saem na hora. As mensagens enviadas pelo Correio não se excluem uma a uma, porque são o registro do envio e contam o uso de envio do período: elas são eliminadas junto com a caixa ou com a conta. Uma caixa excluída pode ser restaurada por 30 dias e depois é apagada com todas as mensagens; se ela enviou e-mails no período de cobrança em curso, a eliminação espera esse período terminar. A cópia de cada e-mail recebido na AWS está configurada para expirar em 30 dias, e as cópias de segurança expiram em até 30 dias. As cópias de uma conta externa e a credencial dela são apagadas quando você a desconecta.",
+          "No Correio, as mensagens recebidas e os rascunhos ficam até você apagá-los: ao esvaziar a lixeira ou excluir para sempre, eles saem na hora. As mensagens enviadas pelo Correio não se excluem uma a uma, porque são o registro do envio e contam o uso de envio do período: elas são eliminadas junto com a caixa ou com a conta. Uma caixa excluída pode ser restaurada por 30 dias e depois é apagada com todas as mensagens; se ela enviou e-mails no período de cobrança em curso, a eliminação espera esse período terminar. A cópia de cada e-mail recebido guardada na AWS é separada da caixa: apagar a mensagem no Correio não a remove de lá. As cópias de segurança expiram em até 30 dias. As cópias de uma conta externa e a credencial dela são apagadas quando você a desconecta.",
           "Após a exclusão da conta, removemos os dados pessoais em até 30 dias, exceto quando a retenção for exigida (por exemplo, registros de cobrança guardados por obrigações fiscais e contábeis) ou quando logs limitados de entrega forem necessários para segurança. Estatísticas agregadas e não identificáveis podem ser mantidas.",
           "A preferência de publicidade pode ser retirada pelo link no rodapé. A retirada interrompe novos envios e cancela os eventos ainda pendentes; não apaga eventos que já chegaram à Meta ou ao Google. Não enviamos eventos anteriores à sua permissão."
         ]
@@ -213,7 +213,7 @@
       {
         "title": "12. Transferências internacionais",
         "body": [
-          "A aplicação, o banco de dados e a Elozi rodam na Alemanha (Contabo). A AWS (nos EUA e, em contingência, na Irlanda), o Stripe, a Command Code, o OpenCode, o Gravatar e o Telegram processam dados nos Estados Unidos e em outros países onde operam, e a Cloudflare opera no mundo todo. Quando o provedor oferece, as transferências se apoiam nas cláusulas contratuais padrão dele ou em salvaguardas equivalentes."
+          "A aplicação, o banco de dados e a Elozi rodam na Alemanha (Contabo). A AWS (nos EUA e, em contingência, na Irlanda), o Stripe, a Command Code, o OpenCode e o Gravatar processam dados nos Estados Unidos e em outros países onde operam, assim como o Telegram, para os avisos de cadastro enviados antes do desligamento, e a Cloudflare opera no mundo todo. Quando o provedor oferece, as transferências se apoiam nas cláusulas contratuais padrão dele ou em salvaguardas equivalentes."
         ]
       },
       {

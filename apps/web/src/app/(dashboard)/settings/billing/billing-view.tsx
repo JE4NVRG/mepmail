@@ -393,7 +393,8 @@ export function BillingView({
                 cancelLabel: t("app.keep"),
                 danger: true,
               });
-              if (confirmed) cancelRenewal.mutate();
+              // One identity per cancel request; the server confirms on Stripe's state.
+              if (confirmed) cancelRenewal.mutate({ operationId: crypto.randomUUID() });
             }}
           >
             {t("app.cancelRenewal")}

@@ -97,7 +97,7 @@
   },
   "privacy": {
     "title": "Privacy Policy",
-    "updated": "Last updated: October 14, 2026",
+    "updated": "Last updated: October 15, 2026",
     "intro": "This policy explains what data MepMail collects, how it is used and what choices you have. It is short on purpose: collect little, encrypt what is sensitive and name the providers.",
     "sections": [
       {
@@ -168,26 +168,26 @@
       {
         "title": "7. Providers",
         "body": [
-          "We use a deliberately short list of providers to run the service. Most handle the data only on our behalf. Some also handle it under their own terms: Command Code and the providers that host its model, OpenCode and the provider of the support models, Telegram and Gravatar; that is why we describe each one below, with what it receives. Page metrics use Umami, which we host on our own servers, with no cookies and no cross-site tracking.",
+          "We use a deliberately short list of providers to run the service. Most handle the data only on our behalf. Some also handle it under their own terms: Command Code and the providers that host its model, OpenCode and the provider of the support models, and Gravatar; that is why we describe each one below, with what it receives. Page metrics use Umami, which we host on our own servers, with no cookies and no cross-site tracking.",
           "If you allow advertising measurement, Meta and Google receive the optional events described in this policy: Meta through the Pixel and the sign-up completion and purchase events, Google through Google Analytics on public pages and the sign-up completion and first paid-plan purchase events, which our server sends with the Meta and Google Analytics cookie identifiers and, for the purchase, the plan and value. These connections also share the IP address and browser information. Each company handles this data under its own privacy policy. We do not turn on Google signals or ad personalization, and measurement is not needed to use MepMail."
         ],
         "list": [
           "Contabo GmbH (Germany) — hosting for the application, the database, the Elozi support platform and our own metrics.",
-          "Amazon Web Services (United States; Ireland as a fallback) — Amazon SES delivers the Send and Correio emails and receives the mailboxes' emails, with the messages' content and metadata. The copy of each received email sits in private, encrypted storage (Amazon S3), set to expire after 30 days. The event queues (SQS and SNS) and the encryption keys (KMS) also run on AWS.",
+          "Amazon Web Services (United States; Ireland as a fallback) — Amazon SES delivers the Send and Correio emails and receives the mailboxes' emails, with the messages' content and metadata. The copy of each received email sits in private, encrypted AWS storage (Amazon S3), apart from the mailbox. The event queues (SQS and SNS) and the encryption keys (KMS) also run on AWS.",
           "Stripe — card and Pix payments, invoices and receipts.",
           "Cloudflare — DNS, CDN and network protection in front of our servers; the Turnstile challenge that can protect sign-in, sign-up and password reset; and storage (R2) of the database backups and of the images you upload (profile picture and team and signature logos, published by link).",
           "Command Code (Langbase, Inc., United States) — automated abuse check. It receives a sample of the emails already accepted by Send: sender, reply-to address, subject, visible text, link domains and attachment names, plus the team's name, plan, age and verified domains; never the recipients. It answers whether they show signs of phishing or spam with the DeepSeek V4.1 Flash model, which Command Code forwards to providers that host the model, under their terms. Under Command Code's policy, this content may be kept for up to 30 days to run and protect the service (we do not use its zero-retention mode) and is not used to train its models. It receives no Correio or external-account content.",
           "Elozi (JE4NDEV's own support platform, the company behind MepMail, hosted on our servers) — the support chat and the suporte@mepmail.dev email, with AI assistants and human support. The conversations are stored in Elozi.",
           "Gravatar (Automattic) — receives the code (hash) of a sender's address to show their picture.",
           "OpenCode Go (Anomaly, United States) — the AI models (DeepSeek) of the support assistants: they receive the messages of the conversation or the support email, your account's identification when you are signed in and the images you attach. OpenCode states that it does not store this content and passes it to the model's provider. For the text model in use it publishes zero retention under an agreement renewed every month; the model that reads images has no published period.",
-          "Telegram — internal notices to our team about each new sign-up: email, name, language and where the sign-up came from (campaign and landing page)."
+          "Telegram — until October 2026, the internal notices to our team about each new sign-up (email, name, language and where the sign-up came from) went through Telegram. That notice is switched off and sends no new data; the notices already sent remain in the team's internal chat."
         ]
       },
       {
         "title": "8. Retention",
         "body": [
           "Account and Correio data are kept while the account is active. In Send, message content is deleted 30 days after sending; the metadata (recipient, subject, status and events) and the API request logs also go after 30 days, leaving only counters and aggregate results. Abuse-check results (score and reason, without the content) are kept for 90 days.",
-          "In Correio, received messages and drafts stay until you delete them: emptying the trash or deleting forever removes them at once. Messages sent from Correio are not deleted one by one, because they are the record of the send and count the period's sending usage: they are erased with the mailbox or with the account. A deleted mailbox can be restored for 30 days and is then erased with all its messages; if it sent email in the billing period under way, the erasure waits for that period to end. The copy of each received email at AWS is set to expire after 30 days, and backup copies expire within 30 days. An external account's copies and its credential are deleted when you disconnect it.",
+          "In Correio, received messages and drafts stay until you delete them: emptying the trash or deleting forever removes them at once. Messages sent from Correio are not deleted one by one, because they are the record of the send and count the period's sending usage: they are erased with the mailbox or with the account. A deleted mailbox can be restored for 30 days and is then erased with all its messages; if it sent email in the billing period under way, the erasure waits for that period to end. The copy of each received email kept at AWS is separate from the mailbox: deleting the message in Correio does not remove it there. Backup copies expire within 30 days. An external account's copies and its credential are deleted when you disconnect it.",
           "After an account is deleted, we remove personal data within 30 days, except where retention is required (for example, billing records kept for tax and accounting obligations) or where limited delivery logs are needed for security. Aggregated, non-identifiable statistics may be kept.",
           "The advertising preference can be withdrawn through the footer link. Withdrawal stops new sends and cancels events still pending; it does not delete events that already reached Meta or Google. We do not send events from before your permission."
         ]
@@ -213,7 +213,7 @@
       {
         "title": "12. International transfers",
         "body": [
-          "The application, the database and Elozi run in Germany (Contabo). AWS (in the United States and, as a fallback, Ireland), Stripe, Command Code, OpenCode, Gravatar and Telegram process data in the United States and other countries where they operate, and Cloudflare operates worldwide. Where the provider offers them, transfers rely on its standard contractual clauses or equivalent safeguards."
+          "The application, the database and Elozi run in Germany (Contabo). AWS (in the United States and, as a fallback, Ireland), Stripe, Command Code, OpenCode and Gravatar process data in the United States and other countries where they operate, as does Telegram for the sign-up notices sent before it was switched off, and Cloudflare operates worldwide. Where the provider offers them, transfers rely on its standard contractual clauses or equivalent safeguards."
         ]
       },
       {
