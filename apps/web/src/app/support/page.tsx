@@ -7,7 +7,6 @@ import { resolveEloziSupportChannel } from "@/lib/elozi-support";
 import { legalLinks } from "@/lib/legal-links";
 import { hasSession } from "@/server/auth";
 import { publicPageUrls } from "@/server/public-seo";
-import { eloziIdentityKey } from "@/server/support-identity";
 import "../landing.css";
 import "./support.css";
 
@@ -52,8 +51,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function SupportPage() {
   const t = await getTranslations("support");
   const l = await getTranslations("landing");
-  // Signed in, with the channel key configured: the chat opens verified.
-  const identified = !!eloziIdentityKey() && (await hasSession());
+  // Signed in: identity is required even when configuration is temporarily unavailable.
+  const identified = await hasSession();
   const site = {
     skip: l("skip"),
     brandAria: l("brandAria"),

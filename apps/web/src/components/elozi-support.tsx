@@ -6,8 +6,9 @@ import {
   createEloziSupportSession,
   type EloziSupportConfig,
   type EloziSupportStatus,
-  fetchEloziIdentityToken,
+  fetchEloziIdentity,
 } from "@/lib/elozi-support";
+import { onSupportSessionChange } from "@/lib/support-session-signal";
 
 export type EloziSupportLabels = {
   eyebrow: string;
@@ -32,7 +33,7 @@ export function EloziSupport({
 }: {
   config: EloziSupportConfig | null;
   labels: EloziSupportLabels;
-  /** A signed-in person with the channel key configured: the chat is verified. */
+  /** Signed in: require verified identity; missing keys must not downgrade to a visitor. */
   identified?: boolean;
 }) {
   const [status, setStatus] = useState<EloziSupportStatus | null>(null);
@@ -43,15 +44,28 @@ export function EloziSupport({
       config,
       setStatus,
       undefined,
-      identified ? () => fetchEloziIdentityToken() : undefined,
+      identified ? (expected) => fetchEloziIdentity(expected) : undefined,
     );
     session.current = current;
+    const checkAccount = () => {
+      if (!document.hidden) void current.reconcile();
+    };
+    window.addEventListener("focus", checkAccount);
+    document.addEventListener("visibilitychange", checkAccount);
+    // A sign-out or team switch in another window ends this chat's capability at once,
+    // even with the panel closed or this window in the background.
+    const stopListening = onSupportSessionChange((kind) => {
+      current.invalidate(kind);
+    });
     // The dashboard's Support link lands on /support#chat: open the chat once.
     if (window.location.hash === "#chat") {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
       void current.open();
     }
     return () => {
+      stopListening();
+      window.removeEventListener("focus", checkAccount);
+      document.removeEventListener("visibilitychange", checkAccount);
       current.destroy();
       session.current = null;
     };

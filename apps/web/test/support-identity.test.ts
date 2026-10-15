@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createEloziSupportSession,
   ELOZI_IDENTITY_ENDPOINT,
+  fetchEloziIdentity,
   fetchEloziIdentityToken,
 } from "@/lib/elozi-support";
 import { openSupportChat, SUPPORT_CHAT_PATH } from "@/lib/support-chat";
@@ -23,12 +24,21 @@ describe("Elozi verified identity", () => {
     const now = new Date("2026-10-10T12:00:00Z");
     const token = signEloziIdentity(
       {
+        v: 2,
+        accountId: "team_1",
         sub: "user_1",
         email: "ana@example.com",
         email_verified: true,
         name: "Ana",
         locale: "pt-BR",
-        ctx: { teamId: "team_1", teamName: "Acme", plan: "pro+correio", mailboxes: 2 },
+        ctx: {
+          teamId: "team_1",
+          teamName: "Acme",
+          plan: "pro+correio",
+          mailboxes: 2,
+          accountName: "Acme",
+          product: "mepmail",
+        },
       },
       KEY,
       CHANNEL,
@@ -40,9 +50,18 @@ describe("Elozi verified identity", () => {
     expect(claims).toMatchObject({
       iss: "https://mepmail.dev",
       aud: `elozi:webchat:${CHANNEL}`,
+      v: 2,
+      accountId: "team_1",
       sub: "user_1",
       email: "ana@example.com",
-      ctx: { teamId: "team_1", teamName: "Acme", plan: "pro+correio", mailboxes: 2 },
+      ctx: {
+        teamId: "team_1",
+        teamName: "Acme",
+        plan: "pro+correio",
+        mailboxes: 2,
+        accountName: "Acme",
+        product: "mepmail",
+      },
     });
     expect(claims.exp - claims.iat).toBe(600);
     expect(claims.iat).toBe(Math.floor(now.getTime() / 1000));
@@ -92,13 +111,55 @@ describe("support identity claims", () => {
       "en",
     );
     expect(claims).toEqual({
+      v: 2,
+      accountId: teamId,
       sub: "u_support",
       email: "ana@acme.test",
       email_verified: true,
       name: "Ana Souza",
       locale: "en",
-      ctx: { teamId, teamName: "acme-support", plan: "free", mailboxes: 0 },
+      ctx: {
+        teamId,
+        teamName: "acme-support",
+        plan: "free",
+        mailboxes: 0,
+        accountName: "acme-support",
+        product: "mepmail",
+      },
     });
+  });
+
+  it("keeps the same user separate on two memberships and rejects an unavailable selection", async () => {
+    const a = await createTeam(db, "account-a");
+    const b = await createTeam(db, "account-b");
+    const foreign = await createTeam(db, "foreign-account");
+    const user = {
+      id: "multi_support",
+      name: "Ana",
+      email: "ana@example.test",
+      emailVerified: true,
+    };
+    await db.insert(schema.user).values(user);
+    await db.insert(schema.teamMembers).values([
+      { teamId: a, userId: user.id, role: "owner" },
+      { teamId: b, userId: user.id, role: "member" },
+    ]);
+    const left = await supportIdentityClaims(db, user, "pt-BR", a);
+    const right = await supportIdentityClaims(db, user, "pt-BR", b);
+    expect(left?.sub).toBe(right?.sub);
+    expect(left?.accountId).toBe(a);
+    expect(right?.accountId).toBe(b);
+    expect(await supportIdentityClaims(db, user, "pt-BR", foreign)).toBeNull();
+    expect(await supportIdentityClaims(db, user, "pt-BR", "")).toBeNull();
+    await db
+      .delete(schema.teamMembers)
+      .where(
+        (await import("drizzle-orm")).and(
+          (await import("drizzle-orm")).eq(schema.teamMembers.userId, user.id),
+          (await import("drizzle-orm")).eq(schema.teamMembers.teamId, b),
+        ),
+      );
+    expect(await supportIdentityClaims(db, user, "pt-BR", b)).toBeNull();
   });
 
   it("returns nothing for a person without a team", async () => {
@@ -130,30 +191,82 @@ describe("support chat from the dashboard", () => {
     expect(assign).toHaveBeenCalledWith(SUPPORT_CHAT_PATH);
   });
 
-  it("reads the token from the same-origin endpoint and falls back to the visitor flow", async () => {
-    const ok = vi.fn(async () => new Response(JSON.stringify({ token: "a.b.c" })));
+  it("requires an identity response from the same-origin endpoint", async () => {
+    const identity = { accountId: "team_1", userId: "user_1" };
+    const ok = vi.fn(async () => Response.json({ token: "a.b.c", identity }));
     expect(await fetchEloziIdentityToken(ok as unknown as typeof fetch)).toBe("a.b.c");
     expect(ok).toHaveBeenCalledWith(ELOZI_IDENTITY_ENDPOINT, {
       credentials: "same-origin",
       cache: "no-store",
     });
-    const missing = vi.fn(async () => new Response(null, { status: 404 }));
-    expect(await fetchEloziIdentityToken(missing as unknown as typeof fetch)).toBeNull();
-    const broken = vi.fn(async () => Promise.reject(new TypeError("offline")));
-    expect(await fetchEloziIdentityToken(broken as unknown as typeof fetch)).toBeNull();
+    await fetchEloziIdentity(identity, ok as unknown as typeof fetch);
+    expect(ok).toHaveBeenLastCalledWith(
+      `${ELOZI_IDENTITY_ENDPOINT}?accountId=team_1&userId=user_1`,
+      {
+        credentials: "same-origin",
+        cache: "no-store",
+      },
+    );
+    for (const code of [401, 403, 409, 503]) {
+      await expect(
+        fetchEloziIdentityToken(async () => new Response(null, { status: code })),
+      ).rejects.toThrow();
+    }
+    await expect(
+      fetchEloziIdentityToken(async () => {
+        throw new TypeError("offline");
+      }),
+    ).rejects.toThrow();
+    await expect(
+      fetchEloziIdentity(identity, async () =>
+        Response.json({
+          token: "a.b.c",
+          identity: { ...identity, accountId: "another" },
+        }),
+      ),
+    ).rejects.toThrow();
   });
 
-  it("hands the identity callback to the widget only when asked to", async () => {
-    const widget = { open: vi.fn(), destroy: vi.fn() };
-    const module = { createWebchatWidget: vi.fn((_options: Record<string, unknown>) => widget) };
-    const identity = vi.fn(async () => "a.b.c");
-    const config = { tenantId: "499f0367", channelId: CHANNEL };
-    await createEloziSupportSession(config, vi.fn(), async () => module, identity).open();
-    expect(module.createWebchatWidget).toHaveBeenCalledWith(
-      expect.objectContaining({ getIdentityToken: identity }),
+  it("hands a verified account/user to the SaaS manager and destroys it on leaving", async () => {
+    const identity = { accountId: "team_1", userId: "user_1" };
+    const widget = { open: vi.fn(), destroy: vi.fn(), setAccount: vi.fn() };
+    const module = { createSaasWebchat: vi.fn((_options: Record<string, unknown>) => widget) };
+    const provider = vi.fn(async () => ({ token: "a.b.c", identity }));
+    const config = { tenantId: "fixture_tenant", channelId: "fixture_channel" };
+    const session = createEloziSupportSession(config, vi.fn(), async () => module, provider);
+    expect(await session.open()).toBe(true);
+    const options = module.createSaasWebchat.mock.calls[0]?.[0];
+    expect(options).toMatchObject({ identity });
+    const getToken = options?.getIdentityToken as (expected: typeof identity) => Promise<string>;
+    expect(await getToken(identity)).toBe("a.b.c");
+    expect(provider).toHaveBeenLastCalledWith(identity);
+    provider.mockResolvedValueOnce({
+      token: "other.b.c",
+      identity: { ...identity, accountId: "team_2" },
+    });
+    expect(await session.reconcile()).toBe(true);
+    expect(widget.setAccount).toHaveBeenLastCalledWith({ accountId: "team_2", userId: "user_1" });
+    provider.mockRejectedValueOnce(new Error("signed out"));
+    expect(await session.reconcile()).toBe(false);
+    expect(widget.setAccount).toHaveBeenLastCalledWith(null);
+    session.destroy();
+    expect(widget.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not mount an anonymous widget when signed-in identity fails", async () => {
+    const module = { createWebchatWidget: vi.fn(), createSaasWebchat: vi.fn() };
+    const status = vi.fn();
+    const session = createEloziSupportSession(
+      { tenantId: "fixture_tenant", channelId: "fixture_channel" },
+      status,
+      async () => module,
+      async () => {
+        throw new Error("unconfigured");
+      },
     );
-    module.createWebchatWidget.mockClear();
-    await createEloziSupportSession(config, vi.fn(), async () => module).open();
-    expect(module.createWebchatWidget.mock.calls[0]?.[0]).not.toHaveProperty("getIdentityToken");
+    expect(await session.open()).toBe(false);
+    expect(module.createWebchatWidget).not.toHaveBeenCalled();
+    expect(module.createSaasWebchat).not.toHaveBeenCalled();
+    expect(status).toHaveBeenLastCalledWith("error");
   });
 });
