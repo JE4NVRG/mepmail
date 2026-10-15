@@ -680,13 +680,17 @@
     calc(100% - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))
   );
   max-height: calc(
-    100dvh -
+    var(--composer-viewport-height, 100dvh) -
     32px -
     env(safe-area-inset-top, 0px) -
     env(safe-area-inset-bottom, 0px)
   );
   padding: 0;
   overflow: hidden;
+}
+.composer:not(.composerDocked) {
+  inset-block-start: var(--composer-viewport-top, 0px);
+  inset-block-end: var(--composer-viewport-bottom, 0px);
 }
 .composer[open] {
   display: flex;
@@ -1095,6 +1099,15 @@
   flex-wrap: wrap;
   flex: none;
   gap: 8px;
+}
+.composerActions .composerAttachAction {
+  margin-inline-end: auto;
+  min-width: 48px;
+  min-height: 48px;
+  justify-content: center;
+}
+.composer[data-keyboard-open="true"] .composerFooter > .hint {
+  display: none;
 }
 
 .serviceBadge {
@@ -1679,7 +1692,7 @@
   .composer {
     width: calc(100% - 16px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
     max-height: calc(
-      100dvh -
+      var(--composer-viewport-height, 100dvh) -
       16px -
       env(safe-area-inset-top, 0px) -
       env(safe-area-inset-bottom, 0px)
@@ -1704,6 +1717,8 @@
     max-width: none;
   }
   .composerActions {
+    width: 100%;
+    align-items: center;
     justify-content: flex-end;
     flex-wrap: wrap;
   }
@@ -2358,14 +2373,13 @@
   flex: none;
   padding: 12px 18px 0;
 }
+/* A retained transform would make fixed mobile actions relative to the workspace. */
 @keyframes mailAppIn {
   from {
     opacity: 0;
-    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

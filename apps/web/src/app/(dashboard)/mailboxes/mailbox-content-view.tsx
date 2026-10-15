@@ -350,7 +350,7 @@ function DraftDialog({
   prefill?: MailtoPrefill | undefined;
   deliveryReady: boolean;
   close: () => void;
-  saved: (item: Outputs["saveDraft"]) => Promise<void>;
+  saved: (item: Outputs["saveDraft"], sending: boolean) => Promise<void>;
   /** Submits the revision just saved: the composer's Send is save, then send. */
   send?: ((item: Outputs["saveDraft"]) => Promise<void>) | undefined;
   lost: () => void;
@@ -361,6 +361,7 @@ function DraftDialog({
   const locale = useLocale();
   const trpc = useTRPC();
   const dialog = useRef<HTMLDialogElement>(null);
+  const composerBody = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const recipientInput = useRef<HTMLInputElement>(null);
   const messageInput = useRef<RichEditorHandle>(null);
@@ -505,7 +506,7 @@ function DraftDialog({
   const [uploads, setUploads] = useState<{ id: number; filename: string; base64: string }[]>([]);
   const uploadSequence = useRef(0);
   const [loadingFiles, loadFiles] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<"draft" | "send" | null>(null);
   const submitting = useRef(false);
   const active = useRef(true);
   const [error, setError] = useState("");
@@ -547,7 +548,7 @@ function DraftDialog({
     };
   });
   const mutation = useMutation(trpc.mailboxes.saveDraft.mutationOptions());
-  const busy = saving || mutation.isPending || loadingFiles;
+  const busy = saving !== null || mutation.isPending || loadingFiles;
   // Mail that arrives while writing: one line under the title (mailboxes-view
   // announces it), until dismissed or replaced by the next one.
   const [arrived, setArrived] = useState<NewMailNotice | null>(null);
@@ -567,6 +568,79 @@ function DraftDialog({
       active.current = false;
     };
   }, [mode, source, docked]);
+  // Android's keyboard can shrink the visual viewport without changing dvh.
+  // Keep the modal and its actions inside that visible area; leave pinch zoom alone.
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const element = dialog.current;
+    if (docked || !viewport || !element) return;
+    let frame = 0;
+    let revealFrame = 0;
+    const revealFocus = () => {
+      revealFrame = 0;
+      if (Math.abs(viewport.scale - 1) > 0.01) return;
+      const body = composerBody.current;
+      const focused = document.activeElement;
+      if (!body || !(focused instanceof HTMLElement) || !body.contains(focused)) return;
+      let caret = focused.getBoundingClientRect();
+      const selection = window.getSelection();
+      if (
+        focused.isContentEditable &&
+        selection?.focusNode &&
+        focused.contains(selection.focusNode)
+      ) {
+        const range = document.createRange();
+        range.setStart(selection.focusNode, selection.focusOffset);
+        range.collapse(true);
+        const rect = range.getBoundingClientRect();
+        if (rect.height) caret = rect;
+      }
+      const bounds = body.getBoundingClientRect();
+      const top = Math.max(bounds.top, viewport.offsetTop) + 8;
+      const bottom = Math.min(bounds.bottom, viewport.offsetTop + viewport.height) - 8;
+      if (bottom <= top) return;
+      // Scroll only the form's body, without moving focus, selection or the page.
+      if (caret.top < top) body.scrollTop += caret.top - top;
+      else if (caret.bottom > bottom) body.scrollTop += caret.bottom - bottom;
+    };
+    const clear = () => {
+      element.style.removeProperty("--composer-viewport-height");
+      element.style.removeProperty("--composer-viewport-top");
+      element.style.removeProperty("--composer-viewport-bottom");
+      delete element.dataset.keyboardOpen;
+    };
+    const update = () => {
+      frame = 0;
+      if (Math.abs(viewport.scale - 1) > 0.01) {
+        clear();
+        return;
+      }
+      const top = Math.max(0, viewport.offsetTop);
+      const bottom = Math.max(0, window.innerHeight - top - viewport.height);
+      element.style.setProperty("--composer-viewport-height", `${viewport.height}px`);
+      element.style.setProperty("--composer-viewport-top", `${top}px`);
+      element.style.setProperty("--composer-viewport-bottom", `${bottom}px`);
+      element.dataset.keyboardOpen = bottom > 80 ? "true" : "false";
+      // Read caret geometry after the dialog has adopted the visible height.
+      cancelAnimationFrame(revealFrame);
+      revealFrame = requestAnimationFrame(revealFocus);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    viewport.addEventListener("resize", schedule);
+    viewport.addEventListener("scroll", schedule);
+    window.addEventListener("resize", schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      cancelAnimationFrame(revealFrame);
+      viewport.removeEventListener("resize", schedule);
+      viewport.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      clear();
+    };
+  }, [docked]);
   // Another sender's signature replaces the last one; the editor gets the new
   // body as plain text (formatting is redone after a sender change).
   const latestText = useRef(text);
@@ -803,7 +877,7 @@ function DraftDialog({
             return;
           }
           submitting.current = true;
-          setSaving(true);
+          setSaving(sendNow ? "send" : "draft");
           setError("");
           try {
             const result = await mutation.mutateAsync({
@@ -826,8 +900,11 @@ function DraftDialog({
               new Map(contacts.map((contact) => [contact.address.toLowerCase(), contact.name])),
             );
             if (!active.current || !current()) return;
-            await saved(result);
-            if (sendNow && active.current && current()) await send?.(result);
+            // Starting the send (or its undo wait) must precede navigation to
+            // the saved draft: changing mailbox scope can unmount this composer.
+            if (sendNow) await send?.(result);
+            if (!active.current || !current()) return;
+            await saved(result, sendNow);
             if (active.current && current()) close();
           } catch (cause) {
             if (!active.current || !current()) return;
@@ -849,11 +926,11 @@ function DraftDialog({
             );
           } finally {
             submitting.current = false;
-            if (active.current && current()) setSaving(false);
+            if (active.current && current()) setSaving(null);
           }
         }}
       >
-        <div className={styles.composerBody}>
+        <div ref={composerBody} className={styles.composerBody}>
           <fieldset
             className={`${styles.fields} ${styles.composerFields}`}
             disabled={busy || !allowed}
@@ -995,25 +1072,6 @@ function DraftDialog({
               />
             </div>
             <div className={styles.composerUpload}>
-              <button
-                type="button"
-                className={`ms-btn ms-btn-ghost ${styles.composerAttachButton}`}
-                onClick={() => fileInput.current?.click()}
-                aria-describedby="draft-attachment-limit"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="m8 12 7-7a4 4 0 0 1 6 6L10 22a6 6 0 0 1-8-8L13 3a2 2 0 0 1 3 3L5 17" />
-                </svg>
-                {t("attach")}
-              </button>
               <input
                 ref={fileInput}
                 type="file"
@@ -1086,20 +1144,52 @@ function DraftDialog({
             </p>
           )}
           <div className={styles.composerActions}>
-            <button type="button" className="ms-btn" disabled={busy} onClick={dismiss}>
-              {t("cancel")}
+            <button
+              type="button"
+              className={`ms-btn ms-btn-ghost ${styles.composerAttachButton} ${styles.composerAttachAction}`}
+              disabled={busy || !allowed}
+              onClick={() => fileInput.current?.click()}
+              aria-label={
+                retained.length + uploads.length
+                  ? `${t("attach")} · ${t("attachmentsCount", { count: retained.length + uploads.length })}`
+                  : t("attach")
+              }
+              title={t("attach")}
+              aria-describedby="draft-attachment-limit"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m8 12 7-7a4 4 0 0 1 6 6L10 22a6 6 0 0 1-8-8L13 3a2 2 0 0 1 3 3L5 17" />
+              </svg>
+              {retained.length + uploads.length > 0 ? (
+                <span aria-hidden="true">{retained.length + uploads.length}</span>
+              ) : null}
             </button>
             <button
               type="submit"
               value="draft"
               className={canSend ? "ms-btn" : "ms-btn ms-btn-primary"}
               disabled={busy}
+              aria-busy={saving === "draft"}
             >
-              {t(busy && !canSend ? "saving" : "saveDraft")}
+              {t(saving === "draft" ? "saving" : "saveDraft")}
             </button>
             {canSend ? (
-              <button type="submit" value="send" className="ms-btn ms-btn-primary" disabled={busy}>
-                {t(busy ? "sendingNow" : "send")}
+              <button
+                type="submit"
+                value="send"
+                className="ms-btn ms-btn-primary"
+                disabled={busy}
+                aria-busy={saving === "send"}
+              >
+                {t(saving === "send" ? "sendingNow" : "send")}
               </button>
             ) : null}
           </div>
@@ -1866,7 +1956,7 @@ export function MailboxContentView({
   }
   async function refresh() {
     await Promise.all([
-      queries.invalidateQueries({ queryKey: trpc.mailboxes.items.queryKey() }),
+      queries.invalidateQueries({ queryKey: trpc.mailboxes.items.pathKey() }),
       queries.invalidateQueries({ queryKey: trpc.mailboxes.item.queryKey() }),
       queries.invalidateQueries({ queryKey: trpc.mailboxes.unreadCounts.queryKey() }),
       queries.invalidateQueries({ queryKey: trpc.mailboxes.scheduling.counts.queryKey() }),
@@ -4611,9 +4701,13 @@ export function MailboxContentView({
             void queries.invalidateQueries({ queryKey: trpc.mailboxes.list.queryKey() });
             void refresh();
           }}
-          saved={async (saved) => {
-            await refresh();
+          saved={async (saved, sending) => {
             if (composerSession.current !== composer.session) return;
+            // The mutation already committed. Refetches reconcile the reader
+            // and lists without holding a completed save (or the next send).
+            // An immediate send already refreshed after its request; an undo
+            // wait still needs the newly saved draft to appear now.
+            if (!sending || prefs.undoSendSeconds) void refresh();
             setSearch("");
             draftSaved(saved);
           }}
