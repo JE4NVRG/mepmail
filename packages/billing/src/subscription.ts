@@ -640,6 +640,42 @@ export async function setOverage(
 }
 
 /**
+ * Stops the renewal of the team's Send subscription: it keeps the plan until the end of the
+ * period already paid for and then ends (cancel_at_period_end), with no invoice, no refund and
+ * no plan offered. The row then follows from the same subscription read the webhook applies.
+ * Null without a live Send subscription; calling it again changes nothing.
+ */
+export async function cancelTeamRenewal(
+  deps: BillingDeps,
+  teamId: string,
+): Promise<{ cancelAt: Date | null } | null> {
+  const team = await loadBillingColumns(deps.db, teamId);
+  if (!team?.stripeSubscriptionId) return null;
+  const sub = await deps.stripe.subscriptions.retrieve(team.stripeSubscriptionId, {
+    expand: SUBSCRIPTION_EXPAND,
+  });
+  if (
+    isMailboxSubscription(sub) ||
+    sub.status === "canceled" ||
+    sub.status === "incomplete_expired"
+  )
+    return null;
+  if (!sub.cancel_at_period_end) {
+    await deps.stripe.subscriptions.update(
+      sub.id,
+      { cancel_at_period_end: true },
+      { idempotencyKey: `send-renewal-cancel:${teamId}:${sub.id}` },
+    );
+  }
+  await reconcileTeamPlan(deps, teamId);
+  const [row] = await deps.db
+    .select({ cancelAt: schema.teams.cancelAt })
+    .from(schema.teams)
+    .where(eq(schema.teams.id, teamId));
+  return { cancelAt: row?.cancelAt ?? null };
+}
+
+/**
  * Cancels the team's subscription immediately (no final invoice) and clears
  * its plan; used when the team itself goes away. No-op without a live
  * subscription.

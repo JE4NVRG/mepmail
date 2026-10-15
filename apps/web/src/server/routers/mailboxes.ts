@@ -119,7 +119,13 @@ import {
   mailboxRegistryEnabled,
 } from "../mailboxes";
 import { getQueue } from "../queue";
-import { noPurchaseInAndroidApp, protectedProcedure, router, teamProcedure } from "../trpc";
+import {
+  ANDROID_PURCHASE_REFUSED,
+  noPurchaseInAndroidApp,
+  protectedProcedure,
+  router,
+  teamProcedure,
+} from "../trpc";
 import { mailboxSchedulingRouter } from "./mailbox-scheduling";
 import { mailboxSendersRouter } from "./mailbox-senders";
 
@@ -351,6 +357,10 @@ export const mailboxesRouter = router({
         .strict(),
     )
     .mutation(async ({ ctx, input }) => {
+      // The Android app sells nothing: only "cancel" (stop the renewal) is not a purchase.
+      // Resuming a renewal, changing the quantity or reconciling it stay on the web.
+      if (ctx.androidApp && input.action !== "cancel")
+        throw new TRPCError({ code: "FORBIDDEN", message: ANDROID_PURCHASE_REFUSED });
       const presentation = await call(() => mailboxBillingPresentation(ctx.db, actor(ctx)));
       if (!presentation.canManage) throw new TRPCError({ code: "FORBIDDEN" });
       if (input.action !== "reconcile" && mailboxBillingMutationsPaused())

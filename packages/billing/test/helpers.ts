@@ -213,6 +213,12 @@ export function fakeStripe() {
         state.calls.push("subscriptions.update");
         state.updates.push([id, params]);
         const s = sub(id);
+        // Like Stripe: ending at the period's end sets cancel_at to that end; undoing clears it.
+        if (params.cancel_at_period_end !== undefined) {
+          s.cancel_at_period_end = params.cancel_at_period_end;
+          const end = s.items.data[0]?.current_period_end ?? null;
+          s.cancel_at = params.cancel_at_period_end ? end : null;
+        }
         if (state.declinePayment && params.payment_behavior === "pending_if_incomplete") {
           // Items stay as they were until the invoice is paid.
           return {

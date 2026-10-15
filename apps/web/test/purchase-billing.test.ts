@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
   locale: "en",
   rate: 123 as number | null,
   role: "owner",
+  cancelAt: null as Date | null,
   mutate: vi.fn(),
   translations: [] as { key: string; values: Record<string, unknown> }[],
   subscribed: true,
@@ -49,6 +50,7 @@ vi.mock("@/lib/trpc", () => {
         portal: operation,
         changePlan: operation,
         setOverage: operation,
+        cancelRenewal: operation,
       },
       team: { list: operation },
       settings: { usage: { recent: operation } },
@@ -68,7 +70,8 @@ vi.mock("@tanstack/react-query", () => ({
           rung: h.subscribed ? "pro_100k" : "free",
           pendingRung: h.pendingRung,
           planStatus: "active",
-          currentPeriodEnd: h.pendingRung ? new Date("2027-10-01") : null,
+          currentPeriodEnd: h.pendingRung || h.subscribed ? new Date("2027-10-01") : null,
+          cancelAt: h.cancelAt,
           quota: {
             kind: "month",
             included: 110000,
@@ -110,6 +113,7 @@ function nodes(value: ReactNode): Node[] {
 }
 beforeEach(() => {
   h.androidApp = false;
+  h.cancelAt = null;
   h.mutate.mockClear();
   h.translations = [];
   h.role = "owner";
@@ -328,6 +332,7 @@ describe("billing selection synthetic UI contract, not paid E2E", () => {
 describe("billing inside the Android app (Google Play: nothing sold there)", () => {
   it("shows the current plan and its status only: no plans, prices, checkout, Pix or portal", () => {
     h.androidApp = true;
+    h.subscribed = false;
     const tree = BillingView({ checkout: null, requestedRung: "pro_100k" });
     const all = nodes(tree);
     expect(all.some((n) => n.type === "button")).toBe(false);
@@ -341,8 +346,41 @@ describe("billing inside the Android app (Google Play: nothing sold there)", () 
 
   it("does the same for the Correio deep link (?correio=1), which preselects nothing in the app", () => {
     h.androidApp = true;
+    h.subscribed = false;
     const tree = BillingView({ checkout: null, requestedMail: true });
     expect(nodes(tree).some((n) => n.type === "button")).toBe(false);
+  });
+
+  it("keeps the renewal cancel for a paid plan: one button, no price, no link, no plan choice", () => {
+    h.androidApp = true;
+    h.subscribed = true;
+    const tree = BillingView({ checkout: null, requestedRung: "pro_200k" });
+    const all = nodes(tree);
+    expect(all.filter((n) => n.type === "button")).toHaveLength(1);
+    expect(all.some((n) => typeof n.props.href === "string")).toBe(false);
+    expect(all.some((n) => typeof n.props.formatted === "string")).toBe(false);
+    const text = h.translations.map((t) => t.key);
+    expect(text).toContain("app.cancelRenewal");
+    expect(text).toContain("app.renewsOn");
+    expect(text.some((key) => /choose|switch|manage|launch\.|combo|pix|resume/i.test(key))).toBe(
+      false,
+    );
+  });
+
+  it("once the renewal is cancelled, says when the plan ends and offers no paid reactivation", () => {
+    h.androidApp = true;
+    h.subscribed = true;
+    h.cancelAt = new Date("2027-10-01");
+    const tree = BillingView({ checkout: null });
+    expect(nodes(tree).some((n) => n.type === "button")).toBe(false);
+    expect(h.translations.map((t) => t.key)).toContain("app.endsOn");
+  });
+
+  it("offers the renewal cancel only to owners and admins", () => {
+    h.androidApp = true;
+    h.subscribed = true;
+    h.role = "member";
+    expect(nodes(BillingView({ checkout: null })).some((n) => n.type === "button")).toBe(false);
   });
 
   it("keeps the full billing on the web", () => {

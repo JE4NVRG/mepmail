@@ -154,6 +154,7 @@ export {
   isMissingStripeCustomer,
 } from "./stripe.js";
 export {
+  cancelTeamRenewal,
   cancelTeamSubscription,
   changeRung,
   type RungChange,

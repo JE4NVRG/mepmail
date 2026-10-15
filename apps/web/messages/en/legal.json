@@ -145,7 +145,7 @@
         ],
         "list": [
           "External accounts: MepMail reads the Inbox of the account you connect without marking, moving or deleting anything at the provider. The first time, it brings the last 30 days of messages (up to 500); then the new ones, every few minutes. Replies leave through the provider's own sending server, with your address. When you disconnect, we delete the copies and the credential; nothing changes at the provider.",
-          "Search: mailbox search uses a blind index. Each word becomes a code (HMAC) under a key of your team, and the index stores no text. The searches you make are not kept as history.",
+          "Search: what you type in search reaches our server, which turns each word into a code (HMAC) under a key of your team to look up a blind index that stores no text. We do not keep your searches as history. Because the query travels in the request address, it passes through Cloudflare and may stay in our web server's access logs, which we keep for up to 14 days for security and troubleshooting.",
           "Translation: the Translate button uses your browser's own translator, on your device. MepMail sends the content to no translation service.",
           "Sender pictures: to show the sender's logo or picture, our server looks up the BIMI record and the website icon of the sender's domain (for authenticated email only) and Gravatar, with a code (hash) of the sender's address. The lookups leave from our server, so these services do not see who is reading.",
           "AI agents: if you connect an agent (MCP or API) to a mailbox, it reaches only what you allow, and sends can require your approval. You choose the agent's provider, which handles the data under its own terms."
@@ -168,7 +168,7 @@
       {
         "title": "7. Providers",
         "body": [
-          "We use a deliberately short list of providers to run the service. Page metrics use Umami, which we host on our own servers, with no cookies and no cross-site tracking.",
+          "We use a deliberately short list of providers to run the service. Most handle the data only on our behalf. Some also handle it under their own terms: Command Code and the providers that host its model, OpenCode and the provider of the support models, Telegram and Gravatar; that is why we describe each one below, with what it receives. Page metrics use Umami, which we host on our own servers, with no cookies and no cross-site tracking.",
           "If you allow advertising measurement, Meta and Google receive the optional events described in this policy: Meta through the Pixel and the sign-up completion and purchase events, Google through Google Analytics on public pages and the sign-up completion and first paid-plan purchase events, which our server sends with the Meta and Google Analytics cookie identifiers and, for the purchase, the plan and value. These connections also share the IP address and browser information. Each company handles this data under its own privacy policy. We do not turn on Google signals or ad personalization, and measurement is not needed to use MepMail."
         ],
         "list": [
@@ -187,7 +187,7 @@
         "title": "8. Retention",
         "body": [
           "Account and Correio data are kept while the account is active. In Send, message content is deleted 30 days after sending; the metadata (recipient, subject, status and events) and the API request logs also go after 30 days, leaving only counters and aggregate results. Abuse-check results (score and reason, without the content) are kept for 90 days.",
-          "In Correio, a message stays until you delete it: emptying the trash or deleting forever removes it at once. Messages sent from Correio stay as the record of the send. A deleted mailbox can be restored for 30 days and is then erased with its messages. The receiving copy at AWS expires after 30 days, and backup copies within 30 days. An external account's copies and its credential are deleted when you disconnect it.",
+          "In Correio, received messages and drafts stay until you delete them: emptying the trash or deleting forever removes them at once. Messages sent from Correio are not deleted one by one, because they are the record of the send and count the period's sending usage: they are erased with the mailbox or with the account. A deleted mailbox can be restored for 30 days and is then erased with all its messages; if it sent email in the billing period under way, the erasure waits for that period to end. The copy of each received email at AWS is set to expire after 30 days, and backup copies expire within 30 days. An external account's copies and its credential are deleted when you disconnect it.",
           "After an account is deleted, we remove personal data within 30 days, except where retention is required (for example, billing records kept for tax and accounting obligations) or where limited delivery logs are needed for security. Aggregated, non-identifiable statistics may be kept.",
           "The advertising preference can be withdrawn through the footer link. Withdrawal stops new sends and cancels events still pending; it does not delete events that already reached Meta or Google. We do not send events from before your permission."
         ]
@@ -201,7 +201,7 @@
       {
         "title": "10. Apps",
         "body": [
-          "The Windows, Linux, macOS and Android apps show the same service as the website and follow this policy. The desktop app can keep a copy of messages for offline reading on the device itself, deleted when you sign out. The Android app shows no purchases and runs no advertising measurement."
+          "The Windows, Linux, macOS and Android apps show the same service as the website and follow this policy. The desktop app can keep a copy of messages for offline reading on the device itself, deleted when you sign out. The Android app sells nothing, shows no prices and runs no advertising measurement; it shows your plan and its period, and lets you cancel the renewal of a subscription you already have."
         ]
       },
       {

@@ -1,4 +1,6 @@
-import { createTestDb } from "@millionsend/test-utils";
+import { schema } from "@millionsend/db";
+import { createTeam, createTestDb } from "@millionsend/test-utils";
+import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ANDROID_APP_ATTRIBUTE,
@@ -19,11 +21,21 @@ import {
  * account stay. Synthetic fixtures only.
  */
 
-const billing = vi.hoisted(() => ({ proof: null as unknown, recorded: vi.fn() }));
+const billing = vi.hoisted(() => ({
+  proof: null as unknown,
+  recorded: vi.fn(),
+  cancelRenewal: vi.fn(async () => ({ cancelAt: new Date("2026-11-14T00:00:00.000Z") })),
+}));
 vi.mock("@millionsend/billing", async (original) => ({
   ...(await original<typeof import("@millionsend/billing")>()),
   decodeConsentProof: () => billing.proof,
   recordSignupConversions: billing.recorded,
+  cancelTeamRenewal: billing.cancelRenewal,
+}));
+// The synthetic team reaches the Correio router: the gate under test is the Android one.
+vi.mock("@/server/mailboxes", async (original) => ({
+  ...(await original<typeof import("@/server/mailboxes")>()),
+  mailboxActorAccessEnabled: async () => true,
 }));
 
 /** Runs the root layout's inline script against a fake tab. */
@@ -193,6 +205,8 @@ describe("Android app: the requests say so", () => {
   });
 });
 
+const ANDROID_REFUSED = "Purchases are not available in the Android app.";
+
 describe("Android app: nothing is sold there (server)", () => {
   let close: () => Promise<void>;
   let db: Awaited<ReturnType<typeof createTestDb>>["db"];
@@ -203,7 +217,7 @@ describe("Android app: nothing is sold there (server)", () => {
     await close();
   });
 
-  async function callers() {
+  async function callers(teamId = "00000000-0000-4000-8000-000000000001", role = "owner") {
     const { createCallerFactory, router } = await import("@/server/trpc");
     const { createBillingRouter } = await import("@/server/routers/billing");
     const { mailboxesRouter } = await import("@/server/routers/mailboxes");
@@ -216,8 +230,8 @@ describe("Android app: nothing is sold there (server)", () => {
     const base = {
       db,
       session: { user: { id: "u1", email: "u1@example.com", name: "u1" } },
-      teamId: "00000000-0000-4000-8000-000000000001",
-      role: "owner" as const,
+      teamId,
+      role,
     };
     return { app: create({ ...base, androidApp: true } as never), web: create(base as never) };
   }
@@ -243,6 +257,44 @@ describe("Android app: nothing is sold there (server)", () => {
         message: "Purchases are not available in the Android app.",
       });
     }
+  });
+
+  it("lets the app stop a renewal, which is not a purchase, under the normal owner/admin rule", async () => {
+    vi.stubEnv("IS_CLOUD", "true");
+    const teamId = await createTeam(db, "android-renewal");
+    await db
+      .update(schema.teams)
+      .set({
+        plan: "pro",
+        planQuota: 110_000,
+        planStatus: "active",
+        stripeCustomerId: "cus_android_test",
+        stripeSubscriptionId: "sub_android_test",
+      })
+      .where(eq(schema.teams.id, teamId));
+    billing.cancelRenewal.mockClear();
+    const owner = await callers(teamId, "owner");
+    await expect(owner.app.billing.cancelRenewal()).resolves.toEqual({
+      cancelAt: new Date("2026-11-14T00:00:00.000Z"),
+    });
+    expect(billing.cancelRenewal).toHaveBeenCalledWith(expect.anything(), teamId);
+    // A member cannot, on the app or the web: the same rule as every billing change.
+    const member = await callers(teamId, "member");
+    await expect(member.app.billing.cancelRenewal()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(billing.cancelRenewal).toHaveBeenCalledTimes(1);
+    // The Correio license: the app may only cancel the renewal; resuming it, changing the
+    // quantity or reconciling it are purchases and stay on the web.
+    for (const action of ["resume", "quantity", "reconcile"] as const) {
+      await expect(
+        owner.app.mailboxes.manage({ action, ...(action === "quantity" ? { seats: 2 } : {}) }),
+        action,
+      ).rejects.toMatchObject({ code: "FORBIDDEN", message: ANDROID_REFUSED });
+    }
+    const cancel = await owner.app.mailboxes
+      .manage({ action: "cancel" })
+      .catch((cause: unknown) => cause as { message?: string });
+    expect((cancel as { message?: string })?.message).not.toBe(ANDROID_REFUSED);
+    vi.unstubAllEnvs();
   });
 
   it("does not refuse the same calls on the web for being the app", async () => {

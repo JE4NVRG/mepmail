@@ -188,13 +188,12 @@ export const publicProcedure = t.procedure.use(procedureTiming).use(supportViewG
  * Google Play's payments policy: nothing is sold inside the Android app. The app marks its
  * requests (lib/android-app.ts), and every purchase or plan change from it is refused here,
  * whatever a hidden link or a deep link tries. The mark can only take a right away.
+ * Cancelling a renewal is not a purchase and stays open (billing.cancelRenewal, and the
+ * "cancel" action of mailboxes.manage).
  */
+export const ANDROID_PURCHASE_REFUSED = "Purchases are not available in the Android app.";
 export const noPurchaseInAndroidApp = t.middleware(({ ctx, next }) => {
-  if (ctx.androidApp)
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Purchases are not available in the Android app.",
-    });
+  if (ctx.androidApp) throw new TRPCError({ code: "FORBIDDEN", message: ANDROID_PURCHASE_REFUSED });
   return next();
 });
 

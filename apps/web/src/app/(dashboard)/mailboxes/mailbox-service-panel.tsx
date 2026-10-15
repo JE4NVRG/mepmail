@@ -771,11 +771,19 @@ export function MailboxServicePanel({
               ) : null}
               {manage &&
               (manage.canReconcile || manage.canAdjust || manage.canCancel || manage.canResume) ? (
-                <div className={styles.management} data-purchase="">
+                // In the Android app only the renewal cancel shows here: cancelling is not a
+                // purchase (the server allows only "cancel" there); quantity, resume and the
+                // increase payment are, so they keep data-purchase.
+                <div className={styles.management}>
                   {/* Quantity terms belong to the older contracts; a plan changes plan instead. */}
-                  {!currentPlanCode ? <p className={styles.hint}>{t("managementTerms")}</p> : null}
+                  {!currentPlanCode ? (
+                    <p className={styles.hint} data-purchase="">
+                      {t("managementTerms")}
+                    </p>
+                  ) : null}
                   {manage.canAdjust ? (
                     <form
+                      data-purchase=""
                       onSubmit={(event) => {
                         event.preventDefault();
                         if (validChange) void runManagement("quantity", changeSeats);
@@ -819,6 +827,7 @@ export function MailboxServicePanel({
                       className="ms-btn"
                       type="button"
                       disabled={busy}
+                      data-purchase=""
                       onClick={() => void runManagement("resume")}
                     >
                       {t("resumeRenewal")}
@@ -831,7 +840,13 @@ export function MailboxServicePanel({
                     </p>
                   ) : null}
                   {visiblePaymentUrl ? (
-                    <a className="ms-btn" href={visiblePaymentUrl} target="_blank" rel="noreferrer">
+                    <a
+                      className="ms-btn"
+                      href={visiblePaymentUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      data-purchase=""
+                    >
                       {t("completeIncreasePayment")}
                     </a>
                   ) : null}

@@ -122,5 +122,6 @@ export const AUDIT_ACTIONS = [
   "billing.subscription_updated",
   "billing.plan_changed",
   "billing.overage_toggled",
+  "billing.renewal_canceled",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

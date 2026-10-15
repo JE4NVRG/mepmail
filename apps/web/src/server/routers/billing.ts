@@ -5,6 +5,7 @@ import {
   beginPixInvoicePayment,
   beginSendCheckout,
   beginSendPixCheckout,
+  cancelTeamRenewal,
   changeRung,
   createPortalSession,
   decodeConsentProof,
@@ -144,8 +145,8 @@ async function checkoutAdvertising() {
 
 const launchOfferEnabled = () => process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
 
-// Every billing change (checkout, Pix, plan change, invoice payment, portal) is refused in
-// the Android app.
+// Every purchase (checkout, Pix, plan change, overage, invoice payment, portal) is refused in
+// the Android app. cancelRenewal is not one and stays open there.
 const billingMutationProcedure = adminProcedure.use(noPurchaseInAndroidApp).use(({ next }) => {
   const paused = process.env.BILLING_MUTATIONS_PAUSED;
   if (paused === "true" || paused === "1") {
@@ -248,6 +249,8 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         pendingRung: team.pendingRung,
         planStatus: team.planStatus,
         currentPeriodEnd: team.currentPeriodEnd,
+        /** Set once the renewal is cancelled: the plan ends then. */
+        cancelAt: team.cancelAt,
         quota,
         usage: await readUsage(ctx.db, ctx.teamId, quota),
         hasCustomer: team.stripeCustomerId !== null,
@@ -551,6 +554,27 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         target: { type: "team", id: ctx.teamId },
       });
       return { url };
+    }),
+    /**
+     * "Cancelar renovação": the Send plan stays until the end of the period already paid for
+     * and does not renew. Not a purchase, so the Android app can do it too (no portal there:
+     * the portal also sells); undoing it is a purchase decision, left to the web's portal.
+     * Owner or admin, never paused: stopping a payment must always be possible.
+     */
+    cancelRenewal: adminProcedure.mutation(async ({ ctx }) => {
+      requireCloud();
+      const team = await loadTeam(ctx.db, ctx.teamId);
+      assertBillable(team);
+      if (!hasLiveSubscription(team.planStatus) || !team.stripeSubscriptionId)
+        throw new TRPCError({ code: "PRECONDITION_FAILED" });
+      const result = await cancelTeamRenewal({ db: ctx.db, stripe: deps.stripe() }, ctx.teamId);
+      if (!result) throw new TRPCError({ code: "PRECONDITION_FAILED" });
+      await recordAudit(ctx, {
+        action: "billing.renewal_canceled",
+        target: { type: "team", id: ctx.teamId },
+        metadata: { cancelAt: result.cancelAt?.toISOString() ?? null },
+      });
+      return { cancelAt: result.cancelAt };
     }),
   });
 }

@@ -10,7 +10,11 @@ import { prepareMetaCheckout, saveAdvertisingConsent } from "../src/meta-adverti
 import type { MetaConversionConfig } from "../src/meta-conversions.js";
 import { priceMetadata } from "../src/prices.js";
 import type { BillingStripe } from "../src/stripe.js";
-import { cancelTeamSubscription, reconcileTeamPlan } from "../src/subscription.js";
+import {
+  cancelTeamRenewal,
+  cancelTeamSubscription,
+  reconcileTeamPlan,
+} from "../src/subscription.js";
 import { handleWebhook, purgeStripeEvents } from "../src/webhook.js";
 import {
   fakeStripe,
@@ -901,6 +905,44 @@ describe("cancelTeamSubscription", () => {
     await cancelTeamSubscription(deps(), teamId);
     expect(state.cancels).toEqual(["sub_1"]);
     expect(await team(teamId)).toMatchObject({ plan: "free", stripeSubscriptionId: null });
+  });
+});
+
+describe("cancelTeamRenewal", () => {
+  it("ends the plan at the period's end, with no invoice and no plan offer, and only once", async () => {
+    const teamId = await customerTeam();
+    // No subscription: nothing to stop.
+    expect(await cancelTeamRenewal(deps(), teamId)).toBeNull();
+    expect(state.updates).toEqual([]);
+
+    state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "active", undefined, {
+      overageKey: "millionsend_pro_100k_overage",
+    });
+    await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
+    const cancelled = await cancelTeamRenewal(deps(), teamId);
+    expect(state.updates).toEqual([["sub_1", { cancel_at_period_end: true }]]);
+    expect(state.cancels).toEqual([]);
+    expect(cancelled?.cancelAt?.getTime()).toBe(PERIOD_END * 1000);
+    // The plan stays until then.
+    expect(await team(teamId)).toMatchObject({
+      plan: "pro",
+      planStatus: "active",
+      stripeSubscriptionId: "sub_1",
+    });
+    const [row] = await db
+      .select({ cancelAt: schema.teams.cancelAt })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, teamId));
+    expect(row?.cancelAt?.getTime()).toBe(PERIOD_END * 1000);
+
+    // Asking again sends nothing more.
+    await cancelTeamRenewal(deps(), teamId);
+    expect(state.updates).toHaveLength(1);
+
+    // An ended subscription is left alone.
+    state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "canceled");
+    expect(await cancelTeamRenewal(deps(), teamId)).toBeNull();
+    expect(state.updates).toHaveLength(1);
   });
 });
 

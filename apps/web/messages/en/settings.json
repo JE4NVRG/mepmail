@@ -394,7 +394,17 @@
       "close": "Close"
     },
     "upgradePaymentPending": "We could not charge the difference for {plan} yet, so your plan has not changed. Check or update your card under Manage and try again; the upgrade applies as soon as the payment goes through.",
-    "localPrice": "In Brazil: {price}"
+    "localPrice": "In Brazil: {price}",
+    "app": {
+      "renewsOn": "Renews on {date}.",
+      "endsOn": "Renewal cancelled: the plan ends on {date}, then the team is back on Free.",
+      "cancelRenewal": "Cancel renewal",
+      "cancelTitle": "Cancel the renewal?",
+      "cancelBody": "{plan} stays until {date} and does not renew. After that the team is back on Free. Nothing is charged for this.",
+      "cancelConfirm": "Cancel renewal",
+      "keep": "Keep plan",
+      "cancelFailed": "The renewal could not be cancelled right now. Try again in a moment."
+    }
   },
   "mcp": {
     "title": "MCP server",
@@ -493,6 +503,7 @@
       "billing_subscription_updated": "Subscription changed",
       "billing_plan_changed": "Changed plan",
       "billing_overage_toggled": "Toggled overage billing",
+      "billing_renewal_canceled": "Cancelled the plan renewal",
       "team_type_changed": "Changed team type",
       "team_limits_updated": "Adjusted team limits",
       "team_broadcasts_paused": "Paused broadcasts",

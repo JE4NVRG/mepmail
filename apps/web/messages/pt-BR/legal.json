@@ -145,7 +145,7 @@
         ],
         "list": [
           "Contas externas: o MepMail lê a Caixa de entrada da conta que você conecta, sem marcar, mover ou apagar nada no provedor. Na primeira vez, traz as mensagens dos últimos 30 dias (até 500); depois, as novas, a cada poucos minutos. As respostas saem pelo servidor de envio do próprio provedor, com o seu endereço. Ao desconectar, apagamos as cópias e a credencial; o que está no provedor não muda.",
-          "Busca: a busca nas caixas usa um índice cego. Cada palavra vira um código (HMAC) com uma chave da sua equipe, e o índice não guarda texto. As buscas que você faz não são guardadas como histórico.",
+          "Busca: o que você digita na busca chega ao nosso servidor, que transforma cada palavra num código (HMAC) com uma chave da sua equipe para consultar um índice cego, que não guarda texto. Não guardamos as buscas como histórico. Como a consulta viaja no endereço da requisição, ela passa pela Cloudflare e pode ficar nos registros de acesso do nosso servidor web, que mantemos por até 14 dias para segurança e diagnóstico.",
           "Tradução: o botão Traduzir usa o tradutor do próprio navegador, no seu aparelho. O MepMail não envia o conteúdo para nenhum serviço de tradução.",
           "Fotos de remetente: para mostrar o logo ou a foto de quem enviou, o nosso servidor consulta o registro BIMI e o ícone do site do domínio do remetente (só para e-mails autenticados) e o Gravatar, com um código (hash) do endereço do remetente. As consultas saem do nosso servidor, então esses serviços não veem quem está lendo.",
           "Agentes de IA: se você conectar um agente (MCP ou API) a uma caixa, ele acessa só o que você liberar, e os envios podem exigir a sua aprovação. O provedor do agente é escolhido por você e trata os dados conforme os termos dele."
@@ -168,7 +168,7 @@
       {
         "title": "7. Provedores",
         "body": [
-          "Usamos uma lista deliberadamente curta de provedores para operar o serviço. As métricas das páginas usam o Umami, que hospedamos nos nossos próprios servidores, sem cookies nem rastreamento entre sites.",
+          "Usamos uma lista deliberadamente curta de provedores para operar o serviço. A maioria trata os dados só em nosso nome. Alguns também os tratam conforme os próprios termos: a Command Code e os provedores que hospedam o modelo dela, o OpenCode e o provedor dos modelos do suporte, o Telegram e o Gravatar; por isso descrevemos cada um abaixo, com o que recebe. As métricas das páginas usam o Umami, que hospedamos nos nossos próprios servidores, sem cookies nem rastreamento entre sites.",
           "Se você permitir a mensuração de publicidade, a Meta e o Google recebem os eventos opcionais descritos nesta política: a Meta pelo Pixel e pelos eventos de cadastro concluído e de compra, o Google pelo Google Analytics nas páginas públicas e pelos eventos de cadastro concluído e de compra inicial de plano pago, que o nosso servidor envia com os identificadores dos cookies da Meta e do Google Analytics e, na compra, o plano e o valor. Essas conexões também informam o endereço IP e informações do navegador. Cada empresa trata esses dados conforme a sua própria política de privacidade. Não ativamos os sinais do Google nem a personalização de anúncios, e a mensuração não é necessária para usar o MepMail."
         ],
         "list": [
@@ -187,7 +187,7 @@
         "title": "8. Retenção",
         "body": [
           "Os dados da conta e do Correio ficam enquanto a conta estiver ativa. No Envio, o conteúdo das mensagens é apagado 30 dias depois do envio; os metadados (destinatário, assunto, status e eventos) e os logs das requisições à API também saem em 30 dias, e ficam só contadores e resultados agregados. Os resultados da verificação de abuso (nota e motivo, sem o conteúdo) ficam 90 dias.",
-          "No Correio, uma mensagem fica até você apagá-la: ao esvaziar a lixeira ou excluir para sempre, ela sai na hora. As mensagens enviadas pelo Correio ficam como registro do envio. Uma caixa excluída pode ser restaurada por 30 dias e depois é apagada com as mensagens. A cópia de recebimento na AWS expira em 30 dias, e as cópias de segurança, em até 30 dias. As cópias de uma conta externa e a credencial dela são apagadas quando você a desconecta.",
+          "No Correio, as mensagens recebidas e os rascunhos ficam até você apagá-los: ao esvaziar a lixeira ou excluir para sempre, eles saem na hora. As mensagens enviadas pelo Correio não se excluem uma a uma, porque são o registro do envio e contam o uso de envio do período: elas são eliminadas junto com a caixa ou com a conta. Uma caixa excluída pode ser restaurada por 30 dias e depois é apagada com todas as mensagens; se ela enviou e-mails no período de cobrança em curso, a eliminação espera esse período terminar. A cópia de cada e-mail recebido na AWS está configurada para expirar em 30 dias, e as cópias de segurança expiram em até 30 dias. As cópias de uma conta externa e a credencial dela são apagadas quando você a desconecta.",
           "Após a exclusão da conta, removemos os dados pessoais em até 30 dias, exceto quando a retenção for exigida (por exemplo, registros de cobrança guardados por obrigações fiscais e contábeis) ou quando logs limitados de entrega forem necessários para segurança. Estatísticas agregadas e não identificáveis podem ser mantidas.",
           "A preferência de publicidade pode ser retirada pelo link no rodapé. A retirada interrompe novos envios e cancela os eventos ainda pendentes; não apaga eventos que já chegaram à Meta ou ao Google. Não enviamos eventos anteriores à sua permissão."
         ]
@@ -201,7 +201,7 @@
       {
         "title": "10. Apps",
         "body": [
-          "Os apps para Windows, Linux, macOS e Android mostram o mesmo serviço do site e seguem esta política. O app para computador pode guardar uma cópia das mensagens para leitura sem internet no próprio aparelho, apagada quando você sai da conta. O app Android não mostra compras nem faz mensuração de publicidade."
+          "Os apps para Windows, Linux, macOS e Android mostram o mesmo serviço do site e seguem esta política. O app para computador pode guardar uma cópia das mensagens para leitura sem internet no próprio aparelho, apagada quando você sai da conta. O app Android não vende nem mostra preços e não faz mensuração de publicidade; nele você vê o plano, o período e pode cancelar a renovação de uma assinatura já contratada."
         ]
       },
       {
