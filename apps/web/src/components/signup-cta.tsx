@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 import { visitSource } from "@/lib/public-funnel";
+import { signupHref } from "@/lib/public-intent";
 
 /**
  * CTA de criação de conta. Dispara `signup_start` no Umami no clique e deixa a
@@ -16,16 +17,19 @@ import { visitSource } from "@/lib/public-funnel";
  *
  * O CTA de um card de plano é o mesmo caminho de entrada em /signup, então ele
  * também emite `signup_start` e, com `plan`, o `cta_pricing_click` que o plano
- * de lançamento pede por card.
+ * de lançamento pede por card. Com `rung` pago, o cadastro termina na Cobrança
+ * com esse plano aberto (lib/public-intent.ts): a escolha não se perde.
  */
 export function SignupCta({
   label,
   className,
   plan,
+  rung,
 }: {
   label: string;
   className?: string;
   plan?: string;
+  rung?: string;
 }) {
   const pathname = usePathname();
   function onClick() {
@@ -34,7 +38,7 @@ export function SignupCta({
     if (plan) trackEvent("cta_pricing_click", { plan });
   }
   return (
-    <a className={className} href="/signup" onClick={onClick}>
+    <a className={className} href={signupHref(rung)} onClick={onClick}>
       {label}
     </a>
   );

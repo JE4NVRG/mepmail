@@ -2,6 +2,7 @@ import { env } from "@millionsend/config";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { PageHeader } from "@/components/page-header";
+import { requestedPlan } from "@/lib/public-intent";
 import { SettingsTabs } from "../settings-tabs";
 import { BillingView } from "./billing-view";
 
@@ -12,6 +13,7 @@ export default async function BillingPage({
     checkout?: string | string[];
     correio?: string | string[];
     pix?: string | string[];
+    plan?: string | string[];
   }>;
 }) {
   // Billing does not exist on self-host: not forbidden, absent.
@@ -23,6 +25,8 @@ export default async function BillingPage({
   const checkout = raw === "success" || raw === "pix" ? "success" : raw === "cancel" ? raw : null;
   // Arriving from the Correio offer preselects the Send + Mail combo; nothing is bought here.
   const requestedMail = params.correio === "1";
+  // A paid plan picked on the public pages (?plan=pro_100k) opens the comparison on it.
+  const requestedRung = requestedPlan(params);
   return (
     <>
       <PageHeader title={t("tabs.billing")} />
@@ -30,6 +34,7 @@ export default async function BillingPage({
       <BillingView
         checkout={checkout}
         requestedMail={requestedMail}
+        requestedRung={requestedRung}
         pixReturned={params.pix === "paid"}
       />
     </>

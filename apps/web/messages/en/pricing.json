@@ -176,5 +176,14 @@
     "lineCorreio": "Mail {plan}",
     "lineSendFree": "Send Free (100 emails/day)",
     "lineSendPro": "Send Pro 110K"
+  },
+  "sendHero": {
+    "eyebrow": "Send · transactional email",
+    "title": "Your app's email, by volume. <highlight>110,000 a month for {price}.</highlight>",
+    "lead": "Transactional email through a Resend-compatible API, SMTP or MCP, from your own verified domain. Start free with 100 emails a day and no card; move to Pro 110K when you need the volume.",
+    "cta": "Start with Pro 110K",
+    "plansLink": "See every Send plan",
+    "note": "Eligible new customers pay {first} for the first month of Pro 110K, then {price} a month. No lock-in.",
+    "noteRegular": "Pro 110K is {price} a month. No lock-in."
   }
 }

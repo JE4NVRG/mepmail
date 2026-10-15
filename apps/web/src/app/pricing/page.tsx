@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { PlanCard, type PlanCardLabels } from "@/components/plan-card";
+import { SignupCta } from "@/components/signup-cta";
 import {
   PublicFooter,
   PublicHeader,
@@ -12,6 +13,7 @@ import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
 import { formatBrl, formatBrlPrice, formatUsd } from "@/lib/landing-pricing";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
+import { pricingFocus } from "@/lib/public-intent";
 import { faqJsonLd } from "@/lib/structured-data";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
@@ -51,8 +53,15 @@ export async function generateMetadata(): Promise<Metadata> {
  * fold), the overage rules and a short FAQ. Chrome, plan ladder and plan copy
  * all come from the shared sources the landing uses.
  */
-export default async function PricingPage() {
+export default async function PricingPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+} = {}) {
   const locale = await getLocale();
+  // A Send campaign (?focus=send, or utm_campaign naming send) lands on Send: its offer leads
+  // and its plans come right after, before the Mail scenarios (lib/public-intent.ts).
+  const sendFirst = pricingFocus((await searchParams) ?? {}) === "send";
   const t = await getTranslations("pricing");
   const l = await getTranslations("landing");
   const site = {
@@ -108,78 +117,118 @@ export default async function PricingPage() {
         };
       })
     : [];
+  // Headline prices: "R$ 149", "US$ 29".
+  const sendPrice = brazil
+    ? formatBrlPrice(LAUNCH_OFFER.sending.brlMonthlyCents, locale)
+    : formatUsd(LAUNCH_OFFER.sending.monthlyCents / 100, locale);
+  const sendFirstPrice = brazil
+    ? formatBrlPrice(LAUNCH_OFFER.sending.brlFirstMonthlyCents, locale)
+    : formatUsd(LAUNCH_OFFER.sending.firstMonthlyCents / 100, locale);
+
+  const scenariosSection = scenarios.length ? (
+    <section className="gtm-section" id="cenarios" aria-labelledby="pricing-scenarios-title">
+      <div className="gtm-container">
+        <p className="gtm-eyebrow">{t("scenarios.eyebrow")}</p>
+        <h2 id="pricing-scenarios-title">{t("scenarios.title")}</h2>
+        <p>{t("scenarios.lead")}</p>
+        <div className="gtm-split gtm-split-three pricing-scenarios">
+          {scenarios.map((scenario) => (
+            <article className="ms-card gtm-plan" key={scenario.id}>
+              <h3>{t(`scenarios.items.${scenario.id}.title`)}</h3>
+              <p>{t(`scenarios.items.${scenario.id}.body`)}</p>
+              <dl className="pricing-scenario-lines">
+                <div>
+                  <dt>
+                    {t("scenarios.lineCorreio", {
+                      plan: t(`correio.names.${scenario.correio.id}`),
+                    })}
+                  </dt>
+                  <dd>
+                    {brazil
+                      ? formatBrl(scenario.correio.brlMonthlyCents / 100, locale)
+                      : formatUsd(scenario.correio.monthlyCents / 100, locale)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>
+                    {t(scenario.sendPro ? "scenarios.lineSendPro" : "scenarios.lineSendFree")}
+                  </dt>
+                  <dd>
+                    {scenario.sendPro
+                      ? brazil
+                        ? formatBrl(sendProBrlCents / 100, locale)
+                        : formatUsd(sendProCents / 100, locale)
+                      : t("scenarios.free")}
+                  </dd>
+                </div>
+                <div className="pricing-scenario-total">
+                  <dt>{t("scenarios.total")}</dt>
+                  <dd>
+                    {brazil
+                      ? formatBrl(scenario.totalBrlCents / 100, locale)
+                      : formatUsd(scenario.totalCents / 100, locale)}
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  ) : null;
 
   return (
     <div className="gtm">
       <StructuredData graph={[faqJsonLd(faq)]} />
       <PublicHeader labels={site} page="pricing" />
       <main id="conteudo">
-        <section className="gtm-section gtm-alt">
-          <div className="gtm-container">
-            <p className="gtm-eyebrow">{t("eyebrow")}</p>
-            <h1>{t.rich("title", { highlight: (chunks) => <span>{chunks}</span> })}</h1>
-            <p className="gtm-lead">{t("lead")}</p>
-            <div className="gtm-actions">
-              <SignupLink label={l("plans.cta")} />
-              <a className="ms-btn ms-btn-secondary gtm-action" href="/alternatives/resend">
-                {t("alternatives.cta")}
-              </a>
-            </div>
-            <p className="gtm-note">{t("note")}</p>
-          </div>
-        </section>
-
-        {scenarios.length ? (
-          <section className="gtm-section" id="cenarios" aria-labelledby="pricing-scenarios-title">
+        {sendFirst ? (
+          <section className="gtm-section gtm-alt">
             <div className="gtm-container">
-              <p className="gtm-eyebrow">{t("scenarios.eyebrow")}</p>
-              <h2 id="pricing-scenarios-title">{t("scenarios.title")}</h2>
-              <p>{t("scenarios.lead")}</p>
-              <div className="gtm-split gtm-split-three pricing-scenarios">
-                {scenarios.map((scenario) => (
-                  <article className="ms-card gtm-plan" key={scenario.id}>
-                    <h3>{t(`scenarios.items.${scenario.id}.title`)}</h3>
-                    <p>{t(`scenarios.items.${scenario.id}.body`)}</p>
-                    <dl className="pricing-scenario-lines">
-                      <div>
-                        <dt>
-                          {t("scenarios.lineCorreio", {
-                            plan: t(`correio.names.${scenario.correio.id}`),
-                          })}
-                        </dt>
-                        <dd>
-                          {brazil
-                            ? formatBrl(scenario.correio.brlMonthlyCents / 100, locale)
-                            : formatUsd(scenario.correio.monthlyCents / 100, locale)}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>
-                          {t(scenario.sendPro ? "scenarios.lineSendPro" : "scenarios.lineSendFree")}
-                        </dt>
-                        <dd>
-                          {scenario.sendPro
-                            ? brazil
-                              ? formatBrl(sendProBrlCents / 100, locale)
-                              : formatUsd(sendProCents / 100, locale)
-                            : t("scenarios.free")}
-                        </dd>
-                      </div>
-                      <div className="pricing-scenario-total">
-                        <dt>{t("scenarios.total")}</dt>
-                        <dd>
-                          {brazil
-                            ? formatBrl(scenario.totalBrlCents / 100, locale)
-                            : formatUsd(scenario.totalCents / 100, locale)}
-                        </dd>
-                      </div>
-                    </dl>
-                  </article>
-                ))}
+              <p className="gtm-eyebrow">{t("sendHero.eyebrow")}</p>
+              <h1>
+                {t.rich("sendHero.title", {
+                  price: sendPrice,
+                  highlight: (chunks) => <span>{chunks}</span>,
+                })}
+              </h1>
+              <p className="gtm-lead">{t("sendHero.lead")}</p>
+              <div className="gtm-actions">
+                <SignupCta
+                  className="ms-btn ms-btn-primary gtm-action"
+                  label={t("sendHero.cta")}
+                  plan="Pro 110K"
+                  rung="pro_100k"
+                />
+                <a className="ms-btn ms-btn-secondary gtm-action" href="#planos">
+                  {t("sendHero.plansLink")}
+                </a>
               </div>
+              <p className="gtm-note">
+                {launchOfferEnabled
+                  ? t("sendHero.note", { first: sendFirstPrice, price: sendPrice })
+                  : t("sendHero.noteRegular", { price: sendPrice })}
+              </p>
             </div>
           </section>
-        ) : null}
+        ) : (
+          <section className="gtm-section gtm-alt">
+            <div className="gtm-container">
+              <p className="gtm-eyebrow">{t("eyebrow")}</p>
+              <h1>{t.rich("title", { highlight: (chunks) => <span>{chunks}</span> })}</h1>
+              <p className="gtm-lead">{t("lead")}</p>
+              <div className="gtm-actions">
+                <SignupLink label={l("plans.cta")} />
+                <a className="ms-btn ms-btn-secondary gtm-action" href="/alternatives/resend">
+                  {t("alternatives.cta")}
+                </a>
+              </div>
+              <p className="gtm-note">{t("note")}</p>
+            </div>
+          </section>
+        )}
+
+        {sendFirst ? null : scenariosSection}
 
         <section className="gtm-section" id="planos">
           <div className="gtm-container">
@@ -267,6 +316,8 @@ export default async function PricingPage() {
             </div>
           </section>
         ) : null}
+
+        {sendFirst ? scenariosSection : null}
 
         {mailOpen ? (
           <section className="gtm-section" id="correio" aria-labelledby="pricing-correio-title">

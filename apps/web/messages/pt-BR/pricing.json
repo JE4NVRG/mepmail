@@ -176,5 +176,14 @@
     "lineCorreio": "Correio {plan}",
     "lineSendFree": "Envio Free (100 e-mails/dia)",
     "lineSendPro": "Envio Pro 110K"
+  },
+  "sendHero": {
+    "eyebrow": "Envio · e-mail transacional",
+    "title": "O e-mail do seu app, por volume. <highlight>110 mil por mês por {price}.</highlight>",
+    "lead": "E-mail transacional por API compatível com o Resend, SMTP ou MCP, saindo do seu domínio verificado. Comece grátis com 100 e-mails por dia, sem cartão; passe para o Pro 110K quando precisar de volume.",
+    "cta": "Começar com o Pro 110K",
+    "plansLink": "Ver todos os planos de Envio",
+    "note": "Novos clientes elegíveis pagam {first} no primeiro mês do Pro 110K; depois, {price} por mês. Sem fidelidade.",
+    "noteRegular": "O Pro 110K custa {price} por mês. Sem fidelidade."
   }
 }

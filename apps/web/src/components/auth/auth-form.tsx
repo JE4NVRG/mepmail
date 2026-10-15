@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { captchaHeaders, useTurnstile } from "@/components/turnstile";
 import { authClient } from "@/lib/auth-client";
 import { isAppLocale, setLocaleCookie } from "@/lib/locale-cookie";
 import { postAuthNext, withNext } from "@/lib/nav";
 import { passwordStrength } from "@/lib/password-strength";
+import { inAppBrowser, openInBrowserHref } from "@/lib/public-intent";
 
 import styles from "./auth.module.css";
 import { AuthScreen } from "./auth-screen";
@@ -91,6 +92,17 @@ export function AuthForm({
   const tLegal = useTranslations("auth.legal");
 
   const tAuth = useTranslations("auth");
+  const tInApp = useTranslations("auth.inApp");
+  // An app's built-in browser (Instagram, Facebook...): the confirmation link opens in the
+  // phone's browser and asks to sign in again there, so say it before the form, and offer the
+  // way out (Android opens Chrome; iOS has only the app's menu). Read after mount: the server
+  // never sees this tab's user agent the same way, and the first paint must match it.
+  const [inApp, setInApp] = useState<{ open: string | null } | null>(null);
+  useEffect(() => {
+    const kind = inAppBrowser(navigator.userAgent);
+    if (kind)
+      setInApp({ open: kind === "android" ? openInBrowserHref(window.location.href) : null });
+  }, []);
   const screenLocale = useLocale();
   // The account's mail language is read from the request that creates it.
   // The OAuth callback reaching the server carries this site's cookies but not
@@ -295,6 +307,12 @@ export function AuthForm({
         {tAuth(`shell.${anySocial ? key : "mailDelayedPlain"}`)}
       </p>
     ) : null;
+  const inAppNotice = inApp ? (
+    <div className={styles.delayed} role="status">
+      <strong>{tInApp("title")}.</strong> {tInApp("body")}{" "}
+      {inApp.open ? <a href={inApp.open}>{tInApp("open")}</a> : tInApp("iosHint")}
+    </div>
+  ) : null;
   const socialButtons = anySocial ? (
     <div className={styles.social}>
       {providers.google ? (
@@ -380,6 +398,7 @@ export function AuthForm({
       </p>
       {mode === "signup" ? <p className={styles.freeNote}>{t("freeNote")}</p> : null}
       {delayedNotice("mailDelayed")}
+      {inAppNotice}
       {socialButtons}
       {anySocial ? <div className={styles.divider}>{tSocial("or")}</div> : null}
       <p className={styles.hint} id="auth-step" aria-live="polite">
