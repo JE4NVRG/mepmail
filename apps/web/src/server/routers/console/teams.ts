@@ -27,6 +27,7 @@ import { escapeLike } from "@/lib/sql";
 import { cutTeamSendingAccess } from "../../console/suspension";
 import { operatorProcedure, router } from "../../trpc";
 import { auditOperator, kickQuotaDrain, loadTeam, mailTeamOwners } from "./shared";
+import { consoleTeamInvitationsRouter } from "./team-invitations";
 
 const SORT_KEYS = [
   "name",
@@ -154,6 +155,9 @@ function reasonText(
 }
 
 export const consoleTeamsRouter = router({
+  /** Invitations into any team, from the console (console/team-invitations.ts). */
+  invitations: consoleTeamInvitationsRouter,
+
   list: operatorProcedure
     .input(
       z.object({

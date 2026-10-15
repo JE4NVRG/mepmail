@@ -460,6 +460,7 @@
     "empty": "0 teams match.",
     "menu": {
       "open": "Open team",
+      "invite": "Invite member",
       "view": "View as owner",
       "viewOff": "Off on this instance: SUPPORT_VIEW=on turns it on",
       "limits": "Adjust limits",
@@ -570,6 +571,55 @@
       "title": "Reinstate {team}",
       "lead": "Sends go out again at once; held broadcasts resume within 15 minutes. The owner is emailed unless the suspension was for phishing.",
       "confirm": "Reinstate team"
+    },
+    "inviteDialog": {
+      "title": "Invite a member to {team}",
+      "lead": "Issued from the console: you do not join this team and your own active team stays as it is. Only the invited address can accept, and it joins this team only.",
+      "email": "Email",
+      "emailPlaceholder": "name@company.com",
+      "role": "Role",
+      "roles": {
+        "member": "Member",
+        "admin": "Admin"
+      },
+      "roleHint": "Member is the default; choose Admin only on purpose. Ownership is never given by invitation.",
+      "next": "Review",
+      "reviewTitle": "Confirm the invitation",
+      "reviewLead": "Nothing is sent until you confirm:",
+      "team": "Team",
+      "reviewNote": "The email names you as the sender. The invitation goes in this team's audit and in the instance audit.",
+      "back": "Back",
+      "confirm": "Send invitation",
+      "sentTitle": "Invitation sent",
+      "createdTitle": "Invitation link",
+      "emailedBody": "We emailed {email} an invitation to {team} as {role}. You can also share this link: it works once and expires in 3 days.",
+      "bodyTtl": "Share this link with {email} to join {team} as {role}. It works once and expires in 3 days.",
+      "sendFailed": "The invitation email could not be sent. Share the link, or resend it from the pending list.",
+      "noSender": "This instance has no email sender configured, so the link is the only way in.",
+      "done": "Done",
+      "errors": {
+        "conflict": "{email} already has a pending invitation to this team.",
+        "rate": "Too many invitations for this team this hour. Try again later.",
+        "generic": "Could not send the invitation: {message}"
+      },
+      "pending": {
+        "title": "Pending invitations",
+        "none": "No pending invitations.",
+        "loading": "Loading…",
+        "email": "Email",
+        "role": "Role",
+        "expires": "Expires",
+        "expired": "expired",
+        "actions": "Actions",
+        "resend": "Resend",
+        "revoke": "Revoke",
+        "revokeConfirm": "Confirm revoke"
+      },
+      "toast": {
+        "resent": "Invitation resent to {email}",
+        "revoked": "Invitation to {email} revoked",
+        "failed": "Could not complete: {message}"
+      }
     },
     "viewDialog": {
       "title": "View {team} as its owner",

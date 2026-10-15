@@ -9,6 +9,7 @@ import { planLabel } from "@/lib/console-format";
 import { useTRPC } from "@/lib/trpc";
 import { usePlanName } from "./teams/cells";
 import { PauseDialog, ReinstateDialog, SuspendDialog } from "./teams/hold-dialogs";
+import { InviteDialog } from "./teams/invite-dialog";
 import { LimitsDialog } from "./teams/limits-dialog";
 import { PlanDialog } from "./teams/plan-dialog";
 import { TeamDialog } from "./teams/team-dialog";
@@ -33,13 +34,23 @@ export interface TeamActions {
   resumeBroadcasts(team: TeamActionTarget): void;
   suspend(team: TeamActionTarget): void;
   reinstate(team: TeamActionTarget): void;
+  /** Invite someone into the team from the console, without joining it (console.teams.invitations). */
+  inviteMember(team: TeamActionTarget): void;
   /** The read-only support view of the team's dashboard (SUPPORT_VIEW=on). */
   viewAsOwner(team: TeamActionTarget): void;
   /** Render once per page: the dialogs the actions above open. */
   dialogs: React.ReactNode;
 }
 
-type DialogKind = "team" | "limits" | "plan" | "pause" | "suspend" | "reinstate" | "view";
+type DialogKind =
+  | "team"
+  | "limits"
+  | "plan"
+  | "pause"
+  | "suspend"
+  | "reinstate"
+  | "view"
+  | "invite";
 
 /**
  * Every operator action on a team and its dialog (Adjust limits, Change
@@ -113,6 +124,7 @@ export function useTeamActions(onChanged: () => void): TeamActions {
           relayPending={relay.isPending ? (relay.variables?.domainId ?? null) : null}
           onClose={close}
           onAdjustLimits={() => setDialog({ kind: "limits", team })}
+          onInvite={() => setDialog({ kind: "invite", team })}
           onViewAsOwner={() => {
             view.reset();
             setDialog({ kind: "view", team });
@@ -136,6 +148,17 @@ export function useTeamActions(onChanged: () => void): TeamActions {
               },
             )
           }
+        />
+      ) : null}
+      {dialog?.kind === "invite" ? (
+        <InviteDialog
+          team={{ id: team.id, name: team.name }}
+          onClose={() => {
+            close();
+            void queryClient.invalidateQueries({
+              queryKey: trpc.console.teams.detail.queryKey({ id: team.id }),
+            });
+          }}
         />
       ) : null}
       {dialog?.kind === "view" ? (
@@ -249,6 +272,7 @@ export function useTeamActions(onChanged: () => void): TeamActions {
     pauseBroadcasts: open("pause"),
     suspend: open("suspend"),
     reinstate: open("reinstate"),
+    inviteMember: open("invite"),
     viewAsOwner: (target) => {
       view.reset();
       setDialog({ kind: "view", team: target });
@@ -264,7 +288,7 @@ export function useTeamActions(onChanged: () => void): TeamActions {
 
 /**
  * The Teams list's "…" items for one team, from the shared actions: Open
- * team, View as owner (when `supportView` is given: disabled with the env
+ * team, Invite member, View as owner (when `supportView` is given: disabled with the env
  * named while the feature is off), Adjust limits, Change plan, separator,
  * Pause/Resume broadcasts, Suspend/Reinstate team. `labels` come from
  * console.teams.menu.
@@ -277,6 +301,7 @@ export function teamMenuItems(
 ): (PopoverMenuItem | null)[] {
   return [
     { label: labels("open"), onSelect: () => actions.openTeam(team) },
+    { label: labels("invite"), onSelect: () => actions.inviteMember(team) },
     options
       ? {
           label: labels("view"),
