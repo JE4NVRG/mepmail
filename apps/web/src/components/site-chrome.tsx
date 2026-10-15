@@ -266,7 +266,9 @@ export function PublicFooter({
         <nav className="gtm-footer-col" aria-label={labels.footer.colProduct}>
           <h3>{labels.footer.colProduct}</h3>
           <a href={anchorHref(page, "#como-funciona")}>{labels.nav.how}</a>
-          <a href={anchorHref(page, "#planos")}>{labels.nav.plans}</a>
+          <a data-purchase="" href={anchorHref(page, "#planos")}>
+            {labels.nav.plans}
+          </a>
           {labels.nav.correio ? <a href="/correio">{labels.nav.correio}</a> : null}
           {labels.footer.apps ? (
             <a href={DESKTOP_DOWNLOAD_URL} aria-current={page === "download" ? "page" : undefined}>

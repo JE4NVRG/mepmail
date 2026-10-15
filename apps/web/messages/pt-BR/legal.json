@@ -108,7 +108,7 @@
           "O conteúdo dos e-mails, enviados e recebidos, e os anexos são criptografados em repouso. Não vendemos esse conteúdo e não o usamos para treinar modelos de IA.",
           "Para proteger a entrega de todos, uma amostra dos e-mails enviados pelo Envio passa por uma verificação automática de abuso, feita por um provedor de IA nomeado abaixo.",
           "Os pagamentos rodam no Stripe, no cartão ou no Pix; nunca vemos nem armazenamos o número do seu cartão.",
-          "Trabalhamos com uma lista curta de provedores, nomeados abaixo.",
+          "Trabalhamos com uma lista curta de provedores, nomeados abaixo, inclusive os de IA da verificação de abuso e do suporte.",
           "Você pode exportar ou excluir os seus dados a qualquer momento."
         ]
       },
@@ -116,13 +116,13 @@
         "title": "2. Dados que coletamos",
         "body": [],
         "list": [
-          "Conta: nome, e-mail, senha (armazenada como hash) e vínculo com equipes.",
+          "Conta: nome, e-mail, senha (armazenada como hash) e vínculo com equipes. Se você entra com o Google, recebemos dele o nome, o e-mail e a foto do perfil.",
           "Cobrança: plano, status de pagamento e referências de fatura. Dados de cartão vão direto para o Stripe; no Pix, o Stripe gera e confirma o pagamento.",
           "Envio: domínios de envio, contatos e públicos que você cadastra, supressões, modelos, campanhas e metadados das mensagens (destinatário, assunto, status e eventos de entrega). Quando você liga o rastreamento no domínio, também os eventos de abertura e de clique dos destinatários.",
           "Conteúdo das mensagens do Envio: o HTML e o texto que você envia, criptografados em repouso.",
           "Correio: as mensagens recebidas e enviadas, os rascunhos e os anexos das suas caixas, criptografados em repouso, além de pastas, regras, remetentes aprovados ou bloqueados e preferências.",
           "Contas externas que você conecta (Gmail, Outlook, Hotmail, Microsoft 365 e outras): a senha de app ou, quando você entra com a Microsoft ou o Google, somente o token de renovação, guardado criptografado; e cópias das mensagens da Caixa de entrada dessa conta.",
-          "Suporte: as conversas no chat de suporte e por e-mail. Quando você está logado, o chat recebe a identificação da sua conta (nome, e-mail, equipe, plano e número de caixas).",
+          "Suporte: as conversas no chat de suporte e por e-mail, com as imagens que você anexa. Quando você está logado, o chat recebe a identificação da sua conta (nome, e-mail, equipe, plano e número de caixas).",
           "Dados técnicos: endereço IP, user agent, cookies de sessão e logs da aplicação e das requisições à API, com segredos ocultos.",
           "Mensuração opcional de publicidade: páginas públicas visitadas, identificadores de cookies e de cliques da Meta e do Google, cliques para criar conta, a conclusão do cadastro e eventos de início de checkout e compra inicial de plano pago, com valor e moeda. Não enviamos nomes, e-mails, telefones, contatos, destinatários ou conteúdo de mensagens para esse fim."
         ]
@@ -172,19 +172,22 @@
           "Se você permitir a mensuração de publicidade, a Meta e o Google recebem os eventos opcionais descritos nesta política: a Meta pelo Pixel e pelos eventos de cadastro concluído e de compra, o Google pelo Google Analytics nas páginas públicas e pelos eventos de cadastro concluído e de compra inicial de plano pago, que o nosso servidor envia com os identificadores dos cookies da Meta e do Google Analytics e, na compra, o plano e o valor. Essas conexões também informam o endereço IP e informações do navegador. Cada empresa trata esses dados conforme a sua própria política de privacidade. Não ativamos os sinais do Google nem a personalização de anúncios, e a mensuração não é necessária para usar o MepMail."
         ],
         "list": [
-          "Contabo GmbH (Alemanha) — hospedagem da aplicação, do banco de dados e das nossas métricas próprias.",
-          "Amazon Web Services (Amazon SES) — entrega dos e-mails e notificações de eventos. Conteúdo e metadados das mensagens passam por ele para a entrega.",
+          "Contabo GmbH (Alemanha) — hospedagem da aplicação, do banco de dados, da plataforma de suporte Elozi e das nossas métricas próprias.",
+          "Amazon Web Services (EUA; Irlanda como contingência) — o Amazon SES entrega os e-mails do Envio e do Correio e recebe os e-mails das caixas, com o conteúdo e os metadados das mensagens. A cópia de cada e-mail recebido fica num armazenamento privado e criptografado (Amazon S3), configurado para expirar em 30 dias. As filas de eventos (SQS e SNS) e as chaves de criptografia (KMS) também rodam na AWS.",
           "Stripe — pagamentos no cartão e no Pix, faturas e recibos.",
-          "Cloudflare — DNS, CDN e proteção de rede na frente dos nossos servidores; o desafio Turnstile que pode proteger login, cadastro e redefinição de senha; e o armazenamento das cópias de segurança do banco de dados (R2).",
-          "Command Code (commandcode.ai) — verificação automática de abuso: recebe uma amostra dos e-mails já aceitos pelo Envio (assunto e texto) e responde se há sinais de phishing ou spam. Não recebe conteúdo do Correio nem das contas externas.",
-          "Elozi (plataforma de atendimento da JE4NDEV, a mesma responsável pelo MepMail) — chat de suporte, com assistentes de IA e atendimento humano.",
-          "Gravatar (Automattic) — recebe o código (hash) do endereço de um remetente para mostrar a foto dele."
+          "Cloudflare — DNS, CDN e proteção de rede na frente dos nossos servidores; o desafio Turnstile que pode proteger login, cadastro e redefinição de senha; e o armazenamento (R2) das cópias de segurança do banco de dados e das imagens que você envia (foto de perfil e logos da equipe e da assinatura, publicadas por link).",
+          "Command Code (Langbase, Inc., EUA) — verificação automática de abuso. Recebe uma amostra dos e-mails já aceitos pelo Envio: remetente, endereço de resposta, assunto, texto visível, domínios dos links e nomes dos anexos, além do nome, do plano, da idade e dos domínios verificados da equipe; nunca os destinatários. Responde se há sinais de phishing ou spam com o modelo DeepSeek V4.1 Flash, que a Command Code encaminha a provedores que hospedam o modelo, conforme os termos deles. Segundo a política da Command Code, esse conteúdo pode ficar guardado por até 30 dias para operar e proteger o serviço (não usamos o modo de retenção zero) e não é usado para treinar os modelos dela. Não recebe conteúdo do Correio nem das contas externas.",
+          "Elozi (plataforma de atendimento da própria JE4NDEV, responsável pelo MepMail, hospedada nos nossos servidores) — o chat de suporte e o e-mail suporte@mepmail.dev, com assistentes de IA e atendimento humano. As conversas ficam guardadas na Elozi.",
+          "Gravatar (Automattic) — recebe o código (hash) do endereço de um remetente para mostrar a foto dele.",
+          "OpenCode Go (Anomaly, EUA) — os modelos de IA (DeepSeek) dos assistentes do suporte: recebem as mensagens da conversa ou do e-mail de suporte, a identificação da conta quando você está logado e as imagens que você anexa. O OpenCode declara que não guarda esse conteúdo e o repassa ao provedor do modelo. Para o modelo de texto em uso, publica retenção zero por um acordo renovado todo mês; o modelo que lê imagens não tem prazo publicado.",
+          "Telegram — avisos internos à nossa equipe sobre cada novo cadastro: e-mail, nome, idioma e a origem do cadastro (campanha e página de entrada)."
         ]
       },
       {
         "title": "8. Retenção",
         "body": [
-          "Dados de conta, de envio e do Correio são mantidos enquanto a conta estiver ativa. No Correio, uma mensagem fica até você apagá-la: ao esvaziar a lixeira ou excluir para sempre, ela sai na hora, e as cópias de segurança expiram em até 30 dias. As cópias de uma conta externa e a credencial dela são apagadas quando você a desconecta.",
+          "Os dados da conta e do Correio ficam enquanto a conta estiver ativa. No Envio, o conteúdo das mensagens é apagado 30 dias depois do envio; os metadados (destinatário, assunto, status e eventos) e os logs das requisições à API também saem em 30 dias, e ficam só contadores e resultados agregados. Os resultados da verificação de abuso (nota e motivo, sem o conteúdo) ficam 90 dias.",
+          "No Correio, uma mensagem fica até você apagá-la: ao esvaziar a lixeira ou excluir para sempre, ela sai na hora. As mensagens enviadas pelo Correio ficam como registro do envio. Uma caixa excluída pode ser restaurada por 30 dias e depois é apagada com as mensagens. A cópia de recebimento na AWS expira em 30 dias, e as cópias de segurança, em até 30 dias. As cópias de uma conta externa e a credencial dela são apagadas quando você a desconecta.",
           "Após a exclusão da conta, removemos os dados pessoais em até 30 dias, exceto quando a retenção for exigida (por exemplo, registros de cobrança guardados por obrigações fiscais e contábeis) ou quando logs limitados de entrega forem necessários para segurança. Estatísticas agregadas e não identificáveis podem ser mantidas.",
           "A preferência de publicidade pode ser retirada pelo link no rodapé. A retirada interrompe novos envios e cancela os eventos ainda pendentes; não apaga eventos que já chegaram à Meta ou ao Google. Não enviamos eventos anteriores à sua permissão."
         ]
@@ -210,7 +213,7 @@
       {
         "title": "12. Transferências internacionais",
         "body": [
-          "A aplicação e o banco de dados rodam na Alemanha (Contabo). A entrega de e-mails (Amazon SES), os pagamentos (Stripe), a verificação de abuso (Command Code) e os assistentes de IA do suporte processam dados nos Estados Unidos e em outros países onde esses provedores operam, e a Cloudflare opera no mundo todo. As transferências se apoiam nas cláusulas contratuais padrão desses provedores e salvaguardas equivalentes."
+          "A aplicação, o banco de dados e a Elozi rodam na Alemanha (Contabo). A AWS (nos EUA e, em contingência, na Irlanda), o Stripe, a Command Code, o OpenCode, o Gravatar e o Telegram processam dados nos Estados Unidos e em outros países onde operam, e a Cloudflare opera no mundo todo. Quando o provedor oferece, as transferências se apoiam nas cláusulas contratuais padrão dele ou em salvaguardas equivalentes."
         ]
       },
       {

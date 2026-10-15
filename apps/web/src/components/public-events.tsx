@@ -17,7 +17,10 @@ import { CopyMark, useCopy } from "./copy-chip";
  * holds up the navigation.
  */
 
-/** The docs link (nav + footer): leaving for the docs site is a funnel step of its own. */
+/**
+ * The docs link (nav + footer): leaving for the docs site is a funnel step of its own.
+ * The Android app hides it (`data-docs`): the docs site is outside the app.
+ */
 export function DocsLink({
   href,
   className,
@@ -34,6 +37,7 @@ export function DocsLink({
       href={href}
       target="_blank"
       rel="noreferrer"
+      data-docs=""
       onClick={() => trackEvent("docs_open", { from_page: pathname })}
     >
       {children}

@@ -9,9 +9,11 @@
  * remembered for that tab only (sessionStorage). Chrome shares its cookies with the app, so a
  * cookie would carry the app mode into the person's regular browser; a tab-scoped flag
  * cannot. The inline script below runs before the first paint: it marks <html> with
- * `data-android-app` (CSS then hides every `[data-purchase]` element), and it leaves the
- * public sales pages for the Correio.
+ * `data-android-app` (CSS then hides every `[data-purchase]` element), it leaves the
+ * public sales pages for the Correio, and it keeps the docs site out of the app.
  */
+import { DOCS_URL } from "./docs-links";
+
 export const ANDROID_APP_PACKAGE = "dev.mepmail.correio";
 export const ANDROID_APP_STORAGE_KEY = "mepmail.android-app";
 export const ANDROID_APP_ATTRIBUTE = "data-android-app";
@@ -26,9 +28,16 @@ export const ANDROID_APP_SALES_PATHS: readonly string[] = [
   "/alternatives/resend",
 ];
 export const ANDROID_APP_HOME = "/mail";
+/**
+ * The docs site opens outside the app, lists the plans with their prices and links back to
+ * the sales pages: a way to buy outside Google Play. Inside the app a docs link opens the
+ * in-app help instead (the support page: its answers, the chat and the support e-mail).
+ */
+export const ANDROID_APP_DOCS_HOST = new URL(DOCS_URL).hostname;
+export const ANDROID_APP_HELP = "/support";
 
 /** Before the first paint (root layout). Plain ES5, no user input. */
-export const ANDROID_APP_INIT_SCRIPT = `try{var s=window.sessionStorage,k=${JSON.stringify(ANDROID_APP_STORAGE_KEY)},q=new URLSearchParams(location.search);if(document.referrer.indexOf(${JSON.stringify(`android-app://${ANDROID_APP_PACKAGE}`)})===0||q.get("source")==="android")s.setItem(k,"1");if(s.getItem(k)==="1"){document.documentElement.setAttribute(${JSON.stringify(ANDROID_APP_ATTRIBUTE)},"");var p=location.pathname.replace(/\\/+$/,"")||"/";if(${JSON.stringify(ANDROID_APP_SALES_PATHS)}.indexOf(p)>=0)location.replace(${JSON.stringify(ANDROID_APP_HOME)})}}catch(e){}`;
+export const ANDROID_APP_INIT_SCRIPT = `try{var s=window.sessionStorage,k=${JSON.stringify(ANDROID_APP_STORAGE_KEY)},q=new URLSearchParams(location.search);if(document.referrer.indexOf(${JSON.stringify(`android-app://${ANDROID_APP_PACKAGE}`)})===0||q.get("source")==="android")s.setItem(k,"1");if(s.getItem(k)==="1"){document.documentElement.setAttribute(${JSON.stringify(ANDROID_APP_ATTRIBUTE)},"");var p=location.pathname.replace(/\\/+$/,"")||"/";if(${JSON.stringify(ANDROID_APP_SALES_PATHS)}.indexOf(p)>=0)location.replace(${JSON.stringify(ANDROID_APP_HOME)});document.addEventListener("click",function(e){var t=e.target,a=t&&t.closest?t.closest("a[href]"):null;if(a&&a.hostname===${JSON.stringify(ANDROID_APP_DOCS_HOST)}){e.preventDefault();location.assign(${JSON.stringify(ANDROID_APP_HELP)})}},true)}}catch(e){}`;
 
 /** Whether this tab is the Android app (after the init script ran). */
 export function inAndroidApp(): boolean {

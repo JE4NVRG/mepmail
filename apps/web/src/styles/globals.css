@@ -14,8 +14,10 @@
 }
 
 /* The Android app (lib/android-app.ts): nothing is sold inside it. The init script marks
-   <html> before the first paint, so a purchase surface never flashes. */
+   <html> before the first paint, so a purchase surface never flashes. [data-docs] marks a
+   docs link on a page that is already the in-app help. */
 html[data-android-app] [data-purchase],
-html[data-android-app] [data-advertising] {
+html[data-android-app] [data-advertising],
+html[data-android-app] [data-docs] {
   display: none !important;
 }

@@ -4,6 +4,7 @@ import {
   ANDROID_APP_ATTRIBUTE,
   ANDROID_APP_HEADER,
   ANDROID_APP_HEADER_VALUE,
+  ANDROID_APP_HELP,
   ANDROID_APP_INIT_SCRIPT,
   ANDROID_APP_STORAGE_KEY,
   androidAppHeaders,
@@ -37,6 +38,8 @@ function launch(tab: {
   if (tab.stored) store.set(ANDROID_APP_STORAGE_KEY, tab.stored);
   const marks = new Set<string>();
   const replace = vi.fn();
+  const assign = vi.fn();
+  const listeners: Array<{ type: string; run: (event: unknown) => void; capture: unknown }> = [];
   const sessionStorage =
     tab.storage === "throws"
       ? {
@@ -63,14 +66,27 @@ function launch(tab: {
     {
       referrer: tab.referrer ?? "",
       documentElement: { setAttribute: (name: string) => marks.add(name) },
+      addEventListener: (type: string, run: (event: unknown) => void, capture: unknown) =>
+        listeners.push({ type, run, capture }),
     },
-    { search: tab.search ?? "", pathname: tab.pathname ?? "/mail", replace },
+    { search: tab.search ?? "", pathname: tab.pathname ?? "/mail", replace, assign },
     URLSearchParams,
   );
+  /** A tap on a link to `href`, seen by the page's click listeners (capture phase). */
+  const tap = (href: string | null) => {
+    const anchor =
+      href === null ? null : { hostname: new URL(href, "https://mepmail.dev").hostname };
+    const event = { target: { closest: () => anchor }, preventDefault: vi.fn() };
+    for (const listener of listeners) if (listener.type === "click") listener.run(event);
+    return event;
+  };
   return {
     stored: store.get(ANDROID_APP_STORAGE_KEY) ?? null,
     marked: marks.has(ANDROID_APP_ATTRIBUTE),
     replace,
+    assign,
+    listeners,
+    tap,
   };
 }
 
@@ -114,6 +130,36 @@ describe("Android app: recognized at the launch, before the first paint", () => 
     expect(
       launch({ referrer: "android-app://dev.mepmail.correio/", pathname: "/pricing" }).replace,
     ).toHaveBeenCalledWith("/mail");
+  });
+
+  it("opens the in-app help instead of the docs site, which lists the plans outside the app", () => {
+    const app = launch({ stored: "1", pathname: "/mail" });
+    expect(app.listeners).toMatchObject([{ type: "click", capture: true }]);
+    for (const href of [
+      "https://docs.mepmail.dev",
+      "https://docs.mepmail.dev/pt-BR/mailboxes",
+      "https://docs.mepmail.dev/billing#plans",
+    ]) {
+      app.assign.mockClear();
+      const event = app.tap(href);
+      expect(event.preventDefault, href).toHaveBeenCalled();
+      expect(app.assign, href).toHaveBeenCalledWith(ANDROID_APP_HELP);
+    }
+    // Every other link, and a tap outside a link, goes on as usual.
+    app.assign.mockClear();
+    for (const href of [
+      "/support#chat",
+      "/mail/settings",
+      "https://mepmail.dev/changelog",
+      "https://github.com/JE4NVRG/mepmail",
+      "mailto:suporte@mepmail.dev",
+      null,
+    ]) {
+      expect(app.tap(href).preventDefault, String(href)).not.toHaveBeenCalled();
+    }
+    expect(app.assign).not.toHaveBeenCalled();
+    // On the web the docs links stay links: no listener at all.
+    expect(launch({ pathname: "/support" }).listeners).toEqual([]);
   });
 
   it("never breaks the page when storage is blocked", () => {

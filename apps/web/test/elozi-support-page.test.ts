@@ -35,7 +35,14 @@ describe("localized support page", () => {
     expect(html).toContain(copy.assistant.available);
     expect(html).toContain(copy.assistant.open);
     expect(html).toContain("gtm-support-hero");
-    expect(html.match(/<details>/g)).toHaveLength(copy.faq.items.length);
+    expect(html.match(/<details[ >]/g)).toHaveLength(copy.faq.items.length);
+    // In the Android app this page is the help: the answers quoting a price or the plans,
+    // and every link to the docs site (outside the app), are marked to stay out of it.
+    const pricing = copy.faq.items.find((item) => item.link.href.startsWith("/pricing"));
+    expect(html).toContain(`<details data-purchase=""><summary>${pricing?.q}</summary>`);
+    const docsLinks = html.match(/<a [^>]*href="https:\/\/docs\.mepmail\.dev[^"]*"[^>]*>/g) ?? [];
+    expect(docsLinks.length).toBeGreaterThan(0);
+    for (const link of docsLinks) expect(link).toContain('data-docs=""');
     // Every contact on the page reaches the owner directly.
     expect(html).toContain('href="mailto:suporte@mepmail.dev"');
     expect(html).not.toContain("@je4ndev.com");
