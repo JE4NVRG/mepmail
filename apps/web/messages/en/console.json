@@ -613,7 +613,9 @@
         "actions": "Actions",
         "resend": "Resend",
         "revoke": "Revoke",
-        "revokeConfirm": "Confirm revoke"
+        "revokeConfirm": "Confirm revoke",
+        "loadError": "Could not load the pending invitations.",
+        "retry": "Try again"
       },
       "toast": {
         "resent": "Invitation resent to {email}",

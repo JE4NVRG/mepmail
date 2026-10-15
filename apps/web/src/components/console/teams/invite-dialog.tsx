@@ -233,7 +233,10 @@ export function InviteDialog({
       )}
       {!create.data && !reviewing ? (
         <PendingList
+          state={pendingListState(pending)}
           invitations={pending.data}
+          retrying={pending.isFetching}
+          onRetry={() => void pending.refetch()}
           busy={resend.isPending || revoke.isPending}
           armedRevoke={armedRevoke}
           onResend={(invite) =>
@@ -274,15 +277,65 @@ interface PendingInvite {
   sendCount: number;
 }
 
+export type PendingListState = "loading" | "error" | "empty" | "ready";
+
+/**
+ * What the pending list shows, from its query: a failure is its own state (with Try again),
+ * never read as "still loading"; loading is only the first fetch.
+ */
+export function pendingListState(query: {
+  data?: readonly unknown[] | undefined;
+  isError: boolean;
+  isPending: boolean;
+}): PendingListState {
+  if (query.isError) return "error";
+  if (query.isPending || !query.data) return "loading";
+  return query.data.length === 0 ? "empty" : "ready";
+}
+
+/** The list could not be read: says so, with Try again (the query's refetch). */
+export function PendingListError({
+  message,
+  retryLabel,
+  retrying,
+  onRetry,
+}: {
+  message: string;
+  retryLabel: string;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <div role="alert" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <span style={{ color: "var(--ms-danger)", fontSize: 13 }}>{message}</span>
+      <button
+        type="button"
+        className="ms-btn ms-btn-secondary ms-btn-sm"
+        disabled={retrying}
+        onClick={onRetry}
+      >
+        <BtnSpinner on={retrying} />
+        {retryLabel}
+      </button>
+    </div>
+  );
+}
+
 /** The team's pending invitations: Resend, and Revoke after a second click on the same row. */
 export function PendingList({
+  state,
   invitations,
+  retrying,
+  onRetry,
   busy,
   armedRevoke,
   onResend,
   onRevoke,
 }: {
+  state: PendingListState;
   invitations: PendingInvite[] | undefined;
+  retrying: boolean;
+  onRetry: () => void;
   busy: boolean;
   armedRevoke: string | null;
   onResend: (invite: PendingInvite) => void;
@@ -295,9 +348,16 @@ export function PendingList({
       <div className="ms-microlabel" style={{ marginBottom: 8 }}>
         {t("title")}
       </div>
-      {!invitations || invitations.length === 0 ? (
+      {state === "error" ? (
+        <PendingListError
+          message={t("loadError")}
+          retryLabel={t("retry")}
+          retrying={retrying}
+          onRetry={onRetry}
+        />
+      ) : state !== "ready" || !invitations ? (
         <p style={{ margin: 0, color: "var(--ms-muted)", fontSize: 13 }}>
-          {invitations ? t("none") : t("loading")}
+          {state === "empty" ? t("none") : t("loading")}
         </p>
       ) : (
         <Table>

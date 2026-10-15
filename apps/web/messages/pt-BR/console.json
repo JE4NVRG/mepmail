@@ -613,7 +613,9 @@
         "actions": "Ações",
         "resend": "Reenviar",
         "revoke": "Revogar",
-        "revokeConfirm": "Confirmar revogação"
+        "revokeConfirm": "Confirmar revogação",
+        "loadError": "Não foi possível carregar os convites pendentes.",
+        "retry": "Tentar novamente"
       },
       "toast": {
         "resent": "Convite reenviado para {email}",

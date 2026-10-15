@@ -16,13 +16,23 @@ vi.mock("@/components/modal", () => ({
 }));
 // Any trpc path answers options objects; the queries return what each test sets.
 let pendingRows: unknown[] | undefined = [];
+// The pending-list query as the dialog reads it; a test may turn it into a failure.
+let listQuery: Record<string, unknown> | null = null;
+const refetch = vi.fn();
 const anyPath: unknown = new Proxy(() => ({}), {
   get: () => anyPath,
   apply: () => ({}),
 });
 vi.mock("@/lib/trpc", () => ({ useTRPC: () => anyPath }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: pendingRows }),
+  useQuery: () =>
+    listQuery ?? {
+      data: pendingRows,
+      isError: false,
+      isPending: pendingRows === undefined,
+      isFetching: false,
+      refetch,
+    },
   useMutation: () => ({
     mutate: vi.fn(),
     reset: vi.fn(),
@@ -33,9 +43,14 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
-const { InviteDialog, InviteReview, inviteErrorKey, looksLikeEmail } = await import(
-  "@/components/console/teams/invite-dialog"
-);
+const {
+  InviteDialog,
+  InviteReview,
+  PendingListError,
+  inviteErrorKey,
+  looksLikeEmail,
+  pendingListState,
+} = await import("@/components/console/teams/invite-dialog");
 const { TeamDialog } = await import("@/components/console/teams/team-dialog");
 const { teamMenuItems } = await import("@/components/console/team-actions");
 
@@ -176,5 +191,84 @@ describe("console invite helpers", () => {
     );
     expect(looksLikeEmail(" admin@vultrix3d.com.br ")).toBe(true);
     expect(looksLikeEmail("admin@")).toBe(false);
+  });
+});
+
+describe.each(["en", "pt-BR"] as const)("console invite pending list (%s)", (locale) => {
+  const pending = MESSAGES[locale].console.teams.inviteDialog.pending;
+  const dialog = () =>
+    render(locale, createElement(InviteDialog, { team: TEAM, onClose: () => {} }));
+
+  it("says the list failed, with Try again, instead of loading forever", () => {
+    listQuery = { data: undefined, isError: true, isPending: false, isFetching: false, refetch };
+    const html = dialog();
+    expect(html).toContain(esc(pending.loadError));
+    expect(html).toContain(pending.retry);
+    expect(html).not.toContain(pending.loading);
+    expect(html).not.toContain(pending.none);
+    listQuery = null;
+  });
+
+  it("shows loading only on the first fetch, and an empty list as empty", () => {
+    listQuery = { data: undefined, isError: false, isPending: true, isFetching: true, refetch };
+    expect(dialog()).toContain(pending.loading);
+    listQuery = { data: [], isError: false, isPending: false, isFetching: false, refetch };
+    const empty = dialog();
+    expect(empty).toContain(pending.none);
+    expect(empty).not.toContain(pending.loading);
+    listQuery = null;
+  });
+
+  it("recovers: after Try again the rows come back", () => {
+    listQuery = { data: undefined, isError: true, isPending: false, isFetching: true, refetch };
+    // While the retry runs, the button waits.
+    expect(dialog()).toMatch(
+      /<button[^>]*disabled[^>]*>.*Try again|<button[^>]*disabled[^>]*>.*Tentar novamente/,
+    );
+    listQuery = {
+      data: [
+        {
+          id: "00000000-0000-4000-8000-0000000000c1",
+          email: "back@example.test",
+          role: "member",
+          expiresAt: new Date(Date.now() + 86_400_000),
+          sendCount: 1,
+        },
+      ],
+      isError: false,
+      isPending: false,
+      isFetching: false,
+      refetch,
+    };
+    const html = dialog();
+    expect(html).toContain("back@example.test");
+    expect(html).not.toContain(esc(pending.loadError));
+    listQuery = null;
+  });
+});
+
+describe("pending list states and Try again", () => {
+  it("tells loading, failure, empty and ready apart, failure first", () => {
+    expect(pendingListState({ data: undefined, isError: false, isPending: true })).toBe("loading");
+    expect(pendingListState({ data: undefined, isError: true, isPending: false })).toBe("error");
+    // A failed refetch is a failure even with old rows in the cache.
+    expect(pendingListState({ data: [{}], isError: true, isPending: false })).toBe("error");
+    expect(pendingListState({ data: [], isError: false, isPending: false })).toBe("empty");
+    expect(pendingListState({ data: [{}], isError: false, isPending: false })).toBe("ready");
+  });
+
+  it("Try again calls the query's refetch", () => {
+    const onRetry = vi.fn();
+    const element = PendingListError({
+      message: "failed",
+      retryLabel: "Try again",
+      retrying: false,
+      onRetry,
+    });
+    const children = (element.props as { children: ReturnType<typeof createElement>[] }).children;
+    const button = children.find((child) => child?.type === "button");
+    if (!button) throw new Error("no Try again button");
+    (button.props as { onClick: () => void }).onClick();
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 });
