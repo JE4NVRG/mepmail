@@ -123,7 +123,7 @@ export function AdvertisingConsent() {
     if (!configured) return;
     const settings = () => {
       setOpen(true);
-      void adConsent.read();
+      void adConsent.read({ force: true });
     };
     window.addEventListener(SETTINGS_EVENT, settings);
     if (typeof BroadcastChannel !== "undefined") {

@@ -7,13 +7,16 @@ export interface AdConsentSnapshot {
   error: boolean;
 }
 const INITIAL: AdConsentSnapshot = { state: "unknown", pending: false, error: false };
+const READ_FRESHNESS_MS = 30_000;
+const READ_ERROR_BACKOFF_MS = 5_000;
 
 /** Server cookie proof is authoritative. No local storage receipt or identifier. */
-export function createAdConsentStore(request: typeof fetch) {
+export function createAdConsentStore(request: typeof fetch, now = () => Date.now()) {
   let snapshot = INITIAL;
   let revision = 0;
   let blockedLocally = false;
   let reading: Promise<void> | undefined;
+  let readAfter = 0;
   let writes: Promise<void> = Promise.resolve();
   const listeners = new Set<() => void>();
   const publish = (next: AdConsentSnapshot) => {
@@ -39,9 +42,12 @@ export function createAdConsentStore(request: typeof fetch) {
         listeners.delete(listener);
       };
     },
-    read(): Promise<void> {
+    read(options: { force?: boolean } = {}): Promise<void> {
       if (snapshot.pending) return writes;
       if (reading) return reading;
+      // Repeated visibility/route events reuse this document's recent server
+      // answer. Explicit settings/retry actions can recheck immediately.
+      if (!options.force && now() < readAfter) return Promise.resolve();
       const current = revision;
       reading = (async () => {
         try {
@@ -51,14 +57,19 @@ export function createAdConsentStore(request: typeof fetch) {
               cache: "no-store",
             }),
           );
-          if (current === revision)
+          if (current === revision) {
+            readAfter = now() + READ_FRESHNESS_MS;
             publish(
               blockedLocally && state === "accepted"
                 ? { state: "denied", pending: false, error: true }
                 : { state, pending: false, error: false },
             );
+          }
         } catch {
-          if (current === revision) publish({ state: "unknown", pending: false, error: true });
+          if (current === revision) {
+            readAfter = now() + READ_ERROR_BACKOFF_MS;
+            publish({ state: "unknown", pending: false, error: true });
+          }
         } finally {
           reading = undefined;
         }
@@ -67,11 +78,13 @@ export function createAdConsentStore(request: typeof fetch) {
     },
     blockLocally() {
       ++revision;
+      readAfter = 0;
       blockedLocally = true;
       publish({ state: "denied", pending: false, error: true });
     },
     choose(granted: boolean): Promise<void> {
       const current = ++revision;
+      readAfter = 0;
       blockedLocally = true;
       // Revoke synchronously, including while an earlier accept is still in flight.
       publish({ state: granted ? "unknown" : "denied", pending: true, error: false });

@@ -4,7 +4,12 @@
  * API key (`ms_...`) and nothing else. Env conventions match `@mepmail/cli`.
  */
 export interface MepMailClient {
-  request(method: string, path: string, body?: unknown): Promise<unknown>;
+  request(
+    method: string,
+    path: string,
+    body?: unknown,
+    headers?: Record<string, string>,
+  ): Promise<unknown>;
 }
 
 /** A non-2xx API reply, carrying the parsed error body (`statusCode`/`name`/`message`). */
@@ -42,10 +47,16 @@ export function createClient(options: ClientOptions): MepMailClient {
   const base = options.baseUrl.replace(/\/+$/, "");
   const doFetch = options.fetchImpl ?? globalThis.fetch;
   return {
-    async request(method: string, path: string, body?: unknown): Promise<unknown> {
+    async request(
+      method: string,
+      path: string,
+      body?: unknown,
+      headers: Record<string, string> = {},
+    ): Promise<unknown> {
       const res = await doFetch(`${base}${path}`, {
         method,
         headers: {
+          ...headers,
           authorization: `Bearer ${options.apiKey}`,
           accept: "application/json",
           ...(body !== undefined ? { "content-type": "application/json" } : {}),

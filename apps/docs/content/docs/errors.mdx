@@ -97,6 +97,23 @@ timeout — that is what makes a retried send safe. Reusing a key with a
 different payload is `409 invalid_idempotent_request`: give the new payload its
 own key instead of retrying.
 
+The scope is **team + key**, shared by `POST /emails` and `POST /emails/batch`,
+not an individual API key. Use a unique key per logical send, including across
+applications in the same team. A completed response is retained for **24 hours**
+from the claim. After expiry, the same key may be accepted as a new send: keep
+your own business-level deduplication when retries may exceed that window.
+
+An incomplete claim can be recovered after **10 minutes**, only with the same
+payload. This recovers an interrupted request; it does not extend completed
+responses beyond 24 hours. A replay returns the original email ID(s).
+
+For the hosted MCP and local builds from this source, `send_email` and
+`send_email_batch` accept
+`idempotency_key` as a top-level tool argument. It maps to the HTTP header;
+the email's `headers` object does not set it. Keep the same value and payload
+after an uncertain result. The separately published local npm package may
+not yet expose this argument; check its tool schema before retrying automatically.
+
 ## Batch sends
 
 `POST /emails/batch` accepts up to 100 emails. With the

@@ -38,6 +38,7 @@ export interface RequestSpec {
   method: "GET" | "POST" | "PATCH" | "DELETE";
   path: string;
   body?: unknown;
+  headers?: Record<string, string>;
 }
 
 export interface ToolSpec {
@@ -84,6 +85,14 @@ const attachment = z.object({
   content_id: z.string().optional().describe("Content id, for inline images"),
   path: z.string().optional().describe("Rejected by the API; kept for wire compatibility"),
 });
+
+const idempotencyKey = z
+  .string()
+  .min(1)
+  .optional()
+  .describe(
+    "Retry key sent as the HTTP Idempotency-Key header, not an email header. Scoped to the team for 24 hours: reuse with the same payload to replay the original ids; a different payload or concurrent request returns 409. Use one key per send or batch.",
+  );
 
 const sendEmail = z
   .object({
@@ -272,15 +281,23 @@ export const TOOLS: ToolSpec[] = [
     name: "send_email",
     description:
       "Send a transactional email (or schedule it with scheduled_at). Suppressed and topic-opted-out recipients are skipped automatically. Returns the email id.",
-    inputSchema: sendEmail,
+    inputSchema: sendEmail.safeExtend({ idempotency_key: idempotencyKey }),
     annotations: {},
-    build: (body) => ({ method: "POST", path: "/emails", body }),
+    build: ({ idempotency_key, ...body }) => ({
+      method: "POST",
+      path: "/emails",
+      body,
+      ...(idempotency_key !== undefined
+        ? { headers: { "Idempotency-Key": String(idempotency_key) } }
+        : {}),
+    }),
   },
   {
     name: "send_email_batch",
     description:
       "Send up to 100 emails in one call; each entry has the same shape as send_email. Returns one id per accepted email.",
     inputSchema: z.object({
+      idempotency_key: idempotencyKey,
       emails: z
         .array(sendEmail)
         .min(1)
@@ -288,7 +305,14 @@ export const TOOLS: ToolSpec[] = [
         .describe("The emails to send, same shape as send_email"),
     }),
     annotations: {},
-    build: ({ emails }) => ({ method: "POST", path: "/emails/batch", body: emails }),
+    build: ({ emails, idempotency_key }) => ({
+      method: "POST",
+      path: "/emails/batch",
+      body: emails,
+      ...(idempotency_key !== undefined
+        ? { headers: { "Idempotency-Key": String(idempotency_key) } }
+        : {}),
+    }),
   },
   {
     name: "update_email",
@@ -357,7 +381,9 @@ export function registerTools(server: McpServer, client: MepMailClient): void {
       (async (args: unknown) => {
         try {
           const request = spec.build(args as Record<string, unknown>);
-          return toolResult(await client.request(request.method, request.path, request.body));
+          return toolResult(
+            await client.request(request.method, request.path, request.body, request.headers),
+          );
         } catch (error) {
           if (error instanceof MepMailApiError) return toolResult(error.payload, false);
           throw error;

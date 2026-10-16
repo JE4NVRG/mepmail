@@ -1508,6 +1508,16 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  justify-content: flex-end;
+  width: 224px;
+  min-height: 44px;
+}
+.gtm-public-account.is-pending::after {
+  content: "";
+  width: 112px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--ms-panel-raised);
 }
 .gtm-account-error {
   position: absolute;
@@ -1550,6 +1560,23 @@
   }
   .gtm-public-account {
     gap: 7px;
+    width: 176px;
+  }
+}
+@media (max-width: 400px) {
+  .gtm-public-account {
+    width: 164px;
+  }
+  .gtm-public-account .gtm-nav-login {
+    padding-inline: 3px;
+    font-size: 12px;
+  }
+  .gtm-header .gtm-public-account .gtm-action {
+    padding-inline: 10px;
+    font-size: 13px;
+  }
+  .gtm-header .gtm-wordmark img {
+    width: 100px;
   }
 }
 

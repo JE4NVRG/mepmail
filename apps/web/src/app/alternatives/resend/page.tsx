@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { CodeDemo } from "@/components/code-demo";
+import { ComparisonReference } from "@/components/comparison-reference";
 import {
   PublicFooter,
   PublicHeader,
@@ -8,7 +9,11 @@ import {
   SignupLink,
 } from "@/components/site-chrome";
 import { RESEND_PRICING_SOURCE, resendSavings } from "@/lib/alternatives-resend";
-import { formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricing";
+import {
+  comparisonRowsForLocale,
+  formatComparisonPrice,
+  formatVolume,
+} from "@/lib/landing-pricing";
 import { legalLinks } from "@/lib/legal-links";
 import { publicPageUrls } from "@/server/public-seo";
 import "../../landing.css";
@@ -54,7 +59,7 @@ export default async function ResendAlternativePage() {
     nav: l.raw("nav"),
     footer: l.raw("footer"),
   } as PublicSiteLabels;
-  const rows = priceRowsForOffer(process.env.SEND_LAUNCH_OFFER_ENABLED === "true");
+  const rows = comparisonRowsForLocale(process.env.SEND_LAUNCH_OFFER_ENABLED === "true", locale);
   const columns = t.raw("table.columns") as string[];
   const sameItems = t.raw("same.items") as string[];
   const differentItems = t.raw("different.items") as string[];
@@ -89,6 +94,7 @@ export default async function ResendAlternativePage() {
             <p className="gtm-eyebrow">{t("eyebrow")}</p>
             <h2>{t("table.title")}</h2>
             <p>{t("table.intro")}</p>
+            {await ComparisonReference()}
             <section
               className="gtm-table-scroll"
               aria-label={t("table.title")}
@@ -111,12 +117,12 @@ export default async function ResendAlternativePage() {
                     return (
                       <tr key={row.volume}>
                         <th scope="row">{formatVolume(row.volume, locale)}</th>
-                        <td>{formatUsd(row.resend, locale)}</td>
-                        <td>{formatUsd(row.mepmail, locale)}</td>
+                        <td>{formatComparisonPrice(row.resend, locale)}</td>
+                        <td>{formatComparisonPrice(row.mepmail, locale)}</td>
                         <td>
                           {t("table.rowAdvantage", {
                             percent: savings.pct,
-                            usd: formatUsd(savings.usd, locale),
+                            usd: formatComparisonPrice(savings.usd, locale),
                           })}
                         </td>
                       </tr>

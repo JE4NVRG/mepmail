@@ -19,6 +19,13 @@ type Operation = {
   tags?: string[];
   responses: Record<string, { headers?: Record<string, unknown> }>;
   requestBody?: { content: Record<string, { example?: unknown }> };
+  parameters?: {
+    name: string;
+    in: string;
+    required?: boolean;
+    description?: string;
+    schema?: { type: string; minLength?: number };
+  }[];
 };
 
 async function spec() {
@@ -78,5 +85,29 @@ describe("published OpenAPI document", () => {
     expect(send?.requestBody?.content["application/json"]?.example).toMatchObject({
       subject: expect.any(String),
     });
+  });
+
+  it("declares the optional HTTP idempotency header on single and batch sends only", async () => {
+    const doc = await spec();
+    const sends: string[] = [];
+    for (const [path, item] of Object.entries(doc.paths)) {
+      for (const [method, operation] of Object.entries(item)) {
+        const headers = operation.parameters?.filter((p) => p.name === "Idempotency-Key") ?? [];
+        if (headers.length === 0) continue;
+        sends.push(`${method.toUpperCase()} ${path}`);
+        expect(headers).toHaveLength(1);
+        expect(headers[0]).toMatchObject({
+          in: "header",
+          required: false,
+          schema: { type: "string", minLength: 1 },
+        });
+        expect(headers[0]?.description).toContain("team");
+        expect(headers[0]?.description).toContain("24 hours");
+        expect(headers[0]?.description).toContain("10 minutes");
+        expect(headers[0]?.description).toContain("invalid_idempotent_request");
+        expect(headers[0]?.description).toContain("concurrent_idempotent_requests");
+      }
+    }
+    expect(sends.sort()).toEqual(["POST /emails", "POST /emails/batch"]);
   });
 });

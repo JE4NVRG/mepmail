@@ -10,7 +10,8 @@
   "note": "O Envio começa grátis: 100 e-mails por dia, sem cartão. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe; a cobrança começa no fim do teste, a menos que você cancele antes.",
   "plans": {
     "title": "Todos os planos de Envio.",
-    "intro": "Mensalidades normais de envio. A oferta de entrada e o plano anual Pro 110K aparecem abaixo quando estiverem disponíveis. No Pro e no Scale mensais, o excedente vem ligado e pode ser desligado em Cobrança."
+    "intro": "Mensalidades recorrentes. A oferta inicial e o anual Pro 110K estão detalhados abaixo. Veja as regras de consumo em “Detalhes de limites, filas e excedentes”.",
+    "details": "Detalhes de limites, filas e excedentes"
   },
   "included": {
     "eyebrow": "Incluído no Envio",
@@ -151,7 +152,7 @@
     "planMailboxes": "{count, plural, one {# caixa} other {# caixas}}",
     "planInbound": "{count, number} mensagens recebidas por mês",
     "planLocal": "Fora do Brasil, em dólar: {price} por mês",
-    "noteLimits": "Os limites renovam a cada mês de cobrança e nada é cobrado além do plano. O envio para no limite do plano; o recebimento pausa depois do limite mais 10% de margem, ou com o armazenamento cheio, até o mês seguinte, um upgrade ou, no armazenamento, esvaziar a lixeira. As mensagens guardadas continuam legíveis, e os donos recebem um e-mail aos 80% e aos 100% de cada limite. No teste grátis, o envio fica em até 50 destinatários por dia e 200 no total."
+    "noteLimits": "Franquias compartilhadas entre todas as caixas. Além das quantidades, saída mensal: 256 MiB / 1 GiB / 3 GiB; entrada: 512 MiB / 1,5 GiB / 3 GiB (Solo / Duo / Equipe). Os limites renovam a cada mês de cobrança e nada é cobrado além do plano. O envio para no limite do plano; o recebimento pausa e o remetente recebe bounce permanente 5.1.1 depois do limite mais 10% de margem, ou com o armazenamento cheio, até o mês seguinte, um upgrade ou, no armazenamento, esvaziar a lixeira. As mensagens guardadas continuam legíveis, e os donos recebem um e-mail aos 80% e aos 100% de cada limite. No teste grátis, o envio fica em até 50 destinatários por dia e 200 no total."
   },
   "scenarios": {
     "eyebrow": "Por cenário",
@@ -185,5 +186,11 @@
     "plansLink": "Ver todos os planos de Envio",
     "note": "Novos clientes elegíveis pagam {first} no primeiro mês do Pro 110K; depois, {price} por mês. Sem fidelidade.",
     "noteRegular": "O Pro 110K custa {price} por mês. Sem fidelidade."
+  },
+  "quickPrices": {
+    "label": "Preços de entrada por produto",
+    "mail": "Correio a partir de",
+    "send": "Envio a partir de",
+    "free": "· 100 e-mails/dia"
   }
 }

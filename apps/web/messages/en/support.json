@@ -65,11 +65,16 @@
         ]
       },
       {
-        "name": "Status page",
-        "kind": "Coming soon",
-        "body": "There is no public status page yet, so there is no URL to link to. When it exists, this card will point at it.",
-        "bullets": ["Until then, material service changes reach you by email."],
-        "links": []
+        "name": "Service status",
+        "kind": "/status",
+        "body": "HTTP availability and published incident history.",
+        "bullets": ["On-demand checks, at most once a minute."],
+        "links": [
+          {
+            "label": "View service status",
+            "href": "/status"
+          }
+        ]
       }
     ]
   },

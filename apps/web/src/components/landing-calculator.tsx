@@ -3,7 +3,12 @@
 import { useLocale } from "next-intl";
 import { useId, useMemo, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
-import { formatUsd, formatVolume, PRICE_ROWS, type PriceRow } from "@/lib/landing-pricing";
+import {
+  formatComparisonPrice,
+  formatVolume,
+  PRICE_ROWS,
+  type PriceRow,
+} from "@/lib/landing-pricing";
 import { computeSavings } from "@/lib/landing-savings";
 
 export interface CalcLabels {
@@ -50,7 +55,7 @@ export function LandingCalculator({
   const volume = formatVolume(savings.row.volume, locale);
   const savingsText = labels.savings
     .replace("{percent}", String(savings.savingsPct))
-    .replace("{usd}", formatUsd(savings.savingsUsd, locale));
+    .replace("{usd}", formatComparisonPrice(savings.savingsUsd, locale));
   const mailto = `${labels.contact}?subject=${encodeURIComponent(
     labels.ctaSubject.replace("{volume}", volume),
   )}`;
@@ -81,15 +86,15 @@ export function LandingCalculator({
       <div className="gtm-calc-result" aria-live="polite">
         <p className="gtm-calc-line">
           <span>{labels.ours}</span>
-          <strong>{formatUsd(savings.row.mepmail, locale)}</strong>
+          <strong>{formatComparisonPrice(savings.row.mepmail, locale)}</strong>
         </p>
         <p className="gtm-calc-line">
           <span>{labels.cheapest.replace("{name}", savings.competitor.name)}</span>
-          <strong>{formatUsd(savings.competitor.price, locale)}</strong>
+          <strong>{formatComparisonPrice(savings.competitor.price, locale)}</strong>
         </p>
         <p className="gtm-calc-savings">{savingsText}</p>
         <p className="gtm-note">
-          {labels.annual.replace("{usd}", formatUsd(savings.savingsYearUsd, locale))}
+          {labels.annual.replace("{usd}", formatComparisonPrice(savings.savingsYearUsd, locale))}
         </p>
       </div>
       <a className="ms-btn ms-btn-primary gtm-action" href={mailto}>

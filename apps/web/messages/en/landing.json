@@ -108,7 +108,7 @@
   "compare": {
     "eyebrow": "Pricing without guesswork",
     "title": "Compare by the volume you actually send.",
-    "intro": "Compare MepMail’s regular monthly price with the historical competitor benchmark of 2026-09-27. The introductory promotion and annual discount are excluded; features and terms differ.",
+    "intro": "MepMail’s regular monthly price; Resend checked on 2026-10-16. SendGrid, Postmark and Mailgun retain the historical reference of 2026-09-27. Also compare features and terms.",
     "tableAria": "Price comparison by volume",
     "columns": [
       "Emails/month",
@@ -117,22 +117,22 @@
       "SendGrid",
       "Postmark",
       "Mailgun",
-      "Historical difference"
+      "Estimated difference"
     ],
     "slideNote": "Swipe the table to see every provider on smaller screens.",
-    "refNote": "Reference: commercial analysis of 2026-09-27; third-party public prices can change and features/terms are not equivalent. USD per month, excluding taxes. Where a provider publishes its overage as a range, the table uses the midpoint."
+    "refNote": "Monthly USD prices. Resend: official table checked on 2026-10-16; other providers: historical reference of 2026-09-27, which may have changed. Excludes taxes, introductory offers and annual discounts. Historical ranges for overage use their midpoint."
   },
   "calc": {
-    "title": "Compare with the historical benchmark.",
-    "lead": "Choose your volume: MepMail’s regular monthly fee and competitor prices recorded on 2026-09-27.",
+    "title": "Estimate the difference at your volume.",
+    "lead": "Regular monthly prices in USD. Resend checked on 2026-10-16; other references from 2026-09-27.",
     "volumeLabel": "Emails per month",
     "ours": "MepMail",
     "cheapest": "Lowest benchmark price ({name})",
-    "savings": "Historical difference: {percent}% (~{usd}/month)",
+    "savings": "Estimated difference: {percent}% (~{usd}/month)",
     "annual": "12 monthly differences: ≈ {usd}; this is not an annual quote",
     "cta": "Discuss my volume",
     "ctaSubject": "MepMail calculator: {volume} emails/month",
-    "note": "Historical reference of 2026-09-27, in USD/month. Check providers’ current prices; features are not equivalent. Excludes introductory offers, annual discounts, taxes and additional usage.",
+    "note": "USD/month. Resend checked on 2026-10-16; other providers retain historical prices from 2026-09-27. Includes the reference’s estimated overage where needed. Excludes taxes, introductory offers and annual discounts; features are not equivalent.",
     "a11y": "Monthly sending volume"
   },
   "structure": {
@@ -397,5 +397,12 @@
     },
     "both": "Or all three together: the same verified domain serves Mail and Send, and each keeps its own credential and limit.",
     "bothCta": "See prices by scenario"
+  },
+  "comparisonReference": {
+    "title": "What the comparison includes",
+    "example": "For 100,000 sends in a month, with no inbound emails, Resend lists Pro 100K at {pro}. Another option is Pro 50K + 50,000 extra emails: {overage} (US$ 20 + 50 × US$ 0.90). Scale 100K costs {scale}, with different features. Pro 100K is the lowest of these three options.",
+    "pricingSource": "Plans and overage rates checked on 2026-10-16 in <link>Resend’s official pricing table</link>. The Resend column uses the lowest published cost for each volume, with overage where needed.",
+    "currency": "MepMail uses its actual BRL catalog price. Foreign prices are estimated in reais using the <link>Brazilian Central Bank closing sell rate</link> on {date}, US$ 1 = R$ {rate}. This is not a checkout quote and excludes taxes and currency fees.",
+    "capabilities": "MCP and inbound are not exclusive: Resend offers <resend>official MCP</resend> and <inboxes>inboxes for people and agents</inboxes>; Plunk also offers <plunk>MCP</plunk>. With MepMail, compare the review workflow, permissions and separate Mail and Send allowances."
   }
 }

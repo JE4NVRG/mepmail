@@ -8,17 +8,22 @@ Resend wire protocol, so sending mail means using the official Resend SDKs with
 your instance's base URL ([SDKs](/sdks)). These cover what those SDKs cannot
 do — running MCP locally, moving an account over and wiring MepMail into n8n.
 
-| Package | Latest | What it is | Guide |
+{/* package-facts:start */}
+| Package | Source version | Node | Role |
 | --- | --- | --- | --- |
-| [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) | [Latest on npm](https://www.npmjs.com/package/@mepmail/mcp) (documented: 0.2.1) | MCP server for local clients (stdio): 22 tools to read, send and manage contacts, plus 5 Correio mailbox tools with a mailbox agent key (`MEPMAIL_MAIL_TOKEN`), from Claude, Cursor, Codex or any MCP client. | [MCP server](/mcp) |
-| [`@mepmail/cli`](https://www.npmjs.com/package/@mepmail/cli) | [Latest on npm](https://www.npmjs.com/package/@mepmail/cli) (documented: 0.2.4) | Migration CLI: reads a Resend account, diffs it against your instance, applies the difference and writes a report. | [CLI](/cli) |
-| [`n8n-nodes-mepmail`](https://www.npmjs.com/package/n8n-nodes-mepmail) | [Latest on npm](https://www.npmjs.com/package/n8n-nodes-mepmail) (documented: 0.2.0) | n8n community nodes: send and schedule email, manage contacts, domains, broadcasts and suppressions, read and answer Correio mailboxes, and a trigger that starts workflows from MepMail events, including mail reaching an agent mailbox. | [Integrations](/integrations#n8n) |
+| [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) | 0.3.2 | `>=20` | 22 team tools and 6 Correio mailbox tools, depending on the credential. [Guide](/mcp). |
+| [`@mepmail/cli`](https://www.npmjs.com/package/@mepmail/cli) | 0.2.4 | `>=18` | Account migration with plan, apply and report. [Guide](/cli). |
+| [`n8n-nodes-mepmail`](https://www.npmjs.com/package/n8n-nodes-mepmail) | [See npm](https://www.npmjs.com/package/n8n-nodes-mepmail) | n8n | Sending and Correio mailbox workflows. [Guide](/integrations#n8n). |
 
-The CLI needs Node 18 or newer; the MCP server needs Node 20 or newer. Both
-ship as a single bundle with no dependencies. The n8n node installs from n8n
-itself (Settings → Community nodes).
-Run them with `npx`, which always resolves the latest published version; the
-numbers above are the versions this page was written against.
+The [hosted MCP](/mcp) at this revision is **0.71.0**, with **79 tools** advertised in the [server card](https://mepmail.dev/.well-known/mcp/server-card.json). The additional `list_teams` tool appears only on all-teams grants. Scopes and permissions can reduce the effective list.
+{/* package-facts:end */}
+
+These values are generated from the package manifests and tool registries at
+the docs source revision. npm packages have their own release cycle: follow
+the registry links for the latest published version and check `tools/list` in
+your actual client for its available tools. A source release does not publish
+a new npm package automatically. The n8n package lives in a separate repository
+and installs from n8n (Settings → Community nodes).
 
 ## @mepmail/mcp — the local MCP server
 
@@ -46,13 +51,16 @@ install:
 
 | Variable | Required | Default | Meaning |
 | --- | --- | --- | --- |
-| `MEPMAIL_API_KEY` | yes | — | Team API key (`ms_...`) from **API keys** in the dashboard. The tools act with exactly this key's reach. |
+| `MEPMAIL_API_KEY` | for team tools | — | Team API key (`ms_...`) from **API keys** in the dashboard. The tools act with exactly this key's reach. May be omitted for a mailbox-only client. |
 | `MEPMAIL_BASE_URL` | no | `https://api.mepmail.dev` | Your instance's API origin. Set it for a self-hosted deployment. |
+| `MEPMAIL_MAIL_TOKEN` | for mailbox tools | — | Correio agent key (`mmb_...` for one mailbox or `mmt_...` for the mailboxes selected by a team credential). Works without a team API key. |
+| `MEPMAIL_MAIL_ORIGIN` | no | `https://mepmail.dev` | Dashboard origin serving Correio. Set it for your self-hosted mailbox service. |
 
-It reaches your instance's REST API directly with that key — no OAuth, no
-browser step — and exposes the reading, sending and contact tools: 22 of the
-[hosted server's](/mcp) 68. Config for Claude Desktop, Cursor and VS Code, and
-the full tool list, are on the [MCP page](/mcp).
+For a mailbox-only client, replace `MEPMAIL_API_KEY` in the configuration above
+with `MEPMAIL_MAIL_TOKEN`. Team tools call the API origin; mailbox tools call
+the dashboard origin. Both authenticate directly with their own scoped key —
+no browser OAuth step. Config for Claude Desktop, Cursor and VS Code, and the
+full hosted tool list, are on the [MCP page](/mcp).
 
 ## @mepmail/cli — the migration CLI
 

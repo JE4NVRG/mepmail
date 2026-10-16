@@ -4,15 +4,31 @@ description: Use os SDKs oficiais do Resend contra a sua instância MepMail — 
 ---
 
 O MepMail fala o protocolo do Resend, então não existe SDK nosso para instalar.
-Os **SDKs oficiais do Resend** funcionam como estão, bastando apontá-los para a
-origem da API da sua instância — o que também significa que sair do Resend custa
-uma linha, não uma reescrita de cada chamada.
+Use os **SDKs oficiais do Resend** com a origem da API da sua instância. A
+compatibilidade depende da versão do SDK e da operação; a matriz abaixo separa
+a cobertura automatizada de contrato dos exemplos de configuração.
 
 Duas coisas que o MepMail publica no npm não são SDKs — o servidor MCP local e a
 CLI de migração. Estão em [Pacotes npm](/pt-BR/packages).
 
-Cada trecho abaixo foi conferido no código-fonte do próprio SDK, e Node e Python
-foram executados contra uma instância real (envio, com `delivered`).
+## Matriz de compatibilidade
+
+{/* sdk-compatibility:start */}
+| SDK | Runtime | Cobertura automatizada no repositório |
+| --- | --- | --- |
+| `resend@6.27.0` (Node / TypeScript) | Node `>=20` | [Suítes de contrato](https://github.com/JE4NVRG/mepmail/tree/main/apps/api/test): emails, domains, contacts, contact properties, segments, broadcasts, suppressions, templates, topics, webhooks. |
+{/* sdk-compatibility:end */}
+
+As suítes de contrato Node usam API local e banco de fixtures sintéticas, com
+enfileiramento de entrega simulado: verificam requisições e respostas, não
+entrega externa. A versão é gerada a partir do lockfile do repositório.
+Os exemplos abaixo de Python, Go, Ruby, PHP, Rust, Elixir, .NET e Java não têm
+versão fixada nesta matriz automatizada; valide as operações da sua aplicação
+antes de adotar outra versão de SDK.
+
+Na consulta de 16 de outubro de 2026, os
+[metadados de `resend@6.33.0` no npm](https://registry.npmjs.org/resend/6.33.0)
+exigem Node **20 ou superior**. Essa versão não está coberta pelo gate fixado acima.
 
 ## O que os SDKs oficiais alcançam
 
@@ -31,9 +47,10 @@ costuma ser trabalho de um dia, não de um redesenho.
 
 `https://api.mepmail.dev` — o que todos os exemplos desta página usam.
 
-O cadastro está aberto — sem convite e sem cartão: crie sua conta em
-[mepmail.dev/signup](https://mepmail.dev/signup). O plano Free envia até
-100 e-mails por dia UTC.
+Crie sua conta em [mepmail.dev/signup](https://mepmail.dev/signup).
+O plano Free do Envio não exige cartão e envia até 100 e-mails por dia UTC.
+Planos pagos e o teste do Correio têm condições próprias em
+[Preços](https://mepmail.dev/pricing).
 
 No painel, você pode solicitar um e-mail de teste para o seu próprio endereço
 sem adicionar um domínio nem criar uma chave de API. Para integrar seu produto
@@ -68,7 +85,7 @@ vale copiar exatamente:
 
 ## Node.js / TypeScript
 
-[`resend` no npm](https://www.npmjs.com/package/resend) — Node 18+.
+[`resend` no npm](https://www.npmjs.com/package/resend) — Node 20+.
 
 ```sh
 npm install resend

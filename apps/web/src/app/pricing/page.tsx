@@ -177,13 +177,78 @@ export default async function PricingPage({
     </section>
   ) : null;
 
+  const correioSection = mailOpen ? (
+    <section className="gtm-section" id="correio" aria-labelledby="pricing-correio-title">
+      <div className="gtm-container">
+        <p className="gtm-eyebrow">{t("correio.eyebrow")}</p>
+        <h2 id="pricing-correio-title">{t("correio.title")}</h2>
+        <p>{t(standaloneOpen ? "correio.bodyStandalone" : "correio.body")}</p>
+        <div className={`gtm-split${standaloneOpen ? " gtm-split-three" : ""}`}>
+          {standaloneOpen
+            ? correioPlans.map((plan) => (
+                <article className="ms-card gtm-plan" key={plan.id}>
+                  <h3>{t(`correio.names.${plan.id}`)}</h3>
+                  <p className="gtm-price">
+                    {brazil
+                      ? formatBrlPrice(plan.brlMonthlyCents, locale)
+                      : formatUsd(plan.monthlyCents / 100, locale)}
+                    <span>{t("correio.perMonthPlan")}</span>
+                  </p>
+                  <ul className="gtm-points">
+                    <li>{t("correio.planMailboxes", { count: plan.mailboxes })}</li>
+                    <li>{t("correio.sharedStorage", { size: plan.storageGiB })}</li>
+                    <li>{t("correio.sharedSends", { count: plan.monthlyRecipientDeliveries })}</li>
+                    <li>{t("correio.planInbound", { count: plan.monthlyInboundMessages })}</li>
+                    <li>{t("correio.domains", { count: LAUNCH_OFFER.correioDomains })}</li>
+                    <li>{t("correio.trial")}</li>
+                    <li>
+                      {t("correio.planLocal", {
+                        price: brazil
+                          ? formatUsd(plan.monthlyCents / 100, locale)
+                          : formatBrl(plan.brlMonthlyCents / 100, locale),
+                      })}
+                    </li>
+                  </ul>
+                </article>
+              ))
+            : LAUNCH_OFFER.mailboxes.map((box) => (
+                <article className="ms-card gtm-plan" key={box.id}>
+                  <h3>{t(`correio.names.${box.id}`)}</h3>
+                  <p className="gtm-price">
+                    {formatUsd(box.monthlyCents / 100, locale)}
+                    <span>{t("correio.perMonth")}</span>
+                  </p>
+                  <ul className="gtm-points">
+                    <li>{t("correio.storage", { size: box.storageGiB })}</li>
+                    <li>{t("correio.sends", { count: box.monthlyRecipientDeliveries })}</li>
+                    <li>{t("correio.agents")}</li>
+                  </ul>
+                </article>
+              ))}
+        </div>
+        {standaloneOpen ? <p className="gtm-note">{t("correio.noteLimits")}</p> : null}
+        <p className="gtm-note">{t(standaloneOpen ? "correio.noteStandalone" : "correio.note")}</p>
+        <div className="ms-wrap-row" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          {standaloneOpen ? (
+            <a className="ms-btn ms-btn-primary gtm-action" href="/signup?next=/mail">
+              {t("correio.subscribe")}
+            </a>
+          ) : null}
+          <a className="ms-btn ms-btn-secondary gtm-action" href="/correio">
+            {t("correio.cta")}
+          </a>
+        </div>
+      </div>
+    </section>
+  ) : null;
+
   return (
     <div className="gtm">
       <StructuredData graph={[faqJsonLd(faq)]} />
       <PublicHeader labels={site} page="pricing" />
       <main id="conteudo">
         {sendFirst ? (
-          <section className="gtm-section gtm-alt">
+          <section className="gtm-section gtm-alt pricing-intro">
             <div className="gtm-container">
               <p className="gtm-eyebrow">{t("sendHero.eyebrow")}</p>
               <h1>
@@ -193,6 +258,26 @@ export default async function PricingPage({
                 })}
               </h1>
               <p className="gtm-lead">{t("sendHero.lead")}</p>
+              <nav className="pricing-shortcuts" aria-label={t("quickPrices.label")}>
+                {standaloneOpen ? (
+                  <a href="#correio">
+                    <span>{t("quickPrices.mail")}</span>
+                    <strong>
+                      {brazil
+                        ? formatBrlPrice(correioPlans[0].brlMonthlyCents, locale)
+                        : formatUsd(correioPlans[0].monthlyCents / 100, locale)}
+                      <small>{l("plans.perMonth")}</small>
+                    </strong>
+                  </a>
+                ) : null}
+                <a href="#planos">
+                  <span>{t("quickPrices.send")}</span>
+                  <strong>
+                    {brazil ? "R$ 0" : "US$ 0"}
+                    <small>{t("quickPrices.free")}</small>
+                  </strong>
+                </a>
+              </nav>
               <div className="gtm-actions">
                 <SignupCta
                   className="ms-btn ms-btn-primary gtm-action"
@@ -212,11 +297,31 @@ export default async function PricingPage({
             </div>
           </section>
         ) : (
-          <section className="gtm-section gtm-alt">
+          <section className="gtm-section gtm-alt pricing-intro">
             <div className="gtm-container">
               <p className="gtm-eyebrow">{t("eyebrow")}</p>
               <h1>{t.rich("title", { highlight: (chunks) => <span>{chunks}</span> })}</h1>
               <p className="gtm-lead">{t("lead")}</p>
+              <nav className="pricing-shortcuts" aria-label={t("quickPrices.label")}>
+                {standaloneOpen ? (
+                  <a href="#correio">
+                    <span>{t("quickPrices.mail")}</span>
+                    <strong>
+                      {brazil
+                        ? formatBrlPrice(correioPlans[0].brlMonthlyCents, locale)
+                        : formatUsd(correioPlans[0].monthlyCents / 100, locale)}
+                      <small>{l("plans.perMonth")}</small>
+                    </strong>
+                  </a>
+                ) : null}
+                <a href="#planos">
+                  <span>{t("quickPrices.send")}</span>
+                  <strong>
+                    {brazil ? "R$ 0" : "US$ 0"}
+                    <small>{t("quickPrices.free")}</small>
+                  </strong>
+                </a>
+              </nav>
               <div className="gtm-actions">
                 <SignupLink label={l("plans.cta")} />
                 <a className="ms-btn ms-btn-secondary gtm-action" href="/alternatives/resend">
@@ -228,7 +333,7 @@ export default async function PricingPage({
           </section>
         )}
 
-        {sendFirst ? null : scenariosSection}
+        {sendFirst ? null : correioSection}
 
         <section className="gtm-section" id="planos">
           <div className="gtm-container">
@@ -239,8 +344,12 @@ export default async function PricingPage({
                 <PlanCard key={plan.name} plan={plan} labels={cardLabels} />
               ))}
             </div>
-            <p className="gtm-note">{l("plans.note")}</p>
-            <p className="gtm-note">{l("plans.noteAttach")}</p>
+            <details className="pricing-usage-details">
+              <summary>{t("plans.details")}</summary>
+              <p className="gtm-note">{l("plans.note")}</p>
+              <p className="gtm-note">{faq[0]?.a}</p>
+              <p className="gtm-note">{l("plans.noteAttach")}</p>
+            </details>
           </div>
         </section>
 
@@ -317,78 +426,8 @@ export default async function PricingPage({
           </section>
         ) : null}
 
-        {sendFirst ? scenariosSection : null}
-
-        {mailOpen ? (
-          <section className="gtm-section" id="correio" aria-labelledby="pricing-correio-title">
-            <div className="gtm-container">
-              <p className="gtm-eyebrow">{t("correio.eyebrow")}</p>
-              <h2 id="pricing-correio-title">{t("correio.title")}</h2>
-              <p>{t(standaloneOpen ? "correio.bodyStandalone" : "correio.body")}</p>
-              <div className={`gtm-split${standaloneOpen ? " gtm-split-three" : ""}`}>
-                {standaloneOpen
-                  ? correioPlans.map((plan) => (
-                      <article className="ms-card gtm-plan" key={plan.id}>
-                        <h3>{t(`correio.names.${plan.id}`)}</h3>
-                        <p className="gtm-price">
-                          {brazil
-                            ? formatBrlPrice(plan.brlMonthlyCents, locale)
-                            : formatUsd(plan.monthlyCents / 100, locale)}
-                          <span>{t("correio.perMonthPlan")}</span>
-                        </p>
-                        <ul className="gtm-points">
-                          <li>{t("correio.planMailboxes", { count: plan.mailboxes })}</li>
-                          <li>{t("correio.sharedStorage", { size: plan.storageGiB })}</li>
-                          <li>
-                            {t("correio.sharedSends", { count: plan.monthlyRecipientDeliveries })}
-                          </li>
-                          <li>
-                            {t("correio.planInbound", { count: plan.monthlyInboundMessages })}
-                          </li>
-                          <li>{t("correio.domains", { count: LAUNCH_OFFER.correioDomains })}</li>
-                          <li>{t("correio.trial")}</li>
-                          <li>
-                            {t("correio.planLocal", {
-                              price: brazil
-                                ? formatUsd(plan.monthlyCents / 100, locale)
-                                : formatBrl(plan.brlMonthlyCents / 100, locale),
-                            })}
-                          </li>
-                        </ul>
-                      </article>
-                    ))
-                  : LAUNCH_OFFER.mailboxes.map((box) => (
-                      <article className="ms-card gtm-plan" key={box.id}>
-                        <h3>{t(`correio.names.${box.id}`)}</h3>
-                        <p className="gtm-price">
-                          {formatUsd(box.monthlyCents / 100, locale)}
-                          <span>{t("correio.perMonth")}</span>
-                        </p>
-                        <ul className="gtm-points">
-                          <li>{t("correio.storage", { size: box.storageGiB })}</li>
-                          <li>{t("correio.sends", { count: box.monthlyRecipientDeliveries })}</li>
-                          <li>{t("correio.agents")}</li>
-                        </ul>
-                      </article>
-                    ))}
-              </div>
-              {standaloneOpen ? <p className="gtm-note">{t("correio.noteLimits")}</p> : null}
-              <p className="gtm-note">
-                {t(standaloneOpen ? "correio.noteStandalone" : "correio.note")}
-              </p>
-              <div className="ms-wrap-row" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                {standaloneOpen ? (
-                  <a className="ms-btn ms-btn-primary gtm-action" href="/signup?next=/mail">
-                    {t("correio.subscribe")}
-                  </a>
-                ) : null}
-                <a className="ms-btn ms-btn-secondary gtm-action" href="/correio">
-                  {t("correio.cta")}
-                </a>
-              </div>
-            </div>
-          </section>
-        ) : null}
+        {sendFirst ? correioSection : null}
+        {scenariosSection}
 
         <section className="gtm-section gtm-alt">
           <div className="gtm-container">

@@ -117,7 +117,8 @@ deployments — see [Billing](/billing); a self-hosted instance has no plan limi
 | `ALLOW_SIGNUP` | The first user can always register; after that signup stays closed unless this is `true`. Keep `false` when the dashboard is reachable from the internet. |
 | `TRUSTED_PROXIES` | Reverse proxies whose forwarded-client-IP headers (`X-Forwarded-For`, `CF-Connecting-IP`) are believed, comma-separated IPs or CIDRs. Default `127.0.0.1,::1` covers a proxy on the same host; add your proxy's address when it runs elsewhere. See the [nginx section](#production-nginx--tls). |
 | `WEBHOOK_ALLOW_LOCALHOST` | Local development only: lets webhook endpoints (test fires included) target `http://` and loopback/private addresses on any port. Keep `false` on any internet-reachable instance. |
-| `COMPOSE_PROFILES` | Optional compose services, comma-separated: `smtp` (the relay; mount a STARTTLS keypair first), and in the standalone file also `docs` (this documentation site) and `backup` (scheduled dumps). |
+| `COMPOSE_PROFILES` | Optional services in the root Compose file, comma-separated: `smtp` (mount a STARTTLS keypair first), `docs` (this site) and `backup` (scheduled dumps; configure the bucket first). Unset selects only Postgres and the app. |
+| `DOCS_API_REGIONS` | Docs build only: comma-separated regions for the generated API reference. Defaults to Cloud's `us-east-1`; set it to your instance's served regions before building self-hosted docs. The instance's `/openapi.json` is authoritative. |
 | `PORT` | API port (default `3001`). Under compose this moves both the container's listen port and the published host port together. |
 | `UNSUBSCRIBE_BASE_URL` | Optional own host for the hosted unsubscribe pages (e.g. `https://unsubscribe.example.com`), pointed at the same web process. Unsubscribe links in mail and the page's redirects use it, and that host serves the unsubscribe flow only, so recipients and link scanners never reach the dashboard's origin, cookies or reputation. Unset: `APP_BASE_URL`. |
 | `WEB_PORT` | Host port the compose file publishes the dashboard on (the web process is always 3000 inside the container). Keep `APP_BASE_URL` in sync. |
@@ -388,8 +389,9 @@ profile, so it stays off until asked for: once the keypair is mounted, add
 
 The image can also serve this documentation site: a `docs` compose service
 runs with `PROCESS=docs` and publishes port `3002` (host side tunable via
-`DOCS_PORT`). It needs no database and is entirely optional; in the standalone
-file it sits behind the `docs` profile (`COMPOSE_PROFILES=docs`).
+`DOCS_PORT`). It needs no database and sits behind the `docs` profile in the
+root Compose file (`COMPOSE_PROFILES=docs`). Add `smtp` and/or `backup` to the
+same comma-separated variable to enable those services too.
 
 ## Production: nginx + TLS
 

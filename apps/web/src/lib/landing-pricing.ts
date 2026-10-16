@@ -1,8 +1,17 @@
-/** Public MepMail prices compared with the dated 2026-09-27 benchmark.
- * Competitor values are historical references, not current quotes or equivalent
- * feature bundles. The new offer is selected by the server, never client env.
+/** Public MepMail prices and dated competitor references.
+ * Resend rates were rechecked on 2026-10-16; other providers retain the
+ * 2026-09-27 reference. Feature bundles differ. Offer selection is server-side.
  */
+
+import { PLAN_RUNGS } from "@millionsend/core/plans";
 import { LAUNCH_OFFER } from "./launch-offer";
+
+/** BCB closing sell rate, retrieved on 2026-10-16; conversion is a comparison estimate. */
+export const COMPARISON_FX = {
+  brlPerUsd: 5.0521,
+  date: "2026-10-15",
+  url: "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao=%2710-15-2026%27&$format=json",
+} as const;
 
 export interface PriceRow {
   /** Emails per month this row refers to: a MepMail rung (plans.ts PLAN_RUNGS). */
@@ -83,6 +92,42 @@ export function priceRowsForOffer(launchOfferEnabled: boolean): readonly PriceRo
     const cheapest = Math.min(row.resend, row.sendgrid, row.postmark ?? Infinity, row.mailgun);
     return { ...row, mepmail, savings: `${Math.round(((cheapest - mepmail) / cheapest) * 100)}%` };
   });
+}
+
+/** Brazil uses the catalog's charged BRL price; only foreign prices are converted. */
+export function comparisonRowsForLocale(
+  launchOfferEnabled: boolean,
+  locale: string,
+): readonly PriceRow[] {
+  const rows = priceRowsForOffer(launchOfferEnabled);
+  if (locale !== "pt-BR") return rows;
+  return rows.map((row) => {
+    const rung = PLAN_RUNGS.find((plan) => plan.period === "month" && plan.included === row.volume);
+    if (!rung) throw new RangeError("Missing BRL comparison rung");
+    const mepmail =
+      row.volume === LAUNCH_OFFER.sending.monthlyRecipientDeliveries && launchOfferEnabled
+        ? LAUNCH_OFFER.sending.brlMonthlyCents / 100
+        : rung.brlPriceCents / 100;
+    const converted = {
+      ...row,
+      mepmail,
+      resend: row.resend * COMPARISON_FX.brlPerUsd,
+      sendgrid: row.sendgrid * COMPARISON_FX.brlPerUsd,
+      postmark: row.postmark === null ? null : row.postmark * COMPARISON_FX.brlPerUsd,
+      mailgun: row.mailgun * COMPARISON_FX.brlPerUsd,
+    };
+    const cheapest = Math.min(
+      converted.resend,
+      converted.sendgrid,
+      converted.postmark ?? Infinity,
+      converted.mailgun,
+    );
+    return { ...converted, savings: `${Math.round(((cheapest - mepmail) / cheapest) * 100)}%` };
+  });
+}
+
+export function formatComparisonPrice(value: number | null, locale: string): string {
+  return locale === "pt-BR" && value !== null ? formatBrl(value, locale) : formatUsd(value, locale);
 }
 
 export const COMPETITORS = [

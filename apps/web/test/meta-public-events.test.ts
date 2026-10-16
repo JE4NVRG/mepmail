@@ -38,7 +38,7 @@ describe("server advertising consent", () => {
     request.mockResolvedValue(
       new Response(JSON.stringify({ state: "accepted", policyVersion: "old" })),
     );
-    await store.read();
+    await store.read({ force: true });
     expect(store.getSnapshot()).toMatchObject({ state: "unknown", error: true });
   });
   it("sends the choice with its same-origin Referer, the receipt's source page", async () => {

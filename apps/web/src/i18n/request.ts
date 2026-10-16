@@ -28,6 +28,7 @@ const NAMESPACES = [
   "changelog",
   "security",
   "support",
+  "status",
   "legal",
   "nav",
   "pricing",

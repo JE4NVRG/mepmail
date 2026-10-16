@@ -1,0 +1,24 @@
+{
+  "eyebrow": "Service status",
+  "title": "MepMail availability",
+  "description": "Current HTTP availability and publicly reported incidents.",
+  "summaryAvailable": "All monitored HTTP endpoints responded successfully",
+  "summaryUnavailable": "One or more HTTP endpoints could not be reached successfully",
+  "checkedAt": "Last checked: {time} UTC",
+  "services": {
+    "web": "Web dashboard",
+    "api": "HTTP API",
+    "docs": "Documentation"
+  },
+  "available": "Available",
+  "unavailable": "Check unsuccessful",
+  "noResponse": "No response within the check timeout",
+  "scope": "Checks run when this page is requested, at most once a minute. They measure HTTP availability, not email delivery or an uptime SLA.",
+  "refresh": "Check again",
+  "support": "Contact support",
+  "historyEyebrow": "Published updates",
+  "historyTitle": "Incident history",
+  "historyEmpty": "No incidents have been published in this history. This is not a record of earlier uptime.",
+  "resolved": "Resolved",
+  "ongoing": "Ongoing"
+}

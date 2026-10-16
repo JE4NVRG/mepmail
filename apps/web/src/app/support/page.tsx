@@ -44,7 +44,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * Página pública /support: os canais de atendimento (e-mail, docs, updates e a
- * status page que ainda NÃO existe — o card fica sem link de propósito) e um
+ * status page) e um
  * FAQ enxuto cujos links apontam para páginas reais da documentação. A copy
  * vive no namespace "support".
  */
@@ -106,11 +106,6 @@ export default async function SupportPage() {
             <h2>{t("channels.title")}</h2>
             <p>{t("channels.body")}</p>
             <div className="gtm-integrations gtm-pairs">
-              {/*
-                O card "Status page" sai sem href: não existe status page
-                pública (nem URL) hoje. Quando existir, basta preencher o
-                links[] da mensagem — o render abaixo já cobre.
-              */}
               {channels.map((channel) => (
                 <article className="gtm-integration" key={channel.name}>
                   <p className="gtm-integration-kind">{channel.kind}</p>

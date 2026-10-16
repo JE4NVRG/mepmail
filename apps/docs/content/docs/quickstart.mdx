@@ -12,12 +12,18 @@ your choice across the docs.
 <DeploymentTabs>
 <DeploymentTab deployment="cloud">
 
-Signup is open — the beta has no seat limit, so create your account at
-[mepmail.dev/signup](https://mepmail.dev/signup) — no invite, no
-card required — then sign in at
-[mepmail.dev](https://mepmail.dev). Each account sends up to 100
-emails per UTC day on the Free plan; write to us if you would rather have us set
-the account up for you. The API is at `api.mepmail.dev`.
+Create your account at [mepmail.dev/signup](https://mepmail.dev/signup), then
+sign in at [mepmail.dev](https://mepmail.dev). The Envio Free plan needs no card
+and sends up to 100 emails per UTC day. Paid Envio plans and the Correio trial
+have their own payment terms; see [current plans](https://mepmail.dev/pricing).
+The API is at `api.mepmail.dev`.
+
+### Try a dashboard email before DNS
+
+In the dashboard's onboarding, use **Send test to my inbox** to send to your own account address.
+You do not need to add a domain or create an API key for this first test.
+This sends a real test message to you; it does not validate your application's
+API integration. For SDK or REST sends, continue with domain verification below.
 
 </DeploymentTab>
 <DeploymentTab deployment="self-hosted">
@@ -116,7 +122,7 @@ curl -X POST https://api.mepmail.dev/emails \
   }'
 ```
 
-Or with the official Resend SDK for Node (`npm install resend`), pointed at your
+Or with the official Resend SDK for Node 20+ (`npm install resend`), pointed at your
 base URL:
 
 ```ts
@@ -134,11 +140,12 @@ const { data, error } = await resend.emails.send({
 });
 
 if (error) console.error(error.name, error.message);
-else console.log("sent", data.id);
+else console.log("accepted", data.id);
 ```
 
-Both return `{ "id": "..." }`. Watch the email move from `queued` to
-`delivered` on the **Emails** page.
+Both return `{ "id": "..." }` when accepted into the queue. Acceptance is not
+delivery: persist the ID and follow the email on **Emails** or through
+[webhooks](/concepts/webhooks) until a delivery or failure event arrives.
 
 <Callout type="info">
 On a self-hosted instance, delivery events (delivered, bounced, complained)

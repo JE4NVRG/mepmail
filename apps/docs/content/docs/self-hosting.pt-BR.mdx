@@ -121,7 +121,8 @@ auto-hospedada não tem limites de plano.
 | `ALLOW_SIGNUP` | O primeiro usuário sempre pode se registrar; depois disso o cadastro fica fechado a menos que isto seja `true`. Mantenha `false` quando o painel é acessível pela internet. |
 | `TRUSTED_PROXIES` | Reverse proxies cujos headers de IP do cliente (`X-Forwarded-For`, `CF-Connecting-IP`) são confiáveis, IPs ou CIDRs separados por vírgula. O padrão `127.0.0.1,::1` cobre um proxy no mesmo host; adicione o endereço do seu proxy quando ele roda em outro lugar. Veja a [seção de nginx](#produção-nginx--tls). |
 | `WEBHOOK_ALLOW_LOCALHOST` | Só para desenvolvimento local: permite que endpoints de webhook (disparos de teste incluídos) apontem para `http://` e endereços de loopback/privados em qualquer porta. Mantenha `false` em qualquer instância acessível pela internet. |
-| `COMPOSE_PROFILES` | Serviços opcionais do compose, separados por vírgula: `smtp` (o relay; monte um par de chaves STARTTLS antes) e, no arquivo standalone, também `docs` (este site de documentação) e `backup` (dumps agendados). |
+| `COMPOSE_PROFILES` | Serviços opcionais do Compose raiz, separados por vírgula: `smtp` (monte um par STARTTLS antes), `docs` (este site) e `backup` (dumps agendados; configure o bucket antes). Sem valor, sobe apenas Postgres e o app. |
+| `DOCS_API_REGIONS` | Somente no build das docs: regiões da referência da API, separadas por vírgula. O padrão é `us-east-1` da Nuvem; defina as regiões da sua instância antes de compilar docs auto-hospedadas. O `/openapi.json` da instância é a fonte autoritativa. |
 | `PORT` | Porta da API (padrão `3001`). No compose, move junto a porta interna do contêiner e a porta publicada no host. |
 | `UNSUBSCRIBE_BASE_URL` | Host próprio, opcional, para as páginas hospedadas de descadastro (ex.: `https://unsubscribe.example.com`), apontado para o mesmo processo web. Os links de descadastro nos e-mails e os redirecionamentos da página usam esse host, e ele serve só o fluxo de descadastro, então destinatários e scanners de links nunca alcançam a origem, os cookies nem a reputação do painel. Sem definir: `APP_BASE_URL`. |
 | `WEB_PORT` | Porta do host em que o compose publica o painel (o processo web é sempre 3000 dentro do contêiner). Mantenha `APP_BASE_URL` em sincronia. |
@@ -401,7 +402,9 @@ outros) e rode `docker compose up -d`.
 A imagem também pode servir este site de documentação: um serviço `docs` do
 compose roda com `PROCESS=docs` e publica a porta `3002` (ajustável no host
 via `DOCS_PORT`). Não precisa de banco e é totalmente opcional; no arquivo
-standalone ele fica atrás do profile `docs` (`COMPOSE_PROFILES=docs`).
+raiz ele fica atrás do profile `docs` (`COMPOSE_PROFILES=docs`). Adicione
+`smtp` e/ou `backup` à mesma variável, separados por vírgula, para habilitar
+esses serviços também.
 
 ## Produção: nginx + TLS
 

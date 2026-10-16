@@ -13,7 +13,7 @@ import { PRICE_ROWS } from "../src/lib/landing-pricing";
 const messages = fileURLToPath(new URL("../messages", import.meta.url));
 const LOCALES = ["en", "pt-BR"] as const;
 
-function landing(locale: string): {
+function landing(locale: string): Record<string, unknown> & {
   meta: { title: string; description: string };
   hero: { eyebrow: string; title: string; lead: string; migrate: string; trust: string[] };
   plans: { items: { volume: string }[] };
@@ -34,6 +34,14 @@ const PAID_CARD_QUOTAS: Record<(typeof LOCALES)[number], string[]> = {
 
 const digits = (value: string) => value.replace(/\D/g, "");
 
+function competitorMentionPaths(value: unknown, path = ""): string[] {
+  if (typeof value === "string") return /resend/i.test(value) ? [path] : [];
+  if (!value || typeof value !== "object") return [];
+  return Object.entries(value).flatMap(([key, child]) =>
+    competitorMentionPaths(child, path ? `${path}.${key}` : key),
+  );
+}
+
 describe("landing value-first positioning", () => {
   for (const locale of LOCALES) {
     it(`${locale}: hero, eyebrow and metadata never name the competitor`, () => {
@@ -46,14 +54,21 @@ describe("landing value-first positioning", () => {
       for (const item of copy.hero.trust) expect(item, item).not.toMatch(/resend/i);
     });
 
-    it(`${locale}: the compatibility survives only as the migration line`, () => {
-      expect(landing(locale).hero.migrate).toMatch(/resend/i);
-      const raw = readFileSync(join(messages, locale, "landing.json"), "utf8");
-      expect(raw.match(/resend/gi)?.length ?? 0).toBeLessThanOrEqual(5);
+    it(`${locale}: compatibility stays in migration and comparison contexts, outside the product pitch`, () => {
+      const copy = landing(locale);
+      expect(copy.hero.migrate).toMatch(/resend/i);
+      // Dates, overage arithmetic and capability references can repeat the
+      // competitor's name without turning the product's own pitch into it.
+      const permitted =
+        /^(?:hero\.migrate|(?:nav|footer)\.alternatives|(?:compare|calc|comparisonReference)\..+|faq\.items\.0\.[qa])$/;
+      for (const path of competitorMentionPaths(copy)) expect(path).toMatch(permitted);
     });
 
     it(`${locale}: the hero leads with sending and separates the offer from the lead`, () => {
       const copy = landing(locale);
+      expect(copy.hero.title).toBe(
+        locale === "en" ? "Send emails. Keep building." : "Envie e-mails. Continue construindo.",
+      );
       expect(copy.hero.trust.join(" ")).toMatch(/MCP/);
       expect(copy.hero.lead).toMatch(/API, SMTP/);
       expect(copy.hero.lead).not.toMatch(/US\$/);

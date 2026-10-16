@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { UmamiAnalytics } from "../src/components/umami-analytics";
+
+vi.mock("next-intl/server", () => ({
+  getLocale: async () => "pt-BR",
+  getTranslations: async () => (key: string) => key,
+}));
 
 const page = readFileSync(fileURLToPath(new URL("../src/app/page.tsx", import.meta.url)), "utf8");
 
@@ -35,7 +41,16 @@ describe("landing CRO contract", () => {
       fileURLToPath(new URL("../src/components/public-starter-gallery.tsx", import.meta.url)),
       "utf8",
     );
-    expect(gallery).toContain("listStartersWithContent(locale)");
+    expect(gallery).toContain("listStarters(locale)");
+  });
+
+  it("keeps fictional email content outside SSR and preserves the starter through signup", async () => {
+    const { PublicStarterGallery } = await import("../src/components/public-starter-gallery");
+    const html = renderToStaticMarkup(await PublicStarterGallery({}));
+    expect(html).not.toMatch(/<iframe|srcdoc=|VOLTEI10|4242|<script/i);
+    expect(html).toContain('aria-hidden="true" inert=""');
+    expect(html).toContain("/signup?next=%2Ftemplates%2Fnew%3Fstarter%3Dwelcome");
+    expect(html.match(/href="\/signup\?next=/g)).toHaveLength(10);
   });
 
   for (const locale of ["en", "pt-BR"]) {

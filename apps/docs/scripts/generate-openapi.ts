@@ -16,14 +16,27 @@ import { openapi } from "../src/lib/openapi";
  * uses. The deps below are never dereferenced: createApi only registers
  * routes, and serving /openapi.json executes no route handler.
  */
+const regions = (process.env.DOCS_API_REGIONS ?? "us-east-1")
+  .split(",")
+  .map((region) => region.trim())
+  .filter(Boolean);
+if (regions.length === 0) throw new Error("DOCS_API_REGIONS must contain at least one region");
+
 const inertDeps: ApiDeps = {
   db: null as unknown as ApiDeps["db"],
   keyring: null as unknown as ApiDeps["keyring"],
-  isCloud: false,
+  isCloud: true,
   enqueueEmailSend: async () => {},
-  // Must be truthy: /domains routes register only when the SES seam is
-  // present. An empty object is safe — registration never dereferences it.
-  ses: {} as ApiDeps["ses"],
+  // Published docs describe Cloud, not the union of all self-host regions.
+  // Self-host operators can set DOCS_API_REGIONS when building their docs;
+  // their instance's /openapi.json remains authoritative for that deployment.
+  // Only regions are read while registering routes; no SES call is made.
+  ses: {
+    regions,
+    clientForRegion: () => {
+      throw new Error("OpenAPI generation must not access SES");
+    },
+  },
 };
 
 const app = createApi(inertDeps);

@@ -10,7 +10,8 @@
   "note": "Send starts free: 100 emails a day, no card. Mail has 7 days free with a card on the team's first plan; billing starts when the trial ends unless you cancel before.",
   "plans": {
     "title": "Every Send plan.",
-    "intro": "Regular Send monthly prices. The introductory offer and the Pro 110K annual plan appear below when available. On monthly Pro and Scale, overage comes switched on and can be turned off in Billing."
+    "intro": "Regular monthly fees. The Pro 110K introductory offer and annual option are detailed below. Open the usage details for queue and overage rules.",
+    "details": "Limits, queues and overage details"
   },
   "included": {
     "eyebrow": "Included in Send",
@@ -151,7 +152,7 @@
     "planMailboxes": "{count, plural, one {# mailbox} other {# mailboxes}}",
     "planInbound": "{count, number} messages received a month",
     "planLocal": "In Brazil, charged in reais: {price} a month",
-    "noteLimits": "Limits renew every billing month and nothing is charged beyond the plan. Sending stops at the plan's limit; receiving pauses past the limit plus a 10% margin, or with storage full, until the next month, an upgrade or, for storage, emptying the trash. Stored mail stays readable, and owners get an email at 80% and 100% of each limit. During the free trial, sending is limited to 50 recipients a day and 200 in total."
+    "noteLimits": "Allowances are shared across all mailboxes. Monthly outbound bytes: 256 MiB / 1 GiB / 3 GiB; inbound: 512 MiB / 1.5 GiB / 3 GiB (Solo / Duo / Team). Limits renew every billing month and nothing is charged beyond the plan. Sending stops at the plan's limit; receiving pauses and the sender gets a permanent 5.1.1 bounce past the limit plus a 10% margin, or with storage full, until the next month, an upgrade or, for storage, emptying the trash. Stored mail stays readable, and owners get an email at 80% and 100% of each limit. During the free trial, sending is limited to 50 recipients a day and 200 in total."
   },
   "scenarios": {
     "eyebrow": "By scenario",
@@ -185,5 +186,11 @@
     "plansLink": "See every Send plan",
     "note": "Eligible new customers pay {first} for the first month of Pro 110K, then {price} a month. No lock-in.",
     "noteRegular": "Pro 110K is {price} a month. No lock-in."
+  },
+  "quickPrices": {
+    "label": "Starting prices by product",
+    "mail": "Mail from",
+    "send": "Send from",
+    "free": "· 100 emails/day"
   }
 }

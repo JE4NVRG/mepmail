@@ -1,15 +1,18 @@
 import { randomBytes } from "node:crypto";
 import { type ServerType, serve } from "@hono/node-server";
-import { DAY_MS, EnvKeyring, MCP_SCOPES, mcpResourceUrl } from "@millionsend/core";
+import { DAY_MS, EnvKeyring, generateApiKey, MCP_SCOPES, mcpResourceUrl } from "@millionsend/core";
 import { mcpServerCardBody } from "@millionsend/core/mcp-server-card";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb, verifiedMonthlyBilling } from "@millionsend/test-utils";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { createClient as createLocalClient } from "../../../packages/mcp/src/client.js";
+import { registerTools } from "../../../packages/mcp/src/tools.js";
 import { createApi } from "../src/app.js";
 
 /**
@@ -1131,4 +1134,200 @@ describe("ChatGPT domain challenge", () => {
       expect((await app.request(path)).status, String(value)).toBe(404);
     }
   });
+});
+
+describe("send idempotency across hosted and local MCP", () => {
+  type Result = { content?: unknown; isError?: boolean };
+  let localApiKey: string | undefined;
+
+  it("advertises an optional idempotency_key on both hosted send tools", async () => {
+    const client = await connect(await mintToken({ scope: "emails:send" }));
+    try {
+      const tools = (await client.listTools()).tools;
+      for (const name of ["send_email", "send_email_batch"]) {
+        const input = tools.find((tool) => tool.name === name)?.inputSchema as {
+          properties?: Record<string, { type?: string; minLength?: number; description?: string }>;
+          required?: string[];
+        };
+        expect(input.properties?.idempotency_key).toMatchObject({ type: "string", minLength: 1 });
+        expect(input.properties?.idempotency_key?.description).toContain("24 hours");
+        expect(input.required).not.toContain("idempotency_key");
+      }
+    } finally {
+      await client.close();
+    }
+  });
+
+  async function sender(surface: "hosted" | "local", via = app) {
+    if (surface === "hosted") {
+      const client = await connect(await mintToken({ scope: "emails:send" }), via);
+      return {
+        call: (name: string, args: Record<string, unknown>) =>
+          client.callTool({ name, arguments: args }) as Promise<Result>,
+        close: () => client.close(),
+      };
+    }
+    if (!localApiKey) {
+      const key = generateApiKey();
+      localApiKey = key.token;
+      await db.insert(schema.apiKeys).values({
+        teamId,
+        name: "local MCP idempotency fixture",
+        tokenPrefix: key.tokenPrefix,
+        keyHash: key.keyHash,
+        last4: key.last4,
+      });
+    }
+    const callbacks = new Map<string, (args: unknown) => Promise<Result>>();
+    registerTools(
+      {
+        registerTool: (
+          name: string,
+          config: { inputSchema: { parse: (args: unknown) => unknown } },
+          callback: (args: unknown) => Promise<Result>,
+        ) => callbacks.set(name, (args) => callback(config.inputSchema.parse(args))),
+      } as unknown as McpServer,
+      createLocalClient({
+        apiKey: localApiKey,
+        baseUrl: "http://local-mcp.test",
+        fetchImpl: async (url, init) => via.request(url, init),
+      }),
+    );
+    return {
+      call: (name: string, args: Record<string, unknown>) => {
+        const callback = callbacks.get(name);
+        if (!callback) throw new Error(`Missing ${name}`);
+        return callback(args);
+      },
+      close: async () => {},
+    };
+  }
+
+  for (const surface of ["hosted", "local"] as const) {
+    for (const name of ["send_email", "send_email_batch"] as const) {
+      const batch = name === "send_email_batch";
+      const payload = (subject: string) => ({
+        from: "Acme <onboarding@acme.dev>",
+        to: ["mcp-fixture@example.com"],
+        subject,
+        text: "Synthetic accept only; no delivery worker or SES is used.",
+        headers: { "X-Message-Label": "fixture" },
+      });
+      const args = (body: ReturnType<typeof payload>, key: string) => ({
+        ...(batch ? { emails: [body, { ...body, to: ["second@example.com"] }] } : body),
+        idempotency_key: key,
+      });
+
+      it(`${surface} ${name} replays original ids and rejects conflicting payloads without re-enqueue`, async () => {
+        const client = await sender(surface);
+        const subject = `${surface} ${name} replay fixture`;
+        const body = payload(subject);
+        const key = `${surface}-${name}-replay`;
+        const queuedBefore = enqueued.length;
+        try {
+          const first = await client.call(name, args(body, key));
+          expect(first.isError).toBeFalsy();
+          const replay = await client.call(name, args(body, key));
+          expect(replay.isError).toBeFalsy();
+          expect(resultJson(replay)).toEqual(resultJson(first));
+          const conflict = await client.call(name, args({ ...body, text: "changed" }, key));
+          expect(conflict.isError).toBe(true);
+          expect(resultJson(conflict)).toMatchObject({
+            statusCode: 409,
+            name: "invalid_idempotent_request",
+          });
+          expect(enqueued.length - queuedBefore).toBe(batch ? 2 : 1);
+          const rows = await db
+            .select({ headers: schema.emails.headers })
+            .from(schema.emails)
+            .where(and(eq(schema.emails.teamId, teamId), eq(schema.emails.subject, subject)));
+          expect(rows).toHaveLength(batch ? 2 : 1);
+          for (const row of rows) expect(row.headers).toEqual({ "X-Message-Label": "fixture" });
+        } finally {
+          await client.close();
+        }
+      });
+
+      it(`${surface} ${name} refuses a simultaneous retry while the owner is accepting`, async () => {
+        let release = () => {};
+        let entered = () => {};
+        const gate = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        const claimed = new Promise<void>((resolve) => {
+          entered = resolve;
+        });
+        let blocked = false;
+        // Pause before the first accept transaction, after its idempotency
+        // claim committed. The retry sees a real live owner without sleeps.
+        const guardedDb = new Proxy(db, {
+          get(target, property) {
+            const value = Reflect.get(target, property);
+            if (property === "transaction") {
+              return async (...transactionArgs: unknown[]) => {
+                if (!blocked) {
+                  blocked = true;
+                  entered();
+                  await gate;
+                }
+                return Reflect.apply(value, target, transactionArgs);
+              };
+            }
+            return typeof value === "function" ? value.bind(target) : value;
+          },
+        });
+        const isolated = createApi({
+          db: guardedDb,
+          keyring: EnvKeyring.fromBase64(randomBytes(32).toString("base64")),
+          isCloud: false,
+          appBaseUrl,
+          enqueueEmailSend: async (id) => {
+            enqueued.push(id);
+          },
+          ses: {
+            clientForRegion: () => {
+              throw new Error("No external delivery in MCP fixtures");
+            },
+            regions: ["sa-east-1"],
+          },
+        });
+        const client = await sender(surface, isolated);
+        const subject = `${surface} ${name} concurrent fixture`;
+        const input = args(payload(subject), `${surface}-${name}-concurrent`);
+        const queuedBefore = enqueued.length;
+        const owner = client.call(name, input);
+        try {
+          // If the owner rejects before reaching the gate, fail immediately.
+          await Promise.race([
+            claimed,
+            owner.then(() => {
+              throw new Error("The first request did not reach its accept transaction");
+            }),
+          ]);
+          const retry = await client.call(name, input);
+          expect(retry.isError).toBe(true);
+          expect(resultJson(retry)).toMatchObject({
+            statusCode: 409,
+            name: "concurrent_idempotent_requests",
+          });
+          release();
+          const accepted = await owner;
+          expect(accepted.isError).toBeFalsy();
+          const replay = await client.call(name, input);
+          expect(replay.isError).toBeFalsy();
+          expect(resultJson(replay)).toEqual(resultJson(accepted));
+          expect(enqueued.length - queuedBefore).toBe(batch ? 2 : 1);
+          const rows = await db
+            .select({ id: schema.emails.id })
+            .from(schema.emails)
+            .where(and(eq(schema.emails.teamId, teamId), eq(schema.emails.subject, subject)));
+          expect(rows).toHaveLength(batch ? 2 : 1);
+        } finally {
+          release();
+          await owner;
+          await client.close();
+        }
+      });
+    }
+  }
 });

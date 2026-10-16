@@ -132,6 +132,20 @@ Every tool result is one JSON block envelope â€” `{ notice, untrusted_data }` â€
 so agents can tell team-authored strings from tool output and never treat
 recipient data as instructions.
 
+## Safe retries when sending
+
+`send_email` and `send_email_batch` accept an optional top-level
+`idempotency_key`. Keep the same key and identical arguments when retrying the
+same send operation. Generate a new key for a new operation. The server passes
+it as the HTTP `Idempotency-Key` header; it is not an email header or message
+field.
+
+Keys are scoped to the team and retained for 24 hours. A completed retry replays
+the original result. Reusing a key with different arguments returns a conflict;
+an operation still in progress can also return a conflict. An incomplete
+reservation can be recovered after 10 minutes. These limits apply to the server,
+so use an API version that supports this contract.
+
 ## Agent discovery
 
 - Machine catalog: <https://mepmail.dev/.well-known/ai-catalog.json>

@@ -551,7 +551,8 @@ dump in the public uploads bucket would be world-readable.
 
 The `backup` compose service takes a scheduled `pg_dump` of Postgres and
 uploads it to any S3-compatible bucket via rclone — Cloudflare R2 works out of
-the box. It is off by default: without `S3_BACKUP_BUCKET` the container prints
+the box. It is off by default behind the `backup` Compose profile. If explicitly
+enabled without `S3_BACKUP_BUCKET`, the container prints
 `backups disabled — set S3_BACKUP_BUCKET to enable` and exits 0, harmless.
 
 Enable it by setting the shared S3 credentials and a backup bucket in `.env`

@@ -2,6 +2,7 @@ import { PLAN_RUNGS } from "@millionsend/core";
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Fragment } from "react";
+import { ComparisonReference } from "@/components/comparison-reference";
 import { IntegrationTabs } from "@/components/integration-tabs";
 import { type CalcLabels, LandingCalculator } from "@/components/landing-calculator";
 import { LandingMotion } from "@/components/landing-motion";
@@ -22,7 +23,13 @@ import {
   WINDOWS_STORE_URL,
 } from "@/lib/desktop-download";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
-import { formatBrlPrice, formatUsd, formatVolume, priceRowsForOffer } from "@/lib/landing-pricing";
+import {
+  comparisonRowsForLocale,
+  formatBrlPrice,
+  formatComparisonPrice,
+  formatUsd,
+  formatVolume,
+} from "@/lib/landing-pricing";
 import { CORREIO_FROM_BRL_CENTS, CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
@@ -113,14 +120,14 @@ export default async function RootPage() {
             : Math.min(...LAUNCH_OFFER.mailboxes.map((box) => box.monthlyCents))) / 100,
           locale,
         );
-  const priceRows = priceRowsForOffer(launchOfferEnabled);
+  const priceRows = comparisonRowsForLocale(launchOfferEnabled, locale);
   const comparison = priceRows.map((row) => [
     formatVolume(row.volume, locale),
-    formatUsd(row.mepmail, locale),
-    formatUsd(row.resend, locale),
-    formatUsd(row.sendgrid, locale),
-    formatUsd(row.postmark, locale),
-    formatUsd(row.mailgun, locale),
+    formatComparisonPrice(row.mepmail, locale),
+    formatComparisonPrice(row.resend, locale),
+    formatComparisonPrice(row.sendgrid, locale),
+    formatComparisonPrice(row.postmark, locale),
+    formatComparisonPrice(row.mailgun, locale),
     row.savings,
   ]);
   const site = {
@@ -407,7 +414,10 @@ export default async function RootPage() {
             </figure>
             <p className="cro-product-next">
               {t("productProof.detail")}{" "}
-              <a className="ms-btn ms-btn-primary gtm-action" href="/templates/new">
+              <a
+                className="ms-btn ms-btn-primary gtm-action"
+                href="/signup?next=%2Ftemplates%2Fnew"
+              >
                 {t("productProof.viewAll")}
               </a>
             </p>
@@ -571,6 +581,7 @@ export default async function RootPage() {
             <p className="gtm-eyebrow">{t("compare.eyebrow")}</p>
             <h2>{t("compare.title")}</h2>
             <p>{t("compare.intro")}</p>
+            {await ComparisonReference()}
             <LandingCalculator labels={{ ...calc, contact }} rows={priceRows} />
             <details className="cro-comparison">
               <summary>{t("integration.tableSummary")}</summary>

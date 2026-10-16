@@ -417,6 +417,13 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
     .describe(
       "Team to act in (this connection spans all your teams). Defaults to your oldest team; call list_teams to see them.",
     );
+  const idempotencyKey = z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Retry key sent as the HTTP Idempotency-Key header, not an email header. Scoped to the selected team for 24 hours: reuse with the same payload to replay the original ids; a different payload or concurrent request returns 409. Use one key per send or batch.",
+    );
   const tool = <S extends z.ZodObject & StandardSchemaWithJSON>(
     name: string,
     scope: McpScope,
@@ -444,7 +451,7 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
         title: toolTitle(name),
         description: cfg.description,
         inputSchema: (teams
-          ? cfg.inputSchema.extend({ team_id: teamIdArg })
+          ? cfg.inputSchema.safeExtend({ team_id: teamIdArg })
           : cfg.inputSchema) as unknown as S,
         annotations: toolAnnotations(name, cfg),
       },
@@ -998,9 +1005,15 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
     {
       description:
         "Send a transactional email (or schedule it with scheduled_at). Suppressed and topic-opted-out recipients are skipped automatically. Returns the email id.",
-      inputSchema: sendEmailRequestSchema,
+      inputSchema: sendEmailRequestSchema.safeExtend({ idempotency_key: idempotencyKey }),
     },
-    (body) => api("POST", "/emails", body),
+    ({ idempotency_key, ...body }) =>
+      api(
+        "POST",
+        "/emails",
+        body,
+        idempotency_key !== undefined ? { "Idempotency-Key": idempotency_key } : undefined,
+      ),
   );
   tool(
     "send_email_batch",
@@ -1009,10 +1022,17 @@ function buildServer(app: OpenAPIHono<Env>, deps: ApiDeps, authInfo: AuthInfo): 
       description:
         "Send up to 100 emails in one call; each entry has the same shape as send_email. Returns one id per accepted email.",
       inputSchema: z.object({
+        idempotency_key: idempotencyKey,
         emails: batchEmailRequestSchema.describe("The emails to send, same shape as send_email"),
       }),
     },
-    ({ emails }) => api("POST", "/emails/batch", emails),
+    ({ emails, idempotency_key }) =>
+      api(
+        "POST",
+        "/emails/batch",
+        emails,
+        idempotency_key !== undefined ? { "Idempotency-Key": idempotency_key } : undefined,
+      ),
   );
   tool(
     "update_email",

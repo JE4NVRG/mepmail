@@ -13,10 +13,7 @@ export function PublicAccount({ login, signup }: { login: string; signup: string
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const router = useRouter();
-  if (isPending)
-    return (
-      <span className="gtm-public-account" aria-busy="true" style={{ minWidth: 130, height: 36 }} />
-    );
+  if (isPending) return <span className="gtm-public-account is-pending" aria-busy="true" />;
   if (!session)
     return (
       <div className="gtm-public-account">

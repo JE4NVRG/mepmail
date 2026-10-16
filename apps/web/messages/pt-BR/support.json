@@ -65,11 +65,16 @@
         ]
       },
       {
-        "name": "Status page",
-        "kind": "Em breve",
-        "body": "Ainda não existe uma status page pública, então não há URL para linkar. Quando existir, este card vai apontar para ela.",
-        "bullets": ["Até lá, mudanças materiais no serviço chegam por e-mail."],
-        "links": []
+        "name": "Status do serviço",
+        "kind": "/status",
+        "body": "Disponibilidade HTTP e histórico de incidentes publicados.",
+        "bullets": ["Verificações sob demanda, no máximo uma vez por minuto."],
+        "links": [
+          {
+            "label": "Ver status do serviço",
+            "href": "/status"
+          }
+        ]
       }
     ]
   },

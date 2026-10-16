@@ -18,6 +18,8 @@ const DESKTOP_IPC = "ipc: http://ipc.localhost https://ipc.localhost";
 const config: NextConfig = {
   poweredByHeader: false,
   experimental: {
+    // Unmatched URLs bypass the dashboard's providers and translation payload.
+    globalNotFound: true,
     // Keep visited page segments in the client router cache so sidebar
     // back-and-forth doesn't refetch RSC payloads every click. Safe at 30s:
     // dashboard pages are "use client" shells whose data flows through
@@ -27,6 +29,15 @@ const config: NextConfig = {
   },
   async redirects() {
     return [
+      ...(
+        [
+          ["/precos", "/pricing"],
+          ["/termos", "/terms"],
+          ["/privacidade", "/privacy"],
+          ["/cadastro", "/signup"],
+          ["/contato", "/support"],
+        ] as const
+      ).map(([source, destination]) => ({ source, destination, permanent: true })),
       {
         source: "/llms-full.txt",
         destination: "https://docs.mepmail.dev/llms-full.txt",

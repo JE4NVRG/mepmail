@@ -508,6 +508,15 @@ const RATE_LIMITED = {
   headers: { "Retry-After": RETRY_AFTER },
   content: { "application/json": { schema: ERROR_SCHEMA } },
 };
+const IDEMPOTENCY_KEY = {
+  name: "Idempotency-Key",
+  in: "header",
+  required: false,
+  description:
+    "Optional retry key, scoped to the team across single and batch sends for 24 hours from the initial claim. The same key and canonical payload replay the original email ids; a different payload returns 409 invalid_idempotent_request and a request still processing returns 409 concurrent_idempotent_requests. An incomplete claim can be recovered after 10 minutes. After expiry, the key can accept a new send. This is an HTTP header, not an email header.",
+  schema: { type: "string", minLength: 1 },
+  example: "order-123-confirmation",
+};
 
 const SEND_EXAMPLE = {
   from: "Acme <hello@yourdomain.com>",
@@ -566,6 +575,19 @@ export function enrichOpenApiDocument<T extends JsonObject>(doc: T): T {
           operation.description = meta.description;
       }
       const responses = isObject(operation.responses) ? operation.responses : {};
+      if (key === "POST /emails" || key === "POST /emails/batch") {
+        const parameters = Array.isArray(operation.parameters) ? operation.parameters : [];
+        if (
+          !parameters.some(
+            (parameter) =>
+              isObject(parameter) &&
+              parameter.in === "header" &&
+              parameter.name === IDEMPOTENCY_KEY.name,
+          )
+        ) {
+          operation.parameters = [...parameters, IDEMPOTENCY_KEY];
+        }
+      }
       operation.responses = responses;
       responses["401"] ??= UNAUTHORIZED;
       const existing = responses["429"];

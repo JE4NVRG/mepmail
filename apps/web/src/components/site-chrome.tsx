@@ -25,6 +25,7 @@ export type PublicPage =
   | "correio"
   | "security"
   | "support"
+  | "status"
   | "changelog"
   | "download"
   | "guides";
@@ -298,6 +299,7 @@ export function PublicFooter({
           <a href="/login">{labels.footer.login}</a>
           <a href="/support">{labels.nav.support}</a>
           <a href={contact}>{labels.footer.contact}</a>
+          <a href="/status">Status</a>
         </nav>
         <nav className="gtm-footer-col" aria-label={labels.footer.colLegal}>
           <h3>{labels.footer.colLegal}</h3>

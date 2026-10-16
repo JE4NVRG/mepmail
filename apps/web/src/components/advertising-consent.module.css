@@ -1,26 +1,21 @@
-/* First-visit banner: a compact card in the corner, one sentence and two
-   equal choices. Refusing is exactly as easy and as visible as accepting. */
+/* The first-visit strip stays in document flow, so it cannot cover a CTA. */
 .banner {
-  position: fixed;
-  right: max(20px, env(safe-area-inset-right));
-  bottom: max(20px, env(safe-area-inset-bottom));
-  z-index: var(--ms-z-popover, 500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
   box-sizing: border-box;
-  width: min(400px, calc(100vw - 40px));
-  padding: 16px;
-  background: color-mix(in srgb, var(--ms-panel, #0c0c0d) 94%, transparent);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  width: 100%;
+  padding: 10px max(20px, env(safe-area-inset-left));
+  background: var(--ms-panel, #0c0c0d);
   color: var(--ms-bone, #f4f1ea);
-  border: 1px solid var(--ms-line-strong, #2a2a2e);
-  border-radius: 14px;
-  box-shadow: 0 18px 50px #0009;
+  border-bottom: 1px solid var(--ms-line-strong, #2a2a2e);
   font: 13px / 1.55 var(--ms-font-sans, sans-serif);
-  animation: banner-in 260ms var(--ms-ease, ease-out) both;
 }
 
 .bannerText {
   margin: 0;
+  max-width: 86ch;
   color: var(--ms-muted, #918f89);
   text-wrap: pretty;
 }
@@ -188,12 +183,13 @@
 }
 
 .banner .actions {
-  margin-top: 14px;
+  flex: 0 0 260px;
+  margin-top: 0;
   gap: 8px;
 }
 
 .banner .choice {
-  min-height: 36px;
+  min-height: 44px;
   padding: 8px 12px;
 }
 
@@ -245,21 +241,16 @@
   }
 }
 
-/* Phones: a strip along the bottom edge that leaves the hero and its
-   buttons visible; the choices keep a 44px touch target. */
+/* Phones: a compact strip above the page, with equal 44px choices. */
 @media (max-width: 560px) {
   .banner {
-    right: max(10px, env(safe-area-inset-right));
-    bottom: max(10px, env(safe-area-inset-bottom));
-    left: max(10px, env(safe-area-inset-left));
-    width: auto;
-    padding: 14px;
-    border-radius: 12px;
+    display: block;
+    padding: 10px max(14px, env(safe-area-inset-left));
     font-size: 12.5px;
   }
 
   .banner .actions {
-    margin-top: 12px;
+    margin-top: 8px;
   }
 
   .banner .choice,

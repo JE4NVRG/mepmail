@@ -1,22 +1,22 @@
 {
   "meta": {
     "title": "Resend alternative: sending flows and pricing",
-    "description": "Compare compatible sending flows in MepMail, with API, SMTP and MCP. Historical competitor pricing reference, with its date and feature differences."
+    "description": "Compare compatible sending flows in MepMail, with API, SMTP and MCP. Resend pricing checked on 2026-10-16, with sources and feature differences."
   },
   "eyebrow": "Alternatives",
   "title": "Coming from Resend? <highlight>Keep the SDK.</highlight>",
-  "lead": "For sending flows compatible with the Resend SDK, change the base URL and key. See the migration guide, available features and the historical price reference below.",
+  "lead": "For sending flows compatible with the Resend SDK, change the base URL and key. See the migration guide, available features and the prices and sources below.",
   "note": "Free to start: 100 emails a day, no card. We help you migrate and set up your sending domain.",
   "table": {
     "title": "Resend vs MepMail, volume by volume.",
-    "intro": "MepMail’s regular monthly fees compared with the historical Resend reference of 2026-09-27, excluding introductory offers and annual discounts. This is not a current competitor quote.",
-    "columns": ["Emails/month", "Resend", "MepMail", "Historical difference"],
+    "intro": "MepMail’s regular monthly fees and Resend’s lowest published option at each volume, including overage where needed, checked on 2026-10-16. Excludes introductory offers and annual discounts; features and terms vary.",
+    "columns": ["Emails/month", "Resend", "MepMail", "Estimated difference"],
     "rowAdvantage": "Difference: {percent}% · {usd}/month",
-    "source": "Historical Resend reference: <link>resend.com/pricing</link>, read on {date}. MepMail: the regular monthly fee presented on this page. USD before taxes; features and terms are not equivalent. Check the provider’s current prices."
+    "source": "Resend source: <link>resend.com/pricing</link>, checked on {date}. MepMail: the regular monthly fee shown on this page. USD before taxes; features and terms are not equivalent."
   },
   "claim": {
     "title": "How to read this comparison",
-    "body": "Percentages are arithmetic differences against the dated reference, not a promise of current savings. MepMail’s US$ 20 introduction and annual offer are excluded; also compare features, limits and support."
+    "body": "Percentages are arithmetic differences between the amounts shown, not a promise of savings or feature parity. MepMail’s introductory offer and annual option are excluded; also compare limits, overage terms and support."
   },
   "same": {
     "title": "What carries over",

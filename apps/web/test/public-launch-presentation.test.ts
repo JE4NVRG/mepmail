@@ -103,14 +103,14 @@ for (const locale of ["en", "pt-BR"] as const) {
       current.locale = locale;
       vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", "true");
       const html = await render(Home);
-      expect(html).toContain("US$ 29");
-      expect(html).toContain("US$ 20");
+      expect(html.includes(locale === "pt-BR" ? "R$ 149" : "US$ 29")).toBe(true);
+      expect(html.includes(locale === "pt-BR" ? "R$ 99" : "US$ 20")).toBe(true);
       expect(html).toContain(messages(locale).landing.plans.launchPriceNote);
       expect(html).toContain(messages(locale).landing.compare.intro);
       expect(html).toContain(messages(locale).landing.calc.note);
       const alternative = await render(Alternative);
       expect(alternative).toContain(messages(locale).alternatives.claim.body);
-      expect(alternative).toContain("2026-09-27");
+      expect(alternative.includes("2026-10-16") || alternative.includes("16/10/2026")).toBe(true);
       expect(alternative).not.toContain("78%");
     });
 
@@ -137,6 +137,22 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(page).toContain(pricing.title);
       expect(page).toContain(small);
       expect(page).toContain(large);
+    });
+
+    it("shows starting prices in the hero and puts Mail before Send unless a Send campaign leads", async () => {
+      current.locale = locale;
+      vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
+      vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");
+      const html = await render(Pricing);
+      const intro = html.slice(html.indexOf('<main id="conteudo">'), html.indexOf("</section>"));
+      expect(intro.includes(locale === "pt-BR" ? "R$ 14,90" : "US$ 2.90")).toBe(true);
+      expect(intro.includes(locale === "pt-BR" ? "R$ 0" : "US$ 0")).toBe(true);
+      expect(html.indexOf('id="correio"')).toBeLessThan(html.indexOf('id="planos"'));
+      expect(html.includes('<details class="pricing-usage-details">')).toBe(true);
+      const send = await render(() =>
+        Pricing({ searchParams: Promise.resolve({ focus: "send" }) }),
+      );
+      expect(send.indexOf('id="planos"')).toBeLessThan(send.indexOf('id="correio"'));
     });
 
     it("leads the home with the domain email, its five steps, then Send, while Mail sells on its own", async () => {

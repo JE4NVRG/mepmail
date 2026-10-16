@@ -4,13 +4,13 @@ import "@fontsource/jetbrains-mono/700.css";
 import "@/styles/globals.css";
 import { env } from "@millionsend/config";
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { AdvertisingConsent } from "@/components/advertising-consent";
 import { Providers } from "@/components/providers";
 import { UmamiAnalytics } from "@/components/umami-analytics";
-import { SERVER_ONLY_NAMESPACES } from "@/lib/client-messages";
+import { publicClientMessages, SERVER_ONLY_NAMESPACES } from "@/lib/client-messages";
 import { THEME_INIT_SCRIPT, THEME_KEY } from "@/lib/theme";
 
 export const viewport: Viewport = {
@@ -57,9 +57,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // The browser gets only what client components read: the public pages render
   // these long namespaces on the server, and shipping them made every page (the 404
   // included) carry ~110 KB of copy it never uses.
-  const messages = Object.fromEntries(
-    Object.entries(await getMessages()).filter(([ns]) => !SERVER_ONLY_NAMESPACES.has(ns)),
-  );
+  const messages =
+    publicClientMessages((await headers()).get("x-mepmail-next"), locale) ??
+    Object.fromEntries(
+      Object.entries(await getMessages()).filter(([ns]) => !SERVER_ONLY_NAMESPACES.has(ns)),
+    );
   return (
     <html
       lang={locale}
@@ -72,8 +74,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <UmamiAnalytics />
         <NextIntlClientProvider messages={messages}>
           <Providers>
-            {children}
             <AdvertisingConsent />
+            {children}
           </Providers>
         </NextIntlClientProvider>
       </body>

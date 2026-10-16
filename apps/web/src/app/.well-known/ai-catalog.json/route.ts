@@ -1,3 +1,5 @@
+import { MCP_SERVER_VERSION } from "@millionsend/core/mcp-server-card";
+
 /**
  * AI catalog (ai-catalog.json): the single document an agent reads to find
  * everything MepMail publishes for machines — the MCP server card, the Correio
@@ -30,7 +32,7 @@ const BODY = JSON.stringify(
           "which MepMail MCP tools are available",
           "set up the MepMail MCP server",
         ],
-        version: "0.6.69",
+        version: MCP_SERVER_VERSION,
       },
       {
         identifier: "urn:air:mepmail.dev:correio:mcp",

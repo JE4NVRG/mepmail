@@ -9,15 +9,22 @@ Resend apontados para a origem da sua instância ([SDKs](/pt-BR/sdks)). Estes
 cobrem o que aqueles SDKs não fazem — rodar MCP localmente, mover uma
 conta de provedor e ligar o MepMail ao n8n.
 
-| Pacote | Última | O que é | Guia |
+{/* package-facts:start */}
+| Pacote | Versão-fonte | Node | Papel |
 | --- | --- | --- | --- |
-| [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) | [Atual no npm](https://www.npmjs.com/package/@mepmail/mcp) (documentado: 0.2.1) | Servidor MCP para clientes locais (stdio): 22 ferramentas para ler, enviar e gerenciar contatos, mais 5 ferramentas das caixas do Correio com uma chave de agente (`MEPMAIL_MAIL_TOKEN`), no Claude, Cursor, Codex ou qualquer cliente MCP. | [Servidor MCP](/pt-BR/mcp) |
-| [`@mepmail/cli`](https://www.npmjs.com/package/@mepmail/cli) | [Atual no npm](https://www.npmjs.com/package/@mepmail/cli) (documentado: 0.2.4) | CLI de migração: lê uma conta do Resend, compara com a sua instância, aplica a diferença e escreve um relatório. | [CLI](/pt-BR/cli) |
-| [`n8n-nodes-mepmail`](https://www.npmjs.com/package/n8n-nodes-mepmail) | [Atual no npm](https://www.npmjs.com/package/n8n-nodes-mepmail) (documentado: 0.2.0) | Nós da comunidade para o n8n: enviar e agendar e-mails, gerenciar contatos, domínios, broadcasts e supressões, ler e responder caixas do Correio, e um gatilho que inicia workflows a partir de eventos do MepMail, inclusive e-mail chegando numa caixa de agente. | [Integrações](/pt-BR/integrations#n8n) |
+| [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) | 0.3.2 | `>=20` | 22 ferramentas da equipe e 6 de caixas Correio, conforme a credencial. [Guia](/pt-BR/mcp). |
+| [`@mepmail/cli`](https://www.npmjs.com/package/@mepmail/cli) | 0.2.4 | `>=18` | Migração de contas com plano, aplicação e relatório. [Guia](/pt-BR/cli). |
+| [`n8n-nodes-mepmail`](https://www.npmjs.com/package/n8n-nodes-mepmail) | [Consultar npm](https://www.npmjs.com/package/n8n-nodes-mepmail) | n8n | Workflows de envio e caixas Correio. [Guia](/pt-BR/integrations#n8n). |
 
-A CLI exige Node 18 ou superior; o servidor MCP exige Node 20 ou superior.
-Ambos são publicados como um único bundle, sem dependências. O nó do n8n se instala pelo próprio n8n (Settings → Community nodes). Rode com `npx`, que sempre resolve a última versão publicada; os
-números acima são as versões com que esta página foi escrita.
+O [MCP hospedado](/pt-BR/mcp) desta revisão é **0.71.0**, com **79 ferramentas** anunciadas no [server card](https://mepmail.dev/.well-known/mcp/server-card.json). A ferramenta adicional `list_teams` só aparece em grants de todas as equipes. Escopos e permissões podem reduzir a lista efetiva.
+{/* package-facts:end */}
+
+Esses valores são gerados dos manifests dos pacotes e registros de ferramentas
+na revisão-fonte das docs. Os pacotes npm têm ciclo próprio: consulte os links
+do registro para a versão publicada e confira `tools/list` no cliente que você
+usa. Uma versão do código não publica automaticamente um novo pacote npm.
+O pacote n8n vive em repositório separado e se instala pelo próprio n8n
+(Settings → Community nodes).
 
 ## @mepmail/mcp — o servidor MCP local
 
@@ -45,14 +52,17 @@ a instalação inteira:
 
 | Variável | Obrigatória | Padrão | Significado |
 | --- | --- | --- | --- |
-| `MEPMAIL_API_KEY` | sim | — | Chave de API do time (`ms_...`) de **Chaves de API** no painel. As ferramentas agem exatamente com o alcance dessa chave. |
+| `MEPMAIL_API_KEY` | para ferramentas da equipe | — | Chave de API do time (`ms_...`) de **Chaves de API** no painel. As ferramentas agem com o alcance dessa chave. Pode ser omitida em cliente somente de caixa postal. |
 | `MEPMAIL_BASE_URL` | não | `https://api.mepmail.dev` | Origem da API da sua instância. Defina em uma implantação auto-hospedada. |
+| `MEPMAIL_MAIL_TOKEN` | para ferramentas de caixa | — | Chave de agente Correio (`mmb_...` para uma caixa ou `mmt_...` para as caixas selecionadas pela credencial de equipe). Funciona sem chave de API da equipe. |
+| `MEPMAIL_MAIL_ORIGIN` | não | `https://mepmail.dev` | Origem do painel que serve o Correio. Defina para o serviço de caixas auto-hospedado. |
 
-Ele chega à API REST da sua instância direto com essa chave — sem OAuth, sem
-passo no navegador — e expõe as ferramentas de leitura, envio e contatos: 22
-das 68 do [servidor hospedado](/pt-BR/mcp). A configuração para Claude Desktop,
-Cursor e VS Code, e a lista completa de ferramentas, estão na
-[página de MCP](/pt-BR/mcp).
+Em um cliente somente de caixa, substitua `MEPMAIL_API_KEY` na configuração
+acima por `MEPMAIL_MAIL_TOKEN`. Ferramentas da equipe usam a origem da API;
+ferramentas de caixa usam a origem do painel. Ambas autenticam diretamente
+com a própria chave limitada ao seu escopo, sem OAuth no navegador. A
+configuração para Claude Desktop, Cursor e VS Code e a lista completa do
+servidor hospedado estão na [página de MCP](/pt-BR/mcp).
 
 ## @mepmail/cli — a CLI de migração
 

@@ -99,6 +99,23 @@ repetir depois de um timeout — é isso que torna o reenvio seguro. Reusar uma
 chave com payload diferente é `409 invalid_idempotent_request`: dê uma chave
 própria ao novo payload em vez de repetir.
 
+O escopo é **equipe + chave**, compartilhado por `POST /emails` e
+`POST /emails/batch`, não uma chave de API individual. Use uma chave única por
+envio lógico, inclusive entre aplicações da mesma equipe. A resposta concluída
+é mantida por **24 horas** a partir da reserva. Depois da expiração, a mesma
+chave pode ser aceita como um novo envio: mantenha deduplicação de negócio se
+suas tentativas puderem ultrapassar essa janela.
+
+Uma reserva incompleta pode ser recuperada após **10 minutos**, somente com o
+mesmo payload. Isso recupera uma requisição interrompida; não estende respostas
+concluídas para além das 24 horas. O replay retorna os IDs originais dos e-mails.
+
+No MCP hospedado e em builds locais deste código, `send_email` e
+`send_email_batch` aceitam `idempotency_key` como argumento de primeiro nível. Ele vira o cabeçalho
+HTTP; o objeto `headers` do e-mail não define essa chave. Após resultado incerto,
+mantenha o mesmo valor e payload. O pacote npm local, publicado separadamente,
+pode ainda não expor esse argumento; confira seu schema antes de repetir automaticamente.
+
 ## Envios em lote
 
 `POST /emails/batch` aceita até 100 e-mails. Com o cabeçalho

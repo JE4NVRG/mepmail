@@ -78,9 +78,10 @@ services:
       - /app/apps/docs/.source
 
   backup:
+    profiles: ["backup"]
     # Optional scheduled pg_dump to S3-compatible storage. Stays disabled (the
     # container prints one line and exits 0, and restart "no" leaves it
-    # stopped) until S3_BACKUP_BUCKET and the S3_* credentials are set in .env.
+    # stopped) if enabled without S3_BACKUP_BUCKET and S3_* credentials.
     build: scripts/backup
     env_file: .env
     restart: "no"
@@ -99,6 +100,7 @@ services:
         condition: service_healthy
 
   docs:
+    profiles: ["docs"]
     build: .
     env_file: .env
     environment:

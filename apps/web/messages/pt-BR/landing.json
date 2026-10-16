@@ -108,7 +108,7 @@
   "compare": {
     "eyebrow": "Preço sem adivinhação",
     "title": "Compare pelo volume que você realmente envia.",
-    "intro": "Compare o preço mensal recorrente do MepMail com a referência histórica dos concorrentes de 27/09/2026. A promoção inicial e o desconto anual não entram nesta tabela; recursos e condições variam.",
+    "intro": "Mensalidade recorrente do MepMail; Resend conferido em 16/10/2026. SendGrid, Postmark e Mailgun mantêm a referência histórica de 27/09/2026. Compare também recursos e condições.",
     "tableAria": "Comparativo de preços por volume",
     "columns": [
       "Envios/mês",
@@ -117,22 +117,22 @@
       "SendGrid",
       "Postmark",
       "Mailgun",
-      "Diferença histórica"
+      "Diferença estimada"
     ],
     "slideNote": "Deslize a tabela para ver todos os fornecedores em telas menores.",
-    "refNote": "Referência da análise comercial de 27/09/2026; preços públicos de terceiros podem mudar e condições/recursos não são equivalentes. Valores em USD por mês, sem impostos. Onde o fornecedor publica o excedente como intervalo, usamos o ponto médio."
+    "refNote": "Preços mensais. Resend: tabela oficial consultada em 16/10/2026; demais fornecedores: referência histórica de 27/09/2026, que pode ter mudado. Valores estrangeiros convertidos pela PTAX de 15/10/2026; MepMail usa o preço próprio em reais. Não inclui impostos, promoção inicial ou desconto anual. A referência histórica usa o ponto médio quando o excedente foi publicado como intervalo."
   },
   "calc": {
-    "title": "Compare com a referência histórica.",
-    "lead": "Escolha seu volume: mensalidade recorrente do MepMail e preços de concorrentes registrados em 27/09/2026.",
+    "title": "Estime a diferença no seu volume.",
+    "lead": "MepMail em reais e concorrentes convertidos. Resend conferido em 16/10/2026; demais referências de 27/09/2026.",
     "volumeLabel": "Envios por mês",
     "ours": "MepMail",
     "cheapest": "Menor preço na referência ({name})",
-    "savings": "Diferença histórica: {percent}% (~{usd}/mês)",
+    "savings": "Diferença estimada: {percent}% (~{usd}/mês)",
     "annual": "12 mensalidades dessa diferença: ≈ {usd}; não é uma cotação anual",
     "cta": "Conversar sobre meu volume",
     "ctaSubject": "Calculadora MepMail: {volume} e-mails/mês",
-    "note": "Referência histórica de 27/09/2026, em USD/mês. Confirme os preços atuais dos fornecedores; os recursos não são equivalentes. Não inclui promoção inicial, desconto anual, impostos ou consumo excedente.",
+    "note": "Estimativa em reais: PTAX venda de 15/10/2026, US$ 1 = R$ 5,0521. MepMail usa o catálogo em BRL; Resend foi conferido em 16/10/2026, demais preços são históricos de 27/09/2026. Inclui o excedente estimado da referência quando necessário; não inclui impostos, promoção inicial, desconto anual ou equivalência de recursos.",
     "a11y": "Volume mensal de envios"
   },
   "structure": {
@@ -397,5 +397,12 @@
     },
     "both": "Ou os três juntos: o mesmo domínio verificado serve ao Correio e ao Envio, e cada frente tem a sua credencial e o seu limite.",
     "bothCta": "Ver preços por cenário"
+  },
+  "comparisonReference": {
+    "title": "O que entra na comparação",
+    "example": "Em 100 mil envios no mês, sem recebimentos, a Resend publica Pro 100K por {pro}. Outra opção é Pro 50K + 50 mil excedentes: {overage} (US$ 20 + 50 × US$ 0,90). Scale 100K custa {scale}, com recursos diferentes. O Pro 100K é o menor valor dessas três opções.",
+    "pricingSource": "Planos e tarifas de excedente conferidos em 16/10/2026 na <link>tabela oficial da Resend</link>. A coluna Resend usa a opção publicada de menor custo para cada volume, incluindo excedente quando necessário.",
+    "currency": "MepMail: preço real do catálogo em reais. Concorrentes: estimativa em reais pela <link>PTAX venda de fechamento do Banco Central</link> de {date}, US$ 1 = R$ {rate}. Não é cotação de checkout e não inclui impostos ou tarifas de câmbio.",
+    "capabilities": "MCP e recebimento não são exclusivos: a Resend tem <resend>MCP oficial</resend> e <inboxes>inboxes para pessoas e agentes</inboxes>; o Plunk também oferece <plunk>MCP</plunk>. No MepMail, compare o fluxo de revisão, as permissões e as franquias separadas de Correio e Envio."
   }
 }

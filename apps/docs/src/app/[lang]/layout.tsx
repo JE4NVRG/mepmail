@@ -1,8 +1,8 @@
 import "../global.css";
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
-import { RootProvider } from "fumadocs-ui/provider/next";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { DocsProvider } from "@/components/docs-provider";
 import { i18nUI } from "@/lib/i18n-ui";
 import { baseOptions } from "@/lib/layout.shared";
 import { DOCS_ORIGIN } from "@/lib/site";
@@ -36,11 +36,11 @@ export default async function Layout({ params, children }: LayoutProps) {
   return (
     <html lang={lang} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
-        <RootProvider theme={{ defaultTheme: "dark" }} i18n={i18nUI.provider(lang)}>
-          <DocsLayout tree={source.getPageTree(lang)} {...baseOptions()}>
+        <DocsProvider theme={{ defaultTheme: "dark" }} i18n={i18nUI.provider(lang)}>
+          <DocsLayout tree={source.getPageTree(lang)} {...baseOptions(lang)}>
             {children}
           </DocsLayout>
-        </RootProvider>
+        </DocsProvider>
       </body>
     </html>
   );

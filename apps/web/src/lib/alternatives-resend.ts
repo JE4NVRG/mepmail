@@ -4,8 +4,8 @@ import { PRICE_ROWS, type PriceRow } from "./landing-pricing";
  * Honest Resend comparison for /alternatives/resend.
  *
  * The Resend column is the public price of the plan that covers each monthly
- * volume, read from resend.com/pricing on 2026-09-27 (commercial analysis:
- * docs/gtm/bench-concorrentes-2026-09.md §2.1). The rows are derived from
+ * volume, rechecked at resend.com/pricing.md on 2026-10-16, including Pro 100K
+ * and overage when cheaper than Scale. The rows are derived from
  * PRICE_ROWS — the same numbers the landing table renders — and every saving is
  * computed, never typed, so no cell can drift from the data.
  *
@@ -18,7 +18,7 @@ import { PRICE_ROWS, type PriceRow } from "./landing-pricing";
 export const RESEND_PRICING_SOURCE = {
   provider: "Resend",
   url: "https://resend.com/pricing",
-  checkedOn: "2026-09-27",
+  checkedOn: "2026-10-16",
 } as const;
 
 export interface ResendRow {

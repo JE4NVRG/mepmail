@@ -1,4 +1,76 @@
 /* /pricing scenarios: each card sums the separate plans it uses. */
+.pricing-intro.gtm-section {
+  padding-block: clamp(28px, 4vw, 48px);
+}
+.pricing-intro h1 {
+  max-width: 24ch;
+  font-size: clamp(30px, 4.5vw, 52px);
+}
+.pricing-intro .gtm-lead {
+  max-width: 76ch;
+}
+.pricing-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-block: 20px;
+}
+.pricing-shortcuts a {
+  display: grid;
+  gap: 6px;
+  min-width: min(100%, 200px);
+  padding: 12px 16px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 10px;
+  background: var(--ms-panel);
+  color: var(--ms-bone);
+  text-decoration: none;
+}
+.pricing-shortcuts span {
+  font-size: 13px;
+}
+.pricing-shortcuts strong {
+  font-size: 25px;
+}
+.pricing-shortcuts small {
+  margin-left: 6px;
+  font-size: 13px;
+  font-weight: 400;
+}
+.pricing-shortcuts a:hover {
+  border-color: var(--ms-violet);
+}
+.pricing-shortcuts a:focus-visible,
+.pricing-usage-details summary:focus-visible {
+  outline: 2px solid var(--ms-violet);
+  outline-offset: 4px;
+}
+.pricing-usage-details {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--ms-line);
+  border-radius: 10px;
+}
+.pricing-usage-details summary {
+  cursor: pointer;
+  min-height: 28px;
+}
+@media (max-width: 560px) {
+  .pricing-shortcuts {
+    gap: 8px;
+  }
+  .pricing-shortcuts a {
+    flex: 1;
+    min-width: 130px;
+    padding: 12px;
+  }
+  .pricing-shortcuts strong {
+    font-size: 23px;
+  }
+  .pricing-intro .gtm-lead {
+    font-size: 15px;
+  }
+}
 .pricing-scenarios .gtm-plan {
   display: flex;
   flex-direction: column;

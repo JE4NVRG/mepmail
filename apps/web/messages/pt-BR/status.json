@@ -1,0 +1,24 @@
+{
+  "eyebrow": "Status do serviço",
+  "title": "Disponibilidade do MepMail",
+  "description": "Disponibilidade HTTP atual e incidentes divulgados publicamente.",
+  "summaryAvailable": "Todos os endereços HTTP verificados responderam com sucesso",
+  "summaryUnavailable": "Um ou mais endereços HTTP não responderam com sucesso",
+  "checkedAt": "Última verificação: {time} UTC",
+  "services": {
+    "web": "Painel web",
+    "api": "API HTTP",
+    "docs": "Documentação"
+  },
+  "available": "Disponível",
+  "unavailable": "Verificação sem sucesso",
+  "noResponse": "Sem resposta dentro do prazo da verificação",
+  "scope": "As verificações acontecem ao abrir esta página, no máximo uma vez por minuto. Medem disponibilidade HTTP, sem medir a entrega dos e-mails nem estabelecer um SLA.",
+  "refresh": "Verificar novamente",
+  "support": "Falar com o suporte",
+  "historyEyebrow": "Atualizações publicadas",
+  "historyTitle": "Histórico de incidentes",
+  "historyEmpty": "Nenhum incidente foi publicado neste histórico. Ele não registra a disponibilidade anterior do serviço.",
+  "resolved": "Resolvido",
+  "ongoing": "Em andamento"
+}

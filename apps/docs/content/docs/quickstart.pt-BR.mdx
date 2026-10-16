@@ -12,12 +12,19 @@ implantação abaixo; as abas lembram sua escolha em toda a documentação.
 <DeploymentTabs>
 <DeploymentTab deployment="cloud">
 
-O cadastro está aberto — a beta não tem limite de vagas, então crie sua conta em
-[mepmail.dev/signup](https://mepmail.dev/signup) — sem convite e
-sem cartão — e entre em
-[mepmail.dev](https://mepmail.dev). Cada conta envia até 100
-e-mails por dia UTC no plano Free; fale com a gente se preferir que a gente
-configure a conta para você. A API fica em `api.mepmail.dev`.
+Crie sua conta em [mepmail.dev/signup](https://mepmail.dev/signup) e entre em
+[mepmail.dev](https://mepmail.dev). O plano Free do Envio não exige cartão e
+envia até 100 e-mails por dia UTC. Os planos pagos do Envio e o teste do Correio
+têm suas próprias condições de pagamento; veja os
+[planos atuais](https://mepmail.dev/pricing). A API fica em `api.mepmail.dev`.
+
+### Teste pelo painel antes do DNS
+
+No onboarding do painel, use **Enviar teste para minha caixa** para enviar ao endereço da sua própria
+conta. Você não precisa adicionar domínio nem criar chave de API para esse
+primeiro teste. Ele envia uma mensagem real para você; não valida a integração
+da API da sua aplicação. Para enviar pelo SDK ou REST, continue com a
+verificação do domínio abaixo.
 
 </DeploymentTab>
 <DeploymentTab deployment="self-hosted">
@@ -117,7 +124,7 @@ curl -X POST https://api.mepmail.dev/emails \
   }'
 ```
 
-Ou com o SDK oficial do Resend para Node (`npm install resend`), apontado para a
+Ou com o SDK oficial do Resend para Node 20+ (`npm install resend`), apontado para a
 sua URL base:
 
 ```ts
@@ -135,11 +142,12 @@ const { data, error } = await resend.emails.send({
 });
 
 if (error) console.error(error.name, error.message);
-else console.log("sent", data.id);
+else console.log("accepted", data.id);
 ```
 
-Ambos retornam `{ "id": "..." }`. Acompanhe o email indo de `queued` a
-`delivered` na página **Emails**.
+Ambos retornam `{ "id": "..." }` ao aceitar o e-mail na fila. Aceite não é
+entrega: salve o ID e acompanhe o e-mail em **Emails** ou por
+[webhooks](/pt-BR/concepts/webhooks) até chegar um evento de entrega ou falha.
 
 <Callout type="info">
 Em uma instância auto-hospedada, eventos de entrega (entregue, bounce,

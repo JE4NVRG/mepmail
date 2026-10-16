@@ -140,7 +140,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 for (const locale of ["en", "pt-BR"] as const) {
   describe(`/pricing in ${locale}`, () => {
-    it("opens on Send for a Send campaign: its offer first, then the Send plans, then Mail", async () => {
+    it("opens on Send for a Send campaign, with Send plans before Mail and scenarios", async () => {
       current.locale = locale;
       const html = await render({ utm_campaign: "mepmail_send_us_20261013" });
       const h1 = html.match(/<h1>(.*?)<\/h1>/)?.[1] ?? "";
@@ -149,17 +149,27 @@ for (const locale of ["en", "pt-BR"] as const) {
       // The hero's main button signs up into Billing on Pro 110K.
       expect(html).toContain('href="/signup?next=%2Fsettings%2Fbilling%3Fplan%3Dpro_100k"');
       const at = (id: string) => html.indexOf(`id="${id}"`);
-      expect(at("planos")).toBeGreaterThan(0);
-      expect(at("planos")).toBeLessThan(at("pro110k"));
-      expect(at("pro110k")).toBeLessThan(at("cenarios"));
-      expect(at("cenarios")).toBeLessThan(at("correio"));
+      const journey = ["planos", "pro110k", "correio", "cenarios"].map(at);
+      expect(journey.every((position) => position > 0)).toBe(true);
+      expect(journey).toEqual([...journey].sort((a, b) => a - b));
+      // Both entry prices are available before the visitor reaches any plan section.
+      const intro = html.slice(0, html.indexOf("</section>")).replace(/\u00a0/g, " ");
+      expect(intro).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
+      expect(intro).toContain(locale === "en" ? "US$ 0" : "R$ 0");
     });
 
-    it("keeps its own order everywhere else, with every paid plan button carrying its plan", async () => {
+    it("starts with Mail elsewhere, then Send and scenarios, preserving each paid plan's intent", async () => {
       current.locale = locale;
       const html = await render({});
-      expect(html.indexOf('id="cenarios"')).toBeLessThan(html.indexOf('id="planos"'));
+      const journey = ["correio", "planos", "pro110k", "cenarios"].map((id) =>
+        html.indexOf(`id="${id}"`),
+      );
+      expect(journey.every((position) => position > 0)).toBe(true);
+      expect(journey).toEqual([...journey].sort((a, b) => a - b));
       expect(html.match(/<h1>(.*?)<\/h1>/)?.[1]).not.toContain("110");
+      const intro = html.slice(0, html.indexOf("</section>")).replace(/\u00a0/g, " ");
+      expect(intro).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
+      expect(intro).toContain(locale === "en" ? "US$ 0" : "R$ 0");
       for (const rung of ["starter", "pro_100k", "pro_200k", "scale_500k"])
         expect(html).toContain(`href="/signup?next=%2Fsettings%2Fbilling%3Fplan%3D${rung}"`);
     });

@@ -35,7 +35,7 @@ vi.mock("@/lib/ad-consent", async (original) => {
       getSnapshot: () => fixture.store.getSnapshot(),
       getServerSnapshot: () => fixture.store.getServerSnapshot(),
       subscribe: (callback: () => void) => fixture.store.subscribe(callback),
-      read: () => fixture.store.read(),
+      read: (options?: { force?: boolean }) => fixture.store.read(options),
       choose: (granted: boolean) => fixture.store.choose(granted),
       blockLocally: () => fixture.store.blockLocally(),
     },
@@ -230,6 +230,20 @@ describe("persisted consent after a private document reload and internal return"
     expect(request).toHaveBeenCalledTimes(1);
     expect(fixture.sdk).toHaveBeenCalledTimes(1);
     expect(events().map((call) => call[2])).toEqual(["PageView"]);
+  });
+  it("forces a fresh preference read when the person opens settings inside the freshness window", async () => {
+    navigate("/");
+    await vi.waitFor(() => expect(fixture.store.getSnapshot().state).toBe("accepted"));
+    paint();
+    expect(request).toHaveBeenCalledTimes(1);
+    request.mockResolvedValue(receipt("denied"));
+    const listener = vi
+      .mocked(window.addEventListener)
+      .mock.calls.find(([event]) => event === "mepmail:advertising-settings")?.[1];
+    expect(typeof listener).toBe("function");
+    (listener as EventListener)(new Event("mepmail:advertising-settings"));
+    await vi.waitFor(() => expect(fixture.store.getSnapshot().state).toBe("denied"));
+    expect(request).toHaveBeenCalledTimes(2);
   });
   it("does not load on a private route if the public read completes after leaving", async () => {
     const pending = deferred<Response>();

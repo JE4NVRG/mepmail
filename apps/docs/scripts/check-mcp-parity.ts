@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 /**
@@ -30,6 +30,38 @@ const PAGES = [
   { path: "content/docs/mcp.mdx", heading: "Tools" },
   { path: "content/docs/mcp.pt-BR.mdx", heading: "Ferramentas" },
 ];
+const writeGenerated = process.argv.includes("--write");
+
+async function readSource(path: string): Promise<string> {
+  return readFile(new URL(`../../../${path}`, import.meta.url), "utf8");
+}
+
+async function readManifest(
+  path: string,
+): Promise<{ name: string; version: string; engines: { node: string } }> {
+  return JSON.parse(await readSource(path));
+}
+
+/** Generated Markdown stays useful on the agent-readable .md and llms surfaces. */
+async function generatedBlock(page: string, name: string, body: string, problems: string[]) {
+  const url = new URL(`../content/docs/${page}`, import.meta.url);
+  const text = await readFile(url, "utf8");
+  const start = `{/* ${name}:start */}`;
+  const end = `{/* ${name}:end */}`;
+  const first = text.indexOf(start);
+  const last = text.indexOf(end);
+  if (first === -1 || last < first) throw new Error(`${page}: missing ${name} markers`);
+  const current = text.slice(first + start.length, last).replace(/\r\n/g, "\n");
+  const expected = `\n${body}\n`;
+  if (current === expected) return;
+  if (writeGenerated) {
+    await writeFile(url, `${text.slice(0, first + start.length)}${expected}${text.slice(last)}`);
+  } else {
+    problems.push(
+      `${page}: stale ${name}; run pnpm exec tsx apps/docs/scripts/check-mcp-parity.ts --write from the repository root`,
+    );
+  }
+}
 
 /** The first capture of every match of a global pattern, in order. */
 function captures(source: string, pattern: RegExp): string[] {
@@ -185,6 +217,81 @@ for (const page of PAGES) {
   }
 }
 
+// Package pages and discovery use these same manifests/registries. A release
+// cannot silently retain a previous version or tool count in either language.
+const [mcpPackage, cliPackage, sdkPackage, cardSource, cardToolsSource, catalogSource] =
+  await Promise.all([
+    readManifest("packages/mcp/package.json"),
+    readManifest("packages/cli/package.json"),
+    readManifest("apps/api/node_modules/resend/package.json"),
+    readSource("packages/core/src/mcp-server-card.ts"),
+    readSource("packages/core/src/mcp-tools.ts"),
+    readSource("apps/web/src/app/.well-known/ai-catalog.json/route.ts"),
+  ]);
+const hostedVersion = /MCP_SERVER_VERSION = "([^"]+)"/.exec(cardSource)?.[1];
+if (!hostedVersion) throw new Error("could not read MCP_SERVER_VERSION");
+const cardNames = captures(cardToolsSource, /\n\s+name: "([a-z0-9_]+)"/g);
+// list_teams is conditional on an all-teams grant and has no OAuth scope of
+// its own. The public card advertises the regular scoped tool surface.
+const scopedRegistry = registry.filter((tool) => tool.scope !== null);
+const runtimeNames = new Set(scopedRegistry.map((tool) => tool.name));
+if (
+  cardNames.length !== scopedRegistry.length ||
+  cardNames.some((name) => !runtimeNames.has(name))
+) {
+  problems.push(
+    "packages/core/src/mcp-tools.ts: server-card tools differ from the hosted runtime registry",
+  );
+}
+if (
+  !/import \{ MCP_SERVER_VERSION \} from "@millionsend\/core\/mcp-server-card"/.test(
+    catalogSource,
+  ) ||
+  !/version: MCP_SERVER_VERSION/.test(catalogSource)
+) {
+  problems.push("ai-catalog.json must use the server card's MCP_SERVER_VERSION");
+}
+const localNames = await readLocalPackageTools();
+const mailboxNames = parseStringList(
+  await readSource("packages/mcp/src/correio-tools.ts"),
+  "CORREIO_TOOL_NAMES",
+  "packages/mcp/src/correio-tools.ts",
+);
+const lock = await readSource("pnpm-lock.yaml");
+const pinnedSdkVersion =
+  /\n {6}resend:\r?\n {8}specifier: [^\r\n]+\r?\n {8}version: (\d+\.\d+\.\d+)/.exec(lock)?.[1];
+if (pinnedSdkVersion !== sdkPackage.version) {
+  problems.push(
+    `installed resend@${sdkPackage.version} differs from lockfile ${pinnedSdkVersion ?? "(not found)"}`,
+  );
+}
+
+for (const locale of ["en", "pt-BR"] as const) {
+  const pt = locale === "pt-BR";
+  const prefix = pt ? "/pt-BR" : "";
+  const suffix = pt ? ".pt-BR" : "";
+  const facts = [
+    pt ? "| Pacote | Versão-fonte | Node | Papel |" : "| Package | Source version | Node | Role |",
+    "| --- | --- | --- | --- |",
+    `| [\`${mcpPackage.name}\`](https://www.npmjs.com/package/${mcpPackage.name}) | ${mcpPackage.version} | \`${mcpPackage.engines.node}\` | ${pt ? `${localNames.length} ferramentas da equipe e ${mailboxNames.length} de caixas Correio, conforme a credencial. [Guia](${prefix}/mcp).` : `${localNames.length} team tools and ${mailboxNames.length} Correio mailbox tools, depending on the credential. [Guide](${prefix}/mcp).`} |`,
+    `| [\`${cliPackage.name}\`](https://www.npmjs.com/package/${cliPackage.name}) | ${cliPackage.version} | \`${cliPackage.engines.node}\` | ${pt ? `Migração de contas com plano, aplicação e relatório. [Guia](${prefix}/cli).` : `Account migration with plan, apply and report. [Guide](${prefix}/cli).`} |`,
+    `| [\`n8n-nodes-mepmail\`](https://www.npmjs.com/package/n8n-nodes-mepmail) | ${pt ? "[Consultar npm]" : "[See npm]"}(https://www.npmjs.com/package/n8n-nodes-mepmail) | n8n | ${pt ? `Workflows de envio e caixas Correio. [Guia](${prefix}/integrations#n8n).` : `Sending and Correio mailbox workflows. [Guide](${prefix}/integrations#n8n).`} |`,
+    "",
+    pt
+      ? `O [MCP hospedado](${prefix}/mcp) desta revisão é **${hostedVersion}**, com **${cardNames.length} ferramentas** anunciadas no [server card](https://mepmail.dev/.well-known/mcp/server-card.json). A ferramenta adicional \`list_teams\` só aparece em grants de todas as equipes. Escopos e permissões podem reduzir a lista efetiva.`
+      : `The [hosted MCP](${prefix}/mcp) at this revision is **${hostedVersion}**, with **${cardNames.length} tools** advertised in the [server card](https://mepmail.dev/.well-known/mcp/server-card.json). The additional \`list_teams\` tool appears only on all-teams grants. Scopes and permissions can reduce the effective list.`,
+  ].join("\n");
+  await generatedBlock(`packages${suffix}.mdx`, "package-facts", facts, problems);
+  const sdkFacts = [
+    pt
+      ? "| SDK | Runtime | Cobertura automatizada no repositório |"
+      : "| SDK | Runtime | Automated repository coverage |",
+    "| --- | --- | --- |",
+    `| \`resend@${sdkPackage.version}\` (Node / TypeScript) | Node \`${sdkPackage.engines.node}\` | ${pt ? "[Suítes de contrato]" : "[Contract suites]"}(https://github.com/JE4NVRG/mepmail/tree/main/apps/api/test): emails, domains, contacts, contact properties, segments, broadcasts, suppressions, templates, topics, webhooks. |`,
+  ].join("\n");
+  await generatedBlock(`sdks${suffix}.mdx`, "sdk-compatibility", sdkFacts, problems);
+}
+
 if (problems.length > 0) {
   console.error("MCP tool parity check failed:");
   for (const problem of problems) console.error(`  - ${problem}`);
@@ -194,4 +301,6 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log(`MCP tool parity: all ${registry.length} registered tools match both doc tables.`);
+console.log(
+  `MCP parity: ${registry.length} hosted, ${localNames.length} local team and ${mailboxNames.length} mailbox tools; package versions and SDK ${sdkPackage.version} match both languages.`,
+);

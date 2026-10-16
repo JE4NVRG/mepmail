@@ -47,6 +47,27 @@ describe("createClient", () => {
     expect(calls[0]?.body).toBeUndefined();
   });
 
+  it("sends the idempotency key as a transport header while preserving authentication", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ id: "e_1" }));
+    const client = createClient({
+      apiKey: "ms_test",
+      baseUrl: "https://api.example.com",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    const body = { subject: "Hi", headers: { "X-Message-Label": "receipt" } };
+    await client.request("POST", "/emails", body, { "Idempotency-Key": "order-123" });
+    expect(fetchImpl).toHaveBeenCalledWith("https://api.example.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer ms_test",
+        accept: "application/json",
+        "content-type": "application/json",
+        "Idempotency-Key": "order-123",
+      },
+      body: JSON.stringify(body),
+    });
+  });
+
   it("maps API errors to MepMailApiError carrying status, name and parsed payload", async () => {
     const fetchImpl = vi.fn(async () =>
       jsonResponse({ statusCode: 422, name: "validation_error", message: "bad payload" }, 422),
