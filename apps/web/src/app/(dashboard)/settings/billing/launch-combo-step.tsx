@@ -14,6 +14,7 @@ import {
 } from "@/lib/launch-combo";
 import { getLaunchMailboxPlan } from "@/lib/launch-offer";
 import { mailboxCheckoutFailure, safeMailboxCheckoutUrl } from "@/lib/mailbox-checkout";
+import { formatMailboxBytes } from "@/lib/mailbox-plans";
 import { useTRPC } from "@/lib/trpc";
 
 // The Send webhook sets the contract a few seconds after Checkout returns;
@@ -76,6 +77,9 @@ export function LaunchComboMailStep({
   const offerId = billing.data
     ? matchLaunchComboOffer(billing.data.offers, intent.tier, intent.interval)
     : null;
+  const selectedOffer = billing.data?.offers.find((offer) => offer.offerId === offerId);
+  const limitsId = `${titleId}-limits`;
+  const count = new Intl.NumberFormat(locale);
   const confirming =
     !timedOut &&
     (capabilities.isPending ||
@@ -165,11 +169,72 @@ export function LaunchComboMailStep({
         })}
       </p>
       <div style={{ color: "var(--ms-muted)", fontSize: 14, lineHeight: 1.6 }}>{body}</div>
+      {canManage && ready && !failure && selectedOffer ? (
+        <div id={limitsId} style={{ marginTop: 14, fontSize: 14, lineHeight: 1.6 }}>
+          <h3 style={{ margin: "0 0 6px", fontSize: 14, color: "var(--ms-bone)" }}>
+            {t("combo.disclosure.title")}
+          </h3>
+          <p style={{ margin: 0, color: "var(--ms-muted)" }}>
+            {t(
+              selectedOffer.quotaScope === "team"
+                ? "combo.disclosure.sharedAllowances"
+                : "combo.disclosure.perMailboxAllowances",
+            )}
+          </p>
+          <ul
+            style={{
+              margin: "8px 0 0",
+              paddingLeft: 18,
+              display: "grid",
+              gap: 6,
+              color: "var(--ms-muted)",
+            }}
+          >
+            <li>
+              {t("combo.disclosure.storage", {
+                size: formatMailboxBytes(selectedOffer.storageBytesPerMailbox, locale),
+              })}
+            </li>
+            {selectedOffer.includedOutboundPerMailbox > 0 ? (
+              <li>
+                {t("combo.disclosure.outbound", {
+                  n: count.format(selectedOffer.includedOutboundPerMailbox),
+                })}
+              </li>
+            ) : null}
+            {selectedOffer.plan && selectedOffer.plan.inboundDeliveriesPerPeriod > 0 ? (
+              <li>
+                {t("combo.disclosure.inbound", {
+                  n: count.format(selectedOffer.plan.inboundDeliveriesPerPeriod),
+                })}
+              </li>
+            ) : null}
+            {selectedOffer.plan && selectedOffer.plan.outboundBytesPerPeriod > 0 ? (
+              <li>
+                {t("combo.disclosure.outboundBytes", {
+                  size: formatMailboxBytes(selectedOffer.plan.outboundBytesPerPeriod, locale),
+                })}
+              </li>
+            ) : null}
+            {selectedOffer.plan && selectedOffer.plan.inboundBytesPerPeriod > 0 ? (
+              <li>
+                {t("combo.disclosure.inboundBytes", {
+                  size: formatMailboxBytes(selectedOffer.plan.inboundBytesPerPeriod, locale),
+                })}
+              </li>
+            ) : null}
+            {selectedOffer.trialDays > 0 ? (
+              <li>{t("combo.disclosure.trial", { n: selectedOffer.trialDays })}</li>
+            ) : null}
+          </ul>
+        </div>
+      ) : null}
       <div className="ms-wrap-row" style={{ display: "flex", gap: 12, marginTop: 18 }}>
         {canManage && ready && !failure ? (
           <button
             type="button"
             className="ms-btn ms-btn-primary"
+            aria-describedby={limitsId}
             disabled={checkout.isPending}
             onClick={() => void pay()}
           >

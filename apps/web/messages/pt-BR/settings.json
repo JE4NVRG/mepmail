@@ -391,7 +391,18 @@
       "unavailable": "A contratação do Correio está indisponível agora. Tente novamente mais tarde.",
       "openMailboxes": "Abrir o Correio",
       "skip": "Agora não",
-      "close": "Fechar"
+      "close": "Fechar",
+      "disclosure": {
+        "title": "Limites da oferta do Correio selecionada",
+        "sharedAllowances": "Limites compartilhados entre todas as caixas do plano; não são uma franquia por caixa.",
+        "perMailboxAllowances": "Limites por caixa conforme esta oferta.",
+        "storage": "{size} de armazenamento",
+        "outbound": "{n} destinatários de saída por período de franquia",
+        "inbound": "{n} mensagens recebidas por período de franquia",
+        "outboundBytes": "Saída: {size} por período de franquia",
+        "inboundBytes": "Entrada: {size} por período de franquia",
+        "trial": "{n} dias de teste com cartão quando elegível; o Pix não inclui teste grátis."
+      }
     },
     "upgradePaymentPending": "Ainda não conseguimos cobrar a diferença do {plan}, então seu plano não mudou. Confira ou atualize o cartão em Gerenciar e tente de novo; o upgrade vale assim que o pagamento for aprovado.",
     "localPrice": "No Brasil: {price}"

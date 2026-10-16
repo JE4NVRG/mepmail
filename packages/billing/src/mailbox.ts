@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import { mailboxCheckoutDisclosure } from "./mailbox-checkout-disclosure.js";
 import type { BillingStripe } from "./stripe.js";
 
 export const MAILBOX_SERVICE_METADATA_KEY = "mepmail_service";
@@ -633,6 +634,14 @@ export async function createMailboxCheckoutSession(
       },
       ...(input.trialDays ? { payment_method_collection: "always" as const } : {}),
       line_items: [{ price: terms.priceId, quantity: mailboxStripeQuantity(terms, input.seats) }],
+      custom_text: {
+        submit: {
+          message: mailboxCheckoutDisclosure(terms, input.seats, {
+            kind: "card",
+            trialDays: input.trialDays ?? 0,
+          }),
+        },
+      },
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
       automatic_tax: { enabled: input.automaticTax ?? false },

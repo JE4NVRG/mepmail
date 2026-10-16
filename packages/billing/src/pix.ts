@@ -1,4 +1,11 @@
 import Stripe from "stripe";
+import {
+  type MailboxPriceTerms,
+  mailboxCheckoutTerms,
+  mailboxIncludedSeats,
+  mailboxStripeQuantity,
+} from "./mailbox.js";
+import { mailboxCheckoutDisclosure } from "./mailbox-checkout-disclosure.js";
 import { idOf } from "./subscription.js";
 
 /**
@@ -155,6 +162,8 @@ export interface PixCheckoutInput {
   /** mailbox_start / send_start: the plan price and quantity the subscription is created with. */
   priceId?: string;
   quantity?: number;
+  /** mailbox_start only: the server-resolved catalog terms and granted mailboxes. */
+  mailbox?: { terms: MailboxPriceTerms; seats: number };
   /** send_start: the metered overage price, the first-invoice coupon and the interval. */
   overagePriceId?: string;
   coupon?: string;
@@ -185,6 +194,29 @@ export async function createPixCheckoutSession(
     (input.attemptId !== undefined && (input.kind !== "send_start" || !UUID.test(input.attemptId)))
   )
     throw new PixBillingError("invalid");
+  let mailboxMessage: string | undefined;
+  if (input.kind === "mailbox_start") {
+    const context = input.mailbox;
+    const terms = context
+      ? mailboxCheckoutTerms({
+          livemode: false,
+          checkoutPriceId: context.terms.priceId,
+          prices: [context.terms],
+        })
+      : null;
+    if (
+      !context ||
+      !terms?.planCode ||
+      terms.interval !== "month" ||
+      terms.priceId !== input.priceId ||
+      context.seats !== mailboxIncludedSeats(terms) ||
+      mailboxStripeQuantity(terms, context.seats) !== input.quantity
+    )
+      throw new PixBillingError("invalid");
+    mailboxMessage = mailboxCheckoutDisclosure(terms, context.seats, { kind: "pix" });
+  } else if (input.mailbox !== undefined) {
+    throw new PixBillingError("invalid");
+  }
   const metadata: Record<string, string> = {
     [PIX_PURCHASE_METADATA_KEY]: input.kind,
     team_id: input.teamId,
@@ -207,6 +239,7 @@ export async function createPixCheckoutSession(
       client_reference_id: input.teamId,
       payment_method_types: ["pix"],
       payment_method_options: { pix: { expires_after_seconds: PIX_QR_SECONDS } },
+      ...(mailboxMessage ? { custom_text: { submit: { message: mailboxMessage } } } : {}),
       line_items: [
         {
           quantity: 1,

@@ -1274,6 +1274,7 @@ export async function beginMailboxPixCheckout(
     product: priced.product,
     priceId: terms.priceId,
     quantity,
+    mailbox: { terms, seats },
     successUrl: input.successUrl,
     cancelUrl: input.cancelUrl,
     idempotencyKey: `pix-mailbox:${input.teamId}:${randomUUID()}`,

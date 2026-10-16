@@ -391,7 +391,18 @@
       "unavailable": "Mail purchases are unavailable right now. Please try again later.",
       "openMailboxes": "Open Mail",
       "skip": "Not now",
-      "close": "Close"
+      "close": "Close",
+      "disclosure": {
+        "title": "Limits for the selected Mail offer",
+        "sharedAllowances": "Limits are shared across every mailbox in the plan; these are not per-mailbox allowances.",
+        "perMailboxAllowances": "Per-mailbox limits for this offer.",
+        "storage": "{size} of storage",
+        "outbound": "{n} outbound recipients per allowance period",
+        "inbound": "{n} received messages per allowance period",
+        "outboundBytes": "Outbound: {size} per allowance period",
+        "inboundBytes": "Inbound: {size} per allowance period",
+        "trial": "{n} trial days with a card when eligible; Pix does not include a free trial."
+      }
     },
     "upgradePaymentPending": "We could not charge the difference for {plan} yet, so your plan has not changed. Check or update your card under Manage and try again; the upgrade applies as soon as the payment goes through.",
     "localPrice": "In Brazil: {price}"
