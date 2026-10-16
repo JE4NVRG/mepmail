@@ -53,48 +53,54 @@ vi.mock("@/lib/trpc", () => {
         cancelRenewal: operation,
       },
       team: { list: operation },
+      mailboxes: {
+        capabilities: { queryOptions: () => ({ mail: true }) },
+        billing: { queryOptions: () => ({ mail: true }) },
+      },
       settings: { usage: { recent: operation } },
     }),
   };
 });
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (options: { fixture?: string }) => ({
-    data: options.fixture
-      ? {
-          effectiveRung:
-            h.subscribed && h.subscriptionState === "confirmed"
-              ? { key: "pro_100k", priceCents: h.billingInterval === "year" ? 29000 : 2000 }
+  useQuery: (options: { fixture?: string; mail?: boolean }) => ({
+    data: options.mail
+      ? undefined
+      : options.fixture
+        ? {
+            effectiveRung:
+              h.subscribed && h.subscriptionState === "confirmed"
+                ? { key: "pro_100k", priceCents: h.billingInterval === "year" ? 29000 : 2000 }
+                : null,
+            plan: h.system ? "system" : h.subscribed ? "pro" : "free",
+            planQuota: h.subscribed ? 110000 : null,
+            rung: h.subscribed ? "pro_100k" : "free",
+            pendingRung: h.pendingRung,
+            planStatus: "active",
+            currentPeriodEnd: h.pendingRung || h.subscribed ? new Date("2027-10-01") : null,
+            cancelAt: h.cancelAt,
+            quota: {
+              kind: "month",
+              included: 110000,
+              periodEnd: new Date("2026-10-01"),
+              overage: true,
+              overageCentsPer1k: h.rate,
+            },
+            usage: { accepted: 111001 },
+            hasCustomer: true,
+            hasLiveSubscription: h.subscribed,
+            billingInterval: h.billingInterval,
+            subscriptionState: h.subscriptionState,
+            launchOffer: h.launchEnabled
+              ? {
+                  rung: "pro_100k",
+                  monthlyCents: 2900,
+                  firstMonthlyCents: 2000,
+                  annualCents: 29000,
+                  monthlyRecipientDeliveries: 110000,
+                }
               : null,
-          plan: h.system ? "system" : h.subscribed ? "pro" : "free",
-          planQuota: h.subscribed ? 110000 : null,
-          rung: h.subscribed ? "pro_100k" : "free",
-          pendingRung: h.pendingRung,
-          planStatus: "active",
-          currentPeriodEnd: h.pendingRung || h.subscribed ? new Date("2027-10-01") : null,
-          cancelAt: h.cancelAt,
-          quota: {
-            kind: "month",
-            included: 110000,
-            periodEnd: new Date("2026-10-01"),
-            overage: true,
-            overageCentsPer1k: h.rate,
-          },
-          usage: { accepted: 111001 },
-          hasCustomer: true,
-          hasLiveSubscription: h.subscribed,
-          billingInterval: h.billingInterval,
-          subscriptionState: h.subscriptionState,
-          launchOffer: h.launchEnabled
-            ? {
-                rung: "pro_100k",
-                monthlyCents: 2900,
-                firstMonthlyCents: 2000,
-                annualCents: 29000,
-                monthlyRecipientDeliveries: 110000,
-              }
-            : null,
-        }
-      : { activeTeamId: "fixture", teams: [{ teamId: "fixture", role: h.role }] },
+          }
+        : { activeTeamId: "fixture", teams: [{ teamId: "fixture", role: h.role }] },
   }),
   useMutation: () => ({ mutate: h.mutate }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),

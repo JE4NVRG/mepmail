@@ -404,6 +404,36 @@
       "cancelConfirm": "Cancelar renovação",
       "keep": "Manter plano",
       "cancelFailed": "Não foi possível cancelar a renovação agora. Tente de novo em instantes."
+    },
+    "discovery": {
+      "sendIntro": "Todas as opções mensais de Envio, com o preço recorrente do catálogo. Abra os detalhes para comparar recursos ou escolher um plano; assinaturas atuais mantêm o contrato.",
+      "dailyReference": "≈ {n} e-mails em 30 dias, como referência",
+      "dailyDisclaimer": "Nos planos Free e Starter, a referência de 30 dias é apenas limite diário × 30. Não é uma cota mensal: o limite de cada dia UTC continua valendo, inclusive para uma campanha pontual.",
+      "details": "Ver detalhes",
+      "detailsFor": "Ver detalhes do {plan}",
+      "mailTitle": "Correio e custo conjunto",
+      "currentMail": "Plano do Correio identificado: {plan}.",
+      "catalogNotice": "Preços de referência do catálogo do Correio. Estes valores não confirmam a moeda nem o valor de uma assinatura existente; cada plano tem franquias compartilhadas entre as caixas.",
+      "mailNames": {
+        "solo": "Solo",
+        "duo": "Duo",
+        "equipe": "Equipe"
+      },
+      "mailSeats": "{n, plural, one {# caixa no plano} other {# caixas no plano}}",
+      "mailUnavailable": "Não foi possível carregar o catálogo do Correio agora. Consulte os detalhes do Correio para conferir a sua cobrança.",
+      "mailLoading": "Carregando os preços do Correio…",
+      "freeMailExample": "Exemplo mensal de catálogo: Envio Free ({send}) + Correio {plan} ({mail}) = {total} / mês. É a soma de duas assinaturas separadas, sem desconto de pacote.",
+      "separateCharges": "O total da sua fatura não é calculado aqui: a moeda e as condições do contrato do Correio não estão confirmadas nesta tela. Mensalidades, anuais antecipados, impostos e excedentes devem ser conferidos separadamente.",
+      "mailDetails": "Ver licença, limites e cobrança do Correio",
+      "mailLimits": "Ver franquias",
+      "sharedAllowances": "Limites compartilhados entre todas as caixas do plano; não são uma franquia por caixa.",
+      "perMailboxAllowances": "Limites por caixa conforme esta oferta.",
+      "storage": "{size} de armazenamento",
+      "outbound": "{n} destinatários de saída por período de franquia",
+      "inbound": "{n} mensagens recebidas por período de franquia",
+      "outboundBytes": "Saída: {size} por período de franquia",
+      "inboundBytes": "Entrada: {size} por período de franquia",
+      "trial": "{n} dias de teste com cartão quando elegível; o Pix não inclui teste grátis."
     }
   },
   "mcp": {

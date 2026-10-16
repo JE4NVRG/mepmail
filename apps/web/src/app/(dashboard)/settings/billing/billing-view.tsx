@@ -21,6 +21,12 @@ import { Skeleton } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
 import { Switch } from "@/components/switch";
 import { WarnCard } from "@/components/warn-card";
+import { inAndroidApp } from "@/lib/android-app";
+import {
+  type BillingAmount,
+  compatibleBillingTotal,
+  dailyQuotaReference,
+} from "@/lib/billing-summary";
 import { formatDay, formatDayTime, formatUsd } from "@/lib/format";
 import { formatBrl } from "@/lib/landing-pricing";
 import {
@@ -67,15 +73,17 @@ const POST_CHECKOUT_POLL_MS = 2500;
 function Card({
   title,
   action,
+  purchase = false,
   children,
 }: {
   title: string;
   /** Right-aligned control on the title row (the card's primary action). */
   action?: ReactNode;
+  purchase?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section className="ms-card" style={{ padding: 24 }}>
+    <section className="ms-card" style={{ padding: 24 }} data-purchase={purchase ? "" : undefined}>
       <div
         style={{
           display: "flex",
@@ -153,6 +161,7 @@ export function BillingView({
   const trpc = useTRPC();
   // The Android app shows the plan as it is; nothing is sold there (lib/android-app.ts).
   const androidApp = useInAndroidApp();
+  const webBilling = !androidApp && !inAndroidApp();
   const queryClient = useQueryClient();
 
   const status = useQuery({
@@ -163,6 +172,18 @@ export function BillingView({
         : false,
   });
   const teams = useQuery(trpc.team.list.queryOptions());
+  // Mail prices are read only on the web and only after the existing capability
+  // check authorizes this surface. A public offer alone does not grant access.
+  const mailCapability = useQuery(
+    trpc.mailboxes.capabilities.queryOptions(undefined, { enabled: webBilling }),
+  );
+  const mailBilling = useQuery(
+    trpc.mailboxes.billing.queryOptions(undefined, {
+      enabled:
+        webBilling && mailCapability.data?.enabled === true && status.data?.plan !== "system",
+      retry: false,
+    }),
+  );
   const role = teams.data?.teams.find((m) => m.teamId === teams.data.activeTeamId)?.role;
   const canManage = role === "owner" || role === "admin";
   const teamId = teams.data?.activeTeamId ?? null;
@@ -469,6 +490,241 @@ export function BillingView({
     ];
   };
 
+  const mailOffers = mailBilling.data?.offers ?? [];
+  const currentMail = mailBilling.data?.management.currentPlan;
+  const mailRows = mailOffers.flatMap((offer) => {
+    if (!offer.plan) return [];
+    const local = inBrazil && offer.localCurrency?.currency === "brl" ? offer.localCurrency : null;
+    return [
+      {
+        key: offer.offerId,
+        plan: offer.plan.code,
+        amountCents: local?.unitAmount ?? offer.unitAmount,
+        currency: local?.currency ?? offer.currency,
+        interval: offer.interval,
+        seats: offer.includedMailboxes,
+        quotaScope: offer.quotaScope,
+        storageBytes: offer.storageBytesPerMailbox,
+        outbound: offer.includedOutboundPerMailbox,
+        inbound: offer.plan.inboundDeliveriesPerPeriod,
+        outboundBytes: offer.plan.outboundBytesPerPeriod,
+        inboundBytes: offer.plan.inboundBytesPerPeriod,
+        trialDays: offer.trialDays,
+      },
+    ];
+  });
+  // Teams offered Mail without registry access can still read the published
+  // catalog. Its prices are labeled as references, never as an active contract.
+  const publishedMailRows =
+    !mailCapability.data?.enabled && mailCapability.data?.offered
+      ? LAUNCH_OFFER.correioPlans.map((offer) => ({
+          key: offer.id,
+          plan: offer.id,
+          amountCents: inBrazil ? offer.brlMonthlyCents : offer.monthlyCents,
+          currency: inBrazil ? "brl" : "usd",
+          interval: "month" as const,
+          seats: offer.mailboxes,
+          quotaScope: "team" as const,
+          storageBytes: offer.storageGiB * 1024 ** 3,
+          outbound: offer.monthlyRecipientDeliveries,
+          inbound: offer.monthlyInboundMessages,
+          outboundBytes: null,
+          inboundBytes: null,
+          trialDays: LAUNCH_OFFER.correioTrialDays,
+        }))
+      : [];
+  const shownMail = mailRows.length ? mailRows : publishedMailRows;
+  const referenceMail = shownMail[0];
+  const mailReference: BillingAmount | null =
+    referenceMail && (referenceMail.interval === "month" || referenceMail.interval === "year")
+      ? {
+          amountCents: referenceMail.amountCents,
+          currency: referenceMail.currency,
+          interval: referenceMail.interval,
+        }
+      : null;
+  const combinedReference =
+    plan === "free" &&
+    !hasLiveSubscription &&
+    !currentMail &&
+    mailBilling.data?.availability === "available" &&
+    mailReference?.interval === "month"
+      ? compatibleBillingTotal(
+          { amountCents: 0, currency: mailReference.currency, interval: "month" },
+          mailReference,
+        )
+      : null;
+  const money = (amount: number, currency: string) =>
+    currency === "brl"
+      ? brl(amount)
+      : currency === "usd"
+        ? usd(amount)
+        : new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount / 100);
+  const binarySize = (bytes: number) =>
+    bytes >= 1024 ** 3
+      ? `${fmt.format(bytes / 1024 ** 3)} GiB`
+      : `${fmt.format(bytes / 1024 ** 2)} MiB`;
+  const mailSummary =
+    mailCapability.data?.enabled || mailCapability.data?.offered ? (
+      <Card title={t("discovery.mailTitle")} purchase>
+        {currentMail ? (
+          <p style={{ margin: "0 0 12px", fontSize: 14 }}>
+            {t("discovery.currentMail", { plan: t(`discovery.mailNames.${currentMail}`) })}
+          </p>
+        ) : null}
+        <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--ms-muted)" }}>
+          {t("discovery.catalogNotice")}
+        </p>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
+            gap: 12,
+          }}
+        >
+          {shownMail.map((offer) => (
+            <div className="ms-plan-strip-item" key={offer.key}>
+              <strong>{t(`discovery.mailNames.${offer.plan}`)}</strong>
+              <span>
+                {money(offer.amountCents, offer.currency)}{" "}
+                {t(offer.interval === "year" ? "launch.perYear" : "perMonth")}
+              </span>
+              <span style={{ fontSize: 12, color: "var(--ms-muted)" }}>
+                {t("discovery.mailSeats", { n: offer.seats })}
+              </span>
+              <details style={{ fontSize: 12, color: "var(--ms-muted)" }}>
+                <summary
+                  style={{
+                    cursor: "pointer",
+                    minHeight: 44,
+                    display: "list-item",
+                    alignContent: "center",
+                  }}
+                >
+                  {t("discovery.mailLimits")}
+                </summary>
+                <p>
+                  {t(
+                    offer.quotaScope === "team"
+                      ? "discovery.sharedAllowances"
+                      : "discovery.perMailboxAllowances",
+                  )}
+                </p>
+                <ul style={{ margin: "8px 0", paddingLeft: 18, display: "grid", gap: 6 }}>
+                  {offer.storageBytes > 0 ? (
+                    <li>{t("discovery.storage", { size: binarySize(offer.storageBytes) })}</li>
+                  ) : null}
+                  {offer.outbound > 0 ? (
+                    <li>{t("discovery.outbound", { n: fmt.format(offer.outbound) })}</li>
+                  ) : null}
+                  {offer.inbound > 0 ? (
+                    <li>{t("discovery.inbound", { n: fmt.format(offer.inbound) })}</li>
+                  ) : null}
+                  {offer.outboundBytes && offer.outboundBytes > 0 ? (
+                    <li>
+                      {t("discovery.outboundBytes", { size: binarySize(offer.outboundBytes) })}
+                    </li>
+                  ) : null}
+                  {offer.inboundBytes && offer.inboundBytes > 0 ? (
+                    <li>{t("discovery.inboundBytes", { size: binarySize(offer.inboundBytes) })}</li>
+                  ) : null}
+                  {offer.trialDays > 0 ? (
+                    <li>{t("discovery.trial", { n: offer.trialDays })}</li>
+                  ) : null}
+                </ul>
+              </details>
+            </div>
+          ))}
+        </div>
+        {shownMail.length === 0 ? (
+          <p role="status" style={{ fontSize: 13 }}>
+            {t(mailBilling.isError ? "discovery.mailUnavailable" : "discovery.mailLoading")}
+          </p>
+        ) : null}
+        {combinedReference && referenceMail && mailReference ? (
+          <p style={{ fontSize: 14 }}>
+            {t("discovery.freeMailExample", {
+              plan: t(`discovery.mailNames.${referenceMail.plan}`),
+              send: money(0, combinedReference.currency),
+              mail: money(mailReference.amountCents, combinedReference.currency),
+              total: money(combinedReference.amountCents, combinedReference.currency),
+            })}
+          </p>
+        ) : null}
+        <p style={{ fontSize: 13, color: "var(--ms-muted)" }}>{t("discovery.separateCharges")}</p>
+        <a href="/mailboxes">{t("discovery.mailDetails")}</a>
+      </Card>
+    ) : null;
+
+  const catalogSendPrice = (r: PlanRung) => {
+    const launch = !!launchOffer && r.key === launchOffer.rung;
+    return inBrazil
+      ? brl(launch ? LAUNCH_OFFER.sending.brlMonthlyCents : r.brlPriceCents)
+      : usd(launch ? launchOffer.monthlyCents : r.priceCents);
+  };
+  const planDiscovery = (
+    <Card title={t("plansTitle")} purchase>
+      <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--ms-muted)" }}>
+        {t("discovery.sendIntro")}
+      </p>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
+          gap: 12,
+        }}
+      >
+        {PLAN_RUNGS.map((r, index) => (
+          <article
+            className="ms-plan-strip-item"
+            key={r.key}
+            data-current={r.key === current.key || undefined}
+          >
+            <h3 className="ms-plan-strip-name" style={{ margin: 0 }}>
+              {rungLabel(r.key)}
+            </h3>
+            <span className="ms-plan-strip-price">
+              {catalogSendPrice(r)} {t("perMonth")}
+            </span>
+            <span style={{ fontSize: 13, color: "var(--ms-bone)" }}>
+              {t(r.period === "day" ? "capPerDay" : "capPerMonth", { n: fmt.format(r.included) })}
+            </span>
+            {r.period === "day" ? (
+              <span style={{ fontSize: 12, color: "var(--ms-muted)" }}>
+                {t("discovery.dailyReference", {
+                  n: fmt.format(dailyQuotaReference(r.included).volume),
+                })}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              className="ms-btn ms-btn-secondary"
+              style={{ marginTop: "auto", minHeight: 44 }}
+              onClick={() => {
+                setStep(index);
+                setPlansOpen(true);
+              }}
+              aria-label={t("discovery.detailsFor", { plan: rungLabel(r.key) })}
+            >
+              {t("discovery.details")}
+            </button>
+          </article>
+        ))}
+      </div>
+      <p style={{ margin: "14px 0 0", fontSize: 12, color: "var(--ms-muted)" }}>
+        {t("discovery.dailyDisclaimer")}
+      </p>
+      <button
+        type="button"
+        className="ms-btn ms-btn-secondary"
+        style={{ marginTop: 14, minHeight: 44 }}
+        onClick={() => setPlansOpen(true)}
+      >
+        {t("comparePlans")}
+      </button>
+    </Card>
+  );
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
       {notice}
@@ -532,6 +788,13 @@ export function BillingView({
                   ? t("capPerMonth", { n: fmt.format(quota.included) })
                   : null}
             </div>
+            {quota.kind === "day" ? (
+              <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ms-muted)" }}>
+                {t("discovery.dailyReference", {
+                  n: fmt.format(dailyQuotaReference(quota.limit).volume),
+                })}
+              </p>
+            ) : null}
           </div>
           {currentPeriodEnd && plan !== "free" ? (
             <div>
@@ -605,6 +868,9 @@ export function BillingView({
               : t("readOnly")}
         </p>
       </Card>
+
+      {mailSummary}
+      {planDiscovery}
 
       <Card title={t("usageTitle")}>
         {quota.kind === "month" ? (
@@ -976,42 +1242,6 @@ export function BillingView({
         </Card>
       ) : null}
 
-      <Card
-        title={t("plansTitle")}
-        action={
-          <button
-            type="button"
-            className="ms-btn ms-btn-secondary"
-            onClick={() => setPlansOpen(true)}
-          >
-            {t("comparePlans")}
-          </button>
-        }
-      >
-        <div className="ms-plan-strip">
-          {PLANS.map((p) => {
-            const rungs = PLAN_RUNGS.filter((x) => x.plan === p);
-            const firstRung = rungs[0];
-            const price = usd(
-              firstRung && newOffer && firstRung.key === newOffer.rung
-                ? newOffer.monthlyCents
-                : (firstRung?.priceCents ?? 0),
-            );
-            return (
-              <div
-                key={p}
-                className="ms-plan-strip-item"
-                data-current={p === current.plan || undefined}
-              >
-                <span className="ms-plan-strip-name">{planName(p)}</span>
-                <span className="ms-plan-strip-price">
-                  {rungs.length > 1 ? t("fromPrice", { price }) : price} {t("perMonth")}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
       {/* The ladder needs more width than the content column beside the
           sidebar gives it, so it opens in a dialog that fills the viewport. */}
       <Modal

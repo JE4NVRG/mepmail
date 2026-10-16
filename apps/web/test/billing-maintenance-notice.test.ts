@@ -44,30 +44,36 @@ vi.mock("@/lib/trpc", () => {
         payPixInvoice: operation,
       },
       team: { list: operation },
+      mailboxes: {
+        capabilities: { queryOptions: () => ({ mail: true }) },
+        billing: { queryOptions: () => ({ mail: true }) },
+      },
       settings: { usage: { recent: operation } },
     }),
   };
 });
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (options: { status?: boolean }) => ({
-    data: options.status
-      ? {
-          effectiveRung: null,
-          plan: "free",
-          planQuota: null,
-          rung: "free",
-          pendingRung: null,
-          planStatus: "none",
-          currentPeriodEnd: null,
-          quota: { kind: "day", limit: 100, overage: false },
-          usage: { accepted: 0 },
-          hasCustomer: false,
-          hasLiveSubscription: false,
-          billingInterval: null,
-          subscriptionState: "none",
-          launchOffer: null,
-        }
-      : { activeTeamId: "fixture", teams: [{ teamId: "fixture", role: "owner" }] },
+  useQuery: (options: { status?: boolean; mail?: boolean }) => ({
+    data: options.mail
+      ? undefined
+      : options.status
+        ? {
+            effectiveRung: null,
+            plan: "free",
+            planQuota: null,
+            rung: "free",
+            pendingRung: null,
+            planStatus: "none",
+            currentPeriodEnd: null,
+            quota: { kind: "day", limit: 100, overage: false },
+            usage: { accepted: 0 },
+            hasCustomer: false,
+            hasLiveSubscription: false,
+            billingInterval: null,
+            subscriptionState: "none",
+            launchOffer: null,
+          }
+        : { activeTeamId: "fixture", teams: [{ teamId: "fixture", role: "owner" }] },
   }),
   useMutation: () => {
     const affected = h.mutationIndex++ === h.failedIndex;

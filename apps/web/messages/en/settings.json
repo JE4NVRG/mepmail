@@ -404,6 +404,36 @@
       "cancelConfirm": "Cancel renewal",
       "keep": "Keep plan",
       "cancelFailed": "The renewal could not be cancelled right now. Try again in a moment."
+    },
+    "discovery": {
+      "sendIntro": "Every monthly Send option, with its regular catalog price. Open the details to compare features or choose a plan; existing subscriptions keep their contract.",
+      "dailyReference": "≈ {n} emails over 30 days, for reference",
+      "dailyDisclaimer": "For Free and Starter, the 30-day reference is only the daily limit × 30. It is not a monthly allowance: the limit still applies to each UTC day, including a one-day campaign.",
+      "details": "View details",
+      "detailsFor": "View {plan} details",
+      "mailTitle": "Mail and combined cost",
+      "currentMail": "Identified Mail plan: {plan}.",
+      "catalogNotice": "Reference prices from the Mail catalog. These amounts do not confirm the currency or charge for an existing subscription; each plan shares its allowances across its mailboxes.",
+      "mailNames": {
+        "solo": "Solo",
+        "duo": "Duo",
+        "equipe": "Team"
+      },
+      "mailSeats": "{n, plural, one {# mailbox in the plan} other {# mailboxes in the plan}}",
+      "mailUnavailable": "The Mail catalog could not be loaded. Open the Mail details to check your billing.",
+      "mailLoading": "Loading Mail prices…",
+      "freeMailExample": "Monthly catalog example: Send Free ({send}) + Mail {plan} ({mail}) = {total} / month. This adds two separate subscriptions, with no bundle discount.",
+      "separateCharges": "Your invoice total is not calculated here: this screen has not confirmed the currency and terms of the Mail contract. Monthly fees, annual upfront payments, taxes and overage must be checked separately.",
+      "mailDetails": "View Mail license, limits and billing",
+      "mailLimits": "View allowances",
+      "sharedAllowances": "Limits are shared across every mailbox in the plan; these are not per-mailbox allowances.",
+      "perMailboxAllowances": "Per-mailbox limits for this offer.",
+      "storage": "{size} of storage",
+      "outbound": "{n} outbound recipients per allowance period",
+      "inbound": "{n} received messages per allowance period",
+      "outboundBytes": "Outbound: {size} per allowance period",
+      "inboundBytes": "Inbound: {size} per allowance period",
+      "trial": "{n} trial days with a card when eligible; Pix does not include a free trial."
     }
   },
   "mcp": {
