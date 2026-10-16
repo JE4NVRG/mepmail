@@ -770,7 +770,9 @@ function ApiQuickstart({
             </div>
           ) : null}
 
-          {demoPanel}
+          <div id="first-email" style={{ scrollMarginTop: 24 }}>
+            {demoPanel}
+          </div>
 
           {/* Add an API key */}
           <div className="ms-step" style={{ display: "flex", gap: 18 }}>

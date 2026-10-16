@@ -11,7 +11,14 @@ import { planLabel } from "@/lib/console-format";
 import { formatDayTime, formatMmSs, formatRelative } from "@/lib/format";
 import { formatScoreTenths } from "@/lib/score-band";
 import { useCountdown } from "@/lib/use-countdown";
-import { GuardrailLabel, RegionLabel, usePlanName } from "./cells";
+import {
+  GuardrailLabel,
+  MailSubscriptionCell,
+  OwnerSignupCell,
+  RegionLabel,
+  SubscriptionStatus,
+  usePlanName,
+} from "./cells";
 import type { TeamDetail } from "./types";
 
 function Figure({ label, value }: { label: string; value: React.ReactNode }) {
@@ -128,7 +135,6 @@ export function TeamDialog({
   const planName = usePlanName();
   const none = common("none");
 
-  const owner = detail?.members.find((m) => m.role === "owner") ?? detail?.members[0];
   const memberEmails = detail?.members.map((m) => m.email).join(", ") ?? "";
 
   return (
@@ -174,7 +180,23 @@ export function TeamDialog({
             <dt>{t("detail.type")}</dt>
             <dd>{planLabel(planName(detail.plan), detail.planQuota)}</dd>
             <dt>{t("detail.owner")}</dt>
-            <dd>{owner?.email ?? none}</dd>
+            <dd>{detail.ownerEmail ?? none}</dd>
+            <dt>{t("acquisition.ownerSignup")}</dt>
+            <dd>
+              <OwnerSignupCell attribution={detail.ownerSignupAttribution} detailed />
+            </dd>
+            <dt>{t("acquisition.mail")}</dt>
+            <dd>
+              <MailSubscriptionCell
+                subscription={detail.mailboxSubscription}
+                enabled={detail.mailboxProjectionEnabled}
+                detailed
+              />
+            </dd>
+            <dt>{t("acquisition.sendStripe")}</dt>
+            <dd>
+              <SubscriptionStatus status={detail.planStatus} />
+            </dd>
             <dt>{t("detail.members")}</dt>
             <dd>
               {memberEmails ? (

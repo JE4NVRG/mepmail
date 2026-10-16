@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 // Public, indexable pages: the landing, the standalone pricing page, the
 // Correio page, the desktop downloads and the Linux page (once Mail is open and indexable),
 // the "Resend alternative" comparison, the integrations, security and support
-// pages and the auth entry points (mirrors robots.ts). The dashboard has no public URLs of its own.
+// pages. Auth utilities remain crawlable so their noindex can be read, but are not advertised here.
 // Each page is listed in English (the plain path) and in Portuguese (?lang=pt-BR),
 // both carrying the same hreflang set (see lib/public-locale-url.ts).
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -38,8 +38,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly" as const,
       priority: 0.7,
     })),
-    { url: `${base}/signup`, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${base}/login`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${base}/terms`, changeFrequency: "yearly", priority: 0.4 },
     { url: `${base}/privacy`, changeFrequency: "yearly", priority: 0.4 },
     { url: `${base}/refund`, changeFrequency: "yearly", priority: 0.4 },

@@ -49,6 +49,8 @@ export const ACCOUNT_MAIL_KINDS = [
   "activation.add_domain",
   "activation.finish_domain",
   "activation.help",
+  "activation.first_email",
+  "activation.day7",
   "mailbox.repriced",
   "mailbox.trial_ending",
   "mailbox.usage_near",

@@ -22,6 +22,7 @@ export interface TeamActionTarget {
   planQuota: number | null;
   suspendedAt: Date | null;
   broadcastsPausedByOperatorAt: Date | null;
+  mailboxSubscription?: { status: string } | null;
 }
 
 export interface TeamActions {
@@ -207,20 +208,28 @@ export function useTeamActions(onChanged: () => void): TeamActions {
       {dialog?.kind === "suspend" ? (
         <SuspendDialog
           name={team.name}
+          paid={
+            (team.plan !== "free" && team.plan !== "system") ||
+            ["active", "trialing", "past_due"].includes(team.mailboxSubscription?.status ?? "")
+          }
           pending={suspend.isPending}
           onClose={close}
           onSubmit={(input) =>
             suspend.mutate(
               { id: team.id, ...input },
               {
-                onSuccess: () =>
+                onSuccess: (result) => {
                   done(
                     t("toast.suspended", {
                       team: team.name,
                       reason: t(`suspendDialog.reasons.${input.reason}`),
                     }),
                     team.id,
-                  ),
+                  );
+                  if (result.notice.requested && result.notice.recipients === 0) {
+                    toast(t("toast.suspensionNoticeUnavailable"), "warn");
+                  }
+                },
               },
             )
           }

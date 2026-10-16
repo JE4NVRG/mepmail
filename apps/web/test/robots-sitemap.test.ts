@@ -86,11 +86,9 @@ describe("robots.txt + sitemap.xml agreement", () => {
   it("allows every URL the sitemap advertises", () => {
     const allow = allowedPaths();
     const urls = sitemap();
-    // 6 URLs from the SEO fix + the three public pages added with /pricing,
-    // /alternatives/resend and /integrations, plus the two institutional pages
-    // (/security and /support), /changelog and the guides (index + 3); each in English and
-    // in Portuguese.
-    expect(urls).toHaveLength(32);
+    // Fourteen indexable public pages, each in English and Portuguese.
+    // Login/signup remain crawlable for their noindex, outside this sitemap.
+    expect(urls).toHaveLength(28);
 
     for (const entry of urls) {
       const { pathname, search } = new URL(entry.url as string);
@@ -108,7 +106,7 @@ describe("robots.txt + sitemap.xml agreement", () => {
     vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
     const urls = sitemap();
     // /correio, the desktop downloads and the Linux app's page, in both languages.
-    expect(urls).toHaveLength(38);
+    expect(urls).toHaveLength(34);
     expect(has()).toBe(true);
     expect(urls.find((entry) => entry.url.endsWith("/desktop/correio/linux"))?.priority).toBe(0.6);
     expect(isAllowed("/desktop/correio/linux", allowedPaths())).toBe(true);
@@ -125,7 +123,7 @@ describe("robots.txt + sitemap.xml agreement", () => {
     // Portuguese copy was never indexed.
     const urls = sitemap();
     const english = urls.filter((entry) => !entry.url.includes("?"));
-    expect(english).toHaveLength(16);
+    expect(english).toHaveLength(14);
     for (const entry of english) {
       const portuguese = `${entry.url}?lang=pt-BR`;
       const twin = urls.find((other) => other.url === portuguese);
@@ -140,6 +138,16 @@ describe("robots.txt + sitemap.xml agreement", () => {
       expect(twin?.priority).toBe(entry.priority);
     }
     expect(urls.some((entry) => entry.url === "https://mepmail.dev/?lang=pt-BR")).toBe(true);
+  });
+
+  it("keeps login and signup crawlable for noindex without advertising them in either locale", () => {
+    const allow = allowedPaths();
+    for (const path of ["/login", "/signup", "/signup?next=%2Femails"]) {
+      expect(isAllowed(path, allow)).toBe(true);
+    }
+    for (const entry of sitemap()) {
+      expect(["/login", "/signup"]).not.toContain(new URL(entry.url).pathname);
+    }
   });
 
   it("serves the IndexNow key file and lets crawlers fetch it", () => {

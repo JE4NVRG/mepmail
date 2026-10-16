@@ -479,7 +479,8 @@
       "plan": "{team} · {from} → {to}",
       "relayOn": "{domain} relays through {relay} while SES is paused",
       "relayOff": "{domain} no longer relays",
-      "error": "The action failed: {message}"
+      "error": "The action failed: {message}",
+      "suspensionNoticeUnavailable": "The suspension was recorded, but the email notice could not be prepared."
     },
     "relay": {
       "title": "SMTP relay · {relay}",
@@ -557,14 +558,15 @@
       "lead": "Stops every send, API key and broadcast. Data stays so the team can be reinstated.",
       "reasons": {
         "phishing": "Phishing or malware",
-        "phishingSub": "Confirmed by a provider report; the owner is not emailed",
+        "phishingSub": "Sending is blocked; paid teams receive a security review notice",
         "reputation": "Sending reputation",
         "reputationSub": "Bounce or complaint rates threatening the region",
         "non_payment": "Non-payment",
         "manual": "Other, explained below"
       },
       "notePlaceholder": "What you saw. Goes to the audit log and, unless phishing, to the owner.",
-      "confirm": "Suspend team"
+      "confirm": "Suspend team",
+      "paidNotice": "Paid teams receive a review notice even when email notification is unchecked. Security review notices omit internal investigation notes."
     },
     "reinstateDialog": {
       "title": "Reinstate {team}",
@@ -590,6 +592,17 @@
         "own_team": "You are a member of this team; open it from the team switcher instead.",
         "reference_required": "A ticket reference is required for this reason."
       }
+    },
+    "acquisition": {
+      "ownerSignup": "Current owner's signup source",
+      "notMeasured": "Not measured",
+      "sendStripe": "Stripe · Send",
+      "mail": "Correio",
+      "noMail": "No Correio subscription",
+      "legacyMail": "Legacy subscription",
+      "cancelAtEnd": "Cancels at the end of the period",
+      "periodEnd": "Period ends on {date}",
+      "inactive": "Inactive"
     }
   },
   "safety": {
@@ -1008,6 +1021,7 @@
       "non_payment": "non-payment"
     },
     "broadcastsPendingReview": "Broadcasts are paused for this team pending review since {since}. Transactional email is unaffected.",
-    "sendReview": "Sending for this team is under a security review since {since}. Accepted mail is kept and goes out as soon as the review ends; nothing is lost. Questions: reply to the welcome email or contact support."
+    "sendReview": "Sending for this team has been held for a security review since {since}. Accepted messages remain on hold while the review is open. An operator must review the team before sending can resume. Contact support to request a review.",
+    "requestReview": "Request a review"
   }
 }

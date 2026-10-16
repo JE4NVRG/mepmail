@@ -36,6 +36,6 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t("signup.submit"),
     alternates: seo.alternates,
-    robots: { index: true, follow: true },
+    robots: { index: false, follow: true },
   };
 }

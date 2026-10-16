@@ -153,6 +153,9 @@ export default function EmailsPage() {
         title={t("list.title")}
         actions={
           <>
+            <Link className="ms-btn ms-btn-secondary" href="/onboarding#first-email">
+              {t("list.firstSend")}
+            </Link>
             {canExport ? (
               <ExportCsvLink
                 href={exportQuery ? `/export/emails?${exportQuery}` : "/export/emails"}

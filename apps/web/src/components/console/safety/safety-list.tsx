@@ -92,12 +92,7 @@ export function SafetyList() {
   });
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
   const first = query.data?.pages[0];
-  const counts = first?.counts ?? {
-    open: 0,
-    guardrailPaused: 0,
-    suspended: 0,
-    revealsThisWeek: 0,
-  };
+  const counts = first?.counts;
   const contentReveal = first?.contentReveal ?? false;
 
   const refetch = () => {
@@ -132,7 +127,7 @@ export function SafetyList() {
     <>
       <PageHeader
         title={t("title")}
-        subtitle={t("proof", counts)}
+        {...(counts ? { subtitle: t("proof", counts) } : {})}
         titleAdornment={<Tooltip text={t("info")} />}
         actions={
           <Link href="/console/safety/settings" className="ms-btn ms-btn-secondary">

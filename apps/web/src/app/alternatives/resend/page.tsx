@@ -2,19 +2,18 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { CodeDemo } from "@/components/code-demo";
 import { ComparisonReference } from "@/components/comparison-reference";
-import {
-  PublicFooter,
-  PublicHeader,
-  type PublicSiteLabels,
-  SignupLink,
-} from "@/components/site-chrome";
+import { SignupCta } from "@/components/signup-cta";
+import { PublicFooter, PublicHeader, type PublicSiteLabels } from "@/components/site-chrome";
 import { RESEND_PRICING_SOURCE, resendSavings } from "@/lib/alternatives-resend";
+import { DOCS_URL } from "@/lib/docs-links";
 import {
   comparisonRowsForLocale,
   formatComparisonPrice,
   formatVolume,
 } from "@/lib/landing-pricing";
 import { legalLinks } from "@/lib/legal-links";
+import { signupHref } from "@/lib/public-intent";
+import { localizedPath } from "@/lib/public-locale-url";
 import { publicPageUrls } from "@/server/public-seo";
 import "../../landing.css";
 
@@ -48,7 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * render in the reader's locale (US separators in en, Brazilian ones in pt-BR).
  */
 export default async function ResendAlternativePage() {
-  const locale = await getLocale();
+  const locale = (await getLocale()) === "pt-BR" ? "pt-BR" : "en";
   const t = await getTranslations("alternatives");
   const l = await getTranslations("landing");
   const site = {
@@ -64,6 +63,8 @@ export default async function ResendAlternativePage() {
   const sameItems = t.raw("same.items") as string[];
   const differentItems = t.raw("different.items") as string[];
   const steps = t.raw("steps.items") as string[];
+  const migrationLimits = t.raw("steps.limits") as string[];
+  const docs = `${DOCS_URL}${locale === "pt-BR" ? "/pt-BR" : ""}`;
 
   return (
     <div className="gtm">
@@ -77,12 +78,22 @@ export default async function ResendAlternativePage() {
                 <h1>{t.rich("title", { highlight: (chunks) => <span>{chunks}</span> })}</h1>
                 <p className="gtm-lead">{t("lead")}</p>
                 <div className="gtm-actions">
-                  <SignupLink label={l("plans.cta")} />
-                  <a className="ms-btn ms-btn-secondary gtm-action" href="/pricing">
-                    {t("pricingLink")}
+                  <SignupCta
+                    className="ms-btn ms-btn-primary gtm-action"
+                    label={t("paidCta")}
+                    rung="pro_100k"
+                    plan="pro_100k"
+                  />
+                  <a className="ms-btn ms-btn-secondary gtm-action" href={`${docs}/quickstart`}>
+                    {t("integrationLink")}
                   </a>
                 </div>
                 <p className="gtm-note">{t("note")}</p>
+                <p className="gtm-note">
+                  <a href={localizedPath("/pricing", locale)}>{t("pricingLink")}</a>
+                  {" · "}
+                  <a href={signupHref()}>{t("freeLink")}</a>
+                </p>
               </div>
               <CodeDemo subject={l("hero.demo.subject")} caption={l("hero.demo.caption")} />
             </div>
@@ -173,12 +184,31 @@ export default async function ResendAlternativePage() {
           <div className="gtm-container">
             <p className="gtm-eyebrow">{t("steps.eyebrow")}</p>
             <h2>{t("steps.title")}</h2>
+            <p>{t("steps.intro")}</p>
+            <div className="gtm-demo-window">
+              <pre className="gtm-demo-code">
+                <code>npx @mepmail/cli migrate --from resend</code>
+              </pre>
+            </div>
             <ol className="gtm-steps">
               {steps.map((step) => (
                 <li key={step}>{step}</li>
               ))}
             </ol>
             <p className="gtm-note">{t("steps.note")}</p>
+            <details className="gtm-plans-more">
+              <summary>{t("steps.limitsTitle")}</summary>
+              <ul className="gtm-points">
+                {migrationLimits.map((limit) => (
+                  <li key={limit}>{limit}</li>
+                ))}
+              </ul>
+            </details>
+            <p>
+              <a href={`${docs}/migrate-from-resend`}>{t("steps.guideLink")}</a>
+              {" · "}
+              <a href={`${docs}/quickstart`}>{t("integrationLink")}</a>
+            </p>
           </div>
         </section>
 
@@ -186,7 +216,12 @@ export default async function ResendAlternativePage() {
           <div className="gtm-container">
             <h2>{t("close.title")}</h2>
             <p>{t("close.body")}</p>
-            <SignupLink label={t("close.cta")} />
+            <SignupCta
+              className="ms-btn ms-btn-primary gtm-action"
+              label={t("close.cta")}
+              rung="pro_100k"
+              plan="pro_100k"
+            />
           </div>
         </section>
       </main>

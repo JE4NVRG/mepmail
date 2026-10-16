@@ -5,8 +5,8 @@
   },
   "eyebrow": "Alternativas",
   "title": "Vindo do Resend? <highlight>Mantenha o SDK.</highlight>",
-  "lead": "Nos fluxos de envio compatíveis com o SDK Resend, troque a base URL e a chave. Veja o guia de migração, os recursos disponíveis e os preços e as fontes abaixo.",
-  "note": "Começar é grátis: 100 e-mails por dia, sem cartão. Ajudamos na migração e na configuração do seu domínio de envio.",
+  "lead": "Mantenha o SDK oficial do Resend nas chamadas de envio suportadas. Compare as mensalidades abaixo, escolha um plano de Envio e use a CLI de migração para revisar o que pode ser transferido antes de mudar o tráfego.",
+  "note": "Após o cadastro, Pro fica selecionado para revisão na Cobrança. Criar a conta não compra uma assinatura; a confirmação acontece nessa etapa.",
   "table": {
     "title": "Resend vs MepMail, volume por volume.",
     "intro": "Mensalidades recorrentes MepMail e menor opção publicada da Resend para cada volume, incluindo excedente quando necessário, conferida em 16/10/2026. Sem promoção de entrada ou desconto anual; recursos e condições variam.",
@@ -38,18 +38,31 @@
   },
   "steps": {
     "eyebrow": "Migração",
-    "title": "Três passos para começar.",
+    "title": "Revise a migração. Depois, mude o envio.",
+    "intro": "Execute este comando localmente com suas chaves de API Resend e MepMail. Ele lê o Resend com requisições GET, mostra um plano de migração e pede confirmação antes de gravar no MepMail.",
     "items": [
-      "Crie a conta e adicione seu domínio de envio: geramos os registros de DKIM e MAIL FROM e esperamos a verificação junto com você.",
-      "Troque a base URL e a chave no seu client Resend. O SDK e as chamadas de envio ficam exatamente como estão.",
-      "Faça um envio de teste e acompanhe o log no painel. Depois, migre o tráfego de produção."
+      "Escolha um plano de Envio para seu volume e crie uma chave de API MepMail. Free é opcional, não uma etapa obrigatória.",
+      "Execute a CLI e revise as mudanças propostas para contatos, segmentos, tópicos, propriedades, domínios, templates, webhooks, supressões e broadcasts. Os limites dos recursos e da conta continuam valendo.",
+      "Conclua a lista manual: verifique o novo DNS do domínio, substitua as chaves de API e revise os campos dos templates. Aponte o SDK para https://api.mepmail.dev com a nova chave nas chamadas suportadas.",
+      "Confira as preferências de assinatura e conclua o enriquecimento dos contatos antes de enviar por tópicos ou broadcasts. Faça um teste controlado, confira o resultado no painel e só então mude o tráfego validado."
     ],
-    "note": "A propagação e a verificação do domínio podem levar mais tempo que a migração em si; a verificação automática roda a cada 15 minutos. Usa fluxos fora do conjunto compatível? Conte antes de migrar: revisamos com você e dizemos com clareza o que não é equivalente."
+    "note": "A verificação DNS, os limites de requisição da origem e o tamanho da conta influenciam o trabalho necessário. Mantenha a integração atual disponível durante a validação; não há prazo fixo de migração nem garantia de paridade de recursos.",
+    "limitsTitle": "Confira estas diferenças antes da troca",
+    "limits": [
+      "Os segredos das chaves de API, registros DNS/DKIM e histórico de e-mails enviados não são copiados. Domínios precisam de nova verificação; from, reply_to e variables dos templates exigem revisão manual.",
+      "Broadcasts em rascunho ou agendados chegam como rascunhos. Os já enviados são ignorados por padrão. Eventos de webhook sem suporte são omitidos; confira os endpoints e eventos resultantes.",
+      "A importação CSV de contatos por POST /contacts/imports não é suportada. Use JSON em POST /contacts/batch; PATCH /contacts/{id}/topics espera um array de assinaturas, sem objeto envolvente.",
+      "Esta migração cobre a API de Envio. Correio é um produto separado de caixas de e-mail; este guia não migra caixas de entrada nem promete compatibilidade de inbound."
+    ],
+    "guideLink": "Ler o guia de migração e as diferenças da API"
   },
-  "pricingLink": "Ver a escada completa",
+  "pricingLink": "Comparar todos os planos de Envio",
   "close": {
-    "title": "Migre e compare na sua próxima fatura.",
-    "body": "Crie a conta grátis, mantenha o SDK que você já tem e faça o primeiro envio de teste hoje.",
-    "cta": "Criar conta grátis"
-  }
+    "title": "Pronto para migrar seu envio?",
+    "body": "Escolha Pro, revise a lista completa de migração e valide seu fluxo de envio antes de mudar o tráfego de produção. Você pode comparar os demais planos antes de confirmar uma compra.",
+    "cta": "Escolher Pro e integrar"
+  },
+  "paidCta": "Escolher Pro para Envio",
+  "integrationLink": "Guia de integração",
+  "freeLink": "Experimentar Free como alternativa"
 }

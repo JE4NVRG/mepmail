@@ -7,8 +7,9 @@ import { languageAlternates, localizedPath, URL_LOCALE_HEADER } from "@/lib/publ
 /**
  * Canonical, hreflang and Open Graph URL of an indexable public page. A page
  * opened as `?lang=pt-BR` is its own canonical (the Portuguese copy search
- * engines index); the plain path, whatever language it negotiated for the
- * visitor, canonicalizes to itself, the English and x-default URL.
+ * engines index); canonical public paths render English without a language
+ * parameter. Auth utilities also use a parameter-free canonical while keeping
+ * their preference-based copy and remaining noindex.
  */
 export async function publicPageUrls(path: string): Promise<{
   alternates: NonNullable<Metadata["alternates"]>;

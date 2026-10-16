@@ -37,7 +37,11 @@ const config: NextConfig = {
           ["/cadastro", "/signup"],
           ["/contato", "/support"],
         ] as const
-      ).map(([source, destination]) => ({ source, destination, permanent: true })),
+      ).map(([source, destination]) => ({
+        source,
+        destination: `${destination}?lang=pt-BR`,
+        permanent: true,
+      })),
       {
         source: "/llms-full.txt",
         destination: "https://docs.mepmail.dev/llms-full.txt",

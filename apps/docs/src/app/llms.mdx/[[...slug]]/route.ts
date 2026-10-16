@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { notFound } from "next/navigation";
-import { getLLMText } from "@/lib/get-llm-text";
-import { i18n, isLocale } from "@/lib/i18n";
-import { absoluteUrl } from "@/lib/site";
-import { source } from "@/lib/source";
+import { getLLMText } from "../../../lib/get-llm-text";
+import { i18n, isLocale } from "../../../lib/i18n";
+import { pageAlternates } from "../../../lib/site";
+import { source } from "../../../lib/source";
 
 export const revalidate = false;
 
@@ -30,7 +30,10 @@ export async function GET(
     const prompt = await promptText(rest[1] ?? "", locale);
     if (prompt === null) notFound();
     return new Response(prompt, {
-      headers: { "Content-Type": "text/markdown; charset=utf-8" },
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "X-Robots-Tag": "noindex, follow",
+      },
     });
   }
   // "/index.md" (or "/pt-BR.md" → []) is the markdown URL of the root page.
@@ -42,7 +45,8 @@ export async function GET(
     headers: {
       "Content-Type": "text/markdown; charset=utf-8",
       // The markdown rendition is the HTML page's duplicate for search engines.
-      Link: `<${absoluteUrl(page.url)}>; rel="canonical"`,
+      Link: `<${pageAlternates(page).canonical}>; rel="canonical"`,
+      "X-Robots-Tag": "noindex, follow",
     },
   });
 }

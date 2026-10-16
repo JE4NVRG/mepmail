@@ -25,6 +25,7 @@ import { z } from "zod";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { escapeLike } from "@/lib/sql";
 import { cutTeamSendingAccess } from "../../console/suspension";
+import { mailboxRegistryEnabled } from "../../mailboxes";
 import { operatorProcedure, router } from "../../trpc";
 import { auditOperator, kickQuotaDrain, loadTeam, mailTeamOwners } from "./shared";
 
@@ -47,7 +48,24 @@ const st = schema.teamStandings;
 // Correlated subqueries the list and the detail share; each is an index range on the team id.
 const ownerEmail = sql<
   string | null
->`(select u.email from ${schema.teamMembers} m join ${schema.user} u on u.id = m.user_id where m.team_id = ${t}."id" and m.role = 'owner' order by m.created_at limit 1)`;
+>`(select u.email from ${schema.teamMembers} m join ${schema.user} u on u.id = m.user_id where m.team_id = ${t}."id" and m.role = 'owner' order by m.created_at, m.user_id limit 1)`;
+/** This is the current displayed owner's signup, never the team's acquisition history. */
+const ownerSignupAttribution = sql<{
+  source: string;
+  medium: string | null;
+  campaign: string | null;
+  content: string | null;
+  term: string | null;
+  referrer: string | null;
+  landingPath: string | null;
+} | null>`(select jsonb_build_object('source', a.source, 'medium', a.medium, 'campaign', a.campaign, 'content', a.content, 'term', a.term, 'referrer', a.referrer, 'landingPath', a.landing_path) from ${schema.signupAttribution} a where a.user_id = (select m.user_id from ${schema.teamMembers} m where m.team_id = ${t}."id" and m.role = 'owner' order by m.created_at, m.user_id limit 1))`;
+/** One indexed local projection per team; rendering never calls Stripe. */
+const mailboxSubscription = sql<{
+  planCode: string | null;
+  status: string;
+  periodEnd: string;
+  cancelAtPeriodEnd: boolean;
+} | null>`(select jsonb_build_object('planCode', s.plan_code, 'status', s.status, 'periodEnd', s.period_end, 'cancelAtPeriodEnd', s.cancel_at_period_end) from ${schema.mailboxSubscriptions} s where s.team_id = ${t}."id")`;
 const memberCount = sql<number>`(select count(*)::int from ${schema.teamMembers} m where m.team_id = ${t}."id")`;
 const domainCount = sql<number>`(select count(*)::int from ${schema.domains} d where d.team_id = ${t}."id" and d.status = 'verified')`;
 const contactCount = sql<number>`(select count(*)::int from ${schema.contacts} c where c.team_id = ${t}."id")`;
@@ -78,6 +96,13 @@ const ROW = {
   plan: sql<string>`${t.plan}::text`,
   planQuota: t.planQuota,
   ownerEmail,
+  ownerSignupAttribution,
+  get mailboxSubscription() {
+    return mailboxRegistryEnabled() ? mailboxSubscription : sql<null>`null::jsonb`;
+  },
+  get mailboxProjectionEnabled() {
+    return mailboxRegistryEnabled() ? sql<boolean>`true` : sql<boolean>`false`;
+  },
   members: memberCount,
   domains: domainCount,
   contacts: contactCount,
@@ -595,7 +620,39 @@ export const consoleTeamsRouter = router({
       const cut = await cutTeamSendingAccess(ctx.db, team, {
         cancelParked: input.reason === "phishing",
       });
-      const notify = input.notify && input.reason !== "phishing";
+      const mailboxSubscription = mailboxRegistryEnabled()
+        ? (
+            await ctx.db
+              .select({ status: schema.mailboxSubscriptions.status })
+              .from(schema.mailboxSubscriptions)
+              .where(eq(schema.mailboxSubscriptions.teamId, team.id))
+          )[0]
+        : undefined;
+      const paidNoticeRequired =
+        (team.plan !== "free" && team.plan !== "system") ||
+        ["active", "trialing", "past_due"].includes(mailboxSubscription?.status ?? "");
+      const notify = paidNoticeRequired || (input.notify && input.reason !== "phishing");
+      let noticeRecipients = 0;
+      let noticePreparationFailed = false;
+      if (notify) {
+        try {
+          noticeRecipients = await mailTeamOwners(
+            ctx.db,
+            team,
+            "team.suspended",
+            "/support",
+            (locale) => ({
+              reason:
+                input.reason === "phishing"
+                  ? accountMailPhrase({ locale, kind: "team.suspended", key: "security_review" })
+                  : reasonText(locale, "team.suspended", input.reason, input.note),
+            }),
+          );
+        } catch {
+          noticePreparationFailed = true;
+          console.error("console: suspension notice could not be prepared", { teamId: team.id });
+        }
+      }
       await auditOperator(ctx, {
         teamId: team.id,
         action: "team.suspended",
@@ -604,7 +661,11 @@ export const consoleTeamsRouter = router({
           name: team.name,
           reason: input.reason,
           note: input.note ?? null,
-          notified: notify,
+          notified: noticeRecipients > 0,
+          notificationRequested: notify,
+          notificationRecipients: noticeRecipients,
+          notificationPreparationFailed: noticePreparationFailed,
+          paidNoticeRequired,
           revokedApiKeys: cut.apiKeys,
           revokedAgentKeys: cut.agentKeys,
           canceledParked: cut.parkedCanceled,
@@ -612,11 +673,6 @@ export const consoleTeamsRouter = router({
           sesIdentitiesFailed: cut.domains.filter((d) => !d.removed).map((d) => d.name),
         },
       });
-      if (notify) {
-        await mailTeamOwners(ctx.db, team, "team.suspended", "/emails", (locale) => ({
-          reason: reasonText(locale, "team.suspended", input.reason, input.note),
-        }));
-      }
       // The trust & safety list is the register of suspended teams, so a
       // suspension without a flag opens a manual one.
       await ctx.db
@@ -628,6 +684,13 @@ export const consoleTeamsRouter = router({
           openedBy: ctx.operator.id,
         })
         .onConflictDoNothing();
+      return {
+        notice: {
+          requested: notify,
+          recipients: noticeRecipients,
+          preparationFailed: noticePreparationFailed,
+        },
+      };
     }),
 
   reinstate: operatorProcedure

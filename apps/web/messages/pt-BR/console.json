@@ -479,7 +479,8 @@
       "plan": "{team} · {from} → {to}",
       "relayOn": "{domain} sai por {relay} enquanto o SES estiver pausado",
       "relayOff": "{domain} não sai mais pelo relay",
-      "error": "A ação falhou: {message}"
+      "error": "A ação falhou: {message}",
+      "suspensionNoticeUnavailable": "A suspensão foi registrada, mas não foi possível preparar o aviso por e-mail."
     },
     "relay": {
       "title": "Relay SMTP · {relay}",
@@ -557,14 +558,15 @@
       "lead": "Interrompe todo envio, chave de API e transmissão. Os dados ficam para que a equipe possa ser reativada.",
       "reasons": {
         "phishing": "Phishing ou malware",
-        "phishingSub": "Confirmado por relatório de provedor; o proprietário não é avisado",
+        "phishingSub": "O envio fica bloqueado; equipes pagas recebem um aviso de revisão",
         "reputation": "Reputação de envio",
         "reputationSub": "Taxas de bounce ou reclamação ameaçando a região",
         "non_payment": "Inadimplência",
         "manual": "Outro, explicado abaixo"
       },
       "notePlaceholder": "O que você viu. Vai para o log de auditoria e, exceto em phishing, para o proprietário.",
-      "confirm": "Suspender equipe"
+      "confirm": "Suspender equipe",
+      "paidNotice": "Equipes pagas recebem um aviso para pedir revisão mesmo com a notificação desmarcada. O aviso de segurança não inclui as notas internas da investigação."
     },
     "reinstateDialog": {
       "title": "Reativar {team}",
@@ -590,6 +592,17 @@
         "own_team": "Você é membro desta equipe; abra-a pelo seletor de equipes.",
         "reference_required": "Uma referência de chamado é obrigatória para este motivo."
       }
+    },
+    "acquisition": {
+      "ownerSignup": "Origem do cadastro do proprietário atual",
+      "notMeasured": "Não medido",
+      "sendStripe": "Stripe · Envio",
+      "mail": "Correio",
+      "noMail": "Sem contrato de Correio",
+      "legacyMail": "Contrato legado",
+      "cancelAtEnd": "Cancelamento ao fim do período",
+      "periodEnd": "Período termina em {date}",
+      "inactive": "Inativo"
     }
   },
   "safety": {
@@ -1008,6 +1021,7 @@
       "non_payment": "inadimplência"
     },
     "broadcastsPendingReview": "As transmissões desta equipe estão pausadas aguardando revisão desde {since}. E-mails transacionais não são afetados.",
-    "sendReview": "Os envios desta equipe estão em revisão de segurança desde {since}. Os e-mails aceitos ficam guardados e saem assim que a revisão terminar; nada é perdido. Dúvidas: responda ao e-mail de boas-vindas ou fale com o suporte."
+    "sendReview": "Os envios desta equipe estão retidos para revisão de segurança desde {since}. As mensagens aceitas ficam em espera enquanto a revisão estiver aberta. Um operador precisa revisar a equipe antes de o envio ser retomado. Fale com o suporte para pedir revisão.",
+    "requestReview": "Pedir revisão"
   }
 }

@@ -18,7 +18,15 @@ import { formatDay } from "@/lib/format";
 import { formatScoreTenths } from "@/lib/score-band";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import { oneOf, useUrlState } from "@/lib/url-state";
-import { GuardrailLabel, PlanBadge, RegionLabel, usePlanName } from "./cells";
+import {
+  GuardrailLabel,
+  MailSubscriptionCell,
+  OwnerSignupCell,
+  PlanBadge,
+  RegionLabel,
+  SubscriptionStatus,
+  usePlanName,
+} from "./cells";
 import type { TeamRow } from "./types";
 
 const SORT_KEYS = [
@@ -38,7 +46,7 @@ const GUARDRAIL_COLOR = {
   warning: "var(--ms-warn)",
   paused: "var(--ms-danger)",
 } as const;
-const COLUMNS = 11;
+const COLUMNS = 13;
 
 function scoreColor(tenths: number): string | undefined {
   if (tenths < 50) return "var(--ms-danger)";
@@ -63,6 +71,12 @@ function SkeletonRows() {
           </td>
           <td>
             <Skeleton width={140} />
+          </td>
+          <td>
+            <Skeleton width={120} />
+          </td>
+          <td>
+            <Skeleton width={100} />
           </td>
           {[28, 48, 56, 28].map((w, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: placeholder cells, position is identity
@@ -259,6 +273,10 @@ export function TeamsView() {
                 {sortable("name", false, "asc")}
                 {sortable("type")}
                 <th>{t("columns.owner")}</th>
+                <th style={{ whiteSpace: "normal", maxWidth: 220 }}>
+                  {t("acquisition.ownerSignup")}
+                </th>
+                <th>{t("acquisition.mail")}</th>
                 {sortable("domains", true)}
                 {sortable("contacts", true)}
                 {sortable("sent30d", true)}
@@ -293,6 +311,10 @@ export function TeamsView() {
                       </td>
                       <td>
                         <PlanBadge plan={row.plan} planQuota={row.planQuota} />
+                        <div style={{ color: "var(--ms-muted)", fontSize: 12, marginTop: 4 }}>
+                          {t("acquisition.sendStripe")}:{" "}
+                          <SubscriptionStatus status={row.planStatus} />
+                        </div>
                       </td>
                       <td
                         title={row.ownerEmail ?? undefined}
@@ -304,6 +326,15 @@ export function TeamsView() {
                         }}
                       >
                         {row.ownerEmail ?? common("none")}
+                      </td>
+                      <td>
+                        <OwnerSignupCell attribution={row.ownerSignupAttribution} />
+                      </td>
+                      <td>
+                        <MailSubscriptionCell
+                          subscription={row.mailboxSubscription}
+                          enabled={row.mailboxProjectionEnabled}
+                        />
                       </td>
                       <td className="right num">{nf.format(row.domains)}</td>
                       <td className="right num">{nf.format(row.contacts)}</td>

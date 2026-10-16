@@ -114,6 +114,8 @@ export function signupAlertMessage(params: {
     `🎯 Origem: ${originLabel(attribution)}`,
     `📣 Campanha: ${attribution?.campaign ?? "—"}`,
     `🧭 Meio: ${attribution?.medium ?? "—"} · landing: ${attribution?.landingPath ?? "—"}`,
+    `🧩 Conteúdo: ${attribution?.content ?? "—"} · termo: ${attribution?.term ?? "—"}`,
+    `🔗 Referrer: ${attribution?.referrer ?? "—"}`,
     `🌎 Locale: ${locale} · moeda/idioma do convite`,
     `🕐 ${alertTimestamp(params.now ?? new Date())}`,
   ];

@@ -209,10 +209,11 @@ export const en = {
     subject: "{team} is suspended",
     body: [
       "The instance operator suspended {team}: {reason}",
-      "Every send is refused and broadcasts are on hold. API keys, domains, contacts and history stay as they are, and a reinstated team sends again within a minute. Reply to this email to resolve it.",
+      "Sending is blocked while the suspension is in place. Contacts and message history are retained. Open support to request a review, or reply to this email. Reinstatement may require new sending credentials and domain verification.",
     ],
-    button: "Open dashboard",
+    button: "Request a review",
     extra: {
+      security_review: "sending was paused for a security review.",
       reputation:
         "its bounce or complaint rates threaten the sending reputation the platform shares.",
       non_payment: "an invoice stayed unpaid.",
@@ -223,7 +224,7 @@ export const en = {
   "team.reinstated": {
     subject: "{team} is reinstated",
     body: [
-      "The instance operator reinstated {team}. Sends go out again, and held broadcasts resume on their own within 15 minutes.",
+      "The instance operator removed the suspension from {team}. Check sending credentials and domain verification before resuming. Revoked credentials are not restored.",
     ],
     button: "Open dashboard",
   },
@@ -269,7 +270,7 @@ export const en = {
     subject: "Sending held for review: {team}",
     body: [
       "Mail from {team} is held before it reaches SES: {note}. Accepted mail is kept and nothing has gone out.",
-      "Open the review page to release sending (the held mail drains within 15 minutes) or suspend the team (it never leaves).",
+      "Open the review page to release sending or suspend the team. Release allows held mail to be processed, but other sending blocks may still apply.",
     ],
     button: "Open review",
   },
@@ -360,6 +361,24 @@ export const en = {
     ],
     button: "Chat with support",
     muted: ["Rather do it yourself? The step-by-step guide is at {docsUrl}"],
+  },
+  "activation.first_email": {
+    subject: "Your first email with MepMail in 2 minutes",
+    body: [
+      "Try the first-email walkthrough for {team}: open the demo, send to your own verified address and check the result.",
+      "You can use the demo before verifying a sending domain. You do not need to activate Free or change the plan you already chose.",
+    ],
+    button: "Try my first email",
+    muted: ["Need a hand? Open support: {supportUrl}"],
+  },
+  "activation.day7": {
+    subject: "Need a hand with your first MepMail email?",
+    body: [
+      "There is no first email on record for {team} yet. The demo sends to your own verified address and is a quick way to try it.",
+      "If an integration or a DNS step is holding you up, open support and tell us where you got stuck. Your current plan stays as it is.",
+    ],
+    button: "Open the first-email demo",
+    muted: ["Talk to us: {supportUrl}"],
   },
   "mailbox.repriced": {
     subject: "{team}'s Mail moves to the price without a Send plan",

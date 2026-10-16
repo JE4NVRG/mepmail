@@ -125,5 +125,9 @@ export function cookieHasCampaign(value: string | undefined | null): boolean {
  * this visitor came from.
  */
 export function shouldReplaceAttribution(existing: string | undefined, incoming: string): boolean {
-  return !cookieHasCampaign(existing) || cookieHasCampaign(incoming);
+  const visit = parseAttributionCookie(existing);
+  const hasChannel = [visit?.source, visit?.referrer].some(
+    (value) => typeof value === "string" && value.trim() !== "",
+  );
+  return !hasChannel || cookieHasCampaign(incoming);
 }

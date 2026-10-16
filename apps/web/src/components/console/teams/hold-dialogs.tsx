@@ -137,14 +137,16 @@ export function PauseDialog({
   );
 }
 
-/** Every send refused until reinstated. A phishing suspension never emails the owner. */
+/** Every send is refused until reinstated; paid teams always receive a review notice. */
 export function SuspendDialog({
   name,
+  paid = false,
   pending,
   onClose,
   onSubmit,
 }: {
   name: string;
+  paid?: boolean;
   pending: boolean;
   onClose: () => void;
   onSubmit: (input: HoldInput<SuspensionReason>) => void;
@@ -160,7 +162,11 @@ export function SuspendDialog({
   function submit() {
     if (pending) return;
     const trimmed = note.trim();
-    onSubmit({ reason, ...(trimmed ? { note: trimmed } : {}), notify: notify && !phishing });
+    onSubmit({
+      reason,
+      ...(trimmed ? { note: trimmed } : {}),
+      notify: paid || (notify && !phishing),
+    });
   }
 
   return (
@@ -210,12 +216,13 @@ export function SuspendDialog({
             onChange={(event) => setNote(event.target.value)}
           />
         </div>
-        {phishing ? null : (
+        <p style={{ color: "var(--ms-muted)", fontSize: 13 }}>{t("paidNotice")}</p>
+        {phishing && !paid ? null : (
           <NotifyRow
             id={`${id}-notify`}
             label={common("notifyOwner")}
-            checked={notify}
-            disabled={pending}
+            checked={paid || notify}
+            disabled={pending || paid}
             onChange={setNotify}
           />
         )}

@@ -1,9 +1,98 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { regionFlag } from "@/app/(dashboard)/domains/regions";
 import { Tooltip } from "@/components/tooltip";
 import { planLabel, planTone } from "@/lib/console-format";
+import { formatDayTime } from "@/lib/format";
+import type { TeamRow } from "./types";
+
+/** Only the displayed owner's signup; missing measurements stay missing. */
+export function OwnerSignupCell({
+  attribution,
+  detailed = false,
+}: {
+  attribution: TeamRow["ownerSignupAttribution"];
+  detailed?: boolean;
+}) {
+  const t = useTranslations("console.teams.acquisition");
+  if (!attribution) return <span style={{ color: "var(--ms-muted)" }}>{t("notMeasured")}</span>;
+  const fields = detailed
+    ? [
+        ["utm_medium", attribution.medium],
+        ["utm_campaign", attribution.campaign],
+        ["utm_content", attribution.content],
+        ["utm_term", attribution.term],
+        ["referrer", attribution.referrer],
+        ["landing", attribution.landingPath],
+      ]
+    : [["utm_campaign", attribution.campaign]];
+  return (
+    <div
+      style={{
+        whiteSpace: "normal",
+        overflowWrap: "anywhere",
+        maxWidth: detailed ? undefined : 220,
+      }}
+    >
+      <span>{attribution.source}</span>
+      {fields
+        .filter(([, value]) => value)
+        .map(([key, value]) => (
+          <div key={key} style={{ color: "var(--ms-muted)", fontSize: 12 }}>
+            {key}: {value}
+          </div>
+        ))}
+    </div>
+  );
+}
+
+export function SubscriptionStatus({ status }: { status: string | null }) {
+  const billing = useTranslations("settings.billing.status");
+  const t = useTranslations("console.teams.acquisition");
+  const value = status ?? "none";
+  const label = value === "inactive" ? t("inactive") : billing.has(value) ? billing(value) : value;
+  return <span title={value}>{label}</span>;
+}
+
+/** These are webhook/local contract facts, not a live Stripe lookup or an invoice. */
+export function MailSubscriptionCell({
+  subscription,
+  detailed = false,
+  enabled = true,
+}: {
+  subscription: TeamRow["mailboxSubscription"];
+  detailed?: boolean;
+  enabled?: boolean;
+}) {
+  const t = useTranslations("console.teams.acquisition");
+  const locale = useLocale();
+  if (!enabled || !subscription)
+    return (
+      <span style={{ color: "var(--ms-muted)" }}>{t(enabled ? "noMail" : "notMeasured")}</span>
+    );
+  return (
+    <div
+      style={{
+        whiteSpace: "normal",
+        overflowWrap: "anywhere",
+        maxWidth: detailed ? undefined : 220,
+      }}
+    >
+      <span>{subscription.planCode ?? t("legacyMail")}</span>
+      {" · "}
+      <SubscriptionStatus status={subscription.status} />
+      {subscription.cancelAtPeriodEnd ? (
+        <div style={{ color: "var(--ms-warn)", fontSize: 12 }}>{t("cancelAtEnd")}</div>
+      ) : null}
+      {detailed ? (
+        <div style={{ color: "var(--ms-muted)", fontSize: 12 }}>
+          {t("periodEnd", { date: formatDayTime(new Date(subscription.periodEnd), locale) })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /** The translated plan name; a value the catalog does not know prints raw. */
 export function usePlanName(): (plan: string) => string {

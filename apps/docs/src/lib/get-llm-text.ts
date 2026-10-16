@@ -29,6 +29,28 @@ function inlineRefs(node: Json, depth = 0): Json {
   return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, inlineRefs(v, depth + 1)]));
 }
 
+/** Mirrors Fumadocs' groupBy: "route" filename, independent of display titles. */
+function operationPath(page: InferPageType<typeof source>, method: string): string {
+  const file = page.path.replaceAll("\\", "/").replace(/\.pt-BR\.mdx$/, ".mdx");
+  const matches = Object.keys(openapiDocument().paths ?? {}).filter((path) => {
+    // fumadocs-openapi's routePathToFilePath strips braces, lowercases and
+    // replaces dots. Resolve forward from real spec keys, never guess {id}.
+    const route = path
+      .toLowerCase()
+      .replaceAll(".", "-")
+      .split("/")
+      .filter(Boolean)
+      .map((part) => (part.startsWith("{") && part.endsWith("}") ? part.slice(1, -1) : part))
+      .join("/");
+    return (
+      file === `api-reference/endpoints/${route}/${method}.mdx` &&
+      openapiDocument().paths?.[path]?.[method] !== undefined
+    );
+  });
+  if (matches.length !== 1) throw new Error(`Cannot uniquely resolve API operation for ${file}`);
+  return matches[0] as string;
+}
+
 /**
  * Markdown rendition of a page for agents (*.md routes and /llms-full.txt).
  * API reference pages are generated MDX whose body is just a component call,
@@ -45,11 +67,11 @@ export async function getLLMText(page: InferPageType<typeof source>): Promise<st
     const method = (
       page.data as { _openapi?: { method?: string } }
     )._openapi?.method?.toLowerCase();
-    const operation = method ? openapiDocument().paths?.[page.data.title]?.[method] : undefined;
-    const spec = operation
-      ? `\n\n\`\`\`json\n${JSON.stringify(inlineRefs(operation), null, 2)}\n\`\`\``
-      : "";
-    return `# ${method?.toUpperCase() ?? ""} ${page.data.title} (${page.url})${description}
+    if (!method) throw new Error(`Missing API method for ${page.path}`);
+    const path = operationPath(page, method);
+    const operation = openapiDocument().paths?.[path]?.[method];
+    const spec = `\n\n\`\`\`json\n${JSON.stringify(inlineRefs(operation ?? null), null, 2)}\n\`\`\``;
+    return `# ${method.toUpperCase()} ${path} (${page.url})${description}
 
 MepMail API operation. Base URL https://api.mepmail.dev (self-hosted: the instance's own API origin); authenticate with \`Authorization: Bearer ms_...\`. The wire format is Resend-compatible. Full OpenAPI 3.1 spec: /openapi.json.${spec}`;
   }

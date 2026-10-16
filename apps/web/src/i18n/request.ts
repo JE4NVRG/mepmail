@@ -60,12 +60,10 @@ function isAppLocale(value: string | undefined): value is AppLocale {
 }
 
 /**
- * Cookie-based locale, no URL prefixes. Messages are namespaced by file:
- * messages/<locale>/<ns>.json → useTranslations("<ns>"). A public URL that
- * names its language (?lang=pt-BR, the copy search engines index) wins; then
- * the cookie; without it (a visitor who never touched a switcher) the browser's
- * own Accept-Language decides, so a pt-BR visitor meets the auth screens in
- * Portuguese on the first visit.
+ * Messages are namespaced by file: messages/<locale>/<ns>.json. The proxy
+ * supplies the locale for canonical public paths (English by default) or an
+ * explicit ?lang=. Elsewhere the cookie and then Accept-Language still decide,
+ * including the first visit to an auth screen.
  */
 export default getRequestConfig(async () => {
   const store = await cookies();

@@ -219,7 +219,7 @@
   },
   "cloudflare": {
     "title": "Configurar automaticamente na Cloudflare",
-    "body": "Seu DNS está na Cloudflare. Com um token que só mexe no DNS, criamos os registros deste domínio para você.",
+    "body": "Com um token restrito ao DNS, configuramos os registros de envio, como DKIM e MAIL FROM. Isso não muda o MX de recebimento. Para receber, siga o guia separado do Correio; um MX existente precisa ser alterado manualmente.",
     "open": "Configurar na Cloudflare",
     "step1": "Crie um token na Cloudflare",
     "step1Hint": "A página abre com as permissões certas (Zona: ler, DNS: editar). Em “Recursos da zona”, escolha só {domain} e clique em criar.",

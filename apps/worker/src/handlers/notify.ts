@@ -16,6 +16,7 @@ import {
   formatMailDate,
   formatMailDateTime,
   freeCapText,
+  listTeamOwners,
   type MailLocale,
   nextUtcDayStart,
   PAUSE_BOUNCE_RATE,
@@ -49,6 +50,7 @@ import {
   isNull,
   like,
   lt,
+  lte,
   ne,
   notInArray,
   or,
@@ -75,6 +77,8 @@ export interface NotifyDeps {
   mailer: SystemMailer;
   enqueueWebhook: WebhookEnqueue;
   appBaseUrl?: string | undefined;
+  /** Explicit rollout cohort; absent/invalid keeps new support notices off. */
+  activationSupportFromISO?: string | undefined;
   now?: Date;
 }
 
@@ -806,7 +810,11 @@ export async function sweepNotifications(db: Db, deps: NotifyDeps): Promise<{ se
     }
   }
 
-  if (deps.isCloud) sent += await sweepActivation(db, deps.mailer, base, now);
+  if (deps.isCloud) {
+    sent += await sweepActivation(db, deps.mailer, base, now, {
+      activationSupportFromISO: deps.activationSupportFromISO,
+    });
+  }
 
   return { sent };
 }
@@ -829,22 +837,20 @@ const ACTIVATION_FINISH_DOMAIN_UNTIL_MS = 60 * 60 * 60 * 1000;
 const ACTIVATION_GUIDE_URL = "https://docs.mepmail.dev/concepts/domains";
 
 /**
- * Getting-started reminders for cloud teams that never verified a sending
- * domain, each at most once and only while the team is young:
- * - activation.add_domain: about a day in, when the team has no domain yet;
- * - activation.finish_domain: hours after a domain was added and still not
- *   verified, with the date the verification expires;
- * - activation.help: from three days in, an offer of help instead.
- * A team gets add_domain or help depending on its age, never both in one
- * sweep. Owners who turned off "activation" are skipped by mailOwners. The
- * instance's own team (plan "system") and suspended teams hear nothing.
+ * Cloud getting-started notices. The explicit support cohort gets a first-email
+ * walkthrough at 2–24h and help at day 7–8, only without prior sending evidence.
+ * Older teams keep add_domain/help for unverified domains; pending domains
+ * retain their event-specific verification reminder. No cutoff means the
+ * existing reminders only. Activation preferences and account holds apply.
  */
 export async function sweepActivation(
   db: Db,
   mailer: SystemMailer,
   base: string,
   now: Date,
+  options: Pick<NotifyDeps, "activationSupportFromISO"> = {},
 ): Promise<number> {
+  const supportStart = activationSupportStart(options.activationSupportFromISO);
   const t = schema.teams;
   const d = schema.domains;
   const supportUrl = `${base}/support#chat`;
@@ -881,7 +887,11 @@ export async function sweepActivation(
     .where(
       and(
         isNull(t.suspendedAt),
+        isNull(t.sendReviewAt),
+        isNull(t.broadcastsPausedByOperatorAt),
         ne(t.plan, "system"),
+        // The explicit new cohort gets first-email/day-7 support instead of these generic nudges.
+        supportStart ? lt(t.createdAt, supportStart) : undefined,
         gt(t.createdAt, new Date(now.getTime() - ACTIVATION_WINDOW_MS)),
         lt(t.createdAt, new Date(now.getTime() - ACTIVATION_ADD_DOMAIN_AFTER_MS)),
       ),
@@ -912,6 +922,8 @@ export async function sweepActivation(
         isNull(d.verifiedAt),
         ne(d.status, "verified"),
         isNull(t.suspendedAt),
+        isNull(t.sendReviewAt),
+        isNull(t.broadcastsPausedByOperatorAt),
         ne(t.plan, "system"),
         lt(d.createdAt, new Date(now.getTime() - ACTIVATION_FINISH_DOMAIN_AFTER_MS)),
         gt(d.createdAt, new Date(now.getTime() - ACTIVATION_FINISH_DOMAIN_UNTIL_MS)),
@@ -930,6 +942,118 @@ export async function sweepActivation(
         supportUrl,
       }),
     );
+  }
+  sent += await sweepActivationSupport(db, mailer, base, now, options.activationSupportFromISO);
+  return sent;
+}
+
+/** A tutorial goal, not a promise about when a recipient receives a message. */
+export const ACTIVATION_FIRST_EMAIL_AFTER_MS = 2 * 60 * 60 * 1000;
+export const ACTIVATION_FIRST_EMAIL_UNTIL_MS = DAY_MS;
+export const ACTIVATION_DAY7_AFTER_MS = 7 * DAY_MS;
+export const ACTIVATION_DAY7_UNTIL_MS = 8 * DAY_MS;
+
+function activationSupportStart(value: string | undefined): Date | null {
+  if (
+    !value ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+  )
+    return null;
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+  if (
+    !year ||
+    !month ||
+    !day ||
+    month > 12 ||
+    day > new Date(Date.UTC(year, month, 0)).getUTCDate()
+  )
+    return null;
+  const start = new Date(value);
+  return Number.isFinite(start.getTime()) ? start : null;
+}
+
+/** New, explicitly enrolled teams only. No plan purchase or Free activation gate. */
+async function sweepActivationSupport(
+  db: Db,
+  mailer: SystemMailer,
+  base: string,
+  now: Date,
+  fromISO: string | undefined,
+): Promise<number> {
+  const start = activationSupportStart(fromISO);
+  if (!start || start > now) return 0;
+  const t = schema.teams;
+  const u = schema.usageCounters;
+  const f = schema.funnelEvents;
+  const e = schema.emails;
+  const teams = await db
+    .select({ id: t.id, name: t.name, createdAt: t.createdAt })
+    .from(t)
+    .where(
+      and(
+        gte(t.createdAt, start),
+        isNull(t.suspendedAt),
+        isNull(t.sendReviewAt),
+        isNull(t.broadcastsPausedByOperatorAt),
+        ne(t.plan, "system"),
+        or(
+          and(
+            lte(t.createdAt, new Date(now.getTime() - ACTIVATION_FIRST_EMAIL_AFTER_MS)),
+            gt(t.createdAt, new Date(now.getTime() - ACTIVATION_FIRST_EMAIL_UNTIL_MS)),
+          ),
+          and(
+            lte(t.createdAt, new Date(now.getTime() - ACTIVATION_DAY7_AFTER_MS)),
+            gt(t.createdAt, new Date(now.getTime() - ACTIVATION_DAY7_UNTIL_MS)),
+          ),
+        ),
+        // Daily counters are retained forever: deliberately no current-period filter.
+        // An already accepted/queued first send needs no getting-started nudge either.
+        sql`not exists (select 1 from ${u} where ${u.teamId} = ${t.id} and (${u.sent} > 0 or ${u.accepted} > 0))`,
+        sql`not exists (select 1 from ${f} where ${f.dedupeKey} = 'first_email_sent:' || ${t.id}::text)`,
+        sql`not exists (select 1 from ${e} where ${e.teamId} = ${t.id} and ${e.sentAt} is not null)`,
+      ),
+    );
+  let sent = 0;
+  for (const team of teams) {
+    const kind =
+      now.getTime() - team.createdAt.getTime() >= ACTIVATION_DAY7_AFTER_MS
+        ? "activation.day7"
+        : "activation.first_email";
+    const owners = await listTeamOwners(db, team.id, accountEmailFrom(), kind);
+    if (!owners.length) continue;
+    const verified = await db
+      .select({ email: schema.user.email })
+      .from(schema.user)
+      .where(
+        and(
+          eq(schema.user.emailVerified, true),
+          inArray(
+            schema.user.email,
+            owners.map((o) => o.email),
+          ),
+        ),
+      );
+    const verifiedEmails = new Set(verified.map((owner) => owner.email));
+    const recipients = owners.filter((owner) => verifiedEmails.has(owner.email));
+    if (!recipients.length) continue;
+    if (!(await claimNotification(db, { teamId: team.id, kind, periodKey: "once" }))) continue;
+    // Same at-most-once ledger as other activation notices; failures do not stop other teams.
+    for (const owner of recipients) {
+      try {
+        await mailer.send(owner.email, {
+          ...buildAccountMail({
+            kind,
+            locale: owner.locale,
+            url: `${base}/onboarding#first-email`,
+            values: { team: team.name, supportUrl: `${base}/support#chat` },
+          }),
+          kind,
+        });
+        sent += 1;
+      } catch (err) {
+        console.error(`notifications.sweep: ${kind} for team ${team.id} failed`, err);
+      }
+    }
   }
   return sent;
 }

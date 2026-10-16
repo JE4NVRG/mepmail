@@ -47,10 +47,44 @@ describe("the language a public URL names", () => {
     expect(forwarded("https://mepmail.dev/?lang=en")).toBe("en");
   });
 
-  it("ignores unknown languages and never trusts the header a caller sends", () => {
-    expect(forwarded("https://mepmail.dev/pricing?lang=fr")).toBeNull();
-    expect(
-      forwarded("https://mepmail.dev/pricing", { "x-mepmail-url-locale": "pt-BR" }),
-    ).toBeNull();
+  it("defaults canonical public URLs to English and never trusts caller headers", () => {
+    expect(forwarded("https://mepmail.dev/pricing?lang=fr")).toBe("en");
+    expect(forwarded("https://mepmail.dev/pricing", { "x-mepmail-url-locale": "pt-BR" })).toBe(
+      "en",
+    );
+  });
+
+  it.each(["/", "/pricing", "/correio", "/alternatives/resend", "/guides/transactional-email"])(
+    "keeps %s English despite Portuguese preference or campaign parameters",
+    (path) => {
+      expect(
+        forwarded(`https://mepmail.dev${path}?utm_source=fixture`, {
+          cookie: "NEXT_LOCALE=pt-BR",
+          "accept-language": "pt-BR,pt;q=0.9",
+        }),
+      ).toBe("en");
+    },
+  );
+
+  it.each([
+    "/login",
+    "/signup?next=%2Femails",
+    "/mail",
+    "/mailboxes",
+    "/api/auth/get-session",
+    "/support/chat",
+    "/guides/not-a-guide",
+  ])("preserves preference negotiation outside canonical public pages: %s", (path) => {
+    expect(forwarded(`https://mepmail.dev${path}`, { "x-mepmail-url-locale": "en" })).toBeNull();
+  });
+
+  it("does not change preference cookies or the requested auth return path", () => {
+    const response = proxy(
+      request("https://mepmail.dev/signup?next=%2Ftemplates%2Fnew%3Fstarter%3Dwelcome"),
+    );
+    expect(response.headers.get("x-middleware-request-x-mepmail-next")).toBe(
+      "/signup?next=%2Ftemplates%2Fnew%3Fstarter%3Dwelcome",
+    );
+    expect(response.cookies.get("NEXT_LOCALE")).toBeUndefined();
   });
 });

@@ -5,8 +5,8 @@
   },
   "eyebrow": "Alternatives",
   "title": "Coming from Resend? <highlight>Keep the SDK.</highlight>",
-  "lead": "For sending flows compatible with the Resend SDK, change the base URL and key. See the migration guide, available features and the prices and sources below.",
-  "note": "Free to start: 100 emails a day, no card. We help you migrate and set up your sending domain.",
+  "lead": "Keep the official Resend SDK for supported sending calls. Compare the recurring prices below, choose a sending plan and use the migration CLI to review what can move before changing traffic.",
+  "note": "Pro is selected after signup so you can review the plan in Billing. Creating the account does not purchase a subscription; confirmation happens there.",
   "table": {
     "title": "Resend vs MepMail, volume by volume.",
     "intro": "MepMail’s regular monthly fees and Resend’s lowest published option at each volume, including overage where needed, checked on 2026-10-16. Excludes introductory offers and annual discounts; features and terms vary.",
@@ -38,18 +38,31 @@
   },
   "steps": {
     "eyebrow": "Migration",
-    "title": "Three steps to get started.",
+    "title": "Review the move. Then switch sending.",
+    "intro": "Run this command locally with your Resend and MepMail API keys. It reads Resend with GET requests, shows a migration plan and asks for confirmation before writing to MepMail.",
     "items": [
-      "Create the account and add your sending domain: we generate the DKIM and MAIL FROM records and wait for verification with you.",
-      "Swap the base URL and the key in your Resend client. The SDK and your send calls stay exactly as they are.",
-      "Send a test and follow the log in the panel. Then move production traffic."
+      "Choose a sending plan for your volume and create a MepMail API key. Free is optional; it is not a required first step.",
+      "Run the CLI and review the proposed changes for contacts, segments, topics, properties, domains, templates, webhooks, suppressions and broadcasts. Resource and account limits still apply.",
+      "Complete the manual checklist: verify the new domain DNS, replace API keys and review template fields. Point the SDK at https://api.mepmail.dev with the new key for supported calls.",
+      "Check subscription preferences and finish contact enrichment before topic sends or broadcasts. Send a controlled test, check its result in the panel and then switch the traffic you have validated."
     ],
-    "note": "Domain propagation and verification can take longer than the migration itself; automatic verification runs every 15 minutes. Using flows outside the compatible set? Tell us before migrating: we review them with you and say plainly what is not equivalent."
+    "note": "DNS verification, source rate limits and account size affect the work required. Keep the existing integration available while you validate; there is no fixed migration time or feature-parity guarantee.",
+    "limitsTitle": "Check these differences before cutover",
+    "limits": [
+      "API key secrets, DNS/DKIM records and sent email history are not copied. Domains need new verification; template from, reply_to and variables require manual review.",
+      "Draft and scheduled broadcasts arrive as drafts. Sent broadcasts are skipped by default. Unsupported webhook event types are omitted; check the resulting endpoints and events.",
+      "Contacts CSV import via POST /contacts/imports is not supported. Use JSON POST /contacts/batch; PATCH /contacts/{id}/topics expects a bare array of subscriptions.",
+      "This migration covers the sending API. Correio is a separate mailbox product; this guide does not migrate inboxes or promise inbound compatibility."
+    ],
+    "guideLink": "Read the migration guide and API differences"
   },
-  "pricingLink": "See the full ladder",
+  "pricingLink": "Compare all sending plans",
   "close": {
-    "title": "Migrate and compare on your next bill.",
-    "body": "Create the free account, keep the SDK you already have and send the first test today.",
-    "cta": "Create free account"
-  }
+    "title": "Ready to move your sending?",
+    "body": "Choose Pro, review the full migration checklist and validate your sending flow before moving production traffic. You can compare the other plans before confirming a purchase.",
+    "cta": "Choose Pro and integrate"
+  },
+  "paidCta": "Choose Pro for sending",
+  "integrationLink": "Integration quickstart",
+  "freeLink": "Try Free instead"
 }

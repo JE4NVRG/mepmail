@@ -6,15 +6,17 @@ vi.mock("next/navigation", () => ({
     throw new Error(`redirect:${url}`);
   },
 }));
-vi.mock("next-intl/server", () => ({ getTranslations: vi.fn() }));
+vi.mock("next-intl/server", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@/components/auth/auth-form", () => ({ AuthForm: vi.fn() }));
 vi.mock("@/server/auth", () => ({ hasSession: async () => true, enabledSocialProviders: vi.fn() }));
-vi.mock("@/server/public-seo", () => ({ publicPageUrls: vi.fn() }));
+vi.mock("@/server/public-seo", () => ({
+  publicPageUrls: async (path: string) => ({ alternates: { canonical: path } }),
+}));
 vi.mock("@/server/ses-pause", () => ({ accountMailDelayed: vi.fn() }));
 vi.mock("@/server/system-mail", () => ({ passwordRecoveryEnabled: vi.fn() }));
 
-import LoginPage from "../src/app/login/page";
-import SignupPage from "../src/app/signup/page";
+import LoginPage, { generateMetadata as loginMetadata } from "../src/app/login/page";
+import SignupPage, { generateMetadata as signupMetadata } from "../src/app/signup/page";
 
 describe.each([
   ["login", LoginPage],
@@ -33,5 +35,16 @@ describe.each([
     { next: ["/emails", "/templates"] },
   ])("rejects unsafe, looping or ambiguous destinations: $next", async ({ next }) => {
     await expect(page({ searchParams: Promise.resolve({ next }) })).rejects.toThrow("redirect:/");
+  });
+});
+
+describe.each([
+  ["/login", loginMetadata],
+  ["/signup", signupMetadata],
+] as const)("utility auth metadata: %s", (path, metadata) => {
+  it("uses noindex/follow and the parameter-free canonical while return-target tests stay intact", async () => {
+    const value = await metadata();
+    expect(value.robots).toEqual({ index: false, follow: true });
+    expect(value.alternates?.canonical).toBe(path);
   });
 });

@@ -209,10 +209,11 @@ export const ptBR = {
     subject: "{team} foi suspensa",
     body: [
       "O operador da instância suspendeu {team}: {reason}",
-      "Todo envio é recusado e os broadcasts ficam em espera. Chaves de API, domínios, contatos e histórico permanecem como estão, e uma equipe reativada volta a enviar em um minuto. Responda a este e-mail para resolver.",
+      "Os envios ficam bloqueados durante a suspensão. Os contatos e o histórico de mensagens são preservados. Abra o suporte para pedir uma revisão ou responda a este e-mail. A reativação pode exigir novas credenciais de envio e verificação do domínio.",
     ],
-    button: "Abrir painel",
+    button: "Pedir revisão",
     extra: {
+      security_review: "o envio foi interrompido para uma revisão de segurança.",
       reputation:
         "suas taxas de bounce ou de reclamação ameaçam a reputação de envio que a plataforma compartilha.",
       non_payment: "uma fatura ficou sem pagamento.",
@@ -223,7 +224,7 @@ export const ptBR = {
   "team.reinstated": {
     subject: "{team} foi reativada",
     body: [
-      "O operador da instância reativou {team}. Os envios voltam a sair, e os broadcasts em espera retomam sozinhos em até 15 minutos.",
+      "O operador da instância retirou a suspensão de {team}. Confira as credenciais de envio e a verificação dos domínios antes de retomar. Credenciais revogadas não são restauradas.",
     ],
     button: "Abrir painel",
   },
@@ -269,7 +270,7 @@ export const ptBR = {
     subject: "Envio retido para revisão: {team}",
     body: [
       "O envio de {team} ficou retido antes de chegar ao SES: {note}. Os e-mails aceitos ficam guardados e nada saiu.",
-      "Abra a página de revisão para liberar o envio (os e-mails retidos saem em até 15 minutos) ou suspender a equipe (nada sai).",
+      "Abra a página de revisão para liberar o envio ou suspender a equipe. A liberação permite processar os e-mails retidos, mas outros bloqueios de envio ainda podem se aplicar.",
     ],
     button: "Abrir revisão",
   },
@@ -360,6 +361,24 @@ export const ptBR = {
     ],
     button: "Falar com o suporte",
     muted: ["Prefere seguir sozinho? O passo a passo está em {docsUrl}"],
+  },
+  "activation.first_email": {
+    subject: "Seu primeiro e-mail com o MepMail em 2 minutos",
+    body: [
+      "Experimente o passo a passo de primeiro envio da equipe {team}: abra a demonstração, envie para o seu próprio endereço verificado e confira o resultado.",
+      "Você pode usar a demonstração antes de verificar um domínio de envio. Não precisa ativar o Free nem mudar o plano que já escolheu.",
+    ],
+    button: "Testar meu primeiro e-mail",
+    muted: ["Precisa de ajuda? Abra o suporte: {supportUrl}"],
+  },
+  "activation.day7": {
+    subject: "Uma ajuda para o seu primeiro e-mail no MepMail?",
+    body: [
+      "Ainda não há um primeiro envio registrado para a equipe {team}. A demonstração envia para o seu próprio endereço verificado e ajuda a experimentar o produto em poucos passos.",
+      "Se uma integração ou um passo do DNS travou, abra o suporte e conte onde parou. Seu plano atual continua como está.",
+    ],
+    button: "Abrir demonstração do primeiro envio",
+    muted: ["Fale com a gente: {supportUrl}"],
   },
   "mailbox.repriced": {
     subject: "O Correio de {team} passa ao preço sem plano de Envio",

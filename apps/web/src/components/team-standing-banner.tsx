@@ -25,6 +25,8 @@ export function TeamStandingBanner() {
     return (
       <NoticeStrip
         tone="danger"
+        href="/support"
+        action={t("requestReview")}
         text={
           note && reason === "manual"
             ? t("suspendedNote", { note })
@@ -37,6 +39,8 @@ export function TeamStandingBanner() {
     return (
       <NoticeStrip
         tone="warn"
+        href="/support"
+        action={t("requestReview")}
         text={t("sendReview", { since: formatDayTime(data.sendReview.at, locale) })}
       />
     );

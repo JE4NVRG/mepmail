@@ -530,6 +530,7 @@ await queue.scheduleCrons({
   "notifications.sweep": async () => {
     const result = await sweepNotifications(db, {
       isCloud: env.IS_CLOUD,
+      activationSupportFromISO: process.env.ACTIVATION_SUPPORT_FROM ?? "",
       mailer,
       enqueueWebhook,
       appBaseUrl: env.APP_BASE_URL,

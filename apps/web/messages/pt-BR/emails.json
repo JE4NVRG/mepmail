@@ -1,5 +1,6 @@
 {
   "list": {
+    "firstSend": "Enviar e-mail de teste",
     "title": "E-mails",
     "suppressionList": "Lista de supressão",
     "apiDocs": "API de e-mails",
