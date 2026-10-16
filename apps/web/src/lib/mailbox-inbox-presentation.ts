@@ -150,21 +150,44 @@ const DAY_MS = 86_400_000;
  * The date a message list shows, the way mail apps do: the time for today,
  * "yesterday", the weekday within the last week, day and month this year,
  * and a short full date before that. Both dates are read in local time.
+ * Keep this formatter while locale and system time zone stay the same; pass
+ * the current date each render so labels still advance at midnight.
  */
-export function mailboxListDate(value: Date, now: Date, locale: string): string {
+export function createMailboxListDateFormatter(locale: string) {
+  let time: Intl.DateTimeFormat | undefined;
+  let weekday: Intl.DateTimeFormat | undefined;
+  let month: Intl.DateTimeFormat | undefined;
+  let short: Intl.DateTimeFormat | undefined;
+  let yesterday: string | undefined;
   const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const days = Math.round((day(now) - day(value)) / DAY_MS);
-  if (days === 0)
-    return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(value);
-  if (days === 1) {
-    const word = new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(-1, "day");
-    return word.charAt(0).toLocaleUpperCase(locale) + word.slice(1);
-  }
-  if (days > 1 && days < 7)
-    return new Intl.DateTimeFormat(locale, { weekday: "short" }).format(value);
-  if (value.getFullYear() === now.getFullYear())
-    return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(value);
-  return new Intl.DateTimeFormat(locale, { dateStyle: "short" }).format(value);
+  return (value: Date, now: Date): string => {
+    const days = Math.round((day(now) - day(value)) / DAY_MS);
+    if (days === 0) {
+      time ??= new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" });
+      return time.format(value);
+    }
+    if (days === 1) {
+      if (yesterday === undefined) {
+        const word = new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(-1, "day");
+        yesterday = word.charAt(0).toLocaleUpperCase(locale) + word.slice(1);
+      }
+      return yesterday;
+    }
+    if (days > 1 && days < 7) {
+      weekday ??= new Intl.DateTimeFormat(locale, { weekday: "short" });
+      return weekday.format(value);
+    }
+    if (value.getFullYear() === now.getFullYear()) {
+      month ??= new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" });
+      return month.format(value);
+    }
+    short ??= new Intl.DateTimeFormat(locale, { dateStyle: "short" });
+    return short.format(value);
+  };
+}
+
+export function mailboxListDate(value: Date, now: Date, locale: string): string {
+  return createMailboxListDateFormatter(locale)(value, now);
 }
 
 /** The named folder colors the server stores; the UI maps them to tokens. */

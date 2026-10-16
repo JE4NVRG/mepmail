@@ -26,9 +26,9 @@ import {
   replaceMailboxSignature,
 } from "@/lib/mailbox-compose-signature";
 import {
+  createMailboxListDateFormatter,
   type MailboxFolder,
   mailboxContentBlocked,
-  mailboxListDate,
   mailboxMessageActions,
   mailboxOutboundPresentation,
   mailboxPrimaryParticipant,
@@ -1335,6 +1335,18 @@ export function MailboxContentView({
       ? tAgent("panel.draftedBy", { label: approval.label })
       : t(approval.key, { label: "label" in approval ? approval.label : "" });
   const locale = useLocale();
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const dateFormats = useMemo(
+    () => ({
+      full: new Intl.DateTimeFormat(locale, {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone,
+      }),
+      list: createMailboxListDateFormatter(locale),
+    }),
+    [locale, timeZone],
+  );
   const trpc = useTRPC();
   const queries = useQueryClient();
   const capability = useQuery(trpc.mailboxes.capabilities.queryOptions());
@@ -1909,8 +1921,7 @@ export function MailboxContentView({
           ?.focus({ preventScroll: true }),
       );
   }
-  const date = (value: Date) =>
-    new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(value);
+  const date = (value: Date) => dateFormats.full.format(value);
   /** The result of an organizing action as a toast at the bottom of the
    * screen, with "Desfazer" for ten seconds when it can be reversed. */
   function offerUndo(message: string, steps: (() => Promise<unknown>)[], keys: string[] = []) {
@@ -2086,6 +2097,7 @@ export function MailboxContentView({
       !(row.kind === "draft" && row.sendStatus && row.sendStatus !== "failed")
     );
   });
+  const movableRowKeys = new Set(movableRows.map(rowKey));
   const checkedRows = movableRows.filter((row) => checkedIds.has(rowKey(row)));
   // "Esvaziar lixeira": the open mailbox, or every own mailbox in this view.
   const trashTargets = (selectedBox ? [selectedBox] : readable)
@@ -2132,7 +2144,7 @@ export function MailboxContentView({
         void organizeRows([row], row.archivedAt ? { folder: "inbox" } : { folder: "archive" });
     },
     onLongPress: (key) => {
-      if (movableRows.some((entry) => rowKey(entry) === key)) toggleChecked(key);
+      if (movableRowKeys.has(key)) toggleChecked(key);
     },
   });
   usePullToRefresh(listBody, { enabled: touch, onRefresh: refresh });
@@ -3191,7 +3203,7 @@ export function MailboxContentView({
       )
     : null;
   const now = new Date();
-  const listDate = (value: Date) => mailboxListDate(value, now, locale);
+  const listDate = (value: Date) => dateFormats.list(value, now);
   // Which mailbox a row belongs to matters only when rows of several are mixed.
   const showRowAddress = (!selected || (searching && searchEverywhere)) && readable.length > 1;
   const canCompose = writable.length > 0 && (!selected || selected.canDraft);
@@ -3455,7 +3467,10 @@ export function MailboxContentView({
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Escape" && search) {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      setSearchTerm(serverSearchTerm(e.currentTarget.value));
+                    } else if (e.key === "Escape" && search) {
                       e.stopPropagation();
                       setSearch("");
                     }
@@ -3768,8 +3783,7 @@ export function MailboxContentView({
                       row.deliveryFolder !== "spam" &&
                       !(row.kind === "draft" && row.sendStatus && row.sendStatus !== "failed");
                     const unread = isUnread(row);
-                    const draggableRow =
-                      !blocked && movableRows.some((entry) => rowKey(entry) === rowKey(row));
+                    const draggableRow = !blocked && movableRowKeys.has(rowKey(row));
                     const rowStatus =
                       blocked ||
                       !!rowApproval ||
@@ -3799,7 +3813,7 @@ export function MailboxContentView({
                           }}
                         >
                           <div className={styles.rowQuickActions}>
-                            {movableRows.some((entry) => rowKey(entry) === rowKey(row)) ? (
+                            {movableRowKeys.has(rowKey(row)) ? (
                               <label className={styles.rowSelectionTarget}>
                                 <input
                                   type="checkbox"
@@ -3839,7 +3853,7 @@ export function MailboxContentView({
                                 touch &&
                                 (touchSelecting ||
                                   (event.target as Element).closest("[data-row-avatar]")) &&
-                                movableRows.some((entry) => rowKey(entry) === rowKey(row))
+                                movableRowKeys.has(rowKey(row))
                               )
                                 toggleChecked(rowKey(row));
                               else openRow(row);
