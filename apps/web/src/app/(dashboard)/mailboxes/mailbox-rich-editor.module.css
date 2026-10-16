@@ -77,7 +77,11 @@
   min-height: 180px;
   padding: 10px 12px;
   overflow-y: auto;
-  font-size: var(--ms-fs-ui);
+  /* Keep the system preference local to editing, outside the serialized mail.
+     Disable heuristic inflation so the explicit scale is applied only once. */
+  font-size: calc(var(--ms-fs-ui) * env(preferred-text-scale, 1));
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
   line-height: 1.55;
   color: var(--ms-bone);
   outline: none;
