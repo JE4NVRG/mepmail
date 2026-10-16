@@ -1,5 +1,6 @@
 import { router } from "../../trpc";
 import { consoleAuditRouter } from "./audit";
+import { consoleHeldMessageReviewRouter } from "./held-message-review";
 import { consoleMonitorRouter } from "./monitor";
 import { consoleOverviewRouter } from "./overview";
 import { consoleRegionsRouter } from "./regions";
@@ -14,6 +15,7 @@ export const consoleRouter = router({
   teams: consoleTeamsRouter,
   users: consoleUsersRouter,
   safety: consoleSafetyRouter,
+  heldReview: consoleHeldMessageReviewRouter,
   monitor: consoleMonitorRouter,
   audit: consoleAuditRouter,
 });

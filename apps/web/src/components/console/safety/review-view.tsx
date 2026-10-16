@@ -20,6 +20,7 @@ import { formatRisk, riskColor } from "@/lib/monitor-settings";
 import { formatScoreTenths } from "@/lib/score-band";
 import { useTRPC } from "@/lib/trpc";
 import { useTeamActions } from "../team-actions";
+import { HeldMessageReviewEntry } from "./held-message-review";
 import {
   CardHead,
   LoadErrorCard,
@@ -305,6 +306,8 @@ export function ReviewView({ teamId }: { teamId: string }) {
           </button>
         </div>
       ) : null}
+
+      <HeldMessageReviewEntry teamId={teamId} />
 
       <div className="ms-grid ms-grid-6" style={{ marginBottom: 16 }}>
         <Tile
