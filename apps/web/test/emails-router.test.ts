@@ -4,7 +4,8 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { and, eq, sql } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as keyringModule from "@/server/keyring";
 import { createCaller } from "@/server/routers";
 import type { Context } from "@/server/trpc";
 
@@ -22,6 +23,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await close();
 });
 
@@ -202,6 +204,40 @@ describe("emails.list", () => {
 });
 
 describe("emails.get", () => {
+  it("reads delivery history without opening the body or requiring a keyring", async () => {
+    const teamA = await createTeam(db, "team-a");
+    const encrypted = await encryptEmailBody(
+      { html: "<p>private message</p>", text: "private message" },
+      EnvKeyring.fromBase64(TEST_KEK),
+    );
+    const id = await insertEmail({
+      ...baseEmail(teamA),
+      latestStatus: "delivered",
+      bodyCiphertext: encrypted.ciphertext,
+      bodyIv: encrypted.iv,
+      bodyWrappedDek: encrypted.wrappedDek,
+      bodyKeyVersion: encrypted.keyVersion,
+    });
+    await db.insert(schema.emailEvents).values([
+      { emailId: id, type: "delivered", occurredAt: new Date("2026-08-01T10:05:00Z") },
+      { emailId: id, type: "sent", occurredAt: new Date("2026-08-01T10:00:00Z") },
+    ]);
+    const keyring = vi.spyOn(keyringModule, "getKeyring").mockImplementation(() => {
+      throw new Error("test keyring unavailable");
+    });
+
+    const email = await caller(teamA).emails.get({ id, includeBody: false });
+    expect(email).toMatchObject({ id, latestStatus: "delivered", html: null, text: null });
+    expect(email.events.map((event) => event.type)).toEqual(["sent", "delivered"]);
+    expect(email).not.toHaveProperty("bodyCiphertext");
+    expect(email).not.toHaveProperty("bodyWrappedDek");
+    expect(keyring).not.toHaveBeenCalled();
+
+    // The ordinary detail still requires encryption configuration by default.
+    await expect(caller(teamA).emails.get({ id })).rejects.toThrow("test keyring unavailable");
+    expect(keyring).toHaveBeenCalledOnce();
+  });
+
   it("decrypts the body and returns events in order", async () => {
     const teamA = await createTeam(db, "team-a");
     const keyring = EnvKeyring.fromBase64(TEST_KEK);
@@ -255,6 +291,9 @@ describe("emails.get", () => {
     const id = await insertEmail(baseEmail(teamA));
 
     await expect(caller(teamB).emails.get({ id })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(caller(teamB).emails.get({ id, includeBody: false })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
   });
 
   it("returns insights from an emailId-keyed row", async () => {

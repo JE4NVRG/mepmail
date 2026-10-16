@@ -173,91 +173,94 @@ export const emailsRouter = router({
     };
   }),
 
-  get: teamProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
-    const t = schema.emails;
-    const [email] = await ctx.db
-      .select()
-      .from(t)
-      .where(and(eq(t.id, input.id), eq(t.teamId, ctx.teamId)))
-      .limit(1);
-    if (!email) throw new TRPCError({ code: "NOT_FOUND" });
-
-    let body: EmailBody = { html: null, text: null };
-    // A support view reads the envelope, never the message: the body is not
-    // decrypted at all, and the flag says so instead of "no body".
-    const hiddenBySupportView = Boolean(ctx.supportView);
-    if (
-      !hiddenBySupportView &&
-      email.bodyCiphertext &&
-      email.bodyIv &&
-      email.bodyWrappedDek &&
-      email.bodyKeyVersion != null
-    ) {
-      const kr = getKeyring();
-      try {
-        body = await decryptEmailBody(
-          {
-            ciphertext: email.bodyCiphertext,
-            iv: email.bodyIv,
-            wrappedDek: email.bodyWrappedDek,
-            keyVersion: email.bodyKeyVersion,
-          },
-          kr,
-          { teamId: email.teamId, rowId: email.id },
-        );
-      } catch {
-        // Undecryptable (corrupt ciphertext, unknown KEK version) reads as
-        // "no body" — the metadata and events are still worth showing.
-      }
-    }
-
-    const ev = schema.emailEvents;
-    const events = await ctx.db
-      .select({ id: ev.id, type: ev.type, occurredAt: ev.occurredAt, data: ev.data })
-      .from(ev)
-      .where(eq(ev.emailId, email.id))
-      .orderBy(asc(ev.occurredAt), asc(ev.id));
-
-    const insightsRow = await fetchEmailInsights(ctx.db, ctx.teamId, {
-      emailId: email.id,
-      broadcastId: email.broadcastId,
-    });
-    const insights = emailInsightsView(insightsRow);
-
-    let apiKeyName: string | null = null;
-    if (email.apiKeyId) {
-      const k = schema.apiKeys;
-      const [key] = await ctx.db
-        .select({ name: k.name })
-        .from(k)
-        .where(and(eq(k.id, email.apiKeyId), eq(k.teamId, ctx.teamId)))
+  get: teamProcedure
+    .input(z.object({ id: z.uuid(), includeBody: z.boolean().default(true) }))
+    .query(async ({ ctx, input }) => {
+      const t = schema.emails;
+      const [email] = await ctx.db
+        .select()
+        .from(t)
+        .where(and(eq(t.id, input.id), eq(t.teamId, ctx.teamId)))
         .limit(1);
-      apiKeyName = key?.name ?? null;
-    }
+      if (!email) throw new TRPCError({ code: "NOT_FOUND" });
 
-    // Whitelisted shape: the ciphertext/key columns must never reach the client.
-    return {
-      apiKeyName,
-      id: email.id,
-      from: email.from,
-      to: email.to,
-      cc: email.cc,
-      bcc: email.bcc,
-      replyTo: email.replyTo,
-      subject: email.subject,
-      tags: email.tags,
-      latestStatus: email.latestStatus,
-      createdAt: email.createdAt,
-      scheduledAt: email.scheduledAt,
-      sentAt: email.sentAt,
-      bodyPurgedAt: email.bodyPurgedAt,
-      html: body.html,
-      text: body.text,
-      hiddenBySupportView,
-      events,
-      insights,
-    };
-  }),
+      let body: EmailBody = { html: null, text: null };
+      // A support view reads the envelope, never the message: the body is not
+      // decrypted at all, and the flag says so instead of "no body".
+      const hiddenBySupportView = Boolean(ctx.supportView);
+      if (
+        input.includeBody &&
+        !hiddenBySupportView &&
+        email.bodyCiphertext &&
+        email.bodyIv &&
+        email.bodyWrappedDek &&
+        email.bodyKeyVersion != null
+      ) {
+        const kr = getKeyring();
+        try {
+          body = await decryptEmailBody(
+            {
+              ciphertext: email.bodyCiphertext,
+              iv: email.bodyIv,
+              wrappedDek: email.bodyWrappedDek,
+              keyVersion: email.bodyKeyVersion,
+            },
+            kr,
+            { teamId: email.teamId, rowId: email.id },
+          );
+        } catch {
+          // Undecryptable (corrupt ciphertext, unknown KEK version) reads as
+          // "no body" — the metadata and events are still worth showing.
+        }
+      }
+
+      const ev = schema.emailEvents;
+      const events = await ctx.db
+        .select({ id: ev.id, type: ev.type, occurredAt: ev.occurredAt, data: ev.data })
+        .from(ev)
+        .where(eq(ev.emailId, email.id))
+        .orderBy(asc(ev.occurredAt), asc(ev.id));
+
+      const insightsRow = await fetchEmailInsights(ctx.db, ctx.teamId, {
+        emailId: email.id,
+        broadcastId: email.broadcastId,
+      });
+      const insights = emailInsightsView(insightsRow);
+
+      let apiKeyName: string | null = null;
+      if (email.apiKeyId) {
+        const k = schema.apiKeys;
+        const [key] = await ctx.db
+          .select({ name: k.name })
+          .from(k)
+          .where(and(eq(k.id, email.apiKeyId), eq(k.teamId, ctx.teamId)))
+          .limit(1);
+        apiKeyName = key?.name ?? null;
+      }
+
+      // Whitelisted shape: the ciphertext/key columns must never reach the client.
+      return {
+        apiKeyName,
+        id: email.id,
+        from: email.from,
+        to: email.to,
+        cc: email.cc,
+        bcc: email.bcc,
+        replyTo: email.replyTo,
+        subject: email.subject,
+        tags: email.tags,
+        latestStatus: email.latestStatus,
+        createdAt: email.createdAt,
+        scheduledAt: email.scheduledAt,
+        sentAt: email.sentAt,
+        bodyPurgedAt: email.bodyPurgedAt,
+        html: body.html,
+        text: body.text,
+        hiddenBySupportView,
+        events,
+        insights,
+      };
+    }),
 
   suppressions: router({
     list: teamProcedure

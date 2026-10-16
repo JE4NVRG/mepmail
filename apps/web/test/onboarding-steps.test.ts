@@ -2,7 +2,11 @@ import { NextIntlClientProvider } from "next-intl";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { deriveOnboardingState, OnboardingSteps } from "@/app/onboarding/onboarding-steps";
+import {
+  ApiQuickstart,
+  deriveOnboardingState,
+  OnboardingSteps,
+} from "@/app/onboarding/onboarding-steps";
 import en from "../messages/en/onboarding.json";
 import pt from "../messages/pt-BR/onboarding.json";
 
@@ -85,6 +89,8 @@ vi.mock("@tanstack/react-query", () => ({
         ? {
             ...email,
             from: "welcome@example.com",
+            html: null,
+            text: null,
             events: f.deliveredEvent
               ? [{ type: "delivered", occurredAt: new Date("2026-09-30T10:00:01Z") }]
               : [],
@@ -138,14 +144,14 @@ function attempt(id: string, latestStatus: string): Attempt {
   };
 }
 
-function render(locale: "en" | "pt-BR" = "en") {
+function render(locale: "en" | "pt-BR" = "en", Component = OnboardingSteps) {
   return renderToStaticMarkup(
     createElement(NextIntlClientProvider, {
       locale,
       timeZone: "UTC",
       messages: { onboarding: locale === "en" ? en : pt },
       // biome-ignore lint/correctness/noChildrenProp: next-intl requires children in its props type.
-      children: createElement(OnboardingSteps, {
+      children: createElement(Component, {
         userEmail: "member@example.com",
         apiUrl: "https://api.example.com",
         showInstanceHint: false,
@@ -211,6 +217,42 @@ for (const [locale, copy] of [
   ["pt-BR", pt],
 ] as const) {
   describe(`OnboardingSteps (${locale})`, () => {
+    it("reads current delivery metadata and history without requesting the message body", () => {
+      hooks.fixture.first = attempt("first-bounce", "bounced");
+      hooks.fixture.latest = attempt("retry-metadata", "sent");
+      hooks.fixture.deliveredEvent = true;
+      const html = render(locale);
+      expect(hooks.queries.find((query) => query.queryKey[0] === "detail")).toMatchObject({
+        queryKey: ["detail", { id: "retry-metadata", includeBody: false }],
+        enabled: true,
+      });
+      expect(html).toContain(copy.success.title);
+      expect(html).toContain('href="/emails/first-bounce"');
+      expect(html).toContain('href="/emails/retry-metadata"');
+      expect(hooks.mutate).not.toHaveBeenCalled();
+    });
+
+    it.each<[string, Partial<Fixture>]>([
+      ["loading", { metricsPending: true }],
+      ["read error", { failedQuery: "metrics" }],
+      ["no send", { hasKey: false }],
+      ["in flight", { first: attempt("queued-send", "queued") }],
+      ["failed", { first: attempt("failed-send", "bounced") }],
+      ["delivered event", { first: attempt("delivered-send", "sent"), deliveredEvent: true }],
+      ["delivery history after email retention", { delivered: 118 }],
+      ["demonstration sender disabled", { onboardingSender: null }],
+    ])("keeps one first-email target in %s for both entry points", (_state, fixture) => {
+      Object.assign(hooks.fixture, fixture);
+      for (const Component of [OnboardingSteps, ApiQuickstart]) {
+        const html = render(locale, Component);
+        expect(html.match(/\bid="first-email"/g)).toHaveLength(1);
+        // The destination exists before the quickstart heading, including fallback states.
+        expect(html.indexOf('id="first-email"')).toBeLessThan(html.indexOf("<h2"));
+      }
+      expect(hooks.mutate).not.toHaveBeenCalled();
+      expect(hooks.getToken).not.toHaveBeenCalled();
+    });
+
     it("after the test send, points to adding a domain while none is verified", () => {
       hooks.fixture.first = attempt("first-send", "delivered");
       hooks.fixture.delivered = 1;

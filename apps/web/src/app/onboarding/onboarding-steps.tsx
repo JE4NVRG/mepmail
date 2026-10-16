@@ -190,7 +190,15 @@ export function OnboardingSteps(props: OnboardingStepsProps) {
 }
 
 /** Test send, API key and snippet: the first email sent from code. */
-function ApiQuickstart({
+export function ApiQuickstart(props: OnboardingStepsProps) {
+  return (
+    <div id="first-email" style={{ scrollMarginTop: 24 }}>
+      <ApiQuickstartContent {...props} />
+    </div>
+  );
+}
+
+function ApiQuickstartContent({
   userEmail,
   apiUrl,
   showInstanceHint,
@@ -262,7 +270,7 @@ function ApiQuickstart({
   });
 
   const detailQuery = useQuery({
-    ...trpc.emails.get.queryOptions({ id: currentEmail?.id ?? "" }),
+    ...trpc.emails.get.queryOptions({ id: currentEmail?.id ?? "", includeBody: false }),
     enabled: currentEmail !== undefined,
     // Poll the current attempt; an old bounce must not stop tracking a retry.
     refetchInterval: (query) => {
@@ -770,9 +778,7 @@ function ApiQuickstart({
             </div>
           ) : null}
 
-          <div id="first-email" style={{ scrollMarginTop: 24 }}>
-            {demoPanel}
-          </div>
+          {demoPanel}
 
           {/* Add an API key */}
           <div className="ms-step" style={{ display: "flex", gap: 18 }}>
