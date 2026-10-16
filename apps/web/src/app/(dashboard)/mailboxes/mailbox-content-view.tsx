@@ -738,6 +738,8 @@ function DraftDialog({
       className={dialogClass}
       aria-labelledby="draft-title"
       onCancel={(e) => {
+        // Cancelling the file picker bubbles from its input, not this dialog.
+        if (e.target !== e.currentTarget) return;
         // Esc never throws the message away on its own: a docked composer
         // minimizes; the full-screen one asks when there is something to lose.
         e.preventDefault();

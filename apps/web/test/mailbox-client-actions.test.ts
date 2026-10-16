@@ -81,6 +81,8 @@ const dialogProps = only(
 const closures = {
   refresh: namedFunction("refresh"),
   submit: property(namedFunction("DraftDialog"), "onSubmit"),
+  cancel: property(namedFunction("DraftDialog"), "onCancel"),
+  dismiss: namedFunction("dismiss"),
   saved: property(dialogProps, "saved"),
   send: property(dialogProps, "send"),
 };
@@ -104,6 +106,92 @@ function deferred<T>() {
 const clients: QueryClient[] = [];
 afterEach(() => {
   for (const client of clients.splice(0)) client.clear();
+});
+
+function cancelFixture(options: {
+  dirty?: boolean;
+  docked?: boolean;
+  confirmingDiscard?: boolean;
+}) {
+  const close = vi.fn();
+  const setMinimized = vi.fn();
+  const setConfirmingDiscard = vi.fn();
+  const dismiss = production<() => void>("dismiss", {
+    submitting: { current: false },
+    loadingFiles: false,
+    current: () => true,
+    isDirty: () => options.dirty ?? false,
+    setMinimized,
+    setConfirmingDiscard,
+    close,
+  });
+  const cancel = production<(event: Event) => void>("cancel", {
+    confirmingDiscard: options.confirmingDiscard ?? false,
+    docked: options.docked ?? false,
+    setMinimized,
+    setConfirmingDiscard,
+    dismiss,
+  });
+  function event(fromInput: boolean) {
+    const dialog = { tagName: "DIALOG" };
+    const event = new Event("cancel", { bubbles: fromInput, cancelable: !fromInput });
+    Object.defineProperties(event, {
+      target: { value: fromInput ? { tagName: "INPUT", type: "file" } : dialog },
+      currentTarget: { value: dialog },
+    });
+    return event;
+  }
+  return { close, setMinimized, setConfirmingDiscard, cancel, event };
+}
+
+describe("composer cancel event ownership", () => {
+  it.each([
+    { dirty: false, docked: false },
+    { dirty: true, docked: false },
+    { dirty: false, docked: true },
+    { dirty: true, docked: true },
+    { dirty: true, confirmingDiscard: true },
+  ])("leaves the composer unchanged when its file picker is cancelled: %j", (options) => {
+    const fixture = cancelFixture(options);
+    const event = fixture.event(true);
+    const preventDefault = vi.spyOn(event, "preventDefault");
+    fixture.cancel(event);
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(fixture.close).not.toHaveBeenCalled();
+    expect(fixture.setMinimized).not.toHaveBeenCalled();
+    expect(fixture.setConfirmingDiscard).not.toHaveBeenCalled();
+  });
+
+  it("closes a clean composer for its own cancel request", () => {
+    const fixture = cancelFixture({});
+    const event = fixture.event(false);
+    fixture.cancel(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(fixture.close).toHaveBeenCalledOnce();
+  });
+
+  it("asks before discarding dirty content for the composer's own cancel request", () => {
+    const fixture = cancelFixture({ dirty: true });
+    fixture.cancel(fixture.event(false));
+    expect(fixture.close).not.toHaveBeenCalled();
+    expect(fixture.setConfirmingDiscard).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it("minimizes a docked composer for its own cancel request", () => {
+    const fixture = cancelFixture({ dirty: true, docked: true });
+    fixture.cancel(fixture.event(false));
+    expect(fixture.close).not.toHaveBeenCalled();
+    expect(fixture.setMinimized).toHaveBeenCalledExactlyOnceWith(true);
+    expect(fixture.setConfirmingDiscard).not.toHaveBeenCalled();
+  });
+
+  it("returns from discard confirmation for the composer's own cancel request", () => {
+    const fixture = cancelFixture({ dirty: true, confirmingDiscard: true });
+    fixture.cancel(fixture.event(false));
+    expect(fixture.close).not.toHaveBeenCalled();
+    expect(fixture.setConfirmingDiscard).toHaveBeenCalledExactlyOnceWith(false);
+    expect(fixture.setMinimized).not.toHaveBeenCalled();
+  });
 });
 
 function queryFixture(readItem = async () => ({ id: "draft-a", revision: 8 })) {
