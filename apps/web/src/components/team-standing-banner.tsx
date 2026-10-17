@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { NoticeStrip } from "@/components/notice-strip";
+import { SignupReviewRequest } from "@/components/signup-review-request";
 import { formatDayTime } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
 
@@ -20,39 +21,49 @@ export function TeamStandingBanner() {
   const trpc = useTRPC();
   const { data } = useQuery(trpc.team.standing.queryOptions());
   if (!data) return null;
+  const request = data.canRequestSignupReview ? <SignupReviewRequest /> : null;
   if (data.suspended) {
     const { reason, note } = data.suspended;
     return (
-      <NoticeStrip
-        tone="danger"
-        href="/support"
-        action={t("requestReview")}
-        text={
-          note && reason === "manual"
-            ? t("suspendedNote", { note })
-            : t("suspended", { reason: t(`reasons.${reason}`) })
-        }
-      />
+      <>
+        <NoticeStrip
+          tone="danger"
+          href={data.canRequestSignupReview ? undefined : "/support"}
+          action={data.canRequestSignupReview ? undefined : t("requestReview")}
+          text={
+            note && reason === "manual"
+              ? t("suspendedNote", { note })
+              : t("suspended", { reason: t(`reasons.${reason}`) })
+          }
+        />
+        {request}
+      </>
     );
   }
   if (data.sendReview) {
     return (
-      <NoticeStrip
-        tone="warn"
-        href="/support"
-        action={t("requestReview")}
-        text={t("sendReview", { since: formatDayTime(data.sendReview.at, locale) })}
-      />
+      <>
+        <NoticeStrip
+          tone="warn"
+          href={data.canRequestSignupReview ? undefined : "/support"}
+          action={data.canRequestSignupReview ? undefined : t("requestReview")}
+          text={t("sendReview", { since: formatDayTime(data.sendReview.at, locale) })}
+        />
+        {request}
+      </>
     );
   }
   if (data.signupRisk === "sandbox" || data.signupRisk === "review") {
     return (
-      <NoticeStrip
-        tone="warn"
-        href="/support"
-        action={t("requestReview")}
-        text={t(data.signupRisk === "sandbox" ? "signupSandbox" : "signupReview")}
-      />
+      <>
+        <NoticeStrip
+          tone="warn"
+          href={data.canRequestSignupReview ? undefined : "/support"}
+          action={data.canRequestSignupReview ? undefined : t("requestReview")}
+          text={t(data.signupRisk === "sandbox" ? "signupSandbox" : "signupReview")}
+        />
+        {request}
+      </>
     );
   }
   if (data.broadcastsPausedByOperatorAt && pathname.startsWith("/broadcasts")) {

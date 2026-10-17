@@ -25,6 +25,7 @@ vi.mock("@/lib/trpc", () => ({
       teams: {
         signupRisk: { queryOptions: (value: unknown) => value },
         clearSignupRisk: { mutationOptions: (value: unknown) => value },
+        resolveSignupReview: { mutationOptions: (value: unknown) => value },
       },
     },
   }),

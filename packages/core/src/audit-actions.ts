@@ -98,6 +98,8 @@ export const AUDIT_ACTIONS = [
   "team.signup_risk_enrolled",
   "team.signup_risk_escalated",
   "team.signup_risk_cleared",
+  "team.signup_risk_review_requested",
+  "team.signup_risk_review_resolved",
   // The operator marked one of the team's domains as verified at the
   // customer SMTP relay's provider (or took the mark back).
   "team.domain_relay_enabled",

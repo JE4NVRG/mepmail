@@ -147,6 +147,7 @@ export {
   recordSignupConversions,
   type SignupAdvertising,
 } from "./signup-advertising.js";
+export { createSignupReviewPaymentReader } from "./signup-review-payments.js";
 export {
   type BillingStripe,
   createStripe,

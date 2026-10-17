@@ -1,14 +1,47 @@
 import { createHash } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
-import { and, count, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { holdTeamForReview } from "./send-review.js";
 import { assessSignupRisk, type SignupRiskSignals } from "./signup-risk-policy.js";
-import { collectSignupRiskSignals } from "./signup-risk-signals.js";
+import { collectSignupRiskSignals, signupGenericTeamName } from "./signup-risk-signals.js";
 
 type UserRisk = typeof schema.userSignupRisk.$inferSelect;
 type RiskLevel = UserRisk["level"];
 const rank: Record<RiskLevel, number> = { good: 0, sandbox: 1, hold: 2 };
 const HOUR = 3_600_000;
+
+function lockNames(userId: string, signals: SignupRiskSignals): string[] {
+  return [
+    `user:${userId}`,
+    `domain:${signals.domain}`,
+    ...(signals.ipKey ? [`ip:${signals.ipKey}`] : []),
+    ...(signals.asn ? [`asn:${signals.asn}`] : []),
+  ];
+}
+
+/** Read only captured registrations, not team creation or legacy backfills. */
+async function currentVelocity(db: Db, signals: SignupRiskSignals, now: Date, increment = 0) {
+  const recent = (since: number) =>
+    and(
+      eq(schema.userSignupRisk.source, "signup"),
+      gte(schema.userSignupRisk.capturedAt, new Date(now.getTime() - since)),
+      lte(schema.userSignupRisk.capturedAt, now),
+    );
+  const tally = async (predicate: ReturnType<typeof eq>, window: number) => {
+    const [row] = await db
+      .select({ n: count() })
+      .from(schema.userSignupRisk)
+      .where(and(predicate, recent(window)));
+    return Number(row?.n ?? 0) + increment;
+  };
+  return {
+    signupsDomain24h: await tally(eq(schema.userSignupRisk.domain, signals.domain), 24 * HOUR),
+    signupsIp1h: signals.ipKey
+      ? await tally(eq(schema.userSignupRisk.ipKey, signals.ipKey), HOUR)
+      : 0,
+    signupsAsn1h: signals.asn ? await tally(eq(schema.userSignupRisk.asn, signals.asn), HOUR) : 0,
+  };
+}
 
 /** Hash only private metadata, then order actual lock IDs to prevent inverted waits. */
 async function lock(db: Db, names: string[]): Promise<void> {
@@ -65,6 +98,9 @@ function observedSignals(value: SignupRiskSignals): SignupRiskSignals {
     signupsIp1h: 0,
     signupsDomain24h: 0,
     signupsAsn1h: 0,
+    // These observations come from application events, never DNS/RDAP dependencies.
+    verificationSeconds: null,
+    genericTeamName: false,
   };
 }
 
@@ -103,12 +139,7 @@ export async function recordSignupRisk(
   }
   return db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
-    await lock(tx, [
-      `user:${input.userId}`,
-      `domain:${signals.domain}`,
-      ...(signals.ipKey ? [`ip:${signals.ipKey}`] : []),
-      ...(signals.asn ? [`asn:${signals.asn}`] : []),
-    ]);
+    await lock(tx, lockNames(input.userId, signals));
     const [prior] = await tx
       .select()
       .from(schema.userSignupRisk)
@@ -119,30 +150,7 @@ export async function recordSignupRisk(
       .from(schema.user)
       .where(eq(schema.user.id, input.userId));
     if (!principal) throw new Error("signup_risk_principal_missing");
-    const increment = source === "signup" ? 1 : 0;
-    const recent = (since: number) =>
-      and(
-        eq(schema.userSignupRisk.source, "signup"),
-        gte(schema.userSignupRisk.capturedAt, new Date(now.getTime() - since)),
-        lte(schema.userSignupRisk.capturedAt, now),
-      );
-    const tally = async (predicate: ReturnType<typeof eq>, window: number) => {
-      const [row] = await tx
-        .select({ n: count() })
-        .from(schema.userSignupRisk)
-        .where(and(predicate, recent(window)));
-      return Number(row?.n ?? 0) + increment;
-    };
-    signals.signupsDomain24h = await tally(
-      eq(schema.userSignupRisk.domain, signals.domain),
-      24 * HOUR,
-    );
-    signals.signupsIp1h = signals.ipKey
-      ? await tally(eq(schema.userSignupRisk.ipKey, signals.ipKey), HOUR)
-      : 0;
-    signals.signupsAsn1h = signals.asn
-      ? await tally(eq(schema.userSignupRisk.asn, signals.asn), HOUR)
-      : 0;
+    Object.assign(signals, await currentVelocity(tx, signals, now, source === "signup" ? 1 : 0));
     const assessment = assessSignupRisk(signals);
     const [created] = await tx
       .insert(schema.userSignupRisk)
@@ -188,13 +196,27 @@ export async function markSignupEmailVerified(
     const tx = transaction as unknown as Db;
     await lock(tx, [`user:${input.userId}`]);
     const [principal] = await tx
-      .select({ verified: schema.user.emailVerified })
+      .select({ verified: schema.user.emailVerified, createdAt: schema.user.createdAt })
       .from(schema.user)
       .where(eq(schema.user.id, input.userId));
     if (!principal?.verified) return;
+    const [profile] = await tx
+      .select()
+      .from(schema.userSignupRisk)
+      .where(eq(schema.userSignupRisk.userId, input.userId));
+    if (!profile || profile.verifiedAt) return;
+    const elapsed = (now.getTime() - principal.createdAt.getTime()) / 1000;
+    // An already-verified social capture has verifiedAt set, and a legacy fallback
+    // has no observed email journey. Neither may fabricate a zero-second signal.
+    const verificationSeconds =
+      profile.source === "signup" && Number.isFinite(elapsed) && elapsed > 0 ? elapsed : null;
+    const signals = { ...profile.signals, verificationSeconds };
+    const assessment = assessSignupRisk(signals);
+    const level = rank[assessment.level] > rank[profile.level] ? assessment.level : profile.level;
+    const reasons = [...new Set([...profile.reasons, ...assessment.reasons])];
     const changed = await tx
       .update(schema.userSignupRisk)
-      .set({ verifiedAt: now })
+      .set({ verifiedAt: now, signals, level, reasons, policyVersion: assessment.policyVersion })
       .where(
         and(
           eq(schema.userSignupRisk.userId, input.userId),
@@ -202,13 +224,69 @@ export async function markSignupEmailVerified(
         ),
       )
       .returning({ id: schema.userSignupRisk.userId });
-    if (changed.length)
-      await audit(tx, {
-        action: "auth.signup_risk_verified",
-        userId: input.userId,
-        now,
-        data: { verifiedAt: now.toISOString() },
-      });
+    if (!changed.length) return;
+    // A team may already exist before its principal confirms email. Project the
+    // observed callback immediately, so it cannot keep an obsolete good profile
+    // until its first full key. Operator-cleared teams retain their override.
+    const teams = await tx
+      .select()
+      .from(schema.teamSignupRisk)
+      .where(
+        and(
+          eq(schema.teamSignupRisk.principalUserId, input.userId),
+          isNull(schema.teamSignupRisk.clearedAt),
+        ),
+      )
+      .for("update");
+    for (const team of teams) {
+      const teamSignals = { ...team.signals, verificationSeconds };
+      const teamAssessment = assessSignupRisk(teamSignals);
+      const previous = rank[level] > rank[team.level] ? level : team.level;
+      const teamLevel =
+        rank[teamAssessment.level] > rank[previous] ? teamAssessment.level : previous;
+      const teamReasons = [...new Set([...team.reasons, ...reasons, ...teamAssessment.reasons])];
+      await tx
+        .update(schema.teamSignupRisk)
+        .set({
+          signals: teamSignals,
+          level: teamLevel,
+          reasons: teamReasons,
+          policyVersion: teamAssessment.policyVersion,
+        })
+        .where(
+          and(
+            eq(schema.teamSignupRisk.teamId, team.teamId),
+            isNull(schema.teamSignupRisk.clearedAt),
+          ),
+        );
+      if (teamLevel === "hold")
+        await holdTeamForReview(tx, {
+          teamId: team.teamId,
+          reason: "new_sender",
+          note: "Signup risk requires operator review.",
+          now,
+        });
+      if (teamLevel !== team.level)
+        await audit(tx, {
+          action: "team.signup_risk_escalated",
+          userId: input.userId,
+          teamId: team.teamId,
+          now,
+          data: {
+            from: team.level,
+            to: teamLevel,
+            reasons: teamReasons,
+            policyVersion: teamAssessment.policyVersion,
+            verificationObserved: true,
+          },
+        });
+    }
+    await audit(tx, {
+      action: "auth.signup_risk_verified",
+      userId: input.userId,
+      now,
+      data: { verifiedAt: now.toISOString(), verificationSeconds, level },
+    });
   });
 }
 
@@ -230,7 +308,7 @@ export async function enrollTeamSignupRisk(
     .where(eq(schema.userSignupRisk.userId, input.userId));
   if (!profile) throw new Error("signup_risk_profile_required");
   const [team] = await tx
-    .select({ createdAt: schema.teams.createdAt })
+    .select({ createdAt: schema.teams.createdAt, name: schema.teams.name })
     .from(schema.teams)
     .where(eq(schema.teams.id, input.teamId));
   if (!team) throw new Error("signup_risk_team_missing");
@@ -247,8 +325,20 @@ export async function enrollTeamSignupRisk(
       ),
     )
     .limit(1);
-  const level = heldOwner ? "hold" : profile.level;
-  const reasons = [...new Set([...profile.reasons, ...(heldOwner ? ["existing_owner_hold"] : [])])];
+  const signals = { ...profile.signals, genericTeamName: signupGenericTeamName(team.name) };
+  const assessment = assessSignupRisk(signals);
+  const level = heldOwner
+    ? "hold"
+    : rank[assessment.level] > rank[profile.level]
+      ? assessment.level
+      : profile.level;
+  const reasons = [
+    ...new Set([
+      ...profile.reasons,
+      ...assessment.reasons,
+      ...(heldOwner ? ["existing_owner_hold"] : []),
+    ]),
+  ];
   const inserted = await tx
     .insert(schema.teamSignupRisk)
     .values({
@@ -256,8 +346,8 @@ export async function enrollTeamSignupRisk(
       principalUserId: input.userId,
       level,
       reasons,
-      signals: profile.signals,
-      policyVersion: profile.policyVersion,
+      signals,
+      policyVersion: assessment.policyVersion,
       createdAt: team.createdAt,
     })
     .onConflictDoNothing()
@@ -283,7 +373,7 @@ export async function enrollTeamSignupRisk(
     data: {
       level,
       reasons,
-      policyVersion: profile.policyVersion,
+      policyVersion: assessment.policyVersion,
       inheritedOwnerHold: Boolean(heldOwner),
     },
   });
@@ -323,45 +413,66 @@ export async function refreshSignupRiskAfterFullKey(
 ): Promise<void> {
   const now = input.now ?? new Date();
   const [identity] = await db
-    .select({ userId: schema.teamSignupRisk.principalUserId })
+    .select({
+      userId: schema.teamSignupRisk.principalUserId,
+      signals: schema.teamSignupRisk.signals,
+    })
     .from(schema.teamSignupRisk)
     .where(eq(schema.teamSignupRisk.teamId, input.teamId));
   if (!identity?.userId) return;
   const userId = identity.userId;
   await db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
-    await lock(tx, [`user:${userId}`]);
+    // Match capture's complete lock set and ordering, so a concurrent signup
+    // cannot hide a newly formed burst from the first-key assessment.
+    await lock(tx, lockNames(userId, identity.signals));
     const [risk] = await tx
       .select()
       .from(schema.teamSignupRisk)
       .where(eq(schema.teamSignupRisk.teamId, input.teamId))
       .for("update");
     if (!risk || risk.clearedAt || risk.principalUserId !== userId) return;
+    const [profile] = await tx
+      .select()
+      .from(schema.userSignupRisk)
+      .where(eq(schema.userSignupRisk.userId, userId));
     const [team] = await tx
-      .select({ createdAt: schema.teams.createdAt })
+      .select({ createdAt: schema.teams.createdAt, name: schema.teams.name })
       .from(schema.teams)
       .where(eq(schema.teams.id, input.teamId));
     if (!team) return;
     const [key] = await tx
-      .select({ id: schema.apiKeys.id })
+      .select({ createdAt: schema.apiKeys.createdAt })
       .from(schema.apiKeys)
       .where(
         and(
           eq(schema.apiKeys.teamId, input.teamId),
           eq(schema.apiKeys.permission, "full_access"),
           gte(schema.apiKeys.createdAt, team.createdAt),
-          lte(schema.apiKeys.createdAt, new Date(team.createdAt.getTime() + 180_000)),
           lte(schema.apiKeys.createdAt, now),
         ),
       )
+      .orderBy(asc(schema.apiKeys.createdAt))
       .limit(1);
     if (!key) return;
-    const signals = { ...risk.signals, rapidFullKey: true };
+    const rapidFullKey = key.createdAt.getTime() - team.createdAt.getTime() <= 180_000;
+    const signals: SignupRiskSignals = {
+      ...risk.signals,
+      ...(await currentVelocity(tx, risk.signals, now)),
+      rapidFullKey: risk.signals.rapidFullKey === true || rapidFullKey,
+      genericTeamName: signupGenericTeamName(team.name),
+      verificationSeconds: profile?.signals.verificationSeconds ?? null,
+    };
     const assessment = assessSignupRisk(signals);
-    const level = rank[assessment.level] > rank[risk.level] ? assessment.level : risk.level;
-    const reasons = [...new Set([...risk.reasons, ...assessment.reasons])];
+    const priorLevel =
+      profile && rank[profile.level] > rank[risk.level] ? profile.level : risk.level;
+    const level = rank[assessment.level] > rank[priorLevel] ? assessment.level : priorLevel;
+    const reasons = [
+      ...new Set([...risk.reasons, ...(profile?.reasons ?? []), ...assessment.reasons]),
+    ];
     const changed =
-      risk.signals.rapidFullKey !== true ||
+      JSON.stringify(signals) !== JSON.stringify(risk.signals) ||
+      risk.policyVersion !== assessment.policyVersion ||
       level !== risk.level ||
       reasons.length !== risk.reasons.length;
     if (!changed) return;
@@ -374,12 +485,8 @@ export async function refreshSignupRiskAfterFullKey(
           isNull(schema.teamSignupRisk.clearedAt),
         ),
       );
-    const [profile] = await tx
-      .select()
-      .from(schema.userSignupRisk)
-      .where(eq(schema.userSignupRisk.userId, userId));
     if (profile) {
-      const userSignals = { ...profile.signals, rapidFullKey: true };
+      const userSignals = { ...profile.signals, ...signals };
       const userAssessment = assessSignupRisk(userSignals);
       const userLevel = rank[level] > rank[userAssessment.level] ? level : userAssessment.level;
       await tx
@@ -409,7 +516,7 @@ export async function refreshSignupRiskAfterFullKey(
         to: level,
         reasons,
         policyVersion: assessment.policyVersion,
-        rapidFullKey: true,
+        rapidFullKey: signals.rapidFullKey,
       },
     });
   });

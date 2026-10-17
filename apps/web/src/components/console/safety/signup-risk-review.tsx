@@ -22,6 +22,11 @@ export function SignupRiskReview({ teamId }: { teamId: string }) {
   );
   const [reason, setReason] = useState("");
   const [reviewed, setReviewed] = useState(false);
+  const resolve = useMutation(
+    trpc.console.teams.resolveSignupReview.mutationOptions({
+      onSuccess: () => void query.refetch(),
+    }),
+  );
   const risk = query.data;
   if (query.isError)
     return (
@@ -40,9 +45,41 @@ export function SignupRiskReview({ teamId }: { teamId: string }) {
   return (
     <section className="ms-card" style={{ padding: 20, marginBlock: 16 }}>
       <h2 style={{ marginTop: 0 }}>{t("title")}</h2>
-      <p>{t("status", { status: t(`levels.${risk.clearedAt ? "good" : risk.level}`) })}</p>
+      <p>{t("storedLevel", { level: risk.level ? t(`levels.${risk.level}`) : t("legacy") })}</p>
+      <p>
+        {t("effective", {
+          status: t(
+            `effectiveLevels.${risk.suspendedAt ? "suspended" : risk.sendReviewAt ? "held" : (risk.restriction ?? (risk.clearedAt || risk.level === "good" ? "none" : risk.level === "hold" ? "review" : "sandbox"))}`,
+          ),
+        })}
+      </p>
+      {risk.policyVersion ? <p>{t("policy", { version: risk.policyVersion })}</p> : null}
+      {risk.reasons?.length ? <p>{t("reasons", { reasons: risk.reasons.join(", ") })}</p> : null}
+      {risk.request ? (
+        <div style={{ marginBlock: 16, overflowWrap: "anywhere" }}>
+          <h3>{t("requestTitle")}</h3>
+          <p>{risk.request.context}</p>
+          <p style={{ color: "var(--ms-muted)", fontSize: 13 }}>{t("privateContext")}</p>
+          {risk.request.resolvedAt ? (
+            <p>{t("resolved")}</p>
+          ) : (
+            <>
+              <p>{t("resolveScope")}</p>
+              <button
+                type="button"
+                className="ms-btn ms-btn-secondary"
+                disabled={resolve.isPending}
+                onClick={() => resolve.mutate({ id: teamId, reviewed: true })}
+              >
+                {t(resolve.isPending ? "saving" : "resolve")}
+              </button>
+              {resolve.isError ? <p role="alert">{t("failed")}</p> : null}
+            </>
+          )}
+        </div>
+      ) : null}
       <p>{t("scope")}</p>
-      {!risk.clearedAt && risk.level !== "good" && (
+      {!risk.clearedAt && risk.level && risk.level !== "good" && (
         <form
           onSubmit={(event) => {
             event.preventDefault();

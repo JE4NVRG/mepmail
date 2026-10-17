@@ -557,7 +557,14 @@
       "mailbox_external_disconnected": "Disconnected an external account from Mail",
       "mailbox_send_queued": "Sent a message from a mailbox",
       "mailbox_license_granted": "Licensed a mailbox in the plan",
-      "mailbox_license_revoked": "Removed a mailbox from the plan"
+      "mailbox_license_revoked": "Removed a mailbox from the plan",
+      "auth_signup_risk_recorded": "Signup signals recorded",
+      "auth_signup_risk_verified": "Signup verification recorded",
+      "team_signup_risk_cleared": "Signup restriction removed",
+      "team_signup_risk_enrolled": "Team enrolled in signup policy",
+      "team_signup_risk_escalated": "Signup restriction escalated",
+      "team_signup_risk_review_requested": "Signup review requested",
+      "team_signup_risk_review_resolved": "Review request addressed"
     },
     "empty": "Nothing recorded yet.",
     "loadMore": "Load more",

@@ -6,6 +6,7 @@ import {
   type SignupRiskLookups,
   signupAsnQuery,
   signupEmailDomain,
+  signupGenericTeamName,
   signupPublicIp,
   signupRdapUrl,
 } from "../src/signup-risk-signals.js";
@@ -69,6 +70,8 @@ describe("bounded signup signal collection", () => {
       signupsIp1h: 0,
       signupsDomain24h: 0,
       signupsAsn1h: 0,
+      verificationSeconds: null,
+      genericTeamName: false,
     });
     expect(result.ipKey).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(result)).not.toMatch(
@@ -77,6 +80,61 @@ describe("bounded signup signal collection", () => {
     expect(d.resolveTxt.mock.calls[0]?.[0]).toBe("8.8.8.8.origin.asn.cymru.com");
     expect(d.fetch.mock.calls[0]?.[1]).toMatchObject({ redirect: "error" });
   });
+
+  it.each([
+    "Loja",
+    "Minha Loja",
+    "loja online",
+    "My Store",
+    "shop 123",
+    "Sunny Acre Farms",
+    "GoldenGateFloral",
+    "Example Coffee Company",
+    "ExampleBoutique",
+  ])("returns a boolean weak signal for a common team-name template: %s", (name) =>
+    expect(signupGenericTeamName(name)).toBe(true),
+  );
+
+  it.each([
+    "",
+    "Synthetic",
+    "JE4NDEV",
+    "Agência MEP",
+    "Golden Gate Technology",
+    "MyShopper",
+    "Farmington Consulting",
+    "x".repeat(257),
+  ])("does not classify arbitrary company names as a template: %s", (name) =>
+    expect(signupGenericTeamName(name)).toBe(false),
+  );
+
+  it.each(["q7mzkvra", "4gkz9wpt", "ab123456", "a1b2c3d4e5", "abcdefabcdefabcdef"])(
+    "detects short mixed and opaque identities without persisting their local part: %s",
+    async (local) => {
+      const d = dependencies();
+      const collector = createSignupRiskSignalCollector(d.lookups);
+      const result = await collector(input(`${local}@acme.com`));
+      expect(result.randomLocal).toBe(true);
+      expect(JSON.stringify(result)).not.toContain(local);
+    },
+  );
+
+  it.each([
+    "carlos1988",
+    "maria12",
+    "alex1234",
+    "person",
+    "first.last2026",
+    "user-name1",
+    "a1b2c3d",
+  ])(
+    "keeps readable human address shapes and too-short mixtures out of random identity evidence: %s",
+    async (local) => {
+      const d = dependencies();
+      const collector = createSignupRiskSignalCollector(d.lookups);
+      expect((await collector(input(`${local}@acme.com`))).randomLocal).toBe(false);
+    },
+  );
 
   it("uses the pinned disposable snapshot including subdomains and no suffix lookalikes", async () => {
     const d = dependencies();
@@ -309,6 +367,37 @@ describe("bounded signup signal collection", () => {
     vi.setSystemTime(Date.now() + 11 * 60_000);
     await collector(input("one@one-company.com"));
     expect(d.fetch).toHaveBeenCalledTimes(5);
+  });
+
+  it("retries incomplete domain facts after thirty seconds while retaining a recovered observation for ten minutes", async () => {
+    vi.useFakeTimers();
+    const d = dependencies();
+    d.resolveMx.mockRejectedValueOnce(
+      Object.assign(new Error("synthetic timeout"), { code: "ETIMEOUT" }),
+    );
+    d.fetch.mockResolvedValueOnce(jsonResponse({ ldhName: "acme.com", events: [] }));
+    const collector = createSignupRiskSignalCollector(d.lookups);
+    expect(await collector(input())).toMatchObject({ mx: "unknown", domainAgeDays: null });
+    await collector(input());
+    expect(d.fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(30_001);
+    expect(await collector(input())).toMatchObject({ mx: "present", domainAgeDays: 2 });
+    expect(d.fetch).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(30_001);
+    await collector(input());
+    expect(d.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries an unknown ASN without reloading complete domain facts", async () => {
+    vi.useFakeTimers();
+    const d = dependencies();
+    d.resolveTxt.mockRejectedValueOnce(new Error("synthetic timeout"));
+    const collector = createSignupRiskSignalCollector(d.lookups);
+    expect((await collector({ ...input(), ip: "8.8.8.8" })).asn).toBeNull();
+    await vi.advanceTimersByTimeAsync(30_001);
+    expect((await collector({ ...input(), ip: "8.8.8.8" })).asn).toBe(15169);
+    expect(d.resolveTxt).toHaveBeenCalledTimes(2);
+    expect(d.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("does not infer a single origin ASN from ambiguous or malformed answers", async () => {

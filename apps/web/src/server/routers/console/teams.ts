@@ -236,17 +236,29 @@ export const consoleTeamsRouter = router({
       };
     }),
 
+  /** One team, the way the console's team dialog and the review page read it: counters live, standing fresh. */
   signupRisk: operatorProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
-    await loadTeam(ctx.db, input.id);
+    const team = await loadTeam(ctx.db, input.id);
     const risk = await getTeamSignupRisk(ctx.db, input.id);
     const restriction = await getSignupSendingRestriction(ctx.db, input.id, env.IS_CLOUD);
-    return risk
+    const [request] = await ctx.db
+      .select({
+        context: schema.signupRiskReviewRequests.context,
+        requestedAt: schema.signupRiskReviewRequests.requestedAt,
+        resolvedAt: schema.signupRiskReviewRequests.resolvedAt,
+      })
+      .from(schema.signupRiskReviewRequests)
+      .where(eq(schema.signupRiskReviewRequests.teamId, input.id));
+    return risk || team.sendReviewAt || request
       ? {
-          level: risk.level,
-          reasons: risk.reasons,
-          policyVersion: risk.policyVersion,
-          clearedAt: risk.clearedAt,
+          level: risk?.level ?? null,
+          reasons: risk?.reasons ?? [],
+          policyVersion: risk?.policyVersion ?? null,
+          clearedAt: risk?.clearedAt ?? null,
           restriction: restriction.kind,
+          sendReviewAt: team.sendReviewAt,
+          suspendedAt: team.suspendedAt,
+          request: request ?? null,
         }
       : null;
   }),
@@ -269,7 +281,34 @@ export const consoleTeamsRouter = router({
       return { changed, existingHoldAndSuspensionUnchanged: true, noQueueAction: true };
     }),
 
-  /** One team, the way the console's team dialog and the review page read it: counters live, standing fresh. */
+  /** Acknowledges only the request. Sending restrictions require their own explicit decisions. */
+  resolveSignupReview: operatorProcedure
+    .input(z.object({ id: z.uuid(), reviewed: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      await loadTeam(ctx.db, input.id);
+      return ctx.db.transaction(async (tx) => {
+        const [request] = await tx
+          .select({ resolvedAt: schema.signupRiskReviewRequests.resolvedAt })
+          .from(schema.signupRiskReviewRequests)
+          .where(eq(schema.signupRiskReviewRequests.teamId, input.id))
+          .for("update");
+        if (!request || request.resolvedAt) return { changed: false };
+        const now = new Date();
+        await tx
+          .update(schema.signupRiskReviewRequests)
+          .set({ resolvedAt: now })
+          .where(eq(schema.signupRiskReviewRequests.teamId, input.id));
+        await tx.insert(schema.auditLog).values({
+          teamId: input.id,
+          actorId: `user:${ctx.operator.id}`,
+          action: "team.signup_risk_review_resolved",
+          target: `team:${input.id}`,
+          data: { existingRestrictionsUnchanged: true },
+        });
+        return { changed: true };
+      });
+    }),
+
   detail: operatorProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
     const [row] = await ctx.db
       .select(ROW)

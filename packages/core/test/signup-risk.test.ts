@@ -35,7 +35,7 @@ async function person(verified = false) {
   const email = `${userId}@signup.test`;
   await db
     .insert(schema.user)
-    .values({ id: userId, email, name: "Synthetic", emailVerified: verified });
+    .values({ id: userId, email, name: "Synthetic", emailVerified: verified, createdAt: now });
   return { userId, email, secret: "synthetic-only-secret", now };
 }
 async function capture(over: Partial<SignupRiskSignals> = {}, verified = true) {
@@ -45,12 +45,12 @@ async function capture(over: Partial<SignupRiskSignals> = {}, verified = true) {
   });
   return user;
 }
-async function team(userId: string, at = now) {
+async function team(userId: string, at = now, name = "Synthetic") {
   return db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
     const [created] = await tx
       .insert(schema.teams)
-      .values({ name: "Synthetic", slug: randomUUID(), createdAt: at })
+      .values({ name, slug: randomUUID(), createdAt: at })
       .returning();
     if (!created) throw new Error("fixture_team_missing");
     await tx.insert(schema.teamMembers).values({ teamId: created.id, userId, role: "owner" });
@@ -96,6 +96,8 @@ describe("signup risk capture and verification", () => {
       ...signals(),
       rawIp: "198.51.100.41",
       email: user.email,
+      verificationSeconds: 1,
+      genericTeamName: true,
     }));
     const first = await recordSignupRisk(db, user, { collect });
     const again = await recordSignupRisk(
@@ -106,6 +108,7 @@ describe("signup risk capture and verification", () => {
     expect(collect).toHaveBeenCalledTimes(1);
     expect(again).toEqual(first);
     expect(first).toMatchObject({ source: "signup", capturedAt: now, verifiedAt: null });
+    expect(first.signals).toMatchObject({ verificationSeconds: null, genericTeamName: false });
     expect(JSON.stringify(first)).not.toContain("198.51.100.41");
     expect(JSON.stringify(first)).not.toContain(user.email);
     expect(await audits("auth.signup_risk_recorded", user.userId)).toHaveLength(1);
@@ -130,12 +133,18 @@ describe("signup risk capture and verification", () => {
       now: new Date(now.getTime() + 20_000),
     });
     expect((await profile(user.userId))?.verifiedAt).toEqual(verifiedAt);
+    expect((await profile(user.userId))?.signals.verificationSeconds).toBe(10);
     expect(await audits("auth.signup_risk_verified", user.userId)).toHaveLength(1);
   });
 
   it("observes a verified social signup, but never fabricates a legacy verification time or original IP", async () => {
     const social = await capture();
     expect((await profile(social.userId))?.verifiedAt).toEqual(now);
+    await markSignupEmailVerified(db, {
+      userId: social.userId,
+      now: new Date(now.getTime() + 8000),
+    });
+    expect((await profile(social.userId))?.signals.verificationSeconds).toBeNull();
     const old = await person(true);
     const collect = vi.fn(async (_input: CollectSignupRiskInput) =>
       signals({ domain: "legacy.test" }),
@@ -147,7 +156,25 @@ describe("signup risk capture and verification", () => {
     );
     expect(collect.mock.calls[0]?.[0]).not.toHaveProperty("ip");
     expect((await profile(old.userId))?.verifiedAt).toBeNull();
+    await markSignupEmailVerified(db, { userId: old.userId, now: new Date(now.getTime() + 8000) });
+    expect((await profile(old.userId))?.signals.verificationSeconds).toBeNull();
   });
+
+  it.each([0, -1000])(
+    "does not turn a zero or negative verification interval into rapid evidence: %s",
+    async (elapsed) => {
+      const user = await capture({}, false);
+      await db
+        .update(schema.user)
+        .set({ emailVerified: true })
+        .where(eq(schema.user.id, user.userId));
+      await markSignupEmailVerified(db, {
+        userId: user.userId,
+        now: new Date(now.getTime() + elapsed),
+      });
+      expect((await profile(user.userId))?.signals.verificationSeconds).toBeNull();
+    },
+  );
 
   it("counts actual signup captures, excluding legacy fallback creation from signup velocity", async () => {
     const domain = `burst-${randomUUID()}.test`;
@@ -175,6 +202,63 @@ describe("signup risk capture and verification", () => {
 });
 
 describe("team projection, holds and immutable principal", () => {
+  it("sandboxes an unknown-age random signup with a generic team name before any full key", async () => {
+    const user = await capture({ domainAgeDays: null, randomLocal: true }, false);
+    const teamId = await team(user.userId, now, "Minha Loja");
+    expect(await getTeamSignupRisk(db, teamId)).toMatchObject({
+      level: "sandbox",
+      signals: { genericTeamName: true },
+    });
+    expect(
+      await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.teamId, teamId)),
+    ).toHaveLength(0);
+  });
+
+  it.each([{ domainAgeDays: null }, { mx: "unknown" as const, domainAgeDays: 365 }])(
+    "projects a measured rapid verification into an existing unknown random team before any full key: %j",
+    async (change) => {
+      const user = await capture({ ...change, randomLocal: true }, false);
+      const teamId = await team(user.userId);
+      expect((await getTeamSignupRisk(db, teamId))?.level).toBe("good");
+      await db
+        .update(schema.user)
+        .set({ emailVerified: true })
+        .where(eq(schema.user.id, user.userId));
+      await markSignupEmailVerified(db, {
+        userId: user.userId,
+        now: new Date(now.getTime() + 8000),
+      });
+      expect((await profile(user.userId))?.level).toBe("sandbox");
+      expect(await getTeamSignupRisk(db, teamId)).toMatchObject({
+        level: "sandbox",
+        signals: { verificationSeconds: 8 },
+      });
+      expect(
+        await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.teamId, teamId)),
+      ).toHaveLength(0);
+    },
+  );
+
+  it("preserves an operator-cleared team when a later verification escalates its principal", async () => {
+    const user = await capture({ domainAgeDays: null, randomLocal: true }, false);
+    const teamId = await team(user.userId);
+    await db
+      .update(schema.teamSignupRisk)
+      .set({
+        clearedAt: now,
+        clearedBy: "synthetic-operator",
+        clearedReason: "Synthetic reviewed exception",
+      })
+      .where(eq(schema.teamSignupRisk.teamId, teamId));
+    await db
+      .update(schema.user)
+      .set({ emailVerified: true })
+      .where(eq(schema.user.id, user.userId));
+    await markSignupEmailVerified(db, { userId: user.userId, now: new Date(now.getTime() + 8000) });
+    expect((await profile(user.userId))?.level).toBe("sandbox");
+    expect(await getTeamSignupRisk(db, teamId)).toMatchObject({ level: "good", clearedAt: now });
+  });
+
   it("preserves legacy absence and returns server-only principal verification", async () => {
     const [legacy] = await db
       .insert(schema.teams)
@@ -302,6 +386,94 @@ describe("team projection, holds and immutable principal", () => {
 });
 
 describe("full-key rescreening", () => {
+  it("keeps the first-wave unknown-age random signup in sandbox after a 19-second full key", async () => {
+    const user = await capture({ domainAgeDays: null, randomLocal: true });
+    const teamId = await team(user.userId);
+    expect((await getTeamSignupRisk(db, teamId))?.level).toBe("good");
+    await key(teamId, new Date(now.getTime() + 19_000));
+    await refreshSignupRiskAfterFullKey(db, { teamId, now: new Date(now.getTime() + 20_000) });
+    expect(await getTeamSignupRisk(db, teamId)).toMatchObject({
+      level: "sandbox",
+      policyVersion: 2,
+      signals: { domainAgeDays: null, randomLocal: true, rapidFullKey: true },
+    });
+    expect((await profile(user.userId))?.level).toBe("sandbox");
+    expect(
+      (await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)))[0]?.sendReviewAt,
+    ).toBeNull();
+  });
+
+  it("uses the current team name instead of its enrollment snapshot", async () => {
+    const user = await capture({ randomLocal: true });
+    const teamId = await team(user.userId);
+    expect((await getTeamSignupRisk(db, teamId))?.signals.genericTeamName).toBe(false);
+    await db.update(schema.teams).set({ name: "Minha Loja" }).where(eq(schema.teams.id, teamId));
+    await key(teamId);
+    await refreshSignupRiskAfterFullKey(db, { teamId, now: new Date(now.getTime() + 100_000) });
+    expect(await getTeamSignupRisk(db, teamId)).toMatchObject({
+      level: "sandbox",
+      signals: { genericTeamName: true },
+    });
+    expect(JSON.stringify((await getTeamSignupRisk(db, teamId))?.signals)).not.toContain(
+      "Minha Loja",
+    );
+  });
+
+  it("preserves a principal hold recorded after team enrollment when the first full key is late", async () => {
+    const user = await capture();
+    const teamId = await team(user.userId);
+    await db
+      .update(schema.userSignupRisk)
+      .set({ level: "hold", reasons: ["existing_owner_hold"] })
+      .where(eq(schema.userSignupRisk.userId, user.userId));
+    await key(teamId, new Date(now.getTime() + 181_000));
+    await refreshSignupRiskAfterFullKey(db, { teamId, now: new Date(now.getTime() + 200_000) });
+    expect(await getTeamSignupRisk(db, teamId)).toMatchObject({
+      level: "hold",
+      reasons: ["existing_owner_hold"],
+      signals: { rapidFullKey: false },
+    });
+    expect((await profile(user.userId))?.level).toBe("hold");
+  });
+
+  it("uses a verification callback observed after team enrollment without inventing a social time", async () => {
+    const user = await capture({ randomLocal: true }, false);
+    const teamId = await team(user.userId);
+    expect((await getTeamSignupRisk(db, teamId))?.signals.verificationSeconds).toBeNull();
+    await db
+      .update(schema.user)
+      .set({ emailVerified: true })
+      .where(eq(schema.user.id, user.userId));
+    await markSignupEmailVerified(db, { userId: user.userId, now: new Date(now.getTime() + 8000) });
+    await key(teamId, new Date(now.getTime() + 19_000));
+    await refreshSignupRiskAfterFullKey(db, { teamId, now: new Date(now.getTime() + 20_000) });
+    expect(await getTeamSignupRisk(db, teamId)).toMatchObject({
+      level: "sandbox",
+      signals: { verificationSeconds: 8 },
+    });
+  });
+
+  it("sees a signup burst formed after capture, excludes fallback captures and evaluates a late first full key", async () => {
+    const domain = `refresh-burst-${randomUUID()}.test`;
+    const user = await capture({ domain, randomLocal: true });
+    const teamId = await team(user.userId);
+    await recordSignupRisk(
+      db,
+      { ...(await person()), source: "team_fallback" },
+      { collect: async () => signals({ domain }) },
+    );
+    await capture({ domain });
+    await capture({ domain });
+    expect((await profile(user.userId))?.signals.signupsDomain24h).toBe(1);
+    await key(teamId, new Date(now.getTime() + 181_000));
+    await refreshSignupRiskAfterFullKey(db, { teamId, now: new Date(now.getTime() + 200_000) });
+    expect(await getTeamSignupRisk(db, teamId)).toMatchObject({
+      level: "sandbox",
+      signals: { signupsDomain24h: 3, rapidFullKey: false },
+    });
+    expect((await profile(user.userId))?.signals.signupsDomain24h).toBe(3);
+  });
+
   it("escalates a young random signup after a full key, persists the user assessment and never releases mail", async () => {
     const user = await capture({ domainAgeDays: 2, randomLocal: true });
     const teamId = await team(user.userId);

@@ -1024,7 +1024,18 @@
     "sendReview": "Os envios desta equipe estão retidos para revisão de segurança desde {since}. As mensagens aceitas ficam em espera enquanto a revisão estiver aberta. Um operador precisa revisar a equipe antes de o envio ser retomado. Fale com o suporte para pedir revisão.",
     "requestReview": "Pedir revisão",
     "signupSandbox": "O envio externo aguarda revisão de segurança. As mensagens de teste só podem ir para o seu próprio e-mail verificado no cadastro. Isso também vale para chaves de API full. Seus dados estão preservados.",
-    "signupReview": "O envio aguarda revisão de segurança desta conta. Seus dados estão preservados. Fale com o suporte para pedir revisão."
+    "signupReview": "O envio aguarda revisão de segurança desta conta. Seus dados estão preservados. Fale com o suporte para pedir revisão.",
+    "reviewRequest": {
+      "button": "Pedir revisão",
+      "failed": "Não foi possível enviar ou consultar o pedido. Tente novamente.",
+      "hint": "20 a 500 caracteres. Informe o tipo de envio e como os destinatários autorizaram o contato. Não inclua segredos ou conteúdo de e-mails.",
+      "label": "Em uma linha, como sua equipe pretende usar o MepMail?",
+      "received": "Pedido recebido. A equipe responsável fará a revisão; as restrições atuais continuam até uma decisão explícita.",
+      "retry": "Tentar novamente",
+      "saving": "Enviando…",
+      "submit": "Enviar pedido",
+      "wait": "Aguarde 24 horas desde o último pedido para abrir outro."
+    }
   },
   "signupRisk": {
     "title": "Restrição inicial de envio",
@@ -1040,6 +1051,42 @@
     "clear": "Remover restrição inicial",
     "saving": "Salvando…",
     "failed": "Não foi possível carregar ou salvar a revisão. Tente novamente.",
-    "retry": "Tentar novamente"
+    "retry": "Tentar novamente",
+    "effective": "Restrição efetiva: {status}",
+    "effectiveLevels": {
+      "held": "Envio retido",
+      "none": "Acesso normal",
+      "review": "Revisão de cadastro necessária",
+      "sandbox": "Testes apenas ao e-mail verificado",
+      "suspended": "Equipe suspensa"
+    },
+    "legacy": "Sem perfil de cadastro (legado)",
+    "policy": "Política armazenada: v{version}",
+    "privateContext": "Informação privada para esta revisão. Não é enviada em recibos, logs ou resumos por e-mail.",
+    "queue": {
+      "count": "{count} equipes na fila",
+      "effective": "Restrição efetiva",
+      "empty": "Nenhuma revisão pendente.",
+      "level": "Nível armazenado",
+      "loading": "Carregando revisões…",
+      "next": "Próxima",
+      "noReasons": "Sem sinais registrados",
+      "paid": "Contrato pago qualificado",
+      "payment": "Pagamento",
+      "previous": "Anterior",
+      "reasons": "Sinais",
+      "requested": "Revisão solicitada",
+      "since": "Na fila desde",
+      "subtitle": "Todos os sandboxes, envios retidos e pedidos abertos. Contratos pagos qualificados aparecem primeiro; o rótulo do plano não comprova pagamento.",
+      "team": "Equipe",
+      "title": "Fila de revisão de cadastro e envio",
+      "unconfirmed": "Pagamento não confirmado"
+    },
+    "reasons": "Sinais registrados: {reasons}",
+    "requestTitle": "Contexto do pedido de revisão",
+    "resolve": "Marcar pedido como revisado",
+    "resolveScope": "Marcar o pedido como revisado não altera restrições, suspensões nem mensagens retidas.",
+    "resolved": "Pedido marcado como revisado.",
+    "storedLevel": "Nível armazenado: {level}"
   }
 }

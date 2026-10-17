@@ -557,7 +557,14 @@
       "mailbox_external_disconnected": "Desconectou uma conta externa do Correio",
       "mailbox_send_queued": "Enviou uma mensagem de uma caixa",
       "mailbox_license_granted": "Liberou uma caixa no plano",
-      "mailbox_license_revoked": "Tirou uma caixa do plano"
+      "mailbox_license_revoked": "Tirou uma caixa do plano",
+      "auth_signup_risk_recorded": "Sinais de cadastro registrados",
+      "auth_signup_risk_verified": "Verificação de cadastro registrada",
+      "team_signup_risk_cleared": "Restrição de cadastro removida",
+      "team_signup_risk_enrolled": "Equipe incluída na política de cadastro",
+      "team_signup_risk_escalated": "Restrição de cadastro elevada",
+      "team_signup_risk_review_requested": "Revisão de cadastro solicitada",
+      "team_signup_risk_review_resolved": "Pedido de revisão atendido"
     },
     "empty": "Nada registrado ainda.",
     "loadMore": "Carregar mais",

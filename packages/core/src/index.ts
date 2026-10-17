@@ -867,6 +867,14 @@ export {
   signupSendMessage,
 } from "./signup-risk-enforcement.js";
 export {
+  isSignupReviewPaidTeam,
+  listSignupRiskReviewCandidates,
+  type SignupReviewPaymentReader,
+  type SignupReviewPaymentStatus,
+  type SignupRiskReviewCandidate,
+  signupReviewDomain,
+} from "./signup-risk-review-digest.js";
+export {
   isBlockedIp,
   type PostFailureCode,
   type PostJsonOptions,

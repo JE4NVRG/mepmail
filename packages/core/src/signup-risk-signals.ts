@@ -11,6 +11,8 @@ const DISPOSABLE = new Set(disposableData.domains);
 const MAX_RDAP_BYTES = 128 * 1024;
 const BUDGET_MS = 2_000;
 const DAY_MS = 86_400_000;
+const COMPLETE_FACTS_TTL_MS = 10 * 60_000;
+const INCOMPLETE_FACTS_TTL_MS = 30_000;
 
 function reservedDomain(domain: string): boolean {
   return [
@@ -171,14 +173,38 @@ export function signupRdapUrl(domain: string): string | null {
 
 function randomLocal(email: string): boolean {
   const local = email.slice(0, email.lastIndexOf("@"));
+  // A readable name followed by a year or a short number is common in human
+  // addresses. It must not become an identity signal just for containing digits.
+  if (/^[a-z]{3,}[0-9]{1,4}$/i.test(local)) return false;
   if (/^[a-f0-9]{16,64}$/i.test(local)) return true;
-  if (!/^[a-z0-9]{10,64}$/i.test(local)) return false;
-  const digits = local.match(/[0-9]/g)?.length ?? 0;
-  const changes = local
-    .split("")
-    .slice(1)
-    .filter((c, i) => /[0-9]/.test(c) !== /[0-9]/.test(local[i] ?? "")).length;
-  return digits >= 4 && local.length - digits >= 4 && changes >= 5;
+  return /^[a-z0-9]{8,64}$/i.test(local) && /[a-z]/i.test(local) && /[0-9]/.test(local);
+}
+
+const BUSINESS_SUFFIX =
+  "(?:antique|craft|mercantile|boutique|jewelry|jewellery|store|shop|floral|farm|bakery|furniture|lumber|aquatic|coffee|tools|supplies|events|market)s?";
+const GENERIC_BUSINESS_NAME = new RegExp(`(?:\\b${BUSINESS_SUFFIX}\\b|${BUSINESS_SUFFIX}$)`);
+
+/** Weak name-template signal; return only the boolean, never the original name. */
+export function signupGenericTeamName(name: string): boolean {
+  if (!name || name.length > 256) return false;
+  const normalized = name
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  if (
+    /^(?:(?:minha|my|online|test|teste) )?(?:loja|shop|store|team|equipe)(?: (?:online|virtual|test|teste|[0-9]{1,6}))?$/.test(
+      normalized,
+    )
+  )
+    return true;
+  // Common business suffixes are weak corroboration only, never a label that
+  // this actual business or its owner is abusive.
+  return (
+    normalized.length >= 6 && normalized.length <= 64 && GENERIC_BUSINESS_NAME.test(normalized)
+  );
 }
 
 async function dnsMx(domain: string, signal: AbortSignal) {
@@ -247,6 +273,7 @@ export function createSignupRiskSignalCollector(
     cache: Map<string, CacheEntry<T>>,
     key: string,
     load: () => Promise<T>,
+    ttl: (value: T) => number = () => COMPLETE_FACTS_TTL_MS,
   ): Promise<T> {
     const entry = cache.get(key);
     if (entry && entry.expiresAt > Date.now()) return entry.promise;
@@ -256,8 +283,13 @@ export function createSignupRiskSignalCollector(
       if (oldest === undefined) break;
       cache.delete(oldest);
     }
-    const promise = load();
-    cache.set(key, { expiresAt: Date.now() + 10 * 60_000, promise });
+    const promise = load().then((value) => {
+      const current = cache.get(key);
+      // An evicted, slow lookup must not replace a more recent observation.
+      if (current?.promise === promise) current.expiresAt = Date.now() + ttl(value);
+      return value;
+    });
+    cache.set(key, { expiresAt: Date.now() + COMPLETE_FACTS_TTL_MS, promise });
     return promise;
   }
   async function mx(domain: string, signal: AbortSignal): Promise<SignupRiskSignals["mx"]> {
@@ -374,16 +406,29 @@ export function createSignupRiskSignalCollector(
     try {
       const [facts, network] = await Promise.all([
         domain && networkAllowed
-          ? cached(domains, domain, async () => {
-              const [mxState, registeredAt] = await Promise.all([
-                bounded(() => mx(domain, signal.signal), "unknown" as const, signal.signal),
-                bounded(() => registration(domain, signal.signal), null, signal.signal),
-              ]);
-              return { mx: mxState, registeredAt };
-            })
+          ? cached(
+              domains,
+              domain,
+              async () => {
+                const [mxState, registeredAt] = await Promise.all([
+                  bounded(() => mx(domain, signal.signal), "unknown" as const, signal.signal),
+                  bounded(() => registration(domain, signal.signal), null, signal.signal),
+                ]);
+                return { mx: mxState, registeredAt };
+              },
+              (value) =>
+                value.mx === "unknown" || value.registeredAt === null
+                  ? INCOMPLETE_FACTS_TTL_MS
+                  : COMPLETE_FACTS_TTL_MS,
+            )
           : Promise.resolve({ mx: "unknown" as const, registeredAt: null }),
         ip && ipKey && networkAllowed
-          ? cached(asns, ipKey, () => bounded(() => asn(ip, signal.signal), null, signal.signal))
+          ? cached(
+              asns,
+              ipKey,
+              () => bounded(() => asn(ip, signal.signal), null, signal.signal),
+              (value) => (value === null ? INCOMPLETE_FACTS_TTL_MS : COMPLETE_FACTS_TTL_MS),
+            )
           : Promise.resolve(null),
       ]);
       const age =
@@ -402,6 +447,8 @@ export function createSignupRiskSignalCollector(
         signupsIp1h: 0,
         signupsDomain24h: 0,
         signupsAsn1h: 0,
+        verificationSeconds: null,
+        genericTeamName: false,
       };
     } finally {
       clearTimeout(timer);

@@ -1,3 +1,4 @@
+import { createSignupReviewPaymentReader } from "@millionsend/billing";
 import { contentRevealOn, env } from "@millionsend/config";
 import {
   CHECKS,
@@ -12,6 +13,8 @@ import {
   fetchContentFactors,
   fetchDeliverabilityHealth,
   getMonitorSettingsRow,
+  getSignupSendingRestriction,
+  listSignupRiskReviewCandidates,
   MAILBOX_ACTIVITY_ACTIONS,
   parseAuditActor,
   recentMonitorSamples,
@@ -48,6 +51,7 @@ import { auditOperator, loadTeam } from "./shared";
 const f = schema.teamFlags;
 const t = schema.teams;
 const st = schema.teamStandings;
+const readSignupReviewPayments = createSignupReviewPaymentReader(env.STRIPE_SECRET_KEY);
 const teamRegion = sql<
   string | null
 >`(select d.region from ${schema.domains} d where d.team_id = ${t}."id" order by d.verified_at desc nulls last, d.created_at desc limit 1)`;
@@ -126,6 +130,75 @@ function assertContentRevealOn(): void {
 }
 
 export const consoleSafetyRouter = router({
+  /** Derived register: all signup sandboxes, holds (including pre-profile holds), and requests. */
+  signupReviews: operatorProcedure
+    .input(
+      z.object({
+        offset: z.number().int().min(0).default(0),
+        limit: z.number().int().min(1).max(100).default(25),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const candidates = await listSignupRiskReviewCandidates(
+        ctx.db,
+        new Date(),
+        readSignupReviewPayments,
+      );
+      const since = (row: (typeof candidates)[number]) => {
+        const dates = [
+          row.reviewRequestedAt,
+          row.sendReviewAt,
+          row.suspendedAt,
+          row.level === "sandbox" || row.level === "hold" ? row.profileCreatedAt : null,
+        ].filter((value): value is Date => value !== null);
+        return dates.length ? new Date(Math.min(...dates.map((value) => value.getTime()))) : null;
+      };
+      candidates.sort(
+        (a, b) =>
+          Number(b.paid) - Number(a.paid) ||
+          (since(a)?.getTime() ?? 0) - (since(b)?.getTime() ?? 0) ||
+          a.teamId.localeCompare(b.teamId),
+      );
+      const page = candidates.slice(input.offset, input.offset + input.limit);
+      const names = page.length
+        ? await ctx.db
+            .select({
+              id: t.id,
+              name: t.name,
+              storedLevel: schema.teamSignupRisk.level,
+              storedReasons: schema.teamSignupRisk.reasons,
+            })
+            .from(t)
+            .leftJoin(schema.teamSignupRisk, eq(schema.teamSignupRisk.teamId, t.id))
+            .where(
+              inArray(
+                t.id,
+                page.map((row) => row.teamId),
+              ),
+            )
+        : [];
+      const items = await Promise.all(
+        page.map(async (row) => ({
+          ...row,
+          level: names.find((team) => team.id === row.teamId)?.storedLevel ?? null,
+          reasons: names.find((team) => team.id === row.teamId)?.storedReasons ?? [],
+          name: names.find((team) => team.id === row.teamId)?.name ?? row.teamId,
+          since: since(row),
+          restriction: row.suspendedAt
+            ? ("suspended" as const)
+            : row.sendReviewAt
+              ? ("held" as const)
+              : (await getSignupSendingRestriction(ctx.db, row.teamId, env.IS_CLOUD)).kind,
+        })),
+      );
+      return {
+        items,
+        total: candidates.length,
+        nextOffset:
+          input.offset + input.limit < candidates.length ? input.offset + input.limit : null,
+      };
+    }),
+
   list: operatorProcedure
     .input(
       z.object({

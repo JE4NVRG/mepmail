@@ -13,7 +13,7 @@ import {
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { slugify } from "@/lib/slug";
@@ -50,6 +50,115 @@ async function selectTeam(
 }
 
 export const teamBootstrapRouter = router({
+  /** The response deliberately excludes private use context. Team scope comes from membership. */
+  signupReview: adminProcedure.query(async ({ ctx }) => {
+    const [request] = await ctx.db
+      .select({
+        requestedAt: schema.signupRiskReviewRequests.requestedAt,
+        resolvedAt: schema.signupRiskReviewRequests.resolvedAt,
+      })
+      .from(schema.signupRiskReviewRequests)
+      .where(eq(schema.signupRiskReviewRequests.teamId, ctx.teamId));
+    return {
+      pending: Boolean(request && !request.resolvedAt),
+      requestedAt: request?.requestedAt ?? null,
+    };
+  }),
+
+  requestSignupReview: adminProcedure
+    .input(
+      z.object({
+        context: z
+          .string()
+          .max(2000)
+          .transform((value) =>
+            value
+              .normalize("NFKC")
+              .replace(/[\p{Cc}\p{Cf}\s]+/gu, " ")
+              .trim(),
+          )
+          .pipe(
+            z
+              .string()
+              .min(20)
+              .max(500)
+              .refine((value) => Array.from(value).length >= 20),
+          ),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date();
+      return ctx.db
+        .transaction(async (tx) => {
+          // Serialize same-team retries and reopens; also prevents duplicate audit events.
+          const [team] = await tx
+            .select()
+            .from(schema.teams)
+            .where(eq(schema.teams.id, ctx.teamId))
+            .for("update");
+          if (!team) throw new TRPCError({ code: "NOT_FOUND" });
+          const [existing] = await tx
+            .select({
+              requestedAt: schema.signupRiskReviewRequests.requestedAt,
+              resolvedAt: schema.signupRiskReviewRequests.resolvedAt,
+            })
+            .from(schema.signupRiskReviewRequests)
+            .where(eq(schema.signupRiskReviewRequests.teamId, ctx.teamId));
+          if (existing && !existing.resolvedAt)
+            return { pending: true, requestedAt: existing.requestedAt };
+          if (existing && now.getTime() - existing.requestedAt.getTime() < 86_400_000)
+            throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "review_request_wait" });
+          const [risk] = await tx
+            .select({ teamId: schema.teamSignupRisk.teamId })
+            .from(schema.teamSignupRisk)
+            .where(
+              and(
+                eq(schema.teamSignupRisk.teamId, ctx.teamId),
+                isNull(schema.teamSignupRisk.clearedAt),
+                or(
+                  eq(schema.teamSignupRisk.level, "sandbox"),
+                  eq(schema.teamSignupRisk.level, "hold"),
+                ),
+              ),
+            );
+          if (!risk && !team.sendReviewAt && !team.suspendedAt)
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "no_review_restriction" });
+          await tx
+            .insert(schema.signupRiskReviewRequests)
+            .values({
+              teamId: ctx.teamId,
+              requestedBy: ctx.session.user.id,
+              context: input.context,
+              requestedAt: now,
+              updatedAt: now,
+            })
+            .onConflictDoUpdate({
+              target: schema.signupRiskReviewRequests.teamId,
+              set: {
+                requestedBy: ctx.session.user.id,
+                context: input.context,
+                requestedAt: now,
+                updatedAt: now,
+                resolvedAt: null,
+              },
+            });
+          // Required, atomic audit. Context is private and never copied to logs or the receipt.
+          await tx.insert(schema.auditLog).values({
+            teamId: ctx.teamId,
+            actorId: `user:${ctx.session.user.id}`,
+            action: "team.signup_risk_review_requested",
+            target: `team:${ctx.teamId}`,
+            data: { requestedAt: now.toISOString() },
+          });
+          return { pending: true, requestedAt: now };
+        })
+        .catch((error: unknown) => {
+          if (error instanceof TRPCError) throw error;
+          // Database driver errors may carry SQL parameters, including private context.
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "review_request_failed" });
+        });
+    }),
+
   /** All of the caller's memberships plus which one the session resolved as active. */
   list: protectedProcedure.query(async ({ ctx }) => ({
     teams: await listMemberships(ctx.db, ctx.session.user.id),
@@ -78,10 +187,17 @@ export const teamBootstrapRouter = router({
           ...standing,
           sendReview,
           signupRisk,
+          canRequestSignupReview: ctx.role === "owner" || ctx.role === "admin",
           pendingReview,
           suspended: { ...standing.suspended, note: null },
         }
-      : { ...standing, sendReview, pendingReview, signupRisk };
+      : {
+          ...standing,
+          sendReview,
+          pendingReview,
+          signupRisk,
+          canRequestSignupReview: ctx.role === "owner" || ctx.role === "admin",
+        };
   }),
 
   /** The operator's read-only look at the active team, for the owner's Support access card. */

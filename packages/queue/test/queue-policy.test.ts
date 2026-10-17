@@ -15,6 +15,7 @@ const workers: { name: string; opts: Record<string, unknown>; handler: Handler; 
 const inserted: { name: string; job: Record<string, unknown> }[] = [];
 const updated: { name: string; opts: Record<string, unknown> }[] = [];
 const scheduled: string[] = [];
+const scheduleOptions: { name: string; cron: string; opts: Record<string, unknown> }[] = [];
 const bosses: { options: Record<string, unknown>; events: string[]; stopped: boolean }[] = [];
 // Shutdown ordering as seen from the mock: "stop:<boss index>" plus whatever a test pushes.
 const order: string[] = [];
@@ -69,8 +70,14 @@ vi.mock("pg-boss", () => ({
       sent.push({ name, opts });
       return "job-1";
     }
-    async schedule(name: string): Promise<void> {
+    async schedule(
+      name: string,
+      cron: string,
+      _data: unknown,
+      opts: Record<string, unknown>,
+    ): Promise<void> {
       scheduled.push(name);
+      scheduleOptions.push({ name, cron, opts });
     }
     async work(name: string, opts: Record<string, unknown>, handler: Handler): Promise<string> {
       workers.push({ name, opts, handler, boss: this.#index });
@@ -90,6 +97,7 @@ beforeEach(() => {
   inserted.length = 0;
   updated.length = 0;
   scheduled.length = 0;
+  scheduleOptions.length = 0;
   bosses.length = 0;
   order.length = 0;
   createQueueError = undefined;
@@ -226,9 +234,35 @@ it("cron and dead-letter workers poll slowly; crons are scheduled through the pr
   ) as Parameters<Queue["scheduleCrons"]>[0];
   await queue.scheduleCrons(handlers);
   expect(scheduled).toEqual(Object.keys(CRON_JOBS));
+  expect(scheduleOptions.find((job) => job.name === "signup-risk.digest")).toEqual({
+    name: "signup-risk.digest",
+    cron: "0 8 * * *",
+    opts: {
+      tz: "America/Sao_Paulo",
+      retryLimit: 5,
+      retryDelay: 60,
+      retryBackoff: true,
+      retryDelayMax: 300,
+    },
+  });
+  expect(
+    scheduleOptions
+      .filter((job) => job.name !== "signup-risk.digest")
+      .every((job) => job.opts.tz === "UTC"),
+  ).toBe(true);
   const cronWorkers = workers.slice(1);
   expect(cronWorkers.map((w) => w.name)).toEqual(Object.keys(CRON_JOBS));
   expect(cronWorkers.every((w) => w.opts.pollingIntervalSeconds === 30 && w.boss === 0)).toBe(true);
+});
+
+it("can omit the operational digest from scheduling and consumption on a web-only process", async () => {
+  const queue = await startWorker();
+  const handlers = Object.fromEntries(
+    Object.keys(CRON_JOBS).map((name) => [name, async () => {}]),
+  ) as Parameters<Queue["scheduleCrons"]>[0];
+  await queue.scheduleCrons(handlers, { disabled: ["signup-risk.digest"] });
+  expect(scheduled).not.toContain("signup-risk.digest");
+  expect(workers.map((worker) => worker.name)).not.toContain("signup-risk.digest");
 });
 
 it("creates job queues with the dedupe-enforcing policy", async () => {

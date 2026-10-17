@@ -172,6 +172,8 @@ export const CRON_JOBS = {
   "domains.reverify": "*/15 * * * *",
   // Every 10 min: quota and deliverability notifications to team owners.
   "notifications.sweep": "*/10 * * * *",
+  // One internal review digest at 08h in its own IANA time zone.
+  "signup-risk.digest": "0 8 * * *",
   // Every 15 min: per-region platform breaker on the account-wide bounce/complaint rates.
   "platform.breaker": "*/15 * * * *",
   // Every 15 min: warn when sends went out but no SES event came back — a
@@ -215,6 +217,11 @@ export const CRON_JOBS = {
 } as const;
 
 export type CronJobName = keyof typeof CRON_JOBS;
+
+/** Other jobs retain their existing UTC schedule. */
+export const CRON_JOB_TIME_ZONES: Partial<Record<CronJobName, string>> = {
+  "signup-risk.digest": "America/Sao_Paulo",
+};
 
 function deadLetterFor(name: JobName): string | undefined {
   return name in DEAD_LETTER_QUEUES ? DEAD_LETTER_QUEUES[name as DeadLetteredJobName] : undefined;
@@ -507,10 +514,26 @@ export class Queue {
     );
   }
 
-  async scheduleCrons(handlers: Record<CronJobName, () => Promise<void>>): Promise<void> {
+  async scheduleCrons(
+    handlers: Record<CronJobName, () => Promise<void>>,
+    opts: { disabled?: readonly CronJobName[] } = {},
+  ): Promise<void> {
     for (const [name, cron] of Object.entries(CRON_JOBS) as [CronJobName, string][]) {
+      if (opts.disabled?.includes(name)) continue;
       await this.#ensureQueue(name);
-      await this.#producer.schedule(name, cron, {}, { tz: "UTC" });
+      await this.#producer.schedule(
+        name,
+        cron,
+        {},
+        {
+          tz: CRON_JOB_TIME_ZONES[name] ?? "UTC",
+          // Retry transient pre-accept failures during the natural 08h window.
+          // The handler's own clock and durable ledger gate every retry/replay.
+          ...(name === "signup-risk.digest"
+            ? { retryLimit: 5, retryDelay: 60, retryBackoff: true, retryDelayMax: 300 }
+            : {}),
+        },
+      );
       await this.#workers.work(
         name,
         { batchSize: 1, pollingIntervalSeconds: SLOW_POLL_SECONDS },

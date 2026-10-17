@@ -1024,7 +1024,18 @@
     "sendReview": "Sending for this team has been held for a security review since {since}. Accepted messages remain on hold while the review is open. An operator must review the team before sending can resume. Contact support to request a review.",
     "requestReview": "Request a review",
     "signupSandbox": "External sending is awaiting a security review. Test messages can be sent only to your own verified signup email. This also applies to full API keys. Your data is preserved.",
-    "signupReview": "Sending is held pending a security review of this account. Your data is preserved. Contact support to request a review."
+    "signupReview": "Sending is held pending a security review of this account. Your data is preserved. Contact support to request a review.",
+    "reviewRequest": {
+      "button": "Request a review",
+      "failed": "Could not submit or load the request. Try again.",
+      "hint": "20–500 characters. Describe the sending use and recipient consent. Exclude secrets and email content.",
+      "label": "In one line, how will your team use MepMail?",
+      "received": "Request received. The review team will assess it; current restrictions remain until an explicit decision.",
+      "retry": "Try again",
+      "saving": "Submitting…",
+      "submit": "Submit request",
+      "wait": "Wait 24 hours from the last request before reopening."
+    }
   },
   "signupRisk": {
     "title": "Signup sending restriction",
@@ -1040,6 +1051,42 @@
     "clear": "Remove signup restriction",
     "saving": "Saving…",
     "failed": "Could not load or save the review. Try again.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "effective": "Effective restriction: {status}",
+    "effectiveLevels": {
+      "held": "Sending held",
+      "none": "Normal access",
+      "review": "Signup review required",
+      "sandbox": "Tests to the verified email only",
+      "suspended": "Team suspended"
+    },
+    "legacy": "No signup profile (legacy)",
+    "policy": "Stored policy: v{version}",
+    "privateContext": "Private review information. Excluded from receipts, logs and email digests.",
+    "queue": {
+      "count": "{count} teams in queue",
+      "effective": "Effective restriction",
+      "empty": "No pending reviews.",
+      "level": "Stored level",
+      "loading": "Loading reviews…",
+      "next": "Next",
+      "noReasons": "No recorded signals",
+      "paid": "Qualified paid contract",
+      "payment": "Payment",
+      "previous": "Previous",
+      "reasons": "Signals",
+      "requested": "Review requested",
+      "since": "Queued since",
+      "subtitle": "All sandboxes, sending holds and open requests. Qualified paid contracts appear first; the plan label does not prove payment.",
+      "team": "Team",
+      "title": "Signup and sending review queue",
+      "unconfirmed": "Payment unconfirmed"
+    },
+    "reasons": "Recorded signals: {reasons}",
+    "requestTitle": "Review request context",
+    "resolve": "Mark request reviewed",
+    "resolveScope": "Marking this request reviewed leaves restrictions, suspensions and held messages unchanged.",
+    "resolved": "Request marked as reviewed.",
+    "storedLevel": "Stored level: {level}"
   }
 }

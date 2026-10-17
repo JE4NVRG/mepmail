@@ -1,6 +1,7 @@
 import { SQSClient } from "@aws-sdk/client-sqs";
 import {
   createPixStripe,
+  createSignupReviewPaymentReader,
   createStripe,
   dispatchGoogleConversions,
   dispatchMetaConversions,
@@ -17,6 +18,7 @@ import {
   abuseJudgeConfig,
   customerSmtpRelay,
   env,
+  notificationsEmailFrom,
   servedRegions,
   sesTenantsEnabled,
   trackingCnameTarget,
@@ -111,6 +113,10 @@ import { runSafetyFlags } from "./handlers/safety-flags.js";
 import { finalizeBroadcast, sendBroadcast } from "./handlers/send-broadcast.js";
 import { failQueuedEmail, sendEmail } from "./handlers/send-email.js";
 import { createRegionSendControls } from "./handlers/ses-regions.js";
+import {
+  canRunSignupRiskDigest,
+  sendSignupRiskDailyDigest,
+} from "./handlers/signup-risk-digest.js";
 import { createCustomerSmtpRelay, createSmtpFallback } from "./handlers/smtp-fallback.js";
 import { syncTenants, watchTenants } from "./handlers/tenants.js";
 import { createMailboxExternalAwareSender } from "./mailbox-external-sender.js";
@@ -192,6 +198,7 @@ const mailboxSes = mailboxTransportEnabled
 // out earlier on EMAIL_RETENTION_DAYS. Read here until it joins the env schema.
 const metadataRetentionDays = env.EMAIL_METADATA_RETENTION_DAYS;
 const stripe = env.IS_CLOUD && env.STRIPE_SECRET_KEY ? createStripe(env.STRIPE_SECRET_KEY) : null;
+const readSignupReviewPayments = createSignupReviewPaymentReader(env.STRIPE_SECRET_KEY);
 const pixStripe =
   env.IS_CLOUD && env.STRIPE_SECRET_KEY ? createPixStripe(env.STRIPE_SECRET_KEY) : null;
 const masterKeyBytes = Buffer.from(env.MASTER_ENCRYPTION_KEY, "base64");
@@ -366,392 +373,418 @@ const enqueueBroadcast = async (broadcastId: string, startAfter?: Date): Promise
 
 // Crons and dead-letter workers first: they poll slowly and must never wait
 // behind the send lanes' registration on a backlog.
-await queue.scheduleCrons({
-  "quota.drain": async () => {
-    const result = await drainQuotaParked(db, {
-      isCloud: env.IS_CLOUD,
-      enqueueSends,
-      sesQuota: sendControls,
-      customerRelay: relay !== undefined,
-      ...(failover ? { failover } : {}),
-      finalize: (id) => finalizeBroadcast(db, { mailer, appBaseUrl: env.APP_BASE_URL }, id),
-    });
-    console.log(`quota.drain: drained=${result.drained} stillParked=${result.stillParked}`);
-  },
-  "sends.reconcile": async () => {
-    const requeued = await reconcileStalledSends(db, { enqueueSends });
-    if (requeued > 0) console.log(`sends.reconcile: requeued=${requeued}`);
-    if (mailboxTransportEnabled)
-      await reconcileMailboxOutbox(db, {
+await queue.scheduleCrons(
+  {
+    "quota.drain": async () => {
+      const result = await drainQuotaParked(db, {
+        isCloud: env.IS_CLOUD,
+        enqueueSends,
+        sesQuota: sendControls,
+        customerRelay: relay !== undefined,
+        ...(failover ? { failover } : {}),
+        finalize: (id) => finalizeBroadcast(db, { mailer, appBaseUrl: env.APP_BASE_URL }, id),
+      });
+      console.log(`quota.drain: drained=${result.drained} stillParked=${result.stillParked}`);
+    },
+    "sends.reconcile": async () => {
+      const requeued = await reconcileStalledSends(db, { enqueueSends });
+      if (requeued > 0) console.log(`sends.reconcile: requeued=${requeued}`);
+      if (mailboxTransportEnabled)
+        await reconcileMailboxOutbox(db, {
+          enqueue: async (outboxId) => {
+            await queue.send("mailbox.send", { outboxId }, { dedupeKey: outboxId });
+          },
+        });
+    },
+    "retention.purge": async () => {
+      const purged = await purgeExpiredEmailBodies(db, {
+        defaultRetentionDays: env.EMAIL_RETENTION_DAYS,
+      });
+      const requests = await purgeExpiredApiRequests(db, {
+        defaultRetentionDays: env.EMAIL_RETENTION_DAYS,
+      });
+      const stripped = await stripExpiredEventPayloads(db, {
+        defaultRetentionDays: env.EMAIL_RETENTION_DAYS,
+      });
+      const metadata = await purgeExpiredEmailMetadata(db, {
+        retentionDays: metadataRetentionDays,
+        deliveryRetentionDays: env.WEBHOOK_DELIVERY_RETENTION_DAYS,
+      });
+      const sessions = await purgeExpiredSessions(db);
+      const hourlyUsage = await purgeStaleHourlyUsage(db);
+      const stripeEvents = await purgeStripeEvents(db);
+      const probes = await pruneProbes(db);
+      const monitorSamples = await pruneMonitorSamples(db);
+      // The console's retention row: how many bodies the last run purged.
+      await recordProbes(db, [{ probe: "retention_purged", value: purged, ok: true }]);
+      const counts = {
+        purged,
+        probes,
+        monitorSamples,
+        hourlyUsage,
+        apiRequests: requests,
+        events: stripped.events,
+        deliveries: stripped.deliveries,
+        emails: metadata.emails,
+        oldDeliveries: metadata.deliveries,
+        broadcastsFrozen: metadata.broadcasts,
+        sessions,
+        stripeEvents,
+      };
+      if (Object.values(counts).some((n) => n > 0)) {
+        console.log(
+          `retention.purge: ${Object.entries(counts)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(" ")}`,
+        );
+      }
+    },
+    "billing.reconcile": async () => {
+      if (!stripe) return;
+      const result = await reconcileBillingPlans(db, {
+        reconcileTeam: (teamId) => reconcileTeamPlan({ db, stripe, log: console.warn }, teamId),
+        livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
+        onPlanMoved: async (team, before, after) => {
+          await reportPlanMove(db, mailer, env.APP_BASE_URL ?? "", team, before, after);
+        },
+      });
+      // Correio add-on contracts that lost Envio move to the standalone price at renewal.
+      const mailCatalog =
+        mailboxRegistryEnabled && process.env.MAILBOX_STANDALONE_OPEN === "true"
+          ? mailboxCatalogFromJson(
+              process.env.MAILBOX_BILLING_CATALOG,
+              isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
+            )
+          : null;
+      if (mailCatalog) {
+        try {
+          const rawCohort = process.env.MAILBOX_EARLY_ACCESS_COHORT;
+          const reprice = await runMailboxReprice(db, {
+            stripe,
+            catalog: mailCatalog,
+            cohort: rawCohort === undefined ? undefined : parseMailboxLaunchCohort(rawCohort),
+            mailer,
+            appBaseUrl: env.APP_BASE_URL ?? "",
+          });
+          if (reprice.repriced > 0)
+            console.log(`mailbox.reprice: checked=${reprice.checked} repriced=${reprice.repriced}`);
+        } catch (err) {
+          console.warn("mailbox.reprice: run skipped", err instanceof Error ? err.message : err);
+        }
+      }
+      // Sold capacity against the shared SES quotas, once a day where the operator reads logs.
+      const committed = await committedDailyVolume(db);
+      const sesDaily = await Promise.all(
+        regions.map((region) =>
+          getAccountOverview(accountClientFor(region)).then(
+            (o) => `${region}:${o.quota.max24h}`,
+            () => `${region}:unknown`,
+          ),
+        ),
+      );
+      console.log(
+        `billing.reconcile: reconciled=${result.reconciled} failed=${result.failed} skipped=${result.skipped} committedPerDay=${committed} sesDailyQuota=${sesDaily.join(",")}`,
+      );
+    },
+    "billing.overage": async () => {
+      if (!stripe) return;
+      const result = await reportOverage({ db, stripe, log: console.warn });
+      if (result.reported > 0 || result.failed > 0) {
+        console.log(`billing.overage: reported=${result.reported} failed=${result.failed}`);
+      }
+    },
+    "idempotency.purge": async () => {
+      await purgeExpiredIdempotencyKeys(db);
+    },
+    "webhooks.reconcile": async () => {
+      const armed = await reconcileWebhookDeliveries(db, { enqueue: enqueueWebhook });
+      if (armed > 0) console.log(`webhooks.reconcile: armed=${armed}`);
+      if (stripe) {
+        const result = await dispatchMetaConversions(db, readMetaConversionConfig(process.env), {
+          stripe,
+          fetch: (url, request) => fetch(url, request),
+        });
+        if (result.sent > 0) console.log(`meta conversions: sent=${result.sent}`);
+      }
+      const google = await dispatchGoogleConversions(db, readGoogleConversionConfig(process.env), {
+        fetch: (url, request) => fetch(url, request),
+      });
+      if (google.sent > 0) console.log(`google conversions: sent=${google.sent}`);
+      // Finished sign-ups (Meta CompleteRegistration, GA4 sign_up) queued by the web app.
+      const signups = await dispatchSignupConversions(
+        db,
+        {
+          meta: readMetaConversionConfig(process.env),
+          google: readGoogleConversionConfig(process.env),
+        },
+        {
+          metaTransport: { fetch: (url, request) => fetch(url, request) },
+          googleFetch: (url, request) => fetch(url, request),
+        },
+      );
+      if (signups.sent > 0) console.log(`signup conversions: sent=${signups.sent}`);
+    },
+    "broadcasts.reconcile": async () => {
+      const requeued = await reconcileStalledBroadcasts(db, {
+        enqueue: (broadcastId) => enqueueBroadcast(broadcastId),
+        finalize: (id) => finalizeBroadcast(db, { mailer, appBaseUrl: env.APP_BASE_URL }, id),
+      });
+      if (requeued > 0) console.log(`broadcasts.reconcile: requeued=${requeued}`);
+    },
+    "segments.recount": async () => {
+      const recounted = await recountStaleSegments(db, { olderThanMs: 30 * 60_000 });
+      if (recounted > 0) console.log(`segments.recount: recounted=${recounted}`);
+    },
+    "notifications.sweep": async () => {
+      const result = await sweepNotifications(db, {
+        isCloud: env.IS_CLOUD,
+        activationSupportFromISO: process.env.ACTIVATION_SUPPORT_FROM ?? "",
+        mailer,
+        enqueueWebhook,
+        appBaseUrl: env.APP_BASE_URL,
+      });
+      if (result.sent > 0) console.log(`notifications.sweep: sent=${result.sent}`);
+      // A Stripe outage must not stop the other notices: Pix reminders retry next sweep.
+      if (pixStripe) {
+        try {
+          const pix = await remindPixInvoices(db, {
+            mailer,
+            stripe: pixStripe,
+            appBaseUrl: env.APP_BASE_URL,
+          });
+          if (pix.sent > 0) console.log(`notifications.sweep: pixInvoices=${pix.sent}`);
+        } catch (err) {
+          console.error("notifications.sweep: Pix invoice reminders skipped", err);
+        }
+      }
+      if (mailboxRegistryEnabled) {
+        const keys = await warnExpiringMailboxAgentKeys(db, {
+          mailer,
+          appBaseUrl: env.APP_BASE_URL,
+        });
+        if (keys.sent > 0) console.log(`notifications.sweep: agentKeysExpiring=${keys.sent}`);
+        const trials = await warnEndingMailboxTrials(db, { mailer, appBaseUrl: env.APP_BASE_URL });
+        if (trials.sent > 0) console.log(`notifications.sweep: trialsEnding=${trials.sent}`);
+        const plans = await warnMailboxPlanUsage(db, { mailer, appBaseUrl: env.APP_BASE_URL });
+        if (plans.near || plans.reached || plans.paused)
+          console.log(
+            `notifications.sweep: mailboxPlans near=${plans.near} reached=${plans.reached} paused=${plans.paused}`,
+          );
+      }
+    },
+    "signup-risk.digest": async () => {
+      const result = await sendSignupRiskDailyDigest(db, {
+        isCloud: env.IS_CLOUD,
+        processSelection: process.env.PROCESS,
+        from: notificationsEmailFrom(),
+        appBaseUrl: env.APP_BASE_URL,
+        keyring,
+        enqueueSend,
+        readPayments: readSignupReviewPayments,
+      });
+      if (result.status === "pipeline_accepted")
+        console.log(
+          `signup-risk.digest: pipelineAccepted=1 emailId=${result.emailId} queued=${result.queued} pending=${result.summary.pending} paidAffected=${result.summary.paidAffected}`,
+        );
+    },
+    "platform.breaker": async () => {
+      // Without SES events there are no bounce/complaint counts to judge.
+      if (!env.SNS_TOPIC_ARNS?.length) return;
+      await runPlatformBreaker(db, { mailer, appBaseUrl: env.APP_BASE_URL });
+    },
+    "instance.probe": async () => {
+      await runInstanceProbes(db, {
+        isCloud: env.IS_CLOUD,
+        keyring,
+        eventsConfigured: Boolean(env.SNS_TOPIC_ARNS?.length),
+        regions,
+        txParkedAt: (region) => sendControls.txParkedAt(region),
+      });
+    },
+    "safety.flags": async () => {
+      // With the judge off a stored risk opens nothing: the line is unreachable.
+      const result = await runSafetyFlags(db, {
+        monitorFlagRisk: judge ? (await monitorSettings()).flagRisk : Number.POSITIVE_INFINITY,
+        mailer,
+        appBaseUrl: env.APP_BASE_URL,
+      });
+      if (result.opened > 0 || result.cleared > 0 || result.reviews > 0) {
+        console.log(
+          `safety.flags: teams=${result.teams} opened=${result.opened} cleared=${result.cleared} reviews=${result.reviews}`,
+        );
+      }
+      // Same quarter-hour: how full the Correio receiving rules are. An SES
+      // read failure is logged and leaves the flags run alone.
+      try {
+        await runMailboxCapacity(db, {
+          configuration: process.env.MAILBOX_RECEIVING_PROVISIONING_CONFIG,
+          credentials:
+            env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
+              ? { accessKeyId: env.AWS_ACCESS_KEY_ID, secretAccessKey: env.AWS_SECRET_ACCESS_KEY }
+              : {},
+          mailer,
+          appBaseUrl: env.APP_BASE_URL,
+          state: mailboxCapacityState,
+        });
+      } catch (err) {
+        console.warn("mailbox.capacity: reading skipped", err instanceof Error ? err.message : err);
+      }
+    },
+    "safety.reveal_notices": async () => {
+      const result = await runRevealNotices(db, { mailer, appBaseUrl: env.APP_BASE_URL });
+      if (result.disclosed > 0 || result.withheld > 0) {
+        console.log(
+          `safety.reveal_notices: disclosed=${result.disclosed} withheld=${result.withheld}`,
+        );
+      }
+    },
+    "monitor.health": async () => {
+      const result = await runMonitorHealth(db, {
+        judge: judgeConfig,
+        mailer,
+        appBaseUrl: env.APP_BASE_URL,
+        state: monitorHealthState,
+      });
+      if (result.lost > 0 || result.degraded) {
+        console.warn(
+          `monitor.health: samples1h=${result.samples} unjudged=${result.unjudged} lost=${result.lost} degraded=${result.degraded}`,
+        );
+      }
+    },
+    "mailbox.schedules": async () => {
+      // The mailbox tables exist only where the mailbox schema was applied.
+      if (!mailboxRegistryEnabled) return;
+      const result = await runMailboxSchedules(db, {
+        keyring,
+        mime: mailboxWorkerMime,
+        transportEnabled: mailboxTransportEnabled,
         enqueue: async (outboxId) => {
           await queue.send("mailbox.send", { outboxId }, { dedupeKey: outboxId });
         },
       });
-  },
-  "retention.purge": async () => {
-    const purged = await purgeExpiredEmailBodies(db, {
-      defaultRetentionDays: env.EMAIL_RETENTION_DAYS,
-    });
-    const requests = await purgeExpiredApiRequests(db, {
-      defaultRetentionDays: env.EMAIL_RETENTION_DAYS,
-    });
-    const stripped = await stripExpiredEventPayloads(db, {
-      defaultRetentionDays: env.EMAIL_RETENTION_DAYS,
-    });
-    const metadata = await purgeExpiredEmailMetadata(db, {
-      retentionDays: metadataRetentionDays,
-      deliveryRetentionDays: env.WEBHOOK_DELIVERY_RETENTION_DAYS,
-    });
-    const sessions = await purgeExpiredSessions(db);
-    const hourlyUsage = await purgeStaleHourlyUsage(db);
-    const stripeEvents = await purgeStripeEvents(db);
-    const probes = await pruneProbes(db);
-    const monitorSamples = await pruneMonitorSamples(db);
-    // The console's retention row: how many bodies the last run purged.
-    await recordProbes(db, [{ probe: "retention_purged", value: purged, ok: true }]);
-    const counts = {
-      purged,
-      probes,
-      monitorSamples,
-      hourlyUsage,
-      apiRequests: requests,
-      events: stripped.events,
-      deliveries: stripped.deliveries,
-      emails: metadata.emails,
-      oldDeliveries: metadata.deliveries,
-      broadcastsFrozen: metadata.broadcasts,
-      sessions,
-      stripeEvents,
-    };
-    if (Object.values(counts).some((n) => n > 0)) {
-      console.log(
-        `retention.purge: ${Object.entries(counts)
-          .map(([k, v]) => `${k}=${v}`)
-          .join(" ")}`,
-      );
-    }
-  },
-  "billing.reconcile": async () => {
-    if (!stripe) return;
-    const result = await reconcileBillingPlans(db, {
-      reconcileTeam: (teamId) => reconcileTeamPlan({ db, stripe, log: console.warn }, teamId),
-      livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
-      onPlanMoved: async (team, before, after) => {
-        await reportPlanMove(db, mailer, env.APP_BASE_URL ?? "", team, before, after);
-      },
-    });
-    // Correio add-on contracts that lost Envio move to the standalone price at renewal.
-    const mailCatalog =
-      mailboxRegistryEnabled && process.env.MAILBOX_STANDALONE_OPEN === "true"
-        ? mailboxCatalogFromJson(
-            process.env.MAILBOX_BILLING_CATALOG,
-            isLiveKey(env.STRIPE_SECRET_KEY ?? ""),
-          )
-        : null;
-    if (mailCatalog) {
-      try {
-        const rawCohort = process.env.MAILBOX_EARLY_ACCESS_COHORT;
-        const reprice = await runMailboxReprice(db, {
-          stripe,
-          catalog: mailCatalog,
-          cohort: rawCohort === undefined ? undefined : parseMailboxLaunchCohort(rawCohort),
-          mailer,
-          appBaseUrl: env.APP_BASE_URL ?? "",
-        });
-        if (reprice.repriced > 0)
-          console.log(`mailbox.reprice: checked=${reprice.checked} repriced=${reprice.repriced}`);
-      } catch (err) {
-        console.warn("mailbox.reprice: run skipped", err instanceof Error ? err.message : err);
-      }
-    }
-    // Sold capacity against the shared SES quotas, once a day where the operator reads logs.
-    const committed = await committedDailyVolume(db);
-    const sesDaily = await Promise.all(
-      regions.map((region) =>
-        getAccountOverview(accountClientFor(region)).then(
-          (o) => `${region}:${o.quota.max24h}`,
-          () => `${region}:unknown`,
-        ),
-      ),
-    );
-    console.log(
-      `billing.reconcile: reconciled=${result.reconciled} failed=${result.failed} skipped=${result.skipped} committedPerDay=${committed} sesDailyQuota=${sesDaily.join(",")}`,
-    );
-  },
-  "billing.overage": async () => {
-    if (!stripe) return;
-    const result = await reportOverage({ db, stripe, log: console.warn });
-    if (result.reported > 0 || result.failed > 0) {
-      console.log(`billing.overage: reported=${result.reported} failed=${result.failed}`);
-    }
-  },
-  "idempotency.purge": async () => {
-    await purgeExpiredIdempotencyKeys(db);
-  },
-  "webhooks.reconcile": async () => {
-    const armed = await reconcileWebhookDeliveries(db, { enqueue: enqueueWebhook });
-    if (armed > 0) console.log(`webhooks.reconcile: armed=${armed}`);
-    if (stripe) {
-      const result = await dispatchMetaConversions(db, readMetaConversionConfig(process.env), {
-        stripe,
-        fetch: (url, request) => fetch(url, request),
-      });
-      if (result.sent > 0) console.log(`meta conversions: sent=${result.sent}`);
-    }
-    const google = await dispatchGoogleConversions(db, readGoogleConversionConfig(process.env), {
-      fetch: (url, request) => fetch(url, request),
-    });
-    if (google.sent > 0) console.log(`google conversions: sent=${google.sent}`);
-    // Finished sign-ups (Meta CompleteRegistration, GA4 sign_up) queued by the web app.
-    const signups = await dispatchSignupConversions(
-      db,
-      {
-        meta: readMetaConversionConfig(process.env),
-        google: readGoogleConversionConfig(process.env),
-      },
-      {
-        metaTransport: { fetch: (url, request) => fetch(url, request) },
-        googleFetch: (url, request) => fetch(url, request),
-      },
-    );
-    if (signups.sent > 0) console.log(`signup conversions: sent=${signups.sent}`);
-  },
-  "broadcasts.reconcile": async () => {
-    const requeued = await reconcileStalledBroadcasts(db, {
-      enqueue: (broadcastId) => enqueueBroadcast(broadcastId),
-      finalize: (id) => finalizeBroadcast(db, { mailer, appBaseUrl: env.APP_BASE_URL }, id),
-    });
-    if (requeued > 0) console.log(`broadcasts.reconcile: requeued=${requeued}`);
-  },
-  "segments.recount": async () => {
-    const recounted = await recountStaleSegments(db, { olderThanMs: 30 * 60_000 });
-    if (recounted > 0) console.log(`segments.recount: recounted=${recounted}`);
-  },
-  "notifications.sweep": async () => {
-    const result = await sweepNotifications(db, {
-      isCloud: env.IS_CLOUD,
-      activationSupportFromISO: process.env.ACTIVATION_SUPPORT_FROM ?? "",
-      mailer,
-      enqueueWebhook,
-      appBaseUrl: env.APP_BASE_URL,
-    });
-    if (result.sent > 0) console.log(`notifications.sweep: sent=${result.sent}`);
-    // A Stripe outage must not stop the other notices: Pix reminders retry next sweep.
-    if (pixStripe) {
-      try {
-        const pix = await remindPixInvoices(db, {
-          mailer,
-          stripe: pixStripe,
-          appBaseUrl: env.APP_BASE_URL,
-        });
-        if (pix.sent > 0) console.log(`notifications.sweep: pixInvoices=${pix.sent}`);
-      } catch (err) {
-        console.error("notifications.sweep: Pix invoice reminders skipped", err);
-      }
-    }
-    if (mailboxRegistryEnabled) {
-      const keys = await warnExpiringMailboxAgentKeys(db, { mailer, appBaseUrl: env.APP_BASE_URL });
-      if (keys.sent > 0) console.log(`notifications.sweep: agentKeysExpiring=${keys.sent}`);
-      const trials = await warnEndingMailboxTrials(db, { mailer, appBaseUrl: env.APP_BASE_URL });
-      if (trials.sent > 0) console.log(`notifications.sweep: trialsEnding=${trials.sent}`);
-      const plans = await warnMailboxPlanUsage(db, { mailer, appBaseUrl: env.APP_BASE_URL });
-      if (plans.near || plans.reached || plans.paused)
+      if (Object.values(result).some((count) => count > 0)) {
         console.log(
-          `notifications.sweep: mailboxPlans near=${plans.near} reached=${plans.reached} paused=${plans.paused}`,
+          `mailbox.schedules: woken=${result.woken} followUps=${result.followUps} sent=${result.sent} failed=${result.failed} deferred=${result.deferred}`,
         );
-    }
-  },
-  "platform.breaker": async () => {
-    // Without SES events there are no bounce/complaint counts to judge.
-    if (!env.SNS_TOPIC_ARNS?.length) return;
-    await runPlatformBreaker(db, { mailer, appBaseUrl: env.APP_BASE_URL });
-  },
-  "instance.probe": async () => {
-    await runInstanceProbes(db, {
-      isCloud: env.IS_CLOUD,
-      keyring,
-      eventsConfigured: Boolean(env.SNS_TOPIC_ARNS?.length),
-      regions,
-      txParkedAt: (region) => sendControls.txParkedAt(region),
-    });
-  },
-  "safety.flags": async () => {
-    // With the judge off a stored risk opens nothing: the line is unreachable.
-    const result = await runSafetyFlags(db, {
-      monitorFlagRisk: judge ? (await monitorSettings()).flagRisk : Number.POSITIVE_INFINITY,
-      mailer,
-      appBaseUrl: env.APP_BASE_URL,
-    });
-    if (result.opened > 0 || result.cleared > 0 || result.reviews > 0) {
-      console.log(
-        `safety.flags: teams=${result.teams} opened=${result.opened} cleared=${result.cleared} reviews=${result.reviews}`,
-      );
-    }
-    // Same quarter-hour: how full the Correio receiving rules are. An SES
-    // read failure is logged and leaves the flags run alone.
-    try {
-      await runMailboxCapacity(db, {
+      }
+      // Same minute: plans whose inbound allowance or storage ran out stop receiving in
+      // SES (and start again on a new period or an upgrade).
+      const holds = await reconcileMailboxReceivingHolds(db, {
         configuration: process.env.MAILBOX_RECEIVING_PROVISIONING_CONFIG,
         credentials:
           env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
             ? { accessKeyId: env.AWS_ACCESS_KEY_ID, secretAccessKey: env.AWS_SECRET_ACCESS_KEY }
             : {},
-        mailer,
-        appBaseUrl: env.APP_BASE_URL,
-        state: mailboxCapacityState,
       });
-    } catch (err) {
-      console.warn("mailbox.capacity: reading skipped", err instanceof Error ? err.message : err);
-    }
-  },
-  "safety.reveal_notices": async () => {
-    const result = await runRevealNotices(db, { mailer, appBaseUrl: env.APP_BASE_URL });
-    if (result.disclosed > 0 || result.withheld > 0) {
-      console.log(
-        `safety.reveal_notices: disclosed=${result.disclosed} withheld=${result.withheld}`,
+      if (holds.paused || holds.resumed || holds.failed)
+        console.log(
+          `mailbox.receiving: paused=${holds.paused} resumed=${holds.resumed} failed=${holds.failed}`,
+        );
+      // Mailboxes deleted 30 days ago (Excluir caixa) are erased, a batch per minute.
+      const deletions = await runMailboxDeletions(db, {
+        configuration: process.env.MAILBOX_RECEIVING_PROVISIONING_CONFIG,
+        credentials:
+          env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
+            ? { accessKeyId: env.AWS_ACCESS_KEY_ID, secretAccessKey: env.AWS_SECRET_ACCESS_KEY }
+            : {},
+      });
+      if (Object.values(deletions).some((count) => count > 0))
+        console.log(
+          `mailbox.deletions: erased=${deletions.erased} partial=${deletions.partial} waiting=${deletions.waiting} failed=${deletions.failed}`,
+        );
+    },
+    "mailbox.search_index": async () => {
+      if (!mailboxRegistryEnabled) return;
+      // A batch per minute, newest first, inside the minute: fresh mail is searchable within
+      // a minute and older mail is backfilled over the following runs.
+      const result = await indexMailboxSearch(
+        db,
+        keyring,
+        mailboxSearchKey,
+        readMailboxSearchDocument,
+        {
+          limit: 300,
+          deadline: Date.now() + 40_000,
+        },
       );
-    }
-  },
-  "monitor.health": async () => {
-    const result = await runMonitorHealth(db, {
-      judge: judgeConfig,
-      mailer,
-      appBaseUrl: env.APP_BASE_URL,
-      state: monitorHealthState,
-    });
-    if (result.lost > 0 || result.degraded) {
+      if (result.indexed || result.quarantined || result.unreadable)
+        console.log(
+          `mailbox.search_index: indexed=${result.indexed} quarantined=${result.quarantined} unreadable=${result.unreadable} remaining=${result.remaining}`,
+        );
+    },
+    "mailbox.external_due": async () => {
+      if (!mailboxRegistryEnabled) return;
+      // Accounts whose round is due, claimed for a lease so a slow round is never doubled.
+      const due = await claimDueMailboxExternalAccounts(db, 50);
+      for (const mailboxId of due)
+        await queue.send(
+          "mailbox.external_sync",
+          { mailboxId },
+          { dedupeKey: mailboxId, group: mailboxId },
+        );
+    },
+    "events.health": async () => {
+      // No topic allowlist = ingestion disabled on purpose; nothing to judge.
+      if (!env.SNS_TOPIC_ARNS?.length) return;
+      const health = await sesEventsHealth(db);
+      if (health.status !== "unhealthy") return;
       console.warn(
-        `monitor.health: samples1h=${result.samples} unjudged=${result.unjudged} lost=${result.lost} degraded=${result.degraded}`,
+        `events.health: ${health.sentInWindow} email(s) sent in the last 2h but no SES event arrived (last one ${health.lastSesEventAt?.toISOString() ?? "never"}) — the SNS subscription is missing or pending confirmation, or SQS_QUEUE_URL is empty / the queue is not being read`,
       );
-    }
+    },
+    "domains.reverify": async () => {
+      const result = await reverifyDomains(db, { clientForRegion, resolver: nodeDnsResolver });
+      if (result.checked > 0 || result.failed > 0) {
+        console.log(`domains.reverify: checked=${result.checked} failed=${result.failed}`);
+      }
+      // Branded tracking CNAMEs never gate domain status, so reverify above skips
+      // them; sweep them here to clear a resolved subdomain's clock or unset one
+      // that never resolved. trackingCnameTarget short-circuits to the edge host
+      // before parsing APP_BASE_URL, so an empty fallback is only ever ignored.
+      const trackingCnameValue =
+        env.TRACKING_EDGE_HOST || env.APP_BASE_URL
+          ? trackingCnameTarget(env.APP_BASE_URL ?? "")
+          : null;
+      const tracking = await reapStaleTrackingSubdomains(db, {
+        resolver: nodeDnsResolver,
+        trackingCnameValue,
+      });
+      if (tracking.unset > 0) console.log(`domains.reap-tracking: unset=${tracking.unset}`);
+    },
+    "tenants.sync": async () => {
+      const result = await syncTenants(db, {
+        clientForRegion,
+        configurationSet: env.SES_CONFIGURATION_SET,
+        enabled: sesTenantsEnabled(),
+      });
+      if (result.associated > 0 || result.failed > 0) {
+        console.log(`tenants.sync: associated=${result.associated} failed=${result.failed}`);
+      }
+    },
+    "tenants.watch": async () => {
+      const result = await watchTenants(db, { clientForRegion, enabled: sesTenantsEnabled() });
+      if (result.held > 0 || result.failed > 0) {
+        console.log(
+          `tenants.watch: checked=${result.checked} held=${result.held} failed=${result.failed}`,
+        );
+      }
+    },
+    "domains.reap": async () => {
+      // Cloud-only: squatting is a cross-tenant problem. Self-host is one
+      // operator's own teams and adopts existing SES identities on create, so
+      // an unverified row blocks nobody there.
+      if (!env.IS_CLOUD) return;
+      const reaped = await reapUnverifiedDomains(db, { clientForRegion });
+      if (reaped > 0) console.log(`domains.reap: reaped=${reaped}`);
+    },
   },
-  "mailbox.schedules": async () => {
-    // The mailbox tables exist only where the mailbox schema was applied.
-    if (!mailboxRegistryEnabled) return;
-    const result = await runMailboxSchedules(db, {
-      keyring,
-      mime: mailboxWorkerMime,
-      transportEnabled: mailboxTransportEnabled,
-      enqueue: async (outboxId) => {
-        await queue.send("mailbox.send", { outboxId }, { dedupeKey: outboxId });
-      },
-    });
-    if (Object.values(result).some((count) => count > 0)) {
-      console.log(
-        `mailbox.schedules: woken=${result.woken} followUps=${result.followUps} sent=${result.sent} failed=${result.failed} deferred=${result.deferred}`,
-      );
-    }
-    // Same minute: plans whose inbound allowance or storage ran out stop receiving in
-    // SES (and start again on a new period or an upgrade).
-    const holds = await reconcileMailboxReceivingHolds(db, {
-      configuration: process.env.MAILBOX_RECEIVING_PROVISIONING_CONFIG,
-      credentials:
-        env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
-          ? { accessKeyId: env.AWS_ACCESS_KEY_ID, secretAccessKey: env.AWS_SECRET_ACCESS_KEY }
-          : {},
-    });
-    if (holds.paused || holds.resumed || holds.failed)
-      console.log(
-        `mailbox.receiving: paused=${holds.paused} resumed=${holds.resumed} failed=${holds.failed}`,
-      );
-    // Mailboxes deleted 30 days ago (Excluir caixa) are erased, a batch per minute.
-    const deletions = await runMailboxDeletions(db, {
-      configuration: process.env.MAILBOX_RECEIVING_PROVISIONING_CONFIG,
-      credentials:
-        env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
-          ? { accessKeyId: env.AWS_ACCESS_KEY_ID, secretAccessKey: env.AWS_SECRET_ACCESS_KEY }
-          : {},
-    });
-    if (Object.values(deletions).some((count) => count > 0))
-      console.log(
-        `mailbox.deletions: erased=${deletions.erased} partial=${deletions.partial} waiting=${deletions.waiting} failed=${deletions.failed}`,
-      );
+  {
+    // PROCESS=web never schedules or consumes this operational mail job.
+    disabled: canRunSignupRiskDigest(env.IS_CLOUD, process.env.PROCESS)
+      ? []
+      : ["signup-risk.digest"],
   },
-  "mailbox.search_index": async () => {
-    if (!mailboxRegistryEnabled) return;
-    // A batch per minute, newest first, inside the minute: fresh mail is searchable within
-    // a minute and older mail is backfilled over the following runs.
-    const result = await indexMailboxSearch(
-      db,
-      keyring,
-      mailboxSearchKey,
-      readMailboxSearchDocument,
-      {
-        limit: 300,
-        deadline: Date.now() + 40_000,
-      },
-    );
-    if (result.indexed || result.quarantined || result.unreadable)
-      console.log(
-        `mailbox.search_index: indexed=${result.indexed} quarantined=${result.quarantined} unreadable=${result.unreadable} remaining=${result.remaining}`,
-      );
-  },
-  "mailbox.external_due": async () => {
-    if (!mailboxRegistryEnabled) return;
-    // Accounts whose round is due, claimed for a lease so a slow round is never doubled.
-    const due = await claimDueMailboxExternalAccounts(db, 50);
-    for (const mailboxId of due)
-      await queue.send(
-        "mailbox.external_sync",
-        { mailboxId },
-        { dedupeKey: mailboxId, group: mailboxId },
-      );
-  },
-  "events.health": async () => {
-    // No topic allowlist = ingestion disabled on purpose; nothing to judge.
-    if (!env.SNS_TOPIC_ARNS?.length) return;
-    const health = await sesEventsHealth(db);
-    if (health.status !== "unhealthy") return;
-    console.warn(
-      `events.health: ${health.sentInWindow} email(s) sent in the last 2h but no SES event arrived (last one ${health.lastSesEventAt?.toISOString() ?? "never"}) — the SNS subscription is missing or pending confirmation, or SQS_QUEUE_URL is empty / the queue is not being read`,
-    );
-  },
-  "domains.reverify": async () => {
-    const result = await reverifyDomains(db, { clientForRegion, resolver: nodeDnsResolver });
-    if (result.checked > 0 || result.failed > 0) {
-      console.log(`domains.reverify: checked=${result.checked} failed=${result.failed}`);
-    }
-    // Branded tracking CNAMEs never gate domain status, so reverify above skips
-    // them; sweep them here to clear a resolved subdomain's clock or unset one
-    // that never resolved. trackingCnameTarget short-circuits to the edge host
-    // before parsing APP_BASE_URL, so an empty fallback is only ever ignored.
-    const trackingCnameValue =
-      env.TRACKING_EDGE_HOST || env.APP_BASE_URL
-        ? trackingCnameTarget(env.APP_BASE_URL ?? "")
-        : null;
-    const tracking = await reapStaleTrackingSubdomains(db, {
-      resolver: nodeDnsResolver,
-      trackingCnameValue,
-    });
-    if (tracking.unset > 0) console.log(`domains.reap-tracking: unset=${tracking.unset}`);
-  },
-  "tenants.sync": async () => {
-    const result = await syncTenants(db, {
-      clientForRegion,
-      configurationSet: env.SES_CONFIGURATION_SET,
-      enabled: sesTenantsEnabled(),
-    });
-    if (result.associated > 0 || result.failed > 0) {
-      console.log(`tenants.sync: associated=${result.associated} failed=${result.failed}`);
-    }
-  },
-  "tenants.watch": async () => {
-    const result = await watchTenants(db, { clientForRegion, enabled: sesTenantsEnabled() });
-    if (result.held > 0 || result.failed > 0) {
-      console.log(
-        `tenants.watch: checked=${result.checked} held=${result.held} failed=${result.failed}`,
-      );
-    }
-  },
-  "domains.reap": async () => {
-    // Cloud-only: squatting is a cross-tenant problem. Self-host is one
-    // operator's own teams and adopts existing SES identities on create, so
-    // an unverified row blocks nobody there.
-    if (!env.IS_CLOUD) return;
-    const reaped = await reapUnverifiedDomains(db, { clientForRegion });
-    if (reaped > 0) console.log(`domains.reap: reaped=${reaped}`);
-  },
-});
+);
 
 // A deploy can restart the process while a Stripe event is mid-flight; Stripe
 // retries it, but the daily reconcile is hours away. One pass at boot closes

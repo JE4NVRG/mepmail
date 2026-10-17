@@ -33,6 +33,7 @@ import {
   usePercent,
 } from "./parts";
 import { useContentReveal } from "./reveal";
+import { SignupRiskQueue } from "./signup-risk-queue";
 
 const STATUSES = ["open", "cleared", "suspended", "all"] as const;
 // The team_flag_reason enum; tsc checks it against the router's input.
@@ -135,6 +136,7 @@ export function SafetyList() {
           </Link>
         }
       />
+      <SignupRiskQueue />
       <div
         className="ms-filter-row"
         style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18 }}
