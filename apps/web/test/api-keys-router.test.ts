@@ -1,9 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { generateApiKey, MAX_ACTIVE_API_KEYS, verifyApiKey } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCaller } from "@/server/routers";
 
 let db: Db;
@@ -14,6 +15,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await close();
 });
 
@@ -49,6 +51,60 @@ async function createDomain(
 }
 
 describe("apiKeys.create", () => {
+  it.each(["hold", "sandbox"] as const)(
+    "enforces cloud %s before a dashboard full-key response",
+    async (level) => {
+      vi.stubEnv("IS_CLOUD", "true");
+      const teamId = await createTeam(db, `restricted-${randomUUID()}`);
+      const userId = randomUUID();
+      await db.insert(schema.user).values({
+        id: userId,
+        name: "Synthetic",
+        email: `${userId}@example.test`,
+        emailVerified: true,
+      });
+      await db.insert(schema.teamSignupRisk).values({
+        teamId,
+        principalUserId: userId,
+        level,
+        reasons: ["synthetic_fixture"],
+        signals: {
+          domain: `${userId}.test`,
+          disposable: false,
+          mx: "present",
+          domainAgeDays: 400,
+          catchAll: "unknown",
+          randomLocal: false,
+          ipKey: null,
+          asn: null,
+          signupsIp1h: 0,
+          signupsDomain24h: 0,
+          signupsAsn1h: 0,
+        },
+      });
+      const caller = callerFor(teamId);
+      await expect(caller.apiKeys.create({ name: "No full credential" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      expect(
+        await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.teamId, teamId)),
+      ).toHaveLength(0);
+      if (level === "sandbox") {
+        const key = await caller.apiKeys.create({
+          name: "Own-address test",
+          permission: "sending_access",
+        });
+        expect(key.token).toMatch(/^ms_/);
+        await expect(
+          caller.apiKeys.create({ name: "Second test", permission: "sending_access" }),
+        ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+      } else {
+        await expect(
+          caller.apiKeys.create({ name: "No test credential", permission: "sending_access" }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      }
+    },
+  );
   it("forbids ordinary members from minting privileged API keys", async () => {
     const teamId = await createTeam(db, "team-a");
     await expect(

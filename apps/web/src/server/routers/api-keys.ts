@@ -1,12 +1,8 @@
 import { env } from "@millionsend/config";
-import {
-  generateApiKey,
-  MAX_ACTIVE_API_KEYS,
-  refreshSignupRiskAfterFullKey,
-} from "@millionsend/core";
+import { apiKeyIssuanceMessage, issueApiKey } from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { recordAudit } from "../audit";
 import { adminProcedure, router, teamProcedure } from "../trpc";
@@ -43,56 +39,29 @@ export const apiKeysRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const [active] = await ctx.db
-        .select({ n: count() })
-        .from(schema.apiKeys)
-        .where(and(eq(schema.apiKeys.teamId, ctx.teamId), isNull(schema.apiKeys.revokedAt)));
-      if ((active?.n ?? 0) >= MAX_ACTIVE_API_KEYS) {
+      const issued = await issueApiKey(ctx.db, {
+        teamId: ctx.teamId,
+        name: input.name,
+        permission: input.permission,
+        domainId: input.domainId ?? null,
+        isCloud: env.IS_CLOUD,
+      });
+      if (!issued.allowed) {
         throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: `A team can have at most ${MAX_ACTIVE_API_KEYS} active API keys; revoke one first.`,
+          code:
+            issued.reason === "invalid_domain"
+              ? "BAD_REQUEST"
+              : issued.reason === "active_key_limit" || issued.reason === "signup_sandbox_key_limit"
+                ? "PRECONDITION_FAILED"
+                : issued.reason === "team_missing"
+                  ? "NOT_FOUND"
+                  : "FORBIDDEN",
+          message: apiKeyIssuanceMessage(issued.reason),
         });
-      }
-      if (input.domainId) {
-        // The scope is enforced server-side, but a key can only be scoped to a
-        // domain the team actually owns and has verified — reject anything else.
-        const [domain] = await ctx.db
-          .select({ id: schema.domains.id })
-          .from(schema.domains)
-          .where(
-            and(
-              eq(schema.domains.id, input.domainId),
-              eq(schema.domains.teamId, ctx.teamId),
-              eq(schema.domains.status, "verified"),
-            ),
-          );
-        if (!domain) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "domainId must be a verified domain of this team",
-          });
-        }
-      }
-      const generated = generateApiKey();
-      const [row] = await ctx.db
-        .insert(schema.apiKeys)
-        .values({
-          teamId: ctx.teamId,
-          name: input.name.trim(),
-          tokenPrefix: generated.tokenPrefix,
-          keyHash: generated.keyHash,
-          last4: generated.last4,
-          permission: input.permission,
-          domainId: input.domainId ?? null,
-        })
-        .returning({ id: schema.apiKeys.id });
-      if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      if (env.IS_CLOUD && input.permission === "full_access") {
-        await refreshSignupRiskAfterFullKey(ctx.db, { teamId: ctx.teamId });
       }
       await recordAudit(ctx, {
         action: "api_key.created",
-        target: { type: "api_key", id: row.id },
+        target: { type: "api_key", id: issued.id },
         metadata: {
           name: input.name.trim(),
           permission: input.permission,
@@ -101,7 +70,7 @@ export const apiKeysRouter = router({
       });
       // The full secret exists only in this response — the row stores
       // tokenPrefix + hash + last4, and no other code path returns or logs it.
-      return { id: row.id, token: generated.token };
+      return { id: issued.id, token: issued.token };
     }),
 
   // Soft revoke: the row is kept so tokenPrefix lookups keep resolving (and

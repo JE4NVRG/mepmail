@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { EnvKeyring, generateApiKey, MAX_ACTIVE_API_KEYS } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
@@ -76,6 +76,64 @@ beforeAll(async () => {
 afterAll(() => close());
 
 describe("POST /api-keys", () => {
+  it.each(["hold", "sandbox"] as const)(
+    "applies cloud %s to an existing REST minter without issuing another credential",
+    async (level) => {
+      const restrictedTeam = await createTeam(db, `rest-restricted-${randomUUID()}`);
+      const minter = await insertKey(restrictedTeam);
+      const userId = randomUUID();
+      await db.insert(schema.user).values({
+        id: userId,
+        name: "Synthetic",
+        email: `${userId}@example.test`,
+        emailVerified: true,
+      });
+      await db.insert(schema.teamSignupRisk).values({
+        teamId: restrictedTeam,
+        principalUserId: userId,
+        level,
+        reasons: ["synthetic_fixture"],
+        signals: {
+          domain: `${userId}.test`,
+          disposable: false,
+          mx: "present",
+          domainAgeDays: 400,
+          catchAll: "unknown",
+          randomLocal: false,
+          ipKey: null,
+          asn: null,
+          signupsIp1h: 0,
+          signupsDomain24h: 0,
+          signupsAsn1h: 0,
+        },
+      });
+      const cloud = createApi({
+        db,
+        keyring: EnvKeyring.fromBase64(randomBytes(32).toString("base64")),
+        isCloud: true,
+        enqueueEmailSend: async () => {},
+      });
+      const result = await cloud.request("/api-keys", {
+        method: "POST",
+        headers: { authorization: `Bearer ${minter}`, "content-type": "application/json" },
+        body: JSON.stringify({ name: "Refused full credential" }),
+      });
+      expect(result.status).toBe(403);
+      const body = await result.json();
+      expect(body).toMatchObject({
+        name: level === "hold" ? "team_review_required" : "signup_api_key_restricted",
+      });
+      expect(body).not.toHaveProperty("token");
+      expect(
+        await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.teamId, restrictedTeam)),
+      ).toHaveLength(1);
+      const [existing] = await db
+        .select()
+        .from(schema.apiKeys)
+        .where(eq(schema.apiKeys.teamId, restrictedTeam));
+      expect(existing?.revokedAt).toBeNull();
+    },
+  );
   it("returns the token exactly once, storing only prefix + hash + last4", async () => {
     const res = await call(fullKey, "POST", "/api-keys", { name: "ci" });
     expect(res.status).toBe(200);

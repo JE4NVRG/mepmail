@@ -137,6 +137,13 @@ export {
 } from "./account-score.js";
 export { type ApiKeyAuth, authenticateApiKey } from "./api-key-auth.js";
 export {
+  type ApiKeyIssuanceRefusal,
+  type ApiKeyIssuanceResult,
+  apiKeyIssuanceMessage,
+  issueApiKey,
+  MAX_SANDBOX_API_KEYS,
+} from "./api-key-issuance.js";
+export {
   extractTokenPrefix,
   type GeneratedApiKey,
   generateApiKey,

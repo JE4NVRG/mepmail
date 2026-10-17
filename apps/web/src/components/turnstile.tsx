@@ -8,6 +8,7 @@ const SCRIPT_URL = "https://challenges.cloudflare.com/turnstile/v0/api.js?render
 const ONLOAD_CALLBACK = "__mepmailTurnstileLoaded";
 /* A token request that never settles must fail visibly, not hang the button. */
 const TOKEN_TIMEOUT_MS = 30_000;
+const SCRIPT_TIMEOUT_MS = 15_000;
 
 interface TurnstileApi {
   render(
@@ -16,6 +17,7 @@ interface TurnstileApi {
       sitekey: string;
       execution: "execute";
       appearance: "interaction-only";
+      action?: string;
       callback: (token: string) => void;
       "error-callback": (code?: string) => void;
       "expired-callback": () => void;
@@ -35,17 +37,28 @@ declare global {
 let scriptLoading: Promise<TurnstileApi> | undefined;
 /** Loads the API once and resolves when Turnstile calls back that it is usable. */
 function loadTurnstile(): Promise<TurnstileApi> {
-  scriptLoading ??= new Promise((resolve, reject) => {
-    if (window.turnstile) return resolve(window.turnstile);
-    (window as unknown as Record<string, unknown>)[ONLOAD_CALLBACK] = () => {
-      if (window.turnstile) resolve(window.turnstile);
-      else reject(new Error("turnstile"));
-    };
+  if (window.turnstile) return Promise.resolve(window.turnstile);
+  scriptLoading ??= new Promise<TurnstileApi>((resolve, reject) => {
     const script = document.createElement("script");
+    const fail = () => {
+      window.clearTimeout(timer);
+      script.remove();
+      reject(new Error("turnstile"));
+    };
+    const timer = window.setTimeout(fail, SCRIPT_TIMEOUT_MS);
+    (window as unknown as Record<string, unknown>)[ONLOAD_CALLBACK] = () => {
+      window.clearTimeout(timer);
+      if (window.turnstile) resolve(window.turnstile);
+      else fail();
+    };
     script.src = `${SCRIPT_URL}&onload=${ONLOAD_CALLBACK}`;
     script.async = true;
-    script.onerror = () => reject(new Error("turnstile"));
+    script.onerror = fail;
     document.head.appendChild(script);
+  }).catch((error: unknown) => {
+    // A network failure must allow the person's next click to retry loading.
+    scriptLoading = undefined;
+    throw error;
   });
   return scriptLoading;
 }
@@ -59,7 +72,7 @@ function loadTurnstile(): Promise<TurnstileApi> {
  * site key (the instance opted out) `getToken` resolves null and the slot
  * stays empty, so callers never branch on configuration.
  */
-export function useTurnstile(siteKey: string | null) {
+export function useTurnstile(siteKey: string | null, action?: string) {
   const slotRef = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
   // The element the widget was rendered into: a screen that swaps its form
@@ -92,6 +105,7 @@ export function useTurnstile(siteKey: string | null) {
         sitekey: siteKey,
         execution: "execute",
         appearance: "interaction-only",
+        ...(action ? { action } : {}),
         callback: (token) => pending.current?.resolve(token),
         "error-callback": (code) => {
           // Cloudflare's code (e.g. 110200 = hostname not on the widget) is
@@ -119,7 +133,7 @@ export function useTurnstile(siteKey: string | null) {
       turnstile.reset(id);
       turnstile.execute(id);
     });
-  }, [siteKey]);
+  }, [siteKey, action]);
 
   return { slot: <div ref={slotRef} />, getToken };
 }

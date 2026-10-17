@@ -1,15 +1,14 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { env } from "@millionsend/config";
 import {
+  apiKeyIssuanceMessage,
   apiRequestActor,
-  generateApiKey,
-  MAX_ACTIVE_API_KEYS,
+  issueApiKey,
   recordAudit,
-  refreshSignupRiskAfterFullKey,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { and, asc, count, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { type Env, errorBody, keysetPage } from "../app.js";
 import {
   createApiKeyRequestSchema,
@@ -20,7 +19,7 @@ import {
   removeApiKeyResponseSchema,
 } from "../schemas.js";
 
-export function registerApiKeyRoutes(app: OpenAPIHono<Env>, db: Db): void {
+export function registerApiKeyRoutes(app: OpenAPIHono<Env>, db: Db, isCloud = env.IS_CLOUD): void {
   const jsonErr = (description: string) => ({
     content: { "application/json": { schema: errorSchema } },
     description,
@@ -41,69 +40,37 @@ export function registerApiKeyRoutes(app: OpenAPIHono<Env>, db: Db): void {
           description: "API key created; the token is returned only here",
         },
         422: jsonErr("Validation error"),
+        403: jsonErr("Account review restricts key creation"),
       },
     }),
     async (c) => {
       const auth = c.get("auth");
       const body = c.req.valid("json");
-      const [active] = await db
-        .select({ n: count() })
-        .from(k)
-        .where(and(eq(k.teamId, auth.teamId), isNull(k.revokedAt)));
-      if ((active?.n ?? 0) >= MAX_ACTIVE_API_KEYS) {
+      const issued = await issueApiKey(db, {
+        teamId: auth.teamId,
+        name: body.name,
+        permission: body.permission,
+        domainId: body.domain_id ?? null,
+        createdByApiKeyId: auth.apiKeyId,
+        isCloud,
+      });
+      if (!issued.allowed) {
+        const status =
+          issued.reason === "invalid_domain" || issued.reason === "active_key_limit" ? 422 : 403;
         return c.json(
           errorBody(
-            422,
-            "validation_error",
-            `A team can have at most ${MAX_ACTIVE_API_KEYS} active API keys; revoke one first`,
+            status,
+            status === 422 ? "validation_error" : issued.reason,
+            apiKeyIssuanceMessage(issued.reason),
           ),
-          422,
+          status,
         );
-      }
-      if (body.domain_id) {
-        // The scope is enforced server-side, but a key can only be scoped to
-        // a domain the team actually owns and has verified — reject anything
-        // else (a foreign id gets the same answer as an unverified one).
-        const [domain] = await db
-          .select({ id: schema.domains.id })
-          .from(schema.domains)
-          .where(
-            and(
-              eq(schema.domains.id, body.domain_id),
-              eq(schema.domains.teamId, auth.teamId),
-              eq(schema.domains.status, "verified"),
-            ),
-          );
-        if (!domain) {
-          return c.json(
-            errorBody(422, "validation_error", "domain_id must be a verified domain of this team"),
-            422,
-          );
-        }
-      }
-      const generated = generateApiKey();
-      const [row] = await db
-        .insert(k)
-        .values({
-          teamId: auth.teamId,
-          name: body.name,
-          tokenPrefix: generated.tokenPrefix,
-          keyHash: generated.keyHash,
-          last4: generated.last4,
-          permission: body.permission,
-          domainId: body.domain_id ?? null,
-          createdByApiKeyId: auth.apiKeyId,
-        })
-        .returning({ id: k.id });
-      if (!row) throw new Error("api key insert returned no row");
-      if (env.IS_CLOUD && body.permission === "full_access") {
-        await refreshSignupRiskAfterFullKey(db, { teamId: auth.teamId });
       }
       await recordAudit(db, {
         teamId: auth.teamId,
         actor: apiRequestActor(auth),
         action: "api_key.created",
-        target: { type: "api_key", id: row.id },
+        target: { type: "api_key", id: issued.id },
         metadata: {
           name: body.name,
           permission: body.permission,
@@ -112,7 +79,7 @@ export function registerApiKeyRoutes(app: OpenAPIHono<Env>, db: Db): void {
       });
       // The full secret exists only in this response — the row stores
       // tokenPrefix + hash + last4, and the request logger redacts `token`.
-      return c.json({ id: row.id, token: generated.token }, 200);
+      return c.json({ id: issued.id, token: issued.token }, 200);
     },
   );
 

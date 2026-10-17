@@ -21,7 +21,12 @@ import {
 import { type Db, getDb, schema } from "@millionsend/db";
 import { type BetterAuthPlugin, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import {
+  APIError,
+  addOAuthServerContext,
+  createAuthMiddleware,
+  getOAuthState,
+} from "better-auth/api";
 import { captcha, jwt } from "better-auth/plugins";
 import { and, desc, eq, ne, notExists } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -35,6 +40,11 @@ import { getActiveMembership, listMemberships } from "./membership";
 import { enqueueRecipientErase } from "./queue";
 import { recordSignupAdvertising } from "./signup-advertising";
 import { notifySignupAlert } from "./signup-alert";
+import {
+  assertSignupBotVerification,
+  SIGNUP_BOT_OAUTH_CONTEXT,
+  signupBotProtectionEnabled,
+} from "./signup-bot-protection";
 import {
   buildMcpConnectedEmail,
   buildPasswordChangedEmail,
@@ -215,6 +225,9 @@ export function createAuth(
   const baseURL = resolveBaseUrl(env.APP_BASE_URL);
   const issuer = resolveOAuthIssuerUrl(baseURL, env.OAUTH_ISSUER_URL, env.PUBLIC_API_URL);
   const erase = deps.eraseRecipient ?? enqueueRecipientErase;
+  // Better Auth gives each dispatched endpoint its own context object.
+  // This proof is never stored in request input or shared between requests.
+  const verifiedSignupContexts = new WeakSet<object>();
   /**
    * A proven account becomes a contact of the account-mail team. Proven:
    * the address is verified, or this instance cannot verify anyone (no
@@ -403,14 +416,15 @@ export function createAuth(
       // Turnstile on sign-in, sign-up, password reset and the verification
       // resend when the instance opts in; the forms send the token in
       // x-captcha-response. The plugin's default list lacks the resend.
-      ...(env.TURNSTILE_SECRET_KEY
+      ...(env.TURNSTILE_SECRET_KEY && (!signupBotProtectionEnabled() || env.TURNSTILE_SITE_KEY)
         ? [
             captcha({
               provider: "cloudflare-turnstile",
               secretKey: env.TURNSTILE_SECRET_KEY,
               endpoints: [
-                "/sign-up/email",
-                "/sign-in/email",
+                // The explicit signup gate consumes the token once in the
+                // before hook; the legacy plugin still owns the other forms.
+                ...(!signupBotProtectionEnabled() ? ["/sign-up/email", "/sign-in/email"] : []),
                 "/request-password-reset",
                 "/send-verification-email",
               ],
@@ -586,8 +600,23 @@ export function createAuth(
       },
       user: {
         create: {
-          before: async () => {
+          before: async (_user, ctx) => {
             await assertSignupAllowed(db, signupOpen());
+            if (signupBotProtectionEnabled()) {
+              const state = await getOAuthState();
+              if (
+                !(ctx && verifiedSignupContexts.has(ctx.context)) &&
+                state?.serverContext?.[SIGNUP_BOT_OAUTH_CONTEXT] !== true
+              ) {
+                // Existing social accounts and account linking do not create
+                // a user. An implicit new account must carry the proof from
+                // its verified initiation, not client-supplied additionalData.
+                throw new APIError("FORBIDDEN", {
+                  code: "SIGNUP_BOT_VERIFICATION_REQUIRED",
+                  message: "Complete the account verification on the signup page and try again.",
+                });
+              }
+            }
           },
           // Runs after the row exists (after the adapter's transaction for a
           // social first sign-in). Social sign-ins arrive verified and enroll
@@ -627,6 +656,21 @@ export function createAuth(
         // still guards the paths that create users elsewhere (social sign-in).
         if (ctx.path === "/sign-up/email") {
           await assertSignupAllowed(db, signupOpen());
+          if (signupBotProtectionEnabled()) {
+            await assertSignupBotVerification(ctx.headers, baseURL);
+            verifiedSignupContexts.add(ctx.context);
+          }
+          return;
+        }
+        if (ctx.path === "/sign-in/social" && signupBotProtectionEnabled()) {
+          const body = ctx.body as { requestSignUp?: boolean } | undefined;
+          // A normal existing-account social login needs no new challenge.
+          // A tokenless implicit signup is rejected in user.create instead.
+          if (body?.requestSignUp === true || ctx.headers?.has("x-captcha-response")) {
+            await assertSignupBotVerification(ctx.headers, baseURL);
+            verifiedSignupContexts.add(ctx.context);
+            await addOAuthServerContext({ [SIGNUP_BOT_OAUTH_CONTEXT]: true });
+          }
           return;
         }
         if (ctx.path !== "/oauth2/register") return;

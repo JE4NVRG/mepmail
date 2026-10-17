@@ -7,6 +7,7 @@ import { postAuthNext } from "@/lib/nav";
 import { enabledSocialProviders, hasSession } from "@/server/auth";
 import { publicPageUrls } from "@/server/public-seo";
 import { accountMailDelayed } from "@/server/ses-pause";
+import { signupBotProtectionEnabled } from "@/server/signup-bot-protection";
 import { passwordRecoveryEnabled } from "@/server/system-mail";
 
 // Server component so the env-derived social-provider flags reach the client
@@ -25,6 +26,7 @@ export default async function LoginPage({
       legal={{ termsUrl: env.TERMS_URL ?? "/terms", privacyUrl: env.PRIVACY_URL ?? "/privacy" }}
       forgotPassword={passwordRecoveryEnabled()}
       turnstileSiteKey={env.TURNSTILE_SITE_KEY ?? null}
+      requireLoginCaptcha={!signupBotProtectionEnabled()}
       mailDelayed={await accountMailDelayed()}
     />
   );

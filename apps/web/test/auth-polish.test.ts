@@ -52,7 +52,7 @@ vi.mock("@/lib/auth-client", () => ({
   },
 }));
 vi.mock("@/components/turnstile", () => ({
-  captchaHeaders: () => ({}),
+  captchaHeaders: (token: string | null) => (token ? { "x-captcha-response": token } : {}),
   useTurnstile: () => ({ getToken: h.token, slot: null }),
 }));
 
@@ -72,6 +72,7 @@ function render(
   mode: "login" | "signup" = "login",
   providers = { google: false, github: false, microsoft: false },
   mailDelayed = false,
+  requireLoginCaptcha = true,
 ) {
   h.cursor = 0;
   return AuthForm({
@@ -80,6 +81,7 @@ function render(
     legal: { termsUrl: null, privacyUrl: null },
     forgotPassword: true,
     mailDelayed,
+    requireLoginCaptcha,
   });
 }
 function input(tree: ReactNode, id: string, value: string) {
@@ -218,6 +220,103 @@ describe("auth UX: synthetic component state harness", () => {
     });
     await submit(render());
     expect(alert(render()).props.children).toBe("auth.login.error");
+  });
+  it("existing email login skips the signup challenge when the page opts out", async () => {
+    h.token.mockRejectedValue(new Error("synthetic challenge outage"));
+    h.email.mockResolvedValue({ error: { code: "INVALID_PASSWORD" } });
+    await submit(render("login", undefined, false, false));
+    await submit(render("login", undefined, false, false));
+    expect(h.token).not.toHaveBeenCalled();
+    expect(h.email).toHaveBeenCalledWith(
+      expect.objectContaining({ fetchOptions: { headers: {} } }),
+    );
+    expect(alert(render("login", undefined, false, false)).props.children).toBe("auth.login.error");
+  });
+  it("the login opt-out cannot remove the signup challenge", async () => {
+    h.token.mockRejectedValue(new Error("synthetic challenge outage"));
+    await submit(render("signup", undefined, false, false));
+    expect(h.token).toHaveBeenCalledTimes(1);
+    expect(h.signup).not.toHaveBeenCalled();
+    expect(alert(render("signup", undefined, false, false)).props.children).toBe(
+      "auth.signup.captcha",
+    );
+  });
+  it("verification resend still obtains a fresh token when login has opted out", async () => {
+    h.signup.mockResolvedValue({ data: { token: null }, error: null });
+    h.token.mockResolvedValue("signup-token");
+    input(render("signup", undefined, false, false), "email", "person@example.com");
+    await submit(render("signup", undefined, false, false));
+    h.token.mockClear();
+    h.token.mockResolvedValue("fresh-resend-token");
+    h.resend.mockResolvedValue({ error: null });
+    const waiting = render("signup", undefined, false, false);
+    const resend = find(
+      waiting,
+      (n) => n.type === "button" && n.props.children === "auth.signup.resend",
+    );
+    await (resend.props.onClick as () => Promise<void>)();
+    expect(h.token).toHaveBeenCalledTimes(1);
+    expect(h.resend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fetchOptions: { headers: { "x-captcha-response": "fresh-resend-token" } },
+      }),
+    );
+  });
+  it("social signup obtains the challenge token and explicitly requests account creation", async () => {
+    h.token.mockResolvedValue("synthetic-challenge");
+    h.social.mockResolvedValue({ error: null });
+    const google = { google: true, github: false, microsoft: false };
+    const social = find(
+      render("signup", google),
+      (n) => n.type === "button" && Array.isArray(n.props.children),
+    );
+    await (social.props.onClick as () => Promise<void>)();
+    expect(h.token).toHaveBeenCalledTimes(1);
+    expect(h.social).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestSignUp: true,
+        fetchOptions: { headers: { "x-captcha-response": "synthetic-challenge" } },
+      }),
+    );
+  });
+  it("a failed challenge does not start a social signup and leaves retry enabled", async () => {
+    h.token.mockRejectedValue(new Error("synthetic provider timeout"));
+    const google = { google: true, github: false, microsoft: false };
+    const social = find(
+      render("signup", google),
+      (n) => n.type === "button" && Array.isArray(n.props.children),
+    );
+    await (social.props.onClick as () => Promise<void>)();
+    expect(h.social).not.toHaveBeenCalled();
+    expect(alert(render("signup", google)).props.children).toBe("auth.signup.captcha");
+    expect(button(render("signup", google)).props.disabled).toBe(false);
+  });
+  it("existing social login never requests signup or waits for the signup challenge", async () => {
+    h.token.mockRejectedValue(new Error("challenge unavailable"));
+    h.social.mockResolvedValue({ error: null });
+    const google = { google: true, github: false, microsoft: false };
+    const social = find(
+      render("login", google),
+      (n) => n.type === "button" && Array.isArray(n.props.children),
+    );
+    await (social.props.onClick as () => Promise<void>)();
+    expect(h.token).not.toHaveBeenCalled();
+    expect(h.social).toHaveBeenCalledWith(expect.not.objectContaining({ requestSignUp: true }));
+  });
+  it("signup provider outage preserves fields, gives a neutral message and links Support", async () => {
+    h.signup.mockResolvedValue({
+      error: { code: "SIGNUP_BOT_PROTECTION_UNAVAILABLE", message: "private transport detail" },
+    });
+    input(render("signup"), "email", "person@example.com");
+    input(render("signup"), "password", "synthetic-test-only");
+    await submit(render("signup"));
+    const tree = render("signup");
+    expect(alert(tree).props.children).toBe("auth.botProtectionUnavailable");
+    expect(find(tree, (n) => n.props.id === "email").props.value).toBe("person@example.com");
+    expect(find(tree, (n) => n.props.href === "/support").props.children).toBe(
+      "auth.botProtectionSupport",
+    );
+    expect(button(tree).props.disabled).toBe(false);
   });
   it("forgot network rejection preserves email and neutral failure", async () => {
     const recovery = () => {

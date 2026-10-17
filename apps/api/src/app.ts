@@ -3535,7 +3535,7 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
 
   app.use("/api-keys", requireApiKey, enforceRateLimit, requireFullAccess);
   app.use("/api-keys/*", requireApiKey, enforceRateLimit, requireFullAccess);
-  registerApiKeyRoutes(app, deps.db);
+  registerApiKeyRoutes(app, deps.db, deps.isCloud);
 
   app.use("/webhooks", requireApiKey, enforceRateLimit, requireFullAccess);
   app.use("/webhooks/*", requireApiKey, enforceRateLimit, requireFullAccess);

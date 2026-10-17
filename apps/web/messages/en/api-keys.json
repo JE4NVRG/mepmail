@@ -29,6 +29,9 @@
     "domain": "Domain",
     "domainAny": "Any domain",
     "submit": "Create key",
+    "sandboxNotice": "While this account awaits review, you can create one sending-only test key. It can send only to your verified signup email. Full access requires review; use the review request shown above.",
+    "reviewNotice": "New API keys are unavailable while this account is under review. Your existing keys and data are preserved. Use the review request shown above.",
+    "awaitingReview": "Awaiting account review",
     "permissionTooltip": "Full access can manage everything over the API — domains, contacts, broadcasts, keys.\n\nSending access can only send emails."
   },
   "reveal": {

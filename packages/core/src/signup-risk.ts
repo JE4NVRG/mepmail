@@ -411,8 +411,31 @@ export async function refreshSignupRiskAfterFullKey(
   db: Db,
   input: { teamId: string; now?: Date },
 ): Promise<void> {
+  await db.transaction((transaction) =>
+    refreshSignupRiskForKey(transaction as unknown as Db, { ...input, issued: true }),
+  );
+}
+
+/** Must share the issuance transaction: a refused attempt still commits its
+ * monotonic risk assessment, but no API-key secret has been generated. */
+export async function prepareSignupRiskForApiKey(
+  tx: Db,
+  input: { teamId: string; permission: "full_access" | "sending_access"; now?: Date },
+): Promise<void> {
+  await refreshSignupRiskForKey(tx, { ...input, issued: false });
+}
+
+async function refreshSignupRiskForKey(
+  tx: Db,
+  input: {
+    teamId: string;
+    permission?: "full_access" | "sending_access";
+    issued: boolean;
+    now?: Date;
+  },
+): Promise<void> {
   const now = input.now ?? new Date();
-  const [identity] = await db
+  const [identity] = await tx
     .select({
       userId: schema.teamSignupRisk.principalUserId,
       signals: schema.teamSignupRisk.signals,
@@ -421,103 +444,99 @@ export async function refreshSignupRiskAfterFullKey(
     .where(eq(schema.teamSignupRisk.teamId, input.teamId));
   if (!identity?.userId) return;
   const userId = identity.userId;
-  await db.transaction(async (transaction) => {
-    const tx = transaction as unknown as Db;
-    // Match capture's complete lock set and ordering, so a concurrent signup
-    // cannot hide a newly formed burst from the first-key assessment.
-    await lock(tx, lockNames(userId, identity.signals));
-    const [risk] = await tx
-      .select()
-      .from(schema.teamSignupRisk)
-      .where(eq(schema.teamSignupRisk.teamId, input.teamId))
-      .for("update");
-    if (!risk || risk.clearedAt || risk.principalUserId !== userId) return;
-    const [profile] = await tx
-      .select()
-      .from(schema.userSignupRisk)
-      .where(eq(schema.userSignupRisk.userId, userId));
-    const [team] = await tx
-      .select({ createdAt: schema.teams.createdAt, name: schema.teams.name })
-      .from(schema.teams)
-      .where(eq(schema.teams.id, input.teamId));
-    if (!team) return;
-    const [key] = await tx
-      .select({ createdAt: schema.apiKeys.createdAt })
-      .from(schema.apiKeys)
-      .where(
-        and(
-          eq(schema.apiKeys.teamId, input.teamId),
-          eq(schema.apiKeys.permission, "full_access"),
-          gte(schema.apiKeys.createdAt, team.createdAt),
-          lte(schema.apiKeys.createdAt, now),
-        ),
-      )
-      .orderBy(asc(schema.apiKeys.createdAt))
-      .limit(1);
-    if (!key) return;
-    const rapidFullKey = key.createdAt.getTime() - team.createdAt.getTime() <= 180_000;
-    const signals: SignupRiskSignals = {
-      ...risk.signals,
-      ...(await currentVelocity(tx, risk.signals, now)),
-      rapidFullKey: risk.signals.rapidFullKey === true || rapidFullKey,
-      genericTeamName: signupGenericTeamName(team.name),
-      verificationSeconds: profile?.signals.verificationSeconds ?? null,
-    };
-    const assessment = assessSignupRisk(signals);
-    const priorLevel =
-      profile && rank[profile.level] > rank[risk.level] ? profile.level : risk.level;
-    const level = rank[assessment.level] > rank[priorLevel] ? assessment.level : priorLevel;
-    const reasons = [
-      ...new Set([...risk.reasons, ...(profile?.reasons ?? []), ...assessment.reasons]),
-    ];
-    const changed =
-      JSON.stringify(signals) !== JSON.stringify(risk.signals) ||
-      risk.policyVersion !== assessment.policyVersion ||
-      level !== risk.level ||
-      reasons.length !== risk.reasons.length;
-    if (!changed) return;
+  // Match capture's complete lock set and ordering, so a concurrent signup
+  // cannot hide a newly formed burst from the first-key assessment.
+  await lock(tx, lockNames(userId, identity.signals));
+  const [risk] = await tx
+    .select()
+    .from(schema.teamSignupRisk)
+    .where(eq(schema.teamSignupRisk.teamId, input.teamId))
+    .for("update");
+  if (!risk || risk.clearedAt || risk.principalUserId !== userId) return;
+  const [profile] = await tx
+    .select()
+    .from(schema.userSignupRisk)
+    .where(eq(schema.userSignupRisk.userId, userId));
+  const [team] = await tx
+    .select({ createdAt: schema.teams.createdAt, name: schema.teams.name })
+    .from(schema.teams)
+    .where(eq(schema.teams.id, input.teamId));
+  if (!team) return;
+  const [key] = await tx
+    .select({ createdAt: schema.apiKeys.createdAt })
+    .from(schema.apiKeys)
+    .where(
+      and(
+        eq(schema.apiKeys.teamId, input.teamId),
+        eq(schema.apiKeys.permission, "full_access"),
+        gte(schema.apiKeys.createdAt, team.createdAt),
+        lte(schema.apiKeys.createdAt, now),
+      ),
+    )
+    .orderBy(asc(schema.apiKeys.createdAt))
+    .limit(1);
+  if (input.issued && !key) return;
+  const elapsed = (key?.createdAt ?? now).getTime() - team.createdAt.getTime();
+  const rapidFullKey =
+    (key !== undefined || input.permission === "full_access") && elapsed >= 0 && elapsed <= 180_000;
+  const signals: SignupRiskSignals = {
+    ...risk.signals,
+    ...(await currentVelocity(tx, risk.signals, now)),
+    rapidFullKey: risk.signals.rapidFullKey === true || rapidFullKey,
+    genericTeamName: signupGenericTeamName(team.name),
+    verificationSeconds: profile?.signals.verificationSeconds ?? null,
+  };
+  const assessment = assessSignupRisk(signals);
+  const priorLevel = profile && rank[profile.level] > rank[risk.level] ? profile.level : risk.level;
+  const level = rank[assessment.level] > rank[priorLevel] ? assessment.level : priorLevel;
+  const reasons = [
+    ...new Set([...risk.reasons, ...(profile?.reasons ?? []), ...assessment.reasons]),
+  ];
+  const changed =
+    JSON.stringify(signals) !== JSON.stringify(risk.signals) ||
+    risk.policyVersion !== assessment.policyVersion ||
+    level !== risk.level ||
+    reasons.length !== risk.reasons.length;
+  if (!changed) return;
+  await tx
+    .update(schema.teamSignupRisk)
+    .set({ level, reasons, signals, policyVersion: assessment.policyVersion })
+    .where(
+      and(eq(schema.teamSignupRisk.teamId, input.teamId), isNull(schema.teamSignupRisk.clearedAt)),
+    );
+  if (profile) {
+    const userSignals = { ...profile.signals, ...signals };
+    const userAssessment = assessSignupRisk(userSignals);
+    const userLevel = rank[level] > rank[userAssessment.level] ? level : userAssessment.level;
     await tx
-      .update(schema.teamSignupRisk)
-      .set({ level, reasons, signals, policyVersion: assessment.policyVersion })
-      .where(
-        and(
-          eq(schema.teamSignupRisk.teamId, input.teamId),
-          isNull(schema.teamSignupRisk.clearedAt),
-        ),
-      );
-    if (profile) {
-      const userSignals = { ...profile.signals, ...signals };
-      const userAssessment = assessSignupRisk(userSignals);
-      const userLevel = rank[level] > rank[userAssessment.level] ? level : userAssessment.level;
-      await tx
-        .update(schema.userSignupRisk)
-        .set({
-          level: rank[userLevel] > rank[profile.level] ? userLevel : profile.level,
-          reasons: [...new Set([...profile.reasons, ...reasons, ...userAssessment.reasons])],
-          signals: userSignals,
-          policyVersion: assessment.policyVersion,
-        })
-        .where(eq(schema.userSignupRisk.userId, userId));
-    }
-    if (level === "hold")
-      await holdTeamForReview(tx, {
-        teamId: input.teamId,
-        reason: "new_sender",
-        note: "Signup risk requires operator review.",
-        now,
-      });
-    await audit(tx, {
-      action: "team.signup_risk_escalated",
-      userId,
-      teamId: input.teamId,
-      now,
-      data: {
-        from: risk.level,
-        to: level,
-        reasons,
+      .update(schema.userSignupRisk)
+      .set({
+        level: rank[userLevel] > rank[profile.level] ? userLevel : profile.level,
+        reasons: [...new Set([...profile.reasons, ...reasons, ...userAssessment.reasons])],
+        signals: userSignals,
         policyVersion: assessment.policyVersion,
-        rapidFullKey: signals.rapidFullKey,
-      },
+      })
+      .where(eq(schema.userSignupRisk.userId, userId));
+  }
+  if (level === "hold")
+    await holdTeamForReview(tx, {
+      teamId: input.teamId,
+      reason: "new_sender",
+      note: "Signup risk requires operator review.",
+      now,
     });
+  await audit(tx, {
+    action: "team.signup_risk_escalated",
+    userId,
+    teamId: input.teamId,
+    now,
+    data: {
+      from: risk.level,
+      to: level,
+      reasons,
+      policyVersion: assessment.policyVersion,
+      rapidFullKey: signals.rapidFullKey,
+      ...(input.issued ? {} : { keyIssuanceAttempt: true }),
+    },
   });
 }

@@ -72,6 +72,7 @@ export function AuthForm({
   legal,
   forgotPassword = false,
   turnstileSiteKey = null,
+  requireLoginCaptcha = true,
   productUpdates = false,
   mailDelayed = false,
 }: {
@@ -82,6 +83,8 @@ export function AuthForm({
   forgotPassword?: boolean;
   /** Set when the instance verifies a Turnstile token on the email form. */
   turnstileSiteKey?: string | null;
+  /** The explicit cloud signup gate leaves existing-account login available. */
+  requireLoginCaptcha?: boolean;
   /** Cadastro: oferece o double opt-in separado de novidades. */
   productUpdates?: boolean;
   /** SES is paused with no fallback: the verification link runs late, so point at social sign-in. */
@@ -147,7 +150,13 @@ export function AuthForm({
   // so the common flow starts as a single field. Signup shows everything.
   const [passwordShown, setPasswordShown] = useState(mode === "signup");
   const passwordRef = useRef<HTMLInputElement>(null);
-  const turnstile = useTurnstile(turnstileSiteKey);
+  const turnstile = useTurnstile(turnstileSiteKey, "auth");
+
+  function verificationError(code: string | undefined): string | null {
+    if (code === "SIGNUP_BOT_PROTECTION_UNAVAILABLE") return tAuth("botProtectionUnavailable");
+    if (code === "SIGNUP_BOT_VERIFICATION_REQUIRED") return t("captcha");
+    return null;
+  }
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -161,9 +170,9 @@ export function AuthForm({
     setPending("email");
     setErrorMessage(null);
     keepScreenLocale();
-    let token: string | null;
+    let token: string | null = null;
     try {
-      token = await turnstile.getToken();
+      if (mode === "signup" || requireLoginCaptcha) token = await turnstile.getToken();
     } catch {
       setErrorMessage(t("captcha"));
       setPending(null);
@@ -197,9 +206,10 @@ export function AuthForm({
         // Signup shows server messages (e.g. the signup-disabled policy)
         // verbatim; login never echoes the server, only the catalog copy.
         setErrorMessage(
-          error.code === "VERIFICATION_FAILED" || error.code === "MISSING_RESPONSE"
-            ? t("captcha")
-            : (mode === "signup" && error.message) || t("error"),
+          verificationError(error.code) ??
+            (error.code === "VERIFICATION_FAILED" || error.code === "MISSING_RESPONSE"
+              ? t("captcha")
+              : (mode === "signup" && error.message) || t("error")),
         );
         setPending(null);
         return;
@@ -277,14 +287,28 @@ export function AuthForm({
     setPending(provider);
     setErrorMessage(null);
     keepScreenLocale();
+    let token: string | null = null;
+    if (mode === "signup") {
+      try {
+        token = await turnstile.getToken();
+      } catch {
+        setErrorMessage(t("captcha"));
+        setPending(null);
+        return;
+      }
+    }
     try {
+      // Only signup requests opt into new account creation. Existing social
+      // sign-in keeps working when signup verification is unavailable.
       const { error } = await authClient.signIn.social({
         provider,
+        ...(mode === "signup" ? { requestSignUp: true } : {}),
+        fetchOptions: { headers: captchaHeaders(token) },
         callbackURL: next,
         errorCallbackURL: withNext(mode === "login" ? "/login" : "/signup", nextParam),
       });
       if (error) {
-        setErrorMessage(tSocial("error"));
+        setErrorMessage(verificationError(error.code) ?? tSocial("error"));
         setPending(null);
       }
     } catch {
@@ -507,6 +531,11 @@ export function AuthForm({
         {errorMessage ? (
           <p className={styles.error} id="auth-error" role="alert">
             {errorMessage}
+          </p>
+        ) : null}
+        {errorMessage === tAuth("botProtectionUnavailable") ? (
+          <p className={styles.notice}>
+            <Link href="/support">{tAuth("botProtectionSupport")}</Link>
           </p>
         ) : null}
         {notice ? (

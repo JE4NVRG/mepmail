@@ -29,6 +29,9 @@
     "domain": "Domínio",
     "domainAny": "Qualquer domínio",
     "submit": "Criar chave",
+    "sandboxNotice": "Enquanto esta conta aguarda revisão, você pode criar uma chave de teste apenas de envio. Ela só envia para o e-mail verificado do seu cadastro. O acesso total depende da revisão; use o pedido de revisão acima.",
+    "reviewNotice": "Novas chaves de API ficam indisponíveis enquanto esta conta está em revisão. Suas chaves existentes e seus dados estão preservados. Use o pedido de revisão acima.",
+    "awaitingReview": "Aguardando revisão da conta",
     "permissionTooltip": "Acesso total gerencia tudo pela API — domínios, contatos, transmissões, chaves.\n\nAcesso de envio só pode enviar e-mails."
   },
   "reveal": {

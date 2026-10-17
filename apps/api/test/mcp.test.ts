@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { type ServerType, serve } from "@hono/node-server";
 import { DAY_MS, EnvKeyring, generateApiKey, MCP_SCOPES, mcpResourceUrl } from "@millionsend/core";
 import { mcpServerCardBody } from "@millionsend/core/mcp-server-card";
@@ -1089,6 +1089,101 @@ describe("REST parity tools", () => {
     expect((await member.listTools()).tools.map((t) => t.name)).toEqual(["list_api_keys"]);
     await member.close();
   });
+});
+
+describe("cloud key issuance through OAuth MCP", () => {
+  it.each([
+    ["sandbox", false],
+    ["sandbox", true],
+    ["hold", false],
+    ["hold", true],
+  ] as const)(
+    "enforces %s for an all-teams=%s grant without exposing a full credential",
+    async (level, allTeams) => {
+      const principal = randomUUID();
+      const restrictedTeam = await createTeam(db, `mcp-risk-${principal}`);
+      await db.insert(schema.user).values({
+        id: principal,
+        name: "Synthetic principal",
+        email: `${principal}@example.test`,
+        emailVerified: true,
+      });
+      await db
+        .insert(schema.teamMembers)
+        .values({ teamId: restrictedTeam, userId: principal, role: "owner" });
+      await db.insert(schema.teamSignupRisk).values({
+        teamId: restrictedTeam,
+        principalUserId: principal,
+        level,
+        reasons: ["synthetic_fixture"],
+        signals: {
+          domain: `${principal}.test`,
+          disposable: false,
+          mx: "present",
+          domainAgeDays: 400,
+          catchAll: "unknown",
+          randomLocal: false,
+          ipKey: null,
+          asn: null,
+          signupsIp1h: 0,
+          signupsDomain24h: 0,
+          signupsAsn1h: 0,
+        },
+      });
+      const cloud = createApi({
+        db,
+        keyring: EnvKeyring.fromBase64(randomBytes(32).toString("base64")),
+        isCloud: true,
+        appBaseUrl,
+        enqueueEmailSend: async () => {},
+      });
+      const client = await connect(
+        await mintToken({
+          sub: principal,
+          team_id: allTeams ? "*" : restrictedTeam,
+          team_role: "owner",
+          scope: "api-keys:write",
+        }),
+        cloud,
+      );
+      try {
+        const team = allTeams ? { team_id: restrictedTeam } : {};
+        const refused = await client.callTool({
+          name: "create_api_key",
+          arguments: { ...team, name: "Refused full credential" },
+        });
+        expect(refused.isError).toBe(true);
+        expect(resultJson(refused)).toMatchObject({
+          name: level === "hold" ? "team_review_required" : "signup_api_key_restricted",
+        });
+        expect(resultJson(refused)).not.toHaveProperty("token");
+        expect(
+          await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.teamId, restrictedTeam)),
+        ).toHaveLength(0);
+        const testKey = await client.callTool({
+          name: "create_api_key",
+          arguments: { ...team, name: "Own-address test", permission: "sending_access" },
+        });
+        if (level === "sandbox") {
+          expect(testKey.isError).toBeFalsy();
+          expect(resultJson(testKey).token).toMatch(/^ms_/);
+          const duplicate = await client.callTool({
+            name: "create_api_key",
+            arguments: { ...team, name: "Second test", permission: "sending_access" },
+          });
+          expect(duplicate.isError).toBe(true);
+          expect(resultJson(duplicate)).toMatchObject({ name: "signup_sandbox_key_limit" });
+        } else {
+          expect(testKey.isError).toBe(true);
+          expect(
+            await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.teamId, restrictedTeam)),
+          ).toHaveLength(0);
+        }
+      } finally {
+        await client.close();
+      }
+    },
+  );
 });
 
 describe("static server card", () => {

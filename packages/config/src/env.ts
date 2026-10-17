@@ -411,6 +411,9 @@ export const env = createEnv({
     // form works as before with no challenge.
     TURNSTILE_SITE_KEY: z.string().optional(),
     TURNSTILE_SECRET_KEY: z.string().optional(),
+    // Explicit cloud signup gate. Missing challenge configuration rejects
+    // account creation, while existing account sign-in remains available.
+    SIGNUP_BOT_PROTECTION: boolFromString,
 
     // Sender for account notifications (quota and deliverability alerts to
     // team owners) and team invitation emails, same forms as AUTH_EMAIL_FROM,

@@ -76,6 +76,12 @@ export function ApiKeysView() {
 
   const listQuery = useQuery(trpc.apiKeys.list.queryOptions());
   const keys = listQuery.data;
+  const standingQuery = useQuery(trpc.team.standing.queryOptions());
+  const standing = standingQuery.data;
+  const sandbox = standing?.signupRisk === "sandbox";
+  const keyCreationHeld = Boolean(
+    standing?.suspended || standing?.sendReview || standing?.signupRisk === "review",
+  );
 
   const domainsQuery = useQuery(trpc.domains.list.queryOptions());
   const verifiedDomains = (domainsQuery.data ?? []).filter((d) => d.status === "verified");
@@ -98,6 +104,9 @@ export function ApiKeysView() {
       onSuccess: (data) => {
         setRevealedToken(data.token);
         invalidateList();
+      },
+      onError: () => {
+        queryClient.invalidateQueries({ queryKey: trpc.team.standing.queryKey() });
       },
     }),
   );
@@ -132,6 +141,10 @@ export function ApiKeysView() {
   }, [resetCreate]);
   const closeRevoke = useCallback(() => setRevokeTarget(null), []);
   const closeRename = useCallback(() => setRenameTarget(null), []);
+  const openCreate = () => {
+    setPermission(sandbox ? "sending_access" : "full_access");
+    setCreateOpen(true);
+  };
 
   // Shared by the form submit and Modal's ⌘↵ onConfirm — one guard for both.
   const confirmCreate = () => {
@@ -139,7 +152,13 @@ export function ApiKeysView() {
       closeCreate();
       return;
     }
-    if (name.trim().length === 0 || createMutation.isPending) return;
+    if (
+      name.trim().length === 0 ||
+      createMutation.isPending ||
+      keyCreationHeld ||
+      (sandbox && permission === "full_access")
+    )
+      return;
     createMutation.mutate({ name, permission, domainId: domainId || null });
   };
   const confirmRevoke = () => {
@@ -168,7 +187,8 @@ export function ApiKeysView() {
             <button
               type="button"
               className="ms-btn ms-btn-primary"
-              onClick={() => setCreateOpen(true)}
+              onClick={openCreate}
+              disabled={keyCreationHeld}
             >
               <PlusGlyph size={14} />
               {t("createKey")}
@@ -177,6 +197,12 @@ export function ApiKeysView() {
           </>
         }
       />
+
+      {keyCreationHeld ? (
+        <p role="note" style={{ color: "var(--ms-muted)", fontSize: "var(--ms-fs-ui)" }}>
+          {t("create.reviewNotice")}
+        </p>
+      ) : null}
 
       {listQuery.isPending ? <KeysSkeleton /> : null}
 
@@ -189,7 +215,8 @@ export function ApiKeysView() {
             <button
               type="button"
               className="ms-btn ms-btn-primary"
-              onClick={() => setCreateOpen(true)}
+              onClick={openCreate}
+              disabled={keyCreationHeld}
             >
               <PlusGlyph />
               {t("createKey")}
@@ -303,6 +330,14 @@ export function ApiKeysView() {
               confirmCreate();
             }}
           >
+            {sandbox ? (
+              <p
+                role="note"
+                style={{ margin: 0, color: "var(--ms-muted)", fontSize: "var(--ms-fs-ui)" }}
+              >
+                {t("create.sandboxNotice")}
+              </p>
+            ) : null}
             <div className="ms-field">
               <label htmlFor="api-key-name">{t("create.name")}</label>
               <input
@@ -330,7 +365,12 @@ export function ApiKeysView() {
                 }
                 ariaLabel={t("create.permission")}
                 options={[
-                  { value: "full_access", label: t("create.permFull") },
+                  {
+                    value: "full_access",
+                    label: t("create.permFull"),
+                    disabled: sandbox,
+                    ...(sandbox ? { hint: t("create.awaitingReview") } : {}),
+                  },
                   { value: "sending_access", label: t("create.permSending") },
                 ]}
               />
@@ -371,7 +411,12 @@ export function ApiKeysView() {
               <button
                 type="submit"
                 className="ms-btn ms-btn-primary"
-                disabled={name.trim().length === 0 || createMutation.isPending}
+                disabled={
+                  name.trim().length === 0 ||
+                  createMutation.isPending ||
+                  keyCreationHeld ||
+                  (sandbox && permission === "full_access")
+                }
               >
                 <BtnSpinner on={createMutation.isPending} />
                 {t("create.submit")} <ConfirmKeycap />
