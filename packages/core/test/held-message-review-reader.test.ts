@@ -5,6 +5,7 @@ import {
   auditedHeldReviewRead,
   privateAudit,
   validateHeldReviewRequest,
+  validateHeldReviewRuntime,
 } from "../scripts/held-message-review-reader.js";
 
 const now = new Date("2026-10-16T22:00:00.000Z");
@@ -43,12 +44,109 @@ describe("trusted held-review reader guards", () => {
       "helperSha256",
       "origin",
       "productionRevision",
+      "productionBuildId",
+      "audience",
     ])
       expect(() =>
         validateHeldReviewRequest({ ...request, [key]: "changed" }, manifest, operationId, now),
       ).toThrow();
     expect(() =>
       validateHeldReviewRequest(request, manifest, "44444444-4444-4444-8444-444444444444", now),
+    ).toThrow();
+  });
+
+  it("binds production reviews to the frozen audience, origin, revision and build", () => {
+    const pins = {
+      audience: "held-message-review-production" as const,
+      origin: "https://mepmail.dev" as const,
+      productionRevision: "c".repeat(40),
+      productionBuildId: "synthetic-qualified-production-build",
+    };
+    const productionManifest = { ...manifest, ...pins, stagingRevision: pins.productionRevision };
+    const productionRequest = { ...request, ...productionManifest, expiresAt: request.expiresAt };
+    expect(
+      validateHeldReviewRequest(productionRequest, productionManifest, operationId, now, pins),
+    ).toEqual(productionRequest);
+    // Merely supplying a production manifest cannot retarget a staging bundle.
+    expect(() =>
+      validateHeldReviewRequest(productionRequest, productionManifest, operationId, now),
+    ).toThrow();
+    for (const changed of [
+      { audience: "held-message-review-staging", origin: "http://127.0.0.1:3186" },
+      { origin: "https://mepmail.dev:443" },
+      { stagingRevision: "d".repeat(40) },
+      { productionRevision: "d".repeat(40) },
+      { productionBuildId: "another-build" },
+    ])
+      expect(() =>
+        validateHeldReviewRequest(
+          { ...productionRequest, ...changed },
+          { ...productionManifest, ...changed },
+          operationId,
+          now,
+          pins,
+        ),
+      ).toThrow();
+  });
+
+  it("refuses a production runtime before DB access unless the independent guards agree", () => {
+    const pins = {
+      audience: "held-message-review-production" as const,
+      origin: "https://mepmail.dev" as const,
+      productionRevision: "c".repeat(40),
+      productionBuildId: "synthetic-qualified-production-build",
+    };
+    const productionManifest = { ...manifest, ...pins, stagingRevision: pins.productionRevision };
+    const environment = {
+      MEPMAIL_HELD_REVIEW_MODE: "production",
+      NODE_ENV: "production",
+      APP_BASE_URL: "https://mepmail.dev",
+      MILLIONSEND_REVISION: pins.productionRevision,
+      CONTENT_REVEAL: "off",
+      SUPPORT_VIEW: "off",
+    };
+    const check = (changed: Record<string, string | undefined> = {}) =>
+      validateHeldReviewRuntime(
+        productionManifest,
+        pins.productionRevision,
+        pins.productionBuildId,
+        { ...environment, ...changed },
+        pins,
+      );
+    expect(check()).toEqual(productionManifest);
+    expect(check({ APP_BASE_URL: "https://mepmail.dev/" })).toEqual(productionManifest);
+    for (const value of [undefined, "", "0", "false", "off"])
+      expect(check({ MEPMAIL_LOCAL_PREVIEW: value })).toEqual(productionManifest);
+    for (const changed of [
+      { MEPMAIL_HELD_REVIEW_MODE: undefined },
+      { MEPMAIL_HELD_REVIEW_MODE: "staging" },
+      { NODE_ENV: "development" },
+      { MEPMAIL_LOCAL_PREVIEW: "true" },
+      { MEPMAIL_LOCAL_PREVIEW: "1" },
+      { APP_BASE_URL: "https://mepmail.dev:443" },
+      { APP_BASE_URL: "https://mepmail.dev/path" },
+      { APP_BASE_URL: "http://127.0.0.1:3186" },
+      { MILLIONSEND_REVISION: "d".repeat(40) },
+      { CONTENT_REVEAL: undefined },
+      { CONTENT_REVEAL: "on" },
+      { SUPPORT_VIEW: undefined },
+      { SUPPORT_VIEW: "on" },
+    ])
+      expect(() => check(changed)).toThrow();
+    for (const [revision, build] of [
+      ["d".repeat(40), pins.productionBuildId],
+      [pins.productionRevision, "another-build"],
+    ] as const)
+      expect(() =>
+        validateHeldReviewRuntime(productionManifest, revision, build, environment, pins),
+      ).toThrow();
+    expect(() =>
+      validateHeldReviewRuntime(
+        manifest,
+        manifest.productionRevision,
+        manifest.productionBuildId,
+        environment,
+      ),
     ).toThrow();
   });
 

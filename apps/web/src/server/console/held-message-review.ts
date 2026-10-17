@@ -10,7 +10,10 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
-const AUDIENCE = "held-message-review-staging";
+const AUDIENCES = {
+  staging: "held-message-review-staging",
+  production: "held-message-review-production",
+} as const;
 const REQUESTED = "console.held_message_review_requested";
 const PREPARED = "console.held_message_review_prepared";
 const VIEWED = "console.held_message_review_viewed";
@@ -25,7 +28,7 @@ const metadata = z.object({
   teamId: z.uuid(),
   emailId: z.uuid(),
   operatorId: z.string().min(1).max(200),
-  audience: z.literal(AUDIENCE),
+  audience: z.enum([AUDIENCES.staging, AUDIENCES.production]),
   origin: z.string().url(),
   stagingRevision: revision,
   productionRevision: revision,
@@ -146,11 +149,19 @@ export function createHeldMessageReviewService(deps: HeldReviewDependencies = {}
   const readFile = deps.readFile ?? boundedFile;
   const now = deps.now ?? (() => new Date());
 
-  async function jsonFile(dir: string, name: string): Promise<unknown> {
+  async function jsonFile(dir: string, name: string): Promise<{ value: unknown } | null> {
+    let bytes: Buffer;
     try {
-      const bytes = await readFile(posix.join(dir, name));
+      bytes = await readFile(posix.join(dir, name));
+    } catch (error) {
+      // No private manifest means no review capability, including in production.
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT")
+        return null;
+      return refuse();
+    }
+    try {
       if (bytes.length > MAX_BYTES) refuse();
-      return JSON.parse(bytes.toString("utf8"));
+      return { value: JSON.parse(bytes.toString("utf8")) };
     } catch {
       return refuse();
     }
@@ -160,21 +171,36 @@ export function createHeldMessageReviewService(deps: HeldReviewDependencies = {}
     const e = env();
     const dir = e.MEPMAIL_HELD_REVIEW_DIR;
     if (!dir) return null;
+    const mode = e.MEPMAIL_HELD_REVIEW_MODE ?? "staging";
     if (
-      !["1", "true"].includes(e.MEPMAIL_LOCAL_PREVIEW ?? "") ||
-      !["1", "true"].includes(e.BILLING_MUTATIONS_PAUSED ?? "") ||
-      e.MAILBOX_TRANSPORT_ENABLED === "1" ||
+      (mode !== "staging" && mode !== "production") ||
+      e.CONTENT_REVEAL !== "off" ||
+      e.SUPPORT_VIEW !== "off" ||
       !posix.isAbsolute(dir) ||
       dir === "/" ||
       posix.normalize(dir) !== dir
+    )
+      return null;
+    if (
+      mode === "staging" &&
+      (!["1", "true"].includes(e.MEPMAIL_LOCAL_PREVIEW ?? "") ||
+        !["1", "true"].includes(e.BILLING_MUTATIONS_PAUSED ?? "") ||
+        e.MAILBOX_TRANSPORT_ENABLED === "1")
+    )
+      return null;
+    if (
+      mode === "production" &&
+      (e.NODE_ENV !== "production" ||
+        !["", "0", "false", "off"].includes(e.MEPMAIL_LOCAL_PREVIEW ?? "") ||
+        !["https://mepmail.dev", "https://mepmail.dev/"].includes(e.APP_BASE_URL ?? ""))
     )
       return null;
     let origin: string;
     try {
       const u = new URL(e.APP_BASE_URL ?? "");
       if (
-        u.protocol !== "http:" ||
-        !["localhost", "127.0.0.1", "[::1]"].includes(u.hostname) ||
+        (mode === "staging" &&
+          (u.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]"].includes(u.hostname))) ||
         u.username ||
         u.password ||
         u.search ||
@@ -186,13 +212,17 @@ export function createHeldMessageReviewService(deps: HeldReviewDependencies = {}
     } catch {
       return null;
     }
-    const result = heldReviewManifestSchema.safeParse(await jsonFile(dir, "manifest.json"));
+    const privateManifest = await jsonFile(dir, "manifest.json");
+    if (!privateManifest) return null;
+    const result = heldReviewManifestSchema.safeParse(privateManifest.value);
     if (!result.success) refuse();
     const manifest = result.data;
     const remaining = Date.parse(manifest.expiresAt) - now().getTime();
     if (
       manifest.origin !== origin ||
+      manifest.audience !== AUDIENCES[mode] ||
       manifest.stagingRevision !== e.MILLIONSEND_REVISION ||
+      (mode === "production" && manifest.productionRevision !== e.MILLIONSEND_REVISION) ||
       remaining <= 0 ||
       remaining > 6 * 60 * 60_000
     )

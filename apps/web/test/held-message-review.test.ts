@@ -95,6 +95,22 @@ beforeEach(async () => {
 function writeManifest() {
   files.set(`${DIR}/manifest.json`, Buffer.from(JSON.stringify(manifest)));
 }
+function productionMode() {
+  Object.assign(env, {
+    MEPMAIL_HELD_REVIEW_MODE: "production",
+    NODE_ENV: "production",
+    MEPMAIL_LOCAL_PREVIEW: "0",
+    BILLING_MUTATIONS_PAUSED: "0",
+    MAILBOX_TRANSPORT_ENABLED: "1",
+    APP_BASE_URL: "https://mepmail.dev",
+  });
+  Object.assign(manifest, {
+    audience: "held-message-review-production",
+    origin: env.APP_BASE_URL,
+    productionRevision: env.MILLIONSEND_REVISION,
+  });
+  writeManifest();
+}
 function caller(userId = OPERATOR) {
   const review = createConsoleHeldMessageReviewRouter({
     env: () => env,
@@ -102,7 +118,7 @@ function caller(userId = OPERATOR) {
     readFile: async (path) => {
       reads.push(path);
       const bytes = files.get(path);
-      if (!bytes) throw new Error("synthetic missing file");
+      if (!bytes) throw Object.assign(new Error("synthetic missing file"), { code: "ENOENT" });
       if (!path.endsWith("/manifest.json")) afterPayloadRead?.();
       return bytes;
     },
@@ -168,6 +184,11 @@ describe("scoped held message review", () => {
     ["APP_BASE_URL", "https://mepmail.dev"],
     ["APP_BASE_URL", "http://127.0.0.1.example.test"],
     ["MEPMAIL_HELD_REVIEW_DIR", "../relative"],
+    ["MEPMAIL_HELD_REVIEW_MODE", "unknown"],
+    ["CONTENT_REVEAL", "on"],
+    ["CONTENT_REVEAL", undefined],
+    ["SUPPORT_VIEW", "on"],
+    ["SUPPORT_VIEW", undefined],
   ])("disables private mode for unsafe %s=%s", async (key, value) => {
     env[key] = value;
     expect(await caller().status({ teamId })).toEqual({
@@ -179,23 +200,156 @@ describe("scoped held message review", () => {
     expect(await rows("console.held_message_review_requested")).toHaveLength(0);
   });
 
-  it("refuses other teams, emails, manifest operators and revisions", async () => {
-    await expect(caller().status({ teamId: randomUUID() })).rejects.toMatchObject({
-      code: "NOT_FOUND",
+  it("keeps the staging defaults and explicit staging mode equivalent", async () => {
+    const implicit = await caller().status({ teamId });
+    env.MEPMAIL_HELD_REVIEW_MODE = "staging";
+    expect(await caller().status({ teamId })).toEqual(implicit);
+    expect(implicit.enabled).toBe(true);
+  });
+
+  it.each([
+    ["NODE_ENV", "development"],
+    ["NODE_ENV", undefined],
+    ["MEPMAIL_LOCAL_PREVIEW", "1"],
+    ["MEPMAIL_LOCAL_PREVIEW", "true"],
+    ["MEPMAIL_LOCAL_PREVIEW", "unknown"],
+    ["APP_BASE_URL", "http://127.0.0.1:3482"],
+    ["APP_BASE_URL", "http://mepmail.dev"],
+    ["APP_BASE_URL", "https://other.example.test"],
+    ["APP_BASE_URL", "https://mepmail.dev.example.test"],
+    ["APP_BASE_URL", "https://user@mepmail.dev"],
+    ["APP_BASE_URL", "https://user:password@mepmail.dev"],
+    ["APP_BASE_URL", "https://mepmail.dev:443"],
+    ["APP_BASE_URL", "https://mepmail.dev:8443"],
+    ["APP_BASE_URL", "https://mepmail.dev/support"],
+    ["APP_BASE_URL", "https://mepmail.dev/?review=1"],
+    ["APP_BASE_URL", "https://mepmail.dev/#review"],
+    ["CONTENT_REVEAL", "on"],
+    ["CONTENT_REVEAL", undefined],
+    ["SUPPORT_VIEW", "on"],
+    ["SUPPORT_VIEW", undefined],
+  ])("disables production for unsafe %s=%s before reading files", async (key, value) => {
+    productionMode();
+    env[key] = value;
+    expect(await caller().status({ teamId })).toEqual({
+      enabled: false,
+      message: null,
+      access: null,
     });
-    await expect(
-      caller().requestAccess({ ...input(), emailId: randomUUID() }),
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-    manifest.operatorId = OTHER;
+    await expect(caller().requestAccess(input())).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(reads).toEqual([]);
+    expect(await rows("console.held_message_review_requested")).toEqual([]);
+  });
+
+  it.each(["https://mepmail.dev", "https://mepmail.dev/"])(
+    "allows explicit production only at %s without pausing billing or transport",
+    async (origin) => {
+      productionMode();
+      env.APP_BASE_URL = origin;
+      const before = { ...env };
+      expect((await caller().status({ teamId })).enabled).toBe(true);
+      expect(env).toEqual(before);
+      expect(env.BILLING_MUTATIONS_PAUSED).toBe("0");
+      expect(env.MAILBOX_TRANSPORT_ENABLED).toBe("1");
+      expect(await rows("console.held_message_review_requested")).toEqual([]);
+      expect(reads.every((path) => path.endsWith("/manifest.json"))).toBe(true);
+    },
+  );
+
+  it.each(["missing_dir", "missing_manifest"])(
+    "leaves production disabled with %s and does not issue a request or read a body",
+    async (condition) => {
+      productionMode();
+      if (condition === "missing_dir") delete env.MEPMAIL_HELD_REVIEW_DIR;
+      else files.delete(`${DIR}/manifest.json`);
+      expect(await caller().status({ teamId })).toEqual({
+        enabled: false,
+        message: null,
+        access: null,
+      });
+      await expect(caller().requestAccess(input())).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(
+        caller().revealed({ teamId, emailId, operationId: randomUUID() }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(reads.every((path) => path.endsWith("/manifest.json"))).toBe(true);
+      expect(await rows("console.held_message_review_requested")).toEqual([]);
+      expect(await rows("console.held_message_review_viewed")).toEqual([]);
+    },
+  );
+
+  it.each(["staging", "production"])("refuses a cross-lane manifest in %s", async (mode) => {
+    if (mode === "production") productionMode();
+    manifest.audience =
+      mode === "staging" ? "held-message-review-production" : "held-message-review-staging";
     writeManifest();
-    await expect(caller().status({ teamId })).rejects.toMatchObject({ code: "FORBIDDEN" });
-    manifest.operatorId = OPERATOR;
-    manifest.stagingRevision = "d".repeat(40);
-    writeManifest();
-    await expect(caller().status({ teamId })).rejects.toMatchObject({
+    await expect(caller().requestAccess(input())).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
     });
+    expect(await rows("console.held_message_review_requested")).toEqual([]);
+    expect(reads.every((path) => path.endsWith("/manifest.json"))).toBe(true);
   });
+
+  it.each(["stagingRevision", "productionRevision"])(
+    "requires production manifest %s to match the serving revision",
+    async (pin) => {
+      productionMode();
+      manifest[pin] = "d".repeat(40);
+      writeManifest();
+      await expect(caller().status({ teamId })).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+      });
+      expect(await rows("console.held_message_review_requested")).toEqual([]);
+    },
+  );
+
+  it.each(["missing_revision", "expired", "invalid_json", "invalid_shape"])(
+    "refuses production configuration with %s without issuing access",
+    async (condition) => {
+      productionMode();
+      if (condition === "missing_revision") delete env.MILLIONSEND_REVISION;
+      if (condition === "expired") {
+        manifest.expiresAt = clock.toISOString();
+        writeManifest();
+      }
+      if (condition === "invalid_json") files.set(`${DIR}/manifest.json`, Buffer.from("{"));
+      if (condition === "invalid_shape") files.set(`${DIR}/manifest.json`, Buffer.from("{}"));
+      await expect(caller().requestAccess(input())).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+      });
+      expect(await rows("console.held_message_review_requested")).toEqual([]);
+      expect(await rows("console.held_message_review_viewed")).toEqual([]);
+      expect(reads.every((path) => path.endsWith("/manifest.json"))).toBe(true);
+    },
+  );
+
+  it("does not infer production mode from a production origin or manifest", async () => {
+    productionMode();
+    delete env.MEPMAIL_HELD_REVIEW_MODE;
+    expect((await caller().status({ teamId })).enabled).toBe(false);
+    expect(reads).toEqual([]);
+  });
+
+  it.each(["staging", "production"])(
+    "%s refuses other teams, emails, manifest operators and revisions",
+    async (mode) => {
+      if (mode === "production") productionMode();
+      await expect(caller().status({ teamId: randomUUID() })).rejects.toMatchObject({
+        code: "NOT_FOUND",
+      });
+      await expect(
+        caller().requestAccess({ ...input(), emailId: randomUUID() }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      manifest.operatorId = OTHER;
+      writeManifest();
+      await expect(caller().status({ teamId })).rejects.toMatchObject({ code: "FORBIDDEN" });
+      manifest.operatorId = OPERATOR;
+      manifest.stagingRevision = "d".repeat(40);
+      writeManifest();
+      await expect(caller().status({ teamId })).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+      });
+    },
+  );
 
   it.each(["no_hold", "sent", "missing_body", "purged", "different_team"])(
     "rejects ineligible %s without a request audit",
@@ -235,29 +389,39 @@ describe("scoped held message review", () => {
     },
   );
 
-  it("bounds manifest and access expiry and validates justification", async () => {
-    await expect(
-      caller().requestAccess({ ...input(), justification: "short" }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    manifest.expiresAt = "2026-10-18T00:00:00.000Z";
-    writeManifest();
-    await expect(caller().status({ teamId })).rejects.toMatchObject({
-      code: "PRECONDITION_FAILED",
-    });
-    manifest.expiresAt = "2026-10-16T22:05:00.000Z";
-    writeManifest();
-    const request = await caller().requestAccess(input());
-    expect(request.expiresAt.toISOString()).toBe(manifest.expiresAt);
-    await prepare(request.operationId);
-    clock = new Date("2026-10-16T22:05:00.000Z");
-    await expect(
-      caller().revealed({ teamId, emailId, operationId: request.operationId }),
-    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
-  });
+  it.each(["staging", "production"])(
+    "%s bounds manifest and access expiry and validates justification",
+    async (mode) => {
+      if (mode === "production") productionMode();
+      await expect(
+        caller().requestAccess({ ...input(), justification: "short" }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      manifest.expiresAt = "2026-10-18T00:00:00.000Z";
+      writeManifest();
+      await expect(caller().status({ teamId })).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+      });
+      manifest.expiresAt = "2026-10-16T22:05:00.000Z";
+      writeManifest();
+      const request = await caller().requestAccess(input());
+      expect(request.expiresAt.toISOString()).toBe(manifest.expiresAt);
+      await prepare(request.operationId);
+      clock = new Date("2026-10-16T22:05:00.000Z");
+      await expect(
+        caller().revealed({ teamId, emailId, operationId: request.operationId }),
+      ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    },
+  );
 
-  it.each(["queued", "queued_quota"] as const)(
-    "audits one %s request, reuses it, and reveals only prepared redacted data",
-    async (status) => {
+  it.each([
+    ["staging", "queued"],
+    ["staging", "queued_quota"],
+    ["production", "queued"],
+    ["production", "queued_quota"],
+  ] as const)(
+    "%s audits one %s request, reuses it, and reveals only prepared redacted data",
+    async (mode, status) => {
+      if (mode === "production") productionMode();
       await db
         .update(schema.emails)
         .set({ latestStatus: status })
@@ -385,86 +549,104 @@ describe("scoped held message review", () => {
     },
   );
 
-  it("fails closed when the database rejects the viewed audit", async () => {
-    const api = caller();
-    const { operationId } = await api.requestAccess(input());
-    await prepare(operationId);
-    await db.execute(
-      sql.raw(
-        `CREATE FUNCTION reject_held_review_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'console.held_message_review_viewed' THEN RAISE EXCEPTION 'synthetic audit unavailable'; END IF; RETURN NEW; END $$`,
-      ),
-    );
-    await db.execute(
-      sql.raw(
-        "CREATE TRIGGER reject_held_review_audit BEFORE INSERT ON audit_log FOR EACH ROW EXECUTE FUNCTION reject_held_review_audit()",
-      ),
-    );
-    try {
-      await expect(api.revealed({ teamId, emailId, operationId })).rejects.toBeDefined();
-      expect(await rows("console.held_message_review_viewed")).toEqual([]);
-    } finally {
-      await db.execute(sql.raw("DROP TRIGGER reject_held_review_audit ON audit_log"));
-      await db.execute(sql.raw("DROP FUNCTION reject_held_review_audit()"));
-    }
-  });
+  it.each(["staging", "production"])(
+    "%s fails closed when the database rejects the viewed audit",
+    async (mode) => {
+      if (mode === "production") productionMode();
+      const api = caller();
+      const { operationId } = await api.requestAccess(input());
+      await prepare(operationId);
+      await db.execute(
+        sql.raw(
+          `CREATE FUNCTION reject_held_review_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'console.held_message_review_viewed' THEN RAISE EXCEPTION 'synthetic audit unavailable'; END IF; RETURN NEW; END $$`,
+        ),
+      );
+      await db.execute(
+        sql.raw(
+          "CREATE TRIGGER reject_held_review_audit BEFORE INSERT ON audit_log FOR EACH ROW EXECUTE FUNCTION reject_held_review_audit()",
+        ),
+      );
+      try {
+        await expect(api.revealed({ teamId, emailId, operationId })).rejects.toBeDefined();
+        expect(await rows("console.held_message_review_viewed")).toEqual([]);
+      } finally {
+        await db.execute(sql.raw("DROP TRIGGER reject_held_review_audit ON audit_log"));
+        await db.execute(sql.raw("DROP FUNCTION reject_held_review_audit()"));
+      }
+    },
+  );
 
-  it("rechecks expiry after payload I/O and returns no content or viewed audit", async () => {
-    const api = caller();
-    const request = await api.requestAccess(input());
-    await prepare(request.operationId);
-    afterPayloadRead = () => {
-      clock = request.expiresAt;
-    };
-    await expect(
-      api.revealed({ teamId, emailId, operationId: request.operationId }),
-    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
-    expect(await rows("console.held_message_review_viewed")).toEqual([]);
-  });
-
-  it("withholds content if the deadline is crossed while committing the viewed audit", async () => {
-    const api = caller();
-    const request = await api.requestAccess(input());
-    await prepare(request.operationId);
-    const transaction = db.transaction.bind(db);
-    const commitDelay = vi.spyOn(db, "transaction").mockImplementation(async (callback, options) =>
-      transaction(async (tx) => {
-        const result = await callback(tx);
-        // The real INSERT finished; advance time before the real transaction commits.
+  it.each(["staging", "production"])(
+    "%s rechecks expiry after payload I/O and returns no content or viewed audit",
+    async (mode) => {
+      if (mode === "production") productionMode();
+      const api = caller();
+      const request = await api.requestAccess(input());
+      await prepare(request.operationId);
+      afterPayloadRead = () => {
         clock = request.expiresAt;
-        return result;
-      }, options),
-    );
-    try {
+      };
       await expect(
         api.revealed({ teamId, emailId, operationId: request.operationId }),
       ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
-      expect(await rows("console.held_message_review_viewed")).toHaveLength(1);
-    } finally {
-      commitDelay.mockRestore();
-    }
-  });
+      expect(await rows("console.held_message_review_viewed")).toEqual([]);
+    },
+  );
 
-  it("does not issue access if the mandatory request audit cannot commit", async () => {
-    await db.execute(
-      sql.raw(
-        `CREATE FUNCTION reject_held_request_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'console.held_message_review_requested' THEN RAISE EXCEPTION 'synthetic audit unavailable'; END IF; RETURN NEW; END $$`,
-      ),
-    );
-    await db.execute(
-      sql.raw(
-        "CREATE TRIGGER reject_held_request_audit BEFORE INSERT ON audit_log FOR EACH ROW EXECUTE FUNCTION reject_held_request_audit()",
-      ),
-    );
-    try {
-      await expect(caller().requestAccess(input())).rejects.toMatchObject({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "held_review_audit_failed",
-      });
-      expect(await rows("console.held_message_review_requested")).toEqual([]);
-      expect(reads.every((path) => path.endsWith("/manifest.json"))).toBe(true);
-    } finally {
-      await db.execute(sql.raw("DROP TRIGGER reject_held_request_audit ON audit_log"));
-      await db.execute(sql.raw("DROP FUNCTION reject_held_request_audit()"));
-    }
-  });
+  it.each(["staging", "production"])(
+    "%s withholds content if the deadline is crossed while committing the viewed audit",
+    async (mode) => {
+      if (mode === "production") productionMode();
+      const api = caller();
+      const request = await api.requestAccess(input());
+      await prepare(request.operationId);
+      const transaction = db.transaction.bind(db);
+      const commitDelay = vi
+        .spyOn(db, "transaction")
+        .mockImplementation(async (callback, options) =>
+          transaction(async (tx) => {
+            const result = await callback(tx);
+            // The real INSERT finished; advance time before the real transaction commits.
+            clock = request.expiresAt;
+            return result;
+          }, options),
+        );
+      try {
+        await expect(
+          api.revealed({ teamId, emailId, operationId: request.operationId }),
+        ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+        expect(await rows("console.held_message_review_viewed")).toHaveLength(1);
+      } finally {
+        commitDelay.mockRestore();
+      }
+    },
+  );
+
+  it.each(["staging", "production"])(
+    "%s does not issue access if the mandatory request audit cannot commit",
+    async (mode) => {
+      if (mode === "production") productionMode();
+      await db.execute(
+        sql.raw(
+          `CREATE FUNCTION reject_held_request_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'console.held_message_review_requested' THEN RAISE EXCEPTION 'synthetic audit unavailable'; END IF; RETURN NEW; END $$`,
+        ),
+      );
+      await db.execute(
+        sql.raw(
+          "CREATE TRIGGER reject_held_request_audit BEFORE INSERT ON audit_log FOR EACH ROW EXECUTE FUNCTION reject_held_request_audit()",
+        ),
+      );
+      try {
+        await expect(caller().requestAccess(input())).rejects.toMatchObject({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "held_review_audit_failed",
+        });
+        expect(await rows("console.held_message_review_requested")).toEqual([]);
+        expect(reads.every((path) => path.endsWith("/manifest.json"))).toBe(true);
+      } finally {
+        await db.execute(sql.raw("DROP TRIGGER reject_held_request_audit ON audit_log"));
+        await db.execute(sql.raw("DROP FUNCTION reject_held_request_audit()"));
+      }
+    },
+  );
 });

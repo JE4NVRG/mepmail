@@ -9,17 +9,46 @@ import { renderHeldMessageReview } from "../src/held-message-review-render.js";
 
 const PRODUCTION = "1f1b1d86b79235b21b1659bce5406c192448d269";
 const BUILD = "B0p3pV58Z7_b0JFw1m7T3";
+// The offline bundler pins these literals to one qualified runtime. Neither the
+// request, manifest nor environment may select a different reader audience.
+const AUDIENCE = "held-message-review-staging";
+const ORIGIN = "http://127.0.0.1:3186";
+const readerPinsSchema = z.discriminatedUnion("audience", [
+  z
+    .object({
+      audience: z.literal("held-message-review-staging"),
+      origin: z.literal("http://127.0.0.1:3186"),
+      productionRevision: z.string().regex(/^[a-f0-9]{40}$/),
+      productionBuildId: z.string().min(1).max(200),
+    })
+    .strict(),
+  z
+    .object({
+      audience: z.literal("held-message-review-production"),
+      origin: z.literal("https://mepmail.dev"),
+      productionRevision: z.string().regex(/^[a-f0-9]{40}$/),
+      productionBuildId: z.string().min(1).max(200),
+    })
+    .strict(),
+]);
+type ReaderPins = z.infer<typeof readerPinsSchema>;
+const READER_PINS: ReaderPins = readerPinsSchema.parse({
+  audience: AUDIENCE,
+  origin: ORIGIN,
+  productionRevision: PRODUCTION,
+  productionBuildId: BUILD,
+});
 const metadata = z.object({
   schemaVersion: z.literal(1),
   operationId: z.uuid(),
   teamId: z.uuid(),
   emailId: z.uuid(),
   operatorId: z.string().min(1).max(200),
-  audience: z.literal("held-message-review-staging"),
-  origin: z.literal("http://127.0.0.1:3186"),
+  audience: z.enum(["held-message-review-staging", "held-message-review-production"]),
+  origin: z.string().url(),
   stagingRevision: z.string().regex(/^[a-f0-9]{40}$/),
-  productionRevision: z.literal(PRODUCTION),
-  productionBuildId: z.literal(BUILD),
+  productionRevision: z.string().regex(/^[a-f0-9]{40}$/),
+  productionBuildId: z.string().min(1).max(200),
   helperSha256: z.string().regex(/^[a-f0-9]{64}$/),
   holdAt: z.iso.datetime(),
   issuedAt: z.iso.datetime(),
@@ -46,14 +75,56 @@ function deny(): never {
   throw new Error("held_review_refused");
 }
 
+function pinnedManifest(raw: unknown, rawPins: ReaderPins): Manifest {
+  const pins = readerPinsSchema.parse(rawPins);
+  const manifest = manifestSchema.parse(raw);
+  if (
+    Object.entries(pins).some(([key, value]) => manifest[key as keyof Manifest] !== value) ||
+    (pins.audience === "held-message-review-production" &&
+      manifest.stagingRevision !== pins.productionRevision)
+  )
+    deny();
+  return manifest;
+}
+
+/** Pure guard: actual preparation always uses the bundle's frozen READER_PINS. */
+export function validateHeldReviewRuntime(
+  rawManifest: unknown,
+  runtimeRevision: unknown,
+  runtimeBuildId: string,
+  environment: Record<string, string | undefined>,
+  pins: ReaderPins = READER_PINS,
+): Manifest {
+  const manifest = pinnedManifest(rawManifest, pins);
+  if (runtimeRevision !== pins.productionRevision || runtimeBuildId !== pins.productionBuildId)
+    deny();
+  if (pins.audience === "held-message-review-production") {
+    if (
+      environment.MEPMAIL_HELD_REVIEW_MODE !== "production" ||
+      environment.NODE_ENV !== "production" ||
+      !["", "0", "false", "off"].includes(environment.MEPMAIL_LOCAL_PREVIEW ?? "") ||
+      !["https://mepmail.dev", "https://mepmail.dev/"].includes(environment.APP_BASE_URL ?? "") ||
+      environment.MILLIONSEND_REVISION !== pins.productionRevision ||
+      environment.CONTENT_REVEAL !== "off" ||
+      environment.SUPPORT_VIEW !== "off"
+    )
+      deny();
+  } else if (environment.MEPMAIL_HELD_REVIEW_MODE === "production") {
+    // A previous staging helper cannot serve production reviews.
+    deny();
+  }
+  return manifest;
+}
+
 /** Pure contract used by the reader and its synthetic guard tests. */
 export function validateHeldReviewRequest(
   raw: unknown,
   rawManifest: unknown,
   operationId: string,
   clock: Date,
+  pins: ReaderPins = READER_PINS,
 ): RequestData {
-  const m = manifestSchema.parse(rawManifest);
+  const m = pinnedManifest(rawManifest, pins);
   const request = requestSchema.parse(raw);
   if (!z.uuid().safeParse(operationId).success || request.operationId !== operationId) deny();
   for (const [key, value] of Object.entries(m)) {
@@ -129,7 +200,7 @@ export async function prepareHeldReview(
   rawManifest: unknown,
   operationId: string,
 ): Promise<Buffer> {
-  const manifest = manifestSchema.parse(rawManifest);
+  const manifest = pinnedManifest(rawManifest, READER_PINS);
   if (!z.uuid().safeParse(operationId).success) deny();
   const response = await fetch("http://127.0.0.1:3000/api/version", {
     signal: AbortSignal.timeout(5_000),
@@ -139,16 +210,20 @@ export async function prepareHeldReview(
     !response.ok ||
     !version ||
     typeof version !== "object" ||
-    !("revision" in version) ||
-    version.revision !== PRODUCTION
+    !("revision" in version)
   )
     deny();
-  if ((await readFile("/app/apps/web/.next-cv0-ad8b5f0a/BUILD_ID", "utf8")).trim() !== BUILD)
-    deny();
+  // Guard before opening a DB connection, querying ciphertext or constructing keys.
+  const environment = process.env;
+  validateHeldReviewRuntime(
+    manifest,
+    version.revision,
+    (await readFile("/app/apps/web/.next-cv0-ad8b5f0a/BUILD_ID", "utf8")).trim(),
+    environment,
+  );
   const runtimeRequire = createRequire("/app/packages/db/package.json");
   const connect = runtimeRequire("postgres") as (url: string, options: object) => Sql;
   // This manual operation is never a cached Turbo task; secrets stay in this runtime.
-  const environment = process.env;
   if (!environment.DATABASE_URL) deny();
   const sql = connect(environment.DATABASE_URL, {
     max: 1,
