@@ -1,4 +1,7 @@
+import { accountEmailFrom, signupAlertEmail } from "@millionsend/config";
 import {
+  accountLocale,
+  buildAccountMail,
   computeTeamStandings,
   holdReputationRuns,
   markSendReviewNotified,
@@ -54,8 +57,9 @@ export async function runSafetyFlags(
 }
 
 /**
- * Tell the operator about every new send-review hold, once per hold: the
- * audit row and the notice are written here, after the hold committed,
+ * Tell the signup alerts box, or the operator when no box is configured,
+ * about every new send-review hold once. The audit row and the notice are
+ * written here, after the hold committed,
  * whichever surface (accept, fan-out, Stripe webhook) opened it.
  */
 export async function notifySendReviews(
@@ -75,14 +79,23 @@ export async function notifySendReviews(
     });
     if (!opts.mailer) continue;
     try {
-      await mailOperator(
-        db,
-        opts.mailer,
-        "review.held",
-        `/console/safety/${hold.id}`,
-        { team: hold.name, note: hold.note ?? hold.reason ?? "" },
-        opts.appBaseUrl,
-      );
+      const path = `/console/safety/${hold.id}`;
+      const values = { team: hold.name, note: hold.note ?? hold.reason ?? "" };
+      const alertEmail = signupAlertEmail();
+      if (alertEmail) {
+        const locale = await accountLocale(db, accountEmailFrom(), alertEmail);
+        await opts.mailer.send(alertEmail, {
+          ...buildAccountMail({
+            kind: "review.held",
+            locale,
+            url: `${opts.appBaseUrl ?? ""}${path}`,
+            values,
+          }),
+          kind: "review.held",
+        });
+      } else {
+        await mailOperator(db, opts.mailer, "review.held", path, values, opts.appBaseUrl);
+      }
     } catch (err) {
       console.error(`safety.flags: review notice for ${hold.id} failed`, err);
     }
