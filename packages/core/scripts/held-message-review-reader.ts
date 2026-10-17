@@ -119,9 +119,9 @@ async function requestRow(tx: Sql, manifest: Manifest, operationId: string) {
   return request;
 }
 
-async function privateAudit(tx: Sql, request: RequestData, action: string, data: object) {
+export async function privateAudit(tx: Sql, request: RequestData, action: string, data: object) {
   await tx`insert into audit_log(team_id,actor_id,action,target,data)
-    values(null,${`user:${request.operatorId}`},${action},${`email:${request.emailId}`},${JSON.stringify(data)}::jsonb)`;
+    values(null,${`user:${request.operatorId}`},${action},${`email:${request.emailId}`},${JSON.stringify(data)}::text::jsonb)`;
 }
 
 /** Only the existing production runtime's local keyring sees ciphertext and secrets. */

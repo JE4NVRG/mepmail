@@ -1,6 +1,9 @@
+import { createRequire } from "node:module";
+import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it, vi } from "vitest";
 import {
   auditedHeldReviewRead,
+  privateAudit,
   validateHeldReviewRequest,
 } from "../scripts/held-message-review-reader.js";
 
@@ -92,5 +95,82 @@ describe("trusted held-review reader guards", () => {
       ),
     ).rejects.toThrow();
     expect(order).toEqual(["audit-committed", "decrypt"]);
+  });
+
+  it("stores readable JSONB proof objects with the raw postgres.js serializers", async () => {
+    const validatedRequest = validateHeldReviewRequest(request, manifest, operationId, now);
+    const loadFromDb = createRequire(new URL("../../db/package.json", import.meta.url));
+    const connect = loadFromDb("postgres") as (options: object) => {
+      options: { serializers: Record<number, (value: unknown) => string> };
+      end(): Promise<void>;
+    };
+    // Never execute a driver query: its real serializers run against PostgreSQL in memory.
+    // Drizzle replaces JSON serializers and would mask the manual reader's regression.
+    const driver = connect({
+      host: "127.0.0.1",
+      port: 1,
+      username: "fixture",
+      password: "fixture",
+      database: "fixture",
+      prepare: false,
+    });
+    const db = new PGlite({ serializers: driver.options.serializers });
+    try {
+      await db.exec(`create table audit_log (
+        team_id uuid, actor_id text, action text, target text, data jsonb
+      )`);
+      // This control reproduces the broken raw-driver binding, not a JSON.parse mock.
+      const broken = await db.query<{ kind: string; operation_id: string | null }>(
+        "select jsonb_typeof($1::jsonb) as kind, $1::jsonb->>'operationId' as operation_id",
+        [JSON.stringify(request)],
+      );
+      expect(broken.rows).toEqual([{ kind: "string", operation_id: null }]);
+
+      const tx = async (strings: TemplateStringsArray, ...values: unknown[]) => {
+        const query = strings.reduce(
+          (text, part, index) => text + (index ? `$${index}` : "") + part,
+          "",
+        );
+        return (await db.query<Record<string, unknown>>(query, values)).rows;
+      };
+      for (const action of [
+        "console.held_message_review_started",
+        "console.held_message_review_prepared",
+      ]) {
+        await privateAudit(
+          tx as Parameters<typeof privateAudit>[0],
+          validatedRequest,
+          action,
+          validatedRequest,
+        );
+      }
+      const stored = await db.query<{
+        kind: string;
+        data: typeof request;
+        operation_id: string;
+        actor_id: string;
+        target: string;
+      }>(`select jsonb_typeof(data) as kind, data, data->>'operationId' as operation_id,
+        actor_id, target from audit_log where team_id is null order by action`);
+      expect(stored.rows).toEqual(
+        Array.from({ length: 2 }, () => ({
+          kind: "object",
+          data: request,
+          operation_id: operationId,
+          actor_id: `user:${request.operatorId}`,
+          target: `email:${request.emailId}`,
+        })),
+      );
+      const proof = await db.query<{ count: number }>(
+        `select count(*)::int as count from audit_log where team_id is null
+          and actor_id=$1 and target=$2 and action='console.held_message_review_prepared'
+          and data->>'operationId'=$3`,
+        [`user:${request.operatorId}`, `email:${request.emailId}`, operationId],
+      );
+      expect(proof.rows).toEqual([{ count: 1 }]);
+    } finally {
+      await db.close();
+      await driver.end();
+    }
   });
 });
