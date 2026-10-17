@@ -206,13 +206,7 @@ export async function prepareHeldReview(
     signal: AbortSignal.timeout(5_000),
   });
   const version: unknown = await response.json();
-  if (
-    !response.ok ||
-    !version ||
-    typeof version !== "object" ||
-    !("revision" in version)
-  )
-    deny();
+  if (!response.ok || !version || typeof version !== "object" || !("revision" in version)) deny();
   // Guard before opening a DB connection, querying ciphertext or constructing keys.
   const environment = process.env;
   validateHeldReviewRuntime(
