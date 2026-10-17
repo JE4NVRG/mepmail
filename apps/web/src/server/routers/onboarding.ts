@@ -1,5 +1,5 @@
 import { env } from "@millionsend/config";
-import { acceptEmail } from "@millionsend/core";
+import { acceptEmail, signupSendMessage } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
@@ -148,7 +148,13 @@ export const onboardingRouter = router({
           { tx: txDb },
         );
         if (!accepted.ok) {
-          throw new TRPCError({ code: "PRECONDITION_FAILED", message: accepted.reason });
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              accepted.reason === "signup_sandbox" || accepted.reason === "signup_review_required"
+                ? signupSendMessage(accepted.reason)
+                : accepted.reason,
+          });
         }
         return accepted;
       });

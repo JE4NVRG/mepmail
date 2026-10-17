@@ -10,6 +10,7 @@ import {
   fetchDeliverabilityHealth,
   fetchTeamStanding,
   findDisguise,
+  getSignupSendingRestriction,
   injectPreheader,
   type MergeContact,
   PAUSE_BOUNCE_RATE,
@@ -17,6 +18,7 @@ import {
   parseSingleSender,
   regionPause,
   senderVerdictMessage,
+  signupSendMessage,
   splitPersonName,
   substituteUnsubscribeUrl,
   verifySenderDomain,
@@ -518,6 +520,15 @@ export const broadcastsRouter = router({
   send: teamProcedure
     .input(z.object({ id: z.uuid(), scheduledAt: z.date().optional() }))
     .mutation(async ({ ctx, input }) => {
+      const signup = await getSignupSendingRestriction(ctx.db, ctx.teamId, env.IS_CLOUD);
+      if (signup.kind !== "none") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: signupSendMessage(
+            signup.kind === "review" ? "signup_review_required" : "signup_sandbox",
+          ),
+        });
+      }
       const row = await getOwnBroadcast(ctx, input.id);
       if (row.status !== "draft") {
         throw new TRPCError({

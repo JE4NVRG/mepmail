@@ -2,9 +2,12 @@ import { isLiveKey } from "@millionsend/billing";
 import { customerSmtpRelay, env, isCloudDeployment, supportViewEnabled } from "@millionsend/config";
 import {
   accountMailPhrase,
+  clearTeamSignupRisk,
   fetchAccountScore,
   fetchDeliverabilityHealth,
   formatMailDateTime,
+  getSignupSendingRestriction,
+  getTeamSignupRisk,
   liveSupportViewForTeam,
   type MailLocale,
   PLAN_RUNGS,
@@ -231,6 +234,39 @@ export const consoleTeamsRouter = router({
         rungs: operatorRungs(),
         supportViewEnabled: supportViewEnabled(),
       };
+    }),
+
+  signupRisk: operatorProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
+    await loadTeam(ctx.db, input.id);
+    const risk = await getTeamSignupRisk(ctx.db, input.id);
+    const restriction = await getSignupSendingRestriction(ctx.db, input.id, env.IS_CLOUD);
+    return risk
+      ? {
+          level: risk.level,
+          reasons: risk.reasons,
+          policyVersion: risk.policyVersion,
+          clearedAt: risk.clearedAt,
+          restriction: restriction.kind,
+        }
+      : null;
+  }),
+
+  clearSignupRisk: operatorProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        reason: z.string().trim().min(15).max(500),
+        reviewed: z.literal(true),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await loadTeam(ctx.db, input.id);
+      const changed = await clearTeamSignupRisk(ctx.db, {
+        teamId: input.id,
+        operatorId: ctx.operator.id,
+        reason: input.reason,
+      });
+      return { changed, existingHoldAndSuspensionUnchanged: true, noQueueAction: true };
     }),
 
   /** One team, the way the console's team dialog and the review page read it: counters live, standing fresh. */

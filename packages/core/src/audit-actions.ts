@@ -93,6 +93,11 @@ export const AUDIT_ACTIONS = [
   "team.reinstated",
   "team.send_review_held",
   "team.send_review_released",
+  "auth.signup_risk_recorded",
+  "auth.signup_risk_verified",
+  "team.signup_risk_enrolled",
+  "team.signup_risk_escalated",
+  "team.signup_risk_cleared",
   // The operator marked one of the team's domains as verified at the
   // customer SMTP relay's provider (or took the mark back).
   "team.domain_relay_enabled",

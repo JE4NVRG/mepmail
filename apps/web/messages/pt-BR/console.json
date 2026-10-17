@@ -1022,6 +1022,24 @@
     },
     "broadcastsPendingReview": "As transmissões desta equipe estão pausadas aguardando revisão desde {since}. E-mails transacionais não são afetados.",
     "sendReview": "Os envios desta equipe estão retidos para revisão de segurança desde {since}. As mensagens aceitas ficam em espera enquanto a revisão estiver aberta. Um operador precisa revisar a equipe antes de o envio ser retomado. Fale com o suporte para pedir revisão.",
-    "requestReview": "Pedir revisão"
+    "requestReview": "Pedir revisão",
+    "signupSandbox": "O envio externo aguarda revisão de segurança. As mensagens de teste só podem ir para o seu próprio e-mail verificado no cadastro. Isso também vale para chaves de API full. Seus dados estão preservados.",
+    "signupReview": "O envio aguarda revisão de segurança desta conta. Seus dados estão preservados. Fale com o suporte para pedir revisão."
+  },
+  "signupRisk": {
+    "title": "Restrição inicial de envio",
+    "status": "Status: {status}",
+    "levels": {
+      "good": "Acesso normal",
+      "sandbox": "Testes apenas para o e-mail verificado do cadastro",
+      "hold": "Revisão necessária"
+    },
+    "scope": "Esta decisão altera apenas a restrição inicial desta equipe. Retenções de envio, suspensões e mensagens retidas existentes continuam como estão.",
+    "reason": "Justificativa da revisão (ao menos 15 caracteres)",
+    "confirm": "Revisei esta equipe e autorizo remover a restrição inicial dela.",
+    "clear": "Remover restrição inicial",
+    "saving": "Salvando…",
+    "failed": "Não foi possível carregar ou salvar a revisão. Tente novamente.",
+    "retry": "Tentar novamente"
   }
 }

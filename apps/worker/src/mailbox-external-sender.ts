@@ -1,5 +1,7 @@
 import { lookup } from "node:dns/promises";
 import {
+  checkSignupSend,
+  fetchTeamStanding,
   type Keyring,
   MailboxExternalOAuthError,
   type MailboxOutboxSender,
@@ -31,6 +33,11 @@ export function createMailboxExternalAwareSender(
 ): MailboxOutboxSender {
   return {
     async send(input) {
+      const recipients = [...input.to, ...input.cc, ...input.bcc];
+      const standing = await fetchTeamStanding(db, input.teamId);
+      if (standing?.suspended || standing?.sendReview) throw new MailboxSendDeferredError();
+      if (!(await checkSignupSend(db, input.teamId, recipients)).allowed)
+        throw new MailboxSendDeferredError();
       const [box] = await db
         .select({ origin: schema.mailboxes.origin })
         .from(schema.mailboxes)
@@ -82,6 +89,11 @@ export function createMailboxExternalAwareSender(
         socketTimeout: 60_000,
       });
       try {
+        // Credentials/DNS may have waited: a new restriction still precedes SMTP.
+        const latest = await fetchTeamStanding(db, input.teamId);
+        if (latest?.suspended || latest?.sendReview) throw new MailboxSendDeferredError();
+        if (!(await checkSignupSend(db, input.teamId, recipients)).allowed)
+          throw new MailboxSendDeferredError();
         const info = await transport.sendMail({
           envelope: { from: input.from, to: [...input.to, ...input.cc, ...input.bcc] },
           // Bcc and the format marker stay on the sealed copies and never leave.

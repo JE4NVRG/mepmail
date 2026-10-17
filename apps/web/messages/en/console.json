@@ -1022,6 +1022,24 @@
     },
     "broadcastsPendingReview": "Broadcasts are paused for this team pending review since {since}. Transactional email is unaffected.",
     "sendReview": "Sending for this team has been held for a security review since {since}. Accepted messages remain on hold while the review is open. An operator must review the team before sending can resume. Contact support to request a review.",
-    "requestReview": "Request a review"
+    "requestReview": "Request a review",
+    "signupSandbox": "External sending is awaiting a security review. Test messages can be sent only to your own verified signup email. This also applies to full API keys. Your data is preserved.",
+    "signupReview": "Sending is held pending a security review of this account. Your data is preserved. Contact support to request a review."
+  },
+  "signupRisk": {
+    "title": "Signup sending restriction",
+    "status": "Status: {status}",
+    "levels": {
+      "good": "Normal access",
+      "sandbox": "Tests to the verified signup address only",
+      "hold": "Review required"
+    },
+    "scope": "This decision changes only the signup restriction for this team. Existing sending holds, suspensions and retained messages stay unchanged.",
+    "reason": "Review justification (at least 15 characters)",
+    "confirm": "I reviewed this team and authorize removing its signup restriction.",
+    "clear": "Remove signup restriction",
+    "saving": "Saving…",
+    "failed": "Could not load or save the review. Try again.",
+    "retry": "Try again"
   }
 }

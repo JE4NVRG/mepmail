@@ -55,6 +55,18 @@ function render(locale: "en" | "pt-BR", component: typeof TeamStandingBanner | t
 }
 
 describe.each(["en", "pt-BR"] as const)("review access and truthful counts (%s)", (locale) => {
+  it.each(["sandbox", "review"])(
+    "explains signup %s with a review path and no suspension claim",
+    (kind) => {
+      standing = { signupRisk: kind };
+      const html = render(locale, TeamStandingBanner);
+      expect(html).toContain('href="/support"');
+      expect(html).toContain(locale === "en" ? "Request a review" : "Pedir revisão");
+      expect(html).not.toContain(locale === "en" ? "is suspended" : "está suspensa");
+      if (kind === "sandbox")
+        expect(html).toContain(locale === "en" ? "your own verified" : "próprio e-mail verificado");
+    },
+  );
   it.each(["suspended", "sendReview"])(
     "offers support from %s without restoring sending",
     (kind) => {

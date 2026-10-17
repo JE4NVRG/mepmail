@@ -17,6 +17,7 @@ import {
   findSuppressed,
   formatMailDate,
   formatMailDateTime,
+  getSignupSendingRestriction,
   holdTeamForReview,
   injectPreheader,
   isSubscribedToTopic,
@@ -269,7 +270,13 @@ export async function sendBroadcast(
   // An operator's pause or suspension, or a review hold, parks the fan-out the
   // way a region hold does; the owners heard about it when the operator acted.
   const standing = await fetchTeamStanding(db, broadcast.teamId);
-  if (standing?.suspended || standing?.sendReview || standing?.broadcastsPausedByOperatorAt) {
+  const signupRestriction = await getSignupSendingRestriction(db, broadcast.teamId, deps.isCloud);
+  if (
+    standing?.suspended ||
+    standing?.sendReview ||
+    standing?.broadcastsPausedByOperatorAt ||
+    signupRestriction.kind !== "none"
+  ) {
     await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
     return "deferred";
   }
@@ -451,10 +458,12 @@ export async function sendBroadcast(
       // A suspension or pause landing mid-walk stops the fan-out at the page
       // edge; the resumed walk skips the contacts already inserted.
       const standingNow = await fetchTeamStanding(db, broadcast.teamId);
+      const signupNow = await getSignupSendingRestriction(db, broadcast.teamId, deps.isCloud);
       if (
         standingNow?.suspended ||
         standingNow?.sendReview ||
-        standingNow?.broadcastsPausedByOperatorAt
+        standingNow?.broadcastsPausedByOperatorAt ||
+        signupNow.kind !== "none"
       ) {
         await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
         return "deferred";

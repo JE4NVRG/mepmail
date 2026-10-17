@@ -852,6 +852,21 @@ export {
 } from "./ses-capacity.js";
 export { associateDomainTenant, markDomainTenantAssociated } from "./ses-tenant.js";
 export {
+  enrollTeamSignupRisk,
+  getTeamSignupRisk,
+  markSignupEmailVerified,
+  recordSignupRisk,
+  refreshSignupRiskAfterFullKey,
+} from "./signup-risk.js";
+export {
+  checkSignupSend,
+  clearTeamSignupRisk,
+  getSignupSendingRestriction,
+  type SignupSendingRestriction,
+  signupRecipientsAllowed,
+  signupSendMessage,
+} from "./signup-risk-enforcement.js";
+export {
   isBlockedIp,
   type PostFailureCode,
   type PostJsonOptions,

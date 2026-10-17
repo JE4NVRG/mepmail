@@ -4,6 +4,7 @@ import {
   buildUnsubscribeUrl,
   bumpHourlyUsage,
   CREDENTIAL_MAIL_KINDS,
+  checkSignupSend,
   countDistinctRecipients,
   decryptEmailBody,
   type EmailAttachment,
@@ -72,6 +73,8 @@ export interface SesSender {
 export interface SendDeps {
   keyring: Keyring;
   ses: SesSender;
+  /** Signup restrictions are cloud-only; omitted preserves the self-host path. */
+  isCloud?: boolean;
   /** Deployment-wide SES configuration set, used when the domain has none. */
   defaultConfigurationSet?: string | undefined;
   /** ONBOARDING_EMAIL_FROM: sends from it carry no team domain (see core isOnboardingSender). */
@@ -473,6 +476,17 @@ export async function sendEmail(
     return "parked";
   }
 
+  const signupAdmission = await checkSignupSend(
+    db,
+    email.teamId,
+    [...email.to, ...(email.cc ?? []), ...(email.bcc ?? [])],
+    deps.isCloud ?? false,
+  );
+  if (!signupAdmission.allowed) {
+    await parkQueued(db, email, signupAdmission.reason);
+    return "parked";
+  }
+
   // SES identities, the 24-hour quota and the send rate are all per region:
   // the send must target the domain's region, not a single deployment-wide
   // one, and so must the gate and bucket below. The name also seeds the
@@ -792,13 +806,22 @@ export async function sendEmail(
     await deps.reschedule?.(email.id, new Date(), emailSendPriority(email));
     return "deferred";
   }
-  // The relay is the exception made while SES is paused, so the operator's
-  // holds are read once more right before the claim: one placed while this
-  // row waited on the decrypt or the bucket keeps it off the relay.
-  if (viaRelay) {
+  // Revalidate every provider immediately before the claim, including a
+  // review or sandbox introduced while decryption/throttling was pending.
+  {
     const latest = await fetchTeamStanding(db, email.teamId);
     if (latest?.suspended || latest?.sendReview) {
       await parkQueued(db, email, latest.suspended ? "team suspended" : "team held for review");
+      return "parked";
+    }
+    const signup = await checkSignupSend(
+      db,
+      email.teamId,
+      [...email.to, ...(email.cc ?? []), ...(email.bcc ?? [])],
+      deps.isCloud ?? false,
+    );
+    if (!signup.allowed) {
+      await parkQueued(db, email, signup.reason);
       return "parked";
     }
   }

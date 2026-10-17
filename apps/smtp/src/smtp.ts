@@ -9,6 +9,7 @@ import {
   OVERAGE_HARD_CAP,
   parseMailbox,
   senderVerdictMessage,
+  signupSendMessage,
   verifySenderDomain,
 } from "@millionsend/core";
 import { type AddressObject, simpleParser } from "mailparser";
@@ -151,6 +152,9 @@ async function handleMessage(
     domainId: domain.domainId,
   });
   if (!result.ok) {
+    if (result.reason === "signup_sandbox" || result.reason === "signup_review_required") {
+      throw smtpError(550, signupSendMessage(result.reason));
+    }
     if (result.reason === "quota_backlog_full") {
       throw smtpError(452, "Daily quota exceeded and the parked backlog is full");
     }

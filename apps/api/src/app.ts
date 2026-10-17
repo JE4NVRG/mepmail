@@ -16,6 +16,7 @@ import {
   type ContactSnapshot,
   cancelBroadcastRows,
   canonicalBodyHash,
+  checkSignupSend,
   clearUnsubscribeSuppression,
   completeIdempotent,
   contactPropertiesChange,
@@ -38,6 +39,7 @@ import {
   findDisguise,
   findSuppressed,
   findTopicOptOuts,
+  getSignupSendingRestriction,
   isTeamSuspended,
   type Keyring,
   MAX_ATTACHMENT_BYTES,
@@ -65,6 +67,7 @@ import {
   segmentFilterSchema,
   senderVerdictMessage,
   sendingBroadcasts,
+  signupSendMessage,
   teamQuota,
   verifyOnboardingSender,
   verifySenderDomain,
@@ -358,6 +361,12 @@ function monthlyQuotaMessage(result: { periodEnd: Date; overage: boolean }): str
 /** Wire status + body for an accept the pipeline refused. */
 function acceptRejection(result: Exclude<AcceptEmailResult, { ok: true }>) {
   switch (result.reason) {
+    case "signup_sandbox":
+    case "signup_review_required":
+      return {
+        status: 403 as const,
+        body: errorBody(403, result.reason, signupSendMessage(result.reason)),
+      };
     case "quota_backlog_full":
       return {
         status: 429 as const,
@@ -2714,6 +2723,11 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
     }
     const paused = await sendingPausedError(deps, auth);
     if (paused) return { ok: false as const, status: 403 as const, body: paused };
+    const signup = await getSignupSendingRestriction(db, auth.teamId, deps.isCloud);
+    if (signup.kind !== "none") {
+      const reason = signup.kind === "review" ? "signup_review_required" : "signup_sandbox";
+      return fail(403, reason, signupSendMessage(reason));
+    }
     // Same boundary as /emails: only a verified team domain may appear as
     // the sender.
     const domain = await verifySenderDomain(db, auth.teamId, broadcast.from);
@@ -3752,6 +3766,14 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
       return { status: 422, name: "validation_error", message: validationMessage(parsed.error) };
     }
     const body = parsed.data;
+    const signup = await checkSignupSend(
+      deps.db,
+      auth.teamId,
+      [...body.to, ...(body.cc ?? []), ...(body.bcc ?? [])],
+      deps.isCloud,
+    );
+    if (!signup.allowed)
+      return { status: 403, name: signup.reason, message: signupSendMessage(signup.reason) };
     if (body.topic_id != null && !(await findTeamTopic(deps.db, auth.teamId, body.topic_id))) {
       return { status: 404, name: "not_found", message: "Topic not found" };
     }
@@ -3816,6 +3838,10 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
       const verdict = await validateBatchItem(auth, raw);
       if ("payload" in verdict) {
         payloads.push({ payload: verdict.payload, index: i });
+      } else if (verdict.name === "signup_sandbox" || verdict.name === "signup_review_required") {
+        // A security restriction refuses the whole operation, even when
+        // permissive wire validation otherwise accepts the valid subset.
+        return c.json(errorBody(403, verdict.name, verdict.message), 403);
       } else if (permissive) {
         itemErrors.push({ index: i, message: verdict.message });
       } else {

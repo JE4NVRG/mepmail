@@ -1,4 +1,9 @@
-import { generateApiKey, MAX_ACTIVE_API_KEYS } from "@millionsend/core";
+import { env } from "@millionsend/config";
+import {
+  generateApiKey,
+  MAX_ACTIVE_API_KEYS,
+  refreshSignupRiskAfterFullKey,
+} from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { and, count, desc, eq, isNull } from "drizzle-orm";
@@ -82,6 +87,9 @@ export const apiKeysRouter = router({
         })
         .returning({ id: schema.apiKeys.id });
       if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (env.IS_CLOUD && input.permission === "full_access") {
+        await refreshSignupRiskAfterFullKey(ctx.db, { teamId: ctx.teamId });
+      }
       await recordAudit(ctx, {
         action: "api_key.created",
         target: { type: "api_key", id: row.id },

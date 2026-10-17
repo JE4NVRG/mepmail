@@ -97,7 +97,7 @@
   },
   "privacy": {
     "title": "Privacy Policy",
-    "updated": "Last updated: October 10, 2026",
+    "updated": "Last updated: October 17, 2026",
     "intro": "This policy explains what data MepMail collects, how it is used, and the choices you have. We keep it short on purpose: collect little, encrypt the sensitive parts, and name our subprocessors.",
     "sections": [
       {
@@ -113,7 +113,9 @@
       },
       {
         "title": "2. Data we collect",
-        "body": [],
+        "body": [
+          "Signup security: we record the signup email domain, mail-routing availability, domain registration age when available, a keyed code (HMAC) of the connecting IP address, the originating network (ASN) when available, signup velocity and risk reason codes. We do not store the raw IP address in this risk record, infer that a mailbox accepts all addresses, or send an additional verification message for this check."
+        ],
         "list": [
           "Account: name, email address, password (stored as a hash), team membership.",
           "Billing: plan, payment status and invoice references. Card data goes directly to Stripe.",
@@ -149,14 +151,16 @@
           "Contabo GmbH (Germany) — hosting of the application, its database and our self-hosted analytics.",
           "Amazon Web Services (Amazon SES) — email delivery and event notifications. Message content and metadata pass through it for delivery.",
           "Stripe — payment processing, invoices and receipts.",
-          "Cloudflare — DNS, CDN and network protection in front of our servers, and the Turnstile challenge that can protect sign-in, sign-up and password reset."
+          "Cloudflare — DNS, CDN and network protection in front of our servers, and the Turnstile challenge that can protect sign-in, sign-up and password reset.",
+          "Domain-registration RDAP operators receive the signup domain to return its public registration date. Team Cymru receives a DNS lookup derived from the connecting IP address to identify its originating network (ASN). These security lookups do not include the full email address, name, password or message content. The disposable-domain list and RDAP service directory are kept locally in the application."
         ]
       },
       {
         "title": "6. Retention",
         "body": [
           "Account and sending data are kept while your account is active. After you delete your account, we remove personal data within 30 days, except where retention is required (for example, billing records kept for tax and accounting obligations) or where limited delivery logs are needed for security. Aggregated, non-identifying statistics may be kept.",
-          "You can withdraw advertising permission through the footer link. Withdrawal stops new transmissions and cancels pending events; it does not erase events already received by Meta or Google. We do not send events from before your permission."
+          "You can withdraw advertising permission through the footer link. Withdrawal stops new transmissions and cancels pending events; it does not erase events already received by Meta or Google. We do not send events from before your permission.",
+          "The reduced signup-risk signals and review decision are kept with the account or team they protect, while that record exists. They do not replace the separate retention period for raw access logs."
         ]
       },
       {

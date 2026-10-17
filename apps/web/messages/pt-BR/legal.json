@@ -97,7 +97,7 @@
   },
   "privacy": {
     "title": "Política de Privacidade",
-    "updated": "Última atualização: 10 de outubro de 2026",
+    "updated": "Última atualização: 17 de outubro de 2026",
     "intro": "Esta política explica quais dados o MepMail coleta, como eles são usados e quais escolhas você tem. Ela é curta de propósito: coletar pouco, criptografar o que é sensível e nomear os subprocessadores.",
     "sections": [
       {
@@ -113,7 +113,9 @@
       },
       {
         "title": "2. Dados que coletamos",
-        "body": [],
+        "body": [
+          "Segurança do cadastro: registramos o domínio do e-mail, a disponibilidade de roteamento de e-mail, a idade do domínio quando disponível, um código com chave (HMAC) do IP de conexão, a rede de origem (ASN) quando disponível, a velocidade dos cadastros e os motivos da classificação de risco. Esse registro não guarda o IP bruto, não presume que a caixa aceite qualquer endereço e não envia outra mensagem de confirmação para fazer a checagem."
+        ],
         "list": [
           "Conta: nome, e-mail, senha (armazenada como hash), vínculo com o time.",
           "Cobrança: plano, status de pagamento e referências de fatura. Dados de cartão vão direto para o Stripe.",
@@ -149,14 +151,16 @@
           "Contabo GmbH (Alemanha) — hospedagem da aplicação, do banco de dados e das nossas métricas próprias.",
           "Amazon Web Services (Amazon SES) — entrega de e-mails e notificações de eventos. Conteúdo e metadados das mensagens passam por ele para a entrega.",
           "Stripe — processamento de pagamentos, faturas e recibos.",
-          "Cloudflare — DNS, CDN e proteção de rede na frente dos nossos servidores, e o desafio Turnstile que pode proteger login, cadastro e redefinição de senha."
+          "Cloudflare — DNS, CDN e proteção de rede na frente dos nossos servidores, e o desafio Turnstile que pode proteger login, cadastro e redefinição de senha.",
+          "Operadores RDAP dos registros de domínio recebem o domínio do cadastro para devolver sua data pública de registro. A Team Cymru recebe uma consulta DNS derivada do IP de conexão para identificar sua rede de origem (ASN). Essas consultas de segurança não levam o e-mail completo, nome, senha ou conteúdo de mensagens. A lista de domínios descartáveis e o diretório dos serviços RDAP ficam locais no aplicativo."
         ]
       },
       {
         "title": "6. Retenção",
         "body": [
           "Dados de conta e de envio são mantidos enquanto a conta estiver ativa. Após a exclusão da conta, removemos os dados pessoais em até 30 dias, exceto quando a retenção for exigida (por exemplo, registros de cobrança guardados por obrigações fiscais e contábeis) ou quando logs limitados de entrega forem necessários para segurança. Estatísticas agregadas e não identificáveis podem ser mantidas.",
-          "A preferência de publicidade pode ser retirada pelo link no rodapé. A retirada interrompe novos envios e cancela os eventos ainda pendentes; não apaga eventos que já chegaram à Meta ou ao Google. Não enviamos eventos anteriores à sua permissão."
+          "A preferência de publicidade pode ser retirada pelo link no rodapé. A retirada interrompe novos envios e cancela os eventos ainda pendentes; não apaga eventos que já chegaram à Meta ou ao Google. Não enviamos eventos anteriores à sua permissão.",
+          "Os sinais reduzidos de risco do cadastro e a decisão da revisão ficam vinculados à conta ou equipe que protegem, enquanto esse registro existir. Eles não substituem o prazo separado dos logs de acesso com IP bruto."
         ]
       },
       {

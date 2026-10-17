@@ -61,6 +61,7 @@ import {
 } from "./mailbox-service.js";
 import { mailboxProviderThreadKeys, mailboxThreadKeys } from "./mailbox-thread.js";
 import { parseMailbox } from "./sender-address.js";
+import { checkSignupSend } from "./signup-risk-enforcement.js";
 import { hashRecipient } from "./suppressions.js";
 import {
   enqueueTeamWebhookEvents,
@@ -968,6 +969,9 @@ async function queueAuthorizedMailboxDraft(
   const parsed = await envelope(mime, raw, true);
   if (parsed.from !== box!.address) throw new MailboxContentError("invalid");
   const recipients = [...parsed.to, ...parsed.cc, ...parsed.bcc];
+  if (!(await checkSignupSend(tx, actor.teamId, recipients)).allowed) {
+    throw new MailboxContentError("forbidden");
+  }
   const recipientHashes = approvedHashes(actor.teamId, recipients, parsed.count);
   const blocked = await mailboxBlockedRecipients(tx, { teamId: actor.teamId, recipients });
   if (blocked.length) throw new MailboxRecipientBlockedError(blocked);
@@ -1294,6 +1298,9 @@ export async function sendMailboxOutbox(
       if (parsed.from !== box!.address || parsed.count !== row!.recipientCount)
         throw new MailboxContentError("invalid");
       const recipients = [...parsed.to, ...parsed.cc, ...parsed.bcc];
+      if (!(await checkSignupSend(tx, row!.teamId, recipients)).allowed) {
+        throw new MailboxSendDeferredError();
+      }
       const recipientHashes = approvedHashes(row!.teamId, recipients, parsed.count);
       if (
         row!.recipientHashes !== null &&

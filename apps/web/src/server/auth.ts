@@ -13,6 +13,8 @@ import {
   findSenderDomainOwner,
   isLoopbackUrl,
   MCP_SCOPES,
+  markSignupEmailVerified,
+  recordSignupRisk,
   removeSystemContact,
   userFunnelProps,
 } from "@millionsend/core";
@@ -521,6 +523,7 @@ export function createAuth(
             // password, which revokes the registrant's sessions.
             expiresIn: VERIFY_TOKEN_TTL_MINUTES * 60,
             afterEmailVerification: async (user, request) => {
+              if (isCloudDeployment()) await markSignupEmailVerified(db, { userId: user.id });
               await enrollAccount(user, request?.headers);
               await trackEmailVerified(user, request?.headers);
             },
@@ -591,6 +594,17 @@ export function createAuth(
           // here; a password sign-up enrolls from afterEmailVerification.
           after: async (user, ctx) => {
             const requestHeaders = ctx?.headers ?? ctx?.request?.headers;
+            if (isCloudDeployment()) {
+              // Cloud ingress trusts only Cloudflare's single-value header,
+              // matching Better Auth's existing session IP configuration.
+              const ip = requestHeaders?.get("cf-connecting-ip") ?? undefined;
+              await recordSignupRisk(db, {
+                userId: user.id,
+                email: user.email,
+                secret: env.BETTER_AUTH_SECRET ?? "",
+                ...(ip ? { ip } : {}),
+              });
+            }
             await enrollAccount(user, requestHeaders);
             const attribution = await trackSignup(user, requestHeaders);
             // Operator alert, fire-and-forget: it must never slow a sign-up,

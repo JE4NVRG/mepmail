@@ -3,12 +3,15 @@ import { betaDefaultDailyCeiling, env, supportViewEnabled } from "@millionsend/c
 import {
   ALL_TEAMS_GRANT,
   endSupportView,
+  enrollTeamSignupRisk,
   fetchBestOwnedPlan,
   fetchTeamStanding,
+  getSignupSendingRestriction,
   liveSupportViewForTeam,
   PLAN_TEAM_LIMIT,
+  recordSignupRisk,
 } from "@millionsend/core";
-import { schema } from "@millionsend/db";
+import { type Db, schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -67,16 +70,18 @@ export const teamBootstrapRouter = router({
     // A send-review hold reads as "under review" too; what tripped it stays
     // on the operator's side.
     const sendReview = standing.sendReview ? { at: standing.sendReview.at } : null;
+    const signupRisk = (await getSignupSendingRestriction(ctx.db, ctx.teamId, env.IS_CLOUD)).kind;
     // The note is written for the owner only on a manual suspension; on the
     // other reasons it is the operator's own record.
     return standing.suspended && standing.suspended.reason !== "manual"
       ? {
           ...standing,
           sendReview,
+          signupRisk,
           pendingReview,
           suspended: { ...standing.suspended, note: null },
         }
-      : { ...standing, sendReview, pendingReview };
+      : { ...standing, sendReview, pendingReview, signupRisk };
   }),
 
   /** The operator's read-only look at the active team, for the owner's Support access card. */
@@ -161,6 +166,14 @@ export const teamBootstrapRouter = router({
         if (owned >= PLAN_TEAM_LIMIT[bestPlan]) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Team limit reached." });
         }
+        // Legacy users get a capture only when creating a new team. It carries
+        // no invented original IP or historical verification timestamp.
+        await recordSignupRisk(ctx.db, {
+          userId,
+          email: ctx.session.user.email,
+          secret: env.BETTER_AUTH_SECRET ?? "",
+          source: "team_fallback",
+        });
       }
       const base = slugify(input.name) || "team";
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -184,6 +197,11 @@ export const teamBootstrapRouter = router({
               userId: ctx.session.user.id,
               role: "owner",
             });
+            if (env.IS_CLOUD)
+              await enrollTeamSignupRisk(tx as unknown as Db, {
+                teamId: team.id,
+                userId: ctx.session.user.id,
+              });
             return { teamId: team.id };
           });
           // A freshly created team becomes the active one.

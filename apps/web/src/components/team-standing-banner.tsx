@@ -45,6 +45,16 @@ export function TeamStandingBanner() {
       />
     );
   }
+  if (data.signupRisk === "sandbox" || data.signupRisk === "review") {
+    return (
+      <NoticeStrip
+        tone="warn"
+        href="/support"
+        action={t("requestReview")}
+        text={t(data.signupRisk === "sandbox" ? "signupSandbox" : "signupReview")}
+      />
+    );
+  }
   if (data.broadcastsPausedByOperatorAt && pathname.startsWith("/broadcasts")) {
     return (
       <NoticeStrip

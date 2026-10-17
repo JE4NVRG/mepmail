@@ -17,6 +17,11 @@ vi.mock("@/components/modal", () => ({
     createElement("section", { "data-title": title }, children),
 }));
 
+// The async signup review is exercised separately with its own providers.
+vi.mock("@/components/console/safety/signup-risk-review", () => ({
+  SignupRiskReview: () => null,
+}));
+
 const BASE = {
   id: "00000000-0000-4000-8000-000000000001",
   name: "Shop",

@@ -1,9 +1,11 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
+import { env } from "@millionsend/config";
 import {
   apiRequestActor,
   generateApiKey,
   MAX_ACTIVE_API_KEYS,
   recordAudit,
+  refreshSignupRiskAfterFullKey,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
@@ -94,6 +96,9 @@ export function registerApiKeyRoutes(app: OpenAPIHono<Env>, db: Db): void {
         })
         .returning({ id: k.id });
       if (!row) throw new Error("api key insert returned no row");
+      if (env.IS_CLOUD && body.permission === "full_access") {
+        await refreshSignupRiskAfterFullKey(db, { teamId: auth.teamId });
+      }
       await recordAudit(db, {
         teamId: auth.teamId,
         actor: apiRequestActor(auth),

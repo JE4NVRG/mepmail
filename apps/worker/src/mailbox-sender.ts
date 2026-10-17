@@ -1,5 +1,6 @@
 import { SESv2Client, type SESv2ClientConfig, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import {
+  checkSignupSend,
   MailboxContentError,
   type MailboxOutboxSender,
   MailboxSendDeferredError,
@@ -163,6 +164,18 @@ export function createMailboxSesSender(
     }
   }
   async function allowedRecipients(teamId: string, recipients: string[]): Promise<void> {
+    const [team] = await db
+      .select({ held: schema.teams.sendReviewAt, suspended: schema.teams.suspendedAt })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, teamId));
+    if (
+      !team ||
+      team.held ||
+      team.suspended ||
+      !(await checkSignupSend(db, teamId, recipients)).allowed
+    ) {
+      throw new MailboxSendDeferredError();
+    }
     if (!opts.checkRecipients) return;
     let allowed: boolean;
     try {
@@ -305,6 +318,9 @@ export function createMailboxSesSender(
       const tenantName = failoverRegion
         ? undefined
         : await sendingTenant(client, domain, configurationSet);
+      // Tenant provisioning can wait on the network after the first gate.
+      // A restriction introduced during that wait still precedes the send.
+      await allowedRecipients(input.teamId, recipients);
       let response: Awaited<ReturnType<MailboxSesClient["send"]>>;
       try {
         response = await client.send(

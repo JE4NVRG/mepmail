@@ -9,6 +9,7 @@ import { attachmentLimit, type QuotaTeamRow, type TeamQuota, teamQuota } from ".
 import { reserveQuota } from "./quota.js";
 import { findDisguise, screenImpersonation, screenNewSender } from "./send-review.js";
 import { parseSingleSender } from "./sender-address.js";
+import { checkSignupSend } from "./signup-risk-enforcement.js";
 import { extractAddrSpec, findSuppressed, normalizeAddress } from "./suppressions.js";
 import { findTopicOptOuts } from "./topics.js";
 import { utcDay } from "./utc-day.js";
@@ -271,6 +272,7 @@ export type AcceptEmailResult =
   | { ok: false; reason: "disguised_sender"; field: "from" | "subject"; sample: string }
   | { ok: false; reason: "attachments_too_large"; maxBytes: number }
   | { ok: false; reason: "quota_backlog_full" }
+  | { ok: false; reason: "signup_sandbox" | "signup_review_required" }
   /**
    * A monthly plan at its cap: the included volume with overage off, or the
    * hard cap past it with overage on. Refused outright, nothing parks for a month.
@@ -309,6 +311,16 @@ export async function acceptEmail(
     quota?: "deferred" | undefined;
   } = {},
 ): Promise<AcceptEmailResult> {
+  // Before content encryption, quota, row creation or queue admission. Full
+  // keys, onboarding senders and every recipient field share this restriction.
+  if (deps.isCloud && auth.billing !== "uncapped") {
+    const signup = await checkSignupSend(opts.tx ?? deps.db, auth.teamId, [
+      ...payload.to,
+      ...(payload.cc ?? []),
+      ...(payload.bcc ?? []),
+    ]);
+    if (!signup.allowed) return { ok: false, reason: signup.reason };
+  }
   // Two ceilings: the absolute one first (cheap, no plan needed), then the
   // plan's own — a team on a small plan may not carry the megabytes the
   // instance-wide ceiling allows, because SES bills that data separately.

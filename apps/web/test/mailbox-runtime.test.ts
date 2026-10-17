@@ -1,5 +1,5 @@
 import { MailboxSendDeferredError, MailboxSendRejectedError } from "@millionsend/core";
-import type { Db } from "@millionsend/db";
+import { type Db, schema } from "@millionsend/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mailboxTransportMime } from "@/server/mailbox-transport";
 import {
@@ -35,8 +35,22 @@ function database(extra = {}) {
     tenantConfigSet: "private_mail_fixture",
     ...extra,
   };
-  const query = { from: () => query, innerJoin: () => query, where: async () => [row] };
-  return { select: () => query } as unknown as Db;
+  return {
+    select: () => {
+      let source: unknown;
+      const query = {
+        from: (table: unknown) => {
+          source = table;
+          return query;
+        },
+        innerJoin: () => query,
+        leftJoin: () => query,
+        // This fixture represents a legacy team without a signup assessment.
+        where: async () => (source === schema.teamSignupRisk ? [] : [row]),
+      };
+      return query;
+    },
+  } as unknown as Db;
 }
 const input = {
   idempotencyKey: "outbox_fixture",

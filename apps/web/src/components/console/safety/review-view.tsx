@@ -30,6 +30,7 @@ import {
   usePlanLabel,
 } from "./parts";
 import { RevealCell, useContentReveal } from "./reveal";
+import { SignupRiskReview } from "./signup-risk-review";
 
 const TILE: React.CSSProperties = { padding: "16px 20px" };
 // The monitoring rows are sentences, not figures: sans, left, the body size.
@@ -308,6 +309,7 @@ export function ReviewView({ teamId }: { teamId: string }) {
       ) : null}
 
       <HeldMessageReviewEntry teamId={teamId} />
+      <SignupRiskReview teamId={teamId} />
 
       <div className="ms-grid ms-grid-6" style={{ marginBottom: 16 }}>
         <Tile

@@ -11,6 +11,7 @@ import { planLabel } from "@/lib/console-format";
 import { formatDayTime, formatMmSs, formatRelative } from "@/lib/format";
 import { formatScoreTenths } from "@/lib/score-band";
 import { useCountdown } from "@/lib/use-countdown";
+import { SignupRiskReview } from "../safety/signup-risk-review";
 import {
   GuardrailLabel,
   MailSubscriptionCell,
@@ -273,6 +274,7 @@ export function TeamDialog({
           )}
         </dl>
       )}
+      {detail && <SignupRiskReview teamId={detail.id} />}
       <ModalFooter>
         <button type="button" className="ms-btn ms-btn-secondary" onClick={onClose}>
           {common("close")} <span className="ms-keycap">Esc</span>

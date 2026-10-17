@@ -372,6 +372,13 @@
       "when": 1791633600000,
       "tag": "0052_signup_conversions",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1792209600000,
+      "tag": "0053_signup_risk",
+      "breakpoints": true
     }
   ]
 }
