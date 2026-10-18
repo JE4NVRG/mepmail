@@ -10,7 +10,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createClient as createLocalClient } from "../../../packages/mcp/src/client.js";
 import { registerTools } from "../../../packages/mcp/src/tools.js";
 import { createApi } from "../src/app.js";
@@ -1171,6 +1171,8 @@ describe("REST parity tools", () => {
 });
 
 describe("cloud key issuance through OAuth MCP", () => {
+  beforeEach(() => vi.stubEnv("SIGNUP_BOT_PROTECTION", "true"));
+  afterEach(() => vi.unstubAllEnvs());
   it.each([
     ["sandbox", false],
     ["sandbox", true],

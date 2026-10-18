@@ -59,6 +59,7 @@ describe("apiKeys.create", () => {
     "enforces cloud %s before a dashboard full-key response",
     async (level) => {
       vi.stubEnv("IS_CLOUD", "true");
+      vi.stubEnv("SIGNUP_BOT_PROTECTION", "true");
       const teamId = await createTeam(db, `restricted-${randomUUID()}`);
       const userId = randomUUID();
       await db.insert(schema.user).values({

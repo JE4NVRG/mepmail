@@ -1,7 +1,8 @@
+import { env } from "@millionsend/config";
 import { type Db, schema } from "@millionsend/db";
 import { and, count, eq, isNull } from "drizzle-orm";
 import { generateApiKey, MAX_ACTIVE_API_KEYS } from "./api-keys.js";
-import { prepareSignupRiskForApiKey } from "./signup-risk.js";
+import { prepareSignupRiskForApiKey, refreshSignupRiskAfterFullKey } from "./signup-risk.js";
 import { getSignupSendingRestriction } from "./signup-risk-enforcement.js";
 
 export const MAX_SANDBOX_API_KEYS = 1;
@@ -18,6 +19,10 @@ export type ApiKeyIssuanceResult =
   | { allowed: true; id: string; token: string }
   | { allowed: false; reason: ApiKeyIssuanceRefusal };
 
+function positiveFlag(value: unknown): boolean {
+  return value === true || value === "true" || value === "1";
+}
+
 /** One issuance path for dashboard, onboarding, REST and OAuth/MCP. Never
  * throws an authorization refusal inside the transaction: prospective risk
  * escalation and its audit must survive a refused key request. */
@@ -33,11 +38,14 @@ export async function issueApiKey(
     now?: Date;
   },
 ): Promise<ApiKeyIssuanceResult> {
-  return db.transaction(async (transaction): Promise<ApiKeyIssuanceResult> => {
+  // The staged issuance policy is opt-in. Missing, false or invalid raw env
+  // values preserve the published post-insert assessment and normal key cap.
+  const protectedIssuance = positiveFlag(input.isCloud) && positiveFlag(env.SIGNUP_BOT_PROTECTION);
+  const result = await db.transaction(async (transaction): Promise<ApiKeyIssuanceResult> => {
     const tx = transaction as unknown as Db;
     // Signup capture/verification acquire the same principal advisory locks
     // before their risk/team rows. Keep that order to avoid inverted waits.
-    if (input.isCloud) await prepareSignupRiskForApiKey(tx, input);
+    if (protectedIssuance) await prepareSignupRiskForApiKey(tx, input);
     const [team] = await tx
       .select({
         id: schema.teams.id,
@@ -48,9 +56,11 @@ export async function issueApiKey(
       .where(eq(schema.teams.id, input.teamId))
       .for("update");
     if (!team) return { allowed: false, reason: "team_missing" };
-    if (input.isCloud && (team.held || team.suspended))
+    if (protectedIssuance && (team.held || team.suspended))
       return { allowed: false, reason: "team_review_required" };
-    const restriction = await getSignupSendingRestriction(tx, input.teamId, input.isCloud);
+    // This gates key issuance only. The existing send-time enforcement stays
+    // independent of the flag and still rejects held/sandbox external sends.
+    const restriction = await getSignupSendingRestriction(tx, input.teamId, protectedIssuance);
     if (restriction.kind === "review") return { allowed: false, reason: "team_review_required" };
     if (restriction.kind === "sandbox") {
       if (!restriction.principalEmail || !restriction.principalVerified)
@@ -100,6 +110,12 @@ export async function issueApiKey(
     if (!row) throw new Error("api_key_issuance_failed");
     return { allowed: true, id: row.id, token: generated.token };
   });
+  if (result.allowed && !protectedIssuance && input.isCloud && input.permission === "full_access") {
+    // As in production 3a5: the key is already committed before this monotonic
+    // assessment; escalation can restrict sending, never erase the issued key.
+    await refreshSignupRiskAfterFullKey(db, { teamId: input.teamId, now: input.now });
+  }
+  return result;
 }
 
 export function apiKeyIssuanceMessage(reason: ApiKeyIssuanceRefusal): string {

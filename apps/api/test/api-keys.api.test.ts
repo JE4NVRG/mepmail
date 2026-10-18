@@ -4,7 +4,7 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createApi } from "../src/app.js";
 
 let db: Db;
@@ -74,11 +74,13 @@ beforeAll(async () => {
   });
 });
 afterAll(() => close());
+afterEach(() => vi.unstubAllEnvs());
 
 describe("POST /api-keys", () => {
   it.each(["hold", "sandbox"] as const)(
     "applies cloud %s to an existing REST minter without issuing another credential",
     async (level) => {
+      vi.stubEnv("SIGNUP_BOT_PROTECTION", "true");
       const restrictedTeam = await createTeam(db, `rest-restricted-${randomUUID()}`);
       const minter = await insertKey(restrictedTeam);
       const userId = randomUUID();

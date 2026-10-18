@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
 import { createTeam, createTestDb, verifiedMonthlyBilling } from "@millionsend/test-utils";
 import { and, eq, isNull } from "drizzle-orm";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { issueApiKey } from "../src/api-key-issuance.js";
 import * as keys from "../src/api-keys.js";
+import * as signupRisk from "../src/signup-risk.js";
 import { checkSignupSend } from "../src/signup-risk-enforcement.js";
 import type { SignupRiskSignals } from "../src/signup-risk-policy.js";
 
@@ -17,6 +18,9 @@ beforeAll(async () => {
   ({ db, close } = await createTestDb());
 });
 afterAll(() => close());
+// These protection tests exercise the staged opt-in policy explicitly.
+beforeEach(() => vi.stubEnv("SIGNUP_BOT_PROTECTION", "true"));
+afterEach(() => vi.unstubAllEnvs());
 
 async function fixture(
   level: "good" | "sandbox" | "hold" = "good",
@@ -286,4 +290,92 @@ it("serializes the last normal slot across minters and keeps the existing cap", 
       .from(schema.apiKeys)
       .where(and(eq(schema.apiKeys.teamId, teamId), isNull(schema.apiKeys.revokedAt))),
   ).toHaveLength(keys.MAX_ACTIVE_API_KEYS);
+});
+
+it.each([undefined, "false", "0", "off", "invalid"])(
+  "preserves published post-insert full-key assessment when the flag is %s",
+  async (flag) => {
+    vi.stubEnv("SIGNUP_BOT_PROTECTION", flag);
+    const f = await fixture("good", { domainAgeDays: null });
+    const result = await mint(f.teamId);
+    expect(result.allowed).toBe(true);
+    expect(await rows(f.teamId)).toHaveLength(1);
+    const [risk] = await db
+      .select()
+      .from(schema.teamSignupRisk)
+      .where(eq(schema.teamSignupRisk.teamId, f.teamId));
+    expect(risk).toMatchObject({ level: "sandbox", signals: { rapidFullKey: true } });
+    const audits = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        and(
+          eq(schema.auditLog.teamId, f.teamId),
+          eq(schema.auditLog.action, "team.signup_risk_escalated"),
+        ),
+      );
+    expect(audits).toHaveLength(1);
+    expect(audits[0]?.data).not.toHaveProperty("keyIssuanceAttempt");
+    expect(await checkSignupSend(db, f.teamId, [f.email])).toEqual({ allowed: true });
+    expect(await checkSignupSend(db, f.teamId, ["external@fixture.test"])).toEqual({
+      allowed: false,
+      reason: "signup_sandbox",
+    });
+  },
+);
+
+it.each(["sandbox", "hold"] as const)(
+  "keeps existing %s send enforcement while the absent flag preserves full-key creation",
+  async (level) => {
+    vi.stubEnv("SIGNUP_BOT_PROTECTION", undefined);
+    const f = await fixture(level);
+    if (level === "hold")
+      await db
+        .update(schema.teams)
+        .set({ sendReviewAt: now, sendReviewReason: "new_sender" })
+        .where(eq(schema.teams.id, f.teamId));
+    expect((await mint(f.teamId)).allowed).toBe(true);
+    expect((await mint(f.teamId)).allowed).toBe(true);
+    expect(await rows(f.teamId)).toHaveLength(2);
+    expect(await checkSignupSend(db, f.teamId, ["external@fixture.test"])).toEqual({
+      allowed: false,
+      reason: level === "hold" ? "signup_review_required" : "signup_sandbox",
+    });
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, f.teamId));
+    if (level === "hold") expect(team?.sendReviewAt).not.toBeNull();
+    const [risk] = await db
+      .select()
+      .from(schema.teamSignupRisk)
+      .where(eq(schema.teamSignupRisk.teamId, f.teamId));
+    expect(risk?.clearedAt).toBeNull();
+  },
+);
+
+it.each(["true", "1"])(
+  "enables the staged issuance restrictions only with positive cloud flag %s",
+  async (flag) => {
+    vi.stubEnv("SIGNUP_BOT_PROTECTION", flag);
+    const f = await fixture("sandbox");
+    expect(await mint(f.teamId)).toEqual({ allowed: false, reason: "signup_api_key_restricted" });
+    expect((await mint(f.teamId, "sending_access")).allowed).toBe(true);
+    expect(await mint(f.teamId, "sending_access")).toEqual({
+      allowed: false,
+      reason: "signup_sandbox_key_limit",
+    });
+  },
+);
+
+it("keeps the legacy key committed when its post-insert assessment fails", async () => {
+  vi.stubEnv("SIGNUP_BOT_PROTECTION", undefined);
+  const f = await fixture();
+  const assessment = vi
+    .spyOn(signupRisk, "refreshSignupRiskAfterFullKey")
+    .mockRejectedValueOnce(new Error("synthetic assessment failure"));
+  try {
+    await expect(mint(f.teamId)).rejects.toThrow("synthetic assessment failure");
+    expect(await rows(f.teamId)).toHaveLength(1);
+    expect(assessment).toHaveBeenCalledTimes(1);
+  } finally {
+    assessment.mockRestore();
+  }
 });
