@@ -449,7 +449,7 @@ describe("buildOperationsInvitationEmail", () => {
     expect(mail.text).toContain("ver a lista de usuários, sem editar contas");
     expect(mail.text).toContain("somente nestes domínios: fullcommerce360.com, mepmail.dev");
     expect(mail.text).toContain(
-      "somente nestas caixas explicitamente permitidas: yuri@fullcommerce360.com, suporte@mepmail.dev",
+      "nestas caixas explicitamente permitidas: yuri@fullcommerce360.com, suporte@mepmail.dev, além das caixas que você criar nos domínios autorizados.",
     );
     expect(mail.text).toContain("caixas pessoais, caixas de outras empresas, o financeiro");
     expect(mail.text).toContain("gerenciar permissões");
@@ -473,7 +473,7 @@ describe("buildOperationsInvitationEmail", () => {
     expect(mail.text).toContain("view the user directory, without editing accounts");
     expect(mail.text).toContain("only on these domains: fullcommerce360.com, mepmail.dev");
     expect(mail.text).toContain(
-      "only in these explicitly permitted mailboxes: yuri@fullcommerce360.com, suporte@mepmail.dev",
+      "in these explicitly permitted mailboxes: yuri@fullcommerce360.com, suporte@mepmail.dev, as well as mailboxes you create on the authorized domains.",
     );
     expect(mail.text).toContain("personal mailboxes, other companies' mailboxes");
     expect(mail.text).toContain("financial administration or permission management");
@@ -514,7 +514,7 @@ describe("buildOperationsInvitationEmail", () => {
     });
     expect(mail.text).toContain("only on these domains: fullcommerce360.com.");
     expect(mail.text).toContain(
-      "only in these explicitly permitted mailboxes: yuri@fullcommerce360.com.",
+      "in these explicitly permitted mailboxes: yuri@fullcommerce360.com, as well as mailboxes you create on the authorized domains.",
     );
     expect(mail.text).not.toContain("fullcommerce360.com, fullcommerce360.com");
     const empty = buildOperationsInvitationEmail({
