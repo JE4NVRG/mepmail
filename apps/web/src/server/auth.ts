@@ -28,7 +28,7 @@ import {
   getOAuthState,
 } from "better-auth/api";
 import { captcha, jwt } from "better-auth/plugins";
-import { and, desc, eq, ne, notExists } from "drizzle-orm";
+import { and, desc, eq, isNotNull, ne, notExists } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { headers } from "next/headers";
 import { mcpResourceUrls, resolveBaseUrl } from "@/lib/api-base-url";
@@ -187,6 +187,25 @@ export async function grantClaims(
   referenceId: string | undefined,
 ): Promise<{ team_id: string; team_role?: string }> {
   const memberships = user ? await listMemberships(db, user.id) : [];
+  if (user) {
+    const [restricted] = await db
+      .select({ id: schema.teamMembers.id })
+      .from(schema.teamMembers)
+      .where(
+        and(
+          eq(schema.teamMembers.userId, user.id),
+          isNotNull(schema.teamMembers.operationsAccess),
+          ...(referenceId === ALL_TEAMS_GRANT
+            ? []
+            : [eq(schema.teamMembers.teamId, referenceId ?? "")]),
+        ),
+      )
+      .limit(1);
+    if (restricted)
+      throw new APIError("FORBIDDEN", {
+        message: "This operational profile cannot authorize team-wide integrations.",
+      });
+  }
   // All-teams grant: no single role to stamp — the API resolves the team
   // (and re-checks membership) per tool call instead.
   if (referenceId === ALL_TEAMS_GRANT) {

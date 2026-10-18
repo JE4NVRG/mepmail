@@ -22,6 +22,7 @@ import {
   type SesAccountClient,
 } from "@millionsend/ses";
 import { TRPCError } from "@trpc/server";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { isAwsCredentialError } from "@/lib/aws-errors";
 import { recordAudit } from "../audit";
@@ -152,8 +153,21 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
     /** Whether the caller is the instance operator, for the Settings → SES console card. */
     operator: teamProcedure.query(async ({ ctx }) => {
       const isOperator = await isInstanceOperator(ctx.db, ctx.session.user.id);
+      // Presentation only. Every operation still checks its own live server policy.
+      const [operationsMember] = await ctx.db
+        .select({ id: schema.teamMembers.id })
+        .from(schema.teamMembers)
+        .where(
+          and(
+            eq(schema.teamMembers.teamId, ctx.teamId),
+            eq(schema.teamMembers.userId, ctx.session.user.id),
+            isNotNull(schema.teamMembers.operationsAccess),
+          ),
+        )
+        .limit(1);
       return {
         isOperator,
+        isOperationsMember: !!operationsMember,
         canReadUsers: isOperator || (await canReadUserDirectory(ctx.db, ctx.session.user.id)),
       };
     }),

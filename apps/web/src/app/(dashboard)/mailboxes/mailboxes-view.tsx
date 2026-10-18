@@ -449,13 +449,20 @@ export function MailboxesView({
   const queries = useQueryClient();
   const router = useRouter();
   const { prefs, setPref, resetPrefs, loaded: prefsLoaded } = useCorreioPrefs();
+  const operator = useQuery(trpc.system.operator.queryOptions());
+  // Wait for the fresh current-team flag before mounting billing, agents or imports.
+  // This is presentation only: each server procedure also enforces its policy.
+  const showTeamTools = operator.data?.isOperationsMember === false;
+  const settingsTabs = showTeamTools
+    ? SETTINGS_TABS
+    : SETTINGS_TABS.filter((tab) => tab === "appearance" || tab === "boxes");
   const capability = useQuery(trpc.mailboxes.capabilities.queryOptions());
   // Start with the capability check instead of after it: one round trip less on
   // open. A team without access gets NOT_FOUND once and the queries stop.
   const mayUseMail = capability.data?.enabled !== false;
   const service = useQuery(
     trpc.mailboxes.service.queryOptions(undefined, {
-      enabled: mayUseMail,
+      enabled: mayUseMail && showTeamTools,
       retry: false,
     }),
   );
@@ -474,12 +481,12 @@ export function MailboxesView({
   // Contas externas: offered to the pilot teams, then to everyone (MAILBOX_EXTERNAL_OPEN).
   const externalAvailable = useQuery(
     trpc.mailboxExternal.available.queryOptions(undefined, {
-      enabled: mayUseMail,
+      enabled: mayUseMail && showTeamTools,
       staleTime: 5 * 60_000,
       retry: false,
     }),
   );
-  const canConnectExternal = externalAvailable.data?.open === true;
+  const canConnectExternal = showTeamTools && externalAvailable.data?.open === true;
   const [connectOpen, setConnectOpen] = useState(false);
   const [connectError, setConnectError] = useState<MailboxConnectAccountError | null>(null);
   const connectExternal = useMutation(
@@ -565,12 +572,18 @@ export function MailboxesView({
   const [signatureDialogId, setSignatureDialogId] = useState<string | null>(null);
   // "Usar em outro app de e-mail": app passwords for IMAP/SMTP (owner, person mailbox).
   const [clientsDialogId, setClientsDialogId] = useState<string | null>(null);
-  const clientAccess = useQuery(trpc.mailboxClients.settings.queryOptions());
+  const clientAccess = useQuery(
+    trpc.mailboxClients.settings.queryOptions(undefined, { enabled: showTeamTools }),
+  );
   const [activityDialogId, setActivityDialogId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("appearance");
+  const visibleSettingsTab = settingsTabs.some((tab) => tab === settingsTab)
+    ? settingsTab
+    : "appearance";
   // "Fazer upgrade" and "Ver planos" anywhere in the Correio open the license
   // dialog, on the plan they name when they name one.
   useEffect(() => {
+    if (!showTeamTools) return;
     const onOpenLicense = (event: Event) => {
       const offerId = (event as CustomEvent<{ offerId: string | null }>).detail?.offerId ?? null;
       setLicenseOfferId(offerId);
@@ -579,7 +592,7 @@ export function MailboxesView({
     };
     window.addEventListener(MAILBOX_OPEN_LICENSE_EVENT, onOpenLicense);
     return () => window.removeEventListener(MAILBOX_OPEN_LICENSE_EVENT, onOpenLicense);
-  }, [layout]);
+  }, [layout, showTeamTools]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   // The phone drawer with the rail (mailboxes and folders).
   const [railOpen, setRailOpen] = useState(false);
@@ -712,7 +725,7 @@ export function MailboxesView({
     trpc.mailboxes.migration.importJobs.queryOptions(
       { mailboxId: null },
       {
-        enabled: mayUseMail,
+        enabled: mayUseMail && showTeamTools,
         retry: false,
         // Every 30 s while an import runs; otherwise only now and then (starting
         // or resuming one in Preferências refreshes this at once).
@@ -1162,7 +1175,17 @@ export function MailboxesView({
           <span>{t("title")}</span>
         </Link>
         <div className={styles.appActions}>
-          <Link className="ms-btn ms-btn-ghost" href="/emails" aria-label={t("app.back")}>
+          <Link
+            className="ms-btn ms-btn-ghost"
+            href={
+              showTeamTools
+                ? "/emails"
+                : operator.data?.canReadUsers
+                  ? "/operations/users"
+                  : "/settings"
+            }
+            aria-label={t("app.back")}
+          >
             <span className={styles.backLong}>{t("app.back")}</span>
             <span className={styles.backShort} aria-hidden="true">
               {t("app.backShort")}
@@ -1176,7 +1199,7 @@ export function MailboxesView({
   if (capability.isPending) return frame(<p aria-live="polite">{t("loading")}</p>);
   if (!capability.isError && !capability.data?.enabled)
     return frame(
-      capability.data?.offered ? (
+      showTeamTools && capability.data?.offered ? (
         <MailboxOffer />
       ) : (
         <section>
@@ -1238,7 +1261,7 @@ export function MailboxesView({
   // The selected mailbox's own actions, beside its name in the rail.
   const boxMenu: (PopoverMenuItem | null)[] = selected
     ? [
-        ...(ownsBox(selected)
+        ...(showTeamTools && ownsBox(selected)
           ? [{ label: t("connectAgent"), onSelect: () => setAgentDialogId(selected.id) }]
           : []),
         ...(ownsBox(selected) && selected.canRead && selected.status === "planned"
@@ -1247,7 +1270,8 @@ export function MailboxesView({
         ...(registry.data?.canManage || ownsBox(selected)
           ? [{ label: t("signature.action"), onSelect: () => setSignatureDialogId(selected.id) }]
           : []),
-        ...(ownsBox(selected) &&
+        ...(showTeamTools &&
+        ownsBox(selected) &&
         selected.kind === "person" &&
         selected.status === "planned" &&
         clientAccess.data?.open
@@ -1360,10 +1384,12 @@ export function MailboxesView({
       boxMenu={boxMenu}
       folders={foldersSection}
       usage={
-        <>
-          <MailboxAgentsPending />
-          <MailboxUsagePanel mailboxId={selected?.id ?? null} />
-        </>
+        showTeamTools ? (
+          <>
+            <MailboxAgentsPending />
+            <MailboxUsagePanel mailboxId={selected?.id ?? null} />
+          </>
+        ) : null
       }
       onShortcuts={() => setShortcutsOpen(true)}
     />
@@ -1541,7 +1567,7 @@ export function MailboxesView({
           openReceiving={() => setDialog("receiving")}
         />
       ) : null}
-      {connectOpen ? (
+      {showTeamTools && connectOpen ? (
         <MailboxConnectAccountDialog
           oauth={externalAvailable.data?.oauth}
           initialError={connectError}
@@ -1587,7 +1613,7 @@ export function MailboxesView({
           }}
         />
       ) : null}
-      {agentBox ? (
+      {showTeamTools && agentBox ? (
         <MailboxAgentKeysDialog
           key={agentBox.id}
           mailbox={{ id: agentBox.id, address: agentBox.address }}
@@ -1595,7 +1621,7 @@ export function MailboxesView({
           mcpUrl={correioMcpUrl}
         />
       ) : null}
-      {teamAgentDialog && teamAgentBoxes.length ? (
+      {showTeamTools && teamAgentDialog && teamAgentBoxes.length ? (
         <MailboxTeamAgentKeysDialog
           key="team-agent"
           mailboxes={teamAgentBoxes}
@@ -1603,7 +1629,7 @@ export function MailboxesView({
           mcpUrl={correioMcpUrl}
         />
       ) : null}
-      {clientsDialogId && boxes.some((box) => box.id === clientsDialogId) ? (
+      {showTeamTools && clientsDialogId && boxes.some((box) => box.id === clientsDialogId) ? (
         <MailboxClientsDialog
           key={clientsDialogId}
           mailbox={boxes.find((box) => box.id === clientsDialogId)!}
@@ -1662,6 +1688,13 @@ export function MailboxesView({
         </nav>
         <div className={styles.appActions}>
           <MailboxAccountMenu
+            dashboardHref={
+              showTeamTools
+                ? "/emails"
+                : operator.data?.canReadUsers
+                  ? "/operations/users"
+                  : "/settings"
+            }
             theme={prefs.theme}
             setTheme={(theme) => setPref({ theme })}
             onShortcuts={() => setShortcutsOpen(true)}
@@ -1677,8 +1710,10 @@ export function MailboxesView({
         <>
           {/* Desktop app: reading without internet (a no-op in browsers). */}
           <CorreioOffline userId={session?.user.id ?? null} />
-          <MailboxReceivingBanner enabled={mayUseMail && !!registry.data} />
-          {licenseOpenRequest > 0 || (service.data && !service.data.active) ? (
+          {showTeamTools ? (
+            <MailboxReceivingBanner enabled={mayUseMail && !!registry.data} />
+          ) : null}
+          {showTeamTools && (licenseOpenRequest > 0 || (service.data && !service.data.active)) ? (
             <div className={styles.appLicense}>
               <MailboxServicePanel
                 openRequest={licenseOpenRequest}
@@ -1691,19 +1726,19 @@ export function MailboxesView({
       ) : (
         <div className={styles.settings}>
           <div className={styles.settingsTabs} role="tablist" aria-label={t("app.settings")}>
-            {SETTINGS_TABS.map((tab) => (
+            {settingsTabs.map((tab) => (
               <button
                 type="button"
                 role="tab"
                 key={tab}
-                aria-selected={settingsTab === tab}
+                aria-selected={visibleSettingsTab === tab}
                 onClick={() => setSettingsTab(tab)}
               >
                 {t(`app.tabs.${tab}`)}
               </button>
             ))}
           </div>
-          {settingsTab === "appearance" ? (
+          {visibleSettingsTab === "appearance" ? (
             <section className={styles.settingsSection} aria-label={t("app.tabs.appearance")}>
               <MailboxAppearanceSettings
                 prefs={prefs}
@@ -1711,6 +1746,7 @@ export function MailboxesView({
                 resetPrefs={resetPrefs}
                 openShortcuts={() => setShortcutsOpen(true)}
                 openTab={setSettingsTab}
+                showTeamTools={showTeamTools}
                 senders={
                   senderBoxes.length ? (
                     <MailboxSenderDecisions
@@ -1720,13 +1756,13 @@ export function MailboxesView({
                   ) : null
                 }
                 rules={
-                  ruleBoxes.length ? (
+                  showTeamTools && ruleBoxes.length ? (
                     <MailboxRules boxes={ruleBoxes} preferredId={selected?.id ?? null} />
                   ) : null
                 }
               />
             </section>
-          ) : settingsTab === "boxes" ? (
+          ) : visibleSettingsTab === "boxes" ? (
             <section className={styles.settingsSection} aria-label={t("app.tabs.boxes")}>
               <p className={styles.hint}>{t("app.boxesHint")}</p>
               {canCreate || canConnectExternal ? (
@@ -1819,7 +1855,7 @@ export function MailboxesView({
                 </Link>
               ) : null}
             </section>
-          ) : settingsTab === "agents" ? (
+          ) : visibleSettingsTab === "agents" ? (
             <section className={styles.settingsSection} aria-label={t("app.tabs.agents")}>
               <MailboxAgentsPanel />
               <p className={styles.hint}>{t("app.agentsHint")}</p>
@@ -1871,7 +1907,7 @@ export function MailboxesView({
                 <p>{t("app.agentsEmpty")}</p>
               )}
             </section>
-          ) : settingsTab === "license" ? (
+          ) : visibleSettingsTab === "license" ? (
             <section className={styles.settingsSection} aria-label={t("app.tabs.license")}>
               <span className={styles.serviceBadge}>
                 {t(systemLicense ? "system.badge" : "paidService")}

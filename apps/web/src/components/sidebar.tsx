@@ -215,12 +215,16 @@ export function Sidebar({
   const mailboxCapability = useQuery(trpc.mailboxes.capabilities.queryOptions());
   const mailEnabled =
     mailboxCapability.data?.enabled === true || mailboxCapability.data?.offered === true;
-  // Shared organization tools stay in the same place on every product route.
-  // The console's server gate remains the access control.
+  // Until the current team's policy is known, keep private Send links out of view.
+  const showSending = operator.data?.isOperationsMember === false;
+  const organizationBase = showSending
+    ? ORGANIZATION_NAV_ITEMS
+    : ORGANIZATION_NAV_ITEMS.filter((item) => item.key === "settings");
+  // These links describe the UI; the server gates remain the access control.
   const organizationItems = navItemsWithConsole(
     operator.data?.canReadUsers && !operator.data.isOperator
-      ? [...ORGANIZATION_NAV_ITEMS, USERS_NAV_ITEM]
-      : ORGANIZATION_NAV_ITEMS,
+      ? [...organizationBase, USERS_NAV_ITEM]
+      : organizationBase,
     CONSOLE_NAV_ITEM,
     operator.data?.isOperator === true,
   );
@@ -298,19 +302,21 @@ export function Sidebar({
             />
           </section>
         ) : null}
-        <section className={styles.navSection} aria-label={t("products.send")}>
-          <div className={styles.navHeading} aria-hidden="true">
-            {t("products.send")}
-          </div>
-          {SEND_NAV_ITEMS.map((item) => (
-            <NavItem
-              key={item.key}
-              item={item}
-              active={isActive(pathname, item.href)}
-              label={t(item.key)}
-            />
-          ))}
-        </section>
+        {showSending ? (
+          <section className={styles.navSection} aria-label={t("products.send")}>
+            <div className={styles.navHeading} aria-hidden="true">
+              {t("products.send")}
+            </div>
+            {SEND_NAV_ITEMS.map((item) => (
+              <NavItem
+                key={item.key}
+                item={item}
+                active={isActive(pathname, item.href)}
+                label={t(item.key)}
+              />
+            ))}
+          </section>
+        ) : null}
         <section className={styles.navSection} aria-label={t("products.organization")}>
           <div className={styles.navHeading} aria-hidden="true">
             {t("products.organization")}
@@ -430,14 +436,16 @@ export function Sidebar({
                 {t("usersDirectory")}
               </Link>
             ) : null}
-            <Link
-              href="/onboarding"
-              role="menuitem"
-              className="ms-menu-item"
-              onClick={() => setMenuOpen(false)}
-            >
-              {tCommon("accountMenu.onboarding")}
-            </Link>
+            {showSending ? (
+              <Link
+                href="/onboarding"
+                role="menuitem"
+                className="ms-menu-item"
+                onClick={() => setMenuOpen(false)}
+              >
+                {tCommon("accountMenu.onboarding")}
+              </Link>
+            ) : null}
             <AppearanceRow />
             <LanguageRow />
             <hr className="ms-menu-sep" />

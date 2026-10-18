@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { AppReleaseProvider } from "@/components/app-release";
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { SupportViewBanner } from "@/components/support-view-banner";
-import { TeamStandingBanner } from "@/components/team-standing-banner";
+import { TeamHealthBanners } from "@/components/team-health-banners";
 import { ToastHost } from "@/components/toast";
 import { VersionNotice } from "@/components/version-notice";
 import { CORREIO_PREFS_PREPAINT_SCRIPT } from "@/lib/mailbox-preferences-prepaint";
@@ -49,7 +49,7 @@ export default async function MailLayout({ children }: { children: React.ReactNo
           expiresAt={view.expiresAt}
         />
       ) : null}
-      <TeamStandingBanner />
+      <TeamHealthBanners standingOnly />
       <main style={{ flex: 1, minWidth: 0 }}>
         {/* The release number and date the Correio shows (rail footer → help menu). */}
         <AppReleaseProvider release={currentRelease()}>{children}</AppReleaseProvider>

@@ -40,11 +40,14 @@ export function MailboxAccountMenu({
   setTheme,
   onShortcuts,
   onPreferences,
+  dashboardHref = "/emails",
 }: {
   theme: CorreioPrefs["theme"];
   setTheme: (theme: CorreioPrefs["theme"]) => void;
   onShortcuts: () => void;
   onPreferences: () => void;
+  /** The dashboard route allowed by the current team's scoped role. */
+  dashboardHref?: string;
 }) {
   const t = useTranslations("mailboxes");
   const tCommon = useTranslations("common");
@@ -231,7 +234,7 @@ export function MailboxAccountMenu({
             <Link
               role="menuitem"
               className="ms-menu-item"
-              href="/emails"
+              href={dashboardHref}
               onClick={() => setOpen(false)}
             >
               {t("app.back")}

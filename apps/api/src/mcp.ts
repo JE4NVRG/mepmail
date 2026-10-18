@@ -214,18 +214,30 @@ function createTokenVerifier(
         // as the single-team check) and pick the team per tool call.
         const teams: McpTeam[] = (
           await db
-            .select({ teamId: m.teamId, name: schema.teams.name, role: m.role, ...QUOTA_COLUMNS })
+            .select({
+              teamId: m.teamId,
+              name: schema.teams.name,
+              role: m.role,
+              operationsAccess: m.operationsAccess,
+              ...QUOTA_COLUMNS,
+            })
             .from(m)
             .innerJoin(schema.teams, eq(m.teamId, schema.teams.id))
             .where(eq(m.userId, claims.data.sub))
             .orderBy(asc(m.createdAt))
-        ).map(({ teamId, name, role, ...billing }) => ({
-          teamId,
-          name,
-          role,
-          plan: effectivePlan(billing.plan, billing.currentPeriodEnd),
-          billing,
-        }));
+        ).map(({ teamId, name, role, operationsAccess, ...billing }) => {
+          // A wildcard token must never turn a restricted membership into full_access.
+          // Presence is enough to refuse malformed or future operational policy formats too.
+          if (operationsAccess != null)
+            throw invalid("Operational profiles cannot use the instance MCP");
+          return {
+            teamId,
+            name,
+            role,
+            plan: effectivePlan(billing.plan, billing.currentPeriodEnd),
+            billing,
+          };
+        });
         const first = teams[0];
         if (!first) throw invalid("Token holder is no longer a member of any team");
         extra = {
@@ -236,12 +248,15 @@ function createTokenVerifier(
         };
       } else {
         const [membership] = await db
-          .select({ role: m.role, ...QUOTA_COLUMNS })
+          .select({ role: m.role, operationsAccess: m.operationsAccess, ...QUOTA_COLUMNS })
           .from(m)
           .innerJoin(schema.teams, eq(m.teamId, schema.teams.id))
           .where(and(eq(m.userId, claims.data.sub), eq(m.teamId, claims.data.team_id)));
         if (!membership) throw invalid("Token holder is no longer a member of the team");
-        const { role, ...billing } = membership;
+        const { role, operationsAccess, ...billing } = membership;
+        // Re-check live policy on every request, including tokens minted before activation.
+        if (operationsAccess != null)
+          throw invalid("Operational profiles cannot use the instance MCP");
         extra = {
           auth: {
             teamId: claims.data.team_id,

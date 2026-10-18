@@ -4,13 +4,10 @@ import { redirect } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
-import { DeliverabilityBanner } from "@/components/deliverability-banner";
-import { EventsHealthBanner } from "@/components/events-health-banner";
-import { RegionBreakerBanner } from "@/components/region-breaker-banner";
 import { SendingPausedBanner } from "@/components/sending-paused-banner";
 import { SupportLauncher } from "@/components/support-launcher";
 import { SupportViewBanner } from "@/components/support-view-banner";
-import { TeamStandingBanner } from "@/components/team-standing-banner";
+import { TeamHealthBanners } from "@/components/team-health-banners";
 import { ToastHost } from "@/components/toast";
 import { VersionNotice } from "@/components/version-notice";
 import { postAuthNext, withNext } from "@/lib/nav";
@@ -60,10 +57,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <main className="ms-main" style={{ flex: 1, minWidth: 0, padding: "32px 40px" }}>
         <div style={{ maxWidth: 1120, margin: "0 auto" }}>
           <SendingPausedBanner />
-          <TeamStandingBanner />
-          <RegionBreakerBanner />
-          <EventsHealthBanner />
-          <DeliverabilityBanner />
+          <TeamHealthBanners />
           {children}
         </div>
       </main>

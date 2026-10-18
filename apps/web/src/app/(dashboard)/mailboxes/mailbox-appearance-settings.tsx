@@ -53,6 +53,7 @@ export function MailboxAppearanceSettings({
   openTab,
   senders,
   rules,
+  showTeamTools = true,
 }: {
   prefs: CorreioPrefs;
   setPref: (patch: Partial<CorreioPrefs>) => void;
@@ -63,6 +64,8 @@ export function MailboxAppearanceSettings({
   senders?: ReactNode;
   /** Preferências → Regras automáticas (the owner's mailboxes). */
   rules?: ReactNode;
+  /** Team-wide agents/imports remain separate from personal preferences. */
+  showTeamTools?: boolean;
 }) {
   const t = useTranslations("mailboxes.appearance");
   const common = useTranslations("mailboxes");
@@ -153,8 +156,12 @@ export function MailboxAppearanceSettings({
   const guide: { key: string; label: string; run: () => void }[] = [
     { key: "receive", label: t("guideReceive"), run: () => openTab("boxes") },
     { key: "mailbox", label: t("guideMailbox"), run: () => openTab("boxes") },
-    { key: "migrate", label: t("guideMigrate"), run: () => openTab("migration") },
-    { key: "agent", label: t("guideAgent"), run: () => openTab("agents") },
+    ...(showTeamTools
+      ? [
+          { key: "migrate", label: t("guideMigrate"), run: () => openTab("migration") },
+          { key: "agent", label: t("guideAgent"), run: () => openTab("agents") },
+        ]
+      : []),
     ...(desktopApp
       ? [
           {

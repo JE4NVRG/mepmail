@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   mailEnabled: true as boolean | undefined,
   operator: true,
   canReadUsers: false,
+  isOperationsMember: false as boolean | undefined,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -29,7 +30,11 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { query: string }) => ({
     data:
       options.query === "operator"
-        ? { isOperator: state.operator, canReadUsers: state.canReadUsers }
+        ? {
+            isOperator: state.operator,
+            canReadUsers: state.canReadUsers,
+            isOperationsMember: state.isOperationsMember,
+          }
         : state.mailEnabled === undefined
           ? undefined
           : { enabled: state.mailEnabled },
@@ -45,6 +50,7 @@ beforeEach(() => {
   state.mailEnabled = true;
   state.operator = true;
   state.canReadUsers = false;
+  state.isOperationsMember = false;
 });
 
 function navMarkup(locale: "en" | "pt-BR") {
@@ -139,11 +145,47 @@ for (const locale of ["en", "pt-BR"] as const) {
     it("shows only the read-only directory link to a delegated reader", () => {
       state.operator = false;
       state.canReadUsers = true;
+      state.isOperationsMember = true;
       state.pathname = "/operations/users";
       const { nav } = navMarkup(locale);
       expect(hrefs(nav)).toContain("/operations/users");
       expect(hrefs(nav)).not.toContain("/console");
       expect(nav).toMatch(/href="\/operations\/users"[^>]*aria-current="page"/);
+    });
+
+    it.each([true, undefined])(
+      "keeps Send and domain tools out of scoped or unresolved navigation (%s)",
+      (isOperationsMember) => {
+        state.operator = false;
+        state.isOperationsMember = isOperationsMember;
+        const links = hrefs(navMarkup(locale).nav);
+        expect(links).toContain("/mail");
+        expect(links).toContain("/settings");
+        expect(links).toContain("/support#chat");
+        for (const href of [
+          "/emails",
+          "/broadcasts",
+          "/templates",
+          "/audience",
+          "/metrics",
+          "/domains",
+          "/logs",
+          "/api-keys",
+          "/webhooks",
+          "/console",
+          "/settings/billing",
+        ])
+          expect(links).not.toContain(href);
+      },
+    );
+
+    it("restores ordinary navigation after switching to a team without the operational profile", () => {
+      state.operator = false;
+      state.isOperationsMember = true;
+      expect(hrefs(navMarkup(locale).nav)).not.toContain("/emails");
+      state.isOperationsMember = false;
+      expect(hrefs(navMarkup(locale).nav)).toContain("/emails");
+      expect(hrefs(navMarkup(locale).nav)).toContain("/domains");
     });
 
     it("does not add the delegated route to an operator or an ordinary member", () => {

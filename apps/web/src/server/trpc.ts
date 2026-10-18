@@ -1,12 +1,14 @@
 import {
   canReadUserDirectory,
   MailboxRecipientBlockedError,
+  parseOperationsAccess,
   recordSupportViewRead,
   type WebhookEnqueue,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
-import { getDb } from "@millionsend/db";
+import { getDb, schema } from "@millionsend/db";
 import { initTRPC, TRPCError } from "@trpc/server";
+import { and, eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import superjson from "superjson";
 import { getAuth } from "./auth";
@@ -180,9 +182,106 @@ const procedureTiming = t.middleware(async ({ path, next }) => {
 
 export const publicProcedure = t.procedure.use(procedureTiming).use(supportViewGuard);
 
-export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
+/**
+ * An operational member is deliberately narrower than a normal member of this
+ * team. These exact procedure/type pairs are the whole delegated surface; a new
+ * endpoint never inherits access from a router prefix. Mailbox ACLs still make
+ * the final decision for every selected box and every queued send.
+ */
+const OPERATIONS_QUERIES: ReadonlySet<string> = new Set([
+  "console.users.list",
+  "mailboxes.activity",
+  "mailboxes.capabilities",
+  "mailboxes.folderCounts",
+  "mailboxes.folders",
+  "mailboxes.item",
+  "mailboxes.items",
+  "mailboxes.list",
+  "mailboxes.options",
+  "mailboxes.preferences.get",
+  "mailboxes.scheduling.counts",
+  "mailboxes.search",
+  "mailboxes.senders.list",
+  "mailboxes.thread",
+  "mailboxes.unreadCounts",
+  "settings.mailPreferences.get",
+  "settings.team.get",
+  "support.current",
+  "system.features",
+  "system.operator",
+  "system.sendingPaused",
+  "team.list",
+]);
+const OPERATIONS_MUTATIONS: ReadonlySet<string> = new Set([
+  "mailboxes.archiveFolder",
+  "mailboxes.create",
+  "mailboxes.createFolder",
+  "mailboxes.preferences.set",
+  "mailboxes.purgeTrash",
+  "mailboxes.queueDraft",
+  "mailboxes.reorderFolders",
+  "mailboxes.saveDraft",
+  "mailboxes.scheduling.followUp",
+  "mailboxes.scheduling.pin",
+  "mailboxes.scheduling.sendLater",
+  "mailboxes.scheduling.snooze",
+  "mailboxes.senders.decide",
+  "mailboxes.setArchive",
+  "mailboxes.setDeliveryFolder",
+  "mailboxes.setItemFolder",
+  "mailboxes.setSeen",
+  "mailboxes.setSeenMany",
+  "mailboxes.setStar",
+  "mailboxes.setTrash",
+  "mailboxes.updateFolder",
+  "mailboxes.updateSignature",
+  "settings.invitations.accept",
+  "settings.mailPreferences.set",
+  "support.end",
+  "team.switch",
+]);
+
+export const protectedProcedure = publicProcedure.use(async ({ ctx, type, path, next }) => {
   if (!ctx.session) throw new TRPCError({ code: "UNAUTHORIZED" });
-  return next({ ctx: { session: ctx.session } });
+  // The request context may have been prepared before a revocation or profile
+  // change. Resolve the current row here, including for session-only endpoints
+  // such as OAuth consent which never go through teamProcedure.
+  const [requestMembership] =
+    ctx.teamId && !ctx.supportView
+      ? await ctx.db
+          .select({
+            role: schema.teamMembers.role,
+            operationsAccess: schema.teamMembers.operationsAccess,
+            verified: schema.user.emailVerified,
+            suspendedAt: schema.teams.suspendedAt,
+          })
+          .from(schema.teamMembers)
+          .innerJoin(schema.user, eq(schema.user.id, schema.teamMembers.userId))
+          .innerJoin(schema.teams, eq(schema.teams.id, schema.teamMembers.teamId))
+          .where(
+            and(
+              eq(schema.teamMembers.teamId, ctx.teamId),
+              eq(schema.teamMembers.userId, ctx.session.user.id),
+            ),
+          )
+      : [];
+  if (requestMembership && requestMembership.operationsAccess !== null) {
+    const access = parseOperationsAccess(requestMembership.operationsAccess);
+    const permitted =
+      type === "query"
+        ? OPERATIONS_QUERIES.has(path)
+        : type === "mutation" && OPERATIONS_MUTATIONS.has(path);
+    if (
+      requestMembership.role !== "member" ||
+      !requestMembership.verified ||
+      requestMembership.suspendedAt ||
+      !access ||
+      !permitted
+    ) {
+      throw new TRPCError({ code: path.startsWith("console.") ? "NOT_FOUND" : "FORBIDDEN" });
+    }
+  }
+  return next({ ctx: { session: ctx.session, requestMembership: requestMembership ?? null } });
 });
 
 /**
@@ -192,8 +291,13 @@ export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
  * ctx.teamId.
  */
 export const teamProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (!ctx.teamId || !ctx.role) throw new TRPCError({ code: "FORBIDDEN" });
-  return next({ ctx: { teamId: ctx.teamId, role: ctx.role } });
+  if (!ctx.teamId) throw new TRPCError({ code: "FORBIDDEN" });
+  // A live operator support view is intentionally not a membership. Its
+  // read-only guard above remains in force; ordinary requests need the fresh
+  // row, and a stale or forged role never survives it.
+  const role = ctx.supportView ? ctx.role : ctx.requestMembership?.role;
+  if (!role) throw new TRPCError({ code: "FORBIDDEN" });
+  return next({ ctx: { teamId: ctx.teamId, role } });
 });
 
 /**

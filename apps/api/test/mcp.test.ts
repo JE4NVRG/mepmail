@@ -147,6 +147,79 @@ afterAll(async () => {
   await closeDb();
 });
 
+describe("operational OAuth profile restrictions", () => {
+  const operationsAccess = {
+    version: 1 as const,
+    userDirectoryRead: true,
+    mailboxCreateDomainIds: [],
+  };
+
+  async function member(operational: boolean) {
+    const id = `ops-mcp-${randomUUID()}`;
+    await db.insert(schema.user).values({
+      id,
+      name: "Operational fixture",
+      email: `${id}@example.invalid`,
+      emailVerified: true,
+    });
+    await db.insert(schema.teamMembers).values({
+      teamId,
+      userId: id,
+      role: "member",
+      operationsAccess: operational ? operationsAccess : null,
+    });
+    return id;
+  }
+
+  const request = (token: string) =>
+    app.request("/mcp", {
+      method: "POST",
+      headers: { ...JSONRPC_HEADERS, authorization: `Bearer ${token}` },
+      body: ping,
+    });
+
+  it("refuses operational single-team tokens before they gain collective email tools", async () => {
+    const id = await member(true);
+    const token = await mintToken({ sub: id, team_role: "member", scope: "emails:read emails:send" });
+    const beforeSends = enqueued.length;
+    const response = await request(token);
+    expect(response.status).toBe(401);
+    expect(((await response.json()) as { error: string }).error).toBe("invalid_token");
+    expect(enqueued).toHaveLength(beforeSends);
+  });
+
+  it("rejects the same already-issued token immediately after an operational policy is added", async () => {
+    const id = await member(false);
+    const token = await mintToken({ sub: id, team_role: "member", scope: "emails:read" });
+    expect((await request(token)).status).toBe(200);
+    await db
+      .update(schema.teamMembers)
+      .set({ operationsAccess })
+      .where(and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamMembers.userId, id)));
+    expect((await request(token)).status).toBe(401);
+  });
+
+  it("refuses wildcard tokens containing an operational team while preserving another regular team", async () => {
+    const id = await member(false);
+    const regularTeamId = await createTeam(db, `ops-mcp-regular-${randomUUID()}`);
+    await db.insert(schema.teamMembers).values({ teamId: regularTeamId, userId: id, role: "member" });
+    const wildcard = await mintToken({ sub: id, team_id: "*", scope: "emails:read emails:send" });
+    expect((await request(wildcard)).status).toBe(200);
+    await db
+      .update(schema.teamMembers)
+      .set({ operationsAccess })
+      .where(and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamMembers.userId, id)));
+    expect((await request(wildcard)).status).toBe(401);
+    const regular = await mintToken({
+      sub: id,
+      team_id: regularTeamId,
+      team_role: "member",
+      scope: "emails:read",
+    });
+    expect((await request(regular)).status).toBe(200);
+  });
+});
+
 describe("auth middleware", () => {
   it("401s without a token, advertising the resource metadata URL", async () => {
     const res = await app.request("/mcp", { method: "POST", headers: JSONRPC_HEADERS, body: ping });

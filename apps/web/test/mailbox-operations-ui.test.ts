@@ -115,6 +115,82 @@ const RegistryDialog = new Function(
   `"use strict"; return (${source.slice(declaration.start, declaration.end)});`,
 )(...Object.values(scope)) as (props: RegistryProps) => ReactNode;
 
+const mailViewNodes = nodes(parse(source, { ecmaVersion: "latest", sourceType: "module" }));
+function viewVariable(name: string): Ast {
+  const found = mailViewNodes.filter(
+    (node) => node.type === "VariableDeclarator" && (node.id as Ast)?.name === name,
+  );
+  if (found.length !== 1) throw new Error(`Expected one production variable ${name}`);
+  return found[0]?.init as Ast;
+}
+const teamToolsExpression = viewVariable("showTeamTools");
+const showTeamTools = new Function(
+  "operator",
+  `return (${source.slice(teamToolsExpression.start, teamToolsExpression.end)});`,
+) as (operator: { data?: { isOperationsMember?: boolean } }) => boolean;
+const settingsTabsExpression = viewVariable("settingsTabs");
+const visibleTabs = new Function(
+  "showTeamTools",
+  "SETTINGS_TABS",
+  `return (${source.slice(settingsTabsExpression.start, settingsTabsExpression.end)});`,
+) as (show: boolean, tabs: readonly string[]) => string[];
+function teamProbeEnabled(route: string, mayUseMail: boolean, showTools: boolean): boolean {
+  const found = mailViewNodes.filter((node) => {
+    if (node.type !== "CallExpression") return false;
+    const callee = node.callee as Ast;
+    return source.slice(callee.start, callee.end) === `trpc.${route}.queryOptions`;
+  });
+  if (found.length !== 1) throw new Error(`Expected one production query for ${route}`);
+  const options = (found[0]?.arguments as Ast[])[1] as Ast;
+  if (options.type !== "ObjectExpression") throw new Error(`Missing options for ${route}`);
+  return new Function(
+    "mayUseMail",
+    "showTeamTools",
+    `return (${source.slice(options.start, options.end)}).enabled;`,
+  )(mayUseMail, showTools) as boolean;
+}
+
+describe("scoped Correio navigation and private probes", () => {
+  it.each([{}, { data: {} }, { data: { isOperationsMember: true } }])(
+    "does not start private team probes before a normal-team flag is confirmed (%j)",
+    (operator) => {
+      const show = showTeamTools(operator);
+      expect(show).toBe(false);
+      for (const route of [
+        "mailboxes.service",
+        "mailboxExternal.available",
+        "mailboxClients.settings",
+        "mailboxes.migration.importJobs",
+      ])
+        expect(teamProbeEnabled(route, true, show)).toBe(false);
+      expect(visibleTabs(show, ["appearance", "boxes", "agents", "license", "migration"])).toEqual([
+        "appearance",
+        "boxes",
+      ]);
+    },
+  );
+  it("preserves normal-team tools and their mailbox capability guard", () => {
+    const show = showTeamTools({ data: { isOperationsMember: false } });
+    expect(show).toBe(true);
+    for (const route of [
+      "mailboxes.service",
+      "mailboxExternal.available",
+      "mailboxes.migration.importJobs",
+    ]) {
+      expect(teamProbeEnabled(route, true, show)).toBe(true);
+      expect(teamProbeEnabled(route, false, show)).toBe(false);
+    }
+    expect(teamProbeEnabled("mailboxClients.settings", true, show)).toBe(true);
+    expect(visibleTabs(show, ["appearance", "boxes", "agents", "license", "migration"])).toEqual([
+      "appearance",
+      "boxes",
+      "agents",
+      "license",
+      "migration",
+    ]);
+  });
+});
+
 const contentSource = transformSync(
   readFileSync(
     new URL("../src/app/(dashboard)/mailboxes/mailbox-content-view.tsx", import.meta.url),

@@ -271,7 +271,7 @@ describe("current operational capabilities with synthetic memberships", () => {
     expect(directory.items.find((user) => user.id === DELEGATE)).toMatchObject({
       isOperator: false,
     });
-    await expect(as().operatorOnly()).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(as().operatorOnly()).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(
       as().console.invitations.create({
         teamId: foreignTeamId,
