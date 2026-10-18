@@ -455,7 +455,9 @@ describe("buildOperationsInvitationEmail", () => {
     expect(mail.text).toContain("gerenciar permissões");
     expect(mail.text).toContain(`cadastre-se com este mesmo Gmail (${input.to})`);
     expect(mail.text).toContain("escolha sua própria senha no site");
-    expect(mail.text).toContain("Verifique o Gmail pelo email de confirmação e depois aceite o convite");
+    expect(mail.text).toContain(
+      "Verifique o Gmail pelo email de confirmação e depois aceite o convite",
+    );
     expect(mail.text).toContain("O acesso ainda não está ativo");
     expect(mail.text).toContain("expira em 3 dias");
     expect(mail.html).toContain('<html lang="pt-BR">');
@@ -511,7 +513,9 @@ describe("buildOperationsInvitationEmail", () => {
       mailboxes: [" YURI@FULLCOMMERCE360.COM ", "yuri@fullcommerce360.com", " "],
     });
     expect(mail.text).toContain("only on these domains: fullcommerce360.com.");
-    expect(mail.text).toContain("only in these explicitly permitted mailboxes: yuri@fullcommerce360.com.");
+    expect(mail.text).toContain(
+      "only in these explicitly permitted mailboxes: yuri@fullcommerce360.com.",
+    );
     expect(mail.text).not.toContain("fullcommerce360.com, fullcommerce360.com");
     const empty = buildOperationsInvitationEmail({
       ...input,

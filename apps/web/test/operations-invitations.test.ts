@@ -282,18 +282,16 @@ describe("operational invitation activation", () => {
   });
 
   it("does not let an operational reader issue an operational invitation", async () => {
-    await db
-      .insert(schema.teamMembers)
-      .values({
-        teamId,
-        userId: "ops-partner",
-        role: "member",
-        operationsAccess: {
-          version: 1,
-          userDirectoryRead: true,
-          mailboxCreateDomainIds: domainIds,
-        },
-      });
+    await db.insert(schema.teamMembers).values({
+      teamId,
+      userId: "ops-partner",
+      role: "member",
+      operationsAccess: {
+        version: 1,
+        userDirectoryRead: true,
+        mailboxCreateDomainIds: domainIds,
+      },
+    });
     await expect(
       caller("ops-partner").console.teams.invitations.createOperations({
         teamId,
@@ -310,16 +308,14 @@ describe("operational invitation activation", () => {
       .insert(schema.teamMembers)
       .values({ teamId, userId: "ops-partner", role: "member" })
       .returning();
-    await db
-      .insert(schema.mailboxGrants)
-      .values({
-        teamId,
-        userId: "ops-partner",
-        membershipId: member!.id,
-        mailboxId: privateId,
-        permission: "read",
-        grantedBy: "ops-issuer",
-      });
+    await db.insert(schema.mailboxGrants).values({
+      teamId,
+      userId: "ops-partner",
+      membershipId: member!.id,
+      mailboxId: privateId,
+      permission: "read",
+      grantedBy: "ops-issuer",
+    });
     const created = await invite();
     await expect(
       caller("ops-partner").settings.invitations.accept({ token: token(created.acceptUrl) }),

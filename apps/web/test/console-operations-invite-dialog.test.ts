@@ -62,7 +62,9 @@ describe("operational invitation selection", () => {
     expect(partial.mailboxes.map((mailbox) => mailbox.id)).toEqual(["yuri"]);
     const external = {
       ...choices,
-      mailboxes: [{ id: "external", address: "personal@example.test", label: "External", domainId: null }],
+      mailboxes: [
+        { id: "external", address: "personal@example.test", label: "External", domainId: null },
+      ],
     };
     expect(selectedOperationsScope(external, ["fullcommerce"], ["external"]).valid).toBe(false);
   });

@@ -362,15 +362,6 @@ export {
 } from "./idempotency.js";
 export { findInstanceOperator, isInstanceOperator } from "./instance-operator.js";
 export {
-  canReadUserDirectory,
-  mailboxCreationAccess,
-  type OperationsAccess,
-  type OperationsInvitationAccess,
-  operationsInvitationTargets,
-  parseOperationsAccess,
-  parseOperationsInvitationAccess,
-} from "./operations-access.js";
-export {
   isProbeKey,
   type LatestProbe,
   latestProbes,
@@ -740,6 +731,15 @@ export {
   mcpResourceUrl,
 } from "./oauth-scopes.js";
 export { classifyOpen, type OpenVerdict, type PrefetchReason } from "./open-classifier.js";
+export {
+  canReadUserDirectory,
+  mailboxCreationAccess,
+  type OperationsAccess,
+  type OperationsInvitationAccess,
+  operationsInvitationTargets,
+  parseOperationsAccess,
+  parseOperationsInvitationAccess,
+} from "./operations-access.js";
 export { isRootDomainSend, registrableDomain } from "./org-domain.js";
 export { splitPersonName } from "./person-name.js";
 export {

@@ -180,7 +180,11 @@ describe("operational OAuth profile restrictions", () => {
 
   it("refuses operational single-team tokens before they gain collective email tools", async () => {
     const id = await member(true);
-    const token = await mintToken({ sub: id, team_role: "member", scope: "emails:read emails:send" });
+    const token = await mintToken({
+      sub: id,
+      team_role: "member",
+      scope: "emails:read emails:send",
+    });
     const beforeSends = enqueued.length;
     const response = await request(token);
     expect(response.status).toBe(401);
@@ -202,7 +206,9 @@ describe("operational OAuth profile restrictions", () => {
   it("refuses wildcard tokens containing an operational team while preserving another regular team", async () => {
     const id = await member(false);
     const regularTeamId = await createTeam(db, `ops-mcp-regular-${randomUUID()}`);
-    await db.insert(schema.teamMembers).values({ teamId: regularTeamId, userId: id, role: "member" });
+    await db
+      .insert(schema.teamMembers)
+      .values({ teamId: regularTeamId, userId: id, role: "member" });
     const wildcard = await mintToken({ sub: id, team_id: "*", scope: "emails:read emails:send" });
     expect((await request(wildcard)).status).toBe(200);
     await db

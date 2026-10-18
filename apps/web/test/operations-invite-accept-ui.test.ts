@@ -2,9 +2,9 @@ import { NextIntlClientProvider } from "next-intl";
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import AcceptInvitePage from "../src/app/invite/[token]/page";
 import en from "../messages/en/settings.json";
 import pt from "../messages/pt-BR/settings.json";
+import AcceptInvitePage from "../src/app/invite/[token]/page";
 
 const fixture = vi.hoisted(() => ({
   operationsProfile: true,

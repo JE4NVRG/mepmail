@@ -30,7 +30,8 @@ export function selectedOperationsScope(
   const domains = options?.domains.filter((domain) => domainIds.includes(domain.id)) ?? [];
   const mailboxes =
     options?.mailboxes.filter(
-      (mailbox) => mailboxIds.includes(mailbox.id) && domains.some((d) => d.id === mailbox.domainId),
+      (mailbox) =>
+        mailboxIds.includes(mailbox.id) && domains.some((d) => d.id === mailbox.domainId),
     ) ?? [];
   return {
     domains,
@@ -336,7 +337,12 @@ export function InviteDialog({
           }}
         >
           {reviewing ? (
-            <InviteReview teamName={team.name} email={normalized} role={role} operations={operations} />
+            <InviteReview
+              teamName={team.name}
+              email={normalized}
+              role={role}
+              operations={operations}
+            />
           ) : (
             <>
               <p style={{ margin: "6px 0 16px", color: "var(--ms-muted)", fontSize: 13.5 }}>
@@ -365,7 +371,11 @@ export function InviteDialog({
                   ariaLabel={t("role")}
                   onChange={(value) => {
                     setRole(
-                      value === "operations" ? "operations" : value === "admin" ? "admin" : "member",
+                      value === "operations"
+                        ? "operations"
+                        : value === "admin"
+                          ? "admin"
+                          : "member",
                     );
                     setDomainIds([]);
                     setMailboxIds([]);
@@ -391,7 +401,9 @@ export function InviteDialog({
                   onRetry={() => void operationsOptions.refetch()}
                   onDomainChange={(domainId, checked) => {
                     setDomainIds((ids) =>
-                      checked ? [...new Set([...ids, domainId])] : ids.filter((id) => id !== domainId),
+                      checked
+                        ? [...new Set([...ids, domainId])]
+                        : ids.filter((id) => id !== domainId),
                     );
                     if (!checked) {
                       const removedMailboxIds = new Set(
@@ -444,11 +456,7 @@ export function InviteDialog({
                 {common("cancel")} <span className="ms-keycap">Esc</span>
               </button>
             )}
-            <button
-              type="submit"
-              className="ms-btn ms-btn-primary"
-              disabled={!valid || busy}
-            >
+            <button type="submit" className="ms-btn ms-btn-primary" disabled={!valid || busy}>
               <BtnSpinner on={busy} />
               {reviewing ? t("confirm") : t("next")} <ConfirmKeycap />
             </button>

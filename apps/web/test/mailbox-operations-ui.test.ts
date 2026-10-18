@@ -141,7 +141,7 @@ function teamProbeEnabled(route: string, mayUseMail: boolean, showTools: boolean
     return source.slice(callee.start, callee.end) === `trpc.${route}.queryOptions`;
   });
   if (found.length !== 1) throw new Error(`Expected one production query for ${route}`);
-  const options = (found[0]?.arguments as Ast[])[1] as Ast;
+  const options = (found[0]!.arguments as Ast[])[1] as Ast;
   if (options.type !== "ObjectExpression") throw new Error(`Missing options for ${route}`);
   return new Function(
     "mayUseMail",
