@@ -55,7 +55,10 @@ for (const [locale, common, messages] of [
         timeZone: "UTC",
         messages: { common, console: messages },
         // biome-ignore lint/correctness/noChildrenProp: next-intl requires children in its props type.
-        children: createElement(UsersView, readOnly === undefined ? {} : { readOnly }),
+        children: createElement<{ readOnly?: boolean }>(
+          UsersView,
+          readOnly === undefined ? {} : { readOnly },
+        ),
       }),
     );
   }

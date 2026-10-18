@@ -187,7 +187,10 @@ export async function grantClaims(
   referenceId: string | undefined,
 ): Promise<{ team_id: string; team_role?: string }> {
   const memberships = user ? await listMemberships(db, user.id) : [];
-  if (user) {
+  if (
+    user &&
+    (referenceId === ALL_TEAMS_GRANT || memberships.some((m) => m.teamId === referenceId))
+  ) {
     const [restricted] = await db
       .select({ id: schema.teamMembers.id })
       .from(schema.teamMembers)

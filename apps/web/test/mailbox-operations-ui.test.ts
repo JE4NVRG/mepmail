@@ -259,6 +259,8 @@ const box = {
   id: "22222222-2222-4222-8222-222222222222",
   address: "mail@allowed.synthetic.invalid",
   label: "Synthetic mailbox",
+  signatureText: "",
+  signatureProfile: null,
   domainId: domain.id,
   ownerUserId: "synthetic-other-owner",
   ownerActive: true,
@@ -267,9 +269,11 @@ const box = {
   canRead: false,
   canDraft: false,
   canSend: false,
-  origin: "hosted" as const,
+  origin: "domain" as const,
   deleteAfter: null,
-} as Parameters<typeof RegistryDialog>[0]["mailbox"];
+  createdAt: new Date("2026-10-17T12:00:00Z"),
+  deliveryReady: false as const,
+} satisfies NonNullable<Parameters<typeof RegistryDialog>[0]["mailbox"]>;
 
 beforeEach(() => {
   vi.clearAllMocks();

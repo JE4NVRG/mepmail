@@ -1346,7 +1346,7 @@ export async function sendMailboxOutbox(
         db,
         { teamId: known.teamId, userId: known.approvedBy },
         known.mailboxId,
-        prepare,
+        (tx) => prepare(tx),
       );
     } else {
       throw new MailboxAgentAccessError("forbidden");

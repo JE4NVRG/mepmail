@@ -51,3 +51,11 @@ it("preserves normal grants for a separate team the person owns", async () => {
     team_role: "owner",
   });
 });
+
+it("refuses a missing or foreign reference without sending an invalid UUID to the database", async () => {
+  for (const reference of [undefined, "unknown-team"]) {
+    await expect(grantClaims(db, { id: userId }, reference)).rejects.toThrow(
+      "The grant is not bound to a team you belong to.",
+    );
+  }
+});
