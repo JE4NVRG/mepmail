@@ -32,6 +32,9 @@ vi.mock("@millionsend/billing", async (original) => ({
   recordSignupConversions: billing.recorded,
   cancelTeamRenewal: billing.cancelRenewal,
 }));
+// Authentication is synthetic in these router unit cases, as in billing-router.test.ts: the
+// live membership row is covered by the operations integration tests.
+vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
 // The synthetic team reaches the Correio router: the gate under test is the Android one.
 vi.mock("@/server/mailboxes", async (original) => ({
   ...(await original<typeof import("@/server/mailboxes")>()),
