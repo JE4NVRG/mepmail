@@ -345,6 +345,9 @@ describe("Contas externas: OAuth accounts (credentials and the callback)", () =>
   });
 
   it("guards direct core creation and reconnect while preserving ordinary member and foreign-owner rules", async () => {
+    const { replaceMailboxExternalSecret: reconnectExternal } = await import(
+      "../../../packages/core/src/mailbox-external-accounts.js"
+    );
     const actor = { teamId: team, userId: "bia" };
     // An ordinary member can connect before any restricted profile is assigned.
     const { mailboxId } = await createMailboxExternalAccount(db, keys, actor, accountInput());
@@ -358,7 +361,7 @@ describe("Contas externas: OAuth accounts (credentials and the callback)", () =>
         createMailboxExternalAccount(db, keys, actor, accountInput("second@example.invalid")),
       ).rejects.toMatchObject({ code: "forbidden" });
       await expect(
-        replaceMailboxExternalSecret(db, keys, actor, {
+        reconnectExternal(db, keys, actor, {
           mailboxId,
           secret: mailboxExternalOAuthSecret("synthetic-replacement"),
         }),
@@ -370,7 +373,7 @@ describe("Contas externas: OAuth accounts (credentials and the callback)", () =>
     }
     await db.update(schema.teamMembers).set({ operationsAccess: null }).where(membership());
     await expect(
-      replaceMailboxExternalSecret(
+      reconnectExternal(
         db,
         keys,
         { teamId: team, userId: "ana" },
@@ -378,7 +381,7 @@ describe("Contas externas: OAuth accounts (credentials and the callback)", () =>
       ),
     ).rejects.toMatchObject({ code: "forbidden" });
     expect(await db.select().from(schema.mailboxExternalAccounts)).toEqual(before);
-    await replaceMailboxExternalSecret(db, keys, actor, {
+    await reconnectExternal(db, keys, actor, {
       mailboxId,
       secret: mailboxExternalOAuthSecret("synthetic-normal-member-reconnect"),
     });
