@@ -13,6 +13,7 @@ import {
   inAndroidApp,
   isAndroidAppRequest,
   isAndroidAppSalesPath,
+  keepAndroidAppMark,
 } from "@/lib/android-app";
 
 /**
@@ -205,6 +206,38 @@ describe("Android app: the requests say so", () => {
     expect(isAndroidAppRequest(headers)).toBe(true);
     expect(isAndroidAppRequest(new Headers({ [ANDROID_APP_HEADER]: "web" }))).toBe(false);
     expect(isAndroidAppRequest(null)).toBe(false);
+  });
+
+  it("stays the app when React cleared <html> after a hydration error, and puts the mark back", () => {
+    const attributes = new Set<string>();
+    const root = {
+      hasAttribute: (name: string) => attributes.has(name),
+      setAttribute: (name: string) => void attributes.add(name),
+    };
+    vi.stubGlobal("document", { documentElement: root });
+    // The web: no tab flag, no mark, nothing added.
+    vi.stubGlobal("sessionStorage", { getItem: () => null });
+    keepAndroidAppMark();
+    expect(inAndroidApp()).toBe(false);
+    expect(attributes.size).toBe(0);
+    // The app after the reset: the tab flag is there, the mark is gone (seen on /mail, #418).
+    vi.stubGlobal("sessionStorage", {
+      getItem: (key: string) => (key === ANDROID_APP_STORAGE_KEY ? "1" : null),
+    });
+    expect(inAndroidApp()).toBe(true);
+    expect(androidAppHeaders()).toEqual({ [ANDROID_APP_HEADER]: ANDROID_APP_HEADER_VALUE });
+    keepAndroidAppMark();
+    expect(attributes.has(ANDROID_APP_ATTRIBUTE)).toBe(true);
+    // Blocked storage is not the app.
+    attributes.clear();
+    vi.stubGlobal("sessionStorage", {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+    });
+    expect(inAndroidApp()).toBe(false);
+    keepAndroidAppMark();
+    expect(attributes.size).toBe(0);
   });
 });
 

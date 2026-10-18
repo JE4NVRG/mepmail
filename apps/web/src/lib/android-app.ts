@@ -39,10 +39,34 @@ export const ANDROID_APP_HELP = "/support";
 /** Before the first paint (root layout). Plain ES5, no user input. */
 export const ANDROID_APP_INIT_SCRIPT = `try{var s=window.sessionStorage,k=${JSON.stringify(ANDROID_APP_STORAGE_KEY)},q=new URLSearchParams(location.search);if(document.referrer.indexOf(${JSON.stringify(`android-app://${ANDROID_APP_PACKAGE}`)})===0||q.get("source")==="android")s.setItem(k,"1");if(s.getItem(k)==="1"){document.documentElement.setAttribute(${JSON.stringify(ANDROID_APP_ATTRIBUTE)},"");var p=location.pathname.replace(/\\/+$/,"")||"/";if(${JSON.stringify(ANDROID_APP_SALES_PATHS)}.indexOf(p)>=0)location.replace(${JSON.stringify(ANDROID_APP_HOME)});document.addEventListener("click",function(e){var t=e.target,a=t&&t.closest?t.closest("a[href]"):null;if(a&&a.hostname===${JSON.stringify(ANDROID_APP_DOCS_HOST)}){e.preventDefault();location.assign(${JSON.stringify(ANDROID_APP_HELP)})}},true)}}catch(e){}`;
 
-/** Whether this tab is the Android app (after the init script ran). */
+/** The tab flag the init script sets; storage can be blocked, and then there is none. */
+function androidAppTab(): boolean {
+  try {
+    return globalThis.sessionStorage?.getItem(ANDROID_APP_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether this tab is the Android app (after the init script ran). The tab flag counts as
+ * well as the mark on <html>: React 19 clears every attribute of <html> when a hydration
+ * error makes it render the page again on the client (seen on /mail, error #418).
+ */
 export function inAndroidApp(): boolean {
   if (typeof document === "undefined") return false;
-  return document.documentElement?.hasAttribute?.(ANDROID_APP_ATTRIBUTE) === true;
+  return (
+    document.documentElement?.hasAttribute?.(ANDROID_APP_ATTRIBUTE) === true || androidAppTab()
+  );
+}
+
+/** Puts the mark back on <html> in the app when something removed it (the CSS needs it). */
+export function keepAndroidAppMark(): void {
+  if (typeof document === "undefined" || !androidAppTab()) return;
+  const root = document.documentElement;
+  if (root && !root.hasAttribute(ANDROID_APP_ATTRIBUTE)) {
+    root.setAttribute(ANDROID_APP_ATTRIBUTE, "");
+  }
 }
 
 /** A sales page that the app does not show (client-side navigations, too). */
