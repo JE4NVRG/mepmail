@@ -82,15 +82,17 @@ async function sealSecret(keyring: Keyring, teamId: string, mailboxId: string, s
   };
 }
 
-/** Any member connects their own account: it is free and only they can read it. */
+/** Normal members connect their own accounts. Hold the membership lock through
+ * writes, so profile activation cannot race creation or replacement of a secret. */
 async function teamMember(tx: Db, actor: Actor) {
   const [member] = await tx
-    .select({ id: schema.teamMembers.id })
+    .select({ id: schema.teamMembers.id, operationsAccess: schema.teamMembers.operationsAccess })
     .from(schema.teamMembers)
     .where(
       and(eq(schema.teamMembers.teamId, actor.teamId), eq(schema.teamMembers.userId, actor.userId)),
-    );
-  if (!member) throw new MailboxExternalError("forbidden");
+    )
+    .for("share");
+  if (!member || member.operationsAccess !== null) throw new MailboxExternalError("forbidden");
   return member;
 }
 
@@ -234,6 +236,7 @@ export async function replaceMailboxExternalSecret(
   if (!input.secret || input.secret.length > SECRET_MAX) throw new MailboxExternalError("invalid");
   await db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
+    await teamMember(tx, actor);
     await ownedAccount(tx, actor, input.mailboxId, true);
     await tx
       .update(schema.mailboxExternalAccounts)

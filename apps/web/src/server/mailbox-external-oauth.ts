@@ -16,6 +16,8 @@ import {
   mailboxExternalOAuthServers,
   replaceMailboxExternalSecret,
 } from "@millionsend/core";
+import { schema } from "@millionsend/db";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { appBaseUrl } from "@/lib/api-base-url";
 import { recordAudit } from "./audit";
@@ -161,6 +163,16 @@ async function connectingActor(request: Request) {
   if (!ctx.session) return { error: "forbidden" as const };
   if (!ctx.teamId || !ctx.role || ctx.supportView) return { error: "forbidden" as const };
   const actor = { teamId: ctx.teamId, userId: ctx.session.user.id };
+  // These REST routes do not pass through protectedProcedure. Check the live
+  // membership before any provider redirect, code exchange or connection probe;
+  // even an unrecognized operational profile must not become a normal member.
+  const [member] = await ctx.db
+    .select({ operationsAccess: schema.teamMembers.operationsAccess })
+    .from(schema.teamMembers)
+    .where(
+      and(eq(schema.teamMembers.teamId, actor.teamId), eq(schema.teamMembers.userId, actor.userId)),
+    );
+  if (!member || member.operationsAccess !== null) return { error: "forbidden" as const };
   if (!mailboxExternalOpen(ctx.teamId) || !(await mailboxActorAccessEnabled(ctx.db, actor)))
     return { error: "unavailable" as const };
   return { ctx: { ...ctx, teamId: ctx.teamId, session: ctx.session }, actor };

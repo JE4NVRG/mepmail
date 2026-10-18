@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { type Db, schema } from "@millionsend/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -268,6 +268,175 @@ async function boot() {
 
 describe("Contas externas: OAuth accounts (credentials and the callback)", () => {
   beforeEach(boot);
+
+  const domain = "00000000-0000-4000-8000-000000000001";
+  const operations = {
+    version: 1 as const,
+    userDirectoryRead: true,
+    mailboxCreateDomainIds: [domain],
+  };
+  const membership = () =>
+    and(eq(schema.teamMembers.teamId, team), eq(schema.teamMembers.userId, "bia"));
+  const accountInput = (address = "bia@example.invalid") => ({
+    address,
+    label: "Synthetic external account",
+    servers: mailboxExternalOAuthServers("microsoft", { address, consumer: true }),
+    secret: mailboxExternalOAuthSecret("synthetic-refresh-token"),
+    auth: "oauth_microsoft" as const,
+  });
+
+  it("refuses active or malformed operational profiles before redirect and callback provider calls", async () => {
+    configure();
+    const { startMailboxExternalOAuth, finishMailboxExternalOAuth, MAILBOX_EXTERNAL_OAUTH_COOKIE } =
+      await import("../src/server/mailbox-external-oauth");
+    // The same already-resolved context remains deliberately stale throughout.
+    context = { db, session: { user: { id: "bia" } }, teamId: team, role: "member" };
+    const start = () =>
+      startMailboxExternalOAuth(
+        new Request("https://mepmail.dev/api/mailboxes/external/oauth/microsoft/start"),
+        "microsoft",
+      );
+    const exchange = vi.fn(
+      async (): Promise<MailboxExternalOAuthGrant> => ({
+        accessToken: "synthetic-access-token",
+        refreshToken: "synthetic-refresh-token",
+        expiresAt: new Date(Date.now() + 3_600_000),
+        address: "bia@example.invalid",
+        name: "Synthetic",
+        consumer: true,
+      }),
+    );
+    const check = vi.fn(async () => undefined);
+    for (const profile of [
+      operations,
+      { ...operations, mailboxCreateDomainIds: [domain, domain] },
+    ]) {
+      await db.update(schema.teamMembers).set({ operationsAccess: null }).where(membership());
+      const started = await start();
+      const consent = new URL(started.headers.get("location")!);
+      expect(consent.hostname).toBe("login.microsoftonline.com");
+      const cookie = started.headers
+        .get("set-cookie")!
+        .match(new RegExp(`${MAILBOX_EXTERNAL_OAUTH_COOKIE}=([^;]+)`))![1]!;
+      await db.update(schema.teamMembers).set({ operationsAccess: profile }).where(membership());
+
+      const blockedStart = await start();
+      const startLocation = new URL(blockedStart.headers.get("location")!);
+      expect(startLocation.origin).toBe("https://mepmail.dev");
+      expect(startLocation.searchParams.get("reason")).toBe("forbidden");
+      expect(blockedStart.headers.get("set-cookie")).toBeNull();
+      const callback = await finishMailboxExternalOAuth(
+        new Request(
+          `https://mepmail.dev/api/mailboxes/external/oauth/microsoft/callback?code=synthetic&state=${consent.searchParams.get("state")}`,
+        ),
+        "microsoft",
+        cookie,
+        { exchange, check },
+      );
+      expect(new URL(callback.headers.get("location")!).searchParams.get("reason")).toBe(
+        "forbidden",
+      );
+      expect(callback.headers.get("set-cookie")).toMatch(/Max-Age=0/);
+      expect(exchange).not.toHaveBeenCalled();
+      expect(check).not.toHaveBeenCalled();
+    }
+    expect(await db.select().from(schema.mailboxes)).toEqual([]);
+    expect(await db.select().from(schema.mailboxExternalAccounts)).toEqual([]);
+  });
+
+  it("guards direct core creation and reconnect while preserving ordinary member and foreign-owner rules", async () => {
+    const actor = { teamId: team, userId: "bia" };
+    // An ordinary member can connect before any restricted profile is assigned.
+    const { mailboxId } = await createMailboxExternalAccount(db, keys, actor, accountInput());
+    const before = await db.select().from(schema.mailboxExternalAccounts);
+    for (const profile of [
+      operations,
+      { ...operations, mailboxCreateDomainIds: [domain, domain] },
+    ]) {
+      await db.update(schema.teamMembers).set({ operationsAccess: profile }).where(membership());
+      await expect(
+        createMailboxExternalAccount(db, keys, actor, accountInput("second@example.invalid")),
+      ).rejects.toMatchObject({ code: "forbidden" });
+      await expect(
+        replaceMailboxExternalSecret(db, keys, actor, {
+          mailboxId,
+          secret: mailboxExternalOAuthSecret("synthetic-replacement"),
+        }),
+      ).rejects.toMatchObject({ code: "forbidden" });
+      expect(await db.select().from(schema.mailboxExternalAccounts)).toEqual(before);
+      expect(await db.select({ id: schema.mailboxes.id }).from(schema.mailboxes)).toEqual([
+        { id: mailboxId },
+      ]);
+    }
+    await db.update(schema.teamMembers).set({ operationsAccess: null }).where(membership());
+    await expect(
+      replaceMailboxExternalSecret(
+        db,
+        keys,
+        { teamId: team, userId: "ana" },
+        { mailboxId, secret: mailboxExternalOAuthSecret("synthetic-foreign-owner") },
+      ),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    expect(await db.select().from(schema.mailboxExternalAccounts)).toEqual(before);
+    await replaceMailboxExternalSecret(db, keys, actor, {
+      mailboxId,
+      secret: mailboxExternalOAuthSecret("synthetic-normal-member-reconnect"),
+    });
+    const account = (await openMailboxExternalAccount(db, keys, mailboxId))!;
+    expect(readMailboxExternalOAuthSecret(account.secret)).toBe(
+      "synthetic-normal-member-reconnect",
+    );
+  });
+
+  it("preserves normal OAuth access in the person's own other team", async () => {
+    configure();
+    await db.update(schema.teamMembers).set({ operationsAccess: operations }).where(membership());
+    const [own] = await db
+      .insert(schema.teams)
+      .values({ name: "Synthetic own team", slug: "synthetic-own-team" })
+      .returning();
+    await db.insert(schema.teamMembers).values({ teamId: own!.id, userId: "bia", role: "owner" });
+    context = { db, session: { user: { id: "bia" } }, teamId: own!.id, role: "owner" };
+    const { startMailboxExternalOAuth, finishMailboxExternalOAuth, MAILBOX_EXTERNAL_OAUTH_COOKIE } =
+      await import("../src/server/mailbox-external-oauth");
+    const started = await startMailboxExternalOAuth(
+      new Request("https://mepmail.dev/api/mailboxes/external/oauth/microsoft/start"),
+      "microsoft",
+    );
+    const consent = new URL(started.headers.get("location")!);
+    expect(consent.hostname).toBe("login.microsoftonline.com");
+    const cookie = started.headers
+      .get("set-cookie")!
+      .match(new RegExp(`${MAILBOX_EXTERNAL_OAUTH_COOKIE}=([^;]+)`))![1]!;
+    const exchange = vi.fn(
+      async (): Promise<MailboxExternalOAuthGrant> => ({
+        accessToken: "synthetic-own-access-token",
+        refreshToken: "synthetic-own-refresh-token",
+        expiresAt: new Date(Date.now() + 3_600_000),
+        address: "bia@example.invalid",
+        name: "Synthetic",
+        consumer: true,
+      }),
+    );
+    const check = vi.fn(async () => undefined);
+    const done = await finishMailboxExternalOAuth(
+      new Request(
+        `https://mepmail.dev/api/mailboxes/external/oauth/microsoft/callback?code=synthetic&state=${consent.searchParams.get("state")}`,
+      ),
+      "microsoft",
+      cookie,
+      { exchange, check },
+    );
+    const landed = new URL(done.headers.get("location")!);
+    expect(landed.searchParams.get("external")).toBe("connected");
+    expect(exchange).toHaveBeenCalledTimes(1);
+    expect(check).toHaveBeenCalledTimes(1);
+    const [box] = await db
+      .select({ teamId: schema.mailboxes.teamId, ownerUserId: schema.mailboxes.ownerUserId })
+      .from(schema.mailboxes)
+      .where(eq(schema.mailboxes.id, landed.searchParams.get("mailbox")!));
+    expect(box).toEqual({ teamId: own!.id, ownerUserId: "bia" });
+  });
 
   it("trades the refresh token for an access token, seals a rotated one, caches the rest", async () => {
     const { mailboxId } = await createMailboxExternalAccount(
