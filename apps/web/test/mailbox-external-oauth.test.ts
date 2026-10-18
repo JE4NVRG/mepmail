@@ -35,7 +35,14 @@ vi.mock("@/server/mailboxes", () => ({
   mailboxRegistryEnabled: () => true,
   mailboxActorAccessEnabled: async () => true,
 }));
-vi.mock("@/server/routers/mailbox-external", () => ({ mailboxExternalOpen: () => true }));
+// Open, and the sign-in buttons exactly as the provider configuration offers them.
+vi.mock("@/server/routers/mailbox-external", async () => {
+  const { mailboxExternalOAuthAvailable } = await import("@millionsend/core");
+  return {
+    mailboxExternalOpen: () => true,
+    mailboxExternalOAuthFor: () => mailboxExternalOAuthAvailable(),
+  };
+});
 vi.mock("@/server/keyring", () => ({ getKeyring: () => keys }));
 vi.mock("@/server/audit", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/api-base-url", () => ({ appBaseUrl: () => "https://mepmail.dev" }));

@@ -230,16 +230,16 @@ export function MailboxAccountMenu({
               <span aria-hidden="true">↗</span>
             </a>
           ) : null}
-          {isDesktop() ? null : (
-            <Link
-              role="menuitem"
-              className="ms-menu-item"
-              href={dashboardHref}
-              onClick={() => setOpen(false)}
-            >
-              {t("app.back")}
-            </Link>
-          )}
+          {/* In the desktop and Android apps too: the dashboard (domains, team, plan) is the
+              only way to set up more than what the Correio itself offers. */}
+          <Link
+            role="menuitem"
+            className="ms-menu-item"
+            href={dashboardHref}
+            onClick={() => setOpen(false)}
+          >
+            {t("app.back")}
+          </Link>
           <hr className="ms-menu-sep" />
           <button
             type="button"

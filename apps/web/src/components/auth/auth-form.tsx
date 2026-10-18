@@ -6,10 +6,12 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { captchaHeaders, useTurnstile } from "@/components/turnstile";
 import { authClient } from "@/lib/auth-client";
+import { isDesktop } from "@/lib/desktop-bridge";
 import { isAppLocale, setLocaleCookie } from "@/lib/locale-cookie";
 import { postAuthNext, withNext } from "@/lib/nav";
 import { passwordStrength } from "@/lib/password-strength";
 import { inAppBrowser, openInBrowserHref } from "@/lib/public-intent";
+import { useInAndroidApp } from "@/lib/use-android-app";
 
 import styles from "./auth.module.css";
 import { AuthScreen } from "./auth-screen";
@@ -96,6 +98,12 @@ export function AuthForm({
 
   const tAuth = useTranslations("auth");
   const tInApp = useTranslations("auth.inApp");
+  // The desktop and Android apps open on this sign-in: someone who installed one from a
+  // store may not know MepMail yet, so the login says what it is and where to start.
+  const androidApp = useInAndroidApp();
+  const [desktopApp, setDesktopApp] = useState(false);
+  useEffect(() => setDesktopApp(isDesktop()), []);
+  const ownApp = androidApp || desktopApp;
   // An app's built-in browser (Instagram, Facebook...): the confirmation link opens in the
   // phone's browser and asks to sign in again there, so say it before the form, and offer the
   // way out (Android opens Chrome; iOS has only the app's menu). Read after mount: the server
@@ -421,6 +429,11 @@ export function AuthForm({
         {t("subline")} <Link href={otherPage}>{t("sublineLink")}</Link>
       </p>
       {mode === "signup" ? <p className={styles.freeNote}>{t("freeNote")}</p> : null}
+      {mode === "login" && ownApp ? (
+        <p className={styles.appIntro}>
+          {tAuth("appIntro.body")} <Link href={otherPage}>{tAuth("appIntro.cta")}</Link>
+        </p>
+      ) : null}
       {delayedNotice("mailDelayed")}
       {inAppNotice}
       {socialButtons}

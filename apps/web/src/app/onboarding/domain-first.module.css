@@ -15,6 +15,14 @@
   line-height: 1.55;
   color: var(--ms-muted);
 }
+.intro .noDomain {
+  margin-top: 10px;
+  color: var(--ms-bone);
+}
+.intro .noDomain a {
+  color: var(--ms-violet);
+  font-weight: 600;
+}
 .steps {
   display: grid;
   gap: 14px;

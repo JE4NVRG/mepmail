@@ -27,12 +27,32 @@ import { router, teamProcedure } from "../trpc";
  * pilot teams in MAILBOX_EXTERNAL_TEAM_IDS.
  */
 export function mailboxExternalOpen(teamId: string) {
-  if (process.env.MAILBOX_EXTERNAL_OPEN === "1") return true;
+  return process.env.MAILBOX_EXTERNAL_OPEN === "1" || mailboxExternalPilot(teamId);
+}
+
+function mailboxExternalPilot(teamId: string) {
   return (process.env.MAILBOX_EXTERNAL_TEAM_IDS ?? "")
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean)
     .includes(teamId);
+}
+
+/**
+ * "Entrar com a Microsoft / o Google" for this team: only where accounts may be connected at
+ * all. Microsoft stays with the pilot teams until its front resumes (an Outlook.com account
+ * ships with IMAP off, and its sync then fails); MAILBOX_EXTERNAL_MICROSOFT_OPEN=1 offers it
+ * to every team.
+ */
+export function mailboxExternalOAuthFor(teamId: string) {
+  const open = mailboxExternalOpen(teamId);
+  const oauth = mailboxExternalOAuthAvailable();
+  const microsoftOpen =
+    process.env.MAILBOX_EXTERNAL_MICROSOFT_OPEN === "1" || mailboxExternalPilot(teamId);
+  return {
+    microsoft: open && oauth.microsoft && microsoftOpen,
+    google: open && oauth.google,
+  };
 }
 
 const open = teamProcedure.use(async ({ ctx, next }) => {
@@ -84,12 +104,10 @@ const servers = {
 };
 
 export const mailboxExternalRouter = router({
-  available: teamProcedure.query(({ ctx }) => {
-    const open = mailboxExternalOpen(ctx.teamId);
-    // "Entrar com a Microsoft / o Google" only where accounts may be connected at all.
-    const oauth = mailboxExternalOAuthAvailable();
-    return { open, oauth: { microsoft: open && oauth.microsoft, google: open && oauth.google } };
-  }),
+  available: teamProcedure.query(({ ctx }) => ({
+    open: mailboxExternalOpen(ctx.teamId),
+    oauth: mailboxExternalOAuthFor(ctx.teamId),
+  })),
   connect: open
     .input(
       z

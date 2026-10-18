@@ -184,6 +184,20 @@
   stroke-width: 2;
 }
 /* "Free to start" under the sign-up headline, on every screen size. */
+.appIntro {
+  margin: -2px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-r-card);
+  background: var(--ms-panel);
+  color: var(--ms-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.appIntro a {
+  color: var(--ms-violet);
+  font-weight: 600;
+}
 .freeNote {
   justify-self: start;
   margin: -4px 0 2px;

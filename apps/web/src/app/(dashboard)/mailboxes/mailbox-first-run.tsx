@@ -30,7 +30,8 @@ export function MailboxFirstRun({
   return (
     <section className={styles.welcome} aria-labelledby="mailbox-first-run-title">
       <h2 id="mailbox-first-run-title">{t("title")}</h2>
-      <p>{t("body")}</p>
+      {/* Outlook and Hotmail are named only where "Entrar com a Microsoft" is offered. */}
+      <p>{t(oauth?.microsoft ? "body" : "bodyNoMicrosoft")}</p>
       <div className={styles.welcomeActions}>
         {oauth?.microsoft ? (
           <a className={`ms-btn ${styles.oauthButton}`} href={mailboxConnectOAuthHref("microsoft")}>

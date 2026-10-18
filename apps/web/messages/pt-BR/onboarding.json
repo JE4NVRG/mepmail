@@ -12,6 +12,8 @@
     "title": "Vamos colocar o e-mail no seu domínio",
     "subtitle": "Seu domínio. Seu e-mail. Seus agentes. Tudo no mesmo lugar. São 4 passos, e dá para pular qualquer um.",
     "skip": "Pular por enquanto",
+    "noDomain": "Ainda não tem domínio?",
+    "noDomainLink": "Comece pelo Gmail, iCloud ou Yahoo que você já usa, grátis e sem mexer em DNS",
     "help": "Precisa de ajuda? Fale com a gente",
     "domain": {
       "title": "Qual é o seu domínio?",

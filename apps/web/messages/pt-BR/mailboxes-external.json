@@ -104,6 +104,7 @@
   "welcome": {
     "title": "Comece pelo e-mail que você já tem",
     "body": "Conecte seu Outlook, Hotmail, Gmail, iCloud ou Yahoo e leia e responda tudo aqui, ao lado dos seus agentes. As respostas saem pela própria conta, com o seu endereço.",
+    "bodyNoMicrosoft": "Conecte seu Gmail, iCloud ou Yahoo e leia e responda tudo aqui, ao lado dos seus agentes. As respostas saem pela própria conta, com o seu endereço.",
     "appPassword": "Gmail, iCloud, Yahoo ou outro (senha de app)",
     "pointFree": "Grátis, sem plano e sem mexer em DNS",
     "pointPrivate": "Só você vê esta caixa; a senha fica criptografada",

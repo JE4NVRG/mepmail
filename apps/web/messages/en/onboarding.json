@@ -12,6 +12,8 @@
     "title": "Let's put email on your domain",
     "subtitle": "Your domain. Your email. Your agents. All in one place. Four steps, and you can skip any of them.",
     "skip": "Skip for now",
+    "noDomain": "No domain yet?",
+    "noDomainLink": "Start with the Gmail, iCloud or Yahoo you already use, free and with no DNS",
     "help": "Need help? Talk to us",
     "domain": {
       "title": "What is your domain?",

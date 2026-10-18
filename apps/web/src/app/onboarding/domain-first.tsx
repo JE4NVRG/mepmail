@@ -110,6 +110,11 @@ export function DomainFirst({ userEmail }: { userEmail: string }) {
       <header className={styles.intro}>
         <h1 className="ms-display">{t("title")}</h1>
         <p>{t("subtitle")}</p>
+        {/* No domain yet: the Correio starts from the address one already has, free and
+            without DNS (its first run offers the connection). */}
+        <p className={styles.noDomain}>
+          {t("noDomain")} <Link href="/mail">{t("noDomainLink")}</Link>
+        </p>
       </header>
       <ol className={styles.steps}>
         <DomainStep

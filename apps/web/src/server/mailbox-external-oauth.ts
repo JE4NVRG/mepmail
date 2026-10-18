@@ -10,7 +10,6 @@ import {
   type MailboxExternalOAuthProvider,
   mailboxExternalOAuthAuth,
   mailboxExternalOAuthAuthorizeUrl,
-  mailboxExternalOAuthAvailable,
   mailboxExternalOAuthPkce,
   mailboxExternalOAuthSecret,
   mailboxExternalOAuthServers,
@@ -24,7 +23,7 @@ import { recordAudit } from "./audit";
 import { getKeyring } from "./keyring";
 import { checkMailboxExternalAccount, MailboxExternalCheckError } from "./mailbox-external-connect";
 import { mailboxActorAccessEnabled, mailboxRegistryEnabled } from "./mailboxes";
-import { mailboxExternalOpen } from "./routers/mailbox-external";
+import { mailboxExternalOAuthFor, mailboxExternalOpen } from "./routers/mailbox-external";
 import { createContext } from "./trpc";
 
 /**
@@ -190,7 +189,7 @@ export async function startMailboxExternalOAuth(request: Request, provider: stri
   if (!isProvider(provider)) return fail("provider_unavailable");
   const who = await connectingActor(request);
   if ("error" in who) return fail(who.error ?? "forbidden");
-  if (!mailboxExternalOAuthAvailable()[provider]) return fail("provider_unavailable");
+  if (!mailboxExternalOAuthFor(who.actor.teamId)[provider]) return fail("provider_unavailable");
   const mailbox = url.searchParams.get("mailbox");
   if (mailbox && !UUID.test(mailbox)) return fail("expired");
   const hint = url.searchParams.get("hint")?.trim().toLowerCase();

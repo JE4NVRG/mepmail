@@ -104,6 +104,7 @@
   "welcome": {
     "title": "Start with the email you already have",
     "body": "Connect your Outlook, Hotmail, Gmail, iCloud or Yahoo and read and reply to everything here, next to your agents. Replies go out through that account, with your address.",
+    "bodyNoMicrosoft": "Connect your Gmail, iCloud or Yahoo and read and reply to everything here, next to your agents. Replies go out through that account, with your address.",
     "appPassword": "Gmail, iCloud, Yahoo or other (app password)",
     "pointFree": "Free, no plan and no DNS changes",
     "pointPrivate": "Only you see this mailbox; the password stays encrypted",
