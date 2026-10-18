@@ -3,7 +3,7 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   WEBHOOK_EVENT_TYPES as WEB_WEBHOOK_EVENT_TYPES,
   WEBHOOK_EVENT_GROUPS,

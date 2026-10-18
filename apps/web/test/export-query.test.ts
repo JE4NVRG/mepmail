@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toCsv } from "@/lib/csv-export";
 import { buildExport, contactColumns, contactRowsForExport } from "@/server/exports";
 import { createCaller } from "@/server/routers";

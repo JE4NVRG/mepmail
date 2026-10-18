@@ -113,7 +113,10 @@ export async function issueApiKey(
   if (result.allowed && !protectedIssuance && input.isCloud && input.permission === "full_access") {
     // As in production 3a5: the key is already committed before this monotonic
     // assessment; escalation can restrict sending, never erase the issued key.
-    await refreshSignupRiskAfterFullKey(db, { teamId: input.teamId, now: input.now });
+    await refreshSignupRiskAfterFullKey(db, {
+      teamId: input.teamId,
+      ...(input.now ? { now: input.now } : {}),
+    });
   }
   return result;
 }
