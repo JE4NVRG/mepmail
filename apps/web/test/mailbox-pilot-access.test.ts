@@ -2,6 +2,10 @@ import { MailboxAgentAccessError } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Authentication is synthetic in these router unit cases. Live membership
+// enforcement is covered by the operations integration tests without this mock.
+vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
+
 // All identities, bearers, provider seams and content are synthetic. These tests
 // exercise the real Web admission paths without database, crypto or provider I/O.
 const h = vi.hoisted(() => ({

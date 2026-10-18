@@ -6,9 +6,8 @@ import {
   type WebhookEnqueue,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
-import { getDb, schema } from "@millionsend/db";
+import { getDb } from "@millionsend/db";
 import { initTRPC, TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import superjson from "superjson";
 import { getAuth } from "./auth";
@@ -16,6 +15,7 @@ import { isInstanceOperator } from "./instance-operator";
 import { ACTIVE_TEAM_COOKIE, getActiveMembership, type SessionRole } from "./membership";
 import { recordProcedureTiming, timedProcedure } from "./procedure-timings";
 import { enqueueEmailSend, enqueueWebhookDeliveries, getQueue } from "./queue";
+import { resolveRequestMembership } from "./request-membership";
 import { resolveSupportView, SUPPORT_VIEW_COOKIE } from "./support-view";
 
 export interface SessionUser {
@@ -246,25 +246,7 @@ export const protectedProcedure = publicProcedure.use(async ({ ctx, type, path, 
   // The request context may have been prepared before a revocation or profile
   // change. Resolve the current row here, including for session-only endpoints
   // such as OAuth consent which never go through teamProcedure.
-  const [requestMembership] =
-    ctx.teamId && !ctx.supportView
-      ? await ctx.db
-          .select({
-            role: schema.teamMembers.role,
-            operationsAccess: schema.teamMembers.operationsAccess,
-            verified: schema.user.emailVerified,
-            suspendedAt: schema.teams.suspendedAt,
-          })
-          .from(schema.teamMembers)
-          .innerJoin(schema.user, eq(schema.user.id, schema.teamMembers.userId))
-          .innerJoin(schema.teams, eq(schema.teams.id, schema.teamMembers.teamId))
-          .where(
-            and(
-              eq(schema.teamMembers.teamId, ctx.teamId),
-              eq(schema.teamMembers.userId, ctx.session.user.id),
-            ),
-          )
-      : [];
+  const requestMembership = await resolveRequestMembership(ctx);
   if (requestMembership && requestMembership.operationsAccess !== null) {
     const access = parseOperationsAccess(requestMembership.operationsAccess);
     const permitted =

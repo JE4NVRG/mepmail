@@ -5,6 +5,10 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCaller } from "@/server/routers";
 
+// Authentication is synthetic in these router unit cases. Live membership
+// enforcement is covered by the operations integration tests without this mock.
+vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
+
 function utcDay(offsetDays: number): string {
   return coreUtcDay(Date.now() - offsetDays * DAY_MS);
 }

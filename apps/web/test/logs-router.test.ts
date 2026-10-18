@@ -7,6 +7,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createCaller } from "@/server/routers";
 import type { Context } from "@/server/trpc";
 
+// Authentication is synthetic in these router unit cases. Live membership
+// enforcement is covered by the operations integration tests without this mock.
+vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
+
 let db: Db;
 let close: () => Promise<void>;
 

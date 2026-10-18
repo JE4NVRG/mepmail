@@ -5,6 +5,10 @@ import { inArray } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCaller } from "@/server/routers";
 
+// Authentication is synthetic in these router unit cases. Live membership
+// enforcement is covered by the operations integration tests without this mock.
+vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
+
 vi.mock("@millionsend/db", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@millionsend/db")>();
   return { ...mod, getDb: () => db };

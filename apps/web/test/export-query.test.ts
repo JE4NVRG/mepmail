@@ -7,6 +7,10 @@ import { toCsv } from "@/lib/csv-export";
 import { buildExport, contactColumns, contactRowsForExport } from "@/server/exports";
 import { createCaller } from "@/server/routers";
 
+// Authentication is synthetic in these router unit cases. Live membership
+// enforcement is covered by the operations integration tests without this mock.
+vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
+
 const endsWith = (value: string) => ({
   match: "all" as const,
   conditions: [{ field: "email", op: "ends_with", value }],

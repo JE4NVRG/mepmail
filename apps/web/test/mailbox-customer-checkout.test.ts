@@ -5,6 +5,10 @@ import { mailboxesRouter } from "@/server/routers/mailboxes";
 import { type Context, createCallerFactory, router } from "@/server/trpc";
 import type { SendBillingContract } from "../../../packages/core/src/send-billing-contract";
 
+// Authentication is synthetic in these router unit cases. Live membership
+// enforcement is covered by the operations integration tests without this mock.
+vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
+
 const runtime = vi.hoisted(() => ({
   env: {
     STRIPE_SECRET_KEY: "sk_test_customer_checkout_fixture",
@@ -37,7 +41,8 @@ vi.mock("@/server/billing", () => ({
 }));
 // Checkout does not touch private content, keys, queues or registry mutations.
 // Keep its actual router, middleware, catalog resolver and membership presentation.
-vi.mock("@millionsend/core", async () => {
+vi.mock("@millionsend/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@millionsend/core")>();
   const { verifiedSendBillingContract } = await import(
     "../../../packages/core/src/send-billing-contract"
   );
@@ -45,6 +50,7 @@ vi.mock("@millionsend/core", async () => {
   const { startTimingLog, TimingWindow } = await import("../../../packages/core/src/timing-window");
   class UnusedMailboxError extends Error {}
   return {
+    ...actual,
     verifiedSendBillingContract,
     startTimingLog,
     TimingWindow,

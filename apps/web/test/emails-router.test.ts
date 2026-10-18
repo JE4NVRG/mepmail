@@ -9,6 +9,10 @@ import * as keyringModule from "@/server/keyring";
 import { createCaller } from "@/server/routers";
 import type { Context } from "@/server/trpc";
 
+// Authentication is synthetic in these router unit cases. Live membership
+// enforcement is covered by the operations integration tests without this mock.
+vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
+
 // The router builds its keyring lazily from the validated env
 // (SKIP_ENV_VALIDATION leaves env reads live), so setting the key here —
 // before any procedure runs — is what production boot does via config.

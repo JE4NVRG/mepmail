@@ -18,6 +18,10 @@ import { createBillingRouter } from "@/server/routers/billing";
 import { createCallerFactory, router } from "@/server/trpc";
 import { applySubscription } from "../../../packages/billing/src/subscription";
 
+// Authentication is synthetic in these router unit cases. Live membership
+// enforcement is covered by the operations integration tests without this mock.
+vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
+
 const h = vi.hoisted(() => ({
   runCronNow: vi.fn(async (_name: string) => {}),
   sent: [] as SystemMailMessage[],

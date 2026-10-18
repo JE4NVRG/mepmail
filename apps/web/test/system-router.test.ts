@@ -7,6 +7,10 @@ import { createCaller } from "@/server/routers";
 import { createSystemRouter } from "@/server/routers/system";
 import { type Context, createCallerFactory, router } from "@/server/trpc";
 
+// Authentication is synthetic in these router unit cases. Live membership
+// enforcement is covered by the operations integration tests without this mock.
+vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
+
 // awsReadiness never touches the db, so a bare ctx suffices — no test db.
 function caller() {
   return createCaller({

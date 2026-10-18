@@ -79,7 +79,12 @@ describe("authenticated private signup review", () => {
     await expect(caller(null, null).team.requestSignupReview({ context })).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
-    await expect(caller("member").team.requestSignupReview({ context })).rejects.toMatchObject({
+    // Session role claims cannot override the current database membership.
+    await db
+      .update(schema.teamMembers)
+      .set({ role: "member" })
+      .where(eq(schema.teamMembers.userId, "owner"));
+    await expect(caller("owner").team.requestSignupReview({ context })).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
     expect(await db.select().from(schema.signupRiskReviewRequests)).toHaveLength(0);

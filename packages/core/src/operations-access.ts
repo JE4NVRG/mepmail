@@ -66,9 +66,12 @@ export async function mailboxCreationAccess(
       and(eq(schema.teamMembers.teamId, actor.teamId), eq(schema.teamMembers.userId, actor.userId)),
     );
   const [member] = await (lock ? query.for("share") : query);
-  if (!member || member.suspendedAt) return { canManage: false, canCreate: false, domainIds: [] };
+  if (!member) return { canManage: false, canCreate: false, domainIds: [] };
   const canManage = member.role === "owner" || member.role === "admin";
+  // Owners/admins retain the existing entitlement error from reserveMailboxSeat;
+  // that gate still rejects a suspended team before any mailbox is inserted.
   if (canManage) return { canManage: true, canCreate: true, domainIds: null };
+  if (member.suspendedAt) return { canManage: false, canCreate: false, domainIds: [] };
   const access =
     member.role === "member" && member.verified
       ? parseOperationsAccess(member.operationsAccess)

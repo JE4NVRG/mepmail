@@ -7,6 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildSegmentFilter, filterToRows, sameFilter } from "@/lib/segment-builder";
 import { createCaller } from "@/server/routers";
 
+// Authentication is synthetic in these router unit cases. Live membership
+// enforcement is covered by the operations integration tests without this mock.
+vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
+
 const TEST_KEK = Buffer.alloc(32, 7).toString("base64");
 process.env.MASTER_ENCRYPTION_KEY = TEST_KEK;
 

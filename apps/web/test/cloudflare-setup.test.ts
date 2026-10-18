@@ -13,6 +13,10 @@ import {
 import { createDomainsRouter, type DomainsSesDeps } from "@/server/routers/domains";
 import { type Context, createCallerFactory, router } from "@/server/trpc";
 
+// Authentication is synthetic in these router unit cases. Live membership
+// enforcement is covered by the operations integration tests without this mock.
+vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
+
 const TOKEN = "cf_test_token_0123456789abcdefghijklmnopqrstuv";
 
 interface FakeRecord {
