@@ -14,6 +14,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
+import { confirmDialog } from "@/components/confirm-dialog";
 import { Modal } from "@/components/modal";
 import { Odometer } from "@/components/odometer";
 import { Skeleton } from "@/components/skeleton";
@@ -37,6 +38,7 @@ import {
 } from "@/lib/launch-offer";
 import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
+import { useInAndroidApp } from "@/lib/use-android-app";
 import { QuotaRow } from "../usage/usage-view";
 import { LaunchComboMailStep } from "./launch-combo-step";
 import { PixInvoices } from "./pix-invoices";
@@ -149,6 +151,8 @@ export function BillingView({
   const usageT = useTranslations("settings.usage");
   const locale = useLocale();
   const trpc = useTRPC();
+  // The Android app shows the plan as it is; nothing is sold there (lib/android-app.ts).
+  const androidApp = useInAndroidApp();
   const queryClient = useQueryClient();
 
   const status = useQuery({
@@ -212,6 +216,8 @@ export function BillingView({
     }),
   );
   const setOverage = useMutation(trpc.billing.setOverage.mutationOptions(refresh));
+  // Stopping the renewal is not a purchase: the Android app offers it (billing.cancelRenewal).
+  const cancelRenewal = useMutation(trpc.billing.cancelRenewal.mutationOptions(refresh));
   const mutations = [startCheckout, startPix, openPortal, changePlan, setOverage];
   const busy = mutations.some((m) => m.isPending);
   const failed = mutations.some((m) => m.isError);
@@ -336,6 +342,69 @@ export function BillingView({
         <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
           {t("systemNotice")}
         </p>
+      </Card>
+    );
+  }
+  // Android app (Google Play payments policy): the current plan, its status and period, and
+  // "Cancelar renovação", with no plan choice, prices, checkout, Pix, invoice payment, billing
+  // portal or paid reactivation. The server refuses those too (noPurchaseInAndroidApp);
+  // cancelling the renewal is not a purchase and stays open.
+  if (androidApp) {
+    const { cancelAt } = status.data;
+    const paidPlan = plan !== "free";
+    const canCancelRenewal = canManage && paidPlan && hasLiveSubscription && !cancelAt;
+    return (
+      <Card title={t("plan")}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span
+            className="ms-display"
+            style={{ fontSize: "var(--ms-fs-h1)", color: "var(--ms-bone)", lineHeight: 1 }}
+          >
+            {planLabel(plan, planQuota)}
+          </span>
+          <span
+            className={`ms-badge ms-badge-${STATUS_TONE[planStatus]}`}
+            style={{ position: "relative", top: 1 }}
+          >
+            {t(`status.${planStatus}`)}
+          </span>
+        </div>
+        {paidPlan && (cancelAt || currentPeriodEnd) ? (
+          <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+            {cancelAt
+              ? t("app.endsOn", { date: formatDay(cancelAt, locale) })
+              : t("app.renewsOn", { date: formatDay(currentPeriodEnd as Date | string, locale) })}
+          </p>
+        ) : null}
+        {canCancelRenewal ? (
+          <button
+            type="button"
+            className="ms-btn ms-btn-ghost"
+            style={{ marginTop: 14 }}
+            disabled={cancelRenewal.isPending}
+            onClick={async () => {
+              const confirmed = await confirmDialog({
+                title: t("app.cancelTitle"),
+                message: t("app.cancelBody", {
+                  plan: planLabel(plan, planQuota),
+                  date: currentPeriodEnd ? formatDay(currentPeriodEnd, locale) : "",
+                }),
+                confirmLabel: t("app.cancelConfirm"),
+                cancelLabel: t("app.keep"),
+                danger: true,
+              });
+              // One identity per cancel request; the server confirms on Stripe's state.
+              if (confirmed) cancelRenewal.mutate({ operationId: crypto.randomUUID() });
+            }}
+          >
+            {t("app.cancelRenewal")}
+          </button>
+        ) : null}
+        {cancelRenewal.isError ? (
+          <p role="alert" style={{ margin: "10px 0 0", fontSize: 13 }}>
+            {t("app.cancelFailed")}
+          </p>
+        ) : null}
       </Card>
     );
   }

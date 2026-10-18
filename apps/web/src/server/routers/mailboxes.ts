@@ -120,7 +120,13 @@ import {
   mailboxRegistryEnabled,
 } from "../mailboxes";
 import { getQueue } from "../queue";
-import { protectedProcedure, router, teamProcedure } from "../trpc";
+import {
+  ANDROID_PURCHASE_REFUSED,
+  noPurchaseInAndroidApp,
+  protectedProcedure,
+  router,
+  teamProcedure,
+} from "../trpc";
 import { mailboxSchedulingRouter } from "./mailbox-scheduling";
 import { mailboxSendersRouter } from "./mailbox-senders";
 
@@ -130,6 +136,15 @@ const enabled = teamProcedure.use(async ({ ctx, next }) => {
   )
     throw new TRPCError({ code: "NOT_FOUND" });
   // Existing operator support grants cover outbound operations, not private mailbox content or registry.
+  if (ctx.supportView) throw new TRPCError({ code: "FORBIDDEN" });
+  return next();
+});
+/** A Correio purchase or plan change: refused in the Android app before anything else runs. */
+const purchase = teamProcedure.use(noPurchaseInAndroidApp).use(async ({ ctx, next }) => {
+  if (
+    !(await mailboxActorAccessEnabled(ctx.db, { teamId: ctx.teamId, userId: ctx.session.user.id }))
+  )
+    throw new TRPCError({ code: "NOT_FOUND" });
   if (ctx.supportView) throw new TRPCError({ code: "FORBIDDEN" });
   return next();
 });
@@ -343,6 +358,10 @@ export const mailboxesRouter = router({
         .strict(),
     )
     .mutation(async ({ ctx, input }) => {
+      // The Android app sells nothing: only "cancel" (stop the renewal) is not a purchase.
+      // Resuming a renewal, changing the quantity or reconciling it stay on the web.
+      if (ctx.androidApp && input.action !== "cancel")
+        throw new TRPCError({ code: "FORBIDDEN", message: ANDROID_PURCHASE_REFUSED });
       const presentation = await call(() => mailboxBillingPresentation(ctx.db, actor(ctx)));
       if (!presentation.canManage) throw new TRPCError({ code: "FORBIDDEN" });
       if (input.action !== "reconcile" && mailboxBillingMutationsPaused())
@@ -378,7 +397,7 @@ export const mailboxesRouter = router({
       });
     }),
   /** Move to another Correio plan; the offer comes from billing.management.planOffers. */
-  changePlan: enabled
+  changePlan: purchase
     .input(z.object({ offerId: z.string().regex(/^mbo_[A-Za-z0-9_-]{43}$/) }).strict())
     .mutation(async ({ ctx, input }) => {
       const presentation = await call(() => mailboxBillingPresentation(ctx.db, actor(ctx)));
@@ -416,7 +435,7 @@ export const mailboxesRouter = router({
       },
     );
   }),
-  checkout: enabled
+  checkout: purchase
     .input(
       z
         .object({
@@ -501,7 +520,7 @@ export const mailboxesRouter = router({
    * The first month of a plan paid by Pix (billing pix.ts): a one-time Pix Checkout in
    * reais. Nothing is granted here; the webhook starts the subscription once it is paid.
    */
-  pixCheckout: enabled
+  pixCheckout: purchase
     .input(
       z
         .object({

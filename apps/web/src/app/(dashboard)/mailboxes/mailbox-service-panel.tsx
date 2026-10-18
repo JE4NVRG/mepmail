@@ -554,7 +554,8 @@ export function MailboxServicePanel({
             </button>
           </header>
           {loaded ? (
-            <p className={styles.hint}>
+            // Plan and price wording stays out of the Android app; the system note stays.
+            <p className={styles.hint} data-purchase={systemLicense ? undefined : ""}>
               {systemLicense
                 ? systemT("licenseBody")
                 : planChoices.length || currentPlanCode
@@ -695,13 +696,17 @@ export function MailboxServicePanel({
                   role={failure === "sending_plan_required" ? "alert" : "status"}
                 >
                   <p>{t("sendingPlanRequiredBody")}</p>
-                  <a className="ms-btn ms-btn-primary" href="/settings/billing">
+                  <a className="ms-btn ms-btn-primary" href="/settings/billing" data-purchase="">
                     {t("viewSendingPlans")}
                   </a>
                 </div>
               ) : null}
               {planChange.length ? (
-                <section className={styles.planChange} aria-labelledby={planChangeTitleId}>
+                <section
+                  className={styles.planChange}
+                  aria-labelledby={planChangeTitleId}
+                  data-purchase=""
+                >
                   <h3 className={styles.sectionTitle} id={planChangeTitleId}>
                     {t(currentPlanCode ? "plans.changeTitle" : "plans.migrateTitle")}
                   </h3>
@@ -766,11 +771,19 @@ export function MailboxServicePanel({
               ) : null}
               {manage &&
               (manage.canReconcile || manage.canAdjust || manage.canCancel || manage.canResume) ? (
+                // In the Android app only the renewal cancel shows here: cancelling is not a
+                // purchase (the server allows only "cancel" there); quantity, resume and the
+                // increase payment are, so they keep data-purchase.
                 <div className={styles.management}>
                   {/* Quantity terms belong to the older contracts; a plan changes plan instead. */}
-                  {!currentPlanCode ? <p className={styles.hint}>{t("managementTerms")}</p> : null}
+                  {!currentPlanCode ? (
+                    <p className={styles.hint} data-purchase="">
+                      {t("managementTerms")}
+                    </p>
+                  ) : null}
                   {manage.canAdjust ? (
                     <form
+                      data-purchase=""
                       onSubmit={(event) => {
                         event.preventDefault();
                         if (validChange) void runManagement("quantity", changeSeats);
@@ -814,6 +827,7 @@ export function MailboxServicePanel({
                       className="ms-btn"
                       type="button"
                       disabled={busy}
+                      data-purchase=""
                       onClick={() => void runManagement("resume")}
                     >
                       {t("resumeRenewal")}
@@ -826,7 +840,13 @@ export function MailboxServicePanel({
                     </p>
                   ) : null}
                   {visiblePaymentUrl ? (
-                    <a className="ms-btn" href={visiblePaymentUrl} target="_blank" rel="noreferrer">
+                    <a
+                      className="ms-btn"
+                      href={visiblePaymentUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      data-purchase=""
+                    >
                       {t("completeIncreasePayment")}
                     </a>
                   ) : null}
@@ -851,6 +871,7 @@ export function MailboxServicePanel({
                 </div>
               ) : offer ? (
                 <form
+                  data-purchase=""
                   onSubmit={async (event) => {
                     event.preventDefault();
                     if (!canPurchase || !validSeats || checkout.isPending) return;
@@ -1153,7 +1174,9 @@ export function MailboxServicePanel({
                 </form>
               ) : null}
               {canPurchase || notice === "existingBody" ? (
-                <p className={styles.hint}>{t("confirmationHint")}</p>
+                <p className={styles.hint} data-purchase="">
+                  {t("confirmationHint")}
+                </p>
               ) : null}
             </>
           )}

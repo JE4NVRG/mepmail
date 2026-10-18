@@ -347,7 +347,7 @@ export function MailboxSetupDialog({
             {t("retry")}
           </button>
         ) : (
-          <button type="button" className="ms-btn" onClick={openLicense}>
+          <button type="button" className="ms-btn" onClick={openLicense} data-purchase="">
             {t("reviewLicense")}
           </button>
         )}
@@ -584,7 +584,8 @@ export function MailboxSetupDialog({
                     </>
                   ) : null}
                   {canChoosePlan && selection.offer ? (
-                    <>
+                    // Choosing and paying for a plan: hidden in the Android app (Play policy).
+                    <div data-purchase="" style={{ display: "contents" }}>
                       <label htmlFor={offerSelectId}>
                         {planT("planChoice")}
                         <select
@@ -653,7 +654,7 @@ export function MailboxSetupDialog({
                       <button type="button" className="ms-btn" onClick={openLicense}>
                         {planT(selection.locked ? "retryCheckout" : "reviewSelectedPlan")}
                       </button>
-                    </>
+                    </div>
                   ) : !systemIdentified && billing.isError ? (
                     <div className={styles.notice} role="alert">
                       <div>
@@ -669,7 +670,12 @@ export function MailboxSetupDialog({
                     </div>
                   ) : null}
                   {seatState === "ready" && !canChoosePlan ? (
-                    <button type="button" className="ms-btn ms-btn-ghost" onClick={openLicense}>
+                    <button
+                      type="button"
+                      className="ms-btn ms-btn-ghost"
+                      onClick={openLicense}
+                      data-purchase=""
+                    >
                       {t("reviewLicense")}
                     </button>
                   ) : null}
@@ -788,6 +794,7 @@ export function MailboxSetupDialog({
                             type="button"
                             className="ms-btn ms-btn-ghost"
                             onClick={openLicense}
+                            data-purchase=""
                           >
                             {t("reviewLicense")}
                           </button>

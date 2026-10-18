@@ -2,8 +2,9 @@ import { createTRPCClient } from "@trpc/client";
 import { initTRPC } from "@trpc/server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import superjson from "superjson";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { ANDROID_APP_ATTRIBUTE, ANDROID_APP_HEADER } from "@/lib/android-app";
 import { createBrowserTrpcTransport } from "@/lib/browser-trpc-transport";
 import type { AppRouter } from "@/server/routers";
 
@@ -24,7 +25,7 @@ function deferred() {
 function fixture() {
   const slowStarted = deferred();
   const slowGate = deferred();
-  const requests: { streaming: boolean; setCookie: string | null }[] = [];
+  const requests: { streaming: boolean; android: string | null; setCookie: string | null }[] = [];
   let cookie = "ms_active_team=team_a";
   const router = t.router({
     team: t.router({
@@ -68,6 +69,7 @@ function fixture() {
     if (setCookie) cookie = setCookie.split(";")[0] ?? cookie;
     requests.push({
       streaming: request.headers.get("trpc-accept") === "application/jsonl",
+      android: request.headers.get(ANDROID_APP_HEADER),
       setCookie,
     });
     return response;
@@ -76,13 +78,19 @@ function fixture() {
   return { client, requests, slowStarted, slowGate };
 }
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe("browser tRPC transport", () => {
-  it("persists a cookie set after async mutation work and sends it on the next query", async () => {
+  it("persists a cookie set after async mutation work and sends Android headers on both transports", async () => {
+    vi.stubGlobal("document", {
+      documentElement: { hasAttribute: (name: string) => name === ANDROID_APP_ATTRIBUTE },
+    });
     const { client, requests } = fixture();
 
     expect(await client.team.switch.mutate({ teamId: "team_b" })).toEqual({ teamId: "team_b" });
     expect(requests[0]).toMatchObject({
       streaming: false,
+      android: "android-app",
       setCookie: "ms_active_team=team_b; Path=/; HttpOnly",
     });
     // The next real client query sees the selection; superjson preserves its Date too.
@@ -90,7 +98,7 @@ describe("browser tRPC transport", () => {
       activeTeamId: "team_b",
       observedAt: OBSERVED_AT,
     });
-    expect(requests[1]).toMatchObject({ streaming: true });
+    expect(requests[1]).toMatchObject({ streaming: true, android: "android-app" });
   });
 
   it("delivers a fast query before a slow query in the same streaming batch", async () => {
@@ -111,7 +119,7 @@ describe("browser tRPC transport", () => {
       ]);
       expect(result).toMatchObject({ activeTeamId: "team_a", observedAt: OBSERVED_AT });
       expect(requests).toHaveLength(1);
-      expect(requests[0]).toMatchObject({ streaming: true });
+      expect(requests[0]).toMatchObject({ streaming: true, android: null });
     } finally {
       clearTimeout(timeout);
       slowGate.resolve();

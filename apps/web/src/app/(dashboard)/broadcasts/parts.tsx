@@ -243,7 +243,11 @@ export function SendPlanSummary({
         <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--ms-muted)" }}>
           {planLine ? (
             <>
-              {planLine} · <Link href="/settings/billing">{t("guard.seePlans")}</Link>
+              {planLine}
+              <span data-purchase="">
+                {" · "}
+                <Link href="/settings/billing">{t("guard.seePlans")}</Link>
+              </span>
             </>
           ) : (
             t("guard.reason")

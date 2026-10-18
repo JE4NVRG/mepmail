@@ -1,6 +1,7 @@
 import { httpBatchLink, httpBatchStreamLink, splitLink, type TRPCLink } from "@trpc/client";
 import superjson from "superjson";
 import type { AppRouter } from "@/server/routers";
+import { androidAppHeaders } from "./android-app";
 
 type BrowserFetch = NonNullable<Parameters<typeof httpBatchLink<AppRouter>>[0]["fetch"]>;
 
@@ -9,6 +10,7 @@ export function createBrowserTrpcTransport(fetchImpl?: BrowserFetch): TRPCLink<A
   const options = {
     url: "/api/trpc",
     transformer: superjson,
+    headers: androidAppHeaders,
     ...(fetchImpl ? { fetch: fetchImpl } : {}),
   };
   return splitLink<AppRouter>({

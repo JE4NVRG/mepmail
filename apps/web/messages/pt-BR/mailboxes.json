@@ -570,7 +570,8 @@
     "requirement": "O Correio é um complemento dos planos pagos de Envio, a partir de {price} por mês. Novos clientes elegíveis pagam {first} no primeiro mês do Envio.",
     "cta": "Assinar Envio + Correio",
     "learn": "Conhecer o Correio",
-    "adminOnly": "Peça a um proprietário ou administrador da equipe para assinar."
+    "adminOnly": "Peça a um proprietário ou administrador da equipe para assinar.",
+    "appUnavailable": "O Correio ainda não está ativo nesta equipe."
   },
   "app": {
     "newMail": "{count, plural, one {# mensagem nova} other {# mensagens novas}}",

@@ -10,6 +10,7 @@ import { getDb } from "@millionsend/db";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { cookies } from "next/headers";
 import superjson from "superjson";
+import { isAndroidAppRequest } from "@/lib/android-app";
 import { getAuth } from "./auth";
 import { isInstanceOperator } from "./instance-operator";
 import { ACTIVE_TEAM_COOKIE, getActiveMembership, type SessionRole } from "./membership";
@@ -46,6 +47,8 @@ export interface Context {
   session: AuthSession | null;
   teamId: string | null;
   role: SessionRole | null;
+  /** The request came from the Android app (lib/android-app.ts): nothing is sold there. */
+  androidApp?: boolean;
   /** Set only while the session user's own live grant names the team; every mutation is refused. */
   supportView?: SupportViewContext | undefined;
   /** Persists the team selection (ACTIVE_TEAM_COOKIE). Absent outside HTTP requests (tests). */
@@ -83,12 +86,14 @@ const enqueueBroadcastSend = async (
 export async function createContext({ headers }: { headers: Headers }): Promise<Context> {
   const db = getDb();
   const session = await getAuth().api.getSession({ headers });
-  if (!session) return { db, session: null, teamId: null, role: null };
+  const androidApp = isAndroidAppRequest(headers);
+  if (!session) return { db, session: null, teamId: null, role: null, androidApp };
   const cookieStore = await cookies();
   const secure = process.env.NODE_ENV === "production";
   const shared = {
     db,
     session,
+    androidApp,
     enqueueBroadcastSend,
     enqueueEmailSend,
     enqueueWebhookDeliveries,
@@ -181,6 +186,19 @@ const procedureTiming = t.middleware(async ({ path, next }) => {
 });
 
 export const publicProcedure = t.procedure.use(procedureTiming).use(supportViewGuard);
+
+/**
+ * Google Play's payments policy: nothing is sold inside the Android app. The app marks its
+ * requests (lib/android-app.ts), and every purchase or plan change from it is refused here,
+ * whatever a hidden link or a deep link tries. The mark can only take a right away.
+ * Cancelling a renewal is not a purchase and stays open (billing.cancelRenewal, and the
+ * "cancel" action of mailboxes.manage).
+ */
+export const ANDROID_PURCHASE_REFUSED = "Purchases are not available in the Android app.";
+export const noPurchaseInAndroidApp = t.middleware(({ ctx, next }) => {
+  if (ctx.androidApp) throw new TRPCError({ code: "FORBIDDEN", message: ANDROID_PURCHASE_REFUSED });
+  return next();
+});
 
 /**
  * An operational member is deliberately narrower than a normal member of this

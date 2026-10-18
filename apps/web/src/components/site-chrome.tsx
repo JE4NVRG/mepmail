@@ -175,7 +175,11 @@ export function PublicHeader({
               <a href="/integrations" aria-current={page === "integrations" ? "page" : undefined}>
                 {labels.nav.integrations}
               </a>
-              <a href="/pricing" aria-current={page === "pricing" ? "page" : undefined}>
+              <a
+                data-purchase=""
+                href="/pricing"
+                aria-current={page === "pricing" ? "page" : undefined}
+              >
                 {labels.nav.pricing}
               </a>
               <DocsLink className="gtm-ext" href={DOCS_URL}>
@@ -263,7 +267,9 @@ export function PublicFooter({
         <nav className="gtm-footer-col" aria-label={labels.footer.colProduct}>
           <h3>{labels.footer.colProduct}</h3>
           <a href={anchorHref(page, "#como-funciona")}>{labels.nav.how}</a>
-          <a href={anchorHref(page, "#planos")}>{labels.nav.plans}</a>
+          <a data-purchase="" href={anchorHref(page, "#planos")}>
+            {labels.nav.plans}
+          </a>
           {labels.nav.correio ? <a href="/correio">{labels.nav.correio}</a> : null}
           {labels.footer.apps ? (
             <a href={DESKTOP_DOWNLOAD_URL} aria-current={page === "download" ? "page" : undefined}>
@@ -284,7 +290,9 @@ export function PublicFooter({
         </nav>
         <nav className="gtm-footer-col" aria-label={labels.footer.colCompare}>
           <h3>{labels.footer.colCompare}</h3>
-          <a href="/pricing">{labels.footer.pricing}</a>
+          <a data-purchase="" href="/pricing">
+            {labels.footer.pricing}
+          </a>
           <a href={anchorHref(page, "#comparativo")}>{labels.nav.compare}</a>
           <a href="/alternatives/resend">{labels.footer.alternatives}</a>
           {labels.footer.guides ? (

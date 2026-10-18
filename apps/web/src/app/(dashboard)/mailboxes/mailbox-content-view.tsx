@@ -19,6 +19,7 @@ import {
 import { confirmDialog } from "@/components/confirm-dialog";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { toast } from "@/components/toast";
+import { inAndroidApp } from "@/lib/android-app";
 import { htmlDropsWork } from "@/lib/desktop-bridge";
 import {
   initialMailboxText,
@@ -3087,9 +3088,14 @@ export function MailboxContentView({
       // nothing went out, the draft stays, and the plans are one click away.
       if (code === "PRECONDITION_FAILED" && (cause as Error)?.message === "quota") {
         attempted.current.delete(key);
-        toast(t("planQuota"), "danger", {
-          action: { label: t("viewPlans"), run: () => openMailboxLicense() },
-        });
+        // No way to the plans inside the Android app (Play payments policy).
+        toast(
+          t("planQuota"),
+          "danger",
+          inAndroidApp()
+            ? undefined
+            : { action: { label: t("viewPlans"), run: () => openMailboxLicense() } },
+        );
         if (mounted.current)
           setSendStates((states) => {
             const { [key]: _blocked, ...rest } = states;

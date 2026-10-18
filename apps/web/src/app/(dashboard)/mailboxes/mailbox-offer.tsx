@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { formatUsd } from "@/lib/format";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { useTRPC } from "@/lib/trpc";
+import { useInAndroidApp } from "@/lib/use-android-app";
 
 /** Correio for teams that cannot use it yet: presentation only, every purchase stays server-gated. */
 export function MailboxOffer() {
@@ -17,6 +18,8 @@ export function MailboxOffer() {
   const canManage = role === "owner" || role === "admin";
   const [small, large] = LAUNCH_OFFER.mailboxes;
   const usd = (cents: number) => formatUsd(cents, locale);
+  // The Android app never shows prices or a way to buy (Play payments policy).
+  const androidApp = useInAndroidApp();
   const points = [
     t("points.addresses"),
     t("points.agents"),
@@ -27,11 +30,20 @@ export function MailboxOffer() {
       largePrice: usd(large.monthlyCents),
     }),
   ];
+  if (androidApp)
+    return (
+      <section className="ms-card" style={{ padding: 28, maxWidth: 760 }}>
+        <p style={{ margin: 0, color: "var(--ms-muted)", fontSize: 15, lineHeight: 1.6 }}>
+          {t("appUnavailable")}
+        </p>
+      </section>
+    );
   return (
     <section
       className="ms-card"
       style={{ padding: 28, maxWidth: 760 }}
       aria-labelledby="mail-offer"
+      data-purchase=""
     >
       <div className="ms-microlabel" style={{ marginBottom: 10 }}>
         {t("eyebrow")}

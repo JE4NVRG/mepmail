@@ -1909,7 +1909,7 @@ export function MailboxesView({
             </section>
           ) : visibleSettingsTab === "license" ? (
             <section className={styles.settingsSection} aria-label={t("app.tabs.license")}>
-              <span className={styles.serviceBadge}>
+              <span className={styles.serviceBadge} data-purchase={systemLicense ? undefined : ""}>
                 {t(systemLicense ? "system.badge" : "paidService")}
               </span>
               <MailboxServicePanel

@@ -1,5 +1,6 @@
 import { oauthProviderClient } from "@better-auth/oauth-provider/client";
 import { createAuthClient } from "better-auth/react";
+import { androidAppHeaders } from "./android-app";
 import {
   announceOnAuthTransitionRequest,
   announceOnAuthTransitionSettled,
@@ -13,7 +14,13 @@ export const authClient = createAuthClient({
   fetchOptions: {
     // Compose support invalidation with the existing OAuth plugin, before and after
     // login/logout. Signals revoke old capabilities; they never authenticate a new one.
-    onRequest: announceOnAuthTransitionRequest,
+    onRequest(context) {
+      announceOnAuthTransitionRequest(context);
+      // The Android app's requests say so: the server records no ad conversion for them.
+      for (const [name, value] of Object.entries(androidAppHeaders()))
+        context.headers.set(name, value);
+      return context;
+    },
     onSuccess: announceOnAuthTransitionSettled,
     onError: announceOnAuthTransitionSettled,
   },

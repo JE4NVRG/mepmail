@@ -20,10 +20,16 @@ vi.mock("@/components/auth/auth-screen", () => ({
 }));
 vi.mock("next/link", () => ({ default: "a" }));
 
-const { ConsentForm } = await import("../src/app/oauth/consent/consent-form");
+const { ConsentForm, MAIL_GRANT_MAX_MAILBOXES, toggleMailbox } = await import(
+  "../src/app/oauth/consent/consent-form"
+);
 
 const TEAM = "00000000-0000-4000-8000-0000000000aa";
-function render(locale: "en" | "pt-BR") {
+const TWO_BOXES = [
+  { id: "box-personal", address: "me@example.test", label: "Me" },
+  { id: "box-agent", address: "agent@example.test", label: "Agent" },
+];
+function render(locale: "en" | "pt-BR", teamBoxes = TWO_BOXES) {
   return renderToStaticMarkup(
     createElement(NextIntlClientProvider, {
       locale,
@@ -42,12 +48,7 @@ function render(locale: "en" | "pt-BR") {
         scopes: ["mail:read", "mail:draft", "mail:send"],
         teams: [{ teamId: TEAM, teamName: "Team", role: "owner" }],
         defaultTeamId: TEAM,
-        mailboxes: {
-          [TEAM]: [
-            { id: "box-personal", address: "me@example.test", label: "Me" },
-            { id: "box-agent", address: "agent@example.test", label: "Agent" },
-          ],
-        },
+        mailboxes: { [TEAM]: teamBoxes },
       }),
     }),
   );
@@ -88,5 +89,33 @@ describe.each(["en", "pt-BR"] as const)("OAuth consent mailboxes (%s)", (locale)
     expect(html).not.toContain(consent.summary.nothing);
     expect(html).not.toContain(consent.summary.sendOn);
     expect(html).toContain(consent.summary.declined.replace("{list}", sendLabel));
+  });
+  it("offers at most 20 mailboxes per app, the limit the grant takes", () => {
+    const many = Array.from({ length: 22 }, (_, i) => ({
+      id: `box-${i}`,
+      address: `box${i}@example.test`,
+      label: `Box ${i}`,
+    }));
+    const html = render(locale, many);
+    expect(html).toContain(consent.mailboxesLimit.replace("{max}", "20"));
+    expect(html).toContain(consent.mailboxesFirst.replace("{max}", "20"));
+    expect(html).not.toContain(`>${consent.mailboxesAll}<`);
+    // Up to two mailboxes: no limit note, the usual "Select all".
+    expect(render(locale)).not.toContain(consent.mailboxesLimit.replace("{max}", "20"));
+  });
+});
+
+describe("toggleMailbox", () => {
+  it("ticks up to the limit, ignores a tick past it and always unticks", () => {
+    expect(MAIL_GRANT_MAX_MAILBOXES).toBe(20);
+    let chosen = new Set<string>();
+    for (let i = 0; i < 22; i++) chosen = toggleMailbox(chosen, `box-${i}`);
+    expect(chosen.size).toBe(20);
+    expect(chosen.has("box-20")).toBe(false);
+    chosen = toggleMailbox(chosen, "box-3");
+    expect(chosen.size).toBe(19);
+    chosen = toggleMailbox(chosen, "box-21");
+    expect(chosen.has("box-21")).toBe(true);
+    expect(chosen.size).toBe(20);
   });
 });

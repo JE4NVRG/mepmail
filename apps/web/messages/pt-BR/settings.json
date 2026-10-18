@@ -407,7 +407,17 @@
       }
     },
     "upgradePaymentPending": "Ainda não conseguimos cobrar a diferença do {plan}, então seu plano não mudou. Confira ou atualize o cartão em Gerenciar e tente de novo; o upgrade vale assim que o pagamento for aprovado.",
-    "localPrice": "No Brasil: {price}"
+    "localPrice": "No Brasil: {price}",
+    "app": {
+      "renewsOn": "Renova em {date}.",
+      "endsOn": "Renovação cancelada: o plano termina em {date} e a equipe volta ao Free.",
+      "cancelRenewal": "Cancelar renovação",
+      "cancelTitle": "Cancelar a renovação?",
+      "cancelBody": "O {plan} continua até {date} e não renova. Depois disso, a equipe volta ao Free. Nada é cobrado por isso.",
+      "cancelConfirm": "Cancelar renovação",
+      "keep": "Manter plano",
+      "cancelFailed": "Não foi possível cancelar a renovação agora. Tente de novo em instantes."
+    }
   },
   "mcp": {
     "title": "Servidor MCP",
@@ -506,6 +516,7 @@
       "billing_subscription_updated": "Assinatura alterada",
       "billing_plan_changed": "Alterou o plano",
       "billing_overage_toggled": "Alterou a cobrança de excedente",
+      "billing_renewal_canceled": "Cancelou a renovação do plano",
       "team_type_changed": "Alterou o tipo da equipe",
       "team_limits_updated": "Ajustou limites da equipe",
       "team_broadcasts_paused": "Pausou transmissões",

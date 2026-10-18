@@ -616,6 +616,7 @@ describe("billing router", () => {
       pendingRung: null,
       planStatus: "none",
       currentPeriodEnd: null,
+      cancelAt: null,
       quota: { kind: "day", plan: "free", limit: 100 },
       usage: { accepted: 0, reportedOverage: 0 },
       hasCustomer: false,

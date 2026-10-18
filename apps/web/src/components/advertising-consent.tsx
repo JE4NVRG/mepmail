@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { adConsent } from "@/lib/ad-consent";
+import { inAndroidApp } from "@/lib/android-app";
 import { createGooglePublicController, loadGoogleTag } from "@/lib/google-public-events";
 import {
   createMetaPublicController,
@@ -41,7 +42,9 @@ function publicController(): PublicController {
   const port = {
     href: () => window.location.href,
     referrer: () => document.referrer,
-    consent: () => adConsent.getSnapshot().state,
+    // Inside the Android app nothing is measured for advertising: the tags read a denial,
+    // whatever this browser's stored choice (Chrome shares it with the app).
+    consent: () => (inAndroidApp() ? "denied" : adConsent.getSnapshot().state),
     leaveDocument,
   };
   const meta = metaConfigured
@@ -94,6 +97,7 @@ export function AdvertisingSettingsButton() {
   return (
     <button
       type="button"
+      data-advertising=""
       className={styles.settings}
       aria-haspopup="dialog"
       onClick={() => {
@@ -119,7 +123,8 @@ export function AdvertisingConsent() {
   const channel = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
-    setPublicPage(configured && publicDocument());
+    // No banner inside the Android app: it measures nothing for advertising.
+    setPublicPage(configured && publicDocument() && !inAndroidApp());
     if (!configured) return;
     const settings = () => {
       setOpen(true);

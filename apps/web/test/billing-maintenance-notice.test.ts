@@ -39,6 +39,7 @@ vi.mock("@/lib/trpc", () => {
         portal: operation,
         changePlan: operation,
         setOverage: operation,
+        cancelRenewal: operation,
         pixInvoices: operation,
         payPixInvoice: operation,
       },
@@ -104,8 +105,9 @@ describe.each(["en", "pt-BR"] as const)("billing maintenance notice in %s", (loc
     (operation) => {
       h.failedIndex = planMutations.indexOf(operation);
       const html = render();
-      // The five plan mutations, then the open Pix invoices' payment (rendered after them).
-      expect(h.mutationIndex).toBe(6);
+      // The five plan mutations, the Android card's renewal cancel, then the open Pix
+      // invoices' payment (rendered after them).
+      expect(h.mutationIndex).toBe(7);
       expect(html).toContain('role="alert"');
       expect(html).toContain(messages.billing.billingPaused);
       expect(html).not.toContain(messages.billing.error);

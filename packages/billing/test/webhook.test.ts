@@ -10,7 +10,12 @@ import { prepareMetaCheckout, saveAdvertisingConsent } from "../src/meta-adverti
 import type { MetaConversionConfig } from "../src/meta-conversions.js";
 import { priceMetadata } from "../src/prices.js";
 import type { BillingStripe } from "../src/stripe.js";
-import { cancelTeamSubscription, reconcileTeamPlan } from "../src/subscription.js";
+import {
+  cancelTeamRenewal,
+  cancelTeamSubscription,
+  RenewalCancelError,
+  reconcileTeamPlan,
+} from "../src/subscription.js";
 import { handleWebhook, purgeStripeEvents } from "../src/webhook.js";
 import {
   fakeStripe,
@@ -901,6 +906,144 @@ describe("cancelTeamSubscription", () => {
     await cancelTeamSubscription(deps(), teamId);
     expect(state.cancels).toEqual(["sub_1"]);
     expect(await team(teamId)).toMatchObject({ plan: "free", stripeSubscriptionId: null });
+  });
+});
+
+describe("cancelTeamRenewal", () => {
+  const op = () => randomUUID();
+  const cancelAtOf = async (teamId: string) => {
+    const [row] = await db
+      .select({ cancelAt: schema.teams.cancelAt })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, teamId));
+    return row?.cancelAt?.getTime() ?? null;
+  };
+  /** A live Pro subscription the team pays for. */
+  async function subscribed(): Promise<string> {
+    const teamId = await customerTeam();
+    state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "active", undefined, {
+      overageKey: "millionsend_pro_100k_overage",
+    });
+    await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
+    return teamId;
+  }
+  /** The renewal resumed elsewhere (the web portal), as Stripe then reports it. */
+  async function reactivated() {
+    const live = state.subscriptions.sub_1;
+    if (!live) throw new Error("no subscription");
+    live.cancel_at_period_end = false;
+    live.cancel_at = null;
+    await deliver(subEvent("customer.subscription.updated", live));
+  }
+
+  it("ends the plan at the period's end, with no invoice and no plan offer", async () => {
+    const teamId = await customerTeam();
+    // No subscription: nothing to stop.
+    expect(await cancelTeamRenewal(deps(), teamId, op())).toBeNull();
+    expect(state.updates).toEqual([]);
+
+    state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "active", undefined, {
+      overageKey: "millionsend_pro_100k_overage",
+    });
+    await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1));
+    const cancelled = await cancelTeamRenewal(deps(), teamId, op());
+    expect(state.updates).toEqual([["sub_1", { cancel_at_period_end: true }]]);
+    expect(state.cancels).toEqual([]);
+    expect(cancelled?.cancelAt?.getTime()).toBe(PERIOD_END * 1000);
+    // The plan stays until then.
+    expect(await team(teamId)).toMatchObject({
+      plan: "pro",
+      planStatus: "active",
+      stripeSubscriptionId: "sub_1",
+    });
+    expect(await cancelAtOf(teamId)).toBe(PERIOD_END * 1000);
+
+    // An ended subscription is left alone.
+    state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "canceled");
+    expect(await cancelTeamRenewal(deps(), teamId, op())).toBeNull();
+    expect(state.updates).toHaveLength(1);
+  });
+
+  it("cancel, reactivate, cancel: the second cancel is a new operation and Stripe applies it", async () => {
+    const teamId = await subscribed();
+    await cancelTeamRenewal(deps(), teamId, op());
+    await reactivated();
+    expect(await cancelAtOf(teamId)).toBeNull();
+
+    const again = await cancelTeamRenewal(deps(), teamId, op());
+    expect(again?.cancelAt?.getTime()).toBe(PERIOD_END * 1000);
+    expect(state.updates).toHaveLength(2);
+    // Two operations, two keys: the second was applied, not answered from the first.
+    expect(state.replays).toEqual([]);
+    expect([...state.idempotency.keys()]).toHaveLength(2);
+    expect(state.subscriptions.sub_1?.cancel_at_period_end).toBe(true);
+  });
+
+  it("a key shared by both cancels (the old scheme) replays the first answer: success is read from Stripe's state instead", async () => {
+    const teamId = await subscribed();
+    const first = op();
+    await cancelTeamRenewal(deps(), teamId, first);
+    await reactivated();
+    // A stale retry of the first operation reaches Stripe after the reactivation: the replayed
+    // answer still says "cancels at the period's end", the subscription does not.
+    const replayed = await stripe.subscriptions.update(
+      "sub_1",
+      { cancel_at_period_end: true },
+      { idempotencyKey: `send-renewal-cancel:sub_1:${first}` },
+    );
+    expect(replayed.cancel_at_period_end).toBe(true);
+    expect(state.subscriptions.sub_1?.cancel_at_period_end).toBe(false);
+    expect(state.replays).toHaveLength(1);
+    // Through cancelTeamRenewal, the same replay is never taken for success.
+    const subscriptions = { ...stripe.subscriptions };
+    const replaying = {
+      ...stripe,
+      subscriptions: {
+        ...subscriptions,
+        update: (id: string, params?: Stripe.SubscriptionUpdateParams) =>
+          subscriptions.update(id, params, {
+            idempotencyKey: `send-renewal-cancel:sub_1:${first}`,
+          }),
+      },
+    } as typeof stripe;
+    await expect(
+      cancelTeamRenewal({ db, stripe: replaying, log: () => {} }, teamId, op()),
+    ).rejects.toBeInstanceOf(RenewalCancelError);
+    expect(await cancelAtOf(teamId)).toBeNull();
+  });
+
+  it("a retry of the same operation after a lost response applies nothing twice and succeeds", async () => {
+    const teamId = await subscribed();
+    const same = op();
+    state.loseNextUpdateResponse = true;
+    await expect(cancelTeamRenewal(deps(), teamId, same)).rejects.toThrow(/response was lost/);
+    // Stripe applied it; the retry reads that and confirms without a second update.
+    const retried = await cancelTeamRenewal(deps(), teamId, same);
+    expect(retried?.cancelAt?.getTime()).toBe(PERIOD_END * 1000);
+    expect(state.updates).toHaveLength(1);
+    // Asking again, later, changes nothing either.
+    await cancelTeamRenewal(deps(), teamId, op());
+    expect(state.updates).toHaveLength(1);
+  });
+
+  it("two cancels at once both end in the cancelled state, applied at most once each", async () => {
+    const teamId = await subscribed();
+    const [a, b] = await Promise.all([
+      cancelTeamRenewal(deps(), teamId, op()),
+      cancelTeamRenewal(deps(), teamId, op()),
+    ]);
+    expect(a?.cancelAt?.getTime()).toBe(PERIOD_END * 1000);
+    expect(b?.cancelAt?.getTime()).toBe(PERIOD_END * 1000);
+    expect(state.updates.length).toBeGreaterThanOrEqual(1);
+    expect(state.updates.length).toBeLessThanOrEqual(2);
+    expect(state.replays).toEqual([]);
+    expect(await cancelAtOf(teamId)).toBe(PERIOD_END * 1000);
+  });
+
+  it("refuses an operation without a UUID identity", async () => {
+    const teamId = await subscribed();
+    await expect(cancelTeamRenewal(deps(), teamId, "retry")).rejects.toThrow(/UUID/);
+    expect(state.updates).toEqual([]);
   });
 });
 
