@@ -150,7 +150,8 @@ for (const locale of ["en", "pt-BR"] as const) {
       const { nav } = navMarkup(locale);
       expect(hrefs(nav)).toContain("/operations/users");
       expect(hrefs(nav)).not.toContain("/console");
-      expect(nav).toMatch(/href="\/operations\/users"[^>]*aria-current="page"/);
+      const directoryLink = nav.match(/<a\b[^>]*href="\/operations\/users"[^>]*>/)?.[0];
+      expect(directoryLink).toContain('aria-current="page"');
     });
 
     it.each([true, undefined])(

@@ -18,8 +18,8 @@ beforeEach(async () => {
     email: "ops-oauth@example.invalid",
     emailVerified: true,
   });
-  restrictedTeam = await createTeam(db);
-  ownTeam = await createTeam(db);
+  restrictedTeam = await createTeam(db, "ops-oauth-restricted");
+  ownTeam = await createTeam(db, "ops-oauth-owned");
   await db.insert(schema.teamMembers).values([
     {
       userId,
