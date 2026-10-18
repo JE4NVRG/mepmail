@@ -227,6 +227,8 @@
     },
     "accept": {
       "title": "Entrar no time",
+      "operationsRole": "Administrador operacional",
+      "operationsBody": "Só os domínios e caixas indicados no convite; suas credenciais são escolhidas por você. Verifique o endereço convidado antes de aceitar.",
       "loading": "Verificando sua sessão…",
       "signInPrompt": "Entre ou crie uma conta para aceitar este convite.",
       "signIn": "Entrar",
@@ -514,6 +516,9 @@
       "team_send_review_released": "Liberou o envio após revisão",
       "team_domain_relay_enabled": "Ligou o relay SMTP de um domínio",
       "team_domain_relay_disabled": "Desligou o relay SMTP de um domínio",
+      "team_member_invited": "Operador convidou um membro",
+      "team_invitation_resent": "Operador reenviou um convite",
+      "team_invitation_revoked": "Operador revogou um convite",
       "console_flag_opened": "Sinalizou a equipe",
       "console_flag_cleared": "Limpou a sinalização",
       "console_flag_reopened": "Reabriu a sinalização",

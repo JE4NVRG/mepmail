@@ -27,6 +27,7 @@ import { MAILBOX_DELIVERY_SOURCE_PREFIX } from "../../../packages/core/src/mailb
 import {
   createMailboxRegistry,
   grantMailboxRegistry,
+  revokeMailboxRegistry,
   updateMailboxRegistry,
 } from "../../../packages/core/src/mailbox-registry.js";
 import {
@@ -376,7 +377,111 @@ describe("durable private Correio transport contracts with captured provider", (
     await expect(receive()).rejects.toMatchObject({ code: "forbidden" });
     expect(await db.select().from(schema.mailboxItems)).toHaveLength(0);
   });
-  it("requires the current owner approval and exact draft revision for person or agent boxes", async () => {
+  it("captures the human send delegate's membership and keeps one immutable approval per revision", async () => {
+    await grantMailboxRegistry(db, owner(), {
+      mailboxId,
+      userId: "delegate",
+      permission: "send",
+    });
+    const item = await draft(fixture(), mailboxId, delegate());
+    const admitted = await queue(item.id, 1, mailboxId, delegate());
+    const [membership] = await db
+      .select({ id: schema.teamMembers.id })
+      .from(schema.teamMembers)
+      .where(and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamMembers.userId, "delegate")));
+    expect(await outbox(admitted.id)).toMatchObject({
+      approvalKind: "human",
+      agentKeyId: null,
+      approvedBy: "delegate",
+      approvedMembershipId: membership!.id,
+    });
+    expect((await queue(item.id, 1, mailboxId, delegate())).id).toBe(admitted.id);
+    await expect(queue(item.id)).rejects.toMatchObject({ code: "conflict" });
+    const capture = vi.fn(async () => ({ messageId: "shared-human-accepted" }));
+    expect((await send(admitted.id, { send: capture })).status).toBe("accepted");
+    expect((await send(admitted.id, { send: capture })).duplicate).toBe(true);
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect((await readMailboxItem(db, keys, delegate(), { mailboxId, id: admitted.id })).kind).toBe(
+      "sent",
+    );
+    expect((await readMailboxItem(db, keys, owner(), { mailboxId, id: admitted.id })).kind).toBe(
+      "sent",
+    );
+    const personal = await draft(fixture("agent@transport.invalid"), agentId);
+    await expect(queue(personal.id, 1, agentId, delegate())).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    await expect(
+      createMailboxAgentKey(db, delegate(), {
+        mailboxId,
+        label: "Not the owner",
+        scopes: ["send"],
+      }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+  });
+  it("refuses revoked or downgraded human send grants before invoking the queued provider", async () => {
+    const capture = vi.fn(async () => ({ messageId: "must-not-send" }));
+    for (const invalidation of ["revoked", "read", "draft"] as const) {
+      const grant = await grantMailboxRegistry(db, owner(), {
+        mailboxId,
+        userId: "delegate",
+        permission: "send",
+      });
+      const item = await draft(fixture(), mailboxId, delegate());
+      const admitted = await queue(item.id, 1, mailboxId, delegate());
+      if (invalidation === "revoked") await revokeMailboxRegistry(db, owner(), grant.id);
+      else
+        await grantMailboxRegistry(db, owner(), {
+          mailboxId,
+          userId: "delegate",
+          permission: invalidation,
+        });
+      expect(await send(admitted.id, { send: capture })).toMatchObject({
+        status: "failed",
+        errorCode: "admission_refused",
+      });
+    }
+    expect(capture).not.toHaveBeenCalled();
+  });
+  it("does not restore a queued human approval after membership removal and reentry with a new grant", async () => {
+    await grantMailboxRegistry(db, owner(), {
+      mailboxId,
+      userId: "delegate",
+      permission: "send",
+    });
+    const admitted = await queue(
+      (await draft(fixture(), mailboxId, delegate())).id,
+      1,
+      mailboxId,
+      delegate(),
+    );
+    const previousMembershipId = (await outbox(admitted.id)).approvedMembershipId;
+    await db
+      .delete(schema.teamMembers)
+      .where(and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamMembers.userId, "delegate")));
+    const [replacement] = await db
+      .insert(schema.teamMembers)
+      .values({ teamId, userId: "delegate", role: "member" })
+      .returning();
+    expect(replacement!.id).not.toBe(previousMembershipId);
+    await grantMailboxRegistry(db, owner(), {
+      mailboxId,
+      userId: "delegate",
+      permission: "send",
+    });
+    const capture = vi.fn(async () => ({ messageId: "must-not-send" }));
+    expect(await send(admitted.id, { send: capture })).toMatchObject({
+      status: "failed",
+      errorCode: "admission_refused",
+    });
+    expect(capture).not.toHaveBeenCalled();
+    await expect(
+      queue((await draft(fixture(), mailboxId, delegate())).id, 1, mailboxId, delegate()),
+    ).resolves.toMatchObject({
+      status: "queued",
+    });
+  });
+  it("requires send authority and exact draft revision for person or agent boxes", async () => {
     await grantMailboxRegistry(db, owner(), {
       mailboxId: agentId,
       userId: "delegate",

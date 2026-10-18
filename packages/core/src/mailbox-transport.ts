@@ -42,7 +42,7 @@ import {
 import {
   type MailboxContentActor,
   MailboxContentError,
-  withMailboxWriteAccess,
+  withMailboxSendAccess,
 } from "./mailbox-private-store.js";
 import {
   deriveMailboxRuleKey,
@@ -827,7 +827,7 @@ export async function receiveMailboxMime(
   });
 }
 
-/** Owner approval freezes one exact private revision. Recipient reservations
+/** Human approval freezes one exact private revision. Recipient reservations
  * belong to Correio's box/period, independent of every Envio quota or API key.
  * Admission commits before a runtime enqueues the returned outbox ID.
  */
@@ -843,10 +843,11 @@ export async function queueMailboxDraft(
   input = { ...input };
   if (!Number.isInteger(input.expectedRevision) || input.expectedRevision < 1)
     throw new MailboxContentError("invalid");
-  return withMailboxWriteAccess(db, actor, input.mailboxId, (tx) =>
+  return withMailboxSendAccess(db, actor, input.mailboxId, (tx, membershipId) =>
     queueAuthorizedMailboxDraft(tx, keys, actor, input, mime, now, {
       kind: "human",
       agentKeyId: null,
+      membershipId,
     }),
   );
 }
@@ -899,7 +900,7 @@ async function queueAuthorizedMailboxDraft(
   mime: MailboxTransportMimeAdapter,
   now: Date,
   approval:
-    | { kind: "human"; agentKeyId: null }
+    | { kind: "human"; agentKeyId: null; membershipId: string }
     | { kind: "agent"; agentKeyId: string; ownerMembershipId: string; expiresAt: Date | null },
 ) {
   const [box] = await tx
@@ -911,10 +912,12 @@ async function queueAuthorizedMailboxDraft(
   if (
     !box ||
     !box.ownerMembershipId ||
-    box.ownerUserId !== actor.userId ||
-    (approval.kind === "agent" && box.ownerMembershipId !== approval.ownerMembershipId)
+    (approval.kind === "agent" &&
+      (box.ownerUserId !== actor.userId || box.ownerMembershipId !== approval.ownerMembershipId))
   )
     throw new MailboxContentError("forbidden");
+  const approvedMembershipId =
+    approval.kind === "human" ? approval.membershipId : approval.ownerMembershipId;
   const [previous] = await tx
     .select()
     .from(mailboxOutbox)
@@ -932,7 +935,7 @@ async function queueAuthorizedMailboxDraft(
       previous.approvalKind !== approval.kind ||
       previous.agentKeyId !== approval.agentKeyId ||
       previous.approvedBy !== actor.userId ||
-      previous.approvedMembershipId !== box.ownerMembershipId
+      previous.approvedMembershipId !== approvedMembershipId
     )
       throw new MailboxContentError("conflict");
     return outboxDto(previous, true);
@@ -1027,7 +1030,7 @@ async function queueAuthorizedMailboxDraft(
       draftId: draft.id,
       draftRevision: draft.revision,
       approvedBy: actor.userId,
-      approvedMembershipId: box.ownerMembershipId,
+      approvedMembershipId,
       approvalKind: approval.kind,
       agentKeyId: approval.agentKeyId,
       recipientCount: parsed.count,
@@ -1339,7 +1342,7 @@ export async function sendMailboxOutbox(
         ({ db: tx, expiresAt }) => prepare(tx, expiresAt),
       );
     } else if (known.approvalKind === "human" && known.agentKeyId === null) {
-      prepared = await withMailboxWriteAccess(
+      prepared = await withMailboxSendAccess(
         db,
         { teamId: known.teamId, userId: known.approvedBy },
         known.mailboxId,

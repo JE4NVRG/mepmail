@@ -8,7 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TeamRole } from "@/server/membership";
 import { createCaller } from "@/server/routers";
 import { createSettingsRouter } from "@/server/routers/settings";
-import { buildInvitationEmail, type SystemMailDeps } from "@/server/system-mail";
+import {
+  buildInvitationEmail,
+  buildOperationsInvitationEmail,
+  type SystemMailDeps,
+} from "@/server/system-mail";
 import { type Context, createCallerFactory, router } from "@/server/trpc";
 
 let db: Db;
@@ -417,6 +421,106 @@ describe("settings.invitations send accounting", () => {
     expect(mail.text).toContain("Acme $$ Co");
     expect(mail.text).not.toMatch(/\{(inviter|team|role|days|email)\}/);
     expect(mail.subject).toContain("Acme $$ Co");
+  });
+});
+
+describe("buildOperationsInvitationEmail", () => {
+  const input = {
+    to: "yuri@example.com",
+    inviterName: "Jean",
+    teamName: "FullCommerce360",
+    url: "https://app.example.com/invite/one-invitation-token",
+    expiresInDays: 3,
+    domains: ["fullcommerce360.com", "mepmail.dev"],
+    mailboxes: ["yuri@fullcommerce360.com", "suporte@mepmail.dev"],
+  };
+
+  it("welcomes the invitee in Portuguese with the exact scope and pending activation steps", () => {
+    vi.stubEnv("NOTIFICATIONS_EMAIL_FROM", "MepMail <notices@example.com>");
+    const mail = buildOperationsInvitationEmail({ ...input, name: "Yuri", locale: "pt-BR" });
+    expect(mail).toMatchObject({
+      from: "MepMail <notices@example.com>",
+      to: input.to,
+      kind: "invitation",
+      subject: "Boas-vindas ao MepMail — convite para FullCommerce360",
+    });
+    expect(mail.text).toContain("Olá, Yuri! Seja bem-vindo ao MepMail.");
+    expect(mail.text).toContain("Administrador operacional");
+    expect(mail.text).toContain("ver a lista de usuários, sem editar contas");
+    expect(mail.text).toContain("somente nestes domínios: fullcommerce360.com, mepmail.dev");
+    expect(mail.text).toContain(
+      "somente nestas caixas explicitamente permitidas: yuri@fullcommerce360.com, suporte@mepmail.dev",
+    );
+    expect(mail.text).toContain("caixas pessoais, caixas de outras empresas, o financeiro");
+    expect(mail.text).toContain("gerenciar permissões");
+    expect(mail.text).toContain(`cadastre-se com este mesmo Gmail (${input.to})`);
+    expect(mail.text).toContain("escolha sua própria senha no site");
+    expect(mail.text).toContain("Verifique o Gmail pelo email de confirmação e depois aceite o convite");
+    expect(mail.text).toContain("O acesso ainda não está ativo");
+    expect(mail.text).toContain("expira em 3 dias");
+    expect(mail.html).toContain('<html lang="pt-BR">');
+    expect(mail.text.split(input.url)).toHaveLength(2);
+    expect(mail.text).not.toContain("/reset-password");
+  });
+
+  it("provides the same scope and safe signup instructions in English without requiring a name", () => {
+    const mail = buildOperationsInvitationEmail({ ...input, locale: "en" });
+    expect(mail.subject).toBe("Welcome to MepMail — invitation to FullCommerce360");
+    expect(mail.text).toContain("Hi! Welcome to MepMail.");
+    expect(mail.text).toContain("Operational administrator");
+    expect(mail.text).toContain("view the user directory, without editing accounts");
+    expect(mail.text).toContain("only on these domains: fullcommerce360.com, mepmail.dev");
+    expect(mail.text).toContain(
+      "only in these explicitly permitted mailboxes: yuri@fullcommerce360.com, suporte@mepmail.dev",
+    );
+    expect(mail.text).toContain("personal mailboxes, other companies' mailboxes");
+    expect(mail.text).toContain("financial administration or permission management");
+    expect(mail.text).toContain("choose your own password on the website");
+    expect(mail.text).toContain("using the confirmation email, then accept the invitation");
+    expect(mail.text).toContain("Access is not active yet");
+    expect(mail.text).toContain("expires in 3 days");
+    expect(mail.text.split(input.url)).toHaveLength(2);
+    expect(mail.text).not.toMatch(/\{(?:inviter|team|email|days)\}/);
+  });
+
+  it("escapes all dynamic text in HTML and preserves literal replacement sequences", () => {
+    const mail = buildOperationsInvitationEmail({
+      ...input,
+      locale: "en",
+      name: '<img src=x onerror="run()">',
+      inviterName: "Jean $' <script>run()</script>",
+      teamName: "Acme $$ & Co",
+      domains: ['<img src=x onerror="domain()">'],
+      mailboxes: ["<script>mailbox()</script>"],
+      url: `${input.url}?a=1&b=" onclick="run()`,
+    });
+    expect(mail.html).not.toContain("<script>");
+    expect(mail.html).not.toContain("<img src=x");
+    expect(mail.html).not.toContain(' onclick="run()');
+    expect(mail.html).toContain("&lt;script&gt;run()&lt;/script&gt;");
+    expect(mail.html).toContain("Acme $$ &amp; Co");
+    expect(mail.text).toContain("Jean $' <script>run()</script>");
+    expect(mail.text).toContain("Acme $$ & Co");
+  });
+
+  it("does not duplicate listed scope entries and never implies an empty scope means unrestricted access", () => {
+    const mail = buildOperationsInvitationEmail({
+      ...input,
+      locale: "en",
+      domains: [" FULLCOMMERCE360.COM ", "fullcommerce360.com", ""],
+      mailboxes: [" YURI@FULLCOMMERCE360.COM ", "yuri@fullcommerce360.com", " "],
+    });
+    expect(mail.text).toContain("only on these domains: fullcommerce360.com.");
+    expect(mail.text).toContain("only in these explicitly permitted mailboxes: yuri@fullcommerce360.com.");
+    expect(mail.text).not.toContain("fullcommerce360.com, fullcommerce360.com");
+    const empty = buildOperationsInvitationEmail({
+      ...input,
+      locale: "pt-BR",
+      domains: [],
+      mailboxes: [],
+    });
+    expect(empty.text).toContain("Nenhum domínio foi autorizado para criar caixas");
+    expect(empty.text).toContain("Nenhuma caixa foi autorizada para ler ou responder mensagens");
   });
 });
 

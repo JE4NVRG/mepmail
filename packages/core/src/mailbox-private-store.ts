@@ -45,7 +45,7 @@ export class MailboxContentError extends Error {
   }
 }
 type Item = typeof schema.mailboxItems.$inferSelect;
-type Permission = "read" | "draft" | "owner";
+type Permission = "read" | "draft" | "send" | "owner";
 /**
  * Received and imported mail is kept up to 25 MiB (Gmail's limit, under SES's
  * 40 MB): a message from outside cannot be held to what our composer writes.
@@ -164,7 +164,7 @@ async function scoped<T>(
   mailboxId: string,
   permission: Permission,
   change: boolean,
-  operation: (tx: Db) => Promise<T>,
+  operation: (tx: Db, membershipId: string) => Promise<T>,
   exclusive = false,
 ): Promise<T> {
   if (actor.supportView) throw new MailboxContentError("forbidden");
@@ -194,6 +194,9 @@ async function scoped<T>(
       .where(and(eq(schema.mailboxes.id, mailboxId), eq(schema.mailboxes.teamId, actor.teamId)));
     const [mailbox] = await (change || exclusive ? query.for("update") : query.for("share"));
     if (!mailbox || mailbox.status !== "planned") throw new MailboxContentError("forbidden");
+    // Sending still requires an active responsible owner, including when delegated.
+    if (permission === "send" && !mailbox.ownerMembershipId)
+      throw new MailboxContentError("forbidden");
     const owner = mailbox.ownerUserId === actor.userId && mailbox.ownerMembershipId === member.id;
     if (!owner) {
       const [grant] = await tx
@@ -212,7 +215,8 @@ async function scoped<T>(
       if (
         !grant ||
         permission === "owner" ||
-        (permission === "draft" && grant.permission !== "draft")
+        (permission === "draft" && grant.permission !== "draft" && grant.permission !== "send") ||
+        (permission === "send" && grant.permission !== "send")
       )
         throw new MailboxContentError("forbidden");
     }
@@ -224,7 +228,7 @@ async function scoped<T>(
         await requireMailboxSeat(tx, actor.teamId, mailboxId, plan);
       }
     }
-    return operation(tx);
+    return operation(tx, member.id);
   });
 }
 
@@ -319,8 +323,8 @@ const scopedRead = <T>(
   operation: (tx: Db) => Promise<T>,
 ) => scopedMany(db, actor, mailboxIds, "read", operation);
 
-/** Trusted server-side send admission. The session actor must own the box now;
- * readers and draft delegates cannot enqueue a message. Keep locks through capture.
+/** Owner-only write admission, retained for scheduling and other owner actions.
+ * Human send delegation uses withMailboxSendAccess without widening ownership.
  */
 export function withMailboxWriteAccess<T>(
   db: Db,
@@ -329,6 +333,20 @@ export function withMailboxWriteAccess<T>(
   operation: (tx: Db) => Promise<T>,
 ): Promise<T> {
   return scoped(db, { ...actor }, mailboxId, "owner", true, operation);
+}
+
+/** A human may send with current ownership or an explicit send grant. The
+ * approver's own membership is held through capture and saved as provenance.
+ * Agent credentials keep their separate owner-bound authorization path.
+ */
+export function withMailboxSendAccess<T>(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxId: string,
+  operation: (tx: Db, membershipId: string) => Promise<T>,
+): Promise<T> {
+  if (actor.agentAccess) throw new MailboxContentError("forbidden");
+  return scoped(db, { ...actor }, mailboxId, "send", true, operation);
 }
 
 /** Human owner metadata access; permits organization of retained data without renewing billing. */

@@ -4172,7 +4172,7 @@ export function MailboxContentView({
                         >
                           {t(sendState === "requesting" ? "sending" : "send")}
                         </button>
-                        {!sendState ? (
+                        {!sendState && isOwner ? (
                           <MailboxTimeMenu
                             kind="sendLater"
                             current={item.sendAt}

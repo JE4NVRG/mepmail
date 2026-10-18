@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
-import { integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { teamMemberRoleEnum, user } from "./auth.js";
+import { integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { type OperationsAccess, teamMemberRoleEnum, user } from "./auth.js";
 import { teams } from "./teams.js";
 
 /**
@@ -10,6 +10,10 @@ import { teams } from "./teams.js";
  * unique index allows only one un-accepted invite per (team, lowercased
  * email); re-inviting after accept or revoke is unblocked.
  */
+export interface OperationsInvitationAccess extends OperationsAccess {
+  sendMailboxIds: string[];
+}
+
 export const teamInvitations = pgTable(
   "team_invitations",
   {
@@ -20,6 +24,8 @@ export const teamInvitations = pgTable(
     email: text("email").notNull(),
     // Only member/admin are invitable; owner is reserved for team creators.
     role: teamMemberRoleEnum("role").notNull().default("member"),
+    // Only the instance operator can issue this profile; accepted after email proof.
+    operationsAccess: jsonb("operations_access").$type<OperationsInvitationAccess>(),
     invitedByUserId: text("invited_by_user_id").references(() => user.id, { onDelete: "set null" }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),

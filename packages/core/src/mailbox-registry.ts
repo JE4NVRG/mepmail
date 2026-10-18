@@ -6,6 +6,7 @@ import {
   mailboxServiceEntitlement,
   reserveMailboxSeat,
 } from "./mailbox-service.js";
+import { mailboxCreationAccess } from "./operations-access.js";
 
 export class MailboxRegistryError extends Error {
   constructor(public readonly code: "forbidden" | "not_found" | "invalid" | "conflict") {
@@ -159,6 +160,7 @@ export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
   const currentRole = rows[0]?.role ?? (await member(db, actor)).role;
   return {
     canManage: currentRole === "owner" || currentRole === "admin",
+    canCreate: (await mailboxCreationAccess(db, actor)).canCreate,
     mailboxes: rows.map(({ role: _, permission, ownerMembershipId, memberId, ...row }) => {
       const owned = row.ownerUserId === actor.userId && ownerMembershipId === memberId;
       return {
@@ -169,11 +171,12 @@ export async function listMailboxRegistry(db: Db, actor: MailboxRegistryActor) {
         canDraft:
           row.status === "planned" &&
           (row.origin === "external"
-            ? owned
-            : licensedIds.has(row.id) && (owned || permission === "draft")),
+            ? owned || permission === "send"
+            : licensedIds.has(row.id) &&
+              (owned || permission === "draft" || permission === "send")),
         canSend:
           row.status === "planned" &&
-          owned &&
+          (owned || (!!ownerMembershipId && permission === "send")) &&
           (row.origin === "external" || licensedIds.has(row.id)),
         deliveryReady: false as const,
       };
@@ -208,7 +211,14 @@ export async function createMailboxRegistry(
     throw new MailboxRegistryError("invalid");
   }
   return db.transaction(async (tx) => {
-    await admin(tx as unknown as Db, actor);
+    const creation = await mailboxCreationAccess(tx as unknown as Db, actor, true);
+    if (
+      !creation.canCreate ||
+      (!creation.canManage &&
+        (!creation.domainIds?.includes(input.domainId) || input.ownerUserId !== actor.userId))
+    ) {
+      throw new MailboxRegistryError("forbidden");
+    }
     await reserveMailboxSeat(tx as unknown as Db, actor.teamId);
     await mailboxDomainLock(tx as unknown as Db, input.domainId);
     const [domain] = await tx
@@ -473,10 +483,11 @@ export async function grantMailboxRegistry(
   input: {
     mailboxId: string;
     userId: string;
-    permission: "read" | "draft";
+    permission: "read" | "draft" | "send";
   },
 ) {
-  if (!["read", "draft"].includes(input.permission)) throw new MailboxRegistryError("invalid");
+  if (!["read", "draft", "send"].includes(input.permission))
+    throw new MailboxRegistryError("invalid");
   return db.transaction(async (tx) => {
     await admin(tx as unknown as Db, actor);
     const membershipId = await requireMember(tx as unknown as Db, actor.teamId, input.userId);

@@ -4,7 +4,7 @@ import { and, asc, eq, ilike, or, type SQL, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { escapeLike } from "@/lib/sql";
-import { operatorProcedure, router } from "../../trpc";
+import { router, usersDirectoryProcedure } from "../../trpc";
 
 const SORT_KEYS = ["name", "email", "teams", "sent30d", "joined", "seen"] as const;
 
@@ -69,7 +69,7 @@ function searchWhere(q: string): SQL | undefined {
  * instance-wide view of them.
  */
 export const consoleUsersRouter = router({
-  list: operatorProcedure
+  list: usersDirectoryProcedure
     .input(
       z.object({
         search: z.string().trim().max(200).optional(),

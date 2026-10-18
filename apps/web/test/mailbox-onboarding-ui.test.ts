@@ -170,6 +170,7 @@ const options: Parameters<typeof MailboxSetupDialog>[0]["options"] = {
   domains: [pendingDomain, verifiedDomain],
   members: [owner],
   currentUserId: owner.id,
+  canManage: true,
 };
 const close = vi.fn();
 const changed = vi.fn();

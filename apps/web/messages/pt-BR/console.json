@@ -406,6 +406,7 @@
   },
   "users": {
     "title": "Usuários",
+    "readOnly": "Acesso somente para leitura. A administração de equipes e a exportação de dados não estão disponíveis nesta tela.",
     "proof": "{total} usuários · {verified} com endereço verificado",
     "search": "Buscar nome, e-mail ou id",
     "filters": {
@@ -460,6 +461,7 @@
     "empty": "0 equipes encontradas.",
     "menu": {
       "open": "Abrir equipe",
+      "invite": "Convidar membro",
       "view": "Ver como proprietário",
       "viewOff": "Desligado nesta instância: SUPPORT_VIEW=on liga",
       "limits": "Ajustar limites",
@@ -572,6 +574,76 @@
       "title": "Reativar {team}",
       "lead": "Os envios voltam a sair na hora; transmissões retidas retomam em até 15 minutos. O proprietário é avisado por e-mail, exceto se a suspensão foi por phishing.",
       "confirm": "Reativar equipe"
+    },
+    "inviteDialog": {
+      "title": "Convidar membro para {team}",
+      "lead": "Emitido pelo console: você não entra nesta equipe e a sua equipe ativa continua a mesma. Só o endereço convidado pode aceitar, e ele entra apenas nesta equipe.",
+      "email": "E-mail",
+      "emailPlaceholder": "nome@empresa.com",
+      "role": "Papel",
+      "roles": {
+        "member": "Membro",
+        "admin": "Administrador",
+        "operations": "Administrador operacional"
+      },
+      "operations": {
+        "hint": "Membro da equipe com permissões operacionais limitadas ao escopo escolhido.",
+        "domains": "Domínios para criar caixas",
+        "domainsHint": "Selecione explicitamente os domínios permitidos. Nenhum vem marcado.",
+        "mailboxes": "Caixas para ler e responder",
+        "mailboxesHint": "Selecione cada caixa que poderá ler, escrever e enviar mensagens.",
+        "mailboxAccess": "Ler, escrever e enviar mensagens apenas nas caixas selecionadas.",
+        "userDirectory": "Usuários da instância",
+        "readOnly": "Somente leitura; sem editar usuários.",
+        "exclusions": "Caixas pessoais não escolhidas, outras empresas, financeiro e gestão de permissões ficam sem acesso.",
+        "selectionRequired": "Escolha ao menos um domínio e uma caixa antes de revisar.",
+        "loading": "Carregando domínios e caixas…",
+        "loadError": "Não foi possível carregar o escopo operacional.",
+        "retry": "Tentar novamente",
+        "noDomains": "Nenhum domínio disponível nesta equipe.",
+        "noMailboxes": "Nenhuma caixa disponível nos domínios escolhidos.",
+        "reviewPending": "O acesso será ativado somente após cadastro, verificação do e-mail e aceite do convite."
+      },
+      "roleHint": "Membro é o padrão; escolha Administrador só de propósito. A propriedade nunca é concedida por convite.",
+      "next": "Revisar",
+      "reviewTitle": "Confirme o convite",
+      "reviewLead": "Nada é enviado antes da sua confirmação:",
+      "team": "Equipe",
+      "reviewNote": "O e-mail mostra você como remetente. O convite fica na auditoria desta equipe e na auditoria da instância.",
+      "back": "Voltar",
+      "confirm": "Enviar convite",
+      "sentTitle": "Convite enviado",
+      "createdTitle": "Link do convite",
+      "emailedBody": "Enviamos a {email} um convite para {team} como {role}. Você também pode compartilhar este link: ele funciona uma vez e expira em 3 dias.",
+      "bodyTtl": "Compartilhe este link com {email} para entrar em {team} como {role}. Ele funciona uma vez e expira em 3 dias.",
+      "sendFailed": "Não foi possível enviar o e-mail do convite. Compartilhe o link ou reenvie pela lista de pendentes.",
+      "noSender": "Esta instância não tem remetente de e-mail configurado, então o link é a única forma de entrar.",
+      "done": "Concluído",
+      "errors": {
+        "conflict": "{email} já tem um convite pendente para esta equipe.",
+        "rate": "Convites demais para esta equipe nesta hora. Tente mais tarde.",
+        "generic": "Não foi possível enviar o convite: {message}"
+      },
+      "pending": {
+        "title": "Convites pendentes",
+        "none": "Nenhum convite pendente.",
+        "loading": "Carregando…",
+        "email": "E-mail",
+        "role": "Papel",
+        "expires": "Expira",
+        "expired": "expirado",
+        "actions": "Ações",
+        "resend": "Reenviar",
+        "revoke": "Revogar",
+        "revokeConfirm": "Confirmar revogação",
+        "loadError": "Não foi possível carregar os convites pendentes.",
+        "retry": "Tentar novamente"
+      },
+      "toast": {
+        "resent": "Convite reenviado para {email}",
+        "revoked": "Convite para {email} revogado",
+        "failed": "Não foi possível concluir: {message}"
+      }
     },
     "viewDialog": {
       "title": "Ver {team} como proprietário",

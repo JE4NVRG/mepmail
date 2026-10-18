@@ -54,6 +54,12 @@ export const CONSOLE_NAV_ITEM: (typeof NAV_ITEMS)[number] = {
   icon: "console",
 };
 
+export const USERS_NAV_ITEM: (typeof NAV_ITEMS)[number] = {
+  key: "usersDirectory",
+  href: "/operations/users",
+  icon: "audience",
+};
+
 // Hover state lives per link so a hover repaints one glyph, not the whole nav.
 function NavItem({
   item,
@@ -212,7 +218,9 @@ export function Sidebar({
   // Shared organization tools stay in the same place on every product route.
   // The console's server gate remains the access control.
   const organizationItems = navItemsWithConsole(
-    ORGANIZATION_NAV_ITEMS,
+    operator.data?.canReadUsers && !operator.data.isOperator
+      ? [...ORGANIZATION_NAV_ITEMS, USERS_NAV_ITEM]
+      : ORGANIZATION_NAV_ITEMS,
     CONSOLE_NAV_ITEM,
     operator.data?.isOperator === true,
   );
@@ -411,6 +419,15 @@ export function Sidebar({
                 onClick={() => setMenuOpen(false)}
               >
                 {t("console")}
+              </Link>
+            ) : operator.data?.canReadUsers ? (
+              <Link
+                href="/operations/users"
+                role="menuitem"
+                className="ms-menu-item"
+                onClick={() => setMenuOpen(false)}
+              >
+                {t("usersDirectory")}
               </Link>
             ) : null}
             <Link

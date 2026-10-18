@@ -117,7 +117,7 @@ export const mailboxGrants = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     membershipId: uuid("membership_id").references(() => teamMembers.id, { onDelete: "set null" }),
-    permission: text("permission").$type<"read" | "draft">().notNull(),
+    permission: text("permission").$type<"read" | "draft" | "send">().notNull(),
     grantedBy: text("granted_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
@@ -131,6 +131,6 @@ export const mailboxGrants = pgTable(
     uniqueIndex("mailbox_grants_active_idx")
       .on(t.mailboxId, t.userId)
       .where(sql`${t.revokedAt} is null`),
-    check("mailbox_grants_permission_check", sql`${t.permission} in ('read', 'draft')`),
+    check("mailbox_grants_permission_check", sql`${t.permission} in ('read', 'draft', 'send')`),
   ],
 );

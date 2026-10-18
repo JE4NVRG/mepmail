@@ -18,6 +18,9 @@ import {
   saveMailboxDraft,
   setMailboxDeliveryFolder,
   setMailboxItemTrash,
+  withMailboxOrganizationAccess,
+  withMailboxSendAccess,
+  withMailboxWriteAccess,
 } from "../../../packages/core/src/mailbox-private-store.js";
 import {
   createMailboxRegistry,
@@ -214,6 +217,57 @@ describe("private mailbox persistence", () => {
     ).rejects.toMatchObject({ code: "forbidden" });
     await revokeMailboxRegistry(db, owner(), grant.id);
     await expect(read(item.id, member())).rejects.toMatchObject({ code: "forbidden" });
+  });
+  it("send grants allow human reading, drafting and sending without owner organization or agent rights", async () => {
+    const item = await imported();
+    const other = await imported("private:unshared", agentId);
+    for (const permission of ["read", "draft"] as const) {
+      await grantMailboxRegistry(db, owner(), { mailboxId, userId: "member", permission });
+      await expect(
+        withMailboxSendAccess(db, member(), mailboxId, async () => true),
+      ).rejects.toMatchObject({ code: "forbidden" });
+    }
+    const grant = await grantMailboxRegistry(db, owner(), {
+      mailboxId,
+      userId: "member",
+      permission: "send",
+    });
+    expect((await read(item.id, member())).raw.equals(mime)).toBe(true);
+    expect(
+      await saveMailboxDraft(db, keyring, member(), { mailboxId, expectedRevision: 0, raw: mime }),
+    ).toMatchObject({ kind: "draft" });
+    const [membership] = await db
+      .select({ id: schema.teamMembers.id })
+      .from(schema.teamMembers)
+      .where(and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamMembers.userId, "member")));
+    expect(
+      await withMailboxSendAccess(
+        db,
+        member(),
+        mailboxId,
+        async (_tx, membershipId) => membershipId,
+      ),
+    ).toBe(membership!.id);
+    for (const access of [withMailboxWriteAccess, withMailboxOrganizationAccess]) {
+      await expect(access(db, member(), mailboxId, async () => true)).rejects.toMatchObject({
+        code: "forbidden",
+      });
+    }
+    await expect(read(other.id, member(), agentId)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(
+      withMailboxSendAccess(db, member(), agentId, async () => true),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(async () =>
+      withMailboxSendAccess(db, { ...member(), agentAccess: true }, mailboxId, async () => true),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(
+      withMailboxSendAccess(db, { ...owner(), supportView: true }, mailboxId, async () => true),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await revokeMailboxRegistry(db, owner(), grant.id);
+    await expect(
+      withMailboxSendAccess(db, member(), mailboxId, async () => true),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    expect(await withMailboxSendAccess(db, owner(), mailboxId, async () => true)).toBe(true);
   });
   it("suspension and membership reincarnation invalidate content rights without deleting bytes", async () => {
     const item = await imported();

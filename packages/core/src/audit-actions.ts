@@ -104,6 +104,11 @@ export const AUDIT_ACTIONS = [
   // customer SMTP relay's provider (or took the mark back).
   "team.domain_relay_enabled",
   "team.domain_relay_disabled",
+  // The operator invited someone into the team from the console (not a
+  // member of it), resent or revoked such an invitation.
+  "team.member_invited",
+  "team.invitation_resent",
+  "team.invitation_revoked",
   // The instance side of a break-glass content access (team_id null, so the
   // team's own audit can never show it); "content.accessed" is the row the
   // team gains seven days later, dated at the access.

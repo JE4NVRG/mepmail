@@ -1,4 +1,5 @@
 import {
+  canReadUserDirectory,
   MailboxRecipientBlockedError,
   recordSupportViewRead,
   type WebhookEnqueue,
@@ -216,4 +217,15 @@ export const operatorProcedure = protectedProcedure.use(async ({ ctx, next }) =>
     throw new TRPCError({ code: "NOT_FOUND" });
   }
   return next({ ctx: { operator: ctx.session.user } });
+});
+
+/** This grants one read procedure, never the operator console or its mutations. */
+export const usersDirectoryProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  if (
+    !(await isInstanceOperator(ctx.db, ctx.session.user.id)) &&
+    !(await canReadUserDirectory(ctx.db, ctx.session.user.id))
+  ) {
+    throw new TRPCError({ code: "NOT_FOUND" });
+  }
+  return next();
 });

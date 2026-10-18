@@ -92,7 +92,7 @@ const FOLDER_TINT_CLASS: Record<string, string> = {
   gray: "tintGray",
 };
 
-function RegistryDialog({
+export function RegistryDialog({
   mailbox,
   options,
   close,
@@ -116,12 +116,12 @@ function RegistryDialog({
   const [kind, setKind] = useState<"person" | "agent">(mailbox?.kind ?? "person");
   const [status, setStatus] = useState<"planned" | "suspended">(mailbox?.status ?? "planned");
   const [person, setPerson] = useState("");
-  const [permission, setPermission] = useState<"read" | "draft">("read");
+  const [permission, setPermission] = useState<"read" | "draft" | "send">("read");
   const [error, setError] = useState("");
   const grants = useQuery(
     trpc.mailboxes.grants.queryOptions(
       { mailboxId: mailbox?.id ?? "00000000-0000-0000-0000-000000000000" },
-      { enabled: !!mailbox },
+      { enabled: !!mailbox && options.canManage },
     ),
   );
   const create = useMutation(trpc.mailboxes.create.mutationOptions());
@@ -173,7 +173,7 @@ function RegistryDialog({
               ? await update.mutateAsync({
                   id: mailbox.id,
                   label,
-                  ownerUserId: owner,
+                  ownerUserId: options.canManage ? owner : options.currentUserId,
                   status,
                 })
               : await create.mutateAsync({
@@ -181,7 +181,7 @@ function RegistryDialog({
                   localPart: local,
                   label,
                   kind,
-                  ownerUserId: owner,
+                  ownerUserId: options.canManage ? owner : options.currentUserId,
                 });
             await changed(result.id);
             close();
@@ -256,22 +256,26 @@ function RegistryDialog({
               </div>
             </>
           )}
-          <label>
-            {t("owner")}
-            <select
-              className="ms-input"
-              required
-              value={owner}
-              onChange={(e) => setOwner(e.target.value)}
-            >
-              <option value="">{t("ownerMissing")}</option>
-              {options.members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} · {m.email}
-                </option>
-              ))}
-            </select>
-          </label>
+          {options.canManage ? (
+            <label>
+              {t("owner")}
+              <select
+                className="ms-input"
+                required
+                value={owner}
+                onChange={(e) => setOwner(e.target.value)}
+              >
+                <option value="">{t("ownerMissing")}</option>
+                {options.members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} · {m.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <p className={styles.hint}>{t("delegatedCreate")}</p>
+          )}
           {mailbox ? (
             <>
               <label>
@@ -308,14 +312,14 @@ function RegistryDialog({
           </button>
         </footer>
       </form>
-      {mailbox && !deleting ? (
+      {options.canManage && mailbox && !deleting ? (
         <div className={styles.dialogFooter}>
           <button type="button" className="ms-btn" disabled={busy} onClick={openReceiving}>
             {t("setup.checkReceiving")}
           </button>
         </div>
       ) : null}
-      {mailbox && !deleting ? (
+      {options.canManage && mailbox && !deleting ? (
         <section className={styles.access}>
           <h3>{t("access")}</h3>
           <p className={styles.hint}>{t("accessHint")}</p>
@@ -335,7 +339,7 @@ function RegistryDialog({
                   <span>
                     {g.name}
                     <small>
-                      {g.email} · {t(g.permission)}
+                      {g.email} · {t(g.permission === "send" ? "sendPermission" : g.permission)}
                     </small>
                   </span>
                   <button
@@ -397,10 +401,11 @@ function RegistryDialog({
                 <select
                   className="ms-input"
                   value={permission}
-                  onChange={(e) => setPermission(e.target.value as "read" | "draft")}
+                  onChange={(e) => setPermission(e.target.value as "read" | "draft" | "send")}
                 >
                   <option value="read">{t("read")}</option>
                   <option value="draft">{t("draft")}</option>
+                  <option value="send">{t("sendPermission")}</option>
                 </select>
               </label>
               <button type="submit" className="ms-btn" disabled={busy || !person}>
@@ -410,8 +415,10 @@ function RegistryDialog({
           </form>
         </section>
       ) : null}
-      {mailbox && mailbox.status === "planned" ? <MailboxAliasesSection mailbox={mailbox} /> : null}
-      {mailbox ? (
+      {options.canManage && mailbox && mailbox.status === "planned" ? (
+        <MailboxAliasesSection mailbox={mailbox} />
+      ) : null}
+      {options.canManage && mailbox ? (
         <MailboxDeletionSection mailbox={mailbox} changed={changed} close={close} />
       ) : null}
     </dialog>
@@ -463,6 +470,7 @@ export function MailboxesView({
         (error as { data?: { code?: string } }).data?.code !== "NOT_FOUND" && count < 3,
     }),
   );
+  const canCreate = registry.data?.canManage === true || registry.data?.canCreate === true;
   // Contas externas: offered to the pilot teams, then to everyone (MAILBOX_EXTERNAL_OPEN).
   const externalAvailable = useQuery(
     trpc.mailboxExternal.available.queryOptions(undefined, {
@@ -477,9 +485,7 @@ export function MailboxesView({
   const connectExternal = useMutation(
     trpc.mailboxExternal.connect.mutationOptions({ retry: false }),
   );
-  const options = useQuery(
-    trpc.mailboxes.options.queryOptions(undefined, { enabled: registry.data?.canManage === true }),
-  );
+  const options = useQuery(trpc.mailboxes.options.queryOptions(undefined, { enabled: canCreate }));
   const [selectedId, select] = useState<string | null>(null);
   const [itemSelection, selectItem] = useState<{ mailboxId: string; id: string } | null>(null);
   const [folder, setFolder] = useState<MailboxFolder>("inbox");
@@ -548,10 +554,10 @@ export function MailboxesView({
   }, [registry.data, queries, trpc]);
   useEffect(() => {
     const link = newMailboxLink.current;
-    if (!link?.pending || !options.data || registry.data?.canManage !== true) return;
+    if (!link?.pending || !options.data || !canCreate) return;
     link.pending = false;
     setDialog("new");
-  }, [options.data, registry.data?.canManage]);
+  }, [options.data, canCreate]);
   const [licenseOpenRequest, openLicense] = useState(0);
   const [licenseOfferId, setLicenseOfferId] = useState<string | null>(null);
   const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
@@ -1212,14 +1218,16 @@ export function MailboxesView({
       ),
     );
   };
-  // The rail's "···" beside CAIXAS: mailbox management, for admins.
+  // Scoped creation and administrator-only management share the rail's menu.
   const boxesMenu: (PopoverMenuItem | null)[] = [
     ...(canConnectExternal
       ? [{ label: tExternal("action"), onSelect: () => setConnectOpen(true) }]
       : []),
+    ...(canCreate
+      ? [{ label: t("new"), disabled: !options.data, onSelect: () => setDialog("new") }]
+      : []),
     ...(registry.data?.canManage
       ? [
-          { label: t("new"), disabled: !options.data, onSelect: () => setDialog("new") },
           {
             label: t("rail.manageBoxes"),
             onSelect: () => router.push("/mail/settings?tab=boxes"),
@@ -1412,9 +1420,7 @@ export function MailboxesView({
                 <MailboxFirstRun
                   oauth={externalAvailable.data?.oauth}
                   connect={() => setConnectOpen(true)}
-                  create={
-                    registry.data?.canManage && options.data ? () => setDialog("new") : undefined
-                  }
+                  create={canCreate && options.data ? () => setDialog("new") : undefined}
                 />
               ) : (
                 <div className={styles.hero}>
@@ -1458,7 +1464,7 @@ export function MailboxesView({
                       <p>
                         {t(mailboxKind === "all" ? "emptyBody" : `scope.empty.${mailboxKind}.body`)}
                       </p>
-                      {registry.data?.canManage && options.data ? (
+                      {canCreate && options.data ? (
                         <button
                           type="button"
                           className="ms-btn ms-btn-primary"
@@ -1494,23 +1500,36 @@ export function MailboxesView({
     .map((box) => ({ id: box.id, address: box.address, label: box.label }));
   const dialogs = (
     <>
-      {registry.data?.canManage && dialog === "new" && options.data ? (
-        <MailboxSetupDialog
-          options={options.data}
-          initialDomainId={newMailboxLink.current?.domainId}
-          initialLocal={newMailboxLink.current?.local}
-          close={() => {
-            newMailboxLink.current = null;
-            setDialog(null);
-          }}
-          changed={changed}
-          reviewLicense={(offerId) => {
-            newMailboxLink.current = null;
-            setDialog(null);
-            setLicenseOfferId(offerId ?? null);
-            openLicense((request) => request + 1);
-          }}
-        />
+      {canCreate && dialog === "new" && options.data ? (
+        registry.data?.canManage ? (
+          <MailboxSetupDialog
+            options={options.data}
+            initialDomainId={newMailboxLink.current?.domainId}
+            initialLocal={newMailboxLink.current?.local}
+            close={() => {
+              newMailboxLink.current = null;
+              setDialog(null);
+            }}
+            changed={changed}
+            reviewLicense={(offerId) => {
+              newMailboxLink.current = null;
+              setDialog(null);
+              setLicenseOfferId(offerId ?? null);
+              openLicense((request) => request + 1);
+            }}
+          />
+        ) : (
+          <RegistryDialog
+            mailbox={null}
+            options={options.data}
+            close={() => {
+              newMailboxLink.current = null;
+              setDialog(null);
+            }}
+            changed={changed}
+            openReceiving={() => {}}
+          />
+        )
       ) : null}
       {registry.data?.canManage && dialog === "edit" && options.data && selected ? (
         <RegistryDialog
@@ -1710,9 +1729,9 @@ export function MailboxesView({
           ) : settingsTab === "boxes" ? (
             <section className={styles.settingsSection} aria-label={t("app.tabs.boxes")}>
               <p className={styles.hint}>{t("app.boxesHint")}</p>
-              {registry.data?.canManage || canConnectExternal ? (
+              {canCreate || canConnectExternal ? (
                 <div className={styles.settingsRowActions}>
-                  {registry.data?.canManage ? (
+                  {canCreate ? (
                     <button
                       type="button"
                       className="ms-btn ms-btn-primary"

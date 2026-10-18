@@ -175,6 +175,7 @@ describe("authenticated persistent mailbox registry", () => {
     expect((await as("reader", team, "member").mailboxes.list()).mailboxes[0]).toMatchObject({
       canRead: true,
       canDraft: false,
+      canSend: false,
     });
     const replacement = await as().mailboxes.grant({
       mailboxId: id,
@@ -188,6 +189,41 @@ describe("authenticated persistent mailbox registry", () => {
       code: "NOT_FOUND",
     });
     await as().mailboxes.revoke({ id: replacement.id });
+    expect((await as("reader", team, "member").mailboxes.list()).mailboxes).toEqual([]);
+  });
+  it("exposes send only on a specifically granted mailbox and removes it on downgrade", async () => {
+    const personal = await box();
+    const shared = await box({ localPart: "support", label: "Shared support" });
+    await as().mailboxes.grant({ mailboxId: shared, userId: "reader", permission: "send" });
+    const visible = await as("reader", team, "member").mailboxes.list();
+    expect(visible.canManage).toBe(false);
+    expect(visible.mailboxes).toHaveLength(1);
+    expect(visible.mailboxes[0]).toMatchObject({
+      id: shared,
+      ownerUserId: "owner",
+      canRead: true,
+      canDraft: true,
+      canSend: true,
+    });
+    expect(visible.mailboxes.some((mailbox) => mailbox.id === personal)).toBe(false);
+    expect(
+      (await as().mailboxes.list()).mailboxes.find((mailbox) => mailbox.id === shared),
+    ).toMatchObject({
+      canRead: true,
+      canDraft: true,
+      canSend: true,
+    });
+    const downgraded = await as().mailboxes.grant({
+      mailboxId: shared,
+      userId: "reader",
+      permission: "draft",
+    });
+    expect((await as("reader", team, "member").mailboxes.list()).mailboxes[0]).toMatchObject({
+      canRead: true,
+      canDraft: true,
+      canSend: false,
+    });
+    await as().mailboxes.revoke({ id: downgraded.id });
     expect((await as("reader", team, "member").mailboxes.list()).mailboxes).toEqual([]);
   });
   it("does not give admins automatic private reading and preserves departed owners", async () => {

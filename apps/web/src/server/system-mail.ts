@@ -193,6 +193,91 @@ export function buildInvitationEmail(input: {
   };
 }
 
+/** Describes an operational invitation; issuing it never activates the listed permissions. */
+export function buildOperationsInvitationEmail(input: {
+  to: string;
+  name?: string;
+  inviterName: string;
+  teamName: string;
+  url: string;
+  expiresInDays: number;
+  locale: MailLocale;
+  domains: string[];
+  mailboxes: string[];
+}): SystemMailMessage {
+  const m = INVITE_MESSAGES[input.locale];
+  const list = (values: string[]) =>
+    [...new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean))].join(", ");
+  const values = {
+    inviter: input.inviterName,
+    team: input.teamName,
+    email: input.to,
+    days: String(input.expiresInDays),
+  };
+  const name = input.name?.trim();
+  const domains = list(input.domains);
+  const mailboxes = list(input.mailboxes);
+  const paragraphs =
+    input.locale === "pt-BR"
+      ? [
+          `${name ? `Olá, ${name}!` : "Olá!"} Seja bem-vindo ao MepMail.`,
+          fill(
+            "{inviter} convidou você para {team} com o perfil Administrador operacional.",
+            values,
+          ),
+          "Após concluir a ativação, você poderá ver a lista de usuários, sem editar contas.",
+          domains
+            ? `Você poderá criar caixas somente nestes domínios: ${domains}.`
+            : "Nenhum domínio foi autorizado para criar caixas.",
+          mailboxes
+            ? `Você poderá ler e responder mensagens nestas caixas explicitamente permitidas: ${mailboxes}, além das caixas que você criar nos domínios autorizados.`
+            : "Nenhuma caixa foi autorizada para ler ou responder mensagens.",
+          "Esse perfil não permite acessar caixas pessoais, caixas de outras empresas, o financeiro ou gerenciar permissões.",
+          fill(
+            "Para ativar o acesso, abra o convite, cadastre-se com este mesmo Gmail ({email}) e escolha sua própria senha no site. Verifique o Gmail pelo email de confirmação e depois aceite o convite. Se já tiver conta, entre com esse endereço e aceite o convite.",
+            values,
+          ),
+          "O acesso ainda não está ativo. Sua senha é escolhida por você no MepMail e não deve ser compartilhada.",
+        ]
+      : [
+          `${name ? `Hi ${name}!` : "Hi!"} Welcome to MepMail.`,
+          fill(
+            "{inviter} invited you to {team} with the Operational administrator profile.",
+            values,
+          ),
+          "After activation, you will be able to view the user directory, without editing accounts.",
+          domains
+            ? `You will be able to create mailboxes only on these domains: ${domains}.`
+            : "No domains have been authorized for mailbox creation.",
+          mailboxes
+            ? `You will be able to read and reply to messages in these explicitly permitted mailboxes: ${mailboxes}, as well as mailboxes you create on the authorized domains.`
+            : "No mailboxes have been authorized for reading or replying to messages.",
+          "This profile does not allow access to personal mailboxes, other companies' mailboxes, financial administration or permission management.",
+          fill(
+            "To activate access, open the invitation, register with this same Gmail address ({email}) and choose your own password on the website. Verify your Gmail address using the confirmation email, then accept the invitation. If you already have an account, sign in with that address and accept the invitation.",
+            values,
+          ),
+          "Access is not active yet. You choose your password yourself in MepMail and should not share it.",
+        ];
+  return {
+    from: notificationsEmailFrom() ?? "",
+    to: input.to,
+    subject:
+      input.locale === "pt-BR"
+        ? fill("Boas-vindas ao MepMail — convite para {team}", values)
+        : fill("Welcome to MepMail — invitation to {team}", values),
+    ...accountMailCard({
+      paragraphs,
+      button: input.locale === "pt-BR" ? "Abrir convite" : "Open invitation",
+      url: input.url,
+      linkFallback: m.linkFallback,
+      muted: [`${fill(m.expiry, values)} ${m.ignore}`],
+      locale: input.locale,
+    }),
+    kind: "invitation",
+  };
+}
+
 /** One catalog kind, from the account sender, addressed to a person. */
 /**
  * One account mail on the shared card; the button opens `path` on this

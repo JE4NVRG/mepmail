@@ -117,6 +117,7 @@ export function TeamDialog({
   relayPending,
   onClose,
   onAdjustLimits,
+  onInvite,
   onViewAsOwner,
   onSetRelay,
 }: {
@@ -126,6 +127,8 @@ export function TeamDialog({
   relayPending: string | null;
   onClose: () => void;
   onAdjustLimits: () => void;
+  /** Console → Invite member: the operator invites without joining the team. */
+  onInvite: () => void;
   onViewAsOwner: () => void;
   onSetRelay: (domain: { id: string; name: string }, enabled: boolean) => void;
 }) {
@@ -278,6 +281,14 @@ export function TeamDialog({
       <ModalFooter>
         <button type="button" className="ms-btn ms-btn-secondary" onClick={onClose}>
           {common("close")} <span className="ms-keycap">Esc</span>
+        </button>
+        <button
+          type="button"
+          className="ms-btn ms-btn-secondary"
+          disabled={!detail}
+          onClick={onInvite}
+        >
+          {t("menu.invite")}
         </button>
         {detail && !detail.supportViewEnabled ? (
           // Inline, so the trigger is a span: the default trigger is itself a

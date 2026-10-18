@@ -362,6 +362,15 @@ export {
 } from "./idempotency.js";
 export { findInstanceOperator, isInstanceOperator } from "./instance-operator.js";
 export {
+  canReadUserDirectory,
+  mailboxCreationAccess,
+  type OperationsAccess,
+  type OperationsInvitationAccess,
+  operationsInvitationTargets,
+  parseOperationsAccess,
+  parseOperationsInvitationAccess,
+} from "./operations-access.js";
+export {
   isProbeKey,
   type LatestProbe,
   latestProbes,
@@ -575,6 +584,7 @@ export {
   withMailboxItem,
   withMailboxItems,
   withMailboxListContents,
+  withMailboxSendAccess,
 } from "./mailbox-private-store.js";
 export {
   getMailboxReceivingReadiness,

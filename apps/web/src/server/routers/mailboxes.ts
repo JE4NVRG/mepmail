@@ -32,6 +32,7 @@ import {
   MailboxRecipientBlockedError,
   MailboxRegistryError,
   MailboxServiceError,
+  mailboxCreationAccess,
   mailboxServiceState,
   purgeMailboxTrash,
   queueMailboxDraft,
@@ -57,7 +58,7 @@ import {
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { apiBaseUrl } from "@/lib/api-base-url";
 import { recordAudit } from "../audit";
@@ -1176,7 +1177,10 @@ export const mailboxesRouter = router({
     }),
   options: enabled.query(({ ctx }) =>
     call(() =>
-      withMailboxRegistryAdmin(ctx.db, actor(ctx), async (db) => {
+      ctx.db.transaction(async (tx) => {
+        const db = tx as unknown as Db;
+        const access = await mailboxCreationAccess(db, actor(ctx), true);
+        if (!access.canCreate) throw new MailboxRegistryError("forbidden");
         const [domains, members] = await Promise.all([
           db
             .select({
@@ -1185,16 +1189,33 @@ export const mailboxesRouter = router({
               status: schema.domains.status,
             })
             .from(schema.domains)
-            .where(eq(schema.domains.teamId, ctx.teamId))
+            .where(
+              and(
+                eq(schema.domains.teamId, ctx.teamId),
+                access.domainIds === null
+                  ? undefined
+                  : inArray(schema.domains.id, access.domainIds),
+              ),
+            )
             .orderBy(asc(schema.domains.name)),
           db
             .select({ id: schema.user.id, name: schema.user.name, email: schema.user.email })
             .from(schema.teamMembers)
             .innerJoin(schema.user, eq(schema.user.id, schema.teamMembers.userId))
-            .where(eq(schema.teamMembers.teamId, ctx.teamId))
+            .where(
+              and(
+                eq(schema.teamMembers.teamId, ctx.teamId),
+                access.canManage ? undefined : eq(schema.teamMembers.userId, ctx.session.user.id),
+              ),
+            )
             .orderBy(asc(schema.user.name)),
         ]);
-        return { domains, members, currentUserId: ctx.session.user.id };
+        return {
+          domains,
+          members,
+          currentUserId: ctx.session.user.id,
+          canManage: access.canManage,
+        };
       }),
     ),
   ),
@@ -1234,7 +1255,10 @@ export const mailboxesRouter = router({
   ),
   create: enabled.input(boxInput).mutation(async ({ ctx, input }) => {
     const row = await call(() =>
-      withMailboxRegistryAdmin(ctx.db, actor(ctx), async (transaction) => {
+      ctx.db.transaction(async (tx) => {
+        const transaction = tx as unknown as Db;
+        if (!(await mailboxCreationAccess(transaction, actor(ctx), true)).canCreate)
+          throw new MailboxRegistryError("forbidden");
         if (!(await mailboxCreateAccessEnabled(transaction, actor(ctx))))
           throw new MailboxLifecycleError(
             (await mailboxBillingPresentation(transaction, actor(ctx))).sendingPlanRequired
@@ -1299,7 +1323,7 @@ export const mailboxesRouter = router({
       z.object({
         mailboxId: z.uuid(),
         userId: z.string().min(1).max(128),
-        permission: z.enum(["read", "draft"]),
+        permission: z.enum(["read", "draft", "send"]),
       }),
     )
     .mutation(async ({ ctx, input }) => {

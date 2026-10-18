@@ -76,7 +76,7 @@ function UserAvatar({ name, email }: { name: string; email: string }) {
   );
 }
 
-export function UsersView() {
+export function UsersView({ readOnly = false }: { readOnly?: boolean } = {}) {
   const t = useTranslations("console.users");
   const common = useTranslations("console.common");
   const locale = useLocale();
@@ -140,6 +140,7 @@ export function UsersView() {
     if (row.teams === 0) {
       return <span style={{ color: "var(--ms-muted)" }}>{common("none")}</span>;
     }
+    if (readOnly) return <span>{nf.format(row.teams)}</span>;
     return (
       <Link
         href={`/console/teams?q=${encodeURIComponent(row.email)}`}
@@ -154,6 +155,9 @@ export function UsersView() {
   return (
     <>
       <PageHeader title={t("title")} {...(proof ? { subtitle: proof } : {})} />
+      {readOnly ? (
+        <p style={{ color: "var(--ms-muted)", margin: "0 0 18px" }}>{t("readOnly")}</p>
+      ) : null}
 
       <div
         className="ms-filter-row"

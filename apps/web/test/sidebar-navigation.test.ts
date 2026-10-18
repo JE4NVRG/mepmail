@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   pathname: "/mailboxes",
   mailEnabled: true as boolean | undefined,
   operator: true,
+  canReadUsers: false,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -28,7 +29,7 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { query: string }) => ({
     data:
       options.query === "operator"
-        ? { isOperator: state.operator }
+        ? { isOperator: state.operator, canReadUsers: state.canReadUsers }
         : state.mailEnabled === undefined
           ? undefined
           : { enabled: state.mailEnabled },
@@ -43,6 +44,7 @@ beforeEach(() => {
   state.pathname = "/mailboxes";
   state.mailEnabled = true;
   state.operator = true;
+  state.canReadUsers = false;
 });
 
 function navMarkup(locale: "en" | "pt-BR") {
@@ -132,6 +134,25 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(nav).toContain(`aria-label="${locale === "en" ? "Mail" : "Correio"}"`);
       expect(nav).toContain(`aria-label="${locale === "en" ? "Send" : "Envio"}"`);
       expect(nav).toContain(`aria-label="${locale === "en" ? "Organization" : "Organização"}"`);
+    });
+
+    it("shows only the read-only directory link to a delegated reader", () => {
+      state.operator = false;
+      state.canReadUsers = true;
+      state.pathname = "/operations/users";
+      const { nav } = navMarkup(locale);
+      expect(hrefs(nav)).toContain("/operations/users");
+      expect(hrefs(nav)).not.toContain("/console");
+      expect(nav).toMatch(/href="\/operations\/users"[^>]*aria-current="page"/);
+    });
+
+    it("does not add the delegated route to an operator or an ordinary member", () => {
+      state.canReadUsers = true;
+      expect(hrefs(navMarkup(locale).nav)).toContain("/console");
+      expect(hrefs(navMarkup(locale).nav)).not.toContain("/operations/users");
+      state.operator = false;
+      state.canReadUsers = false;
+      expect(hrefs(navMarkup(locale).nav)).not.toContain("/operations/users");
     });
   });
 }

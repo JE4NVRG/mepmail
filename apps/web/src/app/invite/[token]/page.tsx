@@ -23,14 +23,19 @@ export default function AcceptInvitePage() {
 
   const accept = useMutation(
     trpc.settings.invitations.accept.mutationOptions({
-      onSuccess: () => router.push("/emails"),
+      onSuccess: () =>
+        router.push(preview.data?.operationsProfile ? "/operations/users" : "/emails"),
     }),
   );
 
   // The signed-out visitor routes through sign-in/up and back to this page.
   const next = `/invite/${encodeURIComponent(token)}`;
   const invite = preview.data;
-  const role = invite ? t(`members.roles.${invite.role}`) : "";
+  const role = invite
+    ? invite.operationsProfile
+      ? t("invitations.accept.operationsRole")
+      : t(`members.roles.${invite.role}`)
+    : "";
 
   return (
     <AuthShell>
@@ -48,6 +53,9 @@ export default function AcceptInvitePage() {
                 })
               : t("invitations.accept.invitedByUnknown", { team: invite.teamName, role })}
           </p>
+        ) : null}
+        {invite?.operationsProfile ? (
+          <p style={muted}>{t("invitations.accept.operationsBody")}</p>
         ) : null}
         {preview.isError || invite?.state === "expired" || invite?.state === "accepted" ? (
           <p style={{ ...muted, color: "var(--ms-danger)" }}>

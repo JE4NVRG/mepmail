@@ -92,6 +92,7 @@ function render(
         relayPending,
         onClose: () => {},
         onAdjustLimits: () => {},
+        onInvite: () => {},
         onViewAsOwner: () => {},
         onSetRelay: () => {},
       }),

@@ -278,6 +278,12 @@ export const oauthClientAssertion = pgTable("oauth_client_assertion", {
 export const teamMemberRoleEnum = pgEnum("team_member_role", ["owner", "admin", "member"]);
 
 /** Links auth users to tenant teams. Every dashboard query scopes through this. */
+export interface OperationsAccess {
+  version: 1;
+  userDirectoryRead: boolean;
+  mailboxCreateDomainIds: string[];
+}
+
 export const teamMembers = pgTable(
   "team_members",
   {
@@ -289,6 +295,8 @@ export const teamMembers = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     role: teamMemberRoleEnum("role").notNull().default("member"),
+    // Explicit operational capabilities; never an administrative team role.
+    operationsAccess: jsonb("operations_access").$type<OperationsAccess>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("team_members_team_user_idx").on(t.teamId, t.userId)],
