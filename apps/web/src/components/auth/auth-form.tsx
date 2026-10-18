@@ -129,7 +129,13 @@ export function AuthForm({
   // An invited user carries ?next=/invite/... — signup sends them to accept
   // the invite rather than /onboarding (which would create a new team).
   const nextParam = params.getAll("next").length === 1 ? params.get("next") : null;
-  const next = postAuthNext(nextParam, mode === "login" ? "/emails" : "/onboarding", true);
+  // Inside the apps the Correio is home: a sign-in (or the sign-up linked from it) with no
+  // explicit destination lands there, not on the Send dashboard.
+  const next = postAuthNext(
+    nextParam,
+    mode === "login" ? (ownApp ? "/mail" : "/emails") : "/onboarding",
+    true,
+  );
   const recoveryHref = withNext("/forgot-password", nextParam);
   // better-auth bounces failed OAuth callbacks to errorCallbackURL?error=code.
   const socialError = params.get("error");

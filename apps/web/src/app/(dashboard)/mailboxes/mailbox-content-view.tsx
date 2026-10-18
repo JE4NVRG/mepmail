@@ -152,6 +152,8 @@ function sendStateMessage(state: SendState) {
 const SEND_ATTACHMENT_BYTES = 256 * 1024;
 /** The server render never has a send waiting. */
 const noHeldSend = () => null;
+/** No subscription: the client clock only has to differ from the server render once. */
+const noClockChange = () => () => {};
 
 /** Requests a bulk action keeps in flight at once (one at a time made 20 rows take 20 round trips). */
 const BULK_CONCURRENCY = 6;
@@ -1336,6 +1338,14 @@ export function MailboxContentView({
       ? tAgent("panel.draftedBy", { label: approval.label })
       : t(approval.key, { label: "label" in approval ? approval.label : "" });
   const locale = useLocale();
+  // Dates wait for the first client render: the server formats in its own zone (UTC), the
+  // reader's zone is only known here, and a mismatched text makes React render the page again
+  // (error #418), which also clears <html>'s attributes, the Android app mark included.
+  const clientClock = useSyncExternalStore(
+    noClockChange,
+    () => true,
+    () => false,
+  );
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const dateFormats = useMemo(
     () => ({
@@ -1922,7 +1932,7 @@ export function MailboxContentView({
           ?.focus({ preventScroll: true }),
       );
   }
-  const date = (value: Date) => dateFormats.full.format(value);
+  const date = (value: Date) => (clientClock ? dateFormats.full.format(value) : "");
   /** The result of an organizing action as a toast at the bottom of the
    * screen, with "Desfazer" for ten seconds when it can be reversed. */
   function offerUndo(message: string, steps: (() => Promise<unknown>)[], keys: string[] = []) {
@@ -3209,7 +3219,7 @@ export function MailboxContentView({
       )
     : null;
   const now = new Date();
-  const listDate = (value: Date) => dateFormats.list(value, now);
+  const listDate = (value: Date) => (clientClock ? dateFormats.list(value, now) : "");
   // Which mailbox a row belongs to matters only when rows of several are mixed.
   const showRowAddress = (!selected || (searching && searchEverywhere)) && readable.length > 1;
   const canCompose = writable.length > 0 && (!selected || selected.canDraft);
