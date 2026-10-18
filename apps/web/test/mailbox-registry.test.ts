@@ -15,6 +15,9 @@ let client: PGlite, db: Db;
 let team: string, otherTeam: string, domain: string, otherDomain: string;
 const folder = fileURLToPath(new URL("../../../packages/db/drizzle/", import.meta.url));
 const extension = fileURLToPath(new URL("../../../packages/db/mailbox-drizzle/", import.meta.url));
+const mailboxMigrationCount = (
+  JSON.parse(readFileSync(extension + "meta/_journal.json", "utf8")) as { entries: unknown[] }
+).entries.length;
 const caller = createCallerFactory(router({ mailboxes: mailboxesRouter }));
 function as(
   userId = "owner",
@@ -457,7 +460,7 @@ describe("authenticated persistent mailbox registry", () => {
     expect((await db.select().from(schema.mailboxes)).length).toBe(1);
     expect(
       (await client.query("select count(*) as count from drizzle.__mailbox_migrations")).rows[0],
-    ).toMatchObject({ count: 35 });
+    ).toMatchObject({ count: mailboxMigrationCount });
     expect(
       (await client.query("select to_regclass('drizzle.__drizzle_migrations') as ledger")).rows[0],
     ).toMatchObject({ ledger: null });
