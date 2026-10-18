@@ -1,4 +1,3 @@
-import { env } from "@millionsend/config";
 import { type Db, schema } from "@millionsend/db";
 import { and, count, eq, isNull } from "drizzle-orm";
 import { generateApiKey, MAX_ACTIVE_API_KEYS } from "./api-keys.js";
@@ -40,7 +39,8 @@ export async function issueApiKey(
 ): Promise<ApiKeyIssuanceResult> {
   // The staged issuance policy is opt-in. Missing, false or invalid raw env
   // values preserve the published post-insert assessment and normal key cap.
-  const protectedIssuance = positiveFlag(input.isCloud) && positiveFlag(env.SIGNUP_BOT_PROTECTION);
+  const protectedIssuance =
+    positiveFlag(input.isCloud) && positiveFlag(process.env.SIGNUP_BOT_PROTECTION);
   const result = await db.transaction(async (transaction): Promise<ApiKeyIssuanceResult> => {
     const tx = transaction as unknown as Db;
     // Signup capture/verification acquire the same principal advisory locks
