@@ -7,12 +7,19 @@
 //! it in Default apps; the person chooses), and a mail link clicked inside
 //! the app stays in it.
 
-use tauri::{AppHandle, Runtime, Url};
+use tauri::Url;
+#[cfg(desktop)]
+use tauri::{AppHandle, Runtime};
+#[cfg(desktop)]
 use tauri_plugin_deep_link::DeepLinkExt;
 
-use crate::{navigate_main, show_main, CORREIO_URL};
+use crate::CORREIO_URL;
+#[cfg(desktop)]
+use crate::{navigate_main, show_main};
 
-/// The hosted page a deep link maps to, if any.
+/// The hosted page a deep link maps to, if any. (Phones get the hosted app's
+/// own https links later, through app links; `mepmail://` is desktop only.)
+#[cfg_attr(mobile, allow(dead_code))]
 pub fn route(url: &Url) -> Option<Url> {
     if url.scheme() != "mepmail" {
         return None;
@@ -52,6 +59,7 @@ pub fn mailto_route(link: &str) -> Option<Url> {
 
 /// The first `mailto:` among the process arguments opens the composer.
 /// Returns whether one did.
+#[cfg(desktop)]
 pub fn open_mailto_args<R: Runtime>(
     handle: &AppHandle<R>,
     args: impl IntoIterator<Item = String>,
@@ -64,6 +72,7 @@ pub fn open_mailto_args<R: Runtime>(
     true
 }
 
+#[cfg(desktop)]
 fn open<R: Runtime>(handle: &AppHandle<R>, url: &Url) {
     match route(url) {
         Some(target) => {
@@ -74,6 +83,7 @@ fn open<R: Runtime>(handle: &AppHandle<R>, url: &Url) {
     }
 }
 
+#[cfg(desktop)]
 pub fn install<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     // The installer registers the scheme (on Linux the .deb/.rpm menu entry
     // declares it); a debug build registers it itself, and so does an

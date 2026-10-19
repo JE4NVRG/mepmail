@@ -10,23 +10,37 @@
 //! signed self-updates of the shell (`update`). The Microsoft Store build
 //! (`--features store`) swaps the updater, autostart and toasts for their
 //! package equivalents (`packaged`).
+//!
+//! The same crate is the Android and iOS app (`mobile`): one full-screen
+//! webview on the splash and then the hosted Correio, links outside MepMail
+//! in the system browser. The tray, badge, agents (credential vault, MCP
+//! bridge), window placement, autostart and the self-updater stay desktop
+//! only; the stores update the phone apps.
 
+#[cfg(desktop)]
 mod agents;
+#[cfg(desktop)]
 mod badge;
+#[cfg(desktop)]
 pub mod bridge;
 mod deeplink;
 #[cfg(feature = "store")]
 mod packaged;
+#[cfg(desktop)]
 mod settings;
+#[cfg(desktop)]
 mod tray;
 #[cfg(all(desktop, not(feature = "store")))]
 mod update;
 
+#[cfg(desktop)]
 use std::sync::Mutex;
 
+#[cfg(desktop)]
+use tauri::{webview::Color, Theme, WindowEvent};
 use tauri::{
-    webview::{Color, NewWindowResponse, PageLoadEvent},
-    AppHandle, Manager, Runtime, Theme, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent,
+    webview::{NewWindowResponse, PageLoadEvent},
+    AppHandle, Manager, Runtime, Url, WebviewUrl, WebviewWindowBuilder,
 };
 use tauri_plugin_opener::OpenerExt;
 
@@ -41,18 +55,27 @@ pub const MAIN_WINDOW: &str = "main";
 /// links inside emails.
 const IN_APP_HOSTS: &[&str] = &["mepmail.dev", "www.mepmail.dev"];
 
-/// Sign-in with Google redirects through Google and back. Those pages must
-/// stay in the webview, or the session cookie would land in another browser.
-/// An explicit list, never a `.google.com` suffix: a Docs or Meet link inside
-/// an email must open in the browser, not replace the inbox.
+/// Sign-in with Google redirects through Google and back, and so does
+/// "Entrar com a Microsoft / o Google" for a conta externa (consent, then the
+/// callback on mepmail.dev that needs this webview's state cookie). Those pages
+/// must stay in the webview, or the round would end in another browser without
+/// the cookie. An explicit list, never a `.google.com` or `.live.com` suffix: a
+/// Docs, Meet or OneDrive link inside an email must open in the browser, not
+/// replace the inbox.
 const SIGN_IN_HOSTS: &[&str] = &[
     "accounts.google.com",
     "accounts.youtube.com",
     "myaccount.google.com",
+    // Microsoft accounts: work/school (Entra), personal (Live) and their consent pages.
+    "login.microsoftonline.com",
+    "login.microsoft.com",
+    "login.live.com",
+    "account.live.com",
 ];
 
 /// `--minimized` (the autostart entry): the window stays hidden in the tray
-/// until the user asks for it.
+/// until the user asks for it. (Read on the desktop only.)
+#[cfg_attr(mobile, allow(dead_code))]
 pub(crate) struct StartHidden(pub(crate) bool);
 
 fn is_in_app_host(host: &str) -> bool {
@@ -63,6 +86,7 @@ fn is_sign_in_host(host: &str) -> bool {
     SIGN_IN_HOSTS.contains(&host)
 }
 
+#[cfg_attr(mobile, allow(dead_code))]
 pub(crate) fn is_portuguese() -> bool {
     sys_locale::get_locale()
         .map(|locale| locale.to_ascii_lowercase().starts_with("pt"))
@@ -132,6 +156,7 @@ pub(crate) fn navigate_main<R: Runtime>(handle: &AppHandle<R>, url: Url) {
 }
 
 /// Brings the main window to the front (tray click, second launch, deep link).
+#[cfg(desktop)]
 pub(crate) fn show_main<R: Runtime>(handle: &AppHandle<R>) {
     if let Some(window) = handle.get_webview_window(MAIN_WINDOW) {
         let _ = window.unminimize();
@@ -143,7 +168,9 @@ pub(crate) fn show_main<R: Runtime>(handle: &AppHandle<R>) {
 /// Script injected before every document the webview loads, the hosted app
 /// included. It marks the page as running inside the desktop shell so the
 /// web app can adapt (native title, notifications, agent setup) without
-/// sniffing the user agent.
+/// sniffing the user agent. Desktop only: on a phone the hosted app runs as
+/// in the phone's browser (no vault, no agent setup, no desktop title).
+#[cfg(desktop)]
 fn bridge_script() -> String {
     format!(
         r#"(() => {{
@@ -181,7 +208,8 @@ fn build_main_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     let builder = WebviewWindowBuilder::new(app, MAIN_WINDOW, WebviewUrl::App("index.html".into()));
     #[cfg(feature = "store")]
     let builder = builder.initialization_script(packaged::notification_shim());
-    let window = builder
+    #[cfg(desktop)]
+    let builder = builder
         .title("MepMail")
         .inner_size(1280.0, 840.0)
         .min_inner_size(900.0, 600.0)
@@ -197,7 +225,8 @@ fn build_main_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
         // a message onto a folder or a file onto the composer must reach the
         // page, as it does in a browser tab.
         .disable_drag_drop_handler()
-        .initialization_script(bridge_script())
+        .initialization_script(bridge_script());
+    let window = builder
         .on_navigation(move |url| {
             if navigation_allowed(url) {
                 return true;
@@ -220,13 +249,23 @@ fn build_main_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
             }
             NewWindowResponse::Deny
         })
-        .on_page_load(|window, payload| {
+        .on_page_load(|_window, payload| {
             if matches!(payload.event(), PageLoadEvent::Finished) {
-                reveal(&window);
+                #[cfg(desktop)]
+                reveal(&_window);
             }
         })
         .build()?;
-    // "Keep in the tray on close": the X hides the window; Quit in the tray exits.
+    #[cfg(desktop)]
+    keep_in_tray(app, &window);
+    #[cfg(mobile)]
+    let _ = window;
+    Ok(())
+}
+
+/// "Keep in the tray on close": the X hides the window; Quit in the tray exits.
+#[cfg(desktop)]
+fn keep_in_tray<R: Runtime>(app: &tauri::App<R>, window: &tauri::WebviewWindow<R>) {
     let close_handle = app.handle().clone();
     window.on_window_event(move |event| {
         if let WindowEvent::CloseRequested { api, .. } = event {
@@ -245,11 +284,11 @@ fn build_main_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
         std::thread::sleep(std::time::Duration::from_secs(3));
         reveal(&window);
     });
-    Ok(())
 }
 
 /// Shows and focuses a window that is still hidden; a no-op once visible or
 /// when the app was started minimized to the tray.
+#[cfg(desktop)]
 fn reveal<R: Runtime>(window: &tauri::WebviewWindow<R>) {
     let start_hidden = window
         .app_handle()
@@ -291,6 +330,11 @@ pub fn run() {
                     .build(),
             );
     }
+    // Phones: new-mail notices from the hosted app (the stores update the app).
+    #[cfg(mobile)]
+    {
+        builder = builder.plugin(tauri_plugin_notification::init());
+    }
     // The Store updates and starts the packaged app itself (see `packaged`).
     #[cfg(all(desktop, not(feature = "store")))]
     {
@@ -303,7 +347,7 @@ pub fn run() {
             .plugin(tauri_plugin_updater::Builder::new().build())
             .plugin(tauri_plugin_notification::init());
     }
-    #[cfg(not(feature = "store"))]
+    #[cfg(all(desktop, not(feature = "store")))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         agents::store_agent_key,
         agents::has_agent_key,
@@ -324,6 +368,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(StartHidden(start_hidden))
         .setup(|app| {
+            #[cfg(desktop)]
             app.manage(settings::SettingsState(Mutex::new(settings::load(
                 app.handle(),
             ))));
@@ -381,6 +426,28 @@ mod tests {
         )));
         assert!(navigation_allowed(&url(
             "https://accounts.youtube.com/accounts/SetSID"
+        )));
+    }
+
+    #[test]
+    fn microsoft_sign_in_stays_in_the_webview() {
+        assert!(navigation_allowed(&url(
+            "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x"
+        )));
+        assert!(navigation_allowed(&url(
+            "https://login.live.com/oauth20_authorize.srf?x=1"
+        )));
+        assert!(navigation_allowed(&url(
+            "https://account.live.com/Consent/Update?x=1"
+        )));
+        assert!(navigation_allowed(&url(
+            "https://login.microsoft.com/consumers/"
+        )));
+        // Not a suffix: other Microsoft pages from an email still leave.
+        assert!(!navigation_allowed(&url("https://onedrive.live.com/view")));
+        assert!(!navigation_allowed(&url("https://outlook.live.com/mail/")));
+        assert!(!opens_in_main(&url(
+            "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
         )));
     }
 

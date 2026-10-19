@@ -3,6 +3,7 @@
   "identifier": "main-window",
   "description": "The Correio window: the bundled splash page and, after it, the hosted app on mepmail.dev. The hosted origin may set the window title, raise notifications and use the agent commands (keep a mailbox's agent key in the credential vault, write an agent's MCP config pointing at this executable); nothing else: no file system, shell or window control. Scoped to the two hosts the navigation guard lets into the window, not to every subdomain.",
   "windows": ["main"],
+  "platforms": ["windows", "linux", "macOS"],
   "remote": {
     "urls": ["https://mepmail.dev", "https://www.mepmail.dev"]
   },

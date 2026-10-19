@@ -111,6 +111,19 @@ WebView2. The same shell is the base for macOS, Linux, iOS and Android.
 - Tray item "Recarregar" / "Reload": reloads the page and shows the window,
   for a page stuck after the network came back.
 
+## What 1.0.3 adds
+
+- "Entrar com a Microsoft / o Google" for contas externas finishes inside the
+  window: the Microsoft account hosts (`login.microsoftonline.com`,
+  `login.microsoft.com`, `login.live.com`, `account.live.com`) join the explicit
+  sign-in list. 1.0.2 sent them to the system browser, where the callback found
+  no state cookie (`reason=expired`). The web app hides those buttons in older
+  shells (`externalOAuthWorks` in apps/web/src/lib/desktop-bridge.ts).
+- The crate also builds the Android and iOS apps (`mobile`): desktop-only parts
+  (tray, badge, agents, vault, updater, window placement) are behind
+  `cfg(desktop)`, the lib is staticlib + cdylib + rlib, and
+  `capabilities/mobile.json` grants the phone window notifications only.
+
 ## Layout
 
 - `src/`: the splash page. Static HTML, CSS and JS, no build step.
@@ -193,6 +206,13 @@ changes.
    WebView2 profiles of throwaway test identities (`dev.mepmail.correio.*`,
    never the installed app's). The Linux build drops its bundles from the
    cache volume itself (`linux/build.sh`).
+
+   Before publishing a new release, use `npm run retain -- --caches-only`
+   (`--dry-run` to preview) to remove only Cargo debug, Android target and
+   release compilation caches. This preserves all package versions, release
+   executables, installers, signatures, MSIX layouts and app profiles. Run
+   with desktop builds stopped; the mode rejects links/junctions and protected
+   1.0.2/1.0.3 app packages inside the cache directories.
 
 The installer is not code-signed yet: SmartScreen shows "Windows protected
 your PC" until it builds reputation (More info, Run anyway). A code-signing

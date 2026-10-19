@@ -1,6 +1,6 @@
 [package]
 name = "mepmail-correio"
-version = "1.0.2"
+version = "1.0.3"
 description = "MepMail for the desktop"
 authors = ["MepMail"]
 license = "AGPL-3.0-only"
@@ -8,18 +8,17 @@ repository = "https://github.com/JE4NVRG/mepmail"
 edition = "2021"
 rust-version = "1.90"
 
-# The binary in main.rs is the desktop entry point. When this src-tauri also
-# serves Android and iOS (0.3), add "staticlib" and "cdylib" here: until then
-# they would only double the LTO link of every release build.
+# The binary in main.rs is the desktop entry point (it links the rlib). Android
+# loads the cdylib and iOS links the staticlib, from this same crate.
 [lib]
 name = "mepmail_correio_lib"
-crate-type = ["rlib"]
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
 
 [dependencies]
-tauri = { version = "2.12", features = ["tray-icon"] }
+tauri = { version = "2.12", features = [] }
 tauri-plugin-notification = "2.5"
 tauri-plugin-opener = "2.7"
 tauri-plugin-deep-link = "2.6"
@@ -27,13 +26,6 @@ tauri-plugin-dialog = "2"
 sys-locale = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# The local MCP bridge (`--mcp`): stdio on one side, the hosted MCP over HTTPS on the other.
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "io-util", "sync", "time"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
-futures-util = "0.3"
-# Agent keys live in the Windows credential vault, never in config files.
-# Linux: the Secret Service (GNOME Keyring, KWallet) over D-Bus, persistent across logins.
-keyring = { version = "3", features = ["windows-native", "sync-secret-service", "crypto-rust"] }
 
 [features]
 # The Microsoft Store build (MSIX, apps/desktop/msix): no self-updater, the
@@ -46,6 +38,15 @@ windows-future = { version = "0.3", optional = true }
 tauri-winrt-notification = { version = "0.8", optional = true }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+# The tray exists on the desktop only.
+tauri = { version = "2.12", features = ["tray-icon"] }
+# The local MCP bridge (`--mcp`): stdio on one side, the hosted MCP over HTTPS on the other.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "io-util", "sync", "time"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+futures-util = "0.3"
+# Agent keys live in the Windows credential vault, never in config files.
+# Linux: the Secret Service (GNOME Keyring, KWallet) over D-Bus, persistent across logins.
+keyring = { version = "3", features = ["windows-native", "sync-secret-service", "crypto-rust"] }
 tauri-plugin-single-instance = { version = "2.5", features = ["deep-link"] }
 tauri-plugin-window-state = "2.5"
 tauri-plugin-autostart = "2.7"
@@ -58,3 +59,7 @@ lto = true
 opt-level = "s"
 panic = "abort"
 strip = true
+
+# macOS: agent keys in the Keychain (Windows uses the credential vault, Linux the Secret Service).
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }

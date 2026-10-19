@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile-window",
+  "description": "The phone app's only window: the bundled splash page and, after it, the hosted Correio on mepmail.dev. The hosted origin may raise notifications; nothing else (no vault, agents, file system or shell).",
+  "windows": ["main"],
+  "platforms": ["android", "iOS"],
+  "remote": {
+    "urls": ["https://mepmail.dev", "https://www.mepmail.dev"]
+  },
+  "permissions": ["core:event:default", "notification:default"]
+}
