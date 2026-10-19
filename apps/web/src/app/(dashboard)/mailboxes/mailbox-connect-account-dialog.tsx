@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { externalOAuthWorks } from "@/lib/desktop-bridge";
 import {
   MAILBOX_EXTERNAL_PRESETS,
   type MailboxExternalPresetId,
@@ -135,6 +136,11 @@ export function MailboxConnectAccountDialog({
   const [smtpPort, setSmtpPort] = useState<465 | 587>(465);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<MailboxConnectAccountError | null>(initialError);
+  // An older desktop app would end the sign-in in another browser: offer it there.
+  const [oauthHere, setOauthHere] = useState(true);
+  useEffect(() => setOauthHere(externalOAuthWorks()), []);
+  const offered = oauthHere ? oauth : undefined;
+  const oauthElsewhere = !oauthHere && (oauth?.microsoft || oauth?.google);
 
   useEffect(() => {
     dialog.current?.showModal();
@@ -200,9 +206,10 @@ export function MailboxConnectAccountDialog({
       </header>
       <form className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
         <p className={styles.hint}>{t("intro")}</p>
-        {oauth?.microsoft || oauth?.google ? (
+        {oauthElsewhere ? <p className={styles.notice}>{t("oauth.updateApp")}</p> : null}
+        {offered?.microsoft || offered?.google ? (
           <div className={styles.oauth}>
-            {oauth.microsoft ? (
+            {offered.microsoft ? (
               <a
                 className={`ms-btn ${styles.oauthButton}`}
                 href={mailboxConnectOAuthHref("microsoft", { returnTo, hint: address })}
@@ -211,7 +218,7 @@ export function MailboxConnectAccountDialog({
                 {t("oauth.microsoft")}
               </a>
             ) : null}
-            {oauth.google ? (
+            {offered.google ? (
               <a
                 className={`ms-btn ${styles.oauthButton}`}
                 href={mailboxConnectOAuthHref("google", { returnTo, hint: address })}
@@ -259,7 +266,7 @@ export function MailboxConnectAccountDialog({
         </fieldset>
 
         {!preset.available ? (
-          provider === "outlook" && oauth?.microsoft ? (
+          provider === "outlook" && offered?.microsoft ? (
             <div className={styles.steps}>
               <p>{t("oauth.outlook")}</p>
               <a

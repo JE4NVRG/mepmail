@@ -1,23 +1,23 @@
 {
-  "version": "1.0.2",
-  "notes": "Links de e-mail (mailto:) abrem direto no MepMail, que agora pode ser o seu app de e-mail padrão no Windows e no Linux. A bandeja ganhou o item Recarregar.",
-  "pub_date": "2026-10-11T05:56:11Z",
+  "version": "1.0.3",
+  "notes": "Entrar com a Microsoft ou com o Google nas contas externas agora funciona dentro do app, sem passar pelo navegador.",
+  "pub_date": "2026-10-14T05:11:49Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITmlYdVdCU2pjT3dMaVJ5ZkJyOThFZlVrd2MzaDBFaDl3NGprTDA3bzBWS0xpSFBsanVVSTlPeHZaUmRjck9aaXh5cHRlWmR0NDREZDc0dkZvVS9xRWdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjk3Nzk4CWZpbGU6TWVwTWFpbCBDb3JyZWlvXzEuMC4yX3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjAuMgpvekphdEdKVFVER2JPU2ZnVlRKeWJWZTJHYlNGZWMrUlhtd3ZzRUxyOU5leW9hQjhtNnpYbFQ5dEtua2x3QXkwbmdiVUlBOURGdXQ5Y2gvT1pVTFBCZz09Cg==",
-      "url": "https://mepmail.dev/desktop/correio/MepMail_1.0.2_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITmt2TThUMHNtWTRENlZTdzgwUVpNVVVkeS9Ua1J6SzBvK3VaQitpVlZmSXdWaS9XclkxdERNaUxPK0pmRmNaRlJ4OTNzU3BVVHBMZEdyTjIyRXlVZWdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxOTUzNjAyCWZpbGU6TWVwTWFpbCBDb3JyZWlvXzEuMC4zX3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjAuMwpZRjhiYVJEVUhPSzJZWWh1dGFqRXhweTdVSzZIK2prcDdFTjI5RUtJcGI0ZDVRUzJJWDZaNjNTSllBZjJZVnorR2NXM3ZadTFITHp6MmJEN24xRFdDQT09Cg==",
+      "url": "https://mepmail.dev/desktop/correio/MepMail_1.0.3_x64-setup.exe"
     },
     "linux-x86_64-appimage": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITnZxYUZuR3VQKy9Sbm5uQ3MxV1FzV3lCRkxUN0x0ODlBZ1ZDUGRqYUt6Z1lpNVRZUUZnZ0NUcmIwcVJZbFREVjc4R3VIRjdXWHBKSGU0a1FLQjAzVVFNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjk3NzkyCWZpbGU6TWVwTWFpbF8xLjAuMl9hbWQ2NC5BcHBJbWFnZQl2ZXJzaW9uOjEuMC4yCjkxOW4rdnpEWnpjQ2tVVU4rZTByb1BUUm9SRnB0VTZGM2pEWlF3aTIrdUg3WnRScDJORjQ4cjJDYjNDSXQ4L0dMdUZZckNPR1d1Y05jaEZQNnlZUEN3PT0K",
-      "url": "https://github.com/JE4NVRG/mepmail/releases/download/desktop-v1.0.2/MepMail_1.0.2_amd64.AppImage"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITmdFakZUbDhQWmFOTWlnVC90MVdPMnZ3Nyt4Zjl0bCsvSE0xU0VNSk9takZxbDJYZHozOUhRbldmb2M4Z3pOdE1ZSVRlRkpXS3ZnOVh1c0R6RlJ6dUFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxOTUzOTE4CWZpbGU6TWVwTWFpbF8xLjAuM19hbWQ2NC5BcHBJbWFnZQl2ZXJzaW9uOjEuMC4zClVvTVpXK0NkUXpoMUt6MWlVWFZnN2x6YmNKdDRxS3lNSmFPWit0dDh6UWJYc1JCLytaTDlGM09ERUthUllkUmxqTVdjSXg5Y2V6VGhHdkwxdGFDZURnPT0K",
+      "url": "https://github.com/JE4NVRG/mepmail/releases/download/desktop-v1.0.3/MepMail_1.0.3_amd64.AppImage"
     },
     "linux-x86_64-deb": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITm0zakJkOWhjSWdBbnlmZlNqdDAxYm1QNlA1bnRhbEdreW4xcTdsMFlUT3dBQTBIWVNaWVhualFzemVJR2xqbjVYZHVDdEpwNlpoWUF0a2dsSWF5WVFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjk3NzkyCWZpbGU6TWVwTWFpbF8xLjAuMl9hbWQ2NC5kZWIJdmVyc2lvbjoxLjAuMgpwQU42Yk5mY2ZSMWc5R1I5RkcrWExRYVBITm9kVGplYzVkWGloVktVdHZBdGdhQ0dyWENsL0Z6WFBJTGgyb094ck9ocmZ2RmxnOS93LzdVTXByQm1BQT09Cg==",
-      "url": "https://github.com/JE4NVRG/mepmail/releases/download/desktop-v1.0.2/MepMail_1.0.2_amd64.deb"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITmdkTzU1TU9iWXVDbG9ENGNhK2toMGN1MmNucXhLM0YzRTR2V3NQWG01d1N1SjFFNGR4WnFjeU16Q0c0YlBMeHJRQ3gzYnh3WEQ0STNXNm9WTWxGaXdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxOTUzOTE4CWZpbGU6TWVwTWFpbF8xLjAuM19hbWQ2NC5kZWIJdmVyc2lvbjoxLjAuMwpSY3RWeklSUmZ4aGlYWGcyN1JIeTBZaEN0cmhIUjRHSzhxTFJMWU01ZU45b2UwUHNjVzJ3OC9mQVlKV0t2cnVzbGxpSUxUUVlxbXdpSVVzSlNLS2VEZz09Cg==",
+      "url": "https://github.com/JE4NVRG/mepmail/releases/download/desktop-v1.0.3/MepMail_1.0.3_amd64.deb"
     },
     "linux-x86_64-rpm": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITm1GQlg1dEY3amJPSlducjRoRUt1YmVBWUpjSHRaRnFUZ0JJaHViaEtxenRMdm9FZEd4R1V1cDdJcUlIQVQ4bG5KVFkraktFbkJCU1YxUm5HRU1rTFFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjk3NzkyCWZpbGU6TWVwTWFpbC0xLjAuMi0xLng4Nl82NC5ycG0JdmVyc2lvbjoxLjAuMgorU0RKbmhwMUtyWHk2UktEdGF6UUNQVDU0dFJDQjVXT1NFR1JCRm5XemliTjVDUVpvbEEvS0VnUTlLSG1YQUc3TjA4WkV4d21VNnZ2Qktoc0pUZXRCdz09Cg==",
-      "url": "https://github.com/JE4NVRG/mepmail/releases/download/desktop-v1.0.2/MepMail-1.0.2-1.x86_64.rpm"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZmErTGJPNG1ITmtOV3JmMGxsUjN6bEpCbFJlSVdkWElOQVpWWVZQcTNwaVpHRnZTUjVlUTk2ajh0WFZmZTRMRDVKL3lobEg1TTNUWXBzcHlNaVgwNVRyRy83aUVIUUFNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxOTUzOTE4CWZpbGU6TWVwTWFpbC0xLjAuMy0xLng4Nl82NC5ycG0JdmVyc2lvbjoxLjAuMwp1NzBYSTJ1WmQra29IZU5nVGI5K2ZjTGdwbFREb2w3M0NLeSt5WDkydEtqVXl0Wm1FeDI5Nks2QmkzSHU4WTdPTVNwTnZYNWIvcm5oSWl5ZUFwOEJDQT09Cg==",
+      "url": "https://github.com/JE4NVRG/mepmail/releases/download/desktop-v1.0.3/MepMail-1.0.3-1.x86_64.rpm"
     }
   }
 }

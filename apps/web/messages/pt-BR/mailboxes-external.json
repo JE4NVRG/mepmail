@@ -100,7 +100,8 @@
     "or": "ou conecte com uma senha de app",
     "outlook": "Hotmail, Outlook.com e Microsoft 365 entram com o login da Microsoft.",
     "connected": "Conta conectada. As mensagens dos últimos 30 dias estão chegando.",
-    "reconnected": "Pronto: a conta voltou a sincronizar."
+    "reconnected": "Pronto: a conta voltou a sincronizar.",
+    "updateApp": "Para entrar com a Microsoft ou o Google pelo app do computador, atualize o app (versão 1.0.3, chega sozinha). Enquanto isso, conecte pelo navegador em mepmail.dev/mail."
   },
   "welcome": {
     "title": "Comece pelo e-mail que você já tem",

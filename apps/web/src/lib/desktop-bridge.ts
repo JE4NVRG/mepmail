@@ -52,6 +52,19 @@ export function htmlDropsWork(): boolean {
   return major > 0 || minor >= 3;
 }
 
+/**
+ * Whether "Entrar com a Microsoft / o Google" (contas externas) can finish where it
+ * starts: always in a browser; in the desktop shell from 1.0.3 on, which keeps the
+ * providers' sign-in pages in its window (1.0.2 handed Microsoft's to the system
+ * browser, where the callback finds no state cookie).
+ */
+export function externalOAuthWorks(): boolean {
+  const info = desktopInfo();
+  if (!info) return true;
+  const [major, minor, patch] = versionParts(info.version);
+  return major > 1 || (major === 1 && (minor > 0 || patch >= 3));
+}
+
 function ipc(): TauriInternals | null {
   if (!isDesktop()) return null;
   const internals = window.__TAURI_INTERNALS__;

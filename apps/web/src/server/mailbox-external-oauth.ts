@@ -37,7 +37,9 @@ import { createContext } from "./trpc";
 
 export const MAILBOX_EXTERNAL_OAUTH_COOKIE = "mm_ext_oauth";
 const COOKIE_PATH = "/api/mailboxes/external/oauth";
-const TTL_MS = 10 * 60_000;
+// The sign-in round can include changing a setting at the provider (Outlook.com IMAP) or a
+// second factor: 30 minutes, not 10 (Jean's 19/10 try came back after 24 and read as expired).
+const TTL_MS = 30 * 60_000;
 /** Where the browser may come back to (the Correio, or onboarding's first step). */
 const RETURN_PATHS = new Set(["/mail", "/onboarding"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

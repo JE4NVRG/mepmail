@@ -100,7 +100,8 @@
     "or": "or connect with an app password",
     "outlook": "Hotmail, Outlook.com and Microsoft 365 connect with the Microsoft sign-in.",
     "connected": "Account connected. Messages from the last 30 days are arriving.",
-    "reconnected": "Done: the account is syncing again."
+    "reconnected": "Done: the account is syncing again.",
+    "updateApp": "To sign in with Microsoft or Google from the desktop app, update the app (version 1.0.3 arrives by itself). Meanwhile, connect from your browser at mepmail.dev/mail."
   },
   "welcome": {
     "title": "Start with the email you already have",

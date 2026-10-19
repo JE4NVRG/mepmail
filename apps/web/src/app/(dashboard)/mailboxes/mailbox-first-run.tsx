@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useEffect, useState } from "react";
+import { externalOAuthWorks } from "@/lib/desktop-bridge";
 import styles from "./mailbox-connect-account.module.css";
 import {
   type MailboxConnectOAuth,
@@ -27,19 +29,23 @@ export function MailboxFirstRun({
 }) {
   const t = useTranslations("mailboxes-external.welcome");
   const external = useTranslations("mailboxes-external");
+  // An older desktop app would end the sign-in in another browser: not offered there.
+  const [oauthHere, setOauthHere] = useState(true);
+  useEffect(() => setOauthHere(externalOAuthWorks()), []);
+  const offered = oauthHere ? oauth : undefined;
   return (
     <section className={styles.welcome} aria-labelledby="mailbox-first-run-title">
       <h2 id="mailbox-first-run-title">{t("title")}</h2>
       {/* Outlook and Hotmail are named only where "Entrar com a Microsoft" is offered. */}
-      <p>{t(oauth?.microsoft ? "body" : "bodyNoMicrosoft")}</p>
+      <p>{t(offered?.microsoft ? "body" : "bodyNoMicrosoft")}</p>
       <div className={styles.welcomeActions}>
-        {oauth?.microsoft ? (
+        {offered?.microsoft ? (
           <a className={`ms-btn ${styles.oauthButton}`} href={mailboxConnectOAuthHref("microsoft")}>
             <MailboxOAuthMark provider="microsoft" />
             {external("oauth.microsoft")}
           </a>
         ) : null}
-        {oauth?.google ? (
+        {offered?.google ? (
           <a className={`ms-btn ${styles.oauthButton}`} href={mailboxConnectOAuthHref("google")}>
             <MailboxOAuthMark provider="google" />
             {external("oauth.google")}
