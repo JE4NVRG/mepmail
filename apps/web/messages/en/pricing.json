@@ -36,7 +36,7 @@
     "items": [
       {
         "q": "How does overage work?",
-        "a": "Free and Starter have a daily limit (UTC) and no overage: sends keep going up to 50% past it, then wait in a queue for the next day, and new sends are refused only when that queue reaches 3× the daily limit. Annual Pro 110K has a 110,000 monthly allowance with no paid overage. On monthly Pro and Scale, overage comes switched on (you can turn it off in Billing) and is billed per 1,000 at the plan’s rate, up to a safety ceiling of 5× the included volume."
+        "a": "Free and Starter have a daily limit (UTC) and no overage: sends keep going up to 50% past it, then wait in a queue for the next day, and new sends are refused only when that queue reaches 3× the daily limit. Annual Pro 110K (US$ 290 a year) has a 110,000 monthly allowance with no paid overage. On monthly Pro and Scale, overage comes switched on (you can turn it off in Billing) and is billed per 1,000 at the plan’s rate, up to a safety ceiling of 5× the included volume in total (the volume plus up to 4× in overage). With overage off, or past that ceiling, new sends are refused until the period renews."
       },
       {
         "q": "Can I use Mail and Send together?",
@@ -48,7 +48,7 @@
       },
       {
         "q": "Is there a contract, and can I change plans later?",
-        "a": "Pro 110K offers monthly and a prepaid 12-month annual period. Annual costs US$ 290, without stacking the introductory monthly promotion. Available subscription actions appear in the dashboard; existing contracts are preserved."
+        "a": "Pro 110K offers monthly and a prepaid 12-month annual period. Annual costs US$ 290, without stacking the introductory monthly promotion. Available subscription actions appear in the dashboard; subscriptions bought earlier keep their contracted price while they stay active."
       },
       {
         "q": "What is the attachment limit per message?",
@@ -93,7 +93,7 @@
   "launchFaq": [
     {
       "q": "How does overage work?",
-      "a": "Free and Starter have a daily limit (UTC) and no overage: sends keep going up to 50% past it, then wait in a queue for the next day, and new sends are refused only when that queue reaches 3× the daily limit. Annual Pro 110K has a 110,000 monthly allowance with no paid overage. On monthly Pro and Scale, overage comes switched on (you can turn it off in Billing) and is billed per 1,000 at the plan’s rate, up to a safety ceiling of 5× the included volume."
+      "a": "Free and Starter have a daily limit (UTC) and no overage: sends keep going up to 50% past it, then wait in a queue for the next day, and new sends are refused only when that queue reaches 3× the daily limit. Annual Pro 110K (US$ 290 a year) has a 110,000 monthly allowance with no paid overage. On monthly Pro and Scale, overage comes switched on (you can turn it off in Billing) and is billed per 1,000 at the plan’s rate, up to a safety ceiling of 5× the included volume in total (the volume plus up to 4× in overage). With overage off, or past that ceiling, new sends are refused until the period renews."
     },
     {
       "q": "Can I use Mail and Send together?",
@@ -105,7 +105,7 @@
     },
     {
       "q": "Is there a contract, and can I change plans later?",
-      "a": "Pro 110K offers monthly and a prepaid 12-month annual period. Annual costs US$ 290, without stacking the introductory monthly promotion. Available subscription actions appear in the dashboard; existing contracts are preserved."
+      "a": "Pro 110K offers monthly and a prepaid 12-month annual period. Annual costs US$ 290, without stacking the introductory monthly promotion. Available subscription actions appear in the dashboard; subscriptions bought earlier keep their contracted price while they stay active."
     },
     {
       "q": "What is the attachment limit per message?",

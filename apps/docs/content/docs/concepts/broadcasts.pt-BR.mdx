@@ -101,8 +101,8 @@ O envio avisa de antemão:
 
 - Somente um **domínio verificado** do seu time pode aparecer em `from`.
 - Se sua taxa recente de bounce ou reclamação cruzou o limite de pausa do
-  SES, novos envios de broadcast são bloqueados com um erro
-  `403 sending_paused` — contendo o estrago antes que o SES pause o envio por
+  SES, novos envios — broadcasts e transacionais — são bloqueados com um
+  erro `403 sending_paused` — contendo o estrago antes que o SES pause o envio por
   completo.
 - Se a taxa agregada de bounce ou reclamação da plataforma na região SES do seu
   remetente se aproxima da linha de revisão do SES, envios de broadcast nessa

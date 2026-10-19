@@ -17,8 +17,14 @@ type Operation = {
   summary?: string;
   description?: string;
   tags?: string[];
-  responses: Record<string, { headers?: Record<string, unknown> }>;
-  requestBody?: { content: Record<string, { example?: unknown }> };
+  responses: Record<
+    string,
+    {
+      headers?: Record<string, unknown>;
+      content?: Record<string, { example?: unknown; schema?: unknown }>;
+    }
+  >;
+  requestBody?: { content: Record<string, { example?: unknown; schema?: unknown }> };
   parameters?: {
     name: string;
     in: string;
@@ -35,8 +41,91 @@ async function spec() {
     paths: Record<string, Record<string, Operation>>;
     security: unknown;
     tags: { name: string }[];
-    components: { securitySchemes: Record<string, { scheme?: string }> };
+    components: {
+      securitySchemes: Record<string, { scheme?: string }>;
+      schemas: Record<string, Schema>;
+    };
   };
+}
+
+type Schema = Record<string, unknown>;
+
+/** A small JSON Schema check (the keywords this document uses), enough to prove an example fits. */
+function fits(
+  value: unknown,
+  schema: unknown,
+  schemas: Record<string, Schema>,
+  at: string,
+): string[] {
+  let node = schema as Schema | undefined;
+  while (node && typeof node.$ref === "string") node = schemas[node.$ref.split("/").at(-1) ?? ""];
+  if (!node || typeof node !== "object") return [];
+  const problems: string[] = [];
+  for (const key of ["anyOf", "oneOf"] as const) {
+    const options = node[key] as unknown[] | undefined;
+    if (Array.isArray(options) && !options.some((o) => fits(value, o, schemas, at).length === 0))
+      problems.push(`${at}: matches no ${key} option`);
+  }
+  for (const part of (node.allOf as unknown[] | undefined) ?? [])
+    problems.push(...fits(value, part, schemas, at));
+  if (Array.isArray(node.enum) && !node.enum.includes(value)) problems.push(`${at}: not in enum`);
+  const declared = node.type;
+  const types = Array.isArray(declared) ? declared : declared ? [declared] : [];
+  const kind =
+    value === null
+      ? "null"
+      : Array.isArray(value)
+        ? "array"
+        : Number.isInteger(value)
+          ? "integer"
+          : typeof value;
+  if (
+    types.length > 0 &&
+    !types.includes(kind) &&
+    !(kind === "integer" && types.includes("number"))
+  )
+    problems.push(`${at}: ${kind} is not ${types.join("|")}`);
+  if (kind === "string") {
+    const text = value as string;
+    if (typeof node.minLength === "number" && text.length < node.minLength)
+      problems.push(`${at}: too short`);
+    if (typeof node.maxLength === "number" && text.length > node.maxLength)
+      problems.push(`${at}: too long`);
+    if (typeof node.pattern === "string" && !new RegExp(node.pattern).test(text))
+      problems.push(`${at}: pattern`);
+    if (node.format === "uuid" && !/^[0-9a-f-]{36}$/i.test(text))
+      problems.push(`${at}: not a uuid`);
+    if (node.format === "email" && !/^[^@\s]+@[^@\s]+$/.test(text))
+      problems.push(`${at}: not an email`);
+  }
+  if (kind === "integer" || kind === "number") {
+    const number = value as number;
+    if (typeof node.minimum === "number" && number < node.minimum)
+      problems.push(`${at}: below minimum`);
+    if (typeof node.maximum === "number" && number > node.maximum)
+      problems.push(`${at}: above maximum`);
+  }
+  if (kind === "array") {
+    const items = value as unknown[];
+    if (typeof node.minItems === "number" && items.length < node.minItems)
+      problems.push(`${at}: too few items`);
+    if (typeof node.maxItems === "number" && items.length > node.maxItems)
+      problems.push(`${at}: too many items`);
+    for (const [index, item] of items.entries())
+      problems.push(...fits(item, node?.items, schemas, `${at}[${index}]`));
+  }
+  if (kind === "object") {
+    const object = value as Record<string, unknown>;
+    const properties = (node.properties as Record<string, unknown> | undefined) ?? {};
+    for (const required of (node.required as string[] | undefined) ?? [])
+      if (!(required in object)) problems.push(`${at}: missing ${required}`);
+    for (const [key, child] of Object.entries(object)) {
+      if (key in properties)
+        problems.push(...fits(child, properties[key], schemas, `${at}.${key}`));
+      else if (node.additionalProperties === false) problems.push(`${at}: unexpected ${key}`);
+    }
+  }
+  return problems;
 }
 
 describe("published OpenAPI document", () => {
@@ -76,6 +165,44 @@ describe("published OpenAPI document", () => {
         expect(operation.responses["429"]?.headers?.["Retry-After"], key).toBeDefined();
       }
     }
+  });
+
+  it("gives every request body and every JSON 200 an example that fits its schema", async () => {
+    const doc = await spec();
+    const problems: string[] = [];
+    let checked = 0;
+    for (const [path, item] of Object.entries(doc.paths)) {
+      for (const [method, operation] of Object.entries(item)) {
+        const key = `${method.toUpperCase()} ${path}`;
+        const body = operation.requestBody?.content["application/json"];
+        if (body) {
+          if (body.example === undefined) problems.push(`${key}: no request example`);
+          else
+            problems.push(
+              ...fits(body.example, body.schema, doc.components.schemas, `${key} request`),
+            );
+          checked++;
+        }
+        const ok = operation.responses["200"]?.content?.["application/json"];
+        if (ok?.schema !== undefined) {
+          if (ok.example === undefined) problems.push(`${key}: no response example`);
+          else problems.push(...fits(ok.example, ok.schema, doc.components.schemas, `${key} 200`));
+          checked++;
+        }
+      }
+    }
+    expect(problems).toEqual([]);
+    expect(checked).toBeGreaterThan(100);
+  });
+
+  it("keeps the send examples on one sender and one recipient", async () => {
+    const doc = await spec();
+    const send = doc.paths["/emails"]!.post!.requestBody!.content["application/json"]!;
+    expect(send.example).toMatchObject({
+      from: "Acme <hello@yourdomain.com>",
+      to: ["customer@example.com"],
+    });
+    expect(JSON.stringify(doc)).not.toContain("resend.dev");
   });
 
   it("carries a request example for sending", async () => {

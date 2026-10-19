@@ -489,6 +489,9 @@
   overflow: hidden;
   color: var(--v2-text);
 }
+.v2-code.v2-migrate {
+  margin-bottom: 12px;
+}
 .v2-code-bar {
   display: flex;
   align-items: center;

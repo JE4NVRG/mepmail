@@ -230,6 +230,11 @@ export function BillingView({
   // In Brazil Stripe charges the BRL currency option of the same price: show it next to USD.
   const inBrazil = locale === "pt-BR";
   const brl = (cents: number) => formatBrl(cents / 100, locale);
+  // An overage amount as Brazil pays it: the same per-1,000 rate in reais, next to US$.
+  const overageMoney = (usdCents: number, brlCents: number | null | undefined) =>
+    inBrazil && typeof brlCents === "number"
+      ? `${usd(usdCents)} (${brl(brlCents)})`
+      : usd(usdCents);
 
   const rungLabel = (key: PlanRungKey) => {
     const r = PLAN_RUNGS.find((x) => x.key === key);
@@ -418,6 +423,14 @@ export function BillingView({
     );
   const selected = PLAN_RUNGS[at] ?? current;
   const over = quota.kind === "month" ? Math.max(0, usage.accepted - quota.included) : 0;
+  // The contracted rate in reais: the rung's BRL rate, while the contract's US$ rate is the rung's.
+  const contractedRung = status.data.effectiveRung ?? current;
+  const contractedBrlRate =
+    quota.kind === "month" &&
+    quota.overageCentsPer1k !== null &&
+    contractedRung.overageCentsPer1k === quota.overageCentsPer1k
+      ? contractedRung.brlOverageCentsPer1k
+      : null;
   // After a successful return the webhook may still be on its way; offering a
   // second purchase in that window would only invite a duplicate Checkout.
   // New subscriptions paused: a team without one sees why, and nothing to buy.
@@ -642,13 +655,20 @@ export function BillingView({
                     ? t("launch.annualHardCap")
                     : quota.overageCentsPer1k === null
                       ? t("effectiveRateUnavailable")
-                      : t("overageCopy", { price: usd(quota.overageCentsPer1k) })}
+                      : t("overageCopy", {
+                          price: overageMoney(quota.overageCentsPer1k, contractedBrlRate),
+                        })}
                 </div>
                 {over > 0 && quota.overageCentsPer1k !== null ? (
                   <div style={{ fontSize: 12.5, color: "var(--ms-bone)", marginTop: 6 }}>
                     {t("overSoFar", {
                       n: over,
-                      amount: usd(Math.ceil(over / 1000) * quota.overageCentsPer1k),
+                      amount: overageMoney(
+                        Math.ceil(over / 1000) * quota.overageCentsPer1k,
+                        contractedBrlRate === null
+                          ? null
+                          : Math.ceil(over / 1000) * contractedBrlRate,
+                      ),
                     })}
                   </div>
                 ) : null}
@@ -1105,7 +1125,9 @@ export function BillingView({
                       ? t("launch.annualHardCap")
                       : r.overageCentsPer1k === null
                         ? "\u00a0"
-                        : t("overagePer1k", { price: usd(r.overageCentsPer1k) })}
+                        : t("overagePer1k", {
+                            price: overageMoney(r.overageCentsPer1k, r.brlOverageCentsPer1k),
+                          })}
                   </span>
                   <div className="ms-plan-more">
                     <div>

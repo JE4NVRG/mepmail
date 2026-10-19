@@ -14,7 +14,7 @@ Two fixed one-minute windows apply to every call made with an API key, and a
 | Window | Default | Set by |
 | --- | --- | --- |
 | Per API key | 600 requests/minute | `API_RATE_LIMIT_PER_MINUTE` |
-| Per team, across every key | 3,000 requests/minute | Deployment |
+| Per team, across every key | 3,000 requests/minute | Fixed (not configurable) |
 
 - Minting more keys does not multiply the cap — the team window spans them all.
 - A fixed window resets on the minute, so a burst that fills one window and
@@ -86,6 +86,10 @@ Two fixed one-minute windows apply to every call made with an API key, and a
   rate crosses the guardrail gets `403 sending_paused`, and broadcast sending
   waits on the platform's regional rate (`403 broadcasts_paused`). Both are in
   [Errors](/errors#sending-pauses-and-holds).
+- **Correio** (Mail) plans have no overage: sending stops at the plan's
+  monthly allowance until the next month, and incoming mail past the allowance
+  or with storage full may be refused. The allowances of each plan are on
+  [Pricing](https://mepmail.dev/pricing).
 
 ## Message shape limits
 
@@ -97,7 +101,7 @@ Two fixed one-minute windows apply to every call made with an API key, and a
 ## Limits by plan (objects)
 
 - Contacts: 1,000 on Free, unlimited on every paid plan.
-- Sender domains: 1 / 10 / 25 / unlimited (Free / Starter / Pro / Scale); up to 3 while only Correio is active.
+- Sender domains: 1 / 10 / 25 / unlimited (Free / Starter / Pro / Scale); while a Correio plan is active, Free goes up to 3.
 - Teams per user: 1 / 3 / 10 / unlimited.
 
 See [Billing](/billing) for prices and the full ladder.

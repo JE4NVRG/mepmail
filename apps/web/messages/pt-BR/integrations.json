@@ -61,7 +61,7 @@
         "links": [
           {
             "label": "Docs: canais de notificação",
-            "href": "https://docs.mepmail.dev/integrations"
+            "href": "https://docs.mepmail.dev/pt-BR/integrations"
           }
         ],
         "access": [
@@ -87,7 +87,7 @@
         "links": [
           {
             "label": "Docs: MCP",
-            "href": "https://docs.mepmail.dev/mcp"
+            "href": "https://docs.mepmail.dev/pt-BR/mcp"
           }
         ],
         "access": [
@@ -179,7 +179,7 @@
         ]
       },
       {
-        "name": "SDKs do Resend, drop-in",
+        "name": "SDKs do Resend: troca só a baseUrl",
         "kind": "Migração",
         "logos": ["nodedotjs", "python", "php", "ruby", "go"],
         "body": "Vindo do Resend? Mantenha os SDKs oficiais. Troque a base URL e a chave, e as suas chamadas de envio continuam as mesmas.",
@@ -190,7 +190,7 @@
         "links": [
           {
             "label": "Docs: SDKs",
-            "href": "https://docs.mepmail.dev/sdks"
+            "href": "https://docs.mepmail.dev/pt-BR/sdks"
           },
           {
             "label": "MepMail vs Resend",
@@ -224,11 +224,11 @@
         "links": [
           {
             "label": "Docs: CLI",
-            "href": "https://docs.mepmail.dev/cli"
+            "href": "https://docs.mepmail.dev/pt-BR/cli"
           },
           {
             "label": "Docs: API",
-            "href": "https://docs.mepmail.dev/api-reference"
+            "href": "https://docs.mepmail.dev/pt-BR/api-reference"
           }
         ],
         "access": [

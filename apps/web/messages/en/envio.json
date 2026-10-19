@@ -140,7 +140,7 @@
       },
       {
         "q": "What happens when I go over the quota?",
-        "a": "Free and Starter have no overage: past the daily limit, sends wait in a queue and are refused only when it reaches 3× the limit. On Pro and Scale, overage is on and can be turned off in Billing."
+        "a": "Free and Starter have a daily limit (UTC) and no overage: sends keep going up to 50% past it, then wait in a queue for the next day, and new sends are refused only when that queue reaches 3× the daily limit. Annual Pro 110K (US$ 290 a year) has a 110,000 monthly allowance with no paid overage. On monthly Pro and Scale, overage comes switched on (you can turn it off in Billing) and is billed per 1,000 at the plan’s rate, up to a safety ceiling of 5× the included volume in total (the volume plus up to 4× in overage). With overage off, or past that ceiling, new sends are refused until the period renews."
       },
       {
         "q": "Do you guarantee the inbox?",
@@ -152,7 +152,7 @@
       },
       {
         "q": "Is there a contract?",
-        "a": "No. Plans are monthly and you can cancel whenever you want, with no fee."
+        "a": "No. Plans renew monthly (Pro 110K also has an optional annual plan, paid upfront) and you can cancel whenever you want, with no fee."
       }
     ]
   },

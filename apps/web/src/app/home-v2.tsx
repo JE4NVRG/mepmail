@@ -192,6 +192,17 @@ export async function HomeV2() {
             </div>
             <p className="v2-note">{t.rich("envio.note", { free: freeVolume, b })}</p>
             <figure>
+              {/* Before the code: the command that brings the account over (packages/cli). */}
+              <div className="v2-code v2-migrate">
+                <p className="v2-code-bar">
+                  <span>{t("envio.migrateBar")}</span>
+                  <span>{t("envio.migrateMoves")}</span>
+                </p>
+                <pre>
+                  <span className="v2-code-line">npx @mepmail/cli migrate --from resend</span>
+                  <span className="v2-code-line v2-code-dim">{t("envio.migrateResult")}</span>
+                </pre>
+              </div>
               <div className="v2-code">
                 <p className="v2-code-bar">
                   <span>send.ts</span>

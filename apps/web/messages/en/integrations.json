@@ -179,7 +179,7 @@
         ]
       },
       {
-        "name": "Resend SDKs, drop-in",
+        "name": "Resend SDKs: change only the baseUrl",
         "kind": "Migration",
         "logos": ["nodedotjs", "python", "php", "ruby", "go"],
         "body": "Coming from Resend? Keep the official SDKs. Swap the base URL and the key, and your send calls stay the same.",

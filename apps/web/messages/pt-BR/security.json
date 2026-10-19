@@ -7,7 +7,7 @@
     "eyebrow": "Segurança",
     "title": "Segurança que você pode <highlight>verificar</highlight>.",
     "lead": "O MepMail Cloud roda na Alemanha, em hardware da Contabo; o produto é open source sob AGPL-3.0 e você pode hospedar tudo no seu próprio servidor. O conteúdo dos seus e-mails — e cada afirmação desta página — está em algo que você confere, não em algo que você precisa acreditar.",
-    "note": "Última revisão: 29 de setembro de 2026. Toda afirmação aqui é uma propriedade do produto em execução, ou está marcada como item de roadmap.",
+    "note": "Última revisão: 19 de outubro de 2026. Toda afirmação aqui é uma propriedade do produto em execução, ou está marcada como item de roadmap.",
     "badges": [
       "Dados hospedados na UE · Alemanha",
       "Open source · AGPL-3.0",
@@ -139,7 +139,7 @@
         "name": "Limites antiabuso",
         "body": "Os limites evitam que uma chave comprometida ou um script descontrolado queime a reputação de um domínio.",
         "bullets": [
-          "Todo plano tem um volume incluído e um teto diário de envio; envios acima do teto diário ficam retidos em vez de rodar o dia inteiro.",
+          "Todo plano tem um volume incluído: diário no Free e no Starter, em que os envios acima dele esperam numa fila, e mensal no Pro e no Scale, em que o excedente para em 5× o volume incluído.",
           "Bounces e reclamações são registrados por time, e a saúde de entregabilidade da instância pode pausar o envio de um time.",
           "O cadastro é fechado por padrão em uma instância acessível — só a primeira conta pode se registrar — e uma beta pode ser limitada por número de contas.",
           "É possível exigir o desafio Cloudflare Turnstile no login, no cadastro, na redefinição de senha e no reenvio da verificação."
@@ -186,28 +186,53 @@
   "subprocessors": {
     "eyebrow": "Infraestrutura",
     "title": "Subprocessadores",
-    "body": "A lista curta de provedores que processam dados do MepMail Cloud. Ela espelha a Política de Privacidade e acrescenta o provedor de hospedagem.",
+    "body": "Os provedores que processam dados do MepMail Cloud, a mesma lista da Política de Privacidade (seção 7), que diz o que cada um recebe.",
     "columns": ["Provedor", "Papel", "Local"],
     "rows": [
       {
         "provider": "Contabo GmbH",
-        "role": "Servidores que hospedam a aplicação e o banco",
+        "role": "Servidores da aplicação, do banco, da plataforma de suporte Elozi e das nossas métricas",
         "location": "Alemanha"
       },
       {
-        "provider": "Amazon Web Services (Amazon SES)",
-        "role": "Entrega de e-mail e eventos de entrega",
-        "location": "us-east-1, Estados Unidos"
-      },
-      {
-        "provider": "Cloudflare",
-        "role": "DNS, CDN e proteção de rede na frente dos servidores",
-        "location": "Rede global de borda"
+        "provider": "Amazon Web Services (Amazon SES, S3, SQS, SNS, KMS)",
+        "role": "Envio e recebimento de e-mail, a cópia de 30 dias dos e-mails recebidos, filas de eventos e chaves de criptografia",
+        "location": "Estados Unidos; Irlanda como contingência"
       },
       {
         "provider": "Stripe",
-        "role": "Processamento de pagamento, faturas e recibos",
+        "role": "Pagamentos no cartão e no Pix, faturas e recibos",
         "location": "Estados Unidos"
+      },
+      {
+        "provider": "Cloudflare",
+        "role": "DNS, CDN e proteção de rede, o desafio Turnstile e o armazenamento R2 de backups e imagens enviadas",
+        "location": "Rede global de borda"
+      },
+      {
+        "provider": "Command Code (Langbase, Inc.)",
+        "role": "Verificação automática de abuso numa amostra dos e-mails do Envio (DeepSeek V4.1 Flash); nunca os destinatários",
+        "location": "Estados Unidos"
+      },
+      {
+        "provider": "OpenCode Go (Anomaly)",
+        "role": "Modelos de IA dos assistentes de suporte",
+        "location": "Estados Unidos"
+      },
+      {
+        "provider": "Elozi (JE4NDEV)",
+        "role": "Chat de suporte e o e-mail suporte@mepmail.dev, nos nossos servidores",
+        "location": "Alemanha"
+      },
+      {
+        "provider": "Gravatar (Automattic)",
+        "role": "Um hash do endereço do remetente, para mostrar a foto",
+        "location": "Estados Unidos"
+      },
+      {
+        "provider": "Operadores RDAP de registro e Team Cymru",
+        "role": "Consultas de segurança no cadastro: data de registro do domínio e rede de origem (ASN)",
+        "location": "Onde cada operador roda"
       }
     ],
     "note": "Uma instância self-hosted roda na infraestrutura que você escolher, então esta lista não se aplica a ela."
@@ -216,10 +241,22 @@
     "title": "Construído sobre infraestrutura em que você já confia",
     "body": "Nenhuma dependência exótica para avaliar: os quatro provedores por trás de cada envio são os mesmos nomes que a maioria dos times já roda em produção.",
     "items": [
-      { "provider": "Contabo GmbH", "role": "Hospedagem na UE · Alemanha" },
-      { "provider": "Amazon SES", "role": "Entrega por TLS" },
-      { "provider": "Cloudflare", "role": "DNS, CDN, proteção de borda" },
-      { "provider": "Stripe", "role": "Pagamentos e faturas" }
+      {
+        "provider": "Contabo GmbH",
+        "role": "Hospedagem na UE · Alemanha"
+      },
+      {
+        "provider": "Amazon SES",
+        "role": "Entrega por TLS"
+      },
+      {
+        "provider": "Cloudflare",
+        "role": "DNS, CDN, proteção de borda"
+      },
+      {
+        "provider": "Stripe",
+        "role": "Pagamentos e faturas"
+      }
     ]
   },
   "compliance": {
@@ -264,7 +301,7 @@
       },
       {
         "q": "O MepMail está em conformidade com o GDPR?",
-        "a": "O MepMail Cloud foi construído para isso: a aplicação e o banco rodam na Alemanha, dentro da UE. Dois subprocessadores ficam nos Estados Unidos — o Amazon SES (us-east-1) para entrega e o Stripe para pagamentos — e a Política de Privacidade declara essas transferências. Não reivindicamos uma certificação que não temos."
+        "a": "O MepMail Cloud foi feito para isso: a aplicação, o banco e a plataforma de suporte Elozi rodam na Alemanha, dentro da UE. AWS (Estados Unidos, com a Irlanda como contingência), Stripe, Command Code, OpenCode e Gravatar tratam dados nos Estados Unidos, e a Cloudflare opera no mundo todo; a Política de Privacidade declara essas transferências. Não afirmamos uma certificação que não temos."
       },
       {
         "q": "Como consigo um DPA assinado?",
@@ -281,15 +318,18 @@
       {
         "q": "Como apago os dados de um contato?",
         "a": "Apague o contato com erase=true pela API: o endereço é então apagado do histórico de e-mails, dos payloads de evento e dos logs de API — o caminho GDPR/LGPD. Sem isso, o log de envio envelhece na janela de retenção. As supressões guardam apenas um hash do endereço, como registro de não contatar.",
-        "link": { "label": "Referência da API", "href": "https://docs.mepmail.dev" }
+        "link": {
+          "label": "Referência da API",
+          "href": "https://docs.mepmail.dev"
+        }
       },
       {
         "q": "Subprocessadores de IA recebem o conteúdo dos meus e-mails?",
-        "a": "Não. Nenhum provedor de IA processa o conteúdo dos seus e-mails no MepMail Cloud. O código open source traz um monitor de abuso opcional (ABUSE_JUDGE, desligado por padrão), que o self-hoster pode ligar: um envio já aceito pode então ser amostrado e enviado ao TypeSafe System One para um veredito de abuso. O MepMail Cloud roda com ele desligado, e quem hospeda decide por si."
+        "a": "Sim, dois, ambos nomeados na Política de Privacidade. A Command Code recebe uma amostra dos e-mails já aceitos pelo Envio (remetente, endereço de resposta, assunto, texto visível, domínios dos links e nomes dos anexos, nunca os destinatários) para uma verificação automática de abuso com o modelo DeepSeek V4.1 Flash. A OpenCode Go roda os modelos dos assistentes de suporte e recebe o que você escreve ao suporte. O MepMail não envia o conteúdo das suas caixas a nenhum provedor de IA; um agente que você mesmo conecta alcança só o que você liberar, nos termos do provedor dele. Nenhum conteúdo de e-mail é usado para treinar modelos de IA. Quem auto-hospeda decide por si: a verificação de abuso (ABUSE_JUDGE) vem desligada no código aberto."
       },
       {
         "q": "Onde encontro a lista atual de subprocessadores?",
-        "a": "Nesta página — a tabela acima, que espelha a Política de Privacidade. Uma instância self-hosted não tem essa lista, porque roda na infraestrutura que você escolher."
+        "a": "Nesta página — a tabela acima, que é a lista da Política de Privacidade (seção 7). Uma instância self-hosted não tem essa lista, porque roda na infraestrutura que você escolher."
       }
     ]
   },

@@ -102,7 +102,7 @@
   "stack": {
     "eyebrow": "Works with your stack",
     "aria": "Integrations and languages that work with MepMail",
-    "note": "The community n8n node, Slack/Discord/Telegram notification channels, the official SDKs the API is drop-in compatible with, Docker to self-host and plain cURL. Each integration uses the right credential: a Send key, a mailbox key or OAuth.",
+    "note": "The community n8n node, Slack/Discord/Telegram notification channels, the official SDKs the API is compatible with (you change only the baseUrl and the key), Docker to self-host and plain cURL. Each integration uses the right credential: a Send key, a mailbox key or OAuth.",
     "pageCta": "See all integrations"
   },
   "compare": {
@@ -266,7 +266,7 @@
   "deliverability": {
     "eyebrow": "Deliverability and integration",
     "title": "Your domain. Sending visibility. Support from the builders.",
-    "body": "Use your own domain, verified with DKIM and MAIL FROM, and follow each send in the dashboard. Send through <api>api.mepmail.dev</api> or the SMTP relay with STARTTLS at <smtp>smtp.mepmail.dev:2587</smtp>. Get onboarding help directly from the team building MepMail.",
+    "body": "Use your own domain, verified with DKIM and MAIL FROM, and follow each send in the dashboard. Send through <api>api.mepmail.dev</api> or the SMTP relay with STARTTLS at <smtp>smtp.mepmail.dev:2587</smtp>. Get onboarding help directly from the MepMail team.",
     "note": "API compatibility is not feature parity: inbound, dedicated IPs and SSO are not part of this promise. Inbox placement also depends on your domain, your content and sending reputation."
   },
   "faq": {
@@ -457,6 +457,9 @@
       "more": "See Send",
       "note": "<b>{free} emails a day free</b>, no card",
       "changed": "2 lines change",
+      "migrateBar": "terminal",
+      "migrateMoves": "Brings contacts, templates and webhooks",
+      "migrateResult": "# plan, confirm, apply; rollback removes only what it created",
       "blockEyebrow": "Send",
       "blockTitle": "Everything your product sends, in one dashboard.",
       "galleryTitle": "Templates to start with today",
@@ -560,7 +563,7 @@
         },
         {
           "q": "Is there a contract?",
-          "a": "No. Plans are monthly and you can cancel whenever you want, with no fee."
+          "a": "No. Plans renew monthly (Pro 110K also has an optional annual plan, paid upfront) and you can cancel whenever you want, with no fee."
         }
       ]
     },

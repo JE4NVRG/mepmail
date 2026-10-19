@@ -1,14 +1,16 @@
 {
   "terms": {
     "title": "Terms of Service",
-    "updated": "Last updated: October 10, 2026",
-    "intro": "These terms govern your access to and use of MepMail, a transactional email service operated by Je4nDev (\"we\", \"us\"). By creating an account or using the service, you agree to these terms. If you do not agree, do not use the service.",
+    "updated": "Last updated: October 19, 2026",
+    "intro": "These terms govern your access to and use of MepMail, an email service operated by Je4nDev (\"we\", \"us\") with two products: Send, for transactional and permission-based marketing email, and Mail, for mailboxes on your own domain. By creating an account or using the service, you agree to these terms. If you do not agree, do not use the service.",
     "sections": [
       {
         "title": "1. The service",
         "body": [
-          "MepMail lets you send transactional email through an HTTPS API, an SMTP relay, or an MCP server, and to manage sending domains, contacts, suppressions and delivery events. Email is delivered through Amazon SES, which acts as our delivery infrastructure.",
-          "The service is offered in tiers: Free and Starter have a daily sending limit, and Pro and Scale include a monthly volume. You are responsible for choosing the tier that fits your volume. On Free and Starter, sends beyond the daily limit wait in a queue and are never billed; on monthly Pro and Scale, sends beyond the included volume are billed as overage, which comes switched on and can be turned off in Billing, as described on the pricing page."
+          "Send lets you send transactional email through an HTTPS API, an SMTP relay, or an MCP server, and manage sending domains, contacts, suppressions and delivery events. Delivery runs on Amazon SES, which acts as our sending infrastructure.",
+          "Send comes in tiers: Free and Starter have a daily sending limit, and Pro and Scale include a monthly volume. You are responsible for choosing the tier that fits your volume. On Free and Starter, sends past the daily limit wait in a queue and are never charged; once that queue reaches 3× the daily limit, new sends are refused. On monthly Pro and Scale, sends past the included volume are billed as overage, which comes switched on and can be turned off in Billing, as described on the pricing page.",
+          "Mail provides mailboxes on your domain, for people and for AI agents: receive, read, organize and answer messages on the website, in the apps, over IMAP and SMTP, through the API or over MCP. It is bought as a plan (Solo, Duo or Team), with the number of mailboxes, the storage and the monthly sending and receiving allowances shown on the pricing page at the time of purchase. Mail has no overage: when an allowance runs out, sending stops until the next month, and incoming messages past the allowance or with storage full may be refused, with a notice to the sender.",
+          "You can also connect accounts you already have with other providers (such as Gmail, iCloud, Yahoo, Zoho, Outlook or another IMAP account) to Mail at no cost, within the limits shown in the product. Those accounts remain subject to the provider's terms; MepMail uses the access you grant only to read the Inbox and send the messages you write, and you can disconnect them at any time. If you give an AI agent access to a mailbox, you choose its permissions: without the send permission, every send waits for your approval. You are responsible for what the agent sends on your behalf."
         ]
       },
       {
@@ -21,7 +23,7 @@
       {
         "title": "3. Acceptable use",
         "body": [
-          "MepMail is for permission-based transactional and marketing email. You must not use the service to:"
+          "MepMail is for transactional and permission-based marketing email and for mailboxes in legitimate use. You may not use the service to:"
         ],
         "list": [
           "Send unsolicited bulk email (spam) or email to purchased, rented or scraped lists.",
@@ -30,7 +32,9 @@
           "Register or send from domains you do not control, such as public or disposable email domains.",
           "Send content that is illegal, harassing, hateful or infringing.",
           "Process data you do not have the right to process.",
-          "Probe, overload or attempt to bypass the service's limits, quotas or security, including by switching sender, domain or account to escape blocks or reviews."
+          "Probe, overload or attempt to bypass the service's limits, quotas or security, including by switching sender, domain or account to escape blocks or reviews.",
+          "Use Mail mailboxes to receive, store or forward spam, phishing or malware, or set up rules, auto-replies or forwarding that send unsolicited email to third parties.",
+          "Connect accounts from other providers that you have no right to access."
         ]
       },
       {
@@ -42,14 +46,15 @@
       {
         "title": "5. Plans, billing and overage",
         "body": [
-          "Paid plans are billed in US dollars through Stripe, monthly or yearly, in advance. Volume is counted per distinct recipient, like our delivery infrastructure does. On monthly Pro and Scale, sends beyond the included volume are billed at the plan's overage rate, up to 5× that volume; overage comes switched on and can be turned off in Billing. Annual plans, Free and Starter have no overage billing.",
-          "If a payment fails, we may suspend sending until it is settled. Prices may change with at least 30 days' notice; changes never apply retroactively to a period you already paid."
+          "Paid plans are billed in advance, monthly or yearly, through Stripe: in US dollars or, in Brazil, in reais, by card or Pix. With Pix, each period is paid by invoice, due within 5 days, with no automatic charge. Send volume is counted per distinct recipient, as our delivery infrastructure counts it. On monthly Pro and Scale, sends past the included volume are billed at the plan's overage rate, up to 5× that volume; overage comes switched on and can be turned off in Billing. Annual plans, Free and Starter have no overage billing.",
+          "A team's first Mail plan can have 7 days free with a card. Billing starts automatically when the trial ends unless you cancel before, and a reminder arrives 2 days before it ends. During the trial, sending from Mail has a lower limit, shown at checkout. The free trial does not apply to Pix.",
+          "If a payment fails or an invoice goes unpaid, we may suspend sending and the use of Mail mailboxes until it is settled. Prices may change with at least 30 days' notice; changes never apply retroactively to a period already paid."
         ]
       },
       {
         "title": "6. Cancellation",
         "body": [
-          "You can cancel at any time from the dashboard. Cancellation stops future renewals; the account remains active until the end of the paid period and then moves to the free tier with its sending limits. Refunds are covered by the Refund Policy."
+          "You can cancel at any time from the dashboard. Cancelling stops future renewals; the account stays active until the end of the paid period and then moves to Send's free tier with its sending limits. On Mail, cancelling also takes effect at the end of the paid period, and keeping and deleting mailboxes and messages follow the Privacy Policy, including restoring a deleted mailbox for 30 days. Refunds follow the Refund Policy."
         ]
       },
       {
@@ -71,7 +76,7 @@
       {
         "title": "9. Intellectual property",
         "body": [
-          "The MepMail software is open source under the AGPL and can be self-hosted; the hosted service, brand and documentation are ours. Your data — contacts, messages and domains — remains yours. We claim no ownership over it."
+          "The MepMail software is open source under the AGPL and can be self-hosted; the hosted service, brand and documentation are ours. Your data — contacts, messages, mailboxes and domains — remains yours. We claim no ownership over it."
         ]
       },
       {
@@ -204,7 +209,7 @@
       {
         "title": "10. Apps",
         "body": [
-          "The Windows, Linux, macOS and Android apps show the same service as the website and follow this policy. The desktop app can keep a copy of messages for offline reading on the device itself, deleted when you sign out. The Android app sells nothing, shows no prices and runs no advertising measurement; it shows your plan and its period, and lets you cancel the renewal of a subscription you already have."
+          "The Windows and Linux apps, and the macOS and Android apps as they are released, show the same service as the website and follow this policy. The desktop app can keep a copy of messages for offline reading on the device itself, deleted when you sign out. The Android app sells nothing, shows no prices and runs no advertising measurement; it shows your plan and its period, and lets you cancel the renewal of a subscription you already have."
         ]
       },
       {
@@ -236,7 +241,7 @@
   },
   "refund": {
     "title": "Refund Policy",
-    "updated": "Last updated: October 8, 2026",
+    "updated": "Last updated: October 19, 2026",
     "intro": "We want you to pay only if MepMail works for you. The free tier exists so you can validate the service with real email before spending anything.",
     "sections": [
       {
@@ -248,13 +253,13 @@
       {
         "title": "2. 7-day guarantee on your first payment",
         "body": [
-          "If you upgrade and are not satisfied, ask us within 7 days of your first payment and we refund it in full — no interrogation. One guarantee per account, on the first paid period. The guarantee does not apply to accounts suspended for violating the Terms of Service (see section 6)."
+          "If you upgrade and are not satisfied, ask us within 7 days of your first payment and we refund it in full — no interrogation. One guarantee per account, on the first paid period, for card and Pix alike. On Correio's 7-day free trial, the 7 days count from the first charge, when the trial ends. The guarantee does not apply to accounts suspended for violating the Terms of Service (see section 6)."
         ]
       },
       {
         "title": "3. After the first 7 days",
         "body": [
-          "After that window, payments are non-refundable and we do not refund unused volume pro-rata: you can cancel at any time and keep sending until the end of the paid period, then the account moves to the free tier."
+          "After that window, payments by card or Pix are non-refundable and we do not refund unused volume pro-rata: you can cancel at any time and keep sending until the end of the paid period, then the account moves to the free tier."
         ]
       },
       {
@@ -279,7 +284,7 @@
       {
         "title": "7. How to request a refund",
         "body": [
-          "Email jean@mepmail.dev from your account address (or tell us the account email) with the charge reference. Refunds are processed through Stripe back to the original payment method, typically within 5–10 business days depending on your bank."
+          "Email jean@mepmail.dev from your account address (or tell us the account email) with the charge reference. Refunds are processed through Stripe back to the original payment method (a Pix payment goes back by Pix to the account that paid it), typically within 5–10 business days depending on your bank."
         ]
       },
       {

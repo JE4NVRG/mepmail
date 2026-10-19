@@ -129,7 +129,7 @@
     "sending": {
       "label": "For your application",
       "title": "Send only",
-      "body": "110,000 emails each month for a recurring US$ 29; new customers pay US$ 20 only for the first monthly bill. Send can be used without mailboxes, and existing subscriptions are preserved.",
+      "body": "110,000 emails each month for a recurring US$ 29; eligible new customers pay US$ 20 only for the first monthly bill. Send can be used without mailboxes, and existing subscriptions are preserved.",
       "link": "Compare Send plans"
     },
     "mail": {
@@ -229,7 +229,7 @@
       },
       {
         "q": "I bought a domain. Can I create any address now?",
-        "a": "You can choose an available address on a domain you control. Sending and receiving require a Mail subscription (on its own or with a Send plan), domain verification, DNS/MX configuration and confirmed receiving activation. If your DNS is at Cloudflare, the dashboard creates the sending records for you. Registering an address alone does not complete these steps."
+        "a": "You can choose an available address on a domain you control. Sending and receiving require a Mail subscription (on its own or with a Send plan), domain verification, DNS/MX configuration and confirmed receiving activation. If your DNS is at Cloudflare, the dashboard creates the sending records and, where the domain has no MX yet, the receiving MX for you; it never changes an MX that points elsewhere. Registering an address alone does not complete these steps."
       },
       {
         "q": "Do I need a website or hosting?",

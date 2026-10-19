@@ -1,14 +1,16 @@
 {
   "terms": {
     "title": "Termos de Uso",
-    "updated": "Última atualização: 10 de outubro de 2026",
-    "intro": "Estes termos regem o seu acesso e uso do MepMail, um serviço de e-mail transacional operado pela Je4nDev (\"nós\"). Ao criar uma conta ou usar o serviço, você concorda com estes termos. Se não concordar, não use o serviço.",
+    "updated": "Última atualização: 19 de outubro de 2026",
+    "intro": "Estes termos regem o seu acesso e uso do MepMail, um serviço de e-mail operado pela Je4nDev (\"nós\") com dois produtos: o Envio, para e-mail transacional e de marketing com permissão, e o Correio, para caixas de e-mail no seu domínio. Ao criar uma conta ou usar o serviço, você concorda com estes termos. Se não concordar, não use o serviço.",
     "sections": [
       {
         "title": "1. O serviço",
         "body": [
-          "O MepMail permite enviar e-mails transacionais por API HTTPS, relay SMTP ou servidor MCP, e gerenciar domínios de envio, contatos, supressões e eventos de entrega. A entrega é feita pelo Amazon SES, que atua como nossa infraestrutura de envio.",
-          "O serviço é oferecido em degraus: Free e Starter têm limite diário de envio, e Pro e Scale incluem um volume mensal. Você é responsável por escolher o degrau adequado ao seu volume. No Free e no Starter, os envios além do limite diário esperam numa fila e nunca são cobrados; no Pro e no Scale mensais, os envios além do volume incluído são cobrados como excedente, que vem ligado e pode ser desligado em Cobrança, conforme descrito na página de preços."
+          "O Envio permite enviar e-mails transacionais por API HTTPS, relay SMTP ou servidor MCP, e gerenciar domínios de envio, contatos, supressões e eventos de entrega. A entrega é feita pelo Amazon SES, que atua como nossa infraestrutura de envio.",
+          "O Envio é oferecido em degraus: Free e Starter têm limite diário de envio, e Pro e Scale incluem um volume mensal. Você é responsável por escolher o degrau adequado ao seu volume. No Free e no Starter, os envios além do limite diário esperam numa fila e nunca são cobrados; quando essa fila chega a 3× o limite diário, novos envios são recusados. No Pro e no Scale mensais, os envios além do volume incluído são cobrados como excedente, que vem ligado e pode ser desligado em Cobrança, conforme descrito na página de preços.",
+          "O Correio oferece caixas de e-mail no seu domínio, para pessoas e para agentes de IA: receber, ler, organizar e responder mensagens pelo site, pelos apps, por IMAP e SMTP, por API ou por MCP. Ele é contratado por plano (Solo, Duo ou Equipe), com o número de caixas, o armazenamento e as franquias mensais de envio e de recebimento mostrados na página de preços no momento da contratação. O Correio não cobra excedente: ao atingir uma franquia, o envio para até o mês seguinte, e mensagens recebidas além da franquia ou com o armazenamento cheio podem ser recusadas, com aviso ao remetente.",
+          "Você também pode conectar ao Correio contas que já tem em outros provedores (como Gmail, iCloud, Yahoo, Zoho, Outlook ou outra conta IMAP), sem custo, nos limites mostrados no produto. Essas contas continuam sujeitas aos termos do provedor; o MepMail usa o acesso que você conceder só para ler a Caixa de entrada e enviar as mensagens que você escrever, e você pode desconectá-las a qualquer momento. Se você der a um agente de IA acesso a uma caixa, você escolhe as permissões dele: sem a permissão de envio, cada envio espera a sua aprovação. Você é responsável pelo que o agente envia em seu nome."
         ]
       },
       {
@@ -21,7 +23,7 @@
       {
         "title": "3. Uso aceitável",
         "body": [
-          "O MepMail é para e-mail transacional e de marketing com permissão. Você não pode usar o serviço para:"
+          "O MepMail é para e-mail transacional e de marketing com permissão e para caixas de e-mail de uso legítimo. Você não pode usar o serviço para:"
         ],
         "list": [
           "Enviar e-mail em massa não solicitado (spam) ou para listas compradas, alugadas ou raspadas.",
@@ -30,7 +32,9 @@
           "Cadastrar ou enviar a partir de domínios que você não controla, como domínios de e-mail público ou descartável.",
           "Enviar conteúdo ilegal, abusivo, de ódio ou que viole direitos.",
           "Processar dados sobre os quais você não tem direitos.",
-          "Sondar, sobrecarregar ou tentar burlar limites, cotas ou a segurança do serviço, inclusive trocando de remetente, domínio ou conta para escapar de bloqueios ou revisões."
+          "Sondar, sobrecarregar ou tentar burlar limites, cotas ou a segurança do serviço, inclusive trocando de remetente, domínio ou conta para escapar de bloqueios ou revisões.",
+          "Usar caixas do Correio para receber, guardar ou reencaminhar spam, phishing ou malware, ou criar regras, respostas automáticas ou encaminhamentos que mandem e-mail não solicitado a terceiros.",
+          "Conectar ao Correio contas de outros provedores que você não tem o direito de acessar."
         ]
       },
       {
@@ -42,14 +46,15 @@
       {
         "title": "5. Planos, cobrança e excedente",
         "body": [
-          "Planos pagos são cobrados em dólar, via Stripe, por mês ou por ano, antecipadamente. O volume é contado por destinatário distinto, como faz a nossa infraestrutura de entrega. No Pro e no Scale mensais, os envios além do volume incluído são cobrados pela taxa de excedente do plano, até 5× esse volume; o excedente vem ligado e pode ser desligado em Cobrança. Planos anuais, Free e Starter não têm cobrança de excedente.",
-          "Se um pagamento falhar, podemos suspender o envio até a regularização. Preços podem mudar com aviso de pelo menos 30 dias; mudanças nunca valem retroativamente para um período já pago."
+          "Planos pagos são cobrados antecipadamente, por mês ou por ano, via Stripe: em dólar ou, no Brasil, em reais, no cartão ou no Pix. Com Pix, cada período é pago por fatura, com vencimento em até 5 dias, sem cobrança automática. O volume do Envio é contado por destinatário distinto, como faz a nossa infraestrutura de entrega. No Pro e no Scale mensais, os envios além do volume incluído são cobrados pela taxa de excedente do plano, até 5× esse volume; o excedente vem ligado e pode ser desligado em Cobrança. Planos anuais, Free e Starter não têm cobrança de excedente.",
+          "O primeiro plano do Correio de uma equipe pode ter 7 dias grátis com cartão. A cobrança começa automaticamente no fim do teste, a menos que você cancele antes, e um aviso chega 2 dias antes do fim. Durante o teste, o envio pelo Correio tem um limite menor, mostrado na contratação. O teste grátis não vale no Pix.",
+          "Se um pagamento falhar ou uma fatura vencer sem pagamento, podemos suspender o envio e o uso das caixas do Correio até a regularização. Preços podem mudar com aviso de pelo menos 30 dias; mudanças nunca valem retroativamente para um período já pago."
         ]
       },
       {
         "title": "6. Cancelamento",
         "body": [
-          "Você pode cancelar a qualquer momento pelo painel. O cancelamento interrompe as renovações futuras; a conta segue ativa até o fim do período pago e depois passa para o degrau gratuito com os seus limites de envio. Reembolsos seguem a Política de Reembolso."
+          "Você pode cancelar a qualquer momento pelo painel. O cancelamento interrompe as renovações futuras; a conta segue ativa até o fim do período pago e depois passa para o degrau gratuito do Envio, com os seus limites de envio. No Correio, o cancelamento também vale no fim do período pago, e a guarda e a exclusão das caixas e das mensagens seguem a Política de Privacidade, inclusive a restauração de uma caixa excluída por 30 dias. Reembolsos seguem a Política de Reembolso."
         ]
       },
       {
@@ -71,7 +76,7 @@
       {
         "title": "9. Propriedade intelectual",
         "body": [
-          "O software do MepMail é aberto sob a AGPL e pode ser auto-hospedado; o serviço hospedado, a marca e a documentação são nossos. Os seus dados — contatos, mensagens e domínios — continuam seus. Não reivindicamos propriedade sobre eles."
+          "O software do MepMail é aberto sob a AGPL e pode ser auto-hospedado; o serviço hospedado, a marca e a documentação são nossos. Os seus dados — contatos, mensagens, caixas e domínios — continuam seus. Não reivindicamos propriedade sobre eles."
         ]
       },
       {
@@ -204,7 +209,7 @@
       {
         "title": "10. Apps",
         "body": [
-          "Os apps para Windows, Linux, macOS e Android mostram o mesmo serviço do site e seguem esta política. O app para computador pode guardar uma cópia das mensagens para leitura sem internet no próprio aparelho, apagada quando você sai da conta. O app Android não vende nem mostra preços e não faz mensuração de publicidade; nele você vê o plano, o período e pode cancelar a renovação de uma assinatura já contratada."
+          "Os apps para Windows e Linux, e os apps para macOS e Android quando forem lançados, mostram o mesmo serviço do site e seguem esta política. O app para computador pode guardar uma cópia das mensagens para leitura sem internet no próprio aparelho, apagada quando você sai da conta. O app Android não vende nem mostra preços e não faz mensuração de publicidade; nele você vê o plano, o período e pode cancelar a renovação de uma assinatura já contratada."
         ]
       },
       {
@@ -236,7 +241,7 @@
   },
   "refund": {
     "title": "Política de Reembolso",
-    "updated": "Última atualização: 8 de outubro de 2026",
+    "updated": "Última atualização: 19 de outubro de 2026",
     "intro": "Queremos que você pague apenas se o MepMail funcionar para você. O degrau gratuito existe para você validar o serviço com e-mail real antes de gastar qualquer coisa.",
     "sections": [
       {
@@ -248,13 +253,13 @@
       {
         "title": "2. Garantia de 7 dias no primeiro pagamento",
         "body": [
-          "Se você fizer upgrade e não ficar satisfeito, peça em até 7 dias após o primeiro pagamento e reembolsamos integralmente — sem interrogatório. Uma garantia por conta, no primeiro período pago. A garantia não vale para contas suspensas por violar os Termos de Uso (veja a seção 6)."
+          "Se você fizer upgrade e não ficar satisfeito, peça em até 7 dias após o primeiro pagamento e reembolsamos integralmente — sem interrogatório. Uma garantia por conta, no primeiro período pago, no cartão ou no Pix. No teste grátis de 7 dias do Correio, os 7 dias contam a partir da primeira cobrança, no fim do teste. A garantia não vale para contas suspensas por violar os Termos de Uso (veja a seção 6)."
         ]
       },
       {
         "title": "3. Depois dos primeiros 7 dias",
         "body": [
-          "Passada a janela, os pagamentos não são reembolsáveis e não devolvemos volume não usado de forma proporcional: você pode cancelar a qualquer momento e continuar enviando até o fim do período pago; depois, a conta passa para o degrau gratuito."
+          "Passada a janela, os pagamentos no cartão ou no Pix não são reembolsáveis e não devolvemos volume não usado de forma proporcional: você pode cancelar a qualquer momento e continuar enviando até o fim do período pago; depois, a conta passa para o degrau gratuito."
         ]
       },
       {
@@ -279,7 +284,7 @@
       {
         "title": "7. Como pedir reembolso",
         "body": [
-          "Envie um e-mail para jean@mepmail.dev a partir do endereço da conta (ou informe o e-mail da conta) com a referência da cobrança. Os reembolsos são processados pelo Stripe, de volta ao meio de pagamento original, normalmente em 5 a 10 dias úteis, dependendo do seu banco."
+          "Envie um e-mail para jean@mepmail.dev a partir do endereço da conta (ou informe o e-mail da conta) com a referência da cobrança. Os reembolsos são processados pelo Stripe, de volta ao meio de pagamento original (um pagamento por Pix volta por Pix para a conta que pagou), normalmente em 5 a 10 dias úteis, dependendo do seu banco."
         ]
       },
       {

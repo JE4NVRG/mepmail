@@ -84,7 +84,7 @@
     "items": [
       {
         "q": "What is MepMail for?",
-        "a": "Sending serves application messages, sign-ups and campaigns, with a dashboard, HTTP API, templates, contacts, broadcasts, webhooks and metrics.",
+        "a": "Two products in one account, on the same verified domain. Send serves your application's email (sign-ups, password resets, notifications and campaigns) by API, SMTP or MCP, with a dashboard, templates, contacts, broadcasts, webhooks and metrics. Mail gives mailboxes on your domain to people and AI agents. Use one, the other or both.",
         "link": {
           "label": "Documentation",
           "href": "https://docs.mepmail.dev"
@@ -152,6 +152,38 @@
         "link": {
           "label": "suporte@mepmail.dev",
           "href": "mailto:suporte@mepmail.dev"
+        }
+      },
+      {
+        "q": "Do you offer a dedicated IP?",
+        "a": "Not at the moment. Every sender uses Amazon SES's shared IPs, which SES monitors; your reputation comes from your verified domain, your list and your content.",
+        "link": {
+          "label": "Deliverability insights",
+          "href": "https://docs.mepmail.dev/concepts/deliverability-insights"
+        }
+      },
+      {
+        "q": "What is your delivery rate?",
+        "a": "We do not publish a platform-wide number: it depends on each sender's domain, list and content. What we enforce instead: a team's sending pauses when its hard bounces reach 5% (at least 10) or its complaints reach 0.1% (at least 3), over today and yesterday once there are 100 sends, with a warning at 4% and 0.05% over 7 days. Those lines protect the reputation every sender shares.",
+        "link": {
+          "label": "Sending pauses",
+          "href": "https://docs.mepmail.dev/errors#sending-pauses-and-holds"
+        }
+      },
+      {
+        "q": "My account is under review or suspended. What now?",
+        "a": "We answer within 2 business days. To ask for a review or to appeal, write to suporte@mepmail.dev from the account address with the sending domain, the kind of email you send (transactional, marketing or agents) and where your list comes from. Never send passwords or API keys.",
+        "link": {
+          "label": "suporte@mepmail.dev",
+          "href": "mailto:suporte@mepmail.dev"
+        }
+      },
+      {
+        "q": "Is there an SLA or a status page?",
+        "a": "There is no SLA for now. The status page shows the availability of the dashboard, the API and the docs, and the incidents we publish.",
+        "link": {
+          "label": "Status",
+          "href": "/status"
         }
       }
     ]

@@ -14,7 +14,7 @@ e um `429 rate_limit_exceeded` responde pela que estiver cheia:
 | Janela | Padrão | Definida por |
 | --- | --- | --- |
 | Por chave de API | 600 requisições/minuto | `API_RATE_LIMIT_PER_MINUTE` |
-| Por time, somando todas as chaves | 3.000 requisições/minuto | Implantação |
+| Por time, somando todas as chaves | 3.000 requisições/minuto | Fixo (não configurável) |
 
 - Criar mais chaves não multiplica o teto — a janela do time cobre todas elas.
 - A janela fixa zera no minuto, então uma rajada que enche uma janela e outra
@@ -88,6 +88,10 @@ e um `429 rate_limit_exceeded` responde pela que estiver cheia:
   reclamação cruze o guardrail recebe `403 sending_paused`, e o envio de
   broadcast espera a taxa regional da plataforma (`403 broadcasts_paused`). Os
   dois estão em [Erros](/pt-BR/errors#pausas-e-bloqueios-de-envio).
+- Os planos do **Correio** não têm excedente: o envio para na franquia mensal
+  do plano até o mês seguinte, e mensagens recebidas além da franquia ou com o
+  armazenamento cheio podem ser recusadas. As franquias de cada plano estão em
+  [Preços](https://mepmail.dev/pricing).
 
 ## Limites de formato da mensagem
 
@@ -99,7 +103,7 @@ e um `429 rate_limit_exceeded` responde pela que estiver cheia:
 ## Limites por plano (objetos)
 
 - Contatos: 1.000 no Free, ilimitado em todos os planos pagos.
-- Domínios remetentes: 1 / 10 / 25 / ilimitado (Free / Starter / Pro / Scale); até 3 enquanto só o Correio estiver ativo.
+- Domínios remetentes: 1 / 10 / 25 / ilimitado (Free / Starter / Pro / Scale); com um plano do Correio ativo, o Free vai até 3.
 - Times por usuário: 1 / 3 / 10 / ilimitado.
 
 Veja [Cobrança](/pt-BR/billing) para preços e a escada completa.

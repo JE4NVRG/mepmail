@@ -97,8 +97,8 @@ The send tells you up front:
 
 - Only a **verified domain** of your team may appear in `from`.
 - If your trailing bounce or complaint rate has crossed the SES pause
-  threshold, new broadcast sends are blocked with a `403 sending_paused`
-  error — stopping the damage before SES pauses sending entirely.
+  threshold, new sends — broadcasts and transactional alike — are blocked
+  with a `403 sending_paused` error — stopping the damage before SES pauses sending entirely.
 - If the platform's aggregate bounce or complaint rate in your sender's SES
   region approaches the SES review line, broadcast sends in that region are
   refused with `403 broadcasts_paused` until the rate recovers. Transactional

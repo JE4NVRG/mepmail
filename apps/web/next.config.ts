@@ -47,6 +47,19 @@ const config: NextConfig = {
         destination: "https://docs.mepmail.dev/llms-full.txt",
         permanent: true,
       },
+      // URLs people guess: billing is the dashboard page; rate limits and the docs live on the docs host.
+      { source: "/billing", destination: "/settings/billing", permanent: false },
+      {
+        source: "/rate-limits",
+        destination: "https://docs.mepmail.dev/rate-limits",
+        permanent: true,
+      },
+      { source: "/docs", destination: "https://docs.mepmail.dev", permanent: true },
+      {
+        source: "/docs/:path*",
+        destination: "https://docs.mepmail.dev/:path*",
+        permanent: true,
+      },
     ];
   },
   async headers() {

@@ -17,16 +17,22 @@ Pro and unlimited on Scale. At either cap the API answers
 `403 plan_limit_reached` ("Your plan allows up to 1000 contacts")
 and the dashboard shows the same sentence.
 
-| Rung | Plan | Price | Included | Cap | Overage per 1,000 |
-| --- | --- | --- | --- | --- | --- |
-| `free` | Free | $0 | 100 | per day | — |
-| `starter` | Starter | $9 | 1,500 | per day | — |
-| `pro_100k` | Pro | $29 (launch offer; $20 grandfathered) | 110,000 | per month | $0.35 |
-| `pro_200k` | Pro | $55 | 220,000 | per month | $0.32 |
-| `scale_500k` | Scale | $129 | 550,000 | per month | $0.29 |
-| `scale_1m` | Scale | $239 | 1,100,000 | per month | $0.26 |
-| `scale_1_5m` | Scale | $349 | 1,650,000 | per month | $0.24 |
-| `scale_2_5m` | Scale | $549 | 2,750,000 | per month | $0.22 |
+| Rung | Plan | Price (USD) | Price in Brazil (BRL) | Included | Cap | Overage per 1,000 (USD / BRL) |
+| --- | --- | --- | --- | --- | --- | --- |
+| `free` | Free | $0 | R$ 0 | 100 | per day | — |
+| `starter` | Starter | $9 | R$ 49 | 1,500 | per day | — |
+| `pro_100k` | Pro | $29 (launch offer; subscriptions from before it keep $20) | R$ 149 (launch offer; subscriptions from before it keep R$ 99) | 110,000 | per month | $0.35 / R$ 1.75 |
+| `pro_200k` | Pro | $55 | R$ 279 | 220,000 | per month | $0.32 / R$ 1.60 |
+| `scale_500k` | Scale | $129 | R$ 649 | 550,000 | per month | $0.29 / R$ 1.45 |
+| `scale_1m` | Scale | $239 | R$ 1,199 | 1,100,000 | per month | $0.26 / R$ 1.30 |
+| `scale_1_5m` | Scale | $349 | R$ 1,749 | 1,650,000 | per month | $0.24 / R$ 1.20 |
+| `scale_2_5m` | Scale | $549 | R$ 2,749 | 2,750,000 | per month | $0.22 / R$ 1.10 |
+
+Pro 110K's launch offer: $29 a month (R$ 149), with $20 (R$ 99) on the first
+monthly bill for eligible new customers, or $290 (R$ 1,490) for a year paid
+upfront, which has no overage. In Brazil every price is charged in reais, by
+card or Pix. The queue, overage and 5× ceiling rules are the same everywhere:
+[Rate limits → Sending volume](/rate-limits#sending-volume).
 
 The ladder is `PLAN_RUNGS` in `packages/core/src/plans.ts`; Checkout, the
 dashboard, `GET /usage` and the account mails all read it from there. The
@@ -41,7 +47,7 @@ The counter is the UTC day. Sends keep passing up to 50% past the cap before
 parking, so a busy day is not cut off at the cap; emails over that ceiling
 park as `queued_quota` and the 15-minute `quota.drain` job releases them after
 midnight UTC. The API answers `429 daily_quota_exceeded` only when the parked
-backlog is full. Owners hear `quota.warning` at 80% of the cap,
+backlog reaches 3× the daily cap. Owners hear `quota.warning` at 80% of the cap,
 `quota.reached` at the cap and `quota.paused` when parking begins, once per
 UTC day; a plan upgrade releases parked mail within minutes.
 

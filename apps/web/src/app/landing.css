@@ -377,6 +377,12 @@
 .gtm-table th:first-child {
   text-align: left;
 }
+.gtm-table .gtm-basis {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ms-muted);
+}
 .gtm-table thead {
   background: var(--ms-panel-raised);
 }

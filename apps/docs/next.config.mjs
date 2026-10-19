@@ -7,6 +7,24 @@ const config = {
   // Content pages are prerendered with dynamicParams = false, so an unknown
   // URL never reaches [lang]/not-found; the global page answers it instead.
   experimental: { globalNotFound: true },
+  async redirects() {
+    // The names people guess for pages that live under another title. Temporary (307):
+    // a page of its own can take the name later without a cached permanent redirect.
+    const aliases = [
+      ["agents", "mcp", "mcp"],
+      ["n8n", "integrations#n8n", "integrations#n8n"],
+      ["smtp", "integrations#smtp-relay", "integrations#relay-smtp"],
+    ];
+    return [
+      { source: "/docs", destination: "/", permanent: true },
+      { source: "/docs/:path*", destination: "/:path*", permanent: true },
+      ...aliases.flatMap(([name, en, pt]) => [
+        { source: `/${name}`, destination: `/${en}`, permanent: false },
+        { source: `/en/${name}`, destination: `/${en}`, permanent: false },
+        { source: `/pt-BR/${name}`, destination: `/pt-BR/${pt}`, permanent: false },
+      ]),
+    ];
+  },
   async rewrites() {
     return [
       // Agent-readable markdown: appending .md to any content page URL serves

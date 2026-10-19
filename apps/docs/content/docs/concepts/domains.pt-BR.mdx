@@ -42,6 +42,27 @@ traz `live` (`found`, `missing`, `mismatch` ou `unknown`: o que o DNS público
 responde agora) e, quando a linha não está verificada, um `detail` de uma linha
 dizendo por quê.
 
+## Recebimento (Correio)
+
+A verificação cobre o envio. Para receber nas caixas do Correio, o domínio
+(ou o subdomínio das caixas) também precisa deste registro MX; depois ligue
+o recebimento em **Correio → Recebimento**, que confere o registro antes de
+ativar.
+
+| Tipo | Nome | Valor | Prioridade |
+| --- | --- | --- | --- |
+| MX | o domínio das caixas (`@` para a raiz, ou o subdomínio) | `inbound-smtp.us-east-1.amazonaws.com` | `10` |
+
+- Ele precisa ser o MX principal: todo registro com o menor número de
+  prioridade tem que ser este. O MX de outro provedor com número maior fica
+  como reserva e não impede a ativação.
+- Trocar o MX muda o recebimento do domínio ou subdomínio inteiro: crie antes
+  todas as caixas e aliases.
+- Com um token da Cloudflare só de DNS, o painel grava este MX quando o nome
+  ainda não tem MX, e nunca muda um MX que aponta para outro serviço.
+- O MepMail Cloud recebe em `us-east-1`, a região em que os domínios são
+  provisionados.
+
 ## Regiões
 
 Uma instalação provisiona identidades nas regiões do SES que atende — a sua

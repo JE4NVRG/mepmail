@@ -9,7 +9,9 @@ import { DOCS_URL } from "@/lib/docs-links";
 import {
   comparisonRowsForLocale,
   formatComparisonPrice,
+  formatUsd,
   formatVolume,
+  resendQuote,
 } from "@/lib/landing-pricing";
 import { legalLinks } from "@/lib/legal-links";
 import { signupHref } from "@/lib/public-intent";
@@ -65,6 +67,18 @@ export default async function ResendAlternativePage() {
   const steps = t.raw("steps.items") as string[];
   const migrationLimits = t.raw("steps.limits") as string[];
   const docs = `${DOCS_URL}${locale === "pt-BR" ? "/pt-BR" : ""}`;
+  // The math behind each Resend cell, in Resend's own currency: plan + overage.
+  const resendBasis = (volume: number) => {
+    const quote = resendQuote(volume);
+    return quote.extra > 0
+      ? t("table.resendBasis", {
+          plan: quote.plan,
+          base: formatUsd(quote.base, locale),
+          extra: new Intl.NumberFormat(locale).format(quote.extra),
+          rate: formatUsd(quote.overagePer1k, locale),
+        })
+      : t("table.resendBasisPlain", { plan: quote.plan, base: formatUsd(quote.base, locale) });
+  };
 
   return (
     <div className="gtm">
@@ -128,7 +142,10 @@ export default async function ResendAlternativePage() {
                     return (
                       <tr key={row.volume}>
                         <th scope="row">{formatVolume(row.volume, locale)}</th>
-                        <td>{formatComparisonPrice(row.resend, locale)}</td>
+                        <td>
+                          {formatComparisonPrice(row.resend, locale)}{" "}
+                          <span className="gtm-basis">{resendBasis(row.volume)}</span>
+                        </td>
                         <td>{formatComparisonPrice(row.mepmail, locale)}</td>
                         <td>
                           {t("table.rowAdvantage", {

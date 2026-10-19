@@ -12,6 +12,8 @@
     "intro": "Mensalidades recorrentes MepMail e menor opção publicada da Resend para cada volume, incluindo excedente quando necessário, conferida em 16/10/2026. Sem promoção de entrada ou desconto anual; recursos e condições variam.",
     "columns": ["Envios/mês", "Resend", "MepMail", "Diferença estimada"],
     "rowAdvantage": "Diferença: {percent}% · {usd}/mês",
+    "resendBasis": "{plan} por {base} + {extra} excedentes a {rate}/mil",
+    "resendBasisPlain": "{plan} por {base}",
     "source": "Fonte Resend: <link>resend.com/pricing</link>, conferida em {date}. MepMail: mensalidade recorrente do catálogo em reais. Valores estrangeiros convertidos pela PTAX venda de 15/10/2026 (US$ 1 = R$ 5,0521), antes de impostos e tarifas; recursos e condições não são equivalentes."
   },
   "claim": {
@@ -32,7 +34,7 @@
     "items": [
       "Inbound, IP dedicado e SSO não fazem parte da promessa de compatibilidade.",
       "A superfície de gestão é menor: cobrimos envio, domínios, chaves, webhooks, templates, supressões e contatos, mas não todos os endpoints que eles publicam.",
-      "Free e Starter têm limite diário em vez de excedente: o que passa dele espera numa fila, nunca vai para o cartão.",
+      "Free e Starter têm limite diário em vez de excedente: os envios seguem até 50% acima dele e depois esperam numa fila para o dia seguinte, nunca vão para o cartão; novos envios só são recusados quando essa fila chega a 3× o limite diário.",
       "Limite de anexos por mensagem: 1 MB no Free e Starter, 5 MB no Pro, 10 MB no Scale."
     ]
   },

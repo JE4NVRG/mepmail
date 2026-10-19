@@ -37,8 +37,11 @@ import { MCP_TOOLS } from "./mcp-tools.js";
  * two match). io.github.* is namespaced by the GitHub account that publishes.
  */
 export const MCP_SERVER_NAME = "io.github.JE4NVRG/mepmail";
-/** The hosted server's version: the platform release (CHANGELOG.md) that serves it. */
-export const MCP_SERVER_VERSION = "0.71.0";
+/**
+ * The hosted server's version, as the official MCP registry lists it: 0.71.1 is the entry
+ * that points at @mepmail/mcp 0.3.2 (0.71.0 still pointed at 0.2.1).
+ */
+export const MCP_SERVER_VERSION = "0.71.1";
 /** The OAuth issuer that signs the endpoint's access tokens (OAUTH_ISSUER_URL in production). */
 const AUTHORIZATION_SERVER = "https://mepmail.dev";
 

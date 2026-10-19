@@ -52,7 +52,12 @@ são `403` e determinísticas — nenhum laço de retentativa as resolve:
 
 - **`sending_paused`** — a taxa de bounce duro ou de reclamação do próprio time
   na janela recente está no limite ou acima do guardrail, então o envio é
-  recusado antes de chegar à fila. A mensagem informa a métrica, a taxa, a
+  recusado antes de chegar à fila. Vale para todo envio, transacional e
+  broadcast. A linha: bounces duros a partir de 5% (e pelo menos 10) ou
+  reclamações a partir de 0,1% (e pelo menos 3), em hoje e ontem (UTC),
+  contando só quando a janela tem 100 envios. Antes dela, um aviso em 4% de
+  bounces ou 0,05% de reclamações em 7 dias mostra um banner e desacelera os
+  broadcasts, sem bloquear. A mensagem informa a métrica, a taxa, a
   janela e o limite. Limpe a lista e diminua o ritmo até a taxa voltar para
   baixo da linha; [insights de entregabilidade](/pt-BR/concepts/deliverability-insights)
   é o relatório que mostra quais endereços causaram isso.
@@ -78,6 +83,10 @@ Duas proteções rodam antes de o e-mail chegar ao SES, no MepMail Cloud:
   Stripe, fica retido para uma revisão rápida. A API continua respondendo
   `200` com o id do e-mail; o e-mail espera como `queued` e sai quando a
   revisão termina, e o painel mostra a retenção. Nada se perde.
+- **Pedir revisão ou recorrer.** Respondemos em até 2 dias úteis. Escreva
+  para suporte@mepmail.dev pelo e-mail da conta, com o domínio de envio, o
+  tipo de e-mail que você envia (transacional, marketing ou agentes) e a origem
+  da sua lista. Vale para a revisão e para um `team_suspended`.
 
 ## Repetir requisições
 

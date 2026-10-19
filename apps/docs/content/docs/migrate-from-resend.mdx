@@ -1,11 +1,12 @@
 ---
 title: Migrate from Resend
-description: One command moves your Resend account; two environment lines move your code — the wire format is identical.
+description: One command moves your Resend account; two environment lines move your code, for the sending flows that follow the Resend API format.
 ---
 
-MepMail's REST API is wire-compatible with Resend's: same endpoints, same
-request and response shapes. Migrating is a configuration change, not a
-rewrite. The account data — contacts, segments, topics, templates, webhooks,
+MepMail's REST API follows the Resend API format: for the supported
+endpoints, the same requests and the same response shapes. For those sending
+flows, migrating is a configuration change, not a rewrite; the management
+surface is smaller than Resend's, and the differences are listed below. The account data — contacts, segments, topics, templates, webhooks,
 domains, suppressions — moves with one command.
 
 ## Hand it to an agent

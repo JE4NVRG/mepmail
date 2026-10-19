@@ -51,8 +51,13 @@ Three refusals mean "not now, and not because of your request". All three are
 
 - **`sending_paused`** — the team's own hard-bounce or complaint rate over the
   trailing window is at or above the guardrail, so a send is refused before it
-  reaches the queue. The message names the metric, the rate, the window and the
-  limit. Clean the list and slow down until the rate falls back under the line;
+  reaches the queue. It applies to every send, transactional and broadcast.
+  The line: hard bounces at 5% or more (and at least 10 of them) or complaints
+  at 0.1% or more (and at least 3), over today and yesterday (UTC), counted only
+  once the window holds 100 sends. Before it, a warning at 4% bounces or 0.05%
+  complaints over 7 days shows a banner and slows broadcasts, never blocks. The
+  message names the metric, the rate, the window and the limit. Clean the list
+  and slow down until the rate falls back under the line;
   [deliverability insights](/concepts/deliverability-insights) is the report
   that says which addresses caused it.
 - **`broadcasts_paused`** — broadcast sending only
@@ -76,6 +81,10 @@ Two protections run before mail reaches SES, on MepMail Cloud:
   fraud screening, is held for a short review. The API still answers `200`
   with the email id; the mail waits as `queued` and goes out when the review
   ends, and the dashboard shows the hold. Nothing is lost.
+- **Asking for a review or appealing.** We answer within 2 business days. Write
+  to suporte@mepmail.dev from the account address with the sending domain, the
+  kind of email you send (transactional, marketing or agents) and where your
+  list comes from. This covers a review hold and a `team_suspended` alike.
 
 ## Retrying
 

@@ -102,7 +102,7 @@
   "stack": {
     "eyebrow": "Funciona com a sua stack",
     "aria": "Integrações e linguagens que funcionam com o MepMail",
-    "note": "Node comunitário do n8n, canais de notificação Slack/Discord/Telegram, os SDKs oficiais com os quais a API é compatível por drop-in, Docker para auto-hospedar e cURL puro. Cada integração usa a credencial certa: chave de Envio, chave de caixa ou OAuth.",
+    "note": "Node comunitário do n8n, canais de notificação Slack/Discord/Telegram, os SDKs oficiais com os quais a API é compatível (troca só a baseUrl e a chave), Docker para auto-hospedar e cURL puro. Cada integração usa a credencial certa: chave de Envio, chave de caixa ou OAuth.",
     "pageCta": "Ver todas as integrações"
   },
   "compare": {
@@ -457,6 +457,9 @@
       "more": "Ver o Envio",
       "note": "<b>{free} e-mails por dia grátis</b>, sem cartão",
       "changed": "2 linhas mudam",
+      "migrateBar": "terminal",
+      "migrateMoves": "Traz contatos, modelos e webhooks",
+      "migrateResult": "# plano, confirmação e aplicação; o rollback desfaz só o que ela criou",
       "blockEyebrow": "Envio",
       "blockTitle": "Tudo o que o seu produto envia, num painel só.",
       "galleryTitle": "Modelos prontos para começar hoje",

@@ -1,11 +1,12 @@
 ---
 title: Migrar do Resend
-description: Um comando move sua conta do Resend; duas linhas de ambiente movem seu código — o formato de wire é idêntico.
+description: Um comando move sua conta do Resend; duas linhas de ambiente movem seu código, nos fluxos de envio que seguem o formato da API do Resend.
 ---
 
-A API REST do MepMail é compatível no wire com a do Resend: mesmos
-endpoints, mesmos formatos de requisição e resposta. Migrar é uma mudança de
-configuração, não uma reescrita. Os dados da conta — contatos, segmentos,
+A API REST do MepMail segue o formato da API do Resend: nos endpoints
+suportados, as mesmas requisições e os mesmos formatos de resposta. Nesses
+fluxos de envio, migrar é uma mudança de configuração, não uma reescrita; a
+superfície de gestão é menor que a do Resend, e as diferenças estão abaixo. Os dados da conta — contatos, segmentos,
 tópicos, templates, webhooks, domínios, supressões — vêm com um comando.
 
 ## Entregue a um agente

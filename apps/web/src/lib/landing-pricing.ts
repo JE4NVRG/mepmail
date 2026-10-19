@@ -13,6 +13,61 @@ export const COMPARISON_FX = {
   url: "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao=%2710-15-2026%27&$format=json",
 } as const;
 
+/**
+ * Resend's transactional plans as resend.com/pricing.md publishes them (checked on
+ * 2026-10-16, unchanged on 2026-10-19): monthly price in USD, included emails and the
+ * overage per 1,000 past them.
+ */
+export const RESEND_PLANS = [
+  { name: "Pro", included: 50_000, usd: 20, overagePer1k: 0.9 },
+  { name: "Pro", included: 100_000, usd: 35, overagePer1k: 0.9 },
+  { name: "Scale", included: 100_000, usd: 90, overagePer1k: 0.9 },
+  { name: "Scale", included: 200_000, usd: 160, overagePer1k: 0.8 },
+  { name: "Scale", included: 500_000, usd: 350, overagePer1k: 0.7 },
+  { name: "Scale", included: 1_000_000, usd: 650, overagePer1k: 0.65 },
+  { name: "Scale", included: 1_500_000, usd: 825, overagePer1k: 0.52 },
+  { name: "Scale", included: 2_500_000, usd: 1_150, overagePer1k: 0.46 },
+] as const;
+
+export interface ResendQuote {
+  /** "Pro 100K", "Scale 500K", "Scale 1.5M": the plan the cheapest option starts from. */
+  plan: string;
+  /** The plan's monthly price, US$. */
+  base: number;
+  /** Emails past the plan's volume, billed as overage. */
+  extra: number;
+  overagePer1k: number;
+  /** base + overage, US$ with cents. */
+  total: number;
+}
+
+function planVolumeLabel(included: number): string {
+  return included >= 1_000_000 ? `${included / 1_000_000}M` : `${included / 1_000}K`;
+}
+
+/**
+ * The cheapest published way to send `volume` emails a month on Resend: a plan, plus
+ * overage for each started 1,000 past it. 110,000 is Pro 100K (US$ 35) + 10,000 extra at
+ * US$ 0.90 per 1,000 = US$ 44, not the US$ 35 of the 100K plan alone.
+ */
+export function resendQuote(volume: number): ResendQuote {
+  let best: ResendQuote | null = null;
+  for (const plan of RESEND_PLANS) {
+    const extra = Math.max(0, volume - plan.included);
+    const total = Math.round((plan.usd + Math.ceil(extra / 1_000) * plan.overagePer1k) * 100) / 100;
+    if (best === null || total < best.total)
+      best = {
+        plan: `${plan.name} ${planVolumeLabel(plan.included)}`,
+        base: plan.usd,
+        extra,
+        overagePer1k: plan.overagePer1k,
+        total,
+      };
+  }
+  if (best === null) throw new RangeError("No Resend plan");
+  return best;
+}
+
 export interface PriceRow {
   /** Emails per month this row refers to: a MepMail rung (plans.ts PLAN_RUNGS). */
   volume: number;
@@ -30,7 +85,7 @@ export const PRICE_ROWS: readonly PriceRow[] = [
   {
     volume: 110_000,
     mepmail: 20,
-    resend: 44,
+    resend: resendQuote(110_000).total,
     sendgrid: 43.95,
     postmark: 115,
     mailgun: 86,
@@ -39,7 +94,7 @@ export const PRICE_ROWS: readonly PriceRow[] = [
   {
     volume: 220_000,
     mepmail: 55,
-    resend: 143,
+    resend: resendQuote(220_000).total,
     sendgrid: 142.95,
     postmark: 245,
     mailgun: 207,
@@ -48,7 +103,7 @@ export const PRICE_ROWS: readonly PriceRow[] = [
   {
     volume: 550_000,
     mepmail: 129,
-    resend: 385,
+    resend: resendQuote(550_000).total,
     sendgrid: 439.95,
     postmark: 455,
     mailgun: 437.5,
@@ -57,7 +112,7 @@ export const PRICE_ROWS: readonly PriceRow[] = [
   {
     volume: 1_100_000,
     mepmail: 239,
-    resend: 715,
+    resend: resendQuote(1_100_000).total,
     sendgrid: 799,
     postmark: 775,
     mailgun: 750,
@@ -66,7 +121,7 @@ export const PRICE_ROWS: readonly PriceRow[] = [
   {
     volume: 1_650_000,
     mepmail: 349,
-    resend: 903,
+    resend: resendQuote(1_650_000).total,
     sendgrid: 889,
     postmark: 1037.5,
     mailgun: 1025,
@@ -75,7 +130,7 @@ export const PRICE_ROWS: readonly PriceRow[] = [
   {
     volume: 2_750_000,
     mepmail: 549,
-    resend: 1265,
+    resend: resendQuote(2_750_000).total,
     sendgrid: 1224,
     postmark: 2962.5,
     mailgun: 1350,

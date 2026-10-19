@@ -9,7 +9,9 @@ import { RESEND_PRICING_SOURCE, resendSavings } from "../src/lib/alternatives-re
 import {
   comparisonRowsForLocale,
   formatComparisonPrice,
+  formatUsd,
   formatVolume,
+  resendQuote,
 } from "../src/lib/landing-pricing";
 import { signupHref } from "../src/lib/public-intent";
 
@@ -107,7 +109,21 @@ describe("Resend migration buyer journey", () => {
         expect(cells).toEqual(
           comparisonRowsForLocale(launch, locale).map((row) => [
             formatVolume(row.volume, locale),
-            formatComparisonPrice(row.resend, locale),
+            // The price, then the math behind it in Resend's own currency.
+            `${formatComparisonPrice(row.resend, locale)} ${(() => {
+              const quote = resendQuote(row.volume);
+              return quote.extra > 0
+                ? t("table.resendBasis", {
+                    plan: quote.plan,
+                    base: formatUsd(quote.base, locale),
+                    extra: new Intl.NumberFormat(locale).format(quote.extra),
+                    rate: formatUsd(quote.overagePer1k, locale),
+                  })
+                : t("table.resendBasisPlain", {
+                    plan: quote.plan,
+                    base: formatUsd(quote.base, locale),
+                  });
+            })()}`,
             formatComparisonPrice(row.mepmail, locale),
             t("table.rowAdvantage", {
               percent: resendSavings(row).pct,

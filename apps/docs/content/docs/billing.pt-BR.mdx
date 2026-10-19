@@ -19,16 +19,22 @@ um desses limites a API responde
 `403 plan_limit_reached` ("Your plan allows up to 1000 contacts") e o painel
 mostra a mesma frase.
 
-| Degrau | Plano | Preço | Incluído | Limite | Excedente por 1.000 |
-| --- | --- | --- | --- | --- | --- |
-| `free` | Free | US$ 0 | 100 | por dia | — |
-| `starter` | Starter | US$ 9 | 1.500 | por dia | — |
-| `pro_100k` | Pro | US$ 29 (oferta de lançamento; US$ 20 para quem já tinha) | 110.000 | por mês | US$ 0,35 |
-| `pro_200k` | Pro | US$ 55 | 220.000 | por mês | US$ 0,32 |
-| `scale_500k` | Scale | US$ 129 | 550.000 | por mês | US$ 0,29 |
-| `scale_1m` | Scale | US$ 239 | 1.100.000 | por mês | US$ 0,26 |
-| `scale_1_5m` | Scale | US$ 349 | 1.650.000 | por mês | US$ 0,24 |
-| `scale_2_5m` | Scale | US$ 549 | 2.750.000 | por mês | US$ 0,22 |
+| Degrau | Plano | Preço (US$) | Preço no Brasil (R$) | Incluído | Limite | Excedente por 1.000 (US$ / R$) |
+| --- | --- | --- | --- | --- | --- | --- |
+| `free` | Free | US$ 0 | R$ 0 | 100 | por dia | — |
+| `starter` | Starter | US$ 9 | R$ 49 | 1.500 | por dia | — |
+| `pro_100k` | Pro | US$ 29 (oferta de lançamento; assinaturas anteriores a ela mantêm US$ 20) | R$ 149 (oferta de lançamento; assinaturas anteriores a ela mantêm R$ 99) | 110.000 | por mês | US$ 0,35 / R$ 1,75 |
+| `pro_200k` | Pro | US$ 55 | R$ 279 | 220.000 | por mês | US$ 0,32 / R$ 1,60 |
+| `scale_500k` | Scale | US$ 129 | R$ 649 | 550.000 | por mês | US$ 0,29 / R$ 1,45 |
+| `scale_1m` | Scale | US$ 239 | R$ 1.199 | 1.100.000 | por mês | US$ 0,26 / R$ 1,30 |
+| `scale_1_5m` | Scale | US$ 349 | R$ 1.749 | 1.650.000 | por mês | US$ 0,24 / R$ 1,20 |
+| `scale_2_5m` | Scale | US$ 549 | R$ 2.749 | 2.750.000 | por mês | US$ 0,22 / R$ 1,10 |
+
+Oferta de lançamento do Pro 110K: US$ 29 por mês (R$ 149), com US$ 20 (R$ 99)
+na primeira mensalidade para novos clientes elegíveis, ou US$ 290 (R$ 1.490)
+por um ano pago antecipadamente, sem excedente. No Brasil, todo preço é cobrado
+em reais, no cartão ou no Pix. As regras de fila, excedente e teto de 5× são as
+mesmas em todo lugar: [Limites → Volume de envio](/pt-BR/rate-limits#volume-de-envio).
 
 A escada é `PLAN_RUNGS` em `packages/core/src/plans.ts`; Checkout, painel,
 `GET /usage` e os e-mails de conta leem tudo de lá. O relatório de migração da
@@ -43,7 +49,7 @@ O contador é o dia UTC. Os envios continuam passando até 50% além do limite
 antes de estacionar, para um dia movimentado não ser cortado no limite; os
 e-mails acima desse teto ficam estacionados como `queued_quota` e o job
 `quota.drain`, a cada 15 minutos, libera-os após a meia-noite UTC. A API
-responde `429 daily_quota_exceeded` só quando a fila estacionada está cheia.
+responde `429 daily_quota_exceeded` só quando a fila estacionada chega a 3× o limite diário.
 Os owners recebem `quota.warning` em 80% do limite, `quota.reached` no limite
 e `quota.paused` quando os envios começam a estacionar, uma vez por dia UTC;
 um upgrade de plano libera o que estava estacionado em poucos minutos.

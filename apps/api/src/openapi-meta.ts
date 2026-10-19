@@ -525,6 +525,17 @@ const SEND_EXAMPLE = {
   html: "<p>Your order is on its way.</p>",
 };
 
+// Fixed ids so the examples read as one account: the same contact, segment, topic and domain.
+const CONTACT_ID = "3f8a2c1e-5b7d-4e9f-a1c2-6d8e0f4b2a91";
+const SEGMENT_ID = "8c1d4e2f-0a3b-4c5d-9e6f-7a8b9c0d1e2f";
+const TOPIC_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
+const DOMAIN_ID = "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f7a";
+
+/**
+ * Written examples, keyed like OPERATION_META. Every request body has one (a test fails
+ * otherwise); a 200 without a written example gets one synthesized from its schema, so a
+ * response example can never drift from the shape the route returns.
+ */
 const EXAMPLES: Readonly<Record<string, { request?: unknown; response?: unknown }>> = {
   "POST /emails": {
     request: SEND_EXAMPLE,
@@ -539,11 +550,127 @@ const EXAMPLES: Readonly<Record<string, { request?: unknown; response?: unknown 
       ],
     },
   },
+  "PATCH /emails/{id}": { request: { scheduled_at: "2026-10-20T09:00:00-03:00" } },
   "POST /contacts": {
     request: { email: "customer@example.com", first_name: "Ana", last_name: "Silva" },
   },
+  "POST /contacts/batch": {
+    request: [
+      { email: "customer@example.com", first_name: "Ana" },
+      { email: "another@example.com", unsubscribed: true },
+    ],
+  },
+  "POST /contacts/batch/get": {
+    request: {
+      contacts: [{ email: "customer@example.com" }, { id: CONTACT_ID }],
+      include: ["topics"],
+    },
+  },
+  "POST /contacts/batch/remove": { request: { emails: ["old@example.com"] } },
+  "PATCH /contacts/{id}": {
+    request: { first_name: "Ana", unsubscribed: false, properties: { plan: "pro" } },
+  },
+  "PATCH /contacts/{id}/topics": { request: [{ id: TOPIC_ID, subscription: "opt_out" }] },
+  "POST /audiences/{audienceId}/contacts": {
+    request: { email: "customer@example.com", first_name: "Ana", last_name: "Silva" },
+  },
+  "PATCH /audiences/{audienceId}/contacts/{id}": { request: { unsubscribed: true } },
+  "POST /contact-properties": { request: { key: "plan", type: "string", fallback_value: "free" } },
+  "PATCH /contact-properties/{id}": { request: { fallback_value: "trial" } },
+  "POST /segments": {
+    request: {
+      name: "Customers at example.com",
+      filter: {
+        match: "all",
+        conditions: [{ field: "email", op: "ends_with", value: "@example.com" }],
+      },
+    },
+  },
+  "PATCH /segments/{id}": { request: { name: "Example customers" } },
+  "POST /broadcasts": {
+    request: {
+      name: "October newsletter",
+      segment_id: SEGMENT_ID,
+      topic_id: TOPIC_ID,
+      from: "Acme <news@yourdomain.com>",
+      subject: "What is new in October",
+      html: "<p>Here is what changed this month.</p>",
+      send: false,
+    },
+  },
+  "PATCH /broadcasts/{id}": { request: { subject: "What is new this October" } },
+  "POST /broadcasts/{id}/send": { request: { scheduled_at: "in 1 hour" } },
+  "POST /topics": {
+    request: {
+      name: "Product updates",
+      description: "News about features and releases",
+      default_subscription: "opt_in",
+      visibility: "public",
+    },
+  },
+  "PATCH /topics/{id}": { request: { description: "Monthly product news" } },
   "POST /domains": { request: { name: "mail.yourdomain.com" } },
+  "PATCH /domains/{id}": {
+    request: { open_tracking: true, click_tracking: true, tracking_subdomain: "links" },
+  },
+  "POST /api-keys": {
+    request: { name: "Production sending", permission: "sending_access", domain_id: DOMAIN_ID },
+  },
+  "POST /webhooks": {
+    request: {
+      endpoint: "https://example.com/webhooks/mepmail",
+      events: ["email.delivered", "email.bounced"],
+    },
+  },
+  "PATCH /webhooks/{id}": { request: { status: "disabled" } },
+  "POST /webhooks/{id}/rotate": { request: { overlap_hours: 24 } },
+  "POST /suppressions": { request: { email: "bounced@example.com", origin: "manual" } },
+  "POST /suppressions/batch/add": {
+    request: { emails: ["bounced@example.com", "old@example.com"], origin: "manual" },
+  },
+  "POST /suppressions/batch/remove": { request: { emails: ["old@example.com"] } },
+  "POST /templates": {
+    request: {
+      name: "Order shipped",
+      alias: "order-shipped",
+      subject: "Your order has shipped",
+      html: "<p>Your order is on its way.</p>",
+      text: "Your order is on its way.",
+    },
+  },
+  "PATCH /templates/{id}": { request: { subject: "Your order is on its way" } },
 };
+
+/** Values for well-known field names, so a synthesized example reads like real data. */
+const NAMED_VALUES: Readonly<Record<string, string>> = {
+  email: "customer@example.com",
+  from: "Acme <hello@yourdomain.com>",
+  to: "customer@example.com",
+  reply_to: "support@yourdomain.com",
+  subject: "Your order has shipped",
+  name: "Order updates",
+  first_name: "Ana",
+  last_name: "Silva",
+  html: "<p>Your order is on its way.</p>",
+  text: "Your order is on its way.",
+  preview_text: "Your order is on its way",
+  endpoint: "https://example.com/webhooks/mepmail",
+  url: "https://example.com/link",
+  domain: "yourdomain.com",
+  key: "plan",
+  description: "Shipping and delivery updates",
+  field: "email",
+  op: "ends_with",
+  value: "@example.com",
+  message: "A human-readable explanation",
+  region: "us-east-1",
+};
+const EXAMPLE_IDS = [
+  "4ef9a417-02e9-4d39-ad75-9611e0fcc33c",
+  "ae2014de-c168-4c61-8267-70d2662a1ce1",
+  "faccb7a5-8a28-4e9a-ac64-8da1cc3bc1cb",
+];
+const EXAMPLE_TIME = "2026-10-19T12:00:00.000Z";
 
 type JsonObject = Record<string, unknown>;
 
@@ -557,9 +684,103 @@ function setJsonExample(container: unknown, example: unknown) {
   if (isObject(media) && media.example === undefined) media.example = example;
 }
 
+function schemaTypes(schema: JsonObject): string[] {
+  const type = schema.type;
+  return Array.isArray(type) ? type.map(String) : typeof type === "string" ? [type] : [];
+}
+
+/**
+ * An example value for a JSON schema of the document: every property of an object, one item
+ * of an array, the first non-null option of anyOf/oneOf, the schema's own example or enum when
+ * it has one, and readable values for well-known field names.
+ */
+export function synthesizeExample(
+  schema: unknown,
+  schemas: JsonObject,
+  name?: string,
+  depth = 0,
+): unknown {
+  let node = schema;
+  for (let hops = 0; isObject(node) && typeof node.$ref === "string" && hops < 20; hops++) {
+    node = schemas[node.$ref.split("/").at(-1) ?? ""];
+  }
+  if (!isObject(node) || depth > 8) return undefined;
+  if (node.example !== undefined) return node.example;
+  if (node.const !== undefined) return node.const;
+  if (Array.isArray(node.enum)) return node.enum.find((value) => value !== null);
+  for (const key of ["anyOf", "oneOf"] as const) {
+    const options = node[key];
+    if (Array.isArray(options) && options.length > 0) {
+      const chosen =
+        options.find((option) => {
+          let resolved = option;
+          for (
+            let hops = 0;
+            isObject(resolved) && typeof resolved.$ref === "string" && hops < 20;
+            hops++
+          )
+            resolved = schemas[resolved.$ref.split("/").at(-1) ?? ""];
+          return isObject(resolved) && !schemaTypes(resolved).every((type) => type === "null");
+        }) ?? options[0];
+      return synthesizeExample(chosen, schemas, name, depth);
+    }
+  }
+  if (Array.isArray(node.allOf)) {
+    const merged: JsonObject = {};
+    for (const part of node.allOf) {
+      const value = synthesizeExample(part, schemas, name, depth);
+      if (isObject(value)) Object.assign(merged, value);
+    }
+    return merged;
+  }
+  // A field the route always answers as null (template from/reply_to today) is null.
+  if (schemaTypes(node).length > 0 && schemaTypes(node).every((type) => type === "null"))
+    return null;
+  const types = schemaTypes(node).filter((type) => type !== "null");
+  const type = types[0] ?? (isObject(node.properties) ? "object" : undefined);
+  if (type === "object") {
+    const properties = isObject(node.properties) ? node.properties : {};
+    const out: JsonObject = {};
+    for (const [key, value] of Object.entries(properties)) {
+      const example = synthesizeExample(value, schemas, key, depth + 1);
+      if (example !== undefined) out[key] = example;
+    }
+    return out;
+  }
+  if (type === "array") {
+    const singular = name?.endsWith("s") ? name.slice(0, -1) : name;
+    const item = synthesizeExample(node.items, schemas, singular, depth + 1);
+    const count = typeof node.minItems === "number" && node.minItems > 1 ? node.minItems : 1;
+    return item === undefined ? [] : Array.from({ length: count }, () => item);
+  }
+  if (type === "string") {
+    let value: string;
+    if (node.format === "uuid" || name === "id" || name?.endsWith("_id"))
+      value = EXAMPLE_IDS[depth % EXAMPLE_IDS.length] ?? EXAMPLE_IDS[0]!;
+    else if (node.format === "date-time" || name?.endsWith("_at")) value = EXAMPLE_TIME;
+    else if (node.format === "email") value = NAMED_VALUES.email!;
+    else if (node.format === "uri")
+      value = name === "endpoint" ? NAMED_VALUES.endpoint! : NAMED_VALUES.url!;
+    else value = (name && NAMED_VALUES[name]) ?? (name ? name.replaceAll("_", " ") : "string");
+    const min = typeof node.minLength === "number" ? node.minLength : 0;
+    const max = typeof node.maxLength === "number" ? node.maxLength : Number.POSITIVE_INFINITY;
+    if (value.length < min) value = value.padEnd(min, "x");
+    return value.slice(0, max);
+  }
+  if (type === "integer" || type === "number") {
+    const min = typeof node.minimum === "number" ? node.minimum : 0;
+    const max = typeof node.maximum === "number" ? node.maximum : Number.POSITIVE_INFINITY;
+    return Math.min(Math.max(min, 1), max);
+  }
+  if (type === "boolean") return false;
+  return undefined;
+}
+
 /** Applies OPERATION_META, tags, the bearer scheme, 401/429 answers and examples in place. */
 export function enrichOpenApiDocument<T extends JsonObject>(doc: T): T {
   const paths = isObject(doc.paths) ? doc.paths : {};
+  const schemas =
+    isObject(doc.components) && isObject(doc.components.schemas) ? doc.components.schemas : {};
   for (const [path, item] of Object.entries(paths)) {
     if (!isObject(item)) continue;
     for (const method of METHODS) {
@@ -604,6 +825,12 @@ export function enrichOpenApiDocument<T extends JsonObject>(doc: T): T {
       const examples = EXAMPLES[key];
       if (examples?.request !== undefined) setJsonExample(operation.requestBody, examples.request);
       if (examples?.response !== undefined) setJsonExample(responses["200"], examples.response);
+      const ok = responses["200"];
+      const media = isObject(ok) && isObject(ok.content) ? ok.content["application/json"] : null;
+      if (isObject(media) && media.example === undefined && media.schema !== undefined) {
+        const synthesized = synthesizeExample(media.schema, schemas);
+        if (synthesized !== undefined) media.example = synthesized;
+      }
     }
   }
   const components = isObject(doc.components) ? doc.components : {};

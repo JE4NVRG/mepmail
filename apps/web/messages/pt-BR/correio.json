@@ -129,7 +129,7 @@
     "sending": {
       "label": "Para sua aplicação",
       "title": "Só Envio",
-      "body": "110 mil e-mails por mês por R$ 149 recorrentes; novos clientes pagam R$ 99 só na primeira mensalidade. Você pode usar o Envio sem contratar caixas, e as assinaturas atuais são preservadas.",
+      "body": "110 mil e-mails por mês por R$ 149 recorrentes; novos clientes elegíveis pagam R$ 99 só na primeira mensalidade. Você pode usar o Envio sem contratar caixas, e as assinaturas atuais são preservadas.",
       "link": "Comparar planos de Envio"
     },
     "mail": {
@@ -229,7 +229,7 @@
       },
       {
         "q": "Comprei um domínio. Já posso criar qualquer endereço?",
-        "a": "Você pode escolher um endereço disponível no domínio que controla. Para enviar e receber, é necessário contratar o Correio (sozinho ou junto de um plano de Envio), verificar o domínio, configurar DNS/MX e confirmar a ativação do recebimento. Se o DNS estiver na Cloudflare, o painel cria os registros de envio por você. Só cadastrar o endereço não conclui essas etapas."
+        "a": "Você pode escolher um endereço disponível no domínio que controla. Para enviar e receber, é necessário contratar o Correio (sozinho ou junto de um plano de Envio), verificar o domínio, configurar DNS/MX e confirmar a ativação do recebimento. Se o DNS estiver na Cloudflare, o painel cria os registros de envio e, quando o domínio ainda não tem MX, o MX de recebimento; ele nunca muda um MX que aponta para outro serviço. Só cadastrar o endereço não conclui essas etapas."
       },
       {
         "q": "Preciso ter um site ou contratar hospedagem?",

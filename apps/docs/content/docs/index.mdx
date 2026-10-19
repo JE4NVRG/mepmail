@@ -22,9 +22,32 @@ these docs cover both, and the Cloud / Self-hosted tabs you'll see on some
 pages remember your choice. Around the sending core you get a dashboard, an
 HTTP API, webhooks, contacts, broadcasts, and an SMTP relay.
 
+## Move from Resend in one command
+
+```bash
+npx @mepmail/cli migrate --from resend
+```
+
+The [CLI](/cli) reads your Resend account (GET requests only), shows the plan and,
+after you confirm, copies contacts, segments, topics, properties, templates,
+webhooks, suppressions and domains to MepMail. `migrate plan` previews without
+writing; `migrate rollback` deletes only what the tool created. For the
+supported sending calls, your code then changes in two variables:
+
+```bash title="Before: Resend"
+RESEND_API_KEY=re_...
+```
+
+```bash title="After: MepMail"
+RESEND_API_KEY=ms_...
+RESEND_BASE_URL=https://api.mepmail.dev
+```
+
+[Migrate from Resend](/migrate-from-resend) has the full guide.
+
 ## Resend-compatible API
 
-The HTTP API is wire-compatible with Resend: same request and response shapes,
+The HTTP API follows the Resend API format: same request and response shapes,
 same error format. Official Resend SDKs honor a configurable base URL, so
 migrating an existing integration means changing two environment variables —
 the API key and the base URL — not rewriting your code. There is no SDK of
@@ -51,7 +74,7 @@ target subsets with [segments](/concepts/segments) (saved filters) and
 | Webhooks | Standard Webhooks signatures, per-endpoint event selection, delivery log. |
 | Suppressions | Hard bounces and complaints suppressed automatically. |
 | One-click unsubscribe | RFC 8058 `List-Unsubscribe` headers plus a hosted unsubscribe page. |
-| SMTP relay | Drop-in SMTP on port 2587, authenticated with an API key. |
+| SMTP relay | SMTP on port 2587 with STARTTLS, authenticated with an API key. |
 | Metrics | Daily sends with bounce and complaint rates tracked against SES thresholds. |
 | Dashboard | Full dashboard in English and Brazilian Portuguese. |
 

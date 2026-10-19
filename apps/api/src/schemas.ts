@@ -278,10 +278,10 @@ export const sendEmailRequestSchema = z
       .describe(
         'Sender, "Name <user@domain>" or bare address; the domain must be verified for the team',
       )
-      .openapi({ example: "Acme <onboarding@acme.dev>" }),
+      .openapi({ example: "Acme <hello@yourdomain.com>" }),
     to: recipientList
       .describe("Recipient address or list of up to 50")
-      .openapi({ example: ["delivered@resend.dev"] }),
+      .openapi({ example: ["customer@example.com"] }),
     subject: z
       .string()
       .min(1)

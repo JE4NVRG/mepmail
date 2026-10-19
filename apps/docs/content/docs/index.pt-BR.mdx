@@ -23,9 +23,33 @@ Auto-hospedado que você verá em algumas páginas lembram sua escolha. Em volta
 do núcleo de envio você tem um painel, uma API HTTP, webhooks, contatos,
 broadcasts e um relay SMTP.
 
+## Saia do Resend com um comando
+
+```bash
+npx @mepmail/cli migrate --from resend
+```
+
+A [CLI](/pt-BR/cli) lê sua conta do Resend (só requisições GET), mostra o plano
+e, depois da sua confirmação, copia contatos, segmentos, tópicos,
+propriedades, templates, webhooks, supressões e domínios para o MepMail.
+`migrate plan` mostra a prévia sem gravar nada; `migrate rollback` apaga só o
+que a ferramenta criou. Nas chamadas de envio suportadas, o seu código muda em
+duas variáveis:
+
+```bash title="Antes: Resend"
+RESEND_API_KEY=re_...
+```
+
+```bash title="Depois: MepMail"
+RESEND_API_KEY=ms_...
+RESEND_BASE_URL=https://api.mepmail.dev
+```
+
+[Migrar do Resend](/pt-BR/migrate-from-resend) tem o guia completo.
+
 ## API compatível com Resend
 
-A API HTTP é compatível na comunicação com a do Resend: mesmos formatos de
+A API HTTP segue o formato da API do Resend: mesmos formatos de
 requisição e resposta, mesmo formato de erro. Os SDKs oficiais do Resend
 respeitam uma URL base configurável, então migrar uma integração existente
 significa trocar duas variáveis de ambiente — a chave de API e a URL base —
@@ -53,7 +77,7 @@ você segmenta com [segmentos](/pt-BR/concepts/segments) (filtros salvos) e
 | Webhooks | Assinaturas Standard Webhooks, seleção de eventos por endpoint, log de entregas. |
 | Supressões | Hard bounces e reclamações suprimidos automaticamente. |
 | Descadastro em um clique | Headers `List-Unsubscribe` (RFC 8058) e página de descadastro hospedada. |
-| Relay SMTP | SMTP pronto para uso na porta 2587, autenticado com chave de API. |
+| Relay SMTP | SMTP na porta 2587, com STARTTLS, autenticado com chave de API. |
 | Métricas | Envios diários com taxas de bounce e reclamação acompanhadas contra os limites do SES. |
 | Painel | Painel completo em inglês e português do Brasil. |
 

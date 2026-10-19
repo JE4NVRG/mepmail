@@ -84,7 +84,7 @@
     "items": [
       {
         "q": "Para que serve o MepMail?",
-        "a": "O Envio atende mensagens de aplicações, cadastros e campanhas, com painel, API HTTP, modelos, contatos, transmissões, webhooks e métricas.",
+        "a": "Dois produtos na mesma conta, no mesmo domínio verificado. O Envio cuida dos e-mails da sua aplicação (cadastros, redefinição de senha, notificações e campanhas) por API, SMTP ou MCP, com painel, modelos, contatos, transmissões, webhooks e métricas. O Correio dá caixas de e-mail no seu domínio para pessoas e agentes de IA. Use um, o outro ou os dois.",
         "link": {
           "label": "Documentação",
           "href": "https://docs.mepmail.dev/pt-BR"
@@ -143,7 +143,7 @@
         "a": "Aponte os SDKs oficiais do Resend para a base URL do MepMail, troque a API key e traga os seus domínios e contatos. A conta grátis pode ser migrada com npx @mepmail/cli migrate --from resend. O guia mostra cada SDK, linguagem por linguagem.",
         "link": {
           "label": "Docs: migrar do Resend",
-          "href": "https://docs.mepmail.dev/migrate-from-resend"
+          "href": "https://docs.mepmail.dev/pt-BR/migrate-from-resend"
         }
       },
       {
@@ -152,6 +152,38 @@
         "link": {
           "label": "suporte@mepmail.dev",
           "href": "mailto:suporte@mepmail.dev"
+        }
+      },
+      {
+        "q": "Vocês oferecem IP dedicado?",
+        "a": "Não no momento. Todo remetente usa os IPs compartilhados do Amazon SES, que a SES monitora; a sua reputação vem do domínio verificado, da sua lista e do seu conteúdo.",
+        "link": {
+          "label": "Insights de entregabilidade",
+          "href": "https://docs.mepmail.dev/pt-BR/concepts/deliverability-insights"
+        }
+      },
+      {
+        "q": "Qual é a taxa de entrega de vocês?",
+        "a": "Não publicamos um número da plataforma: ele depende do domínio, da lista e do conteúdo de cada remetente. O que aplicamos no lugar: o envio de um time pausa quando os bounces duros chegam a 5% (pelo menos 10) ou as reclamações a 0,1% (pelo menos 3), em hoje e ontem, a partir de 100 envios, com um aviso em 4% e 0,05% em 7 dias. Essas linhas protegem a reputação que todos os remetentes dividem.",
+        "link": {
+          "label": "Pausas de envio",
+          "href": "https://docs.mepmail.dev/pt-BR/errors#pausas-e-bloqueios-de-envio"
+        }
+      },
+      {
+        "q": "Minha conta está em revisão ou suspensa. E agora?",
+        "a": "Respondemos em até 2 dias úteis. Para pedir a revisão ou recorrer, escreva para suporte@mepmail.dev pelo e-mail da conta, com o domínio de envio, o tipo de e-mail que você envia (transacional, marketing ou agentes) e a origem da sua lista. Nunca envie senha nem chave de API.",
+        "link": {
+          "label": "suporte@mepmail.dev",
+          "href": "mailto:suporte@mepmail.dev"
+        }
+      },
+      {
+        "q": "Existe SLA ou página de status?",
+        "a": "Não há SLA por enquanto. A página de status mostra a disponibilidade do painel, da API e da documentação, e os incidentes que publicamos.",
+        "link": {
+          "label": "Status",
+          "href": "/status"
         }
       }
     ]

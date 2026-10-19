@@ -41,6 +41,26 @@ Every record also carries `live` (`found`, `missing`, `mismatch` or `unknown`,
 what public DNS answers right now) and, when a row is not verified, a one-line
 `detail` saying why.
 
+## Receiving mail (Correio)
+
+Verification covers sending. To receive in Correio mailboxes, the domain (or
+the subdomain the mailboxes use) also needs this MX record; then turn receiving
+on in **Mail → Receiving**, which checks the record before it switches on.
+
+| Type | Name | Value | Priority |
+| --- | --- | --- | --- |
+| MX | the mailbox domain (`@` for the apex, or the subdomain) | `inbound-smtp.us-east-1.amazonaws.com` | `10` |
+
+- It must be the primary MX: every record at the lowest priority number has to
+  be this one. Another provider's MX at a higher number stays a backup and does
+  not block activation.
+- Changing the MX moves receiving for the whole domain or subdomain: create
+  every mailbox and alias first.
+- With a Cloudflare DNS-only token, the dashboard writes this MX where the name
+  has none, and never changes an MX that points elsewhere.
+- MepMail Cloud receives in `us-east-1`, the region its domains are provisioned
+  in.
+
 ## Regions
 
 A deployment provisions identities in the SES regions it serves — its

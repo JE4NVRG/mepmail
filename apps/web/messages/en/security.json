@@ -7,7 +7,7 @@
     "eyebrow": "Security",
     "title": "Security you can <highlight>verify</highlight>.",
     "lead": "MepMail Cloud runs in Germany on Contabo hardware, the product is open source under AGPL-3.0, and you can self-host the whole thing. Your email content, and every claim on this page, sits somewhere you can check instead of somewhere you have to trust.",
-    "note": "Last reviewed: September 29, 2026. Every statement here is a property of the running product, or labelled as a roadmap item.",
+    "note": "Last reviewed: October 19, 2026. Every statement here is a property of the running product, or labelled as a roadmap item.",
     "badges": [
       "EU data residency · Germany",
       "Open source · AGPL-3.0",
@@ -139,7 +139,7 @@
         "name": "Abuse limits",
         "body": "Limits keep one compromised key or one runaway script from burning a domain's reputation.",
         "bullets": [
-          "Every plan carries an included volume and a daily send ceiling; sends past the daily ceiling are held instead of running all day.",
+          "Every plan carries an included volume: a daily one on Free and Starter, where sends past it wait in a queue, and a monthly one on Pro and Scale, where overage stops at 5× the included volume.",
           "Bounces and complaints are recorded per team, and the instance's deliverability health can pause a team's sending.",
           "Sign-up is closed by default on a reachable instance — only the first account may register — and a beta can be capped by seat count.",
           "A Cloudflare Turnstile challenge can be turned on for sign-in, sign-up, password reset and the verification resend."
@@ -186,28 +186,53 @@
   "subprocessors": {
     "eyebrow": "Infrastructure",
     "title": "Subprocessors",
-    "body": "The short list of providers that process data for MepMail Cloud. It mirrors the Privacy Policy and adds the hosting provider.",
+    "body": "The providers that process data for MepMail Cloud, the same list as the Privacy Policy (section 7), which says what each one receives.",
     "columns": ["Provider", "Role", "Location"],
     "rows": [
       {
         "provider": "Contabo GmbH",
-        "role": "Servers hosting the application and its database",
+        "role": "Servers hosting the application, its database, the Elozi support platform and our own metrics",
         "location": "Germany"
       },
       {
-        "provider": "Amazon Web Services (Amazon SES)",
-        "role": "Email delivery and delivery events",
-        "location": "us-east-1, United States"
-      },
-      {
-        "provider": "Cloudflare",
-        "role": "DNS, CDN and network protection in front of our servers",
-        "location": "Global edge network"
+        "provider": "Amazon Web Services (Amazon SES, S3, SQS, SNS, KMS)",
+        "role": "Sending and receiving email, the 30-day copy of received email, event queues and encryption keys",
+        "location": "United States; Ireland as a fallback"
       },
       {
         "provider": "Stripe",
-        "role": "Payment processing, invoices and receipts",
+        "role": "Card and Pix payments, invoices and receipts",
         "location": "United States"
+      },
+      {
+        "provider": "Cloudflare",
+        "role": "DNS, CDN and network protection, the Turnstile challenge, and R2 storage for backups and uploaded images",
+        "location": "Global edge network"
+      },
+      {
+        "provider": "Command Code (Langbase, Inc.)",
+        "role": "Automated abuse check on a sample of Send emails (DeepSeek V4.1 Flash); never the recipients",
+        "location": "United States"
+      },
+      {
+        "provider": "OpenCode Go (Anomaly)",
+        "role": "AI models of the support assistants",
+        "location": "United States"
+      },
+      {
+        "provider": "Elozi (JE4NDEV)",
+        "role": "Support chat and the suporte@mepmail.dev email, on our own servers",
+        "location": "Germany"
+      },
+      {
+        "provider": "Gravatar (Automattic)",
+        "role": "A hash of a sender's address, to show their picture",
+        "location": "United States"
+      },
+      {
+        "provider": "RDAP registry operators and Team Cymru",
+        "role": "Signup security lookups: the signup domain's registration date and the connecting network (ASN)",
+        "location": "Where each operator runs"
       }
     ],
     "note": "A self-hosted instance runs on infrastructure you choose, so this list does not apply to it."
@@ -216,10 +241,22 @@
     "title": "Built on infrastructure you already trust",
     "body": "No exotic dependencies to vet: the four providers behind every send are the same names most teams already run in production.",
     "items": [
-      { "provider": "Contabo GmbH", "role": "EU hosting · Germany" },
-      { "provider": "Amazon SES", "role": "Delivery over TLS" },
-      { "provider": "Cloudflare", "role": "DNS, CDN, edge protection" },
-      { "provider": "Stripe", "role": "Payments and invoices" }
+      {
+        "provider": "Contabo GmbH",
+        "role": "EU hosting · Germany"
+      },
+      {
+        "provider": "Amazon SES",
+        "role": "Delivery over TLS"
+      },
+      {
+        "provider": "Cloudflare",
+        "role": "DNS, CDN, edge protection"
+      },
+      {
+        "provider": "Stripe",
+        "role": "Payments and invoices"
+      }
     ]
   },
   "compliance": {
@@ -264,7 +301,7 @@
       },
       {
         "q": "Is MepMail GDPR compliant?",
-        "a": "MepMail Cloud is built for it: the application and its database run in Germany, inside the EU. Two subprocessors sit in the United States — Amazon SES (us-east-1) for delivery and Stripe for payments — and the Privacy Policy states those transfers. We do not claim a certification we do not hold."
+        "a": "MepMail Cloud is built for it: the application, its database and the Elozi support platform run in Germany, inside the EU. AWS (United States, Ireland as a fallback), Stripe, Command Code, OpenCode and Gravatar process data in the United States, and Cloudflare operates worldwide; the Privacy Policy states those transfers. We do not claim a certification we do not hold."
       },
       {
         "q": "How do I get a signed DPA?",
@@ -281,15 +318,18 @@
       {
         "q": "How do I delete a contact's data?",
         "a": "Delete the contact with erase=true on the API: the address is then erased from email history, event payloads and API logs — the GDPR/LGPD path. Without it, the send log ages out with the retention window. Suppressions keep only a hash of the address, as the do-not-contact record.",
-        "link": { "label": "API reference", "href": "https://docs.mepmail.dev" }
+        "link": {
+          "label": "API reference",
+          "href": "https://docs.mepmail.dev"
+        }
       },
       {
         "q": "Do AI or model subprocessors receive my email content?",
-        "a": "No. No AI provider processes your email content on MepMail Cloud. The open-source code ships an optional abuse monitor (ABUSE_JUDGE, off by default), which a self-hoster can turn on: an already-accepted send may then be sampled and sent to TypeSafe System One for an abuse verdict. MepMail Cloud runs with it off, and a self-hoster decides for themselves."
+        "a": "Yes, two of them, both named in the Privacy Policy. Command Code receives a sample of the emails already accepted by Send (sender, reply-to, subject, visible text, link domains and attachment names, never the recipients) for an automated abuse verdict with the DeepSeek V4.1 Flash model. OpenCode Go runs the models of the support assistants and receives what you write to support. MepMail does not send the content of your mailboxes to an AI provider; an agent you connect yourself reaches only what you allow, under its provider's terms. No email content is used to train AI models. A self-hoster decides for themselves: the abuse check (ABUSE_JUDGE) is off by default in the open-source code."
       },
       {
         "q": "Where can I find the current subprocessor list?",
-        "a": "On this page — the table above, which mirrors the Privacy Policy. A self-hosted instance has no such list, because it runs on infrastructure you choose."
+        "a": "On this page — the table above, which is the list in the Privacy Policy (section 7). A self-hosted instance has no such list, because it runs on infrastructure you choose."
       }
     ]
   },
