@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { externalOAuthWorks } from "@/lib/desktop-bridge";
+import { mailboxOAuthLoginHint } from "@/lib/mailbox-oauth-hint";
 import {
   MAILBOX_EXTERNAL_PRESETS,
   type MailboxExternalPresetId,
@@ -51,8 +52,8 @@ export function mailboxConnectOAuthHref(
   options: { returnTo?: "/mail" | "/onboarding"; hint?: string } = {},
 ) {
   const params = new URLSearchParams({ return: options.returnTo ?? "/mail" });
-  const hint = options.hint?.trim().toLowerCase();
-  if (hint && EMAIL.test(hint)) params.set("hint", hint);
+  const hint = mailboxOAuthLoginHint(provider, options.hint);
+  if (hint) params.set("hint", hint);
   return `/api/mailboxes/external/oauth/${provider}/start?${params}`;
 }
 

@@ -53,6 +53,9 @@ const MICROSOFT = {
 };
 /** The tenant every personal Microsoft account (Outlook.com, Hotmail, Live) signs into. */
 const MICROSOFT_CONSUMER_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad";
+/** A personal Microsoft mailbox address (Outlook.com, Hotmail, Live, MSN, country domains too). */
+export const MICROSOFT_CONSUMER_ADDRESS =
+  /@(outlook|hotmail|live|msn)\.(com|[a-z]{2}|com\.[a-z]{2}|co\.[a-z]{2})$/;
 
 function googleConfig() {
   const id = process.env.GOOGLE_OAUTH_CLIENT_ID?.trim();
@@ -250,10 +253,14 @@ export async function exchangeMailboxExternalOAuthCode(
     provider === "google"
       ? [claims.email_verified === false ? undefined : claims.email]
       : [claims.email, claims.preferred_username];
-  const address = candidates
-    .find((value): value is string => typeof value === "string" && EMAIL.test(value.trim()))
-    ?.trim()
-    .toLowerCase();
+  const valid = candidates
+    .filter((value): value is string => typeof value === "string" && EMAIL.test(value.trim()))
+    .map((value) => value.trim().toLowerCase());
+  const consumer = provider === "microsoft" && claims.tid === MICROSOFT_CONSUMER_TENANT;
+  // A personal account can sign in under an alias on another domain; IMAP wants the mailbox.
+  const address =
+    (consumer ? valid.find((value) => MICROSOFT_CONSUMER_ADDRESS.test(value)) : undefined) ??
+    valid[0];
   if (!address) throw new MailboxExternalOAuthError("incomplete", "no_address");
   return {
     accessToken: answer.access_token!,
@@ -261,8 +268,28 @@ export async function exchangeMailboxExternalOAuthCode(
     expiresAt: new Date(now + Math.max(60, Number(answer.expires_in ?? 3600)) * 1000),
     address,
     name: typeof claims.name === "string" && claims.name.trim() ? claims.name.trim() : null,
-    consumer: provider === "microsoft" && claims.tid === MICROSOFT_CONSUMER_TENANT,
+    consumer,
   };
+}
+
+/**
+ * The IMAP and SMTP user for a grant. A personal Microsoft account signed in under an alias on
+ * another domain (jean@empresa.com) has no Outlook.com mailbox there: IMAP answers "User is
+ * authenticated but not connected" (19/10). The Outlook.com address the person typed before
+ * signing in is used then; the token still decides which mailbox opens, so a wrong one is refused.
+ */
+export function mailboxExternalOAuthMailboxAddress(
+  grant: { address: string; consumer: boolean },
+  typed: string | null | undefined,
+): string {
+  const hint = typed?.trim().toLowerCase();
+  return grant.consumer &&
+    !MICROSOFT_CONSUMER_ADDRESS.test(grant.address) &&
+    hint &&
+    EMAIL.test(hint) &&
+    MICROSOFT_CONSUMER_ADDRESS.test(hint)
+    ? hint
+    : grant.address;
 }
 
 /** A fresh access token from the refresh token (Microsoft may hand a new refresh token). */

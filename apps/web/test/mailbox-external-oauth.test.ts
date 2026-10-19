@@ -20,6 +20,7 @@ import {
   type MailboxExternalOAuthGrant,
   mailboxExternalOAuthAuthorizeUrl,
   mailboxExternalOAuthAvailable,
+  mailboxExternalOAuthMailboxAddress,
   mailboxExternalOAuthSecret,
   mailboxExternalOAuthServers,
   readMailboxExternalOAuthSecret,
@@ -165,6 +166,60 @@ describe("Contas externas: Microsoft and Google sign-in (provider side)", () => 
         .update(`${header}.${payload}`)
         .verify(publicKey, Buffer.from(signature!, "base64url")),
     ).toBe(true);
+  });
+
+  it("takes the Outlook.com mailbox among the claims of a personal account, not its alias", async () => {
+    configure();
+    const answer = (claims: Record<string, unknown>) =>
+      tokenEndpoint({
+        access_token: "at-1",
+        refresh_token: "rt-1",
+        expires_in: 3600,
+        id_token: idToken(claims),
+      }).fetcher;
+    const input = { code: "code-1", codeVerifier: "verifier-1", redirectUri: "https://x/cb" };
+    await expect(
+      exchangeMailboxExternalOAuthCode(
+        "microsoft",
+        input,
+        answer({
+          email: "ana@empresa.example",
+          preferred_username: "Ana@Hotmail.com",
+          tid: CONSUMER,
+        }),
+      ),
+    ).resolves.toMatchObject({ address: "ana@hotmail.com", consumer: true });
+    // A work account keeps the first claim: its mailbox lives on its own domain.
+    await expect(
+      exchangeMailboxExternalOAuthCode(
+        "microsoft",
+        input,
+        answer({ email: "ana@empresa.example", preferred_username: "ana@hotmail.com", tid: "t-1" }),
+      ),
+    ).resolves.toMatchObject({ address: "ana@empresa.example", consumer: false });
+  });
+
+  it("uses the typed Outlook.com address only for a personal account signed in as an alias", () => {
+    const alias = { address: "ana@empresa.example", consumer: true };
+    expect(mailboxExternalOAuthMailboxAddress(alias, " Ana@Outlook.com.br ")).toBe(
+      "ana@outlook.com.br",
+    );
+    expect(mailboxExternalOAuthMailboxAddress(alias, "ana@empresa.example")).toBe(
+      "ana@empresa.example",
+    );
+    expect(mailboxExternalOAuthMailboxAddress(alias, null)).toBe("ana@empresa.example");
+    expect(
+      mailboxExternalOAuthMailboxAddress(
+        { address: "ana@hotmail.com", consumer: true },
+        "bia@live.com",
+      ),
+    ).toBe("ana@hotmail.com");
+    expect(
+      mailboxExternalOAuthMailboxAddress(
+        { address: "ana@empresa.example", consumer: false },
+        "ana@outlook.com",
+      ),
+    ).toBe("ana@empresa.example");
   });
 
   it("refuses a grant without a refresh token or a verified address", async () => {
@@ -663,6 +718,46 @@ describe("Contas externas: OAuth accounts (credentials and the callback)", () =>
     );
     const after = (await openMailboxExternalAccount(db, keys, mailboxId))!;
     expect(readMailboxExternalOAuthSecret(after.secret)).toBe("rt-2");
+
+    // Signed in under a domain alias after typing the Outlook.com address: IMAP gets the mailbox.
+    const typed = await startMailboxExternalOAuth(
+      new Request(
+        "https://mepmail.dev/api/mailboxes/external/oauth/microsoft/start?hint=Ana.Souza@Hotmail.com",
+      ),
+      "microsoft",
+    );
+    const typedConsent = new URL(typed.headers.get("location")!);
+    expect(typedConsent.searchParams.get("login_hint")).toBe("ana.souza@hotmail.com");
+    const typedCookie = typed.headers
+      .get("set-cookie")!
+      .match(new RegExp(`${MAILBOX_EXTERNAL_OAUTH_COOKIE}=([^;]+)`))![1]!;
+    exchange.mockResolvedValueOnce({
+      accessToken: "at-alias",
+      refreshToken: "rt-alias",
+      expiresAt: new Date(Date.now() + 3_600_000),
+      address: "ana@empresa.example",
+      name: null,
+      consumer: true,
+    });
+    const viaAlias = await finishMailboxExternalOAuth(
+      callback(`code=c&state=${typedConsent.searchParams.get("state")}`),
+      "microsoft",
+      typedCookie,
+      { exchange, check },
+    );
+    expect(new URL(viaAlias.headers.get("location")!).searchParams.get("external")).toBe(
+      "connected",
+    );
+    expect(check).toHaveBeenLastCalledWith(
+      expect.objectContaining({ username: "ana.souza@hotmail.com" }),
+      { accessToken: "at-alias" },
+    );
+    const aliasBox = (await openMailboxExternalAccount(
+      db,
+      keys,
+      new URL(viaAlias.headers.get("location")!).searchParams.get("mailbox")!,
+    ))!;
+    expect(aliasBox.address).toBe("ana.souza@hotmail.com");
 
     // The person said no at Microsoft: back to the Correio, nothing to explain.
     const cancelled = await finishMailboxExternalOAuth(

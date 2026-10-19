@@ -52,7 +52,7 @@
     "oauth_incomplete": "The provider didn't grant access to the mailbox. On the consent screen, allow every permission asked.",
     "other_account": "You signed in with a different account. Sign in with this mailbox's address.",
     "smtp_login_microsoft": "Microsoft allowed reading, but sending (SMTP) is off for this account. For work or school accounts, an admin must turn on \"Authenticated SMTP\".",
-    "imap_login_microsoft": "Microsoft accepted the sign-in but refused IMAP for this account. This is often temporary (Outlook.com has been refusing several tries in a row): try again in a few minutes. If it keeps happening, in Outlook.com open Settings > Mail > Forwarding and IMAP and turn on \"Let devices and apps use IMAP\". For work or school accounts, an admin must allow IMAP."
+    "imap_login_microsoft": "Microsoft accepted the sign-in but refused IMAP for this account. If you signed in with an address on your own domain (an alias of the Microsoft account), type the mailbox's @hotmail or @outlook address in the email field, choose Outlook and sign in with Microsoft again. It can also be temporary (Outlook.com has been refusing tries in a row): try again in a few minutes. If it keeps happening, in Outlook.com open Settings > Mail > Forwarding and IMAP and turn on \"Let devices and apps use IMAP\"."
   },
   "status": {
     "loading": "Checking the account…",

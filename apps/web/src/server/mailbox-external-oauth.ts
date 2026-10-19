@@ -10,6 +10,7 @@ import {
   type MailboxExternalOAuthProvider,
   mailboxExternalOAuthAuth,
   mailboxExternalOAuthAuthorizeUrl,
+  mailboxExternalOAuthMailboxAddress,
   mailboxExternalOAuthPkce,
   mailboxExternalOAuthSecret,
   mailboxExternalOAuthServers,
@@ -76,6 +77,8 @@ interface Pending {
   m: string | null;
   /** where to come back to */
   r: string;
+  /** the address typed before signing in (sent as the login hint), if any */
+  h?: string | null;
   /** expiry (ms) */
   e: number;
 }
@@ -194,7 +197,8 @@ export async function startMailboxExternalOAuth(request: Request, provider: stri
   if (!mailboxExternalOAuthFor(who.actor.teamId)[provider]) return fail("provider_unavailable");
   const mailbox = url.searchParams.get("mailbox");
   if (mailbox && !UUID.test(mailbox)) return fail("expired");
-  const hint = url.searchParams.get("hint")?.trim().toLowerCase();
+  const given = url.searchParams.get("hint")?.trim().toLowerCase();
+  const hint = given && EMAIL.test(given) && given.length <= 254 ? given : null;
   const pkce = mailboxExternalOAuthPkce();
   const state = randomBytes(24).toString("base64url");
   const sealed = seal({
@@ -205,6 +209,7 @@ export async function startMailboxExternalOAuth(request: Request, provider: stri
     u: who.actor.userId,
     m: mailbox,
     r: returnTo,
+    h: hint,
     e: Date.now() + TTL_MS,
   });
   if (!sealed) return fail("unavailable");
@@ -212,7 +217,7 @@ export async function startMailboxExternalOAuth(request: Request, provider: stri
     redirectUri: mailboxExternalOAuthRedirectUri(provider),
     state,
     codeChallenge: pkce.challenge,
-    ...(hint && EMAIL.test(hint) && hint.length <= 254 ? { loginHint: hint } : {}),
+    ...(hint ? { loginHint: hint } : {}),
   });
   const response = NextResponse.redirect(location, 303);
   response.headers.set("Cache-Control", "no-store");
@@ -258,6 +263,13 @@ export async function finishMailboxExternalOAuth(
       return fail(error.reason === "incomplete" ? "oauth_incomplete" : "oauth_failed");
     }
     throw error;
+  }
+  const mailboxAddress = mailboxExternalOAuthMailboxAddress(grant, pending.h);
+  if (mailboxAddress !== grant.address) {
+    console.info(
+      `mailbox.external oauth ${provider}: signed in as an alias at ${grant.address.split("@")[1]}; IMAP uses the typed Outlook.com address`,
+    );
+    grant = { ...grant, address: mailboxAddress };
   }
   const servers = mailboxExternalOAuthServers(provider, grant);
   try {

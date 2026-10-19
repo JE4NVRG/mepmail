@@ -101,6 +101,8 @@ export async function checkMailboxExternalAccount(
       ? { password: credential }
       : { accessToken: credential.accessToken };
   // Outlook.com's transient "authenticated but not connected" is tried again (openImap).
+  // Logs name only the domain of the IMAP user: enough to tell an alias from the mailbox.
+  const userDomain = servers.username.split("@")[1] ?? "?";
   let retried = 0;
   try {
     const session = await openImap(
@@ -110,7 +112,7 @@ export async function checkMailboxExternalAccount(
         onTransientRefusal: (attempt, detail) => {
           retried = attempt;
           console.warn(
-            `contas externas: ${servers.imapHost} IMAP try ${attempt} refused (${detail}); trying again`,
+            `contas externas: ${servers.imapHost} IMAP try ${attempt} as user@${userDomain} refused (${detail}); trying again`,
           );
         },
       },
@@ -123,7 +125,7 @@ export async function checkMailboxExternalAccount(
     // account has IMAP off, for one). They never carry the credential.
     if (error instanceof ImapError && error.reason === "login" && error.detail)
       console.warn(
-        `contas externas: ${servers.imapHost} refused the IMAP sign-in: ${error.detail}`,
+        `contas externas: ${servers.imapHost} refused the IMAP sign-in as user@${userDomain}: ${error.detail}`,
       );
     if (error instanceof ImapError)
       throw new MailboxExternalCheckError(
