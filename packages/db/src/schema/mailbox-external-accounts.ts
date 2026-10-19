@@ -46,6 +46,12 @@ export const mailboxExternalAccounts = pgTable(
     secretWrappedDek: bytea("secret_wrapped_dek").notNull(),
     secretKeyVersion: integer("secret_key_version").notNull(),
     syncState: jsonb("sync_state").$type<MailboxExternalSyncState>().notNull().default({}),
+    /**
+     * Which connection this is (0035): signing in again or a new app password moves it
+     * forward, a rotated OAuth token does not. Worker results carry the generation they
+     * opened and are dropped when it moved.
+     */
+    connectionGeneration: integer("connection_generation").notNull().default(1),
     status: text("status").$type<MailboxExternalStatus>().notNull().default("active"),
     lastError: text("last_error"),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
@@ -60,7 +66,10 @@ export const mailboxExternalAccounts = pgTable(
       columns: [t.mailboxId, t.teamId],
       foreignColumns: [mailboxes.id, mailboxes.teamId],
     }).onDelete("cascade"),
-    index("mailbox_external_accounts_due_idx").on(t.nextSyncAt).where(sql`${t.status} = 'active'`),
+    // Due rounds: active accounts, and accounts in error that retry on their own (0035).
+    index("mailbox_external_accounts_due_idx")
+      .on(t.nextSyncAt)
+      .where(sql`${t.status} in ('active', 'error')`),
     index("mailbox_external_accounts_team_idx").on(t.teamId),
     check(
       "mailbox_external_accounts_provider_check",
@@ -70,6 +79,7 @@ export const mailboxExternalAccounts = pgTable(
       "mailbox_external_accounts_auth_check",
       sql`${t.auth} in ('password', 'oauth_microsoft', 'oauth_google')`,
     ),
+    check("mailbox_external_accounts_generation_check", sql`${t.connectionGeneration} >= 1`),
     check(
       "mailbox_external_accounts_status_check",
       sql`${t.status} in ('active', 'auth_failed', 'error', 'paused')`,

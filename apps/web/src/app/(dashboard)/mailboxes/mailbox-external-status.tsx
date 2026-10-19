@@ -50,6 +50,9 @@ export function MailboxExternalStatus({
       })}`
     : null;
 
+  // An account in error retries by itself at nextSyncAt (and "Sincronizar agora" tries
+  // sooner); only a refused password or sign-in waits for the person.
+  const retry = format.relativeTime(new Date(data.nextSyncAt), now);
   const state =
     data.status === "auth_failed"
       ? oauth
@@ -57,8 +60,8 @@ export function MailboxExternalStatus({
         : t("authFailed")
       : data.status === "error"
         ? data.lastError === "storage_full"
-          ? t("storageFull")
-          : t("syncError")
+          ? t("storageFull", { when: retry })
+          : t("syncError", { when: retry })
         : data.lastSyncedAt
           ? t("syncedAt", { when: format.relativeTime(new Date(data.lastSyncedAt), now) })
           : t("firstSync");
@@ -123,7 +126,7 @@ export function MailboxExternalStatus({
         <button
           type="button"
           className="ms-btn ms-btn-ghost"
-          disabled={syncNow.isPending || data.status !== "active"}
+          disabled={syncNow.isPending || (data.status !== "active" && data.status !== "error")}
           onClick={async () => {
             await syncNow.mutateAsync({ mailboxId }).catch(() => undefined);
             toast(t("syncRequested"));

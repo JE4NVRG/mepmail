@@ -23,13 +23,21 @@ import nodemailer from "nodemailer";
  * @gmail.com. Every other mailbox keeps the SES sender. The provider's SMTP name must
  * resolve only to public addresses and the connection goes to the checked one (TLS still
  * verifies the name). A refused password stops the account (no retry every minute): the
- * person sees "senha recusada" and replaces it.
+ * person sees "senha recusada" and replaces it. A provider saying "not now" during sign-in
+ * (an SMTP 4xx such as 454, even when nodemailer calls it EAUTH) is not a refusal: the
+ * message was never handed over, so the send waits and the account stays connected. A
+ * refusal seen by a send that opened an older connection (the person signed in again
+ * meanwhile) leaves the new connection alone and retries the send with it.
  */
 export function createMailboxExternalAwareSender(
   db: Db,
   keyring: Keyring,
   ses: MailboxOutboxSender | null,
   credentialFor: typeof mailboxExternalCredential = mailboxExternalCredential,
+  deps: {
+    createTransport?: typeof nodemailer.createTransport;
+    lookup?: typeof lookup;
+  } = {},
 ): MailboxOutboxSender {
   return {
     async send(input) {
@@ -52,7 +60,10 @@ export function createMailboxExternalAwareSender(
         throw new MailboxSendRejectedError();
       let address: string;
       try {
-        const answers = await lookup(account.smtpHost, { all: true, verbatim: true });
+        const answers = await (deps.lookup ?? lookup)(account.smtpHost, {
+          all: true,
+          verbatim: true,
+        });
         if (!answers.length || !answers.every((entry) => publicAddress(entry.address)))
           throw new MailboxSendRejectedError();
         address = answers[0]!.address;
@@ -65,16 +76,20 @@ export function createMailboxExternalAwareSender(
       try {
         credential = await credentialFor(db, keyring, account);
       } catch (error) {
-        if (
-          error instanceof MailboxExternalOAuthError &&
-          (error.reason === "invalid_grant" || error.reason === "unconfigured")
-        ) {
-          await markMailboxExternalAuthFailed(db, input.mailboxId, "oauth_refused");
+        if (error instanceof MailboxExternalOAuthError && error.reason === "invalid_grant") {
+          const marked = await markMailboxExternalAuthFailed(
+            db,
+            input.mailboxId,
+            account.connectionGeneration,
+            "oauth_refused",
+          );
+          // An old connection's grant: the person signed in again, so try with the new one.
+          if (!marked) throw new MailboxSendDeferredError();
           throw new MailboxSendRejectedError();
         }
         throw new MailboxSendDeferredError();
       }
-      const transport = nodemailer.createTransport({
+      const transport = (deps.createTransport ?? nodemailer.createTransport)({
         host: address,
         port: account.smtpPort,
         secure: account.smtpSecurity === "tls",
@@ -105,14 +120,23 @@ export function createMailboxExternalAwareSender(
         console.warn(
           `mailbox.send: external SMTP failed (${String(e.code ?? "error")} ${String(e.responseCode ?? "-")})`,
         );
-        if (e.code === "EAUTH" || e.responseCode === 535 || e.responseCode === 534) {
-          await markMailboxExternalAuthFailed(db, input.mailboxId, "smtp_login");
+        const status = typeof e.responseCode === "number" ? e.responseCode : null;
+        // A 4xx is the provider's "try later", at sign-in (454 4.7.0, which nodemailer
+        // reports as EAUTH) or for the message: nothing was accepted, so it waits.
+        if (status !== null && status >= 400 && status < 500) throw new MailboxSendDeferredError();
+        if (e.code === "EAUTH" || status === 535 || status === 534) {
+          const marked = await markMailboxExternalAuthFailed(
+            db,
+            input.mailboxId,
+            account.connectionGeneration,
+            "smtp_login",
+          );
+          // Refused at sign-in, before the message was handed over: with an old
+          // connection, the send retries with the new one instead of failing.
+          if (!marked) throw new MailboxSendDeferredError();
           throw new MailboxSendRejectedError();
         }
-        if (typeof e.responseCode === "number" && e.responseCode >= 400 && e.responseCode < 600)
-          throw e.responseCode < 500
-            ? new MailboxSendDeferredError()
-            : new MailboxSendRejectedError();
+        if (status !== null && status >= 500 && status < 600) throw new MailboxSendRejectedError();
         throw error;
       } finally {
         transport.close();

@@ -51,15 +51,16 @@
     "oauth_failed": "The provider didn't finish the sign-in. Try again in a moment.",
     "oauth_incomplete": "The provider didn't grant access to the mailbox. On the consent screen, allow every permission asked.",
     "other_account": "You signed in with a different account. Sign in with this mailbox's address.",
-    "smtp_login_microsoft": "Microsoft allowed reading, but sending (SMTP) is off for this account. For work or school accounts, an admin must turn on \"Authenticated SMTP\"."
+    "smtp_login_microsoft": "Microsoft allowed reading, but sending (SMTP) is off for this account. For work or school accounts, an admin must turn on \"Authenticated SMTP\".",
+    "imap_login_microsoft": "Microsoft accepted the sign-in but refused IMAP for this account. In Outlook.com, open Settings > Mail > Forwarding and IMAP, turn on \"Let devices and apps use IMAP\" and try again. For work or school accounts, an admin must allow IMAP."
   },
   "status": {
     "loading": "Checking the account…",
     "firstSync": "First sync in progress: messages from the last 30 days are arriving.",
     "syncedAt": "Synced {when}. New messages arrive every 2 minutes.",
     "authFailed": "The provider refused the app password (it may have been deleted, or the account password changed). Create a new app password and paste it below.",
-    "syncError": "Couldn't sync right now. We'll try again in a few minutes.",
-    "storageFull": "This account reached 1 GiB of copies in Mail and stopped syncing. Delete old messages here to free space; nothing changes at the provider.",
+    "syncError": "Couldn't sync right now. We'll try again by ourselves {when}, with no need to reconnect; new emails stay at the provider and arrive here when sync is back.",
+    "storageFull": "This account reached 1 GiB of copies in Mail and sync paused. New emails stay at the provider (nothing is lost). Delete old messages here to free space: we'll try again by ourselves {when}, or tap Sync now.",
     "newPassword": "New app password for {address}",
     "save": "Save password",
     "checking": "Testing…",

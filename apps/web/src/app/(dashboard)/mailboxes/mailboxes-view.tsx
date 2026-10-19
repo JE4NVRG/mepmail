@@ -989,7 +989,9 @@ export function MailboxesView({
       ? (reason as MailboxConnectAccountError)
       : "generic";
     setConnectError(
-      error === "smtp_login" && provider === "microsoft" ? "smtp_login_microsoft" : error,
+      provider === "microsoft" && (error === "smtp_login" || error === "imap_login")
+        ? `${error}_microsoft`
+        : error,
     );
     setConnectOpen(true);
   }, []);

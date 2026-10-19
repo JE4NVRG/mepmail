@@ -455,6 +455,7 @@ export {
   finishMailboxExternalSync,
   getMailboxExternalAccount,
   heldMailboxExternalTeams,
+  MAILBOX_EXTERNAL_RETRY_MS,
   MAILBOX_EXTERNAL_SYNC_EVERY_MS,
   MailboxExternalError,
   type MailboxExternalErrorCode,

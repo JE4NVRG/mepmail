@@ -51,15 +51,16 @@
     "oauth_failed": "O provedor não concluiu o login. Tente de novo em instantes.",
     "oauth_incomplete": "O provedor não liberou o acesso ao e-mail. Na tela de autorização, marque todas as permissões pedidas.",
     "other_account": "Você entrou com outra conta. Entre com o mesmo endereço desta caixa.",
-    "smtp_login_microsoft": "A Microsoft liberou a leitura, mas o envio (SMTP) está desligado para esta conta. Em contas de trabalho ou escola, o administrador precisa liberar o \"SMTP autenticado\"."
+    "smtp_login_microsoft": "A Microsoft liberou a leitura, mas o envio (SMTP) está desligado para esta conta. Em contas de trabalho ou escola, o administrador precisa liberar o \"SMTP autenticado\".",
+    "imap_login_microsoft": "A Microsoft aceitou o login, mas recusou o acesso IMAP desta conta. No Outlook.com, abra Configurações > Email > Encaminhamento e IMAP, ligue \"Permitir que dispositivos e apps usem IMAP\" e tente de novo. Em contas de trabalho ou escola, o administrador precisa liberar o IMAP."
   },
   "status": {
     "loading": "Verificando a conta…",
     "firstSync": "Primeira sincronização em andamento: as mensagens dos últimos 30 dias estão chegando.",
     "syncedAt": "Sincronizado {when}. Novas mensagens chegam a cada 2 minutos.",
     "authFailed": "O provedor recusou a senha de app (ela pode ter sido apagada ou a senha da conta mudou). Crie uma nova senha de app e cole abaixo.",
-    "syncError": "Não deu para sincronizar agora. Tentamos de novo em alguns minutos.",
-    "storageFull": "Esta conta chegou a 1 GiB de cópias no Correio e parou de sincronizar. Apague mensagens antigas daqui para liberar espaço; no provedor nada muda.",
+    "syncError": "Não deu para sincronizar agora. Tentamos de novo sozinhos {when}, sem precisar conectar de novo; os e-mails novos continuam no provedor e chegam aqui quando a sincronização voltar.",
+    "storageFull": "Esta conta chegou a 1 GiB de cópias no Correio e a sincronização pausou. Os e-mails novos continuam no provedor (nada se perde). Apague mensagens antigas daqui para liberar espaço: tentamos de novo sozinhos {when}, ou toque em Sincronizar agora.",
     "newPassword": "Nova senha de app de {address}",
     "save": "Salvar senha",
     "checking": "Testando…",

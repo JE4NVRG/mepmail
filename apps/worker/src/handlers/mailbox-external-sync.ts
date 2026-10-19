@@ -20,7 +20,9 @@ import type { Db } from "@millionsend/db";
  * is marked or moved there), picks up after the last UID it stored under the folder's
  * UIDVALIDITY, and on a first round (or a new UIDVALIDITY) takes the last 30 days, at
  * most 500 messages. Each message is stored like received mail (rules, blocked senders);
- * the checkpoint moves only past what was stored.
+ * the checkpoint moves only past what was stored. Every outcome is written for the
+ * connection the round opened: if the person signs in again meanwhile, the round stops
+ * ("stale") and leaves the new connection's status, checkpoint and schedule alone.
  */
 const BATCH = 25;
 const ROUND_MAX = 200;
@@ -40,16 +42,15 @@ export async function syncMailboxExternalAccount(
     credential?: typeof mailboxExternalCredential;
     now?: () => Date;
   },
-): Promise<"done" | "more" | "held" | "auth_failed" | "error" | "gone"> {
+): Promise<"done" | "more" | "held" | "auth_failed" | "error" | "gone" | "stale"> {
   const now = deps.now ?? (() => new Date());
   const account = await openMailboxExternalAccount(db, keyring, mailboxId);
   if (!account || account.mailboxStatus !== "planned") return "gone";
+  // Outcomes land only on the connection this round opened (see the module comment).
+  const finish = (outcome: Parameters<typeof finishMailboxExternalSync>[3]) =>
+    finishMailboxExternalSync(db, mailboxId, account.connectionGeneration, outcome, now());
   if ((await heldMailboxExternalTeams(db, [account.teamId])).has(account.teamId)) {
-    await finishMailboxExternalSync(db, mailboxId, {
-      ok: true,
-      syncState: account.syncState,
-      more: false,
-    });
+    if (!(await finish({ ok: true, syncState: account.syncState, more: false }))) return "stale";
     return "held";
   }
   let session: Awaited<ReturnType<typeof openImap>>;
@@ -63,20 +64,27 @@ export async function syncMailboxExternalAccount(
   } catch (error) {
     if (error instanceof MailboxExternalOAuthError) {
       // A refused grant waits for the person to sign in again; anything else retries.
-      const refused = error.reason === "invalid_grant" || error.reason === "unconfigured";
-      await finishMailboxExternalSync(db, mailboxId, {
+      // Only the provider refusing the grant needs the person; a missing env retries.
+      const refused = error.reason === "invalid_grant";
+      const written = await finish({
         ok: false,
         status: refused ? "auth_failed" : "error",
-        error: refused ? "oauth_refused" : "oauth_unavailable",
+        error: refused
+          ? "oauth_refused"
+          : error.reason === "unconfigured"
+            ? "oauth_unconfigured"
+            : "oauth_unavailable",
       });
+      if (!written) return "stale";
       return refused ? "auth_failed" : "error";
     }
     const reason = error instanceof ImapError ? error.reason : "network";
-    await finishMailboxExternalSync(db, mailboxId, {
+    const written = await finish({
       ok: false,
       status: reason === "login" ? "auth_failed" : "error",
       error: `imap_${reason}`,
     });
+    if (!written) return "stale";
     return reason === "login" ? "auth_failed" : "error";
   }
   try {
@@ -115,17 +123,21 @@ export async function syncMailboxExternalAccount(
       }
       // Too-large messages are passed over too: they would block the account forever.
       lastUid = Math.max(lastUid, ...batch);
-      await finishMailboxExternalSync(db, mailboxId, {
+      // Signed in again meanwhile: stop here. What was stored stays (the same mailbox,
+      // de-duplicated by source and Message-ID); the new connection keeps its checkpoint.
+      const written = await finish({
         ok: true,
         syncState: { inbox: { uidValidity: folder.uidValidity, lastUid } },
         more: true,
       });
+      if (!written) return "stale";
     }
-    await finishMailboxExternalSync(db, mailboxId, {
+    const written = await finish({
       ok: true,
       syncState: { inbox: { uidValidity: folder.uidValidity, lastUid } },
       more,
     });
+    if (!written) return "stale";
     return more ? "more" : "done";
   } catch (error) {
     const code =
@@ -134,7 +146,7 @@ export async function syncMailboxExternalAccount(
         : error instanceof ImapError
           ? `imap_${error.reason}`
           : "sync_failed";
-    await finishMailboxExternalSync(db, mailboxId, { ok: false, status: "error", error: code });
+    if (!(await finish({ ok: false, status: "error", error: code }))) return "stale";
     return "error";
   } finally {
     await session.logout().catch(() => undefined);

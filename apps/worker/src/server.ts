@@ -1012,6 +1012,9 @@ await queue.work(
     });
     if (result === "auth_failed" || result === "error")
       console.warn(`mailbox.external_sync: ${mailboxId.slice(0, 8)} ${result}`);
+    // Signed in again during the round: its outcome was dropped for the new connection.
+    else if (result === "stale")
+      console.log(`mailbox.external_sync: ${mailboxId.slice(0, 8)} stale (reconnected)`);
   },
   { concurrency: 4, batchSize: 1, groupConcurrency: 1 },
 );

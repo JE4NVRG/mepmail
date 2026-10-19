@@ -53,6 +53,10 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SECRET_MAX = 4000;
 /** Between rounds for one account; the cron picks accounts whose time has come. */
 export const MAILBOX_EXTERNAL_SYNC_EVERY_MS = 2 * 60_000;
+/** After a failed round (provider down, missing setting, storage full): the next try. */
+export const MAILBOX_EXTERNAL_RETRY_MS = 15 * 60_000;
+/** Accounts the scheduler runs: active ones, and ones in error, which retry on their own. */
+const SYNCING_STATUSES = ["active", "error"] as const;
 /** How long a claimed round may run before another worker may take the account. */
 const CLAIM_LEASE_MS = 5 * 60_000;
 
@@ -226,7 +230,11 @@ export async function getMailboxExternalAccount(db: Db, actor: Actor, mailboxId:
   return row;
 }
 
-/** A new app password (already proven by the caller): the account syncs again now. */
+/**
+ * A new app password or a new sign-in (already proven by the caller): a new connection.
+ * Its generation moves forward, so a round or a send still running with the old secret can
+ * no longer write its outcome over this one; the account syncs again now.
+ */
 export async function replaceMailboxExternalSecret(
   db: Db,
   keyring: Keyring,
@@ -242,6 +250,7 @@ export async function replaceMailboxExternalSecret(
       .update(schema.mailboxExternalAccounts)
       .set({
         ...(await sealSecret(keyring, actor.teamId, input.mailboxId, input.secret)),
+        connectionGeneration: sql`${schema.mailboxExternalAccounts.connectionGeneration} + 1`,
         status: "active",
         lastError: null,
         nextSyncAt: new Date(),
@@ -251,7 +260,7 @@ export async function replaceMailboxExternalSecret(
   });
 }
 
-/** "Sincronizar agora": due at once (an active account only). */
+/** "Sincronizar agora": due at once (an active account, or one in error retrying sooner). */
 export async function requestMailboxExternalSync(db: Db, actor: Actor, mailboxId: string) {
   await ownedAccount(db, actor, mailboxId);
   await db
@@ -260,7 +269,7 @@ export async function requestMailboxExternalSync(db: Db, actor: Actor, mailboxId
     .where(
       and(
         eq(schema.mailboxExternalAccounts.mailboxId, mailboxId),
-        eq(schema.mailboxExternalAccounts.status, "active"),
+        inArray(schema.mailboxExternalAccounts.status, SYNCING_STATUSES),
       ),
     );
 }
@@ -289,7 +298,9 @@ export async function disconnectMailboxExternalAccount(db: Db, actor: Actor, mai
 
 /**
  * Accounts whose round is due, claimed for one lease: their next time moves forward now,
- * so two workers never sync one account at the same time.
+ * so two workers never sync one account at the same time. An account in error is due
+ * again at its retry time and comes back by itself once the provider answers; only a
+ * refused password or grant (auth_failed) waits for the person.
  */
 export async function claimDueMailboxExternalAccounts(
   db: Db,
@@ -303,7 +314,7 @@ export async function claimDueMailboxExternalAccounts(
       .from(schema.mailboxExternalAccounts)
       .where(
         and(
-          eq(schema.mailboxExternalAccounts.status, "active"),
+          inArray(schema.mailboxExternalAccounts.status, SYNCING_STATUSES),
           lte(schema.mailboxExternalAccounts.nextSyncAt, now),
         ),
       )
@@ -361,7 +372,19 @@ export async function openMailboxExternalAccount(db: Db, keyring: Keyring, mailb
     username: row.account.username,
     syncState: row.account.syncState,
     secret,
+    /** Which sealing of the secret this is (a fresh IV per seal, rotations included). */
+    secretIv: row.account.secretIv,
+    /** Which connection this is: results are written back only while it is current. */
+    connectionGeneration: row.account.connectionGeneration,
   };
+}
+
+/** One account's row, only while it is still the connection a worker opened. */
+function currentConnection(mailboxId: string, generation: number) {
+  return and(
+    eq(schema.mailboxExternalAccounts.mailboxId, mailboxId),
+    eq(schema.mailboxExternalAccounts.connectionGeneration, generation),
+  );
 }
 
 /** Access tokens this process holds, per account, tied to the refresh token they came from. */
@@ -376,7 +399,14 @@ const accessTokens = new Map<string, { token: string; expiresAt: number; refresh
 export async function mailboxExternalCredential(
   db: Db,
   keyring: Keyring,
-  account: { mailboxId: string; teamId: string; auth: string; secret: string },
+  account: {
+    mailboxId: string;
+    teamId: string;
+    auth: string;
+    secret: string;
+    secretIv?: Buffer;
+    connectionGeneration?: number;
+  },
   refresh = refreshMailboxExternalOAuthToken,
   now = Date.now,
 ): Promise<{ password: string } | { accessToken: string }> {
@@ -400,7 +430,20 @@ export async function mailboxExternalCredential(
         )),
         updatedAt: new Date(),
       })
-      .where(eq(schema.mailboxExternalAccounts.mailboxId, account.mailboxId));
+      .where(
+        and(
+          eq(schema.mailboxExternalAccounts.mailboxId, account.mailboxId),
+          // Only over the sealing and the connection we opened: a reconnect meanwhile
+          // keeps its newer token. A rotation keeps the generation (it is the same
+          // connection), so the round that rotated still writes its own outcome.
+          account.secretIv
+            ? eq(schema.mailboxExternalAccounts.secretIv, account.secretIv)
+            : undefined,
+          account.connectionGeneration !== undefined
+            ? eq(schema.mailboxExternalAccounts.connectionGeneration, account.connectionGeneration)
+            : undefined,
+        ),
+      );
   if (accessTokens.size >= 5000) accessTokens.clear();
   accessTokens.set(account.mailboxId, {
     token: fresh.accessToken,
@@ -410,16 +453,22 @@ export async function mailboxExternalCredential(
   return { accessToken: fresh.accessToken };
 }
 
-/** The end of a round: where the INBOX stands, how it went, and when to come back. */
+/**
+ * The end of a round (or of one batch): where the INBOX stands, how it went, and when to
+ * come back. Written only while `generation` is still the account's connection: false
+ * means the person signed in again meanwhile, so this outcome (status, error, checkpoint,
+ * schedule) belongs to an old connection and was dropped.
+ */
 export async function finishMailboxExternalSync(
   db: Db,
   mailboxId: string,
+  generation: number,
   outcome:
     | { ok: true; syncState: schema.MailboxExternalSyncState; more: boolean }
     | { ok: false; status: "auth_failed" | "error"; error: string },
   now = new Date(),
-) {
-  await db
+): Promise<boolean> {
+  const written = await db
     .update(schema.mailboxExternalAccounts)
     .set(
       outcome.ok
@@ -437,20 +486,34 @@ export async function finishMailboxExternalSync(
         : {
             status: outcome.status,
             lastError: outcome.error.slice(0, 64),
-            // A refused password waits for the person; other failures retry later.
-            nextSyncAt: new Date(now.getTime() + 15 * 60_000),
+            // A refused password waits for the person (auth_failed is never claimed);
+            // an error is claimed again at this time and recovers by itself.
+            nextSyncAt: new Date(now.getTime() + MAILBOX_EXTERNAL_RETRY_MS),
             updatedAt: now,
           },
     )
-    .where(eq(schema.mailboxExternalAccounts.mailboxId, mailboxId));
+    .where(currentConnection(mailboxId, generation))
+    .returning({ mailboxId: schema.mailboxExternalAccounts.mailboxId });
+  return written.length > 0;
 }
 
-/** A send refused the password: the account waits for a new one (no retry loop). */
-export async function markMailboxExternalAuthFailed(db: Db, mailboxId: string, error: string) {
-  await db
+/**
+ * A send refused the password or the grant: the account waits for the person (no retry
+ * loop). Only while `generation` is current: false means the account was signed in again
+ * meanwhile, and the caller should try the send again with the new connection.
+ */
+export async function markMailboxExternalAuthFailed(
+  db: Db,
+  mailboxId: string,
+  generation: number,
+  error: string,
+): Promise<boolean> {
+  const written = await db
     .update(schema.mailboxExternalAccounts)
     .set({ status: "auth_failed", lastError: error.slice(0, 64), updatedAt: new Date() })
-    .where(eq(schema.mailboxExternalAccounts.mailboxId, mailboxId));
+    .where(currentConnection(mailboxId, generation))
+    .returning({ mailboxId: schema.mailboxExternalAccounts.mailboxId });
+  return written.length > 0;
 }
 
 /** sourceId for one provider message ("ext:", never "imap:": that prefix stays silent). */

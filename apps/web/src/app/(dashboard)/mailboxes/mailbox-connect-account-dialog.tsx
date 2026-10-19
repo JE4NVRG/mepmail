@@ -39,7 +39,8 @@ export type MailboxConnectAccountError =
   | "oauth_failed"
   | "oauth_incomplete"
   | "other_account"
-  | "smtp_login_microsoft";
+  | "smtp_login_microsoft"
+  | "imap_login_microsoft";
 
 export type MailboxConnectOAuth = { microsoft: boolean; google: boolean };
 

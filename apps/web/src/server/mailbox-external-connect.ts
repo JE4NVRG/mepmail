@@ -107,6 +107,12 @@ export async function checkMailboxExternalAccount(
     );
     await session.logout();
   } catch (error) {
+    // The provider's own words for a refused sign-in (Outlook.com refuses XOAUTH2 while the
+    // account has IMAP off, for one). They never carry the credential.
+    if (error instanceof ImapError && error.reason === "login" && error.detail)
+      console.warn(
+        `contas externas: ${servers.imapHost} refused the IMAP sign-in: ${error.detail}`,
+      );
     if (error instanceof ImapError)
       throw new MailboxExternalCheckError(
         error.reason === "login"

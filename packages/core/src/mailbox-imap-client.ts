@@ -13,9 +13,25 @@ import tls from "node:tls";
  */
 export type ImapFailure = "login" | "network" | "protocol" | "blocked";
 export class ImapError extends Error {
-  constructor(public readonly reason: ImapFailure) {
+  constructor(
+    public readonly reason: ImapFailure,
+    /** How the server worded a refused sign-in, for logs only (see imapRefusalDetail). */
+    public readonly detail?: string,
+  ) {
     super(reason);
   }
+}
+
+/**
+ * A refused sign-in in the server's words: the tagged NO text and, for SASL, the error the
+ * continuation carried (XOAUTH2 answers base64 JSON such as {"status":"401",...}). Neither
+ * holds the password or the token, which only travel from us to the server. Trimmed for logs.
+ */
+export function imapRefusalDetail(tagged: string, sasl: string | null): string {
+  const said = tagged.replace(/[\r\n]+/g, " ").trim();
+  const decoded = sasl ? Buffer.from(sasl, "base64").toString("utf8") : "";
+  const printable = /^[\x20-\x7e]+$/.test(decoded) ? decoded : "";
+  return (printable ? `${said} sasl=${printable}` : said).slice(0, 300);
 }
 
 export interface ImapFolder {
@@ -239,6 +255,7 @@ class Session implements ImapImportSession {
     const tag = `A${++this.counter}`;
     const authenticating = typeof parts[0] === "string" && parts[0].startsWith("AUTHENTICATE ");
     const untagged: Response[] = [];
+    let sasl: string | null = null;
     let pending = [...parts];
     let chunk = `${tag} `;
     const flush = async () => {
@@ -267,13 +284,20 @@ class Session implements ImapImportSession {
       if (response.text.startsWith(`${tag} `)) {
         const status = response.text.slice(tag.length + 1, tag.length + 4).toUpperCase();
         if (status === "OK ") return untagged;
-        throw new ImapError(parts[0] === "LOGIN " || authenticating ? "login" : "protocol");
+        if (parts[0] === "LOGIN " || authenticating)
+          throw new ImapError(
+            "login",
+            imapRefusalDetail(response.text.slice(tag.length + 1), sasl),
+          );
+        throw new ImapError("protocol");
       }
       if (response.text.startsWith("* BYE")) throw new ImapError("network");
       // A SASL failure comes as a continuation carrying the error; an empty line ends it
       // and the server answers NO.
-      if (response.text.startsWith("+") && authenticating) this.socket.write("\r\n", "latin1");
-      else if (!response.text.startsWith("+")) untagged.push(response);
+      if (response.text.startsWith("+") && authenticating) {
+        sasl = response.text.slice(1).trim() || sasl;
+        this.socket.write("\r\n", "latin1");
+      } else if (!response.text.startsWith("+")) untagged.push(response);
     }
   }
 

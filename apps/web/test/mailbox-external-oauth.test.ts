@@ -12,6 +12,7 @@ import {
   createMailboxExternalAccount,
   mailboxExternalCredential,
   openMailboxExternalAccount,
+  replaceMailboxExternalSecret,
 } from "../../../packages/core/src/mailbox-external-accounts.js";
 import {
   exchangeMailboxExternalOAuthCode,
@@ -49,7 +50,7 @@ vi.mock("@/lib/api-base-url", () => ({ appBaseUrl: () => "https://mepmail.dev" }
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const PEM = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
-const THUMBPRINT = "DA66D6C5AE253491937BA0563108256245FB6BC9";
+const THUMBPRINT = "ABABABABABABABABABABABABABABABABABABABAB";
 const CONSUMER = "9188040d-6c67-4c5b-b112-36a304b66dad";
 
 const savedEnv = { ...process.env };
@@ -500,6 +501,27 @@ describe("Contas externas: OAuth accounts (credentials and the callback)", () =>
     expect(
       await mailboxExternalCredential(db, keys, { ...reopened, auth: "password", secret: "pw" }),
     ).toEqual({ password: "pw" });
+    // A reconnect while a worker holds the old sealing: the worker's rotation never
+    // overwrites the newer token ("Entrar de novo" wins).
+    const stale = (await openMailboxExternalAccount(db, keys, mailboxId))!;
+    await replaceMailboxExternalSecret(
+      db,
+      keys,
+      { teamId: team, userId: "ana" },
+      { mailboxId, secret: mailboxExternalOAuthSecret("rt-reconnect") },
+    );
+    const rotating = (async () => ({
+      accessToken: "at-old-chain",
+      refreshToken: "rt-old-chain",
+      expiresAt: new Date(Date.now() + 3_600_000),
+    })) as typeof refreshMailboxExternalOAuthToken;
+    // Two hours on: the cached token has expired, so the stale holder refreshes.
+    const later = () => Date.now() + 2 * 3_600_000;
+    expect(await mailboxExternalCredential(db, keys, stale, rotating, later)).toEqual({
+      accessToken: "at-old-chain",
+    });
+    const kept = (await openMailboxExternalAccount(db, keys, mailboxId))!;
+    expect(readMailboxExternalOAuthSecret(kept.secret)).toBe("rt-reconnect");
   });
 
   it("connects through the callback only with its own state cookie, then signs in again", async () => {
