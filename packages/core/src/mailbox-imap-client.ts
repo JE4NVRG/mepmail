@@ -475,7 +475,31 @@ export interface ImapOpenDeps {
   timeoutMs?: number;
   /** The largest literal (message) accepted; the scan keeps the small default. */
   maxLiteralBytes?: number;
+  /** Fresh connections tried after a transient XOAUTH2 refusal (imapTransientRefusal). */
+  transientRetries?: number;
+  /** The pause before each of those tries. */
+  sleep?: (ms: number) => Promise<void>;
+  /** Told about each transient refusal that is tried again (for logs). */
+  onTransientRefusal?: (attempt: number, detail: string) => void;
 }
+
+/**
+ * Outlook.com (personal Microsoft accounts) has answered a good XOAUTH2 sign-in with
+ * "NO User is authenticated but not connected" since late September 2026, on most tries
+ * but not all, whatever the client (Thunderbird and other mail apps included). The token
+ * is fine and a fresh connection a moment later usually gets in, so OAuth sign-ins try
+ * again a few times before giving up. A wrong password or a refused token never retries.
+ */
+export function imapTransientRefusal(error: unknown): error is ImapError {
+  return (
+    error instanceof ImapError &&
+    error.reason === "login" &&
+    /authenticated but not connected/i.test(error.detail ?? "")
+  );
+}
+
+const TRANSIENT_RETRIES = 7;
+const TRANSIENT_PAUSE_MS = 1_000;
 
 function tlsConnect(endpoint: { host: string; address: string; port: number }): Duplex {
   return tls.connect({
@@ -494,6 +518,25 @@ export async function openImap(
     | { accessToken: string; password?: undefined }
   ),
   deps: ImapOpenDeps = {},
+): Promise<ImapImportSession> {
+  const retries =
+    input.accessToken === undefined ? 0 : (deps.transientRetries ?? TRANSIENT_RETRIES);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await openImapOnce(input, deps);
+    } catch (error) {
+      if (attempt > retries || !imapTransientRefusal(error)) throw error;
+      deps.onTransientRefusal?.(attempt, error.detail ?? "");
+      await (deps.sleep ?? ((ms) => new Promise<void>((done) => setTimeout(done, ms))))(
+        TRANSIENT_PAUSE_MS,
+      );
+    }
+  }
+}
+
+async function openImapOnce(
+  input: Parameters<typeof openImap>[0],
+  deps: ImapOpenDeps,
 ): Promise<ImapImportSession> {
   const endpoint = await resolveImapEndpoint(input.host, input.port, deps.resolve);
   const socket = (deps.connect ?? tlsConnect)({ ...endpoint, port: input.port });

@@ -100,12 +100,24 @@ export async function checkMailboxExternalAccount(
     typeof credential === "string"
       ? { password: credential }
       : { accessToken: credential.accessToken };
+  // Outlook.com's transient "authenticated but not connected" is tried again (openImap).
+  let retried = 0;
   try {
     const session = await openImap(
       { host: servers.imapHost, port: 993, username: servers.username, ...login },
-      { timeoutMs: 15_000 },
+      {
+        timeoutMs: 15_000,
+        onTransientRefusal: (attempt, detail) => {
+          retried = attempt;
+          console.warn(
+            `contas externas: ${servers.imapHost} IMAP try ${attempt} refused (${detail}); trying again`,
+          );
+        },
+      },
     );
     await session.logout();
+    if (retried)
+      console.info(`contas externas: ${servers.imapHost} IMAP got in on try ${retried + 1}`);
   } catch (error) {
     // The provider's own words for a refused sign-in (Outlook.com refuses XOAUTH2 while the
     // account has IMAP off, for one). They never carry the credential.

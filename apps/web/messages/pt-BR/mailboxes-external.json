@@ -52,7 +52,7 @@
     "oauth_incomplete": "O provedor não liberou o acesso ao e-mail. Na tela de autorização, marque todas as permissões pedidas.",
     "other_account": "Você entrou com outra conta. Entre com o mesmo endereço desta caixa.",
     "smtp_login_microsoft": "A Microsoft liberou a leitura, mas o envio (SMTP) está desligado para esta conta. Em contas de trabalho ou escola, o administrador precisa liberar o \"SMTP autenticado\".",
-    "imap_login_microsoft": "A Microsoft aceitou o login, mas recusou o acesso IMAP desta conta. No Outlook.com, abra Configurações > Email > Encaminhamento e IMAP, ligue \"Permitir que dispositivos e apps usem IMAP\" e tente de novo. Em contas de trabalho ou escola, o administrador precisa liberar o IMAP."
+    "imap_login_microsoft": "A Microsoft aceitou o login, mas recusou o acesso IMAP desta conta. Muitas vezes é temporário (o Outlook.com anda recusando várias tentativas seguidas): tente de novo daqui a alguns minutos. Se continuar, no Outlook.com abra Configurações > Email > Encaminhamento e IMAP e ligue \"Permitir que dispositivos e apps usem IMAP\". Em contas de trabalho ou escola, o administrador precisa liberar o IMAP."
   },
   "status": {
     "loading": "Verificando a conta…",
