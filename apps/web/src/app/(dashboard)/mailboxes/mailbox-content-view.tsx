@@ -2021,7 +2021,8 @@ export function MailboxContentView({
       if (mounted.current) void refresh();
     }
   }
-  const timeLabel = (value: Date) => mailboxTimeLabel(value, new Date(), locale);
+  const timeLabel = (value: Date) =>
+    clientClock ? mailboxTimeLabel(value, new Date(), locale) : "";
   function changeSnooze(until: Date | null) {
     // It comes back unread: drop what this session remembers of reading it.
     if (until && item) {
@@ -3780,8 +3781,13 @@ export function MailboxContentView({
                         ? "pinned"
                         : mailboxDateSection(rows[at]?.date ?? row.date, now);
                     const section = sectionAt(index);
+                    // Day headings ("Hoje", "Ontem"...) are read in the reader's zone, so they
+                    // wait for the client clock like the row dates; "Fixadas" does not.
                     const heading =
-                      index === 0 || sectionAt(index - 1) !== section ? section : null;
+                      (index === 0 || sectionAt(index - 1) !== section) &&
+                      (section === "pinned" || clientClock)
+                        ? section
+                        : null;
                     const avatarAddress = blocked
                       ? row.address
                       : row.kind === "inbox"

@@ -23,5 +23,10 @@ describe("Correio dates and hydration", () => {
     expect(view).toContain(
       'const date = (value: Date) => (clientClock ? dateFormats.full.format(value) : "");',
     );
+    // The day headings and the relative time labels wait for it too.
+    expect(view.replace(/\s+/g, " ")).toContain('(section === "pinned" || clientClock)');
+    expect(view.replace(/\s+/g, " ")).toContain(
+      'clientClock ? mailboxTimeLabel(value, new Date(), locale) : ""',
+    );
   });
 });
