@@ -19,6 +19,7 @@ import { SubscriptionsPausedNotice } from "./subscriptions-paused-notice";
 /** Which public page is rendering; only the landing has the in-page anchors. */
 export type PublicPage =
   | "landing"
+  | "envio"
   | "pricing"
   | "alternatives"
   | "integrations"
@@ -92,14 +93,6 @@ function anchorHref(page: PublicPage, hash: string): string {
   return page === "landing" ? hash : `/${hash}`;
 }
 
-/** Where "Send" lands on the home: its own section once Correio leads the page. */
-function sendAnchor(): string {
-  return process.env.MAILBOX_EARLY_ACCESS_OPEN === "true" &&
-    process.env.MAILBOX_STANDALONE_OPEN === "true"
-    ? "#envio"
-    : "#product";
-}
-
 /** Documentação oficial do produto (host separado do painel). */
 const DOCS_URL = "https://docs.mepmail.dev";
 
@@ -163,7 +156,9 @@ export function PublicHeader({
           </div>
           <LandingNav label={labels.navAria} menuLabel={labels.nav.menu}>
             <div className="gtm-nav-links">
-              <a href={anchorHref(page, sendAnchor())}>{labels.nav.product}</a>
+              <a href="/envio" aria-current={page === "envio" ? "page" : undefined}>
+                {labels.nav.product}
+              </a>
               {labels.nav.correio ? (
                 <a href="/correio" aria-current={page === "correio" ? "page" : undefined}>
                   {labels.nav.correio}
@@ -266,7 +261,10 @@ export function PublicFooter({
         </div>
         <nav className="gtm-footer-col" aria-label={labels.footer.colProduct}>
           <h3>{labels.footer.colProduct}</h3>
-          <a href={anchorHref(page, "#como-funciona")}>{labels.nav.how}</a>
+          <a href="/envio" aria-current={page === "envio" ? "page" : undefined}>
+            {labels.nav.product}
+          </a>
+          <a href="/correio#como-funciona">{labels.nav.how}</a>
           <a data-purchase="" href={anchorHref(page, "#planos")}>
             {labels.nav.plans}
           </a>
@@ -277,7 +275,7 @@ export function PublicFooter({
             </a>
           ) : null}
           <a href="/integrations">{labels.nav.integrations}</a>
-          <a href={anchorHref(page, "#mcp")}>{labels.nav.mcp}</a>
+          <a href="/envio#mcp">{labels.nav.mcp}</a>
           <a href="/changelog" aria-current={page === "changelog" ? "page" : undefined}>
             {labels.nav.changelog}
           </a>
@@ -293,7 +291,9 @@ export function PublicFooter({
           <a data-purchase="" href="/pricing">
             {labels.footer.pricing}
           </a>
-          <a href={anchorHref(page, "#comparativo")}>{labels.nav.compare}</a>
+          <a data-purchase="" href="/pricing#cenarios">
+            {labels.nav.compare}
+          </a>
           <a href="/alternatives/resend">{labels.footer.alternatives}</a>
           {labels.footer.guides ? (
             <a href="/guides" aria-current={page === "guides" ? "page" : undefined}>

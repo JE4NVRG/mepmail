@@ -10,6 +10,11 @@ const BODY = `# MepMail
 - AI catalog (everything published for agents): https://mepmail.dev/.well-known/ai-catalog.json
 - MCP server (hosted, OAuth): https://api.mepmail.dev/mcp
 
+## Envio (Send): transactional email and campaigns
+
+- What it is: https://mepmail.dev/envio
+- Migrating from Resend: https://docs.mepmail.dev/migrate-from-resend
+
 ## Correio: email inboxes for AI agents
 
 - What it is: https://mepmail.dev/correio

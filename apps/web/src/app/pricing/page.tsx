@@ -10,17 +10,29 @@ import {
 } from "@/components/site-chrome";
 import { StructuredData } from "@/components/structured-data";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
-import { formatBrl, formatBrlPrice, formatUsd } from "@/lib/landing-pricing";
+import {
+  COMPARISON_FX,
+  comparisonRowsForLocale,
+  formatBrl,
+  formatBrlPrice,
+  formatUsd,
+  formatVolume,
+  formatWholeComparisonPrice,
+} from "@/lib/landing-pricing";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import { pricingFocus } from "@/lib/public-intent";
 import { faqJsonLd } from "@/lib/structured-data";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
+import "../site-v2.css";
 import "./pricing.css";
 
 const contact = "mailto:suporte@mepmail.dev";
 const canonical = "/pricing";
+/** The comparison row the Resend band quotes (Scale 550K), from the dated table. */
+const PROOF_VOLUME = 550_000;
+const MAIL_SIGNUP = "/signup?next=/mail";
 
 type FaqItem = { q: string; a: string };
 
@@ -49,9 +61,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Standalone pricing page: the whole ladder on one screen (no "show Scale"
- * fold), the overage rules and a short FAQ. Chrome, plan ladder and plan copy
- * all come from the shared sources the landing uses.
+ * /pricing in the v2 dress (Jean, 2026-10-19): the scenarios first, Correio in bone, Envio
+ * in black with three cards and a compact table for the larger rungs, the rules one click
+ * away. Chrome, ladder and plan copy come from the sources the landing uses.
  */
 export default async function PricingPage({
   searchParams,
@@ -60,7 +72,7 @@ export default async function PricingPage({
 } = {}) {
   const locale = await getLocale();
   // A Send campaign (?focus=send, or utm_campaign naming send) lands on Send: its offer leads
-  // and its plans come right after, before the Mail scenarios (lib/public-intent.ts).
+  // and its plans come right after, before the Mail plans and scenarios (lib/public-intent.ts).
   const sendFirst = pricingFocus((await searchParams) ?? {}) === "send";
   const t = await getTranslations("pricing");
   const l = await getTranslations("landing");
@@ -117,108 +129,151 @@ export default async function PricingPage({
         };
       })
     : [];
+  const money = (brlCents: number, usdCents: number) =>
+    brazil ? formatBrlPrice(brlCents, locale) : formatUsd(usdCents / 100, locale);
+  const exact = (brlCents: number, usdCents: number) =>
+    brazil ? formatBrl(brlCents / 100, locale) : formatUsd(usdCents / 100, locale);
   // Headline prices: "R$ 149", "US$ 29".
-  const sendPrice = brazil
-    ? formatBrlPrice(LAUNCH_OFFER.sending.brlMonthlyCents, locale)
-    : formatUsd(LAUNCH_OFFER.sending.monthlyCents / 100, locale);
-  const sendFirstPrice = brazil
-    ? formatBrlPrice(LAUNCH_OFFER.sending.brlFirstMonthlyCents, locale)
-    : formatUsd(LAUNCH_OFFER.sending.firstMonthlyCents / 100, locale);
+  const sendPrice = money(LAUNCH_OFFER.sending.brlMonthlyCents, LAUNCH_OFFER.sending.monthlyCents);
+  const sendFirstPrice = money(
+    LAUNCH_OFFER.sending.brlFirstMonthlyCents,
+    LAUNCH_OFFER.sending.firstMonthlyCents,
+  );
+  const proofRow = comparisonRowsForLocale(launchOfferEnabled, locale).find(
+    (row) => row.volume === PROOF_VOLUME,
+  );
+
+  const quickPrices = (
+    <nav className="pricing-shortcuts v2-quick" aria-label={t("quickPrices.label")}>
+      {standaloneOpen ? (
+        <a href="#correio">
+          <span>{t("quickPrices.mail")}</span>
+          <strong>
+            {money(correioPlans[0].brlMonthlyCents, correioPlans[0].monthlyCents)}
+            <small>{l("plans.perMonth")}</small>
+          </strong>
+        </a>
+      ) : null}
+      <a href="#planos">
+        <span>{t("quickPrices.send")}</span>
+        <strong>
+          {brazil ? "R$ 0" : "US$ 0"}
+          <small>{t("quickPrices.free")}</small>
+        </strong>
+      </a>
+    </nav>
+  );
 
   const scenariosSection = scenarios.length ? (
-    <section className="gtm-section" id="cenarios" aria-labelledby="pricing-scenarios-title">
-      <div className="gtm-container">
-        <p className="gtm-eyebrow">{t("scenarios.eyebrow")}</p>
-        <h2 id="pricing-scenarios-title">{t("scenarios.title")}</h2>
-        <p>{t("scenarios.lead")}</p>
-        <div className="gtm-split gtm-split-three pricing-scenarios">
-          {scenarios.map((scenario) => (
-            <article className="ms-card gtm-plan" key={scenario.id}>
-              <h3>{t(`scenarios.items.${scenario.id}.title`)}</h3>
-              <p>{t(`scenarios.items.${scenario.id}.body`)}</p>
-              <dl className="pricing-scenario-lines">
+    <section
+      className="v2-dark v2-sec-tight"
+      id="cenarios"
+      aria-labelledby="pricing-scenarios-title"
+    >
+      <div className="v2-wrap">
+        <p className="v2-eyebrow">{t("scenarios.eyebrow")}</p>
+        <h2 id="pricing-scenarios-title" className="v2-h3">
+          {t("scenarios.title")}
+        </h2>
+        <div className="v2-grid">
+          {scenarios.map((scenario, index) => (
+            <article
+              className={`v2-card v2-cell${index === scenarios.length - 1 && scenario.sendPro ? " v2-card-violet" : ""}`}
+              key={scenario.id}
+            >
+              <h3 className="v2-h3-sm">{t(`scenarios.items.${scenario.id}.title`)}</h3>
+              <p className="v2-plan-price">
+                {exact(scenario.totalBrlCents, scenario.totalCents)}
+                <small>{l("plans.perMonth")}</small>
+              </p>
+              <p className="v2-body">{t(`scenarios.items.${scenario.id}.body`)}</p>
+              <dl className="v2-mono-table v2-scenario-lines">
                 <div>
                   <dt>
                     {t("scenarios.lineCorreio", {
                       plan: t(`correio.names.${scenario.correio.id}`),
                     })}
                   </dt>
-                  <dd>
-                    {brazil
-                      ? formatBrl(scenario.correio.brlMonthlyCents / 100, locale)
-                      : formatUsd(scenario.correio.monthlyCents / 100, locale)}
-                  </dd>
+                  <dd>{exact(scenario.correio.brlMonthlyCents, scenario.correio.monthlyCents)}</dd>
                 </div>
                 <div>
                   <dt>
                     {t(scenario.sendPro ? "scenarios.lineSendPro" : "scenarios.lineSendFree")}
                   </dt>
                   <dd>
-                    {scenario.sendPro
-                      ? brazil
-                        ? formatBrl(sendProBrlCents / 100, locale)
-                        : formatUsd(sendProCents / 100, locale)
-                      : t("scenarios.free")}
-                  </dd>
-                </div>
-                <div className="pricing-scenario-total">
-                  <dt>{t("scenarios.total")}</dt>
-                  <dd>
-                    {brazil
-                      ? formatBrl(scenario.totalBrlCents / 100, locale)
-                      : formatUsd(scenario.totalCents / 100, locale)}
+                    {scenario.sendPro ? exact(sendProBrlCents, sendProCents) : t("scenarios.free")}
                   </dd>
                 </div>
               </dl>
             </article>
           ))}
         </div>
+        <p className="v2-fine v2-gap-sm">{t("scenarios.lead")}</p>
       </div>
     </section>
   ) : null;
 
   const correioSection = mailOpen ? (
-    <section className="gtm-section" id="correio" aria-labelledby="pricing-correio-title">
-      <div className="gtm-container">
-        <p className="gtm-eyebrow">{t("correio.eyebrow")}</p>
-        <h2 id="pricing-correio-title">{t("correio.title")}</h2>
-        <p>{t(standaloneOpen ? "correio.bodyStandalone" : "correio.body")}</p>
-        <div className={`gtm-split${standaloneOpen ? " gtm-split-three" : ""}`}>
+    <section className="v2-light v2-sec" id="correio" aria-labelledby="pricing-correio-title">
+      <div className="v2-wrap">
+        <p className="v2-eyebrow">{t("correio.eyebrow")}</p>
+        <h2 id="pricing-correio-title" className="v2-h2">
+          {standaloneOpen ? t("v2.correioTitle") : t("correio.title")}
+        </h2>
+        <p className="v2-lead v2-gap-sm">
+          {t(standaloneOpen ? "correio.bodyStandalone" : "correio.body")}
+        </p>
+        <div className="v2-grid">
           {standaloneOpen
-            ? correioPlans.map((plan) => (
-                <article className="ms-card gtm-plan" key={plan.id}>
-                  <h3>{t(`correio.names.${plan.id}`)}</h3>
-                  <p className="gtm-price">
-                    {brazil
-                      ? formatBrlPrice(plan.brlMonthlyCents, locale)
-                      : formatUsd(plan.monthlyCents / 100, locale)}
-                    <span>{t("correio.perMonthPlan")}</span>
-                  </p>
-                  <ul className="gtm-points">
-                    <li>{t("correio.planMailboxes", { count: plan.mailboxes })}</li>
-                    <li>{t("correio.sharedStorage", { size: plan.storageGiB })}</li>
-                    <li>{t("correio.sharedSends", { count: plan.monthlyRecipientDeliveries })}</li>
-                    <li>{t("correio.planInbound", { count: plan.monthlyInboundMessages })}</li>
-                    <li>{t("correio.domains", { count: LAUNCH_OFFER.correioDomains })}</li>
-                    <li>{t("correio.trial")}</li>
-                    <li>
-                      {t("correio.planLocal", {
-                        price: brazil
-                          ? formatUsd(plan.monthlyCents / 100, locale)
-                          : formatBrl(plan.brlMonthlyCents / 100, locale),
-                      })}
-                    </li>
-                  </ul>
-                </article>
-              ))
+            ? correioPlans.map((plan) => {
+                const featured = plan.id === "duo";
+                const name = t(`correio.names.${plan.id}`);
+                return (
+                  <article
+                    className={`v2-plan v2-cell${featured ? " is-featured" : ""}`}
+                    key={plan.id}
+                  >
+                    <h3 className="v2-h3">{name}</h3>
+                    <p className="v2-plan-price">
+                      {money(plan.brlMonthlyCents, plan.monthlyCents)}
+                      <small>{t("correio.perMonthPlan")}</small>
+                    </p>
+                    <ul className="v2-plan-list">
+                      <li>
+                        <strong>{t("correio.planMailboxes", { count: plan.mailboxes })}</strong>
+                      </li>
+                      <li>{t("correio.sharedStorage", { size: plan.storageGiB })}</li>
+                      <li>
+                        {t("correio.sharedSends", { count: plan.monthlyRecipientDeliveries })}
+                      </li>
+                      <li>{t("correio.planInbound", { count: plan.monthlyInboundMessages })}</li>
+                      <li>{t("correio.domains", { count: LAUNCH_OFFER.correioDomains })}</li>
+                      <li>{t("correio.trial")}</li>
+                      <li>
+                        {t("correio.planLocal", {
+                          price: brazil
+                            ? formatUsd(plan.monthlyCents / 100, locale)
+                            : formatBrl(plan.brlMonthlyCents / 100, locale),
+                        })}
+                      </li>
+                    </ul>
+                    <a
+                      className={`v2-btn v2-btn-block ${featured ? "v2-btn-bone" : "v2-btn-line"}`}
+                      href={MAIL_SIGNUP}
+                    >
+                      {t("v2.correioCta", { plan: name })}
+                    </a>
+                  </article>
+                );
+              })
             : LAUNCH_OFFER.mailboxes.map((box) => (
-                <article className="ms-card gtm-plan" key={box.id}>
-                  <h3>{t(`correio.names.${box.id}`)}</h3>
-                  <p className="gtm-price">
+                <article className="v2-plan v2-cell" key={box.id}>
+                  <h3 className="v2-h3">{t(`correio.names.${box.id}`)}</h3>
+                  <p className="v2-plan-price">
                     {formatUsd(box.monthlyCents / 100, locale)}
-                    <span>{t("correio.perMonth")}</span>
+                    <small>{t("correio.perMonth")}</small>
                   </p>
-                  <ul className="gtm-points">
+                  <ul className="v2-plan-list">
                     <li>{t("correio.storage", { size: box.storageGiB })}</li>
                     <li>{t("correio.sends", { count: box.monthlyRecipientDeliveries })}</li>
                     <li>{t("correio.agents")}</li>
@@ -226,70 +281,54 @@ export default async function PricingPage({
                 </article>
               ))}
         </div>
-        {standaloneOpen ? <p className="gtm-note">{t("correio.noteLimits")}</p> : null}
-        <p className="gtm-note">{t(standaloneOpen ? "correio.noteStandalone" : "correio.note")}</p>
-        <div className="ms-wrap-row" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          {standaloneOpen ? (
-            <a className="ms-btn ms-btn-primary gtm-action" href="/signup?next=/mail">
-              {t("correio.subscribe")}
-            </a>
-          ) : null}
-          <a className="ms-btn ms-btn-secondary gtm-action" href="/correio">
-            {t("correio.cta")}
+        {standaloneOpen ? <p className="v2-note v2-gap">{t("v2.correioFree")}</p> : null}
+        <details className="v2-details">
+          <summary>{t("v2.correioDetails")}</summary>
+          <div>
+            {standaloneOpen ? <p className="v2-note">{t("correio.noteLimits")}</p> : null}
+            <p className="v2-note">
+              {t(standaloneOpen ? "correio.noteStandalone" : "correio.note")}
+            </p>
+          </div>
+        </details>
+        <p className="v2-gap">
+          <a className="v2-link-accent" href="/correio">
+            {t("correio.cta")} <span aria-hidden="true">→</span>
           </a>
-        </div>
+        </p>
       </div>
     </section>
   ) : null;
 
   return (
-    <div className="gtm">
+    <div className="gtm v2">
       <StructuredData graph={[faqJsonLd(faq)]} />
       <PublicHeader labels={site} page="pricing" />
       <main id="conteudo">
         {sendFirst ? (
-          <section className="gtm-section gtm-alt pricing-intro">
-            <div className="gtm-container">
-              <p className="gtm-eyebrow">{t("sendHero.eyebrow")}</p>
+          <section className="v2-dark v2-sec pricing-intro">
+            <div className="v2-wrap v2-stack">
+              <p className="v2-eyebrow v2-eyebrow-mono">{t("sendHero.eyebrow")}</p>
               <h1>
                 {t.rich("sendHero.title", {
                   price: sendPrice,
-                  highlight: (chunks) => <span>{chunks}</span>,
+                  highlight: (chunks) => <span className="v2-accent">{chunks}</span>,
                 })}
               </h1>
-              <p className="gtm-lead">{t("sendHero.lead")}</p>
-              <nav className="pricing-shortcuts" aria-label={t("quickPrices.label")}>
-                {standaloneOpen ? (
-                  <a href="#correio">
-                    <span>{t("quickPrices.mail")}</span>
-                    <strong>
-                      {brazil
-                        ? formatBrlPrice(correioPlans[0].brlMonthlyCents, locale)
-                        : formatUsd(correioPlans[0].monthlyCents / 100, locale)}
-                      <small>{l("plans.perMonth")}</small>
-                    </strong>
-                  </a>
-                ) : null}
-                <a href="#planos">
-                  <span>{t("quickPrices.send")}</span>
-                  <strong>
-                    {brazil ? "R$ 0" : "US$ 0"}
-                    <small>{t("quickPrices.free")}</small>
-                  </strong>
-                </a>
-              </nav>
-              <div className="gtm-actions">
+              <p className="v2-lead">{t("sendHero.lead")}</p>
+              {quickPrices}
+              <div className="v2-actions">
                 <SignupCta
-                  className="ms-btn ms-btn-primary gtm-action"
+                  className="v2-btn v2-btn-bone"
                   label={t("sendHero.cta")}
                   plan="Pro 110K"
                   rung="pro_100k"
                 />
-                <a className="ms-btn ms-btn-secondary gtm-action" href="#planos">
+                <a className="v2-link" href="#planos">
                   {t("sendHero.plansLink")}
                 </a>
               </div>
-              <p className="gtm-note">
+              <p className="v2-note">
                 {launchOfferEnabled
                   ? t("sendHero.note", { first: sendFirstPrice, price: sendPrice })
                   : t("sendHero.noteRegular", { price: sendPrice })}
@@ -297,80 +336,110 @@ export default async function PricingPage({
             </div>
           </section>
         ) : (
-          <section className="gtm-section gtm-alt pricing-intro">
-            <div className="gtm-container">
-              <p className="gtm-eyebrow">{t("eyebrow")}</p>
-              <h1>{t.rich("title", { highlight: (chunks) => <span>{chunks}</span> })}</h1>
-              <p className="gtm-lead">{t("lead")}</p>
-              <nav className="pricing-shortcuts" aria-label={t("quickPrices.label")}>
-                {standaloneOpen ? (
-                  <a href="#correio">
-                    <span>{t("quickPrices.mail")}</span>
-                    <strong>
-                      {brazil
-                        ? formatBrlPrice(correioPlans[0].brlMonthlyCents, locale)
-                        : formatUsd(correioPlans[0].monthlyCents / 100, locale)}
-                      <small>{l("plans.perMonth")}</small>
-                    </strong>
-                  </a>
-                ) : null}
-                <a href="#planos">
-                  <span>{t("quickPrices.send")}</span>
-                  <strong>
-                    {brazil ? "R$ 0" : "US$ 0"}
-                    <small>{t("quickPrices.free")}</small>
-                  </strong>
-                </a>
-              </nav>
-              <div className="gtm-actions">
-                <SignupLink label={l("plans.cta")} />
-                <a className="ms-btn ms-btn-secondary gtm-action" href="/alternatives/resend">
+          <section className="v2-dark v2-sec pricing-intro">
+            <div className="v2-wrap v2-stack">
+              <p className="v2-eyebrow">{t("eyebrow")}</p>
+              <h1>{t("v2.title")}</h1>
+              <p className="v2-lead">{t("v2.lead")}</p>
+              {quickPrices}
+              <div className="v2-actions">
+                <SignupLink label={l("plans.cta")} className="v2-btn v2-btn-bone" />
+                <a className="v2-link" href="/alternatives/resend">
                   {t("alternatives.cta")}
                 </a>
               </div>
-              <p className="gtm-note">{t("note")}</p>
+              <p className="v2-note">{t("note")}</p>
             </div>
           </section>
         )}
 
+        {sendFirst ? null : scenariosSection}
         {sendFirst ? null : correioSection}
 
-        <section className="gtm-section" id="planos">
-          <div className="gtm-container">
-            <h2>{t("plans.title")}</h2>
-            <p>{t("plans.intro")}</p>
+        <section className="v2-dark v2-sec" id="planos" aria-labelledby="pricing-plans-title">
+          <div className="v2-wrap">
+            <p className="v2-eyebrow v2-eyebrow-mono">{t("v2.envioEyebrow")}</p>
+            <h2 id="pricing-plans-title" className="v2-h2-sans">
+              {t("v2.envioTitle")}
+            </h2>
+            <p className="v2-lead v2-gap-sm">{t("plans.intro")}</p>
             <div className="gtm-plan-grid">
-              {allPlans.map((plan) => (
+              {allPlans.slice(0, 3).map((plan) => (
                 <PlanCard key={plan.name} plan={plan} labels={cardLabels} />
               ))}
             </div>
+            <h3 className="v2-h3 v2-gap-lg">{t("v2.moreTitle")}</h3>
+            <section
+              className="v2-table-box v2-gap-sm"
+              aria-label={t("v2.table.aria")}
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: focus lets the keyboard scroll the table
+              tabIndex={0}
+            >
+              <table className="v2-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{t("v2.table.plan")}</th>
+                    <th scope="col">{t("v2.table.volume")}</th>
+                    <th scope="col">{t("v2.table.price")}</th>
+                    <th scope="col">{t("v2.table.overage")}</th>
+                    <th scope="col">
+                      <span className="gtm-sr-only">{t("v2.table.choose")}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allPlans.slice(3).map((plan) => (
+                    <tr key={plan.rung}>
+                      <th scope="row">{plan.name}</th>
+                      <td>{plan.copy.volume}</td>
+                      <td className="v2-table-price">
+                        {plan.price}
+                        {l("plans.perMonth")}
+                      </td>
+                      <td>{plan.copy.overage}</td>
+                      <td>
+                        <SignupCta
+                          className="v2-link-accent"
+                          label={t("v2.table.choose")}
+                          plan={plan.name}
+                          rung={plan.rung}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+            <p className="v2-fine v2-gap-sm">
+              {t("v2.scaleNote", { limits: allPlans[allPlans.length - 1]?.copy.limits ?? "" })}
+            </p>
             <details className="pricing-usage-details">
               <summary>{t("plans.details")}</summary>
-              <p className="gtm-note">{l("plans.note")}</p>
-              <p className="gtm-note">{faq[0]?.a}</p>
-              <p className="gtm-note">{l("plans.noteAttach")}</p>
+              <p className="v2-note">{l("plans.note")}</p>
+              <p className="v2-note">{faq[0]?.a}</p>
+              <p className="v2-note">{l("plans.noteAttach")}</p>
             </details>
           </div>
         </section>
 
         {launchOfferEnabled ? (
-          <section className="gtm-section gtm-alt" id="pro110k" aria-labelledby="launch-pro-title">
-            <div className="gtm-container">
-              <p className="gtm-eyebrow">{t("launch.eyebrow")}</p>
-              <h2 id="launch-pro-title">{t("launch.title")}</h2>
-              <p>{t("launch.body")}</p>
-              <div className="gtm-split">
-                <article className="ms-card gtm-plan">
-                  <h3>{t("launch.monthTitle")}</h3>
-                  <p className="gtm-price">
-                    {brazil
-                      ? formatBrlPrice(LAUNCH_OFFER.sending.brlMonthlyCents, locale)
-                      : formatUsd(LAUNCH_OFFER.sending.monthlyCents / 100, locale)}
-                    <span>{l("plans.perMonth")}</span>
+          <section className="v2-ground v2-sec" id="pro110k" aria-labelledby="launch-pro-title">
+            <div className="v2-wrap">
+              <p className="v2-eyebrow v2-eyebrow-mono">{t("launch.eyebrow")}</p>
+              <h2 id="launch-pro-title" className="v2-h2-sans">
+                {t("launch.title")}
+              </h2>
+              <p className="v2-lead v2-gap-sm">{t("launch.body")}</p>
+              <div className="v2-grid">
+                <article className="v2-card v2-card-raised v2-cell">
+                  <h3 className="v2-h3">{t("launch.monthTitle")}</h3>
+                  <p className="v2-plan-price">
+                    {sendPrice}
+                    <small>{l("plans.perMonth")}</small>
                   </p>
-                  <p>{t("launch.monthIntro")}</p>
-                  <p className="gtm-note">{t("launch.monthQuota")}</p>
-                  <p className="gtm-note">
+                  <p className="v2-body">{t("launch.monthIntro")}</p>
+                  <p className="v2-fine">{t("launch.monthQuota")}</p>
+                  <p className="v2-fine">
                     {brazil
                       ? t("launch.monthLocal", {
                           first: formatUsd(LAUNCH_OFFER.sending.firstMonthlyCents / 100, locale),
@@ -382,24 +451,18 @@ export default async function PricingPage({
                         })}
                   </p>
                 </article>
-                <article className="ms-card gtm-plan">
-                  <h3>{t("launch.yearTitle")}</h3>
-                  <p className="gtm-price">
-                    {brazil
-                      ? formatBrlPrice(
-                          LAUNCH_OFFER.sending.brlMonthlyCents * LAUNCH_OFFER.annualChargedMonths,
-                          locale,
-                        )
-                      : formatUsd(
-                          (LAUNCH_OFFER.sending.monthlyCents * LAUNCH_OFFER.annualChargedMonths) /
-                            100,
-                          locale,
-                        )}
-                    <span>{t("launch.perYear")}</span>
+                <article className="v2-card v2-card-raised v2-cell">
+                  <h3 className="v2-h3">{t("launch.yearTitle")}</h3>
+                  <p className="v2-plan-price">
+                    {money(
+                      LAUNCH_OFFER.sending.brlMonthlyCents * LAUNCH_OFFER.annualChargedMonths,
+                      LAUNCH_OFFER.sending.monthlyCents * LAUNCH_OFFER.annualChargedMonths,
+                    )}
+                    <small>{t("launch.perYear")}</small>
                   </p>
-                  <p>{t("launch.yearUpfront")}</p>
-                  <p className="gtm-note">{t("launch.yearQuota")}</p>
-                  <p className="gtm-note">
+                  <p className="v2-body">{t("launch.yearUpfront")}</p>
+                  <p className="v2-fine">{t("launch.yearQuota")}</p>
+                  <p className="v2-fine">
                     {t("launch.yearLocal", {
                       price: brazil
                         ? formatUsd(
@@ -417,46 +480,78 @@ export default async function PricingPage({
                   </p>
                 </article>
               </div>
-              <p className="gtm-note">{t("launch.preserved")}</p>
-              <a className="ms-btn ms-btn-secondary gtm-action" href="/correio">
-                {t("launch.mailCta")}
-              </a>
-              <p className="gtm-note">{t("launch.mailAccess")}</p>
+              <p className="v2-note v2-gap">{t("launch.preserved")}</p>
+              <p className="v2-note v2-gap-sm">
+                {t("launch.mailAccess")}{" "}
+                <a className="v2-link-accent" href="/correio">
+                  {t("launch.mailCta")} <span aria-hidden="true">→</span>
+                </a>
+              </p>
             </div>
           </section>
         ) : null}
 
         {sendFirst ? correioSection : null}
-        {scenariosSection}
+        {sendFirst ? scenariosSection : null}
 
-        <section className="gtm-section gtm-alt">
-          <div className="gtm-container">
-            <p className="gtm-eyebrow">{t("included.eyebrow")}</p>
-            <h2>{t("included.title")}</h2>
-            <p>{t("included.body")}</p>
-            <ul className="gtm-points">
+        <section className="v2-dark v2-sec-tight" aria-labelledby="pricing-included-title">
+          <div className="v2-wrap">
+            <p className="v2-eyebrow v2-eyebrow-mono">{t("included.eyebrow")}</p>
+            <h2 id="pricing-included-title" className="v2-h3">
+              {t("included.title")}
+            </h2>
+            <ul className="v2-checks v2-gap">
               {includedPoints.map((point) => (
-                <li key={point}>{point}</li>
+                <li key={point}>
+                  <span className="v2-check-ok" aria-hidden="true">
+                    ✓
+                  </span>
+                  {point}
+                </li>
               ))}
             </ul>
           </div>
         </section>
 
-        <section className="gtm-section">
-          <div className="gtm-container">
-            <p className="gtm-eyebrow">{t("alternatives.eyebrow")}</p>
-            <h2>{t("alternatives.title")}</h2>
-            <p>{t("alternatives.body")}</p>
-            <a className="ms-btn ms-btn-secondary gtm-action" href="/alternatives/resend">
-              {t("alternatives.cta")}
-            </a>
-          </div>
-        </section>
+        {proofRow ? (
+          <section className="v2-dark v2-sec-tight" aria-labelledby="pricing-compare-title">
+            <div className="v2-wrap">
+              <div className="v2-card-bone v2-row v2-compare">
+                <div className="v2-stack-sm">
+                  <h2 id="pricing-compare-title" className="v2-h3 v2-compare-title">
+                    {t("v2.compareTitle", {
+                      volume: formatVolume(PROOF_VOLUME, locale),
+                      ours: formatWholeComparisonPrice(proofRow.mepmail, locale),
+                      theirs: formatWholeComparisonPrice(proofRow.resend, locale),
+                    })}
+                  </h2>
+                  <p className="v2-note">{t("alternatives.body")}</p>
+                </div>
+                <p>
+                  <a className="v2-btn v2-btn-ink" href="/alternatives/resend">
+                    {t("alternatives.cta")} <span aria-hidden="true">→</span>
+                  </a>
+                </p>
+              </div>
+              <p className="v2-fine v2-gap-sm">
+                {t("v2.footnote", {
+                  volume: formatVolume(PROOF_VOLUME, locale),
+                  date: new Date(`${COMPARISON_FX.date}T12:00:00Z`).toLocaleDateString(locale, {
+                    timeZone: "UTC",
+                  }),
+                  rate: COMPARISON_FX.brlPerUsd.toLocaleString(locale),
+                })}
+              </p>
+            </div>
+          </section>
+        ) : null}
 
-        <section className="gtm-section gtm-alt">
-          <div className="gtm-container">
-            <h2>{t("faq.title")}</h2>
-            <div className="gtm-faq">
+        <section className="v2-ground v2-sec" aria-labelledby="pricing-faq-title">
+          <div className="v2-wrap v2-narrow">
+            <h2 id="pricing-faq-title" className="v2-h2 v2-faq-title">
+              {t("faq.title")}
+            </h2>
+            <div className="v2-faq">
               {faq.map((item) => (
                 <details key={item.q}>
                   <summary>{item.q}</summary>
@@ -467,11 +562,20 @@ export default async function PricingPage({
           </div>
         </section>
 
-        <section className="gtm-section gtm-close">
-          <div className="gtm-container">
-            <h2>{t("close.title")}</h2>
-            <p>{t("close.body")}</p>
-            <SignupLink label={t("close.cta")} />
+        <section className="v2-violet v2-sec v2-center" aria-labelledby="pricing-close-title">
+          <div className="v2-wrap v2-stack">
+            <h2 id="pricing-close-title" className="v2-h2 v2-close-title">
+              {t("v2.closeTitle")}
+            </h2>
+            <p className="v2-lead">{t("close.body")}</p>
+            <div className="v2-actions">
+              <SignupLink label={t("close.cta")} className="v2-btn v2-btn-bone" />
+              {standaloneOpen ? (
+                <a className="v2-btn v2-btn-line" href={MAIL_SIGNUP}>
+                  {t("correio.subscribe")}
+                </a>
+              ) : null}
+            </div>
           </div>
         </section>
       </main>

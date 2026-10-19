@@ -21,6 +21,8 @@ export default function robots(): MetadataRoute.Robots {
         "/$",
         "/?",
         "/pricing",
+        // The Envio (Send) product page.
+        "/envio",
         "/correio",
         // The desktop downloads page.
         "/download",

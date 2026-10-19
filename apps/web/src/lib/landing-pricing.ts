@@ -126,6 +126,15 @@ export function comparisonRowsForLocale(
   });
 }
 
+/**
+ * A comparison figure quoted in a sentence or a headline: rounded to whole units, as a
+ * headline price reads ("R$ 649", "R$ 1.945", "US$ 385"). The table keeps the cents.
+ */
+export function formatWholeComparisonPrice(value: number, locale: string): string {
+  const whole = Math.round(value);
+  return locale === "pt-BR" ? formatBrlPrice(whole * 100, locale) : formatUsd(whole, locale);
+}
+
 export function formatComparisonPrice(value: number | null, locale: string): string {
   return locale === "pt-BR" && value !== null ? formatBrl(value, locale) : formatUsd(value, locale);
 }

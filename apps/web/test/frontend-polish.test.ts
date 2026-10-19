@@ -25,7 +25,9 @@ describe("frontend polish contracts", () => {
     expect(shell).not.toContain("/product/templates-hero.webp");
     // The landing's proof is the live starter gallery (it replaced the static
     // templates-hero.webp); the auth shell keeps its own illustration.
-    expect(read("../src/app/page.tsx")).toContain("<PublicStarterGallery");
+    expect(read("../src/app/home-v2.tsx")).toContain("<PublicStarterGallery");
+    expect(read("../src/app/home-legacy.tsx")).toContain("<PublicStarterGallery");
+    expect(read("../src/app/envio/page.tsx")).toContain("<PublicStarterGallery");
     expect(shell).not.toContain("PublicStarterGallery");
     expect(shell).toContain("LandingLangSwitch");
     expect(shell + form).not.toMatch(/SilkCanvas|waves-dark|waves-light/);

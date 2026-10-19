@@ -19,7 +19,7 @@
     "compare": "Compare prices",
     "plans": "Plans",
     "mcp": "MCP",
-    "how": "Set up the sending domain",
+    "how": "How domain setup works",
     "alternatives": "vs Resend",
     "changelog": "Changelog",
     "login": "Sign in",
@@ -120,7 +120,9 @@
       "Estimated difference"
     ],
     "slideNote": "Swipe the table to see every provider on smaller screens.",
-    "refNote": "Monthly USD prices. Resend: official table checked on 2026-10-16; other providers: historical reference of 2026-09-27, which may have changed. Excludes taxes, introductory offers and annual discounts. Historical ranges for overage use their midpoint."
+    "refNote": "Monthly USD prices. Resend: official table checked on 2026-10-16; other providers: historical reference of 2026-09-27, which may have changed. Excludes taxes, introductory offers and annual discounts. Historical ranges for overage use their midpoint.",
+    "homeStat": "for {volume} emails a month. Resend lists about {theirs}¹",
+    "homeFootnote": "¹ Resend's official price list, checked on 2026-10-16. Taxes not included."
   },
   "calc": {
     "title": "Estimate the difference at your volume.",
@@ -404,5 +406,168 @@
     "pricingSource": "Plans and overage rates checked on 2026-10-16 in <link>Resend’s official pricing table</link>. The Resend column uses the lowest published cost for each volume, with overage where needed.",
     "currency": "MepMail uses its actual BRL catalog price. Foreign prices are estimated in reais using the <link>Brazilian Central Bank closing sell rate</link> on {date}, US$ 1 = R$ {rate}. This is not a checkout quote and excludes taxes and currency fees.",
     "capabilities": "MCP and inbound are not exclusive: Resend offers <resend>official MCP</resend> and <inboxes>inboxes for people and agents</inboxes>; Plunk also offers <plunk>MCP</plunk>. With MepMail, compare the review workflow, permissions and separate Mail and Send allowances."
+  },
+  "home": {
+    "doorsAria": "Where to start: Mail or Send",
+    "correio": {
+      "eyebrow": "Mail · for people and agents",
+      "title": "Email on your own domain, with an agent that waits for your OK.",
+      "lead": "Mailboxes for you, your team and your AI agents. The agent reads and drafts; nothing goes out without your approval.",
+      "more": "See Mail",
+      "note": "From <b>{price}/month</b> · 7 days free with a card",
+      "approvalFrom": "<b>{sender}</b> to support@yourcompany.com",
+      "noDomain": "No domain? Connect the Gmail, iCloud or Yahoo account you already have, free",
+      "blockEyebrow": "Mail",
+      "blockTitle": "A real inbox for every day, that also works for you.",
+      "agentTitle": "The agent drafts. You decide when it sends.",
+      "agentBody": "Connect Claude, Cursor or n8n over MCP or the API. The key only opens the mailbox you chose and can be revoked at any time.",
+      "permissions": {
+        "read": "Read",
+        "draft": "Draft",
+        "send": "Send with your approval"
+      },
+      "priceLabel": "Mail plans",
+      "priceNote": "a month on Solo. Duo {duo} · Equipe {equipe}",
+      "priceLink": "See the plans",
+      "tiles": [
+        {
+          "title": "Your Gmail too, free",
+          "body": "Gmail, iCloud, Yahoo, Zoho or IMAP in the same Mail, no DNS. Up to 3 accounts per person."
+        },
+        {
+          "title": "Apps for Windows and Linux",
+          "body": "Its own window, an unread counter and mailto: links that open in Mail."
+        },
+        {
+          "title": "Bring your history",
+          "body": "Import the old mailbox over IMAP and switch the MX only when you are ready."
+        },
+        {
+          "title": "Schedule, undo, organize",
+          "body": "Scheduled sending, undo send and rules by sender or domain."
+        }
+      ],
+      "cta": "Explore Mail"
+    },
+    "envio": {
+      "eyebrow": "Send · an API for your product",
+      "title": "Swap the base URL. Keep your SDK.",
+      "lead": "API, SMTP and an official MCP server for your product's email, with templates, logs and webhooks.",
+      "cta": "Start free",
+      "more": "See Send",
+      "note": "<b>{free} emails a day free</b>, no card",
+      "changed": "2 lines change",
+      "blockEyebrow": "Send",
+      "blockTitle": "Everything your product sends, in one dashboard.",
+      "galleryTitle": "Templates to start with today",
+      "galleryBody": "Welcome, password, code, order, shipping, cart and receipt. Open one and make it yours.",
+      "checksTitle": "checks on every email",
+      "checks": [
+        {
+          "status": "ok",
+          "label": "DMARC published on the domain"
+        },
+        {
+          "status": "ok",
+          "label": "SPF and DKIM aligned"
+        },
+        {
+          "status": "ok",
+          "label": "Unsubscribe through the List-Unsubscribe header"
+        },
+        {
+          "status": "ok",
+          "label": "Links without a shortener"
+        },
+        {
+          "status": "warn",
+          "label": "Plain-text version missing"
+        },
+        {
+          "status": "info",
+          "label": "Ready for BIMI"
+        }
+      ],
+      "checksNote": "Example result. Every email shows the full list in the dashboard.",
+      "webhooksTitle": "Signed webhooks",
+      "webhooksBody": "Delivery, bounce, open, click and complaint on your endpoint, with a secret you rotate.",
+      "audienceTitle": "Campaigns and audience",
+      "audienceBody": "Contacts by API or CSV, subscription topics and a ready unsubscribe page.",
+      "protectionTitle": "Domain protection",
+      "protectionBody": "Bounces and complaints become suppressions on their own. If the rates climb, sending slows down and pauses before your reputation burns.",
+      "waysTitle": "API, SMTP and MCP",
+      "page": "Explore Send"
+    },
+    "domain": {
+      "title": "One verified domain. Two fronts in one account.",
+      "lead": "Verify the domain once. People and agents use Mail; your product uses Send. Each front has its own credential and its own limit.",
+      "correio": "Mail",
+      "envio": "Send",
+      "agentBox": "support@ · agent",
+      "hub": "yourcompany.com",
+      "hubNote": "DKIM, MAIL FROM and MX verified",
+      "boxes": {
+        "auth": "no-reply@ · sign-up and password",
+        "orders": "orders@ · receipts",
+        "news": "news@ · campaigns"
+      }
+    },
+    "stats": {
+      "aria": "Numbers you can check",
+      "checks": "deliverability checks on every email sent, from DMARC to unsubscribe",
+      "mcp": "tools on the hosted MCP server, with OAuth sign-in and scoped permissions",
+      "open": "open source: audit what runs, or run it on your own server with Docker",
+      "store": "App on the Microsoft Store",
+      "mcpDocs": "Official MCP",
+      "github": "Code on GitHub",
+      "status": "Public status"
+    },
+    "prices": {
+      "title": "Plain monthly prices.",
+      "correio": "Mail · per plan",
+      "envio": "Send · by volume",
+      "mailboxes": "{count, plural, one {# mailbox} other {# mailboxes}}",
+      "perDay": "{amount}/day",
+      "perMonth": "{amount}/month",
+      "correioNote": "A month. 7 days free with a card on the first plan.",
+      "envioNote": "A month. Pro 110K is {first} on the first eligible bill. Up to {max} emails a month.",
+      "envioNoteRegular": "A month. Up to {max} emails a month.",
+      "all": "See every price",
+      "scenarios": "See prices by scenario"
+    },
+    "faq": {
+      "title": "Frequently asked questions",
+      "items": [
+        {
+          "q": "Do I need hosting or a mail server?",
+          "a": "No. You only need control of the domain to publish the DNS records we show."
+        },
+        {
+          "q": "Can the agent send without my review?",
+          "a": "Only if you grant the send permission. Without it, every send waits for your approval."
+        },
+        {
+          "q": "Can I use the Gmail account I already have?",
+          "a": "Yes, free: connect Gmail, iCloud, Yahoo, Zoho or another IMAP account and read and reply from Mail. Up to 3 accounts per person, 1 GiB each."
+        },
+        {
+          "q": "I use Resend. Do I have to rewrite my integration?",
+          "a": "For the compatible sending flows, no: swap the base URL and the key. Inbound over the API, dedicated IPs and SSO are not part of that promise."
+        },
+        {
+          "q": "Do you guarantee inbox placement?",
+          "a": "No honest provider can. We verify the domain, check every email and watch the reputation; the rest depends on the content and the receiving side."
+        },
+        {
+          "q": "Is there a contract?",
+          "a": "No. Plans are monthly and you can cancel whenever you want, with no fee."
+        }
+      ]
+    },
+    "close": {
+      "title": "Your domain can start working for you.",
+      "body": "Create the account today. Coming from another provider? We help with the move.",
+      "envio": "Start Send for free"
+    }
   }
 }

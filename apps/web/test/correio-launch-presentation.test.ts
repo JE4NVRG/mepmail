@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import enCorreio from "../messages/en/correio.json";
 import enLanding from "../messages/en/landing.json";
+import enPricing from "../messages/en/pricing.json";
 import ptCorreio from "../messages/pt-BR/correio.json";
 import ptLanding from "../messages/pt-BR/landing.json";
+import ptPricing from "../messages/pt-BR/pricing.json";
 
 type Locale = "en" | "pt-BR";
 const current = vi.hoisted(() => ({ locale: "en" as Locale, urlLocale: null as Locale | null }));
@@ -21,16 +23,17 @@ vi.mock("next/headers", () => ({
 vi.mock("@/components/site-chrome", () => ({
   PublicHeader: () => createElement("header", null, "MepMail"),
   PublicFooter: () => createElement("footer", null, "MepMail"),
+  SignupLink: ({ label }: { label: string }) => createElement("a", { href: "/signup" }, label),
 }));
 vi.mock("next-intl/server", () => ({
   getLocale: async () => current.locale,
-  getTranslations: async (namespace: "correio" | "landing") =>
+  getTranslations: async (namespace: "correio" | "correio.v2" | "landing" | "pricing") =>
     createTranslator({
       locale: current.locale,
       messages:
         current.locale === "pt-BR"
-          ? { correio: ptCorreio, landing: ptLanding }
-          : { correio: enCorreio, landing: enLanding },
+          ? { correio: ptCorreio, landing: ptLanding, pricing: ptPricing }
+          : { correio: enCorreio, landing: enLanding, pricing: enPricing },
       namespace,
     }),
 }));
@@ -124,8 +127,7 @@ const expectations = {
     publicMailboxMcpPending: /The Mail MCP gives the agent its own inbox as tools/,
     agentFragment: "connect-an-agent-over-mcp",
     docsPrefix: "https://docs.mepmail.dev",
-    plansPrices:
-      /Solo: 1 mailbox for US\$ 2\.90 a month\. Duo: 3 mailboxes for US\$ 5\.90\. Equipe: 10 mailboxes for US\$ 12\.90/,
+    planPrices: ["US$ 2.90", "US$ 5.90", "US$ 12.90"],
     plansNoSending: /Mail does not require a Send plan/,
     plansBilling: "Send plan + a Mail plan",
   },
@@ -165,8 +167,7 @@ const expectations = {
     publicMailboxMcpPending: /O MCP do Correio dá ao agente as ferramentas da própria caixa/,
     agentFragment: "conecte-um-agente-por-mcp",
     docsPrefix: "https://docs.mepmail.dev/pt-BR",
-    plansPrices:
-      /Solo: 1 caixa por R\$ 14,90 por mês\. Duo: 3 caixas por R\$ 29,90\. Equipe: 10 caixas por R\$ 64,90\. No cartão ou no Pix\./,
+    planPrices: ["R$ 14,90", "R$ 29,90", "R$ 64,90"],
     plansNoSending: /O Correio não exige plano de Envio/,
     plansBilling: "Plano de Envio + um plano do Correio",
   },
@@ -180,8 +181,8 @@ async function render(locale: Locale): Promise<string> {
       timeZone: "UTC",
       messages:
         locale === "pt-BR"
-          ? { correio: ptCorreio, landing: ptLanding }
-          : { correio: enCorreio, landing: enLanding },
+          ? { correio: ptCorreio, landing: ptLanding, pricing: ptPricing }
+          : { correio: enCorreio, landing: enLanding, pricing: enPricing },
       // biome-ignore lint/correctness/noChildrenProp: This provider requires children in its createElement props type.
       children: await CorreioPage(),
     }),
@@ -237,7 +238,8 @@ describe.each(["en", "pt-BR"] as const)("Correio launch presentation in %s", (lo
   it("presents the three Correio plans, without the add-on calculator, when Mail opens on its own", async () => {
     vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");
     const plans = textContent(section(await render(locale), "correio-plans-title"));
-    expect(plans).toMatch(expected.plansPrices);
+    for (const name of ["Solo", "Duo", "Equipe"]) expect(plans).toContain(name);
+    for (const price of expected.planPrices) expect(plans).toContain(price);
     expect(plans).toMatch(expected.plansNoSending);
     expect(plans).toContain(expected.plansBilling);
     expect(plans).not.toMatch(expected.minimumPlan);
@@ -490,5 +492,34 @@ describe.each(["en", "pt-BR"] as const)("Correio sold without Envio in %s", (loc
     expect(textContent(plansHtml)).toMatch(equipe);
     expect(links(plansHtml).map((link) => link.href)).toContain("/signup?next=/mail");
     expect(html).not.toMatch(/<form\b/);
+  });
+});
+
+describe.each(["en", "pt-BR"] as const)("Correio v2 while sold on its own in %s", (locale) => {
+  const expected = expectations[locale];
+  afterEach(() => vi.unstubAllEnvs());
+  it("asks for the sign-up in the hero and the close, and keeps the honesty labels", async () => {
+    vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
+    vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");
+    const html = await render(locale);
+    const hero = section(html, "correio-title");
+    expect(hero.match(/<h1\b/g)).toHaveLength(1);
+    expect(textContent(hero)).toMatch(expected.open);
+    expect(textContent(hero)).toMatch(expected.fictional);
+    expect(textContent(hero)).toMatch(expected.noMessageSent);
+    const heroLinks = links(hero).map((link) => link.href);
+    expect(heroLinks).toContain("/signup");
+    expect(heroLinks).toContain("#planos");
+    expect(heroLinks).toContain("/signup?next=/mail");
+    expect(links(section(html, "correio-close-title")).map((link) => link.href)).toContain(
+      "/signup",
+    );
+    expect(textContent(section(html, "correio-integrations-title"))).toMatch(
+      expected.publicMailboxMcpPending,
+    );
+    expect(html).toContain('id="como-funciona"');
+    expect(html).toContain('id="ja-tenho"');
+    expect(html).not.toMatch(/<form\b/);
+    expect(textContent(html)).not.toMatch(expected.internalWording);
   });
 });

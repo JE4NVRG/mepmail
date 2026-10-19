@@ -1,0 +1,166 @@
+{
+  "meta": {
+    "title": "MepMail Send: an email API compatible with the Resend SDK",
+    "description": "Transactional email and campaigns over API, SMTP and MCP. Compatible with the Resend SDK, with {checks} checks on every email, signed webhooks and plans from free. 100 emails a day free, no card."
+  },
+  "hero": {
+    "eyebrow": "Send · transactional email and campaigns",
+    "titleStart": "Swap the base URL.",
+    "titleEnd": "Keep your SDK.",
+    "lead": "The email API for your product: compatible with the Resend SDK, with an SMTP relay and an official MCP server for agents. Monthly plans, no annual lock-in.",
+    "cta": "Start free",
+    "migrate": "Migrate from Resend in one command",
+    "note": "<b>{free} emails a day free</b>, no card. Paid plans from {starter}/month.",
+    "codeAria": "Code examples",
+    "codeCaption": "Code example. This page sends no email.",
+    "changed": "2 lines change"
+  },
+  "proof": {
+    "lead": "At <b>{volume} emails a month</b>, on each provider's cheapest published plan:",
+    "ours": "MepMail {plan}",
+    "theirs": "Resend¹",
+    "cta": "Estimate my volume"
+  },
+  "ways": {
+    "title": "Three ways to send. One account.",
+    "api": {
+      "kind": "01 · REST API",
+      "title": "From your code, with the SDK you already use",
+      "body": "Single, batch and scheduled sends, with a dedicated API key."
+    },
+    "smtp": {
+      "kind": "02 · SMTP",
+      "title": "From any system that already speaks SMTP",
+      "body": "WordPress, ERPs, Laravel, Django: change the outgoing server and you are done."
+    },
+    "mcp": {
+      "kind": "03 · MCP",
+      "title": "From your AI agent, with no key to paste",
+      "body": "{tools} tools with OAuth sign-in for Claude, Cursor, Codex and other MCP clients."
+    }
+  },
+  "panel": {
+    "eyebrow": "The dashboard",
+    "title": "From the first welcome email to the holiday campaign.",
+    "templatesTitle": "Ready-made templates and a visual editor",
+    "templatesBody": "Welcome, confirmation, password, code, order, shipping, cart, receipt, newsletter and win-back.",
+    "insightsTitle": "checks on every email",
+    "insightsBody": "After a send, the dashboard shows what could push the message to spam:",
+    "insights": [
+      {
+        "status": "ok",
+        "label": "DMARC published"
+      },
+      {
+        "status": "ok",
+        "label": "SPF and DKIM aligned with the sender"
+      },
+      {
+        "status": "ok",
+        "label": "Unsubscribe through the List-Unsubscribe header on campaigns"
+      },
+      {
+        "status": "ok",
+        "label": "Links on the same domain, no shortener"
+      },
+      {
+        "status": "warn",
+        "label": "Plain-text version missing"
+      },
+      {
+        "status": "warn",
+        "label": "Image without alt text"
+      },
+      {
+        "status": "info",
+        "label": "Ready for BIMI"
+      }
+    ],
+    "insightsNote": "Example result for one email.",
+    "logsTitle": "Every send, traceable",
+    "logsBody": "API logs, per-email status and delivery, open and click metrics. Illustrative example.",
+    "webhooksTitle": "Signed webhooks",
+    "webhooksBody": "A signature on every event, with a secret you rotate in the dashboard.",
+    "audienceTitle": "Campaigns and audience",
+    "audienceBody": "Contacts by API or CSV, properties, subscription topics and a ready unsubscribe page. Broadcasts at a controlled pace.",
+    "protectionTitle": "Domain protection",
+    "protectionBody": "Hard bounces and complaints become suppressions on their own. If the rates climb, broadcasts slow down and sends pause before your reputation burns."
+  },
+  "agents": {
+    "eyebrow": "For AI agents",
+    "title": "Your agent sends through the same account, with the same limits.",
+    "body": "Connect the hosted MCP server with OAuth, nothing to install, or run the local package with a dedicated key. Sends and campaigns reach the MCP client flagged as irreversible actions, so it asks for confirmation.",
+    "panelTitle": "MCP client · remote server",
+    "url": "URL",
+    "login": "Sign-in",
+    "loginValue": "OAuth 2.1 at MepMail",
+    "tools": "Tools",
+    "toolsValue": "{count}, by scope",
+    "local": "Or local",
+    "configFile": "mcp.json",
+    "configCaption": "Local configuration. Replace the placeholder with your API key in the MCP client."
+  },
+  "migrate": {
+    "eyebrow": "Coming from Resend",
+    "title": "Bring the whole account with one command.",
+    "lead": "The migration CLI reads your Resend account and shows, before anything changes, what comes along: domains, templates, contacts, segments, topics, properties, webhooks, suppressions and broadcasts.",
+    "plan": {
+      "title": "Plan with no risk",
+      "body": "Read-only. It writes a plan for you to review."
+    },
+    "apply": {
+      "title": "Apply and verify the domain",
+      "body": "Publish the new DNS (DKIM and MAIL FROM). If needed, migrate rollback undoes it."
+    },
+    "switch": {
+      "title": "Swap the base URL and the key",
+      "body": "The official SDK stays the same. Move the traffic when you are ready."
+    },
+    "honesty": "API compatibility is not full parity: inbound over the API, dedicated IPs and SSO are not part of this promise.",
+    "guide": "Read the migration guide"
+  },
+  "open": {
+    "title": "Open source. Use ours, or run it on your server.",
+    "body": "AGPL-3.0 on GitHub. The hosted version runs on Amazon SES; to self-host there is a docker compose and the self-hosting guide.",
+    "github": "Code on GitHub",
+    "selfHost": "Self-hosting guide"
+  },
+  "plans": {
+    "title": "Start free. Grow by volume.",
+    "lead": "API, SMTP, MCP, templates and webhooks on every plan.",
+    "more": "More volume: {list}.",
+    "all": "See every plan"
+  },
+  "faq": {
+    "title": "Questions from people who integrate",
+    "items": [
+      {
+        "q": "Do I have to rewrite my Resend integration?",
+        "a": "No, for the supported sending calls: keep the official SDK and point it at api.mepmail.dev with the new key. The migration CLI shows what changes before you move the traffic."
+      },
+      {
+        "q": "What happens when I go over the quota?",
+        "a": "Free and Starter have no overage: past the daily limit, sends wait in a queue and are refused only when it reaches 3× the limit. On Pro and Scale, overage is on and can be turned off in Billing."
+      },
+      {
+        "q": "Do you guarantee the inbox?",
+        "a": "No honest provider can. We verify the domain, check every email and protect the reputation; the rest depends on the content and the receiving side."
+      },
+      {
+        "q": "What is the attachment limit?",
+        "a": "1 MB per message on Free and Starter, 5 MB on Pro and 10 MB on Scale, adding up the attachments."
+      },
+      {
+        "q": "Is there a contract?",
+        "a": "No. Plans are monthly and you can cancel whenever you want, with no fee."
+      }
+    ]
+  },
+  "close": {
+    "title": "Your next email ships from here.",
+    "body": "{free} emails a day free, no card. Move up a plan when the volume asks for it.",
+    "cta": "Create a free account",
+    "docs": "Read the docs"
+  },
+  "footnote": "¹ Resend: official price list checked on 2026-10-16, cheapest published option for {volume} emails a month. Taxes not included."
+}

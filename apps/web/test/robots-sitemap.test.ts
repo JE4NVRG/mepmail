@@ -86,9 +86,9 @@ describe("robots.txt + sitemap.xml agreement", () => {
   it("allows every URL the sitemap advertises", () => {
     const allow = allowedPaths();
     const urls = sitemap();
-    // Fourteen indexable public pages, each in English and Portuguese.
-    // Login/signup remain crawlable for their noindex, outside this sitemap.
-    expect(urls).toHaveLength(28);
+    // Fifteen indexable public pages (the Envio page since v2), each in English and
+    // Portuguese. Login/signup remain crawlable for their noindex, outside this sitemap.
+    expect(urls).toHaveLength(30);
 
     for (const entry of urls) {
       const { pathname, search } = new URL(entry.url as string);
@@ -106,7 +106,7 @@ describe("robots.txt + sitemap.xml agreement", () => {
     vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
     const urls = sitemap();
     // /correio, the desktop downloads and the Linux app's page, in both languages.
-    expect(urls).toHaveLength(34);
+    expect(urls).toHaveLength(36);
     expect(has()).toBe(true);
     expect(urls.find((entry) => entry.url.endsWith("/desktop/correio/linux"))?.priority).toBe(0.6);
     expect(isAllowed("/desktop/correio/linux", allowedPaths())).toBe(true);
@@ -118,12 +118,19 @@ describe("robots.txt + sitemap.xml agreement", () => {
     expect(isAllowed("/correio/opengraph-image", allowedPaths())).toBe(true);
   });
 
+  it("advertises the Envio page with the same weight as pricing, and robots lets crawlers in", () => {
+    const envio = sitemap().find((entry) => new URL(entry.url as string).pathname === "/envio");
+    expect(envio?.priority).toBe(0.9);
+    expect(isAllowed("/envio", allowedPaths())).toBe(true);
+    expect(isAllowed("/envio?lang=pt-BR", allowedPaths())).toBe(true);
+  });
+
   it("lists every page in English and in Portuguese, both with the same hreflang set", () => {
     // Crawlers send neither the cookie nor Accept-Language: without its own URL the
     // Portuguese copy was never indexed.
     const urls = sitemap();
     const english = urls.filter((entry) => !entry.url.includes("?"));
-    expect(english).toHaveLength(14);
+    expect(english).toHaveLength(15);
     for (const entry of english) {
       const portuguese = `${entry.url}?lang=pt-BR`;
       const twin = urls.find((other) => other.url === portuguese);

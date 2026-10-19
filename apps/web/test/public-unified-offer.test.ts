@@ -37,6 +37,8 @@ const messages = (locale: Locale) =>
 
 vi.mock("@millionsend/core", async () => ({
   PLAN_RUNGS: (await import("../../../packages/core/src/plans")).PLAN_RUNGS,
+  // The v2 home counts the real deliverability checks it advertises.
+  CHECKS: (await import("../../../packages/core/src/email-insights")).CHECKS,
 }));
 vi.mock("next-intl/server", () => ({
   getLocale: async () => current.locale,
@@ -61,6 +63,10 @@ vi.mock("@/components/integration-tabs", () => ({ IntegrationTabs: () => null })
 vi.mock("@/components/public-events", () => ({
   ArrivalTracker: () => null,
   McpConfigCopy: () => null,
+  DocsLink: ({ href, children }: { href: string; children: unknown }) =>
+    createElement("a", { href }, children as string),
+  GithubLink: ({ href, children }: { href: string; children: unknown }) =>
+    createElement("a", { href }, children as string),
 }));
 vi.mock("@/components/public-starter-gallery", () => ({ PublicStarterGallery: () => null }));
 vi.mock("@/components/stack-logos", () => ({ StackLogoRow: () => null }));
@@ -108,14 +114,13 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(body).not.toMatch(pt ? /Nenhum plugin/ : /No plugin/);
     });
 
-    it("opens the home on three goals and states the trial's card", async () => {
+    it("opens the home on two doors, Correio and Envio, and states the trial's card", async () => {
       current.locale = locale;
       const html = await render(Home);
-      expect(html).toContain('id="objetivos"');
-      expect(html.match(/class="cro-goal"/g)).toHaveLength(3);
+      expect(html.match(/class="v2-door[ "]/g)).toHaveLength(2);
       expect(html).toContain('href="/pricing#cenarios"');
       const body = text(html);
-      expect(body).toMatch(pt ? /cartão \(7 dias grátis/ : /7 days free with a card/);
+      expect(body).toMatch(pt ? /7 dias grátis no cartão/ : /7 days free with a card/);
       expect(body).not.toMatch(pt ? /Uma API key/ : /One API key/);
     });
 

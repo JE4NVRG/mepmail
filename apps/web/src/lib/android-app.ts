@@ -25,6 +25,7 @@ export const ANDROID_APP_SALES_PATHS: readonly string[] = [
   "/",
   "/pricing",
   "/correio",
+  "/envio",
   "/alternatives/resend",
 ];
 export const ANDROID_APP_HOME = "/mail";

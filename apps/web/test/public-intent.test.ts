@@ -158,10 +158,10 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(intro).toContain(locale === "en" ? "US$ 0" : "R$ 0");
     });
 
-    it("starts with Mail elsewhere, then Send and scenarios, preserving each paid plan's intent", async () => {
+    it("starts with the scenarios elsewhere, then Mail and Send, preserving each paid plan's intent", async () => {
       current.locale = locale;
       const html = await render({});
-      const journey = ["correio", "planos", "pro110k", "cenarios"].map((id) =>
+      const journey = ["cenarios", "correio", "planos", "pro110k"].map((id) =>
         html.indexOf(`id="${id}"`),
       );
       expect(journey.every((position) => position > 0)).toBe(true);

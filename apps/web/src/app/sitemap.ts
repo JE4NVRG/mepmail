@@ -5,7 +5,7 @@ import { languageAlternates, localizedPath } from "@/lib/public-locale-url";
 // Resolve APP_BASE_URL when requested, rather than freezing it at build time.
 export const dynamic = "force-dynamic";
 
-// Public, indexable pages: the landing, the standalone pricing page, the
+// Public, indexable pages: the landing, the standalone pricing page, the Envio page, the
 // Correio page, the desktop downloads and the Linux page (once Mail is open and indexable),
 // the "Resend alternative" comparison, the integrations, security and support
 // pages. Auth utilities remain crawlable so their noindex can be read, but are not advertised here.
@@ -26,6 +26,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const pages: MetadataRoute.Sitemap = [
     { url: `${base}/`, changeFrequency: "weekly", priority: 1 },
     { url: `${base}/pricing`, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${base}/envio`, changeFrequency: "monthly", priority: 0.9 },
     ...correio,
     { url: `${base}/alternatives/resend`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${base}/integrations`, changeFrequency: "monthly", priority: 0.8 },

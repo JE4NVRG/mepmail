@@ -30,6 +30,7 @@ export const PUBLIC_MESSAGE_PATHS = new Set([
   "/changelog",
   "/correio",
   "/download",
+  "/envio",
   "/guides",
   "/integrations",
   "/pricing",

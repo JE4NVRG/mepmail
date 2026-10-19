@@ -21,6 +21,7 @@ const NAMESPACES = [
   "deliverability",
   "alternatives",
   "landing",
+  "envio",
   "integrations",
   "guides",
   "correio",

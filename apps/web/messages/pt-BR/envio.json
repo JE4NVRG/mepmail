@@ -1,0 +1,166 @@
+{
+  "meta": {
+    "title": "MepMail Envio: API de e-mail compatível com o SDK do Resend, em reais",
+    "description": "E-mail transacional e campanhas por API, SMTP e MCP. Compatível com o SDK do Resend, com {checks} verificações em cada e-mail, webhooks assinados e planos em reais no cartão ou no Pix. Grátis até 100 e-mails por dia."
+  },
+  "hero": {
+    "eyebrow": "Envio · e-mail transacional e campanhas",
+    "titleStart": "Troque a base URL.",
+    "titleEnd": "Pague em reais.",
+    "lead": "A API de e-mail do seu produto: compatível com o SDK do Resend, com relay SMTP e MCP oficial para agentes. No cartão ou no Pix, sem depender da cotação do dólar.",
+    "cta": "Começar grátis",
+    "migrate": "Migrar do Resend com um comando",
+    "note": "<b>{free} e-mails por dia grátis</b>, sem cartão. Planos pagos a partir de {starter}/mês.",
+    "codeAria": "Exemplos de código",
+    "codeCaption": "Exemplo de código. Esta página não envia e-mails.",
+    "changed": "2 linhas mudam"
+  },
+  "proof": {
+    "lead": "Em <b>{volume} envios por mês</b>, pelo menor plano publicado de cada um:",
+    "ours": "MepMail {plan}",
+    "theirs": "Resend, convertido¹",
+    "cta": "Calcular no meu volume"
+  },
+  "ways": {
+    "title": "Três jeitos de enviar. A mesma conta.",
+    "api": {
+      "kind": "01 · API REST",
+      "title": "Do seu código, com o SDK que você já usa",
+      "body": "Envio único, em lote e agendado, com chave de API dedicada."
+    },
+    "smtp": {
+      "kind": "02 · SMTP",
+      "title": "De qualquer sistema que já fala SMTP",
+      "body": "WordPress, ERPs, Laravel, Django: troque o servidor de saída e pronto."
+    },
+    "mcp": {
+      "kind": "03 · MCP",
+      "title": "Do seu agente de IA, sem colar chave",
+      "body": "{tools} ferramentas com login OAuth para Claude, Cursor, Codex e outros clientes MCP."
+    }
+  },
+  "panel": {
+    "eyebrow": "O painel",
+    "title": "Do primeiro e-mail de boas-vindas à campanha de fim de ano.",
+    "templatesTitle": "Modelos prontos e editor visual",
+    "templatesBody": "Boas-vindas, confirmação, senha, código, pedido, entrega, carrinho, recibo, newsletter e reengajamento.",
+    "insightsTitle": "verificações em cada e-mail",
+    "insightsBody": "Depois do envio, o painel mostra o que pode levar a mensagem para o spam:",
+    "insights": [
+      {
+        "status": "ok",
+        "label": "DMARC publicado"
+      },
+      {
+        "status": "ok",
+        "label": "SPF e DKIM alinhados ao remetente"
+      },
+      {
+        "status": "ok",
+        "label": "Descadastro pelo cabeçalho List-Unsubscribe nas campanhas"
+      },
+      {
+        "status": "ok",
+        "label": "Links no mesmo domínio, sem encurtador"
+      },
+      {
+        "status": "warn",
+        "label": "Falta a versão em texto"
+      },
+      {
+        "status": "warn",
+        "label": "Imagem sem texto alternativo"
+      },
+      {
+        "status": "info",
+        "label": "Pronto para BIMI"
+      }
+    ],
+    "insightsNote": "Exemplo de resultado de um e-mail.",
+    "logsTitle": "Cada envio, rastreável",
+    "logsBody": "Logs da API, status por e-mail e métricas de entrega, abertura e clique. Exemplo ilustrativo.",
+    "webhooksTitle": "Webhooks assinados",
+    "webhooksBody": "Assinatura em cada evento e segredo que você rotaciona no painel.",
+    "audienceTitle": "Campanhas e audiência",
+    "audienceBody": "Contatos por API ou CSV, propriedades, tópicos de inscrição e página de descadastro pronta. Transmissões em ritmo controlado.",
+    "protectionTitle": "Proteção do domínio",
+    "protectionBody": "Rejeição permanente e reclamação viram supressão sozinhas. Se as taxas sobem, as transmissões desaceleram e os envios pausam antes de queimar a sua reputação."
+  },
+  "agents": {
+    "eyebrow": "Para agentes de IA",
+    "title": "Seu agente envia pela mesma conta, com os mesmos limites.",
+    "body": "Conecte o MCP hospedado com OAuth, sem instalar nada, ou rode o pacote local com uma chave dedicada. Envios e campanhas chegam ao cliente MCP marcados como ações irreversíveis, para que ele peça confirmação.",
+    "panelTitle": "Cliente MCP · servidor remoto",
+    "url": "URL",
+    "login": "Login",
+    "loginValue": "OAuth 2.1 no MepMail",
+    "tools": "Ferramentas",
+    "toolsValue": "{count}, por escopo",
+    "local": "Ou local",
+    "configFile": "mcp.json",
+    "configCaption": "Configuração local. Troque o marcador pela sua chave de API no cliente MCP."
+  },
+  "migrate": {
+    "eyebrow": "Vindo do Resend",
+    "title": "Traga a conta inteira com um comando.",
+    "lead": "A CLI de migração lê a sua conta do Resend e mostra, antes de mudar qualquer coisa, o que vem junto: domínios, modelos, contatos, segmentos, tópicos, propriedades, webhooks, supressões e broadcasts.",
+    "plan": {
+      "title": "Planeje sem risco",
+      "body": "Só leitura. Gera um plano para você revisar."
+    },
+    "apply": {
+      "title": "Aplique e verifique o domínio",
+      "body": "Publique o DNS novo (DKIM e MAIL FROM). Se precisar, migrate rollback desfaz."
+    },
+    "switch": {
+      "title": "Troque a base URL e a chave",
+      "body": "O SDK oficial continua o mesmo. Mude o tráfego quando quiser."
+    },
+    "honesty": "Compatibilidade de API não é paridade total: recebimento por API (inbound), IP dedicado e SSO não fazem parte desta promessa.",
+    "guide": "Ler o guia de migração"
+  },
+  "open": {
+    "title": "Código aberto. Use o nosso, ou rode no seu servidor.",
+    "body": "AGPL-3.0 no GitHub. A versão hospedada usa a Amazon SES por baixo; para auto-hospedar, há um docker compose e o guia de self-hosting.",
+    "github": "Código no GitHub",
+    "selfHost": "Guia de self-hosting"
+  },
+  "plans": {
+    "title": "Comece grátis. Cresça por volume.",
+    "lead": "Em reais, no cartão ou no Pix. API, SMTP, MCP, modelos e webhooks em todos os planos.",
+    "more": "Mais volume: {list}.",
+    "all": "Ver todos os planos"
+  },
+  "faq": {
+    "title": "Perguntas de quem integra",
+    "items": [
+      {
+        "q": "Preciso reescrever a integração com o Resend?",
+        "a": "Não, nas chamadas de envio suportadas: mantenha o SDK oficial e aponte para api.mepmail.dev com a nova chave. A CLI de migração mostra o que muda antes de você trocar o tráfego."
+      },
+      {
+        "q": "O que acontece quando passo da cota?",
+        "a": "No Free e no Starter não há excedente: passando do limite diário, os envios esperam numa fila e só são recusados quando ela chega a 3× o limite. No Pro e no Scale, o excedente vem ligado e pode ser desligado em Cobrança."
+      },
+      {
+        "q": "Vocês garantem a caixa de entrada?",
+        "a": "Não existe garantia honesta disso. Verificamos o domínio, checamos cada e-mail e protegemos a reputação; o resto depende do conteúdo e do destino."
+      },
+      {
+        "q": "Qual o limite de anexos?",
+        "a": "1 MB por mensagem no Free e no Starter, 5 MB no Pro e 10 MB no Scale, somando os anexos."
+      },
+      {
+        "q": "Posso pagar com Pix?",
+        "a": "Sim, sempre em reais. Cada renovação chega como fatura para pagar em até 5 dias. Boleto não é aceito."
+      }
+    ]
+  },
+  "close": {
+    "title": "Seu próximo e-mail sai daqui.",
+    "body": "{free} e-mails por dia grátis, sem cartão. Suba de plano quando o volume pedir.",
+    "cta": "Criar conta grátis",
+    "docs": "Ler a documentação"
+  },
+  "footnote": "¹ Resend: tabela oficial conferida em 16/10/2026, menor opção publicada para {volume} envios, convertida pela PTAX de {date} (US$ 1 = R$ {rate}). Sem impostos nem câmbio do cartão."
+}

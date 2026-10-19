@@ -192,5 +192,28 @@
     "mail": "Correio a partir de",
     "send": "Envio a partir de",
     "free": "· 100 e-mails/dia"
+  },
+  "v2": {
+    "title": "Preço em reais, no cartão ou no Pix. Sem fidelidade.",
+    "lead": "O Correio cobra por plano de caixas; o Envio, pelo volume da sua aplicação. Use um, o outro ou os dois na mesma conta.",
+    "correioTitle": "Caixas no seu domínio. Pessoa ou agente, o mesmo preço.",
+    "correioCta": "Começar no {plan}",
+    "correioFree": "Contas Gmail, iCloud, Yahoo, Zoho ou IMAP conectadas ao Correio: grátis, sem plano, até 3 por pessoa e 1 GiB por conta.",
+    "correioDetails": "Detalhes dos limites do Correio",
+    "envioEyebrow": "Envio · por volume",
+    "envioTitle": "Comece grátis. Cresça por volume.",
+    "moreTitle": "Mais volume",
+    "table": {
+      "aria": "Planos de Envio de maior volume",
+      "plan": "Plano",
+      "volume": "Volume",
+      "price": "Mensalidade",
+      "overage": "Excedente",
+      "choose": "Escolher"
+    },
+    "scaleNote": "Scale: {limits}.",
+    "compareTitle": "{volume} envios: {ours} aqui, cerca de {theirs} na Resend.¹",
+    "footnote": "¹ Resend: tabela oficial conferida em 16/10/2026, menor opção publicada para {volume} envios, convertida pela PTAX de {date} (US$ 1 = R$ {rate}). Sem impostos nem câmbio do cartão.",
+    "closeTitle": "Escolha o plano e comece hoje."
   }
 }

@@ -32,6 +32,12 @@ Use existing locally available sans and monospace stacks. No external fonts. Her
 
 The content container is approximately 1180px with 20px mobile and 32px desktop gutters. Sections use 64–88px desktop and 48px mobile spacing. Use hairline borders and 12–16px card radii, without decorative gradients, parallax or blocking animation. Marketing secondary text may use #aaa7a0 scoped to the landing, not authenticated UI.
 
+## Public site v2 (Jean, 2026-10-19)
+
+While Correio is sold on its own, the home, /envio, /correio and /pricing use the v2 dress in `apps/web/src/app/site-v2.css`: two products, two personalities. Correio sections paint bone (#f4f1ea) with ink text (#141413) and Erode (the self-hosted serif in /fonts) for display headlines; Envio sections stay black with tight sans headlines and the monospace stack for labels and code; the closing band is violet (#5b2fc9) with bone text. This replaces, for those pages only, "dark canvas everywhere" and "violet never a full headline": violet may fill one closing band per page and tint one headline phrase. The home hero splits into two doors (Correio left, Envio right) with one h1 (Correio's).
+
+Every section sets its own ground and colors, so the pages read the same in both themes. Numbers on the page come from the code they describe (CHECKS, MCP_TOOLS, PLAN_RUNGS, LAUNCH_OFFER, the dated comparison rows), never typed into copy. Labelled illustrative examples of a feature (the approval card, an insights checklist, a log line) are allowed; metrics, delivery counters, customer logos and testimonials are still not. With Mail closed or sold only as a Send add-on, the earlier home and /correio (home-legacy.tsx, correio-legacy.tsx) keep rendering.
+
 ## Hero and product evidence
 
 Lead with the user outcome, not infrastructure. The primary action is a bone-on-dark signup button; secondary is outline/ghost linking to the real product section. At 390×844, the primary action must end above y=600. Text and actions precede product imagery on mobile.

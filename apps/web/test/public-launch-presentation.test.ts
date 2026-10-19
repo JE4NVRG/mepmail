@@ -22,6 +22,8 @@ const messages = (locale: Locale) =>
 // calculator, approved offer and core legacy ladder all render below.
 vi.mock("@millionsend/core", async () => ({
   PLAN_RUNGS: (await import("../../../packages/core/src/plans")).PLAN_RUNGS,
+  // The v2 home counts the real deliverability checks it advertises.
+  CHECKS: (await import("../../../packages/core/src/email-insights")).CHECKS,
 }));
 // Pages read the language a URL names (?lang=) from the proxy header; none here.
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
@@ -44,6 +46,10 @@ vi.mock("@/components/integration-tabs", () => ({ IntegrationTabs: () => null })
 vi.mock("@/components/public-events", () => ({
   ArrivalTracker: () => null,
   McpConfigCopy: () => null,
+  DocsLink: ({ href, children }: { href: string; children: unknown }) =>
+    createElement("a", { href }, children as string),
+  GithubLink: ({ href, children }: { href: string; children: unknown }) =>
+    createElement("a", { href }, children as string),
 }));
 vi.mock("@/components/public-starter-gallery", () => ({ PublicStarterGallery: () => null }));
 vi.mock("@/components/stack-logos", () => ({ StackLogoRow: () => null }));
@@ -155,44 +161,53 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(send.indexOf('id="planos"')).toBeLessThan(send.indexOf('id="correio"'));
     });
 
-    it("leads the home with the domain email, its five steps, then Send, while Mail sells on its own", async () => {
+    it("splits the v2 home between Correio and Envio while Mail sells on its own", async () => {
       current.locale = locale;
       const copy = messages(locale).landing;
+      const home2 = copy.home;
       vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
       vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");
       const home = await render(Home);
       const headings = home.match(/<h1[\s>][\s\S]*?<\/h1>/g) ?? [];
       expect(headings).toHaveLength(1);
-      // The title renders as whole sentences, with a non-breaking hyphen in "e-mail".
+      // One headline, Correio's, with a non-breaking hyphen in "e-mail".
       const title = (headings[0] ?? "").replace(/<[^>]+>/g, "");
       expect(title).not.toMatch(/\p{L}-\p{L}/u);
-      expect(title.replace(/‑/g, "-")).toBe(copy.domainHero.title);
+      expect(title.replace(/‑/g, "-")).toBe(home2.correio.title);
+      // Two doors: Correio first, then Envio, each with its own pitch.
+      expect(home.match(/class="v2-door[ "]/g)).toHaveLength(2);
+      expect(home.indexOf(home2.correio.lead)).toBeLessThan(home.indexOf(home2.envio.title));
+      expect(home).toContain(home2.envio.title);
       // Portuguese readers get Brazil's price list: the Correio from R$ 14,90.
       expect(home).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
       expect(home).toContain(messages(locale).correio.demo.awaiting);
-      // The five steps, in order, between the story's anchor and Send's.
-      const story = home.slice(home.indexOf('id="correio"'), home.indexOf('id="envio"'));
-      expect(story.match(/<li[\s>]/g)).toHaveLength(5);
-      const positions = copy.story.steps.map((step) => story.indexOf(step.title));
-      expect(positions.every((at) => at > 0)).toBe(true);
-      expect(positions).toEqual([...positions].sort((a, b) => a - b));
-      expect(story).toContain('href="/correio"');
-      expect(story).toContain('href="/pricing#correio"');
-      // Send keeps its own pitch and every section after the story.
-      expect(home).toContain('href="#envio"');
-      expect(home.indexOf('id="envio"')).toBeLessThan(home.indexOf('id="product"'));
-      expect(home).toContain(copy.hero.title);
-      expect(home).toContain(copy.hero.note);
+      // The counts come from the code they describe, never typed into the copy.
+      const { CHECKS } = await import("../../../packages/core/src/email-insights");
+      const { MCP_TOOLS } = await import("../../../packages/core/src/mcp-tools");
+      expect(home).toContain(`<span class="v2-stat-num">${CHECKS.length}</span>`);
+      expect(home).toContain(`<span class="v2-stat-num">${MCP_TOOLS.length}</span>`);
+      expect(JSON.stringify(home2)).not.toMatch(/\b(?:21|79)\b/);
+      // Correio before Envio, both before the two price ladders.
+      expect(home.indexOf('id="correio"')).toBeLessThan(home.indexOf('id="envio"'));
+      expect(home.indexOf('id="envio"')).toBeLessThan(home.indexOf('id="planos"'));
+      const ladders = home.slice(home.indexOf('id="planos"'));
+      for (const price of locale === "en"
+        ? ["US$ 2.90", "US$ 5.90", "US$ 12.90", "US$ 0"]
+        : ["R$ 14,90", "R$ 29,90", "R$ 64,90", "R$ 0"])
+        expect(ladders).toContain(price);
+      for (const href of ["#envio", "/correio", "/envio", "/pricing#correio", "/pricing#cenarios"])
+        expect(home).toContain(`href="${href}"`);
+      // The anchors earlier links and campaigns point at still land somewhere.
       for (const id of ["product", "mcp", "planos", "comparativo", "como-funciona"])
         expect(home).toContain(`id="${id}"`);
-      // The story takes the add-on card's place: one #correio, no card title.
       expect(home.match(/id="correio"/g)).toHaveLength(1);
       expect(home).not.toContain(copy.correio.title);
+      expect(home).not.toContain("200 OK");
       expect((await homeMetadata()).title).toEqual({ absolute: copy.meta.domainTitle });
 
       vi.stubEnv("MAILBOX_STANDALONE_OPEN", "false");
       const earlier = await render(Home);
-      expect(earlier).not.toContain(copy.domainHero.title);
+      expect(earlier).not.toContain(home2.correio.title);
       expect(earlier).not.toContain('id="envio"');
       expect((await homeMetadata()).title).toEqual({ absolute: copy.meta.title });
     });

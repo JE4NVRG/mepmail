@@ -18,6 +18,7 @@ function landing(locale: string): Record<string, unknown> & {
   hero: { eyebrow: string; title: string; lead: string; migrate: string; trust: string[] };
   plans: { items: { volume: string }[] };
   stack: { eyebrow: string; note: string };
+  home: Record<"correio" | "envio", { eyebrow: string; title: string; lead: string }>;
 } {
   return JSON.parse(readFileSync(join(messages, locale, "landing.json"), "utf8"));
 }
@@ -52,6 +53,10 @@ describe("landing value-first positioning", () => {
       expect(copy.hero.title).not.toMatch(/resend/i);
       expect(copy.hero.lead).not.toMatch(/resend/i);
       for (const item of copy.hero.trust) expect(item, item).not.toMatch(/resend/i);
+      // The v2 home's two doors pitch the products, never the competitor.
+      for (const door of [copy.home.correio, copy.home.envio])
+        for (const key of ["eyebrow", "title", "lead"] as const)
+          expect(door[key], door[key]).not.toMatch(/resend/i);
     });
 
     it(`${locale}: compatibility stays in migration and comparison contexts, outside the product pitch`, () => {
@@ -60,7 +65,7 @@ describe("landing value-first positioning", () => {
       // Dates, overage arithmetic and capability references can repeat the
       // competitor's name without turning the product's own pitch into it.
       const permitted =
-        /^(?:hero\.migrate|(?:nav|footer)\.alternatives|(?:compare|calc|comparisonReference)\..+|faq\.items\.0\.[qa])$/;
+        /^(?:hero\.migrate|(?:nav|footer)\.alternatives|(?:compare|calc|comparisonReference)\..+|(?:home\.)?faq\.items\.\d+\.[qa])$/;
       for (const path of competitorMentionPaths(copy)) expect(path).toMatch(permitted);
     });
 

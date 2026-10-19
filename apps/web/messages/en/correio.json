@@ -305,5 +305,111 @@
     "title": "Your domain. Your email. Your agents.",
     "body": "You and your AI agent in the same mailbox, on your domain, without hosting.",
     "price": "From {price} a month"
+  },
+  "v2": {
+    "hero": {
+      "eyebrow": "Mail · email on your own domain",
+      "title": "Professional email, with agents that wait for your OK.",
+      "lead": "Mailboxes on your domain for you, your team and your AI agents, in the browser and in the Windows and Linux apps. No hosting and no mail server to run.",
+      "plans": "See the plans",
+      "note": "From <b>{price}/month</b> · 7 days free with a card",
+      "noDomain": "No domain? Connect your Gmail, iCloud or Yahoo, free"
+    },
+    "inbox": {
+      "count": "Inbox · 3",
+      "now": "now",
+      "time": "9:12",
+      "yesterday": "yesterday",
+      "thirdSender": "Bruno Lima",
+      "thirdSubject": "Size exchange"
+    },
+    "facts": {
+      "aria": "Mail at a glance",
+      "mailboxes": "mailboxes per plan",
+      "domains": "{count, plural, one {# domain} other {# domains}}",
+      "domainsLabel": "on every plan",
+      "trial": "{count} days",
+      "trialLabel": "free with a card",
+      "free": "Free",
+      "freeLabel": "Gmail, iCloud, Yahoo, Zoho and IMAP"
+    },
+    "kinds": {
+      "title": "You, the team and the agent, each with their own address.",
+      "items": [
+        {
+          "address": "you@yourcompany.com",
+          "title": "For you",
+          "body": "Your professional email, with a signature, folders, favorites, scheduled sending and undo send."
+        },
+        {
+          "address": "sales@ · billing@",
+          "title": "For the team",
+          "body": "One mailbox per person or per area, with an owner and automatic rules by sender."
+        },
+        {
+          "address": "support@yourcompany.com",
+          "title": "For your agent",
+          "body": "Claude, Cursor or n8n read and draft over MCP or the API. Sending only with your permission."
+        }
+      ]
+    },
+    "control": {
+      "title": "The agent starts by drafting. You decide when it sends.",
+      "body": "The agent's key only opens the mailbox you chose, expires, and can be revoked at any time. Without the send permission, every reply waits for your OK.",
+      "on": "On",
+      "gated": "With approval"
+    },
+    "setup": {
+      "title": "From domain to first message in 3 steps.",
+      "steps": [
+        {
+          "title": "Create the account and pick a plan",
+          "body": "Solo, Duo or Equipe, with 7 days free with a card."
+        },
+        {
+          "title": "Connect your domain",
+          "body": "We show the DNS records. With a Cloudflare token, MepMail writes them for you."
+        },
+        {
+          "title": "Create the mailboxes and connect the agent",
+          "body": "People use the browser or the apps; agents use MCP, the API or n8n."
+        }
+      ],
+      "history": "<b>Already receiving email on this domain?</b> Import the old messages over IMAP and switch the MX only when the mailboxes are ready."
+    },
+    "free": {
+      "eyebrow": "No domain, no DNS, free",
+      "title": "Start with the email you already have.",
+      "body": "Read and reply to your Gmail, iCloud, Yahoo, Zoho or another IMAP account from Mail, with your usual address. Up to 3 accounts per person, 1 GiB each. MepMail only reads the Inbox and never deletes anything at the provider.",
+      "other": "Other IMAP",
+      "cta": "Connect my account for free"
+    },
+    "plans": {
+      "title": "Priced per plan. Person or agent, a mailbox costs the same.",
+      "for": {
+        "solo": "Just you",
+        "duo": "You, a partner and an agent",
+        "equipe": "Team and agents"
+      },
+      "mailboxCount": "{count, plural, one {# mailbox} other {# mailboxes}}",
+      "storage": "and {size} GiB",
+      "recipients": "{count} outbound recipients a month",
+      "inbound": "{count} inbound messages a month",
+      "domains": "Up to {count} domains",
+      "cta": "Start on {plan}",
+      "note": "7 days free with a card on the first plan: cancel before it ends and pay nothing. Nothing is charged beyond the plan. In Brazil, in reais: {abroad}.",
+      "limits": "Limit details",
+      "modalities": "What changes between Send only and Send + Mail"
+    },
+    "apps": {
+      "title": "On the desktop, in its own window.",
+      "windows": "Windows · Microsoft Store",
+      "linux": "Linux"
+    },
+    "close": {
+      "title": "Your next address could be your agent's.",
+      "plans": "See the plans",
+      "note": "From {price}/month · 7 days free with a card"
+    }
   }
 }

@@ -19,7 +19,7 @@
     "compare": "Comparar preços",
     "plans": "Planos",
     "mcp": "MCP",
-    "how": "Configurar o domínio de envio",
+    "how": "Como configurar o domínio",
     "alternatives": "vs Resend",
     "changelog": "Changelog",
     "login": "Entrar",
@@ -120,7 +120,9 @@
       "Diferença estimada"
     ],
     "slideNote": "Deslize a tabela para ver todos os fornecedores em telas menores.",
-    "refNote": "Preços mensais. Resend: tabela oficial consultada em 16/10/2026; demais fornecedores: referência histórica de 27/09/2026, que pode ter mudado. Valores estrangeiros convertidos pela PTAX de 15/10/2026; MepMail usa o preço próprio em reais. Não inclui impostos, promoção inicial ou desconto anual. A referência histórica usa o ponto médio quando o excedente foi publicado como intervalo."
+    "refNote": "Preços mensais. Resend: tabela oficial consultada em 16/10/2026; demais fornecedores: referência histórica de 27/09/2026, que pode ter mudado. Valores estrangeiros convertidos pela PTAX de 15/10/2026; MepMail usa o preço próprio em reais. Não inclui impostos, promoção inicial ou desconto anual. A referência histórica usa o ponto médio quando o excedente foi publicado como intervalo.",
+    "homeStat": "por {volume} envios no mês. Na Resend, cerca de {theirs}¹",
+    "homeFootnote": "¹ Tabela oficial da Resend conferida em 16/10/2026 e convertida pela PTAX de {date} (US$ 1 = R$ {rate}). Sem impostos nem câmbio do cartão."
   },
   "calc": {
     "title": "Estime a diferença no seu volume.",
@@ -404,5 +406,168 @@
     "pricingSource": "Planos e tarifas de excedente conferidos em 16/10/2026 na <link>tabela oficial da Resend</link>. A coluna Resend usa a opção publicada de menor custo para cada volume, incluindo excedente quando necessário.",
     "currency": "MepMail: preço real do catálogo em reais. Concorrentes: estimativa em reais pela <link>PTAX venda de fechamento do Banco Central</link> de {date}, US$ 1 = R$ {rate}. Não é cotação de checkout e não inclui impostos ou tarifas de câmbio.",
     "capabilities": "MCP e recebimento não são exclusivos: a Resend tem <resend>MCP oficial</resend> e <inboxes>inboxes para pessoas e agentes</inboxes>; o Plunk também oferece <plunk>MCP</plunk>. No MepMail, compare o fluxo de revisão, as permissões e as franquias separadas de Correio e Envio."
+  },
+  "home": {
+    "doorsAria": "Por onde começar: Correio ou Envio",
+    "correio": {
+      "eyebrow": "Correio · para pessoas e agentes",
+      "title": "E-mail no seu domínio, com um agente que espera o seu OK.",
+      "lead": "Caixas para você, o time e seus agentes de IA. O agente lê e rascunha; nada sai sem a sua aprovação.",
+      "more": "Ver o Correio",
+      "note": "A partir de <b>{price}/mês</b> · 7 dias grátis no cartão · Pix",
+      "approvalFrom": "<b>{sender}</b> para suporte@suaempresa.com.br",
+      "noDomain": "Sem domínio? Conecte o Gmail, iCloud ou Yahoo que você já tem, grátis",
+      "blockEyebrow": "Correio",
+      "blockTitle": "Um e-mail de verdade para o dia a dia, que também trabalha por você.",
+      "agentTitle": "O agente rascunha. Você decide quando ele envia.",
+      "agentBody": "Conecte Claude, Cursor ou n8n por MCP ou API. A chave vale só para a caixa que você escolheu e pode ser revogada a qualquer momento.",
+      "permissions": {
+        "read": "Ler",
+        "draft": "Rascunhar",
+        "send": "Enviar com a sua aprovação"
+      },
+      "priceLabel": "Planos do Correio",
+      "priceNote": "por mês no Solo. Duo {duo} · Equipe {equipe}",
+      "priceLink": "Ver planos",
+      "tiles": [
+        {
+          "title": "Seu Gmail também, grátis",
+          "body": "Gmail, iCloud, Yahoo, Zoho ou IMAP no mesmo Correio, sem DNS. Até 3 contas por pessoa."
+        },
+        {
+          "title": "Apps para Windows e Linux",
+          "body": "Janela própria, contador de não lidas e links mailto: abrindo no Correio."
+        },
+        {
+          "title": "Traga o histórico",
+          "body": "Importe a caixa antiga por IMAP e troque o MX só quando estiver pronto."
+        },
+        {
+          "title": "Agende, desfaça, organize",
+          "body": "Envio programado, desfazer envio e regras por remetente ou domínio."
+        }
+      ],
+      "cta": "Conhecer o Correio"
+    },
+    "envio": {
+      "eyebrow": "Envio · API para o seu produto",
+      "title": "Troque a base URL. Pague em reais.",
+      "lead": "API, SMTP e MCP oficial para os e-mails do seu produto, com modelos, logs e webhooks. No cartão ou no Pix.",
+      "cta": "Começar grátis",
+      "more": "Ver o Envio",
+      "note": "<b>{free} e-mails por dia grátis</b>, sem cartão",
+      "changed": "2 linhas mudam",
+      "blockEyebrow": "Envio",
+      "blockTitle": "Tudo o que o seu produto envia, num painel só.",
+      "galleryTitle": "Modelos prontos para começar hoje",
+      "galleryBody": "Boas-vindas, senha, código, pedido, entrega, carrinho e recibo. Abra um e personalize.",
+      "checksTitle": "verificações em cada e-mail",
+      "checks": [
+        {
+          "status": "ok",
+          "label": "DMARC publicado no domínio"
+        },
+        {
+          "status": "ok",
+          "label": "SPF e DKIM alinhados"
+        },
+        {
+          "status": "ok",
+          "label": "Descadastro pelo cabeçalho List-Unsubscribe"
+        },
+        {
+          "status": "ok",
+          "label": "Links sem encurtador"
+        },
+        {
+          "status": "warn",
+          "label": "Versão em texto ausente"
+        },
+        {
+          "status": "info",
+          "label": "Pronto para BIMI"
+        }
+      ],
+      "checksNote": "Exemplo de resultado. Cada e-mail mostra a lista completa no painel.",
+      "webhooksTitle": "Webhooks assinados",
+      "webhooksBody": "Entrega, rejeição, abertura, clique e reclamação no seu endpoint, com um segredo que você rotaciona.",
+      "audienceTitle": "Campanhas e audiência",
+      "audienceBody": "Contatos por API ou CSV, tópicos de inscrição e página de descadastro pronta.",
+      "protectionTitle": "Proteção do domínio",
+      "protectionBody": "Rejeições e reclamações viram supressão sozinhas. Se as taxas sobem, o envio desacelera e pausa antes de queimar a reputação.",
+      "waysTitle": "API, SMTP e MCP",
+      "page": "Conhecer o Envio"
+    },
+    "domain": {
+      "title": "Um domínio verificado. Duas frentes na mesma conta.",
+      "lead": "Verifique o domínio uma vez. Pessoas e agentes usam o Correio; o seu produto usa o Envio. Cada frente tem a sua credencial e o seu limite.",
+      "correio": "Correio",
+      "envio": "Envio",
+      "agentBox": "suporte@ · agente",
+      "hub": "suaempresa.com.br",
+      "hubNote": "DKIM, MAIL FROM e MX verificados",
+      "boxes": {
+        "auth": "no-reply@ · cadastro e senha",
+        "orders": "pedidos@ · recibos",
+        "news": "novidades@ · campanhas"
+      }
+    },
+    "stats": {
+      "aria": "Números que dá para conferir",
+      "checks": "verificações de entregabilidade em cada e-mail enviado, de DMARC a descadastro",
+      "mcp": "ferramentas no MCP hospedado, com login OAuth e permissões por escopo",
+      "open": "código aberto: audite o que roda, ou rode no seu servidor com Docker",
+      "store": "App na Microsoft Store",
+      "mcpDocs": "MCP oficial",
+      "github": "Código no GitHub",
+      "status": "Status público"
+    },
+    "prices": {
+      "title": "Preço em reais. Cartão ou Pix.",
+      "correio": "Correio · por plano",
+      "envio": "Envio · por volume",
+      "mailboxes": "{count, plural, one {# caixa} other {# caixas}}",
+      "perDay": "{amount}/dia",
+      "perMonth": "{amount}/mês",
+      "correioNote": "Por mês. 7 dias grátis no cartão no primeiro plano.",
+      "envioNote": "Por mês. Pro 110K com {first} na primeira mensalidade elegível. Até {max} envios por mês.",
+      "envioNoteRegular": "Por mês. Até {max} envios por mês.",
+      "all": "Ver todos os preços",
+      "scenarios": "Ver preços por cenário"
+    },
+    "faq": {
+      "title": "Perguntas frequentes",
+      "items": [
+        {
+          "q": "Preciso de hospedagem ou de servidor de e-mail?",
+          "a": "Não. Basta controlar o domínio para publicar os registros de DNS que mostramos."
+        },
+        {
+          "q": "O agente pode enviar sem eu revisar?",
+          "a": "Só se você der a permissão de envio. Sem ela, cada envio espera a sua aprovação."
+        },
+        {
+          "q": "Posso usar o Gmail que já tenho?",
+          "a": "Sim, grátis: conecte Gmail, iCloud, Yahoo, Zoho ou outra conta IMAP e leia e responda pelo Correio. Até 3 contas por pessoa, com 1 GiB cada."
+        },
+        {
+          "q": "Já uso Resend. Preciso reescrever a integração?",
+          "a": "Nos fluxos de envio compatíveis, não: troque a base URL e a chave. Recebimento por API, IP dedicado e SSO não fazem parte dessa promessa."
+        },
+        {
+          "q": "Vocês garantem a chegada na caixa de entrada?",
+          "a": "Não existe garantia honesta disso. Verificamos o domínio, checamos cada e-mail e acompanhamos a reputação; o resto depende do conteúdo e do destino."
+        },
+        {
+          "q": "Posso pagar com Pix? Tem fidelidade?",
+          "a": "Pix sim, no Envio e no Correio, sempre em reais. Sem fidelidade e sem multa para cancelar."
+        }
+      ]
+    },
+    "close": {
+      "title": "Seu domínio já pode trabalhar por você.",
+      "body": "Crie a conta hoje. Vem de outro serviço? A gente ajuda na migração.",
+      "envio": "Começar o Envio grátis"
+    }
   }
 }

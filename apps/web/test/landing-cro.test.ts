@@ -9,7 +9,11 @@ vi.mock("next-intl/server", () => ({
   getTranslations: async () => (key: string) => key,
 }));
 
-const page = readFileSync(fileURLToPath(new URL("../src/app/page.tsx", import.meta.url)), "utf8");
+const source = (path: string) =>
+  readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+// The home before v2 still renders while Correio is not sold on its own.
+const page = source("../src/app/home-legacy.tsx");
+const v2 = source("../src/app/home-v2.tsx");
 
 describe("landing CRO contract", () => {
   afterEach(() => vi.unstubAllEnvs());
@@ -24,6 +28,20 @@ describe("landing CRO contract", () => {
     expect(page).toContain("<ArrivalTracker");
     expect(page).toContain("<McpConfigCopy");
     expect(page).not.toContain("200 OK");
+  });
+
+  it("the v2 home prices from the catalog, counts from the code and shows the live gallery", () => {
+    expect(v2).toContain("PLAN_RUNGS.find");
+    expect(v2).toContain("plansWithCopy(");
+    expect(v2).toContain("LAUNCH_OFFER.correioPlans");
+    expect(v2).toContain("CHECKS.length");
+    expect(v2).toContain("MCP_TOOLS.length");
+    expect(v2).toContain("comparisonRowsForLocale(");
+    expect(v2).toContain("<ArrivalTracker");
+    expect(v2).toContain("<PublicStarterGallery");
+    expect(v2).not.toContain("200 OK");
+    const entry = source("../src/app/page.tsx");
+    expect(entry).toContain("standaloneMailOpen() ? HomeV2() : LegacyHome()");
   });
 
   it("never loads production analytics in explicit local preview", () => {

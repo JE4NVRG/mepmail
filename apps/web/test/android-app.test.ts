@@ -184,6 +184,7 @@ describe("Android app: recognized at the launch, before the first paint", () => 
 
   it("names the sales paths for client-side navigations", () => {
     expect(isAndroidAppSalesPath("/pricing")).toBe(true);
+    expect(isAndroidAppSalesPath("/envio")).toBe(true);
     expect(isAndroidAppSalesPath("/")).toBe(true);
     expect(isAndroidAppSalesPath("/mail")).toBe(false);
     expect(isAndroidAppSalesPath("/settings/billing")).toBe(false);

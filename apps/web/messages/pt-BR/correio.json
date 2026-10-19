@@ -305,5 +305,111 @@
     "title": "Seu domínio. Seu e-mail. Seus agentes.",
     "body": "Você e seu agente de IA na mesma caixa, no seu domínio, sem hospedagem.",
     "price": "A partir de {price} por mês"
+  },
+  "v2": {
+    "hero": {
+      "eyebrow": "Correio · e-mail no seu domínio",
+      "title": "E-mail profissional, com agentes que esperam o seu OK.",
+      "lead": "Caixas no seu domínio para você, o time e seus agentes de IA, no navegador e nos apps para Windows e Linux. Sem hospedagem e sem servidor para manter.",
+      "plans": "Ver planos",
+      "note": "A partir de <b>{price}/mês</b> · 7 dias grátis no cartão · Pix",
+      "noDomain": "Sem domínio? Conecte seu Gmail, iCloud ou Yahoo, grátis"
+    },
+    "inbox": {
+      "count": "Entrada · 3",
+      "now": "agora",
+      "time": "9:12",
+      "yesterday": "ontem",
+      "thirdSender": "Bruno Lima",
+      "thirdSubject": "Troca de tamanho"
+    },
+    "facts": {
+      "aria": "Resumo do Correio",
+      "mailboxes": "caixas por plano",
+      "domains": "{count, plural, one {# domínio} other {# domínios}}",
+      "domainsLabel": "em qualquer plano",
+      "trial": "{count} dias",
+      "trialLabel": "grátis no cartão",
+      "free": "Grátis",
+      "freeLabel": "Gmail, iCloud, Yahoo, Zoho e IMAP"
+    },
+    "kinds": {
+      "title": "Você, o time e o agente, cada um com o seu endereço.",
+      "items": [
+        {
+          "address": "voce@suaempresa.com.br",
+          "title": "Para você",
+          "body": "Seu e-mail profissional, com assinatura, pastas, favoritos, envio programado e desfazer envio."
+        },
+        {
+          "address": "vendas@ · financeiro@",
+          "title": "Para o time",
+          "body": "Uma caixa por pessoa ou por área, com responsável e regras automáticas por remetente."
+        },
+        {
+          "address": "suporte@suaempresa.com.br",
+          "title": "Para o seu agente",
+          "body": "Claude, Cursor ou n8n leem e rascunham por MCP ou API. Enviar, só com a sua permissão."
+        }
+      ]
+    },
+    "control": {
+      "title": "O agente começa rascunhando. Você decide quando ele envia.",
+      "body": "A chave do agente vale só para a caixa que você escolheu, com validade, e pode ser revogada a qualquer momento. Sem a permissão de envio, cada resposta espera o seu OK.",
+      "on": "Ligado",
+      "gated": "Com aprovação"
+    },
+    "setup": {
+      "title": "Do domínio à primeira mensagem em 3 passos.",
+      "steps": [
+        {
+          "title": "Crie a conta e escolha o plano",
+          "body": "Solo, Duo ou Equipe. No cartão, 7 dias grátis; no Pix, mês a mês."
+        },
+        {
+          "title": "Ligue o seu domínio",
+          "body": "Mostramos os registros de DNS. Com um token da Cloudflare, o MepMail grava tudo para você."
+        },
+        {
+          "title": "Crie as caixas e conecte o agente",
+          "body": "Pessoas pelo navegador ou pelos apps; agentes por MCP, API ou n8n."
+        }
+      ],
+      "history": "<b>Já recebe e-mail nesse domínio?</b> Importe as mensagens antigas por IMAP e só troque o MX quando as caixas estiverem prontas."
+    },
+    "free": {
+      "eyebrow": "Sem domínio, sem DNS, grátis",
+      "title": "Comece pelo e-mail que você já tem.",
+      "body": "Leia e responda o seu Gmail, iCloud, Yahoo, Zoho ou outra conta IMAP pelo Correio, com o seu endereço de sempre. Até 3 contas por pessoa, com 1 GiB cada. O MepMail lê só a Entrada e não apaga nada no provedor.",
+      "other": "Outro IMAP",
+      "cta": "Conectar minha conta grátis"
+    },
+    "plans": {
+      "title": "Preço por plano. Pessoa ou agente, a caixa custa o mesmo.",
+      "for": {
+        "solo": "Só você",
+        "duo": "Você, um sócio e um agente",
+        "equipe": "Time e agentes"
+      },
+      "mailboxCount": "{count, plural, one {# caixa} other {# caixas}}",
+      "storage": "e {size} GiB",
+      "recipients": "{count} destinatários de saída por mês",
+      "inbound": "{count} mensagens recebidas por mês",
+      "domains": "Até {count} domínios",
+      "cta": "Começar no {plan}",
+      "note": "7 dias grátis no cartão no primeiro plano: cancele antes do fim e não paga nada. No Pix, mês a mês. Nada é cobrado além do plano. Fora do Brasil: {abroad}.",
+      "limits": "Detalhes dos limites",
+      "modalities": "O que muda entre Só Envio e Envio + Correio"
+    },
+    "apps": {
+      "title": "No computador, numa janela própria.",
+      "windows": "Windows · Microsoft Store",
+      "linux": "Linux"
+    },
+    "close": {
+      "title": "Seu próximo endereço pode ser do seu agente.",
+      "plans": "Ver planos",
+      "note": "A partir de {price}/mês · 7 dias grátis no cartão · Pix"
+    }
   }
 }

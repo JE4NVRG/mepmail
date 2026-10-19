@@ -14,6 +14,7 @@ export const URL_LOCALE_HEADER = "x-mepmail-url-locale";
 const PUBLIC_PATHS: ReadonlySet<string> = new Set([
   "/",
   "/pricing",
+  "/envio",
   "/correio",
   "/download",
   "/desktop/correio/linux",

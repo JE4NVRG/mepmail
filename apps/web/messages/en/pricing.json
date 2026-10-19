@@ -192,5 +192,28 @@
     "mail": "Mail from",
     "send": "Send from",
     "free": "· 100 emails/day"
+  },
+  "v2": {
+    "title": "Plain monthly prices. No contract.",
+    "lead": "Mail is priced per plan of mailboxes; Send, by your application's volume. Use one, the other or both in one account.",
+    "correioTitle": "Mailboxes on your domain. Person or agent, the same price.",
+    "correioCta": "Start on {plan}",
+    "correioFree": "Gmail, iCloud, Yahoo, Zoho or IMAP accounts connected to Mail: free, with no plan, up to 3 per person and 1 GiB per account.",
+    "correioDetails": "Mail limit details",
+    "envioEyebrow": "Send · by volume",
+    "envioTitle": "Start free. Grow by volume.",
+    "moreTitle": "More volume",
+    "table": {
+      "aria": "Higher-volume Send plans",
+      "plan": "Plan",
+      "volume": "Volume",
+      "price": "Monthly",
+      "overage": "Overage",
+      "choose": "Choose"
+    },
+    "scaleNote": "Scale: {limits}.",
+    "compareTitle": "{volume} emails: {ours} here, about {theirs} at Resend.¹",
+    "footnote": "¹ Resend: official price list checked on 2026-10-16, cheapest published option for {volume} emails a month. Taxes not included.",
+    "closeTitle": "Pick a plan and start today."
   }
 }
