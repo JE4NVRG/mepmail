@@ -5,7 +5,8 @@
  *
  * Only integrations we can point at are listed here: the n8n community node,
  * the Slack/Discord/Telegram notification channels, the languages with an
- * official SDK that the API is drop-in compatible with, Docker for self-hosting
+ * official SDK the API is compatible with (only the baseUrl and key change), Docker
+ * for self-hosting
  * and cURL for the raw API. There is deliberately NO logo for MCP — no vendor
  * mark stands for it, so a card draws a text chip instead.
  *

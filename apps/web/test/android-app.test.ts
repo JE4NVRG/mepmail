@@ -17,7 +17,7 @@ import {
 } from "@/lib/android-app";
 
 /**
- * The Android app (TWA dev.mepmail.correio): recognized before the first paint, it sells
+ * The Android app (TWA dev.mepmail.app): recognized before the first paint, it sells
  * nothing and measures nothing for advertising, while signing in, the mailboxes and the
  * account stay. Synthetic fixtures only.
  */
@@ -108,8 +108,13 @@ function launch(tab: {
 
 describe("Android app: recognized at the launch, before the first paint", () => {
   it("recognizes the TWA referrer and the start URL, and remembers it for the tab", () => {
-    const byReferrer = launch({ referrer: "android-app://dev.mepmail.correio/" });
+    const byReferrer = launch({ referrer: "android-app://dev.mepmail.app/" });
     expect(byReferrer).toMatchObject({ stored: "1", marked: true });
+    // The first draft package (internal test builds) is still the app.
+    expect(launch({ referrer: "android-app://dev.mepmail.correio/" })).toMatchObject({
+      stored: "1",
+      marked: true,
+    });
     expect(byReferrer.replace).not.toHaveBeenCalled();
     const byStartUrl = launch({ search: "?source=android" });
     expect(byStartUrl).toMatchObject({ stored: "1", marked: true });

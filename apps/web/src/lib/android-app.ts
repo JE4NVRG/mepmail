@@ -1,11 +1,11 @@
 /**
- * The Android app (a Trusted Web Activity, package dev.mepmail.correio) shows this site full
+ * The Android app (a Trusted Web Activity, package dev.mepmail.app) shows this site full
  * screen. Under Google Play's payments policy nothing is sold inside it, and it carries no
  * advertising measurement; signing in, the mailboxes and the account settings work as on the
  * web.
  *
  * The app is recognized at the launch: Chrome sends the referrer
- * `android-app://dev.mepmail.correio`, and the start URL carries `?source=android`. It is
+ * `android-app://dev.mepmail.app`, and the start URL carries `?source=android`. It is
  * remembered for that tab only (sessionStorage). Chrome shares its cookies with the app, so a
  * cookie would carry the app mode into the person's regular browser; a tab-scoped flag
  * cannot. The inline script below runs before the first paint: it marks <html> with
@@ -14,7 +14,12 @@
  */
 import { DOCS_URL } from "./docs-links";
 
-export const ANDROID_APP_PACKAGE = "dev.mepmail.correio";
+export const ANDROID_APP_PACKAGE = "dev.mepmail.app";
+/**
+ * Every package that opens this site as the app. dev.mepmail.correio was the first draft
+ * (internal test only); it stays recognized so an installed test build keeps working.
+ */
+export const ANDROID_APP_PACKAGES: readonly string[] = [ANDROID_APP_PACKAGE, "dev.mepmail.correio"];
 export const ANDROID_APP_STORAGE_KEY = "mepmail.android-app";
 export const ANDROID_APP_ATTRIBUTE = "data-android-app";
 /** Sent on the app's auth and tRPC requests, so the server refuses purchases and skips ads. */
@@ -38,7 +43,7 @@ export const ANDROID_APP_DOCS_HOST = new URL(DOCS_URL).hostname;
 export const ANDROID_APP_HELP = "/support";
 
 /** Before the first paint (root layout). Plain ES5, no user input. */
-export const ANDROID_APP_INIT_SCRIPT = `try{var s=window.sessionStorage,k=${JSON.stringify(ANDROID_APP_STORAGE_KEY)},q=new URLSearchParams(location.search);if(document.referrer.indexOf(${JSON.stringify(`android-app://${ANDROID_APP_PACKAGE}`)})===0||q.get("source")==="android")s.setItem(k,"1");if(s.getItem(k)==="1"){document.documentElement.setAttribute(${JSON.stringify(ANDROID_APP_ATTRIBUTE)},"");var p=location.pathname.replace(/\\/+$/,"")||"/";if(${JSON.stringify(ANDROID_APP_SALES_PATHS)}.indexOf(p)>=0)location.replace(${JSON.stringify(ANDROID_APP_HOME)});document.addEventListener("click",function(e){var t=e.target,a=t&&t.closest?t.closest("a[href]"):null;if(a&&a.hostname===${JSON.stringify(ANDROID_APP_DOCS_HOST)}){e.preventDefault();location.assign(${JSON.stringify(ANDROID_APP_HELP)})}},true)}}catch(e){}`;
+export const ANDROID_APP_INIT_SCRIPT = `try{var s=window.sessionStorage,k=${JSON.stringify(ANDROID_APP_STORAGE_KEY)},q=new URLSearchParams(location.search);var r=document.referrer;if(${JSON.stringify(ANDROID_APP_PACKAGES.map((p) => `android-app://${p}`))}.some(function(x){return r.indexOf(x)===0})||q.get("source")==="android")s.setItem(k,"1");if(s.getItem(k)==="1"){document.documentElement.setAttribute(${JSON.stringify(ANDROID_APP_ATTRIBUTE)},"");var p=location.pathname.replace(/\\/+$/,"")||"/";if(${JSON.stringify(ANDROID_APP_SALES_PATHS)}.indexOf(p)>=0)location.replace(${JSON.stringify(ANDROID_APP_HOME)});document.addEventListener("click",function(e){var t=e.target,a=t&&t.closest?t.closest("a[href]"):null;if(a&&a.hostname===${JSON.stringify(ANDROID_APP_DOCS_HOST)}){e.preventDefault();location.assign(${JSON.stringify(ANDROID_APP_HELP)})}},true)}}catch(e){}`;
 
 /** The tab flag the init script sets; storage can be blocked, and then there is none. */
 function androidAppTab(): boolean {
