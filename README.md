@@ -112,6 +112,8 @@ and you are sending in a few minutes. Correio plans start at US$ 2.90 a month
 - **Agent discovery**: `/llms.txt`, `/.well-known/ai-catalog.json` and `/auth.md`
   served by the web app.
 
+<a href="https://mcprush.com/to/mepmail-mcp?ref=badge"><img width="380" height="200" src="https://mcprush.com/badge/mepmail-mcp/card.svg" alt="MepMail MCP server: grade A on mcprush" loading="lazy" /></a>
+
 ## Send your first email
 
 Create an API key in the dashboard (it starts with `ms_`), then:

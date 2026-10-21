@@ -113,6 +113,8 @@ no cartão (com 7 dias grátis) ou no Pix. Veja os [preços](https://mepmail.dev
 - **Descoberta por agentes**: `/llms.txt`, `/.well-known/ai-catalog.json` e
   `/auth.md` servidos pelo app web.
 
+<a href="https://mcprush.com/to/mepmail-mcp?ref=badge"><img width="380" height="200" src="https://mcprush.com/badge/mepmail-mcp/card.svg" alt="Servidor MCP do MepMail: nota A no mcprush" loading="lazy" /></a>
+
 ## Envie seu primeiro e-mail
 
 Crie uma chave de API no painel (ela começa com `ms_`) e rode:

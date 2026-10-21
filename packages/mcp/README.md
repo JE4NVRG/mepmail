@@ -1,5 +1,7 @@
 # @mepmail/mcp
 
+[![MepMail MCP server](https://mcprush.com/badge/mepmail-mcp/card.svg)](https://mcprush.com/to/mepmail-mcp?ref=badge)
+
 Official **MepMail** MCP server for local MCP clients — Claude Desktop, Claude
 Code, Cursor, Codex and anything that speaks stdio. It drives your MepMail
 instance over the public REST API (Resend-compatible wire) with a team API key,
