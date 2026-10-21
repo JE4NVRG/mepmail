@@ -2,16 +2,12 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { type LegalDoc, LegalDocument } from "@/components/legal-document";
 import { publicPageUrls } from "@/server/public-seo";
+import "../landing.css";
 
 export default async function PrivacyPage() {
   const t = await getTranslations("legal");
   const doc = t.raw("privacy") as LegalDoc;
-  return (
-    <LegalDocument
-      doc={doc}
-      links={{ terms: t("terms.title"), privacy: t("privacy.title"), refund: t("refund.title") }}
-    />
-  );
+  return <LegalDocument doc={doc} />;
 }
 
 export async function generateMetadata(): Promise<Metadata> {

@@ -4,12 +4,30 @@ import { headers } from "next/headers";
 import styles from "@/components/auth/auth.module.css";
 import { AuthScreen } from "@/components/auth/auth-screen";
 import { localeFromHeaders } from "@/server/locale";
+import { publicPageUrls } from "@/server/public-seo";
 import en from "../../../messages/en/updates.json";
 import ptBR from "../../../messages/pt-BR/updates.json";
-
-export const metadata: Metadata = { robots: { index: false, follow: false } };
+import "./updates.css";
 
 const MESSAGES = { en, "pt-BR": ptBR } as const;
+
+/**
+ * The page reads its own catalog (messages/<locale>/updates.json) instead of a
+ * next-intl namespace, so the metadata takes the locale from the same headers
+ * the form does and the title always describes the copy on screen.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const seo = await publicPageUrls("/updates");
+  const m = MESSAGES[localeFromHeaders(await headers())].meta;
+  return {
+    title: m.title,
+    description: m.description,
+    alternates: seo.alternates,
+    // Reached from the docs and from the wizard's fallback link: it stays out
+    // of search, while still carrying a title a reader can find in a tab.
+    robots: { index: false, follow: false },
+  };
+}
 
 /**
  * Public page: subscribe to product updates. A plain form, so it works from
@@ -28,13 +46,17 @@ export default async function UpdatesPage({
   return (
     <AuthScreen title={m.title}>
       {query.sent ? (
-        <p className={styles.notice} aria-live="polite">
+        <p className={`${styles.notice} updates-page`} aria-live="polite">
           {m.sent}
         </p>
       ) : (
         <>
           <p className={styles.subline}>{m.intro}</p>
-          <form method="post" action="/api/updates/subscribe" className={styles.form}>
+          <form
+            method="post"
+            action="/api/updates/subscribe"
+            className={`${styles.form} updates-page`}
+          >
             <input type="hidden" name="source" value={source} />
             <div className={`ms-field ${styles.field}`}>
               <label htmlFor="email">{m.email}</label>

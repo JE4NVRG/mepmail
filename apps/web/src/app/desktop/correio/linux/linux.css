@@ -43,3 +43,16 @@
   gap: 24px;
   margin-top: 24px;
 }
+
+/* Same fold as /download: the first package button has to end before 844px on a
+   phone, so the hero's 80px of air drops to 32/40 below 768px. */
+@media (max-width: 767px) {
+  .linux-page .gtm-hero {
+    padding-block: 32px 40px;
+  }
+}
+/* The install command is body text: 12px, where `.gtm code` (0.9em of the
+   block's 13px) would render 11.7px. */
+.linux-page .linux-command .gtm-demo-code code {
+  font-size: 12px;
+}

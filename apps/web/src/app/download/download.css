@@ -95,3 +95,12 @@
   gap: 16px 24px;
   margin-top: 8px;
 }
+
+/* The hero is all a phone has above the fold, and the first download button has
+   to end before 844px: the section's 80px of air drops to 32/40 on phones only.
+   The page class keeps the rule off the other public pages. */
+@media (max-width: 767px) {
+  .download-page .gtm-hero {
+    padding-block: 32px 40px;
+  }
+}

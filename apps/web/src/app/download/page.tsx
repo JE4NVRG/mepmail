@@ -114,7 +114,7 @@ export default async function DownloadPage() {
   };
 
   return (
-    <div className="gtm">
+    <div className="gtm download-page">
       <StructuredData
         graph={[
           desktopAppJsonLd(

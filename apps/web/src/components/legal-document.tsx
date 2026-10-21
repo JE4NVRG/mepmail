@@ -1,4 +1,11 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import {
+  PublicFooter,
+  PublicHeader,
+  type PublicPage,
+  type PublicSiteLabels,
+} from "@/components/site-chrome";
+import { legalLinks } from "@/lib/legal-links";
 import "./legal-document.css";
 
 export type LegalSection = {
@@ -15,40 +22,36 @@ export type LegalDoc = {
   contact: string;
 };
 
-export type LegalLinks = {
-  terms: string;
-  privacy: string;
-  refund: string;
-};
+/** The public site's support address, the same the other public pages publish. */
+const CONTACT = "mailto:suporte@mepmail.dev";
 
-const ROUTES: Array<{ href: string; key: keyof LegalLinks }> = [
-  { href: "/terms", key: "terms" },
-  { href: "/privacy", key: "privacy" },
-  { href: "/refund", key: "refund" },
-];
+/**
+ * The legal pages wear the public chrome, so they are reachable by navigation
+ * and carry the language switcher. site-chrome owns the PublicPage union and no
+ * member of it is the legal set: "alternatives" is the member that marks no nav
+ * item as current here and keeps the section anchors pointing at the home page.
+ */
+const CHROME_PAGE: PublicPage = "alternatives";
 
-export function LegalDocument({ doc, links }: { doc: LegalDoc; links: LegalLinks }) {
+/**
+ * One legal document (terms, privacy, refund) inside the public header and
+ * footer. The document itself comes from the "legal" catalog, untouched.
+ */
+export async function LegalDocument({ doc }: { doc: LegalDoc }) {
+  const l = await getTranslations("landing");
+  const site = {
+    skip: l("skip"),
+    brandAria: l("brandAria"),
+    navAria: l("navAria"),
+    langAria: l("lang.aria"),
+    nav: l.raw("nav"),
+    footer: l.raw("footer"),
+  } as PublicSiteLabels;
+
   return (
-    <div className="legal">
-      <header className="legal-top">
-        <Link className="legal-brand" href="/" aria-label="MepMail">
-          <img
-            className="legal-wordmark-dark"
-            src="/logo/mepmail-wordmark.svg"
-            alt="MepMail"
-            width={150}
-            height={20}
-          />
-          <img
-            className="legal-wordmark-light"
-            src="/logo/mepmail-wordmark-light.svg"
-            alt=""
-            width={150}
-            height={20}
-          />
-        </Link>
-      </header>
-      <main className="legal-main">
+    <div className="gtm legal">
+      <PublicHeader labels={site} page={CHROME_PAGE} />
+      <main id="conteudo" className="legal-main">
         <h1>{doc.title}</h1>
         <p className="legal-updated">{doc.updated}</p>
         <p className="legal-intro">{doc.intro}</p>
@@ -69,16 +72,7 @@ export function LegalDocument({ doc, links }: { doc: LegalDoc; links: LegalLinks
         ))}
         <p className="legal-contact">{doc.contact}</p>
       </main>
-      <footer className="legal-foot">
-        <nav aria-label="Legal">
-          {ROUTES.map((route) => (
-            <Link key={route.href} href={route.href}>
-              {links[route.key]}
-            </Link>
-          ))}
-        </nav>
-        <p>© 2026 MepMail</p>
-      </footer>
+      <PublicFooter labels={site} page={CHROME_PAGE} contact={CONTACT} legal={legalLinks()} />
     </div>
   );
 }

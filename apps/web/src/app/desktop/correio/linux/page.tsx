@@ -53,7 +53,7 @@ export default async function LinuxDownloadsPage() {
   const tips = t.raw("tips") as string[];
 
   return (
-    <div className="gtm">
+    <div className="gtm linux-page">
       <PublicHeader labels={site} page="correio" />
       <main id="conteudo">
         <section className="gtm-section gtm-hero">

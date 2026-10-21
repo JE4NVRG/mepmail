@@ -1,0 +1,16 @@
+/* /updates runs on the auth shell (auth.module.css), whose small copy is sized
+   for the sign-in screens. The strings a reader actually reads here, the
+   eyebrow above the pitch and the caption under the artwork, are body text at
+   12px. The marker class lives on this page's form and on its confirmation
+   notice, so login, sign-up and recovery keep their own scale.
+
+   The miniature mail cards inside the artwork stay as drawn: they are
+   aria-hidden decoration inside a 1:1 frame, and lifting their 10.8px to 12px
+   clips the second personalized card's button off the bottom of that frame. */
+main:has(.updates-page) aside > p:first-child {
+  font-size: 12px;
+}
+
+main:has(.updates-page) figcaption {
+  font-size: 12px;
+}

@@ -1,4 +1,8 @@
 {
+  "meta": {
+    "title": "Novidades do produto",
+    "description": "Assine as novidades do MepMail: e-mails ocasionais sobre novos recursos e anúncios, com link de confirmação primeiro e cancelamento em todo e-mail."
+  },
   "page": {
     "title": "Novidades do MepMail",
     "intro": "E-mails ocasionais sobre novos recursos e anúncios. Enviamos um link de confirmação primeiro; nada é armazenado até que você o abra, e todo e-mail traz um link para cancelar.",

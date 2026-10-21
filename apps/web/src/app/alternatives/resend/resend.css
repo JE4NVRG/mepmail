@@ -1,0 +1,6 @@
+/* The Resend snippet is body text, not a footnote: 12px is the floor here.
+   `.gtm code` (0.9em of the block's 13px) would leave it at 11.7px, and the
+   page class keeps this off the landing, which shares the same snippet. */
+.alternatives-resend .gtm-demo-code code {
+  font-size: 12px;
+}

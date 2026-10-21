@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { DocsLink } from "@/components/public-events";
 import {
   PublicFooter,
   PublicHeader,
@@ -7,6 +8,7 @@ import {
   SignupLink,
 } from "@/components/site-chrome";
 import { StackLogoRow } from "@/components/stack-logos";
+import { DOCS_URL } from "@/lib/docs-links";
 import { legalLinks } from "@/lib/legal-links";
 import { STACK_SLUGS } from "@/lib/stack-logos";
 import { publicPageUrls } from "@/server/public-seo";
@@ -91,6 +93,14 @@ export default async function IntegrationsPage() {
               })}
             </h1>
             <p className="gtm-lead">{t("hero.lead")}</p>
+            {/* The two ways in sit in the hero: the page's own close CTA lands
+                thousands of pixels down, past the fold of every phone. */}
+            <div className="gtm-actions">
+              <SignupLink label={t("close.cta")} />
+              <DocsLink className="ms-btn ms-btn-secondary gtm-action" href={DOCS_URL}>
+                {l("nav.docs")}
+              </DocsLink>
+            </div>
             <p className="gtm-note">{t("hero.note")}</p>
             <div className="gtm-integrations-mural">
               <p className="gtm-stack-eyebrow">{t("hero.muralLabel")}</p>

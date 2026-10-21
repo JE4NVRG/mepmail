@@ -1,4 +1,8 @@
 {
+  "meta": {
+    "title": "Product updates",
+    "description": "Subscribe to MepMail product updates: occasional emails about new features and announcements, with a confirmation link first and an unsubscribe in every message."
+  },
   "page": {
     "title": "MepMail product updates",
     "intro": "Occasional emails about new features and announcements. We send a confirmation link first; nothing is stored until you open it, and every email carries an unsubscribe.",
