@@ -44,6 +44,10 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # /packages copies packages/mcp and packages/cli. Fail when npm has
+      # already published a newer version than those manifests.
+      - name: Published npm versions are not newer than the packages page
+        run: pnpm check:npm-package-versions
       - run: pnpm lint
       - run: pnpm typecheck
       # --continue: one run reports every package's failures, not just the first one.
