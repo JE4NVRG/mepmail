@@ -660,7 +660,8 @@ export function createAuth(
             const attribution = await trackSignup(user, requestHeaders);
             // Operator alert, fire-and-forget: it must never slow a sign-up,
             // and it is a no-op on an instance with no alert chat configured.
-            notifySignupAlert(user, attribution, localeFromHeaders(requestHeaders));
+            // The db lets OPERATOR_ALERTS_SINK=audit record it instead of mail.
+            notifySignupAlert(user, attribution, localeFromHeaders(requestHeaders), undefined, db);
           },
         },
       },

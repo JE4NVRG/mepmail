@@ -745,6 +745,13 @@ export {
   parseOperationsAccess,
   parseOperationsInvitationAccess,
 } from "./operations-access.js";
+export {
+  OPERATOR_ALERT_ACTION,
+  OPERATOR_ALERT_TEXT_MAX,
+  type OperatorAlert,
+  operatorAlertText,
+  recordOperatorAlert,
+} from "./operator-alerts.js";
 export { isRootDomainSend, registrableDomain } from "./org-domain.js";
 export { splitPersonName } from "./person-name.js";
 export {

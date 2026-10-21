@@ -38,6 +38,14 @@ export const AWS_REGION_DEFAULT = "us-east-1";
 export const EMAIL_RETENTION_DAYS_DEFAULT = 30;
 export const OPEN_PREFETCH_WINDOW_SECONDS_DEFAULT = 10;
 
+/**
+ * Where the internal operator alerts go: "email" keeps the historic routes
+ * (an alerts box, else the instance operator), "audit" sends none of them and
+ * writes one operator.alert row per alert for an external relay to read.
+ */
+export const OPERATOR_ALERTS_SINKS = ["email", "audit"] as const;
+export type OperatorAlertSink = (typeof OPERATOR_ALERTS_SINKS)[number];
+
 /** Break-glass content access in the console; "off" is the default everywhere. */
 export const CONTENT_REVEAL_MODES = ["off", "on"] as const;
 export type ContentRevealMode = (typeof CONTENT_REVEAL_MODES)[number];
@@ -393,6 +401,12 @@ export const env = createEnv({
     // The same alert by e-mail, from the notifications sender, to an operator
     // mailbox (an alerts box), independent of the Telegram pair.
     SIGNUP_ALERT_EMAIL: emailAddress.optional(),
+    // Where every internal operator alert goes. "email" — the default, and
+    // the behaviour of every instance that never sets it — keeps each alert on
+    // its historic route. "audit" sends none of them and writes one
+    // operator.alert audit row instead, for an external relay to post to
+    // Telegram; the handlers' own audit rows, claims and state stay as they are.
+    OPERATOR_ALERTS_SINK: z.enum(OPERATOR_ALERTS_SINKS).default("email"),
 
     // Sender for system emails (password reset), as `Name <user@domain>` or a
     // bare address; its domain must be a verified identity in this instance's
@@ -619,6 +633,18 @@ export function telegramSignupAlert(e: Env = env): {
 export function signupAlertEmail(e: Env = env): string | null {
   const to = e.SIGNUP_ALERT_EMAIL?.trim();
   return to && emailAddress.safeParse(to).success ? to : null;
+}
+
+/**
+ * Where the internal operator alerts go: e-mailed as they always were, or
+ * written to the audit trail for an external relay to deliver. Read through a
+ * function so a process under SKIP_ENV_VALIDATION (raw strings, so no zod
+ * default) answers "email" exactly like a validated one, and so a value that
+ * is neither keeps the historic behaviour instead of silencing the alert.
+ */
+export function operatorAlertsSink(e: Env = env): OperatorAlertSink {
+  const raw: unknown = e.OPERATOR_ALERTS_SINK;
+  return typeof raw === "string" && raw.trim() === "audit" ? "audit" : "email";
 }
 
 /**

@@ -1,5 +1,11 @@
-import { notificationsEmailFrom, signupAlertEmail, telegramSignupAlert } from "@millionsend/config";
-import type { SignupAttribution } from "@millionsend/core";
+import {
+  notificationsEmailFrom,
+  operatorAlertsSink,
+  signupAlertEmail,
+  telegramSignupAlert,
+} from "@millionsend/config";
+import { recordOperatorAlert, type SignupAttribution } from "@millionsend/core";
+import type { Db } from "@millionsend/db";
 import { defaultSystemMailDeps, type SystemMailDeps, sendAccountMail } from "./system-mail";
 
 /**
@@ -13,7 +19,9 @@ import { defaultSystemMailDeps, type SystemMailDeps, sendAccountMail } from "./s
  * failure — an unreachable Bot API, a revoked token, a wrong chat id — is
  * logged and dropped. An alert may never fail the sign-up it reports.
  * SIGNUP_ALERT_EMAIL sends the same text by e-mail to an operator mailbox,
- * on its own: either channel works without the other.
+ * on its own: either channel works without the other. OPERATOR_ALERTS_SINK
+ * =audit replaces that e-mail with one operator.alert audit row (the Telegram
+ * post is not mail and keeps its own route).
  */
 
 /**
@@ -125,35 +133,57 @@ export function signupAlertMessage(params: {
 /**
  * Sends the alert, if the instance is configured for alerts, and returns
  * immediately: the caller is a sign-up and must not wait on a chat API.
+ * With OPERATOR_ALERTS_SINK=audit the e-mail becomes one operator.alert row
+ * and `db` is required to write it.
  */
 export function notifySignupAlert(
   user: { email: string; name?: string | null },
   attribution: SignupAttribution | null,
   locale: string,
   mail: SystemMailDeps = defaultSystemMailDeps,
+  db?: Db,
 ): void {
   const target = telegramSignupAlert();
   const mailTo = signupAlertEmail();
   const from = notificationsEmailFrom();
-  if (!target && !(mailTo && from)) return;
+  const sink = operatorAlertsSink();
+  if (!target && sink !== "audit" && !(mailTo && from)) return;
+  const subject = `MepMail: novo cadastro ${user.email}`;
   const text = signupAlertMessage({
     email: user.email,
     name: user.name ?? null,
     attribution,
     locale,
   });
-  if (mailTo && from)
+  if (sink === "audit") {
+    // One audit row the relay posts, with the subject and body the e-mail
+    // would have carried; the alert has no link, so the url stays empty.
+    if (!db) {
+      console.error(
+        "signup alert: OPERATOR_ALERTS_SINK=audit without a database, alert not recorded",
+      );
+    } else {
+      void recordOperatorAlert(db, {
+        kind: "signup.alert",
+        subject,
+        text,
+        url: "",
+        teamId: null,
+      });
+    }
+  } else if (mailTo && from) {
     sendAccountMail(
       {
         from,
         to: mailTo,
-        subject: `MepMail: novo cadastro ${user.email}`,
+        subject,
         text,
         html: `<pre style="font:14px/1.5 system-ui,sans-serif;white-space:pre-wrap">${escapeHtml(text)}</pre>`,
         kind: "signup.alert",
       },
       mail,
     );
+  }
   if (!target) return;
   const body: Record<string, unknown> = {
     chat_id: target.chatId,

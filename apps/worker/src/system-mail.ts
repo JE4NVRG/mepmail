@@ -1,4 +1,10 @@
-import { accountEmailFrom, env, notificationsEmailFrom, servedRegions } from "@millionsend/config";
+import {
+  accountEmailFrom,
+  env,
+  notificationsEmailFrom,
+  operatorAlertsSink,
+  servedRegions,
+} from "@millionsend/config";
 import {
   type AccountMailKind,
   accountLocale,
@@ -8,6 +14,7 @@ import {
   listTeamOwners,
   type MailContent,
   type MailLocale,
+  recordOperatorAlert,
   type SenderDomainOwner,
   type SystemMailKind,
   type SystemMailMessage,
@@ -109,6 +116,55 @@ export async function mailOwners(
 }
 
 /**
+ * One operator alert: to the alerts box when `to` names one, else to the
+ * instance operator's own address, in the language their contact row says.
+ * With OPERATOR_ALERTS_SINK=audit nothing is e-mailed: the same subject, body
+ * and link go into one operator.alert audit row, for an external relay to
+ * post to Telegram. Returns whether the alert was handled; a failing send is
+ * the caller's to log.
+ */
+export async function alertOperator(
+  db: Db,
+  mailer: SystemMailer,
+  alert: {
+    kind: AccountMailKind;
+    path: string;
+    values: Record<string, string>;
+    appBaseUrl: string | undefined;
+    /** The team the alert is about; null for an instance-wide one. */
+    teamId?: string | null;
+    /** The alerts box; absent means the instance operator. */
+    to?: string | null;
+  },
+): Promise<boolean> {
+  const url = `${alert.appBaseUrl ?? ""}${alert.path}`;
+  const recipient = alert.to ?? (await findInstanceOperator(db))?.email ?? null;
+  if (operatorAlertsSink() === "audit") {
+    const mail = buildAccountMail({
+      kind: alert.kind,
+      locale: await accountLocale(db, accountEmailFrom(), recipient ?? ""),
+      url,
+      values: alert.values,
+    });
+    await recordOperatorAlert(db, {
+      kind: alert.kind,
+      subject: mail.subject,
+      text: mail.text,
+      url,
+      teamId: alert.teamId ?? null,
+    });
+    return true;
+  }
+  if (!recipient) return false;
+  const locale = await accountLocale(db, accountEmailFrom(), recipient);
+  await mailer.send(recipient, {
+    ...buildAccountMail({ kind: alert.kind, locale, url, values: alert.values }),
+    kind: alert.kind,
+  });
+  return true;
+}
+
+/**
  * One catalog notice to the instance operator, in their own language when
  * their contact row says which; nothing goes out when no operator exists.
  * Returns whether it was sent; a failing send is the caller's to log.
@@ -120,13 +176,13 @@ export async function mailOperator(
   path: string,
   values: Record<string, string>,
   appBaseUrl: string | undefined,
+  opts: { teamId?: string | null } = {},
 ): Promise<boolean> {
-  const operator = await findInstanceOperator(db);
-  if (!operator) return false;
-  const locale = await accountLocale(db, accountEmailFrom(), operator.email);
-  await mailer.send(operator.email, {
-    ...buildAccountMail({ kind, locale, url: `${appBaseUrl ?? ""}${path}`, values }),
+  return alertOperator(db, mailer, {
     kind,
+    path,
+    values,
+    appBaseUrl,
+    teamId: opts.teamId ?? null,
   });
-  return true;
 }

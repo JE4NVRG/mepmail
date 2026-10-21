@@ -586,6 +586,10 @@ await queue.scheduleCrons(
         console.log(
           `signup-risk.digest: pipelineAccepted=1 emailId=${result.emailId} queued=${result.queued} pending=${result.summary.pending} paidAffected=${result.summary.paidAffected}`,
         );
+      else if (result.status === "audit_recorded")
+        console.log(
+          `signup-risk.digest: operatorAlertAudit=1 pending=${result.summary.pending} paidAffected=${result.summary.paidAffected}`,
+        );
     },
     "platform.breaker": async () => {
       // Without SES events there are no bounce/complaint counts to judge.

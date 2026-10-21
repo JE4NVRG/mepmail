@@ -300,6 +300,39 @@ describe("daily digest transaction, without SMTP or provider calls", () => {
     expect(await emails()).toHaveLength(2);
   });
 
+  it("records one operator.alert per period instead of e-mailing when the sink is audit", async () => {
+    vi.stubEnv("OPERATOR_ALERTS_SINK", "audit");
+    await sandbox();
+    const first = await run();
+    expect(first).toMatchObject({ status: "audit_recorded", summary: { pending: 1 } });
+    // Nothing is accepted, claimed or queued: the digest is an audit row now.
+    expect(await emails()).toHaveLength(0);
+    expect(await claims()).toHaveLength(0);
+    expect(enqueueSend).not.toHaveBeenCalled();
+    const rows = () =>
+      db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "operator.alert"));
+    const [row] = await rows();
+    expect(row).toMatchObject({
+      teamId: null,
+      actorId: "system",
+      data: {
+        kind: SIGNUP_RISK_DIGEST_KIND,
+        subject: "MepMail · fila de revisão · 2026-10-17",
+        url: `${appBaseUrl}/console/safety#signup-reviews`,
+        periodKey: "America/Sao_Paulo:2026-10-17:alertas@je4ndev.com",
+      },
+    });
+    expect(String(row?.data?.text)).toContain("Pagantes afetados: 0");
+    // The same day is claimed once: a replay is a duplicate, not a second row.
+    expect(await run()).toMatchObject({ status: "duplicate" });
+    expect(await rows()).toHaveLength(1);
+    expect(await run({ now: () => new Date("2026-10-18T11:00:00Z") })).toMatchObject({
+      status: "audit_recorded",
+    });
+    expect(await rows()).toHaveLength(2);
+    expect(await emails()).toHaveLength(0);
+  });
+
   it("includes a paid legacy team whose only restriction is suspension, and counts its new hold once", async () => {
     const paid = await createTeam(db, "legacy-suspended-paid");
     const periodStart = new Date("2026-10-01T00:00:00Z");

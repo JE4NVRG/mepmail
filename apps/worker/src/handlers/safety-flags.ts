@@ -1,7 +1,5 @@
-import { accountEmailFrom, signupAlertEmail } from "@millionsend/config";
+import { signupAlertEmail } from "@millionsend/config";
 import {
-  accountLocale,
-  buildAccountMail,
   computeTeamStandings,
   holdReputationRuns,
   markSendReviewNotified,
@@ -15,7 +13,7 @@ import {
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { eq, sql } from "drizzle-orm";
-import { mailOperator, type SystemMailer } from "../system-mail.js";
+import { alertOperator, type SystemMailer } from "../system-mail.js";
 
 /**
  * Refresh every active team's standing (score, guardrail, 7-day rates) and
@@ -79,23 +77,16 @@ export async function notifySendReviews(
     });
     if (!opts.mailer) continue;
     try {
-      const path = `/console/safety/${hold.id}`;
-      const values = { team: hold.name, note: hold.note ?? hold.reason ?? "" };
-      const alertEmail = signupAlertEmail();
-      if (alertEmail) {
-        const locale = await accountLocale(db, accountEmailFrom(), alertEmail);
-        await opts.mailer.send(alertEmail, {
-          ...buildAccountMail({
-            kind: "review.held",
-            locale,
-            url: `${opts.appBaseUrl ?? ""}${path}`,
-            values,
-          }),
-          kind: "review.held",
-        });
-      } else {
-        await mailOperator(db, opts.mailer, "review.held", path, values, opts.appBaseUrl);
-      }
+      // The alerts box when one is configured, else the instance operator;
+      // under OPERATOR_ALERTS_SINK=audit either route becomes one audit row.
+      await alertOperator(db, opts.mailer, {
+        kind: "review.held",
+        path: `/console/safety/${hold.id}`,
+        values: { team: hold.name, note: hold.note ?? hold.reason ?? "" },
+        appBaseUrl: opts.appBaseUrl,
+        teamId: hold.id,
+        to: signupAlertEmail(),
+      });
     } catch (err) {
       console.error(`safety.flags: review notice for ${hold.id} failed`, err);
     }

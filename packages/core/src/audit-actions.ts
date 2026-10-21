@@ -129,6 +129,10 @@ export const AUDIT_ACTIONS = [
   "monitor.broadcasts_resumed",
   "support.view_started",
   "support.view_ended",
+  // One internal operator alert written to the trail instead of e-mailed
+  // (OPERATOR_ALERTS_SINK=audit). team_id names the team it is about, or is
+  // null when it is about the instance; the external relay reads these rows.
+  "operator.alert",
   "billing.checkout_started",
   "billing.portal_opened",
   "billing.subscription_updated",

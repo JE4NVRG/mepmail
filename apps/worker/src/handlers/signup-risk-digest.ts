@@ -1,13 +1,16 @@
 import { createHash } from "node:crypto";
+import { operatorAlertsSink } from "@millionsend/config";
 import {
   acceptEmail,
   findSenderDomainOwner,
   type Keyring,
+  OPERATOR_ALERT_ACTION,
+  recordOperatorAlert,
   SYSTEM_MAIL_TAG,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { EMAIL_SEND_PRIORITY, type EmailSendPriority } from "@millionsend/queue";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   listSignupRiskReviewCandidates,
   type SignupReviewPaymentReader,
@@ -149,7 +152,7 @@ export function buildSignupRiskDigest(
   summary: SignupRiskDigestSummary,
   window: SignupRiskDigestWindow,
   appBaseUrl: string,
-): { subject: string; text: string; html: string } {
+): { subject: string; text: string; html: string; url: string } {
   const base = new URL(appBaseUrl);
   if (
     base.protocol !== "https:" ||
@@ -179,6 +182,7 @@ export function buildSignupRiskDigest(
         index === 0 ? `<p><strong>${escapeHtml(line)}</strong></p>` : `<p>${escapeHtml(line)}</p>`,
       )
       .join("")}<p><a href="${escapeHtml(url)}">Abrir fila de revisão</a></p>`,
+    url,
   };
 }
 
@@ -198,13 +202,15 @@ export interface SignupRiskDigestDeps {
 
 export type SignupRiskDigestResult =
   | { status: "disabled" | "outside_window" | "empty" }
-  | { status: "duplicate"; emailId: string }
+  | { status: "duplicate"; emailId: string | null }
   | {
       status: "pipeline_accepted";
       emailId: string;
       queued: boolean;
       summary: SignupRiskDigestSummary;
-    };
+    }
+  /** OPERATOR_ALERTS_SINK=audit: one operator.alert row, no e-mail. */
+  | { status: "audit_recorded"; summary: SignupRiskDigestSummary };
 
 class SignupRiskDigestWindowClosed extends Error {}
 
@@ -256,11 +262,13 @@ export async function sendSignupRiskDailyDigest(
       const afterLock = readNow();
       if (!currentWindowOpen(afterLock)) return { status: "outside_window" } as const;
       const [prior] = await tx
-        .select({ emailId: sql<string>`${schema.auditLog.data}->>'emailId'` })
+        .select({ emailId: sql<string | null>`${schema.auditLog.data}->>'emailId'` })
         .from(schema.auditLog)
         .where(
           and(
-            eq(schema.auditLog.action, ACCEPTED_ACTION),
+            // An accepted message, or the operator.alert an audit sink wrote
+            // instead of one: either way this period has already been served.
+            inArray(schema.auditLog.action, [ACCEPTED_ACTION, OPERATOR_ALERT_ACTION]),
             sql`${schema.auditLog.data}->>'periodKey' = ${window.periodKey}`,
           ),
         )
@@ -271,6 +279,23 @@ export async function sendSignupRiskDailyDigest(
         window,
       );
       if (!summary.pending) return { status: "empty" } as const;
+      // An audit sink sends nothing: the digest becomes one operator.alert row,
+      // and its periodKey claim (read above) keeps it to once per period. No
+      // sender is needed for a row, only the console link it already carries.
+      if (operatorAlertsSink() === "audit") {
+        if (!deps.appBaseUrl) throw new Error("signup_risk_digest_console_url_unconfigured");
+        const digest = buildSignupRiskDigest(summary, window, deps.appBaseUrl);
+        if (!currentWindowOpen(readNow())) return { status: "outside_window" } as const;
+        await recordOperatorAlert(tx, {
+          kind: SIGNUP_RISK_DIGEST_KIND,
+          subject: digest.subject,
+          text: digest.text,
+          url: digest.url,
+          teamId: null,
+          periodKey: window.periodKey,
+        });
+        return { status: "audit_recorded", summary } as const;
+      }
       if (!deps.from) throw new Error("signup_risk_digest_sender_unconfigured");
       const owner = await findSenderDomainOwner(tx, deps.from);
       if (!owner) throw new Error("signup_risk_digest_sender_unverified");
