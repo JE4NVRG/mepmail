@@ -28,6 +28,7 @@
       "Last 30 days, rolling: every email created in the window counts, nothing older.",
       "Rates only: this page never publishes absolute volume, per-customer or per-domain numbers.",
       "Accounts suspended for abuse are excluded from every count.",
+      "The platform's own transactional mail (account verification, password resets and account notices) counts too: it goes through the same pipeline and sending infrastructure as customer mail, and it can be a large share of the total while customer volume is small.",
       "Canceled and unsent emails are excluded: they were never attempted, so they are not delivery failures.",
       "Resolved emails are the denominator: delivered, opened, clicked, bounced, complained and failed.",
       "Updated hourly: one database read serves the page for an hour."

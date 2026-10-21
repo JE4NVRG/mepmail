@@ -28,6 +28,7 @@
       "Últimos 30 dias, móveis: conta todo e-mail criado na janela, nada mais antigo.",
       "Apenas taxas: a página nunca publica volume absoluto, números por cliente ou por domínio.",
       "Contas suspensas por abuso ficam fora de todas as contagens.",
+      "O e-mail transacional da própria plataforma (verificação de conta, troca de senha e avisos de conta) também conta: ele passa pelo mesmo pipeline e pela mesma infraestrutura de envio do e-mail dos clientes, e pode ser uma parte grande do total enquanto o volume dos clientes é pequeno.",
       "E-mails cancelados e não enviados ficam fora: nunca foram tentados, então não são falhas de entrega.",
       "O denominador são os e-mails resolvidos: entregues, abertos, clicados, rejeitados, reclamados e falhos.",
       "Atualizadas a cada hora: uma leitura do banco serve a página por uma hora."
