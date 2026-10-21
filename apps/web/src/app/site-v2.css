@@ -2033,3 +2033,89 @@
     grid-column: 2;
   }
 }
+
+/* ---------- /security (redesign 2026-10-21) ----------
+ * The same copy as before in the v2 language: cards with their detail behind a
+ * disclosure, the subprocessor table and the compliance states in full. */
+.v2 main .v2s-hero .v2-display {
+  font-size: clamp(42px, 5vw, 76px);
+}
+.v2s-badges {
+  margin-block: 4px;
+}
+.v2s-gap {
+  margin-top: 24px;
+}
+.v2 main .v2s-more {
+  margin-top: auto;
+}
+.v2s-more summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v2-lavender);
+}
+.v2-light .v2s-more summary {
+  color: var(--v2-violet);
+}
+.v2 main .v2s-points {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-left: 18px;
+  list-style: disc;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.v2s-table {
+  margin-top: 36px;
+}
+.v2 main .v2s-partners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+.v2s-partners li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  border: 1px solid var(--v2-line-strong);
+  border-radius: 12px;
+  font-size: 15px;
+}
+.v2s-partners span {
+  color: var(--v2-muted);
+  font-size: 14px;
+}
+.v2 main .v2s-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 40px;
+}
+.v2 main .v2s-status-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.v2s-faq {
+  display: grid;
+  gap: 10px;
+  margin-top: 36px;
+}
+.v2s-faq details {
+  border: 1px solid var(--v2-line-strong);
+  border-radius: 14px;
+  padding: 16px 20px;
+}
+.v2s-faq summary {
+  cursor: pointer;
+  font-size: 17px;
+  font-weight: 600;
+}
+.v2 main .v2s-faq details p {
+  margin-top: 12px;
+}

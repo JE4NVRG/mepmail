@@ -17,6 +17,7 @@
     ],
     "ctaDocs": "Ler a documentação"
   },
+  "more": "O que cobre",
   "protection": {
     "eyebrow": "Proteção de dados",
     "title": "Selado em repouso, criptografado em trânsito, restaurável por construção",

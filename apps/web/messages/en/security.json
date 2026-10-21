@@ -17,6 +17,7 @@
     ],
     "ctaDocs": "Read the docs"
   },
+  "more": "What it covers",
   "protection": {
     "eyebrow": "Data protection",
     "title": "Sealed at rest, encrypted in transit, restorable by design",

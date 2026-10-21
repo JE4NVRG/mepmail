@@ -8,6 +8,7 @@ import { cookies, headers } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { AdvertisingConsent } from "@/components/advertising-consent";
+import { PublicLocaleLinks } from "@/components/public-locale-links";
 import { AndroidAppGuard } from "@/components/android-app-guard";
 import { Providers } from "@/components/providers";
 import { UmamiAnalytics } from "@/components/umami-analytics";
@@ -79,6 +80,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <NextIntlClientProvider messages={messages}>
           <Providers>
             <AdvertisingConsent />
+            <PublicLocaleLinks />
             {children}
             <AndroidAppGuard />
           </Providers>

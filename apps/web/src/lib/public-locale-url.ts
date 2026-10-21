@@ -58,3 +58,23 @@ export function languageAlternates(path: string): Record<string, string> {
     "x-default": path,
   };
 }
+
+/** Auth entry pages that read ?lang= too, so a Portuguese visit signs up in Portuguese. */
+const LOCALE_CARRYING_ENTRY_PATHS: ReadonlySet<string> = new Set(["/signup", "/login"]);
+
+/**
+ * The href a same-site link should navigate to from a page in `locale`: public pages and
+ * the sign-up/login entry keep the visitor's language (`?lang=pt-BR`), because canonical
+ * public URLs are English by default and the server deliberately ignores the cookie
+ * there. Null when the link needs no change (English, another origin, a link that already
+ * names a language, or a route outside the public site).
+ */
+export function linkHrefInLocale(link: URL, page: URL, locale: AppLocale): string | null {
+  if (locale === "en" || link.origin !== page.origin || link.searchParams.has(LANG_PARAM))
+    return null;
+  const path = link.pathname === "/" ? "/" : link.pathname.replace(/\/+$/, "");
+  if (!isCanonicalPublicPath(path) && !LOCALE_CARRYING_ENTRY_PATHS.has(path)) return null;
+  const target = new URL(link);
+  target.searchParams.set(LANG_PARAM, locale);
+  return `${target.pathname}${target.search}${target.hash}`;
+}
