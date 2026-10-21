@@ -301,5 +301,50 @@
       }
     ],
     "contact": "Refund requests and questions: suporte@mepmail.dev"
+  },
+  "accountDeletion": {
+    "title": "Delete your MepMail account",
+    "updated": "Last updated: October 21, 2026",
+    "intro": "How to delete your MepMail account (the mepmail.dev website and the MepMail Android app, by Je4nDev), what is deleted and what is kept by legal obligation.",
+    "sections": [
+      {
+        "title": "1. From the dashboard, right away",
+        "body": [
+          "You delete the account yourself, on the website or in the app, and it takes effect immediately."
+        ],
+        "list": [
+          "Sign in at mepmail.dev or in the MepMail app.",
+          "Open Settings (mepmail.dev/settings) and scroll to Danger zone.",
+          "If you are the only owner of a team, first delete the team with Delete team or transfer ownership to another member.",
+          "Tap Delete my account and confirm. All your sessions are ended."
+        ]
+      },
+      {
+        "title": "2. Without access to the account",
+        "body": [
+          "If you cannot sign in, write to suporte@mepmail.dev from the address registered on the account and ask for deletion. We confirm the request comes from the account holder and delete the account within 30 days."
+        ]
+      },
+      {
+        "title": "3. What is deleted",
+        "list": [
+          "Right away: your user, your sessions and your access to teams.",
+          "When the team is deleted: contacts, emails, domains, API keys, templates, campaigns, members and the Correio mailboxes with their messages.",
+          "Within 30 days: the remaining personal data, including backups, which expire in that period."
+        ]
+      },
+      {
+        "title": "4. What is kept",
+        "list": [
+          "Billing records and invoices, for the period required by tax and accounting obligations.",
+          "Limited delivery logs, when needed for security and abuse prevention, for the period described in the Privacy Policy.",
+          "Aggregate statistics that identify no one."
+        ],
+        "body": [
+          "The details of each period are in the Privacy Policy at mepmail.dev/privacy."
+        ]
+      }
+    ],
+    "contact": "Questions about deletion and privacy: suporte@mepmail.dev"
   }
 }

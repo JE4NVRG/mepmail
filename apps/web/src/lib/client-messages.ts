@@ -42,6 +42,7 @@ export const PUBLIC_MESSAGE_PATHS = new Set([
   "/terms",
   "/privacy",
   "/refund",
+  "/account-deletion",
   "/login",
   "/signup",
   "/forgot-password",

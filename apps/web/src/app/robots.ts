@@ -44,6 +44,8 @@ export default function robots(): MetadataRoute.Robots {
         "/terms",
         "/privacy",
         "/refund",
+        // Account deletion steps, linked from the Google Play listing.
+        "/account-deletion",
         "/auth/",
         "/sitemap.xml",
         "/_next/",

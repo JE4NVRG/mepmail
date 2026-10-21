@@ -301,5 +301,50 @@
       }
     ],
     "contact": "Pedidos e dúvidas de reembolso: suporte@mepmail.dev"
+  },
+  "accountDeletion": {
+    "title": "Excluir sua conta do MepMail",
+    "updated": "Última atualização: 21 de outubro de 2026",
+    "intro": "Como excluir a sua conta do MepMail (site mepmail.dev e app Android MepMail, da Je4nDev), o que é apagado e o que fica guardado por obrigação legal.",
+    "sections": [
+      {
+        "title": "1. Pelo painel, na hora",
+        "body": [
+          "A exclusão é feita por você mesmo, no site ou no app, e vale na hora."
+        ],
+        "list": [
+          "Entre na sua conta em mepmail.dev ou no app MepMail.",
+          "Abra Configurações (mepmail.dev/settings) e role até Zona de perigo.",
+          "Se você é o único proprietário de uma equipe, primeiro exclua a equipe em Excluir equipe ou transfira a propriedade para outro membro.",
+          "Toque em Excluir minha conta e confirme. Todas as suas sessões são encerradas."
+        ]
+      },
+      {
+        "title": "2. Sem acesso à conta",
+        "body": [
+          "Se você não consegue entrar, escreva para suporte@mepmail.dev a partir do endereço cadastrado na conta, pedindo a exclusão. Confirmamos que o pedido é do titular e excluímos a conta em até 30 dias."
+        ]
+      },
+      {
+        "title": "3. O que é apagado",
+        "list": [
+          "Na hora: o seu usuário, as sessões e o acesso às equipes.",
+          "Ao excluir a equipe: contatos, e-mails, domínios, chaves de API, templates, campanhas, membros e as caixas do Correio com as mensagens.",
+          "Em até 30 dias: os demais dados pessoais, incluindo as cópias de segurança, que expiram nesse prazo."
+        ]
+      },
+      {
+        "title": "4. O que fica guardado",
+        "list": [
+          "Registros de cobrança e notas, pelo prazo exigido pelas obrigações fiscais e contábeis.",
+          "Logs limitados de entrega, quando necessários para segurança e prevenção de abuso, pelo prazo descrito na Política de Privacidade.",
+          "Estatísticas agregadas que não identificam ninguém."
+        ],
+        "body": [
+          "Os detalhes de cada prazo estão na Política de Privacidade, em mepmail.dev/privacy."
+        ]
+      }
+    ],
+    "contact": "Dúvidas sobre exclusão e privacidade: suporte@mepmail.dev"
   }
 }

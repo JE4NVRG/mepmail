@@ -30,6 +30,7 @@ const PUBLIC_PATHS: ReadonlySet<string> = new Set([
   "/terms",
   "/privacy",
   "/refund",
+  "/account-deletion",
 ]);
 
 /** Exact public pages only; never a prefix that could capture an auth/API route. */
