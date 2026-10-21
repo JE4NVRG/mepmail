@@ -1,16 +1,25 @@
-/* The first-visit strip stays in document flow, so it cannot cover a CTA. */
+/*
+ * The first-visit card floats at the bottom of the screen (redesign 2026-10-21): it no
+ * longer pushes the header and the first screen down, and its two choices weigh the same.
+ */
 .banner {
+  position: fixed;
+  z-index: 60;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(16px, env(safe-area-inset-bottom));
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 24px;
+  gap: 18px;
   box-sizing: border-box;
-  width: 100%;
-  padding: 10px max(20px, env(safe-area-inset-left));
+  width: min(620px, calc(100vw - 32px));
+  padding: 14px 16px;
   background: var(--ms-panel, #0c0c0d);
   color: var(--ms-bone, #f4f1ea);
-  border-bottom: 1px solid var(--ms-line-strong, #2a2a2e);
-  font: 13px / 1.55 var(--ms-font-sans, sans-serif);
+  border: 1px solid var(--ms-line-strong, #2a2a2e);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px -18px #000c;
+  font: 13px / 1.5 var(--ms-font-sans, sans-serif);
+  animation: banner-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .bannerText {
@@ -183,7 +192,7 @@
 }
 
 .banner .actions {
-  flex: 0 0 260px;
+  flex: 0 0 220px;
   margin-top: 0;
   gap: 8px;
 }
@@ -241,11 +250,15 @@
   }
 }
 
-/* Phones: a compact strip above the page, with equal 44px choices. */
+/* Phones: the same card across the bottom, with equal 44px choices. */
 @media (max-width: 560px) {
   .banner {
     display: block;
-    padding: 10px max(14px, env(safe-area-inset-left));
+    left: 8px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: auto;
+    padding: 12px 14px;
     font-size: 12.5px;
   }
 

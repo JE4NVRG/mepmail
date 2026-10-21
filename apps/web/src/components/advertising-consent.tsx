@@ -191,7 +191,7 @@ export function AdvertisingConsent() {
         {consent.state === "accepted" ? t("withdraw") : t("deny")}
       </button>
       <button
-        className={`ms-btn ms-btn-primary ${styles.choice}`}
+        className={`ms-btn ms-btn-secondary ${styles.choice}`}
         type="button"
         disabled={consent.pending}
         onClick={() => void choose(true)}
@@ -253,8 +253,10 @@ export function AdvertisingConsent() {
   return (
     <>
       {publicPage && (consent.state === "unknown" || consent.error) && !open ? (
-        // First visit: one sentence and two equal choices; the full text and the
-        // current state live in the settings dialog.
+        // First visit: a card at the bottom of the screen with one sentence and two
+        // choices of equal weight (redesign 2026-10-21: it used to sit above the
+        // header and push the first screen down); the full text and the current
+        // state live in the settings dialog.
         <aside className={styles.banner} aria-label={t("title")}>
           <p className={styles.bannerText}>
             <strong>{t("bannerTitle")}</strong> {t("bannerBody")}{" "}
