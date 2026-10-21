@@ -275,6 +275,13 @@
     margin-top: 8px;
   }
 
+  /* The inline policy link gets a 44px touch target without moving the text (QA F11). */
+  .inlineLink {
+    display: inline-block;
+    padding-block: 14px;
+    margin-block: -14px;
+  }
+
   .banner .choice,
   .actions .choice,
   .close {
