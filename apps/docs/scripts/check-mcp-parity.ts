@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +19,12 @@ import { fileURLToPath } from "node:url";
  * Everything is parsed from source text on purpose: importing the API would
  * pull its whole dependency graph (env validation, db, keyring) into the docs
  * build just to read a list of tool names.
+ *
+ * Pass `--npm` to also compare the in-repo manifests with `npm view`. The
+ * /packages pages are generated from those manifests, so a publish that moves
+ * ahead of them leaves the page on the old number. The docs image build does
+ * not pass this flag: that build installs with `--offline` and must stay
+ * reproducible without the registry.
  */
 
 type RegistryTool = { name: string; scope: string | null; admin: boolean };
@@ -31,6 +38,7 @@ const PAGES = [
   { path: "content/docs/mcp.pt-BR.mdx", heading: "Ferramentas" },
 ];
 const writeGenerated = process.argv.includes("--write");
+const checkNpm = process.argv.includes("--npm");
 
 async function readSource(path: string): Promise<string> {
   return readFile(new URL(`../../../${path}`, import.meta.url), "utf8");
@@ -61,6 +69,34 @@ async function generatedBlock(page: string, name: string, body: string, problems
       `${page}: stale ${name}; run pnpm exec tsx apps/docs/scripts/check-mcp-parity.ts --write from the repository root`,
     );
   }
+}
+
+/** `1.2.10` > `1.2.9`. Prerelease tags are out of scope for these packages. */
+function compareSemver(left: string, right: string): number {
+  const a = left.split(".").map(Number);
+  const b = right.split(".").map(Number);
+  for (let i = 0; i < 3; i += 1) {
+    const diff = (a[i] ?? 0) - (b[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/** Latest stable version npm would install for `name` (`npm view <name> version`). */
+function publishedVersion(name: string): string {
+  const result = spawnSync("npm", ["view", name, "version"], {
+    encoding: "utf8",
+    timeout: 30_000,
+  });
+  const version = result.stdout
+    ?.split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => /^\d+\.\d+\.\d+$/.test(line));
+  if (result.status !== 0 || !version) {
+    const detail = (result.stderr || result.stdout || result.error?.message || "").trim();
+    throw new Error(`npm view ${name} version failed (${result.status}): ${detail}`);
+  }
+  return version;
 }
 
 /** The first capture of every match of a global pattern, in order. */
@@ -264,6 +300,36 @@ if (pinnedSdkVersion !== sdkPackage.version) {
   problems.push(
     `installed resend@${sdkPackage.version} differs from lockfile ${pinnedSdkVersion ?? "(not found)"}`,
   );
+}
+
+// /packages copies these manifests. Fail when npm has published something
+// newer: that is how the page kept showing @mepmail/mcp 0.2.1.
+if (checkNpm) {
+  for (const item of [
+    { name: mcpPackage.name, manifest: mcpPackage.version, file: "packages/mcp/package.json" },
+    { name: cliPackage.name, manifest: cliPackage.version, file: "packages/cli/package.json" },
+  ]) {
+    const latest = publishedVersion(item.name);
+    const order = compareSemver(latest, item.manifest);
+    if (order > 0) {
+      problems.push(
+        `${item.name}@${latest} is latest on npm, but ${item.file} is ${item.manifest}. ` +
+          `/packages is generated from that manifest, so it still shows ${item.manifest}. ` +
+          `Set the manifest to ${latest} and run ` +
+          `pnpm exec tsx apps/docs/scripts/check-mcp-parity.ts --write.`,
+      );
+    } else if (order < 0) {
+      console.log(
+        `${item.name}: manifest ${item.manifest} is ahead of npm ${latest} ` +
+          `(not published yet); /packages shows the source version.`,
+      );
+    } else {
+      console.log(`${item.name}: npm ${latest} matches ${item.file}`);
+    }
+  }
+  // n8n-nodes-mepmail is another repository. The page links to npm instead of
+  // pinning a number, so a release there cannot turn this build red.
+  console.log(`n8n-nodes-mepmail: npm ${publishedVersion("n8n-nodes-mepmail")}`);
 }
 
 for (const locale of ["en", "pt-BR"] as const) {
