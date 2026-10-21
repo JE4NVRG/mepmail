@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import {
   createMailboxAgentKey,
   effectiveDomainLimit,
+  mailboxPlanDomainLimit,
   withMailboxAgentAccess,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
@@ -296,6 +297,11 @@ describe("Correio hosted opening admission", () => {
     expect(await effectiveDomainLimit(db, teamId, 1)).toBe(3);
     expect(await effectiveDomainLimit(db, teamId, 25)).toBe(25);
     expect(await effectiveDomainLimit(db, teamId, null)).toBeNull();
+    // Equipe includes ten domains (Jean, 2026-10-20); Solo, Duo and plan-less contracts three.
+    expect(mailboxPlanDomainLimit({ planCode: "equipe" })).toBe(10);
+    for (const planCode of ["solo", "duo", null, undefined])
+      expect(mailboxPlanDomainLimit({ planCode })).toBe(3);
+    expect(mailboxPlanDomainLimit(undefined)).toBe(3);
 
     // An add-on contract without Envio keeps needing Envio to create.
     await db

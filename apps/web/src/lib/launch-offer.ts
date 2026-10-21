@@ -32,6 +32,7 @@ export const LAUNCH_OFFER = {
       brlMonthlyCents: 1490,
       monthlyRecipientDeliveries: 500,
       monthlyInboundMessages: 2000,
+      domains: 3,
     },
     {
       id: "duo",
@@ -41,6 +42,7 @@ export const LAUNCH_OFFER = {
       brlMonthlyCents: 2990,
       monthlyRecipientDeliveries: 2000,
       monthlyInboundMessages: 5000,
+      domains: 3,
     },
     {
       id: "equipe",
@@ -48,12 +50,18 @@ export const LAUNCH_OFFER = {
       storageGiB: 10,
       monthlyCents: 1290,
       brlMonthlyCents: 6490,
-      monthlyRecipientDeliveries: 6000,
+      // 10,000 recipients and 10 domains (Jean, 2026-10-20): ahead of AgentMail's
+      // Developer tier (10 inboxes, 10,000 emails, 10 domains, US$ 20) at a lower price.
+      monthlyRecipientDeliveries: 10000,
       monthlyInboundMessages: 10000,
+      domains: 10,
     },
   ],
   correioTrialDays: 7,
-  /** Domains a team with an active Correio subscription may verify on the free Envio plan. */
+  /**
+   * Domains a team with an active Correio subscription may verify on the free Envio plan
+   * (the smallest plans'; each plan carries its own `domains`, core's mailboxPlanDomainLimit).
+   */
   correioDomains: 3,
   internal: { storageGiBPerMailbox: 50 },
 } as const;

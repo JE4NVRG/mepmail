@@ -163,7 +163,9 @@ export async function CorreioV2() {
               <span>{t("facts.mailboxes")}</span>
             </li>
             <li className="v2-fact">
-              <strong>{t("facts.domains", { count: LAUNCH_OFFER.correioDomains })}</strong>
+              <strong>
+                {t("facts.domains", { count: Math.max(...plans.map((plan) => plan.domains)) })}
+              </strong>
               <span>{t("facts.domainsLabel")}</span>
             </li>
             <li className="v2-fact">
@@ -348,7 +350,7 @@ export async function CorreioV2() {
                       <li>
                         {t("plans.inbound", { count: number.format(plan.monthlyInboundMessages) })}
                       </li>
-                      <li>{t("plans.domains", { count: LAUNCH_OFFER.correioDomains })}</li>
+                      <li>{t("plans.domains", { count: plan.domains })}</li>
                     </ul>
                     <a
                       className={`v2-btn v2-btn-block ${featured ? "v2-btn-bone" : "v2-btn-line"}`}

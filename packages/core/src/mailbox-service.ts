@@ -125,11 +125,20 @@ export function mailboxServiceActive(plan: MailboxSubscription | undefined, now 
 
 /** Sender domains a team with an active Correio subscription may hold, whatever its Envio plan. */
 export const MAILBOX_PLAN_DOMAIN_LIMIT = 3;
+/** Plans that include more domains than MAILBOX_PLAN_DOMAIN_LIMIT (Jean, 2026-10-20). */
+export const MAILBOX_PLAN_DOMAIN_LIMITS: Readonly<Record<string, number>> = { equipe: 10 };
+
+/** The domains a Correio subscription includes: its plan's, else the Correio default. */
+export function mailboxPlanDomainLimit(
+  plan: { planCode?: string | null | undefined } | undefined,
+): number {
+  return (plan?.planCode && MAILBOX_PLAN_DOMAIN_LIMITS[plan.planCode]) || MAILBOX_PLAN_DOMAIN_LIMIT;
+}
 
 /**
- * The domain cap for a team: its Envio plan's, raised to MAILBOX_PLAN_DOMAIN_LIMIT
- * while a Correio subscription is active (a Correio-only team sits on the free
- * Envio plan, which allows one). `base` null stays unlimited. The mailbox tables
+ * The domain cap for a team: its Envio plan's, raised to the Correio plan's domains
+ * (MAILBOX_PLAN_DOMAIN_LIMIT, 10 on Equipe) while a Correio subscription is active
+ * (a Correio-only team sits on the free Envio plan, which allows one). `base` null stays unlimited. The mailbox tables
  * exist only where the mailbox schema was applied.
  */
 export async function effectiveDomainLimit(
@@ -138,7 +147,8 @@ export async function effectiveDomainLimit(
   base: number | null,
   now = new Date(),
 ): Promise<number | null> {
-  if (base === null || base >= MAILBOX_PLAN_DOMAIN_LIMIT) return base;
+  const most = Math.max(MAILBOX_PLAN_DOMAIN_LIMIT, ...Object.values(MAILBOX_PLAN_DOMAIN_LIMITS));
+  if (base === null || base >= most) return base;
   const [extension] = await db
     .select({ installed: sql<boolean>`to_regclass('public.mailbox_subscriptions') is not null` })
     .from(sql`(select 1) as mailbox_extension`);
@@ -147,7 +157,8 @@ export async function effectiveDomainLimit(
     .select()
     .from(schema.mailboxSubscriptions)
     .where(eq(schema.mailboxSubscriptions.teamId, teamId));
-  return mailboxServiceActive(plan, now) ? MAILBOX_PLAN_DOMAIN_LIMIT : base;
+  if (!mailboxServiceActive(plan, now)) return base;
+  return Math.max(base, mailboxPlanDomainLimit(plan));
 }
 
 /** System is the platform operator's own team, not an ordinary tenant administrator.

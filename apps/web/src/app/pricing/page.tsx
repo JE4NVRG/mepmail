@@ -247,7 +247,7 @@ export default async function PricingPage({
                         {t("correio.sharedSends", { count: plan.monthlyRecipientDeliveries })}
                       </li>
                       <li>{t("correio.planInbound", { count: plan.monthlyInboundMessages })}</li>
-                      <li>{t("correio.domains", { count: LAUNCH_OFFER.correioDomains })}</li>
+                      <li>{t("correio.domains", { count: plan.domains })}</li>
                       <li>{t("correio.trial")}</li>
                       <li>
                         {t("correio.planLocal", {

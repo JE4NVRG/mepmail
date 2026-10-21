@@ -7,7 +7,7 @@ import { CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 const CONTRACT = [
   { id: "solo", usd: 290, brl: 1490, mailboxes: 1, gib: 1, out: 500, inbound: 2000 },
   { id: "duo", usd: 590, brl: 2990, mailboxes: 3, gib: 3, out: 2000, inbound: 5000 },
-  { id: "equipe", usd: 1290, brl: 6490, mailboxes: 10, gib: 10, out: 6000, inbound: 10000 },
+  { id: "equipe", usd: 1290, brl: 6490, mailboxes: 10, gib: 10, out: 10000, inbound: 10000 },
 ];
 const messages = (locale: string, name: string) =>
   JSON.parse(
