@@ -339,12 +339,12 @@
     "title": "Responsible disclosure",
     "body": "Found a vulnerability? Tell us and we will fix it — that is the same standard the code is held to.",
     "bullets": [
-      "Email suporte@mepmail.dev with the details and, if you have one, a reproduction.",
+      "Email security@mepmail.dev with the details and, if you have one, a reproduction.",
       "We acknowledge the report and give a first answer within 72 hours.",
       "There is no bug bounty today — we will credit you publicly if you want the credit.",
       "Please give us a reasonable window to fix the issue before publishing it; we will tell you what we are doing along the way."
     ],
-    "cta": "Email suporte@mepmail.dev"
+    "cta": "Email security@mepmail.dev"
   },
   "close": {
     "title": "Connect a domain and send in minutes",

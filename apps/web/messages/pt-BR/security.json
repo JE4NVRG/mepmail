@@ -339,12 +339,12 @@
     "title": "Divulgação responsável",
     "body": "Encontrou uma vulnerabilidade? Avise e nós corrigimos — é o mesmo padrão que o código segue.",
     "bullets": [
-      "Escreva para suporte@mepmail.dev com os detalhes e, se tiver, uma reprodução.",
+      "Escreva para security@mepmail.dev com os detalhes e, se tiver, uma reprodução.",
       "Confirmamos o recebimento e damos a primeira resposta em até 72 horas.",
       "Não existe bounty hoje — damos crédito público se você quiser o crédito.",
       "Dê um prazo razoável para corrigirmos antes de publicar; vamos contando o que estamos fazendo no caminho."
     ],
-    "cta": "Escrever para suporte@mepmail.dev"
+    "cta": "Escrever para security@mepmail.dev"
   },
   "close": {
     "title": "Conecte um domínio e envie em minutos",

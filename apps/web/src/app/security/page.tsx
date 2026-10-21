@@ -13,7 +13,7 @@ import "../landing.css";
 import "../site-v2.css";
 
 const contact = "mailto:suporte@mepmail.dev";
-const disclosureContact = "mailto:suporte@mepmail.dev";
+const disclosureContact = "mailto:security@mepmail.dev";
 const canonical = "/security";
 
 type Card = { kind: string; name: string; body: string; bullets: string[] };
