@@ -120,6 +120,14 @@ export default async function GuidePage({ params }: Params) {
                     ))}
                   </ol>
                 ) : null}
+                {section.code ? (
+                  <figure className="guide-code">
+                    <figcaption>{section.code.label}</figcaption>
+                    <pre>
+                      <code>{section.code.content}</code>
+                    </pre>
+                  </figure>
+                ) : null}
               </section>
             ))}
           </article>
@@ -161,6 +169,11 @@ export default async function GuidePage({ params }: Params) {
             <h2>{copy.cta.title}</h2>
             <p>{copy.cta.body}</p>
             <SignupLink label={copy.cta.button} />
+            {copy.cta.docs ? (
+              <p className="guide-docs">
+                <a href={copy.cta.docs.href}>{copy.cta.docs.label}</a>
+              </p>
+            ) : null}
           </div>
         </section>
       </main>

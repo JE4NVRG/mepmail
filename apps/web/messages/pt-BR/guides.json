@@ -217,6 +217,227 @@
         "body": "100 e-mails por dia sem cartão, por API, SMTP ou MCP.",
         "button": "Criar conta grátis"
       }
+    },
+    "ai-agent-email-mcp": {
+      "meta": {
+        "title": "Como um agente de IA envia e lê e-mail por MCP",
+        "description": "Conecte Claude, Cursor ou outro cliente MCP ao MepMail: servidor hospedado com OAuth ou pacote npm, as ferramentas de e-mail e as permissões."
+      },
+      "card": "O servidor com OAuth, o pacote npm, as ferramentas com que o agente lê e responde e as permissões que mantêm o envio sob controle.",
+      "eyebrow": "Guia · Agentes de IA",
+      "title": "Como um agente de IA envia e lê e-mail por MCP",
+      "lead": "O agente escreve a mensagem, mas enviar ainda exige um servidor que confira o domínio de envio, a cota e as supressões. O servidor MCP do MepMail entrega essas ferramentas ao agente, no mesmo caminho da API REST.",
+      "sections": [
+        {
+          "title": "Duas formas de conectar",
+          "body": [
+            "O servidor hospedado em https://api.mepmail.dev/mcp fala Streamable HTTP e entra com OAuth, então nenhuma chave é colada na configuração do cliente.",
+            "O pacote npm @mepmail/mcp fala stdio e chega à sua instância com uma chave de equipe ou uma chave de agente, para clientes que iniciam servidores a partir de um arquivo de configuração.",
+            "Os nomes e o formato do resultado são iguais nos dois, então um prompt escrito para um funciona no outro; o servidor hospedado também expõe as ferramentas que gerenciam domínios, webhooks, templates e disparos."
+          ]
+        },
+        {
+          "title": "Opção 1: o servidor hospedado, com OAuth",
+          "steps": [
+            "No Claude Code, rode o comando abaixo, depois use /mcp e escolha mepmail para entrar. Acrescente --scope user para valer em todos os projetos.",
+            "No Cursor, coloque a URL no .cursor/mcp.json do projeto ou no ~/.cursor/mcp.json, para todos os projetos.",
+            "No VS Code, coloque no .vscode/mcp.json com type http e a URL.",
+            "No Claude Desktop, adicione um conector personalizado em Configurações → Conectores, ou faça a ponte com o mcp-remote até o endpoint HTTP.",
+            "Na tela de consentimento, escolha a equipe em que o cliente pode agir e desmarque as permissões que você não quer conceder. Nada é copiado nem colado."
+          ],
+          "code": {
+            "label": "Claude Code",
+            "content": "claude mcp add --transport http mepmail https://api.mepmail.dev/mcp"
+          }
+        },
+        {
+          "title": "Opção 2: o pacote local",
+          "body": [
+            "O pacote pede Node.js 20 ou mais novo e roda com npx, sem OAuth e sem etapa no navegador: o bloco de configuração é a instalação inteira.",
+            "Use MEPMAIL_API_KEY para as ferramentas de envio, uma chave de equipe que começa com ms_, e MEPMAIL_MAIL_TOKEN para as ferramentas de caixa, uma chave de agente que começa com mmb_ para uma caixa ou mmt_ para várias. Pelo menos uma das duas.",
+            "MEPMAIL_BASE_URL aponta para outra instância; sem ela, o pacote fala com o MepMail Cloud."
+          ],
+          "code": {
+            "label": "claude_desktop_config.json",
+            "content": "{\n  \"mcpServers\": {\n    \"mepmail\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"@mepmail/mcp\"],\n      \"env\": {\n        \"MEPMAIL_API_KEY\": \"ms_...\",\n        \"MEPMAIL_MAIL_TOKEN\": \"mmb_...\"\n      }\n    }\n  }\n}"
+          }
+        },
+        {
+          "title": "Ler e responder mensagens",
+          "steps": [
+            "mailbox_list_accounts lista as caixas que a credencial alcança, com as permissões de cada uma.",
+            "mailbox_list_messages devolve uma página, da mais nova para a mais antiga: passe o nextCursor recebido como cursor até hasMore ser falso e filtre no servidor com query, from, subject, unread, after e before. Uma página curta nunca prova que uma mensagem não existe.",
+            "mailbox_read_message devolve cabeçalhos, texto, a revisão e os dados dos anexos.",
+            "mailbox_save_draft cria ou edita um rascunho em texto puro sem enviar, e mailbox_send_draft envia.",
+            "Sem a permissão de envio, mailbox_send_draft manda um pedido de aprovação para você, que fica esperando no painel.",
+            "No servidor hospedado, as mesmas ferramentas de caixa respondem em https://api.mepmail.dev/mcp/correio com uma chave de agente, sem OAuth."
+          ]
+        },
+        {
+          "title": "Enviar e-mail transacional",
+          "body": [
+            "send_email envia ou agenda uma mensagem, send_email_batch leva até 100 numa chamada, e update_email e cancel_email cuidam de uma mensagem agendada.",
+            "Para repetir um envio com segurança, passe um idempotency_key: mantenha a mesma chave e os mesmos argumentos ao repetir o mesmo envio, e use uma chave nova para uma operação nova. As chaves são da equipe e duram 24 horas, e uma repetição concluída devolve o resultado original.",
+            "O domínio de envio precisa estar verificado antes: um remetente não verificado falha em send_email do mesmo jeito que falha em POST /emails.",
+            "list_emails e get_email mostram o estado e o último evento, delivered, bounced ou complained."
+          ]
+        },
+        {
+          "title": "Permissões, e por que o agente pede",
+          "body": [
+            "Cada ferramenta exige um escopo, como emails:send, mail:read ou mail:draft. As permissões que você desmarca nunca são concedidas, e o cliente não vê as ferramentas correspondentes.",
+            "Enviar sem pedir é uma marcação separada: com o envio direto desligado, todo envio te manda um pedido de aprovação, e marcar caixas não liga isso sozinho.",
+            "As autorizações ficam em Configurações → Aplicativos conectados, onde você revoga as suas. A revogação vale na próxima renovação do token do cliente, em até uma hora, e quem sai da equipe perde o acesso na hora.",
+            "O resultado das ferramentas vem em um envelope untrusted_data: assuntos, remetentes e corpos foram escritos por terceiros, e o agente é instruído a tratá-los como dados, nunca como instruções.",
+            "As chamadas MCP dividem o limite por minuto da API."
+          ]
+        },
+        {
+          "title": "Antes de apontar o agente para uma caixa real",
+          "steps": [
+            "Verifique o domínio de envio e leia os registros dele com get_domain antes de investigar qualquer outra coisa.",
+            "Crie a caixa e a chave de agente em Correio → Configurações → Agentes: mmb_ para uma caixa, mmt_ para várias.",
+            "Comece com leitura e rascunhos: o agente lê, prepara a resposta e pede sua aprovação antes de enviar.",
+            "Confira a autorização em Configurações → Aplicativos conectados e envie uma mensagem para o seu próprio endereço.",
+            "Mantenha o alcance nas caixas que você marcou: uma credencial de equipe só chega às caixas que mailbox_list_accounts devolve."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "O agente precisa da minha senha?",
+          "a": "Não. O servidor hospedado usa OAuth: você entra pelo navegador e o cliente guarda um token que você revoga em Configurações → Aplicativos conectados. O pacote npm usa uma chave de API ou uma chave de agente."
+        },
+        {
+          "q": "Ele consegue ler todas as caixas da equipe?",
+          "a": "Só as que você marcar no consentimento, ou as que a chave de agente cobre. A autorização fica presa a uma equipe, e as ferramentas de caixa respondem apenas pelas caixas dele."
+        },
+        {
+          "q": "E se um envio der timeout?",
+          "a": "No correio, chame mailbox_send_draft de novo com o mesmo id e a mesma revisão: isso devolve o estado do envio e nunca envia duas vezes. No transacional, repita com o mesmo idempotency_key."
+        },
+        {
+          "q": "Quais clientes funcionam?",
+          "a": "Qualquer cliente MCP. A documentação traz a configuração de Claude Code, Claude Desktop, Cursor e VS Code, e o pacote fala stdio para os demais."
+        }
+      ],
+      "cta": {
+        "title": "Dê uma caixa ao seu agente, não um script",
+        "body": "Crie uma conta, verifique um domínio e conecte o servidor MCP em poucos minutos.",
+        "button": "Criar conta grátis",
+        "docs": {
+          "label": "Documentação do servidor MCP",
+          "href": "https://docs.mepmail.dev/mcp"
+        }
+      }
+    },
+    "smtp-relay-setup": {
+      "meta": {
+        "title": "Como enviar e-mail pelo relay SMTP do MepMail",
+        "description": "Aponte WordPress, um CMS, o n8n ou a sua aplicação para o relay SMTP: smtp.mepmail.dev, porta 2587 com STARTTLS, usuário mepmail e chave de envio."
+      },
+      "card": "Os cinco valores que o plugin pede, os limites do relay, os códigos de erro e um teste pelo terminal.",
+      "eyebrow": "Guia · Envio",
+      "title": "Como enviar e-mail pelo relay SMTP do MepMail",
+      "lead": "Alguns sistemas só sabem enviar e-mail por um formulário SMTP. O relay recebe essas mensagens, confere o domínio e as supressões e as coloca na fila exatamente como a API.",
+      "sections": [
+        {
+          "title": "Quando o relay é a porta certa",
+          "body": [
+            "WordPress e WooCommerce com um plugin de SMTP, Ghost, Strapi, Supabase Auth, um ERP, um sistema antigo: qualquer coisa que peça host, porta, usuário e senha em vez de uma chamada HTTP.",
+            "O relay passa a mensagem pelo mesmo caminho de aceite do POST /emails: a mesma verificação de domínio, as mesmas checagens de supressão, os mesmos logs e eventos de entrega."
+          ]
+        },
+        {
+          "title": "Os cinco valores",
+          "body": [
+            "Host: smtp.mepmail.dev.",
+            "Porta: 2587, com STARTTLS. Se o formulário tiver uma lista de criptografia, escolha STARTTLS: a opção SSL espera TLS desde o primeiro byte, e esta porta não fala assim.",
+            "Usuário: mepmail, fixo para todas as equipes. Outro nome é recusado antes de a chave ser conferida.",
+            "Senha: uma chave criada em Chaves de API, a que começa com ms_, de preferência uma que só possa enviar.",
+            "Criptografia: STARTTLS antes do AUTH. Sem um par de chaves TLS o relay não sobe, a menos que o operador libere autenticação sem criptografia em uma rede privada."
+          ],
+          "code": {
+            "label": "Configurações → SMTP",
+            "content": "Host: smtp.mepmail.dev\nPorta: 2587\nCriptografia: STARTTLS\nUsuário: mepmail\nSenha: ms_... (uma chave de envio)"
+          }
+        },
+        {
+          "title": "Antes da primeira mensagem: o domínio",
+          "body": [
+            "O endereço de From precisa estar em um domínio verificado para a equipe. Um domínio não verificado é recusado com 554 antes de qualquer coisa entrar na fila.",
+            "Uma chave restrita a um domínio só envia por esse domínio, também por SMTP.",
+            "O relay ainda não aceita anexos: uma mensagem com anexo é recusada com 554, o mesmo limite do POST /emails."
+          ]
+        },
+        {
+          "title": "Cole os valores: WordPress, Ghost, n8n",
+          "steps": [
+            "WordPress ou WooCommerce: instale um plugin de SMTP, escolha a opção de outro servidor SMTP, cole os cinco valores, marque STARTTLS como criptografia e envie um teste para o seu endereço.",
+            "Ghost, Strapi e Supabase Auth: os mesmos valores nas configurações de e-mail, com um From no domínio verificado.",
+            "n8n: o nó da comunidade do MepMail, n8n-nodes-mepmail, é o caminho principal para enviar; o relay existe para nós que só falam SMTP.",
+            "Qualquer outro sistema: preencha a seção de SMTP, não a de API, e comece com uma mensagem de teste para você mesmo."
+          ]
+        },
+        {
+          "title": "O que o relay confere, e os limites",
+          "steps": [
+            "Um endereço de From, um Subject não vazio e pelo menos um destinatário To que também seja destinatário do envelope.",
+            "Até 50 destinatários por mensagem e 10 conexões do mesmo IP ao mesmo tempo.",
+            "Mensagem de até 40 MB; acima disso é recusada.",
+            "Só quem está no envelope recebe a mensagem: To e Cc decidem quem aparece, e o resto vai em Bcc.",
+            "Três tentativas de login erradas na mesma conexão e ela é fechada com 421."
+          ]
+        },
+        {
+          "title": "Os códigos de erro que você vai ver",
+          "body": [
+            "553: falta um endereço de From único, um Subject não vazio, ou um To que também esteja no envelope.",
+            "535: o usuário não é mepmail, ou a senha não é uma chave válida.",
+            "554: o domínio do From não está verificado para a equipe, o remetente é disfarçado ou a mensagem tem anexo.",
+            "550: a equipe está suspensa, todos os destinatários estão suprimidos, ou a chave é restrita a outro domínio.",
+            "452: mais de 50 destinatários, ou uma cota de envio esgotada, incluindo o backlog estacionado.",
+            "552: a mensagem passou do limite de tamanho."
+          ]
+        },
+        {
+          "title": "Teste pelo terminal",
+          "body": [
+            "A biblioteca padrão do Python basta para conferir a credencial e o domínio antes de mexer na aplicação. Troque a chave e os dois endereços:"
+          ],
+          "code": {
+            "label": "send_test.py",
+            "content": "import smtplib\nfrom email.message import EmailMessage\n\nmsg = EmailMessage()\nmsg[\"From\"] = \"you@yourdomain.com\"\nmsg[\"To\"] = \"you@example.com\"\nmsg[\"Subject\"] = \"Teste do relay\"\nmsg.set_content(\"Funcionou.\")\n\nwith smtplib.SMTP(\"smtp.mepmail.dev\", 2587) as smtp:\n    smtp.starttls()\n    smtp.login(\"mepmail\", \"ms_...\")\n    smtp.send_message(msg)"
+          }
+        }
+      ],
+      "faq": [
+        {
+          "q": "Funciona na porta 587?",
+          "a": "Use 2587 com STARTTLS. É a porta em que o relay escuta, e STARTTLS é a criptografia que ele oferece."
+        },
+        {
+          "q": "Qual chave vira a senha?",
+          "a": "Uma chave de envio, a que começa com ms_. O usuário continua mepmail para todas as equipes e todas as chaves."
+        },
+        {
+          "q": "Como sei que funcionou?",
+          "a": "Um envio aceito responde com Queued as e o id na resposta SMTP, e a mensagem aparece em E-mails com os mesmos eventos de um envio pela API."
+        },
+        {
+          "q": "Anexos funcionam?",
+          "a": "Ainda não. O relay recusa mensagem com anexo (554), o mesmo limite do POST /emails; mande um link para o arquivo."
+        }
+      ],
+      "cta": {
+        "title": "Coloque a sua aplicação no relay",
+        "body": "Crie uma conta, verifique o domínio e gere uma chave de envio. Os mesmos valores estão em Configurações → SMTP.",
+        "button": "Criar conta grátis",
+        "docs": {
+          "label": "Documentação do relay SMTP",
+          "href": "https://docs.mepmail.dev/integrations#smtp-relay"
+        }
+      }
     }
   }
 }

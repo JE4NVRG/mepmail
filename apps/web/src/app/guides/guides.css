@@ -27,6 +27,33 @@
   color: var(--ms-violet);
   font-weight: 700;
 }
+.guide-code {
+  margin: 0 0 24px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 12px;
+  background: var(--ms-ground);
+  overflow: hidden;
+}
+.guide-code figcaption {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--ms-line);
+  color: var(--ms-muted, var(--ms-bone));
+  font-size: 13px;
+}
+.guide-code pre {
+  margin: 0;
+  padding: 16px;
+  overflow-x: auto;
+}
+.guide-code code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre;
+}
+.guide-docs {
+  margin-top: 16px;
+}
 .guide-related {
   list-style: none;
   margin: 0;

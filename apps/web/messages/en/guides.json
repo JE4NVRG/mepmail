@@ -217,6 +217,227 @@
         "body": "100 emails a day with no card, by API, SMTP or MCP.",
         "button": "Create free account"
       }
+    },
+    "ai-agent-email-mcp": {
+      "meta": {
+        "title": "How an AI agent sends and reads email over MCP",
+        "description": "Connect Claude, Cursor or another MCP client to MepMail: the hosted OAuth server or the npm package, the mail tools and the permissions."
+      },
+      "card": "The hosted OAuth server, the npm package, the mail tools an agent reads and answers with, and the permissions that keep sending under control.",
+      "eyebrow": "Guide · AI agents",
+      "title": "How an AI agent sends and reads email over MCP",
+      "lead": "An agent can write the message; sending it still needs a server that checks the sending domain, the quota and the suppressions. MepMail's MCP server gives the agent those tools, on the same pipeline as the REST API.",
+      "sections": [
+        {
+          "title": "Two ways to connect",
+          "body": [
+            "The hosted server at https://api.mepmail.dev/mcp speaks Streamable HTTP and signs in with OAuth, so no key is pasted into the client's config.",
+            "The npm package @mepmail/mcp speaks stdio and reaches your instance with a team key or a mailbox key, for clients that launch servers from a config file.",
+            "The names and the result shape are the same on both, so a prompt written for one works on the other; the hosted server also exposes the tools that manage domains, webhooks, templates and broadcasts."
+          ]
+        },
+        {
+          "title": "Option 1: the hosted server, with OAuth",
+          "steps": [
+            "In Claude Code, run the command below, then /mcp and pick mepmail to sign in. Add --scope user to make it available in every project.",
+            "In Cursor, add the URL to .cursor/mcp.json in the project, or to ~/.cursor/mcp.json for every project.",
+            "In VS Code, add it to .vscode/mcp.json with type http and the URL.",
+            "In Claude Desktop, add a custom connector under Settings → Connectors, or bridge to the HTTP endpoint with mcp-remote.",
+            "On the consent screen, pick the team the client may act on and untick the permissions you do not want to grant. Nothing is copied or pasted."
+          ],
+          "code": {
+            "label": "Claude Code",
+            "content": "claude mcp add --transport http mepmail https://api.mepmail.dev/mcp"
+          }
+        },
+        {
+          "title": "Option 2: the local package",
+          "body": [
+            "The package needs Node.js 20 or newer and runs with npx, with no OAuth and no browser step: the config block is the whole install.",
+            "Set MEPMAIL_API_KEY for the sending tools, a team key that starts with ms_, and MEPMAIL_MAIL_TOKEN for the mailbox tools, an agent key that starts with mmb_ for one mailbox or mmt_ for several. At least one of the two.",
+            "MEPMAIL_BASE_URL points at another instance; leave it out to talk to MepMail Cloud."
+          ],
+          "code": {
+            "label": "claude_desktop_config.json",
+            "content": "{\n  \"mcpServers\": {\n    \"mepmail\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"@mepmail/mcp\"],\n      \"env\": {\n        \"MEPMAIL_API_KEY\": \"ms_...\",\n        \"MEPMAIL_MAIL_TOKEN\": \"mmb_...\"\n      }\n    }\n  }\n}"
+          }
+        },
+        {
+          "title": "Reading and answering mail",
+          "steps": [
+            "mailbox_list_accounts lists the mailboxes the credential reaches, with their permissions.",
+            "mailbox_list_messages returns one page, newest first: pass the returned nextCursor as cursor until hasMore is false, and filter on the server with query, from, subject, unread, after and before. A short page never proves a message is absent.",
+            "mailbox_read_message returns headers, text, the revision and the attachment metadata.",
+            "mailbox_save_draft creates or edits a plain-text draft without sending, and mailbox_send_draft sends it.",
+            "Without the send permission, mailbox_send_draft emails you to approve the send, which waits in the dashboard.",
+            "On the hosted server, the same mailbox tools answer at https://api.mepmail.dev/mcp/correio with an agent key instead of OAuth."
+          ]
+        },
+        {
+          "title": "Sending transactional email",
+          "body": [
+            "send_email sends or schedules one message, send_email_batch takes up to 100 in one call, and update_email and cancel_email handle a scheduled one.",
+            "For a safe retry, pass an idempotency_key: keep the same key and the same arguments when retrying the same send, and use a new key for a new operation. Keys belong to the team and last 24 hours, and a completed retry replays the original result.",
+            "The sending domain has to be verified first: an unverified sender fails send_email exactly as it fails POST /emails.",
+            "list_emails and get_email show the status and the last event, delivered, bounced or complained."
+          ]
+        },
+        {
+          "title": "Permissions, and why the agent asks",
+          "body": [
+            "Each tool needs a scope, such as emails:send, mail:read or mail:draft. Tools whose permissions you untick are never granted, so the client does not see them.",
+            "Sending without asking is a separate tick: leave Direct sending off and every send emails you for approval, and ticking mailboxes never turns it on by itself.",
+            "Grants are listed under Settings → Connected apps, where you can revoke your own. Revocation lands at the client's next token refresh, within an hour, and a member removed from the team loses access at once.",
+            "Tool results arrive in an untrusted_data envelope: subjects, senders and bodies were written by third parties, and the agent is told to treat them as data, never as instructions.",
+            "MCP calls share the API's per-minute rate limit."
+          ]
+        },
+        {
+          "title": "Before you point an agent at a real inbox",
+          "steps": [
+            "Verify the sending domain, and read its records with get_domain before debugging anything else.",
+            "Create the mailbox and its agent key in Correio → Settings → Agents: mmb_ for one mailbox, mmt_ for several.",
+            "Start with read and drafts: the agent reads, prepares the reply and asks you before sending.",
+            "Check the grant under Settings → Connected apps, then send one message to your own address.",
+            "Keep the reach to the mailboxes you ticked: a team credential only reaches the ones mailbox_list_accounts returns."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Does the agent need my password?",
+          "a": "No. The hosted server uses OAuth: you sign in the browser and the client keeps a token you can revoke under Settings → Connected apps. The npm package uses an API key or a mailbox key."
+        },
+        {
+          "q": "Can it read every mailbox in the team?",
+          "a": "Only the ones you tick at consent, or the ones the agent key covers. The grant is bound to a single team, and the mail tools answer only for the mailboxes in it."
+        },
+        {
+          "q": "What if a send times out?",
+          "a": "For mail, call mailbox_send_draft again with the same id and revision: that returns the send's status and never sends twice. For transactional email, retry with the same idempotency_key."
+        },
+        {
+          "q": "Which clients work?",
+          "a": "Any MCP client. The docs give the config for Claude Code, Claude Desktop, Cursor and VS Code, and the package speaks stdio for everything else."
+        }
+      ],
+      "cta": {
+        "title": "Give your agent a mailbox, not a script",
+        "body": "Create an account, verify a domain and connect the MCP server in a few minutes.",
+        "button": "Create free account",
+        "docs": {
+          "label": "MCP server docs",
+          "href": "https://docs.mepmail.dev/mcp"
+        }
+      }
+    },
+    "smtp-relay-setup": {
+      "meta": {
+        "title": "How to send email through the MepMail SMTP relay",
+        "description": "Point WordPress, a CMS, n8n or your own app at the MepMail SMTP relay: host smtp.mepmail.dev, port 2587 with STARTTLS, user mepmail and a Send key."
+      },
+      "card": "The five values a plugin asks for, the limits of the relay, its error codes and a test from the terminal.",
+      "eyebrow": "Guide · Sending",
+      "title": "How to send email through the MepMail SMTP relay",
+      "lead": "Some systems only know how to send email through an SMTP form. The relay takes those messages, checks the domain and the suppressions, and queues them exactly like the API.",
+      "sections": [
+        {
+          "title": "When the relay is the right door",
+          "body": [
+            "WordPress and WooCommerce with an SMTP plugin, Ghost, Strapi, Supabase Auth, an ERP, a legacy stack: anything that asks for a host, a port, a user and a password instead of an HTTP call.",
+            "The relay puts the message through the same accept pipeline as POST /emails: the same domain verification, suppression checks, logs and delivery events."
+          ]
+        },
+        {
+          "title": "The five values",
+          "body": [
+            "Host: smtp.mepmail.dev.",
+            "Port: 2587, with STARTTLS. If the form has an encryption list, choose STARTTLS: the SSL option expects TLS from the first byte, which this port does not speak.",
+            "Username: mepmail, fixed for every team. Another name is refused before the key is checked.",
+            "Password: a key created under API keys, the one that starts with ms_, ideally one that can only send.",
+            "Encryption: STARTTLS before AUTH. Without a TLS keypair the relay does not start, unless the operator explicitly allows plaintext auth on a private network."
+          ],
+          "code": {
+            "label": "Settings → SMTP",
+            "content": "Host: smtp.mepmail.dev\nPort: 2587\nEncryption: STARTTLS\nUsername: mepmail\nPassword: ms_... (a Send key)"
+          }
+        },
+        {
+          "title": "Before the first message: the domain",
+          "body": [
+            "The From address has to be on a domain verified for the team. An unverified domain is refused with 554 before anything is queued.",
+            "A key restricted to one domain only sends from that domain, over SMTP as well.",
+            "The relay does not take attachments today: a message with one is refused with 554, the same boundary POST /emails has."
+          ]
+        },
+        {
+          "title": "Paste it in: WordPress, Ghost, n8n",
+          "steps": [
+            "WordPress or WooCommerce: install an SMTP plugin, choose the option for another SMTP server, paste the five values, set the encryption to STARTTLS and send a test to your own address.",
+            "Ghost, Strapi and Supabase Auth: the same values in the mail settings, with a From on the verified domain.",
+            "n8n: the MepMail community node, n8n-nodes-mepmail, is the first-class path for sending; the relay is there for nodes that only speak SMTP.",
+            "Any other system: fill the SMTP section, not the API section, and start with a test message to yourself."
+          ]
+        },
+        {
+          "title": "What the relay checks, and its limits",
+          "steps": [
+            "One From address, a non-empty Subject, and at least one To recipient that is also an envelope recipient.",
+            "Up to 50 recipients per message, and 10 connections from the same IP at once.",
+            "A message up to 40 MB; a larger one is refused.",
+            "Only envelope recipients receive the message: To and Cc decide who is visible, and the rest are Bcc.",
+            "Three failed logins on one connection close it with 421."
+          ]
+        },
+        {
+          "title": "The error codes you will see",
+          "body": [
+            "553: a single From address, a non-empty Subject, or a To that is also an envelope recipient is missing.",
+            "535: the username is not mepmail, or the password is not a valid key.",
+            "554: the From domain is not verified for the team, the sender is disguised, or the message carries an attachment.",
+            "550: the team is suspended, every recipient is suppressed, or the key is restricted to another domain.",
+            "452: more than 50 recipients, or a sending quota is exhausted, parked backlog included.",
+            "552: the message is over the size cap."
+          ]
+        },
+        {
+          "title": "Test from the terminal",
+          "body": [
+            "Python's standard library is enough to check the credentials and the domain before you touch the app. Replace the key and the two addresses:"
+          ],
+          "code": {
+            "label": "send_test.py",
+            "content": "import smtplib\nfrom email.message import EmailMessage\n\nmsg = EmailMessage()\nmsg[\"From\"] = \"you@yourdomain.com\"\nmsg[\"To\"] = \"you@example.com\"\nmsg[\"Subject\"] = \"Relay test\"\nmsg.set_content(\"It works.\")\n\nwith smtplib.SMTP(\"smtp.mepmail.dev\", 2587) as smtp:\n    smtp.starttls()\n    smtp.login(\"mepmail\", \"ms_...\")\n    smtp.send_message(msg)"
+          }
+        }
+      ],
+      "faq": [
+        {
+          "q": "Does it work on port 587?",
+          "a": "Use 2587 with STARTTLS. That is the port the relay listens on, and STARTTLS is the encryption it offers."
+        },
+        {
+          "q": "Which key becomes the password?",
+          "a": "A Send key, the one that starts with ms_. The username stays mepmail for every team and every key."
+        },
+        {
+          "q": "How do I know it worked?",
+          "a": "A successful send answers Queued as an id in the SMTP reply, and the message appears under Emails with the same events as an API send."
+        },
+        {
+          "q": "Do attachments work?",
+          "a": "Not yet. The relay refuses a message with an attachment (554), the same limit POST /emails has; send a link to the file instead."
+        }
+      ],
+      "cta": {
+        "title": "Put your app on the relay",
+        "body": "Create an account, verify the domain and create a Send key. The same values are in Settings → SMTP.",
+        "button": "Create free account",
+        "docs": {
+          "label": "SMTP relay docs",
+          "href": "https://docs.mepmail.dev/integrations#smtp-relay"
+        }
+      }
     }
   }
 }
