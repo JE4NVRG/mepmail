@@ -327,7 +327,7 @@
         "button": "Criar conta grátis",
         "docs": {
           "label": "Documentação do servidor MCP",
-          "href": "https://docs.mepmail.dev/mcp"
+          "href": "https://docs.mepmail.dev/pt-BR/mcp"
         }
       }
     },
@@ -435,7 +435,7 @@
         "button": "Criar conta grátis",
         "docs": {
           "label": "Documentação do relay SMTP",
-          "href": "https://docs.mepmail.dev/integrations#smtp-relay"
+          "href": "https://docs.mepmail.dev/pt-BR/integrations#relay-smtp"
         }
       }
     }
