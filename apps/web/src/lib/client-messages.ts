@@ -19,6 +19,7 @@ export const SERVER_ONLY_NAMESPACES = new Set([
   "security",
   "support",
   "status",
+  "public-metrics",
 ]);
 
 export const PUBLIC_CLIENT_NAMESPACES = ["common", "landing", "auth", "correio"] as const;

@@ -74,6 +74,9 @@ export default async function StatusPage() {
               <a className="ms-btn ms-btn-secondary gtm-action" href="/status">
                 {t("refresh")}
               </a>
+              <a className="ms-btn ms-btn-secondary gtm-action" href="/delivery">
+                {t("metrics")}
+              </a>
               <a className="ms-btn ms-btn-secondary gtm-action" href="/support">
                 {t("support")}
               </a>

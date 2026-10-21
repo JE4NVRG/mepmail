@@ -1,0 +1,39 @@
+{
+  "title": "Delivery metrics",
+  "description": "Delivery, bounce and complaint rates for mail sent through MepMail in the last 30 days. Rates only, updated hourly.",
+  "eyebrow": "Public metrics",
+  "lead": "What the platform measures about its own mail: delivery, bounce and complaint rates over a rolling 30-day window. Rates only, never absolute volume.",
+  "window": "Window: {since} to {until}, UTC.",
+  "computedAt": "Computed: {time} UTC.",
+  "rates": {
+    "delivery": "Delivery rate",
+    "deliveryNote": "Delivered, opened or clicked, out of every resolved email.",
+    "bounce": "Bounce rate",
+    "bounceNote": "Bounced, out of every resolved email.",
+    "complaint": "Complaint rate",
+    "complaintNote": "Marked as spam, out of every resolved email."
+  },
+  "insufficient": {
+    "title": "Not enough data in this window",
+    "body": "Too few emails resolved in the last 30 days for a rate to mean anything, so no rate is published."
+  },
+  "unavailable": {
+    "title": "Numbers unavailable right now",
+    "body": "The metrics could not be read at this moment. This page shows the numbers again once a read succeeds, and never an estimate."
+  },
+  "methodology": {
+    "eyebrow": "Method",
+    "title": "How these numbers are produced",
+    "points": [
+      "Last 30 days, rolling: every email created in the window counts, nothing older.",
+      "Rates only: this page never publishes absolute volume, per-customer or per-domain numbers.",
+      "Accounts suspended for abuse are excluded from every count.",
+      "Canceled and unsent emails are excluded: they were never attempted, so they are not delivery failures.",
+      "Resolved emails are the denominator: delivered, opened, clicked, bounced, complained and failed.",
+      "Updated hourly: one database read serves the page for an hour."
+    ],
+    "note": "HTTP availability is measured separately, on the service status page."
+  },
+  "statusLink": "Service status",
+  "support": "Contact support"
+}

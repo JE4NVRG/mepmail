@@ -34,6 +34,8 @@ export default function robots(): MetadataRoute.Robots {
         "/integrations",
         "/security",
         "/support",
+        // The public delivery rates, linked from /status.
+        "/delivery",
         "/changelog",
         "/login",
         "/signup",

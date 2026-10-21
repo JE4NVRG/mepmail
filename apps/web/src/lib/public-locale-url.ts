@@ -23,6 +23,7 @@ const PUBLIC_PATHS: ReadonlySet<string> = new Set([
   "/security",
   "/support",
   "/status",
+  "/delivery",
   "/changelog",
   "/guides",
   ...GUIDE_SLUGS.map(guidePath),

@@ -1,0 +1,39 @@
+{
+  "title": "Métricas de entrega",
+  "description": "Taxas de entrega, rejeição e reclamação dos e-mails enviados pelo MepMail nos últimos 30 dias. Apenas taxas, atualizadas a cada hora.",
+  "eyebrow": "Métricas públicas",
+  "lead": "O que a plataforma mede sobre os próprios e-mails: taxas de entrega, rejeição e reclamação em uma janela móvel de 30 dias. Apenas taxas, nunca volume absoluto.",
+  "window": "Janela: {since} a {until}, UTC.",
+  "computedAt": "Calculado em: {time} UTC.",
+  "rates": {
+    "delivery": "Taxa de entrega",
+    "deliveryNote": "Entregues, abertos ou clicados, sobre todos os e-mails resolvidos.",
+    "bounce": "Taxa de rejeição",
+    "bounceNote": "Rejeitados, sobre todos os e-mails resolvidos.",
+    "complaint": "Taxa de reclamação",
+    "complaintNote": "Marcados como spam, sobre todos os e-mails resolvidos."
+  },
+  "insufficient": {
+    "title": "Dados insuficientes nesta janela",
+    "body": "Poucos e-mails foram resolvidos nos últimos 30 dias para que uma taxa signifique algo, então nenhuma taxa é publicada."
+  },
+  "unavailable": {
+    "title": "Números indisponíveis agora",
+    "body": "As métricas não puderam ser lidas neste momento. A página volta a mostrar os números quando a leitura funcionar, e nunca uma estimativa."
+  },
+  "methodology": {
+    "eyebrow": "Método",
+    "title": "Como estes números são produzidos",
+    "points": [
+      "Últimos 30 dias, móveis: conta todo e-mail criado na janela, nada mais antigo.",
+      "Apenas taxas: a página nunca publica volume absoluto, números por cliente ou por domínio.",
+      "Contas suspensas por abuso ficam fora de todas as contagens.",
+      "E-mails cancelados e não enviados ficam fora: nunca foram tentados, então não são falhas de entrega.",
+      "O denominador são os e-mails resolvidos: entregues, abertos, clicados, rejeitados, reclamados e falhos.",
+      "Atualizadas a cada hora: uma leitura do banco serve a página por uma hora."
+    ],
+    "note": "A disponibilidade HTTP é medida separadamente, na página de status do serviço."
+  },
+  "statusLink": "Status do serviço",
+  "support": "Falar com o suporte"
+}

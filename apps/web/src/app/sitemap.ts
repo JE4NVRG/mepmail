@@ -32,6 +32,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/integrations`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/security`, changeFrequency: "yearly", priority: 0.7 },
     { url: `${base}/support`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/delivery`, changeFrequency: "daily", priority: 0.5 },
     { url: `${base}/changelog`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${base}/guides`, changeFrequency: "monthly", priority: 0.6 },
     ...GUIDE_SLUGS.map((slug) => ({

@@ -16,6 +16,7 @@
   "scope": "Checks run when this page is requested, at most once a minute. They measure HTTP availability, not email delivery or an uptime SLA.",
   "refresh": "Check again",
   "support": "Contact support",
+  "metrics": "Delivery metrics",
   "historyEyebrow": "Published updates",
   "historyTitle": "Incident history",
   "historyEmpty": "No incidents have been published in this history. This is not a record of earlier uptime.",

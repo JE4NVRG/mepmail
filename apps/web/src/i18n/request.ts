@@ -30,6 +30,7 @@ const NAMESPACES = [
   "security",
   "support",
   "status",
+  "public-metrics",
   "legal",
   "nav",
   "pricing",

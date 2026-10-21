@@ -27,6 +27,7 @@ export type PublicPage =
   | "security"
   | "support"
   | "status"
+  | "metrics"
   | "changelog"
   | "download"
   | "guides";

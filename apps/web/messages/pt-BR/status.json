@@ -16,6 +16,7 @@
   "scope": "As verificações acontecem ao abrir esta página, no máximo uma vez por minuto. Medem disponibilidade HTTP, sem medir a entrega dos e-mails nem estabelecer um SLA.",
   "refresh": "Verificar novamente",
   "support": "Falar com o suporte",
+  "metrics": "Métricas de entrega",
   "historyEyebrow": "Atualizações publicadas",
   "historyTitle": "Histórico de incidentes",
   "historyEmpty": "Nenhum incidente foi publicado neste histórico. Ele não registra a disponibilidade anterior do serviço.",
