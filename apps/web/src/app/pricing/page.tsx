@@ -169,7 +169,7 @@ export default async function PricingPage({
   const sendEntry = allPlans.slice(0, 3);
   const planBoard = standaloneOpen ? (
     <div className="v2p-board">
-      <section className="v2p-panel v2p-panel-mail" aria-labelledby="pricing-board-mail">
+      <div className="v2p-panel v2p-panel-mail">
         <h2 id="pricing-board-mail" className="v2p-panel-title">
           {t("board.mail")}
           <small>{t("board.mailUnit")}</small>
@@ -195,8 +195,8 @@ export default async function PricingPage({
           ))}
         </ul>
         <p className="v2-fine">{t("board.mailNote")}</p>
-      </section>
-      <section className="v2p-panel v2p-panel-send" aria-labelledby="pricing-board-send">
+      </div>
+      <div className="v2p-panel v2p-panel-send">
         <h2 id="pricing-board-send" className="v2p-panel-title">
           {t("board.send")}
           <small>{t("board.sendUnit")}</small>
@@ -220,7 +220,7 @@ export default async function PricingPage({
             ? t("board.sendLaunch", { first: sendFirstPrice, price: sendPrice })
             : t("board.sendNote")}
         </p>
-      </section>
+      </div>
     </div>
   ) : (
     quickPrices
