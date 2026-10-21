@@ -98,7 +98,7 @@
         ]
       }
     ],
-    "contact": "Dúvidas sobre estes termos: jean@mepmail.dev"
+    "contact": "Dúvidas sobre estes termos: suporte@mepmail.dev"
   },
   "privacy": {
     "title": "Política de Privacidade",
@@ -215,7 +215,7 @@
       {
         "title": "11. Seus direitos",
         "body": [
-          "Conforme onde você mora, você pode pedir acesso, correção, portabilidade, restrição ou exclusão dos seus dados pessoais, e se opor ao tratamento. Você pode excluir a sua conta direto pelo painel e falar conosco em jean@mepmail.dev para qualquer pedido de privacidade. Respondemos em até 30 dias."
+          "Conforme onde você mora, você pode pedir acesso, correção, portabilidade, restrição ou exclusão dos seus dados pessoais, e se opor ao tratamento. Você pode excluir a sua conta direto pelo painel e falar conosco em suporte@mepmail.dev para qualquer pedido de privacidade. Respondemos em até 30 dias."
         ]
       },
       {
@@ -237,7 +237,7 @@
         ]
       }
     ],
-    "contact": "Pedidos e dúvidas de privacidade: jean@mepmail.dev"
+    "contact": "Pedidos e dúvidas de privacidade: suporte@mepmail.dev"
   },
   "refund": {
     "title": "Política de Reembolso",
@@ -284,7 +284,7 @@
       {
         "title": "7. Como pedir reembolso",
         "body": [
-          "Envie um e-mail para jean@mepmail.dev a partir do endereço da conta (ou informe o e-mail da conta) com a referência da cobrança. Os reembolsos são processados pelo Stripe, de volta ao meio de pagamento original (um pagamento por Pix volta por Pix para a conta que pagou), normalmente em 5 a 10 dias úteis, dependendo do seu banco."
+          "Envie um e-mail para suporte@mepmail.dev a partir do endereço da conta (ou informe o e-mail da conta) com a referência da cobrança. Os reembolsos são processados pelo Stripe, de volta ao meio de pagamento original (um pagamento por Pix volta por Pix para a conta que pagou), normalmente em 5 a 10 dias úteis, dependendo do seu banco."
         ]
       },
       {
@@ -300,6 +300,6 @@
         ]
       }
     ],
-    "contact": "Pedidos e dúvidas de reembolso: jean@mepmail.dev"
+    "contact": "Pedidos e dúvidas de reembolso: suporte@mepmail.dev"
   }
 }

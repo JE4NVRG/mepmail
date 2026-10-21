@@ -98,7 +98,7 @@
         ]
       }
     ],
-    "contact": "Questions about these terms: jean@mepmail.dev"
+    "contact": "Questions about these terms: suporte@mepmail.dev"
   },
   "privacy": {
     "title": "Privacy Policy",
@@ -215,7 +215,7 @@
       {
         "title": "11. Your rights",
         "body": [
-          "Depending on where you live, you can ask to access, correct, port, restrict or delete your personal data, and object to processing. You can delete your account directly in the dashboard and reach us at jean@mepmail.dev for any privacy request. We answer within 30 days."
+          "Depending on where you live, you can ask to access, correct, port, restrict or delete your personal data, and object to processing. You can delete your account directly in the dashboard and reach us at suporte@mepmail.dev for any privacy request. We answer within 30 days."
         ]
       },
       {
@@ -237,7 +237,7 @@
         ]
       }
     ],
-    "contact": "Privacy requests and questions: jean@mepmail.dev"
+    "contact": "Privacy requests and questions: suporte@mepmail.dev"
   },
   "refund": {
     "title": "Refund Policy",
@@ -284,7 +284,7 @@
       {
         "title": "7. How to request a refund",
         "body": [
-          "Email jean@mepmail.dev from your account address (or tell us the account email) with the charge reference. Refunds are processed through Stripe back to the original payment method (a Pix payment goes back by Pix to the account that paid it), typically within 5–10 business days depending on your bank."
+          "Email suporte@mepmail.dev from your account address (or tell us the account email) with the charge reference. Refunds are processed through Stripe back to the original payment method (a Pix payment goes back by Pix to the account that paid it), typically within 5–10 business days depending on your bank."
         ]
       },
       {
@@ -300,6 +300,6 @@
         ]
       }
     ],
-    "contact": "Refund requests and questions: jean@mepmail.dev"
+    "contact": "Refund requests and questions: suporte@mepmail.dev"
   }
 }

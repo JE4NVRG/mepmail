@@ -12,8 +12,8 @@ import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
 import "../site-v2.css";
 
-const contact = "mailto:jean@mepmail.dev";
-const disclosureContact = "mailto:jean@mepmail.dev";
+const contact = "mailto:suporte@mepmail.dev";
+const disclosureContact = "mailto:suporte@mepmail.dev";
 const canonical = "/security";
 
 type Card = { kind: string; name: string; body: string; bullets: string[] };
