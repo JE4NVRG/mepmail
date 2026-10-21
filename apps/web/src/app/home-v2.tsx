@@ -15,6 +15,7 @@ import { WINDOWS_STORE_URL } from "@/lib/desktop-download";
 import { MCP_DOCS_URL } from "@/lib/docs-links";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
 import {
+  AGENTMAIL_DEVELOPER,
   COMPARISON_FX,
   comparisonRowsForLocale,
   formatBrlPrice,
@@ -123,6 +124,11 @@ export async function HomeV2() {
   const proofRow = comparisonRowsForLocale(launchOfferEnabled, locale).find(
     (row) => row.volume === PROOF_VOLUME,
   );
+  // AgentMail's Developer tier against Equipe; in reais at the comparison rate, whole units.
+  const agentMailPrice = formatWholeComparisonPrice(
+    brazil ? AGENTMAIL_DEVELOPER.usd * COMPARISON_FX.brlPerUsd : AGENTMAIL_DEVELOPER.usd,
+    locale,
+  );
   const freeVolume = new Intl.NumberFormat(locale).format(free.included);
   const correioTiles = t.raw("correio.tiles") as Tile[];
   const checks = t.raw("envio.checks") as CheckItem[];
@@ -138,41 +144,119 @@ export async function HomeV2() {
       <ArrivalTracker />
       <PublicHeader labels={site} page="landing" />
       <main id="conteudo">
-        {/* Two doors, two personalities. */}
+        {/* The inbox where the agent works (direction B, Jean 2026-10-20): one headline,
+            the product on the right, the price against AgentMail on the first screen. */}
+        <section className="v2-light v2b-hero" aria-labelledby="home-hero-title">
+          <div className="v2-wrap v2b-hero-grid">
+            <div className="v2b-hero-copy">
+              <p className="v2-eyebrow v2b-rise">
+                <i className="v2b-pulse" aria-hidden="true" />
+                {t("correio.eyebrow")}
+              </p>
+              <h1 id="home-hero-title" className="v2-display v2b-title v2b-rise">
+                {headline(t("correio.title"))}
+              </h1>
+              <p className="v2b-compare v2b-rise">
+                {t.rich("correio.compare", { ours: equipe.price, theirs: agentMailPrice, b })}
+              </p>
+              <p className="v2-lead v2b-rise">{t("correio.lead")}</p>
+              <div className="v2-actions v2b-rise">
+                <SignupLink label={l("domainHero.cta")} className="v2-btn v2-btn-violet" />
+                <a className="v2-btn v2-btn-line" href="/pricing#correio">
+                  {t("correio.priceLink")}
+                </a>
+              </div>
+              <p className="v2-note v2b-rise">{t.rich("correio.note", { price: mailFrom, b })}</p>
+            </div>
+            <figure className="v2b-mock v2b-rise" aria-label={t("correio.mockAria")}>
+              <div className="v2b-window" aria-hidden="true">
+                <p className="v2b-window-bar">
+                  <span className="v2b-dots">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  <span>{mail("demo.inbox")}</span>
+                  <span className="v2b-badge">MCP</span>
+                </p>
+                <ul className="v2b-list">
+                  <li className="v2b-msg v2b-msg-new">
+                    <span className="v2b-av">{mail("demo.initials")}</span>
+                    <span className="v2b-msg-text">
+                      <strong>
+                        {mail("demo.sender")} <em>{mail("demo.isNew")}</em>
+                      </strong>
+                      <span>
+                        {mail("demo.subject")} · {mail("demo.preview")}
+                      </span>
+                    </span>
+                    <span className="v2b-time">09:41</span>
+                  </li>
+                  <li className="v2b-msg">
+                    <span className="v2b-av">
+                      {mail("demo.otherSender").slice(0, 2).toUpperCase()}
+                    </span>
+                    <span className="v2b-msg-text">
+                      <strong>{mail("demo.otherSender")}</strong>
+                      <span>{mail("demo.otherSubject")}</span>
+                    </span>
+                    <span className="v2b-time">08:12</span>
+                  </li>
+                </ul>
+                <p className="v2b-typing">
+                  <span className="v2b-bounce">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  {mail("demo.agent")} · {mail("demo.read")}
+                </p>
+                <div className="v2b-draft">
+                  <p className="v2b-draft-head">
+                    <i className="v2b-pulse" />
+                    {mail("demo.awaiting")}
+                  </p>
+                  <p className="v2b-draft-body">{mail("demo.reply")}</p>
+                  <p className="v2b-draft-actions">
+                    <span className="v2b-approve">{mail("demo.approve")}</span>
+                    <span className="v2b-scope">mail:read · mail:draft</span>
+                  </p>
+                </div>
+              </div>
+              <figcaption className="v2-fine">{mail("demo.foot")}</figcaption>
+            </figure>
+          </div>
+          <p className="v2-wrap v2-fine v2b-compare-note">
+            {t("correio.compareNote", {
+              usd: AGENTMAIL_DEVELOPER.usd,
+              date: new Date(`${AGENTMAIL_DEVELOPER.checked}T12:00:00Z`).toLocaleDateString(
+                locale,
+                {
+                  timeZone: "UTC",
+                },
+              ),
+              rate: COMPARISON_FX.brlPerUsd.toLocaleString(locale),
+            })}
+          </p>
+        </section>
+
+        {/* Two doors, two personalities: Correio in bone, Envio in black. */}
         <section className="v2-split" aria-label={t("doorsAria")}>
           <div className="v2-door v2-light">
-            <p className="v2-eyebrow">{t("correio.eyebrow")}</p>
-            <h1 className="v2-display">{headline(t("correio.title"))}</h1>
-            <p className="v2-lead">{t("correio.lead")}</p>
+            <p className="v2-eyebrow">{t("correio.blockEyebrow")}</p>
+            <h2 className="v2-display v2b-door-title">{headline(t("correio.doorTitle"))}</h2>
+            <p className="v2-lead">{t("correio.doorBody")}</p>
+            <ul className="v2-actions">
+              <li className="v2-pill v2-pill-ok">✓ {t("correio.permissions.read")}</li>
+              <li className="v2-pill v2-pill-ok">✓ {t("correio.permissions.draft")}</li>
+              <li className="v2-pill v2-pill-wait">{t("correio.permissions.send")}</li>
+            </ul>
             <div className="v2-actions">
               <SignupLink label={l("domainHero.cta")} className="v2-btn v2-btn-ink" />
               <a className="v2-link" href="#correio">
                 {t("correio.more")}
               </a>
             </div>
-            <p className="v2-note">{t.rich("correio.note", { price: mailFrom, b })}</p>
-            <figure>
-              <div className="v2-approval">
-                <p className="v2-approval-from">
-                  <span className="v2-avatar" aria-hidden="true">
-                    AS
-                  </span>
-                  <span>{t.rich("correio.approvalFrom", { sender: mail("demo.sender"), b })}</span>
-                </p>
-                <p>{mail("demo.preview")}</p>
-                <div className="v2-approval-draft">
-                  <small>{mail("demo.agent")}</small>
-                  <p>{mail("demo.reply")}</p>
-                </div>
-                <div className="v2-approval-row">
-                  <span className="v2-pill v2-pill-wait">{mail("demo.awaiting")}</span>
-                  <span className="v2-fake-button" aria-hidden="true">
-                    {mail("demo.approve")}
-                  </span>
-                </div>
-              </div>
-              <figcaption className="v2-fine v2-gap-sm">{mail("demo.foot")}</figcaption>
-            </figure>
             <p>
               <a className="v2-link-accent" href="/signup?next=/mail">
                 {t("correio.noDomain")} <span aria-hidden="true">→</span>
@@ -182,7 +266,7 @@ export async function HomeV2() {
 
           <div className="v2-door v2-door-dark v2-dark">
             <p className="v2-eyebrow v2-eyebrow-mono">{t("envio.eyebrow")}</p>
-            <h2 className="v2-display-sans">{t("envio.title")}</h2>
+            <h2 className="v2-display-sans v2b-door-title">{t("envio.title")}</h2>
             <p className="v2-lead">{t("envio.lead")}</p>
             <div className="v2-actions">
               <SignupLink label={t("envio.cta")} className="v2-btn v2-btn-bone" />

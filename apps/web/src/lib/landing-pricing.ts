@@ -68,6 +68,19 @@ export function resendQuote(volume: number): ResendQuote {
   return best;
 }
 
+/**
+ * AgentMail's Developer tier as agentmail.to/pricing lists it, checked on 2026-10-20: the
+ * reference the home quotes against Correio Equipe (10 mailboxes, 10,000 recipients and
+ * 10 domains for US$ 12.90). Recheck the page before changing either side.
+ */
+export const AGENTMAIL_DEVELOPER = {
+  usd: 20,
+  inboxes: 10,
+  emails: 10_000,
+  domains: 10,
+  checked: "2026-10-20",
+} as const;
+
 export interface PriceRow {
   /** Emails per month this row refers to: a MepMail rung (plans.ts PLAN_RUNGS). */
   volume: number;

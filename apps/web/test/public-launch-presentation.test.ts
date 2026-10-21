@@ -181,6 +181,11 @@ for (const locale of ["en", "pt-BR"] as const) {
       // Portuguese readers get Brazil's price list: the Correio from R$ 14,90.
       expect(home).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
       expect(home).toContain(messages(locale).correio.demo.awaiting);
+      // The first screen prices Equipe against AgentMail's dated Developer tier.
+      const hero = home.slice(0, home.indexOf('aria-label="' + home2.doorsAria + '"'));
+      expect(hero).toContain("AgentMail");
+      expect(hero).toContain(locale === "en" ? "US$ 12.90" : "R$ 64,90");
+      expect(hero).toContain(locale === "en" ? "US$ 20" : "R$ 101");
       // The counts come from the code they describe, never typed into the copy.
       const { CHECKS } = await import("../../../packages/core/src/email-insights");
       const { MCP_TOOLS } = await import("../../../packages/core/src/mcp-tools");
