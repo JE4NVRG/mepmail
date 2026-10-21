@@ -1596,9 +1596,7 @@
 }
 .v2b-compare strong {
   color: var(--v2-ink);
-  font-family: var(--v2-mono);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 700;
 }
 .v2 main .v2-btn-violet {
   background: var(--v2-violet);
@@ -1635,7 +1633,7 @@
     0 1px 2px rgba(24, 20, 12, 0.06),
     0 24px 48px -28px rgba(24, 20, 12, 0.4);
   color: var(--v2-ink);
-  padding-bottom: 150px;
+  padding-bottom: 112px;
 }
 .v2 main .v2b-window-bar {
   display: flex;

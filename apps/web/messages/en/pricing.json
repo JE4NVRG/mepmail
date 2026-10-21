@@ -40,7 +40,7 @@
       },
       {
         "q": "Can I use Mail and Send together?",
-        "a": "Yes, in the same account and on the same verified domain. Mail handles mailboxes for people and agents; Send handles your app's email by API or SMTP. Each has its own credential and limit, and you pay the sum of the plans you pick, with no required bundle. With Mail active, Send Free accepts up to 3 domains."
+        "a": "Yes, in the same account and on the same verified domain. Mail handles mailboxes for people and agents; Send handles your app's email by API or SMTP. Each has its own credential and limit, and you pay the sum of the plans you pick, with no required bundle. With Mail active, Send Free accepts up to 3 domains (10 with Equipe)."
       },
       {
         "q": "How is usage counted?",
@@ -97,7 +97,7 @@
     },
     {
       "q": "Can I use Mail and Send together?",
-      "a": "Yes, in the same account and on the same verified domain. Mail handles mailboxes for people and agents; Send handles your app's email by API or SMTP. Each has its own credential and limit, and you pay the sum of the plans you pick, with no required bundle. With Mail active, Send Free accepts up to 3 domains."
+      "a": "Yes, in the same account and on the same verified domain. Mail handles mailboxes for people and agents; Send handles your app's email by API or SMTP. Each has its own credential and limit, and you pay the sum of the plans you pick, with no required bundle. With Mail active, Send Free accepts up to 3 domains (10 with Equipe)."
     },
     {
       "q": "How is usage counted?",

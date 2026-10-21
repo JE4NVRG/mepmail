@@ -142,7 +142,7 @@
     "solo": {
       "label": "Planos do Correio",
       "title": "Solo, Duo ou Equipe",
-      "body": "Solo: 1 caixa por R$ 14,90 por mês. Duo: 3 caixas por R$ 29,90. Equipe: 10 caixas por R$ 64,90. No cartão ou no Pix. Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios e sem precisar de plano de Envio. No cartão, comece com 7 dias grátis; no Pix, você paga mês a mês.",
+      "body": "Solo: 1 caixa por R$ 14,90 por mês. Duo: 3 caixas por R$ 29,90. Equipe: 10 caixas por R$ 64,90. No cartão ou no Pix. Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios (10 no Equipe) e sem precisar de plano de Envio. No cartão, comece com 7 dias grátis; no Pix, você paga mês a mês.",
       "cta": "Assinar o Correio"
     },
     "windows": "Instalar o app para Windows pela Microsoft Store",
@@ -225,7 +225,7 @@
     "items": [
       {
         "q": "Preciso de um plano de Envio para usar o Correio?",
-        "a": "Não. Os planos do Correio funcionam sozinhos: Solo R$ 14,90 por mês com 1 caixa, Duo R$ 29,90 com 3 ou Equipe R$ 64,90 com 10 (fora do Brasil, US$ 2,90, US$ 5,90 e US$ 12,90). No cartão, 7 dias grátis (a cobrança começa no fim do teste, a menos que você cancele antes); no Pix, você paga mês a mês. Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios. Assinaturas existentes mantêm as condições, sem migração automática."
+        "a": "Não. Os planos do Correio funcionam sozinhos: Solo R$ 14,90 por mês com 1 caixa, Duo R$ 29,90 com 3 ou Equipe R$ 64,90 com 10 (fora do Brasil, US$ 2,90, US$ 5,90 e US$ 12,90). No cartão, 7 dias grátis (a cobrança começa no fim do teste, a menos que você cancele antes); no Pix, você paga mês a mês. Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios (10 no Equipe). Assinaturas existentes mantêm as condições, sem migração automática."
       },
       {
         "q": "Comprei um domínio. Já posso criar qualquer endereço?",
@@ -269,7 +269,7 @@
     "heroStatus": "Aberto a todos, com ou sem plano de Envio",
     "heroSecondary": "Ver planos e preços",
     "setupFirstTitle": "Escolha como assinar",
-    "setupFirst": "Escolha Solo (1 caixa, R$ 14,90 por mês), Duo (3, R$ 29,90) ou Equipe (10, R$ 64,90), no cartão ou no Pix. As caixas dividem armazenamento, envios e mensagens recebidas do plano, com até 3 domínios. Não é preciso ter Envio, e os contratos existentes são preservados.",
+    "setupFirst": "Escolha Solo (1 caixa, R$ 14,90 por mês), Duo (3, R$ 29,90) ou Equipe (10, R$ 64,90), no cartão ou no Pix. As caixas dividem armazenamento, envios e mensagens recebidas do plano, com até 3 domínios (10 no Equipe). Não é preciso ter Envio, e os contratos existentes são preservados.",
     "restStatus": "Disponível para caixas ativadas",
     "plansBody": "Envio cuida dos e-mails da aplicação e das campanhas. Correio dá caixas com entrada e saída para pessoas e agentes em três planos, com ou sem plano de Envio.",
     "mailNote": "Contrate pelo painel. Cada caixa ainda precisa de domínio verificado, DNS/MX e ativação do recebimento.",

@@ -226,18 +226,20 @@ export async function HomeV2() {
               <figcaption className="v2-fine">{mail("demo.foot")}</figcaption>
             </figure>
           </div>
-          <p className="v2-wrap v2-fine v2b-compare-note">
-            {t("correio.compareNote", {
-              usd: AGENTMAIL_DEVELOPER.usd,
-              date: new Date(`${AGENTMAIL_DEVELOPER.checked}T12:00:00Z`).toLocaleDateString(
-                locale,
-                {
-                  timeZone: "UTC",
-                },
-              ),
-              rate: COMPARISON_FX.brlPerUsd.toLocaleString(locale),
-            })}
-          </p>
+          <div className="v2-wrap">
+            <p className="v2-fine v2b-compare-note">
+              {t("correio.compareNote", {
+                usd: AGENTMAIL_DEVELOPER.usd,
+                date: new Date(`${AGENTMAIL_DEVELOPER.checked}T12:00:00Z`).toLocaleDateString(
+                  locale,
+                  {
+                    timeZone: "UTC",
+                  },
+                ),
+                rate: COMPARISON_FX.brlPerUsd.toLocaleString(locale),
+              })}
+            </p>
+          </div>
         </section>
 
         {/* Two doors, two personalities: Correio in bone, Envio in black. */}

@@ -142,7 +142,7 @@
     "solo": {
       "label": "Mail plans",
       "title": "Solo, Duo or Equipe",
-      "body": "Solo: 1 mailbox for US$ 2.90 a month. Duo: 3 mailboxes for US$ 5.90. Equipe: 10 mailboxes for US$ 12.90. Each plan's storage, sends and received messages are shared by its mailboxes, with up to 3 domains and no Send plan needed. Start with 7 days free; the card is required.",
+      "body": "Solo: 1 mailbox for US$ 2.90 a month. Duo: 3 mailboxes for US$ 5.90. Equipe: 10 mailboxes for US$ 12.90. Each plan's storage, sends and received messages are shared by its mailboxes, with up to 3 domains (10 on Equipe) and no Send plan needed. Start with 7 days free; the card is required.",
       "cta": "Subscribe to Mail"
     },
     "windows": "Get the Windows app on the Microsoft Store",
@@ -225,7 +225,7 @@
     "items": [
       {
         "q": "Do I need a Send plan to use Mail?",
-        "a": "No. Mail plans work on their own: Solo US$ 2.90 a month with 1 mailbox, Duo US$ 5.90 with 3 or Equipe US$ 12.90 with 10, with 7 days free with a card (billing starts when the trial ends unless you cancel before). Each plan's storage, sends and received messages are shared by its mailboxes, with up to 3 domains. Existing subscriptions keep their terms without automatic migration."
+        "a": "No. Mail plans work on their own: Solo US$ 2.90 a month with 1 mailbox, Duo US$ 5.90 with 3 or Equipe US$ 12.90 with 10, with 7 days free with a card (billing starts when the trial ends unless you cancel before). Each plan's storage, sends and received messages are shared by its mailboxes, with up to 3 domains (10 on Equipe). Existing subscriptions keep their terms without automatic migration."
       },
       {
         "q": "I bought a domain. Can I create any address now?",
@@ -269,7 +269,7 @@
     "heroStatus": "Open to everyone, with or without a Send plan",
     "heroSecondary": "See plans and prices",
     "setupFirstTitle": "Choose how to subscribe",
-    "setupFirst": "Choose Solo (1 mailbox, US$ 2.90 a month), Duo (3, US$ 5.90) or Equipe (10, US$ 12.90); in Brazil, R$ 14.90, R$ 29.90 or R$ 64.90. The mailboxes share the plan's storage, sends and received messages, with up to 3 domains. Send is not needed, and existing contracts are preserved.",
+    "setupFirst": "Choose Solo (1 mailbox, US$ 2.90 a month), Duo (3, US$ 5.90) or Equipe (10, US$ 12.90); in Brazil, R$ 14.90, R$ 29.90 or R$ 64.90. The mailboxes share the plan's storage, sends and received messages, with up to 3 domains (10 on Equipe). Send is not needed, and existing contracts are preserved.",
     "restStatus": "Available for activated mailboxes",
     "plansBody": "Send handles application emails and campaigns. Mail gives people and agents inboxes and outboxes in three plans, with or without a Send plan.",
     "mailNote": "Subscribe from the dashboard. Each mailbox still needs a verified domain, DNS/MX and receiving activation.",
