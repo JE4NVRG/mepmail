@@ -168,7 +168,7 @@ export default async function PricingPage({
   // plans and Send's first three rungs, each with its price, its allowance and its section.
   const sendEntry = allPlans.slice(0, 3);
   const planBoard = standaloneOpen ? (
-    <div className="v2p-board" aria-label={t("board.aria")}>
+    <div className="v2p-board">
       <section className="v2p-panel v2p-panel-mail" aria-labelledby="pricing-board-mail">
         <h2 id="pricing-board-mail" className="v2p-panel-title">
           {t("board.mail")}

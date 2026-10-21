@@ -320,8 +320,10 @@ export async function HomeV2() {
             <div className="v2-domain">
               <ul className="v2-domain-side">
                 <li className="v2-eyebrow">{t("domain.correio")}</li>
-                <li className="v2-domain-box v2-domain-box-light">voce@</li>
-                <li className="v2-domain-box v2-domain-box-light">vendas@</li>
+                <li className="v2-domain-box v2-domain-box-light">{brazil ? "voce@" : "you@"}</li>
+                <li className="v2-domain-box v2-domain-box-light">
+                  {brazil ? "vendas@" : "sales@"}
+                </li>
                 <li className="v2-domain-box v2-domain-box-agent">{t("domain.agentBox")}</li>
               </ul>
               <span className="v2-domain-wire" aria-hidden="true" />

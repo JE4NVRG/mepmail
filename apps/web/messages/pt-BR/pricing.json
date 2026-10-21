@@ -194,7 +194,6 @@
     "free": "· 100 e-mails/dia"
   },
   "board": {
-    "aria": "Planos de entrada do Correio e do Envio",
     "mail": "Correio",
     "mailUnit": "por plano de caixas",
     "mailAllowance": "{sends} envios, {domains} domínios",

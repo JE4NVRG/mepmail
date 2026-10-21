@@ -194,7 +194,6 @@
     "free": "· 100 emails/day"
   },
   "board": {
-    "aria": "Entry plans of Mail and Send",
     "mail": "Mail",
     "mailUnit": "per plan of mailboxes",
     "mailAllowance": "{sends} sends, {domains} domains",

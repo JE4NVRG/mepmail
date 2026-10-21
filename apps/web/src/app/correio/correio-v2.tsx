@@ -105,7 +105,7 @@ export async function CorreioV2() {
               <div className="v2-inbox">
                 <p className="v2-inbox-bar">
                   <span className="v2-dot" aria-hidden="true" />
-                  <span>suporte@suaempresa.com.br</span>
+                  <span>{brazil ? "suporte@suaempresa.com.br" : "support@yourcompany.com"}</span>
                   <span>{t("inbox.count")}</span>
                 </p>
                 <div className="v2-inbox-body">
