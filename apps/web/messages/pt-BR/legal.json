@@ -309,9 +309,7 @@
     "sections": [
       {
         "title": "1. Pelo painel, na hora",
-        "body": [
-          "A exclusão é feita por você mesmo, no site ou no app, e vale na hora."
-        ],
+        "body": ["A exclusão é feita por você mesmo, no site ou no app, e vale na hora."],
         "list": [
           "Entre na sua conta em mepmail.dev ou no app MepMail.",
           "Abra Configurações (mepmail.dev/settings) e role até Zona de perigo.",

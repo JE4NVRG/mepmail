@@ -340,9 +340,7 @@
           "Limited delivery logs, when needed for security and abuse prevention, for the period described in the Privacy Policy.",
           "Aggregate statistics that identify no one."
         ],
-        "body": [
-          "The details of each period are in the Privacy Policy at mepmail.dev/privacy."
-        ]
+        "body": ["The details of each period are in the Privacy Policy at mepmail.dev/privacy."]
       }
     ],
     "contact": "Questions about deletion and privacy: suporte@mepmail.dev"
