@@ -164,6 +164,68 @@ export default async function PricingPage({
     </nav>
   );
 
+  // The entry plans of both products on the first screen (redesign 2026-10-20): Mail's three
+  // plans and Send's first three rungs, each with its price, its allowance and its section.
+  const sendEntry = allPlans.slice(0, 3);
+  const planBoard = standaloneOpen ? (
+    <div className="v2p-board" aria-label={t("board.aria")}>
+      <section className="v2p-panel v2p-panel-mail" aria-labelledby="pricing-board-mail">
+        <h2 id="pricing-board-mail" className="v2p-panel-title">
+          {t("board.mail")}
+          <small>{t("board.mailUnit")}</small>
+        </h2>
+        <ul>
+          {correioPlans.map((plan) => (
+            <li key={plan.id}>
+              <a href="#correio" className={plan.id === "equipe" ? "is-featured" : undefined}>
+                <strong>{t(`correio.names.${plan.id}`)}</strong>
+                <span>
+                  {t("correio.planMailboxes", { count: plan.mailboxes })} ·{" "}
+                  {t("board.mailAllowance", {
+                    sends: plan.monthlyRecipientDeliveries.toLocaleString(locale),
+                    domains: plan.domains,
+                  })}
+                </span>
+                <em>
+                  {money(plan.brlMonthlyCents, plan.monthlyCents)}
+                  <small>{l("plans.perMonth")}</small>
+                </em>
+              </a>
+            </li>
+          ))}
+        </ul>
+        <p className="v2-fine">{t("board.mailNote")}</p>
+      </section>
+      <section className="v2p-panel v2p-panel-send" aria-labelledby="pricing-board-send">
+        <h2 id="pricing-board-send" className="v2p-panel-title">
+          {t("board.send")}
+          <small>{t("board.sendUnit")}</small>
+        </h2>
+        <ul>
+          {sendEntry.map((plan) => (
+            <li key={plan.rung}>
+              <a href="#planos" className={plan.featured ? "is-featured" : undefined}>
+                <strong>{plan.name}</strong>
+                <span>{plan.copy.volume}</span>
+                <em>
+                  {plan.price}
+                  <small>{l("plans.perMonth")}</small>
+                </em>
+              </a>
+            </li>
+          ))}
+        </ul>
+        <p className="v2-fine">
+          {launchOfferEnabled
+            ? t("board.sendLaunch", { first: sendFirstPrice, price: sendPrice })
+            : t("board.sendNote")}
+        </p>
+      </section>
+    </div>
+  ) : (
+    quickPrices
+  );
+
   const scenariosSection = scenarios.length ? (
     <section
       className="v2-dark v2-sec-tight"
@@ -336,19 +398,21 @@ export default async function PricingPage({
             </div>
           </section>
         ) : (
-          <section className="v2-dark v2-sec pricing-intro">
-            <div className="v2-wrap v2-stack">
-              <p className="v2-eyebrow">{t("eyebrow")}</p>
-              <h1>{t("v2.title")}</h1>
-              <p className="v2-lead">{t("v2.lead")}</p>
-              {quickPrices}
-              <div className="v2-actions">
-                <SignupLink label={l("plans.cta")} className="v2-btn v2-btn-bone" />
-                <a className="v2-link" href="/alternatives/resend">
-                  {t("alternatives.cta")}
-                </a>
+          <section className="v2-dark v2-sec pricing-intro v2p-intro">
+            <div className="v2-wrap v2p-intro-grid">
+              <div className="v2-stack">
+                <p className="v2-eyebrow">{t("eyebrow")}</p>
+                <h1>{t("v2.title")}</h1>
+                <p className="v2-lead">{t("v2.lead")}</p>
+                <div className="v2-actions">
+                  <SignupLink label={l("plans.cta")} className="v2-btn v2-btn-bone" />
+                  <a className="v2-link" href="/alternatives/resend">
+                    {t("alternatives.cta")}
+                  </a>
+                </div>
+                <p className="v2-note">{t("note")}</p>
               </div>
-              <p className="v2-note">{t("note")}</p>
+              {planBoard}
             </div>
           </section>
         )}

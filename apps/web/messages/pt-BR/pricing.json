@@ -193,6 +193,17 @@
     "send": "Envio a partir de",
     "free": "· 100 e-mails/dia"
   },
+  "board": {
+    "aria": "Planos de entrada do Correio e do Envio",
+    "mail": "Correio",
+    "mailUnit": "por plano de caixas",
+    "mailAllowance": "{sends} envios, {domains} domínios",
+    "mailNote": "7 dias grátis no cartão ou pague mês a mês no Pix. Pessoa ou agente, o mesmo preço.",
+    "send": "Envio",
+    "sendUnit": "por volume",
+    "sendLaunch": "Pro 110K: {first} na primeira mensalidade para novos clientes elegíveis, depois {price}. Volumes maiores abaixo.",
+    "sendNote": "Sem cartão no Free. Volumes maiores abaixo."
+  },
   "v2": {
     "title": "Preço em reais, no cartão ou no Pix. Sem fidelidade.",
     "lead": "O Correio cobra por plano de caixas; o Envio, pelo volume da sua aplicação. Use um, o outro ou os dois na mesma conta.",

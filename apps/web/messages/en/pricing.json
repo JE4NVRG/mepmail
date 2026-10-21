@@ -193,6 +193,17 @@
     "send": "Send from",
     "free": "· 100 emails/day"
   },
+  "board": {
+    "aria": "Entry plans of Mail and Send",
+    "mail": "Mail",
+    "mailUnit": "per plan of mailboxes",
+    "mailAllowance": "{sends} sends, {domains} domains",
+    "mailNote": "7 days free with a card. Person or agent, the same price.",
+    "send": "Send",
+    "sendUnit": "by volume",
+    "sendLaunch": "Pro 110K: {first} on the first monthly bill for eligible new customers, then {price}. Larger volumes below.",
+    "sendNote": "No card on Free. Larger volumes below."
+  },
   "v2": {
     "title": "Plain monthly prices. No contract.",
     "lead": "Mail is priced per plan of mailboxes; Send, by your application's volume. Use one, the other or both in one account.",
