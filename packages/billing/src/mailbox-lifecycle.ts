@@ -41,6 +41,11 @@ import {
   refundPixPayment,
   settlePixInvoice,
 } from "./pix.js";
+import {
+  assertPurchaseEligibility,
+  PurchaseEligibilityError,
+  requirePurchaseEligibility,
+} from "./purchase-eligibility.js";
 import type { BillingStripe } from "./stripe.js";
 import { idOf, lockCustomer } from "./subscription.js";
 
@@ -729,7 +734,8 @@ async function ensureMailboxCustomer(
     if (!team) throw new MailboxLifecycleError("not_found");
     if (team.customerId) return null;
     await currentAdmin(db, input);
-    if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
+    if (team.plan === "system") throw new MailboxLifecycleError("forbidden");
+    await assertPurchaseEligibility(db, team.id);
     if (
       deps.requirePaidSendingPlan &&
       !standalone &&
@@ -797,7 +803,8 @@ async function ensureMailboxCustomer(
       // while holding this team lock; purchaseTeam acquires those locks later in the correct order.
       if (team.customerId) return;
       await currentAdmin(db, input);
-      if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
+      if (team.plan === "system") throw new MailboxLifecycleError("forbidden");
+      await assertPurchaseEligibility(db, team.id);
       if (
         deps.requirePaidSendingPlan &&
         !standalone &&
@@ -853,7 +860,8 @@ async function ensureMailboxCustomer(
         .where(eq(schema.mailboxCustomerRequests.teamId, input.teamId));
     })
     .catch((error: unknown) => {
-      if (error instanceof MailboxLifecycleError) throw error;
+      if (error instanceof MailboxLifecycleError || error instanceof PurchaseEligibilityError)
+        throw error;
       // The provider may have succeeded even when linking or commit failed.
       throw new MailboxLifecycleError("pending");
     });
@@ -894,7 +902,8 @@ async function purchaseTeam(
   if (!team) throw new MailboxLifecycleError("not_found");
   if (team.customerId !== discovered.customerId) throw new MailboxLifecycleError("conflict");
   await currentAdmin(db, input);
-  if (team.plan === "system" || team.suspendedAt) throw new MailboxLifecycleError("forbidden");
+  if (team.plan === "system") throw new MailboxLifecycleError("forbidden");
+  await assertPurchaseEligibility(db, team.id);
   if (
     requirePaidSendingPlan &&
     !standalone &&
@@ -1226,6 +1235,7 @@ export async function beginMailboxCheckout(
   const seats = terms.planCode
     ? mailboxIncludedSeats(terms)
     : Math.max(input.seats, mailboxIncludedSeats(terms));
+  await requirePurchaseEligibility(deps.db, input);
   await ensureMailboxCustomer(deps, catalog, { ...input, seats });
   return purchase(deps, catalog, terms, { ...input, seats });
 }
@@ -1248,6 +1258,7 @@ export async function beginMailboxPixCheckout(
   if (!safeUrl(input.successUrl) || !safeUrl(input.cancelUrl))
     throw new MailboxLifecycleError("invalid");
   const seats = mailboxIncludedSeats(terms);
+  await requirePurchaseEligibility(deps.db, input);
   await ensureMailboxCustomer(deps, catalog, { ...input, seats });
   if ((await abandonMailboxCheckout(deps, input)).state === "completed")
     throw new MailboxLifecycleError("subscription_exists");
@@ -1266,18 +1277,29 @@ export async function beginMailboxPixCheckout(
   const quantity = mailboxStripeQuantity(terms, seats);
   const priced = await pixAmountForPrice(pix, terms.priceId, quantity);
   if (!priced) throw new MailboxLifecycleError("unavailable");
-  const url = await createPixCheckoutSession(pix, {
-    kind: "mailbox_start",
-    teamId: input.teamId,
-    customerId,
-    amount: priced.amount,
-    product: priced.product,
-    priceId: terms.priceId,
-    quantity,
-    mailbox: { terms, seats },
-    successUrl: input.successUrl,
-    cancelUrl: input.cancelUrl,
-    idempotencyKey: `pix-mailbox:${input.teamId}:${randomUUID()}`,
+  const url = await deps.db.transaction(async (transaction) => {
+    const db = transaction as unknown as Db;
+    const team = await purchaseTeam(
+      db,
+      { ...input, seats },
+      deps.requirePaidSendingPlan,
+      deps.earlyAccessCohort,
+      isStandaloneMailboxPrice(catalog, terms.priceId),
+    );
+    if (team.customerId !== customerId) throw new MailboxLifecycleError("conflict");
+    return createPixCheckoutSession(pix, {
+      kind: "mailbox_start",
+      teamId: input.teamId,
+      customerId,
+      amount: priced.amount,
+      product: priced.product,
+      priceId: terms.priceId,
+      quantity,
+      mailbox: { terms, seats },
+      successUrl: input.successUrl,
+      cancelUrl: input.cancelUrl,
+      idempotencyKey: `pix-mailbox:${input.teamId}:${randomUUID()}`,
+    });
   });
   return { url };
 }

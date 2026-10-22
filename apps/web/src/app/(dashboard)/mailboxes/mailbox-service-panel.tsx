@@ -4,6 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TRPCClientError } from "@trpc/client";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  isPurchaseReviewFailure,
+  PurchaseReviewNotice,
+  usePurchaseReview,
+} from "@/components/purchase-review-notice";
 import { DOCS_URL } from "@/lib/docs-links";
 import { mailboxCheckoutFailure, safeMailboxCheckoutUrl } from "@/lib/mailbox-checkout";
 import {
@@ -96,6 +101,9 @@ export function MailboxServicePanel({
   const offerId = useId();
   const offerHintId = useId();
   const [open, setOpen] = useState(false);
+  const purchaseReview = usePurchaseReview(
+    open && !systemIdentified && billing.data?.canPurchase === true,
+  );
   const [seats, setSeats] = useState("1");
   const [attemptedSeats, setAttemptedSeats] = useState<number | null>(null);
   const [failure, setFailure] = useState<ReturnType<typeof mailboxCheckoutFailure> | null>(null);
@@ -852,6 +860,7 @@ export function MailboxServicePanel({
                   ) : null}
                 </div>
               ) : null}
+              <PurchaseReviewNotice review={purchaseReview} />
               {!canPurchase ? (
                 <div className={styles.notice}>
                   {!sendingPlanRequired ||
@@ -874,7 +883,13 @@ export function MailboxServicePanel({
                   data-purchase=""
                   onSubmit={async (event) => {
                     event.preventDefault();
-                    if (!canPurchase || !validSeats || checkout.isPending) return;
+                    if (
+                      !canPurchase ||
+                      !purchaseReview.allowed ||
+                      !validSeats ||
+                      checkout.isPending
+                    )
+                      return;
                     setAttemptedSeats(quantity);
                     setAttemptedOfferId(selection.offerId);
                     setFailure(null);
@@ -892,6 +907,11 @@ export function MailboxServicePanel({
                       window.location.assign(url);
                     } catch (error) {
                       if (!alive.current) return;
+                      if (isPurchaseReviewFailure(error)) {
+                        setFailure(null);
+                        void purchaseReview.refresh();
+                        return;
+                      }
                       const reason = mailboxCheckoutFailure(error);
                       if (reason === "error" || reason === "sending_plan_required") {
                         setAttemptedSeats(null);
@@ -1111,7 +1131,11 @@ export function MailboxServicePanel({
                         type="submit"
                         className="ms-btn ms-btn-primary"
                         disabled={
-                          !validSeats || checkout.isPending || refreshing || abandon.isPending
+                          !purchaseReview.allowed ||
+                          !validSeats ||
+                          checkout.isPending ||
+                          refreshing ||
+                          abandon.isPending
                         }
                       >
                         {checkout.isPending
@@ -1127,12 +1151,14 @@ export function MailboxServicePanel({
                           type="button"
                           className="ms-btn ms-btn-secondary"
                           disabled={
+                            !purchaseReview.allowed ||
                             checkout.isPending ||
                             pixCheckout.isPending ||
                             refreshing ||
                             abandon.isPending
                           }
                           onClick={async () => {
+                            if (!purchaseReview.allowed) return;
                             setFailure(null);
                             try {
                               const result = await pixCheckout.mutateAsync(
@@ -1147,6 +1173,11 @@ export function MailboxServicePanel({
                               window.location.assign(url);
                             } catch (error) {
                               if (!alive.current) return;
+                              if (isPurchaseReviewFailure(error)) {
+                                setFailure(null);
+                                void purchaseReview.refresh();
+                                return;
+                              }
                               setFailure(mailboxCheckoutFailure(error));
                               void refresh();
                             }

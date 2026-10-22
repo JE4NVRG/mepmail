@@ -1,5 +1,7 @@
 import { signupAlertEmail } from "@millionsend/config";
 import {
+  buildAccountMail,
+  claimNotification,
   computeTeamStandings,
   holdReputationRuns,
   markSendReviewNotified,
@@ -7,13 +9,14 @@ import {
   recordAudit,
   recordProbes,
   saveTeamStandings,
+  sendReviewMailReason,
   syncTeamFlags,
   unnotifiedSendReviews,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { eq, sql } from "drizzle-orm";
-import { alertOperator, type SystemMailer } from "../system-mail.js";
+import { alertOperator, mailOwners, type SystemMailer } from "../system-mail.js";
 
 /**
  * Refresh every active team's standing (score, guardrail, 7-day rates) and
@@ -56,7 +59,8 @@ export async function runSafetyFlags(
 
 /**
  * Tell the signup alerts box, or the operator when no box is configured,
- * about every new send-review hold once. The audit row and the notice are
+ * about every new send-review hold once, and tell active owners separately
+ * with a safe explanation. The audit row and the notices are
  * written here, after the hold committed,
  * whichever surface (accept, fan-out, Stripe webhook) opened it.
  */
@@ -89,6 +93,52 @@ export async function notifySendReviews(
       });
     } catch (err) {
       console.error(`safety.flags: review notice for ${hold.id} failed`, err);
+    }
+    try {
+      // A suspension (including phishing) has its own communication policy.
+      // Do not send a stale review notice after release or a different hold.
+      const [current] = await db
+        .select({
+          suspendedAt: schema.teams.suspendedAt,
+          suspensionReason: schema.teams.suspensionReason,
+          sendReviewAt: schema.teams.sendReviewAt,
+        })
+        .from(schema.teams)
+        .where(eq(schema.teams.id, hold.id));
+      if (
+        !hold.at ||
+        !current ||
+        current.suspendedAt ||
+        current.suspensionReason === "phishing" ||
+        current.sendReviewAt?.getTime() !== hold.at.getTime()
+      ) {
+        continue;
+      }
+      const kind = "review.pending";
+      if (
+        !(await claimNotification(db, {
+          teamId: hold.id,
+          kind,
+          periodKey: hold.at.toISOString(),
+        }))
+      ) {
+        continue;
+      }
+      await mailOwners(db, opts.mailer, hold.id, kind, (locale) =>
+        buildAccountMail({
+          kind,
+          locale,
+          url: `${opts.appBaseUrl ?? ""}/support`,
+          values: {
+            team: hold.name,
+            reason: sendReviewMailReason({ locale, reason: hold.reason, note: hold.note }),
+          },
+        }),
+      );
+    } catch {
+      console.error("safety.flags: owner review notice could not be prepared", {
+        teamId: hold.id,
+      });
     }
   }
   return told;

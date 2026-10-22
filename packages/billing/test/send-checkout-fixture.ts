@@ -4,7 +4,7 @@ import { type Db, schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { sql } from "drizzle-orm";
 import type Stripe from "stripe";
-import { type SendCheckoutInput } from "../src/send-checkout.js";
+import type { SendCheckoutInput } from "../src/send-checkout.js";
 import { fakeStripe } from "./helpers.js";
 
 export async function checkoutFixture() {
@@ -17,6 +17,13 @@ export async function checkoutFixture() {
   for (const statement of ddl.split("--> statement-breakpoint").filter((s) => s.trim()))
     await db.execute(sql.raw(statement));
   const teamId = await createTeam(db);
+  await db.insert(schema.domains).values({
+    teamId,
+    name: "sender.example.test",
+    region: "us-east-1",
+    status: "verified",
+    verifiedAt: new Date(),
+  });
   const userId = randomUUID();
   await db
     .insert(schema.user)

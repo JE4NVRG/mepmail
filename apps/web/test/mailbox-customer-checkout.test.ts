@@ -1,3 +1,4 @@
+import { PurchaseEligibilityError } from "@millionsend/billing";
 import type { Db } from "@millionsend/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mailboxBillingOffers } from "@/server/mailbox-billing";
@@ -24,6 +25,13 @@ vi.mock("@millionsend/billing", () => ({
   MailboxLifecycleError: class extends Error {
     constructor(public readonly code: string) {
       super(code);
+    }
+  },
+  PurchaseEligibilityError: class extends Error {
+    readonly code: string;
+    constructor(public readonly eligibility: { code: string }) {
+      super(eligibility.code);
+      this.code = eligibility.code;
     }
   },
   beginMailboxCheckout: runtime.begin,
@@ -231,6 +239,25 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("customer checkout resolves only server-approved mailbox offers", () => {
+  it.each(["domain_required", "domain_review", "send_review"] as const)(
+    "preserves the %s precharge refusal for the customer instead of reporting an uncertain payment",
+    async (code) => {
+      runtime.begin.mockRejectedValueOnce(
+        new PurchaseEligibilityError({
+          eligible: false,
+          code,
+          domains: code === "domain_review" ? ["verifiedsender.online"] : [],
+          reviewReason: code === "domain_review" ? "new_sender" : null,
+        }),
+      );
+      await expect(customer().caller.mailboxes.checkout({ seats: 1 })).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+        message: `PURCHASE_REVIEW_${code.toUpperCase()}`,
+      });
+      expect(runtime.begin).toHaveBeenCalledOnce();
+    },
+  );
+
   it.each([
     { plan: "free" },
     { planStatus: "trialing" },

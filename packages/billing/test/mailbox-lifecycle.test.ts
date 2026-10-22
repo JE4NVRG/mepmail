@@ -239,6 +239,13 @@ describe("Mailbox lifecycle with real optional migrations", () => {
     }
     ({ stripe, state } = fakeStripe());
     teamId = await createTeam(db);
+    await db.insert(schema.domains).values({
+      teamId,
+      name: "mailbox.example.test",
+      region: "us-east-1",
+      status: "verified",
+      verifiedAt: new Date(),
+    });
     await db
       .insert(schema.user)
       .values({ id: USER, name: "Fixture buyer", email: "buyer@example.com" });
@@ -273,6 +280,27 @@ describe("Mailbox lifecycle with real optional migrations", () => {
   });
   afterEach(() => close());
 
+  it.each(["unverified", "review"] as const)(
+    "refuses a Correio purchase with an %s domain before creating a Customer or Checkout",
+    async (state) => {
+      await unlinkCustomer();
+      await db
+        .update(schema.domains)
+        .set(state === "unverified" ? { status: "pending" } : { name: "mailbox.online" })
+        .where(eq(schema.domains.teamId, teamId));
+      await expect(purchase()).rejects.toMatchObject({
+        code: state === "unverified" ? "domain_required" : "domain_review",
+      });
+      expect(await customerRequests()).toEqual([]);
+      expect(await leases()).toEqual([]);
+      expect(sessions).toEqual([]);
+      if (state === "review") {
+        const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+        expect(team?.sendReviewAt).toBeInstanceOf(Date);
+      }
+    },
+  );
+
   it.each([true, false])(
     "requires paid Envio before hosted checkout, linked customer=%s",
     async (linked) => {
@@ -296,7 +324,7 @@ describe("Mailbox lifecycle with real optional migrations", () => {
       const interveningDb = Object.create(db) as Db;
       interveningDb.transaction = (async (...args: Parameters<typeof db.transaction>) => {
         const result = await original(...args);
-        if (++transactions === 2)
+        if (++transactions === 3)
           await db
             .update(schema.teams)
             .set(
@@ -534,7 +562,7 @@ describe("Mailbox lifecycle with real optional migrations", () => {
       .update(schema.teams)
       .set({ suspendedAt: new Date() })
       .where(eq(schema.teams.id, teamId));
-    await expect(purchase()).rejects.toMatchObject({ code: "forbidden" });
+    await expect(purchase()).rejects.toMatchObject({ code: "suspended" });
     await db
       .update(schema.teams)
       .set({ suspendedAt: null, plan: "system" })
@@ -629,7 +657,7 @@ describe("Mailbox lifecycle with real optional migrations", () => {
     let grantCommitted = false;
     interveningDb.transaction = (async (...args: Parameters<Db["transaction"]>) => {
       const result = await transact(...args);
-      if (!grantCommitted) {
+      if (!grantCommitted && (await customerRequests()).length > 0) {
         await internalPlan();
         grantCommitted = true;
       }
@@ -1332,7 +1360,7 @@ describe("Mailbox lifecycle with real optional migrations", () => {
       .update(schema.teams)
       .set({ suspendedAt: new Date() })
       .where(eq(schema.teams.id, teamId));
-    await expect(purchase()).rejects.toMatchObject({ code: "forbidden" });
+    await expect(purchase()).rejects.toMatchObject({ code: "suspended" });
     await db.update(schema.teams).set({ suspendedAt: null }).where(eq(schema.teams.id, teamId));
     state.subscriptions.sub_existing = mailSub("sub_existing");
     await expect(purchase()).rejects.toMatchObject({ code: "subscription_exists" });

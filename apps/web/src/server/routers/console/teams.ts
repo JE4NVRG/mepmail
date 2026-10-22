@@ -2,6 +2,7 @@ import { isLiveKey } from "@millionsend/billing";
 import { customerSmtpRelay, env, isCloudDeployment, supportViewEnabled } from "@millionsend/config";
 import {
   accountMailPhrase,
+  claimNotification,
   clearTeamSignupRisk,
   fetchAccountScore,
   fetchDeliverabilityHealth,
@@ -16,6 +17,7 @@ import {
   SUPPORT_VIEW_REASONS,
   SUSPENSION_REASONS,
   type SupportViewReason,
+  sendReviewMailReason,
   startSupportView,
   supportViewNeedsReference,
   teamQuota,
@@ -807,7 +809,7 @@ export const consoleTeamsRouter = router({
       const team = await loadTeam(ctx.db, input.id);
       if (!team.sendReviewAt) return;
       const now = new Date();
-      await ctx.db
+      const [released] = await ctx.db
         .update(t)
         .set({
           sendReviewAt: null,
@@ -817,7 +819,11 @@ export const consoleTeamsRouter = router({
           sendReviewClearedAt: now,
           sendReviewClearedBy: ctx.operator.id,
         })
-        .where(eq(t.id, team.id));
+        .where(and(eq(t.id, team.id), eq(t.sendReviewAt, team.sendReviewAt)))
+        .returning({ id: t.id });
+      // Concurrent console requests must not release or notify twice, nor
+      // remove a newer hold using the state loaded before it was opened.
+      if (!released) return;
       await ctx.db
         .update(schema.teamFlags)
         .set({ status: "cleared", clearedAt: now, clearedBy: ctx.operator.id })
@@ -828,11 +834,48 @@ export const consoleTeamsRouter = router({
             eq(schema.teamFlags.reason, "review"),
           ),
         );
+      let noticeRecipients = 0;
+      let noticePreparationFailed = false;
+      try {
+        const current = await loadTeam(ctx.db, team.id);
+        if (
+          !current.suspendedAt &&
+          current.suspensionReason !== "phishing" &&
+          !current.sendReviewAt &&
+          (await claimNotification(ctx.db, {
+            teamId: team.id,
+            kind: "review.released",
+            periodKey: team.sendReviewAt.toISOString(),
+          }))
+        ) {
+          noticeRecipients = await mailTeamOwners(
+            ctx.db,
+            team,
+            "review.released",
+            "/emails",
+            (locale) => ({
+              reason: sendReviewMailReason({
+                locale,
+                reason: team.sendReviewReason,
+                note: team.sendReviewNote,
+              }),
+            }),
+          );
+        }
+      } catch {
+        noticePreparationFailed = true;
+        console.error("console: review release notice could not be prepared", { teamId: team.id });
+      }
       await auditOperator(ctx, {
         teamId: team.id,
         action: "team.send_review_released",
         target: { type: "team", id: team.id },
-        metadata: { name: team.name, reason: team.sendReviewReason },
+        metadata: {
+          name: team.name,
+          reason: team.sendReviewReason,
+          notificationRecipients: noticeRecipients,
+          notificationPreparationFailed: noticePreparationFailed,
+        },
       });
       await kickQuotaDrain();
     }),

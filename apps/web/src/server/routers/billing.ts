@@ -9,6 +9,7 @@ import {
   changeRung,
   createPortalSession,
   decodeConsentProof,
+  getPurchaseEligibility,
   googleConversionConfigured,
   hasLiveSubscription,
   isLiveKey,
@@ -16,6 +17,8 @@ import {
   metaConversionConfigured,
   openPixInvoices,
   PixBillingError,
+  PurchaseEligibilityError,
+  preparePurchaseEligibility,
   RenewalCancelError,
   readGoogleConversionConfig,
   readMetaConversionConfig,
@@ -146,6 +149,18 @@ async function checkoutAdvertising() {
 
 const launchOfferEnabled = () => process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
 
+function purchaseEligibilityError(error: PurchaseEligibilityError): TRPCError {
+  return new TRPCError({
+    code:
+      error.code === "forbidden"
+        ? "FORBIDDEN"
+        : error.code === "not_found"
+          ? "NOT_FOUND"
+          : "PRECONDITION_FAILED",
+    message: `PURCHASE_REVIEW_${error.code.toUpperCase()}`,
+  });
+}
+
 // Every purchase (checkout, Pix, plan change, overage, invoice payment, portal) is refused in
 // the Android app. cancelRenewal is not one and stays open there.
 const billingMutationProcedure = adminProcedure.use(noPurchaseInAndroidApp).use(({ next }) => {
@@ -161,6 +176,26 @@ const billingMutationProcedure = adminProcedure.use(noPurchaseInAndroidApp).use(
 
 export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
   return router({
+    /** A read-only preflight: no payment or sending restriction is created here. */
+    purchaseEligibility: teamProcedure.query(async ({ ctx }) => {
+      requireCloud();
+      return getPurchaseEligibility(ctx.db, ctx.teamId);
+    }),
+
+    /** Commit the existing safety review before the customer can open Checkout. */
+    requestPurchaseReview: adminProcedure.mutation(async ({ ctx }) => {
+      requireCloud();
+      try {
+        return await preparePurchaseEligibility(ctx.db, {
+          teamId: ctx.teamId,
+          userId: ctx.session.user.id,
+        });
+      } catch (error) {
+        if (error instanceof PurchaseEligibilityError) throw purchaseEligibilityError(error);
+        throw error;
+      }
+    }),
+
     status: teamProcedure.query(async ({ ctx }) => {
       requireCloud();
       const team = await loadTeam(ctx.db, ctx.teamId);
@@ -319,6 +354,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
             },
           );
         } catch (error) {
+          if (error instanceof PurchaseEligibilityError) throw purchaseEligibilityError(error);
           if (!(error instanceof SendCheckoutError)) throw error;
           const code =
             error.code === "forbidden"
@@ -402,6 +438,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
             },
           );
         } catch (error) {
+          if (error instanceof PurchaseEligibilityError) throw purchaseEligibilityError(error);
           if (error instanceof PixBillingError)
             throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pix_unavailable" });
           if (!(error instanceof SendCheckoutError)) throw error;

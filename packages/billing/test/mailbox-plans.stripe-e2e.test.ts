@@ -98,6 +98,13 @@ describe.skipIf(!enabled)("Correio plans against Stripe test mode", () => {
   // A customer user: the team owner, not a MepMail operator.
   const team = async (name: string) => {
     const teamId = await createTeam(db, `${run}-${name}`);
+    await db.insert(schema.domains).values({
+      teamId,
+      name: "stripe-plans.example.test",
+      region: "us-east-1",
+      status: "verified",
+      verifiedAt: new Date(),
+    });
     const userId = `${run}-${name}-owner`;
     await db
       .insert(schema.user)

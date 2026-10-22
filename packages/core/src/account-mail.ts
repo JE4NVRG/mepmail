@@ -41,6 +41,8 @@ export const ACCOUNT_MAIL_KINDS = [
   "monitor.degraded",
   "monitor.stalled",
   "review.held",
+  "review.pending",
+  "review.released",
   "mailbox.capacity",
   "mailbox.send_requested",
   "mailbox.agent_key_expiring",
@@ -203,6 +205,35 @@ export function accountMailPhrase(input: {
   const phrase = CATALOGS[input.locale][input.kind].extra?.[input.key];
   if (phrase === undefined) throw new Error(`no phrase ${input.key} for ${input.kind}`);
   return fillTemplate(phrase, input.values ?? {});
+}
+
+/**
+ * A safe explanation for owners: internal review notes may contain message
+ * content, sender addresses or payment-screening details, so never quote them.
+ * The domain screen's known note contributes only its validated TLD.
+ */
+export function sendReviewMailReason(input: {
+  locale: MailLocale;
+  reason: string | null;
+  note: string | null;
+}): string {
+  const tld =
+    input.reason === "new_sender"
+      ? input.note?.match(/^Sending domain\b[^\r\n]*\bis under \.([a-z0-9-]{2,63})(?:,|\s|$)/i)?.[1]
+      : undefined;
+  const key = tld
+    ? "domain"
+    : input.reason === "new_sender"
+      ? "new_sender"
+      : input.reason === "reputation"
+        ? "reputation"
+        : "security";
+  return accountMailPhrase({
+    locale: input.locale,
+    kind: "review.pending",
+    key,
+    values: { tld: tld?.toLowerCase() ?? "" },
+  });
 }
 
 /** Renders one kind in one language on the shared card; `url` is the button's target. */

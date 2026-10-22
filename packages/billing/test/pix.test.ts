@@ -310,6 +310,13 @@ describe("Pix", () => {
     ({ stripe, state } = fakeStripe());
     fake = pixFake(state.subscriptions);
     teamId = await createTeam(db);
+    await db.insert(schema.domains).values({
+      teamId,
+      name: "pix.example.test",
+      region: "us-east-1",
+      status: "verified",
+      verifiedAt: new Date(),
+    });
     await db.insert(schema.user).values({ id: USER, name: "Pix buyer", email: "pix@example.com" });
     await db.insert(schema.teamMembers).values({ teamId, userId: USER, role: "owner" });
     await db
@@ -320,6 +327,37 @@ describe("Pix", () => {
   });
   afterEach(async () => {
     await close();
+  });
+
+  it.each(["unverified", "review"] as const)(
+    "refuses a Correio Pix with an %s domain before any payment request",
+    async (domainState) => {
+      await db
+        .update(schema.domains)
+        .set(domainState === "unverified" ? { status: "pending" } : { name: "pix.online" })
+        .where(eq(schema.domains.teamId, teamId));
+      await expect(begin()).rejects.toMatchObject({
+        code: domainState === "unverified" ? "domain_required" : "domain_review",
+      });
+      expect(state.calls).toEqual([]);
+      expect(fake.calls.sessions).toEqual([]);
+      expect(fake.calls.subscriptions).toEqual([]);
+    },
+  );
+
+  it("rechecks the domain after pricing and before creating a Correio Pix", async () => {
+    const retrieve = fake.pix.prices.retrieve;
+    fake.pix.prices.retrieve = async (id, options) => {
+      const price = await retrieve(id, options);
+      await db
+        .update(schema.domains)
+        .set({ status: "failed" })
+        .where(eq(schema.domains.teamId, teamId));
+      return price;
+    };
+    await expect(begin()).rejects.toMatchObject({ code: "domain_required" });
+    expect(fake.calls.sessions).toEqual([]);
+    expect(fake.calls.subscriptions).toEqual([]);
   });
 
   it("opens a one-time Pix Checkout in reais for the first month of a plan", async () => {

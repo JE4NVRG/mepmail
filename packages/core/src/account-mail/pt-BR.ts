@@ -274,6 +274,34 @@ export const ptBR = {
     ],
     button: "Abrir revisão",
   },
+  "review.pending": {
+    subject: "Revisão de envio em andamento: {team}",
+    body: [
+      "O envio de {team} está temporariamente retido para uma revisão preventiva. {reason}",
+      "Os e-mails aceitos continuam na fila enquanto a revisão estiver pendente. Enviaremos um e-mail quando esta revisão for liberada. Contratar um plano não remove uma retenção de segurança; conclua a revisão antes de iniciar uma assinatura paga.",
+      "Fale com o suporte se precisar de ajuda para confirmar seu domínio e a finalidade dos envios.",
+    ],
+    button: "Falar com o suporte",
+    extra: {
+      domain:
+        "Seu novo domínio de envio usa a extensão .{tld}, que exige uma revisão preventiva do domínio. Essa verificação, por si só, não é uma conclusão de phishing ou abuso.",
+      new_sender:
+        "A configuração de envio ou a atividade inicial desta nova conta precisa de verificação. Essa verificação, por si só, não é uma conclusão de phishing ou abuso.",
+      reputation:
+        "Os sinais recentes de entrega precisam de verificação para proteger a reputação de envio do seu domínio.",
+      security:
+        "Sua conta precisa de uma verificação adicional de segurança antes de continuar os envios.",
+    },
+  },
+  "review.released": {
+    subject: "Revisão de envio concluída: {team}",
+    body: [
+      "A revisão preventiva de envio de {team} foi concluída e esta retenção foi removida. {reason}",
+      "Seus e-mails na fila já podem ser processados, respeitando outros limites ou restrições de envio indicados no painel. Este aviso confirma a liberação da revisão; ele não confirma a entrega de cada e-mail.",
+      "As proteções contra phishing e abuso continuam ativas. Fale com o suporte se precisar de ajuda com a situação dos envios.",
+    ],
+    button: "Ver situação dos envios",
+  },
   "mailbox.capacity": {
     subject: "Recebimento do Correio em {share} das vagas",
     body: [

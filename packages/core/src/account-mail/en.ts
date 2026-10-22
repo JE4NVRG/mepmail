@@ -274,6 +274,34 @@ export const en = {
     ],
     button: "Open review",
   },
+  "review.pending": {
+    subject: "Sending review in progress: {team}",
+    body: [
+      "Sending for {team} is temporarily held for a preventive review. {reason}",
+      "Accepted emails remain queued while the review is pending. We will email you when this review is cleared. Buying a plan does not remove a security hold; complete the review before starting a paid subscription.",
+      "Contact support if you need help confirming your domain and sending use case.",
+    ],
+    button: "Contact support",
+    extra: {
+      domain:
+        "Your new sending domain uses the .{tld} extension, which requires a preventive domain review. This check alone is not a finding of phishing or abuse.",
+      new_sender:
+        "The sending setup or initial sending activity of this new account needs verification. This check alone is not a finding of phishing or abuse.",
+      reputation:
+        "Recent delivery signals need verification to protect your domain's sending reputation.",
+      security:
+        "Your account needs an additional security verification before sending can continue.",
+    },
+  },
+  "review.released": {
+    subject: "Sending review cleared: {team}",
+    body: [
+      "The preventive sending review for {team} is complete and this hold has been removed. {reason}",
+      "Your queued emails can now be processed, subject to any other sending limits or restrictions shown in your dashboard. This notice confirms the review was cleared; it does not confirm delivery of each email.",
+      "Phishing and abuse protections remain active. Contact support if you need help with your sending status.",
+    ],
+    button: "View sending status",
+  },
   "mailbox.capacity": {
     subject: "Mail receiving at {share} of its slots",
     body: [

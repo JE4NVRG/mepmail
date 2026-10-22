@@ -278,6 +278,29 @@
     "countingNote": "Cada destinatário (Para, Cc e Cco) de um e-mail aceito conta um envio, mesmo que a entrega falhe depois. Endereços já na sua lista de supressão não contam."
   },
   "billing": {
+    "purchaseReview": {
+      "title": "Revisão de segurança antes do pagamento",
+      "checking": "Conferindo se sua equipe pode usar o serviço pago antes de abrir o pagamento.",
+      "failed": "Não foi possível concluir a verificação de segurança. Tente novamente antes de pagar.",
+      "domains": "Domínios que precisam de revisão: {domains}",
+      "beforePayment": "O pagamento fica indisponível até resolver esta revisão. Nenhuma nova compra é cobrada aqui. As verificações contra phishing e abuso continuam após a aprovação.",
+      "verifyDomain": "Verificar domínio de envio",
+      "request": "Revisar antes de pagar",
+      "retry": "Verificar novamente",
+      "support": "Falar com o suporte",
+      "reasons": {
+        "ready": "Sua equipe pode continuar para o pagamento.",
+        "domain_required": "Adicione e verifique um domínio de envio antes de assinar para poder usar o serviço depois do pagamento.",
+        "domain_review": "Sua equipe é nova e usa uma extensão de domínio que exige revisão inicial de segurança. É uma precaução contra phishing e não significa que seu domínio seja malicioso. Conclua a revisão antes de pagar.",
+        "send_review": "O envio está em revisão de segurança. Conclua a análise antes de iniciar uma nova compra.",
+        "signup_review": "Sua conta precisa de revisão de segurança antes de assinar. Conte como vai usar o MepMail para solicitar a aprovação.",
+        "signup_sandbox": "Sua conta está com restrições iniciais de envio. Conclua a revisão de segurança antes de pagar por um plano.",
+        "suspended": "Sua equipe está suspensa. Solicite uma revisão antes de iniciar uma nova compra.",
+        "guardrail_paused": "O envio está pausado pela proteção de entrega. Resolva a pausa com o suporte antes de iniciar uma nova compra.",
+        "forbidden": "Um proprietário ou administrador da equipe precisa concluir esta revisão.",
+        "not_found": "Não foi possível confirmar que esta equipe pode assinar. Fale com o suporte antes de pagar."
+      }
+    },
     "pix": {
       "open": "Fatura de {amount} disponível para pagar com Pix, até {date}.",
       "openMailbox": "A fatura do Correio deste mês ({amount}) está disponível: pague com Pix até {date} para seguir recebendo e-mails.",

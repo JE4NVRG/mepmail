@@ -17,6 +17,11 @@ import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { Modal } from "@/components/modal";
 import { Odometer } from "@/components/odometer";
+import {
+  isPurchaseReviewFailure,
+  PurchaseReviewNotice,
+  usePurchaseReview,
+} from "@/components/purchase-review-notice";
 import { Skeleton } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
 import { Switch } from "@/components/switch";
@@ -166,6 +171,12 @@ export function BillingView({
   const role = teams.data?.teams.find((m) => m.teamId === teams.data.activeTeamId)?.role;
   const canManage = role === "owner" || role === "admin";
   const teamId = teams.data?.activeTeamId ?? null;
+  const purchaseReview = usePurchaseReview(
+    canManage &&
+      !androidApp &&
+      status.data?.plan !== "system" &&
+      status.data?.hasLiveSubscription === false,
+  );
 
   const redirect = { onSuccess: ({ url }: { url: string }) => window.location.assign(url) };
   // The cap banner reads usage.recent; team.list carries the plan.
@@ -200,8 +211,12 @@ export function BillingView({
   }, [teamId]);
   const [plansOpen, setPlansOpen] = useState(intent !== null);
   const [changed, setChanged] = useState<{ rung: PlanRungKey; result: RungChange } | null>(null);
-  const startCheckout = useMutation(trpc.billing.checkout.mutationOptions(redirect));
-  const startPix = useMutation(trpc.billing.pixCheckout.mutationOptions(redirect));
+  const purchaseRedirect = {
+    ...redirect,
+    onError: () => void purchaseReview.refresh(),
+  };
+  const startCheckout = useMutation(trpc.billing.checkout.mutationOptions(purchaseRedirect));
+  const startPix = useMutation(trpc.billing.pixCheckout.mutationOptions(purchaseRedirect));
   const openPortal = useMutation(trpc.billing.portal.mutationOptions(redirect));
   const changePlan = useMutation(
     trpc.billing.changePlan.mutationOptions({
@@ -220,7 +235,7 @@ export function BillingView({
   const cancelRenewal = useMutation(trpc.billing.cancelRenewal.mutationOptions(refresh));
   const mutations = [startCheckout, startPix, openPortal, changePlan, setOverage];
   const busy = mutations.some((m) => m.isPending);
-  const failed = mutations.some((m) => m.isError);
+  const failed = mutations.some((m) => m.isError && !isPurchaseReviewFailure(m.error));
   const billingPaused = mutations.some(
     (m) => m.isError && m.error?.data?.code === "SERVICE_UNAVAILABLE",
   );
@@ -486,6 +501,7 @@ export function BillingView({
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
       {notice}
       <PixInvoices canManage={canManage} returned={pixReturned} />
+      <PurchaseReviewNotice review={purchaseReview} />
 
       {showComboStep && comboIntent ? (
         <LaunchComboMailStep
@@ -935,8 +951,9 @@ export function BillingView({
             <button
               type="button"
               className="ms-btn ms-btn-primary"
-              disabled={busy || (comboOn && comboSeatCount === null)}
+              disabled={busy || !purchaseReview.allowed || (comboOn && comboSeatCount === null)}
               onClick={() => {
+                if (!purchaseReview.allowed) return;
                 if (comboOn && comboSeatCount !== null && teamId) {
                   saveLaunchComboIntent({
                     teamId,
@@ -960,8 +977,9 @@ export function BillingView({
                 type="button"
                 className="ms-btn ms-btn-secondary"
                 style={{ marginLeft: 10 }}
-                disabled={busy || (comboOn && comboSeatCount === null)}
+                disabled={busy || !purchaseReview.allowed || (comboOn && comboSeatCount === null)}
                 onClick={() => {
+                  if (!purchaseReview.allowed) return;
                   if (comboOn && comboSeatCount !== null && teamId) {
                     saveLaunchComboIntent({
                       teamId,
@@ -1041,6 +1059,7 @@ export function BillingView({
         size="full"
       >
         <div className="ms-plan-dialog">
+          <PurchaseReviewNotice review={purchaseReview} />
           <div className="ms-volume">
             <label htmlFor="ms-volume" className="ms-microlabel">
               {t("volume")}
@@ -1148,9 +1167,16 @@ export function BillingView({
                           <button
                             type="button"
                             className={`ms-btn ${active ? "ms-btn-primary" : "ms-btn-secondary"}`}
-                            disabled={busy || subscriptionChangesUnavailable || salesPaused}
+                            disabled={
+                              busy ||
+                              subscriptionChangesUnavailable ||
+                              salesPaused ||
+                              (!hasLiveSubscription && !purchaseReview.allowed)
+                            }
                             onClick={() =>
-                              subscriptionChangesUnavailable || salesPaused
+                              subscriptionChangesUnavailable ||
+                              salesPaused ||
+                              (!hasLiveSubscription && !purchaseReview.allowed)
                                 ? undefined
                                 : hasLiveSubscription
                                   ? changePlan.mutate({ rung: r.key })
@@ -1182,8 +1208,9 @@ export function BillingView({
                               type="button"
                               className="ms-btn ms-btn-secondary"
                               style={{ marginTop: 8 }}
-                              disabled={busy}
+                              disabled={busy || !purchaseReview.allowed}
                               onClick={() =>
+                                purchaseReview.allowed &&
                                 startPix.mutate({
                                   rung: r.key,
                                   interval:

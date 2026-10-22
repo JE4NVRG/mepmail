@@ -61,8 +61,16 @@ let calls: {
 };
 let onCustomerCreate: (() => Promise<void>) | undefined;
 let checkoutSession: Stripe.Checkout.Session | null;
-async function seedBuyer(teamId: string) {
+async function seedBuyer(teamId: string, domain: string | null = "verifiedsender.example.test") {
   await db.insert(schema.teamMembers).values({ teamId, userId: "u1", role: "admin" });
+  if (domain)
+    await db.insert(schema.domains).values({
+      teamId,
+      name: domain,
+      region: "us-east-1",
+      status: "verified",
+      verifiedAt: new Date(),
+    });
 }
 
 // Stripe stamps whole seconds; rows and the fake agree from the start.
@@ -409,6 +417,105 @@ afterEach(async () => {
 });
 
 describe("billing router", () => {
+  it("reports a missing domain before payment without changing account or provider state", async () => {
+    const teamId = await createTeam(db, "unverified-buyer");
+    await seedBuyer(teamId, null);
+    const owner = callerFor(teamId, "owner");
+    const before = await teamRow(teamId);
+    expect(await owner.billing.purchaseEligibility()).toEqual({
+      eligible: false,
+      code: "domain_required",
+      domains: [],
+      reviewReason: null,
+    });
+    expect((await owner.billing.status()).plan).toBe("free");
+    expect(await teamRow(teamId)).toEqual(before);
+    expect(await db.select().from(schema.teamFlags)).toEqual([]);
+    expect(await auditRows()).toEqual([]);
+    for (const writes of Object.values(calls)) expect(writes).toEqual([]);
+  });
+
+  it("explains a risky domain read-only, then persists the review before any purchase", async () => {
+    const teamId = await createTeam(db, "domain-review-buyer");
+    await seedBuyer(teamId, "verifiedsender.online");
+    const owner = callerFor(teamId, "owner");
+    const expected = {
+      eligible: false,
+      code: "domain_review",
+      domains: ["verifiedsender.online"],
+      reviewReason: "new_sender",
+    };
+    expect(await owner.billing.purchaseEligibility()).toEqual(expected);
+    await owner.billing.status();
+    expect((await teamRow(teamId))?.sendReviewAt).toBeNull();
+    expect(await db.select().from(schema.teamFlags)).toEqual([]);
+
+    expect(await owner.billing.requestPurchaseReview()).toEqual(expected);
+    const reviewed = await teamRow(teamId);
+    expect(reviewed).toMatchObject({
+      sendReviewAt: expect.any(Date),
+      sendReviewReason: "new_sender",
+      stripeCustomerId: null,
+      plan: "free",
+      planStatus: "none",
+    });
+    expect(await owner.billing.requestPurchaseReview()).toEqual(expected);
+    expect((await teamRow(teamId))?.sendReviewAt).toEqual(reviewed?.sendReviewAt);
+    expect(await db.select().from(schema.teamFlags)).toHaveLength(1);
+    for (const writes of Object.values(calls)) expect(writes).toEqual([]);
+  });
+
+  it.each([
+    { domain: null, code: "domain_required" },
+    { domain: "verifiedsender.online", code: "domain_review" },
+  ])(
+    "refuses checkout for $code before accessing a Stripe provider method",
+    async ({ domain, code }) => {
+      const teamId = await createTeam(db, "blocked-before-payment");
+      await seedBuyer(teamId, domain);
+      const providerAccess = vi.fn(() => {
+        throw new Error("Blocked purchase must not access Stripe");
+      });
+      const blockedStripe = new Proxy({}, { get: providerAccess }) as BillingStripe;
+      const caller = createCallerFactory(
+        router({ billing: createBillingRouter({ stripe: () => blockedStripe }) }),
+      )({
+        db,
+        session: { user: { id: "u1", email: "u1@example.com", name: "u1" } },
+        teamId,
+        role: "owner",
+      });
+      await expect(caller.billing.checkout({ rung: "pro_100k" })).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+        message: `PURCHASE_REVIEW_${code.toUpperCase()}`,
+      });
+      expect(providerAccess).not.toHaveBeenCalled();
+      expect(await teamRow(teamId)).toMatchObject({ stripeCustomerId: null, plan: "free" });
+      expect((await teamRow(teamId))?.sendReviewAt !== null).toBe(domain !== null);
+      for (const writes of Object.values(calls)) expect(writes).toEqual([]);
+    },
+  );
+
+  it("allows a verified buyer to prepare without charging and keeps review preparation admin-only", async () => {
+    const teamId = await createTeam(db, "verified-buyer");
+    await seedBuyer(teamId);
+    const expected = {
+      eligible: true,
+      code: "ready",
+      domains: ["verifiedsender.example.test"],
+      reviewReason: null,
+    };
+    expect(await callerFor(teamId, "member").billing.purchaseEligibility()).toEqual(expected);
+    await expect(callerFor(teamId, "member").billing.requestPurchaseReview()).rejects.toMatchObject(
+      {
+        code: "FORBIDDEN",
+      },
+    );
+    expect(await callerFor(teamId, "owner").billing.requestPurchaseReview()).toEqual(expected);
+    expect(await teamRow(teamId)).toMatchObject({ sendReviewAt: null, stripeCustomerId: null });
+    for (const writes of Object.values(calls)) expect(writes).toEqual([]);
+  });
+
   it("keeps the real legacy USD20 price and checkout when the new offer is disabled", async () => {
     vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", "false");
     const existing = await subscribedTeam("pro_100k");
@@ -822,7 +929,7 @@ describe("billing router", () => {
     await db.insert(schema.teamMembers).values({ teamId, userId: "u1", role: "member" });
     await expect(
       callerFor(teamId, "admin").billing.checkout({ rung: "pro_100k" }),
-    ).rejects.toMatchObject({ code: "FORBIDDEN", message: "SEND_CHECKOUT_FORBIDDEN" });
+    ).rejects.toMatchObject({ code: "FORBIDDEN", message: "PURCHASE_REVIEW_FORBIDDEN" });
     expect(calls.customers).toHaveLength(0);
   });
 

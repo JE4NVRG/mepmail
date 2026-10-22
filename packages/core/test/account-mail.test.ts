@@ -13,6 +13,7 @@ import {
   MAIL_LOCALES,
   planCapPhrase,
   planMove,
+  sendReviewMailReason,
 } from "../src/account-mail.js";
 import {
   accountMailCard,
@@ -93,6 +94,71 @@ describe("account mail catalogs", () => {
         values: { date: "1 de outubro" },
       }),
     ).toBe("A Stripe tenta de novo em 1 de outubro.");
+  });
+});
+
+describe("send review owner notices", () => {
+  it.each(MAIL_LOCALES)("explains the domain extension safely in %s", (locale) => {
+    const reason = sendReviewMailReason({
+      locale,
+      reason: "new_sender",
+      note: "Sending domain of PRIVATE-SENDER@example.online is under .online, a TLD abuse feeds rank as mostly malicious",
+    });
+    expect(reason).toContain(".online");
+    expect(reason).not.toContain("PRIVATE-SENDER");
+    expect(reason).not.toContain("mostly malicious");
+    expect(reason).toMatch(
+      locale === "en" ? /not a finding of phishing/ : /não é uma conclusão de phishing/,
+    );
+    const mail = buildAccountMail({
+      kind: "review.pending",
+      locale,
+      url: "https://app.example/support",
+      values: { team: "Example", reason },
+    });
+    expect(mail.text).toMatch(
+      locale === "en"
+        ? /before starting a paid subscription/
+        : /antes de iniciar uma assinatura paga/,
+    );
+  });
+
+  it.each(["payment_risk", "content", "reputation", "new_sender", null])(
+    "never quotes private notes for %s",
+    (reason) => {
+      const text = sendReviewMailReason({
+        locale: "en",
+        reason,
+        note: "PRIVATE-CONTENT-OR-PAYMENT-EVIDENCE",
+      });
+      expect(text).not.toContain("PRIVATE-CONTENT-OR-PAYMENT-EVIDENCE");
+      expect(text).not.toContain("fraud");
+    },
+  );
+
+  it.each(MAIL_LOCALES)("describes release without promising delivery in %s", (locale) => {
+    const mail = buildAccountMail({
+      kind: "review.released",
+      locale,
+      url: "https://app.example/emails",
+      values: {
+        team: "Example",
+        reason: sendReviewMailReason({ locale, reason: "new_sender", note: null }),
+      },
+    });
+    expect(mail.text).toMatch(
+      locale === "en"
+        ? /Phishing and abuse protections remain active/
+        : /proteções contra phishing e abuso continuam ativas/,
+    );
+    expect(mail.text).toMatch(
+      locale === "en" ? /does not confirm delivery/ : /não confirma a entrega/,
+    );
+    expect(mail.text).toMatch(
+      locale === "en" ? /other sending limits or restrictions/ : /outros limites ou restrições/,
+    );
+    expect(mailPreferenceOf("review.pending")).toBeNull();
+    expect(mailPreferenceOf("review.released")).toBeNull();
   });
 });
 

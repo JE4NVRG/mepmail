@@ -133,6 +133,13 @@ export {
   subscriptionItems,
 } from "./prices.js";
 export {
+  getPurchaseEligibility,
+  type PurchaseEligibility,
+  type PurchaseEligibilityCode,
+  PurchaseEligibilityError,
+  preparePurchaseEligibility,
+} from "./purchase-eligibility.js";
+export {
   beginSendCheckout,
   beginSendPixCheckout,
   SEND_CHECKOUT_METADATA_KEY,

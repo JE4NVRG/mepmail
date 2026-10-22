@@ -186,6 +186,13 @@ describe("private cohort at durable Checkout boundaries", () => {
     sequence++;
     ({ stripe, state } = fakeStripe());
     teamId = await createTeam(db, `cohort-checkout-${sequence}`);
+    await db.insert(schema.domains).values({
+      teamId,
+      name: "cohort.example.test",
+      region: "us-east-1",
+      status: "verified",
+      verifiedAt: new Date(),
+    });
     await db.insert(schema.teamMembers).values({ teamId, userId, role: "owner" });
     const periodStart = new Date(Date.now() - 60_000),
       periodEnd = new Date(Date.now() + 86400_000);
@@ -275,7 +282,7 @@ describe("private cohort at durable Checkout boundaries", () => {
     let transactions = 0;
     intervening.transaction = (async (...args: Parameters<typeof db.transaction>) => {
       const result = await original(...args);
-      if (++transactions === 2)
+      if (++transactions === 3)
         await db
           .update(schema.teams)
           .set({ stripeCustomerId: "cus_changed_between_stages" })

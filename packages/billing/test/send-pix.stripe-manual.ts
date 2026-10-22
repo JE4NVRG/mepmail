@@ -76,6 +76,13 @@ async function main() {
     metadata: { claude_probe: run },
   });
   const teamId = await createTeam(db as Db, run);
+  await db.insert(schema.domains).values({
+    teamId,
+    name: "stripe-send-pix.example.test",
+    region: "us-east-1",
+    status: "verified",
+    verifiedAt: new Date(),
+  });
   const userId = `${run}-owner`;
   await db.insert(schema.user).values({ id: userId, name: userId, email: `${userId}@example.com` });
   await db.insert(schema.teamMembers).values({ teamId, userId, role: "owner" });

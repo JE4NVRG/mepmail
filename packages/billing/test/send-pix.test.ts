@@ -350,6 +350,29 @@ const teamRow = async () =>
   (await f.db.select().from(schema.teams).where(eq(schema.teams.id, f.input.team.id)))[0]!;
 
 describe("Send paid by Pix", () => {
+  it("rechecks a hold committed after pricing before creating a Send Pix", async () => {
+    const original = f.db.transaction.bind(f.db);
+    const intervening = Object.create(f.db) as Db;
+    let held = false;
+    intervening.transaction = (async (...args: Parameters<Db["transaction"]>) => {
+      const result = await original(...args);
+      if (!held && (await f.db.select().from(schema.sendCheckoutAttempts)).length) {
+        held = true;
+        await f.db
+          .update(schema.teams)
+          .set({ sendReviewAt: new Date(), sendReviewReason: "content" })
+          .where(eq(schema.teams.id, f.input.team.id));
+      }
+      return result;
+    }) as Db["transaction"];
+    await expect(
+      beginSendPixCheckout({ ...deps(), db: intervening }, pix.client, f.input),
+    ).rejects.toMatchObject({ code: "send_review" });
+    expect(held).toBe(true);
+    expect(pix.calls.sessions).toEqual([]);
+    expect(pix.calls.subscriptions).toEqual([]);
+  });
+
   it("opens a one-time Pix in reais for the launch month, the intro discount included", async () => {
     const { url } = await begin();
     expect(url).toMatch(/^https:\/\/checkout\.stripe\.com\//);

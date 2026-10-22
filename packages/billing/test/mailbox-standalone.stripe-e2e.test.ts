@@ -58,6 +58,13 @@ describe.skipIf(!enabled)("standalone Correio against Stripe test mode", () => {
     includedOutboundPerMailbox: outbound,
   });
   const owner = async (teamId: string, id: string) => {
+    await db.insert(schema.domains).values({
+      teamId,
+      name: "stripe-standalone.example.test",
+      region: "us-east-1",
+      status: "verified",
+      verifiedAt: new Date(),
+    });
     await db.insert(schema.user).values({ id, name: id, email: `${id}@example.com` });
     await db.insert(schema.teamMembers).values({ teamId, userId: id, role: "owner" });
   };

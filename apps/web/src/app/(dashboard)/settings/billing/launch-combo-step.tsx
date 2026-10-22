@@ -4,6 +4,11 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState } from "react";
+import {
+  isPurchaseReviewFailure,
+  PurchaseReviewNotice,
+  usePurchaseReview,
+} from "@/components/purchase-review-notice";
 import { BtnSpinner } from "@/components/spinner";
 import { formatUsd } from "@/lib/format";
 import {
@@ -64,6 +69,7 @@ export function LaunchComboMailStep({
       !timedOut && query.state.data?.availability === "sending_plan_required" ? POLL_MS : false,
   });
   const checkout = useMutation(trpc.mailboxes.checkout.mutationOptions());
+  const purchaseReview = usePurchaseReview(canManage && billing.data?.canPurchase === true);
 
   const availability = billing.data?.availability;
   useEffect(() => {
@@ -89,7 +95,7 @@ export function LaunchComboMailStep({
   const ready = availability === "available" && !!offerId && billing.data?.canPurchase === true;
 
   async function pay() {
-    if (!ready || !offerId || checkout.isPending) return;
+    if (!ready || !purchaseReview.allowed || !offerId || checkout.isPending) return;
     setFailure(null);
     try {
       const result = await checkout.mutateAsync({ seats: intent.seats, offerId });
@@ -103,6 +109,11 @@ export function LaunchComboMailStep({
       window.location.assign(url);
     } catch (error) {
       if (!alive.current) return;
+      if (isPurchaseReviewFailure(error)) {
+        setFailure(null);
+        void purchaseReview.refresh();
+        return;
+      }
       setFailure(mailboxCheckoutFailure(error));
       void billing.refetch();
     }
@@ -169,6 +180,7 @@ export function LaunchComboMailStep({
         })}
       </p>
       <div style={{ color: "var(--ms-muted)", fontSize: 14, lineHeight: 1.6 }}>{body}</div>
+      <PurchaseReviewNotice review={purchaseReview} />
       {canManage && ready && !failure && selectedOffer ? (
         <div id={limitsId} style={{ marginTop: 14, fontSize: 14, lineHeight: 1.6 }}>
           <h3 style={{ margin: "0 0 6px", fontSize: 14, color: "var(--ms-bone)" }}>
@@ -235,7 +247,7 @@ export function LaunchComboMailStep({
             type="button"
             className="ms-btn ms-btn-primary"
             aria-describedby={limitsId}
-            disabled={checkout.isPending}
+            disabled={checkout.isPending || !purchaseReview.allowed}
             onClick={() => void pay()}
           >
             <BtnSpinner on={checkout.isPending} />

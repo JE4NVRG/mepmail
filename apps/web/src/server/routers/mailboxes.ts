@@ -6,6 +6,7 @@ import {
   MailboxLifecycleError,
   manageMailboxSubscription,
   PixBillingError,
+  PurchaseEligibilityError,
 } from "@millionsend/billing";
 import { env } from "@millionsend/config";
 import {
@@ -152,6 +153,16 @@ async function call<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();
   } catch (error) {
+    if (error instanceof PurchaseEligibilityError)
+      throw new TRPCError({
+        code:
+          error.code === "forbidden"
+            ? "FORBIDDEN"
+            : error.code === "not_found"
+              ? "NOT_FOUND"
+              : "PRECONDITION_FAILED",
+        message: `PURCHASE_REVIEW_${error.code.toUpperCase()}`,
+      });
     if (error instanceof MailboxLifecycleError)
       throw new TRPCError({
         code:

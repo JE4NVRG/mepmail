@@ -278,6 +278,29 @@
     "countingNote": "Each recipient (To, Cc and Bcc) of an accepted email counts as one send, even if delivery fails later. Addresses already on your suppression list do not count."
   },
   "billing": {
+    "purchaseReview": {
+      "title": "Safety review before payment",
+      "checking": "Checking whether your team can use the paid service before opening payment.",
+      "failed": "We could not complete the safety check. Try again before paying.",
+      "domains": "Domains requiring review: {domains}",
+      "beforePayment": "Payment stays unavailable until this review is resolved. No new purchase is charged here. Phishing and abuse checks continue after approval.",
+      "verifyDomain": "Verify a sending domain",
+      "request": "Review before paying",
+      "retry": "Check again",
+      "support": "Contact support",
+      "reasons": {
+        "ready": "Your team can continue to payment.",
+        "domain_required": "Add and verify a sending domain before subscribing so you can use the service after payment.",
+        "domain_review": "Your new team uses a domain extension that requires an initial safety review. This is a precaution against phishing and does not mean your domain is malicious. Complete the review before paying.",
+        "send_review": "Sending is under a safety review. Complete the review before starting a new purchase.",
+        "signup_review": "Your account needs a safety review before subscribing. Tell us how you will use MepMail to request approval.",
+        "signup_sandbox": "Your account currently has initial sending restrictions. Complete the safety review before paying for a plan.",
+        "suspended": "Your team is suspended. Request a review before starting a new purchase.",
+        "guardrail_paused": "Sending is paused by delivery protection. Resolve the pause with support before starting a new purchase.",
+        "forbidden": "A team owner or administrator must complete this review.",
+        "not_found": "We could not confirm that this team can subscribe. Contact support before paying."
+      }
+    },
     "pix": {
       "open": "An invoice of {amount} is ready to pay with Pix, by {date}.",
       "openMailbox": "This month's Correio invoice ({amount}) is ready: pay it with Pix by {date} to keep receiving email.",

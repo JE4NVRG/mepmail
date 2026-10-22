@@ -43,6 +43,11 @@ import {
   SUBSCRIPTION_EXPAND,
 } from "./prices.js";
 import {
+  assertPurchaseEligibility,
+  PurchaseEligibilityError,
+  requirePurchaseEligibility,
+} from "./purchase-eligibility.js";
+import {
   resolveSendLaunchPrice,
   SEND_LAUNCH_OFFER,
   verifySendIntroCoupon,
@@ -126,13 +131,9 @@ async function currentTeam(db: Db, input: SendCheckoutInput) {
     .from(schema.teamMembers)
     .where(and(eq(schema.teamMembers.teamId, team.id), eq(schema.teamMembers.userId, input.userId)))
     .for("share");
-  if (
-    !member ||
-    !["owner", "admin"].includes(member.role) ||
-    team.plan === "system" ||
-    team.suspendedAt
-  )
+  if (!member || !["owner", "admin"].includes(member.role) || team.plan === "system")
     throw new SendCheckoutError("forbidden");
+  await assertPurchaseEligibility(db, team.id);
   if (OCCUPIED.has(team.planStatus)) throw new SendCheckoutError("subscription_exists");
   return team;
 }
@@ -207,7 +208,8 @@ async function ensureCustomer(deps: SendCheckoutDeps, input: SendCheckoutInput):
       return customer.id;
     });
   } catch (error) {
-    if (error instanceof SendCheckoutError) throw error;
+    if (error instanceof SendCheckoutError || error instanceof PurchaseEligibilityError)
+      throw error;
     throw new SendCheckoutError("pending");
   }
 }
@@ -346,6 +348,7 @@ export async function beginSendCheckout(
   const launch = deps.launchOfferEnabled === true && input.rung === "pro_100k";
   if (interval === "year" && !launch) throw new SendCheckoutError("invalid");
   if (rung.priceCents <= 0) throw new Error(`rung ${input.rung} is not for sale`);
+  await requirePurchaseEligibility(deps.db, { teamId: input.team.id, userId: input.userId });
   // Price lookups are read-only. Once an attempt exists, its frozen IDs always win.
   const customer = await ensureCustomer(deps, input);
   const existing = await deps.db
@@ -650,7 +653,8 @@ export async function beginSendCheckout(
     } catch {
       /* keep unknown */
     }
-    if (error instanceof SendCheckoutError) throw error;
+    if (error instanceof SendCheckoutError || error instanceof PurchaseEligibilityError)
+      throw error;
     throw new SendCheckoutError("unknown");
   }
 }
@@ -719,6 +723,7 @@ export async function beginSendPixCheckout(
   if (typeof deps.livemode !== "boolean" || !input.userId) throw new SendCheckoutError("invalid");
   const interval = input.interval ?? "month";
   if (interval !== "month" && interval !== "year") throw new SendCheckoutError("invalid");
+  await requirePurchaseEligibility(deps.db, { teamId: input.team.id, userId: input.userId });
   const customer = await ensureCustomer(deps, input);
   const attemptId = randomUUID();
   const terms = await deps.db.transaction(async (transaction) => {
@@ -759,21 +764,26 @@ export async function beginSendPixCheckout(
     await prepareGoogleCheckout(tx, attempt, deps.googleAdvertising, at);
     return terms;
   });
-  const url = await createPixCheckoutSession(pix, {
-    kind: "send_start",
-    teamId: input.team.id,
-    customerId: customer,
-    amount: terms.amount,
-    product: terms.product,
-    priceId: terms.price,
-    quantity: 1,
-    interval,
-    ...(terms.overage ? { overagePriceId: terms.overage } : {}),
-    ...(terms.coupon ? { coupon: terms.coupon } : {}),
-    attemptId,
-    successUrl: input.successUrl,
-    cancelUrl: input.cancelUrl,
-    idempotencyKey: `pix-send:${input.team.id}:${attemptId}`,
+  const url = await deps.db.transaction(async (transaction) => {
+    const tx = transaction as unknown as Db;
+    const team = await currentTeam(tx, input);
+    if (team.stripeCustomerId !== customer) throw new SendCheckoutError("conflict");
+    return createPixCheckoutSession(pix, {
+      kind: "send_start",
+      teamId: input.team.id,
+      customerId: customer,
+      amount: terms.amount,
+      product: terms.product,
+      priceId: terms.price,
+      quantity: 1,
+      interval,
+      ...(terms.overage ? { overagePriceId: terms.overage } : {}),
+      ...(terms.coupon ? { coupon: terms.coupon } : {}),
+      attemptId,
+      successUrl: input.successUrl,
+      cancelUrl: input.cancelUrl,
+      idempotencyKey: `pix-send:${input.team.id}:${attemptId}`,
+    });
   });
   return { url };
 }
