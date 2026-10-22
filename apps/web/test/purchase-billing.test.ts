@@ -19,6 +19,14 @@ const h = vi.hoisted(() => ({
   pendingRung: null as string | null,
   system: false,
 }));
+// These legacy cases exercise prices, maintenance and onboarding. Safety admission
+// has its own denied/loading/approved coverage in purchase-review-ui.test.ts.
+vi.mock("@/components/purchase-review-notice", async (original) => ({
+  ...(await original<typeof import("@/components/purchase-review-notice")>()),
+  usePurchaseReview: (enabled = true) => ({ enabled, allowed: true, refresh: vi.fn() }),
+  PurchaseReviewNotice: () => null,
+}));
+
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useState: (initial: unknown) => [initial === "month" ? h.period : initial, vi.fn()],

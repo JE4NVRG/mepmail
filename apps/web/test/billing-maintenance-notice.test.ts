@@ -14,6 +14,14 @@ const h = vi.hoisted(() => ({
   code: "SERVICE_UNAVAILABLE" as string | null,
   failed: true,
 }));
+// These legacy cases exercise prices, maintenance and onboarding. Safety admission
+// has its own denied/loading/approved coverage in purchase-review-ui.test.ts.
+vi.mock("@/components/purchase-review-notice", async (original) => ({
+  ...(await original<typeof import("@/components/purchase-review-notice")>()),
+  usePurchaseReview: (enabled = true) => ({ enabled, allowed: true, refresh: vi.fn() }),
+  PurchaseReviewNotice: () => null,
+}));
+
 vi.mock("next-intl", () => ({
   useLocale: () => h.locale,
   useTranslations: (namespace: string) => (key: string) => {

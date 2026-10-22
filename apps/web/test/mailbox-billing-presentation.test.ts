@@ -169,6 +169,13 @@ beforeEach(async () => {
     })
     .returning({ id: schema.teams.id });
   teamId = team!.id;
+  await db.insert(schema.domains).values({
+    teamId,
+    name: "billing-presentation.example.invalid",
+    region: "us-east-1",
+    status: "verified",
+    verifiedAt: new Date(),
+  });
   await db
     .update(schema.teams)
     .set({
