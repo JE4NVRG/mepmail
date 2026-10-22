@@ -125,7 +125,8 @@ describe.each(["en", "pt-BR"] as const)("purchase safety notice in %s", (locale)
         node.props.children.includes(messages.request),
     );
     expect(request?.props.disabled).toBe(false);
-    (request?.props.onClick as () => void)();
+    if (!request) throw new Error("Review request button missing");
+    (request.props.onClick as () => void)();
     expect(h.mutate).toHaveBeenCalledOnce();
     expect(h.setQueryData).not.toHaveBeenCalled();
   });
@@ -187,7 +188,8 @@ describe.each(["en", "pt-BR"] as const)("purchase safety notice in %s", (locale)
         Array.isArray(node.props.children) &&
         node.props.children.includes(messages.retry),
     );
-    (retry?.props.onClick as () => void)();
+    if (!retry) throw new Error("Review retry button missing");
+    (retry.props.onClick as () => void)();
     expect(h.refetch).toHaveBeenCalledOnce();
   });
 
