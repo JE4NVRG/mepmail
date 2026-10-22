@@ -13,9 +13,7 @@ export default function ConsoleAuditPage() {
   const [team, setTeam] = useUrlState("team");
   const [limit, setLimit] = useState(25);
   const query = useAuditQuery(action, limit, team);
-  const teamName = team
-    ? query.data?.pages[0]?.items.find((row) => row.teamId === team)?.teamName
-    : undefined;
+  const teamName = team ? query.data?.pages[0]?.team?.name : undefined;
   const actionLabel = useActionLabel();
   const actions = query.data?.pages[0]?.actions ?? [];
   return (

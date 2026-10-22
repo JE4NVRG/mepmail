@@ -135,3 +135,24 @@ describe("console.revenue.summary", () => {
     });
   });
 });
+
+describe("console.audit.list team filter", () => {
+  it("keeps only the team's rows and names the team even when it has none", async () => {
+    const a = await createTeam(db, "audit-a");
+    const b = await createTeam(db, "audit-b");
+    const quiet = await createTeam(db, "audit-quiet");
+    await db.insert(schema.auditLog).values([
+      { teamId: a, actorId: `user:${OPERATOR}`, action: "team.suspended", target: `team:${a}` },
+      { teamId: b, actorId: `user:${OPERATOR}`, action: "team.suspended", target: `team:${b}` },
+    ]);
+    const only = await caller(OPERATOR).console.audit.list({ teamId: a });
+    expect(only.items.map((row) => row.teamId)).toEqual([a]);
+    expect(only.team).toMatchObject({ id: a });
+    const none = await caller(OPERATOR).console.audit.list({ teamId: quiet });
+    expect(none.items).toEqual([]);
+    expect(none.team?.id).toBe(quiet);
+    const all = await caller(OPERATOR).console.audit.list({});
+    expect(all.team).toBeNull();
+    expect(all.items.map((row) => row.teamId)).toEqual(expect.arrayContaining([a, b]));
+  });
+});

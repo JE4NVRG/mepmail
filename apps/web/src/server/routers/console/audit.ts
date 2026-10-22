@@ -84,7 +84,16 @@ export const consoleAuditRouter = router({
                 input.teamId ? eq(a.teamId, input.teamId) : undefined,
               ),
             );
+      const [team] =
+        input.teamId && !input.cursor
+          ? await ctx.db
+              .select({ id: schema.teams.id, name: schema.teams.name })
+              .from(schema.teams)
+              .where(eq(schema.teams.id, input.teamId))
+          : [null];
       return {
+        /** The filtered team, so the page can name it even with no rows. */
+        team: team ?? null,
         nextCursor: page.nextCursor,
         total: total?.n ?? null,
         actions: AUDIT_ACTIONS.filter((x) =>
