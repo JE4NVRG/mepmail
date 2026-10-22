@@ -83,9 +83,21 @@ function nodes(value: ReactNode): Node[] {
   return [node, ...nodes(node.props.children as ReactNode)];
 }
 function render(enabled = true) {
-  const review = usePurchaseReview(enabled);
-  const tree = PurchaseReviewNotice({ review });
-  return { review, tree, html: renderToStaticMarkup(tree) };
+  const captured: {
+    current?: {
+      review: ReturnType<typeof usePurchaseReview>;
+      tree: ReturnType<typeof PurchaseReviewNotice>;
+    };
+  } = {};
+  function ReviewFixture() {
+    const review = usePurchaseReview(enabled);
+    const tree = PurchaseReviewNotice({ review });
+    captured.current = { review, tree };
+    return tree;
+  }
+  const html = renderToStaticMarkup(createElement(ReviewFixture));
+  if (!captured.current) throw new Error("Review fixture did not render");
+  return { ...captured.current, html };
 }
 
 beforeEach(() => {
