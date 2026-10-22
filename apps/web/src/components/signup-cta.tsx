@@ -2,8 +2,9 @@
 
 import { usePathname } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
+import type { MailboxPlanCode } from "@/lib/mailbox-plans";
 import { visitSource } from "@/lib/public-funnel";
-import { signupHref } from "@/lib/public-intent";
+import { signupHref, signupMailboxHref } from "@/lib/public-intent";
 
 /**
  * CTA de criação de conta. Dispara `signup_start` no Umami no clique e deixa a
@@ -25,11 +26,14 @@ export function SignupCta({
   className,
   plan,
   rung,
+  mailboxPlan,
 }: {
   label: string;
   className?: string;
   plan?: string;
   rung?: string;
+  /** "choose" preserves the Correio product without preselecting a paid plan. */
+  mailboxPlan?: MailboxPlanCode | "choose";
 }) {
   const pathname = usePathname();
   function onClick() {
@@ -38,7 +42,15 @@ export function SignupCta({
     if (plan) trackEvent("cta_pricing_click", { plan });
   }
   return (
-    <a className={className} href={signupHref(rung)} onClick={onClick}>
+    <a
+      className={className}
+      href={
+        mailboxPlan
+          ? signupMailboxHref(mailboxPlan === "choose" ? null : mailboxPlan)
+          : signupHref(rung)
+      }
+      onClick={onClick}
+    >
       {label}
     </a>
   );

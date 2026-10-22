@@ -21,7 +21,7 @@ import {
 } from "@/lib/landing-pricing";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
-import { pricingFocus } from "@/lib/public-intent";
+import { pricingFocus, signupMailboxHref } from "@/lib/public-intent";
 import { faqJsonLd } from "@/lib/structured-data";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
@@ -32,7 +32,7 @@ const contact = "mailto:suporte@mepmail.dev";
 const canonical = "/pricing";
 /** The comparison row the Resend band quotes (Scale 550K), from the dated table. */
 const PROOF_VOLUME = 550_000;
-const MAIL_SIGNUP = "/signup?next=/mail";
+const MAIL_SIGNUP = signupMailboxHref();
 
 type FaqItem = { q: string; a: string };
 
@@ -321,7 +321,7 @@ export default async function PricingPage({
                     </ul>
                     <a
                       className={`v2-btn v2-btn-block ${featured ? "v2-btn-bone" : "v2-btn-line"}`}
-                      href={MAIL_SIGNUP}
+                      href={signupMailboxHref(plan.id)}
                     >
                       {t("v2.correioCta", { plan: name })}
                     </a>
@@ -405,7 +405,11 @@ export default async function PricingPage({
                 <h1>{t("v2.title")}</h1>
                 <p className="v2-lead">{t("v2.lead")}</p>
                 <div className="v2-actions">
-                  <SignupLink label={l("plans.cta")} className="v2-btn v2-btn-bone" />
+                  <SignupLink
+                    label={l("plans.cta")}
+                    className="v2-btn v2-btn-bone"
+                    mailboxPlan="choose"
+                  />
                   <a className="v2-link" href="/alternatives/resend">
                     {t("alternatives.cta")}
                   </a>

@@ -8,11 +8,14 @@ import ptLanding from "../messages/pt-BR/landing.json";
 import ptPricing from "../messages/pt-BR/pricing.json";
 import {
   inAppBrowser,
+  mailboxPurchasePath,
   openInBrowserHref,
   paidRung,
   pricingFocus,
+  requestedMailboxPurchase,
   requestedPlan,
   signupHref,
+  signupMailboxHref,
 } from "../src/lib/public-intent";
 
 /**
@@ -33,6 +36,22 @@ const SAFARI_IPHONE =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
 describe("the plan picked on a public page", () => {
+  it("keeps a Correio purchase distinct from free external mail and allowlists each plan", () => {
+    for (const plan of ["solo", "duo", "equipe"] as const) {
+      const destination = new URL(signupMailboxHref(plan), "https://mepmail.test").searchParams.get(
+        "next",
+      );
+      expect(destination).toBe(`/mail?setup=correio&plan=${plan}`);
+      expect(requestedMailboxPurchase({ setup: "correio", plan })).toEqual({ plan });
+    }
+    expect(mailboxPurchasePath()).toBe("/mail?setup=correio");
+    expect(requestedMailboxPurchase({})).toBeNull();
+    expect(requestedMailboxPurchase({ plan: "equipe" })).toBeNull();
+    expect(requestedMailboxPurchase({ setup: ["correio", "correio"], plan: "solo" })).toBeNull();
+    for (const plan of ["admin", "../equipe", ["solo", "equipe"], "price_custom"])
+      expect(requestedMailboxPurchase({ setup: "correio", plan })).toEqual({ plan: null });
+  });
+
   it("is carried by the sign-up into Billing, for paid plans only", () => {
     expect(signupHref("pro_100k")).toBe("/signup?next=%2Fsettings%2Fbilling%3Fplan%3Dpro_100k");
     expect(signupHref("scale_2_5m")).toBe("/signup?next=%2Fsettings%2Fbilling%3Fplan%3Dscale_2_5m");
@@ -108,14 +127,46 @@ vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 vi.mock("@/components/signup-cta", async () => {
   const intent = await import("../src/lib/public-intent");
   return {
-    SignupCta: ({ label, rung }: { label: string; rung?: string }) =>
-      createElement("a", { href: intent.signupHref(rung), "data-cta": "signup" }, label),
+    SignupCta: ({
+      label,
+      rung,
+      mailboxPlan,
+    }: {
+      label: string;
+      rung?: string;
+      mailboxPlan?: "solo" | "duo" | "equipe" | "choose";
+    }) =>
+      createElement(
+        "a",
+        {
+          href: mailboxPlan
+            ? intent.signupMailboxHref(mailboxPlan === "choose" ? null : mailboxPlan)
+            : intent.signupHref(rung),
+          "data-cta": "signup",
+        },
+        label,
+      ),
   };
 });
 vi.mock("@/components/site-chrome", () => ({
   PublicHeader: () => createElement("header", null, "MepMail"),
   PublicFooter: () => createElement("footer", null, "MepMail"),
-  SignupLink: ({ label }: { label: string }) => createElement("a", { href: "/signup" }, label),
+  SignupLink: ({
+    label,
+    mailboxPlan,
+  }: {
+    label: string;
+    mailboxPlan?: "solo" | "duo" | "equipe" | "choose";
+  }) =>
+    createElement(
+      "a",
+      {
+        href: mailboxPlan
+          ? signupMailboxHref(mailboxPlan === "choose" ? null : mailboxPlan)
+          : "/signup",
+      },
+      label,
+    ),
 }));
 
 const { default: Pricing } = await import("../src/app/pricing/page");
@@ -172,6 +223,8 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(intro).toContain(locale === "en" ? "US$ 0" : "R$ 0");
       for (const rung of ["starter", "pro_100k", "pro_200k", "scale_500k"])
         expect(html).toContain(`href="/signup?next=%2Fsettings%2Fbilling%3Fplan%3D${rung}"`);
+      for (const plan of ["solo", "duo", "equipe"] as const)
+        expect(html).toContain(`href="${signupMailboxHref(plan)}"`);
     });
   });
 }

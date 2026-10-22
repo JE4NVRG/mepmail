@@ -161,7 +161,11 @@ export async function HomeV2() {
               </p>
               <p className="v2-lead v2b-rise">{t("correio.lead")}</p>
               <div className="v2-actions v2b-rise">
-                <SignupLink label={l("domainHero.cta")} className="v2-btn v2-btn-violet" />
+                <SignupLink
+                  label={l("domainHero.cta")}
+                  className="v2-btn v2-btn-violet"
+                  mailboxPlan="choose"
+                />
                 <a className="v2-btn v2-btn-line" href="/pricing#correio">
                   {t("correio.priceLink")}
                 </a>
@@ -254,7 +258,11 @@ export async function HomeV2() {
               <li className="v2-pill v2-pill-wait">{t("correio.permissions.send")}</li>
             </ul>
             <div className="v2-actions">
-              <SignupLink label={l("domainHero.cta")} className="v2-btn v2-btn-ink" />
+              <SignupLink
+                label={l("domainHero.cta")}
+                className="v2-btn v2-btn-ink"
+                mailboxPlan="choose"
+              />
               <a className="v2-link" href="#correio">
                 {t("correio.more")}
               </a>
@@ -444,7 +452,11 @@ export async function HomeV2() {
               ))}
             </div>
             <div className="v2-actions v2-gap-lg">
-              <SignupLink label={l("domainHero.cta")} className="v2-btn v2-btn-ink" />
+              <SignupLink
+                label={l("domainHero.cta")}
+                className="v2-btn v2-btn-ink"
+                mailboxPlan="choose"
+              />
               <a className="v2-btn v2-btn-line" href="/correio">
                 {t("correio.cta")}
               </a>
@@ -588,7 +600,11 @@ export async function HomeV2() {
             </h2>
             <p className="v2-lead">{t("close.body")}</p>
             <div className="v2-actions">
-              <SignupLink label={l("domainHero.cta")} className="v2-btn v2-btn-bone" />
+              <SignupLink
+                label={l("domainHero.cta")}
+                className="v2-btn v2-btn-bone"
+                mailboxPlan="choose"
+              />
               <a className="v2-btn v2-btn-line" href="/envio">
                 {t("close.envio")}
               </a>

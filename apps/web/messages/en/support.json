@@ -108,7 +108,7 @@
       },
       {
         "q": "Can my agents use MepMail?",
-        "a": "Yes, through the Send API or the published MCP, within the connection's permissions. Copy the endpoint from Settings → MCP. With the mail permissions, the same MCP also reads and drafts in the Mail inboxes you tick when you connect it, asking your approval before each send; an agent key on the Mail MCP works too.",
+        "a": "Yes. Use the Send API or connect the MCP from the dashboard. With the mail permissions, the agent reads and drafts only in the mailboxes you choose. You allow direct sending or approve each reply. An agent key on the Mail MCP works too.",
         "link": {
           "label": "MCP",
           "href": "https://docs.mepmail.dev/mcp"
@@ -116,7 +116,7 @@
       },
       {
         "q": "Can I receive email or import Gmail/Hotmail?",
-        "a": "Yes, with MepMail Mail: email inboxes on your domain for people and AI agents. Plans: Solo US$ 2.90/month with 1 mailbox, Duo US$ 5.90 with 3 or Equipe US$ 12.90 with 10; each plan's storage, sends and received messages are shared by its mailboxes, with up to 3 domains and 7 days free, and no Send plan is needed. Each mailbox needs a verified domain with receiving turned on. You can bring older mail over IMAP from your current provider; MBOX/PST files are not imported yet, and Google sign-in does not sync a Gmail inbox.",
+        "a": "Yes, with MepMail Mail: email inboxes on your domain for people and AI agents. Plans: Solo US$ 2.90/month with 1 mailbox, Duo US$ 5.90 with 3 or Equipe US$ 12.90 with 10; each plan's storage, sends and received messages are shared by its mailboxes, with up to 3 domains (10 on Equipe) and 7 days free with a card, and no Send plan is needed. Each mailbox needs a verified domain with receiving turned on. You can bring older mail over IMAP from your current provider; MBOX/PST files are not imported yet, and Google sign-in does not sync a Gmail inbox.",
         "link": {
           "label": "Mailboxes",
           "href": "https://docs.mepmail.dev/mailboxes"

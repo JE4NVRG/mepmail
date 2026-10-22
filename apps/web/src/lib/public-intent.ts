@@ -4,6 +4,7 @@
  * browser. No React, so server pages and client leaves share it.
  */
 import { PLAN_RUNGS, type PlanRungKey } from "@millionsend/core/plans";
+import { isMailboxPlanCode, type MailboxPlanCode } from "./mailbox-plans";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -24,6 +25,24 @@ export function paidRung(value: unknown): PlanRungKey | null {
 export function signupHref(rung?: string | null): string {
   const paid = paidRung(rung);
   return paid ? `/signup?next=${encodeURIComponent(`/settings/billing?plan=${paid}`)}` : "/signup";
+}
+
+export type MailboxPurchaseIntent = { plan: MailboxPlanCode | null };
+
+/** Only opens the Correio plan selector; prices and purchase eligibility stay server-owned. */
+export function mailboxPurchasePath(plan?: MailboxPlanCode | null): string {
+  return `/mail?setup=correio${isMailboxPlanCode(plan) ? `&plan=${plan}` : ""}`;
+}
+
+export function signupMailboxHref(plan?: MailboxPlanCode | null): string {
+  return `/signup?next=${encodeURIComponent(mailboxPurchasePath(plan))}`;
+}
+
+/** Plain /mail is also the free external-account flow and must never open a purchase. */
+export function requestedMailboxPurchase(params: SearchParams): MailboxPurchaseIntent | null {
+  if (single(params.setup) !== "correio") return null;
+  const plan = single(params.plan);
+  return { plan: isMailboxPlanCode(plan) ? plan : null };
 }
 
 /** The plan a Billing link asks for (?plan=pro_100k), or none. */

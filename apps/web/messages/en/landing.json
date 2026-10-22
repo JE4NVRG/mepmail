@@ -261,7 +261,7 @@
       "Add your domain and publish its DKIM and MAIL FROM DNS records.",
       "Connect API, SMTP or MCP, then follow your sending in the dashboard."
     ],
-    "note": "DNS propagation and domain verification can take time. Assisted onboarding is included."
+    "note": "Verify your domain and complete any required reviews before subscribing. DNS and review can take time; we help you through them."
   },
   "deliverability": {
     "eyebrow": "Deliverability and integration",
@@ -412,7 +412,7 @@
     "correio": {
       "eyebrow": "Mail · for people and agents",
       "title": "An inbox your agent works in.",
-      "lead": "Mailboxes for you, your team and your AI agents. The agent reads and drafts; nothing goes out without your approval.",
+      "lead": "Mailboxes for you, your team and AI agents. Agents read and draft; you choose direct sending or approval for each reply.",
       "compare": "Ten mailboxes for <b>{ours}</b> a month. AgentMail asks <b>{theirs}</b> for its ten.",
       "compareNote": "Equipe: 10 mailboxes, 10,000 emails and 10 domains. AgentMail Developer: 10 inboxes, 10,000 emails and 10 domains for US$ {usd} a month, checked on {date}.",
       "doorTitle": "Real mailboxes on the domain you own.",
@@ -429,7 +429,7 @@
       "permissions": {
         "read": "Read",
         "draft": "Draft",
-        "send": "Send with your approval"
+        "send": "Send or request approval"
       },
       "priceLabel": "Mail plans",
       "priceNote": "a month on Solo. Duo {duo} · Equipe {equipe}",

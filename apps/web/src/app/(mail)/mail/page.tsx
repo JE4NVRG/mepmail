@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { MailboxesView } from "@/app/(dashboard)/mailboxes/mailboxes-view";
 import { apiBaseUrl } from "@/lib/api-base-url";
 import { CORREIO_APP_METADATA } from "@/lib/correio-app-metadata";
+import { requestedMailboxPurchase } from "@/lib/public-intent";
 import { prefetchMailPage } from "@/server/mail-page-prefetch";
 
 export const metadata = CORREIO_APP_METADATA;
@@ -11,8 +12,18 @@ export const metadata = CORREIO_APP_METADATA;
 export const dynamic = "force-dynamic";
 
 /** The Correio arrives with what it shows first (server/mail-page-prefetch). */
-export default async function MailPage() {
+export default async function MailPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+} = {}) {
   const state = await prefetchMailPage(await headers());
-  const view = <MailboxesView layout="app" correioMcpUrl={`${apiBaseUrl()}/mcp/correio`} />;
+  const view = (
+    <MailboxesView
+      layout="app"
+      correioMcpUrl={`${apiBaseUrl()}/mcp/correio`}
+      purchaseIntent={requestedMailboxPurchase((await searchParams) ?? {})}
+    />
+  );
   return state ? <HydrationBoundary state={state}>{view}</HydrationBoundary> : view;
 }

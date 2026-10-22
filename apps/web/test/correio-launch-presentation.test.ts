@@ -3,6 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
+import { signupMailboxHref } from "@/lib/public-intent";
 import enCorreio from "../messages/en/correio.json";
 import enLanding from "../messages/en/landing.json";
 import enPricing from "../messages/en/pricing.json";
@@ -20,10 +21,25 @@ vi.mock("next/headers", () => ({
 }));
 
 // Only shared client chrome is isolated; the page, its sections and real catalogs render.
-vi.mock("@/components/site-chrome", () => ({
+vi.mock("@/components/site-chrome", async () => ({
   PublicHeader: () => createElement("header", null, "MepMail"),
   PublicFooter: () => createElement("footer", null, "MepMail"),
-  SignupLink: ({ label }: { label: string }) => createElement("a", { href: "/signup" }, label),
+  SignupLink: ({
+    label,
+    mailboxPlan,
+  }: {
+    label: string;
+    mailboxPlan?: "solo" | "duo" | "equipe" | "choose";
+  }) =>
+    createElement(
+      "a",
+      {
+        href: mailboxPlan
+          ? signupMailboxHref(mailboxPlan === "choose" ? null : mailboxPlan)
+          : "/signup",
+      },
+      label,
+    ),
 }));
 vi.mock("next-intl/server", () => ({
   getLocale: async () => current.locale,
@@ -490,7 +506,8 @@ describe.each(["en", "pt-BR"] as const)("Correio sold without Envio in %s", (loc
     const html = await render(locale);
     const plansHtml = section(html, "correio-plans-title");
     expect(textContent(plansHtml)).toMatch(equipe);
-    expect(links(plansHtml).map((link) => link.href)).toContain("/signup?next=/mail");
+    for (const plan of ["solo", "duo", "equipe"] as const)
+      expect(links(plansHtml).map((link) => link.href)).toContain(signupMailboxHref(plan));
     expect(html).not.toMatch(/<form\b/);
   });
 });
@@ -508,11 +525,11 @@ describe.each(["en", "pt-BR"] as const)("Correio v2 while sold on its own in %s"
     expect(textContent(hero)).toMatch(expected.fictional);
     expect(textContent(hero)).toMatch(expected.noMessageSent);
     const heroLinks = links(hero).map((link) => link.href);
-    expect(heroLinks).toContain("/signup");
+    expect(heroLinks).toContain(signupMailboxHref());
     expect(heroLinks).toContain("#planos");
     expect(heroLinks).toContain("/signup?next=/mail");
     expect(links(section(html, "correio-close-title")).map((link) => link.href)).toContain(
-      "/signup",
+      signupMailboxHref(),
     );
     expect(textContent(section(html, "correio-integrations-title"))).toMatch(
       expected.publicMailboxMcpPending,

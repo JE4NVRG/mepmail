@@ -261,7 +261,7 @@
       "Adicione seu domínio e publique os registros DNS de DKIM e MAIL FROM.",
       "Conecte API, SMTP ou MCP e acompanhe seus envios no painel."
     ],
-    "note": "A propagação do DNS e a verificação do domínio podem levar tempo. Onboarding assistido incluído."
+    "note": "Verifique o domínio e conclua eventuais revisões antes de assinar. DNS e análise podem levar tempo; ajudamos no processo."
   },
   "deliverability": {
     "eyebrow": "Entregabilidade e integração",
@@ -412,7 +412,7 @@
     "correio": {
       "eyebrow": "Correio · para pessoas e agentes",
       "title": "A caixa de entrada onde o seu agente trabalha.",
-      "lead": "Caixas para você, o time e seus agentes de IA. O agente lê e rascunha; nada sai sem a sua aprovação.",
+      "lead": "Caixas para você, o time e agentes de IA. O agente lê e rascunha; você permite o envio ou aprova cada resposta.",
       "compare": "Dez caixas por <b>{ours}</b> por mês. Na AgentMail, as dez custam <b>{theirs}</b>.",
       "compareNote": "Equipe: 10 caixas, 10.000 envios e 10 domínios. AgentMail Developer: 10 caixas, 10.000 e-mails e 10 domínios por US$ {usd} por mês, conferido em {date}; em reais pelo câmbio de {rate}.",
       "doorTitle": "Caixas de verdade no domínio que é seu.",
@@ -429,7 +429,7 @@
       "permissions": {
         "read": "Ler",
         "draft": "Rascunhar",
-        "send": "Enviar com a sua aprovação"
+        "send": "Enviar ou pedir aprovação"
       },
       "priceLabel": "Planos do Correio",
       "priceNote": "por mês no Solo. Duo {duo} · Equipe {equipe}",

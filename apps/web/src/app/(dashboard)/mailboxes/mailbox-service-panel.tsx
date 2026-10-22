@@ -21,6 +21,7 @@ import {
 import {
   defaultMailboxPlanOffer,
   MAILBOX_PLAN_NAMES,
+  type MailboxPlanCode,
   mailboxPlanDirection,
   mailboxPlanOffers,
 } from "@/lib/mailbox-plans";
@@ -70,9 +71,11 @@ export function mailboxServiceNotice(
 export function MailboxServicePanel({
   openRequest = 0,
   initialOfferId = null,
+  initialPlan = null,
 }: {
   openRequest?: number;
   initialOfferId?: string | null;
+  initialPlan?: MailboxPlanCode | null;
 } = {}) {
   const t = useTranslations("mailboxes-service");
   const systemT = useTranslations("mailboxes-service.system");
@@ -119,6 +122,12 @@ export function MailboxServicePanel({
     requestedSeats: number | null;
   } | null>(null);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(initialOfferId);
+  // This URL hint is consumed by a manual choice and can never restore itself over it.
+  const requestedPlan = useRef(initialOfferId ? null : initialPlan);
+  function chooseOffer(id: string) {
+    requestedPlan.current = null;
+    setSelectedOfferId(id);
+  }
   const [attemptedOfferId, setAttemptedOfferId] = useState<string | null>(null);
   // Trocar de plano: the card chosen (not the current one) and the outcome.
   const [changeTarget, setChangeTarget] = useState<string | null>(null);
@@ -249,7 +258,10 @@ export function MailboxServicePanel({
     loaded && !systemIdentified ? mailboxPlanOffers(billing.data?.offers ?? []) : [];
   const planSelectedId =
     planChoices.length && !planChoices.some((entry) => entry.offerId === selectedOfferId)
-      ? (defaultMailboxPlanOffer(planChoices, billing.data?.defaultOfferId)?.offerId ?? null)
+      ? ((
+          planChoices.find((entry) => entry.plan.code === requestedPlan.current) ??
+          defaultMailboxPlanOffer(planChoices, billing.data?.defaultOfferId)
+        )?.offerId ?? null)
       : selectedOfferId;
   const selection = mailboxOfferSelection(
     loaded && !systemIdentified ? billing.data : undefined,
@@ -932,7 +944,7 @@ export function MailboxServicePanel({
                               : planChoices
                           }
                           selectedId={selection.offerId}
-                          onSelect={setSelectedOfferId}
+                          onSelect={chooseOffer}
                           label={t("plans.choose")}
                           disabled={selection.locked || lockedSeats !== null}
                         />
@@ -959,7 +971,7 @@ export function MailboxServicePanel({
                           value={selection.offerId ?? ""}
                           disabled={selection.locked || lockedSeats !== null}
                           aria-describedby={offerHintId}
-                          onChange={(event) => setSelectedOfferId(event.target.value)}
+                          onChange={(event) => chooseOffer(event.target.value)}
                         >
                           {(selection.locked && selection.offerId
                             ? [{ ...offer, offerId: selection.offerId }]

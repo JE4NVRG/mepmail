@@ -38,9 +38,9 @@
       "records": "Registros para adicionar",
       "verify": "Verificar agora",
       "verifying": "Verificando…",
-      "pending": "Ainda não encontramos todos os registros. Depois de salvar, o DNS leva de alguns minutos a uma hora para aparecer; seguimos conferindo sozinhos.",
+      "pending": "Ainda não encontramos todos os registros. A propagação varia conforme o provedor; seguimos conferindo depois que você salvar.",
       "failed": "A verificação de {domain} expirou. Confira os registros e clique em Verificar agora de novo.",
-      "verified": "{domain} verificado: o e-mail já pode sair do seu domínio.",
+      "verified": "{domain} verificado. Antes de assinar, conclua eventuais revisões de segurança.",
       "later": "Verifico depois",
       "skipped": "Verificação adiada. Os registros continuam em Domínios."
     },
@@ -177,8 +177,8 @@
   },
   "next": {
     "label": "Próximo passo",
-    "addTitle": "Adicione seu domínio para enviar para qualquer pessoa",
-    "addBody": "Por enquanto o MepMail só envia o teste para o seu próprio e-mail. Com o domínio verificado, você envia de contato@suaempresa.com.br para qualquer endereço. São três registros DNS, e a página confere sozinha quando eles aparecem.",
+    "addTitle": "Use seu domínio de envio",
+    "addBody": "Por enquanto, o teste só vai para seu próprio e-mail. Para usar contato@suaempresa.com.br, verifique o domínio e conclua eventuais revisões. A página acompanha os três registros DNS.",
     "addCta": "Adicionar domínio",
     "finishTitle": "Termine a verificação de {domain}",
     "finishBody": "Faltam os registros DNS. Publique-os no seu provedor até {deadline}: a página do domínio mostra o que copiar e confere de novo a cada 30 segundos.",

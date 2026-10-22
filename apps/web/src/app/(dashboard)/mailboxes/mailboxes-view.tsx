@@ -30,6 +30,7 @@ import { type NewMailNotice, newMailNotices, rememberUnread } from "@/lib/mailbo
 import { noticesWanted } from "@/lib/mailbox-notifications";
 import { MAILBOX_OPEN_LICENSE_EVENT } from "@/lib/mailbox-plans";
 import { applyCorreioTheme, useCorreioPrefs } from "@/lib/mailbox-preferences";
+import type { MailboxPurchaseIntent } from "@/lib/public-intent";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { CorreioOffline } from "./correio-offline";
@@ -434,9 +435,11 @@ export function RegistryDialog({
 export function MailboxesView({
   correioMcpUrl,
   layout = "app",
+  purchaseIntent = null,
 }: {
   correioMcpUrl?: string;
   layout?: "app" | "settings";
+  purchaseIntent?: MailboxPurchaseIntent | null;
 } = {}) {
   const t = useTranslations("mailboxes");
   const locale = useLocale();
@@ -565,7 +568,7 @@ export function MailboxesView({
     link.pending = false;
     setDialog("new");
   }, [options.data, canCreate]);
-  const [licenseOpenRequest, openLicense] = useState(0);
+  const [licenseOpenRequest, openLicense] = useState(purchaseIntent ? 1 : 0);
   const [licenseOfferId, setLicenseOfferId] = useState<string | null>(null);
   const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
   const [teamAgentDialog, setTeamAgentDialog] = useState(false);
@@ -1720,6 +1723,7 @@ export function MailboxesView({
               <MailboxServicePanel
                 openRequest={licenseOpenRequest}
                 initialOfferId={licenseOfferId}
+                initialPlan={purchaseIntent?.plan ?? null}
               />
             </div>
           ) : null}

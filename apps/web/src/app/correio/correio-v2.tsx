@@ -12,6 +12,7 @@ import { LINUX_DOWNLOAD_URL, WINDOWS_STORE_URL } from "@/lib/desktop-download";
 import { formatBrlPrice, formatUsd } from "@/lib/landing-pricing";
 import { CORREIO_FROM_BRL_CENTS, CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
+import { signupMailboxHref } from "@/lib/public-intent";
 import { correioJsonLd, faqJsonLd, siteBaseUrl } from "@/lib/structured-data";
 import { titlePhrases } from "@/lib/title-phrases";
 import { publicPageUrls } from "@/server/public-seo";
@@ -88,7 +89,11 @@ export async function CorreioV2() {
               </h1>
               <p className="v2-lead">{t("hero.lead")}</p>
               <div className="v2-actions">
-                <SignupLink label={l("domainHero.cta")} className="v2-btn v2-btn-ink" />
+                <SignupLink
+                  label={l("domainHero.cta")}
+                  className="v2-btn v2-btn-ink"
+                  mailboxPlan="choose"
+                />
                 <a className="v2-link" href="#planos">
                   {t("hero.plans")}
                 </a>
@@ -354,7 +359,7 @@ export async function CorreioV2() {
                     </ul>
                     <a
                       className={`v2-btn v2-btn-block ${featured ? "v2-btn-bone" : "v2-btn-line"}`}
-                      href={MAIL_SIGNUP}
+                      href={signupMailboxHref(plan.id)}
                     >
                       {t("plans.cta", { plan: name })}
                     </a>
@@ -443,7 +448,11 @@ export async function CorreioV2() {
               {t("close.title")}
             </h2>
             <div className="v2-actions">
-              <SignupLink label={l("domainHero.cta")} className="v2-btn v2-btn-bone" />
+              <SignupLink
+                label={l("domainHero.cta")}
+                className="v2-btn v2-btn-bone"
+                mailboxPlan="choose"
+              />
               <a className="v2-btn v2-btn-line" href="#planos">
                 {t("close.plans")}
               </a>

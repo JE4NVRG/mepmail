@@ -70,7 +70,7 @@
   },
   "close": {
     "title": "Pick your rung and send.",
-    "body": "Create the account, verify your domain with our help, and go live through the API or the relay the same day.",
+    "body": "Create your account and verify your domain with our help. Complete the DNS setup and any required security review before subscribing.",
     "cta": "Create free account"
   },
   "launch": {
@@ -134,7 +134,7 @@
     "trial": "7 days free with a card; billing starts when the trial ends unless you cancel",
     "storage": "{size} GiB of storage",
     "sends": "{count, number} outbound recipients a month",
-    "agents": "Agents connect through the Mail MCP, with optional approval before each send",
+    "agents": "With the Mail MCP, you choose direct sending or approval for each reply",
     "note": "Requires an active paying Send plan. Each mailbox needs a verified domain and receiving turned on.",
     "noteStandalone": "Upgrade at any time: the difference is charged now. Move to a smaller plan when your usage fits it, with no refund for the current month. Contracts bought before keep their price and terms. Each mailbox needs a verified domain and receiving turned on.",
     "bodyStandalone": "Three plans for mailboxes on your domain, each with its own inbox, outbox and permissions. With or without a Send plan; person or agent, the same price. Each plan's limits are shared by the team's mailboxes.",
@@ -167,7 +167,7 @@
       },
       "support": {
         "title": "You, a partner and a support agent",
-        "body": "Three mailboxes: two for people and support@ with an agent that reads and drafts, while each reply waits for your approval."
+        "body": "Three mailboxes: two for people and support@ for the agent to read and draft. You choose direct sending or approval for each reply."
       },
       "saas": {
         "title": "A product in production, with a team and agents",

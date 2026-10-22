@@ -13,6 +13,8 @@ import {
   mailboxServiceNotice,
 } from "../src/app/(dashboard)/mailboxes/mailbox-service-panel";
 import { MailboxSetupDialog } from "../src/app/(dashboard)/mailboxes/mailbox-setup-dialog";
+import type { MailboxPlanCode } from "../src/lib/mailbox-plans";
+import { requestedMailboxPurchase, signupMailboxHref } from "../src/lib/public-intent";
 
 const fixture = vi.hoisted(() => ({
   mode: "setup" as "setup" | "panel",
@@ -36,6 +38,7 @@ const fixture = vi.hoisted(() => ({
   serviceRefetch: vi.fn(),
   pendingCreate: false,
   initialOfferId: null as string | null,
+  initialPlan: null as MailboxPlanCode | null,
 }));
 
 // These legacy cases exercise prices, maintenance and onboarding. Safety admission
@@ -301,6 +304,7 @@ function render(locale: Locale, setupOptions = options) {
       ? createElement(MailboxSetupDialog, { options: setupOptions, close, changed, reviewLicense })
       : createElement<NonNullable<Parameters<typeof MailboxServicePanel>[0]>>(MailboxServicePanel, {
           initialOfferId: fixture.initialOfferId,
+          initialPlan: fixture.initialPlan,
         });
   return renderToStaticMarkup(
     createElement(NextIntlClientProvider, {
@@ -344,6 +348,7 @@ beforeEach(() => {
   fixture.guide = undefined;
   fixture.pendingCreate = false;
   fixture.initialOfferId = null;
+  fixture.initialPlan = null;
   fixture.service = { ...querySnapshot(service()), refetch: fixture.serviceRefetch };
   fixture.receiving = {
     ...querySnapshot({
@@ -908,6 +913,89 @@ it("preserves existing contract notices and recognizes the Send purchase prerequ
 });
 
 describe.each(["en", "pt-BR"] as const)("mailbox plan choices in %s", (locale) => {
+  const publicPlans = [
+    { code: "solo", boxes: 1, storage: 1, amount: 290, outbound: 500, inbound: 2000 },
+    { code: "duo", boxes: 3, storage: 3, amount: 590, outbound: 2000, inbound: 5000 },
+    { code: "equipe", boxes: 10, storage: 10, amount: 1290, outbound: 10000, inbound: 10000 },
+  ].map((plan) => ({
+    ...oneOffer,
+    offerId: `synthetic-approved-${plan.code}`,
+    unitAmount: plan.amount,
+    includedMailboxes: plan.boxes,
+    storageBytesPerMailbox: plan.storage * 1024 ** 3,
+    includedOutboundPerMailbox: plan.outbound,
+    quotaScope: "team",
+    plan: {
+      code: plan.code,
+      inboundDeliveriesPerPeriod: plan.inbound,
+      inboundBytesPerPeriod: 1024 ** 3,
+      outboundBytesPerPeriod: 1024 ** 3,
+    },
+  }));
+  it.each(["solo", "duo", "equipe"] as const)(
+    "preselects the approved %s offer from the public signup destination without purchasing",
+    (plan) => {
+      const signup = new URL(signupMailboxHref(plan), "https://mepmail.test");
+      const destination = new URL(signup.searchParams.get("next") ?? "", signup.origin);
+      fixture.initialPlan =
+        requestedMailboxPurchase(Object.fromEntries(destination.searchParams))?.plan ?? null;
+      fixture.mode = "panel";
+      purchasable({
+        offers: publicPlans,
+        offer: publicPlans[1],
+        defaultOfferId: publicPlans[1]?.offerId,
+      });
+      render(locale);
+      const radios = fixture.controls.filter((control) => control.type === "radio");
+      expect(radios.map((radio) => radio.checked)).toEqual([
+        plan === "solo",
+        plan === "duo",
+        plan === "equipe",
+      ]);
+      expect(fixture.checkout).not.toHaveBeenCalled();
+      expect(fixture.manage).not.toHaveBeenCalled();
+    },
+  );
+  it("lets a manual choice override the public URL after an eligibility/catalog refresh", () => {
+    fixture.initialPlan = "equipe";
+    fixture.mode = "panel";
+    purchasable({
+      offers: publicPlans,
+      offer: publicPlans[1],
+      defaultOfferId: publicPlans[1]?.offerId,
+    });
+    render(locale);
+    const solo = fixture.controls.filter((control) => control.type === "radio")[0];
+    if (!solo) throw new Error("Missing Solo selection");
+    (solo.onChange as () => void)();
+    fixture.billing.data = { ...fixture.billing.data, offers: [...publicPlans] };
+    render(locale);
+    expect(
+      fixture.controls.filter((control) => control.type === "radio").map((radio) => radio.checked),
+    ).toEqual([true, false, false]);
+    expect(fixture.checkout).not.toHaveBeenCalled();
+  });
+  it("keeps a persisted pending offer ahead of a conflicting public plan", () => {
+    fixture.initialPlan = "equipe";
+    fixture.mode = "panel";
+    const pending = publicPlans[0];
+    if (!pending) throw new Error("Missing pending fixture");
+    purchasable({
+      offers: publicPlans,
+      offer: publicPlans[1],
+      defaultOfferId: publicPlans[1]?.offerId,
+      pendingOfferId: pending.offerId,
+      pendingOffer: pending,
+      pendingCheckoutSeats: 1,
+      checkoutPending: true,
+    });
+    render(locale);
+    expect(
+      fixture.controls.filter((control) => control.type === "radio").map((radio) => radio.checked),
+    ).toEqual([true]);
+    expect(fixture.checkout).not.toHaveBeenCalled();
+  });
+
   it("keeps the chosen plan from license preparation through the purchase panel", () => {
     purchasable();
     fixture.seeds[0] = 1;

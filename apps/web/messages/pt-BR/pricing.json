@@ -70,7 +70,7 @@
   },
   "close": {
     "title": "Escolha o degrau e envie.",
-    "body": "Crie a conta, verifique seu domínio com a nossa ajuda e entre em produção pela API ou pelo relay no mesmo dia.",
+    "body": "Crie a conta e verifique seu domínio com nossa ajuda. Conclua o DNS e eventuais revisões de segurança antes de assinar.",
     "cta": "Criar conta grátis"
   },
   "launch": {
@@ -134,7 +134,7 @@
     "trial": "7 dias grátis com cartão; a cobrança começa no fim do teste, a menos que você cancele",
     "storage": "{size} GiB de armazenamento",
     "sends": "{count, number} destinatários de saída por mês",
-    "agents": "Agentes conectam pelo MCP do Correio, com aprovação opcional antes de cada envio",
+    "agents": "Pelo MCP do Correio, você permite o envio ao agente ou aprova cada resposta",
     "note": "Exige um plano pago de Envio ativo. Cada caixa precisa de domínio verificado e do recebimento ativado.",
     "noteStandalone": "Faça upgrade quando quiser: a diferença é cobrada na hora. Mude para um plano menor quando o seu uso couber nele, sem reembolso do mês em curso. Contratos anteriores mantêm preço e condições. Cada caixa precisa de domínio verificado e do recebimento ativado.",
     "bodyStandalone": "Três planos de caixas no seu domínio, cada uma com entrada, saída e permissões próprias. Com ou sem plano de Envio; humano ou agente, o mesmo preço. Os limites de cada plano são divididos entre as caixas da equipe.",
@@ -167,7 +167,7 @@
       },
       "support": {
         "title": "Você, um sócio e um agente de suporte",
-        "body": "Três caixas: duas de pessoas e suporte@ com um agente que lê e rascunha, e cada resposta espera a sua aprovação."
+        "body": "Três caixas: duas de pessoas e suporte@ para o agente ler e rascunhar. Você permite o envio ou aprova cada resposta."
       },
       "saas": {
         "title": "Produto em produção, com time e agentes",

@@ -272,7 +272,7 @@
     "setupFirst": "Escolha Solo (1 caixa, R$ 14,90 por mês), Duo (3, R$ 29,90) ou Equipe (10, R$ 64,90), no cartão ou no Pix. As caixas dividem armazenamento, envios e mensagens recebidas do plano, com até 3 domínios (10 no Equipe). Não é preciso ter Envio, e os contratos existentes são preservados.",
     "restStatus": "Disponível para caixas ativadas",
     "plansBody": "Envio cuida dos e-mails da aplicação e das campanhas. Correio dá caixas com entrada e saída para pessoas e agentes em três planos, com ou sem plano de Envio.",
-    "mailNote": "Contrate pelo painel. Cada caixa ainda precisa de domínio verificado, DNS/MX e ativação do recebimento.",
+    "mailNote": "Verifique o domínio e conclua eventuais revisões antes de assinar pelo painel. O recebimento também depende de DNS/MX e ativação.",
     "previewStatus": "Comparação de preços · contrate pelo painel",
     "annualConsumption": "As franquias renovam mensalmente, sem acumular saldo anual. Armazenamento é contínuo; as mensagens não são apagadas na virada do período.",
     "monthlyNote": "Esta comparação não contrata nenhum plano. O painel confirma contrato, cobrança e ativação de cada caixa.",
@@ -283,7 +283,7 @@
   },
   "demo": {
     "label": "Exemplo de uso · conteúdo fictício",
-    "description": "Exemplo animado: chega um e-mail de uma cliente, o agente lê e escreve a resposta, a resposta fica aguardando a sua aprovação e sai depois que você aprova.",
+    "description": "Exemplo animado no modo com aprovação: chega um e-mail de uma cliente, o agente lê e rascunha a resposta, que só sai depois do seu OK.",
     "inbox": "Entrada · suporte@suaempresa.com",
     "sender": "Ana Souza",
     "initials": "AS",
@@ -309,7 +309,7 @@
   "v2": {
     "hero": {
       "eyebrow": "Correio · e-mail no seu domínio",
-      "title": "E-mail profissional, com agentes que esperam o seu OK.",
+      "title": "E-mail profissional, com agentes sob seu controle.",
       "lead": "Caixas no seu domínio para você, o time e seus agentes de IA, no navegador e nos apps para Windows e Linux. Sem hospedagem e sem servidor para manter.",
       "plans": "Ver planos",
       "note": "A partir de <b>{price}/mês</b> · 7 dias grátis no cartão · Pix",
@@ -327,7 +327,7 @@
       "aria": "Resumo do Correio",
       "mailboxes": "caixas por plano",
       "domains": "{count, plural, one {# domínio} other {# domínios}}",
-      "domainsLabel": "em qualquer plano",
+      "domainsLabel": "no Equipe",
       "trial": "{count} dias",
       "trialLabel": "grátis no cartão",
       "free": "Grátis",
@@ -363,12 +363,12 @@
       "title": "Do domínio à primeira mensagem em 3 passos.",
       "steps": [
         {
-          "title": "Crie a conta e escolha o plano",
-          "body": "Solo, Duo ou Equipe. No cartão, 7 dias grátis; no Pix, mês a mês."
+          "title": "Crie a conta e conecte seu domínio",
+          "body": "Verifique o domínio com os registros DNS do painel ou pela integração Cloudflare."
         },
         {
-          "title": "Ligue o seu domínio",
-          "body": "Mostramos os registros de DNS. Com um token da Cloudflare, o MepMail grava tudo para você."
+          "title": "Escolha o plano após a verificação",
+          "body": "Conclua eventuais revisões antes de assinar. No cartão, 7 dias grátis; no Pix, mês a mês."
         },
         {
           "title": "Crie as caixas e conecte o agente",

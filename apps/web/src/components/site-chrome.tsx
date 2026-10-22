@@ -121,8 +121,22 @@ export function Wordmark() {
 // CTA de criação de conta. Todas as ocorrências públicas (topo, hero, cards de
 // plano, rodapé e as páginas /pricing e /alternatives/resend) passam por aqui —
 // um único ponto, que dispara o evento de conversão `signup-cta` no Umami.
-export function SignupLink({ label, className }: { label: string; className?: string }) {
-  return <SignupCta className={className ?? "ms-btn ms-btn-primary gtm-action"} label={label} />;
+export function SignupLink({
+  label,
+  className,
+  mailboxPlan,
+}: {
+  label: string;
+  className?: string;
+  mailboxPlan?: Parameters<typeof SignupCta>[0]["mailboxPlan"];
+}) {
+  return (
+    <SignupCta
+      className={className ?? "ms-btn ms-btn-primary gtm-action"}
+      label={label}
+      mailboxPlan={mailboxPlan}
+    />
+  );
 }
 
 export function PublicHeader({

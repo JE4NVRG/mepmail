@@ -38,9 +38,9 @@
       "records": "Records to add",
       "verify": "Verify now",
       "verifying": "Verifying…",
-      "pending": "We have not found every record yet. After you save them, DNS takes a few minutes to an hour to show up; we keep checking on our own.",
+      "pending": "We have not found every record yet. Propagation depends on your provider; we keep checking after you save them.",
       "failed": "Verification of {domain} timed out. Check the records and click Verify now again.",
-      "verified": "{domain} is verified: email can leave your domain now.",
+      "verified": "{domain} is verified. Complete any required security review before subscribing.",
       "later": "I'll verify later",
       "skipped": "Verification put off. The records stay in Domains."
     },
@@ -177,8 +177,8 @@
   },
   "next": {
     "label": "Next step",
-    "addTitle": "Add your domain to send to anyone",
-    "addBody": "For now MepMail only sends the test to your own address. With your domain verified, you send from hello@yourcompany.com to any address. It takes three DNS records, and the page checks on its own until they show up.",
+    "addTitle": "Use your own sending domain",
+    "addBody": "For now, the test only goes to your own address. To use hello@yourcompany.com, verify the domain and complete any required reviews. The page keeps checking the three DNS records.",
     "addCta": "Add a domain",
     "finishTitle": "Finish verifying {domain}",
     "finishBody": "The DNS records are still missing. Publish them at your provider before {deadline}: the domain page shows what to copy and checks again every 30 seconds.",

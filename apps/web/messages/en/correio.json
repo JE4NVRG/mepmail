@@ -272,7 +272,7 @@
     "setupFirst": "Choose Solo (1 mailbox, US$ 2.90 a month), Duo (3, US$ 5.90) or Equipe (10, US$ 12.90); in Brazil, R$ 14.90, R$ 29.90 or R$ 64.90. The mailboxes share the plan's storage, sends and received messages, with up to 3 domains (10 on Equipe). Send is not needed, and existing contracts are preserved.",
     "restStatus": "Available for activated mailboxes",
     "plansBody": "Send handles application emails and campaigns. Mail gives people and agents inboxes and outboxes in three plans, with or without a Send plan.",
-    "mailNote": "Subscribe from the dashboard. Each mailbox still needs a verified domain, DNS/MX and receiving activation.",
+    "mailNote": "Verify your domain and complete any required reviews before subscribing in the dashboard. Receiving also needs DNS/MX and activation.",
     "previewStatus": "Price comparison · subscribe in the dashboard",
     "annualConsumption": "Allowances renew monthly, without an accumulated annual balance. Storage is continuous; messages are not deleted when a period changes.",
     "monthlyNote": "This comparison does not purchase a plan. The dashboard confirms your contract, billing and activation for each mailbox.",
@@ -283,7 +283,7 @@
   },
   "demo": {
     "label": "Usage example · fictional content",
-    "description": "Animated example: a customer's email arrives, the agent reads it and writes the answer, the answer waits for your approval and goes out once you approve.",
+    "description": "Animated example with per-message approval: a customer's email arrives, the agent reads and drafts the reply, which goes out only after your OK.",
     "inbox": "Inbox · support@yourcompany.com",
     "sender": "Ana Souza",
     "initials": "AS",
@@ -309,7 +309,7 @@
   "v2": {
     "hero": {
       "eyebrow": "Mail · email on your own domain",
-      "title": "Professional email, with agents that wait for your OK.",
+      "title": "Professional email. Your agents, your permissions.",
       "lead": "Mailboxes on your domain for you, your team and your AI agents, in the browser and in the Windows and Linux apps. No hosting and no mail server to run.",
       "plans": "See the plans",
       "note": "From <b>{price}/month</b> · 7 days free with a card",
@@ -327,7 +327,7 @@
       "aria": "Mail at a glance",
       "mailboxes": "mailboxes per plan",
       "domains": "{count, plural, one {# domain} other {# domains}}",
-      "domainsLabel": "on every plan",
+      "domainsLabel": "on Equipe",
       "trial": "{count} days",
       "trialLabel": "free with a card",
       "free": "Free",
@@ -363,12 +363,12 @@
       "title": "From domain to first message in 3 steps.",
       "steps": [
         {
-          "title": "Create the account and pick a plan",
-          "body": "Solo, Duo or Equipe, with 7 days free with a card."
+          "title": "Create your account and connect your domain",
+          "body": "Verify the domain with the dashboard's DNS records or the Cloudflare integration."
         },
         {
-          "title": "Connect your domain",
-          "body": "We show the DNS records. With a Cloudflare token, MepMail writes them for you."
+          "title": "Pick a plan after verification",
+          "body": "Complete any required reviews before subscribing. 7 days free with a card; Pix has no free trial."
         },
         {
           "title": "Create the mailboxes and connect the agent",
