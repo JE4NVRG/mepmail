@@ -18,6 +18,7 @@ import {
 } from "react";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { NavGlyph } from "@/components/icons/nav-icons";
+import { QueryRecoveryNotice } from "@/components/query-recovery";
 import { toast } from "@/components/toast";
 import { inAndroidApp } from "@/lib/android-app";
 import { htmlDropsWork } from "@/lib/desktop-bridge";
@@ -91,6 +92,7 @@ import {
   takeInterruptedSend,
   undoHeldSend,
 } from "@/lib/mailbox-undo-send";
+import { queryHasUsableData, queryRecoveryPhase, recoverQuery } from "@/lib/query-recovery";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { MailboxColumnDivider } from "./mailbox-column-divider";
@@ -1552,24 +1554,23 @@ export function MailboxContentView({
   const trpcClient = useTRPCClient();
   const live = useMailboxLiveConnected();
   const listMailboxId = selected?.id ?? null;
+  const listInput = {
+    mailboxId: listMailboxId,
+    folder,
+    mailboxKind,
+    ...(folder === "custom" && customFolderId ? { customFolderId } : {}),
+  };
+  const listingKey = trpc.mailboxes.items.infiniteQueryKey(listInput);
   const listing = useInfiniteQuery(
-    trpc.mailboxes.items.infiniteQueryOptions(
-      {
-        mailboxId: listMailboxId,
-        folder,
-        mailboxKind,
-        ...(folder === "custom" && customFolderId ? { customFolderId } : {}),
-      },
-      {
-        getNextPageParam: (page) => page.nextCursor,
-        retry: false,
-        // Coming back to a folder shows what it had at once and refreshes behind it.
-        gcTime: 10 * 60_000,
-        staleTime: 15_000,
-        // The poll below keeps the list fresh; a focus refetch would redo every page.
-        refetchOnWindowFocus: false,
-      },
-    ),
+    trpc.mailboxes.items.infiniteQueryOptions(listInput, {
+      getNextPageParam: (page) => page.nextCursor,
+      retry: false,
+      // Coming back to a folder shows what it had at once and refreshes behind it.
+      gcTime: 10 * 60_000,
+      staleTime: 15_000,
+      // The poll below keeps the list fresh; a focus refetch would redo every page.
+      refetchOnWindowFocus: false,
+    }),
   );
   // Only the first page is polled, also while the window is hidden (the desktop
   // shell's badge and new-mail notices depend on it): new mail always lands
@@ -1656,22 +1657,42 @@ export function MailboxContentView({
   // Server search: every folder of the mailboxes in scope (not the trash or
   // spam), beyond the rows loaded here. Until it answers, and whenever it
   // cannot (an older server), the local filter below is what shows.
+  const searchQueryInput = {
+    query: searchTerm ?? "",
+    mailboxId: searchEverywhere ? null : listMailboxId,
+    folder: "all" as const,
+    limit: 50,
+  };
+  const searchKey = trpc.mailboxes.search.infiniteQueryKey(searchQueryInput);
   const found = useInfiniteQuery(
-    trpc.mailboxes.search.infiniteQueryOptions(
-      {
-        query: searchTerm ?? "",
-        mailboxId: searchEverywhere ? null : listMailboxId,
-        folder: "all",
-        limit: 50,
-      },
-      {
-        enabled: searchTerm !== null,
-        getNextPageParam: (page) => page.nextCursor ?? undefined,
-        retry: false,
-        staleTime: 30_000,
-      },
-    ),
+    trpc.mailboxes.search.infiniteQueryOptions(searchQueryInput, {
+      enabled: searchTerm !== null,
+      getNextPageParam: (page) => page.nextCursor ?? undefined,
+      retry: false,
+      staleTime: 30_000,
+    }),
   );
+  const currentRecoveryScope = useRef("");
+  const recoveryScope = JSON.stringify([listingKey, searchKey]);
+  currentRecoveryScope.current = recoveryScope;
+  const currentRecovery = () => mounted.current && currentRecoveryScope.current === recoveryScope;
+  const recoverListing = (more = false) =>
+    recoverQuery(
+      queries,
+      listingKey,
+      () => (more ? listing.fetchNextPage() : listing.refetch()),
+      currentRecovery,
+    );
+  const recoverSearch = (more = false) =>
+    recoverQuery(
+      queries,
+      searchKey,
+      () => (more ? found.fetchNextPage() : found.refetch()),
+      currentRecovery,
+    );
+  const listingReady = queryHasUsableData(listing);
+  const listingRecovery = queryRecoveryPhase(listing) ?? "loading";
+  const searchRecovery = queryRecoveryPhase(found);
   const searching = searchTerm !== null && found.isSuccess && !found.data.pages[0]?.tooShort;
   const searchFolders = useQuery(
     trpc.mailboxes.folders.queryOptions(
@@ -1731,13 +1752,8 @@ export function MailboxContentView({
         ) ?? []),
       ];
   // "Carregar mais" and J at the end of the list follow whatever the list shows.
-  const pager = searching
-    ? {
-        hasNextPage: found.hasNextPage,
-        isFetchingNextPage: found.isFetchingNextPage,
-        fetchNextPage: found.fetchNextPage,
-      }
-    : listing;
+  const pager = searching ? found : listing;
+  const recoverMore = () => (searching ? recoverSearch(true) : recoverListing(true));
   /**
    * The open message is leaving this view (archived, trashed, marked spam):
    * the next one in the list opens, so clearing the inbox is one key per
@@ -1760,7 +1776,7 @@ export function MailboxContentView({
   const pagesLoaded = listing.data?.pages.length ?? 0;
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = listing;
   useEffect(() => {
-    if (!smartOn || pile === "all") return;
+    if (!smartOn || pile === "all" || listing.isError || listing.fetchStatus === "paused") return;
     if (
       shouldLoadMore({
         shown: pileShown,
@@ -1770,7 +1786,17 @@ export function MailboxContentView({
       })
     )
       void fetchNextPage();
-  }, [smartOn, pile, pileShown, pagesLoaded, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [
+    smartOn,
+    pile,
+    pileShown,
+    pagesLoaded,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    listing.isError,
+    listing.fetchStatus,
+  ]);
   const selectedBox = readable.find((b) => b.id === selection?.mailboxId);
   // Warms the folder list "Move to" opens with, as soon as a message is open.
   useQuery(
@@ -1780,12 +1806,11 @@ export function MailboxContentView({
     ),
   );
   const selectedRow =
-    !listing.isError && selectedBox
+    listingReady && selectedBox
       ? rows.find((i) => i.id === selection?.id && i.mailboxId === selection?.mailboxId)
       : undefined;
   const blockedRow = selectedRow && mailboxContentBlocked(selectedRow) ? selectedRow : null;
-  const visibleItem =
-    !listing.isError && selectedBox && selectedRow && !blockedRow ? selection : null;
+  const visibleItem = listingReady && selectedBox && selectedRow && !blockedRow ? selection : null;
   const readingSelection = visibleItem ?? (blockedRow ? selection : null);
   const detail = useQuery(
     trpc.mailboxes.item.queryOptions(visibleItem ?? { mailboxId: NIL, id: NIL }, {
@@ -3195,7 +3220,7 @@ export function MailboxContentView({
     writeNoticePreference(true);
     setNotice(t("notices.enabled"));
   }
-  const hasRows = !listing.isError && !listing.isPending && rows.length > 0;
+  const hasRows = listingReady && rows.length > 0;
   const unreadTotal =
     listedItems?.filter(
       (i) =>
@@ -3397,8 +3422,8 @@ export function MailboxContentView({
               type="button"
               className="ms-btn ms-btn-ghost"
               aria-label={t("refresh")}
-              disabled={listing.isFetching}
-              onClick={() => void refresh()}
+              aria-busy={searching ? found.isFetching : listing.isFetching}
+              onClick={() => void (searching ? recoverSearch() : recoverListing())}
             >
               <MailboxFolderIcon name="refresh" />
             </button>
@@ -3538,10 +3563,21 @@ export function MailboxContentView({
                   </button>
                 </p>
               ) : null}
+              {searchTerm !== null && searchRecovery ? (
+                <QueryRecoveryNotice
+                  phase={searchRecovery}
+                  message={t(`recovery.${searchRecovery}`)}
+                  retryLabel={t("retry")}
+                  retry={() =>
+                    recoverSearch(found.isFetchingNextPage || found.isFetchNextPageError)
+                  }
+                  className={styles.searchStatus}
+                />
+              ) : null}
               {mailboxesTruncated ? (
                 <p className={styles.trashHelp}>{t("organization.limitedList")}</p>
               ) : null}
-              {!listing.isPending && !listing.isError ? (
+              {listingReady ? (
                 <div
                   className={styles.selectionToolbar}
                   data-active={checkedRows.length > 0 || undefined}
@@ -3751,17 +3787,28 @@ export function MailboxContentView({
                   {t("list.newArrivals", { count: freshCount })}
                 </button>
               ) : null}
-              {listing.isError ? (
-                <div role="alert" className={styles.emptyFolder}>
-                  <p>{t("contentError")}</p>
-                  <button type="button" className="ms-btn" onClick={() => void listing.refetch()}>
-                    {t("retry")}
-                  </button>
-                </div>
-              ) : listing.isPending ? (
-                <p className={styles.emptyFolder} aria-live="polite">
-                  {t("loading")}
-                </p>
+              {listingReady &&
+              (listing.isError ||
+                listing.fetchStatus === "paused" ||
+                listing.isFetchingNextPage) ? (
+                <QueryRecoveryNotice
+                  phase={listingRecovery}
+                  message={t(`recovery.${listingRecovery}`)}
+                  retryLabel={t("retry")}
+                  retry={() =>
+                    recoverListing(listing.isFetchingNextPage || listing.isFetchNextPageError)
+                  }
+                  className={styles.notice}
+                />
+              ) : null}
+              {!listingReady ? (
+                <QueryRecoveryNotice
+                  phase={listingRecovery}
+                  message={t(`recovery.${listingRecovery}`)}
+                  retryLabel={t("retry")}
+                  retry={() => recoverListing()}
+                  className={styles.emptyFolder}
+                />
               ) : rows.length ? (
                 // biome-ignore lint/a11y/noStaticElementInteractions: swiping or holding a row is a touch shortcut; archiving and selecting stay reachable as buttons and checkboxes.
                 <div
@@ -4022,10 +4069,14 @@ export function MailboxContentView({
                       <button
                         type="button"
                         className="ms-btn ms-btn-ghost"
-                        disabled={pager.isFetchingNextPage}
-                        onClick={() => void pager.fetchNextPage()}
+                        aria-busy={pager.isFetchingNextPage}
+                        onClick={() => void recoverMore()}
                       >
-                        {t(pager.isFetchingNextPage ? "list.loadingMore" : "list.loadMore")}
+                        {t(
+                          pager.isFetchingNextPage || pager.fetchStatus === "paused"
+                            ? "recovery.retryMore"
+                            : "list.loadMore",
+                        )}
                       </button>
                     </div>
                   ) : null}
@@ -4092,10 +4143,14 @@ export function MailboxContentView({
                         <button
                           type="button"
                           className="ms-btn ms-btn-ghost"
-                          disabled={listing.isFetchingNextPage}
-                          onClick={() => void listing.fetchNextPage()}
+                          aria-busy={listing.isFetchingNextPage}
+                          onClick={() => void recoverListing(true)}
                         >
-                          {t(listing.isFetchingNextPage ? "list.loadingMore" : "list.loadMore")}
+                          {t(
+                            listing.isFetchingNextPage || listing.fetchStatus === "paused"
+                              ? "recovery.retryMore"
+                              : "list.loadMore",
+                          )}
                         </button>
                       ) : null}
                     </span>

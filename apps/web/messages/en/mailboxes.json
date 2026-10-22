@@ -17,6 +17,19 @@
   "loading": "Loading your mail…",
   "loadError": "Mailboxes could not be loaded.",
   "retry": "Try again",
+  "recovery": {
+    "loading": "Loading mail. If it takes too long, try again.",
+    "refreshing": "Refreshing mail. If it takes too long, try again.",
+    "paused": "Waiting for a connection to load mail. Loading will resume when you are online.",
+    "error": "Mail could not be loaded. Try again.",
+    "retryMore": "Retry loading more",
+    "profile": {
+      "loading": "Checking this team's available tools…",
+      "refreshing": "Checking this team's available tools…",
+      "paused": "Waiting for a connection to check this team's tools.",
+      "error": "This team's tools could not be checked. Try again to load the menu."
+    }
+  },
   "disabled": "Mail is not enabled on this installation yet.",
   "emptyTitle": "A place for every conversation",
   "emptyBody": "Prepare personal and agent mailboxes on your organization's domains. Each mailbox has its own responsible person and access.",

@@ -44,7 +44,7 @@
       },
       {
         "q": "Como o uso é contado?",
-        "a": "No Envio, cada destinatário (Para, Cc e Cco) de um e-mail aceito conta como um e-mail: uma mensagem para 3 pessoas usa 3. Endereços que já estão na sua lista de supressão não contam. Se a entrega falhar depois, o envio continua contado. No Correio, o limite de saída é de destinatários por mês, contando Para, Cc e Cco de cada mensagem enviada. Um envio que não saiu não conta; um bounce depois que o provedor aceitou, conta. Os limites do Correio e do Envio são separados: um não consome o outro."
+        "a": "No Envio, cada destinatário (Para, Cc e Cco) de um e-mail aceito conta como um e-mail: uma mensagem para 3 pessoas usa 3. Endereços que já estão na sua lista de supressão não contam. Se a entrega falhar depois, o envio continua contado. No Correio, a franquia é de destinatários de saída por mês, contando Para, Cc e Cco de cada mensagem enviada. Um envio que não saiu não conta; um bounce depois que o provedor aceitou, conta. Os limites do Correio e do Envio são separados: um não consome o outro."
       },
       {
         "q": "Existe fidelidade e posso trocar de plano depois?",
@@ -101,7 +101,7 @@
     },
     {
       "q": "Como o uso é contado?",
-      "a": "No Envio, cada destinatário (Para, Cc e Cco) de um e-mail aceito conta como um e-mail: uma mensagem para 3 pessoas usa 3. Endereços que já estão na sua lista de supressão não contam. Se a entrega falhar depois, o envio continua contado. No Correio, o limite de saída é de destinatários por mês, contando Para, Cc e Cco de cada mensagem enviada. Um envio que não saiu não conta; um bounce depois que o provedor aceitou, conta. Os limites do Correio e do Envio são separados: um não consome o outro."
+      "a": "No Envio, cada destinatário (Para, Cc e Cco) de um e-mail aceito conta como um e-mail: uma mensagem para 3 pessoas usa 3. Endereços que já estão na sua lista de supressão não contam. Se a entrega falhar depois, o envio continua contado. No Correio, a franquia é de destinatários de saída por mês, contando Para, Cc e Cco de cada mensagem enviada. Um envio que não saiu não conta; um bounce depois que o provedor aceitou, conta. Os limites do Correio e do Envio são separados: um não consome o outro."
     },
     {
       "q": "Existe fidelidade e posso trocar de plano depois?",
@@ -152,7 +152,7 @@
     "planMailboxes": "{count, plural, one {# caixa} other {# caixas}}",
     "planInbound": "{count, number} mensagens recebidas por mês",
     "planLocal": "Fora do Brasil, em dólar: {price} por mês",
-    "noteLimits": "Franquias compartilhadas entre todas as caixas. Além das quantidades, saída mensal: 256 MiB / 1 GiB / 3 GiB; entrada: 512 MiB / 1,5 GiB / 3 GiB (Solo / Duo / Equipe). Os limites renovam a cada mês de cobrança e nada é cobrado além do plano. O envio para no limite do plano; o recebimento pausa e o remetente recebe bounce permanente 5.1.1 depois do limite mais 10% de margem, ou com o armazenamento cheio, até o mês seguinte, um upgrade ou, no armazenamento, esvaziar a lixeira. As mensagens guardadas continuam legíveis, e os donos recebem um e-mail aos 80% e aos 100% de cada limite. No teste grátis, o envio fica em até 50 destinatários por dia e 200 no total."
+    "noteLimits": "Franquias compartilhadas entre todas as caixas. Além das quantidades, saída mensal: 256 MiB / 1 GiB / 5 GiB; entrada: 512 MiB / 1,5 GiB / 3 GiB (Solo / Duo / Equipe). Os limites renovam a cada mês de cobrança e nada é cobrado além do plano. O envio para no limite do plano; o recebimento pausa e o remetente recebe bounce permanente 5.1.1 depois do limite mais 10% de margem, ou com o armazenamento cheio, até o mês seguinte, um upgrade ou, no armazenamento, esvaziar a lixeira. As mensagens guardadas continuam legíveis, e os donos recebem um e-mail aos 80% e aos 100% de cada limite. No teste grátis, o envio fica em até 50 destinatários por dia e 200 no total."
   },
   "scenarios": {
     "eyebrow": "Por cenário",
@@ -196,7 +196,7 @@
   "board": {
     "mail": "Correio",
     "mailUnit": "por plano de caixas",
-    "mailAllowance": "{sends} envios, {domains} domínios",
+    "mailAllowance": "{sends} destinatários de saída/mês, {domains} domínios",
     "mailNote": "7 dias grátis no cartão ou pague mês a mês no Pix. Pessoa ou agente, o mesmo preço.",
     "send": "Envio",
     "sendUnit": "por volume",

@@ -103,6 +103,21 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+.boxIdentity {
+  display: grid;
+  gap: 2px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.boxName {
+  color: var(--ms-bone);
+  line-height: 1.35;
+}
+.boxAddress {
+  color: var(--ms-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
 
 .groupHeader {
   display: flex;
@@ -115,7 +130,7 @@
   border: 0;
   border-radius: var(--ms-r-input);
   background: none;
-  color: var(--ms-faint);
+  color: var(--ms-muted);
   font: 500 var(--ms-fs-micro) var(--ms-font-sans);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -217,16 +232,15 @@
 }
 .boxHeader strong,
 .boxHeader small {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .boxHeader strong {
   font-size: 13px;
   font-weight: 500;
 }
 .boxHeader small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ms-muted);
   font-family: var(--ms-font-mono);
 }
@@ -386,52 +400,11 @@
     margin-left: 0;
   }
 }
-/* Icons only by width, unless the person expanded it on this device. */
+/* A readable compact rail on tablets. Icons only remain an explicit preference;
+   no saved collapsed/expanded choice is changed by the window width. */
 @container (min-width: 621px) and (max-width: 1049px) {
-  :global(html:not([data-rail="expanded"])) .rail {
-    width: 56px;
-  }
-  :global(html:not([data-rail="expanded"])) .rail .quietCount,
-  :global(html:not([data-rail="expanded"])) .rail .label,
-  :global(html:not([data-rail="expanded"])) .rail .sectionHeader,
-  :global(html:not([data-rail="expanded"])) .rail .groupHeader,
-  :global(html:not([data-rail="expanded"])) .rail .search,
-  :global(html:not([data-rail="expanded"])) .rail .showAll,
-  :global(html:not([data-rail="expanded"])) .rail .empty,
-  :global(html:not([data-rail="expanded"])) .rail .boxHeader,
-  :global(html:not([data-rail="expanded"])) .rail .custom,
-  :global(html:not([data-rail="expanded"])) .rail .usage {
-    display: none;
-  }
-  :global(html:not([data-rail="expanded"])) .rail .collapsedOnly {
-    display: flex;
-  }
-  :global(html:not([data-rail="expanded"])) .rail .scroll {
-    padding: 12px 6px;
-    gap: 10px;
-  }
-  :global(html:not([data-rail="expanded"])) .rail .item {
-    justify-content: center;
-    gap: 0;
-    padding: 6px 0;
-  }
-  :global(html:not([data-rail="expanded"])) .rail .count {
-    position: absolute;
-    top: 5px;
-    right: 7px;
-    width: 7px;
-    min-width: 0;
-    height: 7px;
-    padding: 0;
-    font-size: 0;
-    background: var(--ms-violet);
-  }
-  :global(html:not([data-rail="expanded"])) .rail .footer {
-    flex-direction: column;
-    padding: 6px 0;
-  }
-  :global(html:not([data-rail="expanded"])) .rail .collapseToggle {
-    margin-left: 0;
+  :global(html:not([data-rail])) .rail {
+    width: 180px;
   }
 }
 

@@ -9,6 +9,7 @@ import { type DragEvent, useEffect, useRef, useState } from "react";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { PopoverMenu, type PopoverMenuItem } from "@/components/popover-menu";
+import { QueryRecoveryNotice } from "@/components/query-recovery";
 import { toast } from "@/components/toast";
 import { authClient } from "@/lib/auth-client";
 import { htmlDropsWork, isDesktop, notifyDesktop, setNativeTitle } from "@/lib/desktop-bridge";
@@ -31,6 +32,7 @@ import { noticesWanted } from "@/lib/mailbox-notifications";
 import { MAILBOX_OPEN_LICENSE_EVENT } from "@/lib/mailbox-plans";
 import { applyCorreioTheme, useCorreioPrefs } from "@/lib/mailbox-preferences";
 import type { MailboxPurchaseIntent } from "@/lib/public-intent";
+import { queryHasUsableData, queryRecoveryPhase, recoverQuery } from "@/lib/query-recovery";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { CorreioOffline } from "./correio-offline";
@@ -451,6 +453,13 @@ export function MailboxesView({
   const trpc = useTRPC();
   const queries = useQueryClient();
   const router = useRouter();
+  const recoveryMounted = useRef(true);
+  useEffect(() => {
+    recoveryMounted.current = true;
+    return () => {
+      recoveryMounted.current = false;
+    };
+  }, []);
   const { prefs, setPref, resetPrefs, loaded: prefsLoaded } = useCorreioPrefs();
   const operator = useQuery(trpc.system.operator.queryOptions());
   // Wait for the fresh current-team flag before mounting billing, agents or imports.
@@ -1201,8 +1210,33 @@ export function MailboxesView({
       <div className={styles.appCentered}>{body}</div>
     </section>
   );
-  if (capability.isPending) return frame(<p aria-live="polite">{t("loading")}</p>);
-  if (!capability.isError && !capability.data?.enabled)
+  async function retryRegistry() {
+    await Promise.all([
+      queries.cancelQueries({ queryKey: trpc.mailboxes.capabilities.queryKey(), exact: true }),
+      queries.cancelQueries({ queryKey: trpc.mailboxes.list.queryKey(), exact: true }),
+    ]);
+    if (!recoveryMounted.current) return;
+    const checked = await capability.refetch();
+    if (recoveryMounted.current && !checked.isError && checked.data?.enabled)
+      await registry.refetch();
+  }
+  const capabilityReady = queryHasUsableData(capability);
+  const registryReady = queryHasUsableData(registry);
+  const registryRecovery =
+    !capabilityReady || capability.isError || capability.fetchStatus === "paused"
+      ? (queryRecoveryPhase(capability) ?? "loading")
+      : (queryRecoveryPhase(registry) ?? "loading");
+  const registryNotice = (
+    <QueryRecoveryNotice
+      phase={registryRecovery}
+      message={t(`recovery.${registryRecovery}`)}
+      retryLabel={t("retry")}
+      retry={retryRegistry}
+      className={styles.notice}
+    />
+  );
+  if (!capabilityReady) return frame(registryNotice);
+  if (!capability.data?.enabled)
     return frame(
       showTeamTools && capability.data?.offered ? (
         <MailboxOffer />
@@ -1213,24 +1247,16 @@ export function MailboxesView({
         </section>
       ),
     );
-  if (!capability.isError && registry.isPending)
-    return frame(<p aria-live="polite">{t("loading")}</p>);
-  if (capability.isError || registry.isError)
-    return frame(
-      <div role="alert">
-        <p>{t("loadError")}</p>
-        <button
-          type="button"
-          className="ms-btn"
-          onClick={() => {
-            void capability.refetch();
-            void registry.refetch();
-          }}
-        >
-          {t("retry")}
-        </button>
-      </div>,
-    );
+  if (!registryReady) return frame(registryNotice);
+  const registryWarning =
+    capability.isError ||
+    registry.isError ||
+    capability.fetchStatus === "paused" ||
+    registry.fetchStatus === "paused";
+  const operatorRecovery =
+    typeof operator.data?.isOperationsMember === "boolean"
+      ? null
+      : (queryRecoveryPhase(operator) ?? "loading");
   const ownsBox = (box: Box) => box.ownerActive && box.ownerUserId === session?.user.id;
   // The rail reads a folder's first page ahead, under the same key the list uses.
   const prefetchFolder = (next: MailboxFolder) => {
@@ -1711,6 +1737,23 @@ export function MailboxesView({
           />
         </div>
       </header>
+      {registryWarning ? registryNotice : null}
+      {operatorRecovery ? (
+        <QueryRecoveryNotice
+          phase={operatorRecovery}
+          message={t(`recovery.profile.${operatorRecovery}`)}
+          retryLabel={t("retry")}
+          retry={() =>
+            recoverQuery(
+              queries,
+              trpc.system.operator.queryKey(),
+              () => operator.refetch(),
+              () => recoveryMounted.current,
+            )
+          }
+          className={styles.notice}
+        />
+      ) : null}
       {layout === "app" ? (
         <>
           {/* Desktop app: reading without internet (a no-op in browsers). */}

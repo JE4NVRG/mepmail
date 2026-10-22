@@ -27,5 +27,12 @@
     "organization": "Organization",
     "resources": "Resources"
   },
-  "newBadge": "New"
+  "newBadge": "New",
+  "recovery": {
+    "loading": "Checking which services this team can use…",
+    "refreshing": "Checking which services this team can use…",
+    "paused": "Waiting for a connection to check this team's services.",
+    "error": "This team's services could not be checked. Try again to load the menu.",
+    "retry": "Try again"
+  }
 }

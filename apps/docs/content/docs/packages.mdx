@@ -11,9 +11,9 @@ do — running MCP locally, moving an account over and wiring MepMail into n8n.
 {/* package-facts:start */}
 | Package | Source version | Node | Role |
 | --- | --- | --- | --- |
-| [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) | 0.3.2 | `>=20` | 22 team tools and 6 Correio mailbox tools, depending on the credential. [Guide](/mcp). |
+| [`@mepmail/mcp`](https://www.npmjs.com/package/@mepmail/mcp) | 0.3.2 | `>=20` | 22 team tools and 6 Mail mailbox tools, depending on the credential. [Guide](/mcp). |
 | [`@mepmail/cli`](https://www.npmjs.com/package/@mepmail/cli) | 0.2.4 | `>=18` | Account migration with plan, apply and report. [Guide](/cli). |
-| [`n8n-nodes-mepmail`](https://www.npmjs.com/package/n8n-nodes-mepmail) | [See npm](https://www.npmjs.com/package/n8n-nodes-mepmail) | n8n | Sending and Correio mailbox workflows. [Guide](/integrations#n8n). |
+| [`n8n-nodes-mepmail`](https://www.npmjs.com/package/n8n-nodes-mepmail) | [See npm](https://www.npmjs.com/package/n8n-nodes-mepmail) | n8n | Send and Mail mailbox workflows. [Guide](/integrations#n8n). |
 
 The [hosted MCP](/mcp) at this revision is **0.71.1**, with **79 tools** advertised in the [server card](https://mepmail.dev/.well-known/mcp/server-card.json). The additional `list_teams` tool appears only on all-teams grants. Scopes and permissions can reduce the effective list.
 {/* package-facts:end */}
@@ -53,8 +53,8 @@ install:
 | --- | --- | --- | --- |
 | `MEPMAIL_API_KEY` | for team tools | — | Team API key (`ms_...`) from **API keys** in the dashboard. The tools act with exactly this key's reach. May be omitted for a mailbox-only client. |
 | `MEPMAIL_BASE_URL` | no | `https://api.mepmail.dev` | Your instance's API origin. Set it for a self-hosted deployment. |
-| `MEPMAIL_MAIL_TOKEN` | for mailbox tools | — | Correio agent key (`mmb_...` for one mailbox or `mmt_...` for the mailboxes selected by a team credential). Works without a team API key. |
-| `MEPMAIL_MAIL_ORIGIN` | no | `https://mepmail.dev` | Dashboard origin serving Correio. Set it for your self-hosted mailbox service. |
+| `MEPMAIL_MAIL_TOKEN` | for mailbox tools | — | Mail agent key (`mmb_...` for one mailbox or `mmt_...` for the mailboxes selected by a team credential). Works without a team API key. |
+| `MEPMAIL_MAIL_ORIGIN` | no | `https://mepmail.dev` | Dashboard origin serving Mail. Set it for your self-hosted mailbox service. |
 
 For a mailbox-only client, replace `MEPMAIL_API_KEY` in the configuration above
 with `MEPMAIL_MAIL_TOKEN`. Team tools call the API origin; mailbox tools call

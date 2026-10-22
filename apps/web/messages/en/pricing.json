@@ -44,7 +44,7 @@
       },
       {
         "q": "How is usage counted?",
-        "a": "In Send, each recipient (To, Cc and Bcc) of an accepted email counts as one email: a message to 3 people uses 3. Addresses already on your suppression list do not count. If delivery fails later, the send still counts. In Mail, the outbound limit is recipients per month, counting To, Cc and Bcc of each message sent. A send that never left does not count; a bounce after the provider accepted it does. Mail and Send limits are separate: one never uses up the other."
+        "a": "In Send, each recipient (To, Cc and Bcc) of an accepted email counts as one email: a message to 3 people uses 3. Addresses already on your suppression list do not count. If delivery fails later, the send still counts. In Mail, the allowance is outbound recipients per month, counting To, Cc and Bcc of each message sent. A send that never left does not count; a bounce after the provider accepted it does. Mail and Send limits are separate: one never uses up the other."
       },
       {
         "q": "Is there a contract, and can I change plans later?",
@@ -60,7 +60,7 @@
       },
       {
         "q": "Can I pay with Pix?",
-        "a": "Yes, in Brazil. Send and Correio take Pix as well as card, in reais. With Pix you pay one period at a time: each renewal arrives as an invoice to pay with Pix within 5 days, never charged automatically. Correio's 7-day free trial is card only. Boleto is not accepted."
+        "a": "Yes, in Brazil. Send and Mail take Pix as well as card, in reais. With Pix you pay one period at a time: each renewal arrives as an invoice to pay with Pix within 5 days, never charged automatically. Mail's 7-day free trial is card only. Boleto is not accepted."
       },
       {
         "q": "What happens above the top plan?",
@@ -101,7 +101,7 @@
     },
     {
       "q": "How is usage counted?",
-      "a": "In Send, each recipient (To, Cc and Bcc) of an accepted email counts as one email: a message to 3 people uses 3. Addresses already on your suppression list do not count. If delivery fails later, the send still counts. In Mail, the outbound limit is recipients per month, counting To, Cc and Bcc of each message sent. A send that never left does not count; a bounce after the provider accepted it does. Mail and Send limits are separate: one never uses up the other."
+      "a": "In Send, each recipient (To, Cc and Bcc) of an accepted email counts as one email: a message to 3 people uses 3. Addresses already on your suppression list do not count. If delivery fails later, the send still counts. In Mail, the allowance is outbound recipients per month, counting To, Cc and Bcc of each message sent. A send that never left does not count; a bounce after the provider accepted it does. Mail and Send limits are separate: one never uses up the other."
     },
     {
       "q": "Is there a contract, and can I change plans later?",
@@ -117,7 +117,7 @@
     },
     {
       "q": "Can I pay with Pix?",
-      "a": "Yes, in Brazil. Send and Correio take Pix as well as card, in reais. With Pix you pay one period at a time: each renewal arrives as an invoice to pay with Pix within 5 days, never charged automatically. Correio's 7-day free trial is card only. Boleto is not accepted."
+      "a": "Yes, in Brazil. Send and Mail take Pix as well as card, in reais. With Pix you pay one period at a time: each renewal arrives as an invoice to pay with Pix within 5 days, never charged automatically. Mail's 7-day free trial is card only. Boleto is not accepted."
     },
     {
       "q": "What happens above the top plan?",
@@ -152,7 +152,7 @@
     "planMailboxes": "{count, plural, one {# mailbox} other {# mailboxes}}",
     "planInbound": "{count, number} messages received a month",
     "planLocal": "In Brazil, charged in reais: {price} a month",
-    "noteLimits": "Allowances are shared across all mailboxes. Monthly outbound bytes: 256 MiB / 1 GiB / 3 GiB; inbound: 512 MiB / 1.5 GiB / 3 GiB (Solo / Duo / Team). Limits renew every billing month and nothing is charged beyond the plan. Sending stops at the plan's limit; receiving pauses and the sender gets a permanent 5.1.1 bounce past the limit plus a 10% margin, or with storage full, until the next month, an upgrade or, for storage, emptying the trash. Stored mail stays readable, and owners get an email at 80% and 100% of each limit. During the free trial, sending is limited to 50 recipients a day and 200 in total."
+    "noteLimits": "Allowances are shared across all mailboxes. Monthly outbound bytes: 256 MiB / 1 GiB / 5 GiB; inbound: 512 MiB / 1.5 GiB / 3 GiB (Solo / Duo / Equipe). Limits renew every billing month and nothing is charged beyond the plan. Sending stops at the plan's limit; receiving pauses and the sender gets a permanent 5.1.1 bounce past the limit plus a 10% margin, or with storage full, until the next month, an upgrade or, for storage, emptying the trash. Stored mail stays readable, and owners get an email at 80% and 100% of each limit. During the free trial, sending is limited to 50 recipients a day and 200 in total."
   },
   "scenarios": {
     "eyebrow": "By scenario",
@@ -196,7 +196,7 @@
   "board": {
     "mail": "Mail",
     "mailUnit": "per plan of mailboxes",
-    "mailAllowance": "{sends} sends, {domains} domains",
+    "mailAllowance": "{sends} outbound recipients/month, {domains} domains",
     "mailNote": "7 days free with a card. Person or agent, the same price.",
     "send": "Send",
     "sendUnit": "by volume",

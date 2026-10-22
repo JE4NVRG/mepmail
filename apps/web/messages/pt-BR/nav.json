@@ -27,5 +27,12 @@
     "organization": "Organização",
     "resources": "Recursos"
   },
-  "newBadge": "Novo"
+  "newBadge": "Novo",
+  "recovery": {
+    "loading": "Conferindo quais serviços esta equipe pode usar…",
+    "refreshing": "Conferindo quais serviços esta equipe pode usar…",
+    "paused": "Aguardando conexão para conferir os serviços desta equipe.",
+    "error": "Não foi possível conferir os serviços desta equipe. Tente novamente para carregar o menu.",
+    "retry": "Tentar novamente"
+  }
 }

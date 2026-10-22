@@ -14,6 +14,10 @@ const state = vi.hoisted(() => ({
   operator: true,
   canReadUsers: false,
   isOperationsMember: false as boolean | undefined,
+  profile: "success" as "success" | "pending" | "paused" | "error",
+  cachedProfile: false,
+  retry: vi.fn(async () => ({})),
+  cancel: vi.fn(async () => {}),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -22,22 +26,29 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/trpc", () => ({
   useTRPC: () => ({
-    system: { operator: { queryOptions: () => ({ query: "operator" }) } },
+    system: { operator: { queryOptions: () => ({ query: "operator", queryKey: ["operator"] }) } },
     mailboxes: { capabilities: { queryOptions: () => ({ query: "mailboxes" }) } },
   }),
 }));
 vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ cancelQueries: state.cancel }),
   useQuery: (options: { query: string }) => ({
     data:
       options.query === "operator"
-        ? {
-            isOperator: state.operator,
-            canReadUsers: state.canReadUsers,
-            isOperationsMember: state.isOperationsMember,
-          }
+        ? state.profile !== "success" && !state.cachedProfile
+          ? undefined
+          : {
+              isOperator: state.operator,
+              canReadUsers: state.canReadUsers,
+              isOperationsMember: state.isOperationsMember,
+            }
         : state.mailEnabled === undefined
           ? undefined
           : { enabled: state.mailEnabled },
+    isPending: options.query === "operator" && ["pending", "paused"].includes(state.profile),
+    isError: options.query === "operator" && state.profile === "error",
+    fetchStatus: options.query === "operator" && state.profile === "paused" ? "paused" : "idle",
+    refetch: state.retry,
   }),
 }));
 vi.mock("@/lib/auth-client", () => ({ authClient: { signOut: vi.fn() } }));
@@ -51,6 +62,10 @@ beforeEach(() => {
   state.operator = true;
   state.canReadUsers = false;
   state.isOperationsMember = false;
+  state.profile = "success";
+  state.cachedProfile = false;
+  state.retry.mockClear();
+  state.cancel.mockClear();
 });
 
 function navMarkup(locale: "en" | "pt-BR") {
@@ -77,6 +92,31 @@ function hrefs(markup: string) {
 
 for (const locale of ["en", "pt-BR"] as const) {
   describe(`stable Sidebar navigation (${locale})`, () => {
+    it.each(["pending", "paused", "error"] as const)(
+      "explains the unresolved %s profile with a reachable retry and keeps private links hidden",
+      (profile) => {
+        state.profile = profile;
+        state.operator = false;
+        const { nav } = navMarkup(locale);
+        const messages = locale === "en" ? enNav : ptNav;
+        expect(nav).toContain(messages.recovery[profile === "pending" ? "loading" : profile]);
+        expect(nav).toContain(messages.recovery.retry);
+        expect(nav).toContain(profile === "error" ? 'role="alert"' : 'role="status"');
+        expect(nav).not.toMatch(/<button[^>]*disabled/);
+        for (const href of ["/emails", "/domains", "/api-keys", "/console"])
+          expect(hrefs(nav)).not.toContain(href);
+      },
+    );
+
+    it("retains a confirmed ordinary menu when a background check fails", () => {
+      state.profile = "error";
+      state.cachedProfile = true;
+      state.operator = false;
+      const { nav } = navMarkup(locale);
+      expect(hrefs(nav)).toContain("/emails");
+      expect(hrefs(nav)).toContain("/domains");
+      expect(nav).not.toContain('role="alert"');
+    });
     it("preserves the full navigation and width when leaving Mail for a shared domain or settings page", () => {
       const first = navMarkup(locale);
       const initialLinks = hrefs(first.nav);

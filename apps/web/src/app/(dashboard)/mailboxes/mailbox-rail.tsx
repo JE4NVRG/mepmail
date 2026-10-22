@@ -43,8 +43,8 @@ type DropProps = Record<string, unknown>;
 /**
  * The Correio side rail: every mailbox grouped by use with its unread count,
  * the selected mailbox and its actions, the system folders and the person's
- * own folders. It collapses to icons on this device, follows the window width
- * between 620 and 1050 px, and becomes a full-screen drawer on a phone.
+ * own folders. It collapses to icons by choice on this device, keeps a compact
+ * readable width on tablets, and becomes a full-screen drawer on a phone.
  */
 export function MailboxRail({
   boxes,
@@ -261,6 +261,7 @@ export function MailboxRail({
                   className={styles.item}
                   aria-current={selectedId === box.id ? "page" : undefined}
                   title={`${box.label} · ${box.address}`}
+                  aria-label={`${box.label} · ${box.address}${unread[box.id] ? ` · ${unreadLabel(unread[box.id] ?? 0)}` : ""}`}
                   onClick={() => onSelectBox(box.id)}
                 >
                   <span
@@ -270,7 +271,10 @@ export function MailboxRail({
                   >
                     {mailboxInitials(box.label, box.address)}
                   </span>
-                  <span className={styles.label}>{box.label}</span>
+                  <span className={`${styles.label} ${styles.boxIdentity}`}>
+                    <span className={styles.boxName}>{box.label}</span>
+                    <span className={styles.boxAddress}>{box.address}</span>
+                  </span>
                   {pill(unread[box.id] ?? 0)}
                 </button>
               ))}

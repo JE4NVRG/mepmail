@@ -19,7 +19,7 @@ Send without creating a mailbox.
 Mail is sold in three monthly plans, with or without a Send plan. People and
 agents cost the same.
 
-| Plan | Mailboxes | Storage | Recipients sent a month | Messages received a month | Price a month |
+| Plan | Mailboxes | Storage | Outbound recipients per month | Messages received per month | Price a month |
 | --- | --- | --- | --- | --- | --- |
 | Solo | 1 | 1 GiB | 500 | 2,000 | US$ 2.90 (R$ 14.90 in Brazil) |
 | Duo | 3 | 3 GiB | 2,000 | 5,000 | US$ 5.90 (R$ 29.90) |
@@ -29,7 +29,8 @@ agents cost the same.
   Nothing is charged beyond the plan.
 - **Domains:** Solo and Duo include 3 sender domains, Equipe 10, on top of what a
   Send plan already allows.
-- **Sending** counts recipients: one message to three distinct addresses counts
+- **Sending** counts the recipients in To, Cc and Bcc of each sent message:
+  one message to three distinct addresses counts
   three. The plan also caps the bytes sent (message size times recipients):
   256 MiB, 1 GiB and 5 GiB a month. Past either limit a send is refused with
   `quota` until the next billing month or an upgrade.
@@ -207,7 +208,7 @@ A read/draft key, without the **send** permission, does not send on its own: the
 same request records that the agent wants to send that revision and answers
 `202` with `"status": "awaiting_approval"`. The mailbox owner gets an email (at
 most one every 10 minutes per mailbox) and sees the draft marked **Awaiting your
-approval** in Correio; they check it and send, edit or delete it. Repeating the
+approval** in Mail; they check it and send, edit or delete it. Repeating the
 request for the same revision answers `200` with `duplicate: true`. Editing the
 draft makes a new revision, which needs a new request. This is how you keep a
 person in the loop: create the agent key without the send permission.

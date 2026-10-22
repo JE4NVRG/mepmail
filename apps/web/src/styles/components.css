@@ -435,6 +435,16 @@ table.ms-table {
   color: var(--ms-danger);
 }
 .ms-input::placeholder {
+  color: var(--ms-muted);
+  opacity: 1;
+}
+/* Search remains an identifiable field even in toolbars that strip input chrome. */
+.ms-input[type="search"] {
+  background: var(--ms-inset);
+  border: 1px solid var(--ms-line-strong);
+  padding-inline: 10px;
+}
+.ms-input:disabled::placeholder {
   color: var(--ms-faint);
 }
 .ms-input.mono {

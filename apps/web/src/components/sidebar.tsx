@@ -1,18 +1,20 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { EllipsisGlyph, NavGlyph, type NavIconName } from "@/components/icons/nav-icons";
 import { useDismiss } from "@/components/popover-menu";
+import { QueryRecoveryNotice } from "@/components/query-recovery";
 import { TeamSwitcher } from "@/components/team-switcher";
 import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
 import { DOCS_URL } from "@/lib/docs-links";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { isActive, navItemsWithConsole } from "@/lib/nav";
+import { queryRecoveryPhase, recoverQuery } from "@/lib/query-recovery";
 import { openSupportChat } from "@/lib/support-chat";
 import { applyTheme, currentTheme, type Theme } from "@/lib/theme";
 import { useTRPC } from "@/lib/trpc";
@@ -206,17 +208,30 @@ export function Sidebar({
   const tCommon = useTranslations("common");
   const pathname = usePathname();
   const trpc = useTRPC();
+  const queries = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
+  const recoveryMounted = useRef(true);
+  useEffect(() => {
+    recoveryMounted.current = true;
+    return () => {
+      recoveryMounted.current = false;
+    };
+  }, []);
   useDismiss(accountRef, menuOpen, () => setMenuOpen(false));
   // The console is the operator's own: the item appears only for them, and
   // the gate is the server's (a 404 for anyone else), never this query.
-  const operator = useQuery(trpc.system.operator.queryOptions());
+  const operatorOptions = trpc.system.operator.queryOptions();
+  const operator = useQuery(operatorOptions);
   const mailboxCapability = useQuery(trpc.mailboxes.capabilities.queryOptions());
   const mailEnabled =
     mailboxCapability.data?.enabled === true || mailboxCapability.data?.offered === true;
   // Until the current team's policy is known, keep private Send links out of view.
   const showSending = operator.data?.isOperationsMember === false;
+  const operatorRecovery =
+    typeof operator.data?.isOperationsMember === "boolean"
+      ? null
+      : (queryRecoveryPhase(operator) ?? "loading");
   const organizationBase = showSending
     ? ORGANIZATION_NAV_ITEMS
     : ORGANIZATION_NAV_ITEMS.filter((item) => item.key === "settings");
@@ -299,6 +314,23 @@ export function Sidebar({
               active={isActive(pathname, MAIL_NAV_ITEM.href)}
               label={t(MAIL_NAV_ITEM.key)}
               badge={t("newBadge")}
+            />
+          </section>
+        ) : null}
+        {operatorRecovery ? (
+          <section className={styles.navSection}>
+            <QueryRecoveryNotice
+              phase={operatorRecovery}
+              message={t(`recovery.${operatorRecovery}`)}
+              retryLabel={t("recovery.retry")}
+              retry={() =>
+                recoverQuery(
+                  queries,
+                  operatorOptions.queryKey,
+                  () => operator.refetch(),
+                  () => recoveryMounted.current,
+                )
+              }
             />
           </section>
         ) : null}

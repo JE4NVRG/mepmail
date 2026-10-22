@@ -17,6 +17,19 @@
   "loading": "Carregando seu correio…",
   "loadError": "Não foi possível carregar as caixas.",
   "retry": "Tentar novamente",
+  "recovery": {
+    "loading": "Carregando o correio. Se demorar, tente novamente.",
+    "refreshing": "Atualizando o correio. Se demorar, tente novamente.",
+    "paused": "Aguardando conexão para carregar o correio. O carregamento continua quando a conexão voltar.",
+    "error": "Não foi possível carregar o correio. Tente novamente.",
+    "retryMore": "Tentar carregar mais novamente",
+    "profile": {
+      "loading": "Conferindo as ferramentas disponíveis nesta equipe…",
+      "refreshing": "Conferindo as ferramentas disponíveis nesta equipe…",
+      "paused": "Aguardando conexão para conferir as ferramentas desta equipe.",
+      "error": "Não foi possível conferir as ferramentas desta equipe. Tente novamente para carregar o menu."
+    }
+  },
   "disabled": "O correio ainda não está habilitado nesta instalação.",
   "emptyTitle": "Um lugar para cada conversa",
   "emptyBody": "Prepare caixas pessoais e de agentes nos domínios da sua organização. Cada caixa terá seu próprio responsável e acesso.",

@@ -1,15 +1,15 @@
 {
   "terms": {
     "title": "Terms of Service",
-    "updated": "Last updated: October 19, 2026",
+    "updated": "Last updated: October 22, 2026",
     "intro": "These terms govern your access to and use of MepMail, an email service operated by Je4nDev (\"we\", \"us\") with two products: Send, for transactional and permission-based marketing email, and Mail, for mailboxes on your own domain. By creating an account or using the service, you agree to these terms. If you do not agree, do not use the service.",
     "sections": [
       {
         "title": "1. The service",
         "body": [
           "Send lets you send transactional email through an HTTPS API, an SMTP relay, or an MCP server, and manage sending domains, contacts, suppressions and delivery events. Delivery runs on Amazon SES, which acts as our sending infrastructure.",
-          "Send comes in tiers: Free and Starter have a daily sending limit, and Pro and Scale include a monthly volume. You are responsible for choosing the tier that fits your volume. On Free and Starter, sends past the daily limit wait in a queue and are never charged; once that queue reaches 3× the daily limit, new sends are refused. On monthly Pro and Scale, sends past the included volume are billed as overage, which comes switched on and can be turned off in Billing, as described on the pricing page.",
-          "Mail provides mailboxes on your domain, for people and for AI agents: receive, read, organize and answer messages on the website, in the apps, over IMAP and SMTP, through the API or over MCP. It is bought as a plan (Solo, Duo or Team), with the number of mailboxes, the storage and the monthly sending and receiving allowances shown on the pricing page at the time of purchase. Mail has no overage: when an allowance runs out, sending stops until the next month, and incoming messages past the allowance or with storage full may be refused, with a notice to the sender.",
+          "Send comes in tiers: Free and Starter have a daily sending limit (UTC), and Pro and Scale include a monthly volume. You are responsible for choosing the tier that fits your volume. On Free and Starter, sends continue up to 50% past the daily limit at no extra charge, then wait in a queue for the next UTC day; once that queue reaches 3× the daily limit, new sends are refused. On monthly Pro and Scale, sends past the included volume are billed as overage, which comes switched on and can be turned off in Billing, as described on the pricing page.",
+          "Mail provides mailboxes on your domain, for people and for AI agents: receive, read, organize and answer messages on the website, in the apps, over IMAP and SMTP, through the API or over MCP. It is bought as a plan (Solo, Duo or Equipe), with the number of mailboxes, the storage, the outbound recipients per month and the received messages per month shown on the pricing page at the time of purchase. Outbound usage counts the recipients in To, Cc and Bcc of each sent message. Mail has no overage: when an allowance runs out, sending stops until the next month, and incoming messages past the allowance or with storage full may be refused, with a notice to the sender.",
           "You can also connect accounts you already have with other providers (such as Gmail, iCloud, Yahoo, Zoho, Outlook or another IMAP account) to Mail at no cost, within the limits shown in the product. Those accounts remain subject to the provider's terms; MepMail uses the access you grant only to read the Inbox and send the messages you write, and you can disconnect them at any time. If you give an AI agent access to a mailbox, you choose its permissions: without the send permission, every send waits for your approval. You are responsible for what the agent sends on your behalf."
         ]
       },
@@ -160,7 +160,7 @@
       {
         "title": "5. Google and Microsoft data",
         "body": [
-          "When you connect a Google (Gmail) or Microsoft (Outlook, Hotmail, Microsoft 365) account, MepMail uses the access granted only to read that account's Inbox and send the messages you write from it, inside Correio. We do not use this data for advertising, do not sell it and do not transfer it to third parties, except to the infrastructure providers needed to run the feature, for security or when the law requires it. No one on our team reads these messages, except with your consent, for security or when the law requires it.",
+          "When you connect a Google (Gmail) or Microsoft (Outlook, Hotmail, Microsoft 365) account, MepMail uses the access granted only to read that account's Inbox and send the messages you write from it, inside Mail. We do not use this data for advertising, do not sell it and do not transfer it to third parties, except to the infrastructure providers needed to run the feature, for security or when the law requires it. No one on our team reads these messages, except with your consent, for security or when the law requires it.",
           "MepMail's use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.",
           "You can withdraw the access at any time: disconnect the account in MepMail, or remove the access in your Google or Microsoft account's security settings."
         ]
@@ -329,7 +329,7 @@
         "title": "3. What is deleted",
         "list": [
           "Right away: your user, your sessions and your access to teams.",
-          "When the team is deleted: contacts, emails, domains, API keys, templates, campaigns, members and the Correio mailboxes with their messages.",
+          "When the team is deleted: contacts, emails, domains, API keys, templates, campaigns, members and the Mail mailboxes with their messages.",
           "Within 30 days: the remaining personal data, including backups, which expire in that period."
         ]
       },

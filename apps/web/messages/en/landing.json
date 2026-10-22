@@ -299,7 +299,7 @@
       },
       {
         "q": "Can I pay with Pix?",
-        "a": "Yes, in Brazil. Send and Correio take Pix as well as card, in reais. With Pix you pay one period at a time: each renewal arrives as an invoice to pay with Pix within 5 days, never charged automatically. Correio's 7-day free trial is card only. Boleto is not accepted."
+        "a": "Yes, in Brazil. Send and Mail take Pix as well as card, in reais. With Pix you pay one period at a time: each renewal arrives as an invoice to pay with Pix within 5 days, never charged automatically. Mail's 7-day free trial is card only. Boleto is not accepted."
       },
       {
         "q": "How does the Free plan work?",
@@ -368,7 +368,7 @@
       "Connect Claude, Cursor or any agent through the Mail MCP, no code.",
       "You choose what each agent can do: read, draft or send."
     ],
-    "price": "From {price} a month: Solo with 1 mailbox, Duo with 3 or Team with 10. 7 days free with a card; cancel before it ends to avoid the charge.",
+    "price": "From {price} a month: Solo with 1 mailbox, Duo with 3 or Equipe with 10. 7 days free with a card; cancel before it ends to avoid the charge.",
     "cta": "Explore Mail",
     "pricing": "See Mail pricing",
     "desktop": "Also on your computer:",
@@ -414,7 +414,7 @@
       "title": "An inbox your agent works in.",
       "lead": "Mailboxes for you, your team and AI agents. Agents read and draft; you choose direct sending or approval for each reply.",
       "compare": "Ten mailboxes for <b>{ours}</b> a month. AgentMail asks <b>{theirs}</b> for its ten.",
-      "compareNote": "Equipe: 10 mailboxes, 10,000 emails and 10 domains. AgentMail Developer: 10 inboxes, 10,000 emails and 10 domains for US$ {usd} a month, checked on {date}.",
+      "compareNote": "Equipe: 10 mailboxes, 10,000 outbound recipients per month and 10 domains. AgentMail Developer: 10 inboxes, 10,000 emails and 10 domains for US$ {usd} a month, checked on {date}.",
       "doorTitle": "Real mailboxes on the domain you own.",
       "doorBody": "Read, reply and schedule in the app or the browser. The agent works inside the same mailbox, with only the permissions you grant.",
       "mockAria": "Example: an inbox where the agent drafted a reply that waits for your approval",
