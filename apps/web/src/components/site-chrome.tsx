@@ -134,7 +134,7 @@ export function SignupLink({
     <SignupCta
       className={className ?? "ms-btn ms-btn-primary gtm-action"}
       label={label}
-      mailboxPlan={mailboxPlan}
+      {...(mailboxPlan ? { mailboxPlan } : {})}
     />
   );
 }

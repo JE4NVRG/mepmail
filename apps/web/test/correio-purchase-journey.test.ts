@@ -73,8 +73,9 @@ describe("Correio intent across the real auth and onboarding route boundaries", 
     async (plan) => {
       const signup = new URL(signupMailboxHref(plan), "https://mepmail.test");
       const next = signup.searchParams.get("next");
+      if (!next) throw new Error("Correio signup must retain its destination");
       const signupView = await SignupPage({
-        searchParams: Promise.resolve({ next: next ?? undefined }),
+        searchParams: Promise.resolve({ next }),
       });
       expect(signupView.props.mode).toBe("signup");
 
@@ -95,13 +96,14 @@ describe("Correio intent across the real auth and onboarding route boundaries", 
         });
       const onboardingUrl = new URL(withNext("/onboarding", target), "https://mepmail.test");
       const onboardingNext = onboardingUrl.searchParams.get("next");
+      if (!onboardingNext) throw new Error("Team creation must retain the Correio destination");
       const teamCreation = await OnboardingPage({
-        searchParams: Promise.resolve({ next: onboardingNext ?? undefined }),
+        searchParams: Promise.resolve({ next: onboardingNext }),
       });
       expect(teamCreation.props.logoUploadsEnabled).toBe(false);
       h.hasTeam = true;
       await expect(
-        OnboardingPage({ searchParams: Promise.resolve({ next: onboardingNext ?? undefined }) }),
+        OnboardingPage({ searchParams: Promise.resolve({ next: onboardingNext }) }),
       ).rejects.toEqual({ location: target });
 
       const destination = new URL(target, "https://mepmail.test");

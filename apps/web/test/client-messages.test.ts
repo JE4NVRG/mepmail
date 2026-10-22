@@ -127,9 +127,15 @@ describe("messages sent to the browser", () => {
     expect(readFileSync(join(src, "components/public-account.tsx"), "utf8")).toMatch(
       /<a\s[^>]*href="\/emails"/,
     );
-    expect(readFileSync(join(src, "components/signup-cta.tsx"), "utf8")).toMatch(
-      /<a\s[^>]*href=\{signupHref/,
+    const signupSource = withoutComments(
+      readFileSync(join(src, "components/signup-cta.tsx"), "utf8"),
     );
+    // Both Send and Correio return targets must cross the public/private message
+    // boundary by document navigation, regardless of which helper builds the URL.
+    expect(signupSource).toMatch(/<a\b[^>]*\bhref=\{/);
+    expect(signupSource).toMatch(/<\/a>/);
+    expect(signupSource).not.toMatch(/\bfrom\s+["']next\/link["']/);
+    expect(signupSource).not.toMatch(/\b(?:router\.(?:push|replace)|preventDefault)\s*\(/);
   });
 
   it("reduces the serialized public translation boundary by at least 75% in both locales", () => {
