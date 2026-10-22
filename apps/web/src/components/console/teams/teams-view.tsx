@@ -1,6 +1,7 @@
 "use client";
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useDeferredValue, useMemo, useState } from "react";
 import { DOMAIN_REGIONS, regionFlag } from "@/app/(dashboard)/domains/regions";
@@ -118,6 +119,7 @@ export function TeamsView() {
   const [regionParam, setRegion] = useUrlState("region", "all");
   const [guardrailParam, setGuardrail] = useUrlState("guardrail", "all");
   const [statusParam, setStatus] = useUrlState("status", "active");
+  const router = useRouter();
   const [sortParam, setSort] = useUrlState("sort", "sent30d");
   const [dirParam, setDir] = useUrlState("dir", "desc");
   const [limit, setLimit] = useState(25);
@@ -406,9 +408,20 @@ export function TeamsView() {
                       <td className="right" style={{ width: 40 }}>
                         <PopoverMenu
                           ariaLabel={common("actions")}
-                          items={teamMenuItems(row, actions, (key) => t(`menu.${key}`), {
-                            supportView,
-                          })}
+                          items={[
+                            ...teamMenuItems(row, actions, (key) => t(`menu.${key}`), {
+                              supportView,
+                            }),
+                            null,
+                            {
+                              label: t("menu.audit"),
+                              onSelect: () => router.push(`/console/audit?team=${row.id}`),
+                            },
+                            {
+                              label: t("menu.review"),
+                              onSelect: () => router.push(`/console/safety/${row.id}`),
+                            },
+                          ]}
                         />
                       </td>
                     </tr>

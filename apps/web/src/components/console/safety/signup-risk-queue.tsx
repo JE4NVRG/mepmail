@@ -111,22 +111,26 @@ export function SignupRiskQueue() {
             }}
           >
             <span>{t("queue.count", { count: query.data?.total ?? 0 })}</span>
-            <button
-              className="ms-btn ms-btn-secondary"
-              type="button"
-              disabled={offset === 0 || query.isFetching}
-              onClick={() => setOffset(Math.max(0, offset - 25))}
-            >
-              {t("queue.previous")}
-            </button>
-            <button
-              className="ms-btn ms-btn-secondary"
-              type="button"
-              disabled={query.data?.nextOffset == null || query.isFetching}
-              onClick={() => setOffset(query.data?.nextOffset ?? offset)}
-            >
-              {t("queue.next")}
-            </button>
+            {offset > 0 || query.data?.nextOffset != null ? (
+              <>
+                <button
+                  className="ms-btn ms-btn-secondary"
+                  type="button"
+                  disabled={offset === 0 || query.isFetching}
+                  onClick={() => setOffset(Math.max(0, offset - 25))}
+                >
+                  {t("queue.previous")}
+                </button>
+                <button
+                  className="ms-btn ms-btn-secondary"
+                  type="button"
+                  disabled={query.data?.nextOffset == null || query.isFetching}
+                  onClick={() => setOffset(query.data?.nextOffset ?? offset)}
+                >
+                  {t("queue.next")}
+                </button>
+              </>
+            ) : null}
           </div>
         </>
       )}

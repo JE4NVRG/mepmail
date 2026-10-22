@@ -21,6 +21,8 @@ export const consoleAuditRouter = router({
     .input(
       z.object({
         action: z.string().max(64).optional(),
+        /** One team's rows (a team page or a revenue row links here). */
+        teamId: z.uuid().optional(),
         cursor: cursorSchema.optional(),
         limit: z.number().int().min(1).max(100).default(25),
       }),
@@ -52,6 +54,7 @@ export const consoleAuditRouter = router({
             scope,
             privateActivityExcluded,
             input.action ? eq(a.action, input.action) : undefined,
+            input.teamId ? eq(a.teamId, input.teamId) : undefined,
             input.cursor ? beforeCursor(a, input.cursor) : undefined,
           ),
         )
@@ -78,6 +81,7 @@ export const consoleAuditRouter = router({
                 scope,
                 privateActivityExcluded,
                 input.action ? eq(a.action, input.action) : undefined,
+                input.teamId ? eq(a.teamId, input.teamId) : undefined,
               ),
             );
       return {

@@ -6,6 +6,7 @@
     "regions": "Regiões",
     "teams": "Equipes",
     "users": "Usuários",
+    "revenue": "Receita",
     "safety": "Confiança e segurança",
     "audit": "Auditoria",
     "operator": "Operador"
@@ -489,7 +490,9 @@
       "pause": "Pausar transmissões",
       "resume": "Retomar transmissões",
       "suspend": "Suspender equipe",
-      "reinstate": "Reativar equipe"
+      "reinstate": "Reativar equipe",
+      "audit": "Ver auditoria da equipe",
+      "review": "Abrir revisão de segurança"
     },
     "toast": {
       "resumed": "Transmissões retomadas para {team}",
@@ -1101,7 +1104,10 @@
     },
     "count": "{shown} de {total} ações",
     "instance": "instância",
-    "empty": "0 ações."
+    "empty": "0 ações.",
+    "teamFilter": "Ver só os eventos desta equipe",
+    "teamChip": "Equipe: {team}",
+    "clearTeam": "Remover filtro de equipe"
   },
   "settingsCard": {
     "title": "Console da instância",
@@ -1193,5 +1199,43 @@
     "resolveScope": "Marcar o pedido como revisado não altera restrições, suspensões nem mensagens retidas.",
     "resolved": "Pedido marcado como revisado.",
     "storedLevel": "Nível armazenado: {level}"
+  },
+  "revenue": {
+    "title": "Receita",
+    "proof": "Espelho dos webhooks verificados do Stripe. Licenças internas aparecem na lista, mas não entram na soma.",
+    "kpi": {
+      "mrr": "Receita mensal recorrente",
+      "mrrSub": "assinaturas pagantes no Stripe",
+      "paying": "Equipes pagantes",
+      "payingSub": "{send} no Envio · {mail} no Correio",
+      "next30": "Renovam em 30 dias",
+      "next30Sub": "{cancels} cancelam · {pastDue} em atraso",
+      "internal": "Licenças internas",
+      "internalSub": "sem cobrança · {ended} encerradas"
+    },
+    "columns": {
+      "team": "Equipe",
+      "product": "Produto",
+      "status": "Situação",
+      "monthly": "Por mês",
+      "renews": "Renova / termina",
+      "links": "Ver"
+    },
+    "product": {
+      "send": "Envio",
+      "mail": "Correio"
+    },
+    "status": {
+      "paying": "Pagando",
+      "pastDue": "Em atraso",
+      "internal": "Licença interna",
+      "ended": "Encerrada"
+    },
+    "seats": "{count, plural, one {# caixa} other {# caixas}}",
+    "suspended": "Suspensa",
+    "cancelsOn": "cancela em {date}",
+    "audit": "Auditoria",
+    "review": "Revisão",
+    "empty": "Nenhuma assinatura ou licença registrada."
   }
 }

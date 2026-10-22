@@ -10,8 +10,12 @@ import { useUrlState } from "@/lib/url-state";
 export default function ConsoleAuditPage() {
   const t = useTranslations("console.audit");
   const [action, setAction] = useUrlState("action", "all");
+  const [team, setTeam] = useUrlState("team");
   const [limit, setLimit] = useState(25);
-  const query = useAuditQuery(action, limit);
+  const query = useAuditQuery(action, limit, team);
+  const teamName = team
+    ? query.data?.pages[0]?.items.find((row) => row.teamId === team)?.teamName
+    : undefined;
   const actionLabel = useActionLabel();
   const actions = query.data?.pages[0]?.actions ?? [];
   return (
@@ -35,6 +39,18 @@ export default function ConsoleAuditPage() {
           />
         }
       />
+      {team ? (
+        <div style={{ marginBottom: 14 }}>
+          <button
+            type="button"
+            className="ms-chip"
+            onClick={() => setTeam("")}
+            aria-label={t("clearTeam")}
+          >
+            {t("teamChip", { team: teamName ?? team.slice(0, 8) })} ×
+          </button>
+        </div>
+      ) : null}
       <AuditView query={query} limit={limit} onLimit={setLimit} />
     </>
   );

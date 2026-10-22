@@ -2,6 +2,7 @@
 
 import { AUDIT_ACTIONS, type AuditAction } from "@millionsend/core/audit-actions";
 import { useInfiniteQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo } from "react";
 import { ListFooter } from "@/components/list-footer";
@@ -24,11 +25,17 @@ export function useActionLabel() {
     isKnownAction(action) ? t(`audit.actions.${action.replace(".", "_")}`) : action;
 }
 
-export function useAuditQuery(action: string, limit: number) {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function useAuditQuery(action: string, limit: number, team = "") {
   const trpc = useTRPC();
   return useInfiniteQuery(
     trpc.console.audit.list.infiniteQueryOptions(
-      { limit, ...(action === "all" ? {} : { action }) },
+      {
+        limit,
+        ...(action === "all" ? {} : { action }),
+        ...(UUID.test(team) ? { teamId: team } : {}),
+      },
       { getNextPageParam: (page) => page.nextCursor },
     ),
   );
@@ -163,8 +170,14 @@ export function AuditView({
                     </span>
                   </td>
                   <td>
-                    {row.teamName ? (
-                      row.teamName
+                    {row.teamName && row.teamId ? (
+                      <Link
+                        href={`/console/audit?team=${row.teamId}`}
+                        title={t("teamFilter")}
+                        style={{ color: "inherit" }}
+                      >
+                        {row.teamName}
+                      </Link>
                     ) : row.teamId === null ? (
                       <span style={{ color: "var(--ms-muted)" }}>{t("instance")}</span>
                     ) : (

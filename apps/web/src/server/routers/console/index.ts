@@ -4,6 +4,7 @@ import { consoleHeldMessageReviewRouter } from "./held-message-review";
 import { consoleMonitorRouter } from "./monitor";
 import { consoleOverviewRouter } from "./overview";
 import { consoleRegionsRouter } from "./regions";
+import { consoleRevenueRouter } from "./revenue";
 import { consoleSafetyRouter } from "./safety";
 import { consoleTeamsRouter } from "./teams";
 import { consoleUsersRouter } from "./users";
@@ -18,4 +19,5 @@ export const consoleRouter = router({
   heldReview: consoleHeldMessageReviewRouter,
   monitor: consoleMonitorRouter,
   audit: consoleAuditRouter,
+  revenue: consoleRevenueRouter,
 });

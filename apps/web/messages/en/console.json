@@ -6,6 +6,7 @@
     "regions": "Regions",
     "teams": "Teams",
     "users": "Users",
+    "revenue": "Revenue",
     "safety": "Trust & safety",
     "audit": "Audit",
     "operator": "Operator"
@@ -489,7 +490,9 @@
       "pause": "Pause broadcasts",
       "resume": "Resume broadcasts",
       "suspend": "Suspend team",
-      "reinstate": "Reinstate team"
+      "reinstate": "Reinstate team",
+      "audit": "View team audit",
+      "review": "Open safety review"
     },
     "toast": {
       "resumed": "Broadcasts resumed for {team}",
@@ -1101,7 +1104,10 @@
     },
     "count": "{shown} of {total} actions",
     "instance": "instance",
-    "empty": "0 actions."
+    "empty": "0 actions.",
+    "teamFilter": "Show only this team's events",
+    "teamChip": "Team: {team}",
+    "clearTeam": "Clear team filter"
   },
   "settingsCard": {
     "title": "Instance console",
@@ -1193,5 +1199,43 @@
     "resolveScope": "Marking this request reviewed leaves restrictions, suspensions and held messages unchanged.",
     "resolved": "Request marked as reviewed.",
     "storedLevel": "Stored level: {level}"
+  },
+  "revenue": {
+    "title": "Revenue",
+    "proof": "Mirrored from verified Stripe webhooks. Internal licenses are listed but never summed.",
+    "kpi": {
+      "mrr": "Monthly recurring revenue",
+      "mrrSub": "paying Stripe subscriptions",
+      "paying": "Paying teams",
+      "payingSub": "{send} on Send · {mail} on Correio",
+      "next30": "Renew within 30 days",
+      "next30Sub": "{cancels} cancel · {pastDue} past due",
+      "internal": "Internal licenses",
+      "internalSub": "not billed · {ended} ended"
+    },
+    "columns": {
+      "team": "Team",
+      "product": "Product",
+      "status": "Status",
+      "monthly": "Per month",
+      "renews": "Renews / ends",
+      "links": "Open"
+    },
+    "product": {
+      "send": "Send",
+      "mail": "Correio"
+    },
+    "status": {
+      "paying": "Paying",
+      "pastDue": "Past due",
+      "internal": "Internal license",
+      "ended": "Ended"
+    },
+    "seats": "{count, plural, one {# mailbox} other {# mailboxes}}",
+    "suspended": "Suspended",
+    "cancelsOn": "cancels on {date}",
+    "audit": "Audit",
+    "review": "Review",
+    "empty": "No subscription or license on record."
   }
 }
