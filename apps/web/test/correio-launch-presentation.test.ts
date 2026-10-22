@@ -112,7 +112,8 @@ const expectations = {
     fictional: /fictional content/,
     noMessageSent: /No message was sent/,
     everyPayingPlan: /on its own or with any paying Send plan/i,
-    subscribeInDashboard: /Subscribe from the dashboard\. Each mailbox still needs/,
+    subscribeInDashboard:
+      /Verify your domain and complete any required reviews before subscribing in the dashboard/,
     minimumPlan: /Send plan above US\$\s*20\/month/,
     recurringEligibility:
       /US\$ 29 Pro 110K offer qualifies even during its US\$ 20 first monthly bill/,
@@ -153,7 +154,8 @@ const expectations = {
     fictional: /conteúdo fictício/,
     noMessageSent: /Nenhuma mensagem foi enviada/,
     everyPayingPlan: /sozinho ou com qualquer plano pago de Envio/i,
-    subscribeInDashboard: /Contrate pelo painel\. Cada caixa ainda precisa/,
+    subscribeInDashboard:
+      /Verifique o domínio e conclua eventuais revisões antes de assinar pelo painel/,
     minimumPlan: /plano de Envio acima de US\$ 20\/mês/,
     recurringEligibility:
       /oferta Pro 110K de US\$ 29 qualifica mesmo na primeira mensalidade promocional de US\$ 20/,
