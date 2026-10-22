@@ -41,6 +41,7 @@ const SORT_KEYS = [
 ] as const;
 const GUARDRAILS = ["ok", "warning", "paused"] as const;
 const TEAM_TYPES = ["free", "starter", "pro", "scale", "system"] as const;
+const TEAM_STATUSES = ["active", "suspended", "all"] as const;
 const GUARDRAIL_COLOR = {
   ok: "var(--ms-success)",
   warning: "var(--ms-warn)",
@@ -116,6 +117,7 @@ export function TeamsView() {
   const [typeParam, setType] = useUrlState("type", "all");
   const [regionParam, setRegion] = useUrlState("region", "all");
   const [guardrailParam, setGuardrail] = useUrlState("guardrail", "all");
+  const [statusParam, setStatus] = useUrlState("status", "active");
   const [sortParam, setSort] = useUrlState("sort", "sent30d");
   const [dirParam, setDir] = useUrlState("dir", "desc");
   const [limit, setLimit] = useState(25);
@@ -127,12 +129,14 @@ export function TeamsView() {
   const dir: SortDir = oneOf(["asc", "desc"] as const, dirParam, "desc");
   const region = oneOf(DOMAIN_REGIONS, regionParam, "all");
   const type = oneOf(TEAM_TYPES, typeParam, "all");
+  const status = oneOf(TEAM_STATUSES, statusParam, "active");
 
   const input = {
     ...(deferredSearch ? { search: deferredSearch } : {}),
     ...(type !== "all" ? { type } : {}),
     ...(region !== "all" ? { region } : {}),
     ...(guardrail !== "all" ? { guardrail } : {}),
+    ...(status !== "all" ? { status } : {}),
     sort,
     dir,
     limit,
@@ -192,6 +196,35 @@ export function TeamsView() {
   return (
     <>
       <PageHeader title={t("title")} {...(proof ? { subtitle: proof } : {})} />
+
+      <div
+        className="ms-tabs"
+        role="tablist"
+        aria-label={t("status.label")}
+        style={{ marginBottom: 14 }}
+      >
+        {TEAM_STATUSES.map((key) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={status === key}
+            className={status === key ? "active" : undefined}
+            onClick={() => setStatus(key)}
+          >
+            {t(`status.${key}`)}
+            {summary.data && key !== "all" ? (
+              <span className="ms-digits" style={{ marginLeft: 6, color: "var(--ms-muted)" }}>
+                {nf.format(
+                  key === "suspended"
+                    ? summary.data.teams.suspended
+                    : summary.data.teams.total - summary.data.teams.suspended,
+                )}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
 
       <div
         className="ms-filter-row"

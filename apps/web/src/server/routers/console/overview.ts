@@ -8,7 +8,7 @@ import {
   probeHistory,
 } from "@millionsend/core";
 import { schema } from "@millionsend/db";
-import { gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { periodSchema, previousPeriod, resolvePeriod } from "../../console/periods";
 import { servedRegionAccounts } from "../../console/ses-regions";
@@ -78,6 +78,59 @@ export const consoleOverviewRouter = router({
         };
       }),
       workerHeartbeatAt: probe("worker_heartbeat")?.takenAt ?? null,
+    };
+  }),
+
+  /**
+   * "Needs you": what an operator should act on now, on teams that still send.
+   * Suspended teams are excluded everywhere here: their open flags and broken
+   * domains are already decided and only bury the live ones.
+   */
+  attention: operatorProcedure.query(async ({ ctx }) => {
+    const now = new Date();
+    const t = schema.teams;
+    const live = sql`${t.suspendedAt} is null`;
+    const [counts] = await ctx.db
+      .select({
+        active: sql<number>`count(*) filter (where ${live})::int`,
+        suspended: sql<number>`count(*) filter (where ${t.suspendedAt} is not null)::int`,
+        newActive7d: sql<number>`count(*) filter (where ${live} and ${t.createdAt} >= ${new Date(now.getTime() - 7 * DAY_MS)})::int`,
+        newSuspended7d: sql<number>`count(*) filter (where ${t.suspendedAt} is not null and ${t.createdAt} >= ${new Date(now.getTime() - 7 * DAY_MS)})::int`,
+        held: sql<number>`count(*) filter (where ${live} and ${t.sendReviewAt} is not null)::int`,
+        flags: sql<number>`count(*) filter (where ${live} and exists (select 1 from ${schema.teamFlags} f where f.team_id = ${t}."id" and f.status = 'open'))::int`,
+        requests: sql<number>`count(*) filter (where ${live} and exists (select 1 from ${schema.signupRiskReviewRequests} r where r.team_id = ${t}."id" and r.resolved_at is null))::int`,
+        sandboxed: sql<number>`count(*) filter (where ${live} and exists (select 1 from ${schema.teamSignupRisk} s where s.team_id = ${t}."id" and s.cleared_at is null and s.level in ('sandbox', 'hold')))::int`,
+        guardrailPaused: sql<number>`count(*) filter (where ${live} and exists (select 1 from ${schema.teamStandings} g where g.team_id = ${t}."id" and g.guardrail = 'paused'))::int`,
+        guardrailWarning: sql<number>`count(*) filter (where ${live} and exists (select 1 from ${schema.teamStandings} g where g.team_id = ${t}."id" and g.guardrail = 'warning'))::int`,
+      })
+      .from(t);
+    const d = schema.domains;
+    const failedDomains = await ctx.db
+      .select({ id: d.id, name: d.name, teamId: t.id, team: t.name })
+      .from(d)
+      .innerJoin(t, eq(t.id, d.teamId))
+      .where(and(eq(d.status, "failed"), isNull(t.suspendedAt)))
+      .orderBy(desc(d.createdAt))
+      .limit(6);
+    const [failedTotal] = await ctx.db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(d)
+      .innerJoin(t, eq(t.id, d.teamId))
+      .where(and(eq(d.status, "failed"), isNull(t.suspendedAt)));
+    return {
+      teams: {
+        active: counts?.active ?? 0,
+        suspended: counts?.suspended ?? 0,
+        newActive7d: counts?.newActive7d ?? 0,
+        newSuspended7d: counts?.newSuspended7d ?? 0,
+      },
+      held: counts?.held ?? 0,
+      flags: counts?.flags ?? 0,
+      requests: counts?.requests ?? 0,
+      sandboxed: counts?.sandboxed ?? 0,
+      guardrailPaused: counts?.guardrailPaused ?? 0,
+      guardrailWarning: counts?.guardrailWarning ?? 0,
+      failedDomains: { total: failedTotal?.n ?? 0, items: failedDomains },
     };
   }),
 

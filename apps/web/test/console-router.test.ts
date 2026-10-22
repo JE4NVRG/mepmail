@@ -2,7 +2,7 @@ import { recordAudit } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { setRegionAccountDeps } from "@/server/console/ses-regions";
 import { setSuspensionSesDeps } from "@/server/console/suspension";
@@ -116,6 +116,55 @@ describe("operatorProcedure", () => {
     const list = await operator().console.teams.list({});
     expect(list.items.map((t) => t.id)).toContain(teamId);
     await expect(member().console.teams.list({})).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+describe("console attention and status scopes", () => {
+  it("counts only live teams and filters the list by status", async () => {
+    const live = await createTeam(db, "live-flagged");
+    const gone = await createTeam(db, "gone-flagged");
+    await db
+      .update(schema.teams)
+      .set({ suspendedAt: new Date(), suspensionReason: "manual" })
+      .where(eq(schema.teams.id, gone));
+    await db.insert(schema.teamFlags).values([
+      { teamId: live, reason: "monitor" },
+      { teamId: gone, reason: "monitor" },
+    ]);
+    await db.insert(schema.domains).values([
+      { teamId: live, name: "live-broken.example", region: REGION, status: "failed" },
+      { teamId: gone, name: "gone-broken.example", region: REGION, status: "failed" },
+    ]);
+
+    try {
+      const a = await operator().console.overview.attention();
+      expect(a.flags).toBe(1);
+      expect(a.teams.suspended).toBeGreaterThanOrEqual(1);
+      expect(a.failedDomains.items.map((d) => d.name)).toEqual(["live-broken.example"]);
+      expect(a.failedDomains.total).toBe(1);
+
+      const active = await operator().console.teams.list({ status: "active", limit: 100 });
+      const suspended = await operator().console.teams.list({ status: "suspended", limit: 100 });
+      const all = await operator().console.teams.list({ limit: 100 });
+      expect(active.items.map((t) => t.id)).toContain(live);
+      expect(active.items.map((t) => t.id)).not.toContain(gone);
+      expect(suspended.items.map((t) => t.id)).toContain(gone);
+      expect(suspended.items.map((t) => t.id)).not.toContain(live);
+      expect(all.total).toBe(active.total + suspended.total);
+
+      const open = await operator().console.safety.list({});
+      expect(open.items.map((row) => row.teamId)).toEqual([live]);
+      expect(open.counts.open).toBe(1);
+      const decided = await operator().console.safety.list({ status: "suspended" });
+      expect(decided.items.map((row) => row.teamId)).toContain(gone);
+
+      await expect(member().console.overview.attention()).rejects.toMatchObject({
+        code: "NOT_FOUND",
+      });
+    } finally {
+      // Later tests share this database: leave no extra flags, domains or suspensions.
+      await db.delete(schema.teams).where(inArray(schema.teams.id, [live, gone]));
+    }
   });
 });
 

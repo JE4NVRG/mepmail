@@ -3078,3 +3078,12 @@ summary:focus-visible,
   color: var(--ms-muted);
   font-size: 12.5px;
 }
+
+/* Console "Needs you" rows: whole row is the link. */
+.ms-attn-row {
+  transition: background var(--ms-dur-fast) var(--ms-ease);
+}
+.ms-attn-row:hover,
+.ms-attn-row:focus-visible {
+  background: var(--ms-panel-raised);
+}

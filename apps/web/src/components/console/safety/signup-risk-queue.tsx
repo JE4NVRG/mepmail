@@ -8,15 +8,46 @@ import { RelativeTime } from "@/components/relative-time";
 import { Table } from "@/components/table";
 import { useTRPC } from "@/lib/trpc";
 
+const SCOPES = ["pending", "suspended", "all"] as const;
+
 export function SignupRiskQueue() {
   const t = useTranslations("console.signupRisk");
   const trpc = useTRPC();
   const [offset, setOffset] = useState(0);
-  const query = useQuery(trpc.console.safety.signupReviews.queryOptions({ offset, limit: 25 }));
+  // Suspended teams are already decided: the default tab is what still needs one.
+  const [scope, setScope] = useState<(typeof SCOPES)[number]>("pending");
+  const query = useQuery(
+    trpc.console.safety.signupReviews.queryOptions({ offset, limit: 25, scope }),
+  );
+  const counts = query.data?.counts;
   return (
     <section id="signup-reviews" className="ms-card" style={{ padding: 20, marginBottom: 20 }}>
       <h2 style={{ marginTop: 0 }}>{t("queue.title")}</h2>
       <p style={{ color: "var(--ms-muted)", fontSize: 13 }}>{t("queue.subtitle")}</p>
+      <div
+        className="ms-tabs"
+        role="tablist"
+        aria-label={t("queue.scope.label")}
+        style={{ marginBottom: 14 }}
+      >
+        {SCOPES.map((key) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={scope === key}
+            className={scope === key ? "active" : undefined}
+            onClick={() => {
+              setScope(key);
+              setOffset(0);
+            }}
+          >
+            {key === "all"
+              ? t("queue.scope.all")
+              : t(`queue.scope.${key}`, { count: counts ? counts[key] : "…" })}
+          </button>
+        ))}
+      </div>
       {query.isError ? (
         <p role="alert">
           {t("failed")}{" "}
@@ -63,7 +94,9 @@ export function SignupRiskQueue() {
               ))}
               {!query.data?.items?.length ? (
                 <tr>
-                  <td colSpan={6}>{t("queue.empty")}</td>
+                  <td colSpan={6}>
+                    {scope === "pending" ? t("queue.scope.emptyPending") : t("queue.empty")}
+                  </td>
                 </tr>
               ) : null}
             </tbody>

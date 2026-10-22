@@ -17,6 +17,42 @@ export function OwnerSignupCell({
 }) {
   const t = useTranslations("console.teams.acquisition");
   if (!attribution) return <span style={{ color: "var(--ms-muted)" }}>{t("notMeasured")}</span>;
+  if (!detailed) {
+    // One line in the list: source chip + campaign cut with an ellipsis; the
+    // full UTM set stays in the tooltip and in the team's detail sheet.
+    const full = [
+      attribution.source,
+      attribution.medium && `utm_medium: ${attribution.medium}`,
+      attribution.campaign && `utm_campaign: ${attribution.campaign}`,
+      attribution.content && `utm_content: ${attribution.content}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    return (
+      <span
+        title={full}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, maxWidth: 220 }}
+      >
+        <span className="ms-chip" style={{ fontSize: 12, padding: "1px 8px", flex: "none" }}>
+          {attribution.source}
+        </span>
+        {attribution.campaign ? (
+          <span
+            style={{
+              color: "var(--ms-muted)",
+              fontSize: 12,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              minWidth: 0,
+            }}
+          >
+            {attribution.campaign}
+          </span>
+        ) : null}
+      </span>
+    );
+  }
   const fields = detailed
     ? [
         ["utm_medium", attribution.medium],

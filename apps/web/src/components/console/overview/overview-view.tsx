@@ -6,6 +6,7 @@ import { AddRegionCard, RegionCard } from "@/components/console/region-actions";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/skeleton";
 import { useTRPC } from "@/lib/trpc";
+import { AttentionCard } from "./attention-card";
 import { HealthCard, HealthPill } from "./health-card";
 import { KpiCards } from "./kpi-cards";
 import { MonitoringCard } from "./monitoring-card";
@@ -81,6 +82,7 @@ export function OverviewView() {
         <OverviewSkeleton />
       ) : (
         <>
+          <AttentionCard />
           <KpiCards />
           <StatTiles summary={s} />
           <div className="ms-grid ms-grid-regions" style={{ marginBottom: 16 }}>

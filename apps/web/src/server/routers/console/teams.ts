@@ -193,6 +193,8 @@ export const consoleTeamsRouter = router({
         type: z.string().max(32).optional(),
         region: z.string().max(32).optional(),
         guardrail: z.enum(["ok", "warning", "paused"]).optional(),
+        /** Omitted = every team (the original contract). */
+        status: z.enum(["active", "suspended"]).optional(),
         sort: z.enum(SORT_KEYS).default("sent30d"),
         dir: z.enum(["asc", "desc"]).default("desc"),
         limit: z.number().int().min(1).max(100).default(25),
@@ -204,6 +206,8 @@ export const consoleTeamsRouter = router({
       if (input.search) filters.push(searchWhere(input.search));
       if (input.type) filters.push(sql`${t.plan}::text = ${input.type}`);
       if (input.region) filters.push(sql`${teamRegion} = ${input.region}`);
+      if (input.status === "active") filters.push(isNull(t.suspendedAt));
+      if (input.status === "suspended") filters.push(isNotNull(t.suspendedAt));
       if (input.guardrail) {
         filters.push(
           input.guardrail === "ok"

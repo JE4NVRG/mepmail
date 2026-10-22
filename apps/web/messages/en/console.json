@@ -200,6 +200,26 @@
       "flaggedToday": "Flagged today",
       "flaggedTip": "Judged samples scoring {score} or more.",
       "openFlags": "Open monitor flags"
+    },
+    "attention": {
+      "title": "Needs you",
+      "pending": "{count, plural, one {# item} other {# items}}",
+      "active": "active teams",
+      "newWeek": "new active this week",
+      "suspended": "suspended ({week} this week)",
+      "clear": "Nothing pending.",
+      "clearSub": "No active team has held sending, a review request, an open flag or a tripped guardrail.",
+      "open": "Open",
+      "more": "+{count}",
+      "rows": {
+        "requests": "Signup review requests awaiting an answer",
+        "held": "Teams with sending held for release",
+        "guardrailPaused": "Teams paused by the guardrail",
+        "flags": "Open abuse flags on active teams",
+        "sandboxed": "Active teams in the signup sandbox",
+        "guardrailWarning": "Teams in guardrail warning",
+        "failedDomains": "Active teams' domains failing verification"
+      }
     }
   },
   "region": {
@@ -675,6 +695,12 @@
       "cancelAtEnd": "Cancels at the end of the period",
       "periodEnd": "Period ends on {date}",
       "inactive": "Inactive"
+    },
+    "status": {
+      "active": "Active",
+      "suspended": "Suspended",
+      "all": "All",
+      "label": "Team status"
     }
   },
   "safety": {
@@ -1143,16 +1169,23 @@
       "loading": "Loading reviews…",
       "next": "Next",
       "noReasons": "No recorded signals",
-      "paid": "Qualified paid contract",
+      "paid": "Paid (Stripe confirmed)",
       "payment": "Payment",
       "previous": "Previous",
       "reasons": "Signals",
       "requested": "Review requested",
       "since": "Queued since",
-      "subtitle": "All sandboxes, sending holds and open requests. Qualified paid contracts appear first; the plan label does not prove payment.",
+      "subtitle": "Sandboxes, held sending and open requests. Teams with a Stripe-confirmed payment come first; the plan label is not proof of payment.",
       "team": "Team",
       "title": "Signup and sending review queue",
-      "unconfirmed": "Payment unconfirmed"
+      "unconfirmed": "Payment unconfirmed",
+      "scope": {
+        "label": "Queue scope",
+        "pending": "Need a decision ({count})",
+        "suspended": "Already suspended ({count})",
+        "all": "All",
+        "emptyPending": "Nothing awaiting a decision. Suspended teams are in the next tab."
+      }
     },
     "reasons": "Recorded signals: {reasons}",
     "requestTitle": "Review request context",

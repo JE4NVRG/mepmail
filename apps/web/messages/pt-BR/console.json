@@ -200,6 +200,26 @@
       "flaggedToday": "Sinalizados hoje",
       "flaggedTip": "Amostras julgadas com pontuação {score} ou mais.",
       "openFlags": "Sinalizações do monitor abertas"
+    },
+    "attention": {
+      "title": "Precisa de você",
+      "pending": "{count, plural, one {# item} other {# itens}}",
+      "active": "equipes ativas",
+      "newWeek": "novas ativas na semana",
+      "suspended": "suspensas ({week} na semana)",
+      "clear": "Nada pendente.",
+      "clearSub": "Nenhuma equipe ativa com envio retido, pedido de revisão, alerta aberto ou guardrail acionado.",
+      "open": "Abrir",
+      "more": "+{count}",
+      "rows": {
+        "requests": "Pedidos de revisão de cadastro aguardando resposta",
+        "held": "Equipes com envio retido aguardando liberação",
+        "guardrailPaused": "Equipes pausadas pelo guardrail",
+        "flags": "Alertas de abuso abertos em equipes ativas",
+        "sandboxed": "Equipes ativas em sandbox de cadastro",
+        "guardrailWarning": "Equipes em alerta no guardrail",
+        "failedDomains": "Domínios de equipes ativas com verificação falhando"
+      }
     }
   },
   "region": {
@@ -675,6 +695,12 @@
       "cancelAtEnd": "Cancelamento ao fim do período",
       "periodEnd": "Período termina em {date}",
       "inactive": "Inativo"
+    },
+    "status": {
+      "active": "Ativas",
+      "suspended": "Suspensas",
+      "all": "Todas",
+      "label": "Situação da equipe"
     }
   },
   "safety": {
@@ -1143,16 +1169,23 @@
       "loading": "Carregando revisões…",
       "next": "Próxima",
       "noReasons": "Sem sinais registrados",
-      "paid": "Contrato pago qualificado",
+      "paid": "Pagou (Stripe confirmado)",
       "payment": "Pagamento",
       "previous": "Anterior",
       "reasons": "Sinais",
       "requested": "Revisão solicitada",
       "since": "Na fila desde",
-      "subtitle": "Todos os sandboxes, envios retidos e pedidos abertos. Contratos pagos qualificados aparecem primeiro; o rótulo do plano não comprova pagamento.",
+      "subtitle": "Sandboxes, envios retidos e pedidos abertos. Quem tem pagamento confirmado no Stripe aparece primeiro; o rótulo do plano não comprova pagamento.",
       "team": "Equipe",
       "title": "Fila de revisão de cadastro e envio",
-      "unconfirmed": "Pagamento não confirmado"
+      "unconfirmed": "Pagamento não confirmado",
+      "scope": {
+        "label": "Escopo da fila",
+        "pending": "Precisam de decisão ({count})",
+        "suspended": "Já suspensas ({count})",
+        "all": "Todas",
+        "emptyPending": "Nada aguardando decisão. Equipes suspensas ficam na aba ao lado."
+      }
     },
     "reasons": "Sinais registrados: {reasons}",
     "requestTitle": "Contexto do pedido de revisão",

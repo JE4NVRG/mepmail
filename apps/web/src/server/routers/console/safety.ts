@@ -35,6 +35,7 @@ import {
   ilike,
   inArray,
   isNotNull,
+  isNull,
   notInArray,
   or,
   type SQL,
@@ -136,14 +137,24 @@ export const consoleSafetyRouter = router({
       z.object({
         offset: z.number().int().min(0).default(0),
         limit: z.number().int().min(1).max(100).default(25),
+        /** pending = still sending (needs a decision); suspended = already decided. */
+        scope: z.enum(["pending", "suspended", "all"]).default("all"),
       }),
     )
     .query(async ({ ctx, input }) => {
-      const candidates = await listSignupRiskReviewCandidates(
+      const everyone = await listSignupRiskReviewCandidates(
         ctx.db,
         new Date(),
         readSignupReviewPayments,
       );
+      const counts = {
+        pending: everyone.filter((row) => !row.suspendedAt).length,
+        suspended: everyone.filter((row) => row.suspendedAt).length,
+      };
+      const candidates =
+        input.scope === "all"
+          ? everyone
+          : everyone.filter((row) => (input.scope === "pending") === !row.suspendedAt);
       const since = (row: (typeof candidates)[number]) => {
         const dates = [
           row.reviewRequestedAt,
@@ -194,6 +205,7 @@ export const consoleSafetyRouter = router({
       return {
         items,
         total: candidates.length,
+        counts,
         nextOffset:
           input.offset + input.limit < candidates.length ? input.offset + input.limit : null,
       };
@@ -225,7 +237,8 @@ export const consoleSafetyRouter = router({
           ),
         );
       }
-      if (input.status === "open") filters.push(eq(f.status, "open"));
+      // "Open" = still undecided: a suspended team's flag is already acted on (Suspended tab).
+      if (input.status === "open") filters.push(and(eq(f.status, "open"), isNull(t.suspendedAt)));
       else if (input.status === "cleared") filters.push(eq(f.status, "cleared"));
       else if (input.status === "suspended") filters.push(isNotNull(t.suspendedAt));
       if (input.reason) filters.push(eq(f.reason, input.reason));
@@ -276,8 +289,8 @@ export const consoleSafetyRouter = router({
           .where(where),
         ctx.db
           .select({
-            open: sql<number>`count(*) filter (where ${f.status} = 'open')::int`,
-            guardrailPaused: sql<number>`count(*) filter (where ${f.status} = 'open' and ${st.guardrail} = 'paused')::int`,
+            open: sql<number>`count(*) filter (where ${f.status} = 'open' and ${t.suspendedAt} is null)::int`,
+            guardrailPaused: sql<number>`count(*) filter (where ${f.status} = 'open' and ${t.suspendedAt} is null and ${st.guardrail} = 'paused')::int`,
             suspended: sql<number>`(select count(*) from ${t} where ${t.suspendedAt} is not null)::int`,
             revealsThisWeek: sql<number>`(select count(*) from ${g} where ${g.createdAt} >= now() - interval '7 days')::int`,
           })
