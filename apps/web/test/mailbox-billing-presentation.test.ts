@@ -283,6 +283,7 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
         canIncrease: false,
         canChangePlan: false,
         currentPlan: null,
+        currentUnitAmount: null,
         planOffers: [],
         pending: false,
         requestedSeats: null,
@@ -434,6 +435,8 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
     expect(getStripe).not.toHaveBeenCalled();
   });
   it("offers recovery instead of another purchase for every registered subscription status", async () => {
+    // A legacy contract may have a different price from today's catalog offer (123).
+    const contractedUnitAmount = 200;
     await db.insert(schema.mailboxSubscriptions).values({
       teamId,
       status: "active",
@@ -444,6 +447,7 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
       periodEnd: new Date(Date.now() + 86400000),
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
+      unitAmount: contractedUnitAmount,
     });
     for (const status of ["active", "trialing", "past_due", "canceled", "inactive"] as const) {
       await db
@@ -453,6 +457,7 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
       expect(await as().mailboxes.billing()).toMatchObject({
         canPurchase: false,
         availability: "existing_subscription",
+        management: { currentPlan: null, currentUnitAmount: contractedUnitAmount },
       });
       expect(await as().mailboxes.service()).toMatchObject({
         status,
