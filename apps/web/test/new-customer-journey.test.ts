@@ -86,7 +86,7 @@ let stripeCalls: string[];
 let sesVerified: boolean;
 let dnsRows: Array<{ type: string; name: string; value: string; priority?: number }>;
 let auth: ReturnType<typeof createAuth>;
-let factory: ReturnType<typeof createCallerFactory<ReturnType<typeof journeyRouter>>>;
+let factory: ReturnType<typeof journeyCallerFactory>;
 
 /** Instruments every SDK method, including reads; no real SDK HTTP client is used. */
 function observed<T extends object>(object: T, prefix = "stripe"): T {
@@ -147,6 +147,10 @@ function journeyRouter() {
     mailboxes: mailboxesRouter,
     console: router({ teams: consoleTeamsRouter }),
   });
+}
+
+function journeyCallerFactory() {
+  return createCallerFactory(journeyRouter());
 }
 
 beforeEach(async () => {
@@ -270,7 +274,7 @@ beforeEach(async () => {
       throw new Error("Pix transport was reached before purchase eligibility");
     },
   });
-  factory = createCallerFactory(journeyRouter());
+  factory = journeyCallerFactory();
 });
 afterEach(async () => {
   await close?.();
