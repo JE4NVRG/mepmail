@@ -513,6 +513,7 @@ export async function mailboxBillingPresentation(
         !openManagement &&
         planOffers.length > 0,
       currentPlan: subscription?.planCode ?? null,
+      currentUnitAmount: subscription?.unitAmount ?? null,
       planOffers,
       pending: openManagement,
       requestedSeats:

@@ -351,6 +351,7 @@ async function subscribedTeam(
     })
     .where(eq(schema.teams.id, teamId));
   await persistSubscriptionTerms();
+  await seedBuyer(teamId);
   return teamId;
 }
 
@@ -995,6 +996,39 @@ describe("billing router", () => {
       { action: "billing.plan_changed", data: { rung: "scale_500k", applied: "now" } },
     ]);
   });
+
+  it.each(["domain_review", "send_review"] as const)(
+    "changePlan explains %s before a paid upgrade without a provider update or drain",
+    async (code) => {
+      const teamId = await subscribedTeam("pro_100k");
+      if (code === "domain_review") {
+        await db
+          .update(schema.domains)
+          .set({ name: "verifiedsender.online" })
+          .where(eq(schema.domains.teamId, teamId));
+      } else {
+        await db
+          .update(schema.teams)
+          .set({
+            sendReviewAt: new Date(),
+            sendReviewReason: "content",
+            sendReviewNote: "Existing content hold",
+          })
+          .where(eq(schema.teams.id, teamId));
+      }
+      h.runCronNow.mockClear();
+      const owner = callerFor(teamId, "owner");
+      await expect(owner.billing.changePlan({ rung: "pro_200k" })).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+        message: `PURCHASE_REVIEW_${code.toUpperCase()}`,
+      });
+      expect(calls.updates).toEqual([]);
+      expect(calls.scheduleReleases).toEqual([]);
+      expect(calls.meterEvents).toEqual([]);
+      expect(h.runCronNow).not.toHaveBeenCalled();
+      expect(await teamRow(teamId)).toMatchObject({ plan: "pro", planQuota: 110_000 });
+    },
+  );
 
   it("changePlan adds the metered item a subscription from before the ladder lacks", async () => {
     const teamId = await subscribedTeam("pro_100k", { metered: false });

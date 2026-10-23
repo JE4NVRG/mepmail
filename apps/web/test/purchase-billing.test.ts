@@ -1,3 +1,4 @@
+import { PLAN_RUNGS } from "@millionsend/core/plans";
 import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PurchaseReviewNotice } from "@/components/purchase-review-notice";
@@ -19,12 +20,18 @@ const h = vi.hoisted(() => ({
   subscriptionState: "confirmed" as "confirmed" | "pending_confirmation",
   pendingRung: null as string | null,
   system: false,
+  reviewAllowed: true,
+  reviewEnabled: [] as boolean[],
+  contractPrice: 2000,
 }));
 // These cases exercise prices, maintenance, onboarding and review return intent. Safety admission
 // has its own denied/loading/approved coverage in purchase-review-ui.test.ts.
 vi.mock("@/components/purchase-review-notice", async (original) => ({
   ...(await original<typeof import("@/components/purchase-review-notice")>()),
-  usePurchaseReview: (enabled = true) => ({ enabled, allowed: true, refresh: vi.fn() }),
+  usePurchaseReview: (enabled = true) => {
+    h.reviewEnabled.push(enabled);
+    return { enabled, allowed: !enabled || h.reviewAllowed, refresh: vi.fn() };
+  },
   PurchaseReviewNotice: () => null,
 }));
 
@@ -72,7 +79,10 @@ vi.mock("@tanstack/react-query", () => ({
       ? {
           effectiveRung:
             h.subscribed && h.subscriptionState === "confirmed"
-              ? { key: "pro_100k", priceCents: h.billingInterval === "year" ? 29000 : 2000 }
+              ? {
+                  key: "pro_100k",
+                  priceCents: h.billingInterval === "year" ? 29000 : h.contractPrice,
+                }
               : null,
           plan: h.system ? "system" : h.subscribed ? "pro" : "free",
           planQuota: h.subscribed ? 110000 : null,
@@ -135,6 +145,9 @@ beforeEach(() => {
   h.subscriptionState = "confirmed";
   h.pendingRung = null;
   h.system = false;
+  h.reviewAllowed = true;
+  h.reviewEnabled = [];
+  h.contractPrice = 2000;
 });
 
 describe("billing selection synthetic UI contract, not paid E2E", () => {
@@ -354,6 +367,69 @@ describe("billing selection synthetic UI contract, not paid E2E", () => {
     if (!button) throw new Error("Expected owner action");
     (button.props.onClick as () => void)();
     expect(h.mutate).toHaveBeenCalledWith({ rung: "pro_200k" });
+  });
+  it("checks an existing paid subscription and blocks a billable upgrade while keeping reductions, pending reversal and the portal usable", () => {
+    h.reviewAllowed = false;
+    h.pendingRung = "starter";
+    const tree = BillingView({ checkout: null, requestedRung: "pro_200k" });
+    expect(h.reviewEnabled).toEqual([true]);
+    const all = nodes(tree);
+    const upgrade = all.find(
+      (node) => node.type === "button" && node.props.className === "ms-btn ms-btn-primary",
+    );
+    if (!upgrade) throw new Error("Missing selected upgrade action");
+    expect(upgrade.props.disabled).toBe(true);
+    (upgrade.props.onClick as () => void)();
+    expect(h.mutate).not.toHaveBeenCalled();
+    const reduction = all.find(
+      (node) =>
+        node.type === "button" &&
+        Array.isArray(node.props.children) &&
+        node.props.children.includes("switchAtPeriodEnd"),
+    );
+    if (!reduction) throw new Error("Missing paid reduction action");
+    expect(reduction.props.disabled).toBeFalsy();
+    (reduction.props.onClick as () => void)();
+    expect(h.mutate).toHaveBeenCalledExactlyOnceWith({ rung: "starter" });
+    h.mutate.mockClear();
+    const keep = all.find(
+      (node) =>
+        node.type === "button" &&
+        Array.isArray(node.props.children) &&
+        node.props.children.includes("keepPlan"),
+    );
+    if (!keep) throw new Error("Missing pending reduction reversal");
+    expect(keep.props.disabled).toBeFalsy();
+    (keep.props.onClick as () => void)();
+    expect(h.mutate).toHaveBeenCalledExactlyOnceWith({ rung: "pro_100k" });
+    expect(
+      all.find(
+        (node) =>
+          node.type === "button" &&
+          Array.isArray(node.props.children) &&
+          node.props.children.includes("manage"),
+      )?.props.disabled,
+    ).toBeFalsy();
+  });
+  it("uses contracted price and treats a different equal-price rung as billable", () => {
+    h.reviewAllowed = false;
+    const targetPrice = PLAN_RUNGS.find((rung) => rung.key === "pro_200k")?.priceCents;
+    if (!targetPrice) throw new Error("Missing selected rung");
+    h.contractPrice = targetPrice;
+    let tree = BillingView({ checkout: null, requestedRung: "pro_200k" });
+    let action = nodes(tree).find(
+      (node) => node.type === "button" && node.props.className === "ms-btn ms-btn-primary",
+    );
+    expect(action?.props.disabled).toBe(true);
+    h.contractPrice = targetPrice + 1;
+    tree = BillingView({ checkout: null, requestedRung: "pro_200k" });
+    action = nodes(tree).find(
+      (node) => node.type === "button" && node.props.className === "ms-btn ms-btn-primary",
+    );
+    if (!action) throw new Error("Missing contracted-price reduction");
+    expect(action.props.disabled).toBeFalsy();
+    (action.props.onClick as () => void)();
+    expect(h.mutate).toHaveBeenCalledExactlyOnceWith({ rung: "pro_200k" });
   });
   it("member cannot choose or change subscription", () => {
     h.role = "member";

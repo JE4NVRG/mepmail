@@ -134,6 +134,8 @@ describe.each(["en", "pt-BR"] as const)("purchase safety notice in %s", (locale)
     expect(html).toContain("verifiedsender.online");
     expect(html).toContain(messages.beforePayment);
     expect(html).toContain('role="status"');
+    expect(nodes(tree).some((node) => node.props.href === purchaseDomainReviewHref())).toBe(true);
+    expect(html).toContain(messages.reviewDomains);
     const form = nodes(tree).find((node) => typeof node.props.beforeSubmitAction === "function");
     expect(form).toBeDefined();
     expect(html).toContain('data-manual-review="true"');
@@ -160,6 +162,11 @@ describe.each(["en", "pt-BR"] as const)("purchase safety notice in %s", (locale)
       domains: ["sender.example.test"],
       reviewReason: null,
     };
+    h.pending = true;
+    outcome = render();
+    expect(outcome.review.allowed).toBe(false);
+    expect(outcome.html).toContain(messages.checking);
+    h.pending = false;
     h.requestPending = true;
     outcome = render();
     expect(outcome.review.allowed).toBe(false);
@@ -213,6 +220,18 @@ describe.each(["en", "pt-BR"] as const)("purchase safety notice in %s", (locale)
     expect(
       nodes(outcome.tree).some((node) => node.props.href === purchaseDomainReviewHref(destination)),
     ).toBe(true);
+  });
+
+  it("preserves an upgrade selection when a held domain needs review", () => {
+    const destination = "/settings/billing?plan=pro_200k&interval=month";
+    const outcome = render(true, destination);
+    expect(outcome.review.allowed).toBe(false);
+    expect(
+      nodes(outcome.tree).some((node) => node.props.href === purchaseDomainReviewHref(destination)),
+    ).toBe(true);
+    expect(outcome.html).toContain(messages.reasons.domain_review);
+    expect(outcome.html).toContain(messages.beforePayment);
+    expect(h.mutateAsync).not.toHaveBeenCalled();
   });
 
   it("prepares on form submission and skips a request when the review was already cleared", async () => {

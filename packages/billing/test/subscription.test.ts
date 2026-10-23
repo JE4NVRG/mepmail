@@ -6,7 +6,12 @@ import type Stripe from "stripe";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type OverageReport, reportOverage } from "../src/overage.js";
 import type { BillingStripe } from "../src/stripe.js";
-import { applySubscription, changeRung, lockCustomer, setOverage } from "../src/subscription.js";
+import {
+  applySubscription,
+  changeRung as changeRungCore,
+  lockCustomer,
+  setOverage,
+} from "../src/subscription.js";
 import {
   fakeStripe,
   legacyProduct,
@@ -33,6 +38,11 @@ afterEach(() => close());
 
 const deps = () => ({ db, stripe, log: () => {} });
 const team = (teamId: string) => teamRow(db, teamId);
+const OWNER = "subscription-fixture-owner";
+const changeRung = (
+  dependencies: Parameters<typeof changeRungCore>[0],
+  input: Parameters<typeof changeRungCore>[1],
+) => changeRungCore(dependencies, { userId: OWNER, ...input });
 
 /** A team whose row mirrors `sub`, with `accepted` sends in the current period. */
 async function subscribedTeam(sub: Stripe.Subscription, accepted = 0): Promise<string> {
@@ -43,6 +53,22 @@ async function subscribedTeam(sub: Stripe.Subscription, accepted = 0): Promise<s
     .set({ stripeCustomerId: sub.customer as string })
     .where(eq(schema.teams.id, teamId));
   await applySubscription(db, sub, () => {});
+  await db
+    .insert(schema.user)
+    .values({
+      id: OWNER,
+      name: "Subscription fixture",
+      email: "subscription-fixture@example.invalid",
+    })
+    .onConflictDoNothing();
+  await db.insert(schema.teamMembers).values({ teamId, userId: OWNER, role: "owner" });
+  await db.insert(schema.domains).values({
+    teamId,
+    name: "subscription-fixture.com",
+    region: "us-east-1",
+    status: "verified",
+    verifiedAt: new Date(),
+  });
   if (accepted) {
     const [acceptedUnder] = await db
       .select({ billingTerms: schema.teams.billingTerms })
@@ -526,6 +552,153 @@ describe("verified Send projection and event ordering", () => {
       billingTerms: null,
       stripeSubscriptionCreated: sub.created,
     });
+  });
+});
+
+describe("changeRung purchase review", () => {
+  const pendingDowngrade = () =>
+    withOverage("millionsend_pro_100k_monthly", "millionsend_pro_100k_overage", {
+      schedule: schedule([price("millionsend_starter_monthly")]),
+    });
+  const noUpgradeWrites = () => {
+    expect(state.updates).toEqual([]);
+    expect(state.scheduleReleases).toEqual([]);
+    expect(state.scheduleCreates).toEqual([]);
+    expect(state.scheduleUpdates).toEqual([]);
+    expect(state.meterEvents).toEqual([]);
+  };
+
+  it.each(["domain_review", "send_review", "guardrail_paused", "suspended"] as const)(
+    "refuses %s before any upgrade effect and keeps the current paid plan",
+    async (code) => {
+      const teamId = await subscribedTeam(pendingDowngrade());
+      if (code === "domain_review") {
+        await db
+          .update(schema.domains)
+          .set({ name: "subscription-fixture.online" })
+          .where(eq(schema.domains.teamId, teamId));
+      } else if (code === "send_review") {
+        await db
+          .update(schema.teams)
+          .set({
+            sendReviewAt: new Date(),
+            sendReviewReason: "content",
+            sendReviewNote: "Reviewed content hold",
+          })
+          .where(eq(schema.teams.id, teamId));
+      } else if (code === "guardrail_paused") {
+        await db.insert(schema.teamStandings).values({ teamId, guardrail: "paused" });
+      } else {
+        await db
+          .update(schema.teams)
+          .set({ suspendedAt: new Date(), suspensionReason: "phishing" })
+          .where(eq(schema.teams.id, teamId));
+      }
+      const before = await team(teamId);
+      await expect(changeRung(deps(), { teamId, rung: "pro_200k" })).rejects.toMatchObject({
+        code,
+      });
+      noUpgradeWrites();
+      expect(await team(teamId)).toEqual(before);
+      if (code === "domain_review") {
+        const [held] = await db
+          .select({ at: schema.teams.sendReviewAt, reason: schema.teams.sendReviewReason })
+          .from(schema.teams)
+          .where(eq(schema.teams.id, teamId));
+        // The preflight's hold survives the refused upgrade transaction.
+        expect(held).toEqual({ at: expect.any(Date), reason: "new_sender" });
+      }
+    },
+  );
+
+  it("does not let a missing or unauthorized actor charge an upgrade", async () => {
+    const teamId = await subscribedTeam(withOverage());
+    await expect(changeRungCore(deps(), { teamId, rung: "pro_200k" })).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    await expect(
+      changeRungCore(deps(), { teamId, rung: "pro_200k", userId: "not-a-member" }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    noUpgradeWrites();
+  });
+
+  it("upgrades an explicitly approved .online domain without creating another hold", async () => {
+    const teamId = await subscribedTeam(withOverage());
+    await db
+      .update(schema.domains)
+      .set({ name: "subscription-fixture.online" })
+      .where(eq(schema.domains.teamId, teamId));
+    await db
+      .update(schema.teams)
+      .set({ sendReviewClearedAt: new Date(), sendReviewClearedBy: OWNER })
+      .where(eq(schema.teams.id, teamId));
+    expect(await changeRung(deps(), { teamId, rung: "pro_200k" })).toEqual({ applied: "now" });
+    expect(state.updates[0]?.[1]).toMatchObject({ proration_behavior: "always_invoice" });
+    const [standing] = await db
+      .select({ held: schema.teams.sendReviewAt })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, teamId));
+    expect(standing?.held).toBeNull();
+  });
+
+  it.each(["hold", "membership"] as const)(
+    "rechecks a changed %s under the billing lock before releasing a schedule or charging",
+    async (race) => {
+      const teamId = await subscribedTeam(pendingDowngrade());
+      const originalPrices = stripe.prices.list;
+      let introduced = false;
+      stripe.prices.list = async (...args) => {
+        const prices = await originalPrices(...args);
+        if (!introduced) {
+          introduced = true;
+          if (race === "hold") {
+            await db
+              .update(schema.teams)
+              .set({
+                sendReviewAt: new Date(),
+                sendReviewReason: "content",
+                sendReviewNote: "Concurrent hold",
+              })
+              .where(eq(schema.teams.id, teamId));
+          } else {
+            await db
+              .update(schema.teamMembers)
+              .set({ role: "member" })
+              .where(eq(schema.teamMembers.teamId, teamId));
+          }
+        }
+        return prices;
+      };
+      await expect(changeRung(deps(), { teamId, rung: "pro_200k" })).rejects.toMatchObject({
+        code: race === "hold" ? "send_review" : "forbidden",
+      });
+      expect(introduced).toBe(true);
+      noUpgradeWrites();
+      expect(await team(teamId)).toMatchObject({ planQuota: 110_000, pendingRung: "starter" });
+    },
+  );
+
+  it("keeps a downgrade and its cancellation available while sending is held", async () => {
+    const teamId = await subscribedTeam(
+      withOverage("millionsend_pro_200k_monthly", "millionsend_pro_200k_overage"),
+    );
+    await db
+      .update(schema.teams)
+      .set({
+        sendReviewAt: new Date(),
+        sendReviewReason: "content",
+        sendReviewNote: "Existing hold",
+      })
+      .where(eq(schema.teams.id, teamId));
+    expect(await changeRungCore(deps(), { teamId, rung: "pro_100k" })).toMatchObject({
+      applied: "period_end",
+    });
+    expect(await changeRungCore(deps(), { teamId, rung: "pro_200k" })).toEqual({
+      applied: "unscheduled",
+    });
+    expect(state.updates).toEqual([]);
+    expect(state.scheduleCreates).toHaveLength(1);
+    expect(state.scheduleReleases).toHaveLength(1);
   });
 });
 

@@ -20,7 +20,7 @@ export function isPurchaseReviewFailure(error: unknown): boolean {
   );
 }
 
-/** Only new purchases use this gate; existing invoices, cancellation and management stay separate. */
+/** New purchases and billable upgrades use this gate; existing invoices and reductions stay separate. */
 export function usePurchaseReview(enabled = true) {
   const trpc = useTRPC();
   const queries = useQueryClient();
@@ -41,7 +41,10 @@ export function usePurchaseReview(enabled = true) {
     request,
     allowed:
       !enabled ||
-      (!eligibility.isError && eligibility.data?.eligible === true && !request.isPending),
+      (!eligibility.isPending &&
+        !eligibility.isError &&
+        eligibility.data?.eligible === true &&
+        !request.isPending),
     refresh: () => eligibility.refetch(),
   };
 }
@@ -89,9 +92,12 @@ export function PurchaseReviewNotice({
         {t("beforePayment")}
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-        {code === "domain_required" ? (
-          <Link href={purchaseDomainReviewHref(returnTo)} className="ms-btn ms-btn-primary">
-            {t("verifyDomain")}
+        {code === "domain_required" || code === "domain_review" ? (
+          <Link
+            href={purchaseDomainReviewHref(returnTo)}
+            className={`ms-btn ${code === "domain_review" ? "ms-btn-secondary" : "ms-btn-primary"}`}
+          >
+            {t(code === "domain_review" ? "reviewDomains" : "verifyDomain")}
           </Link>
         ) : !manualReview ? (
           <Link href="/support" className="ms-btn ms-btn-secondary">

@@ -486,8 +486,9 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         }
         const change = await changeRung(
           { db: ctx.db, stripe: deps.stripe() },
-          { teamId: ctx.teamId, rung: input.rung },
+          { teamId: ctx.teamId, rung: input.rung, userId: ctx.session.user.id },
         ).catch((error: unknown) => {
+          if (error instanceof PurchaseEligibilityError) throw purchaseEligibilityError(error);
           if (error instanceof PixBillingError)
             throw new TRPCError({ code: "PRECONDITION_FAILED", message: "SEND_PIX_PLAN_CHANGE" });
           throw error;

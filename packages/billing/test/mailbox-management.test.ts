@@ -176,6 +176,13 @@ beforeEach(async () => {
   customer = `cus_management_${sequence}`;
   user = `management_user_${sequence}`;
   teamId = await createTeam(db, `mail-management-${sequence}`);
+  await db.insert(schema.domains).values({
+    teamId,
+    name: `management-${sequence}.example.test`,
+    region: "us-east-1",
+    status: "verified",
+    verifiedAt: new Date(),
+  });
   await db
     .update(schema.teams)
     .set({ stripeCustomerId: customer })

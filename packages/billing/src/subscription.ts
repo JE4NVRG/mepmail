@@ -18,6 +18,11 @@ import {
   SUBSCRIPTION_EXPAND,
   subscriptionItems,
 } from "./prices.js";
+import {
+  assertPurchaseEligibility,
+  PurchaseEligibilityError,
+  requirePurchaseEligibility,
+} from "./purchase-eligibility.js";
 import { resolveSendBillingContract, verifiedSendBillingContract } from "./send-contract.js";
 import type { BillingStripe } from "./stripe.js";
 
@@ -472,7 +477,7 @@ export type RungChange =
  */
 export async function changeRung(
   deps: BillingDeps,
-  input: { teamId: string; rung: PlanRungKey },
+  input: { teamId: string; rung: PlanRungKey; userId?: string },
 ): Promise<RungChange> {
   const rung = rungByKey(input.rung);
   if (rung.priceCents <= 0) throw new Error(`rung ${input.rung} is not for sale`);
@@ -517,7 +522,13 @@ export async function changeRung(
     });
     result = { applied: "period_end", at: new Date(periodEnd * 1000) };
   } else {
-    await releaseSchedule(deps, sub);
+    // Only an upgrade creates a new immediate charge. Persist any required
+    // review outside the billing transaction, before schedule or meter effects.
+    // Missing actors fail closed; non-purchase plan changes keep their old path.
+    await requirePurchaseEligibility(deps.db, {
+      teamId: input.teamId,
+      userId: input.userId ?? "",
+    });
     // Sends made under the old rung settle at its rate before the move.
     if (overage) await reportOverage(deps, { teamId: input.teamId });
     const items: Stripe.SubscriptionUpdateParams.Item[] = [
@@ -545,6 +556,23 @@ export async function changeRung(
         .for("update");
       if (binding?.customerId !== customerId || binding.subscriptionId !== sub.id)
         throw new Error("Subscription binding changed before the plan update");
+      const [member] = await tx
+        .select({ role: schema.teamMembers.role })
+        .from(schema.teamMembers)
+        .where(
+          and(
+            eq(schema.teamMembers.teamId, input.teamId),
+            eq(schema.teamMembers.userId, input.userId ?? ""),
+          ),
+        )
+        .for("share");
+      if (!member || !["owner", "admin"].includes(member.role))
+        throw new PurchaseEligibilityError({
+          eligible: false,
+          code: "forbidden",
+          domains: [],
+          reviewReason: null,
+        });
       const fresh = await deps.stripe.subscriptions.retrieve(sub.id, {
         expand: SUBSCRIPTION_EXPAND,
       });
@@ -563,6 +591,10 @@ export async function changeRung(
         freshOverage?.price.id !== overage?.price.id
       )
         throw new Error("Subscription changed before the plan update");
+      // A hold or membership change after preflight must not release a pending
+      // downgrade or issue a charge. Keep the team/member locks through the POST.
+      await assertPurchaseEligibility(tx, input.teamId);
+      await releaseSchedule({ ...deps, db: tx }, fresh);
       // Internal subscription mutations and meter emission now share this lock.
       // A manual change made directly in Stripe remains outside the app's lock.
       // Charge the difference now; with pending_if_incomplete a declined or

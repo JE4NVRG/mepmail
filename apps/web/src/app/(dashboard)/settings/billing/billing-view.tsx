@@ -175,10 +175,7 @@ export function BillingView({
   const canManage = role === "owner" || role === "admin";
   const teamId = teams.data?.activeTeamId ?? null;
   const purchaseReview = usePurchaseReview(
-    canManage &&
-      !androidApp &&
-      status.data?.plan !== "system" &&
-      status.data?.hasLiveSubscription === false,
+    canManage && !androidApp && !!status.data && status.data.plan !== "system",
   );
 
   const redirect = { onSuccess: ({ url }: { url: string }) => window.location.assign(url) };
@@ -223,6 +220,7 @@ export function BillingView({
   const openPortal = useMutation(trpc.billing.portal.mutationOptions(redirect));
   const changePlan = useMutation(
     trpc.billing.changePlan.mutationOptions({
+      onError: () => void purchaseReview.refresh(),
       onSuccess: async (result, variables) => {
         await refresh.onSuccess();
         // The outcome shows on the plan card at the top of the page, so the
@@ -1109,6 +1107,10 @@ export function BillingView({
               const r = active ? selected : (PLAN_RUNGS.find((x) => x.plan === p) ?? selected);
               const isCurrent = r.key === current.key;
               const forSale = canManage && r.priceCents > 0 && !isCurrent;
+              // Stripe charges a different rung at the same or a higher price now.
+              // A reduction and keeping a pending downgrade's current rung are not purchases.
+              const needsPurchaseReview =
+                !hasLiveSubscription || r.priceCents >= contractedRung.priceCents;
               return (
                 <div key={p} className="ms-plan" data-open={active || undefined}>
                   <div className="ms-plan-name">{planName(p)}</div>
@@ -1180,12 +1182,12 @@ export function BillingView({
                               busy ||
                               subscriptionChangesUnavailable ||
                               salesPaused ||
-                              (!hasLiveSubscription && !purchaseReview.allowed)
+                              (needsPurchaseReview && !purchaseReview.allowed)
                             }
                             onClick={() =>
                               subscriptionChangesUnavailable ||
                               salesPaused ||
-                              (!hasLiveSubscription && !purchaseReview.allowed)
+                              (needsPurchaseReview && !purchaseReview.allowed)
                                 ? undefined
                                 : hasLiveSubscription
                                   ? changePlan.mutate({ rung: r.key })

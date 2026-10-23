@@ -33,6 +33,9 @@ const fixture = vi.hoisted(() => ({
   create: vi.fn(),
   checkout: vi.fn(),
   manage: vi.fn(),
+  changePlan: vi.fn(),
+  reviewAllowed: true,
+  reviewEnabled: [] as boolean[],
   invalidate: vi.fn(),
   receivingRefetch: vi.fn(),
   serviceRefetch: vi.fn(),
@@ -45,7 +48,10 @@ const fixture = vi.hoisted(() => ({
 // has its own denied/loading/approved coverage in purchase-review-ui.test.ts.
 vi.mock("@/components/purchase-review-notice", async (original) => ({
   ...(await original<typeof import("@/components/purchase-review-notice")>()),
-  usePurchaseReview: (enabled = true) => ({ enabled, allowed: true, refresh: vi.fn() }),
+  usePurchaseReview: (enabled = true) => {
+    fixture.reviewEnabled.push(enabled);
+    return { enabled, allowed: !enabled || fixture.reviewAllowed, refresh: vi.fn() };
+  },
   PurchaseReviewNotice: () => null,
 }));
 
@@ -88,7 +94,9 @@ vi.mock("@tanstack/react-query", () => ({
         ? fixture.create
         : options.kind === "checkout"
           ? fixture.checkout
-          : fixture.manage,
+          : options.kind === "changePlan"
+            ? fixture.changePlan
+            : fixture.manage,
   }),
   useQueryClient: () => ({ invalidateQueries: fixture.invalidate }),
 }));
@@ -349,6 +357,8 @@ beforeEach(() => {
   fixture.pendingCreate = false;
   fixture.initialOfferId = null;
   fixture.initialPlan = null;
+  fixture.reviewAllowed = true;
+  fixture.reviewEnabled = [];
   fixture.service = { ...querySnapshot(service()), refetch: fixture.serviceRefetch };
   fixture.receiving = {
     ...querySnapshot({
@@ -886,6 +896,63 @@ describe.each(["en", "pt-BR"] as const)("Mail add-on requirement in %s", (locale
     ).toBe(false);
   });
 
+  it("blocks a held legacy seat increase at the button and submit handler while allowing reduction", () => {
+    fixture.mode = "panel";
+    fixture.reviewAllowed = false;
+    fixture.service.data = service({
+      licenseKind: "subscription",
+      unlimitedSeats: false,
+      seats: 5,
+    });
+    fixture.billing.data = billing({
+      availability: "existing_subscription",
+      management: {
+        canReconcile: true,
+        canAdjust: true,
+        canIncrease: true,
+        canCancel: true,
+        canResume: false,
+        pending: false,
+        scheduledSeats: null,
+        requestedSeats: null,
+        effectiveAt: null,
+      },
+    });
+    render(locale);
+    change(
+      fixture.controls.find((control) => control.type === "number"),
+      "6",
+    );
+    render(locale);
+    expect(fixture.reviewEnabled.at(-1)).toBe(true);
+    expect(
+      fixture.buttons.find((button) => button.children === t("requestIncrease"))?.disabled,
+    ).toBe(true);
+    const increase = fixture.forms[0];
+    if (!increase) throw new Error("Missing legacy quantity form");
+    (increase.onSubmit as (event: FormEvent) => void)({
+      preventDefault: vi.fn(),
+    } as unknown as FormEvent);
+    expect(fixture.manage).not.toHaveBeenCalled();
+    change(
+      fixture.controls.find((control) => control.type === "number"),
+      "3",
+    );
+    render(locale);
+    expect(
+      fixture.buttons.find((button) => button.children === t("requestReduction"))?.disabled,
+    ).toBe(false);
+    expect(fixture.buttons.find((button) => button.children === t("cancelAtEnd"))?.disabled).toBe(
+      false,
+    );
+    const reduction = fixture.forms[0];
+    if (!reduction) throw new Error("Missing reduction form");
+    (reduction.onSubmit as (event: FormEvent) => void)({
+      preventDefault: vi.fn(),
+    } as unknown as FormEvent);
+    expect(fixture.manage).toHaveBeenCalledExactlyOnceWith({ action: "quantity", seats: 3 });
+  });
+
   it("maps a late Send eligibility refusal to the billing CTA without exposing provider details", () => {
     fixture.mode = "panel";
     purchasable();
@@ -913,6 +980,11 @@ it("preserves existing contract notices and recognizes the Send purchase prerequ
 });
 
 describe.each(["en", "pt-BR"] as const)("mailbox plan choices in %s", (locale) => {
+  const t = createTranslator({
+    locale,
+    messages: messages[locale],
+    namespace: "mailboxes-service",
+  });
   const publicPlans = [
     { code: "solo", boxes: 1, storage: 1, amount: 290, outbound: 500, inbound: 2000 },
     { code: "duo", boxes: 3, storage: 3, amount: 590, outbound: 2000, inbound: 5000 },
@@ -932,6 +1004,107 @@ describe.each(["en", "pt-BR"] as const)("mailbox plan choices in %s", (locale) =
       outboundBytesPerPeriod: 1024 ** 3,
     },
   }));
+  function existingPlan(code: "solo" | "duo" | "equipe") {
+    const current = publicPlans.find((offer) => offer.plan.code === code);
+    if (!current) throw new Error("Missing current Mail plan");
+    fixture.mode = "panel";
+    fixture.service.data = service({
+      licenseKind: "subscription",
+      unlimitedSeats: false,
+      seats: current.includedMailboxes,
+      includedMailboxes: current.includedMailboxes,
+    });
+    fixture.billing.data = billing({
+      availability: "existing_subscription",
+      management: {
+        canChangePlan: true,
+        currentPlan: code,
+        currentUnitAmount: current.unitAmount,
+        planOffers: publicPlans.map((offer) => ({ ...offer, current: offer.plan.code === code })),
+        canCancel: true,
+        canResume: true,
+        canReconcile: false,
+        canAdjust: false,
+        canIncrease: false,
+        pending: false,
+        requestedSeats: null,
+        scheduledSeats: null,
+      },
+    });
+  }
+  function selectPlan(index: number) {
+    const radio = fixture.controls.filter((control) => control.type === "radio")[index];
+    if (!radio) throw new Error("Missing change-plan radio");
+    (radio.onChange as () => void)();
+    return plain(render(locale));
+  }
+  it("blocks a held paid upgrade but preserves downgrade, cancellation and renewal resume", () => {
+    existingPlan("duo");
+    fixture.reviewAllowed = false;
+    render(locale);
+    const text = selectPlan(2);
+    expect(fixture.reviewEnabled.at(-1)).toBe(true);
+    expect(text).toContain(t("plans.changeHint"));
+    const upgrade = fixture.buttons.find(
+      (button) => button.children === t("plans.upgradeTo", { name: "Equipe" }),
+    );
+    if (!upgrade) throw new Error("Missing Mail upgrade");
+    expect(upgrade.disabled).toBe(true);
+    (upgrade.onClick as () => void)();
+    expect(fixture.changePlan).not.toHaveBeenCalled();
+    expect(fixture.buttons.find((button) => button.children === t("cancelAtEnd"))?.disabled).toBe(
+      false,
+    );
+    const cancellation = fixture.forms[0];
+    if (!cancellation) throw new Error("Missing cancellation form");
+    (cancellation.onSubmit as (event: FormEvent) => void)({
+      preventDefault: vi.fn(),
+    } as unknown as FormEvent);
+    expect(fixture.manage).toHaveBeenCalledWith({ action: "cancel" });
+    click(t("resumeRenewal"));
+    expect(fixture.manage).toHaveBeenCalledWith({ action: "resume" });
+    selectPlan(0);
+    const downgrade = fixture.buttons.find(
+      (button) => button.children === t("plans.downgradeTo", { name: "Solo" }),
+    );
+    if (!downgrade) throw new Error("Missing Mail downgrade");
+    expect(downgrade.disabled).toBe(false);
+    (downgrade.onClick as () => void)();
+    expect(fixture.changePlan).toHaveBeenCalledExactlyOnceWith({
+      offerId: publicPlans[0]?.offerId,
+    });
+  });
+  it("allows an approved paid upgrade only after an explicit click", () => {
+    existingPlan("solo");
+    render(locale);
+    selectPlan(1);
+    expect(fixture.reviewEnabled.at(-1)).toBe(true);
+    expect(fixture.changePlan).not.toHaveBeenCalled();
+    click(t("plans.upgradeTo", { name: "Duo" }));
+    expect(fixture.changePlan).toHaveBeenCalledExactlyOnceWith({
+      offerId: publicPlans[1]?.offerId,
+    });
+  });
+  it("uses the contracted legacy price to identify a charged migration without extra seats", () => {
+    existingPlan("duo");
+    fixture.reviewAllowed = false;
+    if (!fixture.billing.data) throw new Error("Missing billing fixture");
+    fixture.billing.data.management = {
+      ...(fixture.billing.data.management as Record<string, unknown>),
+      currentPlan: null,
+      currentUnitAmount: 1,
+      planOffers: publicPlans.map((offer) => ({ ...offer, current: false })),
+    };
+    render(locale);
+    selectPlan(0);
+    const upgrade = fixture.buttons.find(
+      (button) => button.children === t("plans.upgradeTo", { name: "Solo" }),
+    );
+    if (!upgrade) throw new Error("Missing charged legacy migration");
+    expect(upgrade.disabled).toBe(true);
+    (upgrade.onClick as () => void)();
+    expect(fixture.changePlan).not.toHaveBeenCalled();
+  });
   it.each(["solo", "duo", "equipe"] as const)(
     "preselects the approved %s offer from the public signup destination without purchasing",
     (plan) => {

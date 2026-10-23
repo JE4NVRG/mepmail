@@ -21,6 +21,7 @@ import {
 import {
   defaultMailboxPlanOffer,
   MAILBOX_PLAN_NAMES,
+  MAILBOX_PLAN_ORDER,
   type MailboxPlanCode,
   mailboxPlanDirection,
   mailboxPlanOffers,
@@ -106,7 +107,11 @@ export function MailboxServicePanel({
   const offerHintId = useId();
   const [open, setOpen] = useState(false);
   const purchaseReview = usePurchaseReview(
-    open && !systemIdentified && billing.data?.canPurchase === true,
+    open &&
+      !systemIdentified &&
+      (billing.data?.canPurchase === true ||
+        billing.data?.management.canIncrease === true ||
+        billing.data?.management.canChangePlan === true),
   );
   const [seats, setSeats] = useState("1");
   const [attemptedSeats, setAttemptedSeats] = useState<number | null>(null);
@@ -362,7 +367,16 @@ export function MailboxServicePanel({
   const planTarget =
     planChange.find((entry) => entry.offerId === changeTarget && !entry.current) ?? null;
   const planDirection = planTarget
-    ? mailboxPlanDirection(currentPlanOffer, plan?.seats ?? 0, planTarget)
+    ? currentPlanCode
+      ? MAILBOX_PLAN_ORDER.indexOf(planTarget.plan.code) >
+        MAILBOX_PLAN_ORDER.indexOf(currentPlanCode)
+        ? "upgrade"
+        : "downgrade"
+      : mailboxPlanDirection(
+          currentPlanOffer ?? { unitAmount: manage?.currentUnitAmount ?? 0 },
+          plan?.seats ?? 0,
+          planTarget,
+        )
     : null;
   // Leaves the purchase begun in Stripe Checkout (never one already paid) so
   // another plan can be chosen; a payment that landed meanwhile is kept.
@@ -401,7 +415,13 @@ export function MailboxServicePanel({
     await Promise.allSettled([service.refetch(), billing.refetch()]);
   }
   async function runChangePlan() {
-    if (!planTarget || busy || systemIdentified) return;
+    if (
+      !planTarget ||
+      busy ||
+      systemIdentified ||
+      (planDirection === "upgrade" && !purchaseReview.allowed)
+    )
+      return;
     const name = MAILBOX_PLAN_NAMES[planTarget.plan.code];
     setPlanNotice(null);
     try {
@@ -414,6 +434,10 @@ export function MailboxServicePanel({
       });
     } catch (error) {
       if (!alive.current) return;
+      if (isPurchaseReviewFailure(error)) {
+        void purchaseReview.refresh();
+        return;
+      }
       const reason = error instanceof TRPCClientError ? error.message : "";
       setPlanNotice({
         tone: "alert",
@@ -434,8 +458,14 @@ export function MailboxServicePanel({
     Number.isSafeInteger(changeSeats) &&
     changeSeats >= minChangeSeats &&
     changeSeats <= maxChangeSeats;
+  const increaseNeedsReview = changeSeats > (plan?.seats ?? 0) && !purchaseReview.allowed;
   async function runManagement(action: "cancel" | "resume" | "quantity", seats?: number) {
-    if (busy || systemIdentified) return;
+    if (
+      busy ||
+      systemIdentified ||
+      (action === "quantity" && (seats ?? 0) > (plan?.seats ?? 0) && !purchaseReview.allowed)
+    )
+      return;
     const sequence = ++managementSequence.current;
     setManagementNotice(null);
     setPaymentUrl(null);
@@ -450,8 +480,12 @@ export function MailboxServicePanel({
         action === "quantity" ? (seats ?? null) : (manage?.requestedSeats ?? null),
         sequence,
       );
-    } catch {
+    } catch (error) {
       if (!alive.current || managementSequence.current !== sequence) return;
+      if (isPurchaseReviewFailure(error)) {
+        void purchaseReview.refresh();
+        return;
+      }
       setManagementNotice("error");
       await Promise.allSettled([service.refetch(), billing.refetch()]);
     }
@@ -722,6 +756,12 @@ export function MailboxServicePanel({
                   </a>
                 </div>
               ) : null}
+              <PurchaseReviewNotice
+                review={purchaseReview}
+                returnTo={mailboxPurchaseReturn(
+                  planTarget?.plan.code ?? offer?.plan?.code ?? initialPlan,
+                )}
+              />
               {planChange.length ? (
                 <section
                   className={styles.planChange}
@@ -762,7 +802,9 @@ export function MailboxServicePanel({
                         <button
                           type="button"
                           className="ms-btn ms-btn-primary"
-                          disabled={busy}
+                          disabled={
+                            busy || (planDirection === "upgrade" && !purchaseReview.allowed)
+                          }
                           onClick={() => void runChangePlan()}
                         >
                           {changePlan.isPending
@@ -825,7 +867,11 @@ export function MailboxServicePanel({
                         disabled={busy}
                         onChange={(event) => setManagedSeats(event.target.value)}
                       />
-                      <button className="ms-btn" type="submit" disabled={busy || !validChange}>
+                      <button
+                        className="ms-btn"
+                        type="submit"
+                        disabled={busy || !validChange || increaseNeedsReview}
+                      >
                         {t(changeSeats > plan!.seats ? "requestIncrease" : "requestReduction")}
                       </button>
                     </form>
@@ -873,10 +919,6 @@ export function MailboxServicePanel({
                   ) : null}
                 </div>
               ) : null}
-              <PurchaseReviewNotice
-                review={purchaseReview}
-                returnTo={mailboxPurchaseReturn(offer?.plan?.code ?? initialPlan)}
-              />
               {!canPurchase ? (
                 <div className={styles.notice}>
                   {!sendingPlanRequired ||

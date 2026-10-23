@@ -24,6 +24,12 @@ import {
   mailboxSubscriptionCatalog,
   reconcileExistingMailboxSubscription,
 } from "./mailbox-lifecycle.js";
+import {
+  assertPurchaseEligibility,
+  getPurchaseEligibility,
+  PurchaseEligibilityError,
+  requirePurchaseEligibility,
+} from "./purchase-eligibility.js";
 import type { BillingStripe } from "./stripe.js";
 import { idOf, lockCustomer } from "./subscription.js";
 
@@ -149,6 +155,7 @@ async function context(
   deps: MailboxManagementDeps,
   catalog: MailboxCatalog,
   input: MailboxManagementInput,
+  target?: MailboxPriceTerms,
 ) {
   const [discovered] = await db
     .select({ customer: schema.teams.stripeCustomerId })
@@ -190,6 +197,7 @@ async function context(
     !plan.stripePriceId
   )
     throw new MailboxLifecycleError("unavailable");
+  if (target && isPlanUpgrade(plan, target)) await assertPurchaseEligibility(db, input.teamId);
   // A standalone Correio contract was bought without Envio and keeps needing none.
   const paidSendingPlanEligible =
     !deps.requirePaidSendingPlan ||
@@ -365,6 +373,7 @@ async function prepare(
           ? "increase"
           : "decrease"
         : input.action;
+    if (action === "increase") await assertPurchaseEligibility(db, input.teamId);
     if (
       input.action === "quantity" &&
       (c.sub.status !== "active" ||
@@ -450,6 +459,13 @@ async function stage(
       .for("update");
     if (!row || !compatible(row, c)) throw new MailboxLifecycleError("conflict");
     if (row.status !== "prepared" || deps.readOnly) return false;
+    if (row.action === "increase") {
+      const eligibility = await getPurchaseEligibility(db, input.teamId);
+      if (!eligibility.eligible) {
+        await save(db, row, { status: "expired" });
+        return eligibility;
+      }
+    }
     if (!c.sendingPlanEligible && ["increase", "resume"].includes(row.action)) {
       // Only prepared proves no provider write was armed. Preserve its journal,
       // close the abandoned intent and allow cancellation/reduction to proceed.
@@ -459,7 +475,8 @@ async function stage(
     await save(db, row, { status: "creating" }); // Commit before the provider call.
     return true;
   });
-  return deps.db.transaction(async (tx) => {
+  if (typeof armed !== "boolean") throw new PurchaseEligibilityError(armed);
+  const outcome = await deps.db.transaction(async (tx) => {
     const db = tx as unknown as Db,
       c = await context(db, deps, catalog, input);
     let [row] = await db
@@ -557,7 +574,14 @@ async function stage(
           );
         } else {
           if (sub.schedule) throw new MailboxLifecycleError("conflict");
-          if (row.action === "increase")
+          if (row.action === "increase") {
+            const eligibility = await getPurchaseEligibility(db, input.teamId);
+            if (!eligibility.eligible) {
+              // This denial proves no update was dispatched. Close only this known attempt;
+              // unknown provider outcomes retain their existing pending/reconciliation path.
+              row = await save(db, row, { status: "expired" });
+              return { again: false, value: result(row, sub), denied: eligibility };
+            }
             await deps.stripe.subscriptions.update(
               sub.id,
               {
@@ -574,7 +598,7 @@ async function stage(
               },
               options,
             );
-          else
+          } else
             await deps.stripe.subscriptions.update(
               sub.id,
               { cancel_at_period_end: row.action === "cancel", proration_behavior: "none" },
@@ -681,6 +705,8 @@ async function stage(
       value: result(row, sub),
     };
   });
+  if ("denied" in outcome && outcome.denied) throw new PurchaseEligibilityError(outcome.denied);
+  return outcome;
 }
 
 export async function manageMailboxSubscription(
@@ -695,6 +721,17 @@ export async function manageMailboxSubscription(
     (!Number.isSafeInteger(input.seats) || input.seats! < 1 || input.seats! > 10000)
   )
     throw new MailboxLifecycleError("invalid");
+  if (input.action === "quantity") {
+    const [current] = await deps.db
+      .select({
+        seats: schema.mailboxSubscriptions.seats,
+        planCode: schema.mailboxSubscriptions.planCode,
+      })
+      .from(schema.mailboxSubscriptions)
+      .where(eq(schema.mailboxSubscriptions.teamId, input.teamId));
+    if (current && current.planCode === null && input.seats! > current.seats)
+      await requirePurchaseEligibility(deps.db, input);
+  }
   const prepared = await prepare(deps, catalog, input);
   if (prepared.done) return prepared.done;
   if (!prepared.id) throw new MailboxLifecycleError("conflict");
@@ -706,6 +743,16 @@ export async function manageMailboxSubscription(
 }
 
 const PLAN_RANK: Record<MailboxPlanCode, number> = { solo: 1, duo: 2, equipe: 3 };
+
+function isPlanUpgrade(
+  current: { planCode: MailboxPlanCode | null; seats: number; unitAmount: number | null },
+  target: MailboxPriceTerms,
+) {
+  if (!target.planCode) throw new MailboxLifecycleError("invalid");
+  return current.planCode
+    ? PLAN_RANK[target.planCode] > PLAN_RANK[current.planCode]
+    : mailboxIncludedSeats(target) > current.seats || target.unitAmount > (current.unitAmount ?? 0);
+}
 
 export interface MailboxPlanChangeInput {
   teamId: string;
@@ -736,9 +783,21 @@ export async function changeMailboxPlan(
   const planCode = target?.planCode;
   if (!target || !planCode || !isStandaloneMailboxPrice(catalog, target.priceId))
     throw new MailboxLifecycleError("invalid");
+  const [currentPlan] = await deps.db
+    .select({
+      planCode: schema.mailboxSubscriptions.planCode,
+      seats: schema.mailboxSubscriptions.seats,
+      unitAmount: schema.mailboxSubscriptions.unitAmount,
+    })
+    .from(schema.mailboxSubscriptions)
+    .where(eq(schema.mailboxSubscriptions.teamId, input.teamId));
+  // Persist any new-sender hold separately: rejecting the upgrade must not roll it back.
+  // The locked context classifies the current contract again before reading the provider.
+  if (currentPlan && isPlanUpgrade(currentPlan, target))
+    await requirePurchaseEligibility(deps.db, input);
   return deps.db.transaction(async (tx) => {
     const db = tx as unknown as Db;
-    const c = await context(db, deps, catalog, { ...input, action: "reconcile" });
+    const c = await context(db, deps, catalog, { ...input, action: "reconcile" }, target);
     if (c.plan.stripePriceId === target.priceId) throw new MailboxLifecycleError("invalid");
     if (
       !["active", "trialing"].includes(c.sub.status) ||
@@ -756,14 +815,12 @@ export async function changeMailboxPlan(
     if (target.currency !== currency && target.localCurrency?.currency !== currency)
       throw new MailboxLifecycleError("invalid");
     if (target.interval !== c.plan.interval) throw new MailboxLifecycleError("invalid");
-    const current = c.plan.planCode;
     // A larger plan, or (from a pre-plan contract) more mailboxes or a higher price, is
     // paid now; anything else must fit what the team already has, without a refund.
-    const upgrade = current
-      ? PLAN_RANK[planCode] > PLAN_RANK[current]
-      : mailboxIncludedSeats(target) > c.plan.seats || target.unitAmount > (c.plan.unitAmount ?? 0);
+    const upgrade = isPlanUpgrade(c.plan, target);
     if (!upgrade) await assertFits(db, input.teamId, c.plan.periodStart, target);
     const ending = upgrade && c.sub.status === "trialing";
+    if (upgrade) await assertPurchaseEligibility(db, input.teamId);
     await deps.stripe.subscriptions.update(
       c.sub.id,
       {
