@@ -393,6 +393,13 @@
       "when": 1792382400000,
       "tag": "0055_operations_access",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1792468800000,
+      "tag": "0056_purchase_rate_limits",
+      "breakpoints": true
     }
   ]
 }

@@ -34,6 +34,7 @@ export * from "./mailbox-trial-claims.js";
 export * from "./mailboxes.js";
 export * from "./meta-advertising.js";
 export * from "./monitor.js";
+export * from "./purchase-rate-limits.js";
 export * from "./region-breakers.js";
 export * from "./segments.js";
 export * from "./send-checkouts.js";

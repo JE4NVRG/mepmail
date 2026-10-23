@@ -54,6 +54,7 @@ import { resolveBaseUrl } from "../auth";
 import { getPixStripe, getStripe, mailPlanMove, pixPaymentsOpen } from "../billing";
 import { emitFunnel } from "../funnel";
 import { newSubscriptionsPaused } from "../new-subscriptions";
+import { enforcePurchaseRateLimit } from "../purchase-rate-limit";
 import { getQueue } from "../queue";
 import { adminProcedure, noPurchaseInAndroidApp, router, teamProcedure } from "../trpc";
 
@@ -163,16 +164,21 @@ function purchaseEligibilityError(error: PurchaseEligibilityError): TRPCError {
 
 // Every purchase (checkout, Pix, plan change, overage, invoice payment, portal) is refused in
 // the Android app. cancelRenewal is not one and stays open there.
-const billingMutationProcedure = adminProcedure.use(noPurchaseInAndroidApp).use(({ next }) => {
-  const paused = process.env.BILLING_MUTATIONS_PAUSED;
-  if (paused === "true" || paused === "1") {
-    throw new TRPCError({
-      code: "SERVICE_UNAVAILABLE",
-      message: "Billing changes are temporarily paused. Please try again later.",
-    });
-  }
-  return next();
-});
+const billingMutationProcedure = adminProcedure
+  .use(noPurchaseInAndroidApp)
+  .use(async ({ ctx, next }) => {
+    const paused = process.env.BILLING_MUTATIONS_PAUSED;
+    if (paused === "true" || paused === "1") {
+      throw new TRPCError({
+        code: "SERVICE_UNAVAILABLE",
+        message: "Billing changes are temporarily paused. Please try again later.",
+      });
+    }
+    // After the pause so a paused deployment never writes counters, and before
+    // any Stripe call so a blocked attempt costs nothing.
+    await enforcePurchaseRateLimit(ctx.db, ctx.teamId);
+    return next();
+  });
 
 export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
   return router({
