@@ -455,9 +455,10 @@ export function BillingView({
   const salesPaused = status.data.newSubscriptionsPaused && !hasLiveSubscription;
   const newOffer =
     !hasLiveSubscription && checkout !== "success" && !salesPaused ? launchOffer : null;
+  const reviewRung = plansOpen ? selected.key : (newOffer?.rung ?? intent ?? current.key);
   const reviewReturnTo = billingPurchaseReturn({
-    plan: newOffer?.rung ?? intent ?? current.key,
-    interval: launchInterval,
+    plan: reviewRung,
+    interval: reviewRung === newOffer?.rung ? launchInterval : "month",
     correio: comboOn,
   });
   const comboSeatCount = parseLaunchMailboxQuantity(comboSeats);

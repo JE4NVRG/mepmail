@@ -19,6 +19,7 @@ function render(locale: "en" | "pt-BR", input: DomainSafetyNoticeInput) {
       locale,
       timeZone: "UTC",
       messages: { domains: locale === "en" ? en : pt },
+      // biome-ignore lint/correctness/noChildrenProp: next-intl requires children in its props type.
       children: createElement(DomainSafetyNotice, input),
     }),
   );

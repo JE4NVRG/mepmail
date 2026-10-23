@@ -62,7 +62,7 @@ describe.each(["en", "pt-BR"] as const)("review access and truthful counts (%s)"
       standing = { signupRisk: kind };
       const html = render(locale, TeamStandingBanner);
       expect(html).toContain('href="/support"');
-      expect(html).toContain((locale === "en" ? enConsole : ptConsole).banner.reviewRequest.button);
+      expect(html).toContain((locale === "en" ? enConsole : ptConsole).banner.requestReview);
       expect(html).not.toContain(locale === "en" ? "is suspended" : "está suspensa");
       if (kind === "sandbox")
         expect(html).toContain(locale === "en" ? "your own verified" : "próprio e-mail verificado");
@@ -77,7 +77,7 @@ describe.each(["en", "pt-BR"] as const)("review access and truthful counts (%s)"
           : { sendReview: { at: new Date("2026-10-16T00:00:00Z") } };
       const html = render(locale, TeamStandingBanner);
       expect(html).toContain('href="/support"');
-      expect(html).toContain((locale === "en" ? enConsole : ptConsole).banner.reviewRequest.button);
+      expect(html).toContain((locale === "en" ? enConsole : ptConsole).banner.requestReview);
       expect(html).not.toContain("INTERNAL-NOTE");
     },
   );

@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PurchaseReviewNotice } from "@/components/purchase-review-notice";
 import { formatUsd } from "@/lib/format";
 import { BillingView } from "../src/app/(dashboard)/settings/billing/billing-view";
 
@@ -19,7 +20,7 @@ const h = vi.hoisted(() => ({
   pendingRung: null as string | null,
   system: false,
 }));
-// These legacy cases exercise prices, maintenance and onboarding. Safety admission
+// These cases exercise prices, maintenance, onboarding and review return intent. Safety admission
 // has its own denied/loading/approved coverage in purchase-review-ui.test.ts.
 vi.mock("@/components/purchase-review-notice", async (original) => ({
   ...(await original<typeof import("@/components/purchase-review-notice")>()),
@@ -137,6 +138,38 @@ beforeEach(() => {
 });
 
 describe("billing selection synthetic UI contract, not paid E2E", () => {
+  it("keeps the selected 200k plan in both review returns instead of the active 100k offer", () => {
+    h.subscribed = false;
+    h.launchEnabled = true;
+    const tree = BillingView({
+      checkout: null,
+      requestedRung: "pro_200k",
+      requestedInterval: "year",
+    });
+    expect(nodes(tree).find((n) => n.props.id === "ms-volume")?.props.value).toBe(3);
+    const reviewNotices = nodes(tree).filter((n) => n.type === PurchaseReviewNotice);
+    expect(reviewNotices).toHaveLength(2);
+    expect(reviewNotices.map((n) => n.props.returnTo)).toEqual([
+      "/settings/billing?plan=pro_200k&interval=month",
+      "/settings/billing?plan=pro_200k&interval=month",
+    ]);
+    expect(h.mutate).not.toHaveBeenCalled();
+  });
+
+  it("preserves the annual new offer in review returns when no other plan is selected", () => {
+    h.subscribed = false;
+    h.launchEnabled = true;
+    const tree = BillingView({ checkout: null, requestedInterval: "year" });
+    expect(nodes(tree).some((n) => n.props.open === true)).toBe(false);
+    const reviewNotices = nodes(tree).filter((n) => n.type === PurchaseReviewNotice);
+    expect(reviewNotices).toHaveLength(2);
+    expect(reviewNotices.map((n) => n.props.returnTo)).toEqual([
+      "/settings/billing?plan=pro_100k&interval=year",
+      "/settings/billing?plan=pro_100k&interval=year",
+    ]);
+    expect(h.mutate).not.toHaveBeenCalled();
+  });
+
   it("shows legacy USD20 and chooses its monthly checkout when the launch flag is disabled", () => {
     h.subscribed = false;
     const tree = BillingView({ checkout: null, requestedRung: "pro_100k" });
