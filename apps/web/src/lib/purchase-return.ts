@@ -1,6 +1,7 @@
 /** Purchase intent only: returning never opens a payment or bypasses eligibility. */
-export function purchaseReturnPath(value?: string | null): string | null {
+export function purchaseReturnPath(value?: unknown): string | null {
   if (
+    typeof value !== "string" ||
     !value ||
     value.length > 1000 ||
     Array.from(value).some((char) => char.charCodeAt(0) <= 32 || char === "\\") ||

@@ -66,4 +66,10 @@ describe("domain review round trip", () => {
     expect(withPurchaseReturn("/domains/new?created=one", null)).toBe("/domains/new?created=one");
     expect(mailboxPurchaseReturn("unknown")).toBe("/mail?setup=correio");
   });
+
+  it("ignores duplicate or non-text query values at the server boundary", () => {
+    expect(purchaseReturnPath(["/mail", "/settings/billing"])).toBeNull();
+    expect(purchaseReturnPath({ next: "/mail" })).toBeNull();
+    expect(purchaseReturnPath(1)).toBeNull();
+  });
 });
