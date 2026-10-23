@@ -27,6 +27,45 @@ function render(locale: "en" | "pt-BR", input: DomainSafetyNoticeInput) {
 
 describe("verified DNS and sending security are separate facts", () => {
   it.each(["en", "pt-BR"] as const)(
+    "%s explains the inapplicable purchase review for a confirmed System account without promising sending clearance",
+    (locale) => {
+      const input = { accountPlan: "system", eligibility: eligibility("not_found") };
+      expect(domainSafetyNotice(input)).toMatchObject({ state: "system", variant: "success" });
+      const html = render(locale, input);
+      expect(html).toContain(locale === "en" ? "DNS verified." : "DNS verificado.");
+      expect(html).toContain(locale === "en" ? "System accounts" : "conta System");
+      expect(html).toContain(locale === "en" ? "security checks" : "verificações de segurança");
+      expect(html).not.toMatch(/Ready to send|Pronto para enviar|unavailable|bloqueado|suspended/i);
+      expect(input.eligibility.eligible).toBe(false);
+    },
+  );
+
+  it.each([undefined, "free", "pro", "equipe"])(
+    "keeps an unconfirmed or ordinary plan (%s) conservative when purchase review returns not_found",
+    (accountPlan) => {
+      expect(
+        domainSafetyNotice({ accountPlan, eligibility: eligibility("not_found") }),
+      ).toMatchObject({
+        state: "unavailable",
+        variant: "warn",
+      });
+    },
+  );
+
+  it("does not let System classification hide failed, pending or inconsistent preflight data", () => {
+    const input = { accountPlan: "system", eligibility: eligibility("not_found") };
+    expect(domainSafetyNotice({ ...input, error: true }).state).toBe("unavailable");
+    expect(domainSafetyNotice({ ...input, pending: true }).state).toBe("checking");
+    expect(domainSafetyNotice({ accountPlan: "system" }).state).toBe("checking");
+    for (const code of ["forbidden", "domain_required", "ready"] as const) {
+      expect(
+        domainSafetyNotice({ accountPlan: "system", eligibility: eligibility(code, false) })
+          .variant,
+      ).toBe("warn");
+    }
+  });
+
+  it.each(["en", "pt-BR"] as const)(
     "%s confirms ordinary verified DNS without promising sending or requiring payment",
     (locale) => {
       const input = { eligibility: eligibility("ready") };
@@ -58,6 +97,9 @@ describe("verified DNS and sending security are separate facts", () => {
       expect(html).toContain(copy.detail.security[state]);
       expect(html).not.toMatch(/Ready to send|Pronto para enviar/);
     }
+    expect(
+      domainSafetyNotice({ accountPlan: "system", eligibility: eligibility(code) }),
+    ).toMatchObject({ state, variant: "warn" });
   });
 
   it("does not turn a failed or pending preflight into security clearance, including cached ready data", () => {

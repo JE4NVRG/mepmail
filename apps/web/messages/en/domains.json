@@ -178,6 +178,7 @@
     "bannerVerified": "DNS verified.",
     "bannerVerifiedBody": "The DNS records are correct. Sending remains subject to account permissions, limits and security checks.",
     "security": {
+      "system": "The DNS records are correct. System accounts do not use purchase review. Sending remains subject to permissions, limits and security checks.",
       "dnsOnly": "The DNS records are correct. Sending remains subject to the permissions, limits and security checks of this installation.",
       "checking": "DNS is confirmed. Checking the security status of the team…",
       "unavailable": "DNS is confirmed, but the security status of the team could not be confirmed. Check the account notices or refresh the status.",

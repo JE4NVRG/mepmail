@@ -178,6 +178,7 @@
     "bannerVerified": "DNS verificado.",
     "bannerVerifiedBody": "Os registros DNS estão corretos. O envio segue as permissões, os limites e as verificações de segurança da conta.",
     "security": {
+      "system": "Os registros DNS estão corretos. A conta System não usa a revisão de contratação. Os envios continuam sujeitos às permissões, aos limites e às verificações de segurança.",
       "dnsOnly": "Os registros DNS estão corretos. O envio segue as permissões, os limites e as verificações de segurança desta instalação.",
       "checking": "O DNS está confirmado. Consultando o estado de segurança da equipe…",
       "unavailable": "O DNS está confirmado, mas não foi possível confirmar o estado de segurança da equipe. Confira os avisos da conta ou atualize o estado.",

@@ -484,10 +484,21 @@ export function DomainDetail({ id }: { id: string }) {
       retry: false,
     }),
   );
+  const teamList = useQuery(trpc.team.list.queryOptions());
+  const accountPlan =
+    teamList.isSuccess && !teamList.isError
+      ? teamList.data.teams.find((membership) => membership.teamId === teamList.data.activeTeamId)
+          ?.plan
+      : undefined;
   const safetyProps = {
     enabled: features.data?.trackingRequiresSubdomain,
     eligibility: eligibility.data,
-    pending: eligibility.isPending || eligibility.isFetching || verify.isPending,
+    accountPlan,
+    pending:
+      eligibility.isPending ||
+      eligibility.isFetching ||
+      verify.isPending ||
+      (eligibility.data?.code === "not_found" && teamList.isPending),
     error: eligibility.isError,
   };
   const safetyNotice = domainSafetyNotice(safetyProps);

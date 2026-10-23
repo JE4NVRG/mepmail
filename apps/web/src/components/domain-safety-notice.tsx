@@ -8,12 +8,15 @@ export interface DomainSafetyNoticeInput {
   enabled?: boolean | undefined;
   /** Pass only the current team's read-only preflight; this component never requests or clears review. */
   eligibility?: Pick<PurchaseEligibility, "code" | "eligible"> | null | undefined;
+  /** Confirmed plan of the active team; a different team's membership must never be used. */
+  accountPlan?: string | undefined;
   pending?: boolean | undefined;
   error?: boolean | undefined;
 }
 
 export type DomainSafetyState =
   | "dnsOnly"
+  | "system"
   | "checking"
   | "unavailable"
   | "ready"
@@ -33,7 +36,7 @@ export interface DomainSafetyNoticeModel {
 export function domainSafetyNotice(input: DomainSafetyNoticeInput = {}): DomainSafetyNoticeModel {
   const result = (state: DomainSafetyState): DomainSafetyNoticeModel => ({
     state,
-    variant: state === "ready" || state === "dnsOnly" ? "success" : "warn",
+    variant: state === "ready" || state === "dnsOnly" || state === "system" ? "success" : "warn",
     bodyKey: `security.${state}`,
   });
   if (input.enabled === false) return result("dnsOnly");
@@ -57,6 +60,9 @@ export function domainSafetyNotice(input: DomainSafetyNoticeInput = {}): DomainS
       // DNS verification can finish before its preflight cache is invalidated/refetched.
       // Keep an unconfirmed state rather than contradicting DNS or claiming security clearance.
       return result("checking");
+    case "not_found":
+      // Purchase review excludes System accounts. This confirms DNS only, not sending clearance.
+      return result(input.accountPlan === "system" ? "system" : "unavailable");
     default:
       return result("unavailable");
   }
