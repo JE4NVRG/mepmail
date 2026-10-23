@@ -14,7 +14,7 @@ export function QueryRecoveryNotice({
   message: string;
   retryLabel: string;
   retry: () => Promise<unknown>;
-  className?: string;
+  className?: string | undefined;
 }) {
   return (
     <div className={className} role={phase === "error" ? "alert" : "status"}>
