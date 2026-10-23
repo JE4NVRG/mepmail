@@ -68,8 +68,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function PricingPage({
   searchParams,
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-} = {}) {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const locale = await getLocale();
   // A Send campaign (?focus=send, or utm_campaign naming send) lands on Send: its offer leads
   // and its plans come right after, before the Mail plans and scenarios (lib/public-intent.ts).

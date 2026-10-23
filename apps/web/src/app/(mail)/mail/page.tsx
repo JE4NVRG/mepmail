@@ -15,8 +15,8 @@ export const dynamic = "force-dynamic";
 export default async function MailPage({
   searchParams,
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-} = {}) {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const state = await prefetchMailPage(await headers());
   const view = (
     <MailboxesView
