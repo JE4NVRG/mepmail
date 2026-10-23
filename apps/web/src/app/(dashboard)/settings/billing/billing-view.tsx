@@ -41,6 +41,7 @@ import {
   type LaunchMailboxTierId,
   parseLaunchMailboxQuantity,
 } from "@/lib/launch-offer";
+import { billingPurchaseReturn } from "@/lib/purchase-return";
 import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { useInAndroidApp } from "@/lib/use-android-app";
@@ -142,12 +143,14 @@ export function BillingView({
   checkout,
   requestedRung = null,
   requestedMail = false,
+  requestedInterval = "month",
   pixReturned = false,
 }: {
   checkout: "success" | "cancel" | null;
   requestedRung?: PlanRungKey | null;
   /** From the Correio offer: preselect the Mail step of the launch combo. */
   requestedMail?: boolean;
+  requestedInterval?: "month" | "year";
   /** Back from paying an invoice by Pix (?pix=paid). */
   pixReturned?: boolean;
 }) {
@@ -192,7 +195,7 @@ export function BillingView({
   const intent =
     PLAN_RUNGS.find((rung) => rung.key === requestedRung && rung.priceCents > 0)?.key ?? null;
   const [step, setStep] = useState<number | null>(null);
-  const [launchInterval, setLaunchInterval] = useState<LaunchBillingPeriod>("month");
+  const [launchInterval, setLaunchInterval] = useState<LaunchBillingPeriod>(requestedInterval);
   // Send + Mail combo: Mail is a second, separate Checkout opened after Send.
   const [comboOn, setComboOn] = useState(requestedMail);
   const [comboTier, setComboTier] = useState<LaunchMailboxTierId>("gib1");
@@ -452,6 +455,11 @@ export function BillingView({
   const salesPaused = status.data.newSubscriptionsPaused && !hasLiveSubscription;
   const newOffer =
     !hasLiveSubscription && checkout !== "success" && !salesPaused ? launchOffer : null;
+  const reviewReturnTo = billingPurchaseReturn({
+    plan: newOffer?.rung ?? intent ?? current.key,
+    interval: launchInterval,
+    correio: comboOn,
+  });
   const comboSeatCount = parseLaunchMailboxQuantity(comboSeats);
   const comboQuote =
     comboOn && comboSeatCount !== null
@@ -501,7 +509,7 @@ export function BillingView({
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
       {notice}
       <PixInvoices canManage={canManage} returned={pixReturned} />
-      <PurchaseReviewNotice review={purchaseReview} />
+      <PurchaseReviewNotice review={purchaseReview} returnTo={reviewReturnTo} />
 
       {showComboStep && comboIntent ? (
         <LaunchComboMailStep
@@ -1059,7 +1067,7 @@ export function BillingView({
         size="full"
       >
         <div className="ms-plan-dialog">
-          <PurchaseReviewNotice review={purchaseReview} />
+          <PurchaseReviewNotice review={purchaseReview} returnTo={reviewReturnTo} />
           <div className="ms-volume">
             <label htmlFor="ms-volume" className="ms-microlabel">
               {t("volume")}

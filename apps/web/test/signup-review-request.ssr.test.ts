@@ -17,6 +17,7 @@ vi.mock("@/lib/trpc", () => ({ useTRPC: () => anyPath }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ ...fixture, refetch: vi.fn() }),
   useMutation: () => ({ isPending: false, isSuccess: false }),
+  useQueryClient: () => ({ setQueryData: vi.fn() }),
 }));
 
 beforeEach(() => {
@@ -44,7 +45,7 @@ it.each(["en", "pt-BR"] as const)(
   (locale) => {
     const button = render(locale, SignupReviewRequest);
     expect(button).toContain('aria-expanded="false"');
-    expect(button).toContain(locale === "en" ? "Request a review" : "Pedir revisão");
+    expect(button).toContain((locale === "en" ? en : pt).banner.reviewRequest.button);
     fixture.data = { pending: true, context: "PRIVATE-CONTEXT-MUST-NOT-RENDER" };
     const receipt = render(locale, SignupReviewRequest);
     expect(receipt).toContain('role="status"');

@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useId } from "react";
 import { SignupReviewRequest } from "@/components/signup-review-request";
 import { BtnSpinner } from "@/components/spinner";
+import { purchaseDomainReviewHref } from "@/lib/purchase-return";
 import { useTRPC } from "@/lib/trpc";
 
 /** A checkout rejection can race a previously successful read-only preflight. */
@@ -45,7 +46,13 @@ export function usePurchaseReview(enabled = true) {
   };
 }
 
-export function PurchaseReviewNotice({ review }: { review: ReturnType<typeof usePurchaseReview> }) {
+export function PurchaseReviewNotice({
+  review,
+  returnTo,
+}: {
+  review: ReturnType<typeof usePurchaseReview>;
+  returnTo?: string;
+}) {
   const t = useTranslations("settings.billing.purchaseReview");
   const titleId = useId();
   if (!review.enabled || review.allowed) return null;
@@ -58,7 +65,7 @@ export function PurchaseReviewNotice({ review }: { review: ReturnType<typeof use
     code === "signup_review" ||
     code === "signup_sandbox" ||
     code === "suspended" ||
-    (code === "domain_review" && request.isSuccess);
+    code === "domain_review";
   return (
     <section
       className="ms-card"
@@ -83,19 +90,9 @@ export function PurchaseReviewNotice({ review }: { review: ReturnType<typeof use
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
         {code === "domain_required" ? (
-          <Link href="/domains" className="ms-btn ms-btn-primary">
+          <Link href={purchaseDomainReviewHref(returnTo)} className="ms-btn ms-btn-primary">
             {t("verifyDomain")}
           </Link>
-        ) : code === "domain_review" && !request.isSuccess ? (
-          <button
-            type="button"
-            className="ms-btn ms-btn-primary"
-            disabled={loading}
-            onClick={() => request.mutate()}
-          >
-            <BtnSpinner on={request.isPending} />
-            {t("request")}
-          </button>
         ) : !manualReview ? (
           <Link href="/support" className="ms-btn ms-btn-secondary">
             {t("support")}
@@ -111,7 +108,22 @@ export function PurchaseReviewNotice({ review }: { review: ReturnType<typeof use
           {t("retry")}
         </button>
       </div>
-      {manualReview ? <SignupReviewRequest /> : null}
+      {manualReview ? (
+        <SignupReviewRequest
+          beforeSubmitAction={async () => {
+            const current = await request.mutateAsync();
+            // The restriction may have been cleared while the form was open. The hook
+            // publishes the new eligibility; no review receipt is invented in that case.
+            return (
+              current.code === "domain_review" ||
+              current.code === "send_review" ||
+              current.code === "signup_review" ||
+              current.code === "signup_sandbox" ||
+              current.code === "suspended"
+            );
+          }}
+        />
+      ) : null}
     </section>
   );
 }

@@ -31,6 +31,7 @@ import {
   mailboxHasUnlimitedSeats,
   mailboxOfferSelection,
 } from "@/lib/mailbox-setup";
+import { mailboxPurchaseReturn } from "@/lib/purchase-return";
 import { useTRPC } from "@/lib/trpc";
 import { MailboxPlanCards } from "./mailbox-plan-cards";
 import styles from "./mailbox-service-panel.module.css";
@@ -872,7 +873,10 @@ export function MailboxServicePanel({
                   ) : null}
                 </div>
               ) : null}
-              <PurchaseReviewNotice review={purchaseReview} />
+              <PurchaseReviewNotice
+                review={purchaseReview}
+                returnTo={mailboxPurchaseReturn(offer?.plan?.code ?? initialPlan)}
+              />
               {!canPurchase ? (
                 <div className={styles.notice}>
                   {!sendingPlanRequired ||

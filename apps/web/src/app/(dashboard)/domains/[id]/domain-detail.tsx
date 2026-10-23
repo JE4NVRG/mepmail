@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { CopyChip } from "@/components/copy-chip";
@@ -10,6 +11,7 @@ import {
   DnsRecordsTable,
   DnsRecordsTableSkeleton,
 } from "@/components/dns-records-table";
+import { DomainSafetyNotice, domainSafetyNotice } from "@/components/domain-safety-notice";
 import { LoadError } from "@/components/load-error";
 import { MetaItem } from "@/components/meta-item";
 import { Modal } from "@/components/modal";
@@ -23,6 +25,7 @@ import { Switch } from "@/components/switch";
 import { WarnCard } from "@/components/warn-card";
 import { OPEN_TRACKING_DOCS_URL } from "@/lib/docs-links";
 import { formatRelative, formatUtcMinute } from "@/lib/format";
+import { purchaseReturnPath, withPurchaseReturn } from "@/lib/purchase-return";
 import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { isLoopbackUrl } from "@/lib/url";
@@ -416,6 +419,7 @@ export function DomainDetail({ id }: { id: string }) {
   const common = useTranslations("common");
   const locale = useLocale();
   const router = useRouter();
+  const returnTo = purchaseReturnPath(useSearchParams().get("next"));
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -466,14 +470,32 @@ export function DomainDetail({ id }: { id: string }) {
         void queryClient.invalidateQueries({ queryKey: trpc.domains.get.queryKey({ id }) });
         void queryClient.invalidateQueries({ queryKey: trpc.domains.records.queryKey({ id }) });
         void queryClient.invalidateQueries({ queryKey: trpc.domains.list.queryKey() });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.billing.purchaseEligibility.queryKey(),
+        });
       },
     }),
   );
+  const eligibility = useQuery(
+    trpc.billing.purchaseEligibility.queryOptions(undefined, {
+      enabled:
+        features.data?.trackingRequiresSubdomain === true &&
+        (verify.data?.status ?? domain.data?.status) === "verified",
+      retry: false,
+    }),
+  );
+  const safetyProps = {
+    enabled: features.data?.trackingRequiresSubdomain,
+    eligibility: eligibility.data,
+    pending: eligibility.isPending || eligibility.isFetching || verify.isPending,
+    error: eligibility.isError,
+  };
+  const safetyNotice = domainSafetyNotice(safetyProps);
   const deleteDomain = useMutation(
     trpc.domains.delete.mutationOptions({
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: trpc.domains.list.queryKey() });
-        router.push("/domains");
+        router.push(withPurchaseReturn("/domains", returnTo));
       },
     }),
   );
@@ -536,7 +558,7 @@ export function DomainDetail({ id }: { id: string }) {
         headline={t("detail.error")}
         notFoundHeadline={t("detail.notFound")}
         onRetry={() => domain.refetch()}
-        backHref="/domains"
+        backHref={withPurchaseReturn("/domains", returnTo)}
         backLabel={t("list.title")}
       />
     );
@@ -665,12 +687,17 @@ export function DomainDetail({ id }: { id: string }) {
         title={data.name}
         breadcrumb={
           <>
-            <Crumb href="/domains" label={nav("domains")} />
+            <Crumb href={withPurchaseReturn("/domains", returnTo)} label={nav("domains")} />
             <CrumbEnd label={t("detail.eyebrow")} />
           </>
         }
         actions={
           <>
+            {returnTo ? (
+              <Link href={returnTo} className="ms-btn ms-btn-secondary">
+                {t("purchaseReturn")}
+              </Link>
+            ) : null}
             {needsDnsCheck ? (
               <button
                 type="button"
@@ -798,14 +825,9 @@ export function DomainDetail({ id }: { id: string }) {
           </span>
         </GradientBanner>
       ) : status === "verified" ? (
-        <GradientBanner variant="success">
+        <GradientBanner variant={safetyNotice.variant}>
           <TadaIcon />
-          <span style={{ fontSize: 13.5, color: "var(--ms-success)" }}>
-            {t("detail.bannerVerified")}
-          </span>
-          <span style={{ fontSize: 13.5, color: "var(--ms-bone)" }}>
-            {t("detail.bannerVerifiedBody")}
-          </span>
+          <DomainSafetyNotice {...safetyProps} />
         </GradientBanner>
       ) : null}
 

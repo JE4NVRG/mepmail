@@ -14,6 +14,7 @@ export default async function BillingPage({
     correio?: string | string[];
     pix?: string | string[];
     plan?: string | string[];
+    interval?: string | string[];
   }>;
 }) {
   // Billing does not exist on self-host: not forbidden, absent.
@@ -35,6 +36,7 @@ export default async function BillingPage({
         checkout={checkout}
         requestedMail={requestedMail}
         requestedRung={requestedRung}
+        requestedInterval={params.interval === "year" ? "year" : "month"}
         pixReturned={params.pix === "paid"}
       />
     </>

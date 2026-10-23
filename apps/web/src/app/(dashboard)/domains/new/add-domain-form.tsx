@@ -17,6 +17,7 @@ import { MarkerRail, MobileStepBar, StepRail } from "@/components/stepper";
 import { Tooltip } from "@/components/tooltip";
 import { isAwsCredentialError } from "@/lib/aws-errors";
 import { codeRichTags } from "@/lib/code-rich-tags";
+import { purchaseReturnPath, withPurchaseReturn } from "@/lib/purchase-return";
 import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { trpcErrorCode } from "@/lib/trpc-error";
@@ -53,7 +54,7 @@ function createErrorKey(
 }
 
 /** Wizard step 02: the created domain's DNS records, rendered in-page after create. */
-function DnsRecordsStep({ id }: { id: string }) {
+function DnsRecordsStep({ id, returnTo }: { id: string; returnTo: string | null }) {
   const t = useTranslations("domains");
   const router = useRouter();
   const trpc = useTRPC();
@@ -222,7 +223,7 @@ function DnsRecordsStep({ id }: { id: string }) {
             <button
               type="button"
               className="ms-btn ms-btn-primary"
-              onClick={() => router.push(`/domains/${id}`)}
+              onClick={() => router.push(withPurchaseReturn(`/domains/${id}`, returnTo))}
             >
               {t("new.addedRecords")}
             </button>
@@ -257,10 +258,15 @@ export function AddDomainForm({ userEmail }: { userEmail: string }) {
 
   // Step 02 lives at ?created=<id> so a refresh (or shared link) lands back on
   // the new domain's records instead of an empty form.
-  const createdId = useSearchParams().get("created");
+  const searchParams = useSearchParams();
+  const createdId = searchParams.get("created");
+  const purchaseReturn = purchaseReturnPath(searchParams.get("next"));
   const create = useMutation(
     trpc.domains.create.mutationOptions({
-      onSuccess: ({ id }) => router.replace(`/domains/new?created=${id}`),
+      onSuccess: ({ id }) =>
+        router.replace(
+          withPurchaseReturn(`/domains/new?created=${encodeURIComponent(id)}`, purchaseReturn),
+        ),
     }),
   );
 
@@ -276,7 +282,7 @@ export function AddDomainForm({ userEmail }: { userEmail: string }) {
     create.mutate({ name, region, mailFromSubdomain: returnPath });
   }
 
-  if (createdId) return <DnsRecordsStep id={createdId} />;
+  if (createdId) return <DnsRecordsStep id={createdId} returnTo={purchaseReturn} />;
 
   const errorKey = create.isError ? createErrorKey(create.error) : null;
 

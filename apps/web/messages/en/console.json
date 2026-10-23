@@ -1130,15 +1130,16 @@
     "signupSandbox": "External sending is awaiting a security review. Test messages can be sent only to your own verified signup email. This also applies to full API keys. Your data is preserved.",
     "signupReview": "Sending is held pending a security review of this account. Your data is preserved. Contact support to request a review.",
     "reviewRequest": {
-      "button": "Request a review",
+      "button": "Open review request form",
       "failed": "Could not submit or load the request. Try again.",
-      "hint": "20–500 characters. Describe the sending use and recipient consent. Exclude secrets and email content.",
+      "hint": "20–500 characters. Describe the sending use and recipient consent. Exclude secrets and email content. The request is sent only when you click Submit request.",
       "label": "In one line, how will your team use MepMail?",
-      "received": "Request received. The review team will assess it; current restrictions remain until an explicit decision.",
+      "received": "Review request submitted and recorded. The review team will assess it; current restrictions remain until an explicit decision.",
       "retry": "Try again",
-      "saving": "Submitting…",
+      "saving": "Submitting request…",
       "submit": "Submit request",
-      "wait": "Wait 24 hours from the last request before reopening."
+      "wait": "Wait 24 hours from the last request before reopening.",
+      "refreshFailed": "Your recorded request is preserved, but its status could not be refreshed. Try again."
     }
   },
   "signupRisk": {

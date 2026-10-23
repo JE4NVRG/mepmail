@@ -1,4 +1,5 @@
 {
+  "purchaseReturn": "Voltar ao plano escolhido",
   "status": {
     "temporary_failure": "Falha temporária"
   },
@@ -174,8 +175,19 @@
     "bannerLooking": "Procurando registros DNS.",
     "bannerLookingBody": "Isso pode levar algumas horas, dependendo do tempo de propagação de {provider}.",
     "bannerLookingBodyGeneric": "Isso pode levar algumas horas, dependendo do tempo de propagação do seu provedor de DNS.",
-    "bannerVerified": "Domínio verificado.",
-    "bannerVerifiedBody": "Pronto para enviar emails.",
+    "bannerVerified": "DNS verificado.",
+    "bannerVerifiedBody": "Os registros DNS estão corretos. O envio segue as permissões, os limites e as verificações de segurança da conta.",
+    "security": {
+      "dnsOnly": "Os registros DNS estão corretos. O envio segue as permissões, os limites e as verificações de segurança desta instalação.",
+      "checking": "O DNS está confirmado. Consultando o estado de segurança da equipe…",
+      "unavailable": "O DNS está confirmado, mas não foi possível confirmar o estado de segurança da equipe. Confira os avisos da conta ou atualize o estado.",
+      "ready": "Os registros DNS estão corretos. O envio segue as permissões, os limites e as verificações de segurança da conta.",
+      "domainReview": "A extensão de um domínio da equipe exige revisão de segurança antes do envio. Solicite a análise no aviso de revisão da conta.",
+      "review": "Os envios da equipe aguardam revisão de segurança. Consulte o aviso de revisão da conta para solicitar análise.",
+      "sandbox": "A conta está em modo restrito. Confira os destinatários permitidos e as orientações no aviso de segurança da conta.",
+      "suspended": "O envio desta equipe está suspenso. Consulte o aviso da conta para saber como solicitar análise.",
+      "paused": "O envio está pausado pelas proteções de entrega. Consulte os avisos de segurança da conta."
+    },
     "deleteDomain": "Excluir domínio",
     "deleteBody": "Isso exclui permanentemente o domínio e sua configuração DNS. O envio a partir dele para imediatamente.",
     "deleteConfirmLabel": "Digite o domínio para confirmar",

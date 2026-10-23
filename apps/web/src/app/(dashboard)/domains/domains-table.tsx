@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ResourceApiButton } from "@/components/api-sheet";
@@ -20,6 +20,7 @@ import { Skeleton, SkeletonBadge } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
 import { NavTile, TONE_COLOR } from "@/components/status-tile";
 import { Table } from "@/components/table";
+import { purchaseReturnPath, withPurchaseReturn } from "@/lib/purchase-return";
 import { useTRPC } from "@/lib/trpc";
 import { useUrlState } from "@/lib/url-state";
 import { useTeamRole } from "@/lib/use-team-role";
@@ -66,6 +67,7 @@ export function DomainsView() {
   const common = useTranslations("common");
   const trpc = useTRPC();
   const router = useRouter();
+  const returnTo = purchaseReturnPath(useSearchParams().get("next"));
   const domains = useQuery(trpc.domains.list.queryOptions());
   const role = useTeamRole();
   const canManage = role === "owner" || role === "admin";
@@ -146,8 +148,16 @@ export function DomainsView() {
         title={t("list.title")}
         actions={
           <>
+            {returnTo ? (
+              <Link href={returnTo} className="ms-btn ms-btn-secondary">
+                {t("purchaseReturn")}
+              </Link>
+            ) : null}
             {canManage ? <ExportCsvLink href="/export/domains" /> : null}
-            <Link href="/domains/new" className="ms-btn ms-btn-primary">
+            <Link
+              href={withPurchaseReturn("/domains/new", returnTo)}
+              className="ms-btn ms-btn-primary"
+            >
               <PlusGlyph size={14} />
               {t("list.addDomain")}
             </Link>
@@ -180,7 +190,10 @@ export function DomainsView() {
           headline={t("list.empty")}
           body={t("list.emptyBody")}
           cta={
-            <Link href="/domains/new" className="ms-btn ms-btn-primary">
+            <Link
+              href={withPurchaseReturn("/domains/new", returnTo)}
+              className="ms-btn ms-btn-primary"
+            >
               <PlusGlyph />
               {t("list.addDomain")}
             </Link>
@@ -262,7 +275,9 @@ export function DomainsView() {
                               name="domains"
                               color={TONE_COLOR[DOMAIN_TONE[shown(domain)]]}
                             />
-                            <Link href={`/domains/${domain.id}`}>{domain.name}</Link>
+                            <Link href={withPurchaseReturn(`/domains/${domain.id}`, returnTo)}>
+                              {domain.name}
+                            </Link>
                           </span>
                         </td>
                         <td>
@@ -286,7 +301,10 @@ export function DomainsView() {
                               items={[
                                 {
                                   label: t("list.rowDetails"),
-                                  onSelect: () => router.push(`/domains/${domain.id}`),
+                                  onSelect: () =>
+                                    router.push(
+                                      withPurchaseReturn(`/domains/${domain.id}`, returnTo),
+                                    ),
                                 },
                                 ...(domain.status !== "verified" && canManage
                                   ? [

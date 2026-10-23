@@ -20,6 +20,7 @@ import {
 import { getLaunchMailboxPlan } from "@/lib/launch-offer";
 import { mailboxCheckoutFailure, safeMailboxCheckoutUrl } from "@/lib/mailbox-checkout";
 import { formatMailboxBytes } from "@/lib/mailbox-plans";
+import { billingPurchaseReturn } from "@/lib/purchase-return";
 import { useTRPC } from "@/lib/trpc";
 
 // The Send webhook sets the contract a few seconds after Checkout returns;
@@ -180,7 +181,10 @@ export function LaunchComboMailStep({
         })}
       </p>
       <div style={{ color: "var(--ms-muted)", fontSize: 14, lineHeight: 1.6 }}>{body}</div>
-      <PurchaseReviewNotice review={purchaseReview} />
+      <PurchaseReviewNotice
+        review={purchaseReview}
+        returnTo={billingPurchaseReturn({ interval: intent.interval, correio: true })}
+      />
       {canManage && ready && !failure && selectedOffer ? (
         <div id={limitsId} style={{ marginTop: 14, fontSize: 14, lineHeight: 1.6 }}>
           <h3 style={{ margin: "0 0 6px", fontSize: 14, color: "var(--ms-bone)" }}>

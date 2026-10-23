@@ -4,6 +4,7 @@ import { createElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PurchaseReviewNotice, usePurchaseReview } from "@/components/purchase-review-notice";
+import { purchaseDomainReviewHref } from "@/lib/purchase-return";
 import enSettings from "../messages/en/settings.json";
 import ptSettings from "../messages/pt-BR/settings.json";
 
@@ -16,6 +17,7 @@ const h = vi.hoisted(() => ({
   requestSuccess: false,
   requestError: false,
   mutate: vi.fn(),
+  mutateAsync: vi.fn(),
   refetch: vi.fn(),
   setQueryData: vi.fn(),
   invalidateQueries: vi.fn(),
@@ -68,6 +70,7 @@ vi.mock("@tanstack/react-query", () => ({
     isSuccess: h.requestSuccess,
     isError: h.requestError,
     mutate: h.mutate,
+    mutateAsync: h.mutateAsync,
   }),
   useQueryClient: () => ({
     setQueryData: h.setQueryData,
@@ -82,7 +85,7 @@ function nodes(value: ReactNode): Node[] {
   const node = value as Node;
   return [node, ...nodes(node.props.children as ReactNode)];
 }
-function render(enabled = true) {
+function render(enabled = true, returnTo?: string) {
   const captured: {
     current?: {
       review: ReturnType<typeof usePurchaseReview>;
@@ -91,7 +94,7 @@ function render(enabled = true) {
   } = {};
   function ReviewFixture() {
     const review = usePurchaseReview(enabled);
-    const tree = PurchaseReviewNotice({ review });
+    const tree = PurchaseReviewNotice({ review, ...(returnTo === undefined ? {} : { returnTo }) });
     captured.current = { review, tree };
     return tree;
   }
@@ -115,6 +118,7 @@ beforeEach(() => {
   h.requestError = false;
   h.queryOptions.mockImplementation((_input, options) => options);
   h.mutationOptions.mockImplementation((options) => options);
+  h.mutateAsync.mockImplementation(async () => h.data);
 });
 
 describe.each(["en", "pt-BR"] as const)("purchase safety notice in %s", (locale) => {
@@ -123,23 +127,18 @@ describe.each(["en", "pt-BR"] as const)("purchase safety notice in %s", (locale)
   });
   const messages = (locale === "en" ? enSettings : ptSettings).billing.purchaseReview;
 
-  it("blocks a domain under review, explains the reason and offers review before payment", () => {
+  it("offers the review form without preparing or submitting a request on render", () => {
     const { review, tree, html } = render();
     expect(review.allowed).toBe(false);
     expect(html).toContain(messages.reasons.domain_review);
     expect(html).toContain("verifiedsender.online");
     expect(html).toContain(messages.beforePayment);
     expect(html).toContain('role="status"');
-    const request = nodes(tree).find(
-      (node) =>
-        node.type === "button" &&
-        Array.isArray(node.props.children) &&
-        node.props.children.includes(messages.request),
-    );
-    expect(request?.props.disabled).toBe(false);
-    if (!request) throw new Error("Review request button missing");
-    (request.props.onClick as () => void)();
-    expect(h.mutate).toHaveBeenCalledOnce();
+    const form = nodes(tree).find((node) => typeof node.props.beforeSubmitAction === "function");
+    expect(form).toBeDefined();
+    expect(html).toContain('data-manual-review="true"');
+    expect(h.mutate).not.toHaveBeenCalled();
+    expect(h.mutateAsync).not.toHaveBeenCalled();
     expect(h.setQueryData).not.toHaveBeenCalled();
   });
 
@@ -187,7 +186,9 @@ describe.each(["en", "pt-BR"] as const)("purchase safety notice in %s", (locale)
     h.data = { eligible: false, code: "domain_required", domains: [], reviewReason: null };
     let outcome = render();
     expect(outcome.review.allowed).toBe(false);
-    expect(outcome.html).toContain('href="/domains"');
+    expect(nodes(outcome.tree).some((node) => node.props.href === purchaseDomainReviewHref())).toBe(
+      true,
+    );
     expect(outcome.html).toContain(messages.verifyDomain);
     h.queryError = true;
     outcome = render();
@@ -205,7 +206,37 @@ describe.each(["en", "pt-BR"] as const)("purchase safety notice in %s", (locale)
     expect(h.refetch).toHaveBeenCalledOnce();
   });
 
-  it("updates the safe snapshot after preparation and still requires manual approval", async () => {
+  it("passes the selected purchase destination to domain verification", () => {
+    h.data = { eligible: false, code: "domain_required", domains: [], reviewReason: null };
+    const destination = "/mail?setup=correio&plan=equipe";
+    const outcome = render(true, destination);
+    expect(
+      nodes(outcome.tree).some((node) => node.props.href === purchaseDomainReviewHref(destination)),
+    ).toBe(true);
+  });
+
+  it("prepares on form submission and skips a request when the review was already cleared", async () => {
+    let outcome = render();
+    let form = nodes(outcome.tree).find(
+      (node) => typeof node.props.beforeSubmitAction === "function",
+    );
+    if (!form) throw new Error("Review form missing");
+    expect(await (form.props.beforeSubmitAction as () => Promise<boolean>)()).toBe(true);
+    expect(h.mutateAsync).toHaveBeenCalledOnce();
+
+    h.mutateAsync.mockResolvedValue({
+      eligible: true,
+      code: "ready",
+      domains: [],
+      reviewReason: null,
+    });
+    outcome = render();
+    form = nodes(outcome.tree).find((node) => typeof node.props.beforeSubmitAction === "function");
+    if (!form) throw new Error("Review form missing");
+    expect(await (form.props.beforeSubmitAction as () => Promise<boolean>)()).toBe(false);
+  });
+
+  it("updates eligibility after preparation without declaring a submitted request", async () => {
     render();
     const options = h.mutationOptions.mock.calls[0]?.[0] as {
       onSuccess: (result: PurchaseEligibility) => Promise<void>;

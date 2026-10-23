@@ -1130,15 +1130,16 @@
     "signupSandbox": "O envio externo aguarda revisão de segurança. As mensagens de teste só podem ir para o seu próprio e-mail verificado no cadastro. Isso também vale para chaves de API full. Seus dados estão preservados.",
     "signupReview": "O envio aguarda revisão de segurança desta conta. Seus dados estão preservados. Fale com o suporte para pedir revisão.",
     "reviewRequest": {
-      "button": "Pedir revisão",
+      "button": "Preencher pedido de revisão",
       "failed": "Não foi possível enviar ou consultar o pedido. Tente novamente.",
-      "hint": "20 a 500 caracteres. Informe o tipo de envio e como os destinatários autorizaram o contato. Não inclua segredos ou conteúdo de e-mails.",
+      "hint": "20 a 500 caracteres. Informe o tipo de envio e como os destinatários autorizaram o contato. Não inclua segredos ou conteúdo de e-mails. O pedido só é enviado ao clicar em Enviar pedido.",
       "label": "Em uma linha, como sua equipe pretende usar o MepMail?",
-      "received": "Pedido recebido. A equipe responsável fará a revisão; as restrições atuais continuam até uma decisão explícita.",
+      "received": "Pedido de revisão enviado e registrado. A equipe responsável fará a análise; as restrições atuais continuam até uma decisão explícita.",
       "retry": "Tentar novamente",
-      "saving": "Enviando…",
+      "saving": "Enviando pedido…",
       "submit": "Enviar pedido",
-      "wait": "Aguarde 24 horas desde o último pedido para abrir outro."
+      "wait": "Aguarde 24 horas desde o último pedido para abrir outro.",
+      "refreshFailed": "Seu pedido registrado está preservado, mas não foi possível atualizar o status. Tente novamente."
     }
   },
   "signupRisk": {

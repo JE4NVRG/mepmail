@@ -1,4 +1,5 @@
 {
+  "purchaseReturn": "Return to selected plan",
   "status": {
     "temporary_failure": "Temporary failure"
   },
@@ -174,8 +175,19 @@
     "bannerLooking": "Looking for DNS records.",
     "bannerLookingBody": "This may take a few hours depending on {provider}'s propagation time.",
     "bannerLookingBodyGeneric": "This may take a few hours depending on your DNS provider's propagation time.",
-    "bannerVerified": "Domain verified.",
-    "bannerVerifiedBody": "Ready to send emails.",
+    "bannerVerified": "DNS verified.",
+    "bannerVerifiedBody": "The DNS records are correct. Sending remains subject to account permissions, limits and security checks.",
+    "security": {
+      "dnsOnly": "The DNS records are correct. Sending remains subject to the permissions, limits and security checks of this installation.",
+      "checking": "DNS is confirmed. Checking the security status of the team…",
+      "unavailable": "DNS is confirmed, but the security status of the team could not be confirmed. Check the account notices or refresh the status.",
+      "ready": "The DNS records are correct. Sending remains subject to account permissions, limits and security checks.",
+      "domainReview": "A domain extension on this team requires a security review before sending. Request a review from the account review notice.",
+      "review": "Sending for this team is awaiting security review. Check the account review notice to request a review.",
+      "sandbox": "The account is in restricted mode. Check the allowed recipients and guidance in the account security notice.",
+      "suspended": "Sending for this team is suspended. Check the account notice for how to request a review.",
+      "paused": "Sending is paused by delivery protections. Check the account security notices."
+    },
     "deleteDomain": "Delete domain",
     "deleteBody": "This permanently deletes the domain and its DNS configuration. Sending from it stops immediately.",
     "deleteConfirmLabel": "Type the domain to confirm",
