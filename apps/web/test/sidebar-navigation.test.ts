@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from "next-intl";
-import { createElement } from "react";
+import { createElement, Fragment } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "@/components/sidebar";
@@ -99,7 +99,8 @@ for (const locale of ["en", "pt-BR"] as const) {
         state.operator = false;
         const { nav } = navMarkup(locale);
         const messages = locale === "en" ? enNav : ptNav;
-        expect(nav).toContain(messages.recovery[profile === "pending" ? "loading" : profile]);
+        const message = messages.recovery[profile === "pending" ? "loading" : profile];
+        expect(nav).toContain(renderToStaticMarkup(createElement(Fragment, null, message)));
         expect(nav).toContain(messages.recovery.retry);
         expect(nav).toContain(profile === "error" ? 'role="alert"' : 'role="status"');
         expect(nav).not.toMatch(/<button[^>]*disabled/);
