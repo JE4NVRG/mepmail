@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
+import { clickContext, funnelClickProps } from "@/lib/funnel-tracking";
 import type { MailboxPlanCode } from "@/lib/mailbox-plans";
 import { visitSource } from "@/lib/public-funnel";
 import { signupHref, signupMailboxHref } from "@/lib/public-intent";
@@ -36,10 +37,24 @@ export function SignupCta({
   mailboxPlan?: MailboxPlanCode | "choose";
 }) {
   const pathname = usePathname();
+  const href = mailboxPlan
+    ? signupMailboxHref(mailboxPlan === "choose" ? null : mailboxPlan)
+    : signupHref(rung);
   function onClick() {
+    const context = clickContext({
+      href,
+      search: window.location.search,
+      cookie: document.cookie,
+      product: mailboxPlan ? "mail" : "send",
+      plan: mailboxPlan ?? rung ?? "free",
+    });
     const source = visitSource(document.cookie);
-    trackEvent("signup_start", { page: pathname, ...(source ? { source } : {}) });
-    if (plan) trackEvent("cta_pricing_click", { plan });
+    trackEvent("signup_start", {
+      ...funnelClickProps(context),
+      page: pathname,
+      ...(source ? { source } : {}),
+    });
+    if (plan) trackEvent("cta_pricing_click", { ...funnelClickProps(context) });
   }
   return (
     <a
@@ -47,11 +62,7 @@ export function SignupCta({
       data-funnel-product={mailboxPlan ? "mail" : "send"}
       data-funnel-plan={mailboxPlan ?? rung ?? "free"}
       className={className}
-      href={
-        mailboxPlan
-          ? signupMailboxHref(mailboxPlan === "choose" ? null : mailboxPlan)
-          : signupHref(rung)
-      }
+      href={href}
       onClick={onClick}
     >
       {label}

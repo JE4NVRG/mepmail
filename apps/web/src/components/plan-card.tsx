@@ -41,7 +41,7 @@ export function PlanCard({ plan, labels }: { plan: LandingPlan; labels: PlanCard
         for (const entry of entries) {
           if (!entry.isIntersecting || seen.current) continue;
           seen.current = true;
-          trackEvent("plan_card_view", { plan: plan.name });
+          trackEvent("plan_card_view", { product: "send", plan: plan.rung, plan_label: plan.name });
           observer.disconnect();
         }
       },
@@ -49,7 +49,7 @@ export function PlanCard({ plan, labels }: { plan: LandingPlan; labels: PlanCard
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [plan.name]);
+  }, [plan.name, plan.rung]);
 
   return (
     <article ref={card} className={`ms-card gtm-plan${plan.featured ? " is-featured" : ""}`}>

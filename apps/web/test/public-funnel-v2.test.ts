@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const route = vi.hoisted(() => ({ path: "/" }));
 vi.mock("next/navigation", () => ({ usePathname: () => route.path }));
 
+import { PlanCard } from "@/components/plan-card";
 import { SignupCta } from "@/components/signup-cta";
 import { SiteFunnelEvents } from "@/components/site-funnel-events";
 import { trackEvent } from "@/lib/analytics";
@@ -15,6 +16,7 @@ import {
   publicFunnelPath,
   trackedSignupHref,
 } from "@/lib/funnel-tracking";
+import { EMPTY_PLAN_COPY, PLANS } from "@/lib/landing-plans";
 
 type MeasuredWindow = Window & { umami?: { track: ReturnType<typeof vi.fn> } };
 let root: Root | undefined;
@@ -95,13 +97,17 @@ describe("public funnel v2 metadata", () => {
     });
   });
   it("does not invent attribution for a direct arrival or expose email/secret campaign values", () => {
-    expect(clickContext({ href: "/signup" })).toEqual({ product: "send", plan: "free" });
+    expect(clickContext({ href: "/signup" })).toEqual({
+      product: "send",
+      plan: "free",
+      plan_label: "Free",
+    });
     expect(
       clickContext({
         href: "/signup",
         search: "?utm_source=person%40example.com&utm_medium=sk_live_do_not_collect",
       }),
-    ).toEqual({ product: "send", plan: "free" });
+    ).toEqual({ product: "send", plan: "free", plan_label: "Free" });
   });
   it("never rewrites an external signup or an unrelated action", () => {
     const ctx = clickContext({ href: "/signup" });
@@ -111,7 +117,10 @@ describe("public funnel v2 metadata", () => {
     expect(trackedSignupHref("/settings/billing", ctx)).toBe("/settings/billing");
   });
   it("stores only bounded product intent, not identity or payment authority", () => {
-    const c = intentCookie({ product: "mail", plan: "choose", utm_source: "x" }, true);
+    const c = intentCookie(
+      { product: "mail", selection_state: "unselected", utm_source: "x" },
+      true,
+    );
     expect(c).toContain("Secure");
     expect(c).toContain("SameSite=Lax");
     expect(c).not.toContain("utm");
@@ -164,7 +173,10 @@ describe("real public callers with isolated collector", () => {
     mount(h(SiteFunnelEvents));
     click("#mail-link");
     expect(tracker.mock.calls.map((c) => c[0])).toEqual(["signup_start"]);
-    expect(tracker.mock.calls[0]?.[1]).toMatchObject({ product: "mail", plan: "choose" });
+    expect(tracker.mock.calls[0]?.[1]).toMatchObject({
+      product: "mail",
+      selection_state: "unselected",
+    });
     expect(document.getElementById("mail-link")?.getAttribute("href")).toContain(
       "next=%2Fmail%3Fsetup%3Dcorreio",
     );
@@ -208,5 +220,190 @@ describe("real public callers with isolated collector", () => {
       }),
     };
     expect(() => trackEvent("signup_start")).not.toThrow();
+  });
+});
+
+describe("catalog-bound browser plan normalization", () => {
+  it.each([
+    ["free", "free", "Free"],
+    ["Free", "free", "Free"],
+    ["choose", undefined, undefined],
+    ["Pro110K", "pro_100k", "Pro 110K"],
+    ["Starter", "starter", "Starter"],
+  ])("normalizes observed legacy value %s without changing event names", (input, code, name) => {
+    for (const event of ["plan_card_view", "cta_pricing_click"]) {
+      trackEvent(event, { product: "send", plan: input });
+      expect(tracker.mock.lastCall?.[0]).toBe(event);
+      const props = tracker.mock.lastCall?.[1];
+      if (code) expect(props).toMatchObject({ product: "send", plan: code, plan_label: name });
+      else {
+        expect(props).not.toHaveProperty("plan");
+        expect(props).toMatchObject({ selection_state: "unselected" });
+      }
+    }
+  });
+  it.each(["Pro", "pro_300k", "unknown", "pro_110k", "person@example.com"])(
+    "never invents a paid plan for %s",
+    (plan) => {
+      trackEvent("plan_card_view", { product: "send", plan });
+      expect(tracker.mock.lastCall?.[1]).toMatchObject({ selection_state: "unknown" });
+      expect(tracker.mock.lastCall?.[1]).not.toHaveProperty("plan");
+      expect(tracker.mock.lastCall?.[1]).not.toHaveProperty("plan_label");
+    },
+  );
+  it("keeps other Pro tiers distinct using the public catalog", () => {
+    trackEvent("plan_card_view", { product: "send", plan: "Pro 220K" });
+    expect(tracker.mock.lastCall?.[1]).toMatchObject({ plan: "pro_200k" });
+  });
+  it("does not infer a card's intent from a previous Mail/Send cookie", () => {
+    document.cookie = intentCookie({ product: "mail", plan: "duo" }, false);
+    trackEvent("plan_card_view", { plan: "Starter" });
+    expect(tracker.mock.lastCall?.[1]).toMatchObject({ product: "send", plan: "starter" });
+    document.cookie = intentCookie({ product: "send", plan: "pro_100k" }, false);
+    trackEvent("cta_pricing_click", { product: "mail", plan: "Duo" });
+    expect(tracker.mock.lastCall?.[1]).toMatchObject({ product: "mail", plan: "duo" });
+    trackEvent("plan_card_view", { product: "mail", plan: "Starter" });
+    expect(tracker.mock.lastCall?.[1]).toMatchObject({
+      product: "mail",
+      selection_state: "unknown",
+    });
+    expect(tracker.mock.lastCall?.[1]).not.toHaveProperty("plan");
+  });
+  it("carries unselected intent without a purchasable choose code", () => {
+    const context = clickContext({ href: "/signup?product=mail&plan=choose" });
+    expect(context).toMatchObject({ product: "mail", selection_state: "unselected" });
+    expect(context).not.toHaveProperty("plan");
+    const href = trackedSignupHref("/signup?product=mail&plan=choose&lang=pt-BR", context);
+    expect(new URL(href, "https://mepmail.dev").searchParams.has("plan")).toBe(false);
+    document.cookie = intentCookie(context, false);
+    trackEvent("signup_start");
+    expect(tracker.mock.lastCall?.[1]).toMatchObject({
+      product: "mail",
+      selection_state: "unselected",
+    });
+    expect(tracker.mock.lastCall?.[1]).not.toHaveProperty("plan");
+  });
+  it("preserves explicit signup intent over a different cookie and includes all five UTMs", () => {
+    document.cookie = intentCookie({ product: "mail", plan: "solo" }, false);
+    trackEvent("signup_start", { product: "send", plan: "Starter" });
+    expect(tracker.mock.lastCall?.[1]).toMatchObject({
+      product: "send",
+      plan: "starter",
+      utm_source: "x",
+      utm_medium: "post",
+      utm_campaign: "send_launch",
+      utm_content: "hero",
+      utm_term: "api",
+    });
+  });
+  it("exercises a real catalog PlanCard view and click without duplicate signup", () => {
+    let observe: ((entries: { isIntersecting: boolean }[]) => void) | undefined;
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(callback: typeof observe) {
+          observe = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const plan = PLANS.find((p) => p.rung === "pro_100k");
+    if (!plan) throw Error("missing-public-plan");
+    try {
+      mount(
+        h(
+          Fragment,
+          null,
+          h(SiteFunnelEvents),
+          h(PlanCard, {
+            plan: { ...plan, copy: EMPTY_PLAN_COPY },
+            labels: {
+              perMonth: "/month",
+              limitsLabel: "Limits",
+              overageLabel: "Overage",
+              attachmentLabel: "Attachments",
+              cta: "Choose Pro",
+              ctaNote: "",
+              featuredBadge: "Featured",
+            },
+          }),
+        ),
+      );
+      act(() => observe?.([{ isIntersecting: true }]));
+      click("a");
+      expect(tracker.mock.calls.map((c) => c[0])).toEqual([
+        "plan_card_view",
+        "signup_start",
+        "cta_pricing_click",
+      ]);
+      for (const [, props] of tracker.mock.calls)
+        expect(props).toMatchObject({ product: "send", plan: "pro_100k", plan_label: "Pro 110K" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it("uses the real Mail CTA with tracker absent and leaves navigation intact", () => {
+    delete (window as MeasuredWindow).umami;
+    mount(
+      h(
+        Fragment,
+        null,
+        h(SiteFunnelEvents),
+        h(SignupCta, { label: "Choose mail", mailboxPlan: "choose" }),
+      ),
+    );
+    expect(() => click("a")).not.toThrow();
+    expect(document.querySelector("a")?.getAttribute("href")).toContain("product=mail");
+    expect(
+      new URL(
+        document.querySelector("a")?.getAttribute("href") ?? "",
+        "https://mepmail.dev",
+      ).searchParams.has("plan"),
+    ).toBe(false);
+  });
+});
+
+describe("intent state survives delegated navigation", () => {
+  it.each(["unknown", "unselected"] as const)(
+    "round-trips Send %s without silently selecting Free",
+    (selection_state) => {
+      const context = { product: "send" as const, selection_state };
+      const href = trackedSignupHref("/signup?lang=pt-BR", context);
+      expect(clickContext({ href })).toMatchObject(context);
+      document.cookie = intentCookie(context, false);
+      trackEvent("signup_start");
+      expect(tracker.mock.lastCall?.[1]).toMatchObject(context);
+      expect(tracker.mock.lastCall?.[1]).not.toHaveProperty("plan");
+      trackEvent("cta_pricing_click", context);
+      expect(tracker.mock.lastCall?.[1]).toMatchObject(context);
+      expect(tracker.mock.lastCall?.[1]).not.toHaveProperty("plan");
+    },
+  );
+  it("uses requested signup URL intent instead of a stale different-product cookie", () => {
+    document.cookie = intentCookie({ product: "mail", plan: "solo" }, false);
+    window.history.replaceState({}, "", "/signup?product=send&plan=starter&utm_source=x");
+    trackEvent("signup_start");
+    expect(tracker.mock.lastCall?.[1]).toMatchObject({ product: "send", plan: "starter" });
+  });
+  it("the real Mail CTA carries its own plan and emits only one signup", () => {
+    document.cookie = intentCookie({ product: "send", plan: "pro_100k" }, false);
+    mount(
+      h(
+        Fragment,
+        null,
+        h(SiteFunnelEvents),
+        h(SignupCta, { label: "Duo", plan: "Duo", mailboxPlan: "duo" }),
+      ),
+    );
+    click("a");
+    expect(tracker.mock.calls.map((c) => c[0])).toEqual(["signup_start", "cta_pricing_click"]);
+    for (const [, props] of tracker.mock.calls)
+      expect(props).toMatchObject({
+        product: "mail",
+        plan: "duo",
+        plan_label: "Duo",
+        utm_term: "api",
+      });
   });
 });

@@ -102,13 +102,16 @@ export function requestedFunnelIntent(cookieHeader: string | null): Record<strin
     if (!raw || raw.length > 1024) return {};
     const v: unknown = JSON.parse(decodeURIComponent(raw));
     if (!v || typeof v !== "object") return {};
-    const { version, product, plan } = v as Record<string, unknown>;
-    if (version !== 1 || typeof plan !== "string") return {};
-    const catalog: readonly string[] =
-      product === "send" ? PLAN_RUNG_KEYS : product === "mail" ? MAILBOX_PLAN_ORDER : [];
-    return catalog.includes(plan) ||
-      ((product === "send" || product === "mail") && (plan === "free" || plan === "choose"))
-      ? { requested_product: String(product), requested_plan: plan }
+    const { version, product, plan, selection_state } = v as Record<string, unknown>;
+    if (version !== 1 || (product !== "send" && product !== "mail")) return {};
+    if (plan === "choose" || (plan === undefined && selection_state === "unselected"))
+      return { requested_product: product, requested_selection_state: "unselected" };
+    if (plan === undefined && selection_state === "unknown")
+      return { requested_product: product, requested_selection_state: "unknown" };
+    if (typeof plan !== "string") return {};
+    const catalog: readonly string[] = product === "send" ? PLAN_RUNG_KEYS : MAILBOX_PLAN_ORDER;
+    return catalog.includes(plan) || plan === "free"
+      ? { requested_product: product, requested_plan: plan }
       : {};
   } catch {
     return {};

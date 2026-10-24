@@ -1,6 +1,7 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, eq } from "drizzle-orm";
+import { teamRung } from "./plans.js";
 import { isLoopbackUrl } from "./url.js";
 
 /**
@@ -344,6 +345,7 @@ export async function userFunnelProps(db: Db, userId: string): Promise<FunnelEve
     .limit(1);
   const requestedProduct = clean(account?.props?.requested_product);
   const requestedPlan = clean(account?.props?.requested_plan);
+  const selection = clean(account?.props?.requested_selection_state);
   const product =
     requestedProduct === "send" || requestedProduct === "mail" ? requestedProduct : null;
   return {
@@ -355,6 +357,8 @@ export async function userFunnelProps(db: Db, userId: string): Promise<FunnelEve
     is_qa: "unknown",
     requested_product: product,
     requested_plan: requestedPlan,
+    requested_selection_state:
+      selection === "unselected" || selection === "unknown" ? selection : null,
     product,
   };
 }
@@ -364,6 +368,7 @@ export async function teamFunnelProps(db: Db, teamId: string): Promise<FunnelEve
   const [team] = await db
     .select({
       plan: schema.teams.plan,
+      planQuota: schema.teams.planQuota,
       suspendedAt: schema.teams.suspendedAt,
       sendReviewAt: schema.teams.sendReviewAt,
       sendReviewClearedAt: schema.teams.sendReviewClearedAt,
@@ -391,7 +396,8 @@ export async function teamFunnelProps(db: Db, teamId: string): Promise<FunnelEve
     ...attribution,
     team_id: teamId,
     product: attribution.product ?? "send",
-    plan: team.plan,
+    plan: team.plan === "system" ? "system" : teamRung(team.plan, team.planQuota).key,
+    plan_tier: team.plan,
     risk_level: level,
     bot_status: "unknown", // Neither suspension nor a signup score proves automation.
     is_suspected:

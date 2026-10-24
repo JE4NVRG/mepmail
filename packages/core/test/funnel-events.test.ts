@@ -270,7 +270,8 @@ describe("emitFunnelEvent", () => {
       resolve: (tx) => teamFunnelProps(tx, teamId),
     });
     expect(body(calls[0]?.init ?? {}).payload.data).toMatchObject({
-      plan: "pro",
+      plan: "pro_100k",
+      plan_tier: "pro",
       source: "linkedin",
       medium: "cpc",
       campaign: "beta",

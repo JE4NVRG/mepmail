@@ -72,7 +72,9 @@ test("intent parser accepts catalog intent only and never grants capability", ()
       requestedFunnelIntent(
         `mm_funnel_intent=${encodeURIComponent(JSON.stringify({ version: 1, product, plan, team_id: "forged", is_suspected: false }))}`,
       ),
-      { requested_product: product, requested_plan: plan },
+      plan === "choose"
+        ? { requested_product: product, requested_selection_state: "unselected" }
+        : { requested_product: product, requested_plan: plan },
     );
   }
   for (const value of [
