@@ -82,6 +82,7 @@ export interface PublicSiteLabels {
     rights: string;
     sourceCode: string;
     sourceDownload: string;
+    sourceArchive?: string;
     pricing: string;
     alternatives: string;
     apps?: string;
@@ -331,8 +332,11 @@ export function PublicFooter({
           <AdvertisingSettingsButton />
           <a href={legal.refund}>{labels.footer.refund}</a>
           <a href="/security">{labels.nav.security}</a>
-          <a href="/source" title={labels.footer.sourceDownload}>
+          <GithubLink href="https://github.com/JE4NVRG/mepmail">
             {labels.footer.sourceCode}
+          </GithubLink>
+          <a href="/source" title={labels.footer.sourceDownload}>
+            {labels.footer.sourceArchive ?? labels.footer.sourceDownload}
           </a>
         </nav>
       </div>

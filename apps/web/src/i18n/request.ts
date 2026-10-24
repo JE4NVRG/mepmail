@@ -68,10 +68,13 @@ function isAppLocale(value: string | undefined): value is AppLocale {
  * including the first visit to an auth screen.
  */
 export default getRequestConfig(async () => {
-  const store = await cookies();
   const headerList = await headers();
   const urlLocale = headerList.get(URL_LOCALE_HEADER) ?? undefined;
-  const cookieValue = store.get(LOCALE_COOKIE)?.value;
+  // The proxy overwrites URL_LOCALE_HEADER. URL-selected public locales do not
+  // need cookie negotiation; this does NOT make the cookie-themed root cacheable.
+  const cookieValue = isAppLocale(urlLocale)
+    ? undefined
+    : (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale: AppLocale = isAppLocale(urlLocale)
     ? urlLocale
     : isAppLocale(cookieValue)

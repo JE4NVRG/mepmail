@@ -9,6 +9,7 @@ import {
   SignupLink,
 } from "@/components/site-chrome";
 import { StructuredData } from "@/components/structured-data";
+import { ENTRY_COMPARISON_SOURCE, ENTRY_PLAN_COMPARISON } from "@/lib/entry-plan-comparison";
 import { type PlanCopy, plansWithCopy } from "@/lib/landing-plans";
 import {
   COMPARISON_FX,
@@ -21,7 +22,7 @@ import {
 } from "@/lib/landing-pricing";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
-import { pricingFocus, signupMailboxHref } from "@/lib/public-intent";
+import { signupMailboxHref } from "@/lib/public-intent";
 import { faqJsonLd } from "@/lib/structured-data";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
@@ -60,20 +61,25 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-/**
- * /pricing in the v2 dress (Jean, 2026-10-19): the scenarios first, Correio in bone, Envio
- * in black with three cards and a compact table for the larger rungs, the rules one click
- * away. Chrome, ladder and plan copy come from the sources the landing uses.
- */
+/** Two products, one server-rendered choice. Catalogs and checkout gates stay authoritative. */
 export default async function PricingPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const locale = await getLocale();
-  // A Send campaign (?focus=send, or utm_campaign naming send) lands on Send: its offer leads
-  // and its plans come right after, before the Mail plans and scenarios (lib/public-intent.ts).
-  const sendFirst = pricingFocus((await searchParams) ?? {}) === "send";
+  // Only an explicit Mail selection changes the default Send-first ordering.
+  const params = (await searchParams) ?? {};
+  const sendFirst = params.focus !== "mail";
+  const focusHref = (focus: "send" | "mail") => {
+    const query = new URLSearchParams();
+    for (const key of ["lang", "utm_source", "utm_medium", "utm_campaign", "utm_content"]) {
+      const value = params[key];
+      if (typeof value === "string") query.set(key, value);
+    }
+    query.set("focus", focus);
+    return `/pricing?${query.toString()}#${focus === "send" ? "planos" : "correio"}`;
+  };
   const t = await getTranslations("pricing");
   const l = await getTranslations("landing");
   const site = {
@@ -360,41 +366,58 @@ export default async function PricingPage({
         </p>
       </div>
     </section>
-  ) : null;
+  ) : (
+    <section className="v2-light v2-sec-tight" id="correio" aria-labelledby="pricing-correio-title">
+      <div className="v2-wrap">
+        <h2 id="pricing-correio-title" className="v2-h3">{t("choice.mailTitle")}</h2>
+        <p className="v2-note">{t("choice.mailClosed")}</p>
+        <a className="v2-link-accent" href="/correio">{t("correio.cta")}</a>
+      </div>
+    </section>
+  );
 
   return (
     <div className="gtm v2">
       <StructuredData graph={[faqJsonLd(faq)]} />
       <PublicHeader labels={site} page="pricing" />
       <main id="conteudo">
+        <section className="v2-dark pricing-choice" aria-labelledby="pricing-choice-title">
+          <div className="v2-wrap">
+            <p id="pricing-choice-title" className="v2-eyebrow">{t("choice.title")}</p>
+            <nav className="pricing-focus" aria-label={t("choice.title")}>
+              <a href={focusHref("send")} aria-current={sendFirst ? "true" : undefined}>
+                <strong>{t("choice.send")}</strong>
+                <span>{t("choice.sendHint")}</span>
+              </a>
+              <a href={focusHref("mail")} aria-current={!sendFirst ? "true" : undefined}>
+                <strong>{t("choice.mail")}</strong>
+                <span>{t("choice.mailHint")}</span>
+              </a>
+            </nav>
+            <p className="v2-note">{t("choice.separate")}</p>
+          </div>
+        </section>
         {sendFirst ? (
           <section className="v2-dark v2-sec pricing-intro">
             <div className="v2-wrap v2-stack">
               <p className="v2-eyebrow v2-eyebrow-mono">{t("sendHero.eyebrow")}</p>
-              <h1>
-                {t.rich("sendHero.title", {
-                  price: sendPrice,
-                  highlight: (chunks) => <span className="v2-accent">{chunks}</span>,
-                })}
-              </h1>
+              <h1>{t("choice.sendTitle")}</h1>
               <p className="v2-lead">{t("sendHero.lead")}</p>
-              {quickPrices}
+              <p className="pricing-entry-note">
+                {t("choice.sendEntry", { price: allPlans[1]?.price ?? "" })}
+              </p>
               <div className="v2-actions">
                 <SignupCta
                   className="v2-btn v2-btn-bone"
-                  label={t("sendHero.cta")}
-                  plan="Pro 110K"
-                  rung="pro_100k"
+                  label={t("choice.freeCta")}
+                  plan="Free"
+                  rung="free"
                 />
                 <a className="v2-link" href="#planos">
                   {t("sendHero.plansLink")}
                 </a>
               </div>
-              <p className="v2-note">
-                {launchOfferEnabled
-                  ? t("sendHero.note", { first: sendFirstPrice, price: sendPrice })
-                  : t("sendHero.noteRegular", { price: sendPrice })}
-              </p>
+              <p className="v2-note">{t("note")}</p>
             </div>
           </section>
         ) : (
@@ -402,14 +425,24 @@ export default async function PricingPage({
             <div className="v2-wrap v2p-intro-grid">
               <div className="v2-stack">
                 <p className="v2-eyebrow">{t("eyebrow")}</p>
-                <h1>{t("v2.title")}</h1>
+                <h1>{t("choice.mailTitle")}</h1>
                 <p className="v2-lead">{t("v2.lead")}</p>
+                <p className="pricing-entry-note">
+                  {t(standaloneOpen ? "choice.mailEntry" : "choice.mailClosed", {
+                    price: money(correioPlans[0].brlMonthlyCents, correioPlans[0].monthlyCents),
+                  })}
+                </p>
+                {brazil && standaloneOpen ? <p className="v2-note">{t("choice.mailPix")}</p> : null}
                 <div className="v2-actions">
-                  <SignupLink
-                    label={l("plans.cta")}
-                    className="v2-btn v2-btn-bone"
-                    mailboxPlan="choose"
-                  />
+                  {standaloneOpen ? (
+                    <SignupLink
+                      label={l("plans.cta")}
+                      className="v2-btn v2-btn-bone"
+                      mailboxPlan="choose"
+                    />
+                  ) : (
+                    <a className="v2-btn v2-btn-bone" href="/correio">{t("correio.cta")}</a>
+                  )}
                   <a className="v2-link" href="/alternatives/resend">
                     {t("alternatives.cta")}
                   </a>
@@ -421,7 +454,6 @@ export default async function PricingPage({
           </section>
         )}
 
-        {sendFirst ? null : scenariosSection}
         {sendFirst ? null : correioSection}
 
         <section className="v2-dark v2-sec" id="planos" aria-labelledby="pricing-plans-title">
@@ -481,14 +513,52 @@ export default async function PricingPage({
             <p className="v2-fine v2-gap-sm">
               {t("v2.scaleNote", { limits: allPlans[allPlans.length - 1]?.copy.limits ?? "" })}
             </p>
-            <details className="pricing-usage-details">
-              <summary>{t("plans.details")}</summary>
-              <p className="v2-note">{l("plans.note")}</p>
-              <p className="v2-note">{faq[0]?.a}</p>
-              <p className="v2-note">{l("plans.noteAttach")}</p>
-            </details>
+            <p className="v2-note v2-gap-sm">
+              <a className="v2-link-accent" href="#pricing-usage">{t("plans.details")}</a>
+            </p>
           </div>
         </section>
+
+        {launchOfferEnabled ? (
+          <section className="v2-dark v2-sec-tight" aria-labelledby="pricing-entry-compare-title">
+            <div className="v2-wrap">
+              <h2 id="pricing-entry-compare-title" className="v2-h3">{t("entryComparison.title")}</h2>
+              <p className="v2-note v2-gap-sm">{t("entryComparison.scope")}</p>
+              <div className="v2-table-box v2-gap-sm">
+                <table className="v2-table pricing-entry-table">
+                  <caption className="gtm-sr-only">{t("entryComparison.title")}</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">{t("entryComparison.volume")}</th>
+                      <th scope="col">MepMail</th>
+                      <th scope="col">Resend</th>
+                      <th scope="col">{t("entryComparison.condition")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ENTRY_PLAN_COMPARISON.map((row) => (
+                      <tr key={row.volume}>
+                        <th scope="row">{formatVolume(row.volume, locale)}</th>
+                        <td>{formatUsd(row.mepmailUsd, locale)} · {row.plan}</td>
+                        <td>{formatUsd(row.resendUsd, locale)} · Pro 50K</td>
+                        <td>{row.condition === "daily"
+                          ? t("entryComparison.daily", { cap: row.dailyCap, days: row.minimumSendingDays })
+                          : t("entryComparison.monthly")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="v2-note v2-gap-sm">{t("entryComparison.notAlwaysCheaper")}</p>
+              <p className="v2-fine v2-gap-sm">
+                {t("entryComparison.sources", { date: ENTRY_COMPARISON_SOURCE.checkedAt })}{" "}
+                <a className="v2-link-accent" href={ENTRY_COMPARISON_SOURCE.resend}>Resend</a>{" · "}
+                <a className="v2-link-accent" href={ENTRY_COMPARISON_SOURCE.mepmail}>MepMail Starter</a>{" · "}
+                <a className="v2-link-accent" href={ENTRY_COMPARISON_SOURCE.offer}>MepMail Pro 110K</a>
+              </p>
+            </div>
+          </section>
+        ) : null}
 
         {launchOfferEnabled ? (
           <section className="v2-ground v2-sec" id="pro110k" aria-labelledby="launch-pro-title">
@@ -560,7 +630,7 @@ export default async function PricingPage({
         ) : null}
 
         {sendFirst ? correioSection : null}
-        {sendFirst ? scenariosSection : null}
+        {scenariosSection}
 
         <section className="v2-dark v2-sec-tight" aria-labelledby="pricing-included-title">
           <div className="v2-wrap">
@@ -614,16 +684,17 @@ export default async function PricingPage({
           </section>
         ) : null}
 
-        <section className="v2-ground v2-sec" aria-labelledby="pricing-faq-title">
+        <section className="v2-ground v2-sec" id="faq" aria-labelledby="pricing-faq-title">
           <div className="v2-wrap v2-narrow">
             <h2 id="pricing-faq-title" className="v2-h2 v2-faq-title">
               {t("faq.title")}
             </h2>
             <div className="v2-faq">
-              {faq.map((item) => (
-                <details key={item.q}>
+              {faq.map((item, index) => (
+                <details key={item.q} id={index === 0 ? "pricing-usage" : `pricing-faq-${index}`}>
                   <summary>{item.q}</summary>
                   <p>{item.a}</p>
+                  {index === 0 ? <p>{t("choice.dailyNote")}</p> : null}
                 </details>
               ))}
             </div>

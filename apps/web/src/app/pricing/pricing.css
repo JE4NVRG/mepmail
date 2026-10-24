@@ -1,3 +1,71 @@
+/* Product choice is SSR navigation: no tab runtime or hidden pricing content. */
+.pricing-choice {
+  padding-block: 24px 12px;
+}
+.pricing-focus {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-block: 12px;
+}
+.pricing-focus a {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 80px;
+  padding: 20px;
+  border: 2px solid var(--ms-line-strong);
+  border-radius: 10px;
+  color: var(--ms-bone);
+  text-decoration: none;
+}
+.pricing-focus a[aria-current="true"] {
+  border-color: var(--ms-bone);
+  background: var(--ms-bone);
+  color: #101010;
+}
+.pricing-focus a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.pricing-focus a:active {
+  transform: translateY(1px);
+}
+.pricing-focus a:focus-visible,
+#pricing-usage:focus-within {
+  outline: 3px solid var(--ms-violet);
+  outline-offset: 4px;
+}
+.pricing-focus span {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.pricing-entry-note {
+  font-weight: 600;
+  line-height: 1.6;
+}
+.pricing-entry-table td:last-child {
+  min-width: 24ch;
+  max-width: 48ch;
+  white-space: normal;
+}
+#planos,
+#correio,
+#pricing-usage,
+#faq {
+  scroll-margin-top: 100px;
+}
+@media (max-width: 560px) {
+  .pricing-focus {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .pricing-focus a {
+    padding: 16px;
+    min-height: 76px;
+  }
+}
+
 /* /pricing scenarios: each card sums the separate plans it uses. */
 .pricing-intro.gtm-section {
   padding-block: clamp(28px, 4vw, 48px);

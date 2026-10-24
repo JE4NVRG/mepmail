@@ -1,9 +1,9 @@
 {
   "meta": {
-    "title": "MepMail: Send emails. Keep building.",
-    "description": "Notifications, receipts and campaigns through API, SMTP or AI agents. Manage your sending in one dashboard. Start free, no credit card.",
-    "domainTitle": "MepMail: business email on your own domain, with AI",
-    "domainDescription": "Business email on your domain for you and your AI agents, plus sending by API and SMTP. From US$ 2.90 a month, 7 days free with a card."
+    "title": "MepMail | Email API and mailboxes for apps and agents",
+    "description": "Send transactional email with a Resend-compatible API. Start with 100 emails/day free, no card. Mailboxes for people and agents are a separate product.",
+    "domainTitle": "MepMail | Email API and mailboxes for apps and agents",
+    "domainDescription": "Send transactional email with a Resend-compatible API. Start with 100 emails/day free, no card. Mailboxes for people and agents are a separate product."
   },
   "skip": "Skip to content",
   "brandAria": "MepMail home",
@@ -349,6 +349,7 @@
     "rights": "© 2026 MepMail. All rights reserved.",
     "sourceCode": "Source code · AGPL-3.0",
     "sourceDownload": "Download the corresponding source of this version for free",
+    "sourceArchive": "Download this version",
     "apps": "Windows and Linux apps",
     "guides": "Guides"
   },
@@ -408,6 +409,27 @@
     "capabilities": "MCP and inbound are not exclusive: Resend offers <resend>official MCP</resend> and <inboxes>inboxes for people and agents</inboxes>; Plunk also offers <plunk>MCP</plunk>. With MepMail, compare the review workflow, permissions and separate Mail and Send allowances."
   },
   "home": {
+    "growth": {
+      "title": "Send email. Keep your SDK.",
+      "lead": "A Resend-compatible sending API for your app, with SMTP and MCP when you need them. Change the base URL for supported email operations, not your whole stack.",
+      "cta": "Start free · {free}/day",
+      "sendPlans": "Compare Send plans",
+      "mailPlans": "See Mail plans",
+      "note": "<b>{free} emails/day free, no card.</b> Paid Send plans from <b>{starter}/month</b>.",
+      "trustLabel": "Delivery, safeguards and the person behind MepMail",
+      "deliveryEyebrow": "Public delivery data",
+      "deliveryTitle": "Check the numbers, not a promise.",
+      "deliveryBody": "See our delivery, bounce and complaint data, the reporting period and the measurement methodology on our public delivery page.",
+      "deliveryLink": "See delivery statistics",
+      "safetyEyebrow": "Responsible sending",
+      "safetyTitle": "Verified domains. Abuse review.",
+      "safetyBody": "Phishing and unsolicited sending are prohibited. We review abuse signals, suppress harmful recipients and can suspend offending accounts.",
+      "safetyLink": "Read the sending rules",
+      "founderEyebrow": "Built in Brazil",
+      "founderTitle": "Talk to the person building it.",
+      "founderBody": "I’m Jean, the developer behind MepMail. Have a migration question or need help choosing between Send and Mail? Talk to me directly.",
+      "founderLink": "Jean on X · @JE4NVRG"
+    },
     "doorsAria": "Where to start: Mail or Send",
     "correio": {
       "eyebrow": "Mail · for people and agents",

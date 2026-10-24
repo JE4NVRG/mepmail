@@ -4,13 +4,39 @@
     "description": "MepMail pricing in USD: free with 100 emails/day, Pro from US$ 20 for 110,000 emails/month and Scale up to 2.75M. Overage per 1,000 and no lock-in.",
     "launchDescription": "Every plan on one page: Mail from US$ 2.90 a month, and Send free with 100 emails a day or Pro with 110K emails for US$ 29 a month."
   },
+  "choice": {
+    "title": "What do you need?",
+    "send": "Send email from my app",
+    "sendHint": "Send · API, SMTP and MCP",
+    "mail": "Email inboxes",
+    "mailHint": "Mail · people and AI agents",
+    "separate": "Two separate products. Separate prices and limits. Use either, or both.",
+    "sendTitle": "Your app's email. Start free.",
+    "sendEntry": "Free: 100 emails/day, no card. Starter: {price}/month for 1,500 emails/day.",
+    "freeCta": "Start free · 100 emails/day",
+    "mailTitle": "Email inboxes on your domain.",
+    "mailEntry": "Mail starts at {price}/month. The 7-day trial needs a card; cancel before it ends to avoid a charge. Separate from Send Free.",
+    "mailPix": "In Brazil, Mail starts at R$ 14.90/month with Pix or card. R$ 14.90 is a Mail price, not a Send plan. The 7-day trial is card only.",
+    "mailClosed": "Mail pricing and availability are shown on its product page. Creating a free Send account does not activate a Mail trial.",
+    "dailyNote": "Free and Starter monthly figures are illustrative, not a monthly allowance: each UTC day has its own cap. With paid overage disabled, monthly sending stops at the quota."
+  },
+  "entryComparison": {
+    "title": "Sending 10k or 50k emails a month?",
+    "scope": "Monthly recurring prices in USD, before tax. Transactional outbound only, not Mail inboxes. No first-month promotion or currency conversion.",
+    "volume": "Emails/month",
+    "condition": "Limits that matter",
+    "daily": "Starter: at most {cap, number}/UTC day; spread 10k over at least {days} sending days. Resend paid has no daily email cap.",
+    "monthly": "Pro includes 110k/month. Starter cannot promise 50k/month at its nominal daily cap. Resend Pro includes 50k/month.",
+    "notAlwaysCheaper": "At 50k/month, Resend's US$ 20 is lower than MepMail Pro's US$ 29. Pick for your workload, not a blanket savings claim. Daily caps and API throughput still matter.",
+    "sources": "Official catalogs checked {date}:"
+  },
   "eyebrow": "Pricing",
   "title": "Mail by mailbox. <highlight>Send by volume.</highlight>",
   "lead": "Monthly prices in USD, no lock-in. Mail is priced by a plan of mailboxes on your domain; Send by your app's email volume. Use one, the other or both in the same account, with the same verified domain.",
   "note": "Send starts free: 100 emails a day, no card. Mail has 7 days free with a card on the team's first plan; billing starts when the trial ends unless you cancel before.",
   "plans": {
     "title": "Every Send plan.",
-    "intro": "Regular monthly fees. The Pro 110K introductory offer and annual option are detailed below. Open the usage details for queue and overage rules.",
+    "intro": "Free: 100 emails/day with no card. Starter: US$ 9/month for 1,500 emails/day. Higher-volume plans below; existing introductory and annual terms remain unchanged. Queue and overage rules are in the pricing FAQ.",
     "details": "Limits, queues and overage details"
   },
   "included": {

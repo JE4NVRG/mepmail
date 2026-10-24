@@ -1,0 +1,45 @@
+/* Existing Send/Mail visual language, with Send first in document order. */
+.v2 .v2-split {
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+}
+@media (max-width: 900px) {
+  .v2 .v2-split { grid-template-columns: minmax(0, 1fr); }
+}
+.v2 .v2-growth-proof {
+  padding: 32px 0;
+  border-top: 1px solid var(--v2-line-strong);
+  border-bottom: 1px solid var(--v2-line-strong);
+}
+.v2-growth-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px;
+}
+.v2-growth-proof-grid article {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+.v2-growth-proof-grid .v2-body {
+  color: var(--v2-muted);
+  line-height: 1.6;
+}
+.v2-growth-proof-grid a {
+  width: fit-content;
+  overflow-wrap: anywhere;
+}
+.v2-growth-proof-grid a:focus-visible {
+  outline: 2px solid var(--v2-lavender);
+  outline-offset: 4px;
+}
+@media (max-width: 760px) {
+  .v2-growth-proof-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .v2-growth-proof-grid article + article {
+    padding-top: 24px;
+    border-top: 1px solid var(--v2-line-strong);
+  }
+}

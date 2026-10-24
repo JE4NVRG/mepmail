@@ -31,6 +31,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/alternatives/resend`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${base}/integrations`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/security`, changeFrequency: "yearly", priority: 0.7 },
+    { url: `${base}/status`, changeFrequency: "daily", priority: 0.6 },
     { url: `${base}/support`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/delivery`, changeFrequency: "daily", priority: 0.5 },
     { url: `${base}/status`, changeFrequency: "daily", priority: 0.5 },

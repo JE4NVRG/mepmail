@@ -1,9 +1,9 @@
 {
   "meta": {
-    "title": "MepMail: Envie e-mails. Continue construindo.",
-    "description": "Notificações, recibos e campanhas por API, SMTP ou agentes de IA. Controle seus envios em um só painel. Comece grátis, sem cartão.",
-    "domainTitle": "MepMail: e-mail profissional com domínio próprio e IA",
-    "domainDescription": "E-mail corporativo no seu domínio para você e seus agentes de IA, mais envio por API e SMTP. A partir de R$ 14,90/mês, 7 dias grátis com cartão."
+    "title": "MepMail | API de e-mail e caixas para apps e agentes",
+    "description": "Envie e-mails transacionais com API compatível com o Resend. Comece com 100 e-mails/dia grátis, sem cartão. Caixas para pessoas e agentes são um produto separado.",
+    "domainTitle": "MepMail | API de e-mail e caixas para apps e agentes",
+    "domainDescription": "Envie e-mails transacionais com API compatível com o Resend. Comece com 100 e-mails/dia grátis, sem cartão. Caixas para pessoas e agentes são um produto separado."
   },
   "skip": "Pular para o conteúdo",
   "brandAria": "MepMail início",
@@ -349,6 +349,7 @@
     "rights": "© 2026 MepMail. Todos os direitos reservados.",
     "sourceCode": "Código-fonte · AGPL-3.0",
     "sourceDownload": "Baixe gratuitamente o código-fonte correspondente a esta versão",
+    "sourceArchive": "Baixar esta versão",
     "apps": "Apps para Windows e Linux",
     "guides": "Guias"
   },
@@ -408,6 +409,27 @@
     "capabilities": "MCP e recebimento não são exclusivos: a Resend tem <resend>MCP oficial</resend> e <inboxes>inboxes para pessoas e agentes</inboxes>; o Plunk também oferece <plunk>MCP</plunk>. No MepMail, compare o fluxo de revisão, as permissões e as franquias separadas de Correio e Envio."
   },
   "home": {
+    "growth": {
+      "title": "Envie e-mails. Mantenha seu SDK.",
+      "lead": "API compatível com o envio do Resend para seu app, com SMTP e MCP quando precisar. Troque a URL base nas operações suportadas, não a sua stack inteira.",
+      "cta": "Começar grátis · {free}/dia",
+      "sendPlans": "Comparar planos de Envio",
+      "mailPlans": "Ver planos do Correio",
+      "note": "<b>{free} e-mails/dia grátis, sem cartão.</b> Planos pagos de Envio a partir de <b>{starter}/mês</b>.",
+      "trustLabel": "Entregabilidade, proteção e quem faz o MepMail",
+      "deliveryEyebrow": "Dados públicos de entrega",
+      "deliveryTitle": "Confira os números, não uma promessa.",
+      "deliveryBody": "Veja os dados de entrega, devoluções e reclamações, o período e a metodologia na nossa página pública de entregabilidade.",
+      "deliveryLink": "Ver estatísticas de entrega",
+      "safetyEyebrow": "Envio responsável",
+      "safetyTitle": "Domínios verificados. Revisão de abuso.",
+      "safetyBody": "Phishing e envio não solicitado são proibidos. Revisamos sinais de abuso, suprimimos destinatários problemáticos e podemos suspender contas infratoras.",
+      "safetyLink": "Ler as regras de envio",
+      "founderEyebrow": "Feito no Brasil",
+      "founderTitle": "Fale com quem está construindo.",
+      "founderBody": "Sou Jean, o desenvolvedor do MepMail. Tem dúvida sobre migração ou precisa escolher entre Envio e Correio? Fale comigo diretamente.",
+      "founderLink": "Jean no X · @JE4NVRG"
+    },
     "doorsAria": "Por onde começar: Correio ou Envio",
     "correio": {
       "eyebrow": "Correio · para pessoas e agentes",

@@ -13,7 +13,8 @@ import { Providers } from "@/components/providers";
 import { PublicLocaleLinks } from "@/components/public-locale-links";
 import { UmamiAnalytics } from "@/components/umami-analytics";
 import { ANDROID_APP_INIT_SCRIPT } from "@/lib/android-app";
-import { publicClientMessages, SERVER_ONLY_NAMESPACES } from "@/lib/client-messages";
+import { SERVER_ONLY_NAMESPACES } from "@/lib/client-messages";
+import { publicMarketingMessages } from "@/lib/public-message-scope";
 import { THEME_INIT_SCRIPT, THEME_KEY } from "@/lib/theme";
 
 export const viewport: Viewport = {
@@ -29,6 +30,12 @@ export const viewport: Viewport = {
 // as the site's; keep the two in step.
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("common");
+  const locale = await getLocale();
+  // Auth pages inherit this OG title; name both products without plan/price promises.
+  const productTitle =
+    locale === "pt-BR"
+      ? "MepMail | API de e-mail e caixas para apps e agentes"
+      : "MepMail | Email API and mailboxes for apps and agents";
   return {
     ...(env.APP_BASE_URL ? { metadataBase: new URL(env.APP_BASE_URL) } : {}),
     title: { default: t("appName"), template: `%s · ${t("appName")}` },
@@ -44,7 +51,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       siteName: t("appName"),
       type: "website",
-      title: t("meta.title"),
+      title: productTitle,
       description: t("meta.description"),
       images: [{ url: "/og.jpg", width: 1280, height: 640, alt: t("appName") }],
     },
@@ -61,7 +68,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // these long namespaces on the server, and shipping them made every page (the 404
   // included) carry ~110 KB of copy it never uses.
   const messages =
-    publicClientMessages((await headers()).get("x-mepmail-next"), locale) ??
+    publicMarketingMessages((await headers()).get("x-mepmail-next"), locale) ??
     Object.fromEntries(
       Object.entries(await getMessages()).filter(([ns]) => !SERVER_ONLY_NAMESPACES.has(ns)),
     );

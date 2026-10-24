@@ -4,13 +4,39 @@
     "description": "Preços do MepMail em reais, no cartão ou no Pix: grátis com 100 e-mails/dia, Pro com 110 mil e-mails por R$ 149/mês (R$ 99 no 1º mês) e Scale até 2,75M. Excedente por mil e sem fidelidade.",
     "launchDescription": "Todos os planos numa página: Correio a partir de R$ 14,90/mês e Envio grátis com 100 e-mails/dia ou Pro com 110 mil e-mails por R$ 149/mês. Pague com Pix ou cartão."
   },
+  "choice": {
+    "title": "Do que você precisa?",
+    "send": "Enviar e-mail do meu app",
+    "sendHint": "Envio · API, SMTP e MCP",
+    "mail": "Caixas de e-mail",
+    "mailHint": "Correio · pessoas e agentes de IA",
+    "separate": "Dois produtos separados. Preços e limites próprios. Use um ou os dois.",
+    "sendTitle": "O e-mail do seu app. Comece grátis.",
+    "sendEntry": "Free: 100 e-mails/dia, sem cartão. Starter: {price}/mês para 1.500 e-mails/dia (US$ 9/mês em dólar).",
+    "freeCta": "Começar grátis · 100 e-mails/dia",
+    "mailTitle": "Caixas de e-mail no seu domínio.",
+    "mailEntry": "O Correio começa em {price}/mês. O teste de 7 dias exige cartão; cancele antes do fim para não ser cobrado. É separado do Envio Free.",
+    "mailPix": "Correio a partir de R$ 14,90/mês no Pix ou cartão. R$ 14,90 é preço do Correio, não de um plano de Envio. O teste de 7 dias é só no cartão.",
+    "mailClosed": "Consulte os preços e a disponibilidade do Correio na página do produto. Criar uma conta grátis de Envio não ativa um teste do Correio.",
+    "dailyNote": "Os volumes mensais de Free e Starter são ilustrativos, não uma franquia mensal: cada dia UTC tem seu próprio limite. Com o excedente pago desligado, o envio mensal para na cota."
+  },
+  "entryComparison": {
+    "title": "Envia 10k ou 50k e-mails por mês?",
+    "scope": "Mensalidades recorrentes em dólar, sem impostos. Só envios transacionais, não caixas do Correio. Sem promoção inicial nem conversão de moeda.",
+    "volume": "E-mails/mês",
+    "condition": "Limites importantes",
+    "daily": "Starter: até {cap, number}/dia UTC; distribua 10k em pelo menos {days} dias de envio. O Resend pago não tem limite diário de e-mails.",
+    "monthly": "O Pro inclui 110k/mês. O Starter não promete 50k/mês no limite diário nominal. O Resend Pro inclui 50k/mês.",
+    "notAlwaysCheaper": "Em 50k/mês, os US$ 20 do Resend são menores que os US$ 29 do MepMail Pro. Escolha pelo uso, não por uma promessa geral de economia. Limites diários e de API continuam valendo.",
+    "sources": "Catálogos oficiais conferidos em {date}:"
+  },
   "eyebrow": "Preços",
   "title": "Correio por caixa. <highlight>Envio por volume.</highlight>",
   "lead": "Preços mensais em reais, sem fidelidade, no cartão ou no Pix. O Correio cobra por plano de caixas no seu domínio; o Envio, pelo volume de e-mails da sua aplicação. Use um, o outro ou os dois na mesma conta, com o mesmo domínio verificado.",
   "note": "O Envio começa grátis: 100 e-mails por dia, sem cartão. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe; a cobrança começa no fim do teste, a menos que você cancele antes.",
   "plans": {
     "title": "Todos os planos de Envio.",
-    "intro": "Mensalidades recorrentes. A oferta inicial e o anual Pro 110K estão detalhados abaixo. Veja as regras de consumo em “Detalhes de limites, filas e excedentes”.",
+    "intro": "Free: 100 e-mails/dia sem cartão. Starter: R$ 49/mês (US$ 9 em dólar) para 1.500 e-mails/dia. Planos maiores abaixo; condições iniciais e anuais existentes preservadas. Regras de fila e excedentes no FAQ de preços.",
     "details": "Detalhes de limites, filas e excedentes"
   },
   "included": {
