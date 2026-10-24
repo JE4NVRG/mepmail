@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const headerBag = new Map<string, string>();
 vi.mock("next/headers", () => ({
-  headers: async () => ({ get: (name: string) => headerBag.get(name.toLowerCase()) ?? null }) as unknown as Headers,
+  headers: async () =>
+    ({ get: (name: string) => headerBag.get(name.toLowerCase()) ?? null }) as unknown as Headers,
 }));
 
 vi.mock("@millionsend/config", () => ({ env: { BETTER_AUTH_SECRET: "test-secret" } }));
@@ -50,7 +51,9 @@ describe("billing purchase rate limit", () => {
 
   it("refuses when one address starts too many purchases across teams", async () => {
     const { db } = stubDb([1, 31]);
-    await expect(enforcePurchaseRateLimit(db, "team-a")).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    await expect(enforcePurchaseRateLimit(db, "team-a")).rejects.toMatchObject({
+      code: "TOO_MANY_REQUESTS",
+    });
   });
 
   it("never stores the raw address", async () => {
