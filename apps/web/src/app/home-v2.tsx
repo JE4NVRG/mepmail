@@ -175,7 +175,8 @@ export async function HomeV2() {
                 {l("hero.migrate")}{" "}
                 <a className="v2-link-accent" href="/alternatives/resend">
                   {l("integration.migrationCta")} <span aria-hidden="true">→</span>
-                </a>{" · "}
+                </a>
+                {" · "}
                 <a className="v2-link-accent" href="#envio">
                   {t("envio.more")}
                 </a>
