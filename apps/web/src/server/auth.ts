@@ -34,7 +34,12 @@ import { headers } from "next/headers";
 import { mcpResourceUrls, resolveBaseUrl } from "@/lib/api-base-url";
 import { httpOrigin } from "@/lib/http-url";
 import { legacyAccountIssuer } from "@/lib/legacy-account-issuer";
-import { attributionProps, emitFunnel, recordSignupAttribution } from "./funnel";
+import {
+  attributionProps,
+  emitFunnel,
+  recordSignupAttribution,
+  requestedFunnelIntent,
+} from "./funnel";
 import { localeFromHeaders } from "./locale";
 import { getActiveMembership, listMemberships } from "./membership";
 import { enqueueRecipientErase } from "./queue";
@@ -295,12 +300,15 @@ export function createAuth(
         requestHeaders?.get("cookie") ?? null,
       );
       await emitFunnel(db, {
-        name: "signup_complete",
-        dedupeKey: `signup:${user.id}`,
+        name: "account_created",
+        dedupeKey: `account:${user.id}`,
         // No team exists yet, so the plan is the one every new account starts on.
+        resolve: (tx) => userFunnelProps(tx, user.id),
         props: {
           ...attributionProps(attribution, localeFromHeaders(requestHeaders)),
           plan: "free",
+          measurement_version: "2",
+          ...requestedFunnelIntent(requestHeaders?.get("cookie") ?? null),
         },
       });
       return attribution;

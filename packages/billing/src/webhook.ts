@@ -1,3 +1,4 @@
+import { emitFunnelEvent, type FunnelEventTarget } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, eq, inArray, lt } from "drizzle-orm";
@@ -20,10 +21,13 @@ import {
 } from "./pix.js";
 import { SUBSCRIPTION_EXPAND } from "./prices.js";
 import { fulfillSendPixStart } from "./send-checkout.js";
+import { type CanonicalInvoicePayment, initialSendInvoiceFacts } from "./send-purchase.js";
 import { applySubscription, idOf, lockCustomer } from "./subscription.js";
 
 export interface WebhookDeps extends BillingDeps {
   webhookSecret: string;
+  /** Collector supplied by the web boundary; absent still records the local truth ledger. */
+  funnel?: FunnelEventTarget | undefined;
   /** Mode of the configured API key; events from the other mode are rejected. */
   livemode: boolean;
   advertisingConfig?: MetaConversionConfig;
@@ -49,6 +53,8 @@ export interface AppliedWebhookEvent {
   customerId: string | null;
   subscriptionId: string;
   service: "send" | "mailbox" | "ignored";
+  /** Verified acquisition only; legacy payment_succeeded remains a separate renewal metric. */
+  acquisition?: { teamId: string; amountPaidMinor: number; currency: string } | undefined;
 }
 
 /** Stripe redelivers for at most 3 days; older dedupe rows are dead weight. */
@@ -105,6 +111,9 @@ export async function handleWebhook(
   }
   if (event.livemode !== deps.livemode) return 400;
   const log = deps.log ?? console.warn;
+  let paidCandidate:
+    | { event: Stripe.Event; sub: Stripe.Subscription; mailbox: boolean }
+    | undefined;
   const applied = await deps.db.transaction(async (tx): Promise<AppliedWebhookEvent | null> => {
     const inserted = await tx
       .insert(schema.stripeEvents)
@@ -208,6 +217,7 @@ export async function handleWebhook(
       mail || !!projected?.applied,
       deps.googleConversionConfig,
     );
+    paidCandidate = { event, sub, mailbox: mail || !!projected?.applied };
     return {
       id: event.id,
       type: event.type,
@@ -224,6 +234,18 @@ export async function handleWebhook(
   // After the commit, and never before it: the caller's hook reports on an
   // event that is durable. A throwing hook is logged, not propagated — the
   // event is applied, and Stripe must not be told to redeliver it.
+  if (applied && paidCandidate) {
+    try {
+      await recordSubscriptionPaid(
+        deps,
+        paidCandidate.event,
+        paidCandidate.sub,
+        paidCandidate.mailbox,
+      );
+    } catch (error) {
+      log(`subscription_paid funnel skipped (${String(error)})`);
+    }
+  }
   if (applied && deps.afterApply) {
     try {
       await deps.afterApply(applied);
@@ -276,4 +298,118 @@ export async function purgeStripeEvents(db: Db, now = new Date()): Promise<numbe
     .where(lt(schema.stripeEvents.receivedAt, new Date(now.getTime() - EVENT_RETENTION_MS)))
     .returning({ id: schema.stripeEvents.id });
   return rows.length;
+}
+
+/** Authenticated webhook caller only. Never backfill or infer money from a plan change. */
+async function recordSubscriptionPaid(
+  deps: WebhookDeps,
+  event: Stripe.Event,
+  sub: Stripe.Subscription,
+  mailbox: boolean,
+): Promise<void> {
+  const db = deps.db;
+  if (
+    event.livemode !== true ||
+    sub.livemode !== true ||
+    mailbox ||
+    (event.type !== "invoice.payment_succeeded" && event.type !== "invoice.paid")
+  )
+    return;
+  let canonicalPayment: CanonicalInvoicePayment | null = null;
+  if (event.type === "invoice.paid") {
+    // paid alone includes out-of-band settlements. Only a canonical expanded
+    // PaymentIntent readback can prove money for this alias; an ID alone cannot.
+    if (!deps.stripe.invoices) return;
+    const invoice = await deps.stripe.invoices.retrieve(event.data.object.id, {
+      expand: ["payments.data.payment.payment_intent"],
+    });
+    const payments = invoice.payments;
+    if (invoice.id !== event.data.object.id || invoice.livemode !== true || payments?.has_more)
+      return;
+    const succeeded = payments?.data.filter(
+      (p) => p.status === "paid" && p.payment.type === "payment_intent",
+    );
+    if (succeeded?.length !== 1) return;
+    const payment = succeeded[0]!;
+    const pi = payment.payment.payment_intent;
+    if (
+      !pi ||
+      typeof pi === "string" ||
+      pi.livemode !== true ||
+      pi.status !== "succeeded" ||
+      pi.currency !== invoice.currency ||
+      pi.amount_received !== invoice.amount_paid ||
+      idOf(pi.customer) !== idOf(invoice.customer)
+    )
+      return;
+    canonicalPayment = {
+      invoiceId: invoice.id,
+      customerId: idOf(invoice.customer) ?? "",
+      subscriptionId: idOf(invoice.parent?.subscription_details?.subscription) ?? "",
+      livemode: true,
+      status: "paid",
+      paymentType: "payment_intent",
+      paymentStatus: "succeeded",
+      amountPaidMinor: pi.amount_received,
+      currency: pi.currency,
+    };
+  }
+  const attemptId = sub.metadata?.mepmail_send_checkout;
+  if (
+    !attemptId ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(attemptId)
+  )
+    return;
+  const [attempt] = await db
+    .select()
+    .from(schema.sendCheckoutAttempts)
+    .where(eq(schema.sendCheckoutAttempts.id, attemptId));
+  if (!attempt?.teamId || !attempt.livemode) return;
+  const facts = initialSendInvoiceFacts({
+    type: event.type,
+    invoice: event.data.object,
+    subscription: sub,
+    attempt,
+    mailbox,
+    canonicalPayment,
+    anyRung: true,
+  });
+  if (
+    !facts ||
+    facts.paidAt > new Date() ||
+    facts.paidAt.getTime() < attempt.createdAt.getTime() - 1000
+  )
+    return;
+  const [team] = await db
+    .select({ id: schema.teams.id })
+    .from(schema.teams)
+    .where(
+      and(
+        eq(schema.teams.id, attempt.teamId),
+        eq(schema.teams.stripeCustomerId, attempt.stripeCustomerId),
+        eq(schema.teams.stripeSubscriptionId, sub.id),
+      ),
+    );
+  if (!team) return;
+  // No collector configuration dependency in billing: durable ledger is canonical.
+  // Both verified aliases share one team claim; legacy renewal events are not summed with it.
+  await emitFunnelEvent(
+    db,
+    deps.funnel ?? {
+      endpoint: null,
+      websiteId: null,
+      hostname: new URL(process.env.APP_BASE_URL ?? "http://localhost").host,
+    },
+    {
+      name: "subscription_paid",
+      dedupeKey: `subscription_paid:${team.id}`,
+      teamId: team.id,
+      props: {
+        product: "send",
+        measurement_version: "2",
+        amount_paid_minor: String(facts.amountPaidMinor),
+        currency: facts.currency,
+      },
+    },
+  );
 }

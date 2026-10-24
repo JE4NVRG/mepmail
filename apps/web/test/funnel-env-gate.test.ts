@@ -120,3 +120,42 @@ it("sends nothing when only half the pair is set", async () => {
   expect(await emitFunnel(db, { name: "signup_complete", dedupeKey: "signup:half" })).toBe(false);
   expect(calls).toEqual([]);
 });
+
+it("keeps a production local ledger while an explicitly disabled collector sends nothing", async () => {
+  vi.stubEnv("APP_BASE_URL", "https://mepmail.dev");
+  const teamId = await createTeam(db);
+  expect(
+    await emitFunnel(db, {
+      name: "checkout_started",
+      dedupeKey: `prod-disabled:${teamId}`,
+      teamId,
+    }),
+  ).toBe(false);
+  expect(calls).toEqual([]);
+  const rows = await db.select().from(schema.funnelEvents);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]?.props?.collector_status).toBe("disabled");
+});
+it("keeps preview mode silent even on a public hostname with a configured collector", async () => {
+  vi.stubEnv("APP_BASE_URL", "https://mepmail.dev");
+  vi.stubEnv("MEPMAIL_LOCAL_PREVIEW", "1");
+  vi.stubEnv("UMAMI_ENDPOINT", ENDPOINT);
+  vi.stubEnv("UMAMI_WEBSITE_ID", WEBSITE);
+  const teamId = await createTeam(db);
+  expect(
+    await emitFunnel(db, { name: "signup_complete", dedupeKey: `preview:${teamId}`, teamId }),
+  ).toBe(false);
+  expect(calls).toEqual([]);
+  expect(await db.select().from(schema.funnelEvents)).toEqual([]);
+});
+it("keeps a localhost port silent even when a collector was configured", async () => {
+  vi.stubEnv("APP_BASE_URL", "http://localhost:3186");
+  vi.stubEnv("UMAMI_ENDPOINT", ENDPOINT);
+  vi.stubEnv("UMAMI_WEBSITE_ID", WEBSITE);
+  const teamId = await createTeam(db);
+  expect(
+    await emitFunnel(db, { name: "signup_complete", dedupeKey: `loopback:${teamId}`, teamId }),
+  ).toBe(false);
+  expect(calls).toEqual([]);
+  expect(await db.select().from(schema.funnelEvents)).toEqual([]);
+});

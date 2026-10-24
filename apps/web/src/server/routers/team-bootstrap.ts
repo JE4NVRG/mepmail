@@ -18,6 +18,7 @@ import { z } from "zod";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { slugify } from "@/lib/slug";
 import { recordAudit } from "../audit";
+import { trackTeamSignup } from "../funnel";
 import { listMemberships } from "../membership";
 import {
   type AuthSession,
@@ -320,6 +321,7 @@ export const teamBootstrapRouter = router({
               });
             return { teamId: team.id };
           });
+          await trackTeamSignup(ctx.db, ctx.session.user.id, created.teamId);
           // A freshly created team becomes the active one.
           await selectTeam(ctx, created.teamId);
           await recordAudit(

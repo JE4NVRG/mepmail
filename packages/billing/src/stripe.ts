@@ -24,7 +24,7 @@ export interface BillingStripe {
     cancel(id: string, params?: Stripe.SubscriptionCancelParams): Promise<Stripe.Subscription>;
   };
   invoices?: {
-    retrieve(id: string): Promise<Stripe.Invoice>;
+    retrieve(id: string, params?: Stripe.InvoiceRetrieveParams): Promise<Stripe.Invoice>;
     list?: (params: Stripe.InvoiceListParams) => Promise<Stripe.ApiList<Stripe.Invoice>>;
   };
   coupons?: { retrieve(id: string, params?: Stripe.CouponRetrieveParams): Promise<Stripe.Coupon> };

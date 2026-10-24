@@ -43,6 +43,9 @@ export function SignupCta({
   }
   return (
     <a
+      data-funnel-signup="1"
+      data-funnel-product={mailboxPlan ? "mail" : "send"}
+      data-funnel-plan={mailboxPlan ?? rung ?? "free"}
       className={className}
       href={
         mailboxPlan

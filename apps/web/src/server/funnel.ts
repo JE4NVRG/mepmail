@@ -4,10 +4,14 @@ import {
   emitFunnelEvent,
   type FunnelEventRequest,
   type FunnelEventTarget,
+  isLoopbackUrl,
   type SignupAttribution,
 } from "@millionsend/core";
+import { PLAN_RUNG_KEYS } from "@millionsend/core/plans";
 import { type Db, schema } from "@millionsend/db";
+import { and, asc, eq } from "drizzle-orm";
 import { ATTRIBUTION_COOKIE, cookieValue, parseAttributionCookie } from "@/lib/attribution";
+import { MAILBOX_PLAN_ORDER } from "@/lib/mailbox-plans";
 
 /**
  * Where the web app sends its funnel events, and what they carry.
@@ -25,6 +29,9 @@ export function funnelTarget(): FunnelEventTarget {
 /** Emits one funnel event, swallowing anything that a measurement may not break. */
 export async function emitFunnel(db: Db, event: FunnelEventRequest): Promise<boolean> {
   try {
+    const hostname = appHostname().toLowerCase();
+    if (process.env.MEPMAIL_LOCAL_PREVIEW === "1" || isLoopbackUrl(`http://${hostname}`))
+      return false;
     return await emitFunnelEvent(db, funnelTarget(), event);
   } catch (error) {
     console.error(`funnel event ${event.name} skipped`, error);
@@ -77,6 +84,55 @@ export function attributionProps(
     source: attribution?.source ?? null,
     medium: attribution?.medium ?? null,
     campaign: attribution?.campaign ?? null,
+    content: attribution?.content ?? null,
+    term: attribution?.term ?? null,
+    utm_source: attribution?.source ?? null,
+    utm_medium: attribution?.medium ?? null,
+    utm_campaign: attribution?.campaign ?? null,
+    utm_content: attribution?.content ?? null,
+    utm_term: attribution?.term ?? null,
     locale,
   };
+}
+
+/** Untrusted navigation intent is metadata only, never billing or capability. */
+export function requestedFunnelIntent(cookieHeader: string | null): Record<string, string> {
+  try {
+    const raw = cookieValue(cookieHeader, "mm_funnel_intent");
+    if (!raw || raw.length > 1024) return {};
+    const v: unknown = JSON.parse(decodeURIComponent(raw));
+    if (!v || typeof v !== "object") return {};
+    const { version, product, plan } = v as Record<string, unknown>;
+    if (version !== 1 || typeof plan !== "string") return {};
+    const catalog: readonly string[] =
+      product === "send" ? PLAN_RUNG_KEYS : product === "mail" ? MAILBOX_PLAN_ORDER : [];
+    return catalog.includes(plan) ||
+      ((product === "send" || product === "mail") && (plan === "free" || plan === "choose"))
+      ? { requested_product: String(product), requested_plan: plan }
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Run only after the actual team/membership/risk transaction committed. */
+export async function trackTeamSignup(db: Db, userId: string, teamId: string): Promise<void> {
+  try {
+    const [first] = await db
+      .select({ id: schema.teams.id })
+      .from(schema.teamMembers)
+      .innerJoin(schema.teams, eq(schema.teams.id, schema.teamMembers.teamId))
+      .where(and(eq(schema.teamMembers.userId, userId), eq(schema.teamMembers.role, "owner")))
+      .orderBy(asc(schema.teams.createdAt), asc(schema.teams.id))
+      .limit(1);
+    if (first?.id !== teamId) return;
+    await emitFunnel(db, {
+      name: "signup_complete",
+      dedupeKey: `signup:${userId}`,
+      teamId,
+      props: { measurement_version: "2" },
+    });
+  } catch (error) {
+    console.error("team signup funnel skipped", error);
+  }
 }

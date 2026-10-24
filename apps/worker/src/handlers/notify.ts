@@ -1009,7 +1009,7 @@ async function sweepActivationSupport(
         // Daily counters are retained forever: deliberately no current-period filter.
         // An already accepted/queued first send needs no getting-started nudge either.
         sql`not exists (select 1 from ${u} where ${u.teamId} = ${t.id} and (${u.sent} > 0 or ${u.accepted} > 0))`,
-        sql`not exists (select 1 from ${f} where ${f.dedupeKey} = 'first_email_sent:' || ${t.id}::text)`,
+        sql`not exists (select 1 from ${f} where ${f.dedupeKey} in ('first_email_sent:' || ${t.id}::text, 'first_send:' || ${t.id}::text))`,
         sql`not exists (select 1 from ${e} where ${e.teamId} = ${t.id} and ${e.sentAt} is not null)`,
       ),
     );

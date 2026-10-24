@@ -1,3 +1,4 @@
+import { appHostname, umamiFunnel } from "@millionsend/config";
 import {
   applyStatusCas,
   buildUnsubscribeHeaders,
@@ -9,12 +10,15 @@ import {
   decryptEmailBody,
   type EmailAttachment,
   type EmailBody,
+  emitFunnelEvent,
   enqueueWebhookDeliveries,
   evaluateEmailInsights,
   extractAddrSpec,
+  type FunnelEventTarget,
   fetchTeamQuota,
   fetchTeamStanding,
   findSuppressed,
+  getSignupSendingRestriction,
   hashRecipient,
   isOnboardingSender,
   isSubscribedToTopic,
@@ -71,6 +75,8 @@ export interface SesSender {
 }
 
 export interface SendDeps {
+  /** Optional fixture transport; deployment configuration is used when absent. */
+  funnel?: FunnelEventTarget | undefined;
   keyring: Keyring;
   ses: SesSender;
   /** Signup restrictions are cloud-only; omitted preserves the self-host path. */
@@ -926,10 +932,46 @@ export async function sendEmail(
 
   // Record the join key BEFORE the status flip: an SES event can arrive
   // within milliseconds and must find the row by sesMessageId.
-  await db
-    .update(schema.emails)
-    .set({ sesMessageId: messageId })
-    .where(eq(schema.emails.id, email.id));
+  // Provider has succeeded; a queued sentAt claim alone is deliberately NOT evidence.
+  let firstProviderSuccess = false;
+  try {
+    await db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Db;
+      await tx
+        .select({ id: schema.teams.id })
+        .from(schema.teams)
+        .where(eq(schema.teams.id, email.teamId))
+        .for("update");
+      const [history] = await tx
+        .select({
+          prior: sql<boolean>`
+        exists (select 1 from ${schema.emails} e where e.team_id = ${email.teamId}
+          and e.id <> ${email.id} and e.ses_message_id is not null)
+        or exists (select 1 from ${schema.usageCounters} u where u.team_id = ${email.teamId} and u.sent > 0)
+        or exists (select 1 from ${schema.emailEvents} ev inner join ${schema.emails} e on e.id = ev.email_id
+          where e.team_id = ${email.teamId} and e.id <> ${email.id} and ev.type = 'sent')
+      `,
+        })
+        .from(sql`(select 1) as history`);
+      await tx
+        .update(schema.emails)
+        .set({ sesMessageId: messageId })
+        .where(eq(schema.emails.id, email.id));
+      const restriction = await getSignupSendingRestriction(
+        tx,
+        email.teamId,
+        deps.isCloud ?? false,
+      );
+      firstProviderSuccess = !history?.prior && !systemMail && restriction.kind === "none";
+    });
+  } catch (error) {
+    // Measurement failure must not lose the real provider join key or retry the delivery.
+    console.error("first_send funnel skipped", error);
+    await db
+      .update(schema.emails)
+      .set({ sesMessageId: messageId })
+      .where(eq(schema.emails.id, email.id));
+  }
   await applyStatusCas(db, email.id, "sent");
   await db.insert(schema.emailEvents).values({
     emailId: email.id,
@@ -948,6 +990,21 @@ export async function sendEmail(
     });
   await bumpHourlyUsage(db, { teamId: email.teamId, at: sentAt, counts: { sent: 1 } });
   if (bulk) deps.sesQuota?.noteBulkSent?.(region);
+  // The provider join key and sent status/counters are committed before network telemetry.
+  // Never hold a team row lock or a SQL transaction while waiting for the collector.
+  if (firstProviderSuccess) {
+    try {
+      const configured = umamiFunnel();
+      await emitFunnelEvent(db, deps.funnel ?? { ...configured, hostname: appHostname() }, {
+        name: "first_send",
+        dedupeKey: `first_send:${email.teamId}`,
+        teamId: email.teamId,
+        props: { product: "send", measurement_version: "2" },
+      });
+    } catch {
+      console.warn("first_send telemetry unavailable after provider success");
+    }
+  }
   // Credential-bearing account mail loses its body the moment SES holds it: a
   // reset link is live for thirty minutes, and the row's body is otherwise
   // readable by every member of the owning team, any full-access key and

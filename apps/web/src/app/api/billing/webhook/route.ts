@@ -29,7 +29,7 @@ import { type Db, getDb, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import { appBaseUrl } from "@/lib/api-base-url";
 import { BILLING_PATH, getPixStripe, getStripe, mailPlanMove } from "@/server/billing";
-import { emitFunnel } from "@/server/funnel";
+import { emitFunnel, funnelTarget } from "@/server/funnel";
 import { mailboxBillingCatalog } from "@/server/mailbox-billing";
 import { mailboxRegistryEnabled } from "@/server/mailboxes";
 import { getQueue } from "@/server/queue";
@@ -51,6 +51,7 @@ export async function POST(request: Request) {
   let sendEvent = false;
   const status = await handleWebhook(rawBody, request.headers.get("stripe-signature"), {
     db,
+    funnel: funnelTarget(),
     stripe: getStripe(),
     webhookSecret: env.STRIPE_WEBHOOK_SECRET ?? "",
     livemode: isLiveKey(env.STRIPE_SECRET_KEY ?? ""),

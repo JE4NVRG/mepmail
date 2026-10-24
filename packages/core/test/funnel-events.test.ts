@@ -232,6 +232,7 @@ describe("emitFunnelEvent", () => {
     const { calls, fetchImpl } = stubFetch();
     const first = await emitFunnelEvent(db, target({ fetch: fetchImpl }), {
       name: "signup_complete",
+      teamId,
       dedupeKey: `signup:${userId}`,
       props: { locale: "pt-BR" },
       resolve: (tx) => userFunnelProps(tx, userId),
@@ -240,6 +241,7 @@ describe("emitFunnelEvent", () => {
 
     const second = await emitFunnelEvent(db, target({ fetch: fetchImpl }), {
       name: "signup_complete",
+      teamId,
       dedupeKey: `signup:${userId}`,
       props: { locale: "pt-BR" },
       resolve: (tx) => userFunnelProps(tx, userId),
@@ -252,6 +254,7 @@ describe("emitFunnelEvent", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       name: "signup_complete",
+      teamId,
       dedupeKey: `signup:${userId}`,
       props: { source: "linkedin", medium: "cpc", campaign: "beta", locale: "pt-BR" },
     });
@@ -266,7 +269,7 @@ describe("emitFunnelEvent", () => {
       teamId,
       resolve: (tx) => teamFunnelProps(tx, teamId),
     });
-    expect(body(calls[0]?.init ?? {}).payload.data).toEqual({
+    expect(body(calls[0]?.init ?? {}).payload.data).toMatchObject({
       plan: "pro",
       source: "linkedin",
       medium: "cpc",
@@ -274,16 +277,19 @@ describe("emitFunnelEvent", () => {
     });
   });
 
-  it("does nothing (and keeps no ledger row) when the instance has no collector", async () => {
+  it("keeps a durable ledger without HTTP when the collector is disabled", async () => {
     const { calls, fetchImpl } = stubFetch();
     expect(
       await emitFunnelEvent(db, target({ endpoint: null, websiteId: null, fetch: fetchImpl }), {
         name: "signup_complete",
+        teamId,
         dedupeKey: `signup:${userId}`,
       }),
     ).toBe(false);
     expect(calls).toHaveLength(0);
-    expect(await db.select().from(schema.funnelEvents)).toEqual([]);
+    expect(await db.select().from(schema.funnelEvents)).toMatchObject([
+      { props: { collector_status: "disabled", measurement_version: "2", team_id: teamId } },
+    ]);
   });
 
   it("keeps the claim and swallows a collector failure", async () => {
@@ -292,15 +298,258 @@ describe("emitFunnelEvent", () => {
       throw new Error("collector down");
     }) as unknown as typeof fetch;
     // The claim is durable: a lost emission is a lost data point, never a
-    // failed signup, and the row is there to replay by hand.
+    // failed signup. The failed outcome is visible, with no replay framework.
     await expect(
       emitFunnelEvent(db, target({ fetch: failing, log: (m) => logs.push(m) }), {
         name: "signup_complete",
+        teamId,
         dedupeKey: `signup:${userId}`,
       }),
-    ).resolves.toBe(true);
+    ).resolves.toBe(false);
     const rows = await db.select().from(schema.funnelEvents);
     expect(rows).toHaveLength(1);
+  });
+
+  it("snapshots known risk levels for account and team without exposing risk signals", async () => {
+    const signals = {
+      domain: "fixture.invalid",
+      disposable: false,
+      mx: "unknown" as const,
+      domainAgeDays: null,
+      catchAll: "unknown" as const,
+      randomLocal: false,
+      ipKey: null,
+      asn: null,
+      signupsIp1h: 0,
+      signupsDomain24h: 0,
+      signupsAsn1h: 0,
+    };
+    await db
+      .insert(schema.teamSignupRisk)
+      .values({ teamId, principalUserId: userId, level: "good", signals });
+    await db
+      .insert(schema.userSignupRisk)
+      .values({ userId, domain: "fixture.invalid", level: "good", signals });
+    for (const level of ["good", "sandbox", "hold"] as const) {
+      await db
+        .update(schema.teamSignupRisk)
+        .set({ level })
+        .where(eq(schema.teamSignupRisk.teamId, teamId));
+      await db
+        .update(schema.userSignupRisk)
+        .set({ level })
+        .where(eq(schema.userSignupRisk.userId, userId));
+      const team = await teamFunnelProps(db, teamId);
+      const user = await userFunnelProps(db, userId);
+      for (const props of [team, user]) {
+        expect(props).toMatchObject({
+          risk_level: level,
+          bot_status: "unknown",
+          is_suspected: level === "good" ? "false" : "true",
+        });
+        expect(props).not.toHaveProperty("signals");
+        expect(JSON.stringify(props)).not.toContain("fixture.invalid");
+      }
+    }
+    const { calls, fetchImpl } = stubFetch();
+    await emitFunnelEvent(db, target({ fetch: fetchImpl }), {
+      name: "account_created",
+      dedupeKey: `account:${userId}`,
+      resolve: (tx) => userFunnelProps(tx, userId),
+      props: { bot_status: "confirmed", risk_level: "good" },
+    });
+    expect(body(calls[0]?.init ?? {}).payload.data).toMatchObject({
+      risk_level: "hold",
+      bot_status: "unknown",
+    });
+  });
+
+  it("claims a canonical event exactly once under concurrent callers", async () => {
+    const { calls, fetchImpl } = stubFetch();
+    let resolutions = 0;
+    const results = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        emitFunnelEvent(db, target({ fetch: fetchImpl }), {
+          name: "first_send",
+          teamId,
+          dedupeKey: `first_send:${teamId}`,
+          resolve: async () => {
+            resolutions += 1;
+            return {};
+          },
+        }),
+      ),
+    );
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(resolutions).toBe(1);
+    expect(calls).toHaveLength(1);
+    expect(await db.select().from(schema.funnelEvents)).toHaveLength(1);
+  });
+
+  it("rejects canonical team milestones without a real teamId but preserves legacy requests", async () => {
+    const { calls, fetchImpl } = stubFetch();
+    for (const name of ["signup_complete", "first_send", "subscription_paid"] as const) {
+      expect(
+        await emitFunnelEvent(db, target({ fetch: fetchImpl, log: () => {} }), {
+          name,
+          dedupeKey: name,
+        }),
+      ).toBe(false);
+    }
+    expect(await db.select().from(schema.funnelEvents)).toHaveLength(0);
+    expect(
+      await emitFunnelEvent(db, target({ fetch: fetchImpl }), {
+        name: "first_email_sent",
+        dedupeKey: "legacy",
+      }),
+    ).toBe(true);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("keeps unknown risk unknown, and only snapshots state without mutating a team", async () => {
+    const props = await teamFunnelProps(db, teamId);
+    expect(props).toMatchObject({
+      team_id: teamId,
+      product: "send",
+      plan: "free",
+      risk_level: "unknown",
+      bot_status: "unknown",
+      is_suspected: "unknown",
+      is_qa: "unknown",
+      is_internal: "unknown",
+    });
+    await db
+      .update(schema.teams)
+      .set({ plan: "system", suspendedAt: new Date(), suspensionReason: "manual" })
+      .where(eq(schema.teams.id, teamId));
+    const before = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    const { calls, fetchImpl } = stubFetch();
+    expect(
+      await emitFunnelEvent(db, target({ fetch: fetchImpl }), {
+        name: "first_send",
+        teamId,
+        dedupeKey: "snapshot",
+        props: {
+          team_id: "forged",
+          bot_status: "confirmed",
+          is_internal: "unknown",
+          is_qa: "false",
+        },
+      }),
+    ).toBe(true);
+    expect(body(calls[0]?.init ?? {}).payload.data).toMatchObject({
+      team_id: teamId,
+      bot_status: "unknown",
+      is_suspected: "true",
+      is_internal: "true",
+      is_qa: "unknown",
+      is_suspended: "true",
+    });
+    expect(await db.select().from(schema.teams).where(eq(schema.teams.id, teamId))).toEqual(before);
+  });
+
+  it("reuses account intent and all five attribution fields without coercing Mail into Send", async () => {
+    await db
+      .update(schema.signupAttribution)
+      .set({ content: "variant-a", term: "transactional" })
+      .where(eq(schema.signupAttribution.userId, userId));
+    const { calls, fetchImpl } = stubFetch();
+    await emitFunnelEvent(db, target({ endpoint: null, websiteId: null }), {
+      name: "account_created",
+      dedupeKey: `account:${userId}`,
+      props: { requested_product: "mail", requested_plan: "mail-entry" },
+    });
+    expect(await userFunnelProps(db, userId)).toMatchObject({
+      requested_product: "mail",
+      requested_plan: "mail-entry",
+      product: "mail",
+      source: "linkedin",
+      content: "variant-a",
+      term: "transactional",
+      utm_source: "linkedin",
+      utm_medium: "cpc",
+      utm_campaign: "beta",
+      utm_content: "variant-a",
+      utm_term: "transactional",
+    });
+    await emitFunnelEvent(db, target({ fetch: fetchImpl }), {
+      name: "signup_complete",
+      teamId,
+      dedupeKey: `signup:${userId}`,
+    });
+    expect(body(calls[0]?.init ?? {}).payload.data).toMatchObject({
+      product: "mail",
+      requested_plan: "mail-entry",
+      team_id: teamId,
+    });
+    await emitFunnelEvent(db, target({ fetch: fetchImpl }), {
+      name: "subscription_paid",
+      teamId,
+      dedupeKey: `subscription_paid:${teamId}`,
+      props: { product: "send", plan: "pro" },
+    });
+    expect(body(calls[1]?.init ?? {}).payload.data).toMatchObject({
+      product: "send",
+      plan: "pro",
+      measurement_version: "2",
+    });
+  });
+
+  it("exposes HTTP failure durably and never retries a claimed key", async () => {
+    const { calls, fetchImpl } = stubFetch(503);
+    const logs: string[] = [];
+    const event = {
+      name: "subscription_paid" as const,
+      teamId,
+      dedupeKey: `subscription_paid:${teamId}`,
+    };
+    expect(
+      await emitFunnelEvent(db, target({ fetch: fetchImpl, log: (m) => logs.push(m) }), event),
+    ).toBe(false);
+    expect((await db.select().from(schema.funnelEvents))[0]?.props).toMatchObject({
+      collector_status: "failed",
+      team_id: teamId,
+      measurement_version: "2",
+    });
+    expect(await emitFunnelEvent(db, target({ fetch: fetchImpl }), event)).toBe(false);
+    expect(calls).toHaveLength(1);
+    expect(logs.join(" ")).toContain("503");
+  });
+
+  it("keeps enrichment failures inside the telemetry boundary with explicit ledger state", async () => {
+    const { calls, fetchImpl } = stubFetch();
+    expect(
+      await emitFunnelEvent(db, target({ fetch: fetchImpl, log: () => {} }), {
+        name: "account_created",
+        dedupeKey: "resolve-failed",
+        resolve: async () => {
+          throw new Error("private detail");
+        },
+      }),
+    ).toBe(false);
+    expect(calls).toHaveLength(0);
+    expect((await db.select().from(schema.funnelEvents))[0]?.props).toMatchObject({
+      collector_status: "ledger_or_enrichment_failed",
+    });
+  });
+
+  it("does not escape when the ledger or even the logger is unavailable", async () => {
+    const broken = {
+      insert: () => {
+        throw new Error("private SQL");
+      },
+    } as unknown as Db;
+    await expect(
+      emitFunnelEvent(
+        broken,
+        target({
+          log: () => {
+            throw new Error("logger");
+          },
+        }),
+        { name: "account_created", dedupeKey: "broken" },
+      ),
+    ).resolves.toBe(false);
   });
 
   it("does not read anything when the claim is lost", async () => {

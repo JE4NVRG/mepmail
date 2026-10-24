@@ -73,7 +73,14 @@ export default async function PricingPage({
   const sendFirst = params.focus !== "mail";
   const focusHref = (focus: "send" | "mail") => {
     const query = new URLSearchParams();
-    for (const key of ["lang", "utm_source", "utm_medium", "utm_campaign", "utm_content"]) {
+    for (const key of [
+      "lang",
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_content",
+      "utm_term",
+    ]) {
       const value = params[key];
       if (typeof value === "string") query.set(key, value);
     }
