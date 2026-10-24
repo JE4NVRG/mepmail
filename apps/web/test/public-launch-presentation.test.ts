@@ -62,11 +62,16 @@ const { default: Pricing, generateMetadata: pricingMetadata } = await import(
 const { default: Alternative } = await import("../src/app/alternatives/resend/page");
 const { default: Mail, generateMetadata: mailMetadata } = await import("../src/app/correio/page");
 
-async function render(page: () => Promise<ReturnType<typeof createElement>>) {
+type PageSearchParams = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+async function render(page: (...args: never[]) => Promise<ReturnType<typeof createElement>>) {
+  // The pages require searchParams (Next's generated PageProps rejects an optional one),
+  // while these tests render them directly: hand them an empty query.
+  const Page = page as (props: PageSearchParams) => Promise<ReturnType<typeof createElement>>;
   const providerProps = {
     locale: current.locale,
     messages: messages(current.locale),
-    children: await page(),
+    children: await Page({ searchParams: Promise.resolve({}) }),
   };
   return renderToStaticMarkup(createElement(NextIntlClientProvider, providerProps)).replace(
     /\u00a0/g,
